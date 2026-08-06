@@ -1,0 +1,25 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+nodeLinker: isolated
+hoist: false
+resolvePeersFromWorkspaceRoot: false
+strictPeerDependencies: true
+
+overrides:
+  "web>react": "18.3.1"
+  "web>react-dom": "18.3.1"
+  "mobile>react": "19.2.3"
+  "mobile>react-dom": "19.2.3"
+
+minimumReleaseAgeExclude:
+  - '@supabase/auth-js@2.112.1'
+  - '@supabase/functions-js@2.112.1'
+  - '@supabase/postgrest-js@2.112.1'
+  - '@supabase/realtime-js@2.112.1'
+  - '@supabase/storage-js@2.112.1'
+  - '@supabase/supabase-js@2.112.1'
+
+allowBuilds:
+  esbuild: true

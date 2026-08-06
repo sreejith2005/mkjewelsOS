@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "JewelOS",
+    "slug": "jewelos-mobile",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.jewelos.mobile"
+    }
+  }
+}

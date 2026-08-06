@@ -1,0 +1,23 @@
+{
+  "name": "jewelos",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.20.0",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "seed": "tsx supabase/seed.ts",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "^2.112.1",
+    "@types/node": "^24.13.3",
+    "turbo": "^2.10.8",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

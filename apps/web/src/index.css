@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply min-h-screen bg-obsidian font-sans text-white antialiased;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-obsidian;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply border border-gold/20 bg-charcoal/80 shadow-2xl backdrop-blur-xl;
+  }
+
+  .field {
+    @apply w-full rounded-lg border border-gold/20 bg-obsidian px-3 py-2 text-sm text-white placeholder:text-soft-grey disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .label {
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wider text-champagne;
+  }
+}
