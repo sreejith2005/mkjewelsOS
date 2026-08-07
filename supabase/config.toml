@@ -1,0 +1,4 @@
+# Platform JWT verification is disabled only because this handler verifies the
+# deployment secret from x-cron-secret before parsing input or accessing data.
+[functions.generate-recurring-tasks]
+verify_jwt = false

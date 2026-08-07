@@ -18,3 +18,24 @@ export {
   getPageForPath,
 } from "./roleMenu";
 export type { MenuItem, PageId, UserRole } from "./roleMenu";
+export {
+  isUserAvailableForRecurringTask,
+  kolkataDateKey,
+  resolveRecurringAssignment,
+  shouldGenerateRecurringTask,
+} from "./recurrence";
+export type {
+  RecurringAssignment,
+  RecurringAvailabilityProfile,
+} from "./recurrence";
+export { calculateDelayMinutes, calculateSla } from "./sla";
+export type { SlaResult, SlaStatus } from "./sla";
+export {
+  countTaskFeedStatuses,
+  groupTaskFeedRows,
+  isTaskFeedItemOverdue,
+  taskMatchesStatus,
+} from "./taskFeed";
+export type { GroupedTaskFeedRow, TaskFeedLike, TaskFeedStatusFilter } from "./taskFeed";
+export { normalizeTaskParticipants } from "./taskParticipants";
+export type { TaskParticipants } from "./taskParticipants";

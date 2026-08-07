@@ -27,4 +27,8 @@
   .label {
     @apply mb-1.5 block text-xs font-semibold uppercase tracking-wider text-champagne;
   }
+
+  .task-field {
+    @apply min-h-11 w-full rounded-md border border-task-border bg-task-bg px-3 py-2 text-sm text-task-text placeholder:text-task-text-muted disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-task-accent focus-visible:ring-offset-task-bg;
+  }
 }

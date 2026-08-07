@@ -16,8 +16,18 @@ import {
   type SupabaseClient,
   type User,
 } from "@supabase/supabase-js";
+import { loadEnvFile } from "node:process";
+import { fileURLToPath } from "node:url";
 
 import type { Database } from "../packages/core/src/database.types.js";
+
+const rootEnvFile = fileURLToPath(new URL("../.env", import.meta.url));
+
+try {
+  loadEnvFile(rootEnvFile);
+} catch (error) {
+  if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+}
 
 type SeedClient = SupabaseClient<Database>;
 type UserProfile = Database["public"]["Tables"]["user_profiles"]["Row"];
@@ -115,6 +125,8 @@ const DROPDOWN_MASTERS = {
   ],
   crm_source: ["Walk-in", "Referral", "Instagram", "Google", "Exhibition", "Other"],
   client_type: ["Regular", "VIP", "Wholesale", "Corporate"],
+  // Development-only task categories. These contain no customer or production data.
+  task_category: ["DEV - Store Opening", "DEV - Daily Operations", "DEV - Follow Up"],
   task_priority: ["HIGH", "MEDIUM", "LOW"],
   task_status: [
     "PENDING",
@@ -615,6 +627,17 @@ async function ensureDropdownMasters(
   actorUserId: string,
 ): Promise<void> {
   for (const [masterType, values] of Object.entries(DROPDOWN_MASTERS)) {
+    if (masterType === "task_category") {
+      const { data: existingCategories, error: categoryCheckError } = await client
+        .from("dropdown_masters")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .eq("master_type", masterType)
+        .limit(1);
+      fail("Check existing task categories", categoryCheckError);
+      if (existingCategories.length > 0) continue;
+    }
+
     for (const [sortOrder, value] of values.entries()) {
       const { data: existing, error: selectError } = await client
         .from("dropdown_masters")
@@ -665,6 +688,47 @@ async function ensureDropdownMasters(
         });
       }
     }
+  }
+}
+
+async function ensureTaskCoverageLinks(
+  client: SeedClient,
+  audit: AuditRecorder,
+  tenantId: string,
+  adminProfileId: string,
+): Promise<void> {
+  const { data: profiles, error: profileError } = await client
+    .from("user_profiles")
+    .select("id,email,buddy_id")
+    .eq("tenant_id", tenantId)
+    .in("email", ["sales@mkjewels.local", "crm@mkjewels.local"]);
+  fail("Load task coverage seed profiles", profileError);
+  const sales = profiles.find((profile) => profile.email === "sales@mkjewels.local");
+  const crm = profiles.find((profile) => profile.email === "crm@mkjewels.local");
+  if (!sales || !crm) throw new Error("Task coverage seed profiles are missing");
+  if (sales.buddy_id !== crm.id) {
+    const { error } = await client.from("user_profiles").update({
+      buddy_id: crm.id,
+      updated_by: adminProfileId,
+    }).eq("id", sales.id);
+    fail("Set sales seed buddy", error);
+    await audit.record({ action: "seed_update", module: "user_profiles", recordId: sales.id });
+  }
+
+  const { data: salesDepartment, error: departmentError } = await client
+    .from("departments")
+    .select("id,head_id")
+    .eq("tenant_id", tenantId)
+    .eq("code", "SALES")
+    .single();
+  fail("Load sales department", departmentError);
+  if (salesDepartment.head_id !== adminProfileId) {
+    const { error } = await client.from("departments").update({
+      head_id: adminProfileId,
+      updated_by: adminProfileId,
+    }).eq("id", salesDepartment.id);
+    fail("Set sales department head", error);
+    await audit.record({ action: "seed_update", module: "departments", recordId: salesDepartment.id });
   }
 }
 
@@ -894,6 +958,7 @@ async function main(): Promise<void> {
     );
   }
 
+  await ensureTaskCoverageLinks(client, audit, tenantId, adminProfile.id);
   await ensureDropdownMasters(client, audit, tenantId, adminProfile.id);
   await ensureFmsFlow(client, audit, tenantId, adminProfile.id);
   await ensureFormTemplates(client, audit, tenantId, adminProfile.id);

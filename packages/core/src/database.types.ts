@@ -1640,6 +1640,7 @@ export type Database = {
         Row: {
           completed_at: string | null
           id: string
+          is_active: boolean
           is_original: boolean | null
           role_at_task: string | null
           task_instance_id: string
@@ -1648,6 +1649,7 @@ export type Database = {
         Insert: {
           completed_at?: string | null
           id?: string
+          is_active?: boolean
           is_original?: boolean | null
           role_at_task?: string | null
           task_instance_id: string
@@ -1656,6 +1658,7 @@ export type Database = {
         Update: {
           completed_at?: string | null
           id?: string
+          is_active?: boolean
           is_original?: boolean | null
           role_at_task?: string | null
           task_instance_id?: string
@@ -1808,15 +1811,22 @@ export type Database = {
         Row: {
           actual_datetime: string | null
           branch_id: string | null
+          category_id: string | null
           created_at: string | null
           created_by: string
           delay_minutes: number | null
           department_id: string | null
           description: string | null
+          completion_remark: string | null
+          form_template_id: string | null
           id: string
           planned_datetime: string
           priority: Database["public"]["Enums"]["task_priority"] | null
           revised_datetime: string | null
+          requires_form: boolean
+          requires_remark: boolean
+          requires_upload: boolean
+          scheduled_date: string | null
           source: string | null
           source_ref_id: string | null
           status: Database["public"]["Enums"]["task_status"]
@@ -1830,15 +1840,22 @@ export type Database = {
         Insert: {
           actual_datetime?: string | null
           branch_id?: string | null
+          category_id?: string | null
           created_at?: string | null
           created_by: string
           delay_minutes?: number | null
           department_id?: string | null
           description?: string | null
+          completion_remark?: string | null
+          form_template_id?: string | null
           id?: string
           planned_datetime: string
           priority?: Database["public"]["Enums"]["task_priority"] | null
           revised_datetime?: string | null
+          requires_form?: boolean
+          requires_remark?: boolean
+          requires_upload?: boolean
+          scheduled_date?: string | null
           source?: string | null
           source_ref_id?: string | null
           status?: Database["public"]["Enums"]["task_status"]
@@ -1852,15 +1869,22 @@ export type Database = {
         Update: {
           actual_datetime?: string | null
           branch_id?: string | null
+          category_id?: string | null
           created_at?: string | null
           created_by?: string
           delay_minutes?: number | null
           department_id?: string | null
           description?: string | null
+          completion_remark?: string | null
+          form_template_id?: string | null
           id?: string
           planned_datetime?: string
           priority?: Database["public"]["Enums"]["task_priority"] | null
           revised_datetime?: string | null
+          requires_form?: boolean
+          requires_remark?: boolean
+          requires_upload?: boolean
+          scheduled_date?: string | null
           source?: string | null
           source_ref_id?: string | null
           status?: Database["public"]["Enums"]["task_status"]
@@ -1880,10 +1904,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "task_instances_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "dropdown_masters"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "task_instances_department_id_fkey"
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_instances_form_template_id_fkey"
+            columns: ["form_template_id"]
+            isOneToOne: false
+            referencedRelation: "form_templates"
             referencedColumns: ["id"]
           },
           {
@@ -1950,14 +1988,20 @@ export type Database = {
       task_templates: {
         Row: {
           branch_id: string | null
+          category_id: string | null
+          checklist_items: Json
           created_at: string | null
           created_by: string | null
           department_id: string | null
           description: string | null
+          default_assignee_role: Database["public"]["Enums"]["user_role"] | null
+          default_assignee_type: string
+          default_assignee_user_id: string | null
           form_template_id: string | null
           id: string
           is_active: boolean | null
           planned_time: string | null
+          priority: Database["public"]["Enums"]["task_priority"]
           recurrence_rule: string | null
           requires_form: boolean | null
           requires_remark: boolean | null
@@ -1970,14 +2014,20 @@ export type Database = {
         }
         Insert: {
           branch_id?: string | null
+          category_id?: string | null
+          checklist_items?: Json
           created_at?: string | null
           created_by?: string | null
           department_id?: string | null
           description?: string | null
+          default_assignee_role?: Database["public"]["Enums"]["user_role"] | null
+          default_assignee_type?: string
+          default_assignee_user_id?: string | null
           form_template_id?: string | null
           id?: string
           is_active?: boolean | null
           planned_time?: string | null
+          priority?: Database["public"]["Enums"]["task_priority"]
           recurrence_rule?: string | null
           requires_form?: boolean | null
           requires_remark?: boolean | null
@@ -1990,14 +2040,20 @@ export type Database = {
         }
         Update: {
           branch_id?: string | null
+          category_id?: string | null
+          checklist_items?: Json
           created_at?: string | null
           created_by?: string | null
           department_id?: string | null
           description?: string | null
+          default_assignee_role?: Database["public"]["Enums"]["user_role"] | null
+          default_assignee_type?: string
+          default_assignee_user_id?: string | null
           form_template_id?: string | null
           id?: string
           is_active?: boolean | null
           planned_time?: string | null
+          priority?: Database["public"]["Enums"]["task_priority"]
           recurrence_rule?: string | null
           requires_form?: boolean | null
           requires_remark?: boolean | null
@@ -2014,6 +2070,20 @@ export type Database = {
             columns: ["branch_id"]
             isOneToOne: false
             referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_templates_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "dropdown_masters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_templates_default_assignee_user_id_fkey"
+            columns: ["default_assignee_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
           {
@@ -2035,6 +2105,62 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_watchers: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          task_instance_id: string
+          tenant_id: string
+          user_profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          task_instance_id: string
+          tenant_id: string
+          user_profile_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          task_instance_id?: string
+          tenant_id?: string
+          user_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_watchers_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_watchers_task_instance_id_fkey"
+            columns: ["task_instance_id"]
+            isOneToOne: false
+            referencedRelation: "task_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_watchers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_watchers_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2382,21 +2508,55 @@ export type Database = {
           actual_datetime: string | null
           assignee_id: string | null
           branch_id: string | null
+          category_id: string | null
+          checklist_completion_pct: number | null
+          created_by: string | null
           delay_minutes: number | null
           department_id: string | null
+          description: string | null
+          form_template_id: string | null
           id: string | null
           planned_datetime: string | null
           priority: Database["public"]["Enums"]["task_priority"] | null
+          requires_form: boolean | null
+          requires_remark: boolean | null
+          requires_upload: boolean | null
+          revised_datetime: string | null
           source: string | null
           status: Database["public"]["Enums"]["task_status"] | null
+          task_template_id: string | null
           task_type: Database["public"]["Enums"]["task_type"] | null
           tenant_id: string | null
           title: string | null
         }
         Relationships: []
       }
+      v_task_users: {
+        Row: {
+          branch_id: string | null
+          buddy_id: string | null
+          department_id: string | null
+          employee_code: string | null
+          employee_name: string | null
+          id: string | null
+          tenant_id: string | null
+          user_role: Database["public"]["Enums"]["user_role"] | null
+          working_status: Database["public"]["Enums"]["working_status"] | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      add_task_attachment_with_audit: {
+        Args: { p_file_url: string; p_task_id: string }
+        Returns: string
+      }
+      can_read_task_attachment_object: { Args: { p_name: string }; Returns: boolean }
+      can_delete_unrecorded_task_attachment_object: {
+        Args: { p_name: string }
+        Returns: boolean
+      }
+      can_write_task_attachment_object: { Args: { p_name: string }; Returns: boolean }
       change_dropdown_with_audit: {
         Args: {
           p_is_active?: boolean
@@ -2446,6 +2606,28 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       current_tenant_id: { Args: never; Returns: string }
+      create_delegation_task_with_audit: {
+        Args: {
+          p_checklist?: Json
+          p_doer_ids: string[]
+          p_payload: Json
+          p_watcher_ids?: string[]
+        }
+        Returns: string
+      }
+      create_recurring_task_instance: {
+        Args: { p_assignments: Json; p_target_date: string; p_template_id: string }
+        Returns: string
+      }
+      delegate_task_with_audit: {
+        Args: {
+          p_from_user_id: string
+          p_reason: string
+          p_task_id: string
+          p_to_user_id: string
+        }
+        Returns: undefined
+      }
       invite_profile_with_audit: {
         Args: {
           p_auth_user_id: string
@@ -2465,6 +2647,32 @@ export type Database = {
         Returns: string
       }
       is_super_admin: { Args: never; Returns: boolean }
+      is_fms_instance_participant: {
+        Args: { p_instance_id: string }
+        Returns: boolean
+      }
+      is_task_participant: { Args: { p_task_id: string }; Returns: boolean }
+      is_task_watcher: { Args: { p_task_id: string }; Returns: boolean }
+      can_read_task: { Args: { p_task_id: string }; Returns: boolean }
+      is_supported_task_rrule: { Args: { p_rule: string }; Returns: boolean }
+      is_user_available_for_task: {
+        Args: { p_target_date: string; p_user_profile_id: string }
+        Returns: boolean
+      }
+      normalize_task_checklist: { Args: { p_checklist: Json }; Returns: Json }
+      record_availability_with_audit: {
+        Args: {
+          p_date: string
+          p_reason: string
+          p_status: Database["public"]["Enums"]["availability_status"]
+          p_user_profile_id: string
+        }
+        Returns: string
+      }
+      revise_task_datetime_with_audit: {
+        Args: { p_reason: string; p_revised_datetime: string; p_task_id: string }
+        Returns: undefined
+      }
       review_resignation_with_audit: {
         Args: { p_decision: string; p_resignation_id: string }
         Returns: Database["public"]["Tables"]["resignations"]["Row"]
@@ -2476,6 +2684,24 @@ export type Database = {
           p_resignation: Json
         }
         Returns: Database["public"]["Tables"]["resignations"]["Row"]
+      }
+      save_task_template_with_audit: {
+        Args: { p_payload: Json; p_template_id: string | null }
+        Returns: string
+      }
+      update_task_with_audit: {
+        Args: {
+          p_action: string
+          p_checklist_id?: string | null
+          p_completed?: boolean | null
+          p_remark?: string | null
+          p_task_id: string
+        }
+        Returns: undefined
+      }
+      use_task_template_with_audit: {
+        Args: { p_planned_datetime: string; p_template_id: string }
+        Returns: string
       }
       update_user_profile_with_audit: {
         Args: { p_changes: Json; p_profile_id: string }

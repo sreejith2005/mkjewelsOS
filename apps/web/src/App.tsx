@@ -1,26 +1,15 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
-  Bell,
-  Bot,
-  Boxes,
   Building2,
   CalendarCheck,
   CheckSquare,
   ClipboardList,
-  FileText,
   Home,
   LayoutDashboard,
   ListFilter,
-  LogOut,
-  Menu,
-  PanelLeftClose,
-  Settings,
-  Sparkles,
   Users,
-  Workflow,
 } from "lucide-react";
 import {
-  ALL_MENU_ITEMS,
   canAccessPage,
   getMenuForRole,
   getPageForPath,
@@ -28,10 +17,16 @@ import {
 } from "@jewelos/core";
 import { AuthProvider, useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
-import { initials, titleCase } from "@/lib/format";
-import { UserManagementPage } from "@/pages/UserManagementPage";
-import { DropdownMasterPage } from "@/pages/DropdownMasterPage";
-import logoUrl from "../../../mk-jewels-logos/WhatsApp Image 2026-06-24 at 13.01.41 (1).jpeg";
+import { ApplicationShell } from "@/components/shell/ApplicationShell";
+import type { LauncherItem } from "@/components/shell/AppLauncher";
+import logoDarkUrl from "../../../mk-jewels-logos/WhatsApp Image 2026-06-24 at 13.01.41 (1).jpeg";
+import logoLightUrl from "../../../mk-jewels-logos/WhatsApp Image 2026-06-24 at 13.01.40 (1).jpeg";
+
+const AvailabilityPage = lazy(() => import("@/pages/AvailabilityPage").then((module) => ({ default: module.AvailabilityPage })));
+const DashboardPage = lazy(() => import("@/pages/DashboardPage").then((module) => ({ default: module.DashboardPage })));
+const DropdownMasterPage = lazy(() => import("@/pages/DropdownMasterPage").then((module) => ({ default: module.DropdownMasterPage })));
+const TasksPage = lazy(() => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
+const UserManagementPage = lazy(() => import("@/pages/UserManagementPage").then((module) => ({ default: module.UserManagementPage })));
 
 const PAGE_ICONS: Record<PageId, typeof Home> = {
   home: Home,
@@ -39,16 +34,31 @@ const PAGE_ICONS: Record<PageId, typeof Home> = {
   crm: Users,
   checklist_tasks: CheckSquare,
   delegation_tasks: ClipboardList,
-  fms_tasks: Boxes,
-  fms_builder: Workflow,
-  forms_library: FileText,
-  meeting_ai: Bot,
-  notifications: Bell,
+  fms_tasks: ClipboardList,
+  fms_builder: ClipboardList,
+  forms_library: ClipboardList,
+  meeting_ai: ClipboardList,
+  notifications: ClipboardList,
   users: Users,
   availability: CalendarCheck,
-  reports: Sparkles,
+  reports: ClipboardList,
   dropdown_master: ListFilter,
-  settings: Settings,
+  settings: ClipboardList,
+};
+
+const IMPLEMENTED_PAGES = new Set<PageId>([
+  "dashboard",
+  "checklist_tasks",
+  "delegation_tasks",
+  "users",
+  "availability",
+  "dropdown_master",
+]);
+
+const APP_DESCRIPTIONS: Partial<Record<PageId, string>> = {
+  users: "Manage authorized employee accounts.",
+  availability: "Record real working availability.",
+  dropdown_master: "Maintain active master values.",
 };
 
 function usePathname() {
@@ -88,7 +98,7 @@ function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-obsidian px-5 py-10">
       <section className="glass-card w-full max-w-md rounded-2xl p-7 sm:p-9">
-        <img alt="MK Jewels" className="mx-auto mb-8 h-14 w-auto object-contain" src={logoUrl} />
+        <img alt="MK Jewels" className="mx-auto mb-8 h-14 w-auto object-contain" src={logoDarkUrl} />
         <p className="mb-6 text-center text-sm text-soft-grey">Sign in to JewelOS</p>
         {statusMessage ? <div className="mb-5"><Notice tone="danger">{statusMessage}</Notice></div> : null}
         {error ? <div className="mb-5"><Notice tone="danger">{error}</Notice></div> : null}
@@ -138,91 +148,56 @@ function IncompleteAccount() {
   );
 }
 
-function ComingSoon({ page }: { page: PageId }) {
-  const item = ALL_MENU_ITEMS.find((candidate) => candidate.id === page);
-  return (
-    <section className="glass-card rounded-2xl p-8 text-center">
-      <Sparkles className="mx-auto h-9 w-9 text-gold" />
-      <h1 className="mt-4 font-display text-3xl text-gold">{item?.label}</h1>
-      <p className="mt-2 text-sm text-soft-grey">Coming in a later phase.</p>
-    </section>
-  );
-}
-
 function AppShell() {
   const { branch, logout, profile } = useAuth();
   const { navigate, path } = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const menu = profile ? getMenuForRole(profile.user_role) : [];
-  const nav = menu.map((item) => ({ ...item, Icon: PAGE_ICONS[item.id] }));
+  const [appsOpen, setAppsOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const menu = useMemo(() => profile
+    ? getMenuForRole(profile.user_role).filter((item) => IMPLEMENTED_PAGES.has(item.id))
+    : [], [profile]);
+  const nav = useMemo(() => menu.map((item) => ({
+    ...item,
+    Icon: PAGE_ICONS[item.id],
+    label: item.id === "checklist_tasks" ? "My Tasks" : item.id === "delegation_tasks" ? "Delegated" : item.label,
+  })), [menu]);
+  const launcherItems = useMemo<LauncherItem[]>(() => nav.flatMap((item) => {
+    const description = APP_DESCRIPTIONS[item.id];
+    return description ? [{ ...item, description }] : [];
+  }), [nav]);
   if (!profile) return null;
   const requestedPage = getPageForPath(path) ?? "home";
-  const allowed = canAccessPage(profile.user_role, requestedPage);
-  const currentPage = allowed ? requestedPage : "home";
-  const pageContent = currentPage === "users"
-    ? <UserManagementPage />
-    : currentPage === "dropdown_master"
-      ? <DropdownMasterPage />
-      : <ComingSoon page={currentPage} />;
+  const allowed = IMPLEMENTED_PAGES.has(requestedPage) && canAccessPage(profile.user_role, requestedPage);
+  const currentPage: PageId = allowed ? requestedPage : "dashboard";
+  const pageContent = currentPage === "users" ? <UserManagementPage />
+    : currentPage === "dropdown_master" ? <DropdownMasterPage />
+      : currentPage === "checklist_tasks" ? <TasksPage />
+        : currentPage === "delegation_tasks" ? <TasksPage delegatedView />
+          : currentPage === "availability" ? <AvailabilityPage />
+            : <DashboardPage items={launcherItems} onNavigate={navigate} />;
 
   return (
-    <div className="min-h-screen bg-obsidian">
-      <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center border-b border-gold/20 bg-charcoal/95 px-3 backdrop-blur sm:px-5">
-        <Button
-          aria-label="Toggle sidebar"
-          className="mr-3 h-10 w-10 p-0"
-          onClick={() => setSidebarOpen((open) => !open)}
-          variant="ghost"
-        >
-          {sidebarOpen ? <PanelLeftClose className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </Button>
-        <img alt="MK Jewels" className="h-8 w-auto" src={logoUrl} />
-        <div className="ml-auto flex items-center gap-3">
-          <span className="hidden text-sm text-champagne md:inline">{branch?.name ?? "Branch unavailable"}</span>
-          <div className="flex items-center gap-2 rounded-lg border border-gold/20 bg-obsidian px-2 py-1.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-gold font-bold text-obsidian">
-              {initials(profile.employee_name)}
-            </span>
-            <div className="hidden sm:block">
-              <p className="max-w-36 truncate text-xs font-semibold text-white">{profile.employee_name}</p>
-              <p className="text-[10px] uppercase tracking-wider text-gold">{titleCase(profile.user_role)}</p>
-            </div>
-          </div>
-          <Button aria-label="Log out" className="h-10 w-10 p-0" onClick={() => void logout()} variant="ghost">
-            <LogOut className="h-4 w-4" />
-          </Button>
-        </div>
-      </header>
-
-      <aside
-        className={`fixed bottom-0 left-0 top-16 z-30 w-64 overflow-y-auto border-r border-gold/20 bg-charcoal p-3 transition-transform ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <nav className="space-y-1" aria-label="Primary navigation">
-          {nav.map(({ Icon, ...item }) => (
-            <button
-              className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition ${
-                currentPage === item.id ? "bg-gold text-obsidian" : "text-champagne hover:bg-gold/10 hover:text-gold"
-              }`}
-              key={item.id}
-              onClick={() => {
-                navigate(item.path);
-                if (window.innerWidth < 768) setSidebarOpen(false);
-              }}
-              type="button"
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {item.label}
-            </button>
-          ))}
-        </nav>
-      </aside>
-
-      <main className={`pt-16 transition-[padding] ${sidebarOpen ? "md:pl-64" : "pl-0"}`}>
-        <div className="mx-auto max-w-7xl p-4 sm:p-6">{pageContent}</div>
-      </main>
-    </div>
+    <ApplicationShell
+      appsOpen={appsOpen}
+      branch={branch}
+      currentPage={currentPage}
+      launcherItems={launcherItems}
+      logoDarkUrl={logoDarkUrl}
+      logoLightUrl={logoLightUrl}
+      moreOpen={moreOpen}
+      nav={nav}
+      navigate={navigate}
+      onAppsOpenChange={setAppsOpen}
+      onLogout={logout}
+      onMoreOpenChange={setMoreOpen}
+      path={currentPage === "dashboard" ? "/dashboard" : path}
+      profile={profile}
+      setSidebarOpen={setSidebarOpen}
+      sidebarOpen={sidebarOpen}
+    >
+      <Suspense fallback={<div className="flex min-h-48 items-center justify-center text-gold">Loading…</div>}>{pageContent}</Suspense>
+    </ApplicationShell>
   );
 }
 

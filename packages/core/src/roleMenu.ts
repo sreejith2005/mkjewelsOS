@@ -71,7 +71,16 @@ export const ROLE_PAGES: Readonly<Record<UserRole, readonly PageId[]>> = {
   super_admin: PAGE_IDS,
   admin: PAGE_IDS.filter((page) => page !== "dropdown_master"),
   manager: [...COMMON_WORK_PAGES, "crm", "users", "reports"],
-  hr: ["home", "dashboard", "notifications", "users", "availability", "reports"],
+  hr: [
+    "home",
+    "dashboard",
+    "checklist_tasks",
+    "delegation_tasks",
+    "notifications",
+    "users",
+    "availability",
+    "reports",
+  ],
   crm: [...COMMON_WORK_PAGES, "crm", "reports"],
   staff: COMMON_WORK_PAGES,
   doer: [
@@ -108,4 +117,3 @@ export function canAccessPage(role: UserRole, page: PageId): boolean {
 export function getPageForPath(path: string): PageId | undefined {
   return ALL_MENU_ITEMS.find((item) => item.path === path)?.id;
 }
-
