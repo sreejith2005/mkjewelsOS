@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Plus, RefreshCw } from "lucide-react";
-import { countTaskFeedStatuses, taskMatchesStatus, type TaskFeedStatusFilter } from "@jewelos/core";
+import { countTaskFeedStatuses, deriveTaskMutationCapability, taskMatchesStatus, type TaskFeedStatusFilter } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Modal, Notice } from "@/components/ui";
 import {
@@ -107,7 +107,13 @@ export function TasksPage({ delegatedView = false }: { delegatedView?: boolean }
 
   const handleAction = async (task: TaskBundle, action: TaskCardAction) => {
     if (!task.id || !profile) throw new Error("Task identifier is missing");
-    if (task.isWatchedByViewer) throw new Error("Watched tasks are read-only");
+    const capability = deriveTaskMutationCapability({
+      assigneeIds: task.assignees.map((assignee) => assignee.id),
+      isWatcher: task.isWatchedByViewer,
+      viewerId: profile.id,
+      viewerRole: profile.user_role,
+    });
+    if (!capability.canMutate) throw new Error("You do not have permission to update this task");
     if (action.kind === "delegate") {
       setDelegateTarget(task);
       return;
@@ -130,7 +136,7 @@ export function TasksPage({ delegatedView = false }: { delegatedView?: boolean }
       <TaskFilterBar counts={counts} endDate={endDate} onEndDateChange={setEndDate} onPresetChange={handlePresetChange} onSearchChange={setSearch} onStartDateChange={setStartDate} onStatusChange={setStatusFilter} preset={preset} search={search} startDate={startDate} status={statusFilter} />
 
       <div className="mx-auto max-w-4xl p-3 sm:p-5">
-        {error ? <div className="flex flex-col gap-3 rounded-xl border border-danger/40 bg-danger/10 p-4"><Notice tone="danger">{error}</Notice><Button className="self-start border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={() => void refresh()} variant="secondary"><RefreshCw />Retry</Button></div> : loading ? <div aria-label="Loading tasks" className="flex flex-col gap-3">{[0, 1, 2].map((item) => <div className="h-28 animate-pulse rounded-2xl border border-task-border bg-task-muted" key={item} />)}</div> : scopedTasks.length === 0 ? <div className="flex min-h-[48dvh] flex-col items-center justify-center px-5 text-center"><span className="mb-5 flex size-20 items-center justify-center rounded-[1.75rem] bg-task-muted text-task-accent"><CheckCircle2 className="size-10" /></span><h2 className="text-2xl font-semibold text-task-text">No Tasks Here</h2><p className="mt-1 max-w-sm text-sm text-task-text-muted">It seems that you don’t have any tasks in this list.</p></div> : <div className="flex flex-col gap-3">{scopedTasks.map((task) => <TaskCard canRevise={canManage} categoryLabel={task.category_id ? categoryNames.get(task.category_id) ?? "Uncategorized" : "Uncategorized"} key={task.id} onAction={(action) => handleAction(task, action)} task={task} />)}</div>}
+        {error ? <div className="flex flex-col gap-3 rounded-xl border border-danger/40 bg-danger/10 p-4"><Notice tone="danger">{error}</Notice><Button className="self-start border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={() => void refresh()} variant="secondary"><RefreshCw />Retry</Button></div> : loading ? <div aria-label="Loading tasks" className="flex flex-col gap-3">{[0, 1, 2].map((item) => <div className="h-28 animate-pulse rounded-2xl border border-task-border bg-task-muted" key={item} />)}</div> : scopedTasks.length === 0 ? <div className="flex min-h-[48dvh] flex-col items-center justify-center px-5 text-center"><span className="mb-5 flex size-20 items-center justify-center rounded-[1.75rem] bg-task-muted text-task-accent"><CheckCircle2 className="size-10" /></span><h2 className="text-2xl font-semibold text-task-text">No Tasks Here</h2><p className="mt-1 max-w-sm text-sm text-task-text-muted">It seems that you don’t have any tasks in this list.</p></div> : <div className="flex flex-col gap-3">{profile ? scopedTasks.map((task) => <TaskCard capability={deriveTaskMutationCapability({ assigneeIds: task.assignees.map((assignee) => assignee.id), isWatcher: task.isWatchedByViewer, viewerId: profile.id, viewerRole: profile.user_role })} categoryLabel={task.category_id ? categoryNames.get(task.category_id) ?? "Uncategorized" : "Uncategorized"} key={task.id} onAction={(action) => handleAction(task, action)} task={task} />) : null}</div>}
       </div>
 
       {canManage && !delegatedView ? <Button aria-label="Create task" className="fixed bottom-[86px] right-4 z-20 size-14 rounded-2xl bg-task-accent p-0 text-task-text shadow-xl hover:bg-task-accent/90 md:bottom-8 md:right-8" disabled={!references} onClick={() => setComposerOpen(true)}><Plus className="size-6" /></Button> : null}

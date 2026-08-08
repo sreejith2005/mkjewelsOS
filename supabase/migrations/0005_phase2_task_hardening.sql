@@ -51,6 +51,28 @@ create index idx_task_watchers_user
 create index idx_task_watchers_created_by
   on task_watchers(created_by);
 
+-- Index every lookup used by the watcher RLS policies, completion checks, and
+-- attachment cleanup. The active-assignee partial index cannot serve inactive
+-- assignment-history reads, so task_assignees also needs a full task index.
+create index idx_task_assignees_task
+  on task_assignees(task_instance_id);
+create index idx_task_checklists_task
+  on task_checklists(task_instance_id);
+create index idx_task_comments_task
+  on task_comments(task_instance_id);
+create index idx_task_attachments_task
+  on task_attachments(task_instance_id);
+create index idx_task_attachments_file_url
+  on task_attachments(file_url);
+create index idx_task_revisions_task
+  on task_revisions(task_instance_id);
+create index idx_form_submissions_task_completion
+  on form_submissions(tenant_id, linked_record_id, linked_module, form_template_id)
+  where linked_record_id is not null;
+create index idx_audit_logs_task_record
+  on audit_logs(record_id)
+  where module = 'tasks' and record_id is not null;
+
 alter table task_watchers enable row level security;
 
 -- --------------------------------------------------------------------------
@@ -115,7 +137,7 @@ $$;
 create or replace function normalize_task_checklist(p_checklist jsonb)
 returns jsonb
 language plpgsql
-immutable
+stable
 set search_path = public
 as $$
 declare
@@ -133,8 +155,19 @@ begin
       or nullif(btrim(item->>'item_text'), '') is null
       or (item ? 'is_required' and jsonb_typeof(item->'is_required') <> 'boolean')
       or (item ? 'sort_order' and jsonb_typeof(item->'sort_order') <> 'number')
+      or (item ? 'sort_order' and item->>'sort_order' !~ '^(0|[1-9][0-9]*)$')
   ) then
     raise exception 'Every checklist item must contain non-empty item_text and supported fields only'
+      using errcode = '22023';
+  end if;
+
+  if exists (
+    select 1
+    from jsonb_array_elements(p_checklist) with ordinality entries(item, ordinal)
+    where item ? 'sort_order'
+      and (item->>'sort_order')::numeric <> ordinal - 1
+  ) then
+    raise exception 'Checklist sort_order must be zero-based and contiguous'
       using errcode = '22023';
   end if;
 
@@ -168,7 +201,7 @@ declare
   v_token text;
   v_key text;
   v_value text;
-  v_seen text[] := '{}';
+  v_seen text[] := array[]::text[];
   v_number text;
 begin
   if v_input = '' then return false; end if;
@@ -314,6 +347,25 @@ using (
 
 revoke all on task_watchers from anon, authenticated;
 grant select on task_watchers to authenticated;
+
+-- RLS policies are effective only when the caller also has table privileges.
+-- Phase 2 writes stay RPC-only; authenticated users receive read access only.
+revoke all on
+  task_templates, task_instances, task_assignees, task_checklists,
+  task_comments, task_attachments, task_revisions, audit_logs,
+  user_availability, buddy_assignments, notifications,
+  form_submissions, form_templates, fms_stages, fms_instance_stages
+from anon, authenticated;
+grant select on
+  task_templates, task_instances, task_assignees, task_checklists,
+  task_comments, task_attachments, task_revisions, audit_logs,
+  user_availability, buddy_assignments, notifications,
+  form_submissions, form_templates, fms_stages, fms_instance_stages
+to authenticated;
+
+-- The recurrence Edge worker reads only these three tables directly; all task
+-- creation still crosses the service-only transactional RPC below.
+grant select on task_templates, user_profiles, user_availability to service_role;
 
 -- --------------------------------------------------------------------------
 -- Validated transactional task/template RPCs

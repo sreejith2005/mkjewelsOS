@@ -1,6 +1,6 @@
-import { useMemo, useState, type ChangeEvent } from "react";
+import { useState, type ChangeEvent } from "react";
 import { AlertTriangle, Check, CheckCircle2, ChevronDown, Clock, Eye, FileUp, PauseCircle, Play, UserRoundPlus, Users } from "lucide-react";
-import { isTaskFeedItemOverdue, type Enums } from "@jewelos/core";
+import { calculateTaskChecklistProgress, isTaskFeedItemOverdue, type Enums, type TaskMutationCapability } from "@jewelos/core";
 import { Button, Field, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import type { TaskBundle } from "./api";
@@ -19,8 +19,8 @@ const PRIORITY_CLASS: Record<Enums<"task_priority">, string> = {
   low: "border-task-border bg-task-muted text-task-text-muted",
 };
 
-export function TaskCard({ canRevise, categoryLabel, onAction, task }: {
-  canRevise: boolean;
+export function TaskCard({ capability, categoryLabel, onAction, task }: {
+  capability: TaskMutationCapability;
   categoryLabel: string;
   onAction: (action: TaskCardAction) => Promise<void>;
   task: TaskBundle;
@@ -31,14 +31,12 @@ export function TaskCard({ canRevise, categoryLabel, onAction, task }: {
   const [remark, setRemark] = useState("");
   const [revision, setRevision] = useState("");
   const [revisionReason, setRevisionReason] = useState("");
-  const requiredItems = useMemo(() => task.checklists.filter((item) => item.is_required), [task.checklists]);
-  const requiredDone = requiredItems.filter((item) => item.is_completed).length;
-  const completion = requiredItems.length === 0 ? 100 : Math.round(requiredDone / requiredItems.length * 100);
+  const checklistProgress = calculateTaskChecklistProgress(task.checklists);
   const overdue = isTaskFeedItemOverdue(task);
   const completed = task.status === "completed";
   const blocked = task.status === "blocked";
-  const readOnly = task.isWatchedByViewer || task.task_type === "fms";
-  const canComplete = requiredDone === requiredItems.length && (!task.requires_upload || task.hasAttachment)
+  const readOnly = !capability.canMutate || task.task_type === "fms";
+  const canComplete = checklistProgress.canCompleteRequiredItems && (!task.requires_upload || task.hasAttachment)
     && (!task.requires_form || task.hasFormSubmission);
 
   const act = async (action: TaskCardAction) => {
@@ -74,7 +72,7 @@ export function TaskCard({ canRevise, categoryLabel, onAction, task }: {
           <span className="flex flex-wrap items-center gap-2">
             <span className={cn("text-sm font-semibold text-task-text", completed && "line-through text-task-text-muted")}>{task.title}</span>
             <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-semibold", completed ? "border-success/40 bg-success/10 text-success" : blocked ? "border-task-warning/50 bg-task-warning/10 text-task-text" : overdue ? "border-task-overdue/40 bg-task-overdue/10 text-task-overdue" : "border-task-border bg-task-muted text-task-text-muted")}>{statusLabel}</span>
-            {task.isWatchedByViewer ? <span className="inline-flex items-center gap-1 rounded-full bg-task-accent-soft px-2 py-0.5 text-[10px] font-semibold text-task-text"><Eye className="size-3" />Watching · read only</span> : null}
+            {capability.watcherLabel ? <span className="inline-flex items-center gap-1 rounded-full bg-task-accent-soft px-2 py-0.5 text-[10px] font-semibold text-task-text"><Eye className="size-3" />{capability.watcherLabel}</span> : null}
           </span>
           <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-task-text-muted">
             <span className="inline-flex min-w-0 items-center gap-1"><Users className="size-3" /><span className="truncate">{task.assigneeName}</span></span>
@@ -82,7 +80,7 @@ export function TaskCard({ canRevise, categoryLabel, onAction, task }: {
             {task.priority ? <span className={cn("rounded-full border px-2 py-0.5 capitalize", PRIORITY_CLASS[task.priority])}>{task.priority}</span> : null}
             <span>{categoryLabel}</span>
           </span>
-          {task.checklists.length > 0 ? <span className="mt-3 flex items-center gap-2"><span className="h-1.5 flex-1 overflow-hidden rounded-full bg-task-muted"><span className="block h-full rounded-full bg-task-accent" style={{ width: `${completion}%` }} /></span><span className="text-xs tabular-nums text-task-text-muted">{requiredDone}/{requiredItems.length}</span></span> : null}
+          {task.checklists.length > 0 ? <span className="mt-3 flex items-center gap-2"><span className="h-1.5 flex-1 overflow-hidden rounded-full bg-task-muted"><span className="block h-full rounded-full bg-task-accent" style={{ width: `${checklistProgress.displayPercent}%` }} /></span><span className="text-xs tabular-nums text-task-text-muted">{checklistProgress.completedItems}/{checklistProgress.totalItems}</span></span> : null}
         </span>
         <ChevronDown className={cn("size-4 shrink-0 text-task-text-muted transition-transform", expanded && "rotate-180")} />
       </button>
@@ -102,7 +100,7 @@ export function TaskCard({ canRevise, categoryLabel, onAction, task }: {
         {!readOnly && task.requires_remark && !completed ? <Field label="Completion remark"><textarea className="task-field min-h-16" onChange={(event) => setRemark(event.target.value)} value={remark} /></Field> : null}
         {!readOnly && !completed && !blocked ? <div className="flex flex-wrap gap-2">{task.status === "pending" ? <Button className="border-task-border bg-task-bg text-task-text hover:bg-task-muted" disabled={busy} onClick={() => void act({ kind: "start" })} variant="secondary"><Play />Start</Button> : null}<Button className="bg-task-accent text-task-text hover:bg-task-accent/90" disabled={busy || !canComplete || Boolean(task.requires_remark && !remark.trim())} onClick={() => void act({ kind: "complete", remark })}><CheckCircle2 />Complete</Button>{task.assignees.length ? <Button className="border-task-border bg-task-bg text-task-text hover:bg-task-muted" disabled={busy} onClick={() => void act({ kind: "delegate" })} variant="secondary"><UserRoundPlus />Delegate</Button> : null}</div> : null}
         {task.task_type === "fms" ? <Notice tone="task">FMS stage actions arrive in Phase 3; this stage is read-only in the unified feed.</Notice> : null}
-        {canRevise && !task.isWatchedByViewer && task.task_type === "delegation" && !completed && !blocked ? <form className="grid gap-3 rounded-xl border border-task-border bg-task-bg p-3 sm:grid-cols-[1fr_1fr_auto]" onSubmit={(event) => { event.preventDefault(); void act({ kind: "revise", datetime: new Date(revision).toISOString(), reason: revisionReason }); }}><Field label="Revised date"><input className="task-field" onChange={(event) => setRevision(event.target.value)} required type="datetime-local" value={revision} /></Field><Field label="Reason"><input className="task-field" onChange={(event) => setRevisionReason(event.target.value)} required value={revisionReason} /></Field><Button className="self-end bg-task-accent text-task-text hover:bg-task-accent/90" disabled={busy} type="submit">Revise</Button></form> : null}
+        {capability.canUseElevatedActions && task.task_type === "delegation" && !completed && !blocked ? <form className="grid gap-3 rounded-xl border border-task-border bg-task-bg p-3 sm:grid-cols-[1fr_1fr_auto]" onSubmit={(event) => { event.preventDefault(); void act({ kind: "revise", datetime: new Date(revision).toISOString(), reason: revisionReason }); }}><Field label="Revised date"><input className="task-field" onChange={(event) => setRevision(event.target.value)} required type="datetime-local" value={revision} /></Field><Field label="Reason"><input className="task-field" onChange={(event) => setRevisionReason(event.target.value)} required value={revisionReason} /></Field><Button className="self-end bg-task-accent text-task-text hover:bg-task-accent/90" disabled={busy} type="submit">Revise</Button></form> : null}
       </div> : null}
     </article>
   );
