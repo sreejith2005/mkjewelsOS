@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.15"
-  }
   public: {
     Tables: {
       audit_logs: {
@@ -60,6 +55,13 @@ export type Database = {
             columns: ["actor_user_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_logs_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
           {
@@ -135,6 +137,13 @@ export type Database = {
             referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_branch_manager"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
         ]
       }
       buddy_assignments: {
@@ -177,10 +186,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "buddy_assignments_buddy_id_fkey"
+            columns: ["buddy_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "buddy_assignments_original_assignee_id_fkey"
             columns: ["original_assignee_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "buddy_assignments_original_assignee_id_fkey"
+            columns: ["original_assignee_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
           {
@@ -233,6 +256,13 @@ export type Database = {
             columns: ["assigned_to"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_followups_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
           {
@@ -361,6 +391,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "clients_assigned_crm_id_fkey"
+            columns: ["assigned_crm_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "clients_branch_id_fkey"
             columns: ["branch_id"]
             isOneToOne: false
@@ -450,6 +487,13 @@ export type Database = {
             columns: ["head_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_dept_head"
+            columns: ["head_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
         ]
@@ -545,6 +589,13 @@ export type Database = {
             columns: ["user_profile_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "export_logs_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
         ]
@@ -847,6 +898,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "fms_instances_started_by_fkey"
+            columns: ["started_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "fms_instances_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -895,6 +953,13 @@ export type Database = {
             referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fms_stage_assignees_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
         ]
       }
       fms_stage_logs: {
@@ -928,6 +993,13 @@ export type Database = {
             columns: ["actor_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_stage_logs_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
           {
@@ -1055,47 +1127,62 @@ export type Database = {
         Row: {
           conditional_logic: Json | null
           created_at: string | null
+          field_key: string
           field_name: string
           field_type: string
           form_template_id: string
           group_name: string | null
+          helper_text: string | null
           id: string
           initial_value: string | null
-          is_editable: boolean | null
-          is_required: boolean | null
-          is_shown: boolean | null
+          is_editable: boolean
+          is_required: boolean
+          is_shown: boolean
           options: Json | null
-          sort_order: number | null
+          placeholder: string | null
+          sort_order: number
+          updated_at: string
+          validation: Json
         }
         Insert: {
           conditional_logic?: Json | null
           created_at?: string | null
+          field_key?: string
           field_name: string
           field_type: string
           form_template_id: string
           group_name?: string | null
+          helper_text?: string | null
           id?: string
           initial_value?: string | null
-          is_editable?: boolean | null
-          is_required?: boolean | null
-          is_shown?: boolean | null
+          is_editable?: boolean
+          is_required?: boolean
+          is_shown?: boolean
           options?: Json | null
-          sort_order?: number | null
+          placeholder?: string | null
+          sort_order?: number
+          updated_at?: string
+          validation?: Json
         }
         Update: {
           conditional_logic?: Json | null
           created_at?: string | null
+          field_key?: string
           field_name?: string
           field_type?: string
           form_template_id?: string
           group_name?: string | null
+          helper_text?: string | null
           id?: string
           initial_value?: string | null
-          is_editable?: boolean | null
-          is_required?: boolean | null
-          is_shown?: boolean | null
+          is_editable?: boolean
+          is_required?: boolean
+          is_shown?: boolean
           options?: Json | null
-          sort_order?: number | null
+          placeholder?: string | null
+          sort_order?: number
+          updated_at?: string
+          validation?: Json
         }
         Relationships: [
           {
@@ -1151,9 +1238,14 @@ export type Database = {
           id: string
           linked_module: string | null
           linked_record_id: string | null
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["form_submission_status"]
           submitted_at: string | null
           submitted_by: string | null
           tenant_id: string
+          updated_at: string
         }
         Insert: {
           branch_id?: string | null
@@ -1163,9 +1255,14 @@ export type Database = {
           id?: string
           linked_module?: string | null
           linked_record_id?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["form_submission_status"]
           submitted_at?: string | null
           submitted_by?: string | null
           tenant_id: string
+          updated_at?: string
         }
         Update: {
           branch_id?: string | null
@@ -1175,9 +1272,14 @@ export type Database = {
           id?: string
           linked_module?: string | null
           linked_record_id?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["form_submission_status"]
           submitted_at?: string | null
           submitted_by?: string | null
           tenant_id?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -1202,10 +1304,31 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "form_submissions_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submissions_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "form_submissions_submitted_by_fkey"
             columns: ["submitted_by"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submissions_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
           {
@@ -1219,45 +1342,111 @@ export type Database = {
       }
       form_templates: {
         Row: {
+          archived_at: string | null
+          archived_by: string | null
+          branch_id: string | null
           created_at: string | null
           created_by: string | null
+          department_id: string | null
           description: string | null
+          family_id: string
           id: string
           is_active: boolean | null
+          lifecycle: Database["public"]["Enums"]["form_template_lifecycle"]
           name: string
-          permissions: Json | null
+          permissions: Json
+          published_at: string | null
+          published_by: string | null
           tenant_id: string
           updated_at: string | null
           updated_by: string | null
           version: number
         }
         Insert: {
+          archived_at?: string | null
+          archived_by?: string | null
+          branch_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          department_id?: string | null
           description?: string | null
+          family_id?: string
           id?: string
           is_active?: boolean | null
+          lifecycle?: Database["public"]["Enums"]["form_template_lifecycle"]
           name: string
-          permissions?: Json | null
+          permissions?: Json
+          published_at?: string | null
+          published_by?: string | null
           tenant_id: string
           updated_at?: string | null
           updated_by?: string | null
           version?: number
         }
         Update: {
+          archived_at?: string | null
+          archived_by?: string | null
+          branch_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          department_id?: string | null
           description?: string | null
+          family_id?: string
           id?: string
           is_active?: boolean | null
+          lifecycle?: Database["public"]["Enums"]["form_template_lifecycle"]
           name?: string
-          permissions?: Json | null
+          permissions?: Json
+          published_at?: string | null
+          published_by?: string | null
           tenant_id?: string
           updated_at?: string | null
           updated_by?: string | null
           version?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "form_templates_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_templates_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_templates_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_templates_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_templates_published_by_fkey"
+            columns: ["published_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_templates_published_by_fkey"
+            columns: ["published_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "form_templates_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -1446,6 +1635,13 @@ export type Database = {
             referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "notifications_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
         ]
       }
       performance_snapshots: {
@@ -1521,6 +1717,13 @@ export type Database = {
             columns: ["user_profile_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_snapshots_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
         ]
@@ -1607,10 +1810,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "resignations_handover_given_to_fkey"
+            columns: ["handover_given_to"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "resignations_replacement_buddy_id_fkey"
             columns: ["replacement_buddy_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resignations_replacement_buddy_id_fkey"
+            columns: ["replacement_buddy_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
           {
@@ -1632,6 +1849,13 @@ export type Database = {
             columns: ["user_profile_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resignations_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
         ]
@@ -1679,6 +1903,13 @@ export type Database = {
             referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "task_assignees_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
         ]
       }
       task_attachments: {
@@ -1716,6 +1947,13 @@ export type Database = {
             columns: ["uploaded_by"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_attachments_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
         ]
@@ -1757,6 +1995,13 @@ export type Database = {
             columns: ["completed_by"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_checklists_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
           {
@@ -1805,6 +2050,13 @@ export type Database = {
             referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "task_comments_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
         ]
       }
       task_instances: {
@@ -1812,20 +2064,20 @@ export type Database = {
           actual_datetime: string | null
           branch_id: string | null
           category_id: string | null
+          completion_remark: string | null
           created_at: string | null
           created_by: string
           delay_minutes: number | null
           department_id: string | null
           description: string | null
-          completion_remark: string | null
           form_template_id: string | null
           id: string
           planned_datetime: string
           priority: Database["public"]["Enums"]["task_priority"] | null
-          revised_datetime: string | null
           requires_form: boolean
           requires_remark: boolean
           requires_upload: boolean
+          revised_datetime: string | null
           scheduled_date: string | null
           source: string | null
           source_ref_id: string | null
@@ -1841,20 +2093,20 @@ export type Database = {
           actual_datetime?: string | null
           branch_id?: string | null
           category_id?: string | null
+          completion_remark?: string | null
           created_at?: string | null
           created_by: string
           delay_minutes?: number | null
           department_id?: string | null
           description?: string | null
-          completion_remark?: string | null
           form_template_id?: string | null
           id?: string
           planned_datetime: string
           priority?: Database["public"]["Enums"]["task_priority"] | null
-          revised_datetime?: string | null
           requires_form?: boolean
           requires_remark?: boolean
           requires_upload?: boolean
+          revised_datetime?: string | null
           scheduled_date?: string | null
           source?: string | null
           source_ref_id?: string | null
@@ -1870,20 +2122,20 @@ export type Database = {
           actual_datetime?: string | null
           branch_id?: string | null
           category_id?: string | null
+          completion_remark?: string | null
           created_at?: string | null
           created_by?: string
           delay_minutes?: number | null
           department_id?: string | null
           description?: string | null
-          completion_remark?: string | null
           form_template_id?: string | null
           id?: string
           planned_datetime?: string
           priority?: Database["public"]["Enums"]["task_priority"] | null
-          revised_datetime?: string | null
           requires_form?: boolean
           requires_remark?: boolean
           requires_upload?: boolean
+          revised_datetime?: string | null
           scheduled_date?: string | null
           source?: string | null
           source_ref_id?: string | null
@@ -1977,6 +2229,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "task_revisions_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "task_revisions_task_instance_id_fkey"
             columns: ["task_instance_id"]
             isOneToOne: false
@@ -1992,11 +2251,11 @@ export type Database = {
           checklist_items: Json
           created_at: string | null
           created_by: string | null
-          department_id: string | null
-          description: string | null
           default_assignee_role: Database["public"]["Enums"]["user_role"] | null
           default_assignee_type: string
           default_assignee_user_id: string | null
+          department_id: string | null
+          description: string | null
           form_template_id: string | null
           id: string
           is_active: boolean | null
@@ -2018,11 +2277,13 @@ export type Database = {
           checklist_items?: Json
           created_at?: string | null
           created_by?: string | null
-          department_id?: string | null
-          description?: string | null
-          default_assignee_role?: Database["public"]["Enums"]["user_role"] | null
+          default_assignee_role?:
+            | Database["public"]["Enums"]["user_role"]
+            | null
           default_assignee_type?: string
           default_assignee_user_id?: string | null
+          department_id?: string | null
+          description?: string | null
           form_template_id?: string | null
           id?: string
           is_active?: boolean | null
@@ -2044,11 +2305,13 @@ export type Database = {
           checklist_items?: Json
           created_at?: string | null
           created_by?: string | null
-          department_id?: string | null
-          description?: string | null
-          default_assignee_role?: Database["public"]["Enums"]["user_role"] | null
+          default_assignee_role?:
+            | Database["public"]["Enums"]["user_role"]
+            | null
           default_assignee_type?: string
           default_assignee_user_id?: string | null
+          department_id?: string | null
+          description?: string | null
           form_template_id?: string | null
           id?: string
           is_active?: boolean | null
@@ -2084,6 +2347,13 @@ export type Database = {
             columns: ["default_assignee_user_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_templates_default_assignee_user_id_fkey"
+            columns: ["default_assignee_user_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
           {
@@ -2143,6 +2413,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "task_watchers_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "task_watchers_task_instance_id_fkey"
             columns: ["task_instance_id"]
             isOneToOne: false
@@ -2161,6 +2438,13 @@ export type Database = {
             columns: ["user_profile_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_watchers_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
         ]
@@ -2241,6 +2525,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "user_availability_logged_by_fkey"
+            columns: ["logged_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "user_availability_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -2252,6 +2543,13 @@ export type Database = {
             columns: ["user_profile_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_availability_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
         ]
@@ -2339,10 +2637,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "user_profiles_buddy_id_fkey"
+            columns: ["buddy_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "user_profiles_department_id_fkey"
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_profiles_designation_id_fkey"
+            columns: ["designation_id"]
+            isOneToOne: false
+            referencedRelation: "dropdown_masters"
             referencedColumns: ["id"]
           },
           {
@@ -2457,10 +2769,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "walkin_entries_crm_id_fkey"
+            columns: ["crm_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "walkin_entries_salesperson_id_fkey"
             columns: ["salesperson_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "walkin_entries_salesperson_id_fkey"
+            columns: ["salesperson_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
           {
@@ -2543,7 +2869,65 @@ export type Database = {
           user_role: Database["public"]["Enums"]["user_role"] | null
           working_status: Database["public"]["Enums"]["working_status"] | null
         }
-        Relationships: []
+        Insert: {
+          branch_id?: string | null
+          buddy_id?: string | null
+          department_id?: string | null
+          employee_code?: string | null
+          employee_name?: string | null
+          id?: string | null
+          tenant_id?: string | null
+          user_role?: Database["public"]["Enums"]["user_role"] | null
+          working_status?: Database["public"]["Enums"]["working_status"] | null
+        }
+        Update: {
+          branch_id?: string | null
+          buddy_id?: string | null
+          department_id?: string | null
+          employee_code?: string | null
+          employee_name?: string | null
+          id?: string | null
+          tenant_id?: string | null
+          user_role?: Database["public"]["Enums"]["user_role"] | null
+          working_status?: Database["public"]["Enums"]["working_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_profiles_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_profiles_buddy_id_fkey"
+            columns: ["buddy_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_profiles_buddy_id_fkey"
+            columns: ["buddy_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_profiles_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_profiles_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
@@ -2551,12 +2935,39 @@ export type Database = {
         Args: { p_file_url: string; p_task_id: string }
         Returns: string
       }
-      can_read_task_attachment_object: { Args: { p_name: string }; Returns: boolean }
+      archive_form_with_audit: {
+        Args: { p_template_id: string }
+        Returns: string
+      }
+      assert_form_publishable: {
+        Args: { p_template_id: string }
+        Returns: undefined
+      }
+      can_access_form_template: {
+        Args: { p_template_id: string }
+        Returns: boolean
+      }
       can_delete_unrecorded_task_attachment_object: {
         Args: { p_name: string }
         Returns: boolean
       }
-      can_write_task_attachment_object: { Args: { p_name: string }; Returns: boolean }
+      can_manage_form_template: {
+        Args: { p_template_id: string }
+        Returns: boolean
+      }
+      can_read_form_submission: {
+        Args: { p_submission_id: string }
+        Returns: boolean
+      }
+      can_read_task: { Args: { p_task_id: string }; Returns: boolean }
+      can_read_task_attachment_object: {
+        Args: { p_name: string }
+        Returns: boolean
+      }
+      can_write_task_attachment_object: {
+        Args: { p_name: string }
+        Returns: boolean
+      }
       change_dropdown_with_audit: {
         Args: {
           p_is_active?: boolean
@@ -2567,7 +2978,46 @@ export type Database = {
           p_sort_order?: number
           p_value?: string
         }
-        Returns: Database["public"]["Tables"]["dropdown_masters"]["Row"]
+        Returns: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          label: string
+          master_type: string
+          sort_order: number | null
+          tenant_id: string | null
+          updated_at: string | null
+          updated_by: string | null
+          value: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "dropdown_masters"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_delegation_task_with_audit: {
+        Args: {
+          p_checklist?: Json
+          p_doer_ids: string[]
+          p_payload: Json
+          p_watcher_ids?: string[]
+        }
+        Returns: string
+      }
+      create_form_revision_with_audit: {
+        Args: { p_payload?: Json; p_source_template_id: string }
+        Returns: string
+      }
+      create_recurring_task_instance: {
+        Args: {
+          p_assignments: Json
+          p_target_date: string
+          p_template_id: string
+        }
+        Returns: string
       }
       current_branch_id: { Args: never; Returns: string }
       current_profile: {
@@ -2601,24 +3051,12 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      current_profile_is_active: { Args: never; Returns: boolean }
       current_role_level: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
       current_tenant_id: { Args: never; Returns: string }
-      create_delegation_task_with_audit: {
-        Args: {
-          p_checklist?: Json
-          p_doer_ids: string[]
-          p_payload: Json
-          p_watcher_ids?: string[]
-        }
-        Returns: string
-      }
-      create_recurring_task_instance: {
-        Args: { p_assignments: Json; p_target_date: string; p_template_id: string }
-        Returns: string
-      }
       delegate_task_with_audit: {
         Args: {
           p_from_user_id: string
@@ -2628,6 +3066,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      form_condition_matches: {
+        Args: { p_answers: Json; p_condition: Json }
+        Returns: boolean
+      }
       invite_profile_with_audit: {
         Args: {
           p_auth_user_id: string
@@ -2635,31 +3077,41 @@ export type Database = {
           p_buddy_id: string
           p_creator_profile_id: string
           p_department_id: string
-          p_designation_id: string | null
+          p_designation_id: string
           p_email: string
           p_employee_code: string
           p_employee_name: string
-          p_official_mobile: string | null
+          p_official_mobile: string
           p_personal_mobile: string
           p_user_role: Database["public"]["Enums"]["user_role"]
           p_week_off: string[]
         }
         Returns: string
       }
-      is_super_admin: { Args: never; Returns: boolean }
       is_fms_instance_participant: {
         Args: { p_instance_id: string }
         Returns: boolean
       }
+      is_super_admin: { Args: never; Returns: boolean }
+      is_supported_task_rrule: { Args: { p_rule: string }; Returns: boolean }
       is_task_participant: { Args: { p_task_id: string }; Returns: boolean }
       is_task_watcher: { Args: { p_task_id: string }; Returns: boolean }
-      can_read_task: { Args: { p_task_id: string }; Returns: boolean }
-      is_supported_task_rrule: { Args: { p_rule: string }; Returns: boolean }
       is_user_available_for_task: {
         Args: { p_target_date: string; p_user_profile_id: string }
         Returns: boolean
       }
+      is_valid_form_date: { Args: { p_value: string }; Returns: boolean }
+      is_valid_form_datetime: { Args: { p_value: string }; Returns: boolean }
+      normalize_form_fields: { Args: { p_fields: Json }; Returns: Json }
+      normalize_form_permissions: {
+        Args: { p_permissions: Json }
+        Returns: Json
+      }
       normalize_task_checklist: { Args: { p_checklist: Json }; Returns: Json }
+      publish_form_with_audit: {
+        Args: { p_template_id: string }
+        Returns: string
+      }
       record_availability_with_audit: {
         Args: {
           p_date: string
@@ -2669,13 +3121,75 @@ export type Database = {
         }
         Returns: string
       }
-      revise_task_datetime_with_audit: {
-        Args: { p_reason: string; p_revised_datetime: string; p_task_id: string }
+      replace_form_draft_fields: {
+        Args: { p_fields: Json; p_template_id: string }
         Returns: undefined
+      }
+      review_form_submission_with_audit: {
+        Args: {
+          p_decision: string
+          p_review_notes?: string | null
+          p_submission_id: string
+        }
+        Returns: string
       }
       review_resignation_with_audit: {
         Args: { p_decision: string; p_resignation_id: string }
-        Returns: Database["public"]["Tables"]["resignations"]["Row"]
+        Returns: {
+          company_assets_returned: boolean
+          created_at: string | null
+          created_by: string | null
+          email_access_remove_date: string
+          final_settlement_status: string | null
+          handover_completed: boolean
+          handover_given_to: string | null
+          hr_remark: string | null
+          id: string
+          last_working_date: string
+          manager_approval_status: string | null
+          notice_period_served: boolean
+          official_mobile_returned: boolean | null
+          pending_tasks_reassigned: boolean
+          replacement_buddy_id: string | null
+          resignation_date: string
+          resignation_reason_id: string | null
+          super_admin_approval_status: string | null
+          tenant_id: string
+          updated_at: string | null
+          updated_by: string | null
+          user_profile_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "resignations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      revise_task_datetime_with_audit: {
+        Args: {
+          p_reason: string
+          p_revised_datetime: string
+          p_task_id: string
+        }
+        Returns: undefined
+      }
+      save_form_draft_with_audit: {
+        Args: { p_fields: Json; p_payload: Json; p_template_id: string | null }
+        Returns: string
+      }
+      save_task_template_with_audit: {
+        Args: { p_payload: Json; p_template_id: string | null }
+        Returns: string
+      }
+      submit_form_with_audit: {
+        Args: {
+          p_answers: Json
+          p_form_template_id: string
+          p_linked_module?: string | null
+          p_linked_record_id?: string | null
+        }
+        Returns: string
       }
       submit_resignation_with_audit: {
         Args: {
@@ -2683,11 +3197,36 @@ export type Database = {
           p_profile_id: string
           p_resignation: Json
         }
-        Returns: Database["public"]["Tables"]["resignations"]["Row"]
-      }
-      save_task_template_with_audit: {
-        Args: { p_payload: Json; p_template_id: string | null }
-        Returns: string
+        Returns: {
+          company_assets_returned: boolean
+          created_at: string | null
+          created_by: string | null
+          email_access_remove_date: string
+          final_settlement_status: string | null
+          handover_completed: boolean
+          handover_given_to: string | null
+          hr_remark: string | null
+          id: string
+          last_working_date: string
+          manager_approval_status: string | null
+          notice_period_served: boolean
+          official_mobile_returned: boolean | null
+          pending_tasks_reassigned: boolean
+          replacement_buddy_id: string | null
+          resignation_date: string
+          resignation_reason_id: string | null
+          super_admin_approval_status: string | null
+          tenant_id: string
+          updated_at: string | null
+          updated_by: string | null
+          user_profile_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "resignations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       update_task_with_audit: {
         Args: {
@@ -2699,13 +3238,40 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_user_profile_with_audit: {
+        Args: { p_changes: Json; p_profile_id: string }
+        Returns: {
+          auth_user_id: string
+          branch_id: string
+          buddy_id: string | null
+          created_at: string | null
+          created_by: string | null
+          department_id: string
+          designation_id: string | null
+          email: string
+          employee_code: string
+          employee_name: string
+          id: string
+          is_login_enabled: boolean | null
+          official_mobile: string | null
+          personal_mobile: string
+          tenant_id: string
+          updated_at: string | null
+          updated_by: string | null
+          user_role: Database["public"]["Enums"]["user_role"]
+          week_off: string[]
+          working_status: Database["public"]["Enums"]["working_status"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       use_task_template_with_audit: {
         Args: { p_planned_datetime: string; p_template_id: string }
         Returns: string
-      }
-      update_user_profile_with_audit: {
-        Args: { p_changes: Json; p_profile_id: string }
-        Returns: Database["public"]["Tables"]["user_profiles"]["Row"]
       }
     }
     Enums: {
@@ -2728,6 +3294,8 @@ export type Database = {
         | "parallel_start"
         | "parallel_join"
         | "end"
+      form_submission_status: "submitted" | "approved" | "rejected"
+      form_template_lifecycle: "draft" | "published" | "archived"
       task_priority: "high" | "medium" | "low"
       task_status:
         | "pending"
@@ -2901,6 +3469,8 @@ export const Constants = {
         "parallel_join",
         "end",
       ],
+      form_submission_status: ["submitted", "approved", "rejected"],
+      form_template_lifecycle: ["draft", "published", "archived"],
       task_priority: ["high", "medium", "low"],
       task_status: [
         "pending",

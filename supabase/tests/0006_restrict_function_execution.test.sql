@@ -7,7 +7,7 @@ select no_plan();
 
 -- The linked project has this postgres-owned platform helper, while a fresh
 -- local Supabase stack does not. Create it transactionally to reproduce the
--- linked 31-function/28-SECURITY-DEFINER matrix and exercise future defaults.
+-- linked baseline matrix plus the explicitly reviewed Phase 4A Forms functions.
 create function rls_auto_enable()
 returns event_trigger
 language plpgsql
@@ -39,14 +39,14 @@ select is((
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
-), 31, 'exactly 31 postgres-owned public application functions exist');
+), 49, 'exactly 49 postgres-owned public application functions exist after Phase 4A');
 select is((
   select count(*)::integer
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres' and p.prosecdef
-), 28, 'exactly 28 public application functions are SECURITY DEFINER');
+), 37, 'exactly 37 public application functions are SECURITY DEFINER after Phase 4A');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -62,7 +62,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 25, 'authenticated can execute exactly 25 public application functions');
+), 34, 'authenticated can execute exactly 34 public application functions after Phase 4A');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -78,9 +78,10 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('postgres', p.oid, 'EXECUTE')
-), 31, 'postgres retains owner execution on every public application function');
+), 49, 'postgres retains owner execution on every public application function');
 
--- Exact authenticated allowlist: 25 expected functions and no extras.
+-- Exact authenticated allowlist: the 25 baseline functions plus nine Forms
+-- policy/RPC entry points, and no extras.
 select ok(has_function_privilege('authenticated', 'current_profile()', 'EXECUTE'), 'authenticated executes current_profile');
 select ok(has_function_privilege('authenticated', 'current_role_level()', 'EXECUTE'), 'authenticated executes current_role_level');
 select ok(has_function_privilege('authenticated', 'current_tenant_id()', 'EXECUTE'), 'authenticated executes current_tenant_id');
@@ -124,7 +125,14 @@ select is((
       'update_task_with_audit(uuid,text,uuid,boolean,text)',
       'add_task_attachment_with_audit(uuid,text)', 'delegate_task_with_audit(uuid,uuid,uuid,text)',
       'revise_task_datetime_with_audit(uuid,timestamp with time zone,text)',
-      'record_availability_with_audit(uuid,date,availability_status,text)'
+      'record_availability_with_audit(uuid,date,availability_status,text)',
+      'can_manage_form_template(uuid)', 'can_read_form_submission(uuid)',
+      'can_access_form_template(uuid)',
+      'save_form_draft_with_audit(uuid,jsonb,jsonb)',
+      'create_form_revision_with_audit(uuid,jsonb)',
+      'publish_form_with_audit(uuid)', 'archive_form_with_audit(uuid)',
+      'submit_form_with_audit(uuid,jsonb,text,uuid)',
+      'review_form_submission_with_audit(uuid,text,text)'
     ]::text[])
   )
   select count(*)::integer
