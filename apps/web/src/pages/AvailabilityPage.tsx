@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import type { Enums } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Field, Notice } from "@/components/ui";
-import { loadTaskReferenceData, recordAvailability, type TaskUser } from "@/features/tasks/api";
+import { loadAvailabilityUsers, recordAvailability, type TaskUser } from "@/features/tasks/api";
 
 function today(): string { return new Date().toLocaleDateString("en-CA"); }
 
@@ -16,7 +16,7 @@ export function AvailabilityPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const canLogOthers = profile ? ["super_admin", "admin", "manager", "hr"].includes(profile.user_role) : false;
-  useEffect(() => { if (canLogOthers) void loadTaskReferenceData().then((data) => setUsers(data.users)).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Unable to load users")); }, [canLogOthers]);
+  useEffect(() => { if (canLogOthers) void loadAvailabilityUsers().then(setUsers).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Unable to load eligible users")); }, [canLogOthers]);
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setSaving(true); setError(null); setMessage(null);
     try { await recordAvailability(userId, today(), status, reason); setMessage("Today’s availability was saved and audited."); }

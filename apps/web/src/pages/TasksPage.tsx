@@ -8,7 +8,8 @@ import {
   createFromTemplate,
   delegateTask,
   loadTaskFeed,
-  loadTaskReferenceData,
+  loadTaskAuthoringReferenceData,
+  loadTaskFeedReferenceData,
   reviseTask,
   saveTaskTemplate,
   updateTask,
@@ -22,6 +23,8 @@ import { TaskCard, type TaskCardAction } from "@/features/tasks/TaskCard";
 import { TaskComposer } from "@/features/tasks/TaskComposer";
 import { TaskFilterBar, type DateRangePreset } from "@/features/tasks/TaskFilterBar";
 import { TaskTemplateForm } from "@/features/tasks/TaskForms";
+import { loadFormDynamicOptions, loadTaskForms, submitForm, type FormBundle } from "@/features/forms/api";
+import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer";
 
 function dateKey(date: Date): string {
   const year = date.getFullYear();
@@ -53,6 +56,7 @@ export function TasksPage({ delegatedView = false }: { delegatedView?: boolean }
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<TaskFeedStatusFilter>("all");
   const [tasks, setTasks] = useState<TaskBundle[]>([]);
+  const [categories, setCategories] = useState<TaskReferenceData["categories"]>([]);
   const [references, setReferences] = useState<TaskReferenceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +64,9 @@ export function TasksPage({ delegatedView = false }: { delegatedView?: boolean }
   const [delegateTarget, setDelegateTarget] = useState<TaskBundle | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [editTemplate, setEditTemplate] = useState<TaskTemplate | null | undefined>(undefined);
+  const [formBundles, setFormBundles] = useState<FormBundle[]>([]);
+  const [formDynamicOptions, setFormDynamicOptions] = useState<DynamicOptions>({ users: [], branches: [], departments: [] });
+  const [formTarget, setFormTarget] = useState<TaskBundle | null>(null);
   const canManage = profile ? ["super_admin", "admin", "manager"].includes(profile.user_role) : false;
 
   const refresh = useCallback(async () => {
@@ -69,12 +76,18 @@ export function TasksPage({ delegatedView = false }: { delegatedView?: boolean }
     try {
       const start = new Date(`${startDate}T00:00:00`).toISOString();
       const end = new Date(`${endDate}T23:59:59.999`).toISOString();
-      const [nextTasks, nextReferences] = await Promise.all([
+      const [nextTasks, nextCategories] = await Promise.all([
         loadTaskFeed(profile.id, start, end, { delegated: delegatedView, includeBlockedCoverage: canManage && !delegatedView }),
-        loadTaskReferenceData(),
+        loadTaskFeedReferenceData().catch(() => ({ categories: [] })),
+      ]);
+      const [forms, dynamicOptions] = await Promise.all([
+        loadTaskForms([...new Set(nextTasks.flatMap((task) => task.requires_form && task.form_template_id ? [task.form_template_id] : []))], nextTasks.flatMap((task) => task.id ? [task.id] : [])),
+        loadFormDynamicOptions(),
       ]);
       setTasks(nextTasks);
-      setReferences(nextReferences);
+      setCategories(nextCategories.categories);
+      setFormBundles(forms.bundles);
+      setFormDynamicOptions(dynamicOptions);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to load tasks");
     } finally {
@@ -84,7 +97,12 @@ export function TasksPage({ delegatedView = false }: { delegatedView?: boolean }
 
   useEffect(() => { void refresh(); }, [refresh]);
 
-  const categoryNames = useMemo(() => new Map(references?.categories.map((category) => [category.id, category.label]) ?? []), [references]);
+  const openComposer = useCallback(async () => {
+    try { setError(null); setReferences(await loadTaskAuthoringReferenceData()); setComposerOpen(true); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to load task authoring options"); }
+  }, []);
+
+  const categoryNames = useMemo(() => new Map(categories.map((category) => [category.id, category.label])), [categories]);
   const counts = useMemo(() => countTaskFeedStatuses(tasks), [tasks]);
   const scopedTasks = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -118,6 +136,7 @@ export function TasksPage({ delegatedView = false }: { delegatedView?: boolean }
       setDelegateTarget(task);
       return;
     }
+    if (action.kind === "fill_form") { setFormTarget(task); return; }
     if (action.kind === "upload") await uploadTaskAttachment(profile.tenant_id, task.id, action.file);
     else if (action.kind === "revise") await reviseTask(task.id, action.datetime, action.reason);
     else if (action.kind === "checklist") await updateTask(task.id, "checklist", { checklistId: action.checklistId, completed: action.completed });
@@ -139,7 +158,7 @@ export function TasksPage({ delegatedView = false }: { delegatedView?: boolean }
         {error ? <div className="flex flex-col gap-3 rounded-xl border border-danger/40 bg-danger/10 p-4"><Notice tone="danger">{error}</Notice><Button className="self-start border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={() => void refresh()} variant="secondary"><RefreshCw />Retry</Button></div> : loading ? <div aria-label="Loading tasks" className="flex flex-col gap-3">{[0, 1, 2].map((item) => <div className="h-28 animate-pulse rounded-2xl border border-task-border bg-task-muted" key={item} />)}</div> : scopedTasks.length === 0 ? <div className="flex min-h-[48dvh] flex-col items-center justify-center px-5 text-center"><span className="mb-5 flex size-20 items-center justify-center rounded-[1.75rem] bg-task-muted text-task-accent"><CheckCircle2 className="size-10" /></span><h2 className="text-2xl font-semibold text-task-text">No Tasks Here</h2><p className="mt-1 max-w-sm text-sm text-task-text-muted">It seems that you don’t have any tasks in this list.</p></div> : <div className="flex flex-col gap-3">{profile ? scopedTasks.map((task) => <TaskCard capability={deriveTaskMutationCapability({ assigneeIds: task.assignees.map((assignee) => assignee.id), isWatcher: task.isWatchedByViewer, viewerId: profile.id, viewerRole: profile.user_role })} categoryLabel={task.category_id ? categoryNames.get(task.category_id) ?? "Uncategorized" : "Uncategorized"} key={task.id} onAction={(action) => handleAction(task, action)} task={task} />) : null}</div>}
       </div>
 
-      {canManage && !delegatedView ? <Button aria-label="Create task" className="fixed bottom-[86px] right-4 z-20 size-14 rounded-2xl bg-task-accent p-0 text-task-text shadow-xl hover:bg-task-accent/90 md:bottom-8 md:right-8" disabled={!references} onClick={() => setComposerOpen(true)}><Plus className="size-6" /></Button> : null}
+      {canManage && !delegatedView ? <Button aria-label="Create task" className="fixed bottom-[86px] right-4 z-20 size-14 rounded-2xl bg-task-accent p-0 text-task-text shadow-xl hover:bg-task-accent/90 md:bottom-8 md:right-8" onClick={() => void openComposer()}><Plus className="size-6" /></Button> : null}
 
       {composerOpen && canManage && references && profile ? <TaskComposer data={references} onClose={() => setComposerOpen(false)} onCreated={() => { setComposerOpen(false); void refresh(); }} onManageTemplates={() => { setComposerOpen(false); setShowTemplates(true); }} onSave={createDelegationTask} onUseTemplate={createFromTemplate} profile={profile} /> : null}
 
@@ -153,6 +172,7 @@ export function TasksPage({ delegatedView = false }: { delegatedView?: boolean }
       {editTemplate !== undefined && canManage && references ? <Modal onClose={() => setEditTemplate(undefined)} title={editTemplate ? "Edit Task Template" : "New Task Template"} wide><TaskTemplateForm data={references} onCancel={() => setEditTemplate(undefined)} onSave={async (id, payload) => { await saveTaskTemplate(id, payload); setEditTemplate(undefined); await refresh(); }} template={editTemplate} /></Modal> : null}
 
       {delegateTarget && references && profile ? <DelegateTaskModal canManage={canManage} currentUserId={profile.id} onClose={() => setDelegateTarget(null)} onDelegate={async (fromUserId, toUserId, reason) => { if (!delegateTarget.id) throw new Error("Task identifier is missing"); await delegateTask(delegateTarget.id, fromUserId, toUserId, reason); setDelegateTarget(null); await refresh(); }} task={delegateTarget} users={references.users} /> : null}
+      {formTarget?.id && formTarget.form_template_id ? (() => { const form = formBundles.find((item) => item.id === formTarget.form_template_id); return form ? <Modal onClose={() => setFormTarget(null)} title={`Required form: ${form.name}`} wide><FormRenderer definition={{ name: form.name, description: form.description ?? undefined, fields: form.fields }} dynamicOptions={formDynamicOptions} onSubmit={async (answers) => { await submitForm(form.id, answers, formTarget.task_type === "delegation" ? "delegation_task" : "checklist_task", formTarget.id as string); setFormTarget(null); await refresh(); }} /></Modal> : <Modal onClose={() => setFormTarget(null)} title="Required form"><Notice tone="danger">The exact required form version is not available to this account.</Notice></Modal>; })() : null}
     </section>
   );
 }

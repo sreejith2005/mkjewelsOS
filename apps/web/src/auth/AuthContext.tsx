@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@jewelos/api-client";
 import type { Branch, UserProfile } from "@/types";
+import { DEFAULT_USER_PREFERENCES, type UserPreferences } from "@jewelos/core";
 
 type AuthStatus = "loading" | "signed_out" | "authenticated" | "incomplete" | "blocked";
 
@@ -9,6 +10,8 @@ type AuthContextValue = {
   branch: Branch | null;
   logout: () => Promise<void>;
   profile: UserProfile | null;
+  preferences: UserPreferences;
+  refreshPreferences: () => Promise<void>;
   session: Session | null;
   signIn: (email: string, password: string) => Promise<string | null>;
   status: AuthStatus;
@@ -21,9 +24,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [branch, setBranch] = useState<Branch | null>(null);
+  const [preferences, setPreferences] = useState<UserPreferences>(DEFAULT_USER_PREFERENCES);
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const forcedSignOut = useRef(false);
+
+  const refreshPreferences = useCallback(async () => {
+    const { data } = await supabase.from("user_preferences").select("preferences").maybeSingle();
+    setPreferences((data?.preferences as UserPreferences | undefined) ?? DEFAULT_USER_PREFERENCES);
+  }, []);
 
   const loadProfile = useCallback(async (nextSession: Session) => {
     setSession(nextSession);
@@ -65,9 +74,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq("id", nextProfile.branch_id)
       .maybeSingle();
     setBranch(nextBranch);
+    await refreshPreferences();
     setStatusMessage(null);
     setStatus("authenticated");
-  }, []);
+  }, [refreshPreferences]);
 
   useEffect(() => {
     let active = true;
@@ -117,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ branch, logout, profile, session, signIn, status, statusMessage }}>
+    <AuthContext.Provider value={{ branch, logout, preferences, profile, refreshPreferences, session, signIn, status, statusMessage }}>
       {children}
     </AuthContext.Provider>
   );

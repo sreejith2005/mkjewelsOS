@@ -10,6 +10,7 @@ export type TaskCardAction =
   | { checklistId: string; completed: boolean; kind: "checklist" }
   | { kind: "complete"; remark: string }
   | { file: File; kind: "upload" }
+  | { kind: "fill_form" }
   | { kind: "delegate" }
   | { datetime: string; kind: "revise"; reason: string };
 
@@ -96,7 +97,7 @@ export function TaskCard({ capability, categoryLabel, onAction, task }: {
           </div>
         ))}
         {!readOnly && task.requires_upload && !completed ? <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-task-border bg-task-bg p-3 text-sm text-task-text"><FileUp className="size-4" /><span>{task.hasAttachment ? "Evidence uploaded · add another" : "Upload required evidence"}</span><input accept="image/jpeg,image/png,application/pdf" className="sr-only" disabled={busy} onChange={(event) => void upload(event)} type="file" /></label> : null}
-        {task.requires_form && !task.hasFormSubmission ? <Notice tone="task">A linked form submission is required before completion. Form rendering remains in the Forms phase.</Notice> : null}
+        {task.requires_form ? task.hasFormSubmission ? <Notice tone="success">Required form submitted. This task is now eligible for completion when its other requirements are met.</Notice> : !readOnly && !completed ? <div className="flex flex-wrap items-center gap-2"><Notice tone="task">A linked form submission is required before completion.</Notice><Button disabled={busy || !task.form_template_id} onClick={() => void act({ kind: "fill_form" })} type="button" variant="secondary">Fill required form</Button></div> : <Notice tone="task">A required form submission is still missing.</Notice> : null}
         {!readOnly && task.requires_remark && !completed ? <Field label="Completion remark"><textarea className="task-field min-h-16" onChange={(event) => setRemark(event.target.value)} value={remark} /></Field> : null}
         {!readOnly && !completed && !blocked ? <div className="flex flex-wrap gap-2">{task.status === "pending" ? <Button className="border-task-border bg-task-bg text-task-text hover:bg-task-muted" disabled={busy} onClick={() => void act({ kind: "start" })} variant="secondary"><Play />Start</Button> : null}<Button className="bg-task-accent text-task-text hover:bg-task-accent/90" disabled={busy || !canComplete || Boolean(task.requires_remark && !remark.trim())} onClick={() => void act({ kind: "complete", remark })}><CheckCircle2 />Complete</Button>{task.assignees.length ? <Button className="border-task-border bg-task-bg text-task-text hover:bg-task-muted" disabled={busy} onClick={() => void act({ kind: "delegate" })} variant="secondary"><UserRoundPlus />Delegate</Button> : null}</div> : null}
         {task.task_type === "fms" ? <Notice tone="task">FMS stage actions arrive in Phase 3; this stage is read-only in the unified feed.</Notice> : null}

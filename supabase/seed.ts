@@ -125,6 +125,11 @@ const DROPDOWN_MASTERS = {
   ],
   crm_source: ["Walk-in", "Referral", "Instagram", "Google", "Exhibition", "Other"],
   client_type: ["Regular", "VIP", "Wholesale", "Corporate"],
+  potential_category: ["High", "Medium", "Low"],
+  product_category: ["Gold", "Diamond", "Silver", "Platinum", "Other"],
+  buy_status: ["Purchased", "Considering", "Follow Up", "Not Bought", "Lost"],
+  not_bought_reason: ["Price", "Design", "Availability", "Decision Pending", "Other"],
+  communication_preference: ["Phone", "Email", "In Person", "No Contact"],
   // Development-only task categories. These contain no customer or production data.
   task_category: ["DEV - Store Opening", "DEV - Daily Operations", "DEV - Follow Up"],
   task_priority: ["HIGH", "MEDIUM", "LOW"],
@@ -184,7 +189,18 @@ Options:
 }
 
 function safeErrorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
+  let message: string;
+
+  if (error instanceof Error) {
+    message = error.message;
+  } else if (error && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    const parts = [record.code, record.message, record.hint]
+      .filter((value): value is string => typeof value === "string" && value.length > 0);
+    message = parts.length > 0 ? parts.join(": ") : JSON.stringify(error);
+  } else {
+    message = String(error);
+  }
 
   if (!serviceRoleKeyForRedaction) {
     return message;
@@ -332,6 +348,22 @@ async function ensureAuthUsers(
       }
 
       usersByEmail.set(normalizedEmail, authUser);
+    } else {
+      const { data, error } = await client.auth.admin.updateUserById(
+        authUser.id,
+        {
+          password: seedUser.password,
+          email_confirm: true,
+        },
+      );
+      fail("Reset Supabase Auth seed user", error);
+      authUser = data.user;
+      usersByEmail.set(normalizedEmail, authUser);
+      await audit.record({
+        action: "seed_update",
+        module: "auth_users",
+        recordId: authUser.id,
+      });
     }
   }
 
@@ -854,12 +886,9 @@ async function ensureFormTemplates(
       .select("id")
       .eq("tenant_id", tenantId)
       .eq("name", name)
-      .limit(2);
+      .order("version", { ascending: false })
+      .limit(1);
     fail(`Check form template ${name}`, selectError);
-
-    if (rows.length > 1) {
-      throw new Error(`Multiple form templates are named ${name}`);
-    }
 
     if (rows[0]) {
       continue;
@@ -867,7 +896,15 @@ async function ensureFormTemplates(
 
     const { data: inserted, error: insertError } = await client
       .from("form_templates")
-      .insert({ tenant_id: tenantId, name, created_by: actorUserId })
+      .insert({
+        tenant_id: tenantId,
+        name,
+        lifecycle: "draft",
+        is_active: false,
+        published_at: null,
+        created_by: actorUserId,
+        updated_by: actorUserId,
+      })
       .select("id")
       .single();
     fail(`Insert form template ${name}`, insertError);

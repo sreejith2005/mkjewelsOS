@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { AppLauncher, type LauncherItem } from "./AppLauncher";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { MoreSheet } from "./MoreSheet";
+import { NotificationBell } from "@/features/notifications/NotificationBell";
 
 export type ShellNavItem = Readonly<{
   Icon: ComponentType<{ className?: string }>;
@@ -63,6 +64,7 @@ export function ApplicationShell({
         <img alt="MK Jewels" className="hidden h-8 w-auto md:block" src={logoDarkUrl} />
         <div className="ml-auto flex items-center gap-2 md:gap-3">
           <span className="hidden text-sm text-champagne md:inline">{branch?.name ?? "Branch unavailable"}</span>
+          <NotificationBell onNavigate={navigate} profileId={profile.id} />
           <button
             aria-label="Open more navigation"
             className="flex size-10 items-center justify-center rounded-full bg-task-accent-soft text-sm font-bold text-task-text md:rounded-lg md:border md:border-gold/20 md:bg-obsidian md:text-gold"

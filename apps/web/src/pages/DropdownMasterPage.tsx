@@ -36,18 +36,12 @@ function DropdownEditor({ item, category, onClose, onSaved }: { item: DropdownMa
     const value = draft.value.trim() || slugify(draft.label);
     if (!draft.master_type.trim() || !draft.label.trim() || !value) return setError("Category, label, and value are required.");
     setSaving(true); setError(null);
-    const { error: saveError } = await supabase.rpc("change_dropdown_with_audit", {
-      p_operation: item ? "update" : "create",
-      p_record_id: item?.id ?? null,
-      p_master_type: draft.master_type.trim(),
-      p_label: draft.label.trim(),
-      p_value: value,
-      p_sort_order: draft.sort_order,
-      p_is_active: draft.is_active,
-    });
-    if (saveError) setError(saveError.message);
-    else { await onSaved(); onClose(); }
-    setSaving(false);
+    try {
+      const { error: saveError } = await supabase.rpc("change_dropdown_with_audit", {
+        p_operation: item ? "update" : "create", ...(item?.id ? { p_record_id: item.id } : {}), p_master_type: draft.master_type.trim(), p_label: draft.label.trim(), p_value: value, p_sort_order: draft.sort_order, p_is_active: draft.is_active,
+      });
+      if (saveError) setError(saveError.message); else { await onSaved(); onClose(); }
+    } catch (caught) { setError(errorMessage(caught)); } finally { setSaving(false); }
   };
 
   return (
@@ -75,10 +69,8 @@ export function DropdownMasterPage() {
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
-    const { data, error: loadError } = await supabase.from("dropdown_masters").select("*").order("master_type").order("sort_order");
-    if (loadError) setError(loadError.message);
-    else setItems(data);
-    setLoading(false);
+    try { const { data, error: loadError } = await supabase.from("dropdown_masters").select("*").order("master_type").order("sort_order"); if (loadError) setError(loadError.message); else setItems(data ?? []); }
+    catch (caught) { setError(errorMessage(caught)); } finally { setLoading(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
 
@@ -111,7 +103,7 @@ export function DropdownMasterPage() {
         <div className="flex items-center gap-3"><span className="rounded-xl bg-gold p-2.5 text-obsidian"><ListFilter className="h-5 w-5" /></span><div><h1 className="font-display text-3xl text-gold">Dropdown Master</h1><p className="text-sm text-soft-grey">Manage real shared option lists</p></div></div>
         <Button onClick={() => setEditing(null)}><Plus className="h-4 w-4" />Add item</Button>
       </header>
-      {error ? <div className="mb-5"><Notice tone="danger">{error}</Notice></div> : null}
+      {error ? <div className="mb-5"><Notice tone="danger">{error}</Notice><Button className="mt-3" onClick={() => void load()} variant="secondary">Retry</Button></div> : null}
       <div className="glass-card mb-5 rounded-xl p-4">
         <Field label="Category"><select className="field" onChange={(e) => setCategory(e.target.value)} value={category}>{categories.map((item) => <option key={item} value={item}>{titleCase(item)}</option>)}</select></Field>
         <div className="mt-4 flex gap-3"><div className="rounded-lg border border-gold/20 bg-obsidian px-4 py-3"><p className="text-xl font-bold text-gold">{categoryItems.length}</p><p className="text-xs text-soft-grey">Total</p></div><div className="rounded-lg border border-success/30 bg-success/5 px-4 py-3"><p className="text-xl font-bold text-success">{activeCount}</p><p className="text-xs text-soft-grey">Active</p></div></div>

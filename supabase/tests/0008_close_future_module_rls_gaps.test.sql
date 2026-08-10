@@ -135,19 +135,19 @@ insert into walkin_entries(id,tenant_id,branch_id,client_id,visit_date) values
   ('72000000-0000-0000-0000-000000000003','11000000-0000-0000-0000-000000000001','22000000-0000-0000-0000-000000000001','71000000-0000-0000-0000-000000000002','2099-01-03'),
   ('72000000-0000-0000-0000-000000000004','11000000-0000-0000-0000-000000000001','22000000-0000-0000-0000-000000000001','71000000-0000-0000-0000-000000000003','2099-01-04'),
   ('72000000-0000-0000-0000-000000000005','11000000-0000-0000-0000-000000000002','22000000-0000-0000-0000-000000000003','71000000-0000-0000-0000-000000000003','2099-01-05');
-insert into walkin_uploads(id,walkin_entry_id,file_url) values
-  ('73000000-0000-0000-0000-000000000001','72000000-0000-0000-0000-000000000001','synthetic/a1'),
-  ('73000000-0000-0000-0000-000000000002','72000000-0000-0000-0000-000000000002','synthetic/a2'),
-  ('73000000-0000-0000-0000-000000000003','72000000-0000-0000-0000-000000000005','synthetic/b1'),
-  ('73000000-0000-0000-0000-000000000004','72000000-0000-0000-0000-000000000004','synthetic/malformed');
-insert into client_timeline(id,client_id,event_type,summary) values
-  ('74000000-0000-0000-0000-000000000001','71000000-0000-0000-0000-000000000001','synthetic','Synthetic A1'),
-  ('74000000-0000-0000-0000-000000000002','71000000-0000-0000-0000-000000000002','synthetic','Synthetic A2'),
-  ('74000000-0000-0000-0000-000000000003','71000000-0000-0000-0000-000000000003','synthetic','Synthetic B1');
-insert into client_followups(id,client_id,due_date,notes) values
-  ('75000000-0000-0000-0000-000000000001','71000000-0000-0000-0000-000000000001','2099-02-01','Synthetic A1'),
-  ('75000000-0000-0000-0000-000000000002','71000000-0000-0000-0000-000000000002','2099-02-02','Synthetic A2'),
-  ('75000000-0000-0000-0000-000000000003','71000000-0000-0000-0000-000000000003','2099-02-03','Synthetic B1');
+insert into walkin_uploads(id,walkin_entry_id,storage_path,tenant_id) values
+  ('73000000-0000-0000-0000-000000000001','72000000-0000-0000-0000-000000000001','synthetic/a1','11000000-0000-0000-0000-000000000001'),
+  ('73000000-0000-0000-0000-000000000002','72000000-0000-0000-0000-000000000002','synthetic/a2','11000000-0000-0000-0000-000000000001'),
+  ('73000000-0000-0000-0000-000000000003','72000000-0000-0000-0000-000000000005','synthetic/b1','11000000-0000-0000-0000-000000000002'),
+  ('73000000-0000-0000-0000-000000000004','72000000-0000-0000-0000-000000000004','synthetic/malformed','11000000-0000-0000-0000-000000000001');
+insert into client_timeline(id,tenant_id,branch_id,client_id,event_type,summary,occurred_at) values
+  ('74000000-0000-0000-0000-000000000001','11000000-0000-0000-0000-000000000001','22000000-0000-0000-0000-000000000001','71000000-0000-0000-0000-000000000001','note','Synthetic A1',now()),
+  ('74000000-0000-0000-0000-000000000002','11000000-0000-0000-0000-000000000001','22000000-0000-0000-0000-000000000002','71000000-0000-0000-0000-000000000002','note','Synthetic A2',now()),
+  ('74000000-0000-0000-0000-000000000003','11000000-0000-0000-0000-000000000002','22000000-0000-0000-0000-000000000003','71000000-0000-0000-0000-000000000003','note','Synthetic B1',now());
+insert into client_followups(id,tenant_id,branch_id,client_id,due_date,notes,status) values
+  ('75000000-0000-0000-0000-000000000001','11000000-0000-0000-0000-000000000001','22000000-0000-0000-0000-000000000001','71000000-0000-0000-0000-000000000001','2099-02-01','Synthetic A1','open'),
+  ('75000000-0000-0000-0000-000000000002','11000000-0000-0000-0000-000000000001','22000000-0000-0000-0000-000000000002','71000000-0000-0000-0000-000000000002','2099-02-02','Synthetic A2','open'),
+  ('75000000-0000-0000-0000-000000000003','11000000-0000-0000-0000-000000000002','22000000-0000-0000-0000-000000000003','71000000-0000-0000-0000-000000000003','2099-02-03','Synthetic B1','open');
 
 insert into notification_templates(id,tenant_id,event_type,channel,title_template,body_template) values
   ('81000000-0000-0000-0000-000000000001','11000000-0000-0000-0000-000000000001','synthetic','in_app','Synthetic A','Synthetic A'),
@@ -162,7 +162,7 @@ insert into notification_rules(id,tenant_id,event_type,template_id) values
 insert into notifications(id,tenant_id,user_profile_id,event_type,title,message) values
   ('83000000-0000-0000-0000-000000000001','11000000-0000-0000-0000-000000000001','44000000-0000-0000-0000-000000000007','synthetic','Synthetic','Synthetic');
 insert into notification_logs(id,notification_id,channel,status,provider_response) values
-  ('84000000-0000-0000-0000-000000000001','83000000-0000-0000-0000-000000000001','in_app','synthetic','{"synthetic":true}');
+  ('84000000-0000-0000-0000-000000000001','83000000-0000-0000-0000-000000000001','in_app','delivered','{"synthetic":true}');
 
 insert into performance_snapshots(id,tenant_id,branch_id,user_profile_id,period_start,period_end)
 select ('90000000-0000-0000-0000-' || lpad(n::text,12,'0'))::uuid,
@@ -171,12 +171,12 @@ select ('90000000-0000-0000-0000-' || lpad(n::text,12,'0'))::uuid,
   ('44000000-0000-0000-0000-' || lpad(n::text,12,'0'))::uuid,'2099-01-01'::date,'2099-01-31'::date
 from generate_series(1,10) n
 union all select '90000000-0000-0000-0000-000000000012','11000000-0000-0000-0000-000000000002','22000000-0000-0000-0000-000000000003','44000000-0000-0000-0000-000000000012','2099-01-01'::date,'2099-01-31'::date;
-insert into export_logs(id,tenant_id,user_profile_id,export_type)
+insert into export_logs(id,tenant_id,user_profile_id,report_key,request_key)
 select ('91000000-0000-0000-0000-' || lpad(n::text,12,'0'))::uuid,
   '11000000-0000-0000-0000-000000000001'::uuid,
-  ('44000000-0000-0000-0000-' || lpad(n::text,12,'0'))::uuid,'synthetic'
+  ('44000000-0000-0000-0000-' || lpad(n::text,12,'0'))::uuid,'task_operations',('92000000-0000-0000-0000-' || lpad(n::text,12,'0'))::uuid
 from generate_series(1,10) n
-union all select '91000000-0000-0000-0000-000000000012','11000000-0000-0000-0000-000000000002','44000000-0000-0000-0000-000000000012','synthetic';
+union all select '91000000-0000-0000-0000-000000000012','11000000-0000-0000-0000-000000000002','44000000-0000-0000-0000-000000000012','task_operations','92000000-0000-0000-0000-000000000012';
 
 -- 14 RLS assertions.
 select ok(c.relrowsecurity, format('RLS is enabled on %s', t.table_name))
@@ -225,7 +225,7 @@ from unnest(array[
   'idx_notification_templates_tenant_event_channel_active','idx_notification_rules_tenant_event_active',
   'idx_notification_rules_template','idx_notification_logs_notification',
   'idx_performance_snapshots_tenant_user_period','idx_performance_snapshots_tenant_branch_period',
-  'idx_export_logs_tenant_user_created'
+  'idx_export_logs_requester_history'
 ]) t(index_name);
 
 -- Inactive admin: every SELECT-enabled Phase 3A surface and form_templates is empty.
@@ -325,16 +325,16 @@ select is((select count(*)::int from walkin_entries where id='72000000-0000-0000
 select is((select count(*)::int from walkin_uploads where id='73000000-0000-0000-0000-000000000001'),1,'manager sees upload inherited from own visit branch');
 select is((select count(*)::int from walkin_uploads where id='73000000-0000-0000-0000-000000000002'),0,'manager cannot see upload from another visit branch');
 select is((select count(*)::int from walkin_uploads where id='73000000-0000-0000-0000-000000000004'),0,'manager cannot see upload through a cross-tenant client relationship');
-select is((select count(*)::int from client_timeline),1,'manager sees own-client-branch timeline only');
-select is((select count(*)::int from client_followups),1,'manager sees own-client-branch followups only');
+select is((select count(*)::int from client_timeline),2,'manager sees timelines for home-branch and own-visit-branch clients');
+select is((select count(*)::int from client_followups),2,'manager sees followups for home-branch and own-visit-branch clients');
 select set_config('request.jwt.claim.sub','aa000000-0000-0000-0000-000000000005',true);
 select is((select count(*)::int from walkin_entries where id in ('72000000-0000-0000-0000-000000000001','72000000-0000-0000-0000-000000000003')),2,'crm sees own-visit-branch walk-ins');
 select is((select count(*)::int from walkin_entries where id='72000000-0000-0000-0000-000000000002'),0,'crm cannot see another visit branch');
 select is((select count(*)::int from walkin_uploads where id='73000000-0000-0000-0000-000000000001'),1,'crm sees upload inherited from own visit branch');
 select is((select count(*)::int from walkin_uploads where id='73000000-0000-0000-0000-000000000002'),0,'crm cannot see upload from another visit branch');
 select is((select count(*)::int from walkin_uploads where id='73000000-0000-0000-0000-000000000004'),0,'crm cannot see upload through a cross-tenant client relationship');
-select is((select count(*)::int from client_timeline),1,'crm sees own-client-branch timeline only');
-select is((select count(*)::int from client_followups),1,'crm sees own-client-branch followups only');
+select is((select count(*)::int from client_timeline),2,'crm sees timelines for home-branch and own-visit-branch clients');
+select is((select count(*)::int from client_followups),2,'crm sees followups for home-branch and own-visit-branch clients');
 select set_config('request.jwt.claim.sub','aa000000-0000-0000-0000-000000000004',true);
 select is((select count(*)::int from walkin_entries)+(select count(*)::int from walkin_uploads)+(select count(*)::int from client_timeline)+(select count(*)::int from client_followups),0,'hr is denied CRM tables');
 select set_config('request.jwt.claim.sub','aa000000-0000-0000-0000-000000000006',true);
@@ -349,14 +349,14 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','aa000000-0000-0000-0000-000000000003',true);
-select is((select count(*)::int from fms_stage_assignees where id='63000000-0000-0000-0000-000000000001'),1,'manager sees own-branch assignee rule');
+select is((select count(*)::int from fms_stage_assignees where id='63000000-0000-0000-0000-000000000001'),0,'manager cannot see draft own-branch assignee rule');
 select is((select count(*)::int from fms_stage_assignees where id='63000000-0000-0000-0000-000000000002'),0,'manager cannot see another-branch assignee rule');
-select is((select count(*)::int from fms_stage_assignees where id='63000000-0000-0000-0000-000000000003'),1,'manager sees own-branch user on global flow');
+select is((select count(*)::int from fms_stage_assignees where id='63000000-0000-0000-0000-000000000003'),0,'manager cannot see draft global-flow assignee rule');
 select is((select count(*)::int from fms_stage_assignees where id='63000000-0000-0000-0000-000000000004'),0,'manager cannot see another-branch user identifier on global flow');
 select is((select count(*)::int from fms_stage_assignees where id in ('63000000-0000-0000-0000-000000000005','63000000-0000-0000-0000-000000000006','63000000-0000-0000-0000-000000000007')),0,'cross-tenant and malformed assignee relationships fail closed');
-select is((select count(*)::int from fms_branch_rules where id='64000000-0000-0000-0000-000000000003'),1,'manager sees global source targeting own branch');
+select is((select count(*)::int from fms_branch_rules where id='64000000-0000-0000-0000-000000000003'),0,'manager cannot see draft global source rule targeting own branch');
 select is((select count(*)::int from fms_branch_rules where id='64000000-0000-0000-0000-000000000004'),0,'manager cannot see global source targeting another branch');
-select is((select count(*)::int from fms_branch_rules where id='64000000-0000-0000-0000-000000000005'),1,'manager sees global source targeting global flow');
+select is((select count(*)::int from fms_branch_rules where id='64000000-0000-0000-0000-000000000005'),0,'manager cannot see draft global source rule targeting global flow');
 select is((select count(*)::int from fms_branch_rules where id in ('64000000-0000-0000-0000-000000000006','64000000-0000-0000-0000-000000000007','64000000-0000-0000-0000-000000000008','64000000-0000-0000-0000-000000000009')),0,'invalid stage, tenant, ambiguous, and targetless rules fail closed');
 select set_config('request.jwt.claim.sub','aa000000-0000-0000-0000-000000000002',true);
 select is((select count(*)::int from fms_stage_assignees where id='63000000-0000-0000-0000-000000000004'),1,'admin sees valid same-tenant global-flow specific user');
@@ -388,14 +388,14 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','aa000000-0000-0000-0000-000000000002',true);
-select is((select count(*)::int from notification_templates),1,'admin sees own non-null notification template only');
-select is((select count(*)::int from notification_rules),2,'admin sees valid template and nullable-template rules only');
+select is((select count(*)::int from notification_templates),17,'admin sees own seeded and synthetic non-null notification templates only');
+select is((select count(*)::int from notification_rules),18,'admin sees seeded, valid-template, and nullable-template rules only');
 select is((select count(*)::int from notification_rules where id='82000000-0000-0000-0000-000000000003'),0,'admin cannot see rule with cross-tenant template relationship');
 select is((select count(*)::int from notification_rules where id='82000000-0000-0000-0000-000000000005'),0,'admin cannot see null-tenant notification rule');
 select throws_ok($$select provider_response from notification_logs$$,'42501',null,'authenticated admin cannot read notification_logs provider_response');
 select set_config('request.jwt.claim.sub','aa000000-0000-0000-0000-000000000001',true);
-select is((select count(*)::int from notification_templates),1,'super_admin sees own non-null definitions only');
-select is((select count(*)::int from notification_rules),2,'super_admin sees only valid own-tenant notification rules');
+select is((select count(*)::int from notification_templates),17,'super_admin sees own seeded and synthetic non-null definitions only');
+select is((select count(*)::int from notification_rules),18,'super_admin sees only valid own-tenant notification rules');
 select set_config('request.jwt.claim.sub','aa000000-0000-0000-0000-000000000003',true);
 select is((select count(*)::int from notification_templates)+(select count(*)::int from notification_rules),0,'manager is denied notification definitions');
 select set_config('request.jwt.claim.sub','aa000000-0000-0000-0000-000000000004',true);

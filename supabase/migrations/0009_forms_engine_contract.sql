@@ -272,9 +272,12 @@ begin
     if v_type in ('select','multiselect','radio') then
       if jsonb_typeof(v_options) <> 'array' or jsonb_array_length(v_options) not between 1 and 100
          or exists (select 1 from jsonb_array_elements(v_options) option_value where jsonb_typeof(option_value) <> 'string' or length(btrim(option_value #>> '{}')) not between 1 and 200)
-         or (select count(*) from jsonb_array_elements_text(v_options)) <> (select count(distinct option_value) from jsonb_array_elements_text(v_options) option_value) then
+         or (select count(*) from jsonb_array_elements_text(v_options)) <> (select count(distinct btrim(option_value)) from jsonb_array_elements_text(v_options) option_value) then
         raise exception 'Option fields require 1 to 100 unique bounded string options' using errcode = '22023';
       end if;
+      select jsonb_agg(to_jsonb(btrim(option_value)) order by option_order)
+      into v_options
+      from jsonb_array_elements_text(v_options) with ordinality as option_entry(option_value, option_order);
     elsif v_options is not null then
       raise exception 'Options are allowed only for select, multiselect, and radio fields' using errcode = '22023';
     end if;
@@ -822,12 +825,19 @@ begin
       or (v_actor.user_role='manager' and v_task.branch_id=v_actor.branch_id)
       or exists(select 1 from task_assignees ta where ta.task_instance_id=v_task.id and ta.user_profile_id=v_actor.id and ta.is_active and ta.role_at_task='doer')
     ) then raise exception 'Caller is not an active task participant or correctly scoped reviewer' using errcode='42501'; end if;
+    if v_task.status='completed' then
+      raise exception 'Completed tasks cannot accept new form submissions' using errcode='23514';
+    end if;
   end if;
 
   for v_field in select * from form_fields where form_template_id=v_template.id order by sort_order loop
     v_visible := v_field.is_shown and form_condition_matches(v_field.conditional_logic,v_normalized);
     v_value := p_answers->v_field.field_key;
     if not v_visible or v_field.field_type in ('section_header','divider') then continue; end if;
+    if v_field.field_type in ('text','textarea','email','phone','date','datetime','select','radio','user_dropdown','branch_dropdown','department_dropdown')
+       and jsonb_typeof(v_value)='string' then
+      v_value := to_jsonb(btrim(v_value #>> '{}'));
+    end if;
     v_empty := v_value is null or v_value='null'::jsonb or v_value='""'::jsonb or v_value='[]'::jsonb;
     if v_field.is_required and (v_empty or (v_field.field_type='checkbox' and v_value<>'true'::jsonb)) then
       raise exception 'Required visible field % is missing',v_field.field_key using errcode='23514';
@@ -836,7 +846,7 @@ begin
 
     if v_field.field_type in ('text','textarea','email','phone','date','datetime','select','radio','user_dropdown','branch_dropdown','department_dropdown') then
       if jsonb_typeof(v_value)<>'string' then raise exception 'Field % must be a string',v_field.field_key using errcode='22023'; end if;
-      v_text := btrim(v_value #>> '{}');
+      v_text := v_value #>> '{}';
       if length(v_text)>5000 then raise exception 'Field % exceeds the value limit',v_field.field_key using errcode='22023'; end if;
       if v_field.field_type='email' and v_text !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$' then raise exception 'Field % is not a valid email',v_field.field_key using errcode='22023'; end if;
       if v_field.field_type='phone' and (v_text !~ '^[0-9+() .-]+$' or length(regexp_replace(v_text,'\D','','g')) not between 7 and 15) then raise exception 'Field % is not a valid phone number',v_field.field_key using errcode='22023'; end if;

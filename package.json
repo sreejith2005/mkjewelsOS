@@ -11,6 +11,7 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "seed": "tsx supabase/seed.ts",
+    "seed:local": "powershell -NoProfile -ExecutionPolicy Bypass -File supabase/seed-local.ps1",
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {

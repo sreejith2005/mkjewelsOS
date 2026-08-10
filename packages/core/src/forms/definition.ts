@@ -54,8 +54,9 @@ export function validateFormDefinition(template: FormTemplateDefinition): readon
     if (!field.label || field.label.length > 200) issues.push({ code: "invalid_label", fieldKey: field.key, message: "Field label must contain 1 to 200 characters" });
     if ((field.placeholder?.length ?? 0) > 300 || (field.helperText?.length ?? 0) > 500) issues.push({ code: "invalid_help_text", fieldKey: field.key, message: "Field helper text is too long" });
     const options = field.options ?? [];
+    const canonicalOptions = options.map((option) => option.trim());
     if (OPTION_TYPES.has(field.type)) {
-      if (options.length === 0 || options.length > 100 || new Set(options).size !== options.length || options.some((option) => !option || option.length > 200)) {
+      if (canonicalOptions.length === 0 || canonicalOptions.length > 100 || new Set(canonicalOptions).size !== canonicalOptions.length || canonicalOptions.some((option) => !option || option.length > 200)) {
         issues.push({ code: "invalid_options", fieldKey: field.key, message: "Option fields require 1 to 100 unique bounded options" });
       }
     } else if (options.length > 0) issues.push({ code: "unexpected_options", fieldKey: field.key, message: "This field type cannot define options" });

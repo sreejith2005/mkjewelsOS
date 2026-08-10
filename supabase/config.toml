@@ -2,3 +2,12 @@
 # deployment secret from x-cron-secret before parsing input or accessing data.
 [functions.generate-recurring-tasks]
 verify_jwt = false
+
+# This worker verifies a dedicated server-side x-cron-secret before any body
+# parsing or database access. No browser client may invoke it.
+[functions.process-notification-outbox]
+verify_jwt = false
+
+# Dedicated scheduler secret is verified before body parsing or database work.
+[functions.process-report-exports]
+verify_jwt = false

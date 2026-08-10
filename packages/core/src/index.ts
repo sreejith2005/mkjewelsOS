@@ -44,3 +44,9 @@ export type { TaskChecklistProgress, TaskChecklistProgressItem } from "./taskChe
 export { deriveTaskMutationCapability } from "./taskCapabilities";
 export type { TaskMutationCapability } from "./taskCapabilities";
 export * from "./forms";
+export * from "./fms";
+export * from "./notifications";
+export * from "./crm";
+export * from "./analytics";
+export * from "./reports";
+export * from "./settings";

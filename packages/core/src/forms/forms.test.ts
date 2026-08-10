@@ -52,6 +52,11 @@ describe("Forms definition contract", () => {
     expect(new Set(issues.map((issue) => issue.code))).toEqual(expect.objectContaining(new Set(["invalid_options", "duplicate_key", "invalid_order", "unexpected_options", "layout_required", "invalid_validation"])));
   });
 
+  it("canonicalizes option whitespace and rejects duplicates after trimming", () => {
+    expect(normalizeFormDefinition(template([field("select", { options: [" Option ", "Other"] })])).fields[0]?.options).toEqual(["Option", "Other"]);
+    expect(validateFormDefinition(template([field("select", { options: ["Option", " Option "] })]))).toEqual(expect.arrayContaining([expect.objectContaining({ code: "invalid_options" })]));
+  });
+
   it("rejects missing, forward, and self dependencies, which also prevents cycles", () => {
     const issues = validateFormDefinition(template([
       field("text", { key: "a", condition: { fieldKey: "b", operator: "equals", value: "yes" } }),
@@ -114,6 +119,18 @@ describe("Forms visibility and answer validation", () => {
     expect(validateFormField(field("multiselect", { options: ["A", "B"] }), ["A", "C"], {})?.code).toBe("invalid_option");
   });
 
+  it.each(["text", "email", "phone", "select", "date", "datetime", "user_dropdown", "branch_dropdown", "department_dropdown"] as const)("rejects a whitespace-only required %s value", (type) => {
+    const options = type === "select" ? { options: ["Option"] } : {};
+    expect(validateFormField(field(type, { required: true, ...options }), "   ", {})?.code).toBe("required");
+  });
+
+  it("validates calendar dates strictly, including leap years", () => {
+    expect(validateFormField(field("date"), "2024-02-29", {})).toBeUndefined();
+    expect(validateFormField(field("date"), "2026-02-29", {})?.code).toBe("invalid_date");
+    expect(validateFormField(field("date"), "2026-02-30", {})?.code).toBe("invalid_date");
+    expect(validateFormField(field("datetime"), "2026-02-30T12:30:00Z", {})?.code).toBe("invalid_datetime");
+  });
+
   it("enforces scalar, array, and boolean shapes", () => {
     expect(validateFormField(field("text"), ["x"], {})?.code).toBe("invalid_shape");
     expect(validateFormField(field("number"), "1", {})?.code).toBe("invalid_shape");
@@ -125,6 +142,14 @@ describe("Forms visibility and answer validation", () => {
     const result = validateCompleteForm(template([field("text")]), { field_text: "ok", unexpected: "no" });
     expect(result.issues.map((issue) => issue.code)).toContain("unknown_answer");
   });
+
+  it("evaluates conditions against earlier normalized answers", () => {
+    const fields = [
+      field("text", { key: "source" }),
+      field("text", { key: "detail", sortOrder: 1, required: true, condition: { fieldKey: "source", operator: "equals", value: "Show" } }),
+    ];
+    expect(validateCompleteForm(template(fields), { source: " Show " }).issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: "required", fieldKey: "detail" })]));
+  });
 });
 
 describe("Forms answer normalization and formatting", () => {
@@ -135,6 +160,14 @@ describe("Forms answer normalization and formatting", () => {
       field("multiselect", { key: "choices", sortOrder: 2, options: ["A", "B"] }),
     ];
     expect(normalizeFormAnswers(template(fields), { amount: "0", hidden: "secret", choices: [" A ", "A", "B"] })).toEqual({ amount: 0, choices: ["A", "B"] });
+  });
+
+  it("normalizes sequentially before evaluating later conditions", () => {
+    const fields = [
+      field("text", { key: "source" }),
+      field("text", { key: "detail", sortOrder: 1, condition: { fieldKey: "source", operator: "equals", value: "Show" } }),
+    ];
+    expect(normalizeFormAnswers(template(fields), { source: " Show ", detail: " kept " })).toEqual({ source: "Show", detail: "kept" });
   });
 
   it("formats from stable keys without storing a label-keyed duplicate", () => {

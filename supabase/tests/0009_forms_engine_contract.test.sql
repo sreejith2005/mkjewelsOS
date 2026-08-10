@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(108);
+select plan(125);
 
 -- Synthetic fixtures only. No production rows or personal information.
 insert into auth.users(id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
@@ -102,7 +102,7 @@ select lives_ok($$select save_form_draft_with_audit(null,
    {"key":"phone_value","label":"Phone","type":"phone"},
    {"key":"date_value","label":"Date","type":"date"},
    {"key":"datetime_value","label":"Datetime","type":"datetime"},
-   {"key":"select_value","label":"Select","type":"select","options":["Show","Hide"]},
+   {"key":"select_value","label":"Select","type":"select","options":[" Show ","Hide"]},
    {"key":"multi_value","label":"Multi","type":"multiselect","options":["A","B"]},
    {"key":"radio_value","label":"Radio","type":"radio","options":["R1","R2"]},
    {"key":"confirmed","label":"Confirmed","type":"checkbox","required":true},
@@ -120,6 +120,7 @@ select is((select lifecycle::text from form_templates where name='Phase 4 Compre
 select is((select count(*)::int from form_fields where form_template_id=(select id from form_templates where name='Phase 4 Comprehensive')),19,'all supported fields are stored');
 select is((select min(sort_order)::int from form_fields where form_template_id=(select id from form_templates where name='Phase 4 Comprehensive')),0,'field ordering starts at zero');
 select is((select max(sort_order)::int from form_fields where form_template_id=(select id from form_templates where name='Phase 4 Comprehensive')),18,'field ordering is contiguous');
+select is((select options from form_fields where form_template_id=(select id from form_templates where name='Phase 4 Comprehensive') and field_key='select_value'),'["Show", "Hide"]'::jsonb,'options are stored in canonical trimmed form');
 select is((select count(*)::int from audit_logs where action='form_draft_created' and record_id=(select id from form_templates where name='Phase 4 Comprehensive')),1,'draft creation is audited transactionally');
 
 set local role authenticated;
@@ -136,6 +137,7 @@ select throws_ok($$select save_form_draft_with_audit(null,'{"name":"Unknown","un
 select throws_ok($$select save_form_draft_with_audit(null,'{"name":"Bad Fields"}','[{"key":"same","label":"One","type":"text"},{"key":"same","label":"Two","type":"text"}]')$$,'22023',null,'duplicate field keys are rejected');
 select throws_ok($$select save_form_draft_with_audit(null,'{"name":"Forward Dependency"}','[{"key":"first","label":"First","type":"text","condition":{"fieldKey":"later","operator":"equals","value":"x"}},{"key":"later","label":"Later","type":"text"}]')$$,'22023',null,'missing and forward dependencies are rejected');
 select throws_ok($$select save_form_draft_with_audit(null,'{"name":"Bad Options"}','[{"key":"choice","label":"Choice","type":"select","options":["A","A"]}]')$$,'22023',null,'duplicate options are rejected');
+select throws_ok($$select save_form_draft_with_audit(null,'{"name":"Canonical Duplicate Options"}','[{"key":"choice","label":"Choice","type":"select","options":["Option"," Option "]}]')$$,'22023',null,'options duplicated after trimming are rejected');
 select throws_ok($$select save_form_draft_with_audit(null,'{"name":"Too Many Options"}',jsonb_build_array(jsonb_build_object('key','choice','label','Choice','type','select','options',(select jsonb_agg(n::text) from generate_series(1,101) n))))$$,'22023',null,'more than 100 options are rejected');
 select throws_ok($$select save_form_draft_with_audit(null,'{"name":"Too Many Fields"}',(select jsonb_agg(jsonb_build_object('key','field_'||n,'label','Field '||n,'type','text')) from generate_series(1,101) n))$$,'22023',null,'more than 100 fields are rejected');
 reset role;
@@ -181,14 +183,48 @@ select is((select count(*)::int from audit_logs where action='form_submitted' an
 
 set local role authenticated;
 select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','a9000000-0000-0000-0000-000000000002',true);
+select lives_ok($$select save_form_draft_with_audit(null,
+  '{"name":"Required String Contract","branch_id":"29000000-0000-0000-0000-000000000001","department_id":"39000000-0000-0000-0000-000000000001"}',
+  '[
+   {"key":"text_value","label":"Text","type":"text","required":true},
+   {"key":"email_value","label":"Email","type":"email","required":true},
+   {"key":"phone_value","label":"Phone","type":"phone","required":true},
+   {"key":"select_value","label":"Select","type":"select","required":true,"options":["Option"]},
+   {"key":"date_value","label":"Date","type":"date","required":true},
+   {"key":"datetime_value","label":"Datetime","type":"datetime","required":true},
+   {"key":"user_value","label":"User","type":"user_dropdown","required":true},
+   {"key":"branch_value","label":"Branch","type":"branch_dropdown","required":true},
+   {"key":"department_value","label":"Department","type":"department_dropdown","required":true}
+  ]'::jsonb)$$,'required string contract draft is valid');
+select lives_ok($$select publish_form_with_audit((select id from form_templates where name='Required String Contract'))$$,'required string contract publishes');
+select throws_ok(
+  format(
+    'select submit_form_with_audit(%L,%L::jsonb)',
+    (select id from form_templates where name='Required String Contract' and lifecycle='published'),
+    jsonb_build_object(
+      'text_value','ok','email_value','synthetic@example.invalid','phone_value','+91 99999 99999','select_value','Option',
+      'date_value','2024-02-29','datetime_value','2024-02-29T12:30:00Z','user_value','49000000-0000-0000-0000-000000000002',
+      'branch_value','29000000-0000-0000-0000-000000000001','department_value','39000000-0000-0000-0000-000000000001'
+    ) || jsonb_build_object(required_key,'   ')
+  ),
+  '23514',null,format('required %s rejects whitespace-only input',required_key)
+)
+from unnest(array['text_value','email_value','phone_value','select_value','date_value','datetime_value','user_value','branch_value','department_value']) required_key;
+reset role;
+
+set local role authenticated;
+select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','a9000000-0000-0000-0000-000000000005',true);
 select throws_ok($$select submit_form_with_audit((select id from form_templates where name='Phase 4 Comprehensive' and lifecycle='published'),'{"unknown":"x"}')$$,'22023',null,'unknown answer keys are rejected');
 select throws_ok($$select submit_form_with_audit((select id from form_templates where name='Phase 4 Comprehensive' and lifecycle='published'),'{"short_text":"ok","select_value":"Bad","confirmed":true}')$$,'22023',null,'invalid options are rejected');
 select throws_ok($$select submit_form_with_audit((select id from form_templates where name='Phase 4 Comprehensive' and lifecycle='published'),'{"short_text":"ok","select_value":"Hide","confirmed":false}')$$,'23514',null,'required checkbox must be true');
-select throws_ok($$select submit_form_with_audit((select id from form_templates where name='Phase 4 Comprehensive' and lifecycle='published'),'{"short_text":"ok","select_value":"Show","confirmed":true}')$$,'23514',null,'visible conditional required field is enforced');
+select throws_ok($$select submit_form_with_audit((select id from form_templates where name='Phase 4 Comprehensive' and lifecycle='published'),'{"short_text":"ok","select_value":" Show ","confirmed":true}')$$,'23514',null,'conditions use the earlier whitespace-normalized answer');
 select throws_ok($$select submit_form_with_audit((select id from form_templates where name='Phase 4 Comprehensive' and lifecycle='published'),'{"short_text":"ok","number_value":"1","select_value":"Hide","confirmed":true}')$$,'22023',null,'numeric string shape is rejected');
 select throws_ok($$select submit_form_with_audit((select id from form_templates where name='Phase 4 Comprehensive' and lifecycle='published'),'{"short_text":"ok","email_value":"bad","select_value":"Hide","confirmed":true}')$$,'22023',null,'invalid email is rejected');
-select throws_ok($$select submit_form_with_audit((select id from form_templates where name='Phase 4 Comprehensive' and lifecycle='published'),'{"short_text":"ok","date_value":"2026-02-31","select_value":"Hide","confirmed":true}')$$,'22023',null,'invalid calendar date is rejected');
+select lives_ok($$select submit_form_with_audit((select id from form_templates where name='Phase 4 Comprehensive' and lifecycle='published'),'{"short_text":"leap","date_value":"2024-02-29","select_value":"Hide","confirmed":true}')$$,'valid leap-year calendar date is accepted');
+select throws_ok($$select submit_form_with_audit((select id from form_templates where name='Phase 4 Comprehensive' and lifecycle='published'),'{"short_text":"ok","date_value":"2026-02-29","select_value":"Hide","confirmed":true}')$$,'22023',null,'non-leap February 29 is rejected');
+select throws_ok($$select submit_form_with_audit((select id from form_templates where name='Phase 4 Comprehensive' and lifecycle='published'),'{"short_text":"ok","date_value":"2026-02-30","select_value":"Hide","confirmed":true}')$$,'22023',null,'impossible calendar date is rejected');
 select throws_ok($$select submit_form_with_audit((select id from form_templates where name='Phase 4 Comprehensive' and lifecycle='published'),jsonb_build_object('short_text',repeat('x',70000),'select_value','Hide','confirmed',true))$$,'22023',null,'oversized answer payload is rejected');
 reset role;
 
@@ -207,6 +243,13 @@ select is((select count(*)::int from form_templates where name='Phase 4 Comprehe
 select lives_ok($$select submit_form_with_audit((select id from form_templates where name='Phase 4 Comprehensive' and lifecycle='published'),'{"short_text":"task","select_value":"Hide","confirmed":true}','checklist_task','59000000-0000-0000-0000-000000000001')$$,'active doer submits exact task form');
 select throws_ok($$select submit_form_with_audit((select id from form_templates where name='Phase 4 Comprehensive' and lifecycle='published'),'{"short_text":"task","select_value":"Hide","confirmed":true}','delegation_task','59000000-0000-0000-0000-000000000001')$$,'42501',null,'wrong task module is denied');
 select throws_ok($$select submit_form_with_audit((select id from form_templates where name='Phase 4 Comprehensive' and lifecycle='published'),'{"short_text":"task","select_value":"Hide","confirmed":true}','checklist_task','59000000-0000-0000-0000-000000000002')$$,'42501',null,'arbitrary task link is denied');
+reset role;
+update task_instances set status='completed' where id='59000000-0000-0000-0000-000000000001';
+set local role authenticated;
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','a9000000-0000-0000-0000-000000000006',true);
+select is((select count(*)::int from form_templates where name='Phase 4 Comprehensive'),1,'completed task keeps historical access to its exact form version');
+select throws_ok($$select submit_form_with_audit((select id from form_templates where name='Phase 4 Comprehensive' and lifecycle='published'),'{"short_text":"late","select_value":"Hide","confirmed":true}','checklist_task','59000000-0000-0000-0000-000000000001')$$,'23514',null,'completed task rejects a new linked submission');
 select set_config('request.jwt.claim.sub','a9000000-0000-0000-0000-000000000007',true);
 select is((select count(*)::int from form_templates where name='Phase 4 Comprehensive'),0,'housekeeping has no general Forms Library access');
 select throws_ok($$select submit_form_with_audit((select id from form_templates where name='Phase 4 Comprehensive' and lifecycle='published'),'{"short_text":"task","select_value":"Hide","confirmed":true}','checklist_task','59000000-0000-0000-0000-000000000001')$$,'42501',null,'nonparticipant housekeeping cannot submit task form');
@@ -235,16 +278,16 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','a9000000-0000-0000-0000-000000000005',true);
-select is((select count(*)::int from form_submissions where submitted_by='49000000-0000-0000-0000-000000000005'),1,'submission owner reads own submission');
+select is((select count(*)::int from form_submissions where submitted_by='49000000-0000-0000-0000-000000000005' and data->>'short_text'='ok'),1,'submission owner reads own submission');
 select set_config('request.jwt.claim.sub','a9000000-0000-0000-0000-000000000004',true);
 select is((select count(*)::int from form_submissions where submitted_by='49000000-0000-0000-0000-000000000005'),0,'other-branch manager cannot read submission');
-select throws_ok($$select review_form_submission_with_audit((select id from form_submissions where submitted_by='49000000-0000-0000-0000-000000000005'),'approved','denied')$$,'42501',null,'other-branch manager cannot review submission');
+select throws_ok($$select review_form_submission_with_audit((select id from form_submissions where submitted_by='49000000-0000-0000-0000-000000000005' and data->>'short_text'='ok'),'approved','denied')$$,'42501',null,'other-branch manager cannot review submission');
 select set_config('request.jwt.claim.sub','a9000000-0000-0000-0000-000000000003',true);
-select lives_ok($$select review_form_submission_with_audit((select id from form_submissions where submitted_by='49000000-0000-0000-0000-000000000005'),'approved','synthetic approved')$$,'own-branch manager reviews submission');
-select throws_ok($$select review_form_submission_with_audit((select id from form_submissions where submitted_by='49000000-0000-0000-0000-000000000005'),'rejected','second decision')$$,'42501',null,'reviewed submission cannot be silently moved again');
+select lives_ok($$select review_form_submission_with_audit((select id from form_submissions where submitted_by='49000000-0000-0000-0000-000000000005' and data->>'short_text'='ok'),'approved','synthetic approved')$$,'own-branch manager reviews submission');
+select throws_ok($$select review_form_submission_with_audit((select id from form_submissions where submitted_by='49000000-0000-0000-0000-000000000005' and data->>'short_text'='ok'),'rejected','second decision')$$,'42501',null,'reviewed submission cannot be silently moved again');
 reset role;
-select is((select status::text from form_submissions where submitted_by='49000000-0000-0000-0000-000000000005'),'approved','review decision is stored');
-select is((select count(*)::int from audit_logs where action='form_submission_approved' and record_id=(select id from form_submissions where submitted_by='49000000-0000-0000-0000-000000000005')),1,'review is audited transactionally');
+select is((select status::text from form_submissions where submitted_by='49000000-0000-0000-0000-000000000005' and data->>'short_text'='ok'),'approved','review decision is stored');
+select is((select count(*)::int from audit_logs where action='form_submission_approved' and record_id=(select id from form_submissions where submitted_by='49000000-0000-0000-0000-000000000005' and data->>'short_text'='ok')),1,'review is audited transactionally');
 
 -- Cross-tenant and anonymous denial plus prior migration regressions.
 set local role authenticated;

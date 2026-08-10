@@ -4,9 +4,12 @@ import {
   CalendarCheck,
   CheckSquare,
   ClipboardList,
+  FileSpreadsheet,
+  GitBranch,
   Home,
   LayoutDashboard,
   ListFilter,
+  Settings,
   Users,
 } from "lucide-react";
 import {
@@ -18,15 +21,24 @@ import {
 import { AuthProvider, useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
 import { ApplicationShell } from "@/components/shell/ApplicationShell";
+import { LazyPageErrorBoundary } from "@/components/LazyPageErrorBoundary";
 import type { LauncherItem } from "@/components/shell/AppLauncher";
 import logoDarkUrl from "../../../mk-jewels-logos/WhatsApp Image 2026-06-24 at 13.01.41 (1).jpeg";
 import logoLightUrl from "../../../mk-jewels-logos/WhatsApp Image 2026-06-24 at 13.01.40 (1).jpeg";
 
 const AvailabilityPage = lazy(() => import("@/pages/AvailabilityPage").then((module) => ({ default: module.AvailabilityPage })));
+const HomePage = lazy(() => import("@/pages/HomePage").then((module) => ({ default: module.HomePage })));
 const DashboardPage = lazy(() => import("@/pages/DashboardPage").then((module) => ({ default: module.DashboardPage })));
 const DropdownMasterPage = lazy(() => import("@/pages/DropdownMasterPage").then((module) => ({ default: module.DropdownMasterPage })));
+const FormsPage = lazy(() => import("@/pages/FormsPage").then((module) => ({ default: module.FormsPage })));
+const FMSBuilderPage = lazy(() => import("@/pages/FMSBuilderPage").then((module) => ({ default: module.FMSBuilderPage })));
+const FMSTasksPage = lazy(() => import("@/pages/FMSTasksPage").then((module) => ({ default: module.FMSTasksPage })));
+const NotificationsPage = lazy(() => import("@/pages/NotificationsPage").then((module) => ({ default: module.NotificationsPage })));
+const CRMPage = lazy(() => import("@/pages/CRMPage").then((module) => ({ default: module.CRMPage })));
 const TasksPage = lazy(() => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
 const UserManagementPage = lazy(() => import("@/pages/UserManagementPage").then((module) => ({ default: module.UserManagementPage })));
+const ReportsPage = lazy(() => import("@/pages/ReportsPage").then((module) => ({ default: module.ReportsPage })));
+const SettingsPage = lazy(() => import("@/pages/SettingsPage").then((module) => ({ default: module.SettingsPage })));
 
 const PAGE_ICONS: Record<PageId, typeof Home> = {
   home: Home,
@@ -34,31 +46,46 @@ const PAGE_ICONS: Record<PageId, typeof Home> = {
   crm: Users,
   checklist_tasks: CheckSquare,
   delegation_tasks: ClipboardList,
-  fms_tasks: ClipboardList,
-  fms_builder: ClipboardList,
+  fms_tasks: GitBranch,
+  fms_builder: GitBranch,
   forms_library: ClipboardList,
   meeting_ai: ClipboardList,
   notifications: ClipboardList,
   users: Users,
   availability: CalendarCheck,
-  reports: ClipboardList,
+  reports: FileSpreadsheet,
   dropdown_master: ListFilter,
-  settings: ClipboardList,
+  settings: Settings,
 };
 
 const IMPLEMENTED_PAGES = new Set<PageId>([
+  "home",
   "dashboard",
   "checklist_tasks",
   "delegation_tasks",
   "users",
   "availability",
   "dropdown_master",
+  "forms_library",
+  "fms_tasks",
+  "fms_builder",
+  "notifications",
+  "crm",
+  "reports",
+  "settings",
 ]);
 
 const APP_DESCRIPTIONS: Partial<Record<PageId, string>> = {
+  home: "See today's authorized work, linked forms, FMS stages, and activity.",
+  dashboard: "Review truthful operational analytics and transparent formulas.",
+  crm: "Manage clients, walk-ins, interactions, follow-ups, and documents.",
+  fms_tasks: "Run assigned stages and authorized workflows.",
+  fms_builder: "Design and publish versioned process flows.",
   users: "Manage authorized employee accounts.",
   availability: "Record real working availability.",
   dropdown_master: "Maintain active master values.",
+  reports: "Preview fixed reports and manage private CSV exports.",
+  settings: "Manage account preferences and authorized organization defaults.",
 };
 
 function usePathname() {
@@ -69,8 +96,9 @@ function usePathname() {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
   const navigate = (nextPath: string) => {
-    if (nextPath !== window.location.pathname) window.history.pushState({}, "", nextPath);
-    setPath(nextPath);
+    const nextUrl = new URL(nextPath, window.location.origin);
+    if (`${nextUrl.pathname}${nextUrl.search}` !== `${window.location.pathname}${window.location.search}`) window.history.pushState({}, "", `${nextUrl.pathname}${nextUrl.search}`);
+    setPath(nextUrl.pathname);
   };
   return { navigate, path };
 }
@@ -149,11 +177,22 @@ function IncompleteAccount() {
 }
 
 function AppShell() {
-  const { branch, logout, profile } = useAuth();
+  const { branch, logout, preferences, profile } = useAuth();
   const { navigate, path } = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [appsOpen, setAppsOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  useEffect(() => {
+    if (!profile || path !== "/" || preferences.default_landing_page !== "dashboard") return;
+    const key = `jewelos-default-landing-${profile.id}`;
+    if (window.sessionStorage.getItem(key)) return;
+    window.sessionStorage.setItem(key, "applied");
+    navigate("/dashboard");
+  }, [navigate, path, preferences.default_landing_page, profile]);
+  useEffect(() => {
+    document.documentElement.dataset.tableDensity = preferences.table_density;
+    return () => { delete document.documentElement.dataset.tableDensity; };
+  }, [preferences.table_density]);
   const menu = useMemo(() => profile
     ? getMenuForRole(profile.user_role).filter((item) => IMPLEMENTED_PAGES.has(item.id))
     : [], [profile]);
@@ -170,12 +209,21 @@ function AppShell() {
   const requestedPage = getPageForPath(path) ?? "home";
   const allowed = IMPLEMENTED_PAGES.has(requestedPage) && canAccessPage(profile.user_role, requestedPage);
   const currentPage: PageId = allowed ? requestedPage : "dashboard";
-  const pageContent = currentPage === "users" ? <UserManagementPage />
+  const pageContent = currentPage === "home" ? <HomePage onNavigate={navigate} />
+    : currentPage === "dashboard" ? <DashboardPage />
+    : currentPage === "reports" ? <ReportsPage />
+    : currentPage === "settings" ? <SettingsPage />
+    : currentPage === "users" ? <UserManagementPage />
+    : currentPage === "crm" ? <CRMPage />
     : currentPage === "dropdown_master" ? <DropdownMasterPage />
       : currentPage === "checklist_tasks" ? <TasksPage />
         : currentPage === "delegation_tasks" ? <TasksPage delegatedView />
-          : currentPage === "availability" ? <AvailabilityPage />
-            : <DashboardPage items={launcherItems} onNavigate={navigate} />;
+      : currentPage === "availability" ? <AvailabilityPage />
+          : currentPage === "forms_library" ? <FormsPage />
+            : currentPage === "fms_tasks" ? <FMSTasksPage />
+              : currentPage === "fms_builder" ? <FMSBuilderPage />
+                : currentPage === "notifications" ? <NotificationsPage onNavigate={navigate} />
+            : <DashboardPage />;
 
   return (
     <ApplicationShell
@@ -191,12 +239,12 @@ function AppShell() {
       onAppsOpenChange={setAppsOpen}
       onLogout={logout}
       onMoreOpenChange={setMoreOpen}
-      path={currentPage === "dashboard" ? "/dashboard" : path}
+      path={path}
       profile={profile}
       setSidebarOpen={setSidebarOpen}
       sidebarOpen={sidebarOpen}
     >
-      <Suspense fallback={<div className="flex min-h-48 items-center justify-center text-gold">Loading…</div>}>{pageContent}</Suspense>
+      <LazyPageErrorBoundary onNavigate={navigate}><Suspense fallback={<div className="flex min-h-48 items-center justify-center text-gold">Loading…</div>}>{pageContent}</Suspense></LazyPageErrorBoundary>
     </ApplicationShell>
   );
 }

@@ -39,14 +39,14 @@ select is((
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
-), 49, 'exactly 49 postgres-owned public application functions exist after Phase 4A');
+), 171, 'exactly 171 postgres-owned public application functions exist after dashboard reports settings');
 select is((
   select count(*)::integer
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres' and p.prosecdef
-), 37, 'exactly 37 public application functions are SECURITY DEFINER after Phase 4A');
+), 143, 'exactly 143 public application functions are SECURITY DEFINER after dashboard reports settings');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -62,7 +62,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 34, 'authenticated can execute exactly 34 public application functions after Phase 4A');
+), 102, 'authenticated can execute exactly 102 public application functions after dashboard reports settings');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -70,7 +70,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('service_role', p.oid, 'EXECUTE')
-), 2, 'service_role can execute exactly two public application functions');
+), 13, 'service_role can execute exactly 13 public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -78,10 +78,9 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('postgres', p.oid, 'EXECUTE')
-), 49, 'postgres retains owner execution on every public application function');
+), 171, 'postgres retains owner execution on every public application function');
 
--- Exact authenticated allowlist: the 25 baseline functions plus nine Forms
--- policy/RPC entry points, and no extras.
+-- Exact authenticated allowlist: baseline, Forms, and reviewed FMS entry points.
 select ok(has_function_privilege('authenticated', 'current_profile()', 'EXECUTE'), 'authenticated executes current_profile');
 select ok(has_function_privilege('authenticated', 'current_role_level()', 'EXECUTE'), 'authenticated executes current_role_level');
 select ok(has_function_privilege('authenticated', 'current_tenant_id()', 'EXECUTE'), 'authenticated executes current_tenant_id');
@@ -132,7 +131,53 @@ select is((
       'create_form_revision_with_audit(uuid,jsonb)',
       'publish_form_with_audit(uuid)', 'archive_form_with_audit(uuid)',
       'submit_form_with_audit(uuid,jsonb,text,uuid)',
-      'review_form_submission_with_audit(uuid,text,text)'
+      'review_form_submission_with_audit(uuid,text,text)',
+      'archive_fms_flow_with_audit(uuid,text)', 'can_manage_fms_flow(uuid)',
+      'can_read_fms_evidence_object(text)', 'can_read_fms_instance(uuid)',
+      'can_start_fms_flow(uuid,uuid,uuid)', 'can_write_fms_evidence_object(text)',
+      'cancel_fms_instance_with_audit(uuid,text)', 'claim_fms_stage_with_audit(uuid)',
+      'complete_fms_stage_with_audit(uuid,text,text,jsonb,uuid)',
+      'create_fms_revision_with_audit(uuid)', 'escalate_fms_stage_with_audit(uuid,text)',
+      'hold_fms_instance_with_audit(uuid,text)',
+      'move_fms_stage_backward_with_audit(uuid,uuid,text,uuid)',
+      'publish_fms_flow_with_audit(uuid)',
+      'reassign_fms_stage_with_audit(uuid,uuid,uuid,text)',
+      'register_fms_evidence_with_audit(uuid,text,text,text,bigint)',
+      'request_fms_revision_with_audit(uuid,uuid,text,uuid)',
+      'resume_fms_instance_with_audit(uuid,text)',
+      'review_fms_stage_with_audit(uuid,text,text,uuid)',
+      'save_fms_flow_draft_with_audit(uuid,jsonb,jsonb)',
+      'start_fms_instance_with_audit(uuid,text,task_priority,jsonb,uuid,uuid,uuid)',
+      'update_fms_checklist_item_with_audit(uuid,boolean)',
+      'save_notification_template(uuid,text,text,text,text,text,text,boolean)',
+      'archive_notification_template(uuid)',
+      'save_notification_rule(uuid,text,text,jsonb,jsonb,jsonb,integer,integer,integer,integer,task_priority,boolean)',
+      'set_notification_rule_enabled(uuid,boolean)',
+      'archive_notification_rule(uuid)',
+      'mark_notification_read(uuid,boolean)',
+      'mark_all_notifications_read()',
+      'retry_notification_delivery(uuid)',
+      'get_notification_provider_availability()',
+      'list_notification_delivery_logs(text,text,text,text,timestamp with time zone,timestamp with time zone,integer,integer)',
+      'normalize_indian_phone(text)', 'assert_crm_actor()', 'can_read_crm_client(uuid)',
+      'lookup_crm_client_by_phone(text)', 'search_crm_clients(jsonb)', 'get_crm_client_detail(uuid)', 'list_crm_followups(jsonb)',
+      'create_crm_client(jsonb,uuid)', 'update_crm_client(uuid,jsonb,integer,uuid)',
+      'reassign_crm_client(uuid,uuid,uuid,integer,uuid)', 'record_crm_walkin(jsonb,uuid)',
+      'merge_crm_clients(uuid,uuid,uuid)', 'log_crm_interaction(uuid,jsonb,uuid)',
+      'correct_crm_interaction(uuid,jsonb,uuid)', 'create_crm_followup(uuid,jsonb,uuid)',
+      'reschedule_crm_followup(uuid,date,uuid,text,integer,uuid)',
+      'complete_crm_followup(uuid,text,integer,uuid)', 'cancel_crm_followup(uuid,text,integer,uuid)',
+      'register_crm_document(uuid,text,uuid,text,text,text,bigint,uuid)',
+      'remove_crm_document(uuid,text,uuid)', 'get_crm_document_path(uuid)', 'link_crm_record(uuid,text,uuid,uuid)',
+      'can_write_crm_document_object(text)', 'can_read_crm_document_object(text)',
+      'can_delete_crm_document_object(text)',
+      'get_home_summary(jsonb)', 'get_dashboard_metrics(jsonb)', 'get_report_data(text,jsonb)',
+      'request_report_export_with_audit(text,jsonb,uuid)',
+      'cancel_report_export_with_audit(uuid,uuid)', 'retry_report_export_with_audit(uuid,uuid)',
+      'get_report_export_download_url(uuid)', 'can_read_report_export_object(text)',
+      'save_user_preferences_with_audit(jsonb)',
+      'save_tenant_settings_with_audit(jsonb,integer,uuid)',
+      'save_branch_settings_with_audit(uuid,jsonb,integer,uuid)'
     ]::text[])
   )
   select count(*)::integer
@@ -147,6 +192,17 @@ select is((
 -- Exact service-role allowlist and preservation of recurrence table reads.
 select ok(has_function_privilege('service_role', 'invite_profile_with_audit(uuid,uuid,text,text,uuid,uuid,uuid,text,text,text[],user_role,text,uuid)', 'EXECUTE'), 'service_role executes invite_profile_with_audit');
 select ok(has_function_privilege('service_role', 'create_recurring_task_instance(uuid,date,jsonb)', 'EXECUTE'), 'service_role executes create_recurring_task_instance');
+select ok(has_function_privilege('service_role', 'process_notification_events(integer)', 'EXECUTE'), 'service_role processes notification events');
+select ok(has_function_privilege('service_role', 'claim_notification_deliveries(integer,uuid,integer)', 'EXECUTE'), 'service_role claims notification deliveries');
+select ok(has_function_privilege('service_role', 'finish_notification_delivery(uuid,text,text,text,boolean)', 'EXECUTE'), 'service_role finishes notification deliveries');
+select ok(has_function_privilege('service_role', 'detect_scheduled_notification_events(integer,timestamp with time zone)', 'EXECUTE'), 'service_role detects scheduled notification events');
+select ok(has_function_privilege('service_role', 'detect_crm_followup_events(integer,timestamp with time zone)', 'EXECUTE'), 'service_role detects CRM follow-up events');
+select ok(has_function_privilege('service_role', 'claim_report_exports(integer,uuid,integer)', 'EXECUTE'), 'service_role claims report exports');
+select ok(has_function_privilege('service_role', 'get_report_export_batch(uuid,integer,integer)', 'EXECUTE'), 'service_role reads bounded export batches');
+select ok(has_function_privilege('service_role', 'update_report_export_progress(uuid,uuid,integer,integer)', 'EXECUTE'), 'service_role updates export progress');
+select ok(has_function_privilege('service_role', 'finish_report_export(uuid,uuid,text,text,integer,text)', 'EXECUTE'), 'service_role finishes report exports');
+select ok(has_function_privilege('service_role', 'claim_report_export_cleanup(integer)', 'EXECUTE'), 'service_role claims expired export cleanup');
+select ok(has_function_privilege('service_role', 'mark_report_export_cleaned(uuid)', 'EXECUTE'), 'service_role records export cleanup');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -156,7 +212,18 @@ select is((
     and has_function_privilege('service_role', p.oid, 'EXECUTE')
     and p.oid::regprocedure::text not in (
       'invite_profile_with_audit(uuid,uuid,text,text,uuid,uuid,uuid,text,text,text[],user_role,text,uuid)',
-      'create_recurring_task_instance(uuid,date,jsonb)'
+      'create_recurring_task_instance(uuid,date,jsonb)',
+      'process_notification_events(integer)',
+      'claim_notification_deliveries(integer,uuid,integer)',
+      'finish_notification_delivery(uuid,text,text,text,boolean)',
+      'detect_scheduled_notification_events(integer,timestamp with time zone)',
+      'detect_crm_followup_events(integer,timestamp with time zone)'
+      ,'claim_report_exports(integer,uuid,integer)'
+      ,'get_report_export_batch(uuid,integer,integer)'
+      ,'update_report_export_progress(uuid,uuid,integer,integer)'
+      ,'finish_report_export(uuid,uuid,text,text,integer,text)'
+      ,'claim_report_export_cleanup(integer)'
+      ,'mark_report_export_cleaned(uuid)'
     )
 ), 0, 'service_role has no function outside its exact allowlist');
 select ok(has_table_privilege('service_role', 'task_templates', 'SELECT'), 'service_role retains task_templates SELECT');

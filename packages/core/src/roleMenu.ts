@@ -65,6 +65,8 @@ const COMMON_WORK_PAGES: readonly PageId[] = [
   "meeting_ai",
   "notifications",
   "availability",
+  "reports",
+  "settings",
 ];
 
 export const ROLE_PAGES: Readonly<Record<UserRole, readonly PageId[]>> = {
@@ -80,6 +82,7 @@ export const ROLE_PAGES: Readonly<Record<UserRole, readonly PageId[]>> = {
     "users",
     "availability",
     "reports",
+    "settings",
   ],
   crm: [...COMMON_WORK_PAGES, "crm", "reports"],
   staff: COMMON_WORK_PAGES,
@@ -91,13 +94,18 @@ export const ROLE_PAGES: Readonly<Record<UserRole, readonly PageId[]>> = {
     "fms_tasks",
     "notifications",
     "availability",
+    "reports",
+    "settings",
   ],
   housekeeping: [
     "home",
+    "dashboard",
     "checklist_tasks",
     "delegation_tasks",
     "notifications",
     "availability",
+    "reports",
+    "settings",
   ],
 };
 

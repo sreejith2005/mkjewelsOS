@@ -24,35 +24,53 @@ export type TaskReferenceData = {
   templates: TaskTemplate[];
   users: TaskUser[];
 };
+export type TaskFeedReferenceData = Pick<TaskReferenceData, "categories">;
 
 function fail(message: string, error: { message: string } | null): asserts error is null {
   if (error) throw new Error(`${message}: ${error.message}`);
 }
 
-export async function loadTaskReferenceData(): Promise<TaskReferenceData> {
-  const [usersResult, branchesResult, departmentsResult, categoriesResult, templatesResult, formsResult] = await Promise.all([
-    supabase.from("v_task_users").select("*").eq("working_status", "active").order("employee_name"),
+export async function loadTaskCategoryOptions(): Promise<TaskReferenceData["categories"]> {
+  const result = await supabase.from("dropdown_masters").select("id,label").eq("master_type", "task_category").eq("is_active", true).order("sort_order");
+  fail("Load task categories", result.error);
+  return result.data;
+}
+
+export async function loadTaskFeedReferenceData(): Promise<TaskFeedReferenceData> {
+  return { categories: await loadTaskCategoryOptions() };
+}
+
+export async function loadAvailabilityUsers(): Promise<TaskUser[]> {
+  const result = await supabase.from("v_task_users").select("*").eq("working_status", "active").order("employee_name");
+  fail("Load availability users", result.error);
+  return result.data;
+}
+
+export async function loadTaskAuthoringReferenceData(): Promise<TaskReferenceData> {
+  const [users, branchesResult, departmentsResult, categories, templatesResult, formsResult] = await Promise.all([
+    loadAvailabilityUsers(),
     supabase.from("branches").select("id,name").eq("is_active", true).order("name"),
     supabase.from("departments").select("id,name,branch_id").eq("is_active", true).order("name"),
-    supabase.from("dropdown_masters").select("id,label").eq("master_type", "task_category").eq("is_active", true).order("sort_order"),
+    loadTaskCategoryOptions(),
     supabase.from("task_templates").select("*").eq("task_type", "checklist").order("created_at", { ascending: false }),
     supabase.from("form_templates").select("id,name").eq("is_active", true).order("name"),
   ]);
-  fail("Load task users", usersResult.error);
   fail("Load branches", branchesResult.error);
   fail("Load departments", departmentsResult.error);
-  fail("Load task categories", categoriesResult.error);
   fail("Load templates", templatesResult.error);
   fail("Load forms", formsResult.error);
   return {
-    users: usersResult.data,
+    users,
     branches: branchesResult.data,
-    categories: categoriesResult.data,
+    categories,
     departments: departmentsResult.data,
     templates: templatesResult.data,
     forms: formsResult.data,
   };
 }
+
+/** @deprecated Use the bounded loaders for each task surface. */
+export const loadTaskReferenceData = loadTaskAuthoringReferenceData;
 
 export async function loadTaskFeed(
   viewerId: string,
@@ -186,7 +204,7 @@ export async function createDelegationTask(
 
 export async function saveTaskTemplate(templateId: string | null, payload: Json): Promise<void> {
   const { error } = await supabase.rpc("save_task_template_with_audit", {
-    p_template_id: templateId,
+    p_template_id: templateId as string,
     p_payload: payload,
   });
   fail("Save task template", error);
@@ -208,9 +226,9 @@ export async function updateTask(
   const { error } = await supabase.rpc("update_task_with_audit", {
     p_task_id: taskId,
     p_action: action,
-    p_checklist_id: options.checklistId ?? null,
-    p_completed: options.completed ?? null,
-    p_remark: options.remark ?? null,
+    ...(options.checklistId ? { p_checklist_id: options.checklistId } : {}),
+    ...(options.completed !== undefined ? { p_completed: options.completed } : {}),
+    ...(options.remark ? { p_remark: options.remark } : {}),
   });
   fail("Update task", error);
 }

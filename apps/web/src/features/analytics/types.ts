@@ -1,0 +1,7 @@
+export type HomeTask={id:string;title:string;task_type:string;priority:"high"|"medium"|"low";status:string;due_at:string;overdue:boolean;checklist_completion:number|null};
+export type HomeFms={stage_id:string;instance_id:string;reference_number:string;instance_title:string;stage_name:string;status:string;planned_datetime:string|null;sla_breached:boolean};
+export type HomeForm={task_id:string;form_template_id:string;form_name:string;task_title:string;due_at:string};
+export type HomeFollowup={id:string;client_id:string;subject:string|null;due_date:string;status:string;overdue:boolean};
+export type HomeActivity={id:string;action:string;module:string;created_at:string};
+export type HomeSummary={generated_at:string;tenant_local_date:string;timezone:string;profile:{id:string;name:string;role:string;branch_id:string;branch_name:string|null;department_id:string;department_name:string|null;working_status:string};tasks:HomeTask[];fms_stages:HomeFms[];forms_awaiting_submission:HomeForm[];crm_followups:HomeFollowup[];unread_notifications:number;availability_status:string|null;recent_activity:HomeActivity[];quick_actions:string[]};
+export type DashboardPayload={generated_at:string;freshness:"live";context:{timezone:string;local_start:string;local_end_exclusive:string;branch_id:string|null;department_id:string|null};metrics:Record<string,number|null>;previous:Record<string,number|null>;task_completion_trend:Array<{local_date:string;completed:number}>;task_status_distribution:Record<string,number>};
