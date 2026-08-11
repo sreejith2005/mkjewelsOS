@@ -55,13 +55,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setProfile(nextProfile);
-    if (nextProfile.working_status === "resigned" || nextProfile.is_login_enabled === false) {
+    // `account_status` is introduced by migration 0016. Keep the established
+    // active-session guard authoritative until that migration is present.
+    const accountIsExplicitlyBlocked = nextProfile.account_status != null && nextProfile.account_status !== "active";
+    if (accountIsExplicitlyBlocked || nextProfile.working_status === "resigned" || nextProfile.is_login_enabled === false) {
       forcedSignOut.current = true;
       setStatus("blocked");
       setStatusMessage(
-        nextProfile.working_status === "resigned"
+        nextProfile.working_status === "resigned" || nextProfile.account_status === "left"
           ? "This account belongs to a resigned employee and can no longer sign in. Contact your admin if this is incorrect."
-          : "Login has been disabled for this account. Please contact your admin.",
+          : nextProfile.account_status === "suspended"
+            ? "This account has been suspended. Please contact your admin."
+            : "Login has been disabled for this account. Please contact your admin.",
       );
       await supabase.auth.signOut();
       setSession(null);

@@ -1,5 +1,6 @@
 import { supabase } from "@jewelos/api-client";
 import { groupTaskFeedRows, type Database, type Enums, type Json, type Tables } from "@jewelos/core";
+import { loadMasterOptions } from "@/features/dropdowns/api";
 
 export type TaskFeedRow = Database["public"]["Views"]["v_all_tasks"]["Row"];
 export type TaskUser = Database["public"]["Views"]["v_task_users"]["Row"];
@@ -19,6 +20,7 @@ export type TaskBundle = TaskFeedRow & {
 export type TaskReferenceData = {
   branches: Array<Pick<Tables<"branches">, "id" | "name">>;
   categories: Array<Pick<Tables<"dropdown_masters">, "id" | "label">>;
+  priorities: Array<Pick<Tables<"dropdown_masters">, "id" | "label" | "value">>;
   departments: Array<Pick<Tables<"departments">, "id" | "name" | "branch_id">>;
   forms: Array<Pick<Tables<"form_templates">, "id" | "name">>;
   templates: TaskTemplate[];
@@ -31,9 +33,7 @@ function fail(message: string, error: { message: string } | null): asserts error
 }
 
 export async function loadTaskCategoryOptions(): Promise<TaskReferenceData["categories"]> {
-  const result = await supabase.from("dropdown_masters").select("id,label").eq("master_type", "task_category").eq("is_active", true).order("sort_order");
-  fail("Load task categories", result.error);
-  return result.data;
+  return (await loadMasterOptions(["task_category"])).map(({ id, label }) => ({ id, label }));
 }
 
 export async function loadTaskFeedReferenceData(): Promise<TaskFeedReferenceData> {
@@ -47,11 +47,12 @@ export async function loadAvailabilityUsers(): Promise<TaskUser[]> {
 }
 
 export async function loadTaskAuthoringReferenceData(): Promise<TaskReferenceData> {
-  const [users, branchesResult, departmentsResult, categories, templatesResult, formsResult] = await Promise.all([
+  const [users, branchesResult, departmentsResult, categories, priorities, templatesResult, formsResult] = await Promise.all([
     loadAvailabilityUsers(),
     supabase.from("branches").select("id,name").eq("is_active", true).order("name"),
     supabase.from("departments").select("id,name,branch_id").eq("is_active", true).order("name"),
     loadTaskCategoryOptions(),
+    loadMasterOptions(["task_priority"]),
     supabase.from("task_templates").select("*").eq("task_type", "checklist").order("created_at", { ascending: false }),
     supabase.from("form_templates").select("id,name").eq("is_active", true).order("name"),
   ]);
@@ -63,6 +64,7 @@ export async function loadTaskAuthoringReferenceData(): Promise<TaskReferenceDat
     users,
     branches: branchesResult.data,
     categories,
+    priorities: priorities.map(({ id, label, value }) => ({ id, label, value })),
     departments: departmentsResult.data,
     templates: templatesResult.data,
     forms: formsResult.data,

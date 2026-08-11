@@ -4202,9 +4202,16 @@ export type Database = {
           },
         ]
       }
+      user_organization_history: {
+        Row: { changed_by: string; created_at: string; effective_from: string; id: string; new_branch_id: string | null; new_department_id: string | null; new_designation_id: string | null; new_reports_to_user_id: string | null; old_branch_id: string | null; old_department_id: string | null; old_designation_id: string | null; old_reports_to_user_id: string | null; reason: string | null; tenant_id: string; user_profile_id: string }
+        Insert: { changed_by: string; created_at?: string; effective_from?: string; id?: string; new_branch_id?: string | null; new_department_id?: string | null; new_designation_id?: string | null; new_reports_to_user_id?: string | null; old_branch_id?: string | null; old_department_id?: string | null; old_designation_id?: string | null; old_reports_to_user_id?: string | null; reason?: string | null; tenant_id: string; user_profile_id: string }
+        Update: { changed_by?: string; created_at?: string; effective_from?: string; id?: string; new_branch_id?: string | null; new_department_id?: string | null; new_designation_id?: string | null; new_reports_to_user_id?: string | null; old_branch_id?: string | null; old_department_id?: string | null; old_designation_id?: string | null; old_reports_to_user_id?: string | null; reason?: string | null; tenant_id?: string; user_profile_id?: string }
+        Relationships: []
+      }
       user_profiles: {
         Row: {
           auth_user_id: string
+          account_status: Database["public"]["Enums"]["user_account_status"]
           branch_id: string
           buddy_id: string | null
           created_at: string | null
@@ -4217,7 +4224,8 @@ export type Database = {
           id: string
           is_login_enabled: boolean | null
           official_mobile: string | null
-          personal_mobile: string
+          personal_mobile: string | null
+          reports_to_user_id: string | null
           tenant_id: string
           updated_at: string | null
           updated_by: string | null
@@ -4227,6 +4235,7 @@ export type Database = {
         }
         Insert: {
           auth_user_id: string
+          account_status?: Database["public"]["Enums"]["user_account_status"]
           branch_id: string
           buddy_id?: string | null
           created_at?: string | null
@@ -4239,7 +4248,8 @@ export type Database = {
           id?: string
           is_login_enabled?: boolean | null
           official_mobile?: string | null
-          personal_mobile: string
+          personal_mobile?: string | null
+          reports_to_user_id?: string | null
           tenant_id: string
           updated_at?: string | null
           updated_by?: string | null
@@ -4249,6 +4259,7 @@ export type Database = {
         }
         Update: {
           auth_user_id?: string
+          account_status?: Database["public"]["Enums"]["user_account_status"]
           branch_id?: string
           buddy_id?: string | null
           created_at?: string | null
@@ -4261,7 +4272,8 @@ export type Database = {
           id?: string
           is_login_enabled?: boolean | null
           official_mobile?: string | null
-          personal_mobile?: string
+          personal_mobile?: string | null
+          reports_to_user_id?: string | null
           tenant_id?: string
           updated_at?: string | null
           updated_by?: string | null
@@ -5926,6 +5938,7 @@ export type Database = {
       update_user_profile_with_audit: {
         Args: { p_changes: Json; p_profile_id: string }
         Returns: {
+          account_status: Database["public"]["Enums"]["user_account_status"]
           auth_user_id: string
           branch_id: string
           buddy_id: string | null
@@ -5940,6 +5953,7 @@ export type Database = {
           is_login_enabled: boolean | null
           official_mobile: string | null
           personal_mobile: string
+          reports_to_user_id: string | null
           tenant_id: string
           updated_at: string | null
           updated_by: string | null
@@ -5968,6 +5982,7 @@ export type Database = {
       }
     }
     Enums: {
+      user_account_status: "active" | "invited" | "inactive" | "suspended" | "left"
       availability_status: "present" | "absent" | "half_day" | "remote"
       fms_completion_rule: "all_doers" | "any_doer" | "manager_approval"
       fms_flow_status: "draft" | "published" | "archived"
@@ -6144,6 +6159,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      user_account_status: ["active", "invited", "inactive", "suspended", "left"],
       availability_status: ["present", "absent", "half_day", "remote"],
       fms_completion_rule: ["all_doers", "any_doer", "manager_approval"],
       fms_flow_status: ["draft", "published", "archived"],
