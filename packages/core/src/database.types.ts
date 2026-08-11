@@ -7,6 +7,11 @@
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.15"
+  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -1072,6 +1077,90 @@ export type Database = {
           {
             foreignKeyName: "fk_dept_head"
             columns: ["head_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dropdown_master_categories: {
+        Row: {
+          category_key: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          display_name: string
+          id: string
+          is_active: boolean
+          is_key_locked: boolean
+          is_system: boolean
+          sort_order: number
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          category_key: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_name: string
+          id?: string
+          is_active?: boolean
+          is_key_locked?: boolean
+          is_system?: boolean
+          sort_order?: number
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          category_key?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          is_key_locked?: boolean
+          is_system?: boolean
+          sort_order?: number
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dropdown_master_categories_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dropdown_master_categories_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dropdown_master_categories_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dropdown_master_categories_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dropdown_master_categories_updated_by_fkey"
+            columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "v_task_users"
             referencedColumns: ["id"]
@@ -4133,6 +4222,166 @@ export type Database = {
           },
         ]
       }
+      user_organization_history: {
+        Row: {
+          changed_by: string
+          created_at: string
+          effective_from: string
+          id: string
+          new_branch_id: string | null
+          new_department_id: string | null
+          new_designation_id: string | null
+          new_reports_to_user_id: string | null
+          old_branch_id: string | null
+          old_department_id: string | null
+          old_designation_id: string | null
+          old_reports_to_user_id: string | null
+          reason: string | null
+          tenant_id: string
+          user_profile_id: string
+        }
+        Insert: {
+          changed_by: string
+          created_at?: string
+          effective_from?: string
+          id?: string
+          new_branch_id?: string | null
+          new_department_id?: string | null
+          new_designation_id?: string | null
+          new_reports_to_user_id?: string | null
+          old_branch_id?: string | null
+          old_department_id?: string | null
+          old_designation_id?: string | null
+          old_reports_to_user_id?: string | null
+          reason?: string | null
+          tenant_id: string
+          user_profile_id: string
+        }
+        Update: {
+          changed_by?: string
+          created_at?: string
+          effective_from?: string
+          id?: string
+          new_branch_id?: string | null
+          new_department_id?: string | null
+          new_designation_id?: string | null
+          new_reports_to_user_id?: string | null
+          old_branch_id?: string | null
+          old_department_id?: string | null
+          old_designation_id?: string | null
+          old_reports_to_user_id?: string | null
+          reason?: string | null
+          tenant_id?: string
+          user_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_organization_history_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_organization_history_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_organization_history_new_branch_id_fkey"
+            columns: ["new_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_organization_history_new_department_id_fkey"
+            columns: ["new_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_organization_history_new_designation_id_fkey"
+            columns: ["new_designation_id"]
+            isOneToOne: false
+            referencedRelation: "dropdown_masters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_organization_history_new_reports_to_user_id_fkey"
+            columns: ["new_reports_to_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_organization_history_new_reports_to_user_id_fkey"
+            columns: ["new_reports_to_user_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_organization_history_old_branch_id_fkey"
+            columns: ["old_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_organization_history_old_department_id_fkey"
+            columns: ["old_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_organization_history_old_designation_id_fkey"
+            columns: ["old_designation_id"]
+            isOneToOne: false
+            referencedRelation: "dropdown_masters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_organization_history_old_reports_to_user_id_fkey"
+            columns: ["old_reports_to_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_organization_history_old_reports_to_user_id_fkey"
+            columns: ["old_reports_to_user_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_organization_history_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_organization_history_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_organization_history_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_preferences: {
         Row: {
           created_at: string
@@ -4202,16 +4451,10 @@ export type Database = {
           },
         ]
       }
-      user_organization_history: {
-        Row: { changed_by: string; created_at: string; effective_from: string; id: string; new_branch_id: string | null; new_department_id: string | null; new_designation_id: string | null; new_reports_to_user_id: string | null; old_branch_id: string | null; old_department_id: string | null; old_designation_id: string | null; old_reports_to_user_id: string | null; reason: string | null; tenant_id: string; user_profile_id: string }
-        Insert: { changed_by: string; created_at?: string; effective_from?: string; id?: string; new_branch_id?: string | null; new_department_id?: string | null; new_designation_id?: string | null; new_reports_to_user_id?: string | null; old_branch_id?: string | null; old_department_id?: string | null; old_designation_id?: string | null; old_reports_to_user_id?: string | null; reason?: string | null; tenant_id: string; user_profile_id: string }
-        Update: { changed_by?: string; created_at?: string; effective_from?: string; id?: string; new_branch_id?: string | null; new_department_id?: string | null; new_designation_id?: string | null; new_reports_to_user_id?: string | null; old_branch_id?: string | null; old_department_id?: string | null; old_designation_id?: string | null; old_reports_to_user_id?: string | null; reason?: string | null; tenant_id?: string; user_profile_id?: string }
-        Relationships: []
-      }
       user_profiles: {
         Row: {
-          auth_user_id: string
           account_status: Database["public"]["Enums"]["user_account_status"]
+          auth_user_id: string
           branch_id: string
           buddy_id: string | null
           created_at: string | null
@@ -4234,8 +4477,8 @@ export type Database = {
           working_status: Database["public"]["Enums"]["working_status"]
         }
         Insert: {
-          auth_user_id: string
           account_status?: Database["public"]["Enums"]["user_account_status"]
+          auth_user_id: string
           branch_id: string
           buddy_id?: string | null
           created_at?: string | null
@@ -4258,8 +4501,8 @@ export type Database = {
           working_status?: Database["public"]["Enums"]["working_status"]
         }
         Update: {
-          auth_user_id?: string
           account_status?: Database["public"]["Enums"]["user_account_status"]
+          auth_user_id?: string
           branch_id?: string
           buddy_id?: string | null
           created_at?: string | null
@@ -4315,6 +4558,20 @@ export type Database = {
             columns: ["designation_id"]
             isOneToOne: false
             referencedRelation: "dropdown_masters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_profiles_reports_to_user_id_fkey"
+            columns: ["reports_to_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_profiles_reports_to_user_id_fkey"
+            columns: ["reports_to_user_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
           {
@@ -4738,6 +4995,7 @@ export type Database = {
       assert_crm_actor: {
         Args: never
         Returns: {
+          account_status: Database["public"]["Enums"]["user_account_status"]
           auth_user_id: string
           branch_id: string
           buddy_id: string | null
@@ -4751,7 +5009,8 @@ export type Database = {
           id: string
           is_login_enabled: boolean | null
           official_mobile: string | null
-          personal_mobile: string
+          personal_mobile: string | null
+          reports_to_user_id: string | null
           tenant_id: string
           updated_at: string | null
           updated_by: string | null
@@ -4774,6 +5033,7 @@ export type Database = {
           p_user_id: string
         }
         Returns: {
+          account_status: Database["public"]["Enums"]["user_account_status"]
           auth_user_id: string
           branch_id: string
           buddy_id: string | null
@@ -4787,7 +5047,8 @@ export type Database = {
           id: string
           is_login_enabled: boolean | null
           official_mobile: string | null
-          personal_mobile: string
+          personal_mobile: string | null
+          reports_to_user_id: string | null
           tenant_id: string
           updated_at: string | null
           updated_by: string | null
@@ -4817,6 +5078,7 @@ export type Database = {
       assert_notification_admin: {
         Args: never
         Returns: {
+          account_status: Database["public"]["Enums"]["user_account_status"]
           auth_user_id: string
           branch_id: string
           buddy_id: string | null
@@ -4830,7 +5092,8 @@ export type Database = {
           id: string
           is_login_enabled: boolean | null
           official_mobile: string | null
-          personal_mobile: string
+          personal_mobile: string | null
+          reports_to_user_id: string | null
           tenant_id: string
           updated_at: string | null
           updated_by: string | null
@@ -4848,6 +5111,7 @@ export type Database = {
       assert_reporting_actor: {
         Args: never
         Returns: {
+          account_status: Database["public"]["Enums"]["user_account_status"]
           auth_user_id: string
           branch_id: string
           buddy_id: string | null
@@ -4861,7 +5125,8 @@ export type Database = {
           id: string
           is_login_enabled: boolean | null
           official_mobile: string | null
-          personal_mobile: string
+          personal_mobile: string | null
+          reports_to_user_id: string | null
           tenant_id: string
           updated_at: string | null
           updated_by: string | null
@@ -4986,6 +5251,38 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "export_logs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      change_dropdown_category_with_audit: {
+        Args: {
+          p_category_id?: string
+          p_description?: string
+          p_display_name?: string
+          p_is_active?: boolean
+          p_key?: string
+          p_operation: string
+          p_sort_order?: number
+        }
+        Returns: {
+          category_key: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          display_name: string
+          id: string
+          is_active: boolean
+          is_key_locked: boolean
+          is_system: boolean
+          sort_order: number
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "dropdown_master_categories"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -5128,6 +5425,7 @@ export type Database = {
       current_profile: {
         Args: never
         Returns: {
+          account_status: Database["public"]["Enums"]["user_account_status"]
           auth_user_id: string
           branch_id: string
           buddy_id: string | null
@@ -5141,7 +5439,8 @@ export type Database = {
           id: string
           is_login_enabled: boolean | null
           official_mobile: string | null
-          personal_mobile: string
+          personal_mobile: string | null
+          reports_to_user_id: string | null
           tenant_id: string
           updated_at: string | null
           updated_by: string | null
@@ -5291,8 +5590,29 @@ export type Database = {
         }
         Returns: string
       }
+      invite_profile_with_audit_v2: {
+        Args: {
+          p_auth_user_id: string
+          p_branch_id: string
+          p_buddy_id: string
+          p_creator_profile_id: string
+          p_department_id: string
+          p_designation_id: string
+          p_email: string
+          p_employee_name: string
+          p_official_mobile: string
+          p_personal_mobile: string
+          p_user_role: Database["public"]["Enums"]["user_role"]
+          p_week_off: string[]
+        }
+        Returns: string
+      }
       is_fms_instance_participant: {
         Args: { p_instance_id: string }
+        Returns: boolean
+      }
+      is_reporting_descendant: {
+        Args: { p_candidate_id: string; p_manager_id: string }
         Returns: boolean
       }
       is_super_admin: { Args: never; Returns: boolean }
@@ -5378,6 +5698,7 @@ export type Database = {
         }
         Returns: string
       }
+      next_employee_code: { Args: never; Returns: string }
       normalize_form_fields: { Args: { p_fields: Json }; Returns: Json }
       normalize_form_permissions: {
         Args: { p_permissions: Json }
@@ -5397,6 +5718,10 @@ export type Database = {
       notification_rule_matches: {
         Args: { p_conditions: Json; p_payload: Json }
         Returns: boolean
+      }
+      prepare_unused_user_deletion: {
+        Args: { p_profile_id: string }
+        Returns: string
       }
       process_notification_events: {
         Args: { p_limit?: number }
@@ -5952,7 +6277,7 @@ export type Database = {
           id: string
           is_login_enabled: boolean | null
           official_mobile: string | null
-          personal_mobile: string
+          personal_mobile: string | null
           reports_to_user_id: string | null
           tenant_id: string
           updated_at: string | null
@@ -5982,7 +6307,6 @@ export type Database = {
       }
     }
     Enums: {
-      user_account_status: "active" | "invited" | "inactive" | "suspended" | "left"
       availability_status: "present" | "absent" | "half_day" | "remote"
       fms_completion_rule: "all_doers" | "any_doer" | "manager_approval"
       fms_flow_status: "draft" | "published" | "archived"
@@ -6014,6 +6338,12 @@ export type Database = {
         | "blocked"
         | "overdue"
       task_type: "checklist" | "fms" | "delegation"
+      user_account_status:
+        | "active"
+        | "invited"
+        | "inactive"
+        | "suspended"
+        | "left"
       user_role:
         | "super_admin"
         | "admin"
@@ -6159,7 +6489,6 @@ export const Constants = {
   },
   public: {
     Enums: {
-      user_account_status: ["active", "invited", "inactive", "suspended", "left"],
       availability_status: ["present", "absent", "half_day", "remote"],
       fms_completion_rule: ["all_doers", "any_doer", "manager_approval"],
       fms_flow_status: ["draft", "published", "archived"],
@@ -6194,6 +6523,13 @@ export const Constants = {
         "overdue",
       ],
       task_type: ["checklist", "fms", "delegation"],
+      user_account_status: [
+        "active",
+        "invited",
+        "inactive",
+        "suspended",
+        "left",
+      ],
       user_role: [
         "super_admin",
         "admin",
