@@ -13,7 +13,7 @@ import { filterFmsInstances } from "@/features/fms/runtimeView";
 const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: [] };
 type Runtime = Awaited<ReturnType<typeof loadFmsRuntime>>;
 
-export function FMSTasksPage() {
+export function FMSTasksPage({ embedded = false }: { embedded?: boolean }) {
   const { profile } = useAuth();
   const [runtime, setRuntime] = useState<Runtime>();
   const [builder, setBuilder] = useState<FmsData>();
@@ -57,7 +57,7 @@ export function FMSTasksPage() {
     finally { setBusy(false); }
   };
 
-  if (selected && runtime) {
+  if (selected && runtime && !embedded) {
     const stages = runtime.stages.filter((stage) => stage.fms_instance_id === selected.id);
     const flow = runtime.flows.find((item) => item.id === selected.fms_flow_id);
     const progress = calculateFmsProgress(stages.map((item) => ({ required: runtime.definitions.find((definition) => definition.id === item.fms_stage_id)?.is_required ?? true, status: item.status as never })));
@@ -75,7 +75,7 @@ export function FMSTasksPage() {
     </section>;
   }
 
-  return <><section className="mx-auto max-w-7xl">
+  return <><section className={embedded ? "w-full" : "mx-auto max-w-7xl"}>
     <header className="mb-6 flex flex-wrap justify-between gap-3"><div><h1 className="text-3xl font-semibold text-gold">FMS Tasks</h1><p className="text-sm text-soft-grey">Assigned stages, started instances, and authorized branch operations.</p></div>{canStart ? <Button onClick={() => setStart(true)}><Play />Start flow</Button> : null}</header>
     {success ? <div className="mb-3"><Notice tone="success">{success}</Notice></div> : null}{error ? <div className="mb-3"><Notice tone="danger">{error} <button className="underline" onClick={() => void refresh()} type="button">Retry</button></Notice></div> : null}
     <div className="mb-4 flex flex-wrap gap-2"><Button onClick={() => setTab("mine")} variant={tab === "mine" ? "primary" : "secondary"}>My Stages</Button><Button onClick={() => setTab("started")} variant={tab === "started" ? "primary" : "secondary"}>Started by Me</Button>{canManage ? <Button onClick={() => setTab("branch")} variant={tab === "branch" ? "primary" : "secondary"}>Branch View</Button> : null}</div>

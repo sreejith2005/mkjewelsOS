@@ -731,14 +731,17 @@ async function ensureTaskCoverageLinks(
 ): Promise<void> {
   const { data: profiles, error: profileError } = await client
     .from("user_profiles")
-    .select("id,email,buddy_id")
+    .select("id,email,buddy_id,department_id")
     .eq("tenant_id", tenantId)
     .in("email", ["sales@mkjewels.local", "crm@mkjewels.local"]);
   fail("Load task coverage seed profiles", profileError);
   const sales = profiles.find((profile) => profile.email === "sales@mkjewels.local");
   const crm = profiles.find((profile) => profile.email === "crm@mkjewels.local");
   if (!sales || !crm) throw new Error("Task coverage seed profiles are missing");
-  if (sales.buddy_id !== crm.id) {
+  // Buddy relationships are department-local. The DEV CRM and Sales users
+  // intentionally belong to different departments, so do not create an
+  // invalid cross-department coverage link.
+  if (sales.department_id === crm.department_id && sales.buddy_id !== crm.id) {
     const { error } = await client.from("user_profiles").update({
       buddy_id: crm.id,
       updated_by: adminProfileId,

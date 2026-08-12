@@ -2,7 +2,13 @@ import { useState } from "react";
 import { Search } from "lucide-react";
 import type { TaskUser } from "./api";
 
-export function UserPicker({ disabledIds, label, onChange, selectedIds, users }: {
+function roleLabel(role: TaskUser["user_role"]): string {
+  return role ? role.replaceAll("_", " ") : "Role not assigned";
+}
+
+export function UserPicker({ branchNames, departmentNames, disabledIds, label, onChange, selectedIds, users }: {
+  branchNames: ReadonlyMap<string, string>;
+  departmentNames: ReadonlyMap<string, string>;
   disabledIds: readonly string[];
   label: string;
   onChange: (ids: string[]) => void;
@@ -11,7 +17,7 @@ export function UserPicker({ disabledIds, label, onChange, selectedIds, users }:
 }) {
   const [search, setSearch] = useState("");
   const query = search.trim().toLowerCase();
-  const filteredUsers = users.filter((user) => !query || `${user.employee_name ?? ""} ${user.employee_code ?? ""}`.toLowerCase().includes(query));
+  const filteredUsers = users.filter((user) => !query || `${user.employee_name ?? ""} ${user.employee_code ?? ""} ${user.department_id ? departmentNames.get(user.department_id) ?? "" : ""} ${roleLabel(user.user_role)}`.toLowerCase().includes(query));
   return (
     <fieldset className="rounded-xl border border-task-border bg-task-muted p-3">
       <legend className="px-1 text-xs font-semibold text-task-text">{label}</legend>
@@ -35,8 +41,8 @@ export function UserPicker({ disabledIds, label, onChange, selectedIds, users }:
               onChange={(event) => onChange(event.target.checked ? [...selectedIds, user.id as string] : selectedIds.filter((id) => id !== user.id))}
               type="checkbox"
             />
-            <span className="min-w-0 flex-1 truncate">{user.employee_name}</span>
-            <span className="text-xs capitalize text-task-text-muted">{user.user_role?.replace("_", " ")}</span>
+            <span className="min-w-0 flex-1"><span className="block truncate">{user.employee_name || "Unnamed user"}</span><span className="block truncate text-xs text-task-text-muted">{[user.department_id ? departmentNames.get(user.department_id) : undefined, user.branch_id ? branchNames.get(user.branch_id) : undefined].filter(Boolean).join(" · ") || "Organization details unavailable"}</span></span>
+            <span className="text-right text-xs capitalize text-task-text-muted">{roleLabel(user.user_role)}</span>
           </label>
         ) : null)}
       </div>

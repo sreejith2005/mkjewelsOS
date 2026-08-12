@@ -3,6 +3,9 @@
 @tailwind utilities;
 
 @layer base {
+  :root { color-scheme: light; --color-obsidian: 248 250 252; --color-gold: 212 175 55; --color-gold-secondary: 184 134 11; --color-charcoal: 255 255 255; --color-champagne: 30 41 59; --color-soft-grey: 100 116 139; --color-danger: 244 63 94; --color-success: 34 197 94; --color-warning: 245 158 11; --color-white: 30 41 59; --color-task-bg: 255 255 255; --color-task-muted: 248 250 252; --color-task-border: 226 232 240; --color-task-text: 30 41 59; --color-task-text-muted: 100 116 139; --color-task-accent: 245 158 11; --color-task-accent-soft: 255 251 235; --color-task-overdue: 244 63 94; --color-task-warning: 245 158 11; }
+  html[data-theme="dark"] { color-scheme: dark; --color-obsidian: 18 15 12; --color-gold: 215 181 113; --color-gold-secondary: 235 211 162; --color-charcoal: 32 27 22; --color-champagne: 241 233 217; --color-soft-grey: 181 172 159; --color-danger: 220 118 112; --color-success: 121 169 130; --color-warning: 220 174 82; --color-white: 255 250 241; --color-task-bg: 32 27 22; --color-task-muted: 48 41 33; --color-task-border: 82 71 58; --color-task-text: 255 250 241; --color-task-text-muted: 194 184 170; --color-task-accent: 215 181 113; --color-task-accent-soft: 72 58 37; --color-task-overdue: 239 133 128; --color-task-warning: 220 174 82; }
+  html { background: rgb(var(--color-obsidian)); }
   body {
     @apply min-h-screen bg-obsidian font-sans text-white antialiased;
   }
@@ -24,18 +27,18 @@
 
 @layer components {
   .glass-card {
-    @apply border border-gold/20 bg-charcoal/80 shadow-2xl backdrop-blur-xl;
+    @apply border border-task-border bg-charcoal shadow-lg;
   }
 
   .field {
-    @apply w-full rounded-lg border border-gold/20 bg-obsidian px-3 py-2 text-sm text-white placeholder:text-soft-grey disabled:cursor-not-allowed disabled:opacity-50;
+    @apply min-h-11 w-full rounded-lg border border-task-border bg-task-bg px-3 py-2 text-sm text-task-text placeholder:text-task-text-muted disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .label {
-    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wider text-champagne;
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wider text-task-text-muted;
   }
 
   .task-field {
-    @apply min-h-11 w-full rounded-md border border-task-border bg-task-bg px-3 py-2 text-sm text-task-text placeholder:text-task-text-muted disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-task-accent focus-visible:ring-offset-task-bg;
+    @apply min-h-11 w-full rounded-lg border border-task-border bg-task-bg px-3 py-2 text-sm text-task-text placeholder:text-task-text-muted disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-task-accent focus-visible:ring-offset-task-bg;
   }
 }

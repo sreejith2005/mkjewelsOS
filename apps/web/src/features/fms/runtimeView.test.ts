@@ -25,6 +25,6 @@ describe("FMS runtime view rules", () => {
   it("accepts an object context", () => expect(parseFmsContext('{"source":"manual"}')).toEqual({ source: "manual" }));
   it.each(["[]", "null", '"value"'])("rejects non-object context %s", (value) => expect(() => parseFmsContext(value)).toThrow("JSON object"));
   it("rejects more than 50 context keys", () => expect(() => parseFmsContext(JSON.stringify(Object.fromEntries(Array.from({ length: 51 }, (_, index) => [`key_${index}`, index]))))).toThrow("50 keys"));
-  it("exposes FMS builder only to authoring roles", () => { expect(getMenuForRole("admin").some((item) => item.id === "fms_builder")).toBe(true); expect(getMenuForRole("staff").some((item) => item.id === "fms_builder")).toBe(false); });
-  it("keeps FMS tasks available to runtime roles and hidden from unrelated roles", () => { expect(getMenuForRole("doer").some((item) => item.id === "fms_tasks")).toBe(true); expect(getMenuForRole("housekeeping").some((item) => item.id === "fms_tasks")).toBe(false); });
+  it("exposes one FMS entry to both workflow runners and authors", () => { expect(getMenuForRole("admin").some((item) => item.id === "fms_builder")).toBe(true); expect(getMenuForRole("staff").some((item) => item.id === "fms_builder")).toBe(true); expect(getMenuForRole("doer").some((item) => item.id === "fms_builder")).toBe(true); });
+  it("keeps the unified FMS entry hidden from unrelated roles", () => expect(getMenuForRole("housekeeping").some((item) => item.id === "fms_builder")).toBe(false));
 });

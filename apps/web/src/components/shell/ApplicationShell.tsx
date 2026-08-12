@@ -9,6 +9,7 @@ import { AppLauncher, type LauncherItem } from "./AppLauncher";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { MoreSheet } from "./MoreSheet";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
+import { ThemeToggle, type Theme } from "@/components/ThemeToggle";
 
 export type ShellNavItem = Readonly<{
   Icon: ComponentType<{ className?: string }>;
@@ -35,6 +36,9 @@ export function ApplicationShell({
   profile,
   sidebarOpen,
   setSidebarOpen,
+  theme,
+  onThemeChange,
+  fullBleed = false,
 }: {
   appsOpen: boolean;
   branch: Branch | null;
@@ -53,6 +57,9 @@ export function ApplicationShell({
   profile: UserProfile;
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
+  theme: Theme;
+  onThemeChange: (theme: Theme) => void;
+  fullBleed?: boolean;
 }) {
   return (
     <div className="min-h-screen bg-obsidian">
@@ -64,6 +71,7 @@ export function ApplicationShell({
         <img alt="MK Jewels" className="hidden h-8 w-auto md:block" src={logoDarkUrl} />
         <div className="ml-auto flex items-center gap-2 md:gap-3">
           <span className="hidden text-sm text-champagne md:inline">{branch?.name ?? "Branch unavailable"}</span>
+          <ThemeToggle onChange={onThemeChange} theme={theme} />
           <NotificationBell onNavigate={navigate} profileId={profile.id} />
           <button
             aria-label="Open more navigation"
@@ -96,7 +104,7 @@ export function ApplicationShell({
       </aside>
 
       <main className={cn("min-h-[calc(100dvh-3.5rem)] pb-[70px] md:min-h-screen md:pb-0 md:pt-16 md:transition-[padding]", sidebarOpen && "md:pl-64")}>
-        <div className="mx-auto max-w-7xl p-4 sm:p-6">{children}</div>
+        <div className={cn(fullBleed ? "w-full p-3 sm:p-5 [&>section]:max-w-none [&>section]:mx-0" : "mx-auto max-w-7xl p-4 sm:p-6")}>{children}</div>
       </main>
 
       <MobileBottomNav onNavigate={navigate} onOpenApps={() => onAppsOpenChange(true)} onOpenMore={() => onMoreOpenChange(true)} path={path} />

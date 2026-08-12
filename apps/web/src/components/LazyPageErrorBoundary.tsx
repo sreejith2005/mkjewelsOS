@@ -1,13 +1,14 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Button, Notice } from "@/components/ui";
 
-type Props = Readonly<{ children: ReactNode; onNavigate: (path: string) => void }>;
+type Props = Readonly<{ children: ReactNode; onNavigate: (path: string) => void; resetKey?: string }>;
 type State = Readonly<{ failed: boolean }>;
 
 export class LazyPageErrorBoundary extends Component<Props, State> {
   override state: State = { failed: false };
   static getDerivedStateFromError(): State { return { failed: true }; }
   override componentDidCatch(_error: Error, _info: ErrorInfo): void { /* keep internal detail out of the UI */ }
+  override componentDidUpdate(previousProps: Props): void { if (this.state.failed && previousProps.resetKey !== this.props.resetKey) this.setState({ failed: false }); }
   retry = (): void => this.setState({ failed: false });
   override render(): ReactNode {
     if (!this.state.failed) return this.props.children;

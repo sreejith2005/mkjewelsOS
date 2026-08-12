@@ -47,7 +47,9 @@ function rangeForPreset(preset: Exclude<DateRangePreset, "custom">): [string, st
   return [dateKey(new Date(now.getFullYear(), now.getMonth(), 1)), dateKey(new Date(now.getFullYear(), now.getMonth() + 1, 0))];
 }
 
-export function TasksPage({ delegatedView = false }: { delegatedView?: boolean }) {
+type TaskWorkspaceView = "mine" | "delegated";
+
+export function TasksPage() {
   const { profile } = useAuth();
   const initialRange = useMemo(() => rangeForPreset("month"), []);
   const [preset, setPreset] = useState<DateRangePreset>("month");
@@ -55,7 +57,9 @@ export function TasksPage({ delegatedView = false }: { delegatedView?: boolean }
   const [endDate, setEndDate] = useState(initialRange[1]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<TaskFeedStatusFilter>("all");
-  const [tasks, setTasks] = useState<TaskBundle[]>([]);
+  const [myTasks, setMyTasks] = useState<TaskBundle[]>([]);
+  const [delegatedTasks, setDelegatedTasks] = useState<TaskBundle[]>([]);
+  const [workspaceView, setWorkspaceView] = useState<TaskWorkspaceView>("mine");
   const [categories, setCategories] = useState<TaskReferenceData["categories"]>([]);
   const [references, setReferences] = useState<TaskReferenceData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -76,15 +80,18 @@ export function TasksPage({ delegatedView = false }: { delegatedView?: boolean }
     try {
       const start = new Date(`${startDate}T00:00:00`).toISOString();
       const end = new Date(`${endDate}T23:59:59.999`).toISOString();
-      const [nextTasks, nextCategories] = await Promise.all([
-        loadTaskFeed(profile.id, start, end, { delegated: delegatedView, includeBlockedCoverage: canManage && !delegatedView }),
+      const [nextMyTasks, nextDelegatedTasks, nextCategories] = await Promise.all([
+        loadTaskFeed(profile.id, start, end, { includeBlockedCoverage: canManage }),
+        loadTaskFeed(profile.id, start, end, { delegated: true }),
         loadTaskFeedReferenceData().catch(() => ({ categories: [] })),
       ]);
+      const nextTasks = [...nextMyTasks, ...nextDelegatedTasks.filter((task) => !nextMyTasks.some((myTask) => myTask.id === task.id))];
       const [forms, dynamicOptions] = await Promise.all([
         loadTaskForms([...new Set(nextTasks.flatMap((task) => task.requires_form && task.form_template_id ? [task.form_template_id] : []))], nextTasks.flatMap((task) => task.id ? [task.id] : [])),
         loadFormDynamicOptions(),
       ]);
-      setTasks(nextTasks);
+      setMyTasks(nextMyTasks);
+      setDelegatedTasks(nextDelegatedTasks);
       setCategories(nextCategories.categories);
       setFormBundles(forms.bundles);
       setFormDynamicOptions(dynamicOptions);
@@ -93,7 +100,7 @@ export function TasksPage({ delegatedView = false }: { delegatedView?: boolean }
     } finally {
       setLoading(false);
     }
-  }, [canManage, delegatedView, endDate, profile, startDate]);
+  }, [canManage, endDate, profile, startDate]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -103,6 +110,7 @@ export function TasksPage({ delegatedView = false }: { delegatedView?: boolean }
   }, []);
 
   const categoryNames = useMemo(() => new Map(categories.map((category) => [category.id, category.label])), [categories]);
+  const tasks = workspaceView === "mine" ? myTasks : delegatedTasks;
   const counts = useMemo(() => countTaskFeedStatuses(tasks), [tasks]);
   const scopedTasks = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -147,18 +155,33 @@ export function TasksPage({ delegatedView = false }: { delegatedView?: boolean }
 
   return (
     <section className="-m-4 min-h-[calc(100dvh-7.875rem)] bg-task-bg pb-24 text-task-text sm:-m-6 md:min-h-[calc(100vh-4rem)] md:pb-10">
-      <h1 className="sr-only">{delegatedView ? "Delegated" : "My Tasks"}</h1>
+      <h1 className="sr-only">Tasks</h1>
       <div className="hidden items-center justify-between border-b border-task-border px-6 py-4 md:flex">
-        <div><h2 className="text-2xl font-semibold text-task-text">{delegatedView ? "Delegated" : "My Tasks"}</h2><p className="text-sm text-task-text-muted">{delegatedView ? "Tasks you assigned" : "Assigned, watched, and coverage-blocked work"}</p></div>
+        <div><h2 className="text-2xl font-semibold text-task-text">Tasks</h2><p className="text-sm text-task-text-muted">Assigned, watched, coverage-blocked, and delegated work in one place.</p></div>
+      </div>
+
+      <div className="flex gap-2 overflow-x-auto border-b border-task-border bg-task-bg px-3 pt-3 sm:px-5">
+        {([
+          ["mine", "My Tasks", myTasks.length],
+          ["delegated", "Delegated", delegatedTasks.length],
+        ] as const).map(([view, label, count]) => <button
+          aria-pressed={workspaceView === view}
+          className={`relative shrink-0 px-3 pb-3 text-sm font-medium ${workspaceView === view ? "text-task-text after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-task-accent" : "text-task-text-muted"}`}
+          key={view}
+          onClick={() => setWorkspaceView(view)}
+          type="button"
+        >
+          {label} <span className="tabular-nums">({count})</span>
+        </button>)}
       </div>
 
       <TaskFilterBar counts={counts} endDate={endDate} onEndDateChange={setEndDate} onPresetChange={handlePresetChange} onSearchChange={setSearch} onStartDateChange={setStartDate} onStatusChange={setStatusFilter} preset={preset} search={search} startDate={startDate} status={statusFilter} />
 
-      <div className="mx-auto max-w-4xl p-3 sm:p-5">
+      <div className="w-full p-3 sm:p-5">
         {error ? <div className="flex flex-col gap-3 rounded-xl border border-danger/40 bg-danger/10 p-4"><Notice tone="danger">{error}</Notice><Button className="self-start border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={() => void refresh()} variant="secondary"><RefreshCw />Retry</Button></div> : loading ? <div aria-label="Loading tasks" className="flex flex-col gap-3">{[0, 1, 2].map((item) => <div className="h-28 animate-pulse rounded-2xl border border-task-border bg-task-muted" key={item} />)}</div> : scopedTasks.length === 0 ? <div className="flex min-h-[48dvh] flex-col items-center justify-center px-5 text-center"><span className="mb-5 flex size-20 items-center justify-center rounded-[1.75rem] bg-task-muted text-task-accent"><CheckCircle2 className="size-10" /></span><h2 className="text-2xl font-semibold text-task-text">No Tasks Here</h2><p className="mt-1 max-w-sm text-sm text-task-text-muted">It seems that you don’t have any tasks in this list.</p></div> : <div className="flex flex-col gap-3">{profile ? scopedTasks.map((task) => <TaskCard capability={deriveTaskMutationCapability({ assigneeIds: task.assignees.map((assignee) => assignee.id), isWatcher: task.isWatchedByViewer, viewerId: profile.id, viewerRole: profile.user_role })} categoryLabel={task.category_id ? categoryNames.get(task.category_id) ?? "Uncategorized" : "Uncategorized"} key={task.id} onAction={(action) => handleAction(task, action)} task={task} />) : null}</div>}
       </div>
 
-      {canManage && !delegatedView ? <Button aria-label="Create task" className="fixed bottom-[86px] right-4 z-20 size-14 rounded-2xl bg-task-accent p-0 text-task-text shadow-xl hover:bg-task-accent/90 md:bottom-8 md:right-8" onClick={() => void openComposer()}><Plus className="size-6" /></Button> : null}
+      {canManage ? <Button aria-label="Create task" className="fixed bottom-[86px] right-4 z-20 size-14 rounded-2xl bg-task-accent p-0 text-task-text shadow-xl hover:bg-task-accent/90 md:bottom-8 md:right-8" onClick={() => void openComposer()}><Plus className="size-6" /></Button> : null}
 
       {composerOpen && canManage && references && profile ? <TaskComposer data={references} onClose={() => setComposerOpen(false)} onCreated={() => { setComposerOpen(false); void refresh(); }} onManageTemplates={() => { setComposerOpen(false); setShowTemplates(true); }} onSave={createDelegationTask} onUseTemplate={createFromTemplate} profile={profile} /> : null}
 

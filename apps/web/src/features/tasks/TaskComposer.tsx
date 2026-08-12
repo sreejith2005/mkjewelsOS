@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { ArrowLeft, CalendarDays, Check, ChevronDown, ClipboardCheck, Flag, Layers3, Plus, Rocket, Trash2, Users, UserRoundCheck } from "lucide-react";
 import { normalizeTaskParticipants, type Enums, type Json } from "@jewelos/core";
 import type { UserProfile } from "@/types";
@@ -29,7 +29,7 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
   const [priority, setPriority] = useState<Enums<"task_priority">>("high");
   const [categoryId, setCategoryId] = useState("");
   const [branchId, setBranchId] = useState(profile.branch_id);
-  const [departmentId, setDepartmentId] = useState(profile.department_id);
+  const [departmentId, setDepartmentId] = useState("");
   const [doers, setDoers] = useState<string[]>([]);
   const [watchers, setWatchers] = useState<string[]>([]);
   const [checklist, setChecklist] = useState<ChecklistDraft[]>([]);
@@ -43,7 +43,12 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
   const [saving, setSaving] = useState(false);
 
   const canSelectBranch = profile.user_role === "admin" || profile.user_role === "super_admin";
-  const scopedDepartments = useMemo(() => data.departments.filter((department) => department.branch_id === branchId), [branchId, data.departments]);
+  const scopedDepartments = useMemo(() => data.departments.filter((department) => !department.branch_id || department.branch_id === branchId), [branchId, data.departments]);
+  const branchNames = useMemo(() => new Map(data.branches.map((branch) => [branch.id, branch.name])), [data.branches]);
+  const departmentNames = useMemo(() => new Map(data.departments.map((department) => [department.id, department.name])), [data.departments]);
+  const priorityOptions = useMemo(() => data.priorities.flatMap((option) => option.value === "high" || option.value === "medium" || option.value === "low"
+    ? [{ ...option, value: option.value as Enums<"task_priority"> }]
+    : []), [data.priorities]);
   const eligibleDoers = useMemo(() => data.users.filter((user) =>
     user.branch_id === branchId && user.department_id === departmentId),
   [branchId, data.users, departmentId]);
@@ -51,7 +56,12 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
     profile.user_role === "manager" ? user.branch_id === branchId : user.tenant_id === profile.tenant_id),
   [branchId, data.users, profile.tenant_id, profile.user_role]);
   const category = data.categories.find((item) => item.id === categoryId);
+  const priorityLabel = priorityOptions.find((option) => option.value === priority)?.label ?? priority;
   const activeTemplates = data.templates.filter((template) => template.is_active);
+
+  useEffect(() => {
+    if (!priorityOptions.some((option) => option.value === priority)) setPriority(priorityOptions[0]?.value ?? "high");
+  }, [priority, priorityOptions]);
 
   const togglePanel = (next: Exclude<Panel, null>) => setPanel((current) => current === next ? null : next);
   const updateDoers = (nextDoers: string[]) => {
@@ -66,14 +76,9 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
     setWatchers((current) => current.filter((id) => !nextDoers.includes(id)));
   };
   const changeBranch = (nextBranchId: string) => {
-    const nextDepartments = data.departments.filter((department) => department.branch_id === nextBranchId);
-    const nextDepartmentId = nextBranchId === profile.branch_id
-      && nextDepartments.some((department) => department.id === profile.department_id)
-      ? profile.department_id
-      : nextDepartments[0]?.id ?? "";
     setBranchId(nextBranchId);
-    setDepartmentId(nextDepartmentId);
-    pruneDoersForScope(nextBranchId, nextDepartmentId);
+    setDepartmentId("");
+    pruneDoersForScope(nextBranchId, "");
   };
   const changeDepartment = (nextDepartmentId: string) => {
     setDepartmentId(nextDepartmentId);
@@ -149,17 +154,35 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
           <div className="flex flex-wrap gap-2 border-b border-task-border py-3">
             <ChipSelector active={panel === "users"} Icon={Users} label="Users" onClick={() => togglePanel("users")} summary={doers.length ? `${doers.length} user${doers.length === 1 ? "" : "s"}` : undefined} />
             <ChipSelector active={panel === "due"} Icon={CalendarDays} label="Due Date" onClick={() => togglePanel("due")} summary={planned ? new Date(planned).toLocaleString("en-IN", { day: "numeric", hour: "numeric", minute: "2-digit", month: "short" }) : undefined} />
-            <ChipSelector active={panel === "priority"} Icon={Flag} label="Priority" onClick={() => togglePanel("priority")} summary={priority[0]!.toUpperCase() + priority.slice(1)} />
+            <ChipSelector active={panel === "priority"} Icon={Flag} label="Priority" onClick={() => togglePanel("priority")} summary={priorityLabel} />
             <ChipSelector active={panel === "category"} Icon={Layers3} label="Category" onClick={() => togglePanel("category")} summary={category?.label} />
             <ChipSelector active={panel === "watchers"} Icon={UserRoundCheck} label="In Loop" onClick={() => togglePanel("watchers")} summary={watchers.length ? `${watchers.length} in loop` : undefined} />
           </div>
 
-          {panel === "users" ? <div className="py-3">{eligibleDoers.length === 0
-            ? <Notice tone="task">No active users are eligible in the selected branch and department.</Notice>
-            : <UserPicker disabledIds={[]} label="Eligible users" onChange={updateDoers} selectedIds={doers} users={eligibleDoers} />}</div> : null}
-          {panel === "watchers" ? <div className="py-3"><UserPicker disabledIds={doers} label="In Loop · read only" onChange={setWatchers} selectedIds={watchers} users={eligibleWatchers} /></div> : null}
+          {panel === "users" ? <div className="flex flex-col gap-3 py-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label>
+                <span className="mb-1 block text-xs font-semibold text-task-text">Branch{canSelectBranch ? "" : " (fixed)"}</span>
+                <select className="task-field" disabled={!canSelectBranch} onChange={(event) => changeBranch(event.target.value)} value={branchId}>
+                  <option value="">Select branch</option>
+                  {data.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                </select>
+              </label>
+              <label>
+                <span className="mb-1 block text-xs font-semibold text-task-text">Department</span>
+                <select className="task-field" onChange={(event) => changeDepartment(event.target.value)} value={departmentId}>
+                  <option value="">Select department first</option>
+                  {scopedDepartments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
+                </select>
+              </label>
+            </div>
+            {!departmentId ? <Notice tone="task">Select a department to see its active users.</Notice>
+              : eligibleDoers.length === 0 ? <Notice tone="task">No active users are assigned to this branch and department.</Notice>
+                : <UserPicker branchNames={branchNames} departmentNames={departmentNames} disabledIds={[]} label="Users in this department" onChange={updateDoers} selectedIds={doers} users={eligibleDoers} />}
+          </div> : null}
+          {panel === "watchers" ? <div className="py-3"><UserPicker branchNames={branchNames} departmentNames={departmentNames} disabledIds={doers} label="In Loop · read only" onChange={setWatchers} selectedIds={watchers} users={eligibleWatchers} /></div> : null}
           {panel === "due" ? <div className="py-3"><label><span className="mb-1 block text-xs font-semibold text-task-text">Due date and time</span><input className="task-field" min={new Date().toISOString().slice(0, 16)} onChange={(event) => setPlanned(event.target.value)} type="datetime-local" value={planned} /></label></div> : null}
-          {panel === "priority" ? <fieldset className="grid grid-cols-3 gap-2 py-3"><legend className="sr-only">Priority</legend>{(["high", "medium", "low"] as const).map((value) => <button className={cn("min-h-11 rounded-lg border text-sm capitalize", priority === value ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border text-task-text-muted")} key={value} onClick={() => { setPriority(value); setPanel(null); }} type="button">{priority === value ? <Check className="mr-1 inline size-4" /> : null}{value}</button>)}</fieldset> : null}
+          {panel === "priority" ? <fieldset className="grid grid-cols-3 gap-2 py-3"><legend className="sr-only">Priority</legend>{priorityOptions.map((option) => <button className={cn("min-h-11 rounded-lg border text-sm", priority === option.value ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border text-task-text-muted")} key={option.id} onClick={() => { setPriority(option.value); setPanel(null); }} type="button">{priority === option.value ? <Check className="mr-1 inline size-4" /> : null}{option.label}</button>)}</fieldset> : null}
           {panel === "category" ? <fieldset className="grid max-h-48 gap-1 overflow-y-auto py-3 sm:grid-cols-2"><legend className="sr-only">Task category</legend>{data.categories.map((item) => <button className={cn("min-h-11 rounded-lg border px-3 text-left text-sm", categoryId === item.id ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border text-task-text-muted")} key={item.id} onClick={() => { setCategoryId(item.id); setPanel(null); }} type="button">{item.label}</button>)}</fieldset> : null}
 
           <button aria-expanded={detailsOpen} className="flex min-h-12 items-center gap-2 border-b border-task-border text-left text-sm font-semibold text-task-text-muted" onClick={() => setDetailsOpen((open) => !open)} type="button">

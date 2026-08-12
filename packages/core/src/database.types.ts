@@ -4464,8 +4464,11 @@ export type Database = {
           email: string
           employee_code: string
           employee_name: string
+          first_name: string | null
           id: string
           is_login_enabled: boolean | null
+          last_name: string | null
+          official_email: string | null
           official_mobile: string | null
           personal_mobile: string | null
           reports_to_user_id: string | null
@@ -4488,8 +4491,11 @@ export type Database = {
           email: string
           employee_code: string
           employee_name: string
+          first_name?: string | null
           id?: string
           is_login_enabled?: boolean | null
+          last_name?: string | null
+          official_email?: string | null
           official_mobile?: string | null
           personal_mobile?: string | null
           reports_to_user_id?: string | null
@@ -4512,8 +4518,11 @@ export type Database = {
           email?: string
           employee_code?: string
           employee_name?: string
+          first_name?: string | null
           id?: string
           is_login_enabled?: boolean | null
+          last_name?: string | null
+          official_email?: string | null
           official_mobile?: string | null
           personal_mobile?: string | null
           reports_to_user_id?: string | null
@@ -5006,8 +5015,11 @@ export type Database = {
           email: string
           employee_code: string
           employee_name: string
+          first_name: string | null
           id: string
           is_login_enabled: boolean | null
+          last_name: string | null
+          official_email: string | null
           official_mobile: string | null
           personal_mobile: string | null
           reports_to_user_id: string | null
@@ -5044,8 +5056,11 @@ export type Database = {
           email: string
           employee_code: string
           employee_name: string
+          first_name: string | null
           id: string
           is_login_enabled: boolean | null
+          last_name: string | null
+          official_email: string | null
           official_mobile: string | null
           personal_mobile: string | null
           reports_to_user_id: string | null
@@ -5089,8 +5104,11 @@ export type Database = {
           email: string
           employee_code: string
           employee_name: string
+          first_name: string | null
           id: string
           is_login_enabled: boolean | null
+          last_name: string | null
+          official_email: string | null
           official_mobile: string | null
           personal_mobile: string | null
           reports_to_user_id: string | null
@@ -5122,8 +5140,11 @@ export type Database = {
           email: string
           employee_code: string
           employee_name: string
+          first_name: string | null
           id: string
           is_login_enabled: boolean | null
+          last_name: string | null
+          official_email: string | null
           official_mobile: string | null
           personal_mobile: string | null
           reports_to_user_id: string | null
@@ -5436,8 +5457,11 @@ export type Database = {
           email: string
           employee_code: string
           employee_name: string
+          first_name: string | null
           id: string
           is_login_enabled: boolean | null
+          last_name: string | null
+          official_email: string | null
           official_mobile: string | null
           personal_mobile: string | null
           reports_to_user_id: string | null
@@ -5601,6 +5625,25 @@ export type Database = {
           p_email: string
           p_employee_name: string
           p_official_mobile: string
+          p_personal_mobile: string
+          p_user_role: Database["public"]["Enums"]["user_role"]
+          p_week_off: string[]
+        }
+        Returns: string
+      }
+      invite_profile_with_audit_v3: {
+        Args: {
+          p_auth_user_id: string
+          p_branch_id: string
+          p_buddy_id: string
+          p_creator_profile_id: string
+          p_department_id: string
+          p_designation_id: string
+          p_first_name: string
+          p_last_name: string
+          p_official_email: string
+          p_official_mobile: string
+          p_personal_email: string
           p_personal_mobile: string
           p_user_role: Database["public"]["Enums"]["user_role"]
           p_week_off: string[]
@@ -6274,8 +6317,11 @@ export type Database = {
           email: string
           employee_code: string
           employee_name: string
+          first_name: string | null
           id: string
           is_login_enabled: boolean | null
+          last_name: string | null
+          official_email: string | null
           official_mobile: string | null
           personal_mobile: string | null
           reports_to_user_id: string | null
@@ -6296,6 +6342,10 @@ export type Database = {
       use_task_template_with_audit: {
         Args: { p_planned_datetime: string; p_template_id: string }
         Returns: string
+      }
+      user_role_hierarchy_rank: {
+        Args: { p_role: Database["public"]["Enums"]["user_role"] }
+        Returns: number
       }
       validate_notification_template_text: {
         Args: { p_body: string; p_event_type: string; p_title: string }

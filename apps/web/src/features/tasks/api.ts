@@ -3,7 +3,9 @@ import { groupTaskFeedRows, type Database, type Enums, type Json, type Tables } 
 import { loadMasterOptions } from "@/features/dropdowns/api";
 
 export type TaskFeedRow = Database["public"]["Views"]["v_all_tasks"]["Row"];
-export type TaskUser = Database["public"]["Views"]["v_task_users"]["Row"];
+export type TaskUser = Pick<Tables<"user_profiles">,
+  "id" | "tenant_id" | "branch_id" | "department_id" | "employee_code" | "employee_name" |
+  "first_name" | "last_name" | "user_role" | "working_status" | "buddy_id">;
 export type TaskChecklist = Tables<"task_checklists">;
 export type TaskTemplate = Tables<"task_templates">;
 export type AvailabilityStatus = Enums<"availability_status">;
@@ -41,9 +43,18 @@ export async function loadTaskFeedReferenceData(): Promise<TaskFeedReferenceData
 }
 
 export async function loadAvailabilityUsers(): Promise<TaskUser[]> {
-  const result = await supabase.from("v_task_users").select("*").eq("working_status", "active").order("employee_name");
+  const result = await supabase.from("user_profiles")
+    .select("id,tenant_id,branch_id,department_id,employee_code,employee_name,first_name,last_name,user_role,working_status,buddy_id")
+    .eq("account_status", "active")
+    .eq("is_login_enabled", true)
+    .eq("working_status", "active")
+    .order("first_name")
+    .order("last_name");
   fail("Load availability users", result.error);
-  return result.data;
+  return result.data.map((user) => ({
+    ...user,
+    employee_name: [user.first_name, user.last_name].filter((name): name is string => Boolean(name?.trim())).join(" ") || user.employee_name,
+  }));
 }
 
 export async function loadTaskAuthoringReferenceData(): Promise<TaskReferenceData> {

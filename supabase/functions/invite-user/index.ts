@@ -19,8 +19,10 @@ const USER_ROLES = new Set([
 ]);
 
 type InviteBody = {
-  email?: unknown;
-  employee_name?: unknown;
+  personal_email?: unknown;
+  official_email?: unknown;
+  first_name?: unknown;
+  last_name?: unknown;
   branch_id?: unknown;
   department_id?: unknown;
   designation_id?: unknown;
@@ -99,12 +101,12 @@ Deno.serve(async (request: Request) => {
   }
 
   try {
-    const email = requiredString(body.email, "email").toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("email is invalid");
+    const personalEmail = requiredString(body.personal_email, "personal_email").toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(personalEmail)) throw new Error("personal email is invalid");
     const { data: existingProfile, error: existingProfileError } = await adminClient
       .from("user_profiles")
       .select("id")
-      .eq("email", email)
+      .eq("email", personalEmail)
       .maybeSingle();
     if (existingProfileError) return json(500, { error: "Unable to check the existing employee" });
     if (existingProfile) return json(200, { user_profile_id: existingProfile.id, already_exists: true });
@@ -116,7 +118,10 @@ Deno.serve(async (request: Request) => {
     if (!Array.isArray(body.week_off) || body.week_off.some((day) => typeof day !== "string")) {
       throw new Error("week_off must be an array of strings");
     }
-    const employeeName = requiredString(body.employee_name, "employee_name");
+    const firstName = requiredString(body.first_name, "first_name");
+    const lastName = optionalString(body.last_name);
+    const officialEmail = optionalString(body.official_email);
+    if (officialEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(officialEmail)) throw new Error("official email is invalid");
     const branchId = requiredString(body.branch_id, "branch_id");
     const departmentId = requiredString(body.department_id, "department_id");
     const designationId = optionalString(body.designation_id);
@@ -130,7 +135,7 @@ Deno.serve(async (request: Request) => {
 
     const password = temporaryPassword();
     const { data: created, error: createError } = await adminClient.auth.admin.createUser({
-      email,
+      email: personalEmail,
       password,
       email_confirm: true,
     });
@@ -139,12 +144,14 @@ Deno.serve(async (request: Request) => {
     }
 
     const { data: profileId, error: insertError } = await adminClient.rpc(
-      "invite_profile_with_audit_v2",
+      "invite_profile_with_audit_v3",
       {
         p_auth_user_id: created.user.id,
         p_creator_profile_id: callerProfile.id,
-        p_email: email,
-        p_employee_name: employeeName,
+        p_personal_email: personalEmail,
+        p_first_name: firstName,
+        p_last_name: lastName ?? "",
+        p_official_email: officialEmail ?? "",
         p_branch_id: branchId,
         p_department_id: departmentId,
         p_designation_id: designationId,

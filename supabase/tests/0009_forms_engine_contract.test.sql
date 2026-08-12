@@ -113,7 +113,7 @@ select lives_ok($$select save_form_draft_with_audit(null,
    {"key":"branch_value","label":"Branch","type":"branch_dropdown"},
    {"key":"department_value","label":"Department","type":"department_dropdown"},
    {"key":"conditional_value","label":"Conditional","type":"text","required":true,"condition":{"fieldKey":"select_value","operator":"equals","value":"Show"}}
-  ]'::jsonb)$$,'admin creates a fully typed branch draft');
+  ]'::jsonb)$$,'admin creates a fully typed tenant-wide draft');
 reset role;
 
 select is((select lifecycle::text from form_templates where name='Phase 4 Comprehensive'),'draft','new form is a draft');
@@ -126,8 +126,8 @@ select is((select count(*)::int from audit_logs where action='form_draft_created
 set local role authenticated;
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','a9000000-0000-0000-0000-000000000003',true);
-select lives_ok($$select save_form_draft_with_audit(null,'{"name":"Manager Own Branch","permissions":{"roles":["manager"]}}','[{"key":"answer","label":"Answer","type":"text"}]')$$,'manager creates own-branch draft');
-select throws_ok($$select save_form_draft_with_audit(null,'{"name":"Manager Other Branch","branch_id":"29000000-0000-0000-0000-000000000002"}','[{"key":"answer","label":"Answer","type":"text"}]')$$,'42501',null,'manager cannot author another branch form');
+select lives_ok($$select save_form_draft_with_audit(null,'{"name":"Manager Tenant Form","permissions":{"roles":["manager"]}}','[{"key":"answer","label":"Answer","type":"text"}]')$$,'manager creates tenant-wide draft');
+select lives_ok($$select save_form_draft_with_audit(null,'{"name":"Manager Legacy Scope Ignored","branch_id":"29000000-0000-0000-0000-000000000002"}','[{"key":"answer","label":"Answer","type":"text"}]')$$,'legacy branch scope is ignored for a tenant-wide form');
 select set_config('request.jwt.claim.sub','a9000000-0000-0000-0000-000000000005',true);
 select throws_ok($$select save_form_draft_with_audit(null,'{"name":"Staff Denied"}','[]')$$,'42501',null,'staff cannot author forms');
 select set_config('request.jwt.claim.sub','a9000000-0000-0000-0000-000000000008',true);
@@ -163,9 +163,9 @@ select is((select count(*)::int from form_templates where family_id=(select fami
 set local role authenticated;
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','a9000000-0000-0000-0000-000000000002',true);
-select lives_ok($$select archive_form_with_audit((select id from form_templates where name='Manager Own Branch'))$$,'admin archives a draft');
+select lives_ok($$select archive_form_with_audit((select id from form_templates where name='Manager Tenant Form'))$$,'admin archives a draft');
 reset role;
-select is((select lifecycle::text from form_templates where name='Manager Own Branch'),'archived','archive lifecycle is stored');
+select is((select lifecycle::text from form_templates where name='Manager Tenant Form'),'archived','archive lifecycle is stored');
 
 -- Re-publish a fresh comprehensive form for submission checks (the family v2 is current).
 -- Valid answers cover every answer-bearing Phase 4A type and hidden-answer stripping.

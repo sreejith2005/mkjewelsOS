@@ -41,10 +41,8 @@ export const ALL_MENU_ITEMS: readonly MenuItem[] = [
   { id: "home", label: "Home", path: "/" },
   { id: "dashboard", label: "Dashboard", path: "/dashboard" },
   { id: "crm", label: "CRM", path: "/crm" },
-  { id: "checklist_tasks", label: "Checklist Tasks", path: "/tasks/checklist" },
-  { id: "delegation_tasks", label: "Delegation Tasks", path: "/tasks/delegation" },
-  { id: "fms_tasks", label: "FMS Tasks", path: "/tasks/fms" },
-  { id: "fms_builder", label: "FMS Builder", path: "/fms-builder" },
+  { id: "checklist_tasks", label: "Tasks", path: "/tasks" },
+  { id: "fms_builder", label: "FMS", path: "/fms" },
   { id: "forms_library", label: "Forms Library", path: "/forms" },
   { id: "meeting_ai", label: "Meeting AI", path: "/meeting-ai" },
   { id: "notifications", label: "Notifications", path: "/notifications" },
@@ -59,8 +57,7 @@ const COMMON_WORK_PAGES: readonly PageId[] = [
   "home",
   "dashboard",
   "checklist_tasks",
-  "delegation_tasks",
-  "fms_tasks",
+  "fms_builder",
   "forms_library",
   "meeting_ai",
   "notifications",
@@ -77,7 +74,6 @@ export const ROLE_PAGES: Readonly<Record<UserRole, readonly PageId[]>> = {
     "home",
     "dashboard",
     "checklist_tasks",
-    "delegation_tasks",
     "notifications",
     "users",
     "availability",
@@ -86,22 +82,11 @@ export const ROLE_PAGES: Readonly<Record<UserRole, readonly PageId[]>> = {
   ],
   crm: [...COMMON_WORK_PAGES, "crm", "reports"],
   staff: COMMON_WORK_PAGES,
-  doer: [
-    "home",
-    "dashboard",
-    "checklist_tasks",
-    "delegation_tasks",
-    "fms_tasks",
-    "notifications",
-    "availability",
-    "reports",
-    "settings",
-  ],
+  doer: ["home", "dashboard", "checklist_tasks", "fms_builder", "notifications", "availability", "reports", "settings"],
   housekeeping: [
     "home",
     "dashboard",
     "checklist_tasks",
-    "delegation_tasks",
     "notifications",
     "availability",
     "reports",
@@ -123,5 +108,6 @@ export function canAccessPage(role: UserRole, page: PageId): boolean {
 }
 
 export function getPageForPath(path: string): PageId | undefined {
+  if (path === "/tasks/checklist" || path === "/tasks/delegation") return "checklist_tasks";
   return ALL_MENU_ITEMS.find((item) => item.path === path)?.id;
 }

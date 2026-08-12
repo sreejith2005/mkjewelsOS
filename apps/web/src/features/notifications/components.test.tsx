@@ -46,4 +46,12 @@ describe("notification rendered states", () => {
     expect(screen.getByText("This page could not be displayed")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
   });
+
+  it("resets a failed lazy page when the route changes", async () => {
+    const Throwing = (): never => { throw new Error("synthetic route failure"); };
+    const mounted = render(<LazyPageErrorBoundary onNavigate={vi.fn()} resetKey="notifications"><Throwing /></LazyPageErrorBoundary>);
+    expect(screen.getByText("This page could not be displayed")).toBeTruthy();
+    mounted.rerender(<LazyPageErrorBoundary onNavigate={vi.fn()} resetKey="dashboard"><p>Dashboard recovered</p></LazyPageErrorBoundary>);
+    await waitFor(() => expect(screen.getByText("Dashboard recovered")).toBeTruthy());
+  });
 });

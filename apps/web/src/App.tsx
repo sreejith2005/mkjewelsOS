@@ -22,6 +22,8 @@ import { AuthProvider, useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
 import { ApplicationShell } from "@/components/shell/ApplicationShell";
 import { LazyPageErrorBoundary } from "@/components/LazyPageErrorBoundary";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { ThemeProvider, useTheme } from "@/theme/ThemeContext";
 import type { LauncherItem } from "@/components/shell/AppLauncher";
 import logoDarkUrl from "../../../mk-jewels-logos/WhatsApp Image 2026-06-24 at 13.01.41 (1).jpeg";
 import logoLightUrl from "../../../mk-jewels-logos/WhatsApp Image 2026-06-24 at 13.01.40 (1).jpeg";
@@ -32,7 +34,6 @@ const DashboardPage = lazy(() => import("@/pages/DashboardPage").then((module) =
 const DropdownMasterPage = lazy(() => import("@/pages/DropdownMasterPage").then((module) => ({ default: module.DropdownMasterPage })));
 const FormsPage = lazy(() => import("@/pages/FormsPage").then((module) => ({ default: module.FormsPage })));
 const FMSBuilderPage = lazy(() => import("@/pages/FMSBuilderPage").then((module) => ({ default: module.FMSBuilderPage })));
-const FMSTasksPage = lazy(() => import("@/pages/FMSTasksPage").then((module) => ({ default: module.FMSTasksPage })));
 const NotificationsPage = lazy(() => import("@/pages/NotificationsPage").then((module) => ({ default: module.NotificationsPage })));
 const CRMPage = lazy(() => import("@/pages/CRMPage").then((module) => ({ default: module.CRMPage })));
 const TasksPage = lazy(() => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
@@ -62,7 +63,6 @@ const IMPLEMENTED_PAGES = new Set<PageId>([
   "home",
   "dashboard",
   "checklist_tasks",
-  "delegation_tasks",
   "users",
   "availability",
   "dropdown_master",
@@ -75,12 +75,23 @@ const IMPLEMENTED_PAGES = new Set<PageId>([
   "settings",
 ]);
 
+const FULL_WIDTH_PAGES = new Set<PageId>([
+  "home",
+  "dashboard",
+  "crm",
+  "checklist_tasks",
+  "reports",
+  "settings",
+  "fms_builder",
+  "fms_tasks",
+]);
+
 const APP_DESCRIPTIONS: Partial<Record<PageId, string>> = {
   home: "See today's authorized work, linked forms, FMS stages, and activity.",
   dashboard: "Review truthful operational analytics and transparent formulas.",
   crm: "Manage clients, walk-ins, interactions, follow-ups, and documents.",
   fms_tasks: "Run assigned stages and authorized workflows.",
-  fms_builder: "Design and publish versioned process flows.",
+  fms_builder: "Run live workflows and design versioned process flows.",
   users: "Manage authorized employee accounts.",
   availability: "Record real working availability.",
   dropdown_master: "Maintain active master values.",
@@ -105,6 +116,7 @@ function usePathname() {
 
 function LoginPage() {
   const { signIn, statusMessage } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -124,7 +136,8 @@ function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-obsidian px-5 py-10">
+    <main className="relative flex min-h-screen items-center justify-center bg-obsidian px-5 py-10">
+      <ThemeToggle className="absolute right-4 top-4" onChange={setTheme} theme={theme} />
       <section className="glass-card w-full max-w-md rounded-2xl p-7 sm:p-9">
         <img alt="MK Jewels" className="mx-auto mb-8 h-14 w-auto object-contain" src={logoDarkUrl} />
         <p className="mb-6 text-center text-sm text-soft-grey">Sign in to JewelOS</p>
@@ -178,6 +191,7 @@ function IncompleteAccount() {
 
 function AppShell() {
   const { branch, logout, preferences, profile } = useAuth();
+  const { theme, setTheme } = useTheme();
   const { navigate, path } = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [appsOpen, setAppsOpen] = useState(false);
@@ -199,7 +213,7 @@ function AppShell() {
   const nav = useMemo(() => menu.map((item) => ({
     ...item,
     Icon: PAGE_ICONS[item.id],
-    label: item.id === "checklist_tasks" ? "My Tasks" : item.id === "delegation_tasks" ? "Delegated" : item.label,
+    label: item.label,
   })), [menu]);
   const launcherItems = useMemo<LauncherItem[]>(() => nav.flatMap((item) => {
     const description = APP_DESCRIPTIONS[item.id];
@@ -217,10 +231,9 @@ function AppShell() {
     : currentPage === "crm" ? <CRMPage />
     : currentPage === "dropdown_master" ? <DropdownMasterPage />
       : currentPage === "checklist_tasks" ? <TasksPage />
-        : currentPage === "delegation_tasks" ? <TasksPage delegatedView />
       : currentPage === "availability" ? <AvailabilityPage />
           : currentPage === "forms_library" ? <FormsPage />
-            : currentPage === "fms_tasks" ? <FMSTasksPage />
+            : currentPage === "fms_tasks" ? <FMSBuilderPage />
               : currentPage === "fms_builder" ? <FMSBuilderPage />
                 : currentPage === "notifications" ? <NotificationsPage onNavigate={navigate} />
             : <DashboardPage />;
@@ -243,8 +256,11 @@ function AppShell() {
       profile={profile}
       setSidebarOpen={setSidebarOpen}
       sidebarOpen={sidebarOpen}
+      theme={theme}
+      onThemeChange={setTheme}
+      fullBleed={FULL_WIDTH_PAGES.has(currentPage)}
     >
-      <LazyPageErrorBoundary onNavigate={navigate}><Suspense fallback={<div className="flex min-h-48 items-center justify-center text-gold">Loading…</div>}>{pageContent}</Suspense></LazyPageErrorBoundary>
+      <LazyPageErrorBoundary onNavigate={navigate} resetKey={currentPage}><Suspense fallback={<div className="flex min-h-48 items-center justify-center text-gold">Loading…</div>}>{pageContent}</Suspense></LazyPageErrorBoundary>
     </ApplicationShell>
   );
 }
@@ -261,8 +277,6 @@ function AuthenticatedApp() {
 
 export function App() {
   return (
-    <AuthProvider>
-      <AuthenticatedApp />
-    </AuthProvider>
+    <ThemeProvider><AuthProvider><AuthenticatedApp /></AuthProvider></ThemeProvider>
   );
 }
