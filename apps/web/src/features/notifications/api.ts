@@ -10,6 +10,24 @@ import type {
   RuleDraft,
 } from "./types";
 
+type InboxRealtimeSubscription = {
+  channel: RealtimeChannel;
+  listeners: Set<() => void>;
+  removalTimer: ReturnType<typeof setTimeout> | null;
+};
+
+const inboxRealtimeSubscriptions = new Map<string, InboxRealtimeSubscription>();
+
+function createInboxRealtimeSubscription(profileId: string): InboxRealtimeSubscription {
+  const listeners = new Set<() => void>();
+  const channel = supabase.channel(`notifications:${profileId}`).on(
+    "postgres_changes",
+    { event: "INSERT", schema: "public", table: "notifications", filter: `user_profile_id=eq.${profileId}` },
+    () => { listeners.forEach((listener) => listener()); },
+  ).subscribe();
+  return { channel, listeners, removalTimer: null };
+}
+
 export async function loadInbox(profileId: string, limit = 200): Promise<InboxNotification[]> {
   const { data, error } = await supabase.from("notifications").select("id,event_type,title,message,link_url,is_read,read_at,priority,created_at").eq("user_profile_id", profileId).order("created_at", { ascending: false }).limit(limit);
   if (error) throw error;
@@ -28,12 +46,31 @@ export async function markAllNotifications(): Promise<number> {
 }
 
 export function subscribeToInbox(profileId: string, refresh: () => void): () => void {
-  const channel: RealtimeChannel = supabase.channel(`notifications:${profileId}`).on(
-    "postgres_changes",
-    { event: "INSERT", schema: "public", table: "notifications", filter: `user_profile_id=eq.${profileId}` },
-    refresh,
-  ).subscribe();
-  return () => { void supabase.removeChannel(channel); };
+  let subscription = inboxRealtimeSubscriptions.get(profileId);
+  if (!subscription) {
+    subscription = createInboxRealtimeSubscription(profileId);
+    inboxRealtimeSubscriptions.set(profileId, subscription);
+  }
+  if (subscription.removalTimer !== null) {
+    clearTimeout(subscription.removalTimer);
+    subscription.removalTimer = null;
+  }
+  subscription.listeners.add(refresh);
+
+  return () => {
+    subscription.listeners.delete(refresh);
+    if (subscription.listeners.size !== 0 || subscription.removalTimer !== null) return;
+
+    // React Strict Mode immediately remounts effects in development. Deferring
+    // teardown lets the remount reuse the configured channel instead of calling
+    // `.on()` after Supabase has already subscribed it.
+    subscription.removalTimer = setTimeout(() => {
+      if (subscription && subscription.listeners.size === 0) {
+        inboxRealtimeSubscriptions.delete(profileId);
+        void supabase.removeChannel(subscription.channel);
+      }
+    }, 0);
+  };
 }
 
 export async function loadTemplates(): Promise<NotificationTemplateRow[]> {
@@ -124,7 +161,7 @@ export async function retryDelivery(id: string): Promise<void> {
 }
 
 export async function loadActiveRecipientProfiles(): Promise<Array<{ id: string; employee_name: string; user_role: string }>> {
-  const { data, error } = await supabase.from("user_profiles").select("id,employee_name,user_role").eq("is_login_enabled", true).not("working_status", "in", "(inactive,resigned)").order("employee_name");
+  const { data, error } = await supabase.from("user_profiles").select("id,employee_name,user_role").in("account_status", ["active", "invited"]).eq("working_status", "active").order("employee_name");
   if (error) throw error;
   return data ?? [];
 }

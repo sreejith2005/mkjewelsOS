@@ -17,7 +17,7 @@ export async function loadFollowups(filter: Record<string, unknown>) { const { d
 export async function loadCrmOptions(): Promise<CrmOptions> {
   const [branches, profiles, dropdowns] = await Promise.all([
     supabase.from("branches").select("id,name").eq("is_active", true).order("name"),
-    supabase.from("user_profiles").select("id,employee_name,branch_id,user_role").eq("is_login_enabled", true).neq("working_status", "inactive").neq("working_status", "resigned").order("employee_name"),
+    supabase.from("user_profiles").select("id,employee_name,branch_id,user_role").in("account_status", ["active", "invited"]).eq("working_status", "active").order("employee_name"),
     supabase.from("dropdown_masters").select("id,label,value,master_type").eq("is_active", true).in("master_type", ["crm_source", "client_type", "potential_category", "product_category", "buy_status", "not_bought_reason", "communication_preference", "gender"]).order("sort_order"),
   ]);
   fail(branches.error, "Branches failed"); fail(profiles.error, "Profiles failed"); fail(dropdowns.error, "Dropdowns failed");

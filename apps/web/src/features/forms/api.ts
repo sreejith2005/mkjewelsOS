@@ -12,7 +12,10 @@ const object = (value: Json | null): Record<string, Json> => value && typeof val
 export function toDefinition(template: FormTemplate, fields: FormField[]): FormTemplateDefinition {
   return normalizeFormDefinition({ name: template.name, description: template.description ?? undefined,
     permissions: { roles: ((object(template.permissions).roles ?? []) as string[]).filter((role): role is import("@jewelos/core").UserRole => ["super_admin","admin","manager","hr","crm","staff","doer","housekeeping"].includes(role)) },
-    fields: fields.map((field) => ({ id: field.id, key: field.field_key, label: field.field_name, type: field.field_type as FormFieldDefinition["type"], sortOrder: field.sort_order, required: field.is_required, shown: field.is_shown, editable: field.is_editable, placeholder: field.placeholder ?? undefined, helperText: field.helper_text ?? undefined, options: Array.isArray(field.options) ? field.options.filter((value): value is string => typeof value === "string") : undefined, validation: object(field.validation) as FormFieldDefinition["validation"], condition: object(field.conditional_logic) as FormFieldDefinition["condition"] })) });
+    fields: fields.map((field) => {
+      const condition = object(field.conditional_logic);
+      return { id: field.id, key: field.field_key, label: field.field_name, type: field.field_type as FormFieldDefinition["type"], sortOrder: field.sort_order, required: field.is_required, shown: field.is_shown, editable: field.is_editable, placeholder: field.placeholder ?? undefined, helperText: field.helper_text ?? undefined, options: Array.isArray(field.options) ? field.options.filter((value): value is string => typeof value === "string") : undefined, validation: object(field.validation) as FormFieldDefinition["validation"], ...(Object.keys(condition).length ? { condition: condition as FormFieldDefinition["condition"] } : {}) };
+    }) });
 }
 
 export async function loadForms(): Promise<{ bundles: FormBundle[]; submissions: FormSubmission[] }> {
@@ -47,5 +50,6 @@ export const saveDraft = async (id: string | null, payload: Json, fields: Json) 
 export const reviseForm = async (id: string) => { const { error } = await supabase.rpc("create_form_revision_with_audit", { p_source_template_id: id, p_payload: {} }); fail("Create form revision", error); };
 export const publishForm = async (id: string) => { const { error } = await supabase.rpc("publish_form_with_audit", { p_template_id: id }); fail("Publish form", error); };
 export const archiveForm = async (id: string) => { const { error } = await supabase.rpc("archive_form_with_audit", { p_template_id: id }); fail("Archive form", error); };
+export const deleteFormDraft = async (id: string) => { const { error } = await supabase.rpc("delete_form_draft_with_audit", { p_template_id: id }); fail("Delete form draft", error); };
 export const submitForm = async (id: string, answers: object, linkedModule?: string, linkedRecordId?: string) => { const { error } = await supabase.rpc("submit_form_with_audit", { p_form_template_id: id, p_answers: answers as Json, ...(linkedModule ? { p_linked_module: linkedModule } : {}), ...(linkedRecordId ? { p_linked_record_id: linkedRecordId } : {}) }); fail("Submit form", error); };
 export const reviewSubmission = async (id: string, decision: "approved" | "rejected", notes: string) => { const { error } = await supabase.rpc("review_form_submission_with_audit", { p_submission_id: id, p_decision: decision, p_review_notes: notes }); fail("Review submission", error); };

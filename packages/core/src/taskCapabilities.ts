@@ -1,7 +1,7 @@
 import type { UserRole } from "./roleMenu";
 
 export type TaskMutationCapability = Readonly<{
-  access: "doer" | "elevated" | "read_only";
+  access: "doer" | "watcher" | "elevated" | "read_only";
   canMutate: boolean;
   canUseElevatedActions: boolean;
   watcherLabel: string | null;
@@ -28,7 +28,7 @@ export function deriveTaskMutationCapability({
 }>): TaskMutationCapability {
   const canUseElevatedActions = ELEVATED_TASK_ROLES.has(viewerRole);
   const isActiveDoer = assigneeIds.includes(viewerId);
-  const access = canUseElevatedActions ? "elevated" : isActiveDoer ? "doer" : "read_only";
+  const access = canUseElevatedActions ? "elevated" : isActiveDoer ? "doer" : isWatcher ? "watcher" : "read_only";
 
   return {
     access,

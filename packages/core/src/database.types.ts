@@ -2054,6 +2054,7 @@ export type Database = {
         Row: {
           allow_next_selection: boolean
           assignee_type: string
+          fallback_user_profile_id: string | null
           fms_stage_id: string
           id: string
           is_start_stage_entry_user: boolean | null
@@ -2064,6 +2065,7 @@ export type Database = {
         Insert: {
           allow_next_selection?: boolean
           assignee_type: string
+          fallback_user_profile_id?: string | null
           fms_stage_id: string
           id?: string
           is_start_stage_entry_user?: boolean | null
@@ -2074,6 +2076,7 @@ export type Database = {
         Update: {
           allow_next_selection?: boolean
           assignee_type?: string
+          fallback_user_profile_id?: string | null
           fms_stage_id?: string
           id?: string
           is_start_stage_entry_user?: boolean | null
@@ -4981,6 +4984,10 @@ export type Database = {
         Returns: undefined
       }
       archive_form_with_audit: {
+        Args: { p_template_id: string }
+        Returns: string
+      }
+      delete_form_draft_with_audit: {
         Args: { p_template_id: string }
         Returns: string
       }

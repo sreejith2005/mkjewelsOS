@@ -596,7 +596,8 @@ begin
   if jsonb_typeof(p_payload) <> 'object'
      or p_payload - array[
        'title','description','planned_datetime','priority','branch_id',
-       'department_id','category_id','requires_upload','requires_remark'
+        'department_id','category_id','requires_upload','requires_remark',
+        'requires_form','form_template_id'
      ] <> '{}'::jsonb then
     raise exception 'Task payload contains unsupported fields' using errcode = '22023';
   end if;
@@ -693,17 +694,26 @@ begin
     raise exception 'Every watcher must be active and belong to the permitted tenant and branch'
       using errcode = '23503';
   end if;
+  if coalesce((p_payload->>'requires_form')::boolean, false) <> (nullif(p_payload->>'form_template_id', '') is not null)
+     or (nullif(p_payload->>'form_template_id', '') is not null and not exists (
+       select 1 from form_templates where id = (p_payload->>'form_template_id')::uuid
+         and tenant_id = v_actor.tenant_id and is_active
+     )) then
+    raise exception 'Required form is invalid, inactive, or inconsistent' using errcode = '23503';
+  end if;
 
   insert into task_instances (
     tenant_id, branch_id, department_id, category_id, task_type, title,
     description, priority, planned_datetime, requires_upload,
-    requires_remark, source, created_by, updated_by
+    requires_remark, requires_form, form_template_id, source, created_by, updated_by
   ) values (
     v_actor.tenant_id, v_branch, v_department, v_category, 'delegation',
     btrim(p_payload->>'title'), nullif(btrim(p_payload->>'description'), ''),
     v_priority, v_planned_datetime,
     coalesce((p_payload->>'requires_upload')::boolean, false),
     coalesce((p_payload->>'requires_remark')::boolean, false),
+    coalesce((p_payload->>'requires_form')::boolean, false),
+    nullif(p_payload->>'form_template_id', '')::uuid,
     'manual', v_actor.id, v_actor.id
   ) returning * into v_task;
 
@@ -897,14 +907,15 @@ begin
   select * into v_old from task_instances where id = p_task_id for update;
   if v_actor.id is null or not current_profile_is_active() or v_old.id is null
      or v_old.tenant_id <> v_actor.tenant_id or not (
-       v_actor.user_role in ('super_admin', 'admin', 'manager')
-       or exists (
+        v_actor.user_role in ('super_admin', 'admin', 'manager')
+        or exists (
          select 1 from task_assignees
          where task_instance_id = p_task_id
            and user_profile_id = v_actor.id
            and role_at_task = 'doer'
-           and is_active
-       )
+            and is_active
+        )
+        or is_task_watcher(p_task_id)
      ) then
     raise exception 'Task is not accessible to an active doer'
       using errcode = '42501';

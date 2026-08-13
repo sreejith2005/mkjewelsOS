@@ -183,7 +183,7 @@ export function TasksPage() {
 
       {canManage ? <Button aria-label="Create task" className="fixed bottom-[86px] right-4 z-20 size-14 rounded-2xl bg-task-accent p-0 text-task-text shadow-xl hover:bg-task-accent/90 md:bottom-8 md:right-8" onClick={() => void openComposer()}><Plus className="size-6" /></Button> : null}
 
-      {composerOpen && canManage && references && profile ? <TaskComposer data={references} onClose={() => setComposerOpen(false)} onCreated={() => { setComposerOpen(false); void refresh(); }} onManageTemplates={() => { setComposerOpen(false); setShowTemplates(true); }} onSave={createDelegationTask} onUseTemplate={createFromTemplate} profile={profile} /> : null}
+      {composerOpen && canManage && references && profile ? <TaskComposer data={references} onClose={() => setComposerOpen(false)} onCreated={() => { setComposerOpen(false); void refresh(); }} onManageTemplates={() => { setComposerOpen(false); setShowTemplates(true); }} onSave={createDelegationTask} onUploadAttachment={(taskId, file) => uploadTaskAttachment(profile.tenant_id, taskId, file)} onSaveRecurring={(payload) => saveTaskTemplate(null, payload)} onUseTemplate={createFromTemplate} profile={profile} /> : null}
 
       {showTemplates && canManage && references ? <Modal onClose={() => setShowTemplates(false)} title="Task Templates">
         <div className="flex flex-col gap-3">

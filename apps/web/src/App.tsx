@@ -37,7 +37,7 @@ const FMSBuilderPage = lazy(() => import("@/pages/FMSBuilderPage").then((module)
 const NotificationsPage = lazy(() => import("@/pages/NotificationsPage").then((module) => ({ default: module.NotificationsPage })));
 const CRMPage = lazy(() => import("@/pages/CRMPage").then((module) => ({ default: module.CRMPage })));
 const TasksPage = lazy(() => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
-const UserManagementPage = lazy(() => import("@/pages/UserManagementPage").then((module) => ({ default: module.UserManagementPage })));
+const TeamDirectoryPage = lazy(() => import("@/pages/TeamDirectoryPage").then((module) => ({ default: module.TeamDirectoryPage })));
 const ReportsPage = lazy(() => import("@/pages/ReportsPage").then((module) => ({ default: module.ReportsPage })));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage").then((module) => ({ default: module.SettingsPage })));
 
@@ -92,7 +92,7 @@ const APP_DESCRIPTIONS: Partial<Record<PageId, string>> = {
   crm: "Manage clients, walk-ins, interactions, follow-ups, and documents.",
   fms_tasks: "Run assigned stages and authorized workflows.",
   fms_builder: "Run live workflows and design versioned process flows.",
-  users: "Manage authorized employee accounts.",
+  users: "Browse employees by department and manage authorized accounts.",
   availability: "Record real working availability.",
   dropdown_master: "Maintain active master values.",
   reports: "Preview fixed reports and manage private CSV exports.",
@@ -227,7 +227,7 @@ function AppShell() {
     : currentPage === "dashboard" ? <DashboardPage />
     : currentPage === "reports" ? <ReportsPage />
     : currentPage === "settings" ? <SettingsPage />
-    : currentPage === "users" ? <UserManagementPage />
+    : currentPage === "users" ? <TeamDirectoryPage />
     : currentPage === "crm" ? <CRMPage />
     : currentPage === "dropdown_master" ? <DropdownMasterPage />
       : currentPage === "checklist_tasks" ? <TasksPage />

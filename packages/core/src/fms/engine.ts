@@ -18,7 +18,7 @@ export function normalizeFmsDefinition(input: FmsFlowDefinition): FmsFlowDefinit
     allowMultipleDoers: bool(stage.allowMultipleDoers), requiresUpload: bool(stage.requiresUpload), requiresRemark: bool(stage.requiresRemark),
     checklist: array<FmsChecklistItemDefinition>(stage.checklist).map((item) => ({ key: text(item.key).toLowerCase(), label: text(item.label), required: bool(item.required, true) })),
     formTemplateId: text(stage.formTemplateId) || undefined,
-    assigneeRules: array<FmsAssigneeRule>(stage.assigneeRules).map((rule) => ({ ...rule, userProfileId: text(rule.userProfileId) || undefined, allowNextSelection: bool(rule.allowNextSelection) })),
+    assigneeRules: array<FmsAssigneeRule>(stage.assigneeRules).map((rule) => ({ ...rule, userProfileId: text(rule.userProfileId) || undefined, fallbackUserProfileId: text(rule.fallbackUserProfileId) || undefined, allowNextSelection: bool(rule.allowNextSelection) })),
     requiresNextDoerHandoff: bool(stage.requiresNextDoerHandoff), canMoveBackward: bool(stage.canMoveBackward), canReject: bool(stage.canReject),
     canRequestRevision: bool(stage.canRequestRevision), canEscalate: bool(stage.canEscalate), defaultNextStageKey: text(stage.defaultNextStageKey).toLowerCase() || undefined,
     branchRules: array<FmsBranchRule>(stage.branchRules).map((rule, index) => ({ ...rule, id: text(rule.id) || `rule_${index + 1}`, sourceKey: text(rule.sourceKey) || undefined, nextStageKey: text(rule.nextStageKey).toLowerCase() || undefined, nextFlowId: text(rule.nextFlowId) || undefined, order: index })),
@@ -67,7 +67,7 @@ export function validateFmsDefinition(raw: FmsFlowDefinition): readonly FmsValid
     if (stage.type === "form" && !stage.formTemplateId) add("missing_form", "Form stages require an exact published template version");
     if (stage.formTemplateId && !UUID.test(stage.formTemplateId)) add("invalid_form", "Linked form ID is invalid");
     if (!AUTO.has(stage.type) && !stage.assigneeRules.length) add("missing_assignee", "Executable stages require an assignee rule");
-    if (stage.assigneeRules.some((rule) => !FMS_ASSIGNEE_TYPES.includes(rule.type) || rule.type === "specific_user" && !UUID.test(rule.userProfileId ?? "") || rule.type === "role" && !rule.role)) add("invalid_assignee", "Assignee rule is incomplete");
+    if (stage.assigneeRules.some((rule) => !FMS_ASSIGNEE_TYPES.includes(rule.type) || rule.type === "specific_user" && (!UUID.test(rule.userProfileId ?? "") || rule.fallbackUserProfileId !== undefined && !UUID.test(rule.fallbackUserProfileId)) || rule.type !== "specific_user" && rule.fallbackUserProfileId !== undefined || rule.type === "role" && !rule.role)) add("invalid_assignee", "Assignee rule is incomplete");
     if (!stage.allowMultipleDoers && stage.completionRule === "all_doers") add("incompatible_completion_rule", "all_doers requires multiple doers");
     if (stage.type === "approval" && stage.completionRule !== "manager_approval") add("incompatible_completion_rule", "Approval stages require manager_approval");
     for (const next of fmsOutgoingStageKeys(stage)) if (!byKey.has(next)) add("dangling_reference", `Stage references missing stage ${next}`);

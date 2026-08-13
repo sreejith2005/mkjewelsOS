@@ -9,6 +9,7 @@ export type TaskUser = Pick<Tables<"user_profiles">,
 export type TaskChecklist = Tables<"task_checklists">;
 export type TaskTemplate = Tables<"task_templates">;
 export type AvailabilityStatus = Enums<"availability_status">;
+export type AvailabilityEntry = Pick<Tables<"user_availability">, "user_profile_id" | "date" | "status" | "reason">;
 
 export type TaskBundle = TaskFeedRow & {
   assignees: Array<{ id: string; name: string }>;
@@ -45,8 +46,7 @@ export async function loadTaskFeedReferenceData(): Promise<TaskFeedReferenceData
 export async function loadAvailabilityUsers(): Promise<TaskUser[]> {
   const result = await supabase.from("user_profiles")
     .select("id,tenant_id,branch_id,department_id,employee_code,employee_name,first_name,last_name,user_role,working_status,buddy_id")
-    .eq("account_status", "active")
-    .eq("is_login_enabled", true)
+    .in("account_status", ["active", "invited"])
     .eq("working_status", "active")
     .order("first_name")
     .order("last_name");
@@ -55,6 +55,14 @@ export async function loadAvailabilityUsers(): Promise<TaskUser[]> {
     ...user,
     employee_name: [user.first_name, user.last_name].filter((name): name is string => Boolean(name?.trim())).join(" ") || user.employee_name,
   }));
+}
+
+export async function loadAvailabilityForDate(date: string): Promise<AvailabilityEntry[]> {
+  const result = await supabase.from("user_availability")
+    .select("user_profile_id,date,status,reason")
+    .eq("date", date);
+  fail("Load availability", result.error);
+  return result.data;
 }
 
 export async function loadTaskAuthoringReferenceData(): Promise<TaskReferenceData> {
@@ -205,14 +213,16 @@ export async function createDelegationTask(
   doerIds: string[],
   watcherIds: string[],
   checklist: Json,
-): Promise<void> {
-  const { error } = await supabase.rpc("create_delegation_task_with_audit", {
+): Promise<string> {
+  const { data, error } = await supabase.rpc("create_delegation_task_with_audit", {
     p_payload: payload,
     p_doer_ids: doerIds,
     p_watcher_ids: watcherIds,
     p_checklist: checklist,
   });
   fail("Create delegation task", error);
+  if (!data) throw new Error("Task creation did not return an identifier");
+  return data;
 }
 
 export async function saveTaskTemplate(templateId: string | null, payload: Json): Promise<void> {

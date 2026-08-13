@@ -16,6 +16,7 @@ export type FmsStageStatus = "pending" | "in_progress" | "in_review" | "complete
 export type FmsAssigneeRule = Readonly<{
   type: FmsAssigneeType;
   userProfileId?: string | undefined;
+  fallbackUserProfileId?: string | undefined;
   role?: UserRole | undefined;
   allowNextSelection?: boolean | undefined;
 }>;

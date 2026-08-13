@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { MoreVertical, Network, Plus, Search, Trash2, UserCog } from "lucide-react";
+import { Copy, KeyRound, MoreVertical, Network, Plus, Search, Trash2, UserCog } from "lucide-react";
 import { USER_ROLES, type Json, type UserRole } from "@jewelos/core";
 import { supabase } from "@jewelos/api-client";
 import { useAuth } from "@/auth/AuthContext";
@@ -22,10 +22,17 @@ function Status({ value }: { value: AccountStatus }) {
   return <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${color}`}>{titleCase(value)}</span>;
 }
 
+function TemporaryPassword({ password, title, onClose }: { password: string; title: string; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => { await navigator.clipboard.writeText(password); setCopied(true); };
+  return <Modal onClose={onClose} title={title}><div className="space-y-4"><Notice tone="danger">This temporary password is displayed only now. Copy it and share it securely; JewelOS never stores or lists passwords.</Notice><div className="break-all rounded-lg border border-gold/30 bg-obsidian p-3 font-mono text-sm text-champagne">{password}</div><div className="flex justify-end gap-3"><Button onClick={() => void copy()} type="button" variant="secondary"><Copy className="h-4 w-4" />{copied ? "Copied" : "Copy password"}</Button><Button onClick={onClose} type="button">Done</Button></div></div></Modal>;
+}
+
 function EditUser({ user, data, superAdmin, onClose, onSaved }: { user: UserProfile; data: Data; superAdmin: boolean; onClose: () => void; onSaved: () => Promise<void> }) {
   const [draft, setDraft] = useState({ employee_name: user.employee_name, employee_code: user.employee_code, branch_id: user.branch_id, department_id: user.department_id, designation_id: user.designation_id ?? "", buddy_id: user.buddy_id ?? "", reports_to_user_id: user.reports_to_user_id ?? "", account_status: user.account_status, user_role: user.user_role, personal_mobile: user.personal_mobile ?? "", official_mobile: user.official_mobile ?? "" });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
   const activeProfiles = data.profiles.filter((profile) => profile.id !== user.id && profile.account_status === "active");
   const buddyProfiles = eligibleBuddies(data.profiles, draft.department_id, user.id);
   const departments = data.departments.filter((department) => !department.branch_id || department.branch_id === draft.branch_id);
@@ -55,6 +62,18 @@ function EditUser({ user, data, superAdmin, onClose, onSaved }: { user: UserProf
     } catch (caught) { setError(errorMessage(caught)); } finally { setSaving(false); }
   };
 
+  const resetPassword = async () => {
+    if (!superAdmin || !window.confirm(`Reset ${user.employee_name}'s password? Their current password will stop working.`)) return;
+    setSaving(true); setError(null);
+    try {
+      const { data: result, error: invokeError } = await supabase.functions.invoke<{ temporary_password?: string }>("reset-user-password", { body: { profile_id: user.id } });
+      if (invokeError) throw invokeError;
+      if (!result?.temporary_password) throw new Error("The password reset did not return a temporary password.");
+      setTemporaryPassword(result.temporary_password);
+    } catch (caught) { setError(errorMessage(caught)); } finally { setSaving(false); }
+  };
+
+  if (temporaryPassword) return <TemporaryPassword onClose={() => setTemporaryPassword(null)} password={temporaryPassword} title={`${user.employee_name}'s temporary password`} />;
   return <Modal onClose={onClose} title={`Edit ${user.employee_name}`} wide>
     <form className="space-y-5" onSubmit={submit}>
       {error ? <Notice tone="danger">{error}</Notice> : null}
@@ -71,27 +90,16 @@ function EditUser({ user, data, superAdmin, onClose, onSaved }: { user: UserProf
         <Field label="System role"><select className="field" disabled={!superAdmin} value={draft.user_role} onChange={(event) => set("user_role", event.target.value as UserRole)}>{USER_ROLES.map((role) => <option key={role} value={role}>{titleCase(role)}</option>)}</select></Field>
       </div>
       <div className="flex items-center justify-between gap-3">
-        <div>{superAdmin ? <Button disabled={saving} type="button" variant="danger" onClick={remove}><Trash2 className="h-4 w-4" />Delete user</Button> : null}</div>
-        <div className="flex gap-3"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button disabled={saving} type="submit">{saving ? "Savingâ€¦" : "Save user"}</Button></div>
+        <div className="flex flex-wrap gap-2">{superAdmin ? <Button disabled={saving} type="button" variant="secondary" onClick={() => void resetPassword()}><KeyRound className="h-4 w-4" />Reset password</Button> : null}{superAdmin ? <Button disabled={saving} type="button" variant="danger" onClick={remove}><Trash2 className="h-4 w-4" />Delete user</Button> : null}</div>
+        <div className="flex gap-3"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button disabled={saving} type="submit">{saving ? "Saving..." : "Save user"}</Button></div>
       </div>
     </form>
   </Modal>;
 }
 
-function InviteUser({ data, role, onClose, onDone }: { data: Data; role: UserRole; onClose: () => void; onDone: () => Promise<void> }) {
-  const [form, setForm] = useState({ email: "", employee_name: "", branch_id: "", department_id: "", designation_id: "", personal_mobile: "", official_mobile: "", buddy_id: "", week_off: [] as string[], user_role: "staff" as UserRole });
-  const [error, setError] = useState<string | null>(null); const [saving, setSaving] = useState(false);
-  const departments = data.departments.filter((item) => !item.branch_id || item.branch_id === form.branch_id);
-  const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => setForm((current) => ({ ...current, [key]: value }));
-  const submit = async (event: FormEvent) => { event.preventDefault(); setSaving(true); setError(null); try { const { error: invokeError } = await supabase.functions.invoke("invite-user", { body: form }); if (invokeError) throw invokeError; await onDone(); onClose(); } catch (caught) { setError(errorMessage(caught)); } finally { setSaving(false); } };
-  return <Modal onClose={onClose} title="Add user" wide><form className="space-y-4" onSubmit={submit}>{error ? <Notice tone="danger">{error}</Notice> : null}<p className="text-sm text-soft-grey">Employee code is generated automatically. Only email, name, branch, and department are required for a new account.</p><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Field label="Email"><input className="field" required type="email" value={form.email} onChange={(event) => set("email", event.target.value)} /></Field><Field label="Employee name"><input className="field" required value={form.employee_name} onChange={(event) => set("employee_name", event.target.value)} /></Field><Field label="Branch"><select className="field" required value={form.branch_id} onChange={(event) => set("branch_id", event.target.value)}><option value="">Select</option>{data.branches.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field><Field label="Department"><select className="field" required value={form.department_id} onChange={(event) => set("department_id", event.target.value)}><option value="">Select</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field><Field label="Personal mobile"><input className="field" type="tel" value={form.personal_mobile} onChange={(event) => set("personal_mobile", event.target.value)} /></Field><Field label="Buddy"><select className="field" value={form.buddy_id} onChange={(event) => set("buddy_id", event.target.value)}><option value="">None yet</option>{data.profiles.filter((item) => item.account_status === "active").map((item) => <option key={item.id} value={item.id}>{item.employee_name}</option>)}</select></Field><Field label="Role"><select className="field" value={form.user_role} onChange={(event) => set("user_role", event.target.value as UserRole)}>{(role === "super_admin" ? USER_ROLES : USER_ROLES.filter((item) => item !== "super_admin")).map((item) => <option key={item} value={item}>{titleCase(item)}</option>)}</select></Field></div><div className="flex justify-end gap-3"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button disabled={saving} type="submit">{saving ? "Creatingâ€¦" : "Create user"}</Button></div></form></Modal>;
-}
-
-void InviteUser;
-
 function AddUserForm({ data, role, onClose, onDone }: { data: Data; role: UserRole; onClose: () => void; onDone: () => Promise<void> }) {
   const [form, setForm] = useState({ first_name: "", last_name: "", branch_id: "", personal_mobile: "", official_mobile: "", personal_email: "", official_email: "", department_id: "", designation_id: "", buddy_id: "", week_off: [] as string[], user_role: "staff" as UserRole });
-  const [error, setError] = useState<string | null>(null); const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null); const [saving, setSaving] = useState(false); const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => setForm((current) => ({ ...current, [key]: value }));
   const departments = data.departments.filter((item) => !item.branch_id || item.branch_id === form.branch_id);
   const buddies = eligibleBuddies(data.profiles, form.department_id);
@@ -100,8 +108,9 @@ function AddUserForm({ data, role, onClose, onDone }: { data: Data; role: UserRo
     if (!form.first_name.trim() || !form.personal_email.trim() || !form.branch_id || !form.department_id) { setError("First name, branch, personal email, and department are required."); return; }
     if ((form.personal_mobile && !PHONE_PATTERN.test(form.personal_mobile)) || (form.official_mobile && !PHONE_PATTERN.test(form.official_mobile))) { setError("Enter valid phone numbers or leave them blank."); return; }
     setSaving(true);
-    try { const { error: invokeError } = await supabase.functions.invoke("invite-user", { body: form }); if (invokeError) throw invokeError; await onDone(); onClose(); } catch (caught) { setError(errorMessage(caught)); } finally { setSaving(false); }
+    try { const { data: result, error: invokeError } = await supabase.functions.invoke<{ temporary_password?: string; already_exists?: boolean }>("invite-user", { body: form }); if (invokeError) throw invokeError; await onDone(); if (result?.temporary_password) setTemporaryPassword(result.temporary_password); else if (result?.already_exists) setError("A user with this login email already exists."); else throw new Error("The account was created but no temporary password was returned."); } catch (caught) { setError(errorMessage(caught)); } finally { setSaving(false); }
   };
+  if (temporaryPassword) return <TemporaryPassword onClose={onClose} password={temporaryPassword} title="New user's temporary password" />;
   return <Modal onClose={onClose} title="Add user" wide><form className="space-y-4" onSubmit={submit}>{error ? <Notice tone="danger">{error}</Notice> : null}<p className="text-sm text-soft-grey">Employee code is generated automatically. Personal email is the login address. Buddy choices are restricted to active users in the same branch, department, and designation at the same or lower hierarchy.</p><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Field label="First name"><input className="field" required value={form.first_name} onChange={(event) => set("first_name", event.target.value)} /></Field><Field label="Last name"><input className="field" value={form.last_name} onChange={(event) => set("last_name", event.target.value)} /></Field><Field label="Branch"><select className="field" required value={form.branch_id} onChange={(event) => { set("branch_id", event.target.value); set("department_id", ""); set("buddy_id", ""); }}><option value="">Select</option>{data.branches.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field><Field label="Personal phone number"><input className="field" type="tel" value={form.personal_mobile} onChange={(event) => set("personal_mobile", event.target.value)} /></Field><Field label="Official phone number"><input className="field" type="tel" value={form.official_mobile} onChange={(event) => set("official_mobile", event.target.value)} /></Field><Field label="Personal email"><input className="field" required type="email" value={form.personal_email} onChange={(event) => set("personal_email", event.target.value)} /></Field><Field label="Official email"><input className="field" type="email" value={form.official_email} onChange={(event) => set("official_email", event.target.value)} /></Field><Field label="Department"><select className="field" required value={form.department_id} onChange={(event) => { set("department_id", event.target.value); set("buddy_id", ""); }}><option value="">Select</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field><Field label="Designation"><select className="field" value={form.designation_id} onChange={(event) => { set("designation_id", event.target.value); set("buddy_id", ""); }}><option value="">None</option>{data.dropdowns.filter((item) => item.master_type === "designation" && item.is_active).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field><Field label="Buddy"><select className="field" disabled={!form.department_id} value={form.buddy_id} onChange={(event) => set("buddy_id", event.target.value)}><option value="">{form.department_id ? "No buddy" : "Choose a department first"}</option>{buddies.map((item) => <option key={item.id} value={item.id}>{item.employee_name}</option>)}</select></Field><Field label="System role"><select className="field" value={form.user_role} onChange={(event) => { set("user_role", event.target.value as UserRole); set("buddy_id", ""); }}>{(role === "super_admin" ? USER_ROLES : USER_ROLES.filter((item) => item !== "super_admin")).map((item) => <option key={item} value={item}>{titleCase(item)}</option>)}</select></Field></div><div className="flex justify-end gap-3"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button disabled={saving} type="submit">{saving ? "Creatingâ€¦" : "Create user"}</Button></div></form></Modal>;
 }
 

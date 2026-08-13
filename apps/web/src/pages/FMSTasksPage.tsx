@@ -13,7 +13,7 @@ import { filterFmsInstances } from "@/features/fms/runtimeView";
 const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: [] };
 type Runtime = Awaited<ReturnType<typeof loadFmsRuntime>>;
 
-export function FMSTasksPage({ embedded = false }: { embedded?: boolean }) {
+export function FMSTasksPage({ embedded = false, query: externalQuery }: { embedded?: boolean; query?: string }) {
   const { profile } = useAuth();
   const [runtime, setRuntime] = useState<Runtime>();
   const [builder, setBuilder] = useState<FmsData>();
@@ -43,7 +43,8 @@ export function FMSTasksPage({ embedded = false }: { embedded?: boolean }) {
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
 
-  const instances = useMemo(() => filterFmsInstances({ instances: runtime?.instances ?? [], stages: runtime?.stages ?? [], profileId: profile?.id ?? "", tab, query, status, priority, overdueOnly: overdue }), [overdue, priority, profile?.id, query, runtime, status, tab]);
+  const activeQuery = externalQuery ?? query;
+  const instances = useMemo(() => filterFmsInstances({ instances: runtime?.instances ?? [], stages: runtime?.stages ?? [], profileId: profile?.id ?? "", tab, query: activeQuery, status, priority, overdueOnly: overdue }), [activeQuery, overdue, priority, profile?.id, runtime, status, tab]);
 
   if (!profile) return null;
   const canStart = ["super_admin", "admin", "manager", "crm", "staff"].includes(profile.user_role);
@@ -76,7 +77,7 @@ export function FMSTasksPage({ embedded = false }: { embedded?: boolean }) {
   }
 
   return <><section className={embedded ? "w-full" : "mx-auto max-w-7xl"}>
-    <header className="mb-6 flex flex-wrap justify-between gap-3"><div><h1 className="text-3xl font-semibold text-gold">FMS Tasks</h1><p className="text-sm text-soft-grey">Assigned stages, started instances, and authorized branch operations.</p></div>{canStart ? <Button onClick={() => setStart(true)}><Play />Start flow</Button> : null}</header>
+    <header className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-semibold text-white">Live instances</h2><p className="text-sm text-soft-grey">Processes assigned to you, started by you, or visible to your branch.</p></div>{canStart ? <Button onClick={() => setStart(true)}><Play />Start workflow</Button> : null}</header>
     {success ? <div className="mb-3"><Notice tone="success">{success}</Notice></div> : null}{error ? <div className="mb-3"><Notice tone="danger">{error} <button className="underline" onClick={() => void refresh()} type="button">Retry</button></Notice></div> : null}
     <div className="mb-4 flex flex-wrap gap-2"><Button onClick={() => setTab("mine")} variant={tab === "mine" ? "primary" : "secondary"}>My Stages</Button><Button onClick={() => setTab("started")} variant={tab === "started" ? "primary" : "secondary"}>Started by Me</Button>{canManage ? <Button onClick={() => setTab("branch")} variant={tab === "branch" ? "primary" : "secondary"}>Branch View</Button> : null}</div>
     <div className="mb-5 grid gap-2 sm:grid-cols-4"><label className="relative"><Search className="absolute left-3 top-3 size-4 text-soft-grey" /><input aria-label="Search FMS instances" className="field pl-9" onChange={(event) => setQuery(event.target.value)} placeholder="Search reference or title" value={query} /></label><select aria-label="Status filter" className="field" onChange={(event) => setStatus(event.target.value)} value={status}><option value="all">All statuses</option>{["active", "overdue", "on_hold", "completed", "cancelled"].map((item) => <option key={item}>{item}</option>)}</select><select aria-label="Priority filter" className="field" onChange={(event) => setPriority(event.target.value)} value={priority}><option value="all">All priorities</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select><label className="field flex items-center gap-2"><input checked={overdue} onChange={(event) => setOverdue(event.target.checked)} type="checkbox" /> Overdue only</label></div>

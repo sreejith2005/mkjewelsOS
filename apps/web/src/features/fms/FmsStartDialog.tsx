@@ -5,9 +5,9 @@ import type { FmsData } from "./api";
 import { startFmsInstance } from "./api";
 import { parseFmsContext } from "./runtimeView";
 
-export function FmsStartDialog({ data, onClose, onStarted }: { data: FmsData; onClose: () => void; onStarted: (reference: string) => Promise<void> }) {
+export function FmsStartDialog({ data, initialFlowId, onClose, onStarted }: { data: FmsData; initialFlowId?: string; onClose: () => void; onStarted: (reference: string) => Promise<void> }) {
   const flows = data.flows.filter((flow) => flow.status === "published" && flow.is_active);
-  const [flowId, setFlowId] = useState(flows[0]?.id ?? "");
+  const [flowId, setFlowId] = useState(() => flows.some((item) => item.id === initialFlowId) ? initialFlowId! : flows[0]?.id ?? "");
   const flow = flows.find((item) => item.id === flowId);
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<"high" | "medium" | "low">("medium");
@@ -19,7 +19,10 @@ export function FmsStartDialog({ data, onClose, onStarted }: { data: FmsData; on
   const [error, setError] = useState<string | null>(null);
   const firstStage = useMemo(() => data.stages.filter((stage) => stage.fms_flow_id === flowId).sort((a, b) => a.sort_order - b.sort_order)[0], [data.stages, flowId]);
   const firstRule = data.assignees.find((item) => item.fms_stage_id === firstStage?.id);
-  const candidates = data.users.filter((user) => user.working_status !== "inactive" && user.working_status !== "resigned" && user.is_login_enabled && (!branchId || user.branch_id === branchId) && (!departmentId || user.department_id === departmentId) && (!firstRule || firstRule.assignee_type !== "role" || user.user_role === firstRule.role_value));
+  const eligibleUsers = data.users.filter((user) => user.working_status !== "inactive" && user.working_status !== "resigned" && user.is_login_enabled && (!branchId || user.branch_id === branchId) && (!departmentId || user.department_id === departmentId));
+  const candidates = firstRule?.assignee_type === "specific_user"
+    ? eligibleUsers.filter((user) => user.id === firstRule.user_profile_id || user.id === firstRule.fallback_user_profile_id)
+    : eligibleUsers;
   const start = async () => {
     setBusy(true); setError(null);
     try {

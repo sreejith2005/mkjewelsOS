@@ -36,6 +36,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
     {preview ? <Notice>Preview mode — nothing is saved.</Notice> : null}
     {error ? <div aria-live="assertive" role="alert"><Notice tone="danger">{error}</Notice></div> : null}
     {success ? <Notice tone="success">Form submitted successfully.</Notice> : null}
+    {definition.fields.length === 0 ? <Notice tone="danger">This form version has no saved questions. Close it and edit the draft before publishing.</Notice> : null}
     {definition.fields.map((field) => {
       if (!isFormFieldVisible(field, normalized)) return null;
       if (field.type === "section_header") return <h3 className="text-lg font-semibold text-gold" key={field.key}>{field.label}</h3>;
@@ -53,6 +54,6 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
           : <input className="field" disabled={disabled} id={field.key} onChange={onText} placeholder={field.placeholder} ref={register(field.key)} step={NUMBER_TYPES.has(field.type) ? "any" : undefined} type={inputType} value={typeof value === "string" || typeof value === "number" ? value : ""} />}
       </label>;
     })}
-    {!readOnly ? <Button disabled={busy || preview || success} type="submit">{busy ? "Submitting…" : "Submit form"}</Button> : null}
+    {!readOnly && definition.fields.length > 0 ? <Button disabled={busy || preview || success} type="submit">{busy ? "Submitting..." : "Submit form"}</Button> : null}
   </form>;
 }

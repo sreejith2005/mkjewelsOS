@@ -18,6 +18,17 @@ export type ShellNavItem = Readonly<{
   path: string;
 }>;
 
+const SIDEBAR_BOTTOM_PAGE_IDS = new Set<PageId>(["dropdown_master", "reports", "settings"]);
+
+export function getSidebarNavigation(nav: readonly ShellNavItem[]): Readonly<{ primary: readonly ShellNavItem[]; bottom: readonly ShellNavItem[] }> {
+  const primary = nav.filter((item) => item.id !== "notifications" && !SIDEBAR_BOTTOM_PAGE_IDS.has(item.id) && item.id !== "users");
+  const users = nav.filter((item) => item.id === "users");
+  return {
+    primary: [...primary, ...users],
+    bottom: nav.filter((item) => SIDEBAR_BOTTOM_PAGE_IDS.has(item.id)),
+  };
+}
+
 export function ApplicationShell({
   appsOpen,
   branch,
@@ -61,6 +72,8 @@ export function ApplicationShell({
   onThemeChange: (theme: Theme) => void;
   fullBleed?: boolean;
 }) {
+  const sidebarNavigation = getSidebarNavigation(nav);
+
   return (
     <div className="min-h-screen bg-obsidian">
       <header className="sticky top-0 z-30 flex h-14 items-center border-b border-task-border bg-task-bg px-3 md:fixed md:inset-x-0 md:h-16 md:border-gold/20 md:bg-charcoal/95 md:px-5 md:backdrop-blur">
@@ -88,9 +101,9 @@ export function ApplicationShell({
         </div>
       </header>
 
-      <aside className={cn("fixed bottom-0 left-0 top-16 z-20 hidden w-64 overflow-y-auto border-r border-gold/20 bg-charcoal p-3 transition-transform md:block", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
-        <nav aria-label="Primary navigation" className="flex flex-col gap-1">
-          {nav.map(({ Icon, ...item }) => (
+      <aside className={cn("fixed bottom-0 left-0 top-16 z-20 hidden w-64 flex-col border-r border-gold/20 bg-charcoal p-3 transition-transform md:flex", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
+        <nav aria-label="Primary navigation" className="flex flex-1 flex-col gap-1 overflow-y-auto">
+          {sidebarNavigation.primary.map(({ Icon, ...item }) => (
             <button
               className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition", currentPage === item.id ? "bg-gold text-obsidian" : "text-champagne hover:bg-gold/10 hover:text-gold")}
               key={item.id}
@@ -101,6 +114,18 @@ export function ApplicationShell({
             </button>
           ))}
         </nav>
+        {sidebarNavigation.bottom.length > 0 ? <nav aria-label="System navigation" className="mt-3 flex flex-col gap-1 border-t border-gold/20 pt-3">
+          {sidebarNavigation.bottom.map(({ Icon, ...item }) => (
+            <button
+              className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition", currentPage === item.id ? "bg-gold text-obsidian" : "text-champagne hover:bg-gold/10 hover:text-gold")}
+              key={item.id}
+              onClick={() => navigate(item.path)}
+              type="button"
+            >
+              <Icon className="size-4 shrink-0" />{item.label}
+            </button>
+          ))}
+        </nav> : null}
       </aside>
 
       <main className={cn("min-h-[calc(100dvh-3.5rem)] pb-[70px] md:min-h-screen md:pb-0 md:pt-16 md:transition-[padding]", sidebarOpen && "md:pl-64")}>

@@ -4,9 +4,13 @@ const OPTION_TYPES = new Set(["select", "multiselect", "radio"]);
 const LAYOUT_TYPES = new Set(["section_header", "divider"]);
 const KEY_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
 
-function text(value: string | undefined): string | undefined {
-  const normalized = value?.trim();
+function text(value: unknown): string | undefined {
+  const normalized = typeof value === "string" ? value.trim() : undefined;
   return normalized ? normalized : undefined;
+}
+
+function requiredText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 export function normalizeFormDefinition(template: FormTemplateDefinition): FormTemplateDefinition {
@@ -14,8 +18,8 @@ export function normalizeFormDefinition(template: FormTemplateDefinition): FormT
     .sort((a, b) => a.sortOrder - b.sortOrder || a.key.localeCompare(b.key))
     .map((field, sortOrder): FormFieldDefinition => Object.freeze({
       ...(field.id ? { id: field.id } : {}),
-      key: field.key.trim().toLowerCase(),
-      label: field.label.trim(),
+      key: requiredText(field.key).toLowerCase(),
+      label: requiredText(field.label),
       type: field.type,
       sortOrder,
       required: field.required === true,
@@ -23,13 +27,13 @@ export function normalizeFormDefinition(template: FormTemplateDefinition): FormT
       editable: field.editable !== false,
       ...(text(field.placeholder) ? { placeholder: text(field.placeholder) } : {}),
       ...(text(field.helperText) ? { helperText: text(field.helperText) } : {}),
-      ...(field.options ? { options: Object.freeze(field.options.map((option) => option.trim())) } : {}),
+      ...(field.options ? { options: Object.freeze(field.options.map((option) => requiredText(option))) } : {}),
       ...(field.validation ? { validation: Object.freeze({ ...field.validation }) } : {}),
-      ...(field.condition ? { condition: Object.freeze({ ...field.condition, fieldKey: field.condition.fieldKey.trim().toLowerCase() }) } : {}),
+      ...(field.condition ? { condition: Object.freeze({ ...field.condition, fieldKey: requiredText(field.condition.fieldKey).toLowerCase() }) } : {}),
     }));
   return Object.freeze({
     ...template,
-    name: template.name.trim(),
+    name: requiredText(template.name),
     ...(text(template.description) ? { description: text(template.description) } : {}),
     fields: Object.freeze(fields),
     permissions: template.permissions
@@ -54,7 +58,7 @@ export function validateFormDefinition(template: FormTemplateDefinition): readon
     if (!field.label || field.label.length > 200) issues.push({ code: "invalid_label", fieldKey: field.key, message: "Field label must contain 1 to 200 characters" });
     if ((field.placeholder?.length ?? 0) > 300 || (field.helperText?.length ?? 0) > 500) issues.push({ code: "invalid_help_text", fieldKey: field.key, message: "Field helper text is too long" });
     const options = field.options ?? [];
-    const canonicalOptions = options.map((option) => option.trim());
+    const canonicalOptions = options.map((option) => requiredText(option));
     if (OPTION_TYPES.has(field.type)) {
       if (canonicalOptions.length === 0 || canonicalOptions.length > 100 || new Set(canonicalOptions).size !== canonicalOptions.length || canonicalOptions.some((option) => !option || option.length > 200)) {
         issues.push({ code: "invalid_options", fieldKey: field.key, message: "Option fields require 1 to 100 unique bounded options" });
