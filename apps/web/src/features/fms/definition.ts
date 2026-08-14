@@ -1,7 +1,19 @@
 import { normalizeFmsDefinition, type FmsFlowDefinition, type FmsStageDefinition } from "@jewelos/core";
 import type { FmsData, FmsFlowRow } from "./api";
 
-export const newFmsStage = (type: FmsStageDefinition["type"], order: number): FmsStageDefinition => ({ key: `stage_${order + 1}`, name: type.split("_").map((part) => part[0]!.toUpperCase() + part.slice(1)).join(" "), type, order, required: true, completionRule: type === "approval" ? "manager_approval" : "any_doer", allowMultipleDoers: false, requiresUpload: false, requiresRemark: false, checklist: [], assigneeRules: [], requiresNextDoerHandoff: false, canMoveBackward: false, canReject: type === "approval", canRequestRevision: type === "approval", canEscalate: false, branchRules: type === "branch" ? [{ id: crypto.randomUUID(), source: "outcome", operator: "default", order: 0 }] : [], parallelTargetStageKeys: [], joinRequiredStageKeys: [], sla: { minutes: 60, excludeWeekOffs: true } });
+export const newFmsStage = (type: FmsStageDefinition["type"], order: number): FmsStageDefinition => ({ key: `stage_${order + 1}`, name: type.split("_").map((part) => part[0]!.toUpperCase() + part.slice(1)).join(" "), type, order, required: true, completionRule: type === "approval" ? "manager_approval" : "any_doer", allowMultipleDoers: false, requiresUpload: false, requiresRemark: false, checklist: [], assigneeRules: [], requiresNextDoerHandoff: false, canMoveBackward: false, canReject: type === "approval", canRequestRevision: type === "approval", canEscalate: false, branchRules: type === "branch" ? [{ id: crypto.randomUUID(), source: "outcome", operator: "default", order: 0 }] : [], parallelTargetStageKeys: [], joinRequiredStageKeys: [], sla: { dueDate: "" } });
+
+export function removeFmsStage(stages: readonly FmsStageDefinition[], key: string): readonly FmsStageDefinition[] {
+  const removed = stages.find((stage) => stage.key === key);
+  const replacement = removed?.type === "branch" || removed?.type === "parallel_start" ? undefined : removed?.defaultNextStageKey;
+  return stages.filter((stage) => stage.key !== key).map((stage) => ({
+    ...stage,
+    defaultNextStageKey: stage.defaultNextStageKey === key ? replacement : stage.defaultNextStageKey,
+    branchRules: stage.branchRules.map((rule) => rule.nextStageKey === key ? { ...rule, nextStageKey: replacement } : rule),
+    parallelTargetStageKeys: stage.parallelTargetStageKeys.filter((target) => target !== key),
+    joinRequiredStageKeys: stage.joinRequiredStageKeys.filter((target) => target !== key),
+  }));
+}
 
 export function flowToDefinition(flow: FmsFlowRow | null, data: FmsData): FmsFlowDefinition {
   if (!flow) return { name: "", description: "", scope: "tenant", manualTrigger: true, stages: [] };

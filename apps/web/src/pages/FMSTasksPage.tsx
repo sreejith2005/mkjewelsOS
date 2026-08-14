@@ -13,7 +13,7 @@ import { filterFmsInstances } from "@/features/fms/runtimeView";
 const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: [] };
 type Runtime = Awaited<ReturnType<typeof loadFmsRuntime>>;
 
-export function FMSTasksPage({ embedded = false, query: externalQuery }: { embedded?: boolean; query?: string }) {
+export function FMSTasksPage({ embedded = false, query: externalQuery, initialInstanceId }: { embedded?: boolean; query?: string; initialInstanceId?: string }) {
   const { profile } = useAuth();
   const [runtime, setRuntime] = useState<Runtime>();
   const [builder, setBuilder] = useState<FmsData>();
@@ -28,6 +28,7 @@ export function FMSTasksPage({ embedded = false, query: externalQuery }: { embed
   const [overdue, setOverdue] = useState(false);
   const [selected, setSelected] = useState<FmsInstance | null>(null);
   const [start, setStart] = useState(false);
+  const [openInstanceId, setOpenInstanceId] = useState(initialInstanceId ?? "");
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -42,6 +43,15 @@ export function FMSTasksPage({ embedded = false, query: externalQuery }: { embed
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to load FMS tasks"); }
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    if (!runtime || !openInstanceId) return;
+    const created = runtime.instances.find((instance) => instance.id === openInstanceId);
+    if (!created) return;
+    setTab("started");
+    setStatus("active");
+    setSelected(created);
+    setOpenInstanceId("");
+  }, [openInstanceId, runtime]);
 
   const activeQuery = externalQuery ?? query;
   const instances = useMemo(() => filterFmsInstances({ instances: runtime?.instances ?? [], stages: runtime?.stages ?? [], profileId: profile?.id ?? "", tab, query: activeQuery, status, priority, overdueOnly: overdue }), [activeQuery, overdue, priority, profile?.id, runtime, status, tab]);
@@ -83,5 +93,5 @@ export function FMSTasksPage({ embedded = false, query: externalQuery }: { embed
     <div className="mb-5 grid gap-2 sm:grid-cols-4"><label className="relative"><Search className="absolute left-3 top-3 size-4 text-soft-grey" /><input aria-label="Search FMS instances" className="field pl-9" onChange={(event) => setQuery(event.target.value)} placeholder="Search reference or title" value={query} /></label><select aria-label="Status filter" className="field" onChange={(event) => setStatus(event.target.value)} value={status}><option value="all">All statuses</option>{["active", "overdue", "on_hold", "completed", "cancelled"].map((item) => <option key={item}>{item}</option>)}</select><select aria-label="Priority filter" className="field" onChange={(event) => setPriority(event.target.value)} value={priority}><option value="all">All priorities</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select><label className="field flex items-center gap-2"><input checked={overdue} onChange={(event) => setOverdue(event.target.checked)} type="checkbox" /> Overdue only</label></div>
     <div className="mb-4 grid grid-cols-3 gap-2">{["active", "overdue", "completed"].map((item) => <div className="rounded-xl border border-gold/20 p-3 text-center" key={item}><b className="text-xl text-white">{instances.filter((instance) => instance.status === item).length}</b><p className="text-xs text-soft-grey">{item}</p></div>)}</div>
     {!runtime ? <div className="h-48 animate-pulse rounded-xl bg-charcoal" /> : instances.length === 0 ? <Notice>No FMS instances match this view.</Notice> : <div className="grid gap-3 md:grid-cols-2">{instances.map((instance) => { const stages = runtime.stages.filter((stage) => stage.fms_instance_id === instance.id); const current = stages.filter((stage) => ["pending", "in_progress", "in_review", "overdue"].includes(stage.status)); const progress = calculateFmsProgress(stages.map((stage) => ({ required: runtime.definitions.find((item) => item.id === stage.fms_stage_id)?.is_required ?? true, status: stage.status as never }))); return <button className="rounded-2xl border border-gold/20 p-4 text-left transition hover:border-gold" key={instance.id} onClick={() => setSelected(instance)} type="button"><div className="flex justify-between gap-2"><div><p className="text-xs text-gold">{instance.reference_number}</p><h2 className="font-semibold text-white">{instance.title}</h2></div><span className="text-xs text-soft-grey">{instance.status}</span></div><p className="mt-2 text-xs text-soft-grey">Current: {current.map((stage) => runtime.definitions.find((item) => item.id === stage.fms_stage_id)?.name).filter(Boolean).join(", ") || "Closed"}</p><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-charcoal"><div className="h-full bg-gold" style={{ width: `${progress.percent}%` }} /></div><p className="mt-1 text-xs text-soft-grey">{progress.percent}% · {instance.priority} priority</p></button>; })}</div>}
-  </section>{start && builder ? <Modal onClose={() => setStart(false)} title="Start FMS flow"><FmsStartDialog data={builder} onClose={() => setStart(false)} onStarted={async (reference) => { setStart(false); setSuccess(`Started ${reference}`); await refresh(); }} /></Modal> : null}</>;
+  </section>{start && builder ? <Modal onClose={() => setStart(false)} title="Start FMS flow"><FmsStartDialog data={builder} profile={profile} onClose={() => setStart(false)} onStarted={async (result) => { setStart(false); setSuccess(`Started ${result.reference_number}`); setOpenInstanceId(result.instance_id); await refresh(); }} /></Modal> : null}</>;
 }

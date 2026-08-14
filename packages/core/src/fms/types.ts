@@ -1,6 +1,8 @@
 import type { UserRole } from "../roleMenu";
 
 export const FMS_STAGE_TYPES = ["task", "approval", "form", "notification", "branch", "parallel_start", "parallel_join", "end"] as const;
+/** New workflows use implicit entry/exit. `end` remains readable for legacy versions only. */
+export const FMS_AUTHORING_STAGE_TYPES = ["form", "task", "approval", "branch", "parallel_start", "parallel_join", "notification"] as const;
 export const FMS_ASSIGNEE_TYPES = ["specific_user", "role", "manager", "department_head", "previous_step_doer", "reporter"] as const;
 export const FMS_BRANCH_OPERATORS = ["equals", "not_equals", "contains", "greater_than", "greater_than_or_equal", "less_than", "less_than_or_equal", "in", "not_empty", "default"] as const;
 
@@ -22,7 +24,8 @@ export type FmsAssigneeRule = Readonly<{
 }>;
 
 export type FmsChecklistItemDefinition = Readonly<{ key: string; label: string; required: boolean }>;
-export type FmsSlaRule = Readonly<{ minutes: number; escalateAfterMinutes?: number | undefined; businessHoursOnly?: boolean | undefined; excludeWeekOffs?: boolean | undefined }>;
+/** Calendar deadline selected by the workflow author. Legacy minute rules remain readable in Postgres JSON only. */
+export type FmsSlaRule = Readonly<{ dueDate: string }>;
 export type FmsBranchRule = Readonly<{
   id: string;
   source: "outcome" | "context" | "form_answer";

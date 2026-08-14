@@ -25,7 +25,7 @@ export function normalizeFmsDefinition(input: FmsFlowDefinition): FmsFlowDefinit
     parallelTargetStageKeys: array<string>(stage.parallelTargetStageKeys).map((key) => text(key).toLowerCase()).filter(Boolean),
     joinRequiredStageKeys: array<string>(stage.joinRequiredStageKeys).map((key) => text(key).toLowerCase()).filter(Boolean),
     splitToFlowId: text(stage.splitToFlowId) || undefined,
-    sla: { minutes: Math.max(0, Math.trunc(stage.sla?.minutes ?? 0)), escalateAfterMinutes: stage.sla?.escalateAfterMinutes === undefined ? undefined : Math.max(0, Math.trunc(stage.sla.escalateAfterMinutes)), businessHoursOnly: bool(stage.sla?.businessHoursOnly), excludeWeekOffs: bool(stage.sla?.excludeWeekOffs, true) },
+    sla: { dueDate: text(stage.sla?.dueDate) },
   }));
   return { ...input, name: text(input.name), description: text(input.description) || undefined, manualTrigger: true, stages };
 }
@@ -58,11 +58,13 @@ export function validateFmsDefinition(raw: FmsFlowDefinition): readonly FmsValid
   if (definition.scope === "department" && (!definition.branchId || !definition.departmentId)) issues.push({ code: "invalid_scope", message: "Department scope requires branch and department" });
   if (definition.scope === "branch" && !definition.branchId) issues.push({ code: "invalid_scope", message: "Branch scope requires a branch" });
   if (!definition.stages.length) return [...issues, { code: "empty_flow", message: "A flow must contain at least one stage" }];
+  if (definition.stages[0]?.type !== "form") issues.push({ code: "first_stage_must_be_form", message: "The first stage must be a Form", stageKey: definition.stages[0]?.key });
   for (const stage of definition.stages) {
     const add = (code: string, message: string) => issues.push({ code, message, stageKey: stage.key });
     if (!KEY.test(stage.key) || keys.has(stage.key)) add("invalid_stage_key", "Stage keys must be unique stable identifiers"); keys.add(stage.key);
     if (!stage.name || stage.name.length > 150 || !FMS_STAGE_TYPES.includes(stage.type)) add("invalid_stage", "Stage name or type is invalid");
-    if (stage.sla.minutes < 0 || (stage.sla.escalateAfterMinutes ?? 0) < 0) add("invalid_sla", "SLA values cannot be negative");
+    if (stage.type === "end") add("legacy_end_stage", "End nodes are no longer used. Leave the final executable stage without a next connection instead");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(stage.sla.dueDate) || Number.isNaN(Date.parse(`${stage.sla.dueDate}T00:00:00Z`))) add("invalid_deadline", "Choose a valid completion due date");
     if (new Set(stage.checklist.map((item) => item.key)).size !== stage.checklist.length || stage.checklist.some((item) => !KEY.test(item.key) || !item.label)) add("invalid_checklist", "Checklist keys must be unique and labels are required");
     if (stage.type === "form" && !stage.formTemplateId) add("missing_form", "Form stages require an exact published template version");
     if (stage.formTemplateId && !UUID.test(stage.formTemplateId)) add("invalid_form", "Linked form ID is invalid");
@@ -77,7 +79,7 @@ export function validateFmsDefinition(raw: FmsFlowDefinition): readonly FmsValid
     if (stage.type === "end" && fmsOutgoingStageKeys(stage).length) add("invalid_end", "End stages cannot have outgoing paths");
   }
   const reached = reachableFmsStageKeys(definition); for (const stage of definition.stages) if (!reached.has(stage.key)) issues.push({ code: "unreachable_stage", message: `Stage ${stage.key} is unreachable`, stageKey: stage.key });
-  if (![...reached].some((key) => byKey.get(key)?.type === "end")) issues.push({ code: "missing_end_path", message: "Flow must have a reachable end stage" });
+  if (![...reached].some((key) => { const stage = byKey.get(key); return stage ? fmsOutgoingStageKeys(stage).length === 0 : false; })) issues.push({ code: "missing_completion_path", message: "At least one reachable path must finish at a step with no outgoing connection" });
   if (hasUnsupportedCycle(definition)) issues.push({ code: "unsupported_cycle", message: "Flow contains an unsupported cycle" });
   return issues;
 }
@@ -103,6 +105,5 @@ export function deriveFmsTransitionCapability(input: Readonly<{ viewerId: string
 }
 
 export function calculateFmsProgress(stages: readonly Readonly<{ required: boolean; status: FmsStageStatus }>[]): Readonly<{ completed: number; total: number; percent: number }> { const relevant = stages.filter((stage) => stage.required); const completed = relevant.filter((stage) => stage.status === "completed").length; return { completed, total: relevant.length, percent: relevant.length ? Math.round(completed / relevant.length * 100) : 100 }; }
-export function calculateFmsPlannedAt(base: Date | string, minutes: number): string { const value = new Date(base); if (Number.isNaN(value.getTime()) || !Number.isFinite(minutes) || minutes < 0) throw new Error("Invalid SLA input"); return new Date(value.getTime() + Math.trunc(minutes) * 60_000).toISOString(); }
 export function calculateFmsDelay(planned: Date | string | null, actual: Date | string | null, now: Date | string = new Date()): Readonly<{ delayMinutes: number; overdue: boolean }> { if (!planned) return { delayMinutes: 0, overdue: false }; const due = new Date(planned); const end = new Date(actual ?? now); if (Number.isNaN(due.getTime()) || Number.isNaN(end.getTime())) throw new Error("Invalid SLA date"); const delayMinutes = Math.max(0, Math.round((end.getTime() - due.getTime()) / 60_000)); return { delayMinutes, overdue: delayMinutes > 0 }; }
 export function fmsStatusLabel(status: string): string { return status.split("_").map((part) => part ? part[0]!.toUpperCase() + part.slice(1) : "").join(" "); }

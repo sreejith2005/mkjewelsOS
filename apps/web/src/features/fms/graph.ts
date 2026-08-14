@@ -45,9 +45,10 @@ export function fmsGraphEdges(stages: readonly FmsStageDefinition[]): readonly F
 }
 
 export function fmsStageSummary(stage: FmsStageDefinition): string {
-  if (stage.type === "end") return "Process complete";
+  if (stage.type === "end") return "Legacy completion node";
   if (stage.type === "branch") return `${stage.branchRules.length} route${stage.branchRules.length === 1 ? "" : "s"}`;
   if (stage.type === "parallel_start") return `${stage.parallelTargetStageKeys.length} parallel path${stage.parallelTargetStageKeys.length === 1 ? "" : "s"}`;
   if (stage.formTemplateId) return "Pinned form";
+  if (!fmsOutgoingStageKeys(stage).length) return "Completes workflow";
   return stage.assigneeRules.length ? stage.assigneeRules.map((rule) => rule.type.replaceAll("_", " ")).join(", ") : "Automatic";
 }

@@ -20,9 +20,18 @@ export type FmsInstanceStage = { id: string; fms_instance_id: string; fms_stage_
 export type FmsChecklistItem = { id: string; fms_instance_stage_id: string; item_key: string; label: string; is_required: boolean; is_completed: boolean; sort_order: number };
 export type FmsEvidence = { id: string; fms_instance_stage_id: string; storage_path: string; original_filename: string; mime_type: string; size_bytes: number; uploaded_by: string; created_at: string };
 export type FmsLog = { id: string; fms_instance_stage_id: string; actor_id: string | null; action: string; details: Json | null; created_at: string | null };
-export type FmsData = { flows: FmsFlowRow[]; stages: FmsStageRow[]; assignees: Array<{ fms_stage_id: string; assignee_type: string; user_profile_id: string | null; fallback_user_profile_id?: string | null; role_value: string | null; allow_next_selection: boolean; sort_order: number }>; branchRules: Array<{ id: string; fms_stage_id: string; source_type: string; source_key: string | null; condition_operator: string; condition_value: string | null; next_stage_id: string | null; next_flow_id: string | null; label: string | null; sort_order: number | null }>; forms: Array<{ id: string; name: string; version: number }>; users: Array<{ id: string; employee_name: string; employee_code?: string; account_status?: string; user_role: string; branch_id: string; department_id: string; working_status: string; is_login_enabled: boolean | null }>; branches: Array<{ id: string; name: string }>; departments: Array<{ id: string; branch_id: string | null; name: string }> };
+export type FmsAvailability = "present" | "absent" | "half_day" | "remote";
+export type FmsData = { flows: FmsFlowRow[]; stages: FmsStageRow[]; assignees: Array<{ fms_stage_id: string; assignee_type: string; user_profile_id: string | null; fallback_user_profile_id?: string | null; role_value: string | null; allow_next_selection: boolean; sort_order: number }>; branchRules: Array<{ id: string; fms_stage_id: string; source_type: string; source_key: string | null; condition_operator: string; condition_value: string | null; next_stage_id: string | null; next_flow_id: string | null; label: string | null; sort_order: number | null }>; forms: Array<{ id: string; name: string; version: number }>; users: Array<{ id: string; employee_name: string; employee_code?: string; account_status?: string; user_role: string; branch_id: string; department_id: string; working_status: string; is_login_enabled: boolean | null }>; availability: Array<{ user_profile_id: string; status: FmsAvailability }>; branches: Array<{ id: string; name: string }>; departments: Array<{ id: string; branch_id: string | null; name: string }> };
+export type FmsStartResult = { instance_id: string; reference_number: string };
+
+function dateInKolkata(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${value("year")}-${value("month")}-${value("day")}`;
+}
 
 export async function loadFmsBuilderData(): Promise<FmsData> {
+  const kolkataDate = dateInKolkata(new Date());
   const results = await Promise.all([
     supabase.from("fms_flows").select("*").order("name").order("version", { ascending: false }).limit(300),
     supabase.from("fms_stages").select("*").order("sort_order").limit(1000),
@@ -32,9 +41,10 @@ export async function loadFmsBuilderData(): Promise<FmsData> {
     supabase.from("user_profiles").select("id,employee_name,employee_code,account_status,user_role,branch_id,department_id,working_status,is_login_enabled").order("employee_name").limit(500),
     supabase.from("branches").select("id,name").eq("is_active", true).order("name").limit(100),
     supabase.from("departments").select("id,branch_id,name").eq("is_active", true).order("name").limit(300),
+    supabase.from("user_availability").select("user_profile_id,status").eq("date", kolkataDate).limit(1000),
   ]);
   results.forEach((result) => fail("Load FMS builder", result.error));
-  return { flows: results[0].data as FmsFlowRow[], stages: results[1].data as FmsStageRow[], assignees: results[2].data ?? [], branchRules: results[3].data ?? [], forms: results[4].data ?? [], users: results[5].data ?? [], branches: results[6].data ?? [], departments: results[7].data ?? [] };
+  return { flows: results[0].data as FmsFlowRow[], stages: results[1].data as FmsStageRow[], assignees: results[2].data ?? [], branchRules: results[3].data ?? [], forms: results[4].data ?? [], users: results[5].data ?? [], branches: results[6].data ?? [], departments: results[7].data ?? [], availability: results[8].data ?? [] };
 }
 
 export async function saveFmsDraft(flowId: string | null, definition: FmsFlowDefinition): Promise<string> {
@@ -54,7 +64,7 @@ export async function loadFmsRuntime(): Promise<{ instances: FmsInstance[]; stag
   ]); [instances, stages, definitions, flows, checklist, evidence, logs, users].forEach((result) => fail("Load FMS runtime", result.error));
   return { instances: instances.data as FmsInstance[], stages: stages.data as FmsInstanceStage[], definitions: definitions.data as FmsStageRow[], flows: flows.data as FmsFlowRow[], checklist: checklist.data as FmsChecklistItem[], evidence: evidence.data as FmsEvidence[], logs: logs.data as FmsLog[], users: users.data ?? [] };
 }
-export async function startFmsInstance(input: { flowId: string; title: string; priority: "high" | "medium" | "low"; context: Json; branchId: string | null; departmentId: string | null; firstAssigneeId: string | null }) { const { data, error } = await supabase.rpc("start_fms_instance_with_audit", { p_flow_id: input.flowId, p_title: input.title, p_priority: input.priority, p_context: input.context, ...(input.branchId ? { p_branch_id: input.branchId } : {}), ...(input.departmentId ? { p_department_id: input.departmentId } : {}), ...(input.firstAssigneeId ? { p_first_assignee_id: input.firstAssigneeId } : {}) }); fail("Start FMS instance", error); const result = data?.[0]; if (!result) throw new Error("Start FMS instance returned no reference"); return result; }
+export async function startFmsInstance(input: { flowId: string; title: string; priority: "high" | "medium" | "low"; context: Json; branchId: string; departmentId: string; firstAssigneeId: string }): Promise<FmsStartResult> { const { data, error } = await supabase.rpc("start_fms_instance_with_audit", { p_flow_id: input.flowId, p_title: input.title, p_priority: input.priority, p_context: input.context, p_branch_id: input.branchId, p_department_id: input.departmentId, p_first_assignee_id: input.firstAssigneeId }); fail("Start FMS instance", error); const result = data?.[0]; if (!result) throw new Error("Start FMS instance returned no reference"); return result; }
 export const claimFmsStage = async (id: string) => { const { error } = await supabase.rpc("claim_fms_stage_with_audit", { p_instance_stage_id: id }); fail("Claim FMS stage", error); };
 export const completeFmsStage = async (id: string, outcome: string, remark: string, checklist: Record<string, boolean>, nextAssigneeId: string | null) => { const { error } = await supabase.rpc("complete_fms_stage_with_audit", { p_instance_stage_id: id, p_checklist: checklist, ...(outcome ? { p_outcome: outcome } : {}), ...(remark ? { p_remark: remark } : {}), ...(nextAssigneeId ? { p_next_assignee_id: nextAssigneeId } : {}) }); fail("Complete FMS stage", error); };
 export const reviewFmsStage = async (id: string, decision: "approved" | "rejected" | "revision_requested", remark: string, nextAssigneeId: string | null) => { const { error } = await supabase.rpc("review_fms_stage_with_audit", { p_instance_stage_id: id, p_decision: decision, ...(remark ? { p_remark: remark } : {}), ...(nextAssigneeId ? { p_next_assignee_id: nextAssigneeId } : {}) }); fail("Review FMS stage", error); };

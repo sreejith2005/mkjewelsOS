@@ -4991,6 +4991,10 @@ export type Database = {
         Args: { p_template_id: string }
         Returns: string
       }
+      duplicate_form_with_audit: {
+        Args: { p_name?: string; p_source_template_id: string }
+        Returns: string
+      }
       archive_notification_rule: {
         Args: { p_rule_id: string }
         Returns: undefined
