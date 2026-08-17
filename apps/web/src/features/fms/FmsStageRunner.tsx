@@ -53,6 +53,8 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
   const [targetUser, setTargetUser] = useState("");
   const [targetStage, setTargetStage] = useState("");
   const [actionReason, setActionReason] = useState("");
+  const plannedRule = definition.planned_time_rule && typeof definition.planned_time_rule === "object" ? definition.planned_time_rule as Record<string, unknown> : {};
+  const isYesNoDecision = plannedRule.decisionMode === "yes_no";
 
   const stageContract = useMemo(() => ({
     type: definition.step_type,
@@ -102,10 +104,10 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
     {definition.requires_upload ? <Field label="Evidence (JPG, PNG, WebP, PDF; max 10 MB)"><input accept=".jpg,.jpeg,.png,.webp,.pdf" className="field" disabled={busy} onChange={(event) => { const file = event.target.files?.[0]; if (file) void work(() => uploadFmsEvidence(stage.id, profile.tenant_id, file)); }} type="file" /></Field> : null}
     {definition.form_template_id ? stage.form_submission_id ? <Notice tone="success">Linked form version submitted and locked.</Notice> : linkedForm ? <Button onClick={() => setShowForm(true)} variant="secondary">Fill {requiresLinkedForm ? "required" : "optional"} form · {linkedForm.name} v{linkedForm.version}</Button> : requiresLinkedForm ? <Notice tone="danger">The exact pinned form version is not visible.</Notice> : <Notice>Optional linked form is not currently visible. You can still complete this step.</Notice> : null}
     {(capability.canComplete || capability.canApprove) ? <>
-      <div className="grid gap-2 sm:grid-cols-2"><Field label="Outcome"><input className="field" maxLength={500} onChange={(event) => setOutcome(event.target.value)} value={outcome} /></Field><Field label={definition.requires_remark ? "Remark *" : "Remark"}><textarea className="field" maxLength={4000} onChange={(event) => setRemark(event.target.value)} value={remark} /></Field></div>
+      <div className="grid gap-2 sm:grid-cols-2">{isYesNoDecision ? <Field label="Decision *"><div className="grid grid-cols-2 gap-2"><button className={`rounded-lg border p-2 ${outcome === "yes" ? "border-success bg-success/10 text-success" : "border-gold/20 text-soft-grey"}`} onClick={() => setOutcome("yes")} type="button">Yes</button><button className={`rounded-lg border p-2 ${outcome === "no" ? "border-danger bg-danger/10 text-danger" : "border-gold/20 text-soft-grey"}`} onClick={() => setOutcome("no")} type="button">No</button></div></Field> : <Field label="Outcome"><input className="field" maxLength={500} onChange={(event) => setOutcome(event.target.value)} value={outcome} /></Field>}<Field label={definition.requires_remark ? "Remark *" : "Remark"}><textarea className="field" maxLength={4000} onChange={(event) => setRemark(event.target.value)} value={remark} /></Field></div>
       {definition.requires_next_doer_handoff ? <Field label="Next-stage assignee"><select className="field" onChange={(event) => setNextAssignee(event.target.value)} value={nextAssignee}><option value="">Select eligible user</option>{eligible.map((user) => <option key={user.id} value={user.id}>{user.employee_name}</option>)}</select></Field> : null}
       <div className="flex flex-wrap gap-2">
-        {capability.canComplete ? <Button disabled={busy} onClick={() => void work(() => completeFmsStage(stage.id, outcome, remark, checklistPayload, nextAssignee || null))}>Complete stage</Button> : null}
+        {capability.canComplete ? <Button disabled={busy || (isYesNoDecision && !outcome)} onClick={() => void work(() => completeFmsStage(stage.id, outcome, remark, checklistPayload, nextAssignee || null))}>{isYesNoDecision ? "Submit decision" : "Complete stage"}</Button> : null}
         {capability.canApprove ? <Button disabled={busy} onClick={() => void work(() => reviewFmsStage(stage.id, "approved", remark, nextAssignee || null))}>Approve</Button> : null}
         {capability.canReject ? <Button disabled={busy} onClick={() => window.confirm("Reject this stage?") && void work(() => reviewFmsStage(stage.id, "rejected", remark, nextAssignee || null))} variant="danger">Reject</Button> : null}
         {capability.canRequestRevision && priorStages.length ? <Button disabled={busy} onClick={() => openManagedAction("revision")} variant="secondary">Request revision</Button> : null}

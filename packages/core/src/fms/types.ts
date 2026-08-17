@@ -24,8 +24,20 @@ export type FmsAssigneeRule = Readonly<{
 }>;
 
 export type FmsChecklistItemDefinition = Readonly<{ key: string; label: string; required: boolean }>;
-/** Calendar deadline selected by the workflow author. Legacy minute rules remain readable in Postgres JSON only. */
-export type FmsSlaRule = Readonly<{ dueDate: string }>;
+export type FmsTimingMethod = "completion_date" | "tat_hours" | "days_before_date" | "specific_time";
+export type FmsDecisionMode = "normal" | "yes_no";
+export type FmsConditionalRule = Readonly<{ decisionStageKey: string; outcome: "yes" | "no" }>;
+export type FmsSlaRule = Readonly<{
+  timingMethod?: FmsTimingMethod | undefined;
+  dueDate: string;
+  tatHours?: number | undefined;
+  futureDate?: string | undefined;
+  daysBefore?: number | undefined;
+  clockTime?: string | undefined;
+  triggerStageKey?: string | undefined;
+  decisionMode?: FmsDecisionMode | undefined;
+  conditional?: FmsConditionalRule | undefined;
+}>;
 export type FmsBranchRule = Readonly<{
   id: string;
   source: "outcome" | "context" | "form_answer";

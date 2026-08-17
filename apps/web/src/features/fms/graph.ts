@@ -48,7 +48,16 @@ export function fmsStageSummary(stage: FmsStageDefinition): string {
   if (stage.type === "end") return "Legacy completion node";
   if (stage.type === "branch") return `${stage.branchRules.length} route${stage.branchRules.length === 1 ? "" : "s"}`;
   if (stage.type === "parallel_start") return `${stage.parallelTargetStageKeys.length} parallel path${stage.parallelTargetStageKeys.length === 1 ? "" : "s"}`;
+  if (stage.sla.decisionMode === "yes_no") return "Yes / No decision";
   if (stage.formTemplateId) return "Pinned form";
   if (!fmsOutgoingStageKeys(stage).length) return "Completes workflow";
   return stage.assigneeRules.length ? stage.assigneeRules.map((rule) => rule.type.replaceAll("_", " ")).join(", ") : "Automatic";
+}
+
+export function fmsTimingSummary(stage: FmsStageDefinition): string {
+  const method = stage.sla.timingMethod ?? "completion_date";
+  if (method === "tat_hours") return stage.sla.tatHours ? `TAT ${stage.sla.tatHours}h` : "TAT not set";
+  if (method === "days_before_date") return stage.sla.futureDate ? `${stage.sla.daysBefore ?? 0}d before ${stage.sla.futureDate}` : "future date not set";
+  if (method === "specific_time") return stage.sla.dueDate && stage.sla.clockTime ? `${stage.sla.dueDate} ${stage.sla.clockTime}` : "date/time not set";
+  return stage.sla.dueDate || "date not set";
 }

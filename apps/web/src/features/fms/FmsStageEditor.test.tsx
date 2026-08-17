@@ -31,6 +31,17 @@ function LaterFormHarness() {
   return <FmsStageEditor data={data} flowBranchId="b1" onChange={setLater} onDelete={() => undefined} stage={later} stages={[first, later]} />;
 }
 
+function DecisionHarness() {
+  const [stages, setStages] = useState<FmsStageDefinition[]>(() => {
+    const first = { ...newFmsStage("form", 0), key: "initial", name: "Initial details", formTemplateId: data.forms[0]!.id, defaultNextStageKey: "decision" };
+    const decision = { ...newFmsStage("task", 1), key: "decision", name: "Approve request", defaultNextStageKey: "follow_up" };
+    const followUp = { ...newFmsStage("task", 2), key: "follow_up", name: "Follow up" };
+    return [first, decision, followUp];
+  });
+  const [selected, setSelected] = useState(1);
+  return <><button onClick={() => setSelected(1)}>Edit decision</button><button onClick={() => setSelected(2)}>Edit follow up</button><FmsStageEditor data={data} flowBranchId="b1" onChange={(value) => setStages((current) => current.map((item, index) => index === selected ? value : item))} onDelete={() => undefined} stage={stages[selected]!} stages={stages} /></>;
+}
+
 describe("FMS stage assignment", () => {
   it("keeps the department selected and exposes primary and same-department fallback people", async () => {
     const user = userEvent.setup();
@@ -48,9 +59,18 @@ describe("FMS stage assignment", () => {
     expect(fallback.textContent).toContain("Fallback Person");
     expect(fallback.textContent).not.toContain("Primary Person");
   });
-  it("uses one calendar deadline field and no minute inputs", () => {
+  it("offers all supported timing methods without minute-based SLA fields", async () => {
+    const user = userEvent.setup();
     render(<Harness />);
     expect(screen.getByLabelText("Completion due date").getAttribute("type")).toBe("date");
+    await user.click(screen.getByRole("button", { name: /TAT \(hours\)/ }));
+    expect(screen.getByLabelText("TAT (hours)")).toBeTruthy();
+    expect(screen.getByLabelText("Trigger from")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: /Days before date/ }));
+    expect(screen.getByLabelText("Future date")).toBeTruthy();
+    expect(screen.getByLabelText("Days before")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: /Specific clock time/ }));
+    expect(screen.getByLabelText("Clock time")).toBeTruthy();
     expect(screen.queryByLabelText("SLA minutes")).toBeNull();
     expect(screen.queryByLabelText("Escalate after")).toBeNull();
   });
@@ -59,7 +79,19 @@ describe("FMS stage assignment", () => {
     render(<LaterFormHarness />);
     expect(screen.queryByLabelText("Initial details form")).toBeNull();
     expect(screen.queryByLabelText("Optional linked form")).toBeNull();
+    await user.click(screen.getByLabelText("Add additional information"));
     await user.click(screen.getByLabelText("Attach an optional form"));
     expect(screen.getByLabelText("Optional linked form")).toBeTruthy();
+  });
+  it("only enables a conditional step after an earlier Yes or No decision", async () => {
+    const user = userEvent.setup();
+    render(<DecisionHarness />);
+    await user.click(screen.getByRole("button", { name: /Decision step \(Yes\/No\)/ }));
+    await user.click(screen.getByRole("button", { name: "Edit follow up" }));
+    const conditional = screen.getByLabelText("Only run on a Yes or No path");
+    expect((conditional as HTMLInputElement).disabled).toBe(false);
+    await user.click(conditional);
+    expect((screen.getByLabelText("Earlier decision") as HTMLSelectElement).value).toBe("decision");
+    expect((screen.getByLabelText("Run when answer is") as HTMLSelectElement).value).toBe("yes");
   });
 });

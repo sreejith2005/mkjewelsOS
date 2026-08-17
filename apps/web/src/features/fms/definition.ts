@@ -1,7 +1,7 @@
 import { normalizeFmsDefinition, type FmsFlowDefinition, type FmsStageDefinition } from "@jewelos/core";
 import type { FmsData, FmsFlowRow } from "./api";
 
-export const newFmsStage = (type: FmsStageDefinition["type"], order: number): FmsStageDefinition => ({ key: `stage_${order + 1}`, name: type.split("_").map((part) => part[0]!.toUpperCase() + part.slice(1)).join(" "), type, order, required: true, completionRule: type === "approval" ? "manager_approval" : "any_doer", allowMultipleDoers: false, requiresUpload: false, requiresRemark: false, checklist: [], assigneeRules: [], requiresNextDoerHandoff: false, canMoveBackward: false, canReject: type === "approval", canRequestRevision: type === "approval", canEscalate: false, branchRules: type === "branch" ? [{ id: crypto.randomUUID(), source: "outcome", operator: "default", order: 0 }] : [], parallelTargetStageKeys: [], joinRequiredStageKeys: [], sla: { dueDate: "" } });
+export const newFmsStage = (type: FmsStageDefinition["type"], order: number): FmsStageDefinition => ({ key: `stage_${order + 1}`, name: type.split("_").map((part) => part[0]!.toUpperCase() + part.slice(1)).join(" "), type, order, required: true, completionRule: type === "approval" ? "manager_approval" : "any_doer", allowMultipleDoers: false, requiresUpload: false, requiresRemark: false, checklist: [], assigneeRules: [], requiresNextDoerHandoff: false, canMoveBackward: false, canReject: type === "approval", canRequestRevision: type === "approval", canEscalate: false, branchRules: type === "branch" ? [{ id: crypto.randomUUID(), source: "outcome", operator: "default", order: 0 }] : [], parallelTargetStageKeys: [], joinRequiredStageKeys: [], sla: { timingMethod: "completion_date", dueDate: "", decisionMode: "normal" } });
 
 export function removeFmsStage(stages: readonly FmsStageDefinition[], key: string): readonly FmsStageDefinition[] {
   const removed = stages.find((stage) => stage.key === key);
@@ -12,6 +12,11 @@ export function removeFmsStage(stages: readonly FmsStageDefinition[], key: strin
     branchRules: stage.branchRules.map((rule) => rule.nextStageKey === key ? { ...rule, nextStageKey: replacement } : rule),
     parallelTargetStageKeys: stage.parallelTargetStageKeys.filter((target) => target !== key),
     joinRequiredStageKeys: stage.joinRequiredStageKeys.filter((target) => target !== key),
+    sla: {
+      ...stage.sla,
+      ...(stage.sla.triggerStageKey === key ? { triggerStageKey: undefined } : {}),
+      ...(stage.sla.conditional?.decisionStageKey === key ? { conditional: undefined } : {}),
+    },
   }));
 }
 
