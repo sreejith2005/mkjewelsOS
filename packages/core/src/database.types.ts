@@ -4991,6 +4991,10 @@ export type Database = {
         Args: { p_template_id: string }
         Returns: string
       }
+      delete_form_with_audit: {
+        Args: { p_template_id: string }
+        Returns: string
+      }
       duplicate_form_with_audit: {
         Args: { p_name?: string; p_source_template_id: string }
         Returns: string
@@ -6103,6 +6107,10 @@ export type Database = {
         Returns: string
       }
       save_form_draft_with_audit: {
+        Args: { p_fields: Json; p_payload: Json; p_template_id: string }
+        Returns: string
+      }
+      save_published_form_with_audit: {
         Args: { p_fields: Json; p_payload: Json; p_template_id: string }
         Returns: string
       }

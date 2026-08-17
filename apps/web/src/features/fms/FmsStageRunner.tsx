@@ -22,7 +22,7 @@ import {
   type FmsStageRow,
 } from "./api";
 import type { UserProfile } from "@/types";
-import { eligibleFmsUsers, priorFmsDefinitions } from "./runtimeView";
+import { eligibleFmsUsers, isInitialFmsDefinition, priorFmsDefinitions, shouldOpenInitialFmsForm } from "./runtimeView";
 
 type ManagedAction = "reassign" | "backward" | "revision" | "escalate";
 
@@ -40,12 +40,14 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
   formOptions: DynamicOptions;
   onRefresh: () => Promise<void>;
 }) {
+  const requiresLinkedForm = isInitialFmsDefinition(definitions, definition);
+  const shouldOpenInitialForm = shouldOpenInitialFmsForm(definitions, definition, stage);
   const [remark, setRemark] = useState("");
   const [outcome, setOutcome] = useState("");
   const [nextAssignee, setNextAssignee] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(shouldOpenInitialForm);
   const [managedAction, setManagedAction] = useState<ManagedAction | null>(null);
   const [fromUser, setFromUser] = useState("");
   const [targetUser, setTargetUser] = useState("");
@@ -98,7 +100,7 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
     {checklist.length ? <fieldset><legend className="mb-2 text-sm text-champagne">Checklist</legend>{checklist.map((item) => <label className="mb-1 block text-sm" key={item.id}><input checked={item.is_completed} disabled={(!capability.canComplete && !capability.canApprove) || busy} onChange={(event) => void work(() => updateFmsChecklistItem(item.id, event.target.checked))} type="checkbox" /> {item.label}{item.is_required ? " *" : ""}</label>)}</fieldset> : null}
     {evidence.length ? <div className="flex flex-wrap gap-2">{evidence.map((item) => <Button key={item.id} onClick={() => void signedFmsEvidenceUrl(item.storage_path).then((url) => window.open(url, "_blank", "noopener,noreferrer"))} variant="secondary">View {item.original_filename}</Button>)}</div> : null}
     {definition.requires_upload ? <Field label="Evidence (JPG, PNG, WebP, PDF; max 10 MB)"><input accept=".jpg,.jpeg,.png,.webp,.pdf" className="field" disabled={busy} onChange={(event) => { const file = event.target.files?.[0]; if (file) void work(() => uploadFmsEvidence(stage.id, profile.tenant_id, file)); }} type="file" /></Field> : null}
-    {definition.form_template_id ? stage.form_submission_id ? <Notice tone="success">Exact linked form version submitted and locked.</Notice> : linkedForm ? <Button onClick={() => setShowForm(true)} variant="secondary">Fill required form · {linkedForm.name} v{linkedForm.version}</Button> : <Notice tone="danger">The exact pinned form version is not visible.</Notice> : null}
+    {definition.form_template_id ? stage.form_submission_id ? <Notice tone="success">Linked form version submitted and locked.</Notice> : linkedForm ? <Button onClick={() => setShowForm(true)} variant="secondary">Fill {requiresLinkedForm ? "required" : "optional"} form · {linkedForm.name} v{linkedForm.version}</Button> : requiresLinkedForm ? <Notice tone="danger">The exact pinned form version is not visible.</Notice> : <Notice>Optional linked form is not currently visible. You can still complete this step.</Notice> : null}
     {(capability.canComplete || capability.canApprove) ? <>
       <div className="grid gap-2 sm:grid-cols-2"><Field label="Outcome"><input className="field" maxLength={500} onChange={(event) => setOutcome(event.target.value)} value={outcome} /></Field><Field label={definition.requires_remark ? "Remark *" : "Remark"}><textarea className="field" maxLength={4000} onChange={(event) => setRemark(event.target.value)} value={remark} /></Field></div>
       {definition.requires_next_doer_handoff ? <Field label="Next-stage assignee"><select className="field" onChange={(event) => setNextAssignee(event.target.value)} value={nextAssignee}><option value="">Select eligible user</option>{eligible.map((user) => <option key={user.id} value={user.id}>{user.employee_name}</option>)}</select></Field> : null}
@@ -112,7 +114,7 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
       </div>
     </> : <p className="text-xs text-soft-grey">{capability.reason}</p>}
     {capability.canReassign && (stage.assigned_to?.length ?? 0) > 0 ? <Button disabled={busy} onClick={() => openManagedAction("reassign")} variant="secondary">Reassign</Button> : null}
-    {showForm && linkedForm ? <Modal onClose={() => setShowForm(false)} title={`Required form: ${linkedForm.name} v${linkedForm.version}`} wide><FormRenderer definition={{ name: linkedForm.name, description: linkedForm.description ?? undefined, fields: linkedForm.fields }} dynamicOptions={formOptions} onSubmit={async (answers) => { await submitForm(linkedForm.id, answers, "fms_stage", stage.id); setShowForm(false); await onRefresh(); }} /></Modal> : null}
+    {showForm && linkedForm ? <Modal onClose={() => setShowForm(false)} title={`${requiresLinkedForm ? "Required" : "Optional"} form: ${linkedForm.name} v${linkedForm.version}`} wide><FormRenderer definition={{ name: linkedForm.name, description: linkedForm.description ?? undefined, fields: linkedForm.fields }} dynamicOptions={formOptions} onSubmit={async (answers) => { await submitForm(linkedForm.id, answers, "fms_stage", stage.id); setShowForm(false); await onRefresh(); }} /></Modal> : null}
     {managedAction ? <Modal onClose={() => setManagedAction(null)} title={managedAction.replace("_", " ")}>
       <div className="space-y-3">
         {managedAction === "reassign" ? <Field label="Current assignee"><select className="field" onChange={(event) => setFromUser(event.target.value)} value={fromUser}>{(stage.assigned_to ?? []).map((id) => <option key={id} value={id}>{users.find((user) => user.id === id)?.employee_name ?? "Historical user"}</option>)}</select></Field> : null}

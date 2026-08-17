@@ -59,14 +59,14 @@ export function validateFmsDefinition(raw: FmsFlowDefinition): readonly FmsValid
   if (definition.scope === "branch" && !definition.branchId) issues.push({ code: "invalid_scope", message: "Branch scope requires a branch" });
   if (!definition.stages.length) return [...issues, { code: "empty_flow", message: "A flow must contain at least one stage" }];
   if (definition.stages[0]?.type !== "form") issues.push({ code: "first_stage_must_be_form", message: "The first stage must be a Form", stageKey: definition.stages[0]?.key });
-  for (const stage of definition.stages) {
+  for (const [stageIndex, stage] of definition.stages.entries()) {
     const add = (code: string, message: string) => issues.push({ code, message, stageKey: stage.key });
     if (!KEY.test(stage.key) || keys.has(stage.key)) add("invalid_stage_key", "Stage keys must be unique stable identifiers"); keys.add(stage.key);
     if (!stage.name || stage.name.length > 150 || !FMS_STAGE_TYPES.includes(stage.type)) add("invalid_stage", "Stage name or type is invalid");
     if (stage.type === "end") add("legacy_end_stage", "End nodes are no longer used. Leave the final executable stage without a next connection instead");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(stage.sla.dueDate) || Number.isNaN(Date.parse(`${stage.sla.dueDate}T00:00:00Z`))) add("invalid_deadline", "Choose a valid completion due date");
     if (new Set(stage.checklist.map((item) => item.key)).size !== stage.checklist.length || stage.checklist.some((item) => !KEY.test(item.key) || !item.label)) add("invalid_checklist", "Checklist keys must be unique and labels are required");
-    if (stage.type === "form" && !stage.formTemplateId) add("missing_form", "Form stages require an exact published template version");
+    if (stageIndex === 0 && !stage.formTemplateId) add("missing_form", "The initial Form requires an exact published template version");
     if (stage.formTemplateId && !UUID.test(stage.formTemplateId)) add("invalid_form", "Linked form ID is invalid");
     if (!AUTO.has(stage.type) && !stage.assigneeRules.length) add("missing_assignee", "Executable stages require an assignee rule");
     if (stage.assigneeRules.some((rule) => !FMS_ASSIGNEE_TYPES.includes(rule.type) || rule.type === "specific_user" && (!UUID.test(rule.userProfileId ?? "") || rule.fallbackUserProfileId !== undefined && !UUID.test(rule.fallbackUserProfileId)) || rule.type !== "specific_user" && rule.fallbackUserProfileId !== undefined || rule.type === "role" && !rule.role)) add("invalid_assignee", "Assignee rule is incomplete");

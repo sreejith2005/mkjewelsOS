@@ -82,7 +82,7 @@ Deno.serve(async (request: Request) => {
 
   const { data: callerProfile, error: profileError } = await adminClient
     .from("user_profiles")
-    .select("id,user_role,working_status,is_login_enabled")
+    .select("id,tenant_id,user_role,working_status,is_login_enabled")
     .eq("auth_user_id", userData.user.id)
     .maybeSingle();
   if (profileError) return json(500, { error: "Unable to verify inviter permissions" });
@@ -171,6 +171,36 @@ Deno.serve(async (request: Request) => {
         detail: insertError?.message ?? "The supplied profile values were rejected",
         cleanup: cleanupError ? "Auth cleanup failed; contact an administrator" : "Auth user was cleaned up",
       });
+    }
+
+    const { data: createdProfile, error: createdProfileError } = await adminClient
+      .from("user_profiles")
+      .select("account_status,is_login_enabled")
+      .eq("id", profileId)
+      .single();
+    if (createdProfileError || !createdProfile) return json(500, { error: "The account profile could not be verified. Contact a system owner." });
+    if (createdProfile.account_status !== "active" || createdProfile.is_login_enabled !== true) {
+      const { error: activationError } = await adminClient
+        .from("user_profiles")
+        .update({ account_status: "active", is_login_enabled: true, updated_by: callerProfile.id })
+        .eq("id", profileId);
+      if (activationError) {
+        console.error("invite account activation failed", { code: activationError.code ?? null });
+        return json(500, { error: "The account was created but could not be activated. Contact a system owner." });
+      }
+      const { error: activationAuditError } = await adminClient.from("audit_logs").insert({
+        tenant_id: callerProfile.tenant_id,
+        actor_user_id: callerProfile.id,
+        action: "user_account_activated",
+        module: "user_management",
+        record_id: profileId,
+        old_value: { account_status: createdProfile.account_status, is_login_enabled: createdProfile.is_login_enabled },
+        new_value: { account_status: "active", is_login_enabled: true, reason: "new account setup" },
+      });
+      if (activationAuditError) {
+        console.error("invite account activation audit failed", { code: activationAuditError.code ?? null });
+        return json(500, { error: "The account was activated but could not be audited. Contact a system owner." });
+      }
     }
 
     return json(201, { user_profile_id: profileId, temporary_password: password });

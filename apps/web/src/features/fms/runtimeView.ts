@@ -9,6 +9,19 @@ export function priorFmsDefinitions(definitions: FmsStageRow[], instanceStages: 
   return definitions.filter((item) => item.fms_flow_id === flowId && item.sort_order < current.sort_order && instanceStages.some((runtime) => runtime.fms_stage_id === item.id));
 }
 
+export function isInitialFmsDefinition(definitions: FmsStageRow[], current: FmsStageRow) {
+  return definitions
+    .filter((item) => item.fms_flow_id === current.fms_flow_id)
+    .sort((left, right) => left.sort_order - right.sort_order || left.id.localeCompare(right.id))[0]?.id === current.id;
+}
+
+export function shouldOpenInitialFmsForm(definitions: FmsStageRow[], current: FmsStageRow, runtime: Pick<FmsInstanceStage, "status" | "form_submission_id">) {
+  return isInitialFmsDefinition(definitions, current)
+    && !!current.form_template_id
+    && !runtime.form_submission_id
+    && ["pending", "in_progress", "in_review", "overdue"].includes(runtime.status);
+}
+
 export function filterFmsInstances(input: { instances: FmsInstance[]; stages: FmsInstanceStage[]; profileId: string; tab: "mine" | "started" | "branch"; query: string; status: string; priority: string; overdueOnly: boolean; now?: string }) {
   return input.instances.filter((instance) => {
     const stages = input.stages.filter((stage) => stage.fms_instance_id === instance.id);

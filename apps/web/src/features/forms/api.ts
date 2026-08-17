@@ -47,10 +47,21 @@ export async function loadFormDynamicOptions() {
   return { users: (users.data ?? []).flatMap((row) => row.id && row.employee_name ? [{ id: row.id, label: row.employee_name }] : []), branches: (branches.data ?? []).map((row) => ({ id: row.id, label: row.name })), departments: (departments.data ?? []).map((row) => ({ id: row.id, branchId: row.branch_id, label: row.name })) };
 }
 export const saveDraft = async (id: string | null, payload: Json, fields: Json) => { const { error } = await supabase.rpc("save_form_draft_with_audit", { p_template_id: id as string, p_payload: payload, p_fields: fields }); fail("Save form draft", error); };
+export const savePublishedForm = async (id: string, payload: Json, fields: Json) => { const { error } = await supabase.rpc("save_published_form_with_audit", { p_template_id: id, p_payload: payload, p_fields: fields }); fail("Save published form", error); };
 export const reviseForm = async (id: string) => { const { error } = await supabase.rpc("create_form_revision_with_audit", { p_source_template_id: id, p_payload: {} }); fail("Create form revision", error); };
 export const publishForm = async (id: string) => { const { error } = await supabase.rpc("publish_form_with_audit", { p_template_id: id }); fail("Publish form", error); };
 export const archiveForm = async (id: string) => { const { error } = await supabase.rpc("archive_form_with_audit", { p_template_id: id }); fail("Archive form", error); };
-export const deleteFormDraft = async (id: string) => { const { error } = await supabase.rpc("delete_form_draft_with_audit", { p_template_id: id }); fail("Delete form draft", error); };
-export const duplicateForm = async (id: string, name?: string) => { const { data, error } = await supabase.rpc("duplicate_form_with_audit", { p_source_template_id: id, ...(name ? { p_name: name } : {}) }); fail("Duplicate form", error); return data; };
+export const deleteForm = async (id: string) => { const { error } = await supabase.rpc("delete_form_with_audit", { p_template_id: id }); fail("Delete form", error); };
+export const duplicateForm = async (id: string, name?: string) => {
+  const { data, error } = await supabase.rpc("duplicate_form_with_audit", { p_source_template_id: id, ...(name ? { p_name: name } : {}) });
+  fail("Duplicate form", error);
+  if (!data) throw new Error("Duplicate form: the server did not return the new draft");
+  return data;
+};
+export const publishAsNewForm = async (id: string) => {
+  const draftId = await duplicateForm(id);
+  await publishForm(draftId);
+  return draftId;
+};
 export const submitForm = async (id: string, answers: object, linkedModule?: string, linkedRecordId?: string) => { const { error } = await supabase.rpc("submit_form_with_audit", { p_form_template_id: id, p_answers: answers as Json, ...(linkedModule ? { p_linked_module: linkedModule } : {}), ...(linkedRecordId ? { p_linked_record_id: linkedRecordId } : {}) }); fail("Submit form", error); };
 export const reviewSubmission = async (id: string, decision: "approved" | "rejected", notes: string) => { const { error } = await supabase.rpc("review_form_submission_with_audit", { p_submission_id: id, p_decision: decision, p_review_notes: notes }); fail("Review submission", error); };

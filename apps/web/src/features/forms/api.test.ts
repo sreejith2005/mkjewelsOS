@@ -3,7 +3,7 @@ import { isFormFieldVisible } from "@jewelos/core";
 
 vi.mock("@jewelos/api-client", () => ({ supabase: {} }));
 
-import { toDefinition, type FormField, type FormTemplate } from "./api";
+import { deleteForm, publishAsNewForm, savePublishedForm, toDefinition, type FormField, type FormTemplate } from "./api";
 
 describe("toDefinition", () => {
   it("does not turn a NULL database condition into a conditional field", () => {
@@ -18,5 +18,41 @@ describe("toDefinition", () => {
 
     expect(definition.fields[0]).not.toHaveProperty("condition");
     expect(isFormFieldVisible(definition.fields[0]!, {})).toBe(true);
+  });
+});
+
+describe("publishAsNewForm", () => {
+  it("duplicates the draft into an independent family before publishing it", async () => {
+    const rpc = vi.fn()
+      .mockResolvedValueOnce({ data: "copied-draft", error: null })
+      .mockResolvedValueOnce({ data: null, error: null });
+    const { supabase } = await import("@jewelos/api-client");
+    Object.assign(supabase, { rpc });
+
+    await expect(publishAsNewForm("edited-draft")).resolves.toBe("copied-draft");
+    expect(rpc).toHaveBeenNthCalledWith(1, "duplicate_form_with_audit", { p_source_template_id: "edited-draft" });
+    expect(rpc).toHaveBeenNthCalledWith(2, "publish_form_with_audit", { p_template_id: "copied-draft" });
+  });
+});
+
+describe("deleteForm", () => {
+  it("uses the audited deletion RPC for every deletable lifecycle", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "deleted-form", error: null });
+    const { supabase } = await import("@jewelos/api-client");
+    Object.assign(supabase, { rpc });
+
+    await expect(deleteForm("published-form")).resolves.toBeUndefined();
+    expect(rpc).toHaveBeenCalledWith("delete_form_with_audit", { p_template_id: "published-form" });
+  });
+});
+
+describe("savePublishedForm", () => {
+  it("uses the audited in-place edit RPC", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "published-form", error: null });
+    const { supabase } = await import("@jewelos/api-client");
+    Object.assign(supabase, { rpc });
+
+    await expect(savePublishedForm("published-form", { name: "Walk-in Form" }, [])).resolves.toBeUndefined();
+    expect(rpc).toHaveBeenCalledWith("save_published_form_with_audit", { p_template_id: "published-form", p_payload: { name: "Walk-in Form" }, p_fields: [] });
   });
 });
