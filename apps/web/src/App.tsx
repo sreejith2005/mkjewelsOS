@@ -19,6 +19,7 @@ import {
   type PageId,
 } from "@jewelos/core";
 import { AuthProvider, useAuth } from "@/auth/AuthContext";
+import { supabase } from "@jewelos/api-client";
 import { Button, Notice } from "@/components/ui";
 import { ApplicationShell } from "@/components/shell/ApplicationShell";
 import { LazyPageErrorBoundary } from "@/components/LazyPageErrorBoundary";
@@ -115,12 +116,13 @@ function usePathname() {
 }
 
 function LoginPage() {
-  const { signIn, statusMessage } = useAuth();
+  const { requestPasswordReset, signIn, statusMessage } = useAuth();
   const { theme, setTheme } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -133,6 +135,18 @@ function LoginPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const requestReset = async () => {
+    if (!email.trim()) {
+      setError("Enter your email address first.");
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    const requestError = await requestPasswordReset(email);
+    setSubmitting(false);
+    setResetMessage(requestError ?? "If this email has an active account, a password-reset link has been sent.");
   };
 
   return (
@@ -169,10 +183,52 @@ function LoginPage() {
           <Button className="mt-2 w-full" disabled={submitting} type="submit">
             {submitting ? "Signing in…" : "Sign in"}
           </Button>
+          <button className="w-full text-sm text-gold underline underline-offset-4" disabled={submitting} onClick={() => void requestReset()} type="button">
+            Forgot password?
+          </button>
         </form>
+        {resetMessage ? <div className="mt-5"><Notice tone="success">{resetMessage}</Notice></div> : null}
       </section>
     </main>
   );
+}
+
+function ResetPasswordPage() {
+  const { logout, session } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (password.length < 8) return setError("Use at least 8 characters.");
+    if (password !== confirmPassword) return setError("Passwords do not match.");
+    if (!session) return setError("This recovery link is invalid or has expired. Request a new one from sign in.");
+    setError(null);
+    setSubmitting(true);
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+    setSubmitting(false);
+    if (updateError) return setError(updateError.message);
+    setSuccess(true);
+  };
+
+  return <main className="relative flex min-h-screen items-center justify-center bg-obsidian px-5 py-10">
+    <ThemeToggle className="absolute right-4 top-4" onChange={setTheme} theme={theme} />
+    <section className="glass-card w-full max-w-md rounded-2xl p-7 sm:p-9">
+      <img alt="MK Jewels" className="mx-auto mb-8 h-14 w-auto object-contain" src={logoDarkUrl} />
+      <h1 className="mb-2 text-center font-display text-2xl text-gold">Set your password</h1>
+      <p className="mb-6 text-center text-sm text-soft-grey">Choose a new password for your JewelOS account.</p>
+      {error ? <div className="mb-5"><Notice tone="danger">{error}</Notice></div> : null}
+      {success ? <div className="space-y-5"><Notice tone="success">Password updated. You can now sign in.</Notice><Button className="w-full" onClick={() => void logout()}>Return to sign in</Button></div> : <form className="space-y-4" onSubmit={submit}>
+        <label className="block"><span className="label">New password</span><input autoComplete="new-password" className="field" minLength={8} onChange={(event) => setPassword(event.target.value)} required type="password" value={password} /></label>
+        <label className="block"><span className="label">Confirm new password</span><input autoComplete="new-password" className="field" minLength={8} onChange={(event) => setConfirmPassword(event.target.value)} required type="password" value={confirmPassword} /></label>
+        <Button className="mt-2 w-full" disabled={submitting} type="submit">{submitting ? "Updating…" : "Update password"}</Button>
+      </form>}
+    </section>
+  </main>;
 }
 
 function IncompleteAccount() {
@@ -277,6 +333,6 @@ function AuthenticatedApp() {
 
 export function App() {
   return (
-    <ThemeProvider><AuthProvider><AuthenticatedApp /></AuthProvider></ThemeProvider>
+    <ThemeProvider><AuthProvider>{window.location.pathname === "/reset-password" ? <ResetPasswordPage /> : <AuthenticatedApp />}</AuthProvider></ThemeProvider>
   );
 }
