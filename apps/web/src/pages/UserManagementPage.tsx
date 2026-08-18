@@ -8,6 +8,7 @@ import { errorMessage, initials, PHONE_PATTERN, titleCase } from "@/lib/format";
 import type { Branch, Department, DropdownMaster, UserProfile } from "@/types";
 
 const ACCOUNT_STATUSES = ["active", "invited", "inactive", "suspended", "left"] as const;
+const WEEK_OFF_DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
 type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
 type Data = { profiles: UserProfile[]; branches: Branch[]; departments: Department[]; dropdowns: DropdownMaster[] };
 const EMPTY: Data = { profiles: [], branches: [], dropdowns: [], departments: [] };
@@ -29,7 +30,7 @@ function TemporaryPassword({ password, title, onClose }: { password: string; tit
 }
 
 function EditUser({ user, data, superAdmin, onClose, onSaved }: { user: UserProfile; data: Data; superAdmin: boolean; onClose: () => void; onSaved: () => Promise<void> }) {
-  const [draft, setDraft] = useState({ employee_name: user.employee_name, employee_code: user.employee_code, branch_id: user.branch_id, department_id: user.department_id, designation_id: user.designation_id ?? "", buddy_id: user.buddy_id ?? "", reports_to_user_id: user.reports_to_user_id ?? "", account_status: user.account_status, user_role: user.user_role, personal_mobile: user.personal_mobile ?? "", official_mobile: user.official_mobile ?? "" });
+  const [draft, setDraft] = useState({ employee_name: user.employee_name, employee_code: user.employee_code, branch_id: user.branch_id, department_id: user.department_id, designation_id: user.designation_id ?? "", buddy_id: user.buddy_id ?? "", reports_to_user_id: user.reports_to_user_id ?? "", account_status: user.account_status, user_role: user.user_role, personal_mobile: user.personal_mobile ?? "", official_mobile: user.official_mobile ?? "", week_off: user.week_off.map((day) => day.toLowerCase()) });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
@@ -46,7 +47,8 @@ function EditUser({ user, data, superAdmin, onClose, onSaved }: { user: UserProf
     }
     setSaving(true); setError(null);
     try {
-      const { error: rpcError } = await supabase.rpc("update_user_profile_with_audit", { p_profile_id: user.id, p_changes: draft as Json });
+      const { week_off, ...profileChanges } = draft;
+      const { error: rpcError } = await supabase.rpc("update_user_profile_with_audit", { p_profile_id: user.id, p_changes: (superAdmin ? { ...profileChanges, week_off } : profileChanges) as Json });
       if (rpcError) throw rpcError;
       await onSaved(); onClose();
     } catch (caught) { setError(errorMessage(caught)); } finally { setSaving(false); }
@@ -88,6 +90,7 @@ function EditUser({ user, data, superAdmin, onClose, onSaved }: { user: UserProf
         <Field label="Buddy"><select className="field" value={draft.buddy_id} onChange={(event) => set("buddy_id", event.target.value)}><option value="">No buddy</option>{buddyProfiles.map((item) => <option key={item.id} value={item.id}>{item.employee_name}</option>)}</select></Field>
         <Field label="Account status"><select className="field" value={draft.account_status} onChange={(event) => set("account_status", event.target.value as AccountStatus)}>{ACCOUNT_STATUSES.filter((status) => status !== "left").map((status) => <option key={status} value={status}>{titleCase(status)}</option>)}</select></Field>
         <Field label="System role"><select className="field" disabled={!superAdmin} value={draft.user_role} onChange={(event) => set("user_role", event.target.value as UserRole)}>{USER_ROLES.map((role) => <option key={role} value={role}>{titleCase(role)}</option>)}</select></Field>
+        {superAdmin ? <Field label="Week off"><select className="field" aria-describedby="week-off-help" value={draft.week_off[0] ?? ""} onChange={(event) => set("week_off", event.target.value ? [event.target.value] : [])}><option value="">No week off (default)</option>{WEEK_OFF_DAYS.map((day) => <option key={day} value={day}>{titleCase(day)}</option>)}</select><p className="mt-1 text-xs text-soft-grey" id="week-off-help">This employee will be unavailable on the selected day every week until it is changed.</p></Field> : null}
       </div>
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">{superAdmin ? <Button disabled={saving} type="button" variant="secondary" onClick={() => void resetPassword()}><KeyRound className="h-4 w-4" />Reset password</Button> : null}{superAdmin ? <Button disabled={saving} type="button" variant="danger" onClick={remove}><Trash2 className="h-4 w-4" />Delete user</Button> : null}</div>

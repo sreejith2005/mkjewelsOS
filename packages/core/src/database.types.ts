@@ -3519,6 +3519,58 @@ export type Database = {
           },
         ]
       }
+      tenant_section_controls: {
+        Row: {
+          created_at: string
+          developer_mode_enabled: boolean
+          section_availability: Json
+          settings_version: number
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          developer_mode_enabled?: boolean
+          section_availability?: Json
+          settings_version?: number
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          developer_mode_enabled?: boolean
+          section_availability?: Json
+          settings_version?: number
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_section_controls_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_section_controls_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_section_controls_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_assignees: {
         Row: {
           completed_at: string | null
@@ -5585,6 +5637,7 @@ export type Database = {
         Returns: string
       }
       get_dashboard_metrics: { Args: { p_context?: Json }; Returns: Json }
+      get_section_availability: { Args: never; Returns: Json }
       get_home_summary: { Args: { p_context?: Json }; Returns: Json }
       get_notification_provider_availability: {
         Args: never
@@ -6101,6 +6154,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      save_section_availability_with_audit: {
+        Args: {
+          p_developer_mode_enabled: boolean
+          p_expected_version: number
+          p_request_key: string
+          p_section_availability: Json
+        }
+        Returns: Json
       }
       save_fms_flow_draft_with_audit: {
         Args: { p_flow_id: string; p_metadata: Json; p_stages: Json }

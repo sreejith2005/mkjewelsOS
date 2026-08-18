@@ -24,7 +24,7 @@ export function TaskFilterBar({ counts, endDate, onEndDateChange, onPresetChange
   startDate: string;
   status: TaskFeedStatusFilter;
 }) {
-  const filters: TaskFeedStatusFilter[] = ["all", "overdue", "pending", "in_progress"];
+  const filters: TaskFeedStatusFilter[] = ["pending", "overdue", "in_progress", "all"];
   return (
     <section aria-label="Task filters" className="border-b border-task-border bg-task-bg">
       <div className="grid gap-3 p-3 sm:grid-cols-[180px_1fr] sm:items-end">

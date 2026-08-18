@@ -13,7 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import {
-  canAccessPage,
+  canAccessPage, DEFAULT_SECTION_CONTROLS, isSectionUnderMaintenance, validateSectionControls,
   getMenuForRole,
   getPageForPath,
   type PageId,
@@ -25,6 +25,7 @@ import { ApplicationShell } from "@/components/shell/ApplicationShell";
 import { LazyPageErrorBoundary } from "@/components/LazyPageErrorBoundary";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ThemeProvider, useTheme } from "@/theme/ThemeContext";
+import { SectionMaintenanceNotice } from "@/components/SectionMaintenanceNotice";
 import type { LauncherItem } from "@/components/shell/AppLauncher";
 import logoDarkUrl from "../../../mk-jewels-logos/WhatsApp Image 2026-06-24 at 13.01.41 (1).jpeg";
 import logoLightUrl from "../../../mk-jewels-logos/WhatsApp Image 2026-06-24 at 13.01.40 (1).jpeg";
@@ -252,6 +253,20 @@ function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [appsOpen, setAppsOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [sectionControls, setSectionControls] = useState(DEFAULT_SECTION_CONTROLS);
+  const [sectionControlsError, setSectionControlsError] = useState(false);
+  const [sectionControlsLoading, setSectionControlsLoading] = useState(true);
+  useEffect(() => {
+    let active = true;
+    setSectionControlsLoading(true); setSectionControlsError(false);
+    void supabase.rpc("get_section_availability").then(({ data, error }) => {
+      if (!active) return;
+      if (error) { setSectionControlsError(true); setSectionControlsLoading(false); return; }
+      try { setSectionControls(validateSectionControls(data)); } catch { setSectionControlsError(true); }
+      setSectionControlsLoading(false);
+    });
+    return () => { active = false; };
+  }, [profile?.id]);
   useEffect(() => {
     if (!profile || path !== "/" || preferences.default_landing_page !== "dashboard") return;
     const key = `jewelos-default-landing-${profile.id}`;
@@ -276,10 +291,14 @@ function AppShell() {
     return description ? [{ ...item, description }] : [];
   }), [nav]);
   if (!profile) return null;
+  if (sectionControlsLoading) return <main className="flex min-h-screen items-center justify-center text-gold">Checking section availability…</main>;
+  if (sectionControlsError) return <main className="flex min-h-screen items-center justify-center p-5 text-center text-champagne">We could not verify section availability. Refresh the page and try again.</main>;
   const requestedPage = getPageForPath(path) ?? "home";
   const allowed = IMPLEMENTED_PAGES.has(requestedPage) && canAccessPage(profile.user_role, requestedPage);
   const currentPage: PageId = allowed ? requestedPage : "dashboard";
-  const pageContent = currentPage === "home" ? <HomePage onNavigate={navigate} />
+  const adminBypass = profile.user_role === "super_admin" || profile.user_role === "admin";
+  const sectionUnderMaintenance = !adminBypass && isSectionUnderMaintenance(sectionControls, currentPage);
+  const pageContent = sectionUnderMaintenance ? <SectionMaintenanceNotice section={currentPage === "checklist_tasks" ? "Tasks" : currentPage === "forms_library" ? "Forms Library" : currentPage === "fms_builder" ? "FMS" : currentPage === "dropdown_master" ? "Dropdown Master" : currentPage === "fms_tasks" ? "FMS Tasks" : currentPage.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())} /> : currentPage === "home" ? <HomePage onNavigate={navigate} />
     : currentPage === "dashboard" ? <DashboardPage />
     : currentPage === "reports" ? <ReportsPage />
     : currentPage === "settings" ? <SettingsPage />
