@@ -12,7 +12,6 @@ import { Button, Field } from "@/components/ui";
 import type { FmsData } from "./api";
 import { fmsDepartmentsForBranch, fmsUsersForDepartment } from "./departments";
 
-const automaticTypes: readonly FmsStageDefinition["type"][] = ["branch", "parallel_start", "parallel_join", "notification", "end"];
 const humanTypes: readonly FmsStageDefinition["type"][] = ["form", "task", "approval"];
 const availabilityTone = { present: "text-success", remote: "text-success", half_day: "text-gold", absent: "text-danger" } as const;
 const timingOptions: readonly { value: FmsTimingMethod; label: string; help: string }[] = [
@@ -30,7 +29,6 @@ export function FmsStageEditor({ stage, stages, data, flowBranchId, onChange, on
   const earlierStages = stages.slice(0, Math.max(0, stageIndex));
   const earlierDecisions = earlierStages.filter((item) => item.sla.decisionMode === "yes_no");
   const others = stages.filter((item) => item.key !== stage.key);
-  const automatic = automaticTypes.includes(stage.type);
   const human = humanTypes.includes(stage.type);
   const canChooseNext = !["branch", "parallel_start", "end"].includes(stage.type);
   const primaryRule = stage.assigneeRules.find((rule) => rule.type === "specific_user");
@@ -47,7 +45,6 @@ export function FmsStageEditor({ stage, stages, data, flowBranchId, onChange, on
     setShowAdditional(!!stage.method || !!stage.formTemplateId || stage.requiresUpload || stage.requiresRemark || stage.requiresNextDoerHandoff || stage.canReject || stage.canRequestRevision || stage.canEscalate);
     setShowConditional(!!stage.sla.conditional);
   }, [stage.key]);
-  useEffect(() => { if (primary?.department_id) setSelectedDepartmentId(primary.department_id); }, [primary?.department_id]);
 
   const departmentId = primary?.department_id ?? selectedDepartmentId;
   const departments = fmsDepartmentsForBranch(data.departments, flowBranchId);
@@ -78,13 +75,13 @@ export function FmsStageEditor({ stage, stages, data, flowBranchId, onChange, on
       <Field label="Step name"><input autoFocus className="field" maxLength={150} onChange={(event) => update({ name: event.target.value })} placeholder="e.g. Issue PO to supplier" value={stage.name} /></Field>
     </section>
 
-    {!automatic ? <section className="space-y-3 border-t border-gold/15 pt-4">
+    {false ? <section className="space-y-3 border-t border-gold/15 pt-4">
       <div><h4 className="text-xs font-semibold uppercase tracking-[0.15em] text-gold">Who</h4><p className="mt-1 text-xs text-soft-grey">Choose a department, a named owner, and an optional fallback from Users.</p></div>
       <Field label="Department"><select className="field" onChange={(event) => { setSelectedDepartmentId(event.target.value); setAssignment(""); }} value={departmentId}><option value="">Select a department</option>{data.branches.map((branch) => { const branchDepartments = departments.filter((department) => department.branch_id === branch.id); return branchDepartments.length ? <optgroup key={branch.id} label={branch.name}>{branchDepartments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</optgroup> : null; })}{departments.filter((department) => department.branch_id === null).map((department) => <option key={department.id} value={department.id}>{branchName(department.branch_id)} · {department.name}</option>)}</select></Field>
       {departmentId ? <p className="text-xs text-soft-grey">{departmentUsers.length} {departmentUsers.length === 1 ? "person" : "people"} available from Users for this department.</p> : null}
       <Field label="Primary assignee"><select className="field" disabled={!departmentId || !departmentUsers.length} onChange={(event) => setAssignment(event.target.value, primaryRule?.fallbackUserProfileId)} value={primaryRule?.userProfileId ?? ""}><option value="">Select a named person</option>{departmentUsers.map((user) => <option key={user.id} value={user.id}>{personLabel(user)}</option>)}</select></Field>
       {departmentId && !departmentUsers.length ? <p className="rounded-lg border border-warning/30 bg-warning/5 p-2 text-xs text-warning">No visible Users profiles belong to this department. Check each person’s department in Users.</p> : null}
-      {primary ? <p className={`text-xs ${availabilityByUser.get(primary.id) ? availabilityTone[availabilityByUser.get(primary.id)!] : "text-soft-grey"}`}>Today: {availabilityByUser.get(primary.id)?.replaceAll("_", " ") ?? "availability not marked"}</p> : null}
+      {primary ? <p className={`text-xs ${availabilityByUser.get(primary!.id) ? availabilityTone[availabilityByUser.get(primary!.id)!] : "text-soft-grey"}`}>Today: {availabilityByUser.get(primary!.id)?.replaceAll("_", " ") ?? "availability not marked"}</p> : null}
       <Field label="Fallback assignee"><select className="field" disabled={!primaryRule?.userProfileId} onChange={(event) => setAssignment(primaryRule?.userProfileId ?? "", event.target.value)} value={primaryRule?.fallbackUserProfileId ?? ""}><option value="">No fallback</option>{departmentUsers.filter((user) => user.id !== primaryRule?.userProfileId).map((user) => <option key={user.id} value={user.id}>{personLabel(user)}</option>)}</select></Field>
       <p className="text-xs text-soft-grey">Availability is shown beside each person. If the primary is absent, work moves to the configured fallback from the same department.</p>
     </section> : null}
