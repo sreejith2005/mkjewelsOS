@@ -8,6 +8,7 @@ type AuthStatus = "loading" | "signed_out" | "authenticated" | "incomplete" | "b
 
 type AuthContextValue = {
   branch: Branch | null;
+  requestPasswordReset: (email: string) => Promise<string | null>;
   logout: () => Promise<void>;
   profile: UserProfile | null;
   preferences: UserPreferences;
@@ -131,8 +132,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   }, []);
 
+  const requestPasswordReset = useCallback(async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      return error?.message ?? null;
+    } catch {
+      return "Unable to request a password reset. Please try again later.";
+    }
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ branch, logout, preferences, profile, refreshPreferences, session, signIn, status, statusMessage }}>
+    <AuthContext.Provider value={{ branch, logout, preferences, profile, refreshPreferences, requestPasswordReset, session, signIn, status, statusMessage }}>
       {children}
     </AuthContext.Provider>
   );
