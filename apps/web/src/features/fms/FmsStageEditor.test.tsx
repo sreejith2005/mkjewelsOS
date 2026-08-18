@@ -9,7 +9,7 @@ import { newFmsStage } from "./definition";
 import { FmsStageEditor } from "./FmsStageEditor";
 
 const data: FmsData = {
-  flows: [], stages: [], assignees: [], branchRules: [], forms: [{ id: "00000000-0000-4000-8000-000000000001", name: "Initial details", version: 1 }], availability: [],
+  flows: [], stages: [], assignees: [], branchRules: [], forms: [{ id: "00000000-0000-4000-8000-000000000001", name: "Initial details", version: 1 }], statusOptions: [{ label: "Follow Up", value: "follow_up" }, { label: "Interested", value: "interested" }], availability: [],
   branches: [{ id: "b1", name: "Main" }],
   departments: [{ id: "d1", branch_id: null, name: "Sales" }],
   users: [
@@ -83,15 +83,16 @@ describe("FMS stage assignment", () => {
     await user.click(screen.getByLabelText("Attach an optional form"));
     expect(screen.getByLabelText("Optional linked form")).toBeTruthy();
   });
-  it("only enables a conditional step after an earlier Yes or No decision", async () => {
+  it("configures a Status condition and retains the earlier Yes or No alternative", async () => {
     const user = userEvent.setup();
     render(<DecisionHarness />);
     await user.click(screen.getByRole("button", { name: /Decision step \(Yes\/No\)/ }));
     await user.click(screen.getByRole("button", { name: "Edit follow up" }));
-    const conditional = screen.getByLabelText("Only run on a Yes or No path");
-    expect((conditional as HTMLInputElement).disabled).toBe(false);
+    const conditional = screen.getByLabelText("Enable conditional step");
     await user.click(conditional);
+    expect((screen.getByLabelText("Condition field") as HTMLSelectElement).value).toBe("status");
+    expect((screen.getByLabelText("Status value") as HTMLSelectElement).value).toBe("follow_up");
+    await user.selectOptions(screen.getByLabelText("Condition field"), "decision");
     expect((screen.getByLabelText("Earlier decision") as HTMLSelectElement).value).toBe("decision");
-    expect((screen.getByLabelText("Run when answer is") as HTMLSelectElement).value).toBe("yes");
   });
 });

@@ -56,7 +56,7 @@ export function TasksPage() {
   const [startDate, setStartDate] = useState(initialRange[0]);
   const [endDate, setEndDate] = useState(initialRange[1]);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<TaskFeedStatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<TaskFeedStatusFilter>("pending");
   const [myTasks, setMyTasks] = useState<TaskBundle[]>([]);
   const [delegatedTasks, setDelegatedTasks] = useState<TaskBundle[]>([]);
   const [workspaceView, setWorkspaceView] = useState<TaskWorkspaceView>("mine");

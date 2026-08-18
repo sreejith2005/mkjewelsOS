@@ -36,7 +36,7 @@ export function normalizeFmsDefinition(input: FmsFlowDefinition): FmsFlowDefinit
       ...(Number.isFinite(stage.sla?.daysBefore) ? { daysBefore: Number(stage.sla.daysBefore) } : {}),
       ...(text(stage.sla?.clockTime) ? { clockTime: text(stage.sla.clockTime) } : {}),
       ...(text(stage.sla?.triggerStageKey) ? { triggerStageKey: text(stage.sla.triggerStageKey).toLowerCase() } : {}),
-      ...(stage.sla?.conditional?.decisionStageKey && ["yes", "no"].includes(stage.sla.conditional.outcome) ? { conditional: { decisionStageKey: text(stage.sla.conditional.decisionStageKey).toLowerCase(), outcome: stage.sla.conditional.outcome as "yes" | "no" } } : {}),
+      ...(stage.sla?.conditional && "field" in stage.sla.conditional ? { conditional: { field: stage.sla.conditional.field, operator: stage.sla.conditional.operator, value: text(stage.sla.conditional.value) } } : stage.sla?.conditional && "decisionStageKey" in stage.sla.conditional ? { conditional: { decisionStageKey: text(stage.sla.conditional.decisionStageKey).toLowerCase(), outcome: stage.sla.conditional.outcome } } : {}),
     },
   }));
   return { ...input, name: text(input.name), description: text(input.description) || undefined, manualTrigger: true, stages };
@@ -82,7 +82,14 @@ export function validateFmsDefinition(raw: FmsFlowDefinition): readonly FmsValid
     if (stage.sla.timingMethod === "specific_time" && (!validDate(stage.sla.dueDate) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(stage.sla.clockTime ?? ""))) add("invalid_deadline", "Choose a valid date and clock time");
     if (stage.sla.triggerStageKey) { const trigger = byKey.get(stage.sla.triggerStageKey); if (!trigger || trigger.order >= stage.order) add("invalid_deadline_trigger", "Timing can only start from an earlier step"); }
     if (stage.sla.decisionMode === "yes_no" && (AUTO.has(stage.type) || stageIndex === 0)) add("invalid_decision", "Yes/No decisions are available on human steps after the initial Form");
-    if (stage.sla.conditional) { const decision = byKey.get(stage.sla.conditional.decisionStageKey); if (!decision || decision.order >= stage.order || decision.sla.decisionMode !== "yes_no") add("invalid_conditional", "A condition must reference an earlier Yes/No decision step"); }
+    if (stage.sla.conditional) {
+      if ("field" in stage.sla.conditional) {
+        if (stage.sla.conditional.field !== "status" || stage.sla.conditional.operator !== "equals" || !text(stage.sla.conditional.value)) add("invalid_conditional", "A Status condition needs an equals value");
+      } else {
+        const decision = byKey.get(stage.sla.conditional.decisionStageKey);
+        if (!decision || decision.order >= stage.order || decision.sla.decisionMode !== "yes_no") add("invalid_conditional", "A condition must reference an earlier Yes/No decision step");
+      }
+    }
     if (new Set(stage.checklist.map((item) => item.key)).size !== stage.checklist.length || stage.checklist.some((item) => !KEY.test(item.key) || !item.label)) add("invalid_checklist", "Checklist keys must be unique and labels are required");
     if (stageIndex === 0 && !stage.formTemplateId) add("missing_form", "The initial Form requires an exact published template version");
     if (stage.formTemplateId && !UUID.test(stage.formTemplateId)) add("invalid_form", "Linked form ID is invalid");

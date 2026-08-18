@@ -26,7 +26,8 @@ export type FmsAssigneeRule = Readonly<{
 export type FmsChecklistItemDefinition = Readonly<{ key: string; label: string; required: boolean }>;
 export type FmsTimingMethod = "completion_date" | "tat_hours" | "days_before_date" | "specific_time";
 export type FmsDecisionMode = "normal" | "yes_no";
-export type FmsConditionalRule = Readonly<{ decisionStageKey: string; outcome: "yes" | "no" }>;
+/** A conditional step either observes the workflow Status supplied at start, or a prior Yes/No decision. */
+export type FmsConditionalRule = Readonly<{ field: "status"; operator: "equals"; value: string } | { decisionStageKey: string; outcome: "yes" | "no" }>;
 export type FmsSlaRule = Readonly<{
   timingMethod?: FmsTimingMethod | undefined;
   dueDate: string;
