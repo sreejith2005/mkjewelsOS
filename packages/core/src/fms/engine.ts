@@ -76,10 +76,10 @@ export function validateFmsDefinition(raw: FmsFlowDefinition): readonly FmsValid
     if (!KEY.test(stage.key) || keys.has(stage.key)) add("invalid_stage_key", "Stage keys must be unique stable identifiers"); keys.add(stage.key);
     if (!stage.name || stage.name.length > 150 || !FMS_STAGE_TYPES.includes(stage.type)) add("invalid_stage", "Stage name or type is invalid");
     if (stage.type === "end") add("legacy_end_stage", "End nodes are no longer used. Leave the final executable stage without a next connection instead");
-    if (stage.sla.timingMethod === "completion_date" && !validDate(stage.sla.dueDate)) add("invalid_deadline", "Choose a valid completion due date");
-    if (stage.sla.timingMethod === "tat_hours" && (!Number.isFinite(stage.sla.tatHours) || stage.sla.tatHours! <= 0 || stage.sla.tatHours! > 8760)) add("invalid_deadline", "TAT must be between 0 and 8,760 hours");
-    if (stage.sla.timingMethod === "days_before_date" && (!validDate(stage.sla.futureDate ?? "") || !Number.isInteger(stage.sla.daysBefore) || stage.sla.daysBefore! < 0 || stage.sla.daysBefore! > 3650)) add("invalid_deadline", "Choose a future date and a valid number of days before it");
-    if (stage.sla.timingMethod === "specific_time" && (!validDate(stage.sla.dueDate) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(stage.sla.clockTime ?? ""))) add("invalid_deadline", "Choose a valid date and clock time");
+    if (!AUTO.has(stage.type) && stage.sla.timingMethod === "completion_date" && !validDate(stage.sla.dueDate)) add("invalid_deadline", "Choose a valid completion due date");
+    if (!AUTO.has(stage.type) && stage.sla.timingMethod === "tat_hours" && (!Number.isFinite(stage.sla.tatHours) || stage.sla.tatHours! <= 0 || stage.sla.tatHours! > 8760)) add("invalid_deadline", "TAT must be between 0 and 8,760 hours");
+    if (!AUTO.has(stage.type) && stage.sla.timingMethod === "days_before_date" && (!validDate(stage.sla.futureDate ?? "") || !Number.isInteger(stage.sla.daysBefore) || stage.sla.daysBefore! < 0 || stage.sla.daysBefore! > 3650)) add("invalid_deadline", "Choose a future date and a valid number of days before it");
+    if (!AUTO.has(stage.type) && stage.sla.timingMethod === "specific_time" && (!validDate(stage.sla.dueDate) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(stage.sla.clockTime ?? ""))) add("invalid_deadline", "Choose a valid date and clock time");
     if (stage.sla.triggerStageKey) { const trigger = byKey.get(stage.sla.triggerStageKey); if (!trigger || trigger.order >= stage.order) add("invalid_deadline_trigger", "Timing can only start from an earlier step"); }
     if (stage.sla.decisionMode === "yes_no" && (AUTO.has(stage.type) || stageIndex === 0)) add("invalid_decision", "Yes/No decisions are available on human steps after the initial Form");
     if (stage.sla.conditional) {
