@@ -29,6 +29,7 @@ import { SectionMaintenanceNotice } from "@/components/SectionMaintenanceNotice"
 import type { LauncherItem } from "@/components/shell/AppLauncher";
 import logoDarkUrl from "../../../mk-jewels-logos/WhatsApp Image 2026-06-24 at 13.01.41 (1).jpeg";
 import logoLightUrl from "../../../mk-jewels-logos/WhatsApp Image 2026-06-24 at 13.01.40 (1).jpeg";
+import { Toaster } from "sonner";
 
 const AvailabilityPage = lazy(() => import("@/pages/AvailabilityPage").then((module) => ({ default: module.AvailabilityPage })));
 const HomePage = lazy(() => import("@/pages/HomePage").then((module) => ({ default: module.HomePage })));
@@ -342,6 +343,6 @@ function AuthenticatedApp() {
 
 export function App() {
   return (
-    <ThemeProvider><AuthProvider>{window.location.pathname === "/reset-password" ? <ResetPasswordPage /> : <AuthenticatedApp />}</AuthProvider></ThemeProvider>
+    <ThemeProvider><AuthProvider>{window.location.pathname === "/reset-password" ? <ResetPasswordPage /> : <AuthenticatedApp />}<Toaster position="bottom-right" richColors theme="dark" /></AuthProvider></ThemeProvider>
   );
 }

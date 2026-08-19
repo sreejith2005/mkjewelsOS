@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Bell, Check, ExternalLink } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui";
 import { loadInbox, markNotification, subscribeToInbox } from "./api";
 import type { InboxNotification } from "./types";
@@ -10,14 +11,20 @@ export function NotificationBell({ profileId, onNavigate }: { profileId: string;
   const [open, setOpen] = useState(false);
   const [error, setError] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const refresh = useCallback(async () => {
-    try { setItems((await loadInbox(profileId, 20)).slice(0, 5)); setError(false); }
+  const refresh = useCallback(async (payload?: any) => {
+    try { 
+      setItems((await loadInbox(profileId, 20)).slice(0, 5)); 
+      setError(false); 
+      if (payload && payload.title) {
+        toast.info(payload.title, { description: payload.message });
+      }
+    }
     catch { setError(true); }
   }, [profileId]);
 
   useEffect(() => {
     void refresh();
-    return subscribeToInbox(profileId, () => { void refresh(); });
+    return subscribeToInbox(profileId, (payload) => { void refresh(payload); });
   }, [profileId, refresh]);
 
   useEffect(() => {

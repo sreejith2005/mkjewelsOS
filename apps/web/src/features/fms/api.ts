@@ -55,6 +55,7 @@ export async function saveFmsDraft(flowId: string | null, definition: FmsFlowDef
 export const reviseFmsFlow = async (id: string) => { const { data, error } = await supabase.rpc("create_fms_revision_with_audit", { p_flow_id: id }); fail("Create FMS revision", error); return data; };
 export const publishFmsFlow = async (id: string) => { const { error } = await supabase.rpc("publish_fms_flow_with_audit", { p_flow_id: id }); fail("Publish FMS flow", error); };
 export const archiveFmsFlow = async (id: string, reason: string) => { const { error } = await supabase.rpc("archive_fms_flow_with_audit", { p_flow_id: id, p_reason: reason }); fail("Archive FMS flow", error); };
+export const deleteFmsFlow = async (id: string) => { const { error } = await supabase.rpc("delete_fms_flow_with_audit" as any, { p_flow_id: id }); fail("Delete FMS flow", error); };
 
 export async function loadFmsRuntime(): Promise<{ instances: FmsInstance[]; stages: FmsInstanceStage[]; definitions: FmsStageRow[]; flows: FmsFlowRow[]; checklist: FmsChecklistItem[]; evidence: FmsEvidence[]; logs: FmsLog[]; users: FmsData["users"] }> {
   const [instances, stages, definitions, flows, checklist, evidence, logs, users] = await Promise.all([

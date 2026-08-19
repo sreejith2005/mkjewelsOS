@@ -12,18 +12,18 @@ import type {
 
 type InboxRealtimeSubscription = {
   channel: RealtimeChannel;
-  listeners: Set<() => void>;
+  listeners: Set<(payload?: any) => void>;
   removalTimer: ReturnType<typeof setTimeout> | null;
 };
 
 const inboxRealtimeSubscriptions = new Map<string, InboxRealtimeSubscription>();
 
 function createInboxRealtimeSubscription(profileId: string): InboxRealtimeSubscription {
-  const listeners = new Set<() => void>();
+  const listeners = new Set<(payload?: any) => void>();
   const channel = supabase.channel(`notifications:${profileId}`).on(
     "postgres_changes",
     { event: "INSERT", schema: "public", table: "notifications", filter: `user_profile_id=eq.${profileId}` },
-    () => { listeners.forEach((listener) => listener()); },
+    (payload) => { listeners.forEach((listener) => listener(payload.new)); },
   ).subscribe();
   return { channel, listeners, removalTimer: null };
 }
@@ -45,7 +45,7 @@ export async function markAllNotifications(): Promise<number> {
   return Number(data ?? 0);
 }
 
-export function subscribeToInbox(profileId: string, refresh: () => void): () => void {
+export function subscribeToInbox(profileId: string, refresh: (payload?: any) => void): () => void {
   let subscription = inboxRealtimeSubscriptions.get(profileId);
   if (!subscription) {
     subscription = createInboxRealtimeSubscription(profileId);
