@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.turbo/
+.supabase/
+supabase/.temp/
+.expo/
+.env
+.env.local
+.env.*.local
+!.env.example
+*.log
+.DS_Store

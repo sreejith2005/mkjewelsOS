@@ -1,0 +1,131 @@
+-- Human Yes/No decisions, conditional steps, and calendar/TAT timing methods.
+
+create or replace function is_valid_fms_timing_rule(p_rule jsonb)
+returns boolean language plpgsql immutable set search_path=public as $$
+declare v_method text:=coalesce(nullif(p_rule->>'timingMethod',''),'completion_date'); v_number numeric;
+begin
+  if coalesce(p_rule->>'decisionMode','normal') not in ('normal','yes_no') then return false; end if;
+  if p_rule ? 'conditional' and (jsonb_typeof(p_rule->'conditional')<>'object' or coalesce(p_rule#>>'{conditional,decisionStageKey}','') !~ '^[a-z][a-z0-9_]{0,63}$' or coalesce(p_rule#>>'{conditional,outcome}','') not in ('yes','no')) then return false; end if;
+  if v_method='completion_date' then return is_valid_fms_due_date(p_rule->>'dueDate'); end if;
+  if v_method='tat_hours' then v_number:=(p_rule->>'tatHours')::numeric; return v_number>0 and v_number<=8760; end if;
+  if v_method='days_before_date' then v_number:=(p_rule->>'daysBefore')::numeric; return is_valid_fms_due_date(p_rule->>'futureDate') and v_number=trunc(v_number) and v_number between 0 and 3650; end if;
+  if v_method='specific_time' then return is_valid_fms_due_date(p_rule->>'dueDate') and coalesce(p_rule->>'clockTime','') ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'; end if;
+  return false;
+exception when others then return false;
+end $$;
+
+create or replace function fms_stage_deadline_for_instance(p_rule jsonb,p_tenant_id uuid,p_instance_id uuid)
+returns timestamptz language plpgsql stable security definer set search_path=public as $$
+declare v_method text:=coalesce(nullif(p_rule->>'timingMethod',''),'completion_date'); v_timezone text; v_base timestamptz;
+begin
+  select coalesce(timezone,'Asia/Kolkata') into v_timezone from tenants where id=p_tenant_id;
+  if v_method='tat_hours' then
+    if nullif(p_rule->>'triggerStageKey','') is not null then
+      select instance_stage.actual_datetime into v_base from fms_instance_stages instance_stage join fms_stages definition on definition.id=instance_stage.fms_stage_id where instance_stage.fms_instance_id=p_instance_id and definition.stage_key=p_rule->>'triggerStageKey' and instance_stage.status='completed' order by instance_stage.actual_datetime desc nulls last limit 1;
+    end if;
+    return coalesce(v_base,now())+make_interval(secs=>round((p_rule->>'tatHours')::numeric*3600)::integer);
+  elsif v_method='days_before_date' then
+    return (((p_rule->>'futureDate')::date-(p_rule->>'daysBefore')::integer)+time '23:59:59.999999') at time zone v_timezone;
+  elsif v_method='specific_time' then
+    return ((p_rule->>'dueDate')::date+(p_rule->>'clockTime')::time) at time zone v_timezone;
+  end if;
+  return ((p_rule->>'dueDate')::date+time '23:59:59.999999') at time zone v_timezone;
+end $$;
+
+create or replace function assert_fms_flow_publishable(p_flow_id uuid)
+returns void language plpgsql security definer set search_path=public as $$
+declare v_flow fms_flows; v_count integer; v_reached integer;
+begin
+  select * into v_flow from fms_flows where id=p_flow_id for update;
+  if v_flow.id is null or v_flow.status<>'draft' then raise exception 'Draft workflow not found' using errcode='23514'; end if;
+  select count(*) into v_count from fms_stages where fms_flow_id=p_flow_id;
+  if v_count=0 then raise exception 'Workflow cannot be empty' using errcode='23514'; end if;
+  if (select step_type from fms_stages where fms_flow_id=p_flow_id order by sort_order,id limit 1)<>'form' then raise exception 'The first workflow step must be a Form' using errcode='23514'; end if;
+  if (select form_template_id from fms_stages where fms_flow_id=p_flow_id order by sort_order,id limit 1) is null then raise exception 'The initial Form step needs a published Form for the workflow details' using errcode='23514'; end if;
+  if exists(select 1 from fms_stages where fms_flow_id=p_flow_id and step_type='end') then raise exception 'End nodes are no longer used; remove the End node and leave the final step unconnected' using errcode='23514'; end if;
+  if not exists(select 1 from fms_stages s where s.fms_flow_id=p_flow_id and s.step_type not in ('branch','parallel_start','end') and s.default_next_stage_id is null and cardinality(s.parallel_target_stage_ids)=0) then raise exception 'Workflow needs at least one completion step with no outgoing connection' using errcode='23514'; end if;
+  if exists(select 1 from fms_stages s where s.fms_flow_id=p_flow_id and not is_valid_fms_timing_rule(s.planned_time_rule)) then raise exception 'Every workflow step needs a valid timing rule' using errcode='23514'; end if;
+  if exists(select 1 from fms_stages s where s.fms_flow_id=p_flow_id and s.planned_time_rule->>'decisionMode'='yes_no' and (s.step_type in ('notification','branch','parallel_start','parallel_join','end') or s.id=(select first_stage.id from fms_stages first_stage where first_stage.fms_flow_id=p_flow_id order by first_stage.sort_order,first_stage.id limit 1))) then raise exception 'Yes or No decisions are only available on human steps after the initial Form' using errcode='23514'; end if;
+  if exists(select 1 from fms_stages s where s.fms_flow_id=p_flow_id and s.planned_time_rule ? 'conditional' and not exists(select 1 from fms_stages decision where decision.fms_flow_id=s.fms_flow_id and decision.stage_key=s.planned_time_rule#>>'{conditional,decisionStageKey}' and decision.sort_order<s.sort_order and decision.planned_time_rule->>'decisionMode'='yes_no')) then raise exception 'Conditional steps must reference an earlier Yes or No decision' using errcode='23514'; end if;
+  if exists(select 1 from fms_stages s where s.fms_flow_id=p_flow_id and ((s.step_type='parallel_start' and cardinality(s.parallel_target_stage_ids)=0) or (s.step_type='parallel_join' and (s.join_rule is null or s.join_rule='specific' and cardinality(s.join_required_stage_ids)=0)) or (s.step_type='approval' and s.completion_rule<>'manager_approval') or (s.completion_rule='all_doers' and not s.allow_multiple_doers))) then raise exception 'A workflow step is incomplete or incompatible' using errcode='23514'; end if;
+  if exists(select 1 from fms_stages s join form_templates f on f.id=s.form_template_id where s.fms_flow_id=p_flow_id and (f.tenant_id<>v_flow.tenant_id or f.lifecycle<>'published' or not f.is_active)) then raise exception 'Linked Forms must be exact active published versions from this tenant' using errcode='23514'; end if;
+  if exists(select 1 from fms_stages s join fms_flows target on target.id=s.split_to_flow_id where s.fms_flow_id=p_flow_id and (target.tenant_id<>v_flow.tenant_id or target.status<>'published' or not target.is_active)) then raise exception 'Linked workflows must be active published versions from this tenant' using errcode='23514'; end if;
+  if exists(select 1 from fms_stages s where s.fms_flow_id=p_flow_id and s.default_next_stage_id is not null and not exists(select 1 from fms_stages n where n.id=s.default_next_stage_id and n.fms_flow_id=p_flow_id)) then raise exception 'A next-step connection points outside this workflow' using errcode='23514'; end if;
+  if exists(select 1 from fms_stages s cross join lateral unnest(s.parallel_target_stage_ids||coalesce(s.join_required_stage_ids,'{}')) target(id) where s.fms_flow_id=p_flow_id and not exists(select 1 from fms_stages n where n.id=target.id and n.fms_flow_id=p_flow_id)) then raise exception 'A parallel connection points outside this workflow' using errcode='23514'; end if;
+  if exists(select 1 from fms_stages s where s.fms_flow_id=p_flow_id and s.step_type='branch' and ((select count(*) from fms_branch_rules r where r.fms_stage_id=s.id and r.condition_operator='default')<>1 or exists(select 1 from fms_branch_rules r where r.fms_stage_id=s.id and (r.next_stage_id is null or r.next_flow_id is not null)) or (select max(sort_order) from fms_branch_rules r where r.fms_stage_id=s.id and r.condition_operator='default')<>(select max(sort_order) from fms_branch_rules r where r.fms_stage_id=s.id))) then raise exception 'Decision steps require ordered routes to workflow steps and one final fallback route' using errcode='23514'; end if;
+  if exists(select 1 from fms_stage_assignees a join fms_stages s on s.id=a.fms_stage_id left join user_profiles primary_user on primary_user.id=a.user_profile_id left join user_profiles fallback_user on fallback_user.id=a.fallback_user_profile_id where s.fms_flow_id=p_flow_id and a.assignee_type='specific_user' and (primary_user.id is null or primary_user.tenant_id<>v_flow.tenant_id or primary_user.working_status='resigned' or (fallback_user.id is not null and (fallback_user.tenant_id<>v_flow.tenant_id or fallback_user.working_status='resigned' or fallback_user.department_id is distinct from primary_user.department_id)))) then raise exception 'Named assignees must be visible Users profiles in this tenant and fallback users must be in the primary user department' using errcode='23514'; end if;
+  if exists(select 1 from fms_stages s where s.fms_flow_id=p_flow_id and s.step_type not in ('notification','branch','parallel_start','parallel_join','end') and not exists(select 1 from fms_stage_assignees a join user_profiles u on u.id=a.user_profile_id where a.fms_stage_id=s.id and a.assignee_type='specific_user' and u.tenant_id=v_flow.tenant_id and u.working_status<>'resigned')) then raise exception 'Every human step needs a named primary assignee from Users' using errcode='23514'; end if;
+  with recursive walk(id,path,cycle) as (select id,array[id],false from fms_stages where fms_flow_id=p_flow_id and sort_order=(select min(sort_order) from fms_stages where fms_flow_id=p_flow_id) union all select edge.next_id,w.path||edge.next_id,edge.next_id=any(w.path) from walk w join fms_stages s on s.id=w.id cross join lateral (select s.default_next_stage_id next_id where s.default_next_stage_id is not null union select unnest(s.parallel_target_stage_ids) union select r.next_stage_id from fms_branch_rules r where r.fms_stage_id=s.id and r.next_stage_id is not null) edge where not w.cycle) select count(distinct id),coalesce(bool_or(cycle),false)::integer into v_reached,v_count from walk;
+  if v_reached<>(select count(*) from fms_stages where fms_flow_id=p_flow_id) then raise exception 'Workflow contains unreachable steps' using errcode='23514'; end if;
+  if v_count=1 then raise exception 'Workflow contains an unsupported cycle' using errcode='23514'; end if;
+end $$;
+
+create or replace function activate_fms_stage_internal(p_instance_id uuid,p_stage_id uuid,p_previous_instance_stage_id uuid,p_selected_user uuid default null,p_guard integer default 0)
+returns uuid language plpgsql security definer set search_path=public as $$
+declare v_instance fms_instances; v_stage fms_stages; v_instance_stage fms_instance_stages; v_ids uuid[]; v_item jsonb; v_rule fms_branch_rules; v_actual jsonb; v_target uuid; v_actor uuid; v_ready boolean; v_required integer; v_completed integer; v_revision_of uuid; v_activated_next boolean:=false; v_condition_key text; v_condition_expected text; v_condition_actual text;
+begin
+ if p_guard>100 then raise exception 'Automatic FMS transition limit exceeded' using errcode='54001'; end if;
+ select * into v_instance from fms_instances where id=p_instance_id for update; select * into v_stage from fms_stages where id=p_stage_id;
+ if v_instance.status not in ('active','overdue') or v_stage.fms_flow_id<>v_instance.fms_flow_id then raise exception 'Instance or stage is not activatable' using errcode='23514'; end if;
+ if v_stage.step_type='parallel_join' then if v_stage.join_rule='specific' then select cardinality(v_stage.join_required_stage_ids),count(*) into v_required,v_completed from fms_instance_stages where fms_instance_id=p_instance_id and fms_stage_id=any(v_stage.join_required_stage_ids) and status='completed'; else select count(*),count(*) filter(where s.status='completed') into v_required,v_completed from fms_stages d join fms_instance_stages s on s.fms_stage_id=d.id and s.fms_instance_id=p_instance_id where v_stage.id=any(d.parallel_target_stage_ids) or d.default_next_stage_id=v_stage.id; end if; v_ready=case v_stage.join_rule when 'any' then v_completed>0 else v_required>0 and v_completed=v_required end; if not v_ready then return null; end if; end if;
+ select * into v_instance_stage from fms_instance_stages where fms_instance_id=p_instance_id and fms_stage_id=p_stage_id order by created_at desc,id desc limit 1;
+ if v_instance_stage.id is not null and v_instance_stage.status<>'blocked' then return v_instance_stage.id; end if;
+ if v_instance_stage.status='blocked' then v_revision_of=v_instance_stage.id; end if;
+ v_condition_key:=v_stage.planned_time_rule#>>'{conditional,decisionStageKey}'; v_condition_expected:=lower(v_stage.planned_time_rule#>>'{conditional,outcome}');
+ if nullif(v_condition_key,'') is not null then
+   select lower(instance_stage.outcome) into v_condition_actual from fms_instance_stages instance_stage join fms_stages definition on definition.id=instance_stage.fms_stage_id where instance_stage.fms_instance_id=p_instance_id and definition.stage_key=v_condition_key and instance_stage.status='completed' order by instance_stage.actual_datetime desc nulls last limit 1;
+   if v_condition_actual is null then raise exception 'The earlier Yes or No decision has not been completed' using errcode='23514'; end if;
+   if v_condition_actual<>v_condition_expected then
+     insert into fms_instance_stages(fms_instance_id,fms_stage_id,status,assigned_to,planned_datetime,activated_at,actual_datetime,completed_by,previous_instance_stage_id,revision_of_id,outcome) values(p_instance_id,p_stage_id,'completed','{}',fms_stage_deadline_for_instance(v_stage.planned_time_rule,v_instance.tenant_id,p_instance_id),now(),now(),v_instance.started_by,p_previous_instance_stage_id,v_revision_of,'condition_skipped') returning * into v_instance_stage;
+     insert into fms_stage_logs(fms_instance_stage_id,actor_id,action,details) values(v_instance_stage.id,v_instance.started_by,'condition_skipped',jsonb_build_object('decisionStageKey',v_condition_key,'expected',v_condition_expected,'actual',v_condition_actual));
+     if v_stage.default_next_stage_id is not null then perform activate_fms_stage_internal(p_instance_id,v_stage.default_next_stage_id,v_instance_stage.id,null,p_guard+1); elsif not exists(select 1 from fms_instance_stages where fms_instance_id=p_instance_id and status in ('pending','in_progress','in_review','overdue')) then update fms_instances set status='completed',completed_at=now(),updated_at=now() where id=p_instance_id; end if;
+     return v_instance_stage.id;
+   end if;
+ end if;
+ v_ids=resolve_fms_stage_assignees(p_stage_id,p_instance_id,p_selected_user);
+ insert into fms_instance_stages(fms_instance_id,fms_stage_id,status,assigned_to,planned_datetime,activated_at,previous_instance_stage_id,revision_of_id) values(p_instance_id,p_stage_id,(case when v_stage.step_type in ('notification','branch','parallel_start','parallel_join','end') then 'in_progress' else case when v_stage.step_type='approval' then 'in_review' else 'in_progress' end end)::task_status,v_ids,fms_stage_deadline_for_instance(v_stage.planned_time_rule,v_instance.tenant_id,p_instance_id),now(),p_previous_instance_stage_id,v_revision_of) returning * into v_instance_stage;
+ foreach v_actor in array v_ids loop insert into fms_instance_stage_assignees(tenant_id,fms_instance_stage_id,user_profile_id,assigned_by) values(v_instance.tenant_id,v_instance_stage.id,v_actor,v_instance.started_by); end loop;
+ for v_item in select value from jsonb_array_elements(v_stage.checklist_definition) loop insert into fms_instance_checklist_items(tenant_id,fms_instance_stage_id,item_key,label,is_required,sort_order) values(v_instance.tenant_id,v_instance_stage.id,v_item->>'key',v_item->>'label',coalesce((v_item->>'required')::boolean,true),coalesce((v_item->>'sortOrder')::integer,0)); end loop;
+ insert into fms_stage_logs(fms_instance_stage_id,actor_id,action,details) values(v_instance_stage.id,v_instance.started_by,'activated',jsonb_build_object('guard',p_guard));
+ if v_stage.step_type='notification' then foreach v_actor in array case when cardinality(v_ids)>0 then v_ids else array[v_instance.started_by] end loop insert into notifications(tenant_id,user_profile_id,event_type,title,message,link_url,channel,delivered_status) values(v_instance.tenant_id,v_actor,'fms_stage_notification',coalesce(nullif(v_stage.notification_config->>'title',''),v_stage.name),coalesce(nullif(v_stage.notification_config->>'message',''),coalesce(v_stage.method,'FMS stage notification')),'/tasks?view=fms&instance='||p_instance_id,'in_app','delivered'); end loop;
+ elsif v_stage.step_type='branch' then for v_rule in select * from fms_branch_rules where fms_stage_id=v_stage.id order by sort_order loop if v_rule.source_type='outcome' then select to_jsonb(outcome) into v_actual from fms_instance_stages where id=p_previous_instance_stage_id; elsif v_rule.source_type='context' then v_actual=v_instance.context->v_rule.source_key; else select fs.data->v_rule.source_key into v_actual from form_submissions fs join fms_instance_stages prior on prior.form_submission_id=fs.id where prior.id=p_previous_instance_stage_id; end if; if fms_rule_matches(v_rule.condition_operator,v_rule.condition_value,v_actual) then v_target=v_rule.next_stage_id; update fms_instance_stages set branch_rule_id=v_rule.id where id=v_instance_stage.id; exit; end if; end loop; if v_target is null then raise exception 'No deterministic decision route matched' using errcode='23514'; end if;
+ elsif v_stage.step_type='parallel_start' then foreach v_target in array v_stage.parallel_target_stage_ids loop perform activate_fms_stage_internal(p_instance_id,v_target,v_instance_stage.id,null,p_guard+1); v_activated_next=true; end loop;
+ elsif v_stage.step_type='end' then update fms_instances set status='completed',completed_at=now(),updated_at=now() where id=p_instance_id; end if;
+ if v_stage.step_type in ('notification','branch','parallel_start','parallel_join','end') then update fms_instance_stages set status='completed',actual_datetime=now(),completed_by=v_instance.started_by where id=v_instance_stage.id; insert into fms_stage_logs(fms_instance_stage_id,actor_id,action,details) values(v_instance_stage.id,v_instance.started_by,case when v_stage.step_type='branch' then 'branch_taken' else 'automatic_completed' end,'{}'); if v_stage.step_type='branch' and v_target is not null then perform activate_fms_stage_internal(p_instance_id,v_target,v_instance_stage.id,null,p_guard+1); v_activated_next=true; elsif v_stage.step_type in ('notification','parallel_join') and v_stage.default_next_stage_id is not null then perform activate_fms_stage_internal(p_instance_id,v_stage.default_next_stage_id,v_instance_stage.id,null,p_guard+1); v_activated_next=true; end if; if not v_activated_next and v_stage.step_type<>'end' and not exists(select 1 from fms_instance_stages where fms_instance_id=p_instance_id and status in ('pending','in_progress','in_review','overdue')) then update fms_instances set status='completed',completed_at=now(),updated_at=now() where id=p_instance_id; end if; end if;
+ return v_instance_stage.id;
+end $$;
+
+create or replace function complete_fms_stage_with_audit(p_instance_stage_id uuid,p_outcome text default null,p_remark text default null,p_checklist jsonb default '{}',p_next_assignee_id uuid default null)
+returns void language plpgsql security definer set search_path=public as $$
+declare v_actor user_profiles; v_instance_stage fms_instance_stages; v_instance fms_instances; v_stage fms_stages; v_item record; v_satisfied boolean; v_next uuid; v_child uuid; v_outcome text:=nullif(btrim(p_outcome),'');
+begin
+ select * into v_actor from current_profile(); select * into v_instance_stage from fms_instance_stages where id=p_instance_stage_id for update; select * into v_instance from fms_instances where id=v_instance_stage.fms_instance_id for update; select * into v_stage from fms_stages where id=v_instance_stage.fms_stage_id;
+ if v_actor.id is null or not current_profile_is_active() or v_instance.status not in ('active','overdue') or v_instance_stage.status not in ('pending','in_progress','in_review','overdue') then raise exception 'Stage is not actionable' using errcode='23514'; end if;
+ if not (v_actor.id=any(v_instance_stage.assigned_to) or (v_actor.user_role in ('super_admin','admin')) or (v_actor.user_role='manager' and v_instance.branch_id=v_actor.branch_id)) then raise exception 'Stage completion denied' using errcode='42501'; end if;
+ if v_stage.step_type='approval' and v_actor.user_role not in ('super_admin','admin','manager') then raise exception 'Approval requires manager or administrator authority' using errcode='42501'; end if;
+ if v_stage.planned_time_rule->>'decisionMode'='yes_no' then v_outcome:=lower(v_outcome); if v_outcome not in ('yes','no') then raise exception 'A Yes or No decision is required' using errcode='23514'; end if; end if;
+ if jsonb_typeof(p_checklist)<>'object' then raise exception 'Checklist payload must be an object' using errcode='22023'; end if;
+ for v_item in select * from fms_instance_checklist_items where fms_instance_stage_id=p_instance_stage_id for update loop if coalesce((p_checklist->>v_item.item_key)::boolean,false) then update fms_instance_checklist_items set is_completed=true,completed_by=v_actor.id,completed_at=now() where id=v_item.id; end if; end loop;
+ if v_stage.requires_remark and nullif(btrim(p_remark),'') is null then raise exception 'A completion remark is required' using errcode='23514'; end if;
+ if v_stage.requires_upload and not exists(select 1 from fms_evidence where fms_instance_stage_id=p_instance_stage_id and removed_at is null) then raise exception 'Required evidence upload is missing' using errcode='23514'; end if;
+ if exists(select 1 from fms_instance_checklist_items where fms_instance_stage_id=p_instance_stage_id and is_required and not is_completed) then raise exception 'Required checklist items are incomplete' using errcode='23514'; end if;
+ if v_stage.id=(select first_stage.id from fms_stages first_stage where first_stage.fms_flow_id=v_stage.fms_flow_id order by first_stage.sort_order,first_stage.id limit 1) and v_stage.form_template_id is not null and not exists(select 1 from form_submissions where form_template_id=v_stage.form_template_id and linked_module='fms_stage' and linked_record_id=p_instance_stage_id) then raise exception 'The initial details form submission is required' using errcode='23514'; end if;
+ if v_stage.requires_next_doer_handoff and p_next_assignee_id is null then raise exception 'Next-stage assignee selection is required' using errcode='23514'; end if;
+ if not v_actor.id=any(v_instance_stage.assigned_to) then insert into fms_instance_stage_assignees(tenant_id,fms_instance_stage_id,user_profile_id,assigned_by,status,claimed_at,completed_at,outcome,remark) values(v_instance.tenant_id,p_instance_stage_id,v_actor.id,v_actor.id,'completed',now(),now(),left(v_outcome,500),left(p_remark,4000)); update fms_instance_stages set assigned_to=array_append(assigned_to,v_actor.id) where id=p_instance_stage_id; else update fms_instance_stage_assignees set status='completed',completed_at=now(),outcome=left(v_outcome,500),remark=left(p_remark,4000) where fms_instance_stage_id=p_instance_stage_id and user_profile_id=v_actor.id and is_active; end if;
+ select case v_stage.completion_rule when 'all_doers' then count(*)>0 and bool_and(status='completed') when 'any_doer' then bool_or(status='completed') else v_actor.user_role in ('super_admin','admin','manager') end into v_satisfied from fms_instance_stage_assignees where fms_instance_stage_id=p_instance_stage_id and is_active;
+ insert into fms_stage_logs(fms_instance_stage_id,actor_id,action,details) values(p_instance_stage_id,v_actor.id,'actor_completed',jsonb_build_object('outcome',left(coalesce(v_outcome,''),500),'remark',left(coalesce(p_remark,''),4000))); if not v_satisfied then return; end if;
+ update fms_instance_stages set status='completed',actual_datetime=now(),completed_by=v_actor.id,remark=nullif(btrim(p_remark),''),outcome=v_outcome where id=p_instance_stage_id;
+ if v_stage.split_to_flow_id is not null and not exists(select 1 from fms_instances where parent_instance_id=v_instance.id and fms_flow_id=v_stage.split_to_flow_id) then select started.instance_id into v_child from start_fms_instance_with_audit(v_stage.split_to_flow_id,v_instance.title,v_instance.priority,v_instance.context,v_instance.branch_id,v_instance.department_id,p_next_assignee_id) started; update fms_instances set parent_instance_id=v_instance.id where id=v_child; end if;
+ v_next=v_stage.default_next_stage_id; if v_next is not null then perform activate_fms_stage_internal(v_instance.id,v_next,p_instance_stage_id,p_next_assignee_id,0); end if;
+ if v_next is null and v_stage.step_type<>'end' and not exists(select 1 from fms_instance_stages where fms_instance_id=v_instance.id and status in ('pending','in_progress','in_review','overdue')) then update fms_instances set status='completed',completed_at=now(),updated_at=now() where id=v_instance.id; end if;
+ insert into audit_logs(tenant_id,actor_user_id,action,module,record_id,new_value) values(v_instance.tenant_id,v_actor.id,'fms_stage_completed','fms_instance_stages',p_instance_stage_id,jsonb_build_object('outcome',left(coalesce(v_outcome,''),500)));
+end $$;
+
+alter function is_valid_fms_timing_rule(jsonb) owner to postgres;
+alter function fms_stage_deadline_for_instance(jsonb,uuid,uuid) owner to postgres;
+alter function assert_fms_flow_publishable(uuid) owner to postgres;
+alter function activate_fms_stage_internal(uuid,uuid,uuid,uuid,integer) owner to postgres;
+alter function complete_fms_stage_with_audit(uuid,text,text,jsonb,uuid) owner to postgres;
+revoke all on function is_valid_fms_timing_rule(jsonb),fms_stage_deadline_for_instance(jsonb,uuid,uuid),assert_fms_flow_publishable(uuid),activate_fms_stage_internal(uuid,uuid,uuid,uuid,integer),complete_fms_stage_with_audit(uuid,text,text,jsonb,uuid) from public,anon,authenticated,service_role;
+grant execute on function complete_fms_stage_with_audit(uuid,text,text,jsonb,uuid) to authenticated;
+notify pgrst,'reload schema';

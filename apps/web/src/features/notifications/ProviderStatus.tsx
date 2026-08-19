@@ -1,0 +1,6 @@
+import { Bell, HelpCircle, Mail, MessageCircle, Radio, Smartphone } from "lucide-react";
+import type { ProviderAvailability } from "./types";
+
+const icons: Record<string, typeof Bell> = { in_app: Bell, email: Mail, whatsapp: MessageCircle, sms: Smartphone, push: Radio };
+const text = (value: unknown, fallback: string): string => typeof value === "string" && value.trim() ? value : fallback;
+export function ProviderStatus({ providers }: { providers: readonly ProviderAvailability[] }) { return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">{providers.map((provider, index) => { const channel = text(provider.channel, "unknown"); const Icon = icons[channel] ?? HelpCircle; return <article className="rounded-xl border border-task-border bg-task-bg p-4" key={`${channel}-${index}`}><div className="flex items-center gap-2"><Icon aria-hidden className="size-4 text-task-accent"/><h3 className="font-semibold capitalize text-task-text">{channel.replaceAll("_", " ")}</h3></div><p className={provider.is_available ? "mt-3 text-sm font-semibold text-success" : "mt-3 text-sm font-semibold text-task-text-muted"}>{provider.is_available ? "Available" : "Unavailable"}</p><p className="mt-1 text-xs text-task-text-muted">{text(provider.status_reason, "Provider status is unavailable.")}</p></article>; })}</div>; }

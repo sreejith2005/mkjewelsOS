@@ -1,0 +1,12 @@
+import type {ReactNode} from "react";
+import {AlertCircle,RefreshCw} from "lucide-react";
+import {Button} from "@/components/ui";
+import {cn} from "@/lib/utils";
+
+export function PageSurface({children}: {children:ReactNode}){return <section className="-m-4 min-h-[calc(100dvh-7.875rem)] bg-task-muted p-4 text-task-text sm:-m-6 sm:p-6 md:min-h-[calc(100vh-4rem)]">{children}</section>;}
+export function PageHeading({title,description,actions}: {title:string;description:string;actions?:ReactNode}){return <header className="mb-5 flex flex-col gap-3 border-b border-task-border pb-5 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="text-2xl font-semibold tracking-tight">{title}</h1><p className="mt-1 text-sm text-task-text-muted">{description}</p></div>{actions}</header>;}
+export function Panel({title,description,children,className}: {title:string;description?:string;children:ReactNode;className?:string}){return <section className={cn("rounded-xl border border-task-border bg-task-bg",className)}><header className="border-b border-task-border px-4 py-3"><h2 className="text-sm font-semibold">{title}</h2>{description?<p className="mt-0.5 text-xs text-task-text-muted">{description}</p>:null}</header><div className="p-4">{children}</div></section>;}
+export function LoadingPanels({count=4}: {count?:number}){return <div aria-label="Loading dashboard" className="grid gap-3 sm:grid-cols-2">{Array.from({length:count},(_,index)=><div className="h-32 animate-pulse rounded-xl border border-task-border bg-task-bg" key={index}/>)}</div>;}
+export function ErrorPanel({message,onRetry}: {message:string;onRetry:()=>void}){return <div role="alert" className="rounded-xl border border-task-overdue/40 bg-task-bg p-5"><div className="flex items-start gap-3"><AlertCircle className="mt-0.5 size-5 text-task-overdue"/><div className="flex-1"><p className="font-semibold">Could not load this page</p><p className="mt-1 text-sm text-task-text-muted">{message}</p><Button className="mt-4 border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={onRetry} variant="secondary"><RefreshCw/>Retry</Button></div></div></div>;}
+export function StatusDot({tone="neutral"}: {tone?:"success"|"warning"|"danger"|"neutral"}){return <span className={cn("size-2 shrink-0 rounded-full",tone==="success"?"bg-success":tone==="warning"?"bg-warning":tone==="danger"?"bg-task-overdue":"bg-task-text-muted")}/>;}
+export function EmptyMessage({children}: {children:ReactNode}){return <p className="py-5 text-center text-sm text-task-text-muted">{children}</p>;}
