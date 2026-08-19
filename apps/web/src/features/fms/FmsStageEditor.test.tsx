@@ -42,22 +42,12 @@ function DecisionHarness() {
   return <><button onClick={() => setSelected(1)}>Edit decision</button><button onClick={() => setSelected(2)}>Edit follow up</button><FmsStageEditor data={data} flowBranchId="b1" onChange={(value) => setStages((current) => current.map((item, index) => index === selected ? value : item))} onDelete={() => undefined} stage={stages[selected]!} stages={stages} /></>;
 }
 
-describe("FMS stage assignment", () => {
-  it("keeps the department selected and exposes primary and same-department fallback people", async () => {
-    const user = userEvent.setup();
+describe("FMS stage editor", () => {
+  it("keeps assignment controls out of each individual stage", () => {
     render(<Harness />);
-
-    await user.selectOptions(screen.getByLabelText("Department"), "d1");
-    expect(screen.getByText("2 people available from Users for this department.")).toBeTruthy();
-
-    const primary = screen.getByLabelText("Primary assignee");
-    expect(primary.textContent).toContain("Primary Person");
-    expect(primary.textContent).toContain("Fallback Person");
-    await user.selectOptions(primary, "u1");
-
-    const fallback = screen.getByLabelText("Fallback assignee");
-    expect(fallback.textContent).toContain("Fallback Person");
-    expect(fallback.textContent).not.toContain("Primary Person");
+    expect(screen.queryByLabelText("Department")).toBeNull();
+    expect(screen.queryByLabelText("Primary assignee")).toBeNull();
+    expect(screen.queryByLabelText("Fallback assignee")).toBeNull();
   });
   it("offers all supported timing methods without minute-based SLA fields", async () => {
     const user = userEvent.setup();
@@ -92,6 +82,12 @@ describe("FMS stage assignment", () => {
     await user.click(conditional);
     expect((screen.getByLabelText("Condition field") as HTMLSelectElement).value).toBe("status");
     expect((screen.getByLabelText("Status value") as HTMLSelectElement).value).toBe("follow_up");
+    expect(screen.getByLabelText("Status value").textContent).toContain("Busy");
+    expect(screen.getByLabelText("Status value").textContent).toContain("Not Interested");
+    expect(screen.getByLabelText("Condition operator").textContent).toContain("not equals");
+    expect(screen.getByLabelText("Condition operator").textContent).toContain("not contains");
+    await user.selectOptions(screen.getByLabelText("Condition operator"), "not_contains");
+    expect((screen.getByLabelText("Condition operator") as HTMLSelectElement).value).toBe("not_contains");
     await user.selectOptions(screen.getByLabelText("Condition field"), "decision");
     expect((screen.getByLabelText("Earlier decision") as HTMLSelectElement).value).toBe("decision");
   });

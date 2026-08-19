@@ -12,7 +12,7 @@ const ZOOM_STEP = 0.05;
 const WORLD_SIZE = 5000;
 
 const appearance: Record<FmsStageDefinition["type"], { Icon: typeof CheckSquare; label: string; className: string }> = {
-  task: { Icon: CheckSquare, label: "Task", className: "border-gold/40 bg-gold/10 text-gold" },
+  task: { Icon: CheckSquare, label: "Step", className: "border-gold/40 bg-gold/10 text-gold" },
   form: { Icon: FileText, label: "Form", className: "border-success/40 bg-success/10 text-success" },
   approval: { Icon: ShieldCheck, label: "Approval", className: "border-gold/50 bg-gold/15 text-gold" },
   branch: { Icon: GitBranch, label: "Decision", className: "border-danger/40 bg-danger/10 text-danger" },

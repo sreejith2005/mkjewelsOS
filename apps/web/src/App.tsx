@@ -254,26 +254,18 @@ function AppShell() {
   const [appsOpen, setAppsOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [sectionControls, setSectionControls] = useState(DEFAULT_SECTION_CONTROLS);
-  const [sectionControlsError, setSectionControlsError] = useState(false);
-  const [sectionControlsLoading, setSectionControlsLoading] = useState(true);
   useEffect(() => {
     let active = true;
-    setSectionControlsLoading(true); setSectionControlsError(false);
     void supabase.rpc("get_section_availability").then(({ data, error }) => {
       if (!active) return;
-      if (error) { setSectionControlsError(true); setSectionControlsLoading(false); return; }
-      try { setSectionControls(validateSectionControls(data)); } catch { setSectionControlsError(true); }
-      setSectionControlsLoading(false);
+      // Maintenance controls are a convenience overlay, never an access-control
+      // dependency. A stale deployment or a transient RPC failure must not stop a
+      // signed-in employee from using otherwise authorized sections.
+      if (error) { setSectionControls(DEFAULT_SECTION_CONTROLS); return; }
+      try { setSectionControls(validateSectionControls(data)); } catch { setSectionControls(DEFAULT_SECTION_CONTROLS); }
     });
     return () => { active = false; };
   }, [profile?.id]);
-  useEffect(() => {
-    if (!profile || path !== "/" || preferences.default_landing_page !== "dashboard") return;
-    const key = `jewelos-default-landing-${profile.id}`;
-    if (window.sessionStorage.getItem(key)) return;
-    window.sessionStorage.setItem(key, "applied");
-    navigate("/dashboard");
-  }, [navigate, path, preferences.default_landing_page, profile]);
   useEffect(() => {
     document.documentElement.dataset.tableDensity = preferences.table_density;
     return () => { delete document.documentElement.dataset.tableDensity; };
@@ -291,8 +283,6 @@ function AppShell() {
     return description ? [{ ...item, description }] : [];
   }), [nav]);
   if (!profile) return null;
-  if (sectionControlsLoading) return <main className="flex min-h-screen items-center justify-center text-gold">Checking section availability…</main>;
-  if (sectionControlsError) return <main className="flex min-h-screen items-center justify-center p-5 text-center text-champagne">We could not verify section availability. Refresh the page and try again.</main>;
   const requestedPage = getPageForPath(path) ?? "home";
   const allowed = IMPLEMENTED_PAGES.has(requestedPage) && canAccessPage(profile.user_role, requestedPage);
   const currentPage: PageId = allowed ? requestedPage : "dashboard";
@@ -335,7 +325,7 @@ function AppShell() {
       onThemeChange={setTheme}
       fullBleed={FULL_WIDTH_PAGES.has(currentPage)}
     >
-      <LazyPageErrorBoundary onNavigate={navigate} resetKey={currentPage}><Suspense fallback={<div className="flex min-h-48 items-center justify-center text-gold">Loading…</div>}>{pageContent}</Suspense></LazyPageErrorBoundary>
+      <LazyPageErrorBoundary onNavigate={navigate} resetKey={path}><Suspense fallback={<div className="flex min-h-48 items-center justify-center text-gold">Loading…</div>}>{pageContent}</Suspense></LazyPageErrorBoundary>
     </ApplicationShell>
   );
 }

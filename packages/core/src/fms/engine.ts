@@ -1,5 +1,5 @@
 import type { UserRole } from "../roleMenu";
-import { FMS_ASSIGNEE_TYPES, FMS_BRANCH_OPERATORS, FMS_STAGE_TYPES, type FmsAssignmentCandidate, type FmsAssigneeRule, type FmsBranchRule, type FmsChecklistItemDefinition, type FmsFlowDefinition, type FmsInstanceStatus, type FmsStageActorState, type FmsStageDefinition, type FmsStageStatus, type FmsTimingMethod, type FmsTransitionCapability, type FmsValidationIssue } from "./types";
+import { FMS_ASSIGNEE_TYPES, FMS_BRANCH_OPERATORS, FMS_STAGE_TYPES, FMS_STATUS_CONDITION_OPERATORS, type FmsAssignmentCandidate, type FmsAssigneeRule, type FmsBranchRule, type FmsChecklistItemDefinition, type FmsFlowDefinition, type FmsInstanceStatus, type FmsStageActorState, type FmsStageDefinition, type FmsStageStatus, type FmsTimingMethod, type FmsTransitionCapability, type FmsValidationIssue } from "./types";
 
 const KEY = /^[a-z][a-z0-9_]{0,63}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -84,7 +84,7 @@ export function validateFmsDefinition(raw: FmsFlowDefinition): readonly FmsValid
     if (stage.sla.decisionMode === "yes_no" && (AUTO.has(stage.type) || stageIndex === 0)) add("invalid_decision", "Yes/No decisions are available on human steps after the initial Form");
     if (stage.sla.conditional) {
       if ("field" in stage.sla.conditional) {
-        if (stage.sla.conditional.field !== "status" || stage.sla.conditional.operator !== "equals" || !text(stage.sla.conditional.value)) add("invalid_conditional", "A Status condition needs an equals value");
+        if (stage.sla.conditional.field !== "status" || !FMS_STATUS_CONDITION_OPERATORS.includes(stage.sla.conditional.operator) || !text(stage.sla.conditional.value)) add("invalid_conditional", "A Status condition needs a supported operator and value");
       } else {
         const decision = byKey.get(stage.sla.conditional.decisionStageKey);
         if (!decision || decision.order >= stage.order || decision.sla.decisionMode !== "yes_no") add("invalid_conditional", "A condition must reference an earlier Yes/No decision step");

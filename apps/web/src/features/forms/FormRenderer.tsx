@@ -7,7 +7,7 @@ const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: []
 const NUMBER_TYPES = new Set(["number", "currency", "rating"]);
 const SELECT_TYPES = new Set(["select", "user_dropdown", "branch_dropdown", "department_dropdown"]);
 
-export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initialAnswers = {}, onSubmit, preview = false, readOnly = false }: { definition: FormTemplateDefinition; dynamicOptions?: DynamicOptions; initialAnswers?: FormAnswers; onSubmit?: (answers: FormAnswers) => Promise<void>; preview?: boolean; readOnly?: boolean }) {
+export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initialAnswers = {}, onSubmit, preview = false, readOnly = false, workflowHint = false }: { definition: FormTemplateDefinition; dynamicOptions?: DynamicOptions; initialAnswers?: FormAnswers; onSubmit?: (answers: FormAnswers) => Promise<void>; preview?: boolean; readOnly?: boolean; workflowHint?: boolean }) {
   const [answers, setAnswers] = useState<Record<string, FormAnswer>>(() => Object.fromEntries(Object.entries(initialAnswers).filter((entry): entry is [string, FormAnswer] => entry[1] !== null && entry[1] !== undefined)));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -33,6 +33,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
   };
 
   return <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
+    {workflowHint && !preview ? <Notice><span className="font-semibold text-white">Workflow form?</span> If this form is linked to an FMS process, submit once and the next step starts automatically for the right person.</Notice> : null}
     {preview ? <Notice>Preview mode — nothing is saved.</Notice> : null}
     {error ? <div aria-live="assertive" role="alert"><Notice tone="danger">{error}</Notice></div> : null}
     {success ? <Notice tone="success">Form submitted successfully.</Notice> : null}
@@ -54,6 +55,6 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
           : <input className="field" disabled={disabled} id={field.key} onChange={onText} placeholder={field.placeholder} ref={register(field.key)} step={NUMBER_TYPES.has(field.type) ? "any" : undefined} type={inputType} value={typeof value === "string" || typeof value === "number" ? value : ""} />}
       </label>;
     })}
-    {!readOnly && definition.fields.length > 0 ? <Button disabled={busy || preview || success} type="submit">{busy ? "Submitting..." : "Submit form"}</Button> : null}
+    {!readOnly && definition.fields.length > 0 ? <Button className="w-full sm:w-auto" disabled={busy || preview || success} type="submit">{busy ? "Submitting..." : "Submit form"}</Button> : null}
   </form>;
 }
