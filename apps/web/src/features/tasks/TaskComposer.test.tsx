@@ -80,6 +80,7 @@ describe("TaskComposer selector panels", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(onSaveRecurring).toHaveBeenCalledTimes(1);
+    expect(onSaveRecurring).toHaveBeenCalledWith(expect.objectContaining({ initial_planned_datetime: "2026-12-01T03:30:00.000Z" }));
     expect(toastSuccess).toHaveBeenCalledWith("Recurring task scheduled", expect.objectContaining({ description: expect.stringContaining("Daily") }));
   });
 });
