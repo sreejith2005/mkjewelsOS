@@ -54,7 +54,7 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
   const [saving, setSaving] = useState(false);
 
   const canSelectBranch = profile.user_role === "admin" || profile.user_role === "super_admin";
-  const scopedDepartments = useMemo(() => data.departments.filter((department) => !department.branch_id || department.branch_id === branchId), [branchId, data.departments]);
+  const scopedDepartments = useMemo(() => data.departments.filter((department) => department.branch_id === branchId), [branchId, data.departments]);
   const branchNames = useMemo(() => new Map(data.branches.map((branch) => [branch.id, branch.name])), [data.branches]);
   const departmentNames = useMemo(() => new Map(data.departments.map((department) => [department.id, department.name])), [data.departments]);
   const priorityOptions = useMemo(() => data.priorities.flatMap((option) => option.value === "high" || option.value === "medium" || option.value === "low"
