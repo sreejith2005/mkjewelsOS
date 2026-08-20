@@ -118,7 +118,7 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
         const recurrenceRule = repeatSchedule === "daily" ? "FREQ=DAILY"
           : repeatSchedule === "weekly" ? `FREQ=WEEKLY;BYDAY=${repeatDays.map((day) => day.slice(0, 2).toUpperCase()).join(",")}`
             : "FREQ=MONTHLY";
-        await onSaveRecurring({ title: title.trim(), description: description.trim(), recurrence_rule: `${recurrenceRule}${repeatEndDate ? `;UNTIL=${repeatEndDate.replaceAll("-", "")}T235959Z` : ""}`, planned_time: planned.slice(11, 16), priority, branch_id: branchId, department_id: departmentId, default_assignee_type: "specific_user", default_assignee_user_id: participants.doerIds[0], default_assignee_role: "", checklist_items: [], requires_upload: false, requires_remark: false, requires_form: Boolean(formTemplateId), form_template_id: formTemplateId, is_active: true });
+        await onSaveRecurring({ title: title.trim(), description: description.trim(), recurrence_rule: `${recurrenceRule}${repeatEndDate ? `;UNTIL=${repeatEndDate.replaceAll("-", "")}T235959Z` : ""}`, planned_time: planned.slice(11, 16), priority, branch_id: branchId, default_assignee_type: "specific_user", default_assignee_user_id: participants.doerIds[0], default_assignee_role: "", checklist_items: [], requires_upload: false, requires_remark: false, requires_form: Boolean(formTemplateId), form_template_id: formTemplateId, is_active: true });
         onCreated();
         return;
       }
