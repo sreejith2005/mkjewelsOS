@@ -35,7 +35,6 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
   const [description, setDescription] = useState("");
   const [planned, setPlanned] = useState("");
   const [priority, setPriority] = useState<Enums<"task_priority">>("high");
-  const [categoryId, setCategoryId] = useState(data.categories[0]?.id ?? "");
   const [branchId, setBranchId] = useState(profile.branch_id);
   const [departmentId, setDepartmentId] = useState("");
   const [doers, setDoers] = useState<string[]>([]);
@@ -72,10 +71,6 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
     if (!priorityOptions.some((option) => option.value === priority)) setPriority(priorityOptions[0]?.value ?? "high");
   }, [priority, priorityOptions]);
 
-  useEffect(() => {
-    if (!categoryId && data.categories[0]?.id) setCategoryId(data.categories[0].id);
-  }, [categoryId, data.categories]);
-
   const togglePanel = (next: Exclude<Panel, null>) => setPanel((current) => current === next ? null : next);
   const updateDoers = (nextDoers: string[]) => {
     setDoers(nextDoers);
@@ -105,7 +100,6 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
     if (!branchId || !departmentId) return setError("Choose a valid branch and department.");
     if (doers.length === 0) return setError("Select at least one user.");
     if (!planned) return setError("Choose a due date and time.");
-    if (!categoryId) return setError("No active task category is configured.");
     if (repeat && repeatSchedule === "weekly" && repeatDays.length === 0) return setError("Select at least one repeat day.");
     setSaving(true);
     try {
@@ -114,7 +108,7 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
         const recurrenceRule = repeatSchedule === "daily" ? "FREQ=DAILY"
           : repeatSchedule === "weekly" ? `FREQ=WEEKLY;BYDAY=${repeatDays.map((day) => day.slice(0, 2).toUpperCase()).join(",")}`
             : "FREQ=MONTHLY";
-        await onSaveRecurring({ title: title.trim(), description: description.trim(), recurrence_rule: `${recurrenceRule}${repeatEndDate ? `;UNTIL=${repeatEndDate.replaceAll("-", "")}T235959Z` : ""}`, planned_time: planned.slice(11, 16), priority, category_id: categoryId, branch_id: branchId, department_id: departmentId, default_assignee_type: "specific_user", default_assignee_user_id: participants.doerIds[0], default_assignee_role: "", checklist_items: [], requires_upload: false, requires_remark: false, requires_form: Boolean(formTemplateId), form_template_id: formTemplateId, is_active: true });
+        await onSaveRecurring({ title: title.trim(), description: description.trim(), recurrence_rule: `${recurrenceRule}${repeatEndDate ? `;UNTIL=${repeatEndDate.replaceAll("-", "")}T235959Z` : ""}`, planned_time: planned.slice(11, 16), priority, branch_id: branchId, department_id: departmentId, default_assignee_type: "specific_user", default_assignee_user_id: participants.doerIds[0], default_assignee_role: "", checklist_items: [], requires_upload: false, requires_remark: false, requires_form: Boolean(formTemplateId), form_template_id: formTemplateId, is_active: true });
         onCreated();
         return;
       }
@@ -125,7 +119,6 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
         priority,
         branch_id: branchId,
         department_id: departmentId,
-        category_id: categoryId,
         requires_upload: false,
         requires_remark: false,
         requires_form: Boolean(formTemplateId),

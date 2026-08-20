@@ -9,7 +9,6 @@ export type ImportedTaskRow = Readonly<{
   description?: string;
   due_at?: string;
   priority?: string;
-  category?: string;
   branch?: string;
   department?: string;
   checklist: readonly string[];
@@ -69,7 +68,6 @@ export function normalizeImportRows(parsed: ParsedTaskCsv, mapping: TaskImportMa
       ...(value(row, mapping.description) ? { description: value(row, mapping.description) } : {}),
       ...(value(row, mapping.dueAt) ? { due_at: value(row, mapping.dueAt) } : {}),
       ...(value(row, mapping.priority) ? { priority: value(row, mapping.priority) } : {}),
-      ...(value(row, mapping.category) ? { category: value(row, mapping.category) } : {}),
       ...(value(row, mapping.branch) ? { branch: value(row, mapping.branch) } : {}),
       ...(value(row, mapping.department) ? { department: value(row, mapping.department) } : {}),
       checklist: checklistItem ? [checklistItem] : [],
