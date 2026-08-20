@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { ArrowLeft, CalendarDays, Check, FileText, Flag, Paperclip, Rocket, Users, UserRoundCheck } from "lucide-react";
 import { normalizeTaskParticipants, type Enums, type Json } from "@jewelos/core";
 import type { UserProfile } from "@/types";
@@ -10,6 +10,13 @@ import { UserPicker } from "./UserPicker";
 
 type Panel = "users" | "due" | "priority" | "form" | "watchers" | null;
 type ComposerMode = "manual" | "template";
+
+function TaskSelector({ children, id, open, panel, side = "left" }: { children: ReactNode; id: Exclude<Panel, null>; open: boolean; panel: ReactNode; side?: "left" | "right" }) {
+  return <div className="relative min-w-0" data-testid={`task-selector-${id}`}>
+    {children}
+    {open ? <div className={cn("absolute top-full z-20 mt-2 max-h-[min(26rem,50dvh)] w-[calc(200%+0.5rem)] overflow-y-auto rounded-xl border border-task-border bg-task-bg p-3 shadow-lg", side === "right" ? "right-0" : "left-0")} data-testid={`task-panel-${id}`}>{panel}</div> : null}
+  </div>;
+}
 
 export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSave, onUploadAttachment, onSaveRecurring, onUseTemplate, profile }: {
   data: TaskReferenceData;
@@ -148,6 +155,18 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
     }
   };
 
+  const usersPanel = <div className="flex flex-col gap-3">
+    <div className="grid gap-3 sm:grid-cols-2">
+      <label><span className="mb-1 block text-xs font-semibold text-task-text">Branch{canSelectBranch ? "" : " (fixed)"}</span><select className="task-field" disabled={!canSelectBranch} onChange={(event) => changeBranch(event.target.value)} value={branchId}><option value="">Select branch</option>{data.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label>
+      <label><span className="mb-1 block text-xs font-semibold text-task-text">Department</span><select className="task-field" onChange={(event) => changeDepartment(event.target.value)} value={departmentId}><option value="">Select department first</option>{scopedDepartments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select></label>
+    </div>
+    {!departmentId ? <Notice tone="task">Select a department to see its active users.</Notice> : eligibleDoers.length === 0 ? <Notice tone="task">No active users are assigned to this branch and department.</Notice> : <UserPicker branchNames={branchNames} departmentNames={departmentNames} disabledIds={[]} label="Users in this department" onChange={updateDoers} selectedIds={doers} users={eligibleDoers} />}
+  </div>;
+  const duePanel = <label><span className="mb-1 block text-xs font-semibold text-task-text">Due date and time</span><input className="task-field" min={new Date().toISOString().slice(0, 16)} onChange={(event) => setPlanned(event.target.value)} type="datetime-local" value={planned} /></label>;
+  const priorityPanel = <fieldset className="grid grid-cols-3 gap-2"><legend className="sr-only">Priority</legend>{priorityOptions.map((option) => <button className={cn("min-h-11 rounded-lg border text-sm", priority === option.value ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border text-task-text-muted")} key={option.id} onClick={() => { setPriority(option.value); setPanel(null); }} type="button">{priority === option.value ? <Check className="mr-1 inline size-4" /> : null}{option.label}</button>)}</fieldset>;
+  const formPanel = <div><label><span className="mb-1 block text-xs font-semibold text-task-text">Required form</span><select className="task-field" onChange={(event) => { setFormTemplateId(event.target.value); setPanel(null); }} value={formTemplateId}><option value="">No form required</option>{data.forms.map((form) => <option key={form.id} value={form.id}>{form.name}</option>)}</select></label><p className="mt-2 text-xs text-task-text-muted">The selected form must be completed before this task can be finished.</p></div>;
+  const watchersPanel = <UserPicker branchNames={branchNames} departmentNames={departmentNames} disabledIds={doers} label="In Loop · read only" onChange={setWatchers} selectedIds={watchers} users={eligibleWatchers} />;
+
   return (
     <Modal onClose={onClose} title="Assign New Task" tone="light" wide>
       {error ? <div className="mb-4"><Notice tone="danger">{error}</Notice></div> : null}
@@ -164,38 +183,13 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
           </label>
 
           <div className="grid grid-cols-2 gap-2 border-b border-task-border py-3">
-            <ChipSelector active={panel === "users"} Icon={Users} label="Users" onClick={() => togglePanel("users")} summary={doers.length ? `${doers.length} user${doers.length === 1 ? "" : "s"}` : undefined} />
-            <ChipSelector active={panel === "due"} Icon={CalendarDays} label="Due Date" onClick={() => togglePanel("due")} summary={planned ? new Date(planned).toLocaleString("en-IN", { day: "numeric", hour: "numeric", minute: "2-digit", month: "short" }) : undefined} />
-            <ChipSelector active={panel === "priority"} Icon={Flag} label="Priority" onClick={() => togglePanel("priority")} summary={priorityLabel} />
-            <ChipSelector active={panel === "form"} Icon={FileText} label="Attach Form" onClick={() => togglePanel("form")} summary={attachedForm?.name} />
-            <ChipSelector active={panel === "watchers"} Icon={UserRoundCheck} label="In Loop" onClick={() => togglePanel("watchers")} summary={watchers.length ? `${watchers.length} in loop` : undefined} />
+            <TaskSelector id="users" open={panel === "users"} panel={usersPanel}><ChipSelector active={panel === "users"} Icon={Users} label="Users" onClick={() => togglePanel("users")} summary={doers.length ? `${doers.length} user${doers.length === 1 ? "" : "s"}` : undefined} /></TaskSelector>
+            <TaskSelector id="due" open={panel === "due"} panel={duePanel} side="right"><ChipSelector active={panel === "due"} Icon={CalendarDays} label="Due Date" onClick={() => togglePanel("due")} summary={planned ? new Date(planned).toLocaleString("en-IN", { day: "numeric", hour: "numeric", minute: "2-digit", month: "short" }) : undefined} /></TaskSelector>
+            <TaskSelector id="priority" open={panel === "priority"} panel={priorityPanel}><ChipSelector active={panel === "priority"} Icon={Flag} label="Priority" onClick={() => togglePanel("priority")} summary={priorityLabel} /></TaskSelector>
+            <TaskSelector id="form" open={panel === "form"} panel={formPanel} side="right"><ChipSelector active={panel === "form"} Icon={FileText} label="Attach Form" onClick={() => togglePanel("form")} summary={attachedForm?.name} /></TaskSelector>
+            <TaskSelector id="watchers" open={panel === "watchers"} panel={watchersPanel}><ChipSelector active={panel === "watchers"} Icon={UserRoundCheck} label="In Loop" onClick={() => togglePanel("watchers")} summary={watchers.length ? `${watchers.length} in loop` : undefined} /></TaskSelector>
           </div>
 
-          {panel === "users" ? <div className="flex flex-col gap-3 py-3">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label>
-                <span className="mb-1 block text-xs font-semibold text-task-text">Branch{canSelectBranch ? "" : " (fixed)"}</span>
-                <select className="task-field" disabled={!canSelectBranch} onChange={(event) => changeBranch(event.target.value)} value={branchId}>
-                  <option value="">Select branch</option>
-                  {data.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-                </select>
-              </label>
-              <label>
-                <span className="mb-1 block text-xs font-semibold text-task-text">Department</span>
-                <select className="task-field" onChange={(event) => changeDepartment(event.target.value)} value={departmentId}>
-                  <option value="">Select department first</option>
-                  {scopedDepartments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
-                </select>
-              </label>
-            </div>
-            {!departmentId ? <Notice tone="task">Select a department to see its active users.</Notice>
-              : eligibleDoers.length === 0 ? <Notice tone="task">No active users are assigned to this branch and department.</Notice>
-                : <UserPicker branchNames={branchNames} departmentNames={departmentNames} disabledIds={[]} label="Users in this department" onChange={updateDoers} selectedIds={doers} users={eligibleDoers} />}
-          </div> : null}
-          {panel === "watchers" ? <div className="py-3"><UserPicker branchNames={branchNames} departmentNames={departmentNames} disabledIds={doers} label="In Loop · read only" onChange={setWatchers} selectedIds={watchers} users={eligibleWatchers} /></div> : null}
-          {panel === "due" ? <div className="py-3"><label><span className="mb-1 block text-xs font-semibold text-task-text">Due date and time</span><input className="task-field" min={new Date().toISOString().slice(0, 16)} onChange={(event) => setPlanned(event.target.value)} type="datetime-local" value={planned} /></label></div> : null}
-          {panel === "priority" ? <fieldset className="grid grid-cols-3 gap-2 py-3"><legend className="sr-only">Priority</legend>{priorityOptions.map((option) => <button className={cn("min-h-11 rounded-lg border text-sm", priority === option.value ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border text-task-text-muted")} key={option.id} onClick={() => { setPriority(option.value); setPanel(null); }} type="button">{priority === option.value ? <Check className="mr-1 inline size-4" /> : null}{option.label}</button>)}</fieldset> : null}
-          {panel === "form" ? <div className="py-3"><label><span className="mb-1 block text-xs font-semibold text-task-text">Required form</span><select className="task-field" onChange={(event) => { setFormTemplateId(event.target.value); setPanel(null); }} value={formTemplateId}><option value="">No form required</option>{data.forms.map((form) => <option key={form.id} value={form.id}>{form.name}</option>)}</select></label><p className="mt-2 text-xs text-task-text-muted">The selected form must be completed before this task can be finished.</p></div> : null}
 
           {repeat ? <section className="mt-4 rounded-xl border border-task-border bg-task-muted p-3"><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-task-text-muted">Recurring settings</p><select className="task-field" onChange={(event) => setRepeatSchedule(event.target.value)} value={repeatSchedule}><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select><div className="mt-2 grid grid-cols-2 gap-2"><label><span className="sr-only">End date</span><input className="task-field" min={new Date().toISOString().slice(0, 10)} onChange={(event) => setRepeatEndDate(event.target.value)} type="date" value={repeatEndDate} /></label><span className="flex min-h-11 items-center rounded-lg border border-task-border px-3 text-sm text-task-text-muted">{repeatEndDate ? "Ends on selected date" : "No end date"}</span></div>{repeatSchedule === "weekly" ? <div className="mt-3 flex flex-wrap gap-2">{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((day) => <button className={cn("size-10 rounded-full border text-xs", repeatDays.includes(day) ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border text-task-text-muted")} key={day} onClick={() => setRepeatDays((current) => current.includes(day) ? current.filter((item) => item !== day) : [...current, day])} type="button">{day}</button>)}</div> : null}</section> : null}
           <div className="sticky -bottom-5 -mx-5 mt-4 flex items-center gap-3 border-t border-task-border bg-task-bg px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
