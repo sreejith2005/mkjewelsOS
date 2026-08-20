@@ -3,6 +3,7 @@ import { ArrowLeft, CalendarDays, Check, ChevronDown, FileText, Flag, Paperclip,
 import { normalizeTaskParticipants, type Enums, type Json } from "@jewelos/core";
 import type { UserProfile } from "@/types";
 import { Button, Modal, Notice } from "@/components/ui";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ChipSelector } from "./ChipSelector";
 import type { TaskReferenceData } from "./api";
@@ -135,6 +136,7 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
         form_template_id: formTemplateId,
       }, [...participants.doerIds], [...participants.watcherIds], checklist.map((item, sort_order) => ({ item_text: item, is_required: true, sort_order })));
       if (attachment) await onUploadAttachment(taskId, attachment);
+      toast.success("Task assigned", { description: `Sent to ${participants.doerIds.length} user${participants.doerIds.length === 1 ? "" : "s"}.` });
       onCreated();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to create task");
