@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { ArrowLeft, CalendarDays, Check, FileText, Flag, Paperclip, Rocket, Users, UserRoundCheck } from "lucide-react";
+import { ArrowLeft, CalendarDays, Check, ChevronDown, FileText, Flag, Paperclip, Plus, Rocket, Users, UserRoundCheck, X } from "lucide-react";
 import { normalizeTaskParticipants, type Enums, type Json } from "@jewelos/core";
 import type { UserProfile } from "@/types";
 import { Button, Modal, Notice } from "@/components/ui";
@@ -11,10 +11,10 @@ import { UserPicker } from "./UserPicker";
 type Panel = "users" | "due" | "priority" | "form" | "watchers" | null;
 type ComposerMode = "manual" | "template";
 
-function TaskSelector({ children, id, open, panel, side = "left" }: { children: ReactNode; id: Exclude<Panel, null>; open: boolean; panel: ReactNode; side?: "left" | "right" }) {
-  return <div className="relative min-w-0" data-testid={`task-selector-${id}`}>
+function TaskSelector({ children, id, open, panel }: { children: ReactNode; id: Exclude<Panel, null>; open: boolean; panel: ReactNode }) {
+  return <div className="min-w-0" data-testid={`task-selector-${id}`}>
     {children}
-    {open ? <div className={cn("absolute top-full z-20 mt-2 max-h-[min(26rem,50dvh)] w-[calc(200%+0.5rem)] overflow-y-auto rounded-xl border border-task-border bg-task-bg p-3 shadow-lg", side === "right" ? "right-0" : "left-0")} data-testid={`task-panel-${id}`}>{panel}</div> : null}
+    {open ? <div className="mt-2 max-h-[min(26rem,50dvh)] overflow-y-auto rounded-xl border border-task-border bg-task-muted p-3" data-testid={`task-panel-${id}`}>{panel}</div> : null}
   </div>;
 }
 
@@ -41,6 +41,9 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
   const [watchers, setWatchers] = useState<string[]>([]);
   const [formTemplateId, setFormTemplateId] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const [checklistDraft, setChecklistDraft] = useState("");
+  const [checklist, setChecklist] = useState<string[]>([]);
   const [repeat, setRepeat] = useState(false);
   const [repeatSchedule, setRepeatSchedule] = useState("daily");
   const [repeatEndDate, setRepeatEndDate] = useState("");
@@ -92,6 +95,12 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
     setDepartmentId(nextDepartmentId);
     pruneDoersForScope(branchId, nextDepartmentId);
   };
+  const addChecklistItem = () => {
+    const item = checklistDraft.trim();
+    if (!item) return;
+    setChecklist((current) => [...current, item]);
+    setChecklistDraft("");
+  };
 
   const submitManual = async (event: FormEvent) => {
     event.preventDefault();
@@ -123,7 +132,7 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
         requires_remark: false,
         requires_form: Boolean(formTemplateId),
         form_template_id: formTemplateId,
-      }, [...participants.doerIds], [...participants.watcherIds], []);
+      }, [...participants.doerIds], [...participants.watcherIds], checklist.map((item, sort_order) => ({ item_text: item, is_required: true, sort_order })));
       if (attachment) await onUploadAttachment(taskId, attachment);
       onCreated();
     } catch (caught) {
@@ -174,12 +183,16 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
             <span className="sr-only">Task description</span>
             <textarea className="min-h-24 w-full resize-y bg-task-muted p-3 text-sm text-task-text placeholder:text-task-text-muted focus-visible:ring-task-accent" onChange={(event) => setDescription(event.target.value)} placeholder="Add Description" value={description} />
           </label>
+          <section className="border-b border-task-border py-3">
+            <button aria-expanded={checklistOpen} className="flex min-h-11 w-full items-center justify-between text-sm font-semibold text-task-text" onClick={() => setChecklistOpen((current) => !current)} type="button"><span className="flex items-center gap-2"><Plus className="size-4" />Add Checklist</span><ChevronDown className={cn("size-4 transition-transform", checklistOpen ? "rotate-180" : "")} /></button>
+            {checklistOpen ? <div className="mt-2 space-y-2"><input className="task-field" onChange={(event) => setChecklistDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addChecklistItem(); } }} placeholder="Type and hit Enter" value={checklistDraft} />{checklist.map((item, index) => <div className="flex items-center gap-3 rounded-xl border border-task-border bg-task-muted px-3 py-2 text-sm text-task-text" key={`${item}-${index}`}><input aria-label={`Required checklist item ${index + 1}`} checked readOnly type="checkbox" /><span className="min-w-0 flex-1 truncate">{item}</span><button aria-label={`Remove checklist item ${index + 1}`} className="text-task-text-muted hover:text-task-text" onClick={() => setChecklist((current) => current.filter((_, itemIndex) => itemIndex !== index))} type="button"><X className="size-4" /></button></div>)}</div> : null}
+          </section>
 
           <div className="grid grid-cols-2 gap-2 border-b border-task-border py-3">
             <TaskSelector id="users" open={panel === "users"} panel={usersPanel}><ChipSelector active={panel === "users"} Icon={Users} label="Users" onClick={() => togglePanel("users")} summary={doers.length ? `${doers.length} user${doers.length === 1 ? "" : "s"}` : undefined} /></TaskSelector>
-            <TaskSelector id="due" open={panel === "due"} panel={duePanel} side="right"><ChipSelector active={panel === "due"} Icon={CalendarDays} label="Due Date" onClick={() => togglePanel("due")} summary={planned ? new Date(planned).toLocaleString("en-IN", { day: "numeric", hour: "numeric", minute: "2-digit", month: "short" }) : undefined} /></TaskSelector>
+            <TaskSelector id="due" open={panel === "due"} panel={duePanel}><ChipSelector active={panel === "due"} Icon={CalendarDays} label="Due Date" onClick={() => togglePanel("due")} summary={planned ? new Date(planned).toLocaleString("en-IN", { day: "numeric", hour: "numeric", minute: "2-digit", month: "short" }) : undefined} /></TaskSelector>
             <TaskSelector id="priority" open={panel === "priority"} panel={priorityPanel}><ChipSelector active={panel === "priority"} Icon={Flag} label="Priority" onClick={() => togglePanel("priority")} summary={priorityLabel} /></TaskSelector>
-            <TaskSelector id="form" open={panel === "form"} panel={formPanel} side="right"><ChipSelector active={panel === "form"} Icon={FileText} label="Attach Form" onClick={() => togglePanel("form")} summary={attachedForm?.name} /></TaskSelector>
+            <TaskSelector id="form" open={panel === "form"} panel={formPanel}><ChipSelector active={panel === "form"} Icon={FileText} label="Attach Form" onClick={() => togglePanel("form")} summary={attachedForm?.name} /></TaskSelector>
             <TaskSelector id="watchers" open={panel === "watchers"} panel={watchersPanel}><ChipSelector active={panel === "watchers"} Icon={UserRoundCheck} label="In Loop" onClick={() => togglePanel("watchers")} summary={watchers.length ? `${watchers.length} in loop` : undefined} /></TaskSelector>
           </div>
 
