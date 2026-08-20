@@ -64,8 +64,8 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
     user.branch_id === branchId && user.department_id === departmentId),
   [branchId, data.users, departmentId]);
   const eligibleWatchers = useMemo(() => data.users.filter((user) =>
-    profile.user_role === "manager" ? user.branch_id === branchId : user.tenant_id === profile.tenant_id),
-  [branchId, data.users, profile.tenant_id, profile.user_role]);
+    user.tenant_id === profile.tenant_id && user.branch_id === branchId && user.department_id === departmentId),
+  [branchId, data.users, departmentId, profile.tenant_id]);
   const priorityLabel = priorityOptions.find((option) => option.value === priority)?.label ?? priority;
   const attachedForm = data.forms.find((form) => form.id === formTemplateId);
   const activeTemplates = data.templates.filter((template) => template.is_active);
@@ -78,6 +78,7 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
   const updateDoers = (nextDoers: string[]) => {
     setDoers(nextDoers);
     setWatchers((current) => current.filter((id) => !nextDoers.includes(id)));
+    setPanel(null);
   };
   const pruneDoersForScope = (nextBranchId: string, nextDepartmentId: string) => {
     const eligibleIds = new Set(data.users.filter((user) =>
@@ -164,10 +165,10 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
     </div>
     {!departmentId ? <Notice tone="task">Select a department to see its active users.</Notice> : eligibleDoers.length === 0 ? <Notice tone="task">No active users are assigned to this branch and department.</Notice> : <UserPicker branchNames={branchNames} departmentNames={departmentNames} disabledIds={[]} label="Users in this department" onChange={updateDoers} selectedIds={doers} users={eligibleDoers} />}
   </div>;
-  const duePanel = <label><span className="mb-1 block text-xs font-semibold text-task-text">Due date and time</span><input className="task-field" min={new Date().toISOString().slice(0, 16)} onChange={(event) => setPlanned(event.target.value)} type="datetime-local" value={planned} /></label>;
+  const duePanel = <label><span className="mb-1 block text-xs font-semibold text-task-text">Due date and time</span><input className="task-field" min={new Date().toISOString().slice(0, 16)} onChange={(event) => { setPlanned(event.target.value); setPanel(null); }} type="datetime-local" value={planned} /></label>;
   const priorityPanel = <fieldset className="grid grid-cols-3 gap-2"><legend className="sr-only">Priority</legend>{priorityOptions.map((option) => <button className={cn("min-h-11 rounded-lg border text-sm", priority === option.value ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border text-task-text-muted")} key={option.id} onClick={() => { setPriority(option.value); setPanel(null); }} type="button">{priority === option.value ? <Check className="mr-1 inline size-4" /> : null}{option.label}</button>)}</fieldset>;
   const formPanel = <div><label><span className="mb-1 block text-xs font-semibold text-task-text">Required form</span><select className="task-field" onChange={(event) => { setFormTemplateId(event.target.value); setPanel(null); }} value={formTemplateId}><option value="">No form required</option>{data.forms.map((form) => <option key={form.id} value={form.id}>{form.name}</option>)}</select></label><p className="mt-2 text-xs text-task-text-muted">The selected form must be completed before this task can be finished.</p></div>;
-  const watchersPanel = <UserPicker branchNames={branchNames} departmentNames={departmentNames} disabledIds={doers} label="In Loop · read only" onChange={setWatchers} selectedIds={watchers} users={eligibleWatchers} />;
+  const watchersPanel = <UserPicker branchNames={branchNames} departmentNames={departmentNames} disabledIds={doers} label="In Loop · read only" onChange={(nextWatchers) => { setWatchers(nextWatchers); setPanel(null); }} selectedIds={watchers} users={eligibleWatchers} />;
 
   return (
     <Modal onClose={onClose} title="Assign New Task" tone="light" wide>
