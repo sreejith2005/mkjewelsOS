@@ -1,9 +1,11 @@
 import {AlarmClock,ArrowRight,Bell,CheckCircle2,ClipboardCheck,ClipboardList,FileText,Gem,GitBranch,Users} from "lucide-react";
+import {useEffect} from "react";
 import {useAuth} from "@/auth/AuthContext";
 import {titleCase} from "@/lib/format";
 import {fetchHomeSummary} from "@/features/analytics/api";
 import {EmptyMessage,ErrorPanel,LoadingPanels,Panel,StatusDot} from "@/features/analytics/components";
 import {useAsyncData} from "@/features/analytics/useAsyncData";
+import {subscribeToInbox} from "@/features/notifications/api";
 import type {HomeSummary} from "@/features/analytics/types";
 
 const routeLabel:Record<string,string>={"/tasks":"Tasks","/tasks/fms":"FMS Tasks","/forms":"Forms","/crm":"CRM","/reports":"Reports"};
@@ -16,6 +18,7 @@ function WorkPanel({title,caption,count,Icon,children,onOpen}:{title:string;capt
 export function HomeView({onNavigate}:{onNavigate:(path:string)=>void}){
   const {branch,profile}=useAuth();
   const {data,error,loading,retry}=useAsyncData(fetchHomeSummary,[]);
+  useEffect(()=>profile?.id ? subscribeToInbox(profile.id,()=>{void retry();}) : undefined,[profile?.id,retry]);
   if(loading)return <section className="-m-4 min-h-[calc(100dvh-7.875rem)] bg-task-muted p-4 sm:-m-6 sm:p-6"><LoadingPanels count={6}/></section>;
   if(error)return <section className="-m-4 min-h-[calc(100dvh-7.875rem)] bg-task-muted p-4 sm:-m-6 sm:p-6"><ErrorPanel message={error} onRetry={retry}/></section>;
   if(!data)return null;

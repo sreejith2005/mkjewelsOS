@@ -63,5 +63,11 @@ export const publishAsNewForm = async (id: string) => {
   await publishForm(draftId);
   return draftId;
 };
-export const submitForm = async (id: string, answers: object, linkedModule?: string, linkedRecordId?: string) => { const { error } = await supabase.rpc("submit_form_with_audit", { p_form_template_id: id, p_answers: answers as Json, ...(linkedModule ? { p_linked_module: linkedModule } : {}), ...(linkedRecordId ? { p_linked_record_id: linkedRecordId } : {}) }); fail("Submit form", error); };
+export const submitForm = async (id: string, answers: object, linkedModule?: string, linkedRecordId?: string) => { const { data, error } = await supabase.rpc("submit_form_with_audit", { p_form_template_id: id, p_answers: answers as Json, ...(linkedModule ? { p_linked_module: linkedModule } : {}), ...(linkedRecordId ? { p_linked_record_id: linkedRecordId } : {}) }); fail("Submit form", error); if (!data) throw new Error("Submit form: the server did not return a submission id"); return data as string; };
+export async function startFmsFromFormSubmission(submissionId: string): Promise<{ instanceId: string; referenceNumber: string } | null> {
+  const { data, error } = await supabase.rpc("start_fms_from_form_submission_with_audit", { p_submission_id: submissionId });
+  fail("Start linked FMS", error);
+  const row = Array.isArray(data) ? data[0] : data;
+  return row ? { instanceId: row.instance_id as string, referenceNumber: row.reference_number as string } : null;
+}
 export const reviewSubmission = async (id: string, decision: "approved" | "rejected", notes: string) => { const { error } = await supabase.rpc("review_form_submission_with_audit", { p_submission_id: id, p_decision: decision, p_review_notes: notes }); fail("Review submission", error); };
