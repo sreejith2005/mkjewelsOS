@@ -5639,6 +5639,17 @@ export type Database = {
       get_dashboard_metrics: { Args: { p_context?: Json }; Returns: Json }
       get_section_availability: { Args: never; Returns: Json }
       get_home_summary: { Args: { p_context?: Json }; Returns: Json }
+      get_my_fms_starter_assignments: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          assigned_at: string
+          flow_name: string
+          form_template_id: string
+          fms_flow_id: string
+          id: string
+          stage_name: string
+        }[]
+      }
       get_notification_provider_availability: {
         Args: never
         Returns: {
