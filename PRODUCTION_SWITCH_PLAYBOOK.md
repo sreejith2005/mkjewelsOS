@@ -1,75 +1,81 @@
-# JewelOS Local-to-Production Switch Playbook
+# JewelOS production switch playbook
 
-Last reviewed: 2026-08-13 (Asia/Kolkata)
+Last source review: 2026-08-20 (Asia/Kolkata)
 
-This is the operational guide for moving JewelOS from local development to a hosted release, and for safely releasing every future feature. `PROJECT_HANDOFF.md` describes product status and roadmap; this file describes environments, testing, deployment, verification, and rollback.
+This is the release procedure for the active JewelOS repository. It separates
+what source code is configured to do from what has actually been verified in a
+hosted environment. Read `AGENTS.md` and `PROJECT_HANDOFF.md` first.
 
-## 1. Scope and non-negotiable rules
+## 1. Scope and safety rules
 
-Only this repository is deployable and writable:
+The only deployable repository is:
 
 `C:\Users\MIS\Downloads\MKJewelOS\jewelos`
 
-`mkjewelos-base44/` and `mkjewelsos/jewelos/jewelos/` are read-only behavior references. Never edit, import, deploy, or publish either one.
+Retired prototype/Base44 projects are not release inputs or targets. Do not
+build, publish, deploy, or import from them.
 
-Read `AGENTS.md` and `PROJECT_HANDOFF.md` before each feature/release. These rules always apply:
+These rules apply to every feature release:
 
-- RLS and RPCs are the security boundary; hidden browser controls are UX only.
-- Sensitive writes must be transactional and audited.
-- Applied migrations are immutable; fix them with a new forward-only migration.
-- Never commit, print, or put secrets into browser/mobile configuration.
-- Stage named Git paths only. Never use `git add -A` for a release.
+- RLS, minimum grants, and protected RPC/Edge Function checks are the real
+  permission boundary; browser role hiding is UX only.
+- Sensitive writes must authorize and create `audit_logs` in the same database
+  transaction/request.
+- Applied migrations are immutable. Correct them with a new forward-only
+  migration; do not rewrite migration history.
+- Never put service-role, cron, provider, Auth admin, database-password, or
+  customer-data material in a client build, Git, terminal transcript, or chat.
+- Stage approved named paths only. Do not use `git add -A` for a release.
+- A Git push is not a web-host, database, Edge Function, secret, or cron
+  deployment.
 
-## 2. Target architecture
+## 2. Release architecture and current checked-in configuration
 
 ```text
 Developer laptop                         Hosted services
-------------------                       ----------------------------------
+------------------                       -----------------------------------
 Web dev server     ---- local only ----> local Supabase containers (Docker)
 
-Web production app ---- HTTPS --------> hosted Supabase production project
-Mobile app         ---- HTTPS --------> hosted Supabase production project
+Vite web build     ---- HTTPS ---------> Vercel static deployment
+Web/mobile client  ---- HTTPS ---------> hosted Supabase project
                                          Postgres, Auth, Storage, Functions,
-                                         Vault/secrets and scheduled jobs
+                                         secrets/Vault and scheduled jobs
 ```
 
-Docker Desktop is only for local Supabase testing. It is not part of the hosted app and is not needed by staff using the web/mobile app. Hosted Supabase is the live database, Auth, Storage, Edge Function and cron platform.
+`vercel.json` is checked in with Vite settings: frozen pnpm install,
+`pnpm --filter web build`, output `apps/web/dist`, and an SPA rewrite to
+`index.html`. It does not prove that a Vercel project, domain, environment
+variables, or deployment is currently connected.
 
-The Vite web app still needs an external static web host. This repository has no web-host configuration or CI deployment pipeline yet, so choosing and configuring the host is required before launch. The host may be Vercel, Netlify, Cloudflare Pages, or another approved static host.
+Migrations `0001` through `0070` are in source. The database contains task,
+forms, FMS, CRM, notification, report/export, roster, and operational-control
+contracts. Confirm the real linked project and migration history before every
+hosted write; do not infer it from this file or Git.
 
-| Environment | Use | Supabase target | Docker | Customer data |
-|---|---|---|---|---|
-| Local | Build and destructive DB tests | Local CLI stack | Required for DB work | Never |
-| Staging | Hosted pre-release verification | Separate hosted project | Not required | Synthetic/masked only |
-| Production | Live staff use | Hosted production project | Not required | Yes, protected |
-
-**Before launch, create a separate hosted staging Supabase project.** Do not use production as the normal feature-test database. Local Docker catches most database failures; staging catches hosted configuration, redirect URL, deployed function, and web-host integration failures.
-
-## 3. Current deployable structure
-
-- `apps/web` — React/Vite static web app.
-- `apps/mobile` — Expo app; it is a separate future release track.
-- `packages/core` — shared pure business rules and generated DB types.
-- `packages/api-client` — typed Supabase client.
-- `packages/ui-tokens` — shared design tokens.
-- `supabase/migrations` — schema, RLS, RPC, privilege, Storage and cron work. The current working tree contains migrations through `0028`.
-- `supabase/tests` — pgTAP contracts.
-- `supabase/functions` — Edge Functions.
-
-The browser-safe build values are only:
+The browser-safe build variables are exactly:
 
 ```text
 VITE_SUPABASE_URL
 VITE_SUPABASE_ANON_KEY
 ```
 
-The anon/publishable key is intended for clients and is protected by RLS. A service-role key is server-only: never put it in `apps/web`, `VITE_*`, a mobile build, Git, or a user device.
+The anon/publishable key belongs in a client only because RLS protects data.
+Service-role credentials are server-only and must never be `VITE_*`, mobile
+build configuration, source, Git, or a user device.
 
-## 4. One-time environment setup
+| Environment | Purpose | Supabase target | Data |
+| --- | --- | --- | --- |
+| Local | Build, destructive DB tests, synthetic development | Local CLI/Docker stack | Synthetic only |
+| Staging | Hosted release verification | Separate hosted project | Synthetic/masked only |
+| Production | Staff use | Hosted production project | Protected operational data |
 
-### Local
+Do not use production as a feature-test database. A separate hosted staging
+project is a launch requirement, not a convenience.
 
-Follow `LOCAL_DEVELOPMENT.md`. It uses Docker Desktop and `supabase.cmd start` to create a disposable local stack with synthetic users/data.
+## 3. Local setup and verification
+
+Follow `LOCAL_DEVELOPMENT.md` for local variables and synthetic users. Typical
+local database startup is:
 
 ```powershell
 Set-Location 'C:\Users\MIS\Downloads\MKJewelOS\jewelos'
@@ -78,66 +84,8 @@ supabase.cmd db reset
 pnpm.cmd seed:local
 ```
 
-Set local Vite values in the same terminal as Vite, exactly as documented in `LOCAL_DEVELOPMENT.md`. Do not use `--linked` for local work.
-
-### Hosted staging
-
-Provision a distinct hosted Supabase project. Configure:
-
-- staging web URL and localhost development redirects in Supabase Auth;
-- staging origins/CORS as needed by deployed functions;
-- migrations, Storage, Edge Functions, jobs, Vault entries and function secrets matching the release;
-- synthetic test users for every actual JewelOS role;
-- staging web-host values for `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
-
-Vite variables are built into the static build, so changing them requires a new deployment.
-
-### Hosted production
-
-Configure after staging passes:
-
-- production web domain in Auth redirect/allowed URL settings;
-- production web origin in relevant CORS/origin configuration;
-- production browser-safe `VITE_*` variables in the web-host environment;
-- Edge Function secrets and Vault entries through Supabase's protected secret management, never source files;
-- cron schedules and Vault-backed worker-secret references;
-- Auth email/provider and invitation flow using a controlled account.
-
-Never point local Vite at production as a shortcut. Never use production for local seeds, resets, broad test imports, or exploratory writes.
-
-Record these decisions when made; do not put secrets here:
-
-| Item | Choice | Owner | Verified |
-|---|---|---|---|
-| Web host | Pending | Pending | Pending |
-| Staging Supabase project | Pending | Pending | Pending |
-| Production Supabase project | Existing hosted account | Pending | Pending |
-| Production domain | Pending | Pending | Pending |
-| Error monitoring | Pending | Pending | Pending |
-| Backup/restore owner | Pending | Pending | Pending |
-
-## 5. Repeatable feature-to-production workflow
-
-```text
-Design -> local build -> local verification -> staging deployment
-       -> staging smoke/E2E -> production release -> monitor
-```
-
-Do not advance when a prior gate lacks evidence. A Git push is not a database, function, web-host, or production verification.
-
-### Gate A — Design
-
-1. Read repository instructions and relevant behavior in both reference apps.
-2. Record behavior comparison and product decisions.
-3. Define schema/indexes, RPC inputs/outputs, RLS readers/writers, Storage rules, audit events, jobs, secrets, and rollback impact.
-4. Put reusable validation/state logic in `packages/core`; put Supabase access in the API layer.
-5. Identify every required migration, function, secret, host setting, mobile configuration, and data migration.
-
-For protected workflows prove database authorization for unauthenticated, ordinary employee, manager, administrator, super admin, inactive, cross-branch, cross-tenant, and service-role cases where applicable.
-
-### Gate B — Local build and validation
-
-For database work, validate against a clean local rebuild:
+For a database-affecting release, validate a clean local rebuild when Docker is
+available:
 
 ```powershell
 supabase.cmd start
@@ -145,65 +93,121 @@ supabase.cmd db reset
 supabase.cmd test db
 supabase.cmd db lint --local --level warning
 pnpm.cmd --filter @jewelos/core test
+pnpm.cmd --filter web test
 pnpm.cmd exec turbo run typecheck --force --concurrency=1
 pnpm.cmd exec turbo run build --force --concurrency=1
 git diff --check
 ```
 
-Run focused web/component tests where they exist and test the rendered flow at desktop and narrow mobile widths. Use local synthetic data only. If Docker is unavailable, report it accurately: typecheck/build/static checks do not prove Postgres, RLS, RPC, Storage or pgTAP runtime behavior.
+Run focused test files first and add rendered desktop/narrow-width QA for every
+changed user flow. If Docker or browser automation is unavailable, report that
+limit accurately. Typecheck/build/static review does not prove Postgres, RLS,
+RPC, Storage, Edge Functions, cron, provider delivery, or hosted rendering.
 
-### Gate C — Reviewable Git change
+## 4. Release gates
+
+### Gate A - Design and compatibility
+
+1. Read the three repository documents and the relevant current source,
+   migration, tests, and approved spec/plan.
+2. Define tables/indexes, RLS readers/writers, grants, RPC/function inputs and
+   outputs, audit event, Storage path/policy, jobs, secrets, user impact, and
+   rollback/compatibility path.
+3. Put reusable state/validation in `packages/core`; keep Supabase I/O in the
+   API/database layers.
+4. For protected flows, prove denial as well as success: unauthenticated,
+   inactive, ordinary, privileged, cross-tenant, cross-branch, and service-role
+   cases as applicable.
+5. For destructive or identity/roster work, get explicit approval, back up or
+   rehearse recovery, and preserve historical records.
+
+### Gate B - Local evidence
+
+Complete the appropriate checks from section 3. For every schema change,
+regenerate/check the DB types and run the relevant pgTAP suite. For web work,
+run focused Vitest tests and inspect the real rendered route. For Edge Functions,
+test authentication, bad input, idempotency/retry, and secret-free failures.
+
+Do not carry a local seed/reset, test import, or development Vite variable into
+a hosted target.
+
+### Gate C - Reviewable Git change
 
 ```powershell
-git status --short
+git status --short --branch
 git diff --check
 git diff --name-only
 ```
 
-Review unrelated worktree changes. Stage approved files by name, inspect the staged diff, then run a credential-pattern scan. Do not stage `.env`, `.supabase`, `supabase/.temp`, local secrets, exports, customer data, or broad unreviewed changes.
+Review unrelated work before staging. Stage named approved paths, inspect the
+staged diff and whitespace, then do a credential-safe scan:
 
-Recommended model: short-lived feature branch, reviewed merge to `main`, then a deliberate release from a known commit SHA. Until CI exists, record every manual validation result. Add CI before frequent releases.
+```powershell
+git diff --cached --check
+git diff --cached --name-only
+git diff --cached | Select-String -Pattern 'service_role|SUPABASE.*KEY|password|secret|token' -CaseSensitive:$false
+```
 
-### Gate D — Staging deployment
+Treat matches as review prompts, not permission to print credentials. Never
+stage `.env`, `.supabase`, `supabase/.temp`, production exports, customer data,
+or key material. Record the release commit SHA after review.
 
-Use an interactive authenticated Supabase CLI session linked to **staging**. Confirm the linked project before every write; never paste access tokens or database passwords into a command, source, or chat.
+### Gate D - Staging deployment
 
-Read-only preflight:
+Use an authenticated Supabase CLI session linked to **staging**. Before any
+hosted command, establish the exact project in the interactive CLI/UI and
+record its non-secret name/reference. Do not paste access tokens or passwords
+into command lines.
+
+Preflight is read-only:
 
 ```powershell
 supabase.cmd migration list --linked
 supabase.cmd db push --linked --dry-run
 ```
 
-After review, apply the listed pending migrations:
+Review every pending migration and ensure it matches the approved SHA. Then,
+and only then, apply it:
 
 ```powershell
 supabase.cmd db push --linked
 ```
 
-Deploy only changed Edge Functions by name. `--use-api` can avoid local Docker for function bundling, but does not replace database testing:
+Deploy only changed Edge Functions by explicit name:
 
 ```powershell
 supabase.cmd functions deploy <changed-function-name> --use-api
 ```
 
-Set or rotate function secrets only through Supabase's protected secret process. Deploy the web build with staging `VITE_*` values, then smoke-test:
+The current function configuration disables platform JWT verification for
+three cron-only workers - `generate-recurring-tasks`,
+`process-notification-outbox`, and `process-report-exports` - because they
+must validate a dedicated server-side `x-cron-secret` before parsing a request
+or accessing data. Configure/rotate those secrets only through protected
+Supabase secret management; never call them from a browser.
 
-- login/logout and deactivated-user denial;
-- changed role permissions and RLS-denial paths;
-- audit records and normal writes;
-- private upload/download policies, where relevant;
-- function authentication, validation and errors;
-- jobs/queues/providers with safe fixtures;
-- desktop and mobile-width layouts, console/network errors and monitoring.
+Build/deploy the web app with staging-only browser-safe Vite variables. Then
+smoke-test with controlled synthetic users:
 
-If staging fails, correct source and repeat. Do not bypass it by applying the untested change to production.
+- sign-in, password recovery, logout, inactive-account denial, and redirects;
+- role/RLS success and denial paths; audit records for changed workflows;
+- private upload/download or signed-URL rules when Storage changed;
+- task assignment/in-app alerts, Forms/FMS stage contracts, CSV import
+  idempotency, recurrence, and any affected workflow;
+- Edge Function authentication/validation/errors and safe jobs/providers;
+- desktop and mobile-width route rendering, console/network errors, and
+  monitoring signals.
 
-### Gate E — Production release
+If staging fails, fix source and repeat from the applicable local gate. Do not
+use production as a shortcut around a failed/unverified staging gate.
 
-Create a release record: commit SHA, migration names, changed functions, web-host/config changes, expected user impact, backup status, rollback plan, and approver. Use a quiet release window for schema/workflow changes.
+### Gate E - Production release
 
-Immediately before production writes:
+Create a release record containing: approved SHA, target, approver, migration
+names, changed functions, host/config changes, expected impact, backup/recovery
+status, smoke-test owner, monitoring window, and rollback path.
+
+Immediately before a production write:
 
 ```powershell
 git rev-parse HEAD
@@ -212,129 +216,96 @@ supabase.cmd migration list --linked
 supabase.cmd db push --linked --dry-run
 ```
 
-Confirm the link is production and the dry-run exactly matches approval. Take or verify a current backup/recovery plan. Then apply once:
+Confirm the link is production, the dry run exactly matches approval, and the
+backup/recovery plan is current. Apply once with `supabase.cmd db push --linked`.
+Deploy only the approved functions and exact web commit with production Vite
+variables. Never seed, reset, bulk-import exploratory data, or test customer
+flows in production.
 
-```powershell
-supabase.cmd db push --linked
-```
+Use controlled staff/test accounts for smoke tests, monitor for the agreed
+window, and record the deployed SHA and result. A failed database contract is
+corrected by a reviewed forward migration, not by changing history.
 
-Deploy only changed functions and the exact approved web commit with production `VITE_*` variables. Smoke-test with controlled staff/test accounts only; never seed or insert test customer data in production. Monitor the agreed period and record deployed SHA and outcome.
+## 5. Database, Storage, function, and host rules
 
-## 6. Database rules
+1. Database migrations are append-only; `db push` has no automatic rollback.
+   Prefer compatible expansion, code deployment, controlled data migration,
+   then later cleanup.
+2. A protected workflow change needs RLS, minimum grants, RPC privilege
+   decisions, indexes, audit behaviour, and pgTAP coverage in the same review.
+3. `supabase.cmd db reset`, local seeds, and destructive test imports are
+   local-only. `--linked` operates on the exact hosted project currently linked.
+4. Storage buckets should be private by default. Validate path ownership,
+   tenant scope, MIME/size, signed URL access, cleanup, and audit linkage.
+5. Service-role use is server-only and bypasses RLS. A JWT-disabled worker must
+   authenticate a dedicated secret before parsing input or touching data.
+6. Vercel must retain HTTPS, separate staging/production environments, SPA
+   fallback, deployment logs/commit association, browser-safe variables only,
+   and rollback to a known-good deployment. Deploy `apps/web/dist`, never the
+   Vite dev server.
 
-1. `supabase/migrations` is append-only after any shared hosted application.
-2. A protected workflow's migration must include its RLS, minimum grants, indexes, RPC privilege decisions, audit behavior and pgTAP coverage.
-3. `supabase.cmd db push --linked --dry-run` is mandatory hosted preflight.
-4. `supabase.cmd db reset`, local seeds and test imports are local-only.
-5. `db push` has no automatic rollback. Prefer compatible expansion first, deploy new code, migrate data safely, and remove obsolete paths later.
-6. Before destructive work, take a backup and rehearse recovery in staging. Prefer archived/soft-deleted data and delayed cleanup.
-
-## 7. Functions, Storage and secrets
-
-For every Edge Function:
-
-- Keep service-role use server-only; it bypasses RLS.
-- If JWT verification is intentionally disabled for a cron worker, validate a dedicated secret before reading request data or accessing the database.
-- Test request auth, invalid input, retries, idempotency and failure logging.
-- Deploy explicitly by function name; do not use broad `--prune` without a function inventory/deletion review.
-- Prove response classes, not secret values.
-
-For Storage, use private buckets by default. Test policy denial, path ownership, MIME/size validation, download access, cleanup lifecycle, and audit behavior.
-
-## 8. Web host requirements
-
-Build from the monorepo using:
-
-```powershell
-pnpm.cmd install --frozen-lockfile
-pnpm.cmd --filter web build
-```
-
-The static output is `apps/web/dist`. Do not deploy the Vite dev server. The chosen host must provide HTTPS, staging/production separation, SPA fallback for deep links, environment separation, build logs, commit association, and rollback to a known-good build. It may receive browser-safe Vite variables only.
-
-## 9. Mobile release path
-
-The Expo app is a separate later release. Do not call it production-ready until it has real auth, navigation, API access, uploads, error/offline behavior and device testing. Use the same staging/production Supabase separation, secure session storage, client-safe keys only, versioned signed builds, and staged store rollouts. A mobile client is untrusted: RLS/RPC checks still apply.
-
-## 10. Production readiness checklist
+## 6. Production readiness checklist
 
 ### Security and data
 
-- [ ] Intentional RLS/minimum privileges for every exposed table.
-- [ ] RPC/function denial tests for unauthorized and inactive users.
-- [ ] Transactional audit records for sensitive operations.
-- [ ] Private Storage policies and file validation tested.
-- [ ] No service-role/provider secret in clients or Git.
-- [ ] Auth redirects, email settings and invitations tested.
-- [ ] Privacy, retention, export and deletion policy agreed.
+- [ ] Every exposed table has intentional RLS and minimum grants.
+- [ ] Critical RPC/function denial paths cover inactive and cross-scope actors.
+- [ ] Sensitive writes are transactional and audited.
+- [ ] Private Storage policy and file validation are tested.
+- [ ] No service-role/provider/cron secret is in clients or Git.
+- [ ] Auth redirect URLs, email flow, invitations, and recovery are tested.
+- [ ] Privacy, retention, export/deletion, and backup responsibilities are agreed.
 
 ### Quality
 
-- [ ] Clean local reset, relevant pgTAP, lint, core tests, typecheck and build.
-- [ ] Rendered desktop and mobile-width web QA.
-- [ ] Role-based authenticated E2E coverage for critical flows.
-- [ ] Staging smoke tests pass.
-- [ ] Accessibility, loading, error and recovery states reviewed.
+- [ ] Clean local reset, relevant pgTAP, lint, core/web tests, typecheck and build pass.
+- [ ] Rendered desktop and narrow-width web QA passes.
+- [ ] Authenticated role-based E2E covers critical work flows.
+- [ ] Staging smoke tests pass with evidence attached to the release record.
+- [ ] Loading, error/recovery, accessibility, and provider failure states are reviewed.
+- [ ] Mobile is separately device-tested and signed before any mobile launch claim.
 
 ### Operations
 
-- [ ] Separate hosted staging and production projects.
-- [ ] Web host configured for HTTPS, deep links, staging and rollback.
-- [ ] Functions, Vault/secrets and cron configured without exposing values.
-- [ ] Monitoring/alerts for web, functions, cron, queues and providers.
-- [ ] Backup/restore ownership and a staging restore drill documented.
-- [ ] Incident/release approval responsibilities assigned.
-- [ ] CI runs typecheck, tests, build, migration review and secret scan.
+- [ ] Separate staging and production Supabase projects are configured.
+- [ ] Vercel staging/production host, HTTPS, deep links, variables and rollback are verified.
+- [ ] Named functions, protected secrets, and cron schedules are deployed/verified.
+- [ ] Monitoring/alerts cover web, functions, cron, queues, exports and providers.
+- [ ] Backup/restore owner and a staging restore drill are documented.
+- [ ] CI runs typecheck, tests, build, migration review, and secret scanning.
 
-## 11. Rollback and incidents
+## 7. Rollback and incident response
 
-A static web build can normally roll back to the previous known-good deployment. Database migrations cannot be safely undone by editing history: make a reviewed forward corrective migration, or use an approved and tested backup/restore plan.
+A static web deployment can normally roll back to the previous known-good build
+only when it remains database-compatible. Never attempt to undo a hosted
+migration by editing history. Use a reviewed forward corrective migration, or
+an approved, tested backup/restore procedure.
 
-For an incident: limit the affected feature/worker safely, preserve aggregate evidence without PII/secrets, roll back web only if it remains DB-compatible, then verify authorization, data integrity and critical flows. Record prevention tests before the next release.
+For an incident, first contain the affected feature/worker safely, preserve
+non-sensitive evidence, establish the deployed SHA and target, check
+authorization/data integrity, and use the compatible web rollback or corrective
+migration path. Confirm critical flows after recovery and add prevention tests
+before the next release.
 
-## 12. First production-switch sequence
-
-1. Reconcile current branch/migrations. The worktree contains migrations past the older `PROJECT_HANDOFF.md` baseline; do not treat its old commit/count as current.
-2. Finish the first-release RLS, test, UX and module readiness gaps.
-3. Choose/configure web host and production domain.
-4. Create/configure hosted staging Supabase.
-5. Add CI and a small authenticated browser E2E suite.
-6. Deploy the approved commit to staging and complete all smoke tests.
-7. Verify production backup/recovery and approve the release record.
-8. Deploy the exact approved commit to production using Gate E.
-9. Smoke-test, monitor, and hand over with support/rollback contacts.
-
-## 13. Release evidence template
+## 8. Release record template
 
 ```text
 Release: <name>
 Commit SHA: <sha>
 Target: staging | production
 Approved by: <name/role>
+Hosted project confirmed: <non-secret project name/reference>
 
-Changed: web / migrations / Edge Functions / host configuration
-Local evidence: reset + pgTAP / tests / typecheck / build / rendered QA
-Hosted preflight: linked target confirmed / dry-run reviewed
-Hosted verification: roles / functions / storage / jobs / responsive QA
-Rollback: prior web build / corrective migration or restore plan
+Changed: web / migrations / Edge Functions / host configuration / secrets / jobs
+Local evidence: <commands and results>
+Hosted preflight: <migration list and dry-run reviewed>
+Hosted verification: <roles/RLS, audits, functions, Storage, jobs, responsive QA>
+Rollback: <prior compatible web build and forward-correction or restore path>
+Monitoring owner/window:
 Outcome and follow-up:
 ```
 
-## 14. Command safety reference
-
-| Command | Meaning | Target |
-|---|---|---|
-| `supabase.cmd start` | Starts local containers | Local; Docker required |
-| `supabase.cmd db reset` | Deletes/rebuilds local DB | Local only |
-| `supabase.cmd test db` | Runs database tests | Local; Docker required |
-| `supabase.cmd db lint --local --level warning` | Lints local DB | Local only |
-| `supabase.cmd migration list --linked` | Compares migration history | Hosted read-only preflight |
-| `supabase.cmd db push --linked --dry-run` | Lists hosted pending migrations | Hosted read-only preflight |
-| `supabase.cmd db push --linked` | Applies migrations | Approved staging/production action |
-| `supabase.cmd functions deploy <name> --use-api` | Deploys one function | Approved hosted action |
-
-Before every `--linked` command, confirm which hosted project is linked. It acts on that exact project, not a generic cloud environment.
-
-## 15. Keep this current
-
-Update this file whenever the host, CI, environment setup, mobile release process, monitoring, backup method, release command or security boundary changes. Keep `PROJECT_HANDOFF.md` for product implementation status and this file for the repeatable release process.
+Update this playbook when the actual host/domain, CI, environments, monitoring,
+backup/recovery process, release commands, or security boundary changes. Keep
+`PROJECT_HANDOFF.md` focused on implementation state and this document focused
+on repeatable operational evidence.

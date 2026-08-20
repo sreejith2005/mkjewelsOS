@@ -4,3 +4,7 @@ export * from "./client";
 export * from "./workflows";
 export * from "./search";
 export * from "./capabilities";
+export * from "./migrationRegistry";
+export * from "./fieldDefinitions";
+export * from "./preflight";
+export * from "./legacyImport";
