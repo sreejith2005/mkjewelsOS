@@ -6285,6 +6285,13 @@ export type Database = {
           reference_number: string
         }[]
       }
+      start_fms_from_form_submission_with_audit: {
+        Args: { p_submission_id: string }
+        Returns: {
+          instance_id: string
+          reference_number: string
+        }[]
+      }
       submit_form_base_with_audit: {
         Args: {
           p_answers: Json

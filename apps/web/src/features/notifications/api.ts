@@ -23,7 +23,7 @@ function createInboxRealtimeSubscription(profileId: string): InboxRealtimeSubscr
   const channel = supabase.channel(`notifications:${profileId}`).on(
     "postgres_changes",
     { event: "INSERT", schema: "public", table: "notifications", filter: `user_profile_id=eq.${profileId}` },
-    (payload) => { listeners.forEach((listener) => listener(payload.new)); },
+    (payload) => { listeners.forEach((listener) => listener(payload?.new)); },
   ).subscribe();
   return { channel, listeners, removalTimer: null };
 }

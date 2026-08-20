@@ -3,7 +3,7 @@ import { isFormFieldVisible } from "@jewelos/core";
 
 vi.mock("@jewelos/api-client", () => ({ supabase: {} }));
 
-import { deleteForm, publishAsNewForm, savePublishedForm, toDefinition, type FormField, type FormTemplate } from "./api";
+import { deleteForm, publishAsNewForm, savePublishedForm, startFmsFromFormSubmission, toDefinition, type FormField, type FormTemplate } from "./api";
 
 describe("toDefinition", () => {
   it("does not turn a NULL database condition into a conditional field", () => {
@@ -54,5 +54,16 @@ describe("savePublishedForm", () => {
 
     await expect(savePublishedForm("published-form", { name: "Walk-in Form" }, [])).resolves.toBeUndefined();
     expect(rpc).toHaveBeenCalledWith("save_published_form_with_audit", { p_template_id: "published-form", p_payload: { name: "Walk-in Form" }, p_fields: [] });
+  });
+});
+
+describe("startFmsFromFormSubmission", () => {
+  it("uses the audited workflow trigger after a standalone form submission", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: [{ instance_id: "instance-1", reference_number: "FMS-1" }], error: null });
+    const { supabase } = await import("@jewelos/api-client");
+    Object.assign(supabase, { rpc });
+
+    await expect(startFmsFromFormSubmission("submission-1")).resolves.toEqual({ instanceId: "instance-1", referenceNumber: "FMS-1" });
+    expect(rpc).toHaveBeenCalledWith("start_fms_from_form_submission_with_audit", { p_submission_id: "submission-1" });
   });
 });
