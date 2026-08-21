@@ -8,3 +8,4 @@ export * from "./migrationRegistry";
 export * from "./fieldDefinitions";
 export * from "./preflight";
 export * from "./legacyImport";
+export * from "./syncIngestion";
