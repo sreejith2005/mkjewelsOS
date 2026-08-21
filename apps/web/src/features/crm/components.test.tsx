@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ClientForm } from "./ClientForm";
 import { CrmDirectory, EMPTY_FILTERS } from "./CrmDirectory";
 import { WalkinForm } from "./WalkinForm";
+import { WalkinWorkspace } from "./WalkinWorkspace";
 import type { CrmClientSummary, CrmOptions } from "./types";
 
 const options: CrmOptions = {
@@ -66,5 +67,12 @@ describe("CRM component states", () => {
     expect(html).toContain("Visit date and time");
     expect(html).toContain("Optional private attachment");
     expect(html).toContain("Record walk-in");
+  });
+  it("renders the native walk-in CRM workspace instead of an external destination", () => {
+    const html = renderToStaticMarkup(<WalkinWorkspace onCompleted={vi.fn()} options={options}/>);
+    expect(html).toContain("CLIENT WALK-IN FORM");
+    expect(html).toContain("Register a client visit inside JewelOS");
+    expect(html).toContain("NEW WALK-IN");
+    expect(html).toContain("RETURNING CLIENT");
   });
 });
