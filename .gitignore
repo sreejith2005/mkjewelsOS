@@ -11,3 +11,4 @@ crm-migration-*.json
 !.env.example
 *.log
 .DS_Store
+.worktrees/
