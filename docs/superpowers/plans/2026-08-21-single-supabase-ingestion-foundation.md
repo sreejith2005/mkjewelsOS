@@ -125,7 +125,7 @@ Add fixtures and assertions for cross-tenant denial, duplicate replay, invalid c
 
 - [ ] **Step 2: Verify failure**
 
-Run: `supabase.cmd test db --file supabase/tests/0081_crm_sync_ingestion_contract.test.sql`
+Run: `supabase.cmd test db --local supabase/tests/0081_crm_sync_ingestion_contract.test.sql`
 
 Expected: FAIL because the new objects are absent.
 
@@ -144,7 +144,7 @@ Enable RLS on all new tables. Browser roles have no direct mutation grant. Admin
 
 ```powershell
 supabase.cmd db reset
-supabase.cmd test db --file supabase/tests/0081_crm_sync_ingestion_contract.test.sql
+supabase.cmd test db --local supabase/tests/0081_crm_sync_ingestion_contract.test.sql
 supabase.cmd db lint --local --level warning
 supabase.cmd gen types typescript --local --schema public > packages/api-client/src/database.types.ts
 pnpm.cmd --filter @jewelos/api-client typecheck
@@ -267,7 +267,7 @@ git -C C:/Users/MIS/Downloads/mkjewels-sync commit -m "docs: define hosted sync 
 Set-Location C:\Users\MIS\Downloads\MKJewelOS\jewelos
 supabase.cmd start
 supabase.cmd db reset
-supabase.cmd test db --file supabase/tests/0081_crm_sync_ingestion_contract.test.sql
+supabase.cmd test db --local supabase/tests/0081_crm_sync_ingestion_contract.test.sql
 supabase.cmd db lint --local --level warning
 pnpm.cmd --filter @jewelos/core test -- syncIngestion.test.ts
 pnpm.cmd --filter @jewelos/core typecheck

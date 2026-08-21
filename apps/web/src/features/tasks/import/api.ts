@@ -1,12 +1,12 @@
 import { supabase } from "@jewelos/api-client";
 import type { Json } from "@jewelos/core";
-import type { ImportedTaskRow } from "./normalizeRows";
+import type { TaskBulkImportPayload } from "./workbook";
 
-export type TaskImportResult = Readonly<{ batch_id: string; created_count: number; rejected_count: number; replayed: boolean }>;
-
-export async function submitTaskImport(rows: readonly ImportedTaskRow[], importHash: string): Promise<TaskImportResult> {
-  const rpc = supabase.rpc as unknown as (name: string, args: { p_rows: Json; p_import_hash: string }) => Promise<{ data: unknown; error: { message: string } | null }>;
-  const { data, error } = await rpc("import_delegation_tasks_with_audit", { p_rows: rows as unknown as Json, p_import_hash: importHash });
-  if (error) throw new Error(`Import tasks: ${error.message}`);
-  return data as TaskImportResult;
-}
+export type TaskImportValidation = Readonly<{ valid: boolean; canonical_hash: string; summary: { requested_count: number; valid_count: number; error_count: number; one_time_count: number; recurring_count: number; initial_instance_count: number }; issues: Array<{ sheet: string; row: number; field: string; reason: string; guidance: string; severity: "error" | "warning" }> }>;
+export type TaskImportBatch = Readonly<{ id: string; created_at: string; safe_file_label: string | null; requested_count: number; valid_count: number; error_count: number; one_time_count: number; recurring_count: number; initial_instance_count: number; outcome: string; created_by: string }>;
+type Rpc = (name: string, args: Record<string, Json>) => Promise<{ data: unknown; error: { message: string } | null }>;
+const rpc = supabase.rpc as unknown as Rpc;
+function unwrap<T>(result: { data: unknown; error: { message: string } | null }, context: string): T { if (result.error) throw new Error(`${context}: ${result.error.message}`); return result.data as T; }
+export async function validateTaskBulkImport(payload: TaskBulkImportPayload, hash: string): Promise<TaskImportValidation> { return unwrap<TaskImportValidation>(await rpc("validate_task_bulk_import", { p_payload: payload as unknown as Json, p_import_hash: hash }), "Validate task import"); }
+export async function submitTaskBulkImport(payload: TaskBulkImportPayload, hash: string, fileLabel: string): Promise<{ batch_id: string; created_count: number; replayed: boolean; outcome: string }> { return unwrap(await rpc("import_task_bulk_with_audit", { p_payload: payload as unknown as Json, p_import_hash: hash, p_file_label: fileLabel }), "Import tasks"); }
+export async function loadTaskImportBatches(): Promise<TaskImportBatch[]> { const table = supabase.from as unknown as (name: string) => { select: (columns: string) => { order: (column: string, options: { ascending: boolean }) => { limit: (count: number) => Promise<{ data: unknown; error: { message: string } | null }> } } }; const result = await table("task_import_batches").select("id,created_at,safe_file_label,requested_count,valid_count,error_count,one_time_count,recurring_count,initial_instance_count,outcome,created_by").order("created_at", { ascending: false }).limit(20); if (result.error) throw new Error(`Load import history: ${result.error.message}`); return result.data as TaskImportBatch[]; }

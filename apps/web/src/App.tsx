@@ -40,6 +40,7 @@ const FMSBuilderPage = lazy(() => import("@/pages/FMSBuilderPage").then((module)
 const NotificationsPage = lazy(() => import("@/pages/NotificationsPage").then((module) => ({ default: module.NotificationsPage })));
 const CRMPage = lazy(() => import("@/pages/CRMPage").then((module) => ({ default: module.CRMPage })));
 const TasksPage = lazy(() => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
+const TaskBulkImportPage = lazy(() => import("@/pages/TaskBulkImportPage").then((module) => ({ default: module.TaskBulkImportPage })));
 const TeamDirectoryPage = lazy(() => import("@/pages/TeamDirectoryPage").then((module) => ({ default: module.TeamDirectoryPage })));
 const ReportsPage = lazy(() => import("@/pages/ReportsPage").then((module) => ({ default: module.ReportsPage })));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage").then((module) => ({ default: module.SettingsPage })));
@@ -296,7 +297,7 @@ function AppShell() {
     : currentPage === "users" ? <TeamDirectoryPage />
     : currentPage === "crm" ? <CRMPage />
     : currentPage === "dropdown_master" ? <DropdownMasterPage />
-      : currentPage === "checklist_tasks" ? <TasksPage />
+      : currentPage === "checklist_tasks" ? path === "/tasks/import" ? <TaskBulkImportPage onBack={() => navigate("/tasks")} /> : <TasksPage />
       : currentPage === "availability" ? <AvailabilityPage />
           : currentPage === "forms_library" ? <FormsPage />
             : currentPage === "fms_tasks" ? <FMSBuilderPage />

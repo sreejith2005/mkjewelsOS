@@ -21,7 +21,6 @@ import {
 import { DelegateTaskModal } from "@/features/tasks/DelegateTaskModal";
 import { TaskCard, type TaskCardAction } from "@/features/tasks/TaskCard";
 import { TaskComposer } from "@/features/tasks/TaskComposer";
-import { TaskImportDialog } from "@/features/tasks/import/TaskImportDialog";
 import { TaskFilterBar, type DateRangePreset } from "@/features/tasks/TaskFilterBar";
 import { TaskTemplateForm } from "@/features/tasks/TaskForms";
 import { loadFormDynamicOptions, loadTaskForms, submitForm, type FormBundle } from "@/features/forms/api";
@@ -66,7 +65,6 @@ export function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
   const [delegateTarget, setDelegateTarget] = useState<TaskBundle | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [editTemplate, setEditTemplate] = useState<TaskTemplate | null | undefined>(undefined);
@@ -183,9 +181,7 @@ export function TasksPage() {
         {error ? <div className="flex flex-col gap-3 rounded-xl border border-danger/40 bg-danger/10 p-4"><Notice tone="danger">{error}</Notice><Button className="self-start border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={() => void refresh()} variant="secondary"><RefreshCw />Retry</Button></div> : loading ? <div aria-label="Loading tasks" className="flex flex-col gap-3">{[0, 1, 2].map((item) => <div className="h-28 animate-pulse rounded-2xl border border-task-border bg-task-muted" key={item} />)}</div> : scopedTasks.length === 0 ? <div className="flex min-h-[48dvh] flex-col items-center justify-center px-5 text-center"><span className="mb-5 flex size-20 items-center justify-center rounded-[1.75rem] bg-task-muted text-task-accent"><CheckCircle2 className="size-10" /></span><h2 className="text-2xl font-semibold text-task-text">No Tasks Here</h2><p className="mt-1 max-w-sm text-sm text-task-text-muted">It seems that you don’t have any tasks in this list.</p></div> : <div className="flex flex-col gap-3">{profile ? scopedTasks.map((task) => <TaskCard capability={deriveTaskMutationCapability({ assigneeIds: task.assignees.map((assignee) => assignee.id), isWatcher: task.isWatchedByViewer, viewerId: profile.id, viewerRole: profile.user_role })} categoryLabel={task.category_id ? categoryNames.get(task.category_id) ?? "Uncategorized" : "Uncategorized"} key={task.id} onAction={(action) => handleAction(task, action)} task={task} />) : null}</div>}
       </div>
 
-      {canManage ? <div className="fixed bottom-[86px] right-4 z-20 flex gap-2 md:bottom-8 md:right-8"><Button onClick={() => setImportOpen(true)} variant="secondary"><Upload className="size-4" />Import Tasks</Button><Button aria-label="Create task" className="min-h-14 rounded-2xl bg-task-accent px-5 text-task-text shadow-xl hover:bg-task-accent/90" onClick={() => void openComposer()}><Plus className="size-6" />Create Task</Button></div> : null}
-
-      {importOpen && canManage ? <TaskImportDialog onClose={() => setImportOpen(false)} onImported={refresh} /> : null}
+      {canManage ? <div className="fixed bottom-[86px] right-4 z-20 flex gap-2 md:bottom-8 md:right-8"><Button onClick={() => { window.history.pushState({}, "", "/tasks/import"); window.dispatchEvent(new PopStateEvent("popstate")); }} variant="secondary"><Upload className="size-4" />Bulk Import</Button><Button aria-label="Create task" className="min-h-14 rounded-2xl bg-task-accent px-5 text-task-text shadow-xl hover:bg-task-accent/90" onClick={() => void openComposer()}><Plus className="size-6" />Create Task</Button></div> : null}
 
       {composerOpen && canManage && references && profile ? <TaskComposer data={references} onClose={() => setComposerOpen(false)} onCreated={() => { setComposerOpen(false); void refresh(); }} onManageTemplates={() => { setComposerOpen(false); setShowTemplates(true); }} onSave={createDelegationTask} onUploadAttachment={(taskId, file) => uploadTaskAttachment(profile.tenant_id, taskId, file)} onSaveRecurring={(payload) => saveTaskTemplate(null, payload)} onUseTemplate={createFromTemplate} profile={profile} /> : null}
 
