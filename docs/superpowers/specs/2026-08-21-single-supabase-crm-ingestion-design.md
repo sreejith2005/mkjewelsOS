@@ -77,7 +77,8 @@ historical CRM row.
 ## Ingestion RPC contract
 
 The implementation exposes a versioned worker-only RPC family, owned by
-Postgres. Execution is revoked from `public`, `anon`, and `authenticated`.
+Postgres. Execution is revoked from `public`, `anon`, and `authenticated`;
+only the server-side `service_role` may invoke it.
 The worker authenticates through a dedicated server-side mechanism approved for
 the hosting environment; service-role credentials alone are not authorization.
 The RPC verifies a worker identity/secret or signed request before reading the
