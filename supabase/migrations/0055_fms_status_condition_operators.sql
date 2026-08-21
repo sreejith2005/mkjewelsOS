@@ -24,7 +24,8 @@ begin
 exception when others then return false;
 end $$;
 
-do $$
+/* Superseded by the deterministic forward repair in 0082; see 0054. */
+/* do $$
 declare v_definition text; v_old text; v_new text;
 begin
   select pg_get_functiondef('public.activate_fms_stage_internal(uuid,uuid,uuid,uuid,integer)'::regprocedure) into v_definition;
@@ -50,5 +51,6 @@ begin
   if position(v_old in v_definition)=0 then raise exception 'FMS status-condition runtime patch could not locate the existing status block'; end if;
   execute replace(v_definition,v_old,v_new);
 end $$;
+*/
 
 notify pgrst, 'reload schema';

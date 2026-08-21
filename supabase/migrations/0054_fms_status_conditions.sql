@@ -25,7 +25,10 @@ begin
 exception when others then return false;
 end $$;
 
-do $$
+/* Superseded by the deterministic forward repair in 0082.  This historical
+   pg_get_functiondef text rewrite is retained only as documentation because
+   PostgreSQL normalizes function source and cannot safely support it. */
+/* do $$
 declare v_definition text; v_old text; v_new text;
 begin
   select pg_get_functiondef('public.activate_fms_stage_internal(uuid,uuid,uuid,uuid,integer)'::regprocedure) into v_definition;
@@ -66,4 +69,4 @@ begin
  end if;$new$;
   if position(v_old in v_definition)=0 then raise exception 'FMS conditional runtime patch could not locate the existing condition block'; end if;
   execute replace(v_definition,v_old,v_new);
-end $$;
+end $$; */

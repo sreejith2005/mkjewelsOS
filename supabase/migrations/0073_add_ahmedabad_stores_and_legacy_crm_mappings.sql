@@ -8,7 +8,9 @@ do $$
 declare v_tenant_id uuid; v_source_id uuid;
 begin
   select tenant_id into v_tenant_id from branches where code = 'AND' limit 1;
-  if v_tenant_id is null then raise exception 'Cannot locate the JewelOS organization tenant'; end if;
+  -- A pristine local bootstrap intentionally has no production organization
+  -- records. The approved hosted alignment remains idempotent when they exist.
+  if v_tenant_id is null then return; end if;
   select id into v_source_id from crm_source_systems where source_key = 'legacy_sreejith_crm' and is_active;
   if v_source_id is null then raise exception 'Legacy CRM source registry is unavailable'; end if;
 
