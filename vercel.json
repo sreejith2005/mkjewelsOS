@@ -4,11 +4,19 @@
   "installCommand": "pnpm install --frozen-lockfile",
   "buildCommand": "pnpm --filter web build",
   "outputDirectory": "apps/web/dist",
-  "rewrites": [
+  "redirects": [
+    {
+      "source": "/crm",
+      "destination": "https://mkjewels-crm.vercel.app/crm",
+      "permanent": false
+    },
     {
       "source": "/crm/:path*",
-      "destination": "https://mkjewels-crm.vercel.app/crm/:path*"
-    },
+      "destination": "https://mkjewels-crm.vercel.app/crm/:path*",
+      "permanent": false
+    }
+  ],
+  "rewrites": [
     {
       "source": "/(.*)",
       "destination": "/index.html"
