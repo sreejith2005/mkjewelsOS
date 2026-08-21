@@ -6,10 +6,6 @@
   "outputDirectory": "apps/web/dist",
   "rewrites": [
     {
-      "source": "/crm/:path*",
-      "destination": "https://mkjewels-crm.vercel.app/crm/:path*"
-    },
-    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
