@@ -4,7 +4,7 @@ import {
   resolveTaskCoverage,
   type TaskCoverageProfile,
   type TaskCoverageResolution,
-} from "./taskCoverage";
+} from "./taskCoverage.ts";
 
 const compatibleRRule = rruleNamespace as typeof rruleNamespace & {
   default?: typeof rruleNamespace;
