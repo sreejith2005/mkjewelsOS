@@ -39,6 +39,7 @@ export {
 export type { GroupedTaskFeedRow, TaskFeedLike, TaskFeedStatusFilter } from "./taskFeed";
 export { normalizeTaskParticipants } from "./taskParticipants";
 export type { TaskParticipants } from "./taskParticipants";
+export * from "./taskCoverage";
 export { calculateTaskChecklistProgress } from "./taskChecklist";
 export type { TaskChecklistProgress, TaskChecklistProgressItem } from "./taskChecklist";
 export { deriveTaskMutationCapability } from "./taskCapabilities";

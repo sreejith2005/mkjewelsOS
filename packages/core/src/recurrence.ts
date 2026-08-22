@@ -1,4 +1,10 @@
 import * as rruleNamespace from "rrule";
+import {
+  isCoverageCandidateAvailable,
+  resolveTaskCoverage,
+  type TaskCoverageProfile,
+  type TaskCoverageResolution,
+} from "./taskCoverage";
 
 const compatibleRRule = rruleNamespace as typeof rruleNamespace & {
   default?: typeof rruleNamespace;
@@ -10,17 +16,16 @@ if (!rrulestr) throw new Error("rrule parser is unavailable");
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const KOLKATA_TIME_ZONE = "Asia/Kolkata";
 
-export type RecurringAvailabilityProfile = {
+export type RecurringAvailabilityProfile = TaskCoverageProfile & {
   buddy_id: string | null;
-  id: string;
-  week_off: readonly string[];
-  working_status: string;
+  reports_to_user_id: string | null;
+  secondary_buddy_id: string | null;
 };
 
 export type RecurringAssignment = {
   effective_assignee_id: string | null;
   original_assignee_id: string;
-  resolution: "assigned" | "blocked" | "buddy";
+  resolution: TaskCoverageResolution;
 };
 
 function assertDateOnly(value: string): string {
@@ -62,21 +67,12 @@ function normalizeRule(recurrenceRule: string): string {
   return `DTSTART:19700101T000000Z\nRRULE:${trimmed.replace(/^RRULE:/i, "")}`;
 }
 
-function weekdayName(date: Date | string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: KOLKATA_TIME_ZONE,
-    weekday: "long",
-  }).format(new Date(`${kolkataDateKey(date)}T12:00:00.000Z`)).toLowerCase();
-}
-
 export function isUserAvailableForRecurringTask(
   profile: RecurringAvailabilityProfile | undefined,
   availabilityStatus: string | null | undefined,
   targetDate: Date | string,
 ): boolean {
-  if (!profile || profile.working_status !== "active" || availabilityStatus === "absent") return false;
-  const weekday = weekdayName(targetDate);
-  return !profile.week_off.some((day) => day.trim().toLowerCase() === weekday);
+  return isCoverageCandidateAvailable(profile, availabilityStatus, targetDate);
 }
 
 export function resolveRecurringAssignment(
@@ -85,24 +81,11 @@ export function resolveRecurringAssignment(
   availabilityByUser: ReadonlyMap<string, string>,
   targetDate: Date | string,
 ): RecurringAssignment {
-  if (isUserAvailableForRecurringTask(original, availabilityByUser.get(original.id), targetDate)) {
-    return {
-      effective_assignee_id: original.id,
-      original_assignee_id: original.id,
-      resolution: "assigned",
-    };
-  }
-  if (buddy && isUserAvailableForRecurringTask(buddy, availabilityByUser.get(buddy.id), targetDate)) {
-    return {
-      effective_assignee_id: buddy.id,
-      original_assignee_id: original.id,
-      resolution: "buddy",
-    };
-  }
+  const decision = resolveTaskCoverage({ availabilityByUser, original, primary: buddy, targetDate });
   return {
-    effective_assignee_id: null,
-    original_assignee_id: original.id,
-    resolution: "blocked",
+    effective_assignee_id: decision.effectiveAssigneeId,
+    original_assignee_id: decision.originalAssigneeId,
+    resolution: decision.resolution,
   };
 }
 

@@ -10,12 +10,16 @@ import {
 const doer: RecurringAvailabilityProfile = {
   buddy_id: "buddy-1",
   id: "doer-1",
+  reports_to_user_id: "manager-1",
+  secondary_buddy_id: "buddy-2",
   week_off: ["Sunday"],
   working_status: "active",
 };
 const buddy: RecurringAvailabilityProfile = {
   buddy_id: null,
   id: "buddy-1",
+  reports_to_user_id: null,
+  secondary_buddy_id: null,
   week_off: ["Sunday"],
   working_status: "active",
 };
@@ -76,7 +80,7 @@ describe("recurring task availability", () => {
     )).toEqual({
       effective_assignee_id: doer.id,
       original_assignee_id: doer.id,
-      resolution: "assigned",
+      resolution: "original",
     });
   });
 
@@ -97,7 +101,7 @@ describe("recurring task availability", () => {
     )).toEqual({
       effective_assignee_id: buddy.id,
       original_assignee_id: doer.id,
-      resolution: "buddy",
+      resolution: "primary_buddy",
     });
   });
 
@@ -110,7 +114,7 @@ describe("recurring task availability", () => {
     )).toEqual({
       effective_assignee_id: null,
       original_assignee_id: doer.id,
-      resolution: "blocked",
+      resolution: "coverage_required",
     });
   });
 
