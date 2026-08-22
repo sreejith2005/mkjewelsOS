@@ -12,7 +12,7 @@ describe("UserPicker", () => {
       label="Eligible users"
       onChange={vi.fn()}
       selectedIds={[]}
-      users={[{ branch_id: "branch-1", buddy_id: null, department_id: "department-1", employee_code: "MK-101", employee_name: "Ananya Shah", first_name: "Ananya", id: "user-1", last_name: "Shah", tenant_id: "tenant-1", user_role: "staff", working_status: "active" }]}
+      users={[{ branch_id: "branch-1", buddy_id: null, secondary_buddy_id: null, reports_to_user_id: null, department_id: "department-1", employee_code: "MK-101", employee_name: "Ananya Shah", first_name: "Ananya", id: "user-1", last_name: "Shah", tenant_id: "tenant-1", user_role: "staff", working_status: "active" }]}
     />);
 
     expect(screen.getByText("Ananya Shah")).toBeTruthy();

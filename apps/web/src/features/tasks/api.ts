@@ -5,7 +5,7 @@ import { loadMasterOptions } from "@/features/dropdowns/api";
 export type TaskFeedRow = Database["public"]["Views"]["v_all_tasks"]["Row"];
 export type TaskUser = Pick<Tables<"user_profiles">,
   "id" | "tenant_id" | "branch_id" | "department_id" | "employee_code" | "employee_name" |
-  "first_name" | "last_name" | "user_role" | "working_status" | "buddy_id">;
+  "first_name" | "last_name" | "user_role" | "working_status" | "buddy_id" | "secondary_buddy_id" | "reports_to_user_id">;
 export type TaskChecklist = Tables<"task_checklists">;
 export type TaskTemplate = Tables<"task_templates">;
 export type AvailabilityStatus = Enums<"availability_status">;
@@ -45,7 +45,7 @@ export async function loadTaskFeedReferenceData(): Promise<TaskFeedReferenceData
 
 export async function loadAvailabilityUsers(): Promise<TaskUser[]> {
   const result = await supabase.from("user_profiles")
-    .select("id,tenant_id,branch_id,department_id,employee_code,employee_name,first_name,last_name,user_role,working_status,buddy_id")
+    .select("id,tenant_id,branch_id,department_id,employee_code,employee_name,first_name,last_name,user_role,working_status,buddy_id,secondary_buddy_id,reports_to_user_id")
     .in("account_status", ["active", "invited"])
     .eq("working_status", "active")
     .order("first_name")
@@ -316,4 +316,21 @@ export async function recordAvailability(
     p_reason: reason,
   });
   fail("Record availability", error);
+}
+
+export async function recordAvailabilityRange(
+  userProfileId: string,
+  startDate: string,
+  endDate: string,
+  status: AvailabilityStatus,
+  reason: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("record_availability_range_with_audit", {
+    p_user_profile_id: userProfileId,
+    p_start_date: startDate,
+    p_end_date: endDate,
+    p_status: status,
+    p_reason: reason,
+  });
+  fail("Record availability range", error);
 }

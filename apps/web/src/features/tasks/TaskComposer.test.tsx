@@ -20,7 +20,7 @@ const data = {
   departments: [{ branch_id: "branch-1", id: "department-1", name: "Sales" }],
   forms: [{ id: "form-1", name: "Stock count" }],
   templates: [],
-  users: [{ branch_id: "branch-1", buddy_id: null, department_id: "department-1", employee_code: "E-1", employee_name: "Ashwini", first_name: "Ashwini", id: "doer-1", last_name: null, tenant_id: "tenant-1", user_role: "staff", working_status: "active" }],
+  users: [{ branch_id: "branch-1", buddy_id: null, secondary_buddy_id: null, reports_to_user_id: null, department_id: "department-1", employee_code: "E-1", employee_name: "Ashwini", first_name: "Ashwini", id: "doer-1", last_name: null, tenant_id: "tenant-1", user_role: "staff", working_status: "active" }],
 } as TaskReferenceData;
 
 const profile = {
