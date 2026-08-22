@@ -16,6 +16,7 @@ export const PAGE_IDS = [
   "dashboard",
   "crm",
   "checklist_tasks",
+  "recurring_todo",
   "delegation_tasks",
   "fms_tasks",
   "fms_builder",
@@ -42,6 +43,7 @@ export const ALL_MENU_ITEMS: readonly MenuItem[] = [
   { id: "dashboard", label: "Dashboard", path: "/dashboard" },
   { id: "crm", label: "CRM", path: "/crm" },
   { id: "checklist_tasks", label: "Tasks", path: "/tasks" },
+  { id: "recurring_todo", label: "Recurring / To-Do", path: "/recurring-todo" },
   { id: "fms_builder", label: "FMS", path: "/fms" },
   { id: "forms_library", label: "Forms Library", path: "/forms" },
   { id: "meeting_ai", label: "Meeting AI", path: "/meeting-ai" },
@@ -57,6 +59,7 @@ const COMMON_WORK_PAGES: readonly PageId[] = [
   "home",
   "dashboard",
   "checklist_tasks",
+  "recurring_todo",
   "fms_builder",
   "forms_library",
   "meeting_ai",
@@ -74,6 +77,7 @@ export const ROLE_PAGES: Readonly<Record<UserRole, readonly PageId[]>> = {
     "home",
     "dashboard",
     "checklist_tasks",
+    "recurring_todo",
     "notifications",
     "users",
     "availability",
@@ -82,11 +86,12 @@ export const ROLE_PAGES: Readonly<Record<UserRole, readonly PageId[]>> = {
   ],
   crm: [...COMMON_WORK_PAGES, "crm", "reports"],
   staff: COMMON_WORK_PAGES,
-  doer: ["home", "dashboard", "checklist_tasks", "fms_builder", "notifications", "availability", "reports", "settings"],
+  doer: ["home", "dashboard", "checklist_tasks", "recurring_todo", "fms_builder", "notifications", "availability", "reports", "settings"],
   housekeeping: [
     "home",
     "dashboard",
     "checklist_tasks",
+    "recurring_todo",
     "notifications",
     "availability",
     "reports",
@@ -108,6 +113,6 @@ export function canAccessPage(role: UserRole, page: PageId): boolean {
 }
 
 export function getPageForPath(path: string): PageId | undefined {
-  if (path === "/tasks/checklist" || path === "/tasks/delegation") return "checklist_tasks";
+  if (path === "/tasks/checklist" || path === "/tasks/delegation" || path === "/tasks/import") return "checklist_tasks";
   return ALL_MENU_ITEMS.find((item) => item.path === path)?.id;
 }

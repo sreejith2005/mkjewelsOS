@@ -14,6 +14,28 @@ alter table task_instances
   add column if not exists coverage_resolution text,
   add column if not exists coverage_resolved_for_date date;
 
+alter table task_templates
+  add column if not exists schedule_kind text not null default 'recurring',
+  add column if not exists verification_required boolean not null default false,
+  add column if not exists followup_enabled boolean not null default false,
+  add column if not exists personal_performance_enabled boolean not null default true;
+
+alter table task_templates drop constraint if exists task_templates_schedule_kind_check;
+alter table task_templates add constraint task_templates_schedule_kind_check check(schedule_kind in
+  ('recurring','daily','weekly','monthly','quarterly','yearly','one_time','as_required'));
+
+alter table task_instances
+  add column if not exists verification_status text not null default 'not_required',
+  add column if not exists verified_by uuid references user_profiles(id),
+  add column if not exists verified_at timestamptz,
+  add column if not exists verification_note text,
+  add column if not exists followup_count integer not null default 0,
+  add column if not exists last_followup_at timestamptz;
+
+alter table task_instances drop constraint if exists task_instances_verification_status_check;
+alter table task_instances add constraint task_instances_verification_status_check
+  check(verification_status in ('not_required','pending','verified','rejected'));
+
 alter table client_followups
   add column if not exists coverage_status text,
   add column if not exists coverage_original_assignee_id uuid references user_profiles(id),
@@ -112,6 +134,25 @@ begin
     end if;
   end loop;
   return query select v_original.id,null::uuid,'coverage_required'::text;
+end;
+$$;
+
+create or replace function configure_invited_profile_coverage_with_audit(
+  p_creator_profile_id uuid,p_profile_id uuid,p_secondary_buddy_id uuid,p_reports_to_user_id uuid
+) returns void language plpgsql security definer set search_path=public as $$
+declare v_creator user_profiles; v_old user_profiles; v_new user_profiles;
+begin
+  if auth.role()<>'service_role' then raise exception 'Service role required' using errcode='42501'; end if;
+  select * into v_creator from user_profiles where id=p_creator_profile_id;
+  select * into v_old from user_profiles where id=p_profile_id for update;
+  if v_creator.id is null or v_creator.user_role not in ('super_admin','admin') or v_creator.account_status<>'active'
+    or v_old.id is null or v_old.tenant_id<>v_creator.tenant_id then raise exception 'Invited profile coverage configuration denied' using errcode='42501'; end if;
+  update user_profiles set secondary_buddy_id=p_secondary_buddy_id,reports_to_user_id=p_reports_to_user_id,
+    updated_by=v_creator.id,updated_at=now() where id=p_profile_id returning * into v_new;
+  insert into audit_logs(tenant_id,actor_user_id,action,module,record_id,old_value,new_value)
+  values(v_creator.tenant_id,v_creator.id,'user_coverage_profile_configured','user_management',p_profile_id,
+    jsonb_build_object('secondary_buddy_id',v_old.secondary_buddy_id,'reports_to_user_id',v_old.reports_to_user_id),
+    jsonb_build_object('primary_buddy_id',v_new.buddy_id,'secondary_buddy_id',v_new.secondary_buddy_id,'reports_to_user_id',v_new.reports_to_user_id));
 end;
 $$;
 
@@ -483,6 +524,120 @@ begin
 end;
 $$;
 
+create or replace function initialize_recurring_task_requirements()
+returns trigger language plpgsql set search_path=public as $$
+declare v_template task_templates;
+begin
+  if new.task_template_id is null then return new; end if;
+  select * into v_template from task_templates where id=new.task_template_id;
+  new.verification_status:=case when v_template.verification_required then 'pending' else 'not_required' end;
+  return new;
+end;
+$$;
+drop trigger if exists task_instances_initialize_recurring_requirements on task_instances;
+create trigger task_instances_initialize_recurring_requirements before insert on task_instances
+for each row execute function initialize_recurring_task_requirements();
+
+create or replace function save_recurring_todo_template_with_audit(p_template_id uuid,p_payload jsonb)
+returns uuid language plpgsql security definer set search_path=public as $$
+declare v_id uuid; v_actor user_profiles; v_old task_templates; v_new task_templates; v_base jsonb; v_kind text;
+begin
+  select * into v_actor from user_profiles where auth_user_id=auth.uid();
+  if v_actor.id is null or not current_profile_is_active() or v_actor.user_role not in ('super_admin','admin','manager') then
+    raise exception 'Recurring schedule management denied' using errcode='42501';
+  end if;
+  if jsonb_typeof(p_payload)<>'object' then raise exception 'Recurring schedule payload is invalid' using errcode='22023'; end if;
+  v_kind:=coalesce(nullif(p_payload->>'schedule_kind',''),'recurring');
+  if v_kind not in ('recurring','daily','weekly','monthly','quarterly','yearly','one_time','as_required') then
+    raise exception 'Schedule kind is unsupported' using errcode='22023';
+  end if;
+  if p_template_id is not null then select * into v_old from task_templates where id=p_template_id; end if;
+  v_base:=p_payload-array['schedule_kind','verification_required','followup_enabled','personal_performance_enabled'];
+  v_id:=save_task_template_with_audit(p_template_id,v_base);
+  update task_templates set schedule_kind=v_kind,
+    verification_required=coalesce((p_payload->>'verification_required')::boolean,false),
+    followup_enabled=coalesce((p_payload->>'followup_enabled')::boolean,false),
+    personal_performance_enabled=coalesce((p_payload->>'personal_performance_enabled')::boolean,true),
+    updated_by=v_actor.id,updated_at=now() where id=v_id returning * into v_new;
+  insert into audit_logs(tenant_id,actor_user_id,action,module,record_id,old_value,new_value)
+  values(v_actor.tenant_id,v_actor.id,case when p_template_id is null then 'recurring_todo_created' else 'recurring_todo_updated' end,
+    'recurring_todo',v_id,case when v_old.id is null then null else to_jsonb(v_old) end,to_jsonb(v_new));
+  return v_id;
+end;
+$$;
+
+create or replace function delete_recurring_todo_template_with_audit(p_template_id uuid)
+returns text language plpgsql security definer set search_path=public as $$
+declare v_actor user_profiles; v_old task_templates; v_outcome text;
+begin
+  select * into v_actor from user_profiles where auth_user_id=auth.uid();
+  select * into v_old from task_templates where id=p_template_id for update;
+  if v_actor.id is null or not current_profile_is_active() or v_actor.user_role not in ('super_admin','admin','manager')
+    or v_old.id is null or v_old.tenant_id<>v_actor.tenant_id
+    or (v_actor.user_role='manager' and v_old.branch_id is distinct from v_actor.branch_id) then
+    raise exception 'Recurring schedule deletion denied' using errcode='42501';
+  end if;
+  if exists(select 1 from task_instances where task_template_id=p_template_id) then
+    update task_templates set is_active=false,updated_by=v_actor.id,updated_at=now() where id=p_template_id;
+    v_outcome:='archived';
+  else
+    delete from task_templates where id=p_template_id;
+    v_outcome:='deleted';
+  end if;
+  insert into audit_logs(tenant_id,actor_user_id,action,module,record_id,old_value,new_value)
+  values(v_actor.tenant_id,v_actor.id,'recurring_todo_'||v_outcome,'recurring_todo',p_template_id,to_jsonb(v_old),jsonb_build_object('outcome',v_outcome));
+  return v_outcome;
+end;
+$$;
+
+create or replace function verify_recurring_task_with_audit(p_task_id uuid,p_decision text,p_note text default null)
+returns void language plpgsql security definer set search_path=public as $$
+declare v_actor user_profiles; v_task task_instances;
+begin
+  select * into v_actor from user_profiles where auth_user_id=auth.uid();
+  select * into v_task from task_instances where id=p_task_id for update;
+  if v_actor.id is null or not current_profile_is_active() or v_actor.user_role not in ('super_admin','admin','manager')
+    or v_task.id is null or v_task.tenant_id<>v_actor.tenant_id or v_task.task_template_id is null then
+    raise exception 'Recurring task verification denied' using errcode='42501';
+  end if;
+  if v_task.status<>'completed' or v_task.verification_status not in ('pending','rejected') then
+    raise exception 'Only completed tasks awaiting verification can be reviewed' using errcode='23514';
+  end if;
+  if p_decision not in ('verified','rejected') then raise exception 'Verification decision is invalid' using errcode='22023'; end if;
+  if p_decision='rejected' and nullif(btrim(p_note),'') is null then raise exception 'A rejection note is required' using errcode='22023'; end if;
+  update task_instances set verification_status=p_decision,verified_by=v_actor.id,verified_at=now(),
+    verification_note=nullif(btrim(p_note),''),updated_by=v_actor.id,updated_at=now() where id=p_task_id;
+  insert into audit_logs(tenant_id,actor_user_id,action,module,record_id,old_value,new_value)
+  values(v_actor.tenant_id,v_actor.id,'recurring_task_'||p_decision,'recurring_todo',p_task_id,
+    jsonb_build_object('verification_status',v_task.verification_status),
+    jsonb_build_object('verification_status',p_decision,'note',nullif(btrim(p_note),'')));
+end;
+$$;
+
+create or replace function send_recurring_followup_with_audit(p_task_id uuid,p_message text)
+returns void language plpgsql security definer set search_path=public as $$
+declare v_actor user_profiles; v_task task_instances; v_assignee uuid;
+begin
+  select * into v_actor from user_profiles where auth_user_id=auth.uid();
+  select * into v_task from task_instances where id=p_task_id for update;
+  if v_actor.id is null or not current_profile_is_active() or v_actor.user_role not in ('super_admin','admin','manager')
+    or v_task.id is null or v_task.tenant_id<>v_actor.tenant_id or v_task.task_template_id is null
+    or not exists(select 1 from task_templates where id=v_task.task_template_id and followup_enabled) then
+    raise exception 'Recurring task follow-up denied' using errcode='42501';
+  end if;
+  if nullif(btrim(p_message),'') is null or length(btrim(p_message))>1000 then raise exception 'Follow-up message must contain 1 to 1000 characters' using errcode='22023'; end if;
+  insert into task_comments(task_instance_id,user_profile_id,comment) values(p_task_id,v_actor.id,btrim(p_message));
+  update task_instances set followup_count=followup_count+1,last_followup_at=now(),updated_by=v_actor.id,updated_at=now() where id=p_task_id;
+  for v_assignee in select user_profile_id from task_assignees where task_instance_id=p_task_id and is_active loop
+    insert into notifications(tenant_id,user_profile_id,event_type,title,message,link_url)
+    values(v_actor.tenant_id,v_assignee,'recurring_task_followup','Task follow-up',btrim(p_message),'/recurring-todo');
+  end loop;
+  insert into audit_logs(tenant_id,actor_user_id,action,module,record_id,new_value)
+  values(v_actor.tenant_id,v_actor.id,'recurring_task_followup_sent','recurring_todo',p_task_id,
+    jsonb_build_object('message',btrim(p_message),'recipient_count',(select count(*) from task_assignees where task_instance_id=p_task_id and is_active)));
+end;
+$$;
+
 -- Protected worker entry point. The worker supplies only the original doers;
 -- the database resolves coverage again inside the creation transaction.
 create or replace function create_recurring_todo_instance(
@@ -566,10 +721,20 @@ revoke all on function reconcile_short_deadline_coverage_with_audit(uuid,date,te
 revoke all on function record_availability_range_with_audit(uuid,date,date,availability_status,text) from public,anon;
 revoke all on function get_recurring_todo_workspace(jsonb) from public,anon;
 revoke all on function create_recurring_todo_instance(uuid,date,uuid[]) from public,anon,authenticated;
+revoke all on function configure_invited_profile_coverage_with_audit(uuid,uuid,uuid,uuid) from public,anon,authenticated;
+revoke all on function save_recurring_todo_template_with_audit(uuid,jsonb) from public,anon;
+revoke all on function delete_recurring_todo_template_with_audit(uuid) from public,anon;
+revoke all on function verify_recurring_task_with_audit(uuid,text,text) from public,anon;
+revoke all on function send_recurring_followup_with_audit(uuid,text) from public,anon;
 grant execute on function reconcile_short_deadline_coverage_with_audit(uuid,date,text) to authenticated;
 grant execute on function record_availability_range_with_audit(uuid,date,date,availability_status,text) to authenticated;
 grant execute on function get_recurring_todo_workspace(jsonb) to authenticated;
 grant execute on function resolve_task_coverage(uuid,date) to service_role;
 grant execute on function create_recurring_todo_instance(uuid,date,uuid[]) to service_role;
+grant execute on function configure_invited_profile_coverage_with_audit(uuid,uuid,uuid,uuid) to service_role;
+grant execute on function save_recurring_todo_template_with_audit(uuid,jsonb) to authenticated;
+grant execute on function delete_recurring_todo_template_with_audit(uuid) to authenticated;
+grant execute on function verify_recurring_task_with_audit(uuid,text,text) to authenticated;
+grant execute on function send_recurring_followup_with_audit(uuid,text) to authenticated;
 
 notify pgrst,'reload schema';

@@ -31,6 +31,8 @@ type InviteBody = {
   week_off?: unknown;
   user_role?: unknown;
   buddy_id?: unknown;
+  secondary_buddy_id?: unknown;
+  reports_to_user_id?: unknown;
 };
 
 function json(status: number, body: Record<string, unknown>): Response {
@@ -132,6 +134,8 @@ Deno.serve(async (request: Request) => {
       throw new Error("mobile number format is invalid");
     }
     const buddyId = optionalString(body.buddy_id);
+    const secondaryBuddyId = optionalString(body.secondary_buddy_id);
+    const reportsToUserId = optionalString(body.reports_to_user_id);
 
     const password = temporaryPassword();
     const { data: created, error: createError } = await adminClient.auth.admin.createUser({
@@ -171,6 +175,18 @@ Deno.serve(async (request: Request) => {
         detail: insertError?.message ?? "The supplied profile values were rejected",
         cleanup: cleanupError ? "Auth cleanup failed; contact an administrator" : "Auth user was cleaned up",
       });
+    }
+
+    const { error: coverageError } = await adminClient.rpc("configure_invited_profile_coverage_with_audit", {
+      p_creator_profile_id: callerProfile.id,
+      p_profile_id: profileId,
+      p_secondary_buddy_id: secondaryBuddyId,
+      p_reports_to_user_id: reportsToUserId,
+    });
+    if (coverageError) {
+      console.error("invite coverage profile rejected", { code: coverageError.code ?? null, message: coverageError.message ?? null });
+      const { error: cleanupError } = await adminClient.auth.admin.deleteUser(created.user.id);
+      return json(400, { error: "The account coverage profile could not be saved", detail: coverageError.message, cleanup: cleanupError ? "Auth cleanup failed; contact an administrator" : "Auth user was cleaned up" });
     }
 
     const { data: createdProfile, error: createdProfileError } = await adminClient

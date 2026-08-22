@@ -1,5 +1,5 @@
 begin;
-select plan(19);
+select plan(29);
 
 select has_column('public', 'user_profiles', 'secondary_buddy_id', 'profiles store a secondary buddy');
 select col_is_fk('public', 'user_profiles', 'secondary_buddy_id', 'secondary buddy is referentially enforced');
@@ -11,6 +11,16 @@ select has_function('public', 'record_availability_range_with_audit', array['uui
 select has_function('public', 'get_recurring_todo_workspace', array['jsonb'], 'recurring workspace is database-backed');
 select has_function('public', 'create_recurring_todo_instance', array['uuid', 'date', 'uuid[]'], 'recurring generation uses the central contract');
 select has_function('public', 'resolve_fms_stage_assignees', array['uuid', 'uuid', 'uuid'], 'FMS activation has one assignment resolver');
+select has_column('public', 'task_templates', 'verification_required', 'recurring schedules can require verification');
+select has_column('public', 'task_templates', 'followup_enabled', 'recurring schedules can enable follow-up');
+select has_column('public', 'task_instances', 'verification_status', 'recurring instances persist verification state');
+select has_column('public', 'task_instances', 'followup_count', 'recurring instances persist follow-up activity');
+select has_function('public', 'save_recurring_todo_template_with_audit', array['uuid', 'jsonb'], 'recurring schedules have an audited save contract');
+select has_function('public', 'verify_recurring_task_with_audit', array['uuid', 'text', 'text'], 'verification decisions are audited');
+select has_function('public', 'send_recurring_followup_with_audit', array['uuid', 'text'], 'task follow-ups are audited');
+select has_function('public', 'delete_recurring_todo_template_with_audit', array['uuid'], 'template deletion is dependency-safe and audited');
+select has_function('public', 'configure_invited_profile_coverage_with_audit', array['uuid', 'uuid', 'uuid', 'uuid'], 'new users can receive their full coverage profile atomically');
+select ok(position('secondary_buddy_id' in pg_get_functiondef('public.configure_invited_profile_coverage_with_audit(uuid,uuid,uuid,uuid)'::regprocedure)) > 0, 'new-user coverage configuration persists the secondary buddy');
 
 select ok(
   position('secondary_buddy_id' in pg_get_functiondef('public.resolve_task_coverage(uuid,date)'::regprocedure)) > 0,

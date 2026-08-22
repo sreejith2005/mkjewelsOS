@@ -40,6 +40,7 @@ const FMSBuilderPage = lazy(() => import("@/pages/FMSBuilderPage").then((module)
 const NotificationsPage = lazy(() => import("@/pages/NotificationsPage").then((module) => ({ default: module.NotificationsPage })));
 const CRMPage = lazy(() => import("@/pages/CRMPage").then((module) => ({ default: module.CRMPage })));
 const TasksPage = lazy(() => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
+const RecurringTodoPage = lazy(() => import("@/pages/RecurringTodoPage").then((module) => ({ default: module.RecurringTodoPage })));
 const TaskBulkImportPage = lazy(() => import("@/pages/TaskBulkImportPage").then((module) => ({ default: module.TaskBulkImportPage })));
 const TeamDirectoryPage = lazy(() => import("@/pages/TeamDirectoryPage").then((module) => ({ default: module.TeamDirectoryPage })));
 const ReportsPage = lazy(() => import("@/pages/ReportsPage").then((module) => ({ default: module.ReportsPage })));
@@ -50,6 +51,7 @@ const PAGE_ICONS: Record<PageId, typeof Home> = {
   dashboard: LayoutDashboard,
   crm: Users,
   checklist_tasks: CheckSquare,
+  recurring_todo: CalendarCheck,
   delegation_tasks: ClipboardList,
   fms_tasks: GitBranch,
   fms_builder: GitBranch,
@@ -67,6 +69,7 @@ const IMPLEMENTED_PAGES = new Set<PageId>([
   "home",
   "dashboard",
   "checklist_tasks",
+  "recurring_todo",
   "users",
   "availability",
   "dropdown_master",
@@ -84,6 +87,7 @@ const FULL_WIDTH_PAGES = new Set<PageId>([
   "dashboard",
   "crm",
   "checklist_tasks",
+  "recurring_todo",
   "reports",
   "settings",
   "fms_builder",
@@ -98,6 +102,7 @@ const APP_DESCRIPTIONS: Partial<Record<PageId, string>> = {
   fms_builder: "Run live workflows and design versioned process flows.",
   users: "Browse employees by department and manage authorized accounts.",
   availability: "Record real working availability.",
+  recurring_todo: "Manage recurring schedules, personal work, verification, follow-ups, and coverage.",
   dropdown_master: "Maintain active master values.",
   reports: "Preview fixed reports and manage private CSV exports.",
   settings: "Manage account preferences and authorized organization defaults.",
@@ -298,6 +303,7 @@ function AppShell() {
     : currentPage === "crm" ? <CRMPage />
     : currentPage === "dropdown_master" ? <DropdownMasterPage />
       : currentPage === "checklist_tasks" ? path === "/tasks/import" ? <TaskBulkImportPage onBack={() => navigate("/tasks")} /> : <TasksPage />
+      : currentPage === "recurring_todo" ? <RecurringTodoPage />
       : currentPage === "availability" ? <AvailabilityPage />
           : currentPage === "forms_library" ? <FormsPage />
             : currentPage === "fms_tasks" ? <FMSBuilderPage />

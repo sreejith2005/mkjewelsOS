@@ -11,5 +11,11 @@ describe("task workspace navigation", () => {
     expect(getPageForPath("/tasks")).toBe("checklist_tasks");
     expect(getPageForPath("/tasks/checklist")).toBe("checklist_tasks");
     expect(getPageForPath("/tasks/delegation")).toBe("checklist_tasks");
+    expect(getPageForPath("/tasks/import")).toBe("checklist_tasks");
+  });
+
+  it("routes recurring work to its own workspace", () => {
+    expect(getPageForPath("/recurring-todo")).toBe("recurring_todo");
+    expect(getMenuForRole("manager")).toContainEqual({ id: "recurring_todo", label: "Recurring / To-Do", path: "/recurring-todo" });
   });
 });

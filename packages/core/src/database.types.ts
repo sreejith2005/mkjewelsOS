@@ -5026,8 +5026,10 @@ export type Database = {
           delay_minutes: number | null
           department_id: string | null
           description: string | null
+          followup_count: number
           form_template_id: string | null
           id: string
+          last_followup_at: string | null
           planned_datetime: string
           priority: Database["public"]["Enums"]["task_priority"] | null
           requires_form: boolean
@@ -5044,6 +5046,10 @@ export type Database = {
           title: string
           updated_at: string | null
           updated_by: string | null
+          verification_note: string | null
+          verification_status: string
+          verified_at: string | null
+          verified_by: string | null
         }
         Insert: {
           actual_datetime?: string | null
@@ -5059,8 +5065,10 @@ export type Database = {
           delay_minutes?: number | null
           department_id?: string | null
           description?: string | null
+          followup_count?: number
           form_template_id?: string | null
           id?: string
+          last_followup_at?: string | null
           planned_datetime: string
           priority?: Database["public"]["Enums"]["task_priority"] | null
           requires_form?: boolean
@@ -5077,6 +5085,10 @@ export type Database = {
           title: string
           updated_at?: string | null
           updated_by?: string | null
+          verification_note?: string | null
+          verification_status?: string
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Update: {
           actual_datetime?: string | null
@@ -5092,8 +5104,10 @@ export type Database = {
           delay_minutes?: number | null
           department_id?: string | null
           description?: string | null
+          followup_count?: number
           form_template_id?: string | null
           id?: string
+          last_followup_at?: string | null
           planned_datetime?: string
           priority?: Database["public"]["Enums"]["task_priority"] | null
           requires_form?: boolean
@@ -5110,6 +5124,10 @@ export type Database = {
           title?: string
           updated_at?: string | null
           updated_by?: string | null
+          verification_note?: string | null
+          verification_status?: string
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Relationships: [
           {
@@ -5166,6 +5184,20 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_instances_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_instances_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
         ]
@@ -5234,20 +5266,24 @@ export type Database = {
           default_assignee_user_id: string | null
           department_id: string | null
           description: string | null
+          followup_enabled: boolean
           form_template_id: string | null
           id: string
           is_active: boolean | null
+          personal_performance_enabled: boolean
           planned_time: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           recurrence_rule: string | null
           requires_form: boolean | null
           requires_remark: boolean | null
           requires_upload: boolean | null
+          schedule_kind: string
           task_type: Database["public"]["Enums"]["task_type"]
           tenant_id: string
           title: string
           updated_at: string | null
           updated_by: string | null
+          verification_required: boolean
         }
         Insert: {
           branch_id?: string | null
@@ -5262,20 +5298,24 @@ export type Database = {
           default_assignee_user_id?: string | null
           department_id?: string | null
           description?: string | null
+          followup_enabled?: boolean
           form_template_id?: string | null
           id?: string
           is_active?: boolean | null
+          personal_performance_enabled?: boolean
           planned_time?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           recurrence_rule?: string | null
           requires_form?: boolean | null
           requires_remark?: boolean | null
           requires_upload?: boolean | null
+          schedule_kind?: string
           task_type?: Database["public"]["Enums"]["task_type"]
           tenant_id: string
           title: string
           updated_at?: string | null
           updated_by?: string | null
+          verification_required?: boolean
         }
         Update: {
           branch_id?: string | null
@@ -5290,20 +5330,24 @@ export type Database = {
           default_assignee_user_id?: string | null
           department_id?: string | null
           description?: string | null
+          followup_enabled?: boolean
           form_template_id?: string | null
           id?: string
           is_active?: boolean | null
+          personal_performance_enabled?: boolean
           planned_time?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           recurrence_rule?: string | null
           requires_form?: boolean | null
           requires_remark?: boolean | null
           requires_upload?: boolean | null
+          schedule_kind?: string
           task_type?: Database["public"]["Enums"]["task_type"]
           tenant_id?: string
           title?: string
           updated_at?: string | null
           updated_by?: string | null
+          verification_required?: boolean
         }
         Relationships: [
           {
@@ -6840,6 +6884,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      configure_invited_profile_coverage_with_audit: {
+        Args: {
+          p_creator_profile_id: string
+          p_profile_id: string
+          p_reports_to_user_id: string
+          p_secondary_buddy_id: string
+        }
+        Returns: undefined
+      }
       correct_crm_interaction: {
         Args: {
           p_correction: Json
@@ -6992,6 +7045,10 @@ export type Database = {
         Returns: string
       }
       delete_form_with_audit: {
+        Args: { p_template_id: string }
+        Returns: string
+      }
+      delete_recurring_todo_template_with_audit: {
         Args: { p_template_id: string }
         Returns: string
       }
@@ -7783,6 +7840,10 @@ export type Database = {
         Args: { p_fields: Json; p_payload: Json; p_template_id: string }
         Returns: string
       }
+      save_recurring_todo_template_with_audit: {
+        Args: { p_payload: Json; p_template_id: string }
+        Returns: string
+      }
       save_section_availability_with_audit: {
         Args: {
           p_developer_mode_enabled: boolean
@@ -7846,6 +7907,10 @@ export type Database = {
       search_crm_clients: { Args: { p_filter?: Json }; Returns: Json[] }
       seed_default_notification_rules: {
         Args: { p_tenant_id: string }
+        Returns: undefined
+      }
+      send_recurring_followup_with_audit: {
+        Args: { p_message: string; p_task_id: string }
         Returns: undefined
       }
       set_fms_instance_status_with_audit: {
@@ -8060,6 +8125,10 @@ export type Database = {
       validated_user_preferences: {
         Args: { p_preferences: Json }
         Returns: Json
+      }
+      verify_recurring_task_with_audit: {
+        Args: { p_decision: string; p_note?: string; p_task_id: string }
+        Returns: undefined
       }
     }
     Enums: {

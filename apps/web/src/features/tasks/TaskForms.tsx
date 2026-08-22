@@ -123,9 +123,10 @@ export function DelegationTaskForm({ data, onCancel, onSave }: {
   );
 }
 
-type RecurrenceKind = "daily" | "weekly" | "monthly" | "nth_weekday";
+type RecurrenceKind = "daily" | "weekly" | "monthly" | "nth_weekday" | "quarterly" | "yearly" | "one_time" | "as_required";
 
-function inferRecurrence(rule: string | null): RecurrenceKind {
+function inferRecurrence(rule: string | null, scheduleKind?: string): RecurrenceKind {
+  if (scheduleKind === "quarterly" || scheduleKind === "yearly" || scheduleKind === "one_time" || scheduleKind === "as_required") return scheduleKind;
   if (rule?.includes("BYSETPOS")) return "nth_weekday";
   if (rule?.includes("BYMONTHDAY")) return "monthly";
   if (rule?.includes("FREQ=WEEKLY")) return "weekly";
@@ -141,7 +142,7 @@ export function TaskTemplateForm({ data, template, onCancel, onSave }: {
   const initialRule = template?.recurrence_rule ?? "FREQ=DAILY";
   const [title, setTitle] = useState(template?.title ?? "");
   const [description, setDescription] = useState(template?.description ?? "");
-  const [kind, setKind] = useState<RecurrenceKind>(inferRecurrence(initialRule));
+  const [kind, setKind] = useState<RecurrenceKind>(inferRecurrence(initialRule, template?.schedule_kind));
   const [weekdays, setWeekdays] = useState<string[]>(WEEKDAYS.filter((day) => initialRule.includes(day.code)).map((day) => day.code));
   const [monthDay, setMonthDay] = useState(Number(initialRule.match(/BYMONTHDAY=(\d+)/)?.[1] ?? 1));
   const [nth, setNth] = useState(Number(initialRule.match(/BYSETPOS=(-?\d+)/)?.[1] ?? 1));
@@ -159,6 +160,9 @@ export function TaskTemplateForm({ data, template, onCancel, onSave }: {
   const [requiresForm, setRequiresForm] = useState(template?.requires_form ?? false);
   const [formId, setFormId] = useState(template?.form_template_id ?? "");
   const [active, setActive] = useState(template?.is_active ?? true);
+  const [verificationRequired, setVerificationRequired] = useState(template?.verification_required ?? false);
+  const [followupEnabled, setFollowupEnabled] = useState(template?.followup_enabled ?? false);
+  const [personalPerformanceEnabled, setPersonalPerformanceEnabled] = useState(template?.personal_performance_enabled ?? true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const departments = useMemo(() => data.departments.filter((department) => !branchId || !department.branch_id || department.branch_id === branchId), [branchId, data.departments]);
@@ -166,7 +170,10 @@ export function TaskTemplateForm({ data, template, onCancel, onSave }: {
   const recurrenceRule = kind === "daily" ? "FREQ=DAILY"
     : kind === "weekly" ? `FREQ=WEEKLY;BYDAY=${weekdays.join(",")}`
       : kind === "monthly" ? `FREQ=MONTHLY;BYMONTHDAY=${monthDay}`
-        : `FREQ=MONTHLY;BYDAY=${nthDay};BYSETPOS=${nth}`;
+        : kind === "nth_weekday" ? `FREQ=MONTHLY;BYDAY=${nthDay};BYSETPOS=${nth}`
+          : kind === "quarterly" ? "FREQ=MONTHLY;INTERVAL=3"
+            : kind === "yearly" ? "FREQ=YEARLY"
+              : "FREQ=YEARLY;COUNT=1";
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -176,13 +183,15 @@ export function TaskTemplateForm({ data, template, onCancel, onSave }: {
     setSaving(true); setError(null);
     try {
       await onSave(template?.id ?? null, {
-        title: title.trim(), description: description.trim(), recurrence_rule: recurrenceRule,
+        title: title.trim(), description: description.trim(), recurrence_rule: recurrenceRule, schedule_kind: kind,
         planned_time: plannedTime, priority, branch_id: branchId, department_id: departmentId,
         default_assignee_type: assigneeType,
         default_assignee_user_id: assigneeType === "specific_user" ? assigneeUser : "",
         default_assignee_role: assigneeType === "role" ? assigneeRole : "",
         checklist_items: checklist, requires_upload: requiresUpload, requires_remark: requiresRemark,
         requires_form: requiresForm, form_template_id: requiresForm ? formId : "", is_active: active,
+        verification_required: verificationRequired, followup_enabled: followupEnabled,
+        personal_performance_enabled: personalPerformanceEnabled,
       });
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to save template"); }
     finally { setSaving(false); }
@@ -193,7 +202,7 @@ export function TaskTemplateForm({ data, template, onCancel, onSave }: {
       {error ? <Notice tone="danger">{error}</Notice> : null}
       <Field label="Title"><input className="field" maxLength={200} onChange={(event) => setTitle(event.target.value)} required value={title} /></Field>
       <Field label="Description"><textarea className="field min-h-20" onChange={(event) => setDescription(event.target.value)} value={description} /></Field>
-      <div className="grid gap-4 sm:grid-cols-2"><Field label="Recurrence"><select className="field" onChange={(event) => setKind(event.target.value as RecurrenceKind)} value={kind}><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly day</option><option value="nth_weekday">Nth weekday of month</option></select></Field><Field label="Planned time"><input className="field" onChange={(event) => setPlannedTime(event.target.value)} required type="time" value={plannedTime} /></Field></div>
+      <div className="grid gap-4 sm:grid-cols-2"><Field label="Schedule"><select className="field" onChange={(event) => setKind(event.target.value as RecurrenceKind)} value={kind}><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly day</option><option value="nth_weekday">Nth weekday of month</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option><option value="one_time">One time</option><option value="as_required">As required</option></select></Field><Field label="Planned time"><input className="field" onChange={(event) => setPlannedTime(event.target.value)} required type="time" value={plannedTime} /></Field></div>
       {kind === "weekly" ? <fieldset className="flex flex-wrap gap-3 rounded-xl border border-gold/20 p-4"><legend className="px-1 text-xs text-champagne">Repeat on</legend>{WEEKDAYS.map((day) => <label className="flex items-center gap-1 text-sm text-white" key={day.code}><input checked={weekdays.includes(day.code)} onChange={(event) => setWeekdays((current) => event.target.checked ? [...current, day.code] : current.filter((code) => code !== day.code))} type="checkbox" />{day.label}</label>)}</fieldset> : null}
       {kind === "monthly" ? <Field label="Day of month"><input className="field" max={31} min={1} onChange={(event) => setMonthDay(event.target.valueAsNumber)} type="number" value={monthDay} /></Field> : null}
       {kind === "nth_weekday" ? <div className="grid grid-cols-2 gap-4"><Field label="Occurrence"><select className="field" onChange={(event) => setNth(Number(event.target.value))} value={nth}><option value={1}>First</option><option value={2}>Second</option><option value={3}>Third</option><option value={4}>Fourth</option><option value={-1}>Last</option></select></Field><Field label="Weekday"><select className="field" onChange={(event) => setNthDay(event.target.value)} value={nthDay}>{WEEKDAYS.map((day) => <option key={day.code} value={day.code}>{day.label}</option>)}</select></Field></div> : null}
@@ -201,6 +210,7 @@ export function TaskTemplateForm({ data, template, onCancel, onSave }: {
       <div className="grid gap-4 sm:grid-cols-2"><Field label="Default assignee rule"><select className="field" onChange={(event) => setAssigneeType(event.target.value)} value={assigneeType}><option value="specific_user">Specific user</option><option value="role">Role</option></select></Field>{assigneeType === "specific_user" ? <Field label="User"><select className="field" onChange={(event) => setAssigneeUser(event.target.value)} required value={assigneeUser}><option value="">Select user</option>{data.users.map((user) => user.id ? <option key={user.id} value={user.id}>{user.employee_name}</option> : null)}</select></Field> : <Field label="Role"><select className="field" onChange={(event) => setAssigneeRole(event.target.value as Enums<"user_role">)} value={assigneeRole}>{TASK_ROLES.map((role) => <option key={role} value={role}>{role.replace("_", " ")}</option>)}</select></Field>}</div>
       <ChecklistEditor items={checklist} onChange={setChecklist} />
       <div className="flex flex-wrap gap-5"><label className="flex items-center gap-2 text-sm text-champagne"><input checked={requiresUpload} onChange={(event) => setRequiresUpload(event.target.checked)} type="checkbox" />Require upload</label><label className="flex items-center gap-2 text-sm text-champagne"><input checked={requiresRemark} onChange={(event) => setRequiresRemark(event.target.checked)} type="checkbox" />Require remark</label><label className="flex items-center gap-2 text-sm text-champagne"><input checked={requiresForm} onChange={(event) => setRequiresForm(event.target.checked)} type="checkbox" />Require form</label><label className="flex items-center gap-2 text-sm text-champagne"><input checked={active} onChange={(event) => setActive(event.target.checked)} type="checkbox" />Active</label></div>
+      <div className="grid gap-3 rounded-xl border border-gold/15 p-4 sm:grid-cols-3"><label className="flex items-center gap-2 text-sm text-champagne"><input checked={verificationRequired} onChange={(event) => setVerificationRequired(event.target.checked)} type="checkbox" />Manager verification</label><label className="flex items-center gap-2 text-sm text-champagne"><input checked={followupEnabled} onChange={(event) => setFollowupEnabled(event.target.checked)} type="checkbox" />Follow-up enabled</label><label className="flex items-center gap-2 text-sm text-champagne"><input checked={personalPerformanceEnabled} onChange={(event) => setPersonalPerformanceEnabled(event.target.checked)} type="checkbox" />Personal performance</label></div>
       {requiresForm ? <Field label="Required form"><select className="field" onChange={(event) => setFormId(event.target.value)} value={formId}><option value="">Select form</option>{data.forms.map((form) => <option key={form.id} value={form.id}>{form.name}</option>)}</select></Field> : null}
       <div className="flex justify-end gap-3"><Button onClick={onCancel} type="button" variant="secondary">Cancel</Button><Button disabled={saving} type="submit">{saving ? "Saving…" : "Save template"}</Button></div>
     </form>
