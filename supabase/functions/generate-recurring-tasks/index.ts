@@ -1,9 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import {
-  resolveRecurringAssignment,
   shouldGenerateRecurringTask,
-  type RecurringAssignment,
-  type RecurringAvailabilityProfile,
 } from "../../../packages/core/src/recurrence.ts";
 
 const corsHeaders = {
@@ -14,8 +11,6 @@ const corsHeaders = {
 };
 
 type RequestBody = { date?: unknown };
-type Profile = RecurringAvailabilityProfile;
-
 function json(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), { status, headers: corsHeaders });
 }
@@ -92,7 +87,7 @@ Deno.serve(async (request: Request) => {
 
     let profilesQuery = admin
       .from("user_profiles")
-      .select("id,buddy_id,week_off,working_status")
+      .select("id")
       .eq("tenant_id", template.tenant_id);
     if (template.branch_id) profilesQuery = profilesQuery.eq("branch_id", template.branch_id);
     if (template.department_id) profilesQuery = profilesQuery.eq("department_id", template.department_id);
@@ -107,34 +102,10 @@ Deno.serve(async (request: Request) => {
       continue;
     }
 
-    const originalProfiles = assignees as Profile[];
-    const relatedIds = Array.from(new Set(originalProfiles.flatMap((profile) =>
-      profile.buddy_id ? [profile.id, profile.buddy_id] : [profile.id]
-    )));
-    const [{ data: relatedProfiles, error: relatedError }, { data: availability, error: availabilityError }] = await Promise.all([
-      admin.from("user_profiles").select("id,buddy_id,week_off,working_status")
-        .eq("tenant_id", template.tenant_id).in("id", relatedIds),
-      admin.from("user_availability").select("user_profile_id,status")
-        .eq("tenant_id", template.tenant_id).eq("date", targetDate).in("user_profile_id", relatedIds),
-    ]);
-    if (relatedError || availabilityError) {
-      failures.push({ template_id: template.id, error: "Unable to resolve availability" });
-      continue;
-    }
-    const profileById = new Map((relatedProfiles as Profile[] | null ?? []).map((profile) => [profile.id, profile]));
-    const statusByUser = new Map((availability ?? []).map((row) => [row.user_profile_id, row.status]));
-    const assignments: RecurringAssignment[] = originalProfiles.map((original) =>
-      resolveRecurringAssignment(
-        original,
-        original.buddy_id ? profileById.get(original.buddy_id) : undefined,
-        statusByUser,
-        targetDate,
-      ));
-
-    const { data: taskId, error: createError } = await admin.rpc("create_recurring_task_instance", {
+    const { data: taskId, error: createError } = await admin.rpc("create_recurring_todo_instance", {
       p_template_id: template.id,
       p_target_date: targetDate,
-      p_assignments: assignments,
+      p_original_assignee_ids: assignees.map((profile) => profile.id),
     });
     if (createError) failures.push({ template_id: template.id, error: "Instance creation failed" });
     else if (taskId) created += 1;

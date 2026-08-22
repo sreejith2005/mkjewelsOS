@@ -429,12 +429,93 @@ begin
 end;
 $$;
 
+-- Protected worker entry point. The worker supplies only the original doers;
+-- the database resolves coverage again inside the creation transaction.
+create or replace function create_recurring_todo_instance(
+  p_template_id uuid,p_target_date date,p_original_assignee_ids uuid[]
+) returns uuid language plpgsql security definer set search_path=public as $$
+declare v_template task_templates; v_task task_instances; v_original_id uuid; v_resolution record;
+  v_item jsonb; v_uncovered boolean:=false; v_first_uncovered uuid; v_manager uuid;
+begin
+  if coalesce(auth.role(),'')<>'service_role' then raise exception 'Service role required' using errcode='42501'; end if;
+  if p_target_date is null or coalesce(array_length(p_original_assignee_ids,1),0)=0 then
+    raise exception 'Target date and original assignees are required' using errcode='22023';
+  end if;
+  select * into v_template from task_templates where id=p_template_id and is_active and task_type='checklist' for update;
+  if v_template.id is null then raise exception 'Template not found' using errcode='22023'; end if;
+  if exists(select 1 from task_instances where task_template_id=p_template_id and scheduled_date=p_target_date) then return null; end if;
+  insert into task_instances(tenant_id,branch_id,department_id,category_id,task_template_id,task_type,title,
+    description,priority,status,planned_datetime,scheduled_date,requires_upload,requires_remark,requires_form,
+    form_template_id,source,created_by)
+  values(v_template.tenant_id,v_template.branch_id,v_template.department_id,v_template.category_id,v_template.id,
+    'checklist',v_template.title,v_template.description,v_template.priority,'pending',
+    (p_target_date::text||' '||coalesce(v_template.planned_time,'23:59'::time)::text||' Asia/Kolkata')::timestamptz,
+    p_target_date,v_template.requires_upload,v_template.requires_remark,v_template.requires_form,
+    v_template.form_template_id,'checklist',coalesce(v_template.created_by,v_template.updated_by,p_original_assignee_ids[1]))
+  on conflict do nothing returning * into v_task;
+  if v_task.id is null then return null; end if;
+  for v_item in select value from jsonb_array_elements(v_template.checklist_items) loop
+    insert into task_checklists(task_instance_id,item_text,is_required,sort_order)
+    values(v_task.id,v_item->>'item_text',coalesce((v_item->>'is_required')::boolean,true),coalesce((v_item->>'sort_order')::integer,0));
+  end loop;
+  foreach v_original_id in array p_original_assignee_ids loop
+    if not exists(select 1 from user_profiles u where u.id=v_original_id and u.tenant_id=v_template.tenant_id
+      and (v_template.branch_id is null or u.branch_id=v_template.branch_id)
+      and (v_template.department_id is null or u.department_id=v_template.department_id)
+      and ((v_template.default_assignee_type='specific_user' and u.id=v_template.default_assignee_user_id)
+        or (v_template.default_assignee_type='role' and u.user_role=v_template.default_assignee_role))) then
+      raise exception 'Original recurring doer is outside the template scope' using errcode='23503';
+    end if;
+    select * into v_resolution from resolve_task_coverage(v_original_id,p_target_date);
+    if v_resolution.effective_assignee_id is null then
+      v_uncovered:=true; v_first_uncovered:=coalesce(v_first_uncovered,v_original_id);
+      insert into task_assignees(task_instance_id,user_profile_id,role_at_task,is_original,is_active)
+      values(v_task.id,v_original_id,'doer',true,true) on conflict do nothing;
+      insert into audit_logs(tenant_id,actor_user_id,action,module,record_id,new_value)
+      values(v_template.tenant_id,null,'coverage_required','tasks',v_task.id,
+        jsonb_build_object('original_assignee_id',v_original_id,'date',p_target_date));
+    else
+      insert into task_assignees(task_instance_id,user_profile_id,role_at_task,is_original,is_active)
+      values(v_task.id,v_resolution.effective_assignee_id,'doer',v_resolution.resolution='original',true) on conflict do nothing;
+      if v_resolution.resolution<>'original' then
+        insert into buddy_assignments(tenant_id,original_assignee_id,buddy_id,task_instance_id,date,escalated_to_manager)
+        values(v_template.tenant_id,v_original_id,v_resolution.effective_assignee_id,v_task.id,p_target_date,
+          v_resolution.resolution='reporting_manager');
+      end if;
+      insert into audit_logs(tenant_id,actor_user_id,action,module,record_id,new_value)
+      values(v_template.tenant_id,null,'task_assignment_resolved','tasks',v_task.id,
+        jsonb_build_object('original_assignee_id',v_original_id,'effective_assignee_id',v_resolution.effective_assignee_id,
+          'resolution',v_resolution.resolution,'date',p_target_date));
+    end if;
+  end loop;
+  if v_uncovered then
+    update task_instances set coverage_status='coverage_required',coverage_original_assignee_id=v_first_uncovered,
+      coverage_resolution='coverage_required',coverage_resolved_for_date=p_target_date where id=v_task.id;
+    select coalesce(u.reports_to_user_id,d.head_id) into v_manager from user_profiles u
+      left join departments d on d.id=u.department_id where u.id=v_first_uncovered;
+    if v_manager is not null then
+      insert into notifications(tenant_id,user_profile_id,event_type,title,message,link_url)
+      values(v_template.tenant_id,v_manager,'task_coverage_required','Task needs coverage',
+        v_template.title||' has no available buddy for '||p_target_date::text,'/recurring-todo');
+    end if;
+  end if;
+  insert into audit_logs(tenant_id,actor_user_id,action,module,record_id,new_value)
+  values(v_template.tenant_id,null,'recurring_task_generated','tasks',v_task.id,
+    jsonb_build_object('template_id',p_template_id,'scheduled_date',p_target_date,'coverage_required',v_uncovered));
+  return v_task.id;
+exception when unique_violation then return null;
+end;
+$$;
+
 revoke all on function resolve_task_coverage(uuid,date) from public,anon,authenticated;
 revoke all on function reconcile_short_deadline_coverage_with_audit(uuid,date,text) from public,anon;
 revoke all on function record_availability_range_with_audit(uuid,date,date,availability_status,text) from public,anon;
 revoke all on function get_recurring_todo_workspace(jsonb) from public,anon;
+revoke all on function create_recurring_todo_instance(uuid,date,uuid[]) from public,anon,authenticated;
 grant execute on function reconcile_short_deadline_coverage_with_audit(uuid,date,text) to authenticated;
 grant execute on function record_availability_range_with_audit(uuid,date,date,availability_status,text) to authenticated;
 grant execute on function get_recurring_todo_workspace(jsonb) to authenticated;
+grant execute on function resolve_task_coverage(uuid,date) to service_role;
+grant execute on function create_recurring_todo_instance(uuid,date,uuid[]) to service_role;
 
 notify pgrst,'reload schema';

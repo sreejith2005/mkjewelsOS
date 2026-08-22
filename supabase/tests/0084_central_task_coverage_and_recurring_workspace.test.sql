@@ -1,5 +1,5 @@
 begin;
-select plan(15);
+select plan(17);
 
 select has_column('public', 'user_profiles', 'secondary_buddy_id', 'profiles store a secondary buddy');
 select col_is_fk('public', 'user_profiles', 'secondary_buddy_id', 'secondary buddy is referentially enforced');
@@ -9,10 +9,15 @@ select has_function('public', 'resolve_task_coverage', array['uuid', 'date'], 'c
 select has_function('public', 'reconcile_short_deadline_coverage_with_audit', array['uuid', 'date', 'text'], 'short-deadline work has one audited reconciler');
 select has_function('public', 'record_availability_range_with_audit', array['uuid', 'date', 'date', 'availability_status', 'text'], 'availability ranges are recorded atomically');
 select has_function('public', 'get_recurring_todo_workspace', array['jsonb'], 'recurring workspace is database-backed');
+select has_function('public', 'create_recurring_todo_instance', array['uuid', 'date', 'uuid[]'], 'recurring generation uses the central contract');
 
 select ok(
   position('secondary_buddy_id' in pg_get_functiondef('public.resolve_task_coverage(uuid,date)'::regprocedure)) > 0,
   'resolver evaluates the secondary buddy'
+);
+select ok(
+  position('resolve_task_coverage' in pg_get_functiondef('public.create_recurring_todo_instance(uuid,date,uuid[])'::regprocedure)) > 0,
+  'recurring generation delegates availability and buddy order to the canonical resolver'
 );
 select ok(
   position('reports_to_user_id' in pg_get_functiondef('public.resolve_task_coverage(uuid,date)'::regprocedure)) > 0,
