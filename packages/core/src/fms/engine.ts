@@ -20,7 +20,7 @@ export function normalizeFmsDefinition(input: FmsFlowDefinition): FmsFlowDefinit
     allowMultipleDoers: bool(stage.allowMultipleDoers), requiresUpload: bool(stage.requiresUpload), requiresRemark: bool(stage.requiresRemark),
     checklist: array<FmsChecklistItemDefinition>(stage.checklist).map((item) => ({ key: text(item.key).toLowerCase(), label: text(item.label), required: bool(item.required, true) })),
     formTemplateId: text(stage.formTemplateId) || undefined,
-    assigneeRules: array<FmsAssigneeRule>(stage.assigneeRules).map((rule) => ({ ...rule, userProfileId: text(rule.userProfileId) || undefined, fallbackUserProfileId: text(rule.fallbackUserProfileId) || undefined, allowNextSelection: bool(rule.allowNextSelection) })),
+    assigneeRules: array<FmsAssigneeRule>(stage.assigneeRules).map((rule) => ({ ...rule, userProfileId: text(rule.userProfileId) || undefined, fallbackUserProfileId: undefined, allowNextSelection: bool(rule.allowNextSelection) })),
     requiresNextDoerHandoff: bool(stage.requiresNextDoerHandoff), canMoveBackward: bool(stage.canMoveBackward), canReject: bool(stage.canReject),
     canRequestRevision: bool(stage.canRequestRevision), canEscalate: bool(stage.canEscalate), defaultNextStageKey: text(stage.defaultNextStageKey).toLowerCase() || undefined,
     branchRules: array<FmsBranchRule>(stage.branchRules).map((rule, index) => ({ ...rule, id: text(rule.id) || `rule_${index + 1}`, sourceKey: text(rule.sourceKey) || undefined, nextStageKey: text(rule.nextStageKey).toLowerCase() || undefined, nextFlowId: text(rule.nextFlowId) || undefined, order: index })),

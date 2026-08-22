@@ -147,6 +147,7 @@ export function TaskTemplateForm({ data, template, onCancel, onSave }: {
   const [monthDay, setMonthDay] = useState(Number(initialRule.match(/BYMONTHDAY=(\d+)/)?.[1] ?? 1));
   const [nth, setNth] = useState(Number(initialRule.match(/BYSETPOS=(-?\d+)/)?.[1] ?? 1));
   const [nthDay, setNthDay] = useState(initialRule.match(/BYDAY=([A-Z]{2})/)?.[1] ?? "MO");
+  const [startsOn, setStartsOn] = useState(template?.starts_on ?? new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }));
   const [plannedTime, setPlannedTime] = useState(template?.planned_time?.slice(0, 5) ?? "09:00");
   const [priority, setPriority] = useState<Enums<"task_priority">>(template?.priority ?? "medium");
   const [branchId, setBranchId] = useState(template?.branch_id ?? "");
@@ -177,14 +178,14 @@ export function TaskTemplateForm({ data, template, onCancel, onSave }: {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if ((kind === "weekly" && weekdays.length === 0) || (assigneeType === "specific_user" && !assigneeUser) || (requiresForm && !formId)) {
+    if ((kind === "weekly" && weekdays.length === 0) || (assigneeType === "specific_user" && !assigneeUser) || (requiresForm && !formId) || !startsOn) {
       setError("Complete the recurrence, assignee, and required form selections."); return;
     }
     setSaving(true); setError(null);
     try {
       await onSave(template?.id ?? null, {
         title: title.trim(), description: description.trim(), recurrence_rule: recurrenceRule, schedule_kind: kind,
-        planned_time: plannedTime, priority, branch_id: branchId, department_id: departmentId,
+        starts_on: startsOn, planned_time: plannedTime, priority, branch_id: branchId, department_id: departmentId,
         default_assignee_type: assigneeType,
         default_assignee_user_id: assigneeType === "specific_user" ? assigneeUser : "",
         default_assignee_role: assigneeType === "role" ? assigneeRole : "",
@@ -202,7 +203,7 @@ export function TaskTemplateForm({ data, template, onCancel, onSave }: {
       {error ? <Notice tone="danger">{error}</Notice> : null}
       <Field label="Title"><input className="field" maxLength={200} onChange={(event) => setTitle(event.target.value)} required value={title} /></Field>
       <Field label="Description"><textarea className="field min-h-20" onChange={(event) => setDescription(event.target.value)} value={description} /></Field>
-      <div className="grid gap-4 sm:grid-cols-2"><Field label="Schedule"><select className="field" onChange={(event) => setKind(event.target.value as RecurrenceKind)} value={kind}><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly day</option><option value="nth_weekday">Nth weekday of month</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option><option value="one_time">One time</option><option value="as_required">As required</option></select></Field><Field label="Planned time"><input className="field" onChange={(event) => setPlannedTime(event.target.value)} required type="time" value={plannedTime} /></Field></div>
+      <div className="grid gap-4 sm:grid-cols-3"><Field label="Schedule"><select className="field" onChange={(event) => setKind(event.target.value as RecurrenceKind)} value={kind}><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly day</option><option value="nth_weekday">Nth weekday of month</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option><option value="one_time">One time</option><option value="as_required">As required</option></select></Field><Field label="Start date"><input className="field" onChange={(event) => setStartsOn(event.target.value)} required type="date" value={startsOn} /></Field><Field label="Planned time"><input className="field" onChange={(event) => setPlannedTime(event.target.value)} required type="time" value={plannedTime} /></Field></div>
       {kind === "weekly" ? <fieldset className="flex flex-wrap gap-3 rounded-xl border border-gold/20 p-4"><legend className="px-1 text-xs text-champagne">Repeat on</legend>{WEEKDAYS.map((day) => <label className="flex items-center gap-1 text-sm text-white" key={day.code}><input checked={weekdays.includes(day.code)} onChange={(event) => setWeekdays((current) => event.target.checked ? [...current, day.code] : current.filter((code) => code !== day.code))} type="checkbox" />{day.label}</label>)}</fieldset> : null}
       {kind === "monthly" ? <Field label="Day of month"><input className="field" max={31} min={1} onChange={(event) => setMonthDay(event.target.valueAsNumber)} type="number" value={monthDay} /></Field> : null}
       {kind === "nth_weekday" ? <div className="grid grid-cols-2 gap-4"><Field label="Occurrence"><select className="field" onChange={(event) => setNth(Number(event.target.value))} value={nth}><option value={1}>First</option><option value={2}>Second</option><option value={3}>Third</option><option value={4}>Fourth</option><option value={-1}>Last</option></select></Field><Field label="Weekday"><select className="field" onChange={(event) => setNthDay(event.target.value)} value={nthDay}>{WEEKDAYS.map((day) => <option key={day.code} value={day.code}>{day.label}</option>)}</select></Field></div> : null}

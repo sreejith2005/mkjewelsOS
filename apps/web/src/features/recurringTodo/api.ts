@@ -22,8 +22,13 @@ export async function deleteRecurringTemplate(id: string): Promise<string> {
   return data;
 }
 
-export async function runRecurringTemplateNow(id: string, planned: string): Promise<void> {
-  const { error } = await supabase.rpc("use_task_template_with_audit", { p_template_id: id, p_planned_datetime: planned });
+export async function setRecurringTemplateActive(id: string, active: boolean): Promise<void> {
+  const { error } = await supabase.rpc("set_recurring_todo_template_active_with_audit", { p_template_id: id, p_active: active });
+  if (error) throw new Error(`Update recurring schedule: ${error.message}`);
+}
+
+export async function runRecurringTemplateNow(id: string, targetDate: string): Promise<void> {
+  const { error } = await supabase.rpc("run_recurring_todo_template_now_with_audit", { p_template_id: id, p_target_date: targetDate });
   if (error) throw new Error(`Run recurring schedule: ${error.message}`);
 }
 

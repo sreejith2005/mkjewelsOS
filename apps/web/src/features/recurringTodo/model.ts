@@ -4,6 +4,8 @@ export type RecurringTemplate = Tables<"task_templates">;
 export type RecurringInstance = Tables<"task_instances"> & {
   assignees: Array<{ id: string; name: string; is_original: boolean }>;
   checklist: Tables<"task_checklists">[];
+  has_attachment: boolean;
+  has_form_submission: boolean;
 };
 export type RecurringStats = { total: number; pending: number; in_progress: number; completed: number; overdue: number; coverage_required: number; manager_review: number };
 export type RecurringWorkspace = { templates: RecurringTemplate[]; instances: RecurringInstance[]; stats: RecurringStats };

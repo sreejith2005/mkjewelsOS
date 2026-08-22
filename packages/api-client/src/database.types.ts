@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -5278,6 +5278,7 @@ export type Database = {
           requires_remark: boolean | null
           requires_upload: boolean | null
           schedule_kind: string
+          starts_on: string | null
           task_type: Database["public"]["Enums"]["task_type"]
           tenant_id: string
           title: string
@@ -5310,6 +5311,7 @@ export type Database = {
           requires_remark?: boolean | null
           requires_upload?: boolean | null
           schedule_kind?: string
+          starts_on?: string | null
           task_type?: Database["public"]["Enums"]["task_type"]
           tenant_id: string
           title: string
@@ -5342,6 +5344,7 @@ export type Database = {
           requires_remark?: boolean | null
           requires_upload?: boolean | null
           schedule_kind?: string
+          starts_on?: string | null
           task_type?: Database["public"]["Enums"]["task_type"]
           tenant_id?: string
           title?: string
@@ -5578,6 +5581,7 @@ export type Database = {
           id: string
           logged_by: string | null
           reason: string | null
+          source: string
           status: Database["public"]["Enums"]["availability_status"]
           tenant_id: string
           user_profile_id: string
@@ -5588,6 +5592,7 @@ export type Database = {
           id?: string
           logged_by?: string | null
           reason?: string | null
+          source?: string
           status: Database["public"]["Enums"]["availability_status"]
           tenant_id: string
           user_profile_id: string
@@ -5598,6 +5603,7 @@ export type Database = {
           id?: string
           logged_by?: string | null
           reason?: string | null
+          source?: string
           status?: Database["public"]["Enums"]["availability_status"]
           tenant_id?: string
           user_profile_id?: string
@@ -7766,6 +7772,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      run_recurring_todo_template_now_with_audit: {
+        Args: { p_target_date: string; p_template_id: string }
+        Returns: string
+      }
       save_branch_settings_with_audit: {
         Args: {
           p_branch_id: string
@@ -7920,6 +7930,10 @@ export type Database = {
       set_notification_rule_enabled: {
         Args: { p_enabled: boolean; p_rule_id: string }
         Returns: undefined
+      }
+      set_recurring_todo_template_active_with_audit: {
+        Args: { p_active: boolean; p_template_id: string }
+        Returns: boolean
       }
       start_fms_from_form_submission_with_audit: {
         Args: { p_submission_id: string }

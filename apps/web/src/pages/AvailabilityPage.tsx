@@ -8,7 +8,7 @@ import { normalizeAvailabilityRange } from "@/features/availability/dateRange";
 import { initials, titleCase } from "@/lib/format";
 import { loadAvailabilityForDate, loadAvailabilityUsers, recordAvailabilityRange, type AvailabilityEntry, type TaskUser } from "@/features/tasks/api";
 
-function today(): string { return new Date().toLocaleDateString("en-CA"); }
+function today(): string { return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); }
 const statusLabels: Record<Enums<"availability_status">, string> = { present: "Present", absent: "Absent", half_day: "Half day", remote: "Remote" };
 
 export function AvailabilityPage() {
@@ -25,6 +25,7 @@ export function AvailabilityPage() {
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
+  const [coverageSummary, setCoverageSummary] = useState<{ primary_buddy: number; secondary_buddy: number; reporting_manager: number; coverage_required: number; manager_review: number } | null>(null);
   const canLogOthers = profile ? ["super_admin", "admin", "manager", "hr"].includes(profile.user_role) : false;
   const date = startDate;
 
@@ -75,7 +76,8 @@ export function AvailabilityPage() {
     try {
       const range = normalizeAvailabilityRange(startDate, endDate);
       const resolvedReason = reason.trim() || entryByUser.get(user.id)?.reason || "";
-      await recordAvailabilityRange(user.id, range.startDate, range.endDate, status, resolvedReason);
+      const summary = await recordAvailabilityRange(user.id, range.startDate, range.endDate, status, resolvedReason);
+      setCoverageSummary(summary);
       setEntries((current) => {
         const remaining = current.filter((entry) => entry.user_profile_id !== user.id);
         return [...remaining, { user_profile_id: user.id, date, status, reason: resolvedReason || null }];
@@ -91,6 +93,7 @@ export function AvailabilityPage() {
       <div className="flex gap-2 text-xs"><span className="rounded-full bg-success/15 px-3 py-1.5 font-semibold text-success">{presentCount} present</span><button className="rounded-full bg-danger/15 px-3 py-1.5 font-semibold text-danger" onClick={() => { setOnlyAbsent((value) => !value); setOnlyExceptions(false); }} type="button">{onlyAbsent ? "Showing absent" : `${absentCount} absent`}</button></div>
     </header>
     {error ? <Notice tone="danger">{error}</Notice> : null}
+    {coverageSummary ? <Notice tone={coverageSummary.coverage_required ? "danger" : coverageSummary.manager_review ? "neutral" : "success"}>Coverage result: {coverageSummary.primary_buddy} primary, {coverageSummary.secondary_buddy} secondary, {coverageSummary.reporting_manager} manager, {coverageSummary.manager_review} review, {coverageSummary.coverage_required} unassigned.</Notice> : null}
     <section className="mb-5"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><h2 className="text-sm font-semibold text-white">Department overview</h2><p className="text-xs text-soft-grey">Select a department to focus the team list below.</p></div>{departmentId ? <Button onClick={() => setDepartmentId("")} variant="secondary">All departments</Button> : null}</div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{departmentOverview.map((department) => <button className={`rounded-xl border p-4 text-left transition ${departmentId === department.id ? "border-gold bg-gold/10" : "border-gold/15 bg-charcoal hover:border-gold/40"}`} key={department.id} onClick={() => setDepartmentId(department.id)} type="button"><div className="mb-2 flex items-center justify-between gap-2"><span className="truncate text-sm font-semibold text-white">{department.name}</span><span className="rounded-full bg-task-muted px-2 py-0.5 text-xs text-soft-grey">{department.total}</span></div><div className="flex flex-wrap gap-2 text-xs"><span className="text-success">{department.present} present</span><span className="text-danger">{department.absent} absent</span>{department.halfDay ? <span className="text-gold">{department.halfDay} half day</span> : null}{department.remote ? <span className="text-gold">{department.remote} remote</span> : null}</div></button>)}</div></section>
     <div className="glass-card mb-5 grid gap-3 rounded-xl p-4 md:grid-cols-2 xl:grid-cols-[1fr_160px_160px_1fr_auto]"><label className="relative"><Search className="absolute left-3 top-3 size-4 text-soft-grey" /><input aria-label="Search team" className="field pl-9" onChange={(event) => setSearch(event.target.value)} placeholder="Find a team member" value={search} /></label><label className="text-xs text-soft-grey">Start date<input aria-label="Availability start date" className="field mt-1" type="date" value={startDate} onChange={(event) => { setStartDate(event.target.value); if (endDate && endDate < event.target.value) setEndDate(""); }} /></label><label className="text-xs text-soft-grey">End date<input aria-label="Availability end date" className="field mt-1" min={startDate} type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></label><label className="text-xs text-soft-grey">Reason<input aria-label="Availability reason" className="field mt-1" maxLength={500} placeholder="Optional note" value={reason} onChange={(event) => setReason(event.target.value)} /></label><Button onClick={() => { setOnlyExceptions((value) => !value); setOnlyAbsent(false); }} variant={onlyExceptions ? "primary" : "secondary"}>{onlyExceptions ? "Showing exceptions" : "Show exceptions"}</Button></div>
     <div className="mb-4 flex items-center gap-2 text-sm text-soft-grey"><Users className="size-4 text-gold" /><span>{canLogOthers ? "Mark only the people who are away. Each change is saved immediately." : "Your current working status for today."}</span></div>

@@ -324,8 +324,8 @@ export async function recordAvailabilityRange(
   endDate: string,
   status: AvailabilityStatus,
   reason: string,
-): Promise<void> {
-  const { error } = await supabase.rpc("record_availability_range_with_audit", {
+): Promise<{ primary_buddy: number; secondary_buddy: number; reporting_manager: number; coverage_required: number; manager_review: number }> {
+  const { data, error } = await supabase.rpc("record_availability_range_with_audit", {
     p_user_profile_id: userProfileId,
     p_start_date: startDate,
     p_end_date: endDate,
@@ -333,4 +333,9 @@ export async function recordAvailabilityRange(
     p_reason: reason,
   });
   fail("Record availability range", error);
+  const summary = data && typeof data === "object" && !Array.isArray(data) && data.coverage_summary
+    && typeof data.coverage_summary === "object" && !Array.isArray(data.coverage_summary)
+    ? data.coverage_summary : {};
+  const count = (key: string) => typeof summary[key] === "number" ? summary[key] : 0;
+  return { primary_buddy: count("primary_buddy"), secondary_buddy: count("secondary_buddy"), reporting_manager: count("reporting_manager"), coverage_required: count("coverage_required"), manager_review: count("manager_review") };
 }

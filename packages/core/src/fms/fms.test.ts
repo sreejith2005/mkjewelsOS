@@ -8,6 +8,7 @@ const good = () => flow([stage({ key: "start_form", name: "Start form", type: "f
 
 describe("FMS definitions", () => {
   it("normalizes deterministic stage order and text", () => { const value = normalizeFmsDefinition(flow([stage({ key: " DONE ", name: " Done ", type: "task", order: 9 }), stage({ key: " START_FORM ", name: " Start ", type: "form", formTemplateId: formId, order: 2, defaultNextStageKey: " DONE " })])); expect(value.stages.map((item) => [item.key, item.order])).toEqual([["start_form", 0], ["done", 1]]); expect(value.stages[0]?.defaultNextStageKey).toBe("done"); });
+  it("strips retired per-stage fallback users from newly normalized revisions", () => { const value = normalizeFmsDefinition(flow([stage({ key: "form", name: "Form", type: "form", formTemplateId: formId, order: 0, assigneeRules: [{ type: "specific_user", userProfileId: formId, fallbackUserProfileId: "00000000-0000-4000-8000-000000000002" }] })])); expect(value.stages[0]?.assigneeRules[0]?.fallbackUserProfileId).toBeUndefined(); });
   it("accepts a valid linear graph", () => expect(validateFmsDefinition(good())).toEqual([]));
   it("rejects an empty flow", () => expect(validateFmsDefinition(flow([])).map((item) => item.code)).toContain("empty_flow"));
   it("rejects duplicate identities", () => expect(validateFmsDefinition(flow([stage({ key: "same", name: "A", type: "form", formTemplateId: formId, order: 0, defaultNextStageKey: "same" }), stage({ key: "same", name: "B", type: "task", order: 1 })])).some((item) => item.code === "invalid_stage_key")).toBe(true));

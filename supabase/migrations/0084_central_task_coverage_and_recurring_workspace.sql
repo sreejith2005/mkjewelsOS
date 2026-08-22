@@ -5,6 +5,11 @@ set search_path = public, extensions;
 alter table user_profiles
   add column if not exists secondary_buddy_id uuid references user_profiles(id);
 
+alter table user_availability add column if not exists source text not null default 'manual';
+alter table user_availability drop constraint if exists user_availability_source_check;
+alter table user_availability add constraint user_availability_source_check
+  check (source in ('manual','weekly_off'));
+
 create index if not exists idx_user_profiles_secondary_buddy
   on user_profiles(secondary_buddy_id) where secondary_buddy_id is not null;
 
@@ -16,13 +21,14 @@ alter table task_instances
 
 alter table task_templates
   add column if not exists schedule_kind text not null default 'recurring',
+  add column if not exists starts_on date,
   add column if not exists verification_required boolean not null default false,
   add column if not exists followup_enabled boolean not null default false,
   add column if not exists personal_performance_enabled boolean not null default true;
 
 alter table task_templates drop constraint if exists task_templates_schedule_kind_check;
 alter table task_templates add constraint task_templates_schedule_kind_check check(schedule_kind in
-  ('recurring','daily','weekly','monthly','quarterly','yearly','one_time','as_required'));
+  ('recurring','daily','weekly','monthly','nth_weekday','quarterly','yearly','one_time','as_required'));
 
 alter table task_instances
   add column if not exists verification_status text not null default 'not_required',
@@ -238,20 +244,24 @@ create or replace function resolve_fms_stage_assignees(
   p_stage_id uuid,p_instance_id uuid,p_selected_user uuid default null
 ) returns uuid[] language plpgsql security definer set search_path=public as $$
 declare v_stage fms_stages; v_instance fms_instances; v_rule fms_stage_assignees;
-  v_ids uuid[]:='{}'; v_previous uuid[]; v_candidate uuid; v_coverage record; v_target_date date;
+  v_ids uuid[]:=array[]::uuid[]; v_resolved uuid[]:=array[]::uuid[]; v_previous uuid[];
+  v_candidate uuid; v_coverage record; v_target_date date;
+  v_today date:=(now() at time zone 'Asia/Kolkata')::date;
 begin
   select * into v_stage from fms_stages where id=p_stage_id;
   select * into v_instance from fms_instances where id=p_instance_id;
   if v_stage.id is null or v_instance.id is null or v_stage.fms_flow_id<>v_instance.fms_flow_id then
     raise exception 'Invalid stage activation' using errcode='23514';
   end if;
-  v_target_date:=(now() at time zone 'Asia/Kolkata')::date;
+  v_target_date:=(fms_stage_deadline_for_instance(v_stage.planned_time_rule,v_instance.tenant_id,p_instance_id)
+    at time zone 'Asia/Kolkata')::date;
   if p_selected_user is not null then
     if not exists(select 1 from user_profiles u where u.id=p_selected_user and u.tenant_id=v_instance.tenant_id
       and u.branch_id=v_instance.branch_id and u.department_id=v_instance.department_id
       and u.working_status not in ('inactive','resigned') and coalesce(u.account_status::text,'active') in ('active','invited')) then
       raise exception 'The selected starting assignee is outside this branch and department' using errcode='23514';
     end if;
+    if v_target_date not between v_today and v_today+1 then return array[p_selected_user]; end if;
     select * into v_coverage from resolve_task_coverage(p_selected_user,v_target_date);
     if v_coverage.effective_assignee_id is null then raise exception 'Coverage required for the selected starting assignee' using errcode='23514'; end if;
     return array[v_coverage.effective_assignee_id];
@@ -260,16 +270,14 @@ begin
     and status='completed' order by actual_datetime desc nulls last,created_at desc limit 1;
   for v_rule in select * from fms_stage_assignees where fms_stage_id=p_stage_id order by sort_order,id loop
     if v_rule.assignee_type='specific_user' then
-      select * into v_coverage from resolve_task_coverage(v_rule.user_profile_id,v_target_date);
-      if v_coverage.effective_assignee_id is not null then v_ids:=array_append(v_ids,v_coverage.effective_assignee_id); end if;
+      v_ids:=array_append(v_ids,v_rule.user_profile_id);
     elsif v_rule.assignee_type='role' then
       for v_candidate in select id from user_profiles where tenant_id=v_instance.tenant_id and user_role=v_rule.role_value
         and (v_instance.branch_id is null or branch_id=v_instance.branch_id)
         and (v_instance.department_id is null or department_id=v_instance.department_id)
         and working_status not in ('inactive','resigned') and is_login_enabled
       loop
-        select * into v_coverage from resolve_task_coverage(v_candidate,v_target_date);
-        if v_coverage.effective_assignee_id is not null then v_ids:=array_append(v_ids,v_coverage.effective_assignee_id); end if;
+        v_ids:=array_append(v_ids,v_candidate);
       end loop;
     elsif v_rule.assignee_type='manager' then select manager_id into v_candidate from branches where id=v_instance.branch_id; v_ids:=array_append(v_ids,v_candidate);
     elsif v_rule.assignee_type='department_head' then select head_id into v_candidate from departments where id=v_instance.department_id; v_ids:=array_append(v_ids,v_candidate);
@@ -277,9 +285,20 @@ begin
     elsif v_rule.assignee_type='reporter' then v_ids:=array_append(v_ids,v_instance.started_by);
     end if;
   end loop;
-  select coalesce(array_agg(distinct u.id),'{}') into v_ids from unnest(array_remove(v_ids,null)) candidate(id)
+  for v_candidate in select distinct candidate.id from unnest(array_remove(v_ids,null)) candidate(id)
     join user_profiles u on u.id=candidate.id where u.tenant_id=v_instance.tenant_id
-      and u.working_status not in ('inactive','resigned') and u.is_login_enabled;
+  loop
+    if v_target_date not between v_today and v_today+1 then
+      v_resolved:=array_append(v_resolved,v_candidate);
+      continue;
+    end if;
+    select * into v_coverage from resolve_task_coverage(v_candidate,v_target_date);
+    if v_coverage.effective_assignee_id is not null then
+      v_resolved:=array_append(v_resolved,v_coverage.effective_assignee_id);
+    end if;
+  end loop;
+  select coalesce(array_agg(distinct candidate.id),array[]::uuid[]) into v_ids
+  from unnest(array_remove(v_resolved,null)) candidate(id);
   if cardinality(v_ids)=0 and v_stage.step_type not in ('notification','branch','parallel_start','parallel_join','end') then
     raise exception 'Coverage required: no active profile-level buddy or manager is available for this step' using errcode='23514';
   end if;
@@ -293,6 +312,7 @@ create or replace function reconcile_short_deadline_coverage_with_audit(
 ) returns jsonb language plpgsql security definer set search_path=public as $$
 declare
   v_actor user_profiles; v_target user_profiles; v_resolution record; v_today date;
+  v_availability user_availability;
   v_task record; v_followup record; v_stage record; v_manager uuid;
   v_moved_tasks int:=0; v_moved_crm int:=0; v_moved_fms int:=0;
   v_manager_review int:=0; v_coverage_required int:=0;
@@ -308,17 +328,36 @@ begin
   if p_date not between v_today and v_today+1 then
     return jsonb_build_object('date',p_date,'ignored',true,'reason','outside_short_deadline_window');
   end if;
+  select * into v_availability from user_availability
+    where user_profile_id=p_user_profile_id and date=p_date for update;
+  if v_availability.id is null or v_availability.status<>'absent' then
+    return jsonb_build_object('date',p_date,'ignored',true,'reason','authorized_absence_required');
+  end if;
   select * into v_resolution from resolve_task_coverage(p_user_profile_id,p_date);
+  if v_resolution.resolution='original' then
+    return jsonb_build_object('date',p_date,'ignored',true,'reason','original_assignee_available');
+  end if;
   v_manager := coalesce(v_target.reports_to_user_id,
     (select d.head_id from departments d where d.id=v_target.department_id));
 
   for v_task in
-    select distinct ti.* from task_instances ti join task_assignees ta on ta.task_instance_id=ti.id
-    where ti.tenant_id=v_actor.tenant_id and ta.user_profile_id=p_user_profile_id
-      and ta.is_active and ta.role_at_task='doer'
+    select ti.* from task_instances ti
+    where ti.tenant_id=v_actor.tenant_id
+      and exists (
+        select 1 from task_assignees ta
+        where ta.task_instance_id=ti.id
+          and ta.user_profile_id=p_user_profile_id
+          and ta.is_active
+          and ta.completed_at is null
+          and ta.role_at_task='doer'
+      )
       and (coalesce(ti.revised_datetime,ti.planned_datetime) at time zone 'Asia/Kolkata')::date=p_date
       and ti.status in ('pending','in_progress','in_review') for update of ti
   loop
+    if v_task.coverage_resolved_for_date=p_date
+       and v_task.coverage_status in ('manager_review','coverage_required') then
+      continue;
+    end if;
     if v_task.status<>'pending' then
       update task_instances set coverage_status='manager_review',coverage_original_assignee_id=p_user_profile_id,
         coverage_resolution='manager_review',coverage_resolved_for_date=p_date,updated_by=v_actor.id,updated_at=now()
@@ -348,6 +387,8 @@ begin
         v_task.title||' was assigned to you for '||p_date::text,'/tasks');
       v_moved_tasks:=v_moved_tasks+1;
     else
+      update task_assignees set is_active=false where task_instance_id=v_task.id
+        and user_profile_id=p_user_profile_id and is_active and role_at_task='doer';
       update task_instances set coverage_status='coverage_required',coverage_original_assignee_id=p_user_profile_id,
         coverage_resolution='coverage_required',coverage_resolved_for_date=p_date,updated_by=v_actor.id,updated_at=now()
       where id=v_task.id;
@@ -362,6 +403,10 @@ begin
     where cf.tenant_id=v_actor.tenant_id and cf.assigned_to=p_user_profile_id
       and cf.due_date=p_date and cf.status='open' for update
   loop
+    if v_followup.coverage_resolved_for_date=p_date
+       and v_followup.coverage_status in ('covered','coverage_required','manager_review') then
+      continue;
+    end if;
     if v_resolution.effective_assignee_id is not null then
       update client_followups set assigned_to=v_resolution.effective_assignee_id,
         coverage_status='covered',coverage_original_assignee_id=p_user_profile_id,
@@ -371,6 +416,9 @@ begin
       values(v_actor.tenant_id,v_actor.id,'short_deadline_coverage_assigned','crm_followups',v_followup.id,
         jsonb_build_object('assigned_to',p_user_profile_id),
         jsonb_build_object('assigned_to',v_resolution.effective_assignee_id,'resolution',v_resolution.resolution,'date',p_date));
+      insert into notifications(tenant_id,user_profile_id,event_type,title,message,link_url)
+      values(v_actor.tenant_id,v_resolution.effective_assignee_id,'crm_followup_coverage_assigned','CRM follow-up coverage assigned',
+        'A follow-up due '||p_date::text||' was assigned to you','/crm?client='||v_followup.client_id);
       v_moved_crm:=v_moved_crm+1;
     else
       update client_followups set coverage_status='coverage_required',coverage_original_assignee_id=p_user_profile_id,
@@ -390,6 +438,10 @@ begin
       and (fis.planned_datetime at time zone 'Asia/Kolkata')::date=p_date
       and fis.status in ('pending','in_progress','in_review') for update of fis
   loop
+    if v_stage.coverage_resolved_for_date=p_date
+       and v_stage.coverage_status in ('manager_review','coverage_required') then
+      continue;
+    end if;
     if v_stage.status<>'pending' then
       update fms_instance_stages set coverage_status='manager_review',coverage_original_assignee_id=p_user_profile_id,
         coverage_resolution='manager_review',coverage_resolved_for_date=p_date,updated_at=now() where id=v_stage.id;
@@ -415,6 +467,9 @@ begin
       values(v_actor.tenant_id,v_actor.id,'short_deadline_coverage_assigned','fms',v_stage.id,
         jsonb_build_object('assigned_to',p_user_profile_id),
         jsonb_build_object('assigned_to',v_resolution.effective_assignee_id,'resolution',v_resolution.resolution,'date',p_date));
+      insert into notifications(tenant_id,user_profile_id,event_type,title,message,link_url)
+      values(v_actor.tenant_id,v_resolution.effective_assignee_id,'fms_coverage_assigned','FMS coverage assigned',
+        v_stage.title||' was assigned to you for '||p_date::text,'/fms');
       v_moved_fms:=v_moved_fms+1;
     else
       update fms_instance_stages set coverage_status='coverage_required',coverage_original_assignee_id=p_user_profile_id,
@@ -451,9 +506,10 @@ begin
     raise exception 'Availability cannot be recorded for this user' using errcode='42501';
   end if;
   select * into v_old from user_availability where user_profile_id=p_user_profile_id and date=p_date;
-  insert into user_availability(tenant_id,user_profile_id,date,status,reason,logged_by)
-  values(v_actor.tenant_id,p_user_profile_id,p_date,p_status,nullif(btrim(p_reason),''),v_actor.id)
-  on conflict(user_profile_id,date) do update set status=excluded.status,reason=excluded.reason,logged_by=excluded.logged_by
+  insert into user_availability(tenant_id,user_profile_id,date,status,reason,logged_by,source)
+  values(v_actor.tenant_id,p_user_profile_id,p_date,p_status,nullif(btrim(p_reason),''),v_actor.id,'manual')
+  on conflict(user_profile_id,date) do update set status=excluded.status,reason=excluded.reason,
+    logged_by=excluded.logged_by,source='manual'
   returning * into v_new;
   insert into audit_logs(tenant_id,actor_user_id,action,module,record_id,old_value,new_value)
   values(v_actor.tenant_id,v_actor.id,'availability_recorded','availability',v_new.id,
@@ -468,7 +524,7 @@ $$;
 create or replace function record_availability_range_with_audit(
   p_user_profile_id uuid,p_start_date date,p_end_date date,p_status availability_status,p_reason text
 ) returns jsonb language plpgsql security definer set search_path=public as $$
-declare v_date date; v_ids jsonb:='[]'::jsonb;
+declare v_date date; v_ids jsonb:='[]'::jsonb; v_summary jsonb;
 begin
   if p_end_date<p_start_date or p_end_date-p_start_date>366 then
     raise exception 'Availability range must be between 1 and 367 days' using errcode='22023';
@@ -476,9 +532,63 @@ begin
   for v_date in select generate_series(p_start_date,p_end_date,'1 day'::interval)::date loop
     v_ids:=v_ids||jsonb_build_array(record_availability_with_audit(p_user_profile_id,v_date,p_status,p_reason));
   end loop;
-  return jsonb_build_object('start_date',p_start_date,'end_date',p_end_date,'record_ids',v_ids);
+  with outcomes as (
+    select coverage_resolution from task_instances where coverage_original_assignee_id=p_user_profile_id
+      and coverage_resolved_for_date between p_start_date and p_end_date
+    union all select coverage_resolution from client_followups where coverage_original_assignee_id=p_user_profile_id
+      and coverage_resolved_for_date between p_start_date and p_end_date
+    union all select coverage_resolution from fms_instance_stages where coverage_original_assignee_id=p_user_profile_id
+      and coverage_resolved_for_date between p_start_date and p_end_date
+  ) select jsonb_build_object(
+    'primary_buddy',count(*) filter(where coverage_resolution='primary_buddy'),
+    'secondary_buddy',count(*) filter(where coverage_resolution='secondary_buddy'),
+    'reporting_manager',count(*) filter(where coverage_resolution='reporting_manager'),
+    'coverage_required',count(*) filter(where coverage_resolution='coverage_required'),
+    'manager_review',count(*) filter(where coverage_resolution='manager_review')
+  ) into v_summary from outcomes;
+  return jsonb_build_object('start_date',p_start_date,'end_date',p_end_date,
+    'record_ids',v_ids,'coverage_summary',v_summary);
 end;
 $$;
+
+create or replace function reconcile_changed_week_off()
+returns trigger language plpgsql security definer set search_path=public as $$
+declare v_date date; v_today date:=(now() at time zone 'Asia/Kolkata')::date;
+  v_actor user_profiles; v_old_availability user_availability; v_new_availability user_availability;
+begin
+  if new.week_off is not distinct from old.week_off then return new; end if;
+  select * into v_actor from user_profiles where auth_user_id=auth.uid();
+  for v_date in select generate_series(v_today,v_today+1,'1 day'::interval)::date loop
+    select * into v_old_availability from user_availability
+      where user_profile_id=new.id and date=v_date for update;
+    if v_old_availability.id is not null and v_old_availability.source='weekly_off'
+       and lower(to_char(v_date,'FMDay'))<>all(new.week_off) then
+      delete from user_availability where id=v_old_availability.id;
+      insert into audit_logs(tenant_id,actor_user_id,action,module,record_id,old_value,new_value)
+      values(new.tenant_id,v_actor.id,'weekly_off_availability_removed','availability',v_old_availability.id,
+        to_jsonb(v_old_availability),null);
+      v_old_availability:=null;
+    end if;
+    if lower(to_char(v_date,'FMDay'))=any(new.week_off) then
+      if v_old_availability.id is null or v_old_availability.source='weekly_off' then
+        insert into user_availability(tenant_id,user_profile_id,date,status,reason,logged_by,source)
+        values(new.tenant_id,new.id,v_date,'absent','Configured weekly off',v_actor.id,'weekly_off')
+        on conflict(user_profile_id,date) do update set status='absent',reason='Configured weekly off',
+          logged_by=excluded.logged_by,source='weekly_off' returning * into v_new_availability;
+        insert into audit_logs(tenant_id,actor_user_id,action,module,record_id,old_value,new_value)
+        values(new.tenant_id,v_actor.id,'weekly_off_availability_recorded','availability',v_new_availability.id,
+          case when v_old_availability.id is null then null else to_jsonb(v_old_availability) end,to_jsonb(v_new_availability));
+        perform reconcile_short_deadline_coverage_with_audit(new.id,v_date,'Configured weekly off');
+      end if;
+    end if;
+    v_old_availability:=null; v_new_availability:=null;
+  end loop;
+  return new;
+end;
+$$;
+drop trigger if exists user_profiles_reconcile_changed_week_off on user_profiles;
+create trigger user_profiles_reconcile_changed_week_off after update of week_off on user_profiles
+for each row execute function reconcile_changed_week_off();
 
 create or replace function get_recurring_todo_workspace(p_filter jsonb default '{}'::jsonb)
 returns jsonb language plpgsql stable security definer set search_path=public as $$
@@ -493,20 +603,22 @@ begin
   select coalesce(jsonb_agg(to_jsonb(t) order by t.title),'[]'::jsonb) into v_templates
   from task_templates t where t.tenant_id=v_actor.tenant_id and t.task_type='checklist'
     and t.recurrence_rule is not null
-    and (v_actor.user_role in ('super_admin','admin','manager','hr') or t.created_by=v_actor.id or t.default_assignee_user_id=v_actor.id)
+    and (v_actor.user_role in ('super_admin','admin','manager') or t.created_by=v_actor.id or t.default_assignee_user_id=v_actor.id)
     and (v_search='' or lower(t.title||' '||coalesce(t.description,'')) like '%'||v_search||'%');
   with visible as (
     select ti.* from task_instances ti where ti.tenant_id=v_actor.tenant_id and ti.task_template_id is not null
       and (ti.planned_datetime at time zone 'Asia/Kolkata')::date between v_from and v_to
       and (v_status is null or ti.status::text=v_status)
       and (v_search='' or lower(ti.title||' '||coalesce(ti.description,'')) like '%'||v_search||'%')
-      and (v_actor.user_role in ('super_admin','admin','manager','hr') or ti.created_by=v_actor.id or exists(
-        select 1 from task_assignees a where a.task_instance_id=ti.id and a.user_profile_id=v_actor.id and a.is_active))
+      and can_read_task(ti.id)
   )
   select coalesce(jsonb_agg(to_jsonb(v)||jsonb_build_object(
     'assignees',(select coalesce(jsonb_agg(jsonb_build_object('id',u.id,'name',u.employee_name,'is_original',a.is_original)),'[]'::jsonb)
       from task_assignees a join user_profiles u on u.id=a.user_profile_id where a.task_instance_id=v.id and a.is_active),
-    'checklist',(select coalesce(jsonb_agg(to_jsonb(c) order by c.sort_order),'[]'::jsonb) from task_checklists c where c.task_instance_id=v.id)
+    'checklist',(select coalesce(jsonb_agg(to_jsonb(c) order by c.sort_order),'[]'::jsonb) from task_checklists c where c.task_instance_id=v.id),
+    'has_attachment',exists(select 1 from task_attachments a where a.task_instance_id=v.id),
+    'has_form_submission',exists(select 1 from form_submissions s where s.linked_module='checklist_task'
+      and s.linked_record_id=v.id and s.form_template_id=v.form_template_id)
   ) order by v.planned_datetime),'[]'::jsonb) into v_instances from visible v;
   select jsonb_build_object(
     'total',count(*),'pending',count(*) filter(where status='pending'),
@@ -517,8 +629,7 @@ begin
     'manager_review',count(*) filter(where coverage_status='manager_review')) into v_stats
   from task_instances ti where ti.tenant_id=v_actor.tenant_id and ti.task_template_id is not null
     and (ti.planned_datetime at time zone 'Asia/Kolkata')::date between v_from and v_to
-    and (v_actor.user_role in ('super_admin','admin','manager','hr') or ti.created_by=v_actor.id or exists(
-      select 1 from task_assignees a where a.task_instance_id=ti.id and a.user_profile_id=v_actor.id and a.is_active));
+    and can_read_task(ti.id);
   return jsonb_build_object('filters',jsonb_build_object('date_from',v_from,'date_to',v_to),
     'templates',v_templates,'instances',v_instances,'stats',v_stats);
 end;
@@ -540,7 +651,8 @@ for each row execute function initialize_recurring_task_requirements();
 
 create or replace function save_recurring_todo_template_with_audit(p_template_id uuid,p_payload jsonb)
 returns uuid language plpgsql security definer set search_path=public as $$
-declare v_id uuid; v_actor user_profiles; v_old task_templates; v_new task_templates; v_base jsonb; v_kind text;
+declare v_id uuid; v_actor user_profiles; v_old task_templates; v_new task_templates;
+  v_base jsonb; v_kind text; v_starts_on date;
 begin
   select * into v_actor from user_profiles where auth_user_id=auth.uid();
   if v_actor.id is null or not current_profile_is_active() or v_actor.user_role not in ('super_admin','admin','manager') then
@@ -548,21 +660,61 @@ begin
   end if;
   if jsonb_typeof(p_payload)<>'object' then raise exception 'Recurring schedule payload is invalid' using errcode='22023'; end if;
   v_kind:=coalesce(nullif(p_payload->>'schedule_kind',''),'recurring');
-  if v_kind not in ('recurring','daily','weekly','monthly','quarterly','yearly','one_time','as_required') then
+  if v_kind not in ('recurring','daily','weekly','monthly','nth_weekday','quarterly','yearly','one_time','as_required') then
     raise exception 'Schedule kind is unsupported' using errcode='22023';
   end if;
+  v_starts_on:=coalesce(nullif(p_payload->>'starts_on','')::date,
+    case when p_template_id is null then (now() at time zone 'Asia/Kolkata')::date else null end);
+  if v_kind='one_time' and v_starts_on is null then
+    raise exception 'One-time schedules require a start date' using errcode='22023';
+  end if;
   if p_template_id is not null then select * into v_old from task_templates where id=p_template_id; end if;
-  v_base:=p_payload-array['schedule_kind','verification_required','followup_enabled','personal_performance_enabled'];
+  v_base:=p_payload-array['schedule_kind','starts_on','verification_required','followup_enabled','personal_performance_enabled'];
+  if v_kind='as_required' then
+    v_base:=v_base||jsonb_build_object('is_active',false);
+  elsif p_template_id is null and v_starts_on is not null then
+    v_base:=v_base||jsonb_build_object('initial_planned_datetime',
+      (v_starts_on::text||' '||coalesce(nullif(p_payload->>'planned_time',''),'09:00')||' Asia/Kolkata')::timestamptz);
+  end if;
   v_id:=save_task_template_with_audit(p_template_id,v_base);
-  update task_templates set schedule_kind=v_kind,
+  update task_templates set schedule_kind=v_kind,starts_on=coalesce(v_starts_on,starts_on),
     verification_required=coalesce((p_payload->>'verification_required')::boolean,false),
     followup_enabled=coalesce((p_payload->>'followup_enabled')::boolean,false),
     personal_performance_enabled=coalesce((p_payload->>'personal_performance_enabled')::boolean,true),
+    is_active=case when v_kind='as_required' then false else is_active end,
     updated_by=v_actor.id,updated_at=now() where id=v_id returning * into v_new;
+  update task_instances set verification_status=case when v_new.verification_required then 'pending' else 'not_required' end,
+    updated_by=v_actor.id,updated_at=now()
+    where task_template_id=v_id and status='pending'
+      and (planned_datetime at time zone 'Asia/Kolkata')::date=coalesce(v_starts_on,v_new.starts_on);
   insert into audit_logs(tenant_id,actor_user_id,action,module,record_id,old_value,new_value)
   values(v_actor.tenant_id,v_actor.id,case when p_template_id is null then 'recurring_todo_created' else 'recurring_todo_updated' end,
     'recurring_todo',v_id,case when v_old.id is null then null else to_jsonb(v_old) end,to_jsonb(v_new));
   return v_id;
+end;
+$$;
+
+create or replace function set_recurring_todo_template_active_with_audit(p_template_id uuid,p_active boolean)
+returns boolean language plpgsql security definer set search_path=public as $$
+declare v_actor user_profiles; v_old task_templates; v_new task_templates;
+begin
+  select * into v_actor from user_profiles where auth_user_id=auth.uid();
+  select * into v_old from task_templates where id=p_template_id for update;
+  if v_actor.id is null or not current_profile_is_active()
+     or v_actor.user_role not in ('super_admin','admin','manager')
+     or v_old.id is null or v_old.tenant_id<>v_actor.tenant_id
+     or (v_actor.user_role='manager' and v_old.branch_id is distinct from v_actor.branch_id) then
+    raise exception 'Recurring schedule activation denied' using errcode='42501';
+  end if;
+  if v_old.schedule_kind='as_required' and p_active then
+    raise exception 'As-required schedules are run manually and cannot be activated' using errcode='23514';
+  end if;
+  update task_templates set is_active=p_active,updated_by=v_actor.id,updated_at=now()
+    where id=p_template_id returning * into v_new;
+  insert into audit_logs(tenant_id,actor_user_id,action,module,record_id,old_value,new_value)
+  values(v_actor.tenant_id,v_actor.id,case when p_active then 'recurring_todo_activated' else 'recurring_todo_paused' end,
+    'recurring_todo',p_template_id,to_jsonb(v_old),to_jsonb(v_new));
+  return p_active;
 end;
 $$;
 
@@ -597,7 +749,8 @@ begin
   select * into v_actor from user_profiles where auth_user_id=auth.uid();
   select * into v_task from task_instances where id=p_task_id for update;
   if v_actor.id is null or not current_profile_is_active() or v_actor.user_role not in ('super_admin','admin','manager')
-    or v_task.id is null or v_task.tenant_id<>v_actor.tenant_id or v_task.task_template_id is null then
+    or v_task.id is null or v_task.tenant_id<>v_actor.tenant_id or v_task.task_template_id is null
+    or (v_actor.user_role='manager' and v_task.branch_id is distinct from v_actor.branch_id) then
     raise exception 'Recurring task verification denied' using errcode='42501';
   end if;
   if v_task.status<>'completed' or v_task.verification_status not in ('pending','rejected') then
@@ -622,6 +775,7 @@ begin
   select * into v_task from task_instances where id=p_task_id for update;
   if v_actor.id is null or not current_profile_is_active() or v_actor.user_role not in ('super_admin','admin','manager')
     or v_task.id is null or v_task.tenant_id<>v_actor.tenant_id or v_task.task_template_id is null
+    or (v_actor.user_role='manager' and v_task.branch_id is distinct from v_actor.branch_id)
     or not exists(select 1 from task_templates where id=v_task.task_template_id and followup_enabled) then
     raise exception 'Recurring task follow-up denied' using errcode='42501';
   end if;
@@ -646,11 +800,16 @@ create or replace function create_recurring_todo_instance(
 declare v_template task_templates; v_task task_instances; v_original_id uuid; v_resolution record;
   v_item jsonb; v_uncovered boolean:=false; v_first_uncovered uuid; v_manager uuid;
 begin
-  if coalesce(auth.role(),'')<>'service_role' then raise exception 'Service role required' using errcode='42501'; end if;
+  if coalesce(auth.role(),'')<>'service_role' and not exists(
+    select 1 from user_profiles u where u.auth_user_id=auth.uid()
+      and u.account_status='active' and u.is_login_enabled
+      and u.user_role in ('super_admin','admin','manager')
+  ) then raise exception 'Recurring task creation denied' using errcode='42501'; end if;
   if p_target_date is null or coalesce(array_length(p_original_assignee_ids,1),0)=0 then
     raise exception 'Target date and original assignees are required' using errcode='22023';
   end if;
-  select * into v_template from task_templates where id=p_template_id and is_active and task_type='checklist' for update;
+  select * into v_template from task_templates where id=p_template_id
+    and (is_active or schedule_kind='as_required') and task_type='checklist' for update;
   if v_template.id is null then raise exception 'Template not found' using errcode='22023'; end if;
   if exists(select 1 from task_instances where task_template_id=p_template_id and scheduled_date=p_target_date) then return null; end if;
   insert into task_instances(tenant_id,branch_id,department_id,category_id,task_template_id,task_type,title,
@@ -679,7 +838,7 @@ begin
     if v_resolution.effective_assignee_id is null then
       v_uncovered:=true; v_first_uncovered:=coalesce(v_first_uncovered,v_original_id);
       insert into task_assignees(task_instance_id,user_profile_id,role_at_task,is_original,is_active)
-      values(v_task.id,v_original_id,'doer',true,true) on conflict do nothing;
+      values(v_task.id,v_original_id,'doer',true,false) on conflict do nothing;
       insert into audit_logs(tenant_id,actor_user_id,action,module,record_id,new_value)
       values(v_template.tenant_id,null,'coverage_required','tasks',v_task.id,
         jsonb_build_object('original_assignee_id',v_original_id,'date',p_target_date));
@@ -716,23 +875,211 @@ exception when unique_violation then return null;
 end;
 $$;
 
+create or replace function run_recurring_todo_template_now_with_audit(p_template_id uuid,p_target_date date)
+returns uuid language plpgsql security definer set search_path=public as $$
+declare v_actor user_profiles; v_template task_templates; v_assignees uuid[]; v_task_id uuid;
+begin
+  select * into v_actor from user_profiles where auth_user_id=auth.uid();
+  select * into v_template from task_templates where id=p_template_id for update;
+  if v_actor.id is null or not current_profile_is_active()
+     or v_actor.user_role not in ('super_admin','admin','manager')
+     or v_template.id is null or v_template.tenant_id<>v_actor.tenant_id
+     or (v_actor.user_role='manager' and v_template.branch_id is distinct from v_actor.branch_id) then
+    raise exception 'Recurring schedule run denied' using errcode='42501';
+  end if;
+  select coalesce(array_agg(u.id),array[]::uuid[]) into v_assignees from user_profiles u
+    where u.tenant_id=v_template.tenant_id and u.account_status='active' and u.is_login_enabled
+      and (v_template.branch_id is null or u.branch_id=v_template.branch_id)
+      and (v_template.department_id is null or u.department_id=v_template.department_id)
+      and ((v_template.default_assignee_type='specific_user' and u.id=v_template.default_assignee_user_id)
+        or (v_template.default_assignee_type='role' and u.user_role=v_template.default_assignee_role));
+  if cardinality(v_assignees)=0 then raise exception 'No eligible schedule assignee' using errcode='23514'; end if;
+  v_task_id:=create_recurring_todo_instance(p_template_id,p_target_date,v_assignees);
+  insert into audit_logs(tenant_id,actor_user_id,action,module,record_id,new_value)
+  values(v_actor.tenant_id,v_actor.id,'recurring_todo_run_now','recurring_todo',p_template_id,
+    jsonb_build_object('target_date',p_target_date,'task_id',v_task_id));
+  return v_task_id;
+end;
+$$;
+
+-- Every manual task-assignee insert passes through the same profile coverage
+-- chain. The original row remains as inactive history when a cover is used.
+create or replace function apply_task_assignment_coverage()
+returns trigger language plpgsql security definer set search_path=public as $$
+declare v_task task_instances; v_date date; v_today date; v_resolution record; v_actor uuid;
+begin
+  if new.role_at_task<>'doer' or new.is_active is not true or new.is_original is not true
+     or new.completed_at is not null then return new; end if;
+  select * into v_task from task_instances where id=new.task_instance_id for update;
+  v_date:=(coalesce(v_task.revised_datetime,v_task.planned_datetime) at time zone 'Asia/Kolkata')::date;
+  v_today:=(now() at time zone 'Asia/Kolkata')::date;
+  if v_task.status<>'pending' or v_date not between v_today and v_today+1 then return new; end if;
+  select id into v_actor from user_profiles where auth_user_id=auth.uid();
+  select * into v_resolution from resolve_task_coverage(new.user_profile_id,v_date);
+  if v_resolution.resolution='original' then return new; end if;
+  if v_resolution.effective_assignee_id is null then
+    update task_assignees set is_active=false where id=new.id;
+    update task_instances set coverage_status='coverage_required',coverage_original_assignee_id=new.user_profile_id,
+      coverage_resolution='coverage_required',coverage_resolved_for_date=v_date,updated_at=now() where id=v_task.id;
+    insert into audit_logs(tenant_id,actor_user_id,action,module,record_id,new_value)
+    values(v_task.tenant_id,v_actor,'coverage_required','tasks',v_task.id,
+      jsonb_build_object('original_assignee_id',new.user_profile_id,'date',v_date,'source','assignment_created'));
+    return new;
+  end if;
+  update task_assignees set is_active=false where id=new.id;
+  insert into task_assignees(task_instance_id,user_profile_id,role_at_task,is_original,is_active)
+  values(v_task.id,v_resolution.effective_assignee_id,'doer',false,true) on conflict do nothing;
+  insert into buddy_assignments(tenant_id,original_assignee_id,buddy_id,task_instance_id,date,escalated_to_manager)
+  values(v_task.tenant_id,new.user_profile_id,v_resolution.effective_assignee_id,v_task.id,v_date,
+    v_resolution.resolution='reporting_manager');
+  update task_instances set coverage_status='covered',coverage_original_assignee_id=new.user_profile_id,
+    coverage_resolution=v_resolution.resolution,coverage_resolved_for_date=v_date,updated_at=now() where id=v_task.id;
+  insert into audit_logs(tenant_id,actor_user_id,action,module,record_id,new_value)
+  values(v_task.tenant_id,v_actor,'task_assignment_resolved','tasks',v_task.id,
+    jsonb_build_object('original_assignee_id',new.user_profile_id,'effective_assignee_id',v_resolution.effective_assignee_id,
+      'resolution',v_resolution.resolution,'date',v_date,'source','assignment_created'));
+  return new;
+end;
+$$;
+drop trigger if exists task_assignees_apply_profile_coverage on task_assignees;
+create trigger task_assignees_apply_profile_coverage after insert on task_assignees
+for each row execute function apply_task_assignment_coverage();
+
+create or replace function apply_crm_followup_coverage()
+returns trigger language plpgsql security definer set search_path=public as $$
+declare v_today date; v_resolution record; v_actor uuid; v_original uuid;
+begin
+  if new.status<>'open' or new.assigned_to is null then return new; end if;
+  if tg_op='UPDATE' and new.assigned_to is not distinct from old.assigned_to
+     and new.due_date is not distinct from old.due_date then return new; end if;
+  v_today:=(now() at time zone 'Asia/Kolkata')::date;
+  if new.due_date not between v_today and v_today+1 then
+    new.coverage_status:=null; new.coverage_original_assignee_id:=null;
+    new.coverage_resolution:=null; new.coverage_resolved_for_date:=null;
+    return new;
+  end if;
+  v_original:=new.assigned_to;
+  select * into v_resolution from resolve_task_coverage(v_original,new.due_date);
+  if v_resolution.resolution='original' then return new; end if;
+  select id into v_actor from user_profiles where auth_user_id=auth.uid();
+  new.coverage_original_assignee_id:=v_original;
+  new.coverage_resolved_for_date:=new.due_date;
+  if v_resolution.effective_assignee_id is null then
+    new.coverage_status:='coverage_required'; new.coverage_resolution:='coverage_required';
+  else
+    new.assigned_to:=v_resolution.effective_assignee_id;
+    new.coverage_status:='covered'; new.coverage_resolution:=v_resolution.resolution;
+  end if;
+  insert into audit_logs(tenant_id,actor_user_id,action,module,record_id,new_value)
+  values(new.tenant_id,v_actor,case when v_resolution.effective_assignee_id is null then 'coverage_required' else 'task_assignment_resolved' end,
+    'crm_followups',new.id,jsonb_build_object('original_assignee_id',v_original,
+      'effective_assignee_id',v_resolution.effective_assignee_id,'resolution',v_resolution.resolution,
+      'date',new.due_date,'source','followup_created_or_rescheduled'));
+  return new;
+end;
+$$;
+drop trigger if exists client_followups_apply_profile_coverage on client_followups;
+create trigger client_followups_apply_profile_coverage before insert or update of assigned_to,due_date on client_followups
+for each row execute function apply_crm_followup_coverage();
+
+-- Legacy notification producers capture the requested assignee before coverage
+-- triggers run. Suppress stale Task events and normalize CRM recipients to the
+-- persisted effective assignee so absent originals are never notified as doers.
+create or replace function notify_task_assignment()
+returns trigger language plpgsql security definer set search_path=public as $$
+declare v_title text; v_tenant_id uuid; v_persisted_active boolean; v_task task_instances; v_resolution record;
+  v_task_date date; v_today date:=(now() at time zone 'Asia/Kolkata')::date;
+begin
+  select * into v_task from task_instances where id=new.task_instance_id;
+  v_task_date:=(coalesce(v_task.revised_datetime,v_task.planned_datetime) at time zone 'Asia/Kolkata')::date;
+  if new.is_original and v_task.status='pending' and v_task_date between v_today and v_today+1 then
+    select * into v_resolution from resolve_task_coverage(new.user_profile_id,
+      v_task_date);
+    if v_resolution.resolution<>'original' then return new; end if;
+  end if;
+  select is_active into v_persisted_active from task_assignees where id=new.id;
+  if not coalesce(v_persisted_active,false) then return new; end if;
+  if tg_op='UPDATE' and old.is_active=true then return new; end if;
+  select title,tenant_id into v_title,v_tenant_id from task_instances where id=new.task_instance_id;
+  insert into notifications(tenant_id,user_profile_id,event_type,title,message,link_url,channel)
+  values(v_tenant_id,new.user_profile_id,'task_assigned','New Task Assigned',
+    'You have been assigned to task: '||coalesce(v_title,'Untitled Task'),'/tasks/checklist','in_app');
+  return new;
+end;
+$$;
+
+create or replace function emit_task_notification_event()
+returns trigger language plpgsql security definer set search_path=public as $$
+declare v_task task_instances; v_event_type text; v_resolution record;
+  v_task_date date; v_today date:=(now() at time zone 'Asia/Kolkata')::date;
+begin
+  select * into v_task from task_instances where id=new.task_instance_id;
+  v_task_date:=(coalesce(v_task.revised_datetime,v_task.planned_datetime) at time zone 'Asia/Kolkata')::date;
+  if new.is_original and v_task.status='pending' and v_task_date between v_today and v_today+1 then
+    select * into v_resolution from resolve_task_coverage(new.user_profile_id,
+      v_task_date);
+    if v_resolution.resolution<>'original' then return new; end if;
+  end if;
+  v_event_type:=case when new.is_original then 'task_assigned' else 'task_delegated' end;
+  insert into notifications(tenant_id,branch_id,department_id,user_profile_id,event_type,title,message,
+    link_url,channel,delivered_status,priority,source_module,source_record_id,delivered_at)
+  values(v_task.tenant_id,v_task.branch_id,v_task.department_id,new.user_profile_id,v_event_type,
+    case when new.is_original then 'New task assigned' else 'Task delegated to you' end,
+    left(v_task.title,4000),'/tasks','in_app','delivered',v_task.priority,'tasks',v_task.id,now());
+  return new;
+end;
+$$;
+
+create or replace function normalize_coverage_notification_event()
+returns trigger language plpgsql security definer set search_path=public as $$
+declare v_effective uuid;
+begin
+  if new.source_module='tasks' and new.event_type in ('task_assigned','task_delegated') then
+    if new.idempotency_key like 'task_watcher:%' then return new; end if;
+    if not exists(
+      select 1 from task_assignees a
+      where a.task_instance_id=new.source_record_id and a.is_active and a.role_at_task='doer'
+        and a.user_profile_id in (select value::uuid from jsonb_array_elements_text(coalesce(new.payload->'_assigned_user_ids','[]'::jsonb)))
+    ) then return null; end if;
+  elsif new.source_module='crm' and new.event_type='followup_created' then
+    select assigned_to into v_effective from client_followups where id=new.source_record_id;
+    if v_effective is not null then
+      new.payload:=jsonb_set(new.payload,'{_assigned_user_ids}',jsonb_build_array(v_effective),true);
+    end if;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists notification_events_normalize_coverage_recipient on notification_events;
+create trigger notification_events_normalize_coverage_recipient before insert on notification_events
+for each row execute function normalize_coverage_notification_event();
+
 revoke all on function resolve_task_coverage(uuid,date) from public,anon,authenticated;
-revoke all on function reconcile_short_deadline_coverage_with_audit(uuid,date,text) from public,anon;
+revoke all on function reconcile_short_deadline_coverage_with_audit(uuid,date,text) from public,anon,authenticated,service_role;
 revoke all on function record_availability_range_with_audit(uuid,date,date,availability_status,text) from public,anon;
 revoke all on function get_recurring_todo_workspace(jsonb) from public,anon;
 revoke all on function create_recurring_todo_instance(uuid,date,uuid[]) from public,anon,authenticated;
 revoke all on function configure_invited_profile_coverage_with_audit(uuid,uuid,uuid,uuid) from public,anon,authenticated;
 revoke all on function save_recurring_todo_template_with_audit(uuid,jsonb) from public,anon;
+revoke all on function set_recurring_todo_template_active_with_audit(uuid,boolean) from public,anon;
+revoke all on function run_recurring_todo_template_now_with_audit(uuid,date) from public,anon;
 revoke all on function delete_recurring_todo_template_with_audit(uuid) from public,anon;
 revoke all on function verify_recurring_task_with_audit(uuid,text,text) from public,anon;
 revoke all on function send_recurring_followup_with_audit(uuid,text) from public,anon;
-grant execute on function reconcile_short_deadline_coverage_with_audit(uuid,date,text) to authenticated;
+revoke all on function apply_task_assignment_coverage() from public,anon,authenticated,service_role;
+revoke all on function apply_crm_followup_coverage() from public,anon,authenticated,service_role;
+revoke all on function normalize_coverage_notification_event() from public,anon,authenticated,service_role;
+revoke all on function notify_task_assignment() from public,anon,authenticated,service_role;
+revoke all on function emit_task_notification_event() from public,anon,authenticated,service_role;
+revoke all on function reconcile_changed_week_off() from public,anon,authenticated,service_role;
 grant execute on function record_availability_range_with_audit(uuid,date,date,availability_status,text) to authenticated;
 grant execute on function get_recurring_todo_workspace(jsonb) to authenticated;
 grant execute on function resolve_task_coverage(uuid,date) to service_role;
 grant execute on function create_recurring_todo_instance(uuid,date,uuid[]) to service_role;
 grant execute on function configure_invited_profile_coverage_with_audit(uuid,uuid,uuid,uuid) to service_role;
 grant execute on function save_recurring_todo_template_with_audit(uuid,jsonb) to authenticated;
+grant execute on function set_recurring_todo_template_active_with_audit(uuid,boolean) to authenticated;
+grant execute on function run_recurring_todo_template_now_with_audit(uuid,date) to authenticated;
 grant execute on function delete_recurring_todo_template_with_audit(uuid) to authenticated;
 grant execute on function verify_recurring_task_with_audit(uuid,text,text) to authenticated;
 grant execute on function send_recurring_followup_with_audit(uuid,text) to authenticated;
