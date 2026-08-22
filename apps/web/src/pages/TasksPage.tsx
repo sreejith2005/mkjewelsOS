@@ -5,24 +5,20 @@ import { useAuth } from "@/auth/AuthContext";
 import { Button, Modal, Notice } from "@/components/ui";
 import {
   createDelegationTask,
-  createFromTemplate,
   delegateTask,
   loadTaskFeed,
   loadTaskAuthoringReferenceData,
   loadTaskFeedReferenceData,
   reviseTask,
-  saveTaskTemplate,
   updateTask,
   uploadTaskAttachment,
   type TaskBundle,
   type TaskReferenceData,
-  type TaskTemplate,
 } from "@/features/tasks/api";
 import { DelegateTaskModal } from "@/features/tasks/DelegateTaskModal";
 import { TaskCard, type TaskCardAction } from "@/features/tasks/TaskCard";
 import { TaskComposer } from "@/features/tasks/TaskComposer";
 import { TaskFilterBar, type DateRangePreset } from "@/features/tasks/TaskFilterBar";
-import { TaskTemplateForm } from "@/features/tasks/TaskForms";
 import { loadFormDynamicOptions, loadTaskForms, submitForm, type FormBundle } from "@/features/forms/api";
 import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer";
 
@@ -66,8 +62,6 @@ export function TasksPage() {
   const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [delegateTarget, setDelegateTarget] = useState<TaskBundle | null>(null);
-  const [showTemplates, setShowTemplates] = useState(false);
-  const [editTemplate, setEditTemplate] = useState<TaskTemplate | null | undefined>(undefined);
   const [formBundles, setFormBundles] = useState<FormBundle[]>([]);
   const [formDynamicOptions, setFormDynamicOptions] = useState<DynamicOptions>({ users: [], branches: [], departments: [] });
   const [formTarget, setFormTarget] = useState<TaskBundle | null>(null);
@@ -183,16 +177,8 @@ export function TasksPage() {
 
       {canManage ? <div className="fixed bottom-[86px] right-4 z-20 flex gap-2 md:bottom-8 md:right-8"><Button onClick={() => { window.history.pushState({}, "", "/tasks/import"); window.dispatchEvent(new PopStateEvent("popstate")); }} variant="secondary"><Upload className="size-4" />Bulk Import</Button><Button aria-label="Create task" className="min-h-14 rounded-2xl bg-task-accent px-5 text-task-text shadow-xl hover:bg-task-accent/90" onClick={() => void openComposer()}><Plus className="size-6" />Create Task</Button></div> : null}
 
-      {composerOpen && canManage && references && profile ? <TaskComposer data={references} onClose={() => setComposerOpen(false)} onCreated={() => { setComposerOpen(false); void refresh(); }} onManageTemplates={() => { setComposerOpen(false); setShowTemplates(true); }} onSave={createDelegationTask} onUploadAttachment={(taskId, file) => uploadTaskAttachment(profile.tenant_id, taskId, file)} onSaveRecurring={(payload) => saveTaskTemplate(null, payload)} onUseTemplate={createFromTemplate} profile={profile} /> : null}
+      {composerOpen && canManage && references && profile ? <TaskComposer data={references} onClose={() => setComposerOpen(false)} onCreated={() => { setComposerOpen(false); void refresh(); }} onSave={createDelegationTask} onUploadAttachment={(taskId, file) => uploadTaskAttachment(profile.tenant_id, taskId, file)} profile={profile} /> : null}
 
-      {showTemplates && canManage && references ? <Modal onClose={() => setShowTemplates(false)} title="Task Templates">
-        <div className="flex flex-col gap-3">
-          <Button onClick={() => { setShowTemplates(false); setEditTemplate(null); }}><Plus />New template</Button>
-          {references.templates.length === 0 ? <p className="rounded-xl border border-dashed border-gold/20 p-6 text-center text-sm text-soft-grey">No task templates yet.</p> : references.templates.map((template) => <button className="flex items-center justify-between gap-4 rounded-xl border border-gold/20 p-3 text-left" key={template.id} onClick={() => { setShowTemplates(false); setEditTemplate(template); }} type="button"><span><span className="block text-sm font-semibold text-white">{template.title}</span><span className="text-xs text-soft-grey">{template.recurrence_rule} · {template.planned_time?.slice(0, 5)}</span></span><span className="text-xs text-gold">{template.is_active ? "Active" : "Inactive"}</span></button>)}
-        </div>
-      </Modal> : null}
-
-      {editTemplate !== undefined && canManage && references ? <Modal onClose={() => setEditTemplate(undefined)} title={editTemplate ? "Edit Task Template" : "New Task Template"} wide><TaskTemplateForm data={references} onCancel={() => setEditTemplate(undefined)} onSave={async (id, payload) => { await saveTaskTemplate(id, payload); setEditTemplate(undefined); await refresh(); }} template={editTemplate} /></Modal> : null}
 
       {delegateTarget && references && profile ? <DelegateTaskModal canManage={canManage} currentUserId={profile.id} onClose={() => setDelegateTarget(null)} onDelegate={async (fromUserId, toUserId, reason) => { if (!delegateTarget.id) throw new Error("Task identifier is missing"); await delegateTask(delegateTarget.id, fromUserId, toUserId, reason); setDelegateTarget(null); await refresh(); }} task={delegateTarget} users={references.users} /> : null}
       {formTarget?.id && formTarget.form_template_id ? (() => { const form = formBundles.find((item) => item.id === formTarget.form_template_id); return form ? <Modal onClose={() => setFormTarget(null)} title={`Required form: ${form.name}`} wide><FormRenderer definition={{ name: form.name, description: form.description ?? undefined, fields: form.fields }} dynamicOptions={formDynamicOptions} onSubmit={async (answers) => { await submitForm(form.id, answers, formTarget.task_type === "delegation" ? "delegation_task" : "checklist_task", formTarget.id as string); setFormTarget(null); await refresh(); }} /></Modal> : <Modal onClose={() => setFormTarget(null)} title="Required form"><Notice tone="danger">The exact required form version is not available to this account.</Notice></Modal>; })() : null}

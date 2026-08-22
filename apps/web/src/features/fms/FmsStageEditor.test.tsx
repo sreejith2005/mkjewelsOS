@@ -22,13 +22,13 @@ afterEach(cleanup);
 
 function Harness() {
   const [stage, setStage] = useState<FmsStageDefinition>(() => ({ ...newFmsStage("task", 0), key: "task" }));
-  return <FmsStageEditor data={data} flowBranchId="b1" onChange={setStage} onDelete={() => undefined} stage={stage} stages={[stage]} />;
+  return <FmsStageEditor data={data} onChange={setStage} onDelete={() => undefined} stage={stage} stages={[stage]} />;
 }
 
 function LaterFormHarness() {
   const first = { ...newFmsStage("form", 0), key: "initial", formTemplateId: data.forms[0]!.id };
   const [later, setLater] = useState<FmsStageDefinition>(() => ({ ...newFmsStage("form", 1), key: "later" }));
-  return <FmsStageEditor data={data} flowBranchId="b1" onChange={setLater} onDelete={() => undefined} stage={later} stages={[first, later]} />;
+  return <FmsStageEditor data={data} onChange={setLater} onDelete={() => undefined} stage={later} stages={[first, later]} />;
 }
 
 function DecisionHarness() {
@@ -39,7 +39,7 @@ function DecisionHarness() {
     return [first, decision, followUp];
   });
   const [selected, setSelected] = useState(1);
-  return <><button onClick={() => setSelected(1)}>Edit decision</button><button onClick={() => setSelected(2)}>Edit follow up</button><FmsStageEditor data={data} flowBranchId="b1" onChange={(value) => setStages((current) => current.map((item, index) => index === selected ? value : item))} onDelete={() => undefined} stage={stages[selected]!} stages={stages} /></>;
+  return <><button onClick={() => setSelected(1)}>Edit decision</button><button onClick={() => setSelected(2)}>Edit follow up</button><FmsStageEditor data={data} onChange={(value) => setStages((current) => current.map((item, index) => index === selected ? value : item))} onDelete={() => undefined} stage={stages[selected]!} stages={stages} /></>;
 }
 
 describe("FMS stage editor", () => {

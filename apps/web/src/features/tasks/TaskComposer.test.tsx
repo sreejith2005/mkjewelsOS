@@ -35,11 +35,8 @@ function renderComposer(overrides: Partial<Parameters<typeof TaskComposer>[0]> =
     data={data}
     onClose={vi.fn()}
     onCreated={vi.fn()}
-    onManageTemplates={vi.fn()}
     onSave={vi.fn()}
-    onSaveRecurring={vi.fn()}
     onUploadAttachment={vi.fn()}
-    onUseTemplate={vi.fn()}
     profile={profile}
     {...overrides}
   />);
@@ -65,22 +62,8 @@ describe("TaskComposer selector panels", () => {
     });
   });
 
-  it("confirms that a recurring task has been scheduled", async () => {
-    const onSaveRecurring = vi.fn().mockResolvedValue(undefined);
-    renderComposer({ onSaveRecurring });
-
-    fireEvent.change(screen.getByPlaceholderText("Add Title"), { target: { value: "Daily stock check" } });
-    fireEvent.click(screen.getByRole("button", { name: /Users/i }));
-    fireEvent.change(screen.getByLabelText("Department"), { target: { value: "department-1" } });
-    fireEvent.click(screen.getByLabelText(/Ashwini/i));
-    fireEvent.click(screen.getByRole("button", { name: /Due Date/i }));
-    fireEvent.change(screen.getByLabelText("Due date and time"), { target: { value: "2026-12-01T09:00" } });
-    fireEvent.click(screen.getByLabelText("Repeat"));
-    fireEvent.click(screen.getByRole("button", { name: /Assign Task/i }));
-
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(onSaveRecurring).toHaveBeenCalledTimes(1);
-    expect(onSaveRecurring).toHaveBeenCalledWith(expect.objectContaining({ initial_planned_datetime: "2026-12-01T03:30:00.000Z" }));
-    expect(toastSuccess).toHaveBeenCalledWith("Recurring task scheduled", expect.objectContaining({ description: expect.stringContaining("Daily") }));
+  it("does not expose recurrence authoring in manual Tasks", () => {
+    renderComposer();
+    expect(screen.queryByLabelText("Repeat")).toBeNull();
   });
 });

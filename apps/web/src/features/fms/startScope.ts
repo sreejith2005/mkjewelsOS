@@ -29,10 +29,6 @@ export function fmsStartUsers(data: FmsData, branchId: string, departmentId: str
   );
 }
 
-export function isFmsStartUserAvailable(data: FmsData, userId: string) {
-  return data.availability.find((item) => item.user_profile_id === userId)?.status !== "absent";
-}
-
 export function resolveFmsQuickStart(data: FmsData, flow: FmsFlowRow, profile: StartProfile) {
   const firstStage = data.stages
     .filter((stage) => stage.fms_flow_id === flow.id)
@@ -42,16 +38,11 @@ export function resolveFmsQuickStart(data: FmsData, flow: FmsFlowRow, profile: S
   const firstRule = data.assignees
     .filter((rule) => rule.fms_stage_id === firstStage.id && rule.assignee_type === "specific_user")
     .sort((left, right) => left.sort_order - right.sort_order)[0];
-  const candidates = [firstRule?.user_profile_id, firstRule?.fallback_user_profile_id]
-    .filter((id): id is string => !!id)
-    .map((id) => data.users.find((user) => user.id === id))
-    .filter((user): user is FmsData["users"][number] => !!user);
-  const assignee = candidates.find((user) =>
-    user.working_status !== "inactive"
+  const assignee = data.users.find((user) => user.id === firstRule?.user_profile_id
+    && user.working_status !== "inactive"
     && user.working_status !== "resigned"
     && user.account_status !== "inactive"
     && user.account_status !== "suspended"
-    && isFmsStartUserAvailable(data, user.id)
   );
 
   const branchId = flow.branch_id ?? assignee?.branch_id ?? profile.branch_id;

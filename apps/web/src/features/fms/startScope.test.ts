@@ -35,7 +35,7 @@ describe("FMS manual start scope", () => {
     expect(resolveFmsQuickStart(quickData, flow, { user_role: "admin", branch_id: "a", department_id: "global" } as UserProfile)).toEqual(expect.objectContaining({ title: "Sales intake", branchId: "b", departmentId: "b-sales", firstAssigneeId: "right", context: {} }));
   });
 
-  it("uses the configured fallback when the primary person is absent", () => {
+  it("keeps the configured owner and leaves coverage resolution to the database", () => {
     const quickData = {
       ...data,
       users: [...data.users, { id: "fallback", branch_id: "b", department_id: "b-sales", working_status: "active", account_status: "active" }],
@@ -44,6 +44,6 @@ describe("FMS manual start scope", () => {
       availability: [{ user_profile_id: "right", status: "absent" }],
     } as unknown as FmsData;
     const flow = { id: "flow", name: "Sales intake", branch_id: null, department_id: null } as FmsFlowRow;
-    expect(resolveFmsQuickStart(quickData, flow, { user_role: "admin", branch_id: "a", department_id: "global" } as UserProfile).firstAssigneeId).toBe("fallback");
+    expect(resolveFmsQuickStart(quickData, flow, { user_role: "admin", branch_id: "a", department_id: "global" } as UserProfile).firstAssigneeId).toBe("right");
   });
 });

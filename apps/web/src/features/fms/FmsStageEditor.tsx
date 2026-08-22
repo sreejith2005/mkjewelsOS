@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import {
   FMS_BRANCH_OPERATORS,
   FMS_STATUS_CONDITION_OPERATORS,
-  type FmsAssigneeRule,
   type FmsBranchRule,
   type FmsSlaRule,
   type FmsStageDefinition,
@@ -11,10 +10,8 @@ import {
 } from "@jewelos/core";
 import { Button, Field } from "@/components/ui";
 import type { FmsData } from "./api";
-import { fmsDepartmentsForBranch, fmsUsersForDepartment } from "./departments";
 
 const humanTypes: readonly FmsStageDefinition["type"][] = ["form", "task", "approval"];
-const availabilityTone = { present: "text-success", remote: "text-success", half_day: "text-gold", absent: "text-danger" } as const;
 const timingOptions: readonly { value: FmsTimingMethod; label: string; help: string }[] = [
   { value: "completion_date", label: "Completion date", help: "Complete by the selected calendar date." },
   { value: "tat_hours", label: "TAT (hours)", help: "Working target measured from an earlier step." },
@@ -24,7 +21,7 @@ const timingOptions: readonly { value: FmsTimingMethod; label: string; help: str
 const defaultStatusOptions = ["Busy", "DND", "Follow Up", "Interested", "Not Interested", "Proposal", "Ringing", "demo call done", "required follow up", "yes"] as const;
 const statusOperatorLabel: Record<typeof FMS_STATUS_CONDITION_OPERATORS[number], string> = { equals: "equals", not_equals: "not equals", greater_than: "greater than", less_than: "less than", greater_than_or_equal: "greater than & equals", less_than_or_equal: "less than and equals", contains: "contains", not_contains: "not contains" };
 
-export function FmsStageEditor({ stage, stages, data, flowBranchId, onChange, onDelete }: { stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; flowBranchId?: string | undefined; onChange: (value: FmsStageDefinition) => void; onDelete: () => void }) {
+export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; onChange: (value: FmsStageDefinition) => void; onDelete: () => void }) {
   const update = (patch: Partial<FmsStageDefinition>) => onChange({ ...stage, ...patch });
   const updateSla = (patch: Partial<FmsSlaRule>) => update({ sla: { ...stage.sla, ...patch } });
   const stageIndex = stages.findIndex((item) => item.key === stage.key);
@@ -34,9 +31,6 @@ export function FmsStageEditor({ stage, stages, data, flowBranchId, onChange, on
   const others = stages.filter((item) => item.key !== stage.key);
   const human = humanTypes.includes(stage.type);
   const canChooseNext = !["branch", "parallel_start", "end"].includes(stage.type);
-  const primaryRule = stage.assigneeRules.find((rule) => rule.type === "specific_user");
-  const primary = data.users.find((user) => user.id === primaryRule?.userProfileId);
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState(primary?.department_id ?? "");
   const [showAdditional, setShowAdditional] = useState(!!stage.method || !!stage.formTemplateId || stage.requiresUpload || stage.requiresRemark || stage.requiresNextDoerHandoff || stage.canReject || stage.canRequestRevision || stage.canEscalate);
   const [showConditional, setShowConditional] = useState(!!stage.sla.conditional);
   const statusCondition = stage.sla.conditional && "field" in stage.sla.conditional ? stage.sla.conditional : undefined;
@@ -44,25 +38,10 @@ export function FmsStageEditor({ stage, stages, data, flowBranchId, onChange, on
   const statusOptions = [...new Map([...(data.statusOptions ?? []), ...defaultStatusOptions.map((label) => ({ label, value: label }))].map((option) => [option.value.toLowerCase(), option])).values()];
 
   useEffect(() => {
-    setSelectedDepartmentId(primary?.department_id ?? "");
     setShowAdditional(!!stage.method || !!stage.formTemplateId || stage.requiresUpload || stage.requiresRemark || stage.requiresNextDoerHandoff || stage.canReject || stage.canRequestRevision || stage.canEscalate);
     setShowConditional(!!stage.sla.conditional);
   }, [stage.key]);
 
-  const departmentId = primary?.department_id ?? selectedDepartmentId;
-  const departments = fmsDepartmentsForBranch(data.departments, flowBranchId);
-  const departmentUsers = useMemo(() => fmsUsersForDepartment(data.users, departmentId), [data.users, departmentId]);
-  const availabilityByUser = useMemo(() => new Map(data.availability.map((item) => [item.user_profile_id, item.status])), [data.availability]);
-  const branchName = (branchId: string | null) => data.branches.find((branch) => branch.id === branchId)?.name ?? "Shared";
-  const personLabel = (user: FmsData["users"][number]) => {
-    const availability = availabilityByUser.get(user.id);
-    const account = !user.is_login_enabled || user.account_status && user.account_status !== "active" ? user.account_status ?? "login disabled" : availability ?? "not marked";
-    return `${user.employee_name}${user.employee_code ? ` · ${user.employee_code}` : ""} — ${account.replaceAll("_", " ")}`;
-  };
-  const setAssignment = (primaryUserId: string, fallbackUserId?: string) => {
-    const rule: FmsAssigneeRule | undefined = primaryUserId ? { type: "specific_user", userProfileId: primaryUserId, fallbackUserProfileId: fallbackUserId || undefined } : undefined;
-    update({ assigneeRules: rule ? [rule] : [] });
-  };
   const changeBranchRule = (index: number, patch: Partial<FmsBranchRule>) => update({ branchRules: stage.branchRules.map((rule, ruleIndex) => ruleIndex === index ? { ...rule, ...patch } : rule).map((rule, order) => ({ ...rule, order })) });
   const moveBranchRule = (index: number, direction: -1 | 1) => {
     const target = index + direction;
@@ -78,16 +57,6 @@ export function FmsStageEditor({ stage, stages, data, flowBranchId, onChange, on
       <Field label="Step name"><input autoFocus className="field" maxLength={150} onChange={(event) => update({ name: event.target.value })} placeholder="e.g. Issue PO to supplier" value={stage.name} /></Field>
     </section>
 
-    {false ? <section className="space-y-3 border-t border-gold/15 pt-4">
-      <div><h4 className="text-xs font-semibold uppercase tracking-[0.15em] text-gold">Who</h4><p className="mt-1 text-xs text-soft-grey">Choose a department, a named owner, and an optional fallback from Users.</p></div>
-      <Field label="Department"><select className="field" onChange={(event) => { setSelectedDepartmentId(event.target.value); setAssignment(""); }} value={departmentId}><option value="">Select a department</option>{data.branches.map((branch) => { const branchDepartments = departments.filter((department) => department.branch_id === branch.id); return branchDepartments.length ? <optgroup key={branch.id} label={branch.name}>{branchDepartments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</optgroup> : null; })}{departments.filter((department) => department.branch_id === null).map((department) => <option key={department.id} value={department.id}>{branchName(department.branch_id)} · {department.name}</option>)}</select></Field>
-      {departmentId ? <p className="text-xs text-soft-grey">{departmentUsers.length} {departmentUsers.length === 1 ? "person" : "people"} available from Users for this department.</p> : null}
-      <Field label="Primary assignee"><select className="field" disabled={!departmentId || !departmentUsers.length} onChange={(event) => setAssignment(event.target.value, primaryRule?.fallbackUserProfileId)} value={primaryRule?.userProfileId ?? ""}><option value="">Select a named person</option>{departmentUsers.map((user) => <option key={user.id} value={user.id}>{personLabel(user)}</option>)}</select></Field>
-      {departmentId && !departmentUsers.length ? <p className="rounded-lg border border-warning/30 bg-warning/5 p-2 text-xs text-warning">No visible Users profiles belong to this department. Check each person’s department in Users.</p> : null}
-      {primary ? <p className={`text-xs ${availabilityByUser.get(primary!.id) ? availabilityTone[availabilityByUser.get(primary!.id)!] : "text-soft-grey"}`}>Today: {availabilityByUser.get(primary!.id)?.replaceAll("_", " ") ?? "availability not marked"}</p> : null}
-      <Field label="Fallback assignee"><select className="field" disabled={!primaryRule?.userProfileId} onChange={(event) => setAssignment(primaryRule?.userProfileId ?? "", event.target.value)} value={primaryRule?.fallbackUserProfileId ?? ""}><option value="">No fallback</option>{departmentUsers.filter((user) => user.id !== primaryRule?.userProfileId).map((user) => <option key={user.id} value={user.id}>{personLabel(user)}</option>)}</select></Field>
-      <p className="text-xs text-soft-grey">Availability is shown beside each person. If the primary is absent, work moves to the configured fallback from the same department.</p>
-    </section> : null}
 
     {human ? <section className="space-y-3 border-t border-gold/15 pt-4">
       <div><h4 className="text-xs font-semibold uppercase tracking-[0.15em] text-gold">Step type</h4><p className="mt-1 text-xs text-soft-grey">A normal step is completed once. A decision step records a required Yes or No.</p></div>

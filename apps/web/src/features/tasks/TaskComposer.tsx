@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { ArrowLeft, CalendarDays, Check, ChevronDown, FileText, Flag, Paperclip, Plus, Rocket, Users, UserRoundCheck, X } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, FileText, Flag, Paperclip, Plus, Rocket, Users, UserRoundCheck, X } from "lucide-react";
 import { normalizeTaskParticipants, type Enums, type Json } from "@jewelos/core";
 import type { UserProfile } from "@/types";
 import { Button, Modal, Notice } from "@/components/ui";
@@ -10,7 +10,6 @@ import type { TaskReferenceData } from "./api";
 import { UserPicker } from "./UserPicker";
 
 type Panel = "users" | "due" | "priority" | "form" | "watchers" | null;
-type ComposerMode = "manual" | "template";
 
 function TaskSelector({ children, id, open, panel }: { children: ReactNode; id: Exclude<Panel, null>; open: boolean; panel: ReactNode }) {
   return <div className="min-w-0" data-testid={`task-selector-${id}`}>
@@ -19,18 +18,14 @@ function TaskSelector({ children, id, open, panel }: { children: ReactNode; id: 
   </div>;
 }
 
-export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSave, onUploadAttachment, onSaveRecurring, onUseTemplate, profile }: {
+export function TaskComposer({ data, onClose, onCreated, onSave, onUploadAttachment, profile }: {
   data: TaskReferenceData;
   onClose: () => void;
   onCreated: () => void;
-  onManageTemplates: () => void;
   onSave: (payload: Json, doers: string[], watchers: string[], checklist: Json) => Promise<string>;
   onUploadAttachment: (taskId: string, file: File) => Promise<void>;
-  onSaveRecurring: (payload: Json) => Promise<void>;
-  onUseTemplate: (templateId: string, planned: string) => Promise<void>;
   profile: UserProfile;
 }) {
-  const [mode, setMode] = useState<ComposerMode>("manual");
   const [panel, setPanel] = useState<Panel>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -45,12 +40,6 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [checklistDraft, setChecklistDraft] = useState("");
   const [checklist, setChecklist] = useState<string[]>([]);
-  const [repeat, setRepeat] = useState(false);
-  const [repeatSchedule, setRepeatSchedule] = useState("daily");
-  const [repeatEndDate, setRepeatEndDate] = useState("");
-  const [repeatDays, setRepeatDays] = useState<string[]>([]);
-  const [templateId, setTemplateId] = useState("");
-  const [templatePlanned, setTemplatePlanned] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -69,7 +58,6 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
   [branchId, data.users, departmentId, profile.tenant_id]);
   const priorityLabel = priorityOptions.find((option) => option.value === priority)?.label ?? priority;
   const attachedForm = data.forms.find((form) => form.id === formTemplateId);
-  const activeTemplates = data.templates.filter((template) => template.is_active);
 
   useEffect(() => {
     if (!priorityOptions.some((option) => option.value === priority)) setPriority(priorityOptions[0]?.value ?? "high");
@@ -111,19 +99,9 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
     if (!branchId || !departmentId) return setError("Choose a valid branch and department.");
     if (doers.length === 0) return setError("Select at least one user.");
     if (!planned) return setError("Choose a due date and time.");
-    if (repeat && repeatSchedule === "weekly" && repeatDays.length === 0) return setError("Select at least one repeat day.");
     setSaving(true);
     try {
       const participants = normalizeTaskParticipants(doers, watchers);
-      if (repeat) {
-        const recurrenceRule = repeatSchedule === "daily" ? "FREQ=DAILY"
-          : repeatSchedule === "weekly" ? `FREQ=WEEKLY;BYDAY=${repeatDays.map((day) => day.slice(0, 2).toUpperCase()).join(",")}`
-            : "FREQ=MONTHLY";
-        await onSaveRecurring({ title: title.trim(), description: description.trim(), recurrence_rule: `${recurrenceRule}${repeatEndDate ? `;UNTIL=${repeatEndDate.replaceAll("-", "")}T235959Z` : ""}`, planned_time: planned.slice(11, 16), initial_planned_datetime: new Date(planned).toISOString(), priority, branch_id: branchId, department_id: departmentId, default_assignee_type: "specific_user", default_assignee_user_id: participants.doerIds[0], default_assignee_role: "", checklist_items: [], requires_upload: false, requires_remark: false, requires_form: Boolean(formTemplateId), form_template_id: formTemplateId, is_active: true });
-        toast.success("Recurring task scheduled", { description: `${repeatSchedule[0]?.toUpperCase()}${repeatSchedule.slice(1)} schedule saved and the first task sent to ${participants.doerIds.length} user${participants.doerIds.length === 1 ? "" : "s"}.` });
-        onCreated();
-        return;
-      }
       const taskId = await onSave({
         title: title.trim(),
         description: description.trim(),
@@ -146,21 +124,6 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
     }
   };
 
-  const submitTemplate = async (event: FormEvent) => {
-    event.preventDefault();
-    setError(null);
-    if (!templateId || !templatePlanned) return setError("Choose a template and due date.");
-    setSaving(true);
-    try {
-      await onUseTemplate(templateId, new Date(templatePlanned).toISOString());
-      onCreated();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to create task from template");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const usersPanel = <div className="flex flex-col gap-3">
     <div className="grid gap-3 sm:grid-cols-2">
       <label><span className="mb-1 block text-xs font-semibold text-task-text">Branch{canSelectBranch ? "" : " (fixed)"}</span><select className="task-field" disabled={!canSelectBranch} onChange={(event) => changeBranch(event.target.value)} value={branchId}><option value="">Select branch</option>{data.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label>
@@ -177,8 +140,7 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
     <Modal onClose={onClose} title="Assign New Task" tone="light" wide>
       {error ? <div className="mb-4"><Notice tone="danger">{error}</Notice></div> : null}
 
-      {mode === "manual" ? (
-        <form className="flex flex-col" onSubmit={(event) => void submitManual(event)}>
+      <form className="flex flex-col" onSubmit={(event) => void submitManual(event)}>
           <label className="border-b border-task-border px-1 pb-3">
             <span className="sr-only">Task title</span>
             <input autoFocus className="w-full bg-transparent text-base font-medium text-task-text placeholder:text-task-text-muted/80 focus-visible:ring-0" data-autofocus maxLength={200} onChange={(event) => setTitle(event.target.value)} placeholder="Add Title" value={title} />
@@ -201,23 +163,11 @@ export function TaskComposer({ data, onClose, onCreated, onManageTemplates, onSa
           </div>
 
 
-          {repeat ? <section className="mt-4 rounded-xl border border-task-border bg-task-muted p-3"><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-task-text-muted">Recurring settings</p><select className="task-field" onChange={(event) => setRepeatSchedule(event.target.value)} value={repeatSchedule}><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select><div className="mt-2 grid grid-cols-2 gap-2"><label><span className="sr-only">End date</span><input className="task-field" min={new Date().toISOString().slice(0, 10)} onChange={(event) => setRepeatEndDate(event.target.value)} type="date" value={repeatEndDate} /></label><span className="flex min-h-11 items-center rounded-lg border border-task-border px-3 text-sm text-task-text-muted">{repeatEndDate ? "Ends on selected date" : "No end date"}</span></div>{repeatSchedule === "weekly" ? <div className="mt-3 flex flex-wrap gap-2">{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((day) => <button className={cn("size-10 rounded-full border text-xs", repeatDays.includes(day) ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border text-task-text-muted")} key={day} onClick={() => setRepeatDays((current) => current.includes(day) ? current.filter((item) => item !== day) : [...current, day])} type="button">{day}</button>)}</div> : null}</section> : null}
           <div className="sticky -bottom-5 -mx-5 mt-4 flex items-center gap-3 border-t border-task-border bg-task-bg px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-            <label className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-task-text"><input checked={repeat} className="size-4 accent-task-accent" onChange={(event) => setRepeat(event.target.checked)} type="checkbox" />Repeat</label>
             <label className="flex size-11 cursor-pointer items-center justify-center rounded-lg text-task-text-muted hover:bg-task-muted"><Paperclip className="size-5" /><span className="sr-only">Attach image or document</span><input accept="image/jpeg,image/png,image/webp,application/pdf" className="sr-only" onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} type="file" /></label>
             <Button className="ml-auto bg-task-accent text-task-text hover:bg-task-accent/90" disabled={saving} type="submit"><Rocket />{saving ? "Assigning…" : "Assign Task"}</Button>
           </div>
-        </form>
-      ) : (
-        <form className="flex flex-col gap-4" onSubmit={(event) => void submitTemplate(event)}>
-          <button className="inline-flex min-h-11 items-center gap-2 self-start text-sm font-semibold text-task-text-muted hover:text-task-text" onClick={() => { setMode("manual"); setError(null); }} type="button"><ArrowLeft className="size-4" />Back to manual task</button>
-          <p className="text-sm text-task-text-muted">Create from an active database-backed template, including its checklist and configured requirements.</p>
-          <label><span className="mb-1 block text-xs font-semibold text-task-text">Task template</span><select className="task-field" onChange={(event) => setTemplateId(event.target.value)} value={templateId}><option value="">Select template</option>{activeTemplates.map((template) => <option key={template.id} value={template.id}>{template.title}</option>)}</select></label>
-          <label><span className="mb-1 block text-xs font-semibold text-task-text">Due date and time</span><input className="task-field" onChange={(event) => setTemplatePlanned(event.target.value)} type="datetime-local" value={templatePlanned} /></label>
-          <Button className="border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={onManageTemplates} type="button" variant="secondary">Manage task templates</Button>
-          <Button className="bg-task-accent text-task-text hover:bg-task-accent/90" disabled={saving} type="submit"><Rocket />{saving ? "Creating…" : "Create from Template"}</Button>
-        </form>
-      )}
+      </form>
     </Modal>
   );
 }
