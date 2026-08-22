@@ -11,15 +11,14 @@ Make the primary Recurring / To-Do creation flow match the supplied operational 
 - Frequencies are daily, weekly, monthly, quarterly, yearly, one-time, and as-required. Existing advanced weekly/monthly controls remain available when needed.
 - Scheduled start and due time are separate. Scheduled start records when work becomes actionable; due time supplies the task deadline shown to the employee.
 - Completion type is either Checkbox (normal completion) or Upload (at least one attachment is mandatory before completion).
-- Coverage is enabled by default. For an unavailable named employee, the server resolves Primary Buddy, then Secondary Buddy, then Reporting Manager. No per-schedule buddy can be selected.
-- Disabling coverage leaves the original assignee unchanged and records the assignment as Coverage Required when that employee is unavailable; it never silently picks another person.
+- Coverage is always enabled. For an unavailable named employee, the server resolves Primary Buddy, then Secondary Buddy, then Reporting Manager. No per-schedule buddy can be selected or disabled.
 - Every save remains a protected, audited RPC. The browser submits declarative fields only and cannot claim a coverage result.
 
 ## Data and compatibility
 
-Add nullable `due_time time` and non-null `coverage_enabled boolean default true` to `task_templates`. Existing `planned_time` remains the scheduled-start time. The recurring-instance creator writes `planned_datetime` from `due_time` when supplied, retaining `planned_time` as its compatible fallback. Existing schedules get `coverage_enabled=true` and keep their existing `planned_time` behavior.
+Add nullable `due_time time` and non-null `coverage_enabled boolean default true` to `task_templates`. Existing `planned_time` remains the scheduled-start time. The recurring-instance creator writes `planned_datetime` from `due_time` when supplied, retaining `planned_time` as its compatible fallback. Existing schedules get `coverage_enabled=true` and keep their existing `planned_time` behavior. A database constraint preserves the always-enabled coverage policy.
 
-The coverage resolver runs only when `coverage_enabled` is true. The same guard applies to immediate creation, worker generation, manual Run now, and reconciliation. The migration updates generated database types and uses a forward-only RPC replacement with audit preservation.
+The existing coverage resolver remains mandatory for immediate creation, worker generation, manual Run now, and reconciliation. The migration updates generated database types and uses a forward-only RPC replacement with audit preservation.
 
 ## UI and validation
 

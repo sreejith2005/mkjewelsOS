@@ -566,7 +566,7 @@ export function RecurringTodoPage() {
                     <p className="mt-1 text-xs text-soft-grey">
                       {titleCase(template.schedule_kind)} | Starts{" "}
                       {template.starts_on ?? "immediately"} |{" "}
-                      {template.planned_time?.slice(0, 5)} |{" "}
+                      Starts {template.planned_time?.slice(0, 5)} | Due {template.due_time?.slice(0, 5) ?? template.planned_time?.slice(0, 5)} |{" "}
                       {template.is_active ? "Active" : "Paused"}
                     </p>
                   </div>

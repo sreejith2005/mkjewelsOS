@@ -5261,9 +5261,11 @@ export type Database = {
           checklist_items: Json
           created_at: string | null
           created_by: string | null
+          coverage_enabled: boolean
           default_assignee_role: Database["public"]["Enums"]["user_role"] | null
           default_assignee_type: string
           default_assignee_user_id: string | null
+          due_time: string | null
           department_id: string | null
           description: string | null
           followup_enabled: boolean
@@ -5292,11 +5294,13 @@ export type Database = {
           checklist_items?: Json
           created_at?: string | null
           created_by?: string | null
+          coverage_enabled?: boolean
           default_assignee_role?:
             | Database["public"]["Enums"]["user_role"]
             | null
           default_assignee_type?: string
           default_assignee_user_id?: string | null
+          due_time?: string | null
           department_id?: string | null
           description?: string | null
           followup_enabled?: boolean
@@ -5325,11 +5329,13 @@ export type Database = {
           checklist_items?: Json
           created_at?: string | null
           created_by?: string | null
+          coverage_enabled?: boolean
           default_assignee_role?:
             | Database["public"]["Enums"]["user_role"]
             | null
           default_assignee_type?: string
           default_assignee_user_id?: string | null
+          due_time?: string | null
           department_id?: string | null
           description?: string | null
           followup_enabled?: boolean
