@@ -97,7 +97,7 @@ export function Modal({
         tabIndex={-1}
         onKeyDown={trapFocus}
         className={cn(
-          "max-h-[94dvh] w-full overflow-y-auto rounded-t-2xl p-5 shadow-2xl sm:rounded-2xl",
+          "max-h-[94dvh] w-full overflow-y-auto rounded-t-2xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl sm:rounded-2xl",
           tone === "light" ? "border border-task-border bg-task-bg text-task-text" : "glass-card",
           wide ? "sm:max-w-4xl" : "sm:max-w-lg",
         )}

@@ -33,6 +33,14 @@ const data = {
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("published FMS quick start", () => {
+  it("lets the builder heading wrap its primary action on narrow screens", async () => {
+    mocks.loadFmsBuilderData.mockResolvedValue(data);
+    render(<FMSBuilderPage />);
+
+    const create = await screen.findByRole("button", { name: "New workflow" });
+    expect(create.parentElement?.className).toContain("flex-wrap");
+  });
+
   it("starts in one click without rendering start settings and opens the new instance", async () => {
     mocks.loadFmsBuilderData.mockResolvedValue(data);
     mocks.startFmsInstance.mockResolvedValue({ instance_id: "instance-1", reference_number: "FMS-1" });
