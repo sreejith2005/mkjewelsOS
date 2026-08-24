@@ -24,7 +24,8 @@ import {
 import { supabase } from "@jewelos/api-client";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Field, Modal, Notice } from "@/components/ui";
-import { errorMessage, initials, PHONE_PATTERN, titleCase } from "@/lib/format";
+import { eligibleBuddies } from "@/features/users/buddyEligibility";
+import { edgeFunctionErrorMessage, errorMessage, initials, PHONE_PATTERN, titleCase } from "@/lib/format";
 import type { Branch, Department, DropdownMaster, UserProfile } from "@/types";
 
 const ACCOUNT_STATUSES = [
@@ -56,20 +57,6 @@ const EMPTY: Data = {
   dropdowns: [],
   departments: [],
 };
-function eligibleBuddies(
-  profiles: UserProfile[],
-  departmentId: string,
-  excludedId?: string,
-) {
-  return profiles.filter(
-    (profile) =>
-      profile.id !== excludedId &&
-      (profile.account_status === "active" ||
-        profile.account_status === "invited") &&
-      profile.department_id === departmentId,
-  );
-}
-
 function Status({ value }: { value: AccountStatus }) {
   const color =
     value === "active"
@@ -124,8 +111,12 @@ function EditUser({
   );
   const buddyProfiles = eligibleBuddies(
     data.profiles,
-    draft.department_id,
-    user.id,
+    {
+      branchId: draft.branch_id,
+      departmentId: draft.department_id,
+      designationId: draft.designation_id,
+      excludedId: user.id,
+    },
   );
   const departments = data.departments.filter(
     (department) =>
@@ -506,7 +497,11 @@ export function AddUserForm({
   const departments = data.departments.filter(
     (item) => !item.branch_id || item.branch_id === form.branch_id,
   );
-  const buddies = eligibleBuddies(data.profiles, form.department_id);
+  const buddies = eligibleBuddies(data.profiles, {
+    branchId: form.branch_id,
+    departmentId: form.department_id,
+    designationId: form.designation_id,
+  });
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
@@ -548,7 +543,7 @@ export function AddUserForm({
         setError("A user with this login email already exists.");
       else setCreated(true);
     } catch (caught) {
-      setError(errorMessage(caught));
+      setError(await edgeFunctionErrorMessage(caught));
     } finally {
       setSaving(false);
     }
@@ -694,14 +689,14 @@ export function AddUserForm({
           <Field label="Primary buddy">
             <select
               className="field"
-              disabled={!form.department_id}
+              disabled={!form.department_id || !form.designation_id}
               value={form.buddy_id}
               onChange={(event) => set("buddy_id", event.target.value)}
             >
               <option value="">
-                {form.department_id
+                {form.department_id && form.designation_id
                   ? "No primary buddy"
-                  : "Choose a department first"}
+                  : "Choose department and designation first"}
               </option>
               {buddies
                 .filter((item) => item.id !== form.secondary_buddy_id)
@@ -715,16 +710,16 @@ export function AddUserForm({
           <Field label="Secondary buddy">
             <select
               className="field"
-              disabled={!form.department_id}
+              disabled={!form.department_id || !form.designation_id}
               value={form.secondary_buddy_id}
               onChange={(event) =>
                 set("secondary_buddy_id", event.target.value)
               }
             >
               <option value="">
-                {form.department_id
+                {form.department_id && form.designation_id
                   ? "No secondary buddy"
-                  : "Choose a department first"}
+                  : "Choose department and designation first"}
               </option>
               {buddies
                 .filter((item) => item.id !== form.buddy_id)

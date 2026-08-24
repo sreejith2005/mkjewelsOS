@@ -53,6 +53,20 @@ function optionalString(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
 }
 
+function profileSaveError(error: { code?: string; message?: string } | null): string {
+  if (error?.code === "P0001" && error.message) return error.message;
+  if (error?.code === "23514") {
+    return "The selected buddy combination is not eligible for this employee.";
+  }
+  if (error?.code === "23503") {
+    return "A selected branch, department, designation, or buddy is no longer available.";
+  }
+  if (error?.code === "42501") {
+    return "You are not allowed to create this account with the selected role or buddy.";
+  }
+  return "The employee profile could not be saved. Please review the selected branch, department, designation, and buddies.";
+}
+
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return json(405, { error: "Method not allowed" });
@@ -170,12 +184,11 @@ Deno.serve(async (request: Request) => {
     );
 
     if (insertError || !profileId) {
-      console.error("invite profile rejected", { code: insertError?.code ?? null, message: insertError?.message ?? null });
+      console.error("invite profile rejected", { code: insertError?.code ?? null });
       const { error: cleanupError } = await adminClient.auth.admin.deleteUser(created.user.id);
+      if (cleanupError) console.error("invite auth cleanup failed", { code: cleanupError.code ?? null });
       return json(400, {
-        error: "Auth user was created but the profile could not be saved",
-        detail: insertError?.message ?? "The supplied profile values were rejected",
-        cleanup: cleanupError ? "Auth cleanup failed; contact an administrator" : "Auth user was cleaned up",
+        error: profileSaveError(insertError),
       });
     }
 
