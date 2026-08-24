@@ -6,7 +6,7 @@ Replace branch-then-department assignment cascades with one searchable, tenant-w
 
 ## Scope and user flow
 
-The change applies only to controls whose purpose is assigning a person. It does not remove branch or department fields that describe an independent business record or workflow scope.
+The change applies only to controls whose purpose is assigning a person. It does not remove branch or department fields that describe an independent business record or workflow scope. Normal manual task assignment becomes single-assignee only; existing historical shared tasks remain readable.
 
 Every applicable assignment control will open a searchable roster. Search matches employee name, employee code, role, branch, and department. Each result presents the employee name and a secondary line in the form `Department · Branch · Role`. The selector supports keyboard navigation, an accessible search label, empty-result feedback, and selected-user context after a choice is made.
 
@@ -28,6 +28,8 @@ The control searches locally over already-authorized reference data and uses def
 
 Selecting a person updates the associated assignment ID and derived branch/department display atomically in component state. Changing an assignee clears only dependent assignment state that is genuinely invalid; it does not silently discard unrelated form fields.
 
+For a normal task, the selected person is the original assignee. At the task planned date, the established database coverage resolver checks the selected person’s availability. If they are absent, it assigns their active, available primary buddy; if the primary buddy is also absent, it assigns their active, available secondary buddy. The effective assignee receives the task in their Tasks/Home work feed, while task coverage fields retain the original selected person and the resolution (`primary_buddy` or `secondary_buddy`) for auditability. When no eligible coverage exists, the task follows the existing coverage-required path rather than assigning an unavailable person.
+
 ## Database and authorization contract
 
 Add a forward-only migration; do not alter applied migrations. Protected assignment RPCs must treat caller-supplied branch and department values as untrusted compatibility inputs.
@@ -42,7 +44,7 @@ For direct individual assignment, each RPC loads the selected `user_profiles` ro
 
 The change intentionally enables authorized cross-branch assignment. It does not make cross-tenant assignment possible and does not weaken ordinary-user, inactive-user, or workflow-specific restrictions. Where a record has an independently meaningful branch (for example a CRM visit), the RPC validates that branch separately and does not overwrite it merely because an assignee works elsewhere.
 
-Every affected sensitive mutation keeps its audit write in the same transaction, recording the selected profile and the derived organizational context without storing excess profile data. Direct table writes remain unavailable; the browser continues to call only the narrowly granted RPCs.
+Every affected sensitive mutation keeps its audit write in the same transaction, recording the selected profile and the derived organizational context without storing excess profile data. Normal-task creation also records original/effective assignee coverage details transactionally. Direct table writes remain unavailable; the browser continues to call only the narrowly granted RPCs.
 
 ## Compatibility and migration behavior
 
@@ -52,9 +54,9 @@ Bulk import, recurring templates, role-based FMS stage rules, manager/department
 
 ## Testing and acceptance criteria
 
-- Component tests prove name/code/department/branch/role search, accessible labels, keyboard selection, result context, no-results feedback, and selection without an initial branch or department.
+- Component tests prove name/code/department/branch/role search, accessible labels, keyboard selection, result context, no-results feedback, selection without an initial branch or department, and single-assignee task selection.
 - Task, FMS, and CRM tests prove that their former cascades are absent from assignment controls and that selecting a profile displays the correct organization context.
-- Database contract tests prove authorized cross-branch assignment, derived scope persistence, audit entries, inactive/login-disabled rejection, ordinary-user denial, cross-tenant denial, and rejection of incompatible independent record scope.
+- Database contract tests prove authorized cross-branch assignment, derived scope persistence, primary-then-secondary buddy coverage, audit entries, inactive/login-disabled rejection, ordinary-user denial, cross-tenant denial, and rejection of incompatible independent record scope.
 - Existing FMS availability, coverage, role-rule, and client concurrency tests remain valid; failures are investigated rather than bypassed.
 - Focused web tests, relevant pgTAP tests, TypeScript checks, production build, `git diff --check`, staged secret scan, and authenticated browser verification using safe test accounts are run before any production claim.
 

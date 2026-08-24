@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ChipSelector } from "./ChipSelector";
 import type { TaskReferenceData } from "./api";
-import { UserPicker } from "./UserPicker";
+import { AssigneePicker } from "@/components/assignees/AssigneePicker";
 
 type Panel = "users" | "due" | "priority" | "form" | "watchers" | null;
 
@@ -31,8 +31,6 @@ export function TaskComposer({ data, onClose, onCreated, onSave, onUploadAttachm
   const [description, setDescription] = useState("");
   const [planned, setPlanned] = useState("");
   const [priority, setPriority] = useState<Enums<"task_priority">>("high");
-  const [branchId, setBranchId] = useState(profile.branch_id);
-  const [departmentId, setDepartmentId] = useState("");
   const [doers, setDoers] = useState<string[]>([]);
   const [watchers, setWatchers] = useState<string[]>([]);
   const [formTemplateId, setFormTemplateId] = useState("");
@@ -43,19 +41,12 @@ export function TaskComposer({ data, onClose, onCreated, onSave, onUploadAttachm
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const canSelectBranch = profile.user_role === "admin" || profile.user_role === "super_admin";
-  const scopedDepartments = useMemo(() => data.departments.filter((department) => !department.branch_id || department.branch_id === branchId), [branchId, data.departments]);
   const branchNames = useMemo(() => new Map(data.branches.map((branch) => [branch.id, branch.name])), [data.branches]);
   const departmentNames = useMemo(() => new Map(data.departments.map((department) => [department.id, department.name])), [data.departments]);
   const priorityOptions = useMemo(() => data.priorities.flatMap((option) => option.value === "high" || option.value === "medium" || option.value === "low"
     ? [{ ...option, value: option.value as Enums<"task_priority"> }]
     : []), [data.priorities]);
-  const eligibleDoers = useMemo(() => data.users.filter((user) =>
-    user.branch_id === branchId && user.department_id === departmentId),
-  [branchId, data.users, departmentId]);
-  const eligibleWatchers = useMemo(() => data.users.filter((user) =>
-    user.tenant_id === profile.tenant_id && user.branch_id === branchId && user.department_id === departmentId),
-  [branchId, data.users, departmentId, profile.tenant_id]);
+  const eligiblePeople = useMemo(() => data.users.filter((user) => user.id && user.tenant_id === profile.tenant_id), [data.users, profile.tenant_id]);
   const priorityLabel = priorityOptions.find((option) => option.value === priority)?.label ?? priority;
   const attachedForm = data.forms.find((form) => form.id === formTemplateId);
 
@@ -65,25 +56,10 @@ export function TaskComposer({ data, onClose, onCreated, onSave, onUploadAttachm
 
   const togglePanel = (next: Exclude<Panel, null>) => setPanel((current) => current === next ? null : next);
   const updateDoers = (nextDoers: string[]) => {
-    setDoers(nextDoers);
-    setWatchers((current) => current.filter((id) => !nextDoers.includes(id)));
+    const nextDoer = nextDoers.slice(0, 1);
+    setDoers(nextDoer);
+    setWatchers((current) => current.filter((id) => !nextDoer.includes(id)));
     setPanel(null);
-  };
-  const pruneDoersForScope = (nextBranchId: string, nextDepartmentId: string) => {
-    const eligibleIds = new Set(data.users.filter((user) =>
-      user.branch_id === nextBranchId && user.department_id === nextDepartmentId).flatMap((user) => user.id ? [user.id] : []));
-    const nextDoers = doers.filter((id) => eligibleIds.has(id));
-    setDoers(nextDoers);
-    setWatchers((current) => current.filter((id) => !nextDoers.includes(id)));
-  };
-  const changeBranch = (nextBranchId: string) => {
-    setBranchId(nextBranchId);
-    setDepartmentId("");
-    pruneDoersForScope(nextBranchId, "");
-  };
-  const changeDepartment = (nextDepartmentId: string) => {
-    setDepartmentId(nextDepartmentId);
-    pruneDoersForScope(branchId, nextDepartmentId);
   };
   const addChecklistItem = () => {
     const item = checklistDraft.trim();
@@ -96,8 +72,9 @@ export function TaskComposer({ data, onClose, onCreated, onSave, onUploadAttachm
     event.preventDefault();
     setError(null);
     if (!title.trim()) return setError("Add a task title.");
-    if (!branchId || !departmentId) return setError("Choose a valid branch and department.");
     if (doers.length === 0) return setError("Select at least one user.");
+    const selectedDoer = eligiblePeople.find((person) => person.id === doers[0]);
+    if (!selectedDoer?.branch_id || !selectedDoer.department_id) return setError("The selected user needs an active branch and department.");
     if (!planned) return setError("Choose a due date and time.");
     setSaving(true);
     try {
@@ -107,8 +84,8 @@ export function TaskComposer({ data, onClose, onCreated, onSave, onUploadAttachm
         description: description.trim(),
         planned_datetime: new Date(planned).toISOString(),
         priority,
-        branch_id: branchId,
-        department_id: departmentId,
+        branch_id: selectedDoer.branch_id,
+        department_id: selectedDoer.department_id,
         requires_upload: false,
         requires_remark: false,
         requires_form: Boolean(formTemplateId),
@@ -124,17 +101,11 @@ export function TaskComposer({ data, onClose, onCreated, onSave, onUploadAttachm
     }
   };
 
-  const usersPanel = <div className="flex flex-col gap-3">
-    <div className="grid gap-3 sm:grid-cols-2">
-      <label><span className="mb-1 block text-xs font-semibold text-task-text">Branch{canSelectBranch ? "" : " (fixed)"}</span><select className="task-field" disabled={!canSelectBranch} onChange={(event) => changeBranch(event.target.value)} value={branchId}><option value="">Select branch</option>{data.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label>
-      <label><span className="mb-1 block text-xs font-semibold text-task-text">Department</span><select className="task-field" onChange={(event) => changeDepartment(event.target.value)} value={departmentId}><option value="">Select department first</option>{scopedDepartments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select></label>
-    </div>
-    {!departmentId ? <Notice tone="task">Select a department to see its active users.</Notice> : eligibleDoers.length === 0 ? <Notice tone="task">No active users are assigned to this branch and department.</Notice> : <UserPicker branchNames={branchNames} departmentNames={departmentNames} disabledIds={[]} label="Users in this department" onChange={updateDoers} selectedIds={doers} users={eligibleDoers} />}
-  </div>;
+  const usersPanel = <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} label="Assign user" multiple={false} onChange={updateDoers} people={eligiblePeople.flatMap((person) => person.id ? [{ ...person, id: person.id }] : [])} selectedIds={doers} />;
   const duePanel = <label><span className="mb-1 block text-xs font-semibold text-task-text">Due date and time</span><input className="task-field" min={new Date().toISOString().slice(0, 16)} onChange={(event) => { setPlanned(event.target.value); setPanel(null); }} type="datetime-local" value={planned} /></label>;
   const priorityPanel = <fieldset className="grid grid-cols-3 gap-2"><legend className="sr-only">Priority</legend>{priorityOptions.map((option) => <button className={cn("min-h-11 rounded-lg border text-sm", priority === option.value ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border text-task-text-muted")} key={option.id} onClick={() => { setPriority(option.value); setPanel(null); }} type="button">{priority === option.value ? <Check className="mr-1 inline size-4" /> : null}{option.label}</button>)}</fieldset>;
   const formPanel = <div><label><span className="mb-1 block text-xs font-semibold text-task-text">Required form</span><select className="task-field" onChange={(event) => { setFormTemplateId(event.target.value); setPanel(null); }} value={formTemplateId}><option value="">No form required</option>{data.forms.map((form) => <option key={form.id} value={form.id}>{form.name}</option>)}</select></label><p className="mt-2 text-xs text-task-text-muted">The selected form must be completed before this task can be finished.</p></div>;
-  const watchersPanel = <UserPicker branchNames={branchNames} departmentNames={departmentNames} disabledIds={doers} label="In Loop · read only" onChange={(nextWatchers) => { setWatchers(nextWatchers); setPanel(null); }} selectedIds={watchers} users={eligibleWatchers} />;
+  const watchersPanel = <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} disabledIds={doers} label="In Loop · read only" multiple onChange={(nextWatchers) => { setWatchers(nextWatchers); setPanel(null); }} people={eligiblePeople.flatMap((person) => person.id ? [{ ...person, id: person.id }] : [])} selectedIds={watchers} />;
 
   return (
     <Modal onClose={onClose} title="Assign New Task" tone="light" wide>

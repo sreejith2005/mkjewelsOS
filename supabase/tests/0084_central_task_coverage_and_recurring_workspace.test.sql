@@ -70,30 +70,30 @@ select ok(
   'authorized Run Now can instantiate an inactive as-required schedule'
 );
 select ok(
-  position('reports_to_user_id' in pg_get_functiondef('public.resolve_task_coverage(uuid,date)'::regprocedure)) > 0,
-  'resolver falls back to the reporting manager'
+  position('reports_to_user_id' in pg_get_functiondef('public.resolve_task_coverage(uuid,date)'::regprocedure)) = 0,
+  'resolver leaves coverage required instead of assigning the reporting manager'
 );
 select ok(
-  position('Asia/Kolkata' in pg_get_functiondef('public.reconcile_short_deadline_coverage_with_audit(uuid,date,text)'::regprocedure)) > 0,
+  position('Asia/Kolkata' in pg_get_functiondef('public.reconcile_all_assignment_coverage_with_audit(uuid,date,text)'::regprocedure)) > 0,
   'reconciliation uses the agreed business timezone'
 );
 select ok(
-  position('client_followups' in pg_get_functiondef('public.reconcile_short_deadline_coverage_with_audit(uuid,date,text)'::regprocedure)) > 0
-  and position('fms_instance_stages' in pg_get_functiondef('public.reconcile_short_deadline_coverage_with_audit(uuid,date,text)'::regprocedure)) > 0
-  and position('task_instances' in pg_get_functiondef('public.reconcile_short_deadline_coverage_with_audit(uuid,date,text)'::regprocedure)) > 0,
+  position('client_followups' in pg_get_functiondef('public.reconcile_all_assignment_coverage_with_audit(uuid,date,text)'::regprocedure)) > 0
+  and position('fms_instance_stages' in pg_get_functiondef('public.reconcile_all_assignment_coverage_with_audit(uuid,date,text)'::regprocedure)) > 0
+  and position('task_instances' in pg_get_functiondef('public.reconcile_all_assignment_coverage_with_audit(uuid,date,text)'::regprocedure)) > 0,
   'reconciliation covers Tasks, CRM follow-ups, and FMS stages'
 );
 select ok(
-  position('manager_review' in pg_get_functiondef('public.reconcile_short_deadline_coverage_with_audit(uuid,date,text)'::regprocedure)) > 0,
+  position('manager_review' in pg_get_functiondef('public.reconcile_all_assignment_coverage_with_audit(uuid,date,text)'::regprocedure)) > 0,
   'claimed or in-progress work is routed to manager review'
 );
 select ok(
-  position('coverage_required' in pg_get_functiondef('public.reconcile_short_deadline_coverage_with_audit(uuid,date,text)'::regprocedure)) > 0,
+  position('coverage_required' in pg_get_functiondef('public.reconcile_all_assignment_coverage_with_audit(uuid,date,text)'::regprocedure)) > 0,
   'uncovered work is visibly marked coverage required'
 );
 select ok(
-  position('reconcile_short_deadline_coverage_with_audit' in pg_get_functiondef('public.record_availability_with_audit(uuid,date,availability_status,text)'::regprocedure)) > 0,
-  'single-day absence recording invokes reconciliation'
+  position('reconcile_all_assignment_coverage_with_audit' in pg_get_functiondef('public.record_availability_with_audit(uuid,date,availability_status,text)'::regprocedure)) > 0,
+  'single-day absence recording invokes all-date reconciliation'
 );
 select ok(
   not has_function_privilege('authenticated', 'reconcile_short_deadline_coverage_with_audit(uuid,date,text)', 'EXECUTE'),
