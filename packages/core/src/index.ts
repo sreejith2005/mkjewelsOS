@@ -55,3 +55,4 @@ export * from "./crm";
 export * from "./analytics";
 export * from "./reports";
 export * from "./settings";
+export * from "./identity";

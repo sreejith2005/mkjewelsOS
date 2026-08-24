@@ -1,0 +1,11 @@
+begin;
+select plan(7);
+select has_column('public', 'user_profiles', 'username', 'profiles have a username');
+select col_type_is('public', 'user_profiles', 'username', 'text', 'username is text');
+select has_index('public', 'user_profiles', 'user_profiles_username_lower_unique', 'case-insensitive username uniqueness is indexed');
+select has_table('public', 'username_login_rate_limits', 'login rate limits are persisted');
+select ok(not has_table_privilege('anon', 'username_login_rate_limits', 'SELECT,INSERT,UPDATE,DELETE'), 'anonymous callers cannot access rate-limit rows');
+select ok(has_function_privilege('service_role', 'consume_username_login_rate_limit(text)', 'EXECUTE') and not has_function_privilege('authenticated', 'consume_username_login_rate_limit(text)', 'EXECUTE'), 'only service role consumes login limits');
+select ok(has_function_privilege('service_role', 'apply_work_identity_with_audit(jsonb)', 'EXECUTE') and not has_function_privilege('authenticated', 'apply_work_identity_with_audit(jsonb)', 'EXECUTE'), 'only service role applies identity changes');
+select * from finish();
+rollback;

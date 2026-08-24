@@ -126,37 +126,24 @@ function usePathname() {
 }
 
 function LoginPage() {
-  const { requestPasswordReset, signIn, statusMessage } = useAuth();
+  const { signIn, statusMessage } = useAuth();
   const { theme, setTheme } = useTheme();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [resetMessage, setResetMessage] = useState<string | null>(null);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
     setSubmitting(true);
     try {
-      setError(await signIn(email.trim(), password));
+      setError(await signIn(username.trim(), password));
     } catch (error) {
       setError(error instanceof Error ? error.message : "Sign-in failed");
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const requestReset = async () => {
-    if (!email.trim()) {
-      setError("Enter your email address first.");
-      return;
-    }
-    setError(null);
-    setSubmitting(true);
-    const requestError = await requestPasswordReset(email);
-    setSubmitting(false);
-    setResetMessage(requestError ?? "If this email has an active account, a password-reset link has been sent.");
   };
 
   return (
@@ -169,14 +156,14 @@ function LoginPage() {
         {error ? <div className="mb-5"><Notice tone="danger">{error}</Notice></div> : null}
         <form className="space-y-4" onSubmit={submit}>
           <label className="block">
-            <span className="label">Email</span>
+            <span className="label">Username</span>
             <input
-              autoComplete="email"
+              autoComplete="username"
               className="field"
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => setUsername(event.target.value.toLowerCase())}
               required
-              type="email"
-              value={email}
+              pattern="[a-z0-9]+"
+              value={username}
             />
           </label>
           <label className="block">
@@ -193,11 +180,8 @@ function LoginPage() {
           <Button className="mt-2 w-full" disabled={submitting} type="submit">
             {submitting ? "Signing in…" : "Sign in"}
           </Button>
-          <button className="w-full text-sm text-gold underline underline-offset-4" disabled={submitting} onClick={() => void requestReset()} type="button">
-            Forgot password?
-          </button>
+          <p className="text-center text-xs text-soft-grey">For a password reset, contact your Super Admin.</p>
         </form>
-        {resetMessage ? <div className="mt-5"><Notice tone="success">{resetMessage}</Notice></div> : null}
       </section>
     </main>
   );

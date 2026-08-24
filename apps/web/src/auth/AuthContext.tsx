@@ -8,13 +8,12 @@ type AuthStatus = "loading" | "signed_out" | "authenticated" | "incomplete" | "b
 
 type AuthContextValue = {
   branch: Branch | null;
-  requestPasswordReset: (email: string) => Promise<string | null>;
   logout: () => Promise<void>;
   profile: UserProfile | null;
   preferences: UserPreferences;
   refreshPreferences: () => Promise<void>;
   session: Session | null;
-  signIn: (email: string, password: string) => Promise<string | null>;
+  signIn: (username: string, password: string) => Promise<string | null>;
   status: AuthStatus;
   statusMessage: string | null;
 };
@@ -127,15 +126,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [loadProfile]);
 
-  const signIn = useCallback(async (email: string, password: string) => {
+  const signIn = useCallback(async (username: string, password: string) => {
     setStatusMessage(null);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error || !data.session) {
+      const { data, error } = await supabase.functions.invoke<{ access_token?: string; refresh_token?: string; error?: string }>("username-password-login", { body: { username, password } });
+      if (error || !data?.access_token || !data.refresh_token) {
         setStatus("signed_out");
-        return error?.message ?? "Sign-in failed";
+        return data?.error ?? error?.message ?? "Invalid username or password";
       }
-      await loadProfile(data.session);
+      const { data: sessionData, error: sessionError } = await supabase.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
+      if (sessionError || !sessionData.session) { setStatus("signed_out"); return "Sign-in failed"; }
+      await loadProfile(sessionData.session);
       return null;
     } catch (error) {
       setStatus("signed_out");
@@ -147,19 +148,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   }, []);
 
-  const requestPasswordReset = useCallback(async (email: string) => {
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-      return error?.message ?? null;
-    } catch {
-      return "Unable to request a password reset. Please try again later.";
-    }
-  }, []);
-
   return (
-    <AuthContext.Provider value={{ branch, logout, preferences, profile, refreshPreferences, requestPasswordReset, session, signIn, status, statusMessage }}>
+    <AuthContext.Provider value={{ branch, logout, preferences, profile, refreshPreferences, session, signIn, status, statusMessage }}>
       {children}
     </AuthContext.Provider>
   );

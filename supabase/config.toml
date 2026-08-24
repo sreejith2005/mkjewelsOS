@@ -11,3 +11,8 @@ verify_jwt = false
 # Dedicated scheduler secret is verified before body parsing or database work.
 [functions.process-report-exports]
 verify_jwt = false
+
+# This is the public login entry point. It validates bodies, uses a private
+# salted rate-limit key, and returns generic credential failures.
+[functions.username-password-login]
+verify_jwt = false

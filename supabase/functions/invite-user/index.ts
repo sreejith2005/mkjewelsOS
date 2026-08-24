@@ -38,6 +38,8 @@ type InviteBody = {
 
 const ADMIN_SET_PASSWORD_LENGTH = 6;
 
+function compactIdentity(value: string): string { return value.toLowerCase().replace(/[^a-z0-9]/g, ""); }
+
 function json(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), { status, headers: corsHeaders });
 }
@@ -141,6 +143,9 @@ Deno.serve(async (request: Request) => {
     }
     const firstName = requiredString(body.first_name, "first_name");
     const lastName = optionalString(body.last_name);
+    const username = `${compactIdentity(firstName)}${compactIdentity(lastName ?? "")}`;
+    if (!/^[a-z0-9]{2,80}$/.test(username)) throw new Error("first and last name must produce a valid username");
+    const workEmail = `${compactIdentity(firstName)}${compactIdentity(lastName ?? "")}mkjewels@gmail.com`;
     const officialEmail = optionalString(body.official_email);
     if (officialEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(officialEmail)) throw new Error("official email is invalid");
     const branchId = requiredString(body.branch_id, "branch_id");
@@ -161,7 +166,7 @@ Deno.serve(async (request: Request) => {
     }
 
     const { data: created, error: createError } = await adminClient.auth.admin.createUser({
-      email: personalEmail,
+      email: workEmail,
       password: initialPassword,
       email_confirm: true,
     });
@@ -174,7 +179,7 @@ Deno.serve(async (request: Request) => {
       {
         p_auth_user_id: created.user.id,
         p_creator_profile_id: callerProfile.id,
-        p_personal_email: personalEmail,
+        p_personal_email: workEmail,
         p_first_name: firstName,
         p_last_name: lastName ?? "",
         p_official_email: officialEmail ?? "",
@@ -199,6 +204,8 @@ Deno.serve(async (request: Request) => {
         error: profileSaveError(insertError),
       });
     }
+    const { error: identityError } = await adminClient.rpc("set_new_user_work_identity_with_audit", { p_profile_id: profileId, p_username: username, p_personal_email: personalEmail });
+    if (identityError) return json(500, { error: "The account was created but its username could not be configured. Contact a system owner." });
 
     const { data: createdProfile, error: createdProfileError } = await adminClient
       .from("user_profiles")
