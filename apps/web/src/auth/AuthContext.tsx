@@ -96,6 +96,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
       if (!active) return;
       if (refreshError || !refreshed.session) {
+        await supabase.auth.signOut({ scope: "local" });
+        if (!active) return;
         setSession(null);
         setProfile(null);
         setBranch(null);
