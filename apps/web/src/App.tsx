@@ -13,7 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import {
-  canAccessPage, DEFAULT_SECTION_CONTROLS, isSectionUnderMaintenance, validateSectionControls,
+  canAccessPage, canBypassSectionMaintenance, DEFAULT_SECTION_CONTROLS, isSectionUnderMaintenance, validateSectionControls,
   getMenuForRole,
   getPageForPath,
   type PageId,
@@ -27,10 +27,11 @@ import { lazyPage } from "@/lib/lazyPage";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ThemeProvider, useTheme } from "@/theme/ThemeContext";
 import { SectionMaintenanceNotice } from "@/components/SectionMaintenanceNotice";
+import { saveSectionControls } from "@/features/settings/api";
 import type { LauncherItem } from "@/components/shell/AppLauncher";
 import logoDarkUrl from "../../../mk-jewels-logos/WhatsApp Image 2026-06-24 at 13.01.41 (1).jpeg";
 import logoLightUrl from "../../../mk-jewels-logos/WhatsApp Image 2026-06-24 at 13.01.40 (1).jpeg";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 
 const AvailabilityPage = lazyPage("availability", () => import("@/pages/AvailabilityPage").then((module) => ({ default: module.AvailabilityPage })));
 const HomePage = lazyPage("home", () => import("@/pages/HomePage").then((module) => ({ default: module.HomePage })));
@@ -262,6 +263,7 @@ function AppShell() {
   const [appsOpen, setAppsOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [sectionControls, setSectionControls] = useState(DEFAULT_SECTION_CONTROLS);
+  const [savingSectionControls, setSavingSectionControls] = useState(false);
   useEffect(() => {
     let active = true;
     void supabase.rpc("get_section_availability").then(({ data, error }) => {
@@ -291,11 +293,21 @@ function AppShell() {
     return description ? [{ ...item, description }] : [];
   }), [nav]);
   if (!profile) return null;
+  const isSuperAdmin = canBypassSectionMaintenance(profile.user_role);
+  const persistSectionControls = async (nextControls: typeof sectionControls) => {
+    setSavingSectionControls(true);
+    try {
+      setSectionControls(await saveSectionControls(nextControls));
+    } catch {
+      toast.error("Unable to save Developer Mode. Please refresh and retry.");
+    } finally {
+      setSavingSectionControls(false);
+    }
+  };
   const requestedPage = getPageForPath(path) ?? "home";
   const allowed = IMPLEMENTED_PAGES.has(requestedPage) && canAccessPage(profile.user_role, requestedPage);
   const currentPage: PageId = allowed ? requestedPage : "dashboard";
-  const adminBypass = profile.user_role === "super_admin" || profile.user_role === "admin";
-  const sectionUnderMaintenance = !adminBypass && isSectionUnderMaintenance(sectionControls, currentPage);
+  const sectionUnderMaintenance = !isSuperAdmin && isSectionUnderMaintenance(sectionControls, currentPage);
   const pageContent = sectionUnderMaintenance ? <SectionMaintenanceNotice section={currentPage === "checklist_tasks" ? "Tasks" : currentPage === "forms_library" ? "Forms Library" : currentPage === "fms_builder" ? "FMS" : currentPage === "dropdown_master" ? "Dropdown Master" : currentPage === "fms_tasks" ? "FMS Tasks" : currentPage.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())} /> : currentPage === "home" ? <HomePage onNavigate={navigate} />
     : currentPage === "dashboard" ? <DashboardPage />
     : currentPage === "reports" ? <ReportsPage />
@@ -317,6 +329,9 @@ function AppShell() {
       appsOpen={appsOpen}
       branch={branch}
       currentPage={currentPage}
+      developerModeActive={isSuperAdmin && sectionControls.developer_mode_enabled}
+      developerModeControl={isSuperAdmin ? <button aria-checked={sectionControls.developer_mode_enabled} className={`relative flex h-8 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition ${sectionControls.developer_mode_enabled ? "border-gold bg-gold text-obsidian" : "border-gold/30 text-gold hover:bg-gold/10"}`} disabled={savingSectionControls} onClick={() => void persistSectionControls({ ...sectionControls, developer_mode_enabled: !sectionControls.developer_mode_enabled })} role="switch" type="button"><span className={`size-2 rounded-full ${sectionControls.developer_mode_enabled ? "bg-obsidian" : "bg-task-text-muted"}`} />Developer Mode</button> : undefined}
+      developerSectionControls={isSuperAdmin ? <nav aria-label="Developer Mode section controls" className="flex gap-2 overflow-x-auto pb-1">{nav.map((item) => <label className="flex shrink-0 items-center gap-2 rounded-full border border-gold/20 px-3 py-1.5 text-xs text-champagne" key={item.id}><span>{item.label}</span><button aria-checked={sectionControls.section_availability[item.id]} aria-label={`${item.label} availability`} className={`relative h-5 w-9 rounded-full transition ${sectionControls.section_availability[item.id] ? "bg-success" : "bg-task-overdue"}`} disabled={savingSectionControls} onClick={() => void persistSectionControls({ ...sectionControls, section_availability: { ...sectionControls.section_availability, [item.id]: !sectionControls.section_availability[item.id] } })} role="switch" type="button"><span className={`absolute top-0.5 size-4 rounded-full bg-task-bg transition ${sectionControls.section_availability[item.id] ? "left-4" : "left-0.5"}`} /></button></label>)}</nav> : undefined}
       launcherItems={launcherItems}
       logoDarkUrl={logoDarkUrl}
       logoLightUrl={logoLightUrl}

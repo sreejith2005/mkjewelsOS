@@ -34,6 +34,9 @@ export function ApplicationShell({
   branch,
   children,
   currentPage,
+  developerModeActive = false,
+  developerModeControl,
+  developerSectionControls,
   launcherItems,
   logoDarkUrl,
   logoLightUrl,
@@ -55,6 +58,9 @@ export function ApplicationShell({
   branch: Branch | null;
   children: ReactNode;
   currentPage: PageId;
+  developerModeActive?: boolean;
+  developerModeControl?: ReactNode;
+  developerSectionControls?: ReactNode;
   launcherItems: readonly LauncherItem[];
   logoDarkUrl: string;
   logoLightUrl: string;
@@ -76,7 +82,8 @@ export function ApplicationShell({
 
   return (
     <div className="min-h-screen bg-obsidian">
-      <header className="sticky top-0 z-30 flex h-14 items-center border-b border-task-border bg-task-bg px-3 md:fixed md:inset-x-0 md:h-16 md:border-gold/20 md:bg-charcoal/95 md:px-5 md:backdrop-blur">
+      <header className={cn("sticky top-0 z-30 flex items-center border-b border-task-border bg-task-bg px-3 md:fixed md:inset-x-0 md:border-gold/20 md:bg-charcoal/95 md:px-5 md:backdrop-blur", developerModeActive ? "min-h-14 flex-wrap py-2 md:min-h-16" : "h-14 md:h-16")}>
+        <div className="flex w-full items-center">
         <Button aria-label="Toggle sidebar" className="mr-3 hidden size-10 p-0 md:inline-flex" onClick={() => setSidebarOpen(!sidebarOpen)} variant="ghost">
           {sidebarOpen ? <PanelLeftClose /> : <Menu />}
         </Button>
@@ -84,6 +91,7 @@ export function ApplicationShell({
         <img alt="MK Jewels" className="hidden h-8 w-auto md:block" src={logoDarkUrl} />
         <div className="ml-auto flex items-center gap-2 md:gap-3">
           <span className="hidden text-sm text-champagne md:inline">{branch?.name ?? "Branch unavailable"}</span>
+          {developerModeControl}
           <ThemeToggle onChange={onThemeChange} theme={theme} />
           <NotificationBell onNavigate={navigate} profileId={profile.id} />
           <button
@@ -99,6 +107,8 @@ export function ApplicationShell({
             <p className="text-[10px] uppercase tracking-wider text-gold">{titleCase(profile.user_role)}</p>
           </div>
         </div>
+        </div>
+        {developerModeActive && developerSectionControls ? <div className="mt-2 w-full border-t border-gold/20 pt-2">{developerSectionControls}</div> : null}
       </header>
 
       <aside className={cn("fixed bottom-0 left-0 top-16 z-20 hidden w-64 flex-col border-r border-gold/20 bg-charcoal p-3 transition-transform md:flex", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
@@ -128,7 +138,7 @@ export function ApplicationShell({
         </nav> : null}
       </aside>
 
-      <main className={cn("min-h-[calc(100dvh-3.5rem)] pb-[70px] md:min-h-screen md:pb-0 md:pt-16 md:transition-[padding]", sidebarOpen && "md:pl-64")}>
+      <main className={cn("min-h-[calc(100dvh-3.5rem)] pb-[70px] md:min-h-screen md:pb-0 md:pt-16 md:transition-[padding]", developerModeActive && "md:pt-28", sidebarOpen && "md:pl-64")}>
         <div className={cn(fullBleed ? "w-full p-3 sm:p-5 [&>section]:max-w-none [&>section]:mx-0" : "mx-auto max-w-7xl p-4 sm:p-6")}>{children}</div>
       </main>
 

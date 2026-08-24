@@ -1,4 +1,4 @@
-import { PAGE_IDS, type PageId } from "../roleMenu";
+import { PAGE_IDS, type PageId, type UserRole } from "../roleMenu";
 
 export type SectionAvailability = Readonly<Record<PageId, boolean>>;
 
@@ -34,4 +34,8 @@ export function validateSectionControls(input: unknown): SectionControls {
 
 export function isSectionUnderMaintenance(controls: SectionControls, page: PageId): boolean {
   return controls.developer_mode_enabled && !controls.section_availability[page];
+}
+
+export function canBypassSectionMaintenance(role: UserRole): boolean {
+  return role === "super_admin";
 }
