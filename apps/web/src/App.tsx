@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Building2,
   CalendarCheck,
@@ -23,6 +23,7 @@ import { supabase } from "@jewelos/api-client";
 import { Button, Notice } from "@/components/ui";
 import { ApplicationShell } from "@/components/shell/ApplicationShell";
 import { LazyPageErrorBoundary } from "@/components/LazyPageErrorBoundary";
+import { lazyPage } from "@/lib/lazyPage";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ThemeProvider, useTheme } from "@/theme/ThemeContext";
 import { SectionMaintenanceNotice } from "@/components/SectionMaintenanceNotice";
@@ -31,20 +32,20 @@ import logoDarkUrl from "../../../mk-jewels-logos/WhatsApp Image 2026-06-24 at 1
 import logoLightUrl from "../../../mk-jewels-logos/WhatsApp Image 2026-06-24 at 13.01.40 (1).jpeg";
 import { Toaster } from "sonner";
 
-const AvailabilityPage = lazy(() => import("@/pages/AvailabilityPage").then((module) => ({ default: module.AvailabilityPage })));
-const HomePage = lazy(() => import("@/pages/HomePage").then((module) => ({ default: module.HomePage })));
-const DashboardPage = lazy(() => import("@/pages/DashboardPage").then((module) => ({ default: module.DashboardPage })));
-const DropdownMasterPage = lazy(() => import("@/pages/DropdownMasterPage").then((module) => ({ default: module.DropdownMasterPage })));
-const FormsPage = lazy(() => import("@/pages/FormsPage").then((module) => ({ default: module.FormsPage })));
-const FMSBuilderPage = lazy(() => import("@/pages/FMSBuilderPage").then((module) => ({ default: module.FMSBuilderPage })));
-const NotificationsPage = lazy(() => import("@/pages/NotificationsPage").then((module) => ({ default: module.NotificationsPage })));
-const CRMPage = lazy(() => import("@/pages/CRMPage").then((module) => ({ default: module.CRMPage })));
-const TasksPage = lazy(() => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
-const RecurringTodoPage = lazy(() => import("@/pages/RecurringTodoPage").then((module) => ({ default: module.RecurringTodoPage })));
-const TaskBulkImportPage = lazy(() => import("@/pages/TaskBulkImportPage").then((module) => ({ default: module.TaskBulkImportPage })));
-const TeamDirectoryPage = lazy(() => import("@/pages/TeamDirectoryPage").then((module) => ({ default: module.TeamDirectoryPage })));
-const ReportsPage = lazy(() => import("@/pages/ReportsPage").then((module) => ({ default: module.ReportsPage })));
-const SettingsPage = lazy(() => import("@/pages/SettingsPage").then((module) => ({ default: module.SettingsPage })));
+const AvailabilityPage = lazyPage("availability", () => import("@/pages/AvailabilityPage").then((module) => ({ default: module.AvailabilityPage })));
+const HomePage = lazyPage("home", () => import("@/pages/HomePage").then((module) => ({ default: module.HomePage })));
+const DashboardPage = lazyPage("dashboard", () => import("@/pages/DashboardPage").then((module) => ({ default: module.DashboardPage })));
+const DropdownMasterPage = lazyPage("dropdown-master", () => import("@/pages/DropdownMasterPage").then((module) => ({ default: module.DropdownMasterPage })));
+const FormsPage = lazyPage("forms", () => import("@/pages/FormsPage").then((module) => ({ default: module.FormsPage })));
+const FMSBuilderPage = lazyPage("fms", () => import("@/pages/FMSBuilderPage").then((module) => ({ default: module.FMSBuilderPage })));
+const NotificationsPage = lazyPage("notifications", () => import("@/pages/NotificationsPage").then((module) => ({ default: module.NotificationsPage })));
+const CRMPage = lazyPage("crm", () => import("@/pages/CRMPage").then((module) => ({ default: module.CRMPage })));
+const TasksPage = lazyPage("tasks", () => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
+const RecurringTodoPage = lazyPage("recurring-todo", () => import("@/pages/RecurringTodoPage").then((module) => ({ default: module.RecurringTodoPage })));
+const TaskBulkImportPage = lazyPage("task-bulk-import", () => import("@/pages/TaskBulkImportPage").then((module) => ({ default: module.TaskBulkImportPage })));
+const TeamDirectoryPage = lazyPage("team-directory", () => import("@/pages/TeamDirectoryPage").then((module) => ({ default: module.TeamDirectoryPage })));
+const ReportsPage = lazyPage("reports", () => import("@/pages/ReportsPage").then((module) => ({ default: module.ReportsPage })));
+const SettingsPage = lazyPage("settings", () => import("@/pages/SettingsPage").then((module) => ({ default: module.SettingsPage })));
 
 const PAGE_ICONS: Record<PageId, typeof Home> = {
   home: Home,
