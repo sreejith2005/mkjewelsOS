@@ -15,13 +15,14 @@ export async function loadClient(id: string) { const { data, error } = await sup
 export async function loadFollowups(filter: Record<string, unknown>) { const { data, error } = await supabase.rpc("list_crm_followups", { p_filter: filter as Json }); fail(error, "Follow-ups failed"); return (data ?? []) as unknown as CrmFollowup[]; }
 
 export async function loadCrmOptions(): Promise<CrmOptions> {
-  const [branches, profiles, dropdowns] = await Promise.all([
+  const [branches, departments, profiles, dropdowns] = await Promise.all([
     supabase.from("branches").select("id,name").eq("is_active", true).order("name"),
-    supabase.from("user_profiles").select("id,employee_name,branch_id,user_role").in("account_status", ["active", "invited"]).eq("working_status", "active").order("employee_name"),
+    supabase.from("departments").select("id,name,branch_id").eq("is_active", true).order("name"),
+    supabase.from("user_profiles").select("id,employee_name,employee_code,branch_id,department_id,user_role").eq("account_status", "active").eq("working_status", "active").eq("is_login_enabled", true).order("employee_name"),
     supabase.from("dropdown_masters").select("id,label,value,master_type").eq("is_active", true).in("master_type", ["crm_source", "client_type", "potential_category", "product_category", "buy_status", "not_bought_reason", "communication_preference", "gender"]).order("sort_order"),
   ]);
-  fail(branches.error, "Branches failed"); fail(profiles.error, "Profiles failed"); fail(dropdowns.error, "Dropdowns failed");
-  return { branches: (branches.data ?? []).map((row) => ({ id: row.id, label: row.name })), profiles: (profiles.data ?? []).map((row) => ({ id: row.id, label: row.employee_name, branch_id: row.branch_id, user_role: row.user_role })), dropdowns: (dropdowns.data ?? []).map((row) => ({ id: row.id, label: row.label, value: row.value, master_type: row.master_type })) };
+  fail(branches.error, "Branches failed"); fail(departments.error, "Departments failed"); fail(profiles.error, "Profiles failed"); fail(dropdowns.error, "Dropdowns failed");
+  return { branches: (branches.data ?? []).map((row) => ({ id: row.id, label: row.name })), departments: (departments.data ?? []).map((row) => ({ id: row.id, label: row.name, branch_id: row.branch_id })), profiles: (profiles.data ?? []).map((row) => ({ id: row.id, label: row.employee_name, employee_code: row.employee_code, branch_id: row.branch_id, department_id: row.department_id, user_role: row.user_role })), dropdowns: (dropdowns.data ?? []).map((row) => ({ id: row.id, label: row.label, value: row.value, master_type: row.master_type })) };
 }
 
 export async function createClient(input: Record<string, unknown>, key = requestKey()) { const { data, error } = await supabase.rpc("create_crm_client", { p_input: input as Json, p_request_key: key }); fail(error, "Client creation failed"); return data as string; }

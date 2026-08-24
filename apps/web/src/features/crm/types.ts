@@ -12,5 +12,5 @@ export type CrmDocument = { id: string; parent_type: string; parent_id: string; 
 export type CrmLink = { id: string; title?: string; status: string; planned_datetime?: string; form_template_id?: string; submitted_at?: string; reference_number?: string };
 export type CrmClient = CrmClientSummary & { billing_phone: string | null; gender: string | null; date_of_birth: string | null; anniversary_date: string | null; address: string | null; city: string | null; state: string | null; pincode: string | null; tags: string[]; status: string; communication_preference: string | null; communication_consent: boolean | null; merged_into_client_id: string | null };
 export type CrmClientDetail = { client: CrmClient; timeline: CrmTimeline[]; walkins: CrmWalkin[]; followups: CrmFollowup[]; documents: CrmDocument[]; tasks: CrmLink[]; forms: CrmLink[]; fms: CrmLink[] };
-export type CrmOption = { id: string; label: string; value?: string; branch_id?: string; user_role?: string; master_type?: string };
-export type CrmOptions = { branches: CrmOption[]; profiles: CrmOption[]; dropdowns: CrmOption[] };
+export type CrmOption = { id: string; label: string; value?: string; branch_id?: string | null; department_id?: string | null; employee_code?: string | null; user_role?: string; master_type?: string };
+export type CrmOptions = { branches: CrmOption[]; departments?: CrmOption[]; profiles: CrmOption[]; dropdowns: CrmOption[] };

@@ -60,10 +60,13 @@ describe("CRM component states", () => {
     expect(html).toContain("Home branch");
     expect(html).toContain("Assigned CRM");
     expect(html).toContain("recorded communication consent");
+    expect(html).toContain("Search assigned crm");
   });
   it("renders the phone-first walk-in and private attachment controls", () => {
     const html = renderToStaticMarkup(<WalkinForm onCancel={vi.fn()} onSaved={vi.fn()} options={options}/>);
     expect(html).toContain("Look up");
+    expect(html).toContain("flex-col");
+    expect(html).toContain("sm:flex-row");
     expect(html).toContain("Visit date and time");
     expect(html).toContain("Optional private attachment");
     expect(html).toContain("Record walk-in");

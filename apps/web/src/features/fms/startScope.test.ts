@@ -7,9 +7,9 @@ const data = {
   branches: [{ id: "a", name: "Andheri" }, { id: "b", name: "Bandra" }],
   departments: [{ id: "global", branch_id: null, name: "Shared" }, { id: "b-sales", branch_id: "b", name: "Sales" }],
   users: [
-    { id: "right", branch_id: "b", department_id: "b-sales", working_status: "active", account_status: "invited" },
-    { id: "wrong-branch", branch_id: "a", department_id: "b-sales", working_status: "active", account_status: "active" },
-    { id: "inactive", branch_id: "b", department_id: "b-sales", working_status: "inactive", account_status: "active" },
+    { id: "right", branch_id: "b", department_id: "b-sales", working_status: "active", account_status: "invited", is_login_enabled: true },
+    { id: "wrong-branch", branch_id: "a", department_id: "b-sales", working_status: "active", account_status: "active", is_login_enabled: true },
+    { id: "inactive", branch_id: "b", department_id: "b-sales", working_status: "inactive", account_status: "active", is_login_enabled: true },
   ],
 } as FmsData;
 
@@ -19,9 +19,9 @@ describe("FMS manual start scope", () => {
     expect(fmsStartBranches(data.branches, { user_role: "manager", branch_id: "b", department_id: "b-sales" } as UserProfile).map((item) => item.id)).toEqual(["b"]);
   });
 
-  it("keeps tenant-wide departments and requires users to match both selected scope fields", () => {
+  it("keeps workflow scope independent from the direct first-assignee roster", () => {
     expect(fmsStartDepartments(data, "b", { user_role: "admin", branch_id: "a", department_id: "global" } as UserProfile).map((item) => item.id)).toEqual(["global", "b-sales"]);
-    expect(fmsStartUsers(data, "b", "b-sales").map((item) => item.id)).toEqual(["right"]);
+    expect(fmsStartUsers(data, "b", "b-sales").map((item) => item.id)).toEqual(["right", "wrong-branch"]);
   });
 
   it("starts directly from the published first-step assignment and uses its scope", () => {

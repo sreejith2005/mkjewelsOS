@@ -22,4 +22,13 @@ describe("AssigneePicker", () => {
     expect(screen.getByText("Ananya Shah")).toBeTruthy();
     expect(screen.getByText("Sales · Bandra · Staff")).toBeTruthy();
   });
+
+  it("selects one user with the keyboard and explains an empty search", async () => {
+    const user = userEvent.setup(); const onChange = vi.fn();
+    render(<AssigneePicker branchNames={new Map([["b", "Bandra"]])} departmentNames={new Map([["d", "Sales"]])} label="Assigned CRM" multiple={false} onChange={onChange} people={[{ branch_id: "b", department_id: "d", employee_code: "MK-8", employee_name: "Asha", id: "asha", user_role: "crm" }]} selectedIds={[]}/>);
+    screen.getByRole("radio", { name: "Asha" }).focus(); await user.keyboard(" ");
+    expect(onChange).toHaveBeenCalledWith(["asha"]);
+    await user.clear(screen.getByRole("textbox", { name: "Search assigned crm" })); await user.type(screen.getByRole("textbox", { name: "Search assigned crm" }), "nobody");
+    expect(screen.getByText("No matching people.")).toBeTruthy();
+  });
 });

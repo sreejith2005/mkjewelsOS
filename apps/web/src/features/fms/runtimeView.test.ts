@@ -14,7 +14,7 @@ const users: FmsData["users"] = [
 ];
 
 describe("FMS runtime view rules", () => {
-  it("limits eligible assignees to active login-enabled instance scope", () => expect(eligibleFmsUsers(users, instance()).map((item) => item.id)).toEqual(["u1"]));
+  it("offers active login-enabled assignees across branches for a direct assignment", () => expect(eligibleFmsUsers(users, instance()).map((item) => item.id)).toEqual(["u1", "u2"]));
   it("supports tenant-wide eligible assignees", () => expect(eligibleFmsUsers(users, instance({ branch_id: null, department_id: null })).map((item) => item.id)).toEqual(["u1", "u2"]));
   it("shows assigned instances in My Stages", () => expect(filterFmsInstances({ instances: [instance()], stages: [runtimeStage()], profileId: "u2", tab: "mine", query: "", status: "all", priority: "all", overdueOnly: false, now: "2026-01-01T00:00:00Z" })).toHaveLength(1));
   it("hides unassigned instances from My Stages", () => expect(filterFmsInstances({ instances: [instance()], stages: [runtimeStage()], profileId: "u3", tab: "mine", query: "", status: "all", priority: "all", overdueOnly: false })).toHaveLength(0));

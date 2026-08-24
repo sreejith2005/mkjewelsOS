@@ -5015,6 +5015,7 @@ export type Database = {
         Row: {
           actual_datetime: string | null
           branch_id: string | null
+          buddy_assignment_allowed: boolean
           category_id: string | null
           completion_remark: string | null
           coverage_original_assignee_id: string | null
@@ -5054,6 +5055,7 @@ export type Database = {
         Insert: {
           actual_datetime?: string | null
           branch_id?: string | null
+          buddy_assignment_allowed?: boolean
           category_id?: string | null
           completion_remark?: string | null
           coverage_original_assignee_id?: string | null
@@ -5093,6 +5095,7 @@ export type Database = {
         Update: {
           actual_datetime?: string | null
           branch_id?: string | null
+          buddy_assignment_allowed?: boolean
           category_id?: string | null
           completion_remark?: string | null
           coverage_original_assignee_id?: string | null
@@ -5257,6 +5260,7 @@ export type Database = {
       task_templates: {
         Row: {
           branch_id: string | null
+          buddy_assignment_allowed: boolean
           category_id: string | null
           checklist_items: Json
           created_at: string | null
@@ -5288,6 +5292,7 @@ export type Database = {
         }
         Insert: {
           branch_id?: string | null
+          buddy_assignment_allowed?: boolean
           category_id?: string | null
           checklist_items?: Json
           created_at?: string | null
@@ -5321,6 +5326,7 @@ export type Database = {
         }
         Update: {
           branch_id?: string | null
+          buddy_assignment_allowed?: boolean
           category_id?: string | null
           checklist_items?: Json
           created_at?: string | null
@@ -6542,6 +6548,44 @@ export type Database = {
           worker_assertion_id: string
         }[]
       }
+      assert_direct_assignment_user: {
+        Args: { p_purpose: string; p_tenant_id: string; p_user_id: string }
+        Returns: {
+          account_status: Database["public"]["Enums"]["user_account_status"]
+          auth_user_id: string
+          branch_id: string
+          buddy_id: string | null
+          created_at: string | null
+          created_by: string | null
+          department_id: string
+          designation_id: string | null
+          email: string
+          employee_code: string
+          employee_name: string
+          first_name: string | null
+          id: string
+          is_login_enabled: boolean | null
+          last_name: string | null
+          official_email: string | null
+          official_mobile: string | null
+          personal_email: string | null
+          personal_mobile: string | null
+          reports_to_user_id: string | null
+          secondary_buddy_id: string | null
+          tenant_id: string
+          updated_at: string | null
+          updated_by: string | null
+          user_role: Database["public"]["Enums"]["user_role"]
+          week_off: string[]
+          working_status: Database["public"]["Enums"]["working_status"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       assert_fms_flow_publishable: {
         Args: { p_flow_id: string }
         Returns: undefined
@@ -6888,6 +6932,10 @@ export type Database = {
           p_outcome?: string
           p_remark?: string
         }
+        Returns: undefined
+      }
+      complete_recurring_task_with_image_with_audit: {
+        Args: { p_file_url: string; p_task_id: string }
         Returns: undefined
       }
       configure_invited_profile_coverage_with_audit: {
@@ -7483,6 +7531,10 @@ export type Database = {
           p_to_user_id: string
         }
         Returns: undefined
+      }
+      reconcile_all_assignment_coverage_with_audit: {
+        Args: { p_date: string; p_reason?: string; p_user_profile_id: string }
+        Returns: Json
       }
       reconcile_duplicate_production_identity_profiles: {
         Args: never

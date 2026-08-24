@@ -2,7 +2,8 @@ import { calculateFmsDelay } from "@jewelos/core";
 import type { FmsData, FmsInstance, FmsInstanceStage, FmsStageRow } from "./api";
 
 export function eligibleFmsUsers(users: FmsData["users"], instance: Pick<FmsInstance, "branch_id" | "department_id">) {
-  return users.filter((user) => user.working_status !== "inactive" && user.working_status !== "resigned" && user.is_login_enabled && (!instance.branch_id || user.branch_id === instance.branch_id) && (!instance.department_id || user.department_id === instance.department_id));
+  void instance;
+  return users.filter((user) => user.working_status === "active" && user.account_status !== "inactive" && user.account_status !== "suspended" && user.is_login_enabled);
 }
 
 export function priorFmsDefinitions(definitions: FmsStageRow[], instanceStages: FmsInstanceStage[], flowId: string, current: FmsStageRow) {

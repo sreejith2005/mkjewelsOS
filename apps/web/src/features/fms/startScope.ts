@@ -18,14 +18,13 @@ export function fmsStartDepartments(data: FmsData, branchId: string, profile: St
 }
 
 export function fmsStartUsers(data: FmsData, branchId: string, departmentId: string) {
-  if (!branchId || !departmentId) return [];
+  void branchId;
+  void departmentId;
   return data.users.filter((user) =>
-    user.branch_id === branchId
-    && user.department_id === departmentId
-    && user.working_status !== "inactive"
-    && user.working_status !== "resigned"
+    user.working_status === "active"
     && user.account_status !== "inactive"
     && user.account_status !== "suspended"
+    && user.is_login_enabled
   );
 }
 
