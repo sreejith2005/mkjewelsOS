@@ -44,6 +44,10 @@ export { calculateTaskChecklistProgress } from "./taskChecklist";
 export type { TaskChecklistProgress, TaskChecklistProgressItem } from "./taskChecklist";
 export { deriveTaskMutationCapability } from "./taskCapabilities";
 export type { TaskMutationCapability } from "./taskCapabilities";
+export {
+  ADMIN_SET_PASSWORD_LENGTH,
+  validateAdminSetPassword,
+} from "./userCredentials";
 export * from "./forms";
 export * from "./fms";
 export * from "./notifications";

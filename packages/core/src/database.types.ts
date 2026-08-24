@@ -6899,6 +6899,27 @@ export type Database = {
         }
         Returns: undefined
       }
+      create_user_profile_with_coverage_and_audit: {
+        Args: {
+          p_auth_user_id: string
+          p_branch_id: string
+          p_buddy_id: string
+          p_creator_profile_id: string
+          p_department_id: string
+          p_designation_id: string
+          p_first_name: string
+          p_last_name: string
+          p_official_email: string
+          p_official_mobile: string
+          p_personal_email: string
+          p_personal_mobile: string
+          p_reports_to_user_id: string
+          p_secondary_buddy_id: string
+          p_user_role: Database["public"]["Enums"]["user_role"]
+          p_week_off: string[]
+        }
+        Returns: string
+      }
       correct_crm_interaction: {
         Args: {
           p_correction: Json

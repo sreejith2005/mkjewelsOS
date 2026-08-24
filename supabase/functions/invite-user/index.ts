@@ -33,7 +33,10 @@ type InviteBody = {
   buddy_id?: unknown;
   secondary_buddy_id?: unknown;
   reports_to_user_id?: unknown;
+  initial_password?: unknown;
 };
+
+const ADMIN_SET_PASSWORD_LENGTH = 6;
 
 function json(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), { status, headers: corsHeaders });
@@ -48,12 +51,6 @@ function requiredString(value: unknown, field: string): string {
 
 function optionalString(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
-}
-
-function temporaryPassword(): string {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
-  const bytes = crypto.getRandomValues(new Uint8Array(24));
-  return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
 }
 
 Deno.serve(async (request: Request) => {
@@ -136,11 +133,14 @@ Deno.serve(async (request: Request) => {
     const buddyId = optionalString(body.buddy_id);
     const secondaryBuddyId = optionalString(body.secondary_buddy_id);
     const reportsToUserId = optionalString(body.reports_to_user_id);
+    const initialPassword = requiredString(body.initial_password, "initial_password");
+    if (initialPassword.length !== ADMIN_SET_PASSWORD_LENGTH) {
+      throw new Error(`initial_password must be exactly ${ADMIN_SET_PASSWORD_LENGTH} characters`);
+    }
 
-    const password = temporaryPassword();
     const { data: created, error: createError } = await adminClient.auth.admin.createUser({
       email: personalEmail,
-      password,
+      password: initialPassword,
       email_confirm: true,
     });
     if (createError || !created.user) {
@@ -148,7 +148,7 @@ Deno.serve(async (request: Request) => {
     }
 
     const { data: profileId, error: insertError } = await adminClient.rpc(
-      "invite_profile_with_audit_v3",
+      "create_user_profile_with_coverage_and_audit",
       {
         p_auth_user_id: created.user.id,
         p_creator_profile_id: callerProfile.id,
@@ -164,6 +164,8 @@ Deno.serve(async (request: Request) => {
         p_week_off: body.week_off as string[],
         p_user_role: userRole,
         p_buddy_id: buddyId,
+        p_secondary_buddy_id: secondaryBuddyId,
+        p_reports_to_user_id: reportsToUserId,
       },
     );
 
@@ -175,18 +177,6 @@ Deno.serve(async (request: Request) => {
         detail: insertError?.message ?? "The supplied profile values were rejected",
         cleanup: cleanupError ? "Auth cleanup failed; contact an administrator" : "Auth user was cleaned up",
       });
-    }
-
-    const { error: coverageError } = await adminClient.rpc("configure_invited_profile_coverage_with_audit", {
-      p_creator_profile_id: callerProfile.id,
-      p_profile_id: profileId,
-      p_secondary_buddy_id: secondaryBuddyId,
-      p_reports_to_user_id: reportsToUserId,
-    });
-    if (coverageError) {
-      console.error("invite coverage profile rejected", { code: coverageError.code ?? null, message: coverageError.message ?? null });
-      const { error: cleanupError } = await adminClient.auth.admin.deleteUser(created.user.id);
-      return json(400, { error: "The account coverage profile could not be saved", detail: coverageError.message, cleanup: cleanupError ? "Auth cleanup failed; contact an administrator" : "Auth user was cleaned up" });
     }
 
     const { data: createdProfile, error: createdProfileError } = await adminClient
@@ -219,7 +209,7 @@ Deno.serve(async (request: Request) => {
       }
     }
 
-    return json(201, { user_profile_id: profileId, temporary_password: password });
+    return json(201, { user_profile_id: profileId, success: true });
   } catch (error) {
     console.error("invite request rejected", { message: error instanceof Error ? error.message : "Invalid invite request" });
     return json(400, { error: error instanceof Error ? error.message : "Invalid invite request" });

@@ -6,7 +6,6 @@ import {
   type FormEvent,
 } from "react";
 import {
-  Copy,
   KeyRound,
   MoreVertical,
   Network,
@@ -15,7 +14,13 @@ import {
   Trash2,
   UserCog,
 } from "lucide-react";
-import { USER_ROLES, type Json, type UserRole } from "@jewelos/core";
+import {
+  ADMIN_SET_PASSWORD_LENGTH,
+  USER_ROLES,
+  validateAdminSetPassword,
+  type Json,
+  type UserRole,
+} from "@jewelos/core";
 import { supabase } from "@jewelos/api-client";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Field, Modal, Notice } from "@/components/ui";
@@ -81,44 +86,6 @@ function Status({ value }: { value: AccountStatus }) {
   );
 }
 
-function TemporaryPassword({
-  password,
-  title,
-  onClose,
-}: {
-  password: string;
-  title: string;
-  onClose: () => void;
-}) {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    await navigator.clipboard.writeText(password);
-    setCopied(true);
-  };
-  return (
-    <Modal onClose={onClose} title={title}>
-      <div className="space-y-4">
-        <Notice tone="danger">
-          This temporary password is displayed only now. Copy it and share it
-          securely; JewelOS never stores or lists passwords.
-        </Notice>
-        <div className="break-all rounded-lg border border-gold/30 bg-obsidian p-3 font-mono text-sm text-champagne">
-          {password}
-        </div>
-        <div className="flex justify-end gap-3">
-          <Button onClick={() => void copy()} type="button" variant="secondary">
-            <Copy className="h-4 w-4" />
-            {copied ? "Copied" : "Copy password"}
-          </Button>
-          <Button onClick={onClose} type="button">
-            Done
-          </Button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
 function EditUser({
   user,
   data,
@@ -149,9 +116,9 @@ function EditUser({
   });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(
-    null,
-  );
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordUpdated, setPasswordUpdated] = useState(false);
   const activeProfiles = data.profiles.filter(
     (profile) => profile.id !== user.id && profile.account_status === "active",
   );
@@ -231,27 +198,25 @@ function EditUser({
   };
 
   const resetPassword = async () => {
-    if (
-      !superAdmin ||
-      !window.confirm(
-        `Reset ${user.employee_name}'s password? Their current password will stop working.`,
-      )
-    )
+    if (!superAdmin) return;
+    const validationError = validateAdminSetPassword(newPassword, confirmPassword);
+    if (validationError) {
+      setError(validationError);
       return;
+    }
+    if (!window.confirm(`Set the new password for ${user.employee_name}? Their current password will stop working.`)) return;
     setSaving(true);
     setError(null);
     try {
-      const { data: result, error: invokeError } =
-        await supabase.functions.invoke<{ temporary_password?: string }>(
-          "reset-user-password",
-          { body: { profile_id: user.id } },
-        );
+      const { data: result, error: invokeError } = await supabase.functions.invoke<{ success?: boolean }>(
+        "reset-user-password",
+        { body: { profile_id: user.id, password: newPassword } },
+      );
       if (invokeError) throw invokeError;
-      if (!result?.temporary_password)
-        throw new Error(
-          "The password reset did not return a temporary password.",
-        );
-      setTemporaryPassword(result.temporary_password);
+      if (!result?.success) throw new Error("The password was not updated.");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordUpdated(true);
     } catch (caught) {
       setError(errorMessage(caught));
     } finally {
@@ -259,14 +224,6 @@ function EditUser({
     }
   };
 
-  if (temporaryPassword)
-    return (
-      <TemporaryPassword
-        onClose={() => setTemporaryPassword(null)}
-        password={temporaryPassword}
-        title={`${user.employee_name}'s temporary password`}
-      />
-    );
   return (
     <Modal onClose={onClose} title={`Edit ${user.employee_name}`} wide>
       <form className="space-y-5" onSubmit={submit}>
@@ -304,7 +261,6 @@ function EditUser({
                 set("buddy_id", "");
                 set("secondary_buddy_id", "");
                 set("reports_to_user_id", "");
-                set("secondary_buddy_id", "");
               }}
             >
               {data.branches.map((item) => (
@@ -322,7 +278,6 @@ function EditUser({
                 set("department_id", event.target.value);
                 set("buddy_id", "");
                 set("secondary_buddy_id", "");
-                set("secondary_buddy_id", "");
               }}
             >
               {departments.map((item) => (
@@ -339,7 +294,6 @@ function EditUser({
               onChange={(event) => {
                 set("designation_id", event.target.value);
                 set("buddy_id", "");
-                set("secondary_buddy_id", "");
                 set("secondary_buddy_id", "");
               }}
             >
@@ -471,17 +425,24 @@ function EditUser({
         </div>
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
-            {superAdmin ? (
-              <Button
-                disabled={saving}
-                type="button"
-                variant="secondary"
-                onClick={() => void resetPassword()}
-              >
-                <KeyRound className="h-4 w-4" />
-                Reset password
+          {superAdmin ? (
+            <div className="space-y-3 rounded-lg border border-gold/20 p-3">
+              <p className="text-sm font-semibold text-gold">Set login password</p>
+              <p className="text-xs text-soft-grey">
+                Enter the {ADMIN_SET_PASSWORD_LENGTH}-character password this employee will use. It is sent only to Supabase Auth and is never stored or displayed by JewelOS.
+              </p>
+              {passwordUpdated ? <Notice tone="success">Password updated. The employee can now sign in using their email and this password.</Notice> : null}
+              <Field label="New password">
+                <input autoComplete="new-password" className="field" maxLength={ADMIN_SET_PASSWORD_LENGTH} minLength={ADMIN_SET_PASSWORD_LENGTH} onChange={(event) => setNewPassword(event.target.value)} type="password" value={newPassword} />
+              </Field>
+              <Field label="Confirm new password">
+                <input autoComplete="new-password" className="field" maxLength={ADMIN_SET_PASSWORD_LENGTH} minLength={ADMIN_SET_PASSWORD_LENGTH} onChange={(event) => setConfirmPassword(event.target.value)} type="password" value={confirmPassword} />
+              </Field>
+              <Button disabled={saving || !newPassword || !confirmPassword} type="button" variant="secondary" onClick={() => void resetPassword()}>
+                <KeyRound className="h-4 w-4" /> Set password
               </Button>
-            ) : null}
+            </div>
+          ) : null}
             {superAdmin ? (
               <Button
                 disabled={saving}
@@ -534,12 +495,12 @@ function AddUserForm({
     reports_to_user_id: "",
     week_off: [] as string[],
     user_role: "staff" as UserRole,
+    initial_password: "",
+    confirm_password: "",
   });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(
-    null,
-  );
+  const [created, setCreated] = useState(false);
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
   const departments = data.departments.filter(
@@ -560,6 +521,14 @@ function AddUserForm({
       );
       return;
     }
+    const passwordError = validateAdminSetPassword(
+      form.initial_password,
+      form.confirm_password,
+    );
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
     if (
       (form.personal_mobile && !PHONE_PATTERN.test(form.personal_mobile)) ||
       (form.official_mobile && !PHONE_PATTERN.test(form.official_mobile))
@@ -570,38 +539,25 @@ function AddUserForm({
     setSaving(true);
     try {
       const { data: result, error: invokeError } =
-        await supabase.functions.invoke<{
-          temporary_password?: string;
-          already_exists?: boolean;
-        }>("invite-user", { body: form });
+        await supabase.functions.invoke<{ already_exists?: boolean }>("invite-user", {
+          body: form,
+        });
       if (invokeError) throw invokeError;
       await onDone();
-      if (result?.temporary_password)
-        setTemporaryPassword(result.temporary_password);
-      else if (result?.already_exists)
+      if (result?.already_exists)
         setError("A user with this login email already exists.");
-      else
-        throw new Error(
-          "The account was created but no temporary password was returned.",
-        );
+      else setCreated(true);
     } catch (caught) {
       setError(errorMessage(caught));
     } finally {
       setSaving(false);
     }
   };
-  if (temporaryPassword)
-    return (
-      <TemporaryPassword
-        onClose={onClose}
-        password={temporaryPassword}
-        title="New user's temporary password"
-      />
-    );
   return (
     <Modal onClose={onClose} title="Add user" wide>
       <form className="space-y-4" onSubmit={submit}>
         {error ? <Notice tone="danger">{error}</Notice> : null}
+        {created ? <Notice tone="success">User created and activated. They can sign in with their personal email and the password you set.</Notice> : null}
         <p className="text-sm text-soft-grey">
           Employee code is generated automatically. Personal email is the login
           address. Buddy choices are restricted to active users in the same
@@ -632,6 +588,8 @@ function AddUserForm({
                 set("branch_id", event.target.value);
                 set("department_id", "");
                 set("buddy_id", "");
+                set("secondary_buddy_id", "");
+                set("reports_to_user_id", "");
               }}
             >
               <option value="">Select</option>
@@ -683,6 +641,7 @@ function AddUserForm({
               onChange={(event) => {
                 set("department_id", event.target.value);
                 set("buddy_id", "");
+                set("secondary_buddy_id", "");
               }}
             >
               <option value="">Select</option>
@@ -700,6 +659,7 @@ function AddUserForm({
               onChange={(event) => {
                 set("designation_id", event.target.value);
                 set("buddy_id", "");
+                set("secondary_buddy_id", "");
               }}
             >
               <option value="">None</option>
@@ -798,12 +758,18 @@ function AddUserForm({
               ))}
             </select>
           </Field>
+          <Field label="Set login password">
+            <input autoComplete="new-password" className="field" maxLength={ADMIN_SET_PASSWORD_LENGTH} minLength={ADMIN_SET_PASSWORD_LENGTH} onChange={(event) => set("initial_password", event.target.value)} required type="password" value={form.initial_password} />
+          </Field>
+          <Field label="Confirm login password">
+            <input autoComplete="new-password" className="field" maxLength={ADMIN_SET_PASSWORD_LENGTH} minLength={ADMIN_SET_PASSWORD_LENGTH} onChange={(event) => set("confirm_password", event.target.value)} required type="password" value={form.confirm_password} />
+          </Field>
         </div>
         <div className="flex justify-end gap-3">
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button disabled={saving} type="submit">
+          <Button disabled={saving || created} type="submit">
             {saving ? "Creatingâ€¦" : "Create user"}
           </Button>
         </div>
