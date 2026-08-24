@@ -9,5 +9,8 @@ describe("Recurring / To-Do workspace contract", () => {
     for (const action of ["Start", "Complete", "Upload", "Fill form", "Verify", "Reject", "Pause", "Activate", "Run now"]) {
       expect(source).toContain(action);
     }
+    expect(source).toContain("Upload image to complete");
+    expect(source).toContain('aria-label="Complete checklist"');
+    expect(source).toContain("completeRecurringTaskWithImage");
   });
 });

@@ -19,8 +19,8 @@ import { Button, Modal, Notice } from "@/components/ui";
 import { TaskTemplateForm } from "@/features/tasks/TaskForms";
 import {
   loadTaskAuthoringReferenceData,
+  completeRecurringTaskWithImage,
   updateTask,
-  uploadTaskAttachment,
   type TaskReferenceData,
 } from "@/features/tasks/api";
 import {
@@ -194,34 +194,36 @@ function WorkCard({
         </div>
       ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
-        {task.status === "pending" &&
+        {task.task_type === "checklist" && task.status !== "completed" ? <Button aria-label="Complete checklist" onClick={() => void act("complete")}><CheckCircle2 className="size-4" />Complete checklist</Button> : null}
+        {task.task_type !== "checklist" && task.status === "pending" &&
         task.coverage_status !== "coverage_required" ? (
           <Button onClick={() => void act("start")} variant="secondary">
             <Play className="size-4" />
             Start
           </Button>
         ) : null}
-        {task.status === "in_progress" && canComplete ? (
+        {task.task_type !== "checklist" && task.status === "in_progress" && canComplete ? (
           <Button onClick={() => void act("complete")}>
             <CheckCircle2 className="size-4" />
             Complete
           </Button>
         ) : null}
-        {task.requires_upload && !task.has_attachment ? (
+        {task.task_type === "delegation" && task.requires_upload && !task.has_attachment ? (
           <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-gold/30 px-4 py-2 text-sm font-semibold text-gold">
             <Upload className="size-4" />
-            Upload
+            Upload image to complete
             <input
               className="sr-only"
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 if (file && profile)
-                  void uploadTaskAttachment(
+                  void completeRecurringTaskWithImage(
                     profile.tenant_id,
                     task.id,
                     file,
                   ).then(onChanged);
               }}
+              accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
               type="file"
             />
           </label>

@@ -303,6 +303,18 @@ export async function uploadTaskAttachment(
   }
 }
 
+export async function completeRecurringTaskWithImage(tenantId: string, taskId: string, file: File): Promise<void> {
+  const extension = file.name.toLowerCase().match(/\.[a-z0-9]+$/)?.[0];
+  if (!extension || ![".jpg", ".jpeg", ".png", ".webp"].includes(extension) || !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) throw new Error("Upload a JPEG, PNG, or WebP image no larger than 5 MiB.");
+  const path = `${tenantId}/${taskId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+  const { error: uploadError } = await supabase.storage.from("task-attachments").upload(path, file, { cacheControl: "3600", contentType: file.type, upsert: false });
+  fail("Upload task evidence", uploadError);
+  const { error } = await (supabase.rpc as unknown as (name: "complete_recurring_task_with_image_with_audit", args: { p_task_id: string; p_file_url: string }) => Promise<{ error: { message: string } | null }>)("complete_recurring_task_with_image_with_audit", { p_task_id: taskId, p_file_url: path });
+  if (!error) return;
+  try { await supabase.storage.from("task-attachments").remove([path]); } catch { /* preserve the authoritative RPC error */ }
+  throw new Error(error.message);
+}
+
 export async function recordAvailability(
   userProfileId: string,
   date: string,
