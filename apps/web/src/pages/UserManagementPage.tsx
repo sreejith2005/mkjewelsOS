@@ -25,7 +25,7 @@ import { supabase } from "@jewelos/api-client";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Field, Modal, Notice } from "@/components/ui";
 import { eligibleBuddies } from "@/features/users/buddyEligibility";
-import { edgeFunctionErrorMessage, errorMessage, initials, PHONE_PATTERN, titleCase } from "@/lib/format";
+import { edgeFunctionErrorMessage, initials, PHONE_PATTERN, titleCase } from "@/lib/format";
 import type { Branch, Department, DropdownMaster, UserProfile } from "@/types";
 
 const ACCOUNT_STATUSES = [
@@ -208,7 +208,7 @@ export function EditUser({
       setConfirmPassword("");
       setPasswordUpdated(true);
     } catch (caught) {
-      setError(errorMessage(caught));
+      setError(await edgeFunctionErrorMessage(caught));
     } finally {
       setSaving(false);
     }

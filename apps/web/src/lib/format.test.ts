@@ -20,4 +20,17 @@ describe("edgeFunctionErrorMessage", () => {
       "Network unavailable",
     );
   });
+
+  it("reads a safe response even when the Edge client cannot clone it", async () => {
+    const error = {
+      message: "Edge Function returned a non-2xx status code",
+      context: {
+        json: async () => ({ error: "Only a Super Admin can reset this password." }),
+      },
+    };
+
+    await expect(edgeFunctionErrorMessage(error)).resolves.toBe(
+      "Only a Super Admin can reset this password.",
+    );
+  });
 });
