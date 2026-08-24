@@ -114,7 +114,6 @@ function EditUser({
     {
       branchId: draft.branch_id,
       departmentId: draft.department_id,
-      designationId: draft.designation_id || null,
       excludedId: user.id,
     },
   );
@@ -500,7 +499,6 @@ export function AddUserForm({
   const buddies = eligibleBuddies(data.profiles, {
     branchId: form.branch_id,
     departmentId: form.department_id,
-    designationId: form.designation_id || null,
   });
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -556,7 +554,7 @@ export function AddUserForm({
         <p className="text-sm text-soft-grey">
           Employee code is generated automatically. Personal email is the login
           address. Buddy choices are restricted to active users in the same
-          branch, department, and designation at the same or lower hierarchy.
+          branch and department at the same or lower hierarchy.
         </p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="First name">

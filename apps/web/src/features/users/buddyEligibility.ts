@@ -5,13 +5,11 @@ export type BuddyCandidate = Readonly<{
   working_status: string;
   branch_id: string | null;
   department_id: string | null;
-  designation_id: string | null;
 }>;
 
 export type BuddyScope = Readonly<{
   branchId: string;
   departmentId: string;
-  designationId: string | null;
   excludedId?: string;
 }>;
 
@@ -32,7 +30,6 @@ export function eligibleBuddies<T extends BuddyCandidate>(
       profile.is_login_enabled &&
       profile.working_status === "active" &&
       profile.branch_id === scope.branchId &&
-      profile.department_id === scope.departmentId &&
-      profile.designation_id === scope.designationId,
+      profile.department_id === scope.departmentId,
   );
 }

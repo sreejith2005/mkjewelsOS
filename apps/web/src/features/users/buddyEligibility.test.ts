@@ -32,10 +32,10 @@ describe("eligibleBuddies", () => {
         ],
         scope,
       ).map((profile) => profile.id),
-    ).toEqual(["eligible"]);
+    ).toEqual(["eligible", "other-designation"]);
   });
 
-  it("excludes the employee being edited and supports employees with no designation", () => {
+  it("excludes the employee being edited regardless of designation", () => {
     const profile = {
       id: "employee",
       account_status: "active",
@@ -47,11 +47,6 @@ describe("eligibleBuddies", () => {
     };
 
     expect(eligibleBuddies([profile], { ...scope, excludedId: "employee" })).toEqual([]);
-    expect(
-      eligibleBuddies([{ ...profile, designation_id: null }], {
-        ...scope,
-        designationId: null,
-      }).map((candidate) => candidate.id),
-    ).toEqual(["employee"]);
+    expect(eligibleBuddies([{ ...profile, designation_id: null }], scope).map((candidate) => candidate.id)).toEqual(["employee"]);
   });
 });
