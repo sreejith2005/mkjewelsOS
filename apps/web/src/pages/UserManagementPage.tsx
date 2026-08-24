@@ -44,7 +44,7 @@ const WEEK_OFF_DAYS = [
   "sunday",
 ] as const;
 type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
-type Data = {
+export type Data = {
   profiles: UserProfile[];
   branches: Branch[];
   departments: Department[];
@@ -469,7 +469,7 @@ function EditUser({
   );
 }
 
-function AddUserForm({
+export function AddUserForm({
   data,
   role,
   onClose,
