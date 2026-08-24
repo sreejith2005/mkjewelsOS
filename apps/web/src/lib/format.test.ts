@@ -33,4 +33,17 @@ describe("edgeFunctionErrorMessage", () => {
       "Only a Super Admin can reset this password.",
     );
   });
+
+  it("reads the message returned by the Supabase Function gateway", async () => {
+    const error = {
+      message: "Edge Function returned a non-2xx status code",
+      context: new Response(JSON.stringify({ code: "JWTExpired", message: "Your session has expired. Please sign in again." }), {
+        headers: { "Content-Type": "application/json" },
+      }),
+    };
+
+    await expect(edgeFunctionErrorMessage(error)).resolves.toBe(
+      "Your session has expired. Please sign in again.",
+    );
+  });
 });

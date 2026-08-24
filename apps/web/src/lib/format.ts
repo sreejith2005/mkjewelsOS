@@ -29,6 +29,17 @@ type EdgeFunctionErrorContext = {
   text?: () => Promise<string>;
 };
 
+function functionResponseMessage(payload: unknown): string | null {
+  if (typeof payload !== "object" || payload === null) return null;
+  const record = payload as Record<string, unknown>;
+  for (const key of ["error", "message"] as const) {
+    if (typeof record[key] === "string" && record[key].trim()) {
+      return record[key];
+    }
+  }
+  return null;
+}
+
 /** Reads only the intentionally safe `error` field returned by an Edge Function. */
 export async function edgeFunctionErrorMessage(error: unknown): Promise<string> {
   if (typeof error !== "object" || error === null || !("context" in error)) {
@@ -44,22 +55,14 @@ export async function edgeFunctionErrorMessage(error: unknown): Promise<string> 
   try {
     if (typeof readable.json !== "function") throw new Error("No JSON response reader");
     const payload = await readable.json();
-    if (
-      typeof payload === "object" &&
-      payload !== null &&
-      "error" in payload &&
-      typeof payload.error === "string" &&
-      payload.error.trim()
-    ) {
-      return payload.error;
-    }
+    const message = functionResponseMessage(payload);
+    if (message) return message;
   } catch {
     if (typeof readable.text === "function") {
       try {
         const payload = JSON.parse(await readable.text());
-        if (typeof payload === "object" && payload !== null && "error" in payload && typeof payload.error === "string" && payload.error.trim()) {
-          return payload.error;
-        }
+        const message = functionResponseMessage(payload);
+        if (message) return message;
       } catch {
         // The ordinary error remains the final fallback.
       }
