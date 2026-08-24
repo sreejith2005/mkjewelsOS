@@ -64,6 +64,9 @@ function profileSaveError(error: { code?: string; message?: string } | null): st
   if (error?.code === "42501") {
     return "You are not allowed to create this account with the selected role or buddy.";
   }
+  if (error?.code === "23505") {
+    return "An employee record with one of these identifiers already exists. Please try again.";
+  }
   return "The employee profile could not be saved. Please review the selected branch, department, designation, and buddies.";
 }
 
