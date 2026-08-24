@@ -13,3 +13,4 @@ crm-migration-*.json
 *.log
 .DS_Store
 .worktrees/
+.vercel/
