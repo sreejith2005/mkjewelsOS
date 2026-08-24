@@ -114,7 +114,7 @@ function EditUser({
     {
       branchId: draft.branch_id,
       departmentId: draft.department_id,
-      designationId: draft.designation_id,
+      designationId: draft.designation_id || null,
       excludedId: user.id,
     },
   );
@@ -500,7 +500,7 @@ export function AddUserForm({
   const buddies = eligibleBuddies(data.profiles, {
     branchId: form.branch_id,
     departmentId: form.department_id,
-    designationId: form.designation_id,
+    designationId: form.designation_id || null,
   });
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -689,14 +689,14 @@ export function AddUserForm({
           <Field label="Primary buddy">
             <select
               className="field"
-              disabled={!form.department_id || !form.designation_id}
+              disabled={!form.department_id}
               value={form.buddy_id}
               onChange={(event) => set("buddy_id", event.target.value)}
             >
               <option value="">
-                {form.department_id && form.designation_id
+                {form.department_id
                   ? "No primary buddy"
-                  : "Choose department and designation first"}
+                  : "Choose a department first"}
               </option>
               {buddies
                 .filter((item) => item.id !== form.secondary_buddy_id)
@@ -710,16 +710,16 @@ export function AddUserForm({
           <Field label="Secondary buddy">
             <select
               className="field"
-              disabled={!form.department_id || !form.designation_id}
+              disabled={!form.department_id}
               value={form.secondary_buddy_id}
               onChange={(event) =>
                 set("secondary_buddy_id", event.target.value)
               }
             >
               <option value="">
-                {form.department_id && form.designation_id
+                {form.department_id
                   ? "No secondary buddy"
-                  : "Choose department and designation first"}
+                  : "Choose a department first"}
               </option>
               {buddies
                 .filter((item) => item.id !== form.buddy_id)

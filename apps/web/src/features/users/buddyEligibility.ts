@@ -11,7 +11,7 @@ export type BuddyCandidate = Readonly<{
 export type BuddyScope = Readonly<{
   branchId: string;
   departmentId: string;
-  designationId: string;
+  designationId: string | null;
   excludedId?: string;
 }>;
 
@@ -23,7 +23,7 @@ export function eligibleBuddies<T extends BuddyCandidate>(
   profiles: readonly T[],
   scope: BuddyScope,
 ): T[] {
-  if (!scope.branchId || !scope.departmentId || !scope.designationId) return [];
+  if (!scope.branchId || !scope.departmentId) return [];
 
   return profiles.filter(
     (profile) =>
