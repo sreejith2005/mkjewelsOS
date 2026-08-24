@@ -5,6 +5,7 @@ import { supabase } from "@jewelos/api-client";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Field, Modal, Notice } from "@/components/ui";
 import { edgeFunctionErrorMessage, initials, titleCase } from "@/lib/format";
+import { refreshSessionForSensitiveAction } from "@/lib/edgeSession";
 import { AddUserForm, EditUser, type Data as UserManagementData } from "@/pages/UserManagementPage";
 import type { Branch, Department, DropdownMaster, UserProfile } from "@/types";
 
@@ -42,6 +43,7 @@ function EmployeeEditor({ employee, data, superAdmin, onClose, onSaved }: { empl
     if (!window.confirm(`Set the new password for ${employee.employee_name}? Their current password will stop working.`)) return;
     setSaving(true); setError(null); setPasswordUpdated(false);
     try {
+      await refreshSessionForSensitiveAction();
       const { data: result, error: invokeError } = await supabase.functions.invoke<{ success?: boolean }>("reset-user-password", { body: { profile_id: employee.id, password: newPassword } });
       if (invokeError) throw invokeError;
       if (!result?.success) throw new Error("The password was not updated.");

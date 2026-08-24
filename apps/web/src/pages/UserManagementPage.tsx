@@ -25,6 +25,7 @@ import { supabase } from "@jewelos/api-client";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Field, Modal, Notice } from "@/components/ui";
 import { eligibleBuddies } from "@/features/users/buddyEligibility";
+import { refreshSessionForSensitiveAction } from "@/lib/edgeSession";
 import { edgeFunctionErrorMessage, initials, PHONE_PATTERN, titleCase } from "@/lib/format";
 import type { Branch, Department, DropdownMaster, UserProfile } from "@/types";
 
@@ -173,6 +174,7 @@ export function EditUser({
     setSaving(true);
     setError(null);
     try {
+      await refreshSessionForSensitiveAction();
       const { error: invokeError } = await supabase.functions.invoke(
         "delete-user",
         { body: { profile_id: user.id } },
@@ -198,6 +200,7 @@ export function EditUser({
     setSaving(true);
     setError(null);
     try {
+      await refreshSessionForSensitiveAction();
       const { data: result, error: invokeError } = await supabase.functions.invoke<{ success?: boolean }>(
         "reset-user-password",
         { body: { profile_id: user.id, password: newPassword } },
@@ -531,6 +534,7 @@ export function AddUserForm({
     }
     setSaving(true);
     try {
+      await refreshSessionForSensitiveAction();
       const { data: result, error: invokeError } =
         await supabase.functions.invoke<{ already_exists?: boolean }>("invite-user", {
           body: form,

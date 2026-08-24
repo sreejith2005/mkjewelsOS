@@ -87,10 +87,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    void supabase.auth.getSession().then(({ data }) => {
+    void supabase.auth.getSession().then(async ({ data, error }) => {
       if (!active) return;
-      if (data.session) void loadProfile(data.session);
-      else setStatus("signed_out");
+      if (error || !data.session) {
+        setStatus("signed_out");
+        return;
+      }
+      const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+      if (!active) return;
+      if (refreshError || !refreshed.session) {
+        setSession(null);
+        setProfile(null);
+        setBranch(null);
+        setStatus("signed_out");
+        setStatusMessage("Your session has expired. Please sign in again.");
+        return;
+      }
+      void loadProfile(refreshed.session);
     });
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!active) return;
