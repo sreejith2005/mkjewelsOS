@@ -67,6 +67,11 @@ function profileSaveError(error: { code?: string; message?: string } | null): st
   if (error?.code === "23505") {
     return "An employee record with one of these identifiers already exists. Please try again.";
   }
+  if (error?.message) {
+    // Database function messages are authored validation messages or a
+    // PostgREST capability error; return them instead of an opaque failure.
+    return error.message.slice(0, 300);
+  }
   return "The employee profile could not be saved. Please review the selected branch, department, designation, and buddies.";
 }
 
