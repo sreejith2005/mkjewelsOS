@@ -157,7 +157,7 @@ function EditUser({
       await onSaved();
       onClose();
     } catch (caught) {
-      setError(errorMessage(caught));
+      setError(await edgeFunctionErrorMessage(caught));
     } finally {
       setSaving(false);
     }
@@ -182,7 +182,7 @@ function EditUser({
       await onSaved();
       onClose();
     } catch (caught) {
-      setError(errorMessage(caught));
+      setError(await edgeFunctionErrorMessage(caught));
     } finally {
       setSaving(false);
     }
