@@ -6,10 +6,14 @@ describe("Recurring / To-Do workspace contract", () => {
     for (const label of ["Today", "Overdue", "Completed", "Coverage Required", "Manager Review", "Schedules", "Verification", "Follow-ups", "Performance", "Import schedules"]) {
       expect(source).toContain(label);
     }
-    for (const action of ["Start", "Complete", "Upload", "Fill form", "Verify", "Reject", "Pause", "Activate", "Run now"]) {
+    for (const action of ["Start", "Complete", "Upload", "Verify", "Reject", "Pause", "Activate", "Run now"]) {
       expect(source).toContain(action);
     }
-    expect(source).toContain("Upload image to complete");
+    expect(source).toContain("Complete form");
+    expect(source).toContain('task.requires_form && task.status !== "completed"');
+    expect(source).toContain('task.coverage_status !== "coverage_required"');
+    expect(source).toContain("!task.requires_form && task.task_type === \"checklist\"");
+    expect(source).toContain("!task.requires_form && task.task_type !== \"checklist\"");
     expect(source).toContain('aria-label="Complete checklist"');
     expect(source).toContain("completeRecurringTaskWithImage");
   });

@@ -4,7 +4,6 @@ import {
   Check,
   CheckCircle2,
   ClipboardCheck,
-  FileText,
   MessageSquareMore,
   Play,
   Plus,
@@ -174,7 +173,7 @@ function WorkCard({
           {task.description}
         </p>
       ) : null}
-      {task.checklist.length ? (
+      {!task.requires_form && task.checklist.length ? (
         <div className="mt-3 space-y-2">
           {task.checklist.map((item) => (
             <button
@@ -194,21 +193,22 @@ function WorkCard({
         </div>
       ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
-        {task.task_type === "checklist" && task.status !== "completed" ? <Button aria-label="Complete checklist" onClick={() => void act("complete")}><CheckCircle2 className="size-4" />Complete checklist</Button> : null}
-        {task.task_type !== "checklist" && task.status === "pending" &&
+        {task.requires_form && task.status !== "completed" && task.coverage_status !== "coverage_required" ? <Button disabled={!task.form_template_id} onClick={() => window.dispatchEvent(new CustomEvent("recurring-form-request", { detail: task }))}><CheckCircle2 className="size-4" />Complete form</Button> : null}
+        {!task.requires_form && task.task_type === "checklist" && task.status !== "completed" ? <Button aria-label="Complete checklist" onClick={() => void act("complete")}><CheckCircle2 className="size-4" />Complete checklist</Button> : null}
+        {!task.requires_form && task.task_type !== "checklist" && task.status === "pending" &&
         task.coverage_status !== "coverage_required" ? (
           <Button onClick={() => void act("start")} variant="secondary">
             <Play className="size-4" />
             Start
           </Button>
         ) : null}
-        {task.task_type !== "checklist" && task.status === "in_progress" && canComplete ? (
+        {!task.requires_form && task.task_type !== "checklist" && task.status === "in_progress" && canComplete ? (
           <Button onClick={() => void act("complete")}>
             <CheckCircle2 className="size-4" />
             Complete
           </Button>
         ) : null}
-        {task.task_type === "delegation" && task.requires_upload && !task.has_attachment ? (
+        {!task.requires_form && task.task_type === "delegation" && task.requires_upload && !task.has_attachment ? (
           <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-gold/30 px-4 py-2 text-sm font-semibold text-gold">
             <Upload className="size-4" />
             Upload image to complete
@@ -228,27 +228,13 @@ function WorkCard({
             />
           </label>
         ) : null}
-        {task.requires_form && !task.has_form_submission ? (
-          <Button
-            disabled={!task.form_template_id}
-            onClick={() =>
-              window.dispatchEvent(
-                new CustomEvent("recurring-form-request", { detail: task }),
-              )
-            }
-            variant="secondary"
-          >
-            <FileText className="size-4" />
-            Fill form
-          </Button>
-        ) : null}
-        {followupEnabled && canManage && task.status !== "completed" ? (
+        {!task.requires_form && followupEnabled && canManage && task.status !== "completed" ? (
           <Button onClick={() => void followup()} variant="secondary">
             <MessageSquareMore className="size-4" />
             Follow up
           </Button>
         ) : null}
-        {canManage &&
+        {!task.requires_form && canManage &&
         task.status === "completed" &&
         task.verification_status === "pending" ? (
           <>
@@ -723,7 +709,7 @@ export function RecurringTodoPage() {
                     await submitForm(
                       form.id,
                       answers,
-                      "checklist_task",
+                      formTarget.task_type === "delegation" ? "delegation_task" : "checklist_task",
                       formTarget.id,
                     );
                     setFormTarget(null);
