@@ -73,7 +73,7 @@ function Status({ value }: { value: AccountStatus }) {
   );
 }
 
-function EditUser({
+export function EditUser({
   user,
   data,
   superAdmin,

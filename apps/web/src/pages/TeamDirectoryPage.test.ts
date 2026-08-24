@@ -8,5 +8,10 @@ describe("Employee Directory account administration", () => {
 
     expect(source).toContain("Add user");
     expect(source).toContain("<AddUserForm");
+    expect(source).toContain("<EditUser");
+    const editorSource = await import("./UserManagementPage?raw").then(
+      (module) => module.default,
+    );
+    expect(editorSource).toContain("Delete user");
   });
 });
