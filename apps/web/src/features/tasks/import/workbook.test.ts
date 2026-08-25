@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createTaskImportTemplate, hashTaskImportPayload, normalizeTaskImportWorkbook, TASK_IMPORT_HEADERS } from "./workbook";
+import { createTaskImportTemplate, hashTaskImportPayload, normalizeTaskImportWorkbook, parseTaskImportFile, TASK_IMPORT_HEADERS } from "./workbook";
+import { LEGACY_TASK_HEADERS } from "./legacySheet";
 
 function task(overrides: Record<string, unknown>) {
   return Object.fromEntries(TASK_IMPORT_HEADERS.map((header) => [header, overrides[header] ?? ""]));
@@ -28,5 +29,16 @@ describe("normalizeTaskImportWorkbook", () => {
 
   it("creates the four-sheet Excel template", () => {
     expect(createTaskImportTemplate().SheetNames).toEqual(["Read Me", "Tasks", "Checklist Items", "Reference Data"]);
+  });
+
+  it("detects the current MK Jewels CSV headers", async () => {
+    const source = `${LEGACY_TASK_HEADERS.join(",")}\r\n${LEGACY_TASK_HEADERS.map(() => "").join(",")}`;
+    const parsed = await parseTaskImportFile(new File([source], "current.csv", { type: "text/csv" }));
+    expect(parsed.sourceFormat).toBe("mk_daily_checklist_csv");
+  });
+
+  it("rejects more than 2500 canonical rows", () => {
+    const result = normalizeTaskImportWorkbook({ Tasks: Array.from({ length: 2501 }, (_, index) => task({ task_key: `t-${index}`, task_mode: "one_time", title: "Task", doer_emails: "a@example.com", planned_at: "2026-08-22 09:00" })) });
+    expect(result.errors.join(" ")).toMatch(/2500/);
   });
 });
