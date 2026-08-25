@@ -48,9 +48,11 @@ export async function loadDailyChecklistManagement(): Promise<DailyChecklistMana
   return { checklists: data.map(asChecklist), designations: (designationResult.data ?? []).map((item) => ({ id: item.id, label: item.label })) };
 }
 
-export async function saveDailyChecklist(input: DailyChecklistSaveInput): Promise<void> {
+export type DailyChecklistSaveResult = Readonly<{ id: string; revision: number }>;
+
+export async function saveDailyChecklist(input: DailyChecklistSaveInput): Promise<DailyChecklistSaveResult> {
   const draft = validateDailyChecklistDraft(input);
-  const { error } = await supabase.rpc("save_designation_daily_checklist_with_audit", {
+  const { data, error } = await supabase.rpc("save_designation_daily_checklist_with_audit", {
     p_checklist_id: input.id as never,
     p_designation_id: input.designationId,
     p_title: draft.title,
@@ -61,6 +63,9 @@ export async function saveDailyChecklist(input: DailyChecklistSaveInput): Promis
     p_expected_revision: input.revision,
   });
   if (error) throw error;
+  const row = asRecord(data);
+  if (typeof row.id !== "string" || typeof row.revision !== "number") throw new Error("Daily checklist save response is invalid");
+  return { id: row.id, revision: row.revision };
 }
 
 export async function loadMyDailyChecklistStatus(): Promise<DailyChecklistStatus> {

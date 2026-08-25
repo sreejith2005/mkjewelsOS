@@ -11,6 +11,12 @@ function parsePastedChecklistLines(value: string): string[] {
   return value.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0);
 }
 
+function errorMessage(cause: unknown, fallback: string): string {
+  if (cause instanceof Error) return cause.message;
+  if (cause && typeof cause === "object" && "message" in cause && typeof cause.message === "string") return cause.message;
+  return fallback;
+}
+
 export function DailyChecklistManager({ role }: { role: UserRole }) {
   const [records, setRecords] = useState<readonly DailyChecklistRecord[]>([]);
   const [designations, setDesignations] = useState<readonly { id: string; label: string }[]>([]);
@@ -24,6 +30,7 @@ export function DailyChecklistManager({ role }: { role: UserRole }) {
   const [revision, setRevision] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   const load = async () => {
@@ -33,7 +40,7 @@ export function DailyChecklistManager({ role }: { role: UserRole }) {
       setRecords(result.checklists);
       setDesignations(result.designations);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not load daily checklists.");
+      setError(errorMessage(cause, "Could not load daily checklists."));
     } finally {
       setLoaded(true);
     }
@@ -57,6 +64,7 @@ export function DailyChecklistManager({ role }: { role: UserRole }) {
     setActive(record?.isActive ?? true);
     setRevision(record?.revision ?? 0);
     setError(null);
+    setSuccess(null);
   };
 
   const replaceItemsFromPaste = () => {
@@ -82,10 +90,15 @@ export function DailyChecklistManager({ role }: { role: UserRole }) {
     try {
       setSaving(true);
       setError(null);
-      await saveDailyChecklist({ id: selectedRecord?.id ?? null, designationId: selected, title, instruction: instruction || null, confirmationText, items, isActive: active, revision });
-      await load();
+      setSuccess(null);
+      const saved = await saveDailyChecklist({ id: selectedRecord?.id ?? null, designationId: selected, title, instruction: instruction || null, confirmationText, items, isActive: active, revision });
+      const designationLabel = designations.find((designation) => designation.id === selected)?.label ?? "Designation";
+      const savedRecord: DailyChecklistRecord = { id: saved.id, designationId: selected, designationLabel, title, instruction: instruction || null, confirmationText, items, isActive: active, revision: saved.revision };
+      setRecords((current) => [...current.filter((record) => record.designationId !== selected), savedRecord]);
+      setRevision(saved.revision);
+      setSuccess("Checklist saved.");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not save daily checklist.");
+      setError(errorMessage(cause, "Could not save daily checklist."));
     } finally {
       setSaving(false);
     }
@@ -103,6 +116,7 @@ export function DailyChecklistManager({ role }: { role: UserRole }) {
       <label><span className="mb-1 block text-xs text-task-text-muted">Final affirmation</span><input className="task-field" maxLength={240} value={confirmationText} onChange={(event) => setConfirmationText(event.target.value)} /></label>
       <label className="flex gap-2 text-sm"><input checked={active} onChange={(event) => setActive(event.target.checked)} type="checkbox" />Show this checklist to employees</label>
       {error ? <p className="text-sm text-task-overdue">{error}</p> : null}
+      {success ? <p className="text-sm text-task-success" role="status">{success}</p> : null}
       <Button disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save checklist"}</Button>
     </div>
   </Panel>;
