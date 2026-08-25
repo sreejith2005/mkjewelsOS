@@ -3,7 +3,7 @@ import { usernameLoginErrorMessage } from "./functionError";
 
 describe("usernameLoginErrorMessage", () => {
   it("uses the safe function response instead of the SDK wrapper", () => {
-    expect(usernameLoginErrorMessage(401, "invalid_credentials")).toBe("Username or password is incorrect.");
+    expect(usernameLoginErrorMessage(401, "invalid_credentials")).toBe("Username, work email, or password is incorrect.");
   });
 
   it("explains a rate-limit response", () => {

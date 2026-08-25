@@ -158,13 +158,12 @@ function LoginPage() {
         {error ? <div className="mb-5"><Notice tone="danger">{error}</Notice></div> : null}
         <form className="space-y-4" onSubmit={submit}>
           <label className="block">
-            <span className="label">Username</span>
+            <span className="label">Username or work email</span>
             <input
               autoComplete="username"
               className="field"
               onChange={(event) => setUsername(event.target.value.toLowerCase())}
               required
-              pattern="[a-z0-9]+"
               value={username}
             />
           </label>

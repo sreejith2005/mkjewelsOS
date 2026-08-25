@@ -1,7 +1,7 @@
 type LoginErrorCode = "invalid_credentials" | "login_rate_limited" | "login_configuration" | "login_rate_limit" | "login_identity" | "login_auth";
 
 export function usernameLoginErrorMessage(status: number, code: string | null | undefined): string {
-  if (status === 401 || code === "invalid_credentials") return "Username or password is incorrect.";
+  if (status === 401 || code === "invalid_credentials") return "Username, work email, or password is incorrect.";
   if (status === 429 || code === "login_rate_limited") return "Too many attempts. Try again in 15 minutes.";
   const labels: Partial<Record<LoginErrorCode, string>> = {
     login_configuration: "Login configuration needs attention. Please contact your administrator and quote LOGIN-CONFIG.",
