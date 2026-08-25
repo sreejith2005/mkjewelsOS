@@ -42,6 +42,8 @@ export type { TaskParticipants } from "./taskParticipants";
 export * from "./taskCoverage.ts";
 export { calculateTaskChecklistProgress } from "./taskChecklist";
 export type { TaskChecklistProgress, TaskChecklistProgressItem } from "./taskChecklist";
+export { calculateDailyChecklistProgress, validateDailyChecklistDraft } from "./dailyChecklist";
+export type { DailyChecklistDraft, DailyChecklistItem, DailyChecklistStatus } from "./dailyChecklist";
 export { deriveTaskMutationCapability } from "./taskCapabilities";
 export type { TaskMutationCapability } from "./taskCapabilities";
 export {
