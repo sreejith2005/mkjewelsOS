@@ -2,11 +2,9 @@ export async function prepareRecurringTasksThenLoad<T>(
   prepare: () => Promise<unknown>,
   load: () => Promise<T>,
 ): Promise<T> {
-  try {
-    await prepare();
-  } catch {
-    // Recurrence preparation is best-effort. Persisted task rows remain the
-    // source of truth for the employee's day board.
-  }
+  // The day feed must not wait on a best-effort recurring-task catch-up.
+  // Persisted assignments are already authoritative and should render as soon
+  // as their realtime event arrives.
+  void prepare().catch(() => undefined);
   return load();
 }
