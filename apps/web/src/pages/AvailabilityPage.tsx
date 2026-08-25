@@ -7,6 +7,7 @@ import { Button, Notice } from "@/components/ui";
 import { normalizeAvailabilityRange } from "@/features/availability/dateRange";
 import { initials, titleCase } from "@/lib/format";
 import { loadAvailabilityForDate, loadAvailabilityUsers, recordAvailabilityRange, type AvailabilityEntry, type TaskUser } from "@/features/tasks/api";
+import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 
 function today(): string { return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); }
 const statusLabels: Record<Enums<"availability_status">, string> = { present: "Present", absent: "Absent", half_day: "Half day", remote: "Remote" };
@@ -47,6 +48,7 @@ export function AvailabilityPage() {
   }, [canLogOthers, date, profile?.id]);
 
   useEffect(() => { void load(); }, [load]);
+  useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["organization", "tasks"], refresh: load });
   const entryByUser = useMemo(() => new Map(entries.map((entry) => [entry.user_profile_id, entry])), [entries]);
   const visibleUsers = useMemo(() => users.filter((user) => {
     const status = entryByUser.get(user.id)?.status ?? "present";

@@ -14,6 +14,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useAuth } from "@/auth/AuthContext";
+import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { Button, Modal, Notice } from "@/components/ui";
 import { TaskTemplateForm } from "@/features/tasks/TaskForms";
 import {
@@ -318,6 +319,7 @@ export function RecurringTodoPage() {
   useEffect(() => {
     void load();
   }, [load]);
+  useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["tasks", "forms", "organization"], refresh: load });
   useEffect(() => {
     const open = (event: Event) =>
       setFormTarget((event as CustomEvent<RecurringInstance>).detail);

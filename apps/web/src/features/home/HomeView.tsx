@@ -6,6 +6,7 @@ import {fetchHomeSummary} from "@/features/analytics/api";
 import {EmptyMessage,ErrorPanel,LoadingPanels,Panel,StatusDot} from "@/features/analytics/components";
 import {useAsyncData} from "@/features/analytics/useAsyncData";
 import {subscribeToInbox} from "@/features/notifications/api";
+import {useTenantRealtimeRefresh} from "@/features/realtime/useTenantRealtimeRefresh";
 import type {HomeSummary} from "@/features/analytics/types";
 
 function greeting(timezone:string){const hour=Number(new Intl.DateTimeFormat("en-IN",{hour:"2-digit",hour12:false,timeZone:timezone}).format(new Date()));return hour<12?"Good Morning":hour<17?"Good Afternoon":"Good Evening";}
@@ -15,6 +16,7 @@ export function HomeView({onNavigate}:{onNavigate:(path:string)=>void}){
   const {branch,profile}=useAuth();
   const {data,error,loading,retry}=useAsyncData(fetchHomeSummary,[]);
   useEffect(()=>profile?.id ? subscribeToInbox(profile.id,()=>{void retry();}) : undefined,[profile?.id,retry]);
+  useTenantRealtimeRefresh({tenantId:profile?.tenant_id,topics:["tasks","fms","crm","organization","settings"],refresh:retry});
   if(loading)return <section className="-m-4 min-h-[calc(100dvh-7.875rem)] bg-task-muted p-4 sm:-m-6 sm:p-6"><LoadingPanels count={6}/></section>;
   if(error)return <section className="-m-4 min-h-[calc(100dvh-7.875rem)] bg-task-muted p-4 sm:-m-6 sm:p-6"><ErrorPanel message={error} onRetry={retry}/></section>;
   if(!data)return null;

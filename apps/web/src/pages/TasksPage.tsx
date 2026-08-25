@@ -22,8 +22,10 @@ import { TaskComposer } from "@/features/tasks/TaskComposer";
 import { TaskFilterBar } from "@/features/tasks/TaskFilterBar";
 import { loadFormDynamicOptions, loadTaskForms, submitForm, type FormBundle } from "@/features/forms/api";
 import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer";
+import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 
 type TaskWorkspaceView = "mine" | "delegated";
+const TASK_TOPICS = ["tasks", "forms", "organization"] as const;
 
 export function TasksPage() {
   const { profile } = useAuth();
@@ -78,6 +80,7 @@ export function TasksPage() {
   }, [canManage, hasAdminTaskView, profile]);
 
   useEffect(() => { void refresh(); }, [refresh]);
+  useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: TASK_TOPICS, refresh });
 
   const openComposer = useCallback(async () => {
     try { setError(null); setReferences(await loadTaskAuthoringReferenceData()); setComposerOpen(true); }

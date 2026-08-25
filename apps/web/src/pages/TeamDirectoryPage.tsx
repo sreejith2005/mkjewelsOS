@@ -3,6 +3,7 @@ import { Building2, KeyRound, Pencil, Plus, Search, Users } from "lucide-react";
 import type { Json } from "@jewelos/core";
 import { supabase } from "@jewelos/api-client";
 import { useAuth } from "@/auth/AuthContext";
+import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { Button, Field, Modal, Notice } from "@/components/ui";
 import { edgeFunctionErrorMessage, initials, titleCase } from "@/lib/format";
 import { refreshSessionForSensitiveAction } from "@/lib/edgeSession";
@@ -57,6 +58,7 @@ export function TeamDirectoryPage() {
   const { profile } = useAuth(); const [data, setData] = useState<ReferenceData>(EMPTY); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null); const [search, setSearch] = useState(""); const [branchId, setBranchId] = useState(""); const [departmentId, setDepartmentId] = useState(""); const [editing, setEditing] = useState<Employee | null>(null); const [inviting, setInviting] = useState(false);
   const load = useCallback(async () => { setLoading(true); const [employees, branches, departments, designations] = await Promise.all([supabase.from("user_profiles").select("*").order("employee_name"), supabase.from("branches").select("*").eq("is_active", true).order("name"), supabase.from("departments").select("*").eq("is_active", true).order("name"), supabase.from("dropdown_masters").select("*").eq("master_type", "designation").order("sort_order")]); const first = [employees.error, branches.error, departments.error, designations.error].find(Boolean); if (first) setError(first.message); else setData({ employees: employees.data ?? [], branches: branches.data ?? [], departments: departments.data ?? [], designations: designations.data ?? [] }); setLoading(false); }, []);
   useEffect(() => { void load(); }, [load]);
+  useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["organization", "settings"], refresh: load });
   const filteredDepartments = useMemo(() => data.departments.filter((department) => !branchId || department.branch_id === branchId), [branchId, data.departments]);
   const employees = useMemo(() => data.employees.filter((employee) => (!branchId || employee.branch_id === branchId) && (!departmentId || employee.department_id === departmentId) && (!search.trim() || `${employee.employee_name} ${employee.employee_code} ${employee.email}`.toLowerCase().includes(search.trim().toLowerCase()))), [branchId, data.employees, departmentId, search]);
   const branchNames = useMemo(() => new Map(data.branches.map((branch) => [branch.id, branch.name])), [data.branches]); const departmentNames = useMemo(() => new Map(data.departments.map((department) => [department.id, department.name])), [data.departments]); const designationNames = useMemo(() => new Map(data.designations.map((designation) => [designation.id, designation.label])), [data.designations]);

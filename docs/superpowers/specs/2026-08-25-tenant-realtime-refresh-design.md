@@ -27,7 +27,9 @@ Create a forward-only `tenant_realtime_events` table containing only the
 tenant id, a bounded topic, monotonic event id, and timestamp. It contains no
 customer content, task title, assignee identity, form answer, or other
 business payload. Authenticated active profiles may receive events only for
-their own tenant. Direct client reads remain unnecessary.
+their own tenant. Supabase Realtime requires that tenant-scoped `SELECT`
+authorization to deliver database changes; the application does not issue
+direct REST reads against this safe signal table.
 
 Database triggers publish an event for changes in these functional domains:
 

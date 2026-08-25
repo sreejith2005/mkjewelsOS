@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Building2,
   CalendarCheck,
@@ -29,6 +29,7 @@ import { DailyChecklistManager } from "@/features/daily-checklists/DailyChecklis
 import { DailyChecklistGate } from "@/features/daily-checklists/DailyChecklistGate";
 import { ThemeProvider, useTheme } from "@/theme/ThemeContext";
 import { SectionMaintenanceNotice } from "@/components/SectionMaintenanceNotice";
+import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { saveSectionControls } from "@/features/settings/api";
 import type { LauncherItem } from "@/components/shell/AppLauncher";
 import logoDarkUrl from "../../../mk-jewels-logos/WhatsApp Image 2026-06-24 at 13.01.41 (1).jpeg";
@@ -249,18 +250,20 @@ function AppShell() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [sectionControls, setSectionControls] = useState(DEFAULT_SECTION_CONTROLS);
   const [savingSectionControls, setSavingSectionControls] = useState(false);
+  const refreshSectionControls = useCallback(async () => {
+    const { data, error } = await supabase.rpc("get_section_availability");
+    // Maintenance controls are a convenience overlay, never an access-control
+    // dependency. A stale deployment or a transient RPC failure must not stop a
+    // signed-in employee from using otherwise authorized sections.
+    if (error) { setSectionControls(DEFAULT_SECTION_CONTROLS); return; }
+    try { setSectionControls(validateSectionControls(data)); } catch { setSectionControls(DEFAULT_SECTION_CONTROLS); }
+  }, []);
   useEffect(() => {
     let active = true;
-    void supabase.rpc("get_section_availability").then(({ data, error }) => {
-      if (!active) return;
-      // Maintenance controls are a convenience overlay, never an access-control
-      // dependency. A stale deployment or a transient RPC failure must not stop a
-      // signed-in employee from using otherwise authorized sections.
-      if (error) { setSectionControls(DEFAULT_SECTION_CONTROLS); return; }
-      try { setSectionControls(validateSectionControls(data)); } catch { setSectionControls(DEFAULT_SECTION_CONTROLS); }
-    });
+    void refreshSectionControls().then(() => { if (!active) return; });
     return () => { active = false; };
-  }, [profile?.id]);
+  }, [profile?.id, refreshSectionControls]);
+  useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["settings"], refresh: refreshSectionControls });
   useEffect(() => {
     document.documentElement.dataset.tableDensity = preferences.table_density;
     return () => { delete document.documentElement.dataset.tableDensity; };

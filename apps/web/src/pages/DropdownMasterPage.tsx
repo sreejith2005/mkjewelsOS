@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { ListFilter, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { supabase } from "@jewelos/api-client";
 import { useAuth } from "@/auth/AuthContext";
+import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { Button, Field, Modal, Notice } from "@/components/ui";
 import { errorMessage, titleCase } from "@/lib/format";
 import type { DropdownMaster } from "@/types";
@@ -76,6 +77,7 @@ export function DropdownMasterPage() {
     catch (caught) { setError(errorMessage(caught)); } finally { setLoading(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
+  useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["organization", "settings"], refresh: load });
 
   const categories = useMemo(() => Array.from(new Set([...REQUIRED_EMPTY_CATEGORIES, ...items.map((item) => item.master_type)])).sort(), [items]);
   const categoryItems = useMemo(() => items.filter((item) => item.master_type === category && (status === "all" || (status === "active") === (item.is_active !== false)) && `${item.label} ${item.value} ${item.master_type}`.toLowerCase().includes(search.toLowerCase())), [category, items, search, status]);

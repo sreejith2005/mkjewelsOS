@@ -8,6 +8,7 @@ import type { DynamicOptions } from "@/features/forms/FormRenderer";
 import { FmsStageRunner } from "@/features/fms/FmsStageRunner";
 import { loadFmsRuntime, setFmsInstanceStatus, type FmsInstance } from "@/features/fms/api";
 import { filterFmsInstances } from "@/features/fms/runtimeView";
+import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 
 const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: [] };
 type Runtime = Awaited<ReturnType<typeof loadFmsRuntime>>;
@@ -38,6 +39,7 @@ export function FMSTasksPage({ embedded = false, query: externalQuery, initialIn
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to load FMS tasks"); }
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
+  useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["fms", "forms", "organization"], refresh });
   useEffect(() => {
     if (!runtime || !openInstanceId) return;
     const created = runtime.instances.find((instance) => instance.id === openInstanceId);

@@ -8,6 +8,7 @@ import { CrmDirectory, EMPTY_FILTERS } from "@/features/crm/CrmDirectory";
 import { FollowupsPanel } from "@/features/crm/FollowupsPanel";
 import { MergeDialog } from "@/features/crm/MergeDialog";
 import { WalkinWorkspace } from "@/features/crm/WalkinWorkspace";
+import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { loadClient, loadCrmOptions, searchClients } from "@/features/crm/api";
 import type { CrmClientDetail, CrmClientSummary, CrmOptions } from "@/features/crm/types";
 
@@ -78,6 +79,11 @@ export function CRMPage() {
     await search(false);
     await open(clientId);
   }, [open, search]);
+  const refreshVisibleCrm = useCallback(async () => {
+    if (detail) await refreshDetail();
+    if (section === "directory") await search(false);
+  }, [detail, refreshDetail, search, section]);
+  useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["crm", "organization"], refresh: refreshVisibleCrm });
 
   if (!profile) return null;
 
