@@ -28,11 +28,11 @@ export function deriveTaskMutationCapability({
 }>): TaskMutationCapability {
   const canUseElevatedActions = ELEVATED_TASK_ROLES.has(viewerRole);
   const isActiveDoer = assigneeIds.includes(viewerId);
-  const access = canUseElevatedActions ? "elevated" : isActiveDoer ? "doer" : isWatcher ? "watcher" : "read_only";
+  const access = canUseElevatedActions ? "elevated" : isActiveDoer ? "doer" : "read_only";
 
   return {
     access,
-    canMutate: access !== "read_only",
+    canMutate: access === "doer" || access === "elevated",
     canUseElevatedActions,
     watcherLabel: !isWatcher
       ? null
