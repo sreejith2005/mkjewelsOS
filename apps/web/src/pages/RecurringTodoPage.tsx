@@ -36,6 +36,7 @@ import {
 import {
   deleteRecurringTemplate,
   loadRecurringWorkspace,
+  materializeRecurringTemplate,
   runRecurringTemplateNow,
   saveRecurringTemplate,
   sendRecurringFollowup,
@@ -397,7 +398,8 @@ export function RecurringTodoPage() {
     id: string | null,
     payload: Parameters<typeof saveRecurringTemplate>[1],
   ) => {
-    await saveRecurringTemplate(id, payload);
+    const templateId = await saveRecurringTemplate(id, payload);
+    await materializeRecurringTemplate(templateId);
     setEditing(undefined);
     await load();
   };

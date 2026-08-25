@@ -21,6 +21,7 @@ export type { MenuItem, PageId, UserRole } from "./roleMenu";
 export {
   isUserAvailableForRecurringTask,
   kolkataDateKey,
+  materializeRecurringSchedule,
   resolveRecurringAssignment,
   shouldGenerateRecurringTask,
 } from "./recurrence";

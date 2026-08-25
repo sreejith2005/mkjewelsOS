@@ -17,4 +17,12 @@ describe("Recurring / To-Do workspace contract", () => {
     expect(source).toContain('aria-label="Complete checklist"');
     expect(source).toContain("completeRecurringTaskWithImage");
   });
+
+  it("materializes a due schedule immediately after saving it", async () => {
+    const source = await import("./RecurringTodoPage?raw").then((module) => module.default);
+
+    expect(source).toContain("materializeRecurringTemplate");
+    expect(source).toContain("const templateId = await saveRecurringTemplate(id, payload);");
+    expect(source).toContain("await materializeRecurringTemplate(templateId);");
+  });
 });

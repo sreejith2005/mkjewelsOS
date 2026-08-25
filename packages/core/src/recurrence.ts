@@ -142,3 +142,16 @@ export async function materializeDueRecurringTemplates(
 
   return { alreadyExists, created, eligible, failed };
 }
+
+/**
+ * Materializes one schedule immediately after it is saved when it is due on
+ * the supplied JewelOS business date. The database creation contract remains
+ * idempotent, so a concurrent scheduler run is reported as already existing.
+ */
+export async function materializeRecurringSchedule(
+  template: DueRecurringTemplate,
+  targetDate: Date | string,
+  create: (template: DueRecurringTemplate) => Promise<string | null>,
+): Promise<RecurringMaterializationOutcome> {
+  return materializeDueRecurringTemplates([template], targetDate, create);
+}

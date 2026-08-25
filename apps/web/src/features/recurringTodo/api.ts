@@ -16,6 +16,15 @@ export async function saveRecurringTemplate(id: string | null, payload: Json): P
   return data;
 }
 
+export async function materializeRecurringTemplate(templateId: string): Promise<{ created: number }> {
+  const { data, error } = await supabase.functions.invoke("materialize-recurring-schedule", {
+    body: { template_id: templateId },
+    method: "POST",
+  });
+  if (error) throw new Error(`Prepare recurring task: ${error.message}`);
+  return data as { created: number };
+}
+
 export async function deleteRecurringTemplate(id: string): Promise<string> {
   const { data, error } = await supabase.rpc("delete_recurring_todo_template_with_audit", { p_template_id: id });
   if (error) throw new Error(`Delete recurring schedule: ${error.message}`);

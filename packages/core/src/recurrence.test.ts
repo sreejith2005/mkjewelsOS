@@ -3,6 +3,7 @@ import {
   isUserAvailableForRecurringTask,
   kolkataDateKey,
   materializeDueRecurringTemplates,
+  materializeRecurringSchedule,
   resolveRecurringAssignment,
   shouldGenerateRecurringTask,
   type RecurringAvailabilityProfile,
@@ -100,6 +101,36 @@ describe("materializeDueRecurringTemplates", () => {
 
     expect(attempted).toEqual(["broken", "daily"]);
     expect(result).toEqual({ alreadyExists: 0, created: 1, eligible: 2, failed: 1 });
+  });
+});
+
+describe("materializeRecurringSchedule", () => {
+  it("creates today's occurrence when a daily schedule is saved after its start date", async () => {
+    const created: string[] = [];
+
+    const result = await materializeRecurringSchedule(
+      { id: "daily", recurrenceRule: "FREQ=DAILY", startsOn: "2026-08-24" },
+      "2026-08-25",
+      async (template) => {
+        created.push(template.id);
+        return template.id;
+      },
+    );
+
+    expect(result).toEqual({ alreadyExists: 0, created: 1, eligible: 1, failed: 0 });
+    expect(created).toEqual(["daily"]);
+  });
+
+  it("does not create a weekly occurrence before the next scheduled day", async () => {
+    const result = await materializeRecurringSchedule(
+      { id: "weekly", recurrenceRule: "FREQ=WEEKLY", startsOn: "2026-08-24" },
+      "2026-08-25",
+      async () => {
+        throw new Error("a non-due schedule must not be created");
+      },
+    );
+
+    expect(result).toEqual({ alreadyExists: 0, created: 0, eligible: 0, failed: 0 });
   });
 });
 
