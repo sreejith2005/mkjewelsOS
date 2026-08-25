@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -2067,6 +2067,124 @@ export type Database = {
           },
         ]
       }
+      daily_checklist_acknowledgements: {
+        Row: {
+          acknowledged_at: string
+          acknowledgement_date: string
+          checklist_id: string
+          checklist_items: Json
+          checklist_revision: number
+          checklist_title: string
+          confirmation_text: string
+          created_at: string
+          created_by: string
+          designation_id: string
+          id: string
+          tenant_id: string
+          updated_at: string
+          updated_by: string
+          user_profile_id: string
+        }
+        Insert: {
+          acknowledged_at?: string
+          acknowledgement_date: string
+          checklist_id: string
+          checklist_items: Json
+          checklist_revision: number
+          checklist_title: string
+          confirmation_text: string
+          created_at?: string
+          created_by: string
+          designation_id: string
+          id?: string
+          tenant_id: string
+          updated_at?: string
+          updated_by: string
+          user_profile_id: string
+        }
+        Update: {
+          acknowledged_at?: string
+          acknowledgement_date?: string
+          checklist_id?: string
+          checklist_items?: Json
+          checklist_revision?: number
+          checklist_title?: string
+          confirmation_text?: string
+          created_at?: string
+          created_by?: string
+          designation_id?: string
+          id?: string
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string
+          user_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_checklist_acknowledgements_checklist_id_fkey"
+            columns: ["checklist_id"]
+            isOneToOne: false
+            referencedRelation: "designation_daily_checklists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_checklist_acknowledgements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_checklist_acknowledgements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_checklist_acknowledgements_designation_id_fkey"
+            columns: ["designation_id"]
+            isOneToOne: false
+            referencedRelation: "dropdown_masters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_checklist_acknowledgements_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_checklist_acknowledgements_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_checklist_acknowledgements_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_checklist_acknowledgements_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_checklist_acknowledgements_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       departments: {
         Row: {
           branch_id: string | null
@@ -2132,6 +2250,97 @@ export type Database = {
           {
             foreignKeyName: "fk_dept_head"
             columns: ["head_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      designation_daily_checklists: {
+        Row: {
+          confirmation_text: string
+          created_at: string
+          created_by: string
+          designation_id: string
+          id: string
+          instruction: string | null
+          is_active: boolean
+          items: Json
+          revision: number
+          tenant_id: string
+          title: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          confirmation_text: string
+          created_at?: string
+          created_by: string
+          designation_id: string
+          id?: string
+          instruction?: string | null
+          is_active?: boolean
+          items: Json
+          revision?: number
+          tenant_id: string
+          title: string
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          confirmation_text?: string
+          created_at?: string
+          created_by?: string
+          designation_id?: string
+          id?: string
+          instruction?: string | null
+          is_active?: boolean
+          items?: Json
+          revision?: number
+          tenant_id?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "designation_daily_checklists_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "designation_daily_checklists_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "designation_daily_checklists_designation_id_fkey"
+            columns: ["designation_id"]
+            isOneToOne: false
+            referencedRelation: "dropdown_masters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "designation_daily_checklists_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "designation_daily_checklists_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "designation_daily_checklists_updated_by_fkey"
+            columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "v_task_users"
             referencedColumns: ["id"]
@@ -5015,6 +5224,7 @@ export type Database = {
         Row: {
           actual_datetime: string | null
           branch_id: string | null
+          buddy_assignment_allowed: boolean
           category_id: string | null
           completion_remark: string | null
           coverage_original_assignee_id: string | null
@@ -5054,6 +5264,7 @@ export type Database = {
         Insert: {
           actual_datetime?: string | null
           branch_id?: string | null
+          buddy_assignment_allowed?: boolean
           category_id?: string | null
           completion_remark?: string | null
           coverage_original_assignee_id?: string | null
@@ -5093,6 +5304,7 @@ export type Database = {
         Update: {
           actual_datetime?: string | null
           branch_id?: string | null
+          buddy_assignment_allowed?: boolean
           category_id?: string | null
           completion_remark?: string | null
           coverage_original_assignee_id?: string | null
@@ -5257,6 +5469,7 @@ export type Database = {
       task_templates: {
         Row: {
           branch_id: string | null
+          buddy_assignment_allowed: boolean
           category_id: string | null
           checklist_items: Json
           created_at: string | null
@@ -5288,6 +5501,7 @@ export type Database = {
         }
         Insert: {
           branch_id?: string | null
+          buddy_assignment_allowed?: boolean
           category_id?: string | null
           checklist_items?: Json
           created_at?: string | null
@@ -5321,6 +5535,7 @@ export type Database = {
         }
         Update: {
           branch_id?: string | null
+          buddy_assignment_allowed?: boolean
           category_id?: string | null
           checklist_items?: Json
           created_at?: string | null
@@ -5902,6 +6117,7 @@ export type Database = {
           updated_at: string | null
           updated_by: string | null
           user_role: Database["public"]["Enums"]["user_role"]
+          username: string | null
           week_off: string[]
           working_status: Database["public"]["Enums"]["working_status"]
         }
@@ -5931,6 +6147,7 @@ export type Database = {
           updated_at?: string | null
           updated_by?: string | null
           user_role?: Database["public"]["Enums"]["user_role"]
+          username?: string | null
           week_off?: string[]
           working_status?: Database["public"]["Enums"]["working_status"]
         }
@@ -5960,6 +6177,7 @@ export type Database = {
           updated_at?: string | null
           updated_by?: string | null
           user_role?: Database["public"]["Enums"]["user_role"]
+          username?: string | null
           week_off?: string[]
           working_status?: Database["public"]["Enums"]["working_status"]
         }
@@ -6035,6 +6253,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      username_login_rate_limits: {
+        Row: {
+          attempts: number
+          blocked_until: string | null
+          rate_limit_key: string
+          updated_at: string
+          window_started_at: string
+        }
+        Insert: {
+          attempts?: number
+          blocked_until?: string | null
+          rate_limit_key: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Update: {
+          attempts?: number
+          blocked_until?: string | null
+          rate_limit_key?: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Relationships: []
       }
       walkin_entries: {
         Row: {
@@ -6406,6 +6648,14 @@ export type Database = {
       }
     }
     Functions: {
+      acknowledge_daily_checklist_with_audit: {
+        Args: {
+          p_checked_item_ids: string[]
+          p_checklist_id: string
+          p_revision: number
+        }
+        Returns: Json
+      }
       activate_fms_stage_internal: {
         Args: {
           p_guard?: number
@@ -6420,12 +6670,20 @@ export type Database = {
         Args: { p_file_url: string; p_task_id: string }
         Returns: string
       }
+      apply_authoritative_admin_roles: {
+        Args: { p_profile_ids: string[] }
+        Returns: number
+      }
       apply_authoritative_production_roster: {
         Args: { p_retire_profile_ids?: string[]; p_roster: Json }
         Returns: number
       }
       apply_complete_authoritative_roster: {
         Args: { p_roster: Json }
+        Returns: number
+      }
+      apply_work_identity_with_audit: {
+        Args: { p_identities: Json }
         Returns: number
       }
       archive_fms_flow_with_audit: {
@@ -6481,6 +6739,7 @@ export type Database = {
           updated_at: string | null
           updated_by: string | null
           user_role: Database["public"]["Enums"]["user_role"]
+          username: string | null
           week_off: string[]
           working_status: Database["public"]["Enums"]["working_status"]
         }
@@ -6524,6 +6783,7 @@ export type Database = {
           updated_at: string | null
           updated_by: string | null
           user_role: Database["public"]["Enums"]["user_role"]
+          username: string | null
           week_off: string[]
           working_status: Database["public"]["Enums"]["working_status"]
         }
@@ -6541,6 +6801,45 @@ export type Database = {
           tenant_id: string
           worker_assertion_id: string
         }[]
+      }
+      assert_direct_assignment_user: {
+        Args: { p_purpose: string; p_tenant_id: string; p_user_id: string }
+        Returns: {
+          account_status: Database["public"]["Enums"]["user_account_status"]
+          auth_user_id: string
+          branch_id: string
+          buddy_id: string | null
+          created_at: string | null
+          created_by: string | null
+          department_id: string
+          designation_id: string | null
+          email: string
+          employee_code: string
+          employee_name: string
+          first_name: string | null
+          id: string
+          is_login_enabled: boolean | null
+          last_name: string | null
+          official_email: string | null
+          official_mobile: string | null
+          personal_email: string | null
+          personal_mobile: string | null
+          reports_to_user_id: string | null
+          secondary_buddy_id: string | null
+          tenant_id: string
+          updated_at: string | null
+          updated_by: string | null
+          user_role: Database["public"]["Enums"]["user_role"]
+          username: string | null
+          week_off: string[]
+          working_status: Database["public"]["Enums"]["working_status"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       assert_fms_flow_publishable: {
         Args: { p_flow_id: string }
@@ -6582,6 +6881,7 @@ export type Database = {
           updated_at: string | null
           updated_by: string | null
           user_role: Database["public"]["Enums"]["user_role"]
+          username: string | null
           week_off: string[]
           working_status: Database["public"]["Enums"]["working_status"]
         }
@@ -6620,6 +6920,7 @@ export type Database = {
           updated_at: string | null
           updated_by: string | null
           user_role: Database["public"]["Enums"]["user_role"]
+          username: string | null
           week_off: string[]
           working_status: Database["public"]["Enums"]["working_status"]
         }
@@ -6890,6 +7191,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      complete_recurring_task_with_image_with_audit: {
+        Args: { p_file_url: string; p_task_id: string }
+        Returns: undefined
+      }
       configure_invited_profile_coverage_with_audit: {
         Args: {
           p_creator_profile_id: string
@@ -6899,26 +7204,9 @@ export type Database = {
         }
         Returns: undefined
       }
-      create_user_profile_with_coverage_and_audit: {
-        Args: {
-          p_auth_user_id: string
-          p_branch_id: string
-          p_buddy_id: string
-          p_creator_profile_id: string
-          p_department_id: string
-          p_designation_id: string
-          p_first_name: string
-          p_last_name: string
-          p_official_email: string
-          p_official_mobile: string
-          p_personal_email: string
-          p_personal_mobile: string
-          p_reports_to_user_id: string
-          p_secondary_buddy_id: string
-          p_user_role: Database["public"]["Enums"]["user_role"]
-          p_week_off: string[]
-        }
-        Returns: string
+      consume_username_login_rate_limit: {
+        Args: { p_rate_limit_key: string }
+        Returns: boolean
       }
       correct_crm_interaction: {
         Args: {
@@ -6981,6 +7269,27 @@ export type Database = {
         }
         Returns: string
       }
+      create_user_profile_with_coverage_and_audit: {
+        Args: {
+          p_auth_user_id: string
+          p_branch_id: string
+          p_buddy_id: string
+          p_creator_profile_id: string
+          p_department_id: string
+          p_designation_id: string
+          p_first_name: string
+          p_last_name: string
+          p_official_email: string
+          p_official_mobile: string
+          p_personal_email: string
+          p_personal_mobile: string
+          p_reports_to_user_id: string
+          p_secondary_buddy_id: string
+          p_user_role: Database["public"]["Enums"]["user_role"]
+          p_week_off: string[]
+        }
+        Returns: string
+      }
       crm_sync_record_operation: {
         Args: {
           p_assertion_id: string
@@ -7037,6 +7346,7 @@ export type Database = {
           updated_at: string | null
           updated_by: string | null
           user_role: Database["public"]["Enums"]["user_role"]
+          username: string | null
           week_off: string[]
           working_status: Database["public"]["Enums"]["working_status"]
         }
@@ -7207,6 +7517,7 @@ export type Database = {
       }
       get_dashboard_metrics: { Args: { p_context?: Json }; Returns: Json }
       get_home_summary: { Args: { p_context?: Json }; Returns: Json }
+      get_my_daily_checklist_status: { Args: never; Returns: Json }
       get_my_fms_starter_assignments: {
         Args: never
         Returns: {
@@ -7369,6 +7680,7 @@ export type Database = {
         Returns: string
       }
       list_crm_followups: { Args: { p_filter?: Json }; Returns: Json[] }
+      list_designation_daily_checklists: { Args: never; Returns: Json }
       list_notification_delivery_logs: {
         Args: {
           p_channel?: string
@@ -7504,6 +7816,10 @@ export type Database = {
           p_to_user_id: string
         }
         Returns: undefined
+      }
+      reconcile_all_assignment_coverage_with_audit: {
+        Args: { p_date: string; p_reason?: string; p_user_profile_id: string }
+        Returns: Json
       }
       reconcile_duplicate_production_identity_profiles: {
         Args: never
@@ -7829,6 +8145,19 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      save_designation_daily_checklist_with_audit: {
+        Args: {
+          p_checklist_id: string
+          p_confirmation_text: string
+          p_designation_id: string
+          p_expected_revision: number
+          p_instruction: string
+          p_is_active: boolean
+          p_items: Json
+          p_title: string
+        }
+        Returns: Json
+      }
       save_fms_flow_draft_with_audit: {
         Args: { p_flow_id: string; p_metadata: Json; p_stages: Json }
         Returns: string
@@ -7948,6 +8277,14 @@ export type Database = {
         Args: { p_action: string; p_instance_id: string; p_reason: string }
         Returns: undefined
       }
+      set_new_user_work_identity_with_audit: {
+        Args: {
+          p_personal_email: string
+          p_profile_id: string
+          p_username: string
+        }
+        Returns: undefined
+      }
       set_notification_rule_enabled: {
         Args: { p_enabled: boolean; p_rule_id: string }
         Returns: undefined
@@ -7979,6 +8316,15 @@ export type Database = {
         }[]
       }
       submit_form_base_with_audit: {
+        Args: {
+          p_answers: Json
+          p_form_template_id: string
+          p_linked_module?: string
+          p_linked_record_id?: string
+        }
+        Returns: string
+      }
+      submit_form_locked_with_audit: {
         Args: {
           p_answers: Json
           p_form_template_id: string
@@ -8109,6 +8455,7 @@ export type Database = {
           updated_at: string | null
           updated_by: string | null
           user_role: Database["public"]["Enums"]["user_role"]
+          username: string | null
           week_off: string[]
           working_status: Database["public"]["Enums"]["working_status"]
         }
@@ -8145,6 +8492,7 @@ export type Database = {
         Args: { p_role: Database["public"]["Enums"]["user_role"] }
         Returns: number
       }
+      validate_daily_checklist_items: { Args: { p_items: Json }; Returns: Json }
       validate_notification_template_text: {
         Args: { p_body: string; p_event_type: string; p_title: string }
         Returns: undefined

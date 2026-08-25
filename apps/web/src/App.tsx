@@ -25,6 +25,8 @@ import { ApplicationShell } from "@/components/shell/ApplicationShell";
 import { LazyPageErrorBoundary } from "@/components/LazyPageErrorBoundary";
 import { lazyPage } from "@/lib/lazyPage";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { DailyChecklistManager } from "@/features/daily-checklists/DailyChecklistManager";
+import { DailyChecklistGate } from "@/features/daily-checklists/DailyChecklistGate";
 import { ThemeProvider, useTheme } from "@/theme/ThemeContext";
 import { SectionMaintenanceNotice } from "@/components/SectionMaintenanceNotice";
 import { saveSectionControls } from "@/features/settings/api";
@@ -295,7 +297,7 @@ function AppShell() {
   const pageContent = sectionUnderMaintenance ? <SectionMaintenanceNotice section={currentPage === "checklist_tasks" ? "Tasks" : currentPage === "forms_library" ? "Forms Library" : currentPage === "fms_builder" ? "FMS" : currentPage === "dropdown_master" ? "Dropdown Master" : currentPage === "fms_tasks" ? "FMS Tasks" : currentPage.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())} /> : currentPage === "home" ? <HomePage onNavigate={navigate} />
     : currentPage === "dashboard" ? <DashboardPage />
     : currentPage === "reports" ? <ReportsPage />
-    : currentPage === "settings" ? <SettingsPage />
+    : currentPage === "settings" ? <><SettingsPage /><div className="mx-auto w-full max-w-7xl px-4 pb-8"><DailyChecklistManager role={profile.user_role} /></div></>
     : currentPage === "users" ? <TeamDirectoryPage />
     : currentPage === "crm" ? <CRMPage />
     : currentPage === "dropdown_master" ? <DropdownMasterPage />
@@ -309,6 +311,7 @@ function AppShell() {
             : <DashboardPage />;
 
   return (
+    <>
     <ApplicationShell
       appsOpen={appsOpen}
       branch={branch}
@@ -335,6 +338,8 @@ function AppShell() {
     >
       <LazyPageErrorBoundary onNavigate={navigate} resetKey={path}><Suspense fallback={<div className="flex min-h-48 items-center justify-center text-gold">Loading…</div>}>{pageContent}</Suspense></LazyPageErrorBoundary>
     </ApplicationShell>
+    <DailyChecklistGate profileId={profile.id} />
+    </>
   );
 }
 
