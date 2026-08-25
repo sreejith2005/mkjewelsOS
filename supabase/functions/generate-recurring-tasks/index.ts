@@ -66,7 +66,7 @@ Deno.serve(async (request: Request) => {
   const { data: templates, error: templatesError } = await admin
     .from("task_templates")
     .select("id,tenant_id,branch_id,department_id,recurrence_rule,schedule_kind,starts_on,default_assignee_type,default_assignee_user_id,default_assignee_role")
-    .eq("task_type", "checklist")
+    .in("task_type", ["checklist", "delegation"])
     .eq("is_active", true);
   if (templatesError) return json(500, { error: "Unable to load task templates" });
 

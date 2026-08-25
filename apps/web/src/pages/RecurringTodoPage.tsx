@@ -161,7 +161,7 @@ function WorkCard({
         <div className="min-w-0">
           <h3 className="truncate font-semibold text-white">{task.title}</h3>
           <p className="mt-1 text-xs text-soft-grey">
-            {dueLabel(task.planned_datetime)} |{" "}
+            Start {dueLabel(task.planned_datetime)} · Due {dueLabel(task.revised_datetime ?? task.due_datetime ?? task.planned_datetime)} |{" "}
             {task.assignees.map((item) => item.name).join(", ") ||
               "Coverage required"}
           </p>

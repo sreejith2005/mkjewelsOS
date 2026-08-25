@@ -5,11 +5,16 @@ export type TaskFeedStatusFilter = "all" | "overdue" | "pending" | "in_progress"
 export type TaskFeedLike = Readonly<{
   actual_datetime: string | null;
   assignee_id: string | null;
+  due_datetime?: string | null;
   id: string | null;
   planned_datetime: string | null;
   revised_datetime: string | null;
   status: string | null;
 }>;
+
+export function effectiveTaskDeadline(task: Pick<TaskFeedLike, "due_datetime" | "planned_datetime" | "revised_datetime">): string | null {
+  return task.revised_datetime ?? task.due_datetime ?? task.planned_datetime;
+}
 
 export type GroupedTaskFeedRow<T extends TaskFeedLike> = Readonly<{
   assigneeIds: readonly string[];
@@ -35,10 +40,18 @@ export function groupTaskFeedRows<T extends TaskFeedLike>(rows: readonly T[]): G
   return [...grouped.values()];
 }
 
+export function splitAssignedTaskFeed<T extends { task_type: string | null }>(tasks: readonly T[]) {
+  return tasks.reduce<{ delegatedTasks: T[]; myTasks: T[] }>((result, task) => {
+    (task.task_type === "delegation" ? result.delegatedTasks : result.myTasks).push(task);
+    return result;
+  }, { delegatedTasks: [], myTasks: [] });
+}
+
 export function isTaskFeedItemOverdue(task: TaskFeedLike, now: Date | string = new Date()): boolean {
-  if (!task.planned_datetime || task.status === "completed") return false;
+  const deadline = effectiveTaskDeadline(task);
+  if (!deadline || task.status === "completed") return false;
   if (task.status === "overdue") return true;
-  return calculateSla(task.revised_datetime ?? task.planned_datetime, task.actual_datetime, now).status === "overdue";
+  return calculateSla(deadline, task.actual_datetime, now).status === "overdue";
 }
 
 export function taskMatchesStatus(

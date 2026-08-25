@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Plus, RefreshCw, Upload } from "lucide-react";
-import { countTaskFeedStatuses, deriveTaskMutationCapability, taskMatchesStatus, type TaskFeedStatusFilter } from "@jewelos/core";
+import { countTaskFeedStatuses, deriveTaskMutationCapability, splitAssignedTaskFeed, taskMatchesStatus, type TaskFeedStatusFilter } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Modal, Notice } from "@/components/ui";
 import {
@@ -66,6 +66,7 @@ export function TasksPage() {
   const [formDynamicOptions, setFormDynamicOptions] = useState<DynamicOptions>({ users: [], branches: [], departments: [] });
   const [formTarget, setFormTarget] = useState<TaskBundle | null>(null);
   const canManage = profile ? ["super_admin", "admin", "manager"].includes(profile.user_role) : false;
+  const hasAdminTaskView = profile ? ["super_admin", "admin"].includes(profile.user_role) : false;
 
   const refresh = useCallback(async () => {
     if (!profile || !startDate || !endDate) return;
@@ -74,11 +75,14 @@ export function TasksPage() {
     try {
       const start = new Date(`${startDate}T00:00:00`).toISOString();
       const end = new Date(`${endDate}T23:59:59.999`).toISOString();
-      const [nextMyTasks, nextDelegatedTasks, nextCategories] = await Promise.all([
+      const [assignedTasks, authoredTasks, nextCategories] = await Promise.all([
         loadTaskFeed(profile.id, start, end, { includeBlockedCoverage: canManage }),
-        loadTaskFeed(profile.id, start, end, { delegated: true }),
+        hasAdminTaskView ? loadTaskFeed(profile.id, start, end, { delegated: true }) : Promise.resolve([]),
         loadTaskFeedReferenceData().catch(() => ({ categories: [] })),
       ]);
+      const assignedSplit = splitAssignedTaskFeed(assignedTasks);
+      const nextMyTasks = hasAdminTaskView ? assignedTasks : assignedSplit.myTasks;
+      const nextDelegatedTasks = hasAdminTaskView ? authoredTasks : assignedSplit.delegatedTasks;
       const nextTasks = [...nextMyTasks, ...nextDelegatedTasks.filter((task) => !nextMyTasks.some((myTask) => myTask.id === task.id))];
       const [forms, dynamicOptions] = await Promise.all([
         loadTaskForms([...new Set(nextTasks.flatMap((task) => task.requires_form && task.form_template_id ? [task.form_template_id] : []))], nextTasks.flatMap((task) => task.id ? [task.id] : [])),
@@ -94,7 +98,7 @@ export function TasksPage() {
     } finally {
       setLoading(false);
     }
-  }, [canManage, endDate, profile, startDate]);
+  }, [canManage, endDate, hasAdminTaskView, profile, startDate]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 

@@ -5220,6 +5220,77 @@ export type Database = {
           },
         ]
       }
+      task_import_items: {
+        Row: {
+          batch_id: string
+          created_at: string
+          destination: string
+          error_code: string | null
+          id: string
+          outcome: string
+          row_hash: string
+          source_row: number
+          task_instance_id: string | null
+          task_template_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          destination: string
+          error_code?: string | null
+          id?: string
+          outcome: string
+          row_hash: string
+          source_row: number
+          task_instance_id?: string | null
+          task_template_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          destination?: string
+          error_code?: string | null
+          id?: string
+          outcome?: string
+          row_hash?: string
+          source_row?: number
+          task_instance_id?: string | null
+          task_template_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_import_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "task_import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_import_items_task_instance_id_fkey"
+            columns: ["task_instance_id"]
+            isOneToOne: false
+            referencedRelation: "task_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_import_items_task_template_id_fkey"
+            columns: ["task_template_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_import_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_instances: {
         Row: {
           actual_datetime: string | null
@@ -5227,6 +5298,7 @@ export type Database = {
           buddy_assignment_allowed: boolean
           category_id: string | null
           completion_remark: string | null
+          core_task_label: string | null
           coverage_original_assignee_id: string | null
           coverage_resolution: string | null
           coverage_resolved_for_date: string | null
@@ -5236,6 +5308,7 @@ export type Database = {
           delay_minutes: number | null
           department_id: string | null
           description: string | null
+          due_datetime: string | null
           followup_count: number
           form_template_id: string | null
           id: string
@@ -5260,6 +5333,7 @@ export type Database = {
           verification_status: string
           verified_at: string | null
           verified_by: string | null
+          verifier_user_profile_id: string | null
         }
         Insert: {
           actual_datetime?: string | null
@@ -5267,6 +5341,7 @@ export type Database = {
           buddy_assignment_allowed?: boolean
           category_id?: string | null
           completion_remark?: string | null
+          core_task_label?: string | null
           coverage_original_assignee_id?: string | null
           coverage_resolution?: string | null
           coverage_resolved_for_date?: string | null
@@ -5276,6 +5351,7 @@ export type Database = {
           delay_minutes?: number | null
           department_id?: string | null
           description?: string | null
+          due_datetime?: string | null
           followup_count?: number
           form_template_id?: string | null
           id?: string
@@ -5300,6 +5376,7 @@ export type Database = {
           verification_status?: string
           verified_at?: string | null
           verified_by?: string | null
+          verifier_user_profile_id?: string | null
         }
         Update: {
           actual_datetime?: string | null
@@ -5307,6 +5384,7 @@ export type Database = {
           buddy_assignment_allowed?: boolean
           category_id?: string | null
           completion_remark?: string | null
+          core_task_label?: string | null
           coverage_original_assignee_id?: string | null
           coverage_resolution?: string | null
           coverage_resolved_for_date?: string | null
@@ -5316,6 +5394,7 @@ export type Database = {
           delay_minutes?: number | null
           department_id?: string | null
           description?: string | null
+          due_datetime?: string | null
           followup_count?: number
           form_template_id?: string | null
           id?: string
@@ -5340,6 +5419,7 @@ export type Database = {
           verification_status?: string
           verified_at?: string | null
           verified_by?: string | null
+          verifier_user_profile_id?: string | null
         }
         Relationships: [
           {
@@ -5412,6 +5492,20 @@ export type Database = {
             referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "task_instances_verifier_user_profile_id_fkey"
+            columns: ["verifier_user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_instances_verifier_user_profile_id_fkey"
+            columns: ["verifier_user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
         ]
       }
       task_revisions: {
@@ -5472,6 +5566,7 @@ export type Database = {
           buddy_assignment_allowed: boolean
           category_id: string | null
           checklist_items: Json
+          core_task_label: string | null
           created_at: string | null
           created_by: string | null
           default_assignee_role: Database["public"]["Enums"]["user_role"] | null
@@ -5479,6 +5574,7 @@ export type Database = {
           default_assignee_user_id: string | null
           department_id: string | null
           description: string | null
+          due_time: string | null
           followup_enabled: boolean
           form_template_id: string | null
           id: string
@@ -5498,12 +5594,14 @@ export type Database = {
           updated_at: string | null
           updated_by: string | null
           verification_required: boolean
+          verifier_user_profile_id: string | null
         }
         Insert: {
           branch_id?: string | null
           buddy_assignment_allowed?: boolean
           category_id?: string | null
           checklist_items?: Json
+          core_task_label?: string | null
           created_at?: string | null
           created_by?: string | null
           default_assignee_role?:
@@ -5513,6 +5611,7 @@ export type Database = {
           default_assignee_user_id?: string | null
           department_id?: string | null
           description?: string | null
+          due_time?: string | null
           followup_enabled?: boolean
           form_template_id?: string | null
           id?: string
@@ -5532,12 +5631,14 @@ export type Database = {
           updated_at?: string | null
           updated_by?: string | null
           verification_required?: boolean
+          verifier_user_profile_id?: string | null
         }
         Update: {
           branch_id?: string | null
           buddy_assignment_allowed?: boolean
           category_id?: string | null
           checklist_items?: Json
+          core_task_label?: string | null
           created_at?: string | null
           created_by?: string | null
           default_assignee_role?:
@@ -5547,6 +5648,7 @@ export type Database = {
           default_assignee_user_id?: string | null
           department_id?: string | null
           description?: string | null
+          due_time?: string | null
           followup_enabled?: boolean
           form_template_id?: string | null
           id?: string
@@ -5566,6 +5668,7 @@ export type Database = {
           updated_at?: string | null
           updated_by?: string | null
           verification_required?: boolean
+          verifier_user_profile_id?: string | null
         }
         Relationships: [
           {
@@ -5615,6 +5718,20 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_templates_verifier_user_profile_id_fkey"
+            columns: ["verifier_user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_templates_verifier_user_profile_id_fkey"
+            columns: ["verifier_user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
         ]
@@ -6553,10 +6670,12 @@ export type Database = {
           branch_id: string | null
           category_id: string | null
           checklist_completion_pct: number | null
+          core_task_label: string | null
           created_by: string | null
           delay_minutes: number | null
           department_id: string | null
           description: string | null
+          due_datetime: string | null
           form_template_id: string | null
           id: string | null
           planned_datetime: string | null
@@ -6571,6 +6690,7 @@ export type Database = {
           task_type: Database["public"]["Enums"]["task_type"] | null
           tenant_id: string | null
           title: string | null
+          verifier_user_profile_id: string | null
         }
         Relationships: []
       }
@@ -6948,6 +7068,14 @@ export type Database = {
         }
         Returns: Json
       }
+      begin_task_bulk_import: {
+        Args: {
+          p_file_label: string
+          p_import_hash: string
+          p_requested_count: number
+        }
+        Returns: Json
+      }
       bootstrap_initial_production_super_admin: {
         Args: { p_target_profile_id: string }
         Returns: undefined
@@ -7066,6 +7194,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      cancel_task_bulk_import: { Args: { p_batch_id: string }; Returns: Json }
       change_dropdown_category_with_audit: {
         Args: {
           p_category_id?: string
@@ -7171,6 +7300,10 @@ export type Database = {
           p_context: Json
         }
         Returns: boolean
+      }
+      commit_task_bulk_import_chunk: {
+        Args: { p_batch_id: string; p_rows: Json }
+        Returns: Json
       }
       complete_crm_followup: {
         Args: {
@@ -7552,6 +7685,10 @@ export type Database = {
         Returns: Json
       }
       get_section_availability: { Args: never; Returns: Json }
+      get_task_import_batch_status: {
+        Args: { p_batch_id: string }
+        Returns: Json
+      }
       hold_fms_instance_with_audit: {
         Args: { p_instance_id: string; p_reason: string }
         Returns: undefined
@@ -7704,6 +7841,16 @@ export type Database = {
           recipient_label: string
           scheduled_at: string
           state: string
+        }[]
+      }
+      list_task_import_identity_candidates: {
+        Args: never
+        Returns: {
+          branch_id: string
+          department_id: string
+          email: string
+          employee_name: string
+          id: string
         }[]
       }
       log_crm_interaction: {
@@ -8386,6 +8533,49 @@ export type Database = {
       task_bulk_import_validation: {
         Args: { p_hash: string; p_payload: Json }
         Returns: Json
+      }
+      task_effective_due_datetime: {
+        Args: { p_task: Database["public"]["Tables"]["task_instances"]["Row"] }
+        Returns: string
+      }
+      task_import_actor: {
+        Args: never
+        Returns: {
+          account_status: Database["public"]["Enums"]["user_account_status"]
+          auth_user_id: string
+          branch_id: string
+          buddy_id: string | null
+          created_at: string | null
+          created_by: string | null
+          department_id: string
+          designation_id: string | null
+          email: string
+          employee_code: string
+          employee_name: string
+          first_name: string | null
+          id: string
+          is_login_enabled: boolean | null
+          last_name: string | null
+          official_email: string | null
+          official_mobile: string | null
+          personal_email: string | null
+          personal_mobile: string | null
+          reports_to_user_id: string | null
+          secondary_buddy_id: string | null
+          tenant_id: string
+          updated_at: string | null
+          updated_by: string | null
+          user_role: Database["public"]["Enums"]["user_role"]
+          username: string | null
+          week_off: string[]
+          working_status: Database["public"]["Enums"]["working_status"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       task_in_reporting_scope: {
         Args: {

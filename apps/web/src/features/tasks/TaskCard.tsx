@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent } from "react";
 import { AlertTriangle, Check, CheckCircle2, ChevronDown, Clock, Eye, FileUp, PauseCircle, Play, UserRoundPlus, Users } from "lucide-react";
-import { calculateTaskChecklistProgress, isTaskFeedItemOverdue, type Enums, type TaskMutationCapability } from "@jewelos/core";
+import { calculateTaskChecklistProgress, effectiveTaskDeadline, isTaskFeedItemOverdue, type Enums, type TaskMutationCapability } from "@jewelos/core";
 import { Button, Field, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import type { TaskBundle } from "./api";
@@ -8,7 +8,8 @@ import type { TaskBundle } from "./api";
 export type TaskCardAction = { kind: "start" } | { checklistId: string; completed: boolean; kind: "checklist" } | { kind: "complete"; remark: string } | { file: File; kind: "upload" } | { kind: "fill_form" } | { kind: "delegate" } | { datetime: string; kind: "revise"; reason: string };
 const PRIORITY_CLASS: Record<Enums<"task_priority">, string> = { high: "border-task-overdue/40 bg-task-overdue/10 text-task-overdue", medium: "border-task-warning/40 bg-task-warning/10 text-task-text", low: "border-task-border bg-task-muted text-task-text-muted" };
 
-export function TaskCard({ capability, categoryLabel, onAction, task }: { capability: TaskMutationCapability; categoryLabel: string; onAction: (action: TaskCardAction) => Promise<void>; task: TaskBundle }) {
+export function TaskCard({ capability, categoryLabel, onAction, task: taskInput }: { capability: TaskMutationCapability; categoryLabel: string; onAction: (action: TaskCardAction) => Promise<void>; task: TaskBundle }) {
+  const task = { ...taskInput, planned_datetime: effectiveTaskDeadline(taskInput) };
   const [expanded, setExpanded] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null); const [remark, setRemark] = useState(""); const [revision, setRevision] = useState(""); const [revisionReason, setRevisionReason] = useState("");
   const checklistProgress = calculateTaskChecklistProgress(task.checklists); const overdue = isTaskFeedItemOverdue(task); const completed = task.status === "completed"; const blocked = task.status === "blocked"; const readOnly = !capability.canMutate || task.task_type === "fms";
   const formOnlyAction = task.requires_form && !completed;

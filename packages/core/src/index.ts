@@ -32,8 +32,10 @@ export { calculateDelayMinutes, calculateSla } from "./sla";
 export type { SlaResult, SlaStatus } from "./sla";
 export {
   countTaskFeedStatuses,
+  effectiveTaskDeadline,
   groupTaskFeedRows,
   isTaskFeedItemOverdue,
+  splitAssignedTaskFeed,
   taskMatchesStatus,
 } from "./taskFeed";
 export type { GroupedTaskFeedRow, TaskFeedLike, TaskFeedStatusFilter } from "./taskFeed";

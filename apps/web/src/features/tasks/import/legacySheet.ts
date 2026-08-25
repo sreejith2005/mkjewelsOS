@@ -47,7 +47,7 @@ export function normalizeLegacyTaskSheet(rows: readonly Row[]): LegacyTaskSheetN
     let schedule: ReturnType<typeof buildImportSchedule> = { destination: "recurring_todo", recurrenceRule: "" };
     try { schedule = buildImportSchedule(scheduleKind, startsOn); } catch (error) { issues.push(issue(sourceRow, "TASK START DATE", error instanceof Error ? error.message : "Start date is invalid", "Use a valid YYYY-MM-DD date.")); }
     const boolean = (header: "EVIDENCE REQUIRED" | "VERIFICATION REQUIRED" | "BUDDY ALLOWED" | "ACTIVE") => { try { return normalizeImportBoolean(value(row, header)); } catch { issues.push(issue(sourceRow, header, `${header} is required`, "Use Yes or No.")); return false; } };
-    const verification = boolean("VERIFICATION REQUIRED"); const verifier = value(row, "VERIFIER");
+    const verification = boolean("VERIFICATION REQUIRED"); const active = boolean("ACTIVE"); const verifier = value(row, "VERIFIER");
     if (verification && !verifier) issues.push(issue(sourceRow, "VERIFIER", "Verifier is required", "Enter a verifier name for explicit mapping."));
     if (verification && verifier) addRequirement(requirements, "verifier", verifier, sourceRow);
     const plannedAt = startsOn ? `${startsOn} ${startTime}` : ""; const dueAt = startsOn ? `${startsOn} ${dueTime}` : "";
@@ -56,7 +56,7 @@ export function normalizeLegacyTaskSheet(rows: readonly Row[]): LegacyTaskSheetN
       description: value(row, "TASK DESCRIPTION"), priority: value(row, "PRIORITY").toLowerCase(), branch, department, category: "",
       assignee_email: email, assignee_name: name, verifier_label: verifier, starts_on: startsOn, start_time: startTime, due_time: dueTime,
       planned_at: plannedAt, due_at: dueAt, recurrence_rule: schedule.recurrenceRule, requires_upload: boolean("EVIDENCE REQUIRED"),
-      verification_required: verification, buddy_assignment_allowed: boolean("BUDDY ALLOWED"), is_active: scheduleKind === "as_required" ? false : boolean("ACTIVE"),
+      verification_required: verification, buddy_assignment_allowed: boolean("BUDDY ALLOWED"), is_active: scheduleKind === "as_required" ? false : active,
       checklist: taskType === "checklist" && task ? [{ item_text: task, required: true }] : [] });
   });
   return { draftRows: drafts, identityRequirements: [...requirements.values()], issues };

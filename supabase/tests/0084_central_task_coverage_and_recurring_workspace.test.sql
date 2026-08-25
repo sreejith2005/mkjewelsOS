@@ -52,8 +52,8 @@ select ok(
   'manager run-now is branch scoped'
 );
 select ok(
-  position('v_task.branch_id is distinct from v_actor.branch_id' in pg_get_functiondef('public.verify_recurring_task_with_audit(uuid,text,text)'::regprocedure)) > 0,
-  'manager verification is branch scoped'
+  position('v_task.verifier_user_profile_id=v_actor.id' in replace(pg_get_functiondef('public.verify_recurring_task_with_audit(uuid,text,text)'::regprocedure),' ','')) > 0,
+  'verification is restricted to the designated verifier or an admin override'
 );
 select ok(
   position('v_task.branch_id is distinct from v_actor.branch_id' in pg_get_functiondef('public.send_recurring_followup_with_audit(uuid,text)'::regprocedure)) > 0,

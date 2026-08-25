@@ -27,4 +27,9 @@ describe("current task sheet", () => {
     const result = normalizeLegacyTaskSheet([row({ "EMPLOYEE EMAIL": "", "EMPLOYEE NAME": "Named Person" })]);
     expect(result.identityRequirements).toEqual([expect.objectContaining({ kind: "assignee", label: "Named Person", source_rows: [2] })]);
   });
+
+  it("requires every explicit boolean even for an inactive as-required template", () => {
+    const result = normalizeLegacyTaskSheet([row({ FREQUENCY: "As Required", ACTIVE: "" })]);
+    expect(result.issues).toContainEqual(expect.objectContaining({ field: "ACTIVE" }));
+  });
 });

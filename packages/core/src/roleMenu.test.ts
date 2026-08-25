@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getMenuForRole, getPageForPath } from "./roleMenu";
+import { canAccessPage, getMenuForRole, getPageForPath } from "./roleMenu";
 
 describe("task workspace navigation", () => {
   it("exposes one Tasks menu item", () => {
@@ -14,8 +14,11 @@ describe("task workspace navigation", () => {
     expect(getPageForPath("/tasks/import")).toBe("checklist_tasks");
   });
 
-  it("routes recurring work to its own workspace", () => {
+  it("reserves recurring schedule management for admin roles", () => {
     expect(getPageForPath("/recurring-todo")).toBe("recurring_todo");
-    expect(getMenuForRole("manager")).toContainEqual({ id: "recurring_todo", label: "Recurring / To-Do", path: "/recurring-todo" });
+    expect(getMenuForRole("admin")).toContainEqual({ id: "recurring_todo", label: "Recurring / To-Do", path: "/recurring-todo" });
+    expect(getMenuForRole("manager")).not.toContainEqual(expect.objectContaining({ id: "recurring_todo" }));
+    expect(canAccessPage("staff", "recurring_todo")).toBe(false);
+    expect(canAccessPage("super_admin", "recurring_todo")).toBe(true);
   });
 });

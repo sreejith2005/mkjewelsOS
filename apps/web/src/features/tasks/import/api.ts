@@ -1,5 +1,5 @@
 import { supabase } from "@jewelos/api-client";
-import type { Json } from "@jewelos/core";
+import type { Json, TaskImportCanonicalRow } from "@jewelos/core";
 import type { TaskBulkImportPayload } from "./workbook";
 
 export type TaskImportValidation = Readonly<{ valid: boolean; canonical_hash: string; summary: { requested_count: number; valid_count: number; error_count: number; one_time_count: number; recurring_count: number; initial_instance_count: number }; issues: Array<{ sheet: string; row: number; field: string; reason: string; guidance: string; severity: "error" | "warning" }> }>;
@@ -8,3 +8,9 @@ function unwrap<T>(result: { data: unknown; error: { message: string } | null },
 export async function validateTaskBulkImport(payload: TaskBulkImportPayload, hash: string): Promise<TaskImportValidation> { return unwrap<TaskImportValidation>(await supabase.rpc("validate_task_bulk_import", { p_payload: payload as unknown as Json, p_import_hash: hash }), "Validate task import"); }
 export async function submitTaskBulkImport(payload: TaskBulkImportPayload, hash: string, fileLabel: string): Promise<{ batch_id: string; created_count: number; replayed: boolean; outcome: string }> { return unwrap(await supabase.rpc("import_task_bulk_with_audit", { p_payload: payload as unknown as Json, p_import_hash: hash, p_file_label: fileLabel }), "Import tasks"); }
 export async function loadTaskImportBatches(): Promise<TaskImportBatch[]> { const result = await supabase.from("task_import_batches").select("id,created_at,safe_file_label,requested_count,valid_count,error_count,one_time_count,recurring_count,initial_instance_count,outcome,created_by").order("created_at", { ascending: false }).limit(20); if (result.error) throw new Error(`Load import history: ${result.error.message}`); return result.data as TaskImportBatch[]; }
+
+export type TaskImportIdentityCandidate = Readonly<{ id: string; employee_name: string; email: string; branch_id: string; department_id: string }>;
+export type TaskImportChunkOutcome = Readonly<{ created: number; rejected: number; replayed: number; outcome: string; issues: Array<{ row: number; field: string; reason: string; guidance: string; code: string }> }>;
+export async function loadTaskImportIdentityCandidates(): Promise<TaskImportIdentityCandidate[]> { return unwrap(await supabase.rpc("list_task_import_identity_candidates"), "Load identity candidates"); }
+export async function beginCurrentSheetTaskImport(hash: string, fileLabel: string, requestedCount: number): Promise<{ batch_id: string; outcome: string; replayed: boolean }> { return unwrap(await supabase.rpc("begin_task_bulk_import", { p_import_hash: hash, p_file_label: fileLabel, p_requested_count: requestedCount }), "Begin task import"); }
+export async function commitCurrentSheetTaskImportChunk(batchId: string, rows: readonly TaskImportCanonicalRow[]): Promise<TaskImportChunkOutcome> { return unwrap(await supabase.rpc("commit_task_bulk_import_chunk", { p_batch_id: batchId, p_rows: rows as unknown as Json }), "Commit task import chunk"); }

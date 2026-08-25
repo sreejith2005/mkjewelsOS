@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countTaskFeedStatuses, groupTaskFeedRows, taskMatchesStatus } from "./taskFeed";
+import { countTaskFeedStatuses, effectiveTaskDeadline, groupTaskFeedRows, splitAssignedTaskFeed, taskMatchesStatus } from "./taskFeed";
 
 const now = "2026-08-07T12:00:00.000Z";
 
@@ -32,5 +32,19 @@ describe("task feed presentation", () => {
     expect(countTaskFeedStatuses(tasks, now)).toEqual({ all: 4, overdue: 1, pending: 1, in_progress: 1 });
     expect(taskMatchesStatus(tasks[0]!, "overdue", now)).toBe(true);
     expect(taskMatchesStatus(tasks[0]!, "pending", now)).toBe(false);
+  });
+
+  it("puts assigned checklist work in My Tasks and assigned delegation work in Delegated", () => {
+    const assigned = [
+      { ...task("personal", "viewer"), task_type: "checklist" },
+      { ...task("recurring", "viewer"), task_type: "checklist", task_template_id: "template" },
+      { ...task("delegated", "viewer"), task_type: "delegation" },
+    ];
+    expect(splitAssignedTaskFeed(assigned)).toEqual({ myTasks: assigned.slice(0, 2), delegatedTasks: assigned.slice(2) });
+  });
+
+  it("uses revised, then independent due, then planned datetime", () => {
+    expect(effectiveTaskDeadline({ planned_datetime: "planned", due_datetime: "due", revised_datetime: null })).toBe("due");
+    expect(effectiveTaskDeadline({ planned_datetime: "planned", due_datetime: "due", revised_datetime: "revised" })).toBe("revised");
   });
 });
