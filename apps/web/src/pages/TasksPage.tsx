@@ -20,6 +20,7 @@ import { DelegateTaskModal } from "@/features/tasks/DelegateTaskModal";
 import { TaskCard, type TaskCardAction } from "@/features/tasks/TaskCard";
 import { TaskComposer } from "@/features/tasks/TaskComposer";
 import { TaskFilterBar } from "@/features/tasks/TaskFilterBar";
+import { prepareRecurringTasksThenLoad } from "@/features/tasks/taskRefresh";
 import { loadFormDynamicOptions, loadTaskForms, submitForm, type FormBundle } from "@/features/forms/api";
 import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
@@ -53,12 +54,11 @@ export function TasksPage() {
       const today = kolkataDateKey(new Date());
       const start = `${today}T00:00:00.000+05:30`;
       const end = `${today}T23:59:59.999+05:30`;
-      await ensureMyRecurringTasks();
-      const [assignedTasks, authoredTasks, nextCategories] = await Promise.all([
+      const [assignedTasks, authoredTasks, nextCategories] = await prepareRecurringTasksThenLoad(ensureMyRecurringTasks, () => Promise.all([
         loadTaskFeed(profile.id, start, end, { includeBlockedCoverage: canManage }),
         hasAdminTaskView ? loadTaskFeed(profile.id, start, end, { delegated: true }) : Promise.resolve([]),
         loadTaskFeedReferenceData().catch(() => ({ categories: [] })),
-      ]);
+      ]));
       const assignedSplit = splitAssignedTaskFeed(assignedTasks);
       const nextMyTasks = hasAdminTaskView ? assignedTasks : assignedSplit.myTasks;
       const nextDelegatedTasks = hasAdminTaskView ? authoredTasks : assignedSplit.delegatedTasks;
