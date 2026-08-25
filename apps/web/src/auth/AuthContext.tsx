@@ -3,6 +3,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@jewelos/api-client";
 import type { Branch, UserProfile } from "@/types";
 import { DEFAULT_USER_PREFERENCES, type UserPreferences } from "@jewelos/core";
+import { usernameLoginFunctionError } from "./functionError";
 
 type AuthStatus = "loading" | "signed_out" | "authenticated" | "incomplete" | "blocked";
 
@@ -132,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.functions.invoke<{ access_token?: string; refresh_token?: string; error?: string }>("username-password-login", { body: { username, password } });
       if (error || !data?.access_token || !data.refresh_token) {
         setStatus("signed_out");
-        return data?.error ?? error?.message ?? "Invalid username or password";
+        return error ? await usernameLoginFunctionError(error) : "Login failed. Please contact your administrator and quote LOGIN-UNKNOWN.";
       }
       const { data: sessionData, error: sessionError } = await supabase.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
       if (sessionError || !sessionData.session) { setStatus("signed_out"); return "Sign-in failed"; }
