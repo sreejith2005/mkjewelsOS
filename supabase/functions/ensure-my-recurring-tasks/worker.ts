@@ -1,4 +1,4 @@
-import { shouldGenerateRecurringTask } from "../../../packages/core/src/recurrence.ts";
+import { materializeDueRecurringTemplates } from "../../../packages/core/src/recurrence.ts";
 
 export type DueRecurringTemplate = Readonly<{
   id: string;
@@ -15,20 +15,13 @@ export type RecurringTaskGateway = Readonly<{
 export async function ensureMyRecurringTasks(
   gateway: RecurringTaskGateway,
   targetDate: string,
-): Promise<{ alreadyExists: number; created: number; eligible: number }> {
-  let alreadyExists = 0;
-  let created = 0;
-  let eligible = 0;
-  for (const template of await gateway.listTemplates()) {
-    if (template.schedule_kind === "as_required" || !template.recurrence_rule) continue;
-    try {
-      if (!shouldGenerateRecurringTask(template.recurrence_rule, targetDate, template.starts_on ?? undefined)) continue;
-    } catch {
-      continue;
-    }
-    eligible += 1;
-    if (await gateway.create(template.id)) created += 1;
-    else alreadyExists += 1;
-  }
-  return { alreadyExists, created, eligible };
+): Promise<{ alreadyExists: number; created: number; eligible: number; failed: number }> {
+  const templates = (await gateway.listTemplates())
+    .filter((template) => template.schedule_kind !== "as_required" && Boolean(template.recurrence_rule))
+    .map((template) => ({
+      id: template.id,
+      recurrenceRule: template.recurrence_rule,
+      startsOn: template.starts_on,
+    }));
+  return materializeDueRecurringTemplates(templates, targetDate, (template) => gateway.create(template.id));
 }

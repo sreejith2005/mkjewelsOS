@@ -101,3 +101,44 @@ export function shouldGenerateRecurringTask(
   const recurrence = rrulestr(normalizeRule(recurrenceRule, startsOn), { forceset: true });
   return recurrence.between(start, end, true).length > 0;
 }
+
+export type DueRecurringTemplate = Readonly<{
+  id: string;
+  recurrenceRule: string;
+  startsOn: string | null;
+}>;
+
+export type RecurringMaterializationOutcome = Readonly<{
+  alreadyExists: number;
+  created: number;
+  eligible: number;
+  failed: number;
+}>;
+
+/**
+ * Creates every schedule due on a business date. A failure in one schedule is
+ * isolated so it cannot prevent later eligible schedules from being created.
+ */
+export async function materializeDueRecurringTemplates(
+  templates: readonly DueRecurringTemplate[],
+  targetDate: Date | string,
+  create: (template: DueRecurringTemplate) => Promise<string | null>,
+): Promise<RecurringMaterializationOutcome> {
+  let alreadyExists = 0;
+  let created = 0;
+  let eligible = 0;
+  let failed = 0;
+
+  for (const template of templates) {
+    try {
+      if (!shouldGenerateRecurringTask(template.recurrenceRule, targetDate, template.startsOn ?? undefined)) continue;
+      eligible += 1;
+      if (await create(template)) created += 1;
+      else alreadyExists += 1;
+    } catch {
+      failed += 1;
+    }
+  }
+
+  return { alreadyExists, created, eligible, failed };
+}

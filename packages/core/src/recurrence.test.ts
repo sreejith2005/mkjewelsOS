@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isUserAvailableForRecurringTask,
   kolkataDateKey,
+  materializeDueRecurringTemplates,
   resolveRecurringAssignment,
   shouldGenerateRecurringTask,
   type RecurringAvailabilityProfile,
@@ -77,6 +78,28 @@ describe("shouldGenerateRecurringTask", () => {
     expect(kolkataDateKey(instant)).toBe("2026-08-07");
     expect(shouldGenerateRecurringTask("FREQ=WEEKLY;BYDAY=FR", instant)).toBe(true);
     expect(shouldGenerateRecurringTask("FREQ=WEEKLY;BYDAY=TH", instant)).toBe(false);
+  });
+});
+
+describe("materializeDueRecurringTemplates", () => {
+  it("continues creating later due schedules when an earlier schedule fails", async () => {
+    const attempted: string[] = [];
+
+    const result = await materializeDueRecurringTemplates(
+      [
+        { id: "broken", recurrenceRule: "FREQ=DAILY", startsOn: "2026-08-24" },
+        { id: "daily", recurrenceRule: "FREQ=DAILY", startsOn: "2026-08-24" },
+      ],
+      "2026-08-25",
+      async (template) => {
+        attempted.push(template.id);
+        if (template.id === "broken") throw new Error("database failure");
+        return template.id;
+      },
+    );
+
+    expect(attempted).toEqual(["broken", "daily"]);
+    expect(result).toEqual({ alreadyExists: 0, created: 1, eligible: 2, failed: 1 });
   });
 });
 

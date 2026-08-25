@@ -12,6 +12,24 @@ Deno.test("materializes only the signed-in employee's schedules that are due tod
     ],
   };
 
-  assertEquals(await ensureMyRecurringTasks(gateway, "2026-08-10"), { created: 1, alreadyExists: 0, eligible: 1 });
+  assertEquals(await ensureMyRecurringTasks(gateway, "2026-08-10"), { created: 1, alreadyExists: 0, eligible: 1, failed: 0 });
   assertEquals(created, ["daily"]);
+});
+
+Deno.test("creates a due daily schedule after another due schedule fails", async () => {
+  const created: string[] = [];
+  const gateway: RecurringTaskGateway = {
+    create: async (templateId) => {
+      created.push(templateId);
+      if (templateId === "broken") throw new Error("database failure");
+      return templateId;
+    },
+    listTemplates: async () => [
+      { id: "broken", recurrence_rule: "FREQ=DAILY", schedule_kind: "daily", starts_on: "2026-08-24" },
+      { id: "daily", recurrence_rule: "FREQ=DAILY", schedule_kind: "daily", starts_on: "2026-08-24" },
+    ],
+  };
+
+  assertEquals(await ensureMyRecurringTasks(gateway, "2026-08-25"), { created: 1, alreadyExists: 0, eligible: 2, failed: 1 });
+  assertEquals(created, ["broken", "daily"]);
 });
