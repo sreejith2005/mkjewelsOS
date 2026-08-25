@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Plus, RefreshCw, Upload } from "lucide-react";
-import { countTaskFeedStatuses, deriveTaskMutationCapability, splitAssignedTaskFeed, taskMatchesStatus, type TaskFeedStatusFilter } from "@jewelos/core";
+import { countTaskFeedStatuses, deriveTaskMutationCapability, kolkataDateKey, splitAssignedTaskFeed, taskMatchesStatus, type TaskFeedStatusFilter } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Modal, Notice } from "@/components/ui";
 import {
   createDelegationTask,
   delegateTask,
+  ensureMyRecurringTasks,
   loadTaskFeed,
   loadTaskAuthoringReferenceData,
   loadTaskFeedReferenceData,
@@ -18,40 +19,14 @@ import {
 import { DelegateTaskModal } from "@/features/tasks/DelegateTaskModal";
 import { TaskCard, type TaskCardAction } from "@/features/tasks/TaskCard";
 import { TaskComposer } from "@/features/tasks/TaskComposer";
-import { TaskFilterBar, type DateRangePreset } from "@/features/tasks/TaskFilterBar";
+import { TaskFilterBar } from "@/features/tasks/TaskFilterBar";
 import { loadFormDynamicOptions, loadTaskForms, submitForm, type FormBundle } from "@/features/forms/api";
 import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer";
-
-function dateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function rangeForPreset(preset: Exclude<DateRangePreset, "custom">): [string, string] {
-  const now = new Date();
-  if (preset === "today") return [dateKey(now), dateKey(now)];
-  if (preset === "week") {
-    const start = new Date(now);
-    const weekday = (start.getDay() + 6) % 7;
-    start.setDate(start.getDate() - weekday);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    return [dateKey(start), dateKey(end)];
-  }
-  return [dateKey(new Date(now.getFullYear(), now.getMonth(), 1)), dateKey(new Date(now.getFullYear(), now.getMonth() + 1, 0))];
-}
 
 type TaskWorkspaceView = "mine" | "delegated";
 
 export function TasksPage() {
   const { profile } = useAuth();
-  const initialRange = useMemo(() => rangeForPreset("month"), []);
-  const [preset, setPreset] = useState<DateRangePreset>("month");
-  const [startDate, setStartDate] = useState(initialRange[0]);
-  const [endDate, setEndDate] = useState(initialRange[1]);
-  const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<TaskFeedStatusFilter>("pending");
   const [myTasks, setMyTasks] = useState<TaskBundle[]>([]);
   const [delegatedTasks, setDelegatedTasks] = useState<TaskBundle[]>([]);
@@ -69,12 +44,14 @@ export function TasksPage() {
   const hasAdminTaskView = profile ? ["super_admin", "admin"].includes(profile.user_role) : false;
 
   const refresh = useCallback(async () => {
-    if (!profile || !startDate || !endDate) return;
+    if (!profile) return;
     setLoading(true);
     setError(null);
     try {
-      const start = new Date(`${startDate}T00:00:00`).toISOString();
-      const end = new Date(`${endDate}T23:59:59.999`).toISOString();
+      const today = kolkataDateKey(new Date());
+      const start = `${today}T00:00:00.000+05:30`;
+      const end = `${today}T23:59:59.999+05:30`;
+      await ensureMyRecurringTasks();
       const [assignedTasks, authoredTasks, nextCategories] = await Promise.all([
         loadTaskFeed(profile.id, start, end, { includeBlockedCoverage: canManage }),
         hasAdminTaskView ? loadTaskFeed(profile.id, start, end, { delegated: true }) : Promise.resolve([]),
@@ -98,7 +75,7 @@ export function TasksPage() {
     } finally {
       setLoading(false);
     }
-  }, [canManage, endDate, hasAdminTaskView, profile, startDate]);
+  }, [canManage, hasAdminTaskView, profile]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -111,23 +88,8 @@ export function TasksPage() {
   const tasks = workspaceView === "mine" ? myTasks : delegatedTasks;
   const counts = useMemo(() => countTaskFeedStatuses(tasks), [tasks]);
   const scopedTasks = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return tasks.filter((task) => taskMatchesStatus(task, statusFilter) && (!query || [
-      task.title,
-      task.description,
-      task.assigneeName,
-      task.category_id ? categoryNames.get(task.category_id) : "",
-    ].join(" ").toLowerCase().includes(query)));
-  }, [categoryNames, search, statusFilter, tasks]);
-
-  const handlePresetChange = (next: DateRangePreset) => {
-    setPreset(next);
-    if (next !== "custom") {
-      const [start, end] = rangeForPreset(next);
-      setStartDate(start);
-      setEndDate(end);
-    }
-  };
+    return tasks.filter((task) => taskMatchesStatus(task, statusFilter));
+  }, [statusFilter, tasks]);
 
   const handleAction = async (task: TaskBundle, action: TaskCardAction) => {
     if (!task.id || !profile) throw new Error("Task identifier is missing");
@@ -173,7 +135,7 @@ export function TasksPage() {
         </button>)}
       </div>
 
-      <TaskFilterBar counts={counts} endDate={endDate} onEndDateChange={setEndDate} onPresetChange={handlePresetChange} onSearchChange={setSearch} onStartDateChange={setStartDate} onStatusChange={setStatusFilter} preset={preset} search={search} startDate={startDate} status={statusFilter} />
+      <TaskFilterBar counts={counts} onStatusChange={setStatusFilter} status={statusFilter} />
 
       <div className="w-full p-3 sm:p-5">
         {error ? <div className="flex flex-col gap-3 rounded-xl border border-danger/40 bg-danger/10 p-4"><Notice tone="danger">{error}</Notice><Button className="self-start border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={() => void refresh()} variant="secondary"><RefreshCw />Retry</Button></div> : loading ? <div aria-label="Loading tasks" className="flex flex-col gap-3">{[0, 1, 2].map((item) => <div className="h-28 animate-pulse rounded-2xl border border-task-border bg-task-muted" key={item} />)}</div> : scopedTasks.length === 0 ? <div className="flex min-h-[48dvh] flex-col items-center justify-center px-5 text-center"><span className="mb-5 flex size-20 items-center justify-center rounded-[1.75rem] bg-task-muted text-task-accent"><CheckCircle2 className="size-10" /></span><h2 className="text-2xl font-semibold text-task-text">No Tasks Here</h2><p className="mt-1 max-w-sm text-sm text-task-text-muted">It seems that you don’t have any tasks in this list.</p></div> : <div className="flex flex-col gap-3">{profile ? scopedTasks.map((task) => <TaskCard capability={deriveTaskMutationCapability({ assigneeIds: task.assignees.map((assignee) => assignee.id), isWatcher: task.isWatchedByViewer, viewerId: profile.id, viewerRole: profile.user_role })} categoryLabel={task.category_id ? categoryNames.get(task.category_id) ?? "Uncategorized" : "Uncategorized"} key={task.id} onAction={(action) => handleAction(task, action)} task={task} />) : null}</div>}

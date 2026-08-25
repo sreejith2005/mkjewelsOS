@@ -1,6 +1,6 @@
 import { calculateSla } from "./sla";
 
-export type TaskFeedStatusFilter = "all" | "overdue" | "pending" | "in_progress";
+export type TaskFeedStatusFilter = "all" | "overdue" | "pending";
 
 export type TaskFeedLike = Readonly<{
   actual_datetime: string | null;
@@ -62,16 +62,14 @@ export function taskMatchesStatus(
   if (filter === "all") return true;
   const overdue = isTaskFeedItemOverdue(task, now);
   if (filter === "overdue") return overdue;
-  if (filter === "pending") return task.status === "pending" && !overdue;
-  return task.status === "in_progress";
+  return !overdue && task.status !== "completed";
 }
 
 export function countTaskFeedStatuses(tasks: readonly TaskFeedLike[], now: Date | string = new Date()) {
   return tasks.reduce((counts, task) => {
     counts.all += 1;
     if (isTaskFeedItemOverdue(task, now)) counts.overdue += 1;
-    else if (task.status === "pending") counts.pending += 1;
-    if (task.status === "in_progress") counts.in_progress += 1;
+    else if (task.status !== "completed") counts.pending += 1;
     return counts;
-  }, { all: 0, overdue: 0, pending: 0, in_progress: 0 });
+  }, { all: 0, overdue: 0, pending: 0 });
 }

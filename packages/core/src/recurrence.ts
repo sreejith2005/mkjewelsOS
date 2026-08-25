@@ -60,11 +60,12 @@ function recurrenceDayBounds(date: Date | string): { end: Date; start: Date } {
   return { start, end: new Date(start.getTime() + 86_400_000 - 1) };
 }
 
-function normalizeRule(recurrenceRule: string): string {
+function normalizeRule(recurrenceRule: string, startsOn?: string): string {
   const trimmed = recurrenceRule.trim();
   if (!trimmed) throw new Error("recurrence_rule is required");
   if (/^DTSTART(?:;|:)/im.test(trimmed)) return trimmed;
-  return `DTSTART:19700101T000000Z\nRRULE:${trimmed.replace(/^RRULE:/i, "")}`;
+  const anchor = startsOn ? assertDateOnly(startsOn).replaceAll("-", "") : "19700101";
+  return `DTSTART:${anchor}T000000Z\nRRULE:${trimmed.replace(/^RRULE:/i, "")}`;
 }
 
 export function isUserAvailableForRecurringTask(
@@ -93,8 +94,10 @@ export function resolveRecurringAssignment(
 export function shouldGenerateRecurringTask(
   recurrenceRule: string,
   targetDate: Date | string,
+  startsOn?: string,
 ): boolean {
+  if (startsOn && kolkataDateKey(targetDate) < assertDateOnly(startsOn)) return false;
   const { start, end } = recurrenceDayBounds(targetDate);
-  const recurrence = rrulestr(normalizeRule(recurrenceRule), { forceset: true });
+  const recurrence = rrulestr(normalizeRule(recurrenceRule, startsOn), { forceset: true });
   return recurrence.between(start, end, true).length > 0;
 }

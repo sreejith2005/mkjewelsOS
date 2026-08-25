@@ -22,16 +22,17 @@ describe("task feed presentation", () => {
     expect(grouped[1]?.assigneeIds).toEqual([]);
   });
 
-  it("derives truthful, mutually useful counts", () => {
+  it("treats legacy in-progress work as pending until it is completed", () => {
     const tasks = [
       task("overdue", "user-1", "pending", "2026-08-06T12:00:00.000Z"),
       task("pending", "user-1"),
       task("progress", "user-1", "in_progress"),
       task("done", "user-1", "completed", "2026-08-06T12:00:00.000Z"),
     ];
-    expect(countTaskFeedStatuses(tasks, now)).toEqual({ all: 4, overdue: 1, pending: 1, in_progress: 1 });
+    expect(countTaskFeedStatuses(tasks, now)).toEqual({ all: 4, overdue: 1, pending: 2 });
     expect(taskMatchesStatus(tasks[0]!, "overdue", now)).toBe(true);
     expect(taskMatchesStatus(tasks[0]!, "pending", now)).toBe(false);
+    expect(taskMatchesStatus(tasks[2]!, "pending", now)).toBe(true);
   });
 
   it("puts assigned checklist work in My Tasks and assigned delegation work in Delegated", () => {

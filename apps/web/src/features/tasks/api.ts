@@ -31,6 +31,11 @@ export type TaskReferenceData = {
 };
 export type TaskFeedReferenceData = Pick<TaskReferenceData, "categories">;
 
+export async function ensureMyRecurringTasks(): Promise<void> {
+  const { error } = await supabase.functions.invoke("ensure-my-recurring-tasks", { method: "POST" });
+  fail("Prepare recurring tasks", error);
+}
+
 function fail(message: string, error: { message: string } | null): asserts error is null {
   if (error) throw new Error(`${message}: ${error.message}`);
 }

@@ -81,7 +81,7 @@ Deno.serve(async (request: Request) => {
     if (template.schedule_kind === "one_time" && template.starts_on !== targetDate) continue;
     if (!template.recurrence_rule) continue;
     try {
-      if (template.schedule_kind !== "one_time" && !shouldGenerateRecurringTask(template.recurrence_rule, targetDate)) continue;
+      if (template.schedule_kind !== "one_time" && !shouldGenerateRecurringTask(template.recurrence_rule, targetDate, template.starts_on ?? undefined)) continue;
     } catch {
       failures.push({ template_id: template.id, error: "Invalid recurrence rule" });
       continue;

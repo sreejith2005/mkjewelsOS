@@ -29,6 +29,17 @@ describe("shouldGenerateRecurringTask", () => {
     expect(shouldGenerateRecurringTask("FREQ=DAILY", "2026-08-07")).toBe(true);
   });
 
+  it("anchors interval-based weekly schedules to the date the schedule starts", () => {
+    expect(shouldGenerateRecurringTask("FREQ=WEEKLY;INTERVAL=2", "2026-08-03", "2026-08-03")).toBe(true);
+    expect(shouldGenerateRecurringTask("FREQ=WEEKLY;INTERVAL=2", "2026-08-10", "2026-08-03")).toBe(false);
+    expect(shouldGenerateRecurringTask("FREQ=WEEKLY;INTERVAL=2", "2026-08-17", "2026-08-03")).toBe(true);
+  });
+
+  it("does not generate a yearly schedule before its scheduled start date", () => {
+    expect(shouldGenerateRecurringTask("FREQ=YEARLY", "2026-08-07", "2027-08-07")).toBe(false);
+    expect(shouldGenerateRecurringTask("FREQ=YEARLY", "2027-08-07", "2027-08-07")).toBe(true);
+  });
+
   it("honors selected weekdays", () => {
     const rule = "FREQ=WEEKLY;BYDAY=MO,FR";
     expect(shouldGenerateRecurringTask(rule, "2026-08-07")).toBe(true);
