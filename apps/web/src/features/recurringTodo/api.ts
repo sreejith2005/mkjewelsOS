@@ -1,7 +1,7 @@
 import { supabase } from "@jewelos/api-client";
 import { kolkataDateKey, shouldGenerateRecurringTask, type Json } from "@jewelos/core";
 import { parseRecurringWorkspace, type RecurringWorkspace } from "./model";
-export { parseRecurringWorkspace, type RecurringInstance, type RecurringTemplate, type RecurringWorkspace } from "./model";
+export { parseRecurringWorkspace, recurringInstanceDisplayStatus, type RecurringInstance, type RecurringTemplate, type RecurringWorkspace } from "./model";
 
 export async function loadRecurringWorkspace(filter: { date_from: string; date_to: string; search?: string; status?: string }): Promise<RecurringWorkspace> {
   const { data, error } = await supabase.rpc("get_recurring_todo_workspace", { p_filter: filter });

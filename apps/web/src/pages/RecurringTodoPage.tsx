@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { kolkataDateKey } from "@jewelos/core";
 import {
   CalendarClock,
   Check,
@@ -42,6 +43,7 @@ import {
   sendRecurringFollowup,
   setRecurringTemplateActive,
   verifyRecurringTask,
+  recurringInstanceDisplayStatus,
   type RecurringInstance,
   type RecurringTemplate,
   type RecurringWorkspace,
@@ -74,7 +76,7 @@ const EMPTY: RecurringWorkspace = {
 };
 
 function dateKey(date: Date): string {
-  return date.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  return kolkataDateKey(date);
 }
 function defaultRange(): [string, string] {
   const from = new Date();
@@ -92,13 +94,14 @@ function dueLabel(value: string): string {
 
 function StatusPill({ task }: { task: RecurringInstance }) {
   const special = task.coverage_status;
-  const label = special ?? task.status;
+  const displayStatus = recurringInstanceDisplayStatus(task);
+  const label = special ?? displayStatus;
   const tone =
-    special === "coverage_required" || task.status === "overdue"
+    special === "coverage_required" || displayStatus === "overdue"
       ? "bg-danger/15 text-danger"
       : special === "manager_review"
         ? "bg-warning/15 text-warning"
-        : task.status === "completed"
+        : displayStatus === "completed"
           ? "bg-success/15 text-success"
           : "bg-gold/10 text-gold";
   return (
@@ -341,10 +344,7 @@ export function RecurringTodoPage() {
         if (tab === "today")
           return plannedDate === today && task.status !== "completed";
         if (tab === "overdue")
-          return (
-            task.status === "overdue" ||
-            (plannedDate < today && task.status !== "completed")
-          );
+          return recurringInstanceDisplayStatus(task) === "overdue";
         if (tab === "completed") return task.status === "completed";
         if (tab === "coverage")
           return task.coverage_status === "coverage_required";

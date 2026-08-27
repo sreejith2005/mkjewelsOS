@@ -1,4 +1,4 @@
-import type { Tables } from "@jewelos/core";
+import { isTaskFeedItemOverdue, type Tables } from "@jewelos/core";
 
 export type RecurringTemplate = Tables<"task_templates">;
 export type RecurringInstance = Tables<"task_instances"> & {
@@ -9,6 +9,17 @@ export type RecurringInstance = Tables<"task_instances"> & {
 };
 export type RecurringStats = { total: number; pending: number; in_progress: number; completed: number; overdue: number; coverage_required: number; manager_review: number };
 export type RecurringWorkspace = { templates: RecurringTemplate[]; instances: RecurringInstance[]; stats: RecurringStats };
+
+/** Keeps stored workflow state intact while displaying a missed occurrence as overdue. */
+export function recurringInstanceDisplayStatus(
+  instance: RecurringInstance,
+  now: Date | string = new Date(),
+): string | null {
+  if (["completed", "rejected", "blocked"].includes(instance.status ?? "")) return instance.status;
+  return isTaskFeedItemOverdue({ ...instance, assignee_id: null }, now)
+    ? "overdue"
+    : instance.status;
+}
 
 function object(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 
