@@ -9,6 +9,7 @@ export type TaskBulkImportChecklist = Readonly<{ item_text: string; required: bo
 export type TaskBulkImportTask = Readonly<{ task_key: string; task_mode: "one_time" | "recurring"; title: string; description: string; priority: string; branch: string; department: string; category: string; primary_doer_email: string; doer_emails: readonly string[]; watcher_emails: readonly string[]; planned_at: string; recurrence_kind: string; recurrence_interval: number; weekly_days: readonly string[]; monthly_day: string; monthly_nth: string; monthly_weekday: string; ends_on: string; requires_upload: boolean; requires_remark: boolean; published_form: string; checklist: readonly TaskBulkImportChecklist[] }>;
 export type TaskBulkImportPayload = Readonly<{ tasks: readonly TaskBulkImportTask[] }>;
 export type WorkbookNormalization = Readonly<{ payload: TaskBulkImportPayload | null; errors: readonly string[]; issues: readonly TaskBulkImportIssue[] }>;
+export type ParseTaskImportOptions = Readonly<{ defaultStartsOn?: string }>;
 type SheetRows = Readonly<Record<string, readonly Readonly<Record<string, unknown>>[]>>;
 const unsafe = (value: unknown) => typeof value === "string" && (/^[=+\-@]/.test(value.trim()) || /[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(value));
 const text = (value: unknown) => typeof value === "string" ? value.trim() : String(value ?? "").trim();
@@ -43,7 +44,17 @@ export function normalizeTaskImportWorkbook(sheets: SheetRows): WorkbookNormaliz
   for (const key of checklists.keys()) if (!keys.has(key)) issues.push(entry("Checklist Items", 2, "task_key", "Checklist key has no Tasks row", "Add the matching task_key to Tasks."));
   return { payload: issues.length ? null : { tasks }, errors: issues.map((item) => `${item.sheet} row ${item.row}: ${item.reason}`), issues };
 }
-export async function parseTaskImportFile(file: File) {
+export function dedupeTaskImportIssues(issues: readonly TaskBulkImportIssue[]) {
+  const seen = new Set<string>();
+  return issues.filter((item) => {
+    const key = [item.sheet, item.row, item.field, item.reason, item.guidance, item.severity].join("\u0000");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export async function parseTaskImportFile(file: File, options: ParseTaskImportOptions = {}) {
   if (file.size > TASK_IMPORT_MAX_BYTES) return { sourceFormat: "unknown" as const, payload: null, draftRows: [], identityRequirements: [], errors: ["File exceeds 2 MiB"], issues: [entry("Upload", 0, "file", "File exceeds 2 MiB", "Reduce the workbook size.")] };
   const extension = file.name.toLowerCase().split(".").pop();
   if (extension !== "xlsx" && extension !== "csv") return { sourceFormat: "unknown" as const, payload: null, draftRows: [], identityRequirements: [], errors: ["Only .xlsx or .csv files are supported"], issues: [entry("Upload", 0, "file", "Unsupported file extension", "Choose an .xlsx or .csv file.")] };
@@ -53,8 +64,9 @@ export async function parseTaskImportFile(file: File) {
   const firstRows = XLSX.utils.sheet_to_json(first, { defval: "", raw: false }) as Readonly<Record<string, unknown>>[];
   const headerRow = (XLSX.utils.sheet_to_json(first, { header: 1, defval: "", raw: false }) as unknown[][])[0]?.map((header) => String(header).trim().toUpperCase()) ?? [];
   if (extension === "csv" && headerRow.join("|") === LEGACY_TASK_HEADERS.join("|")) {
-    const legacy = normalizeLegacyTaskSheet(firstRows);
-    return { sourceFormat: "mk_daily_checklist_csv" as const, payload: null, ...legacy, errors: legacy.issues.map((item) => `Tasks row ${item.row}: ${item.reason}`) };
+    const legacy = normalizeLegacyTaskSheet(firstRows, options);
+    const issues = dedupeTaskImportIssues(legacy.issues);
+    return { sourceFormat: "mk_daily_checklist_csv" as const, payload: null, ...legacy, issues, errors: issues.map((item) => `Tasks row ${item.row}: ${item.reason}`) };
   }
   const sheets: Record<string, readonly Readonly<Record<string, unknown>>[]> = {};
   for (const name of book.SheetNames) sheets[extension === "csv" ? "Tasks" : name] = XLSX.utils.sheet_to_json(book.Sheets[name]!, { defval: "", raw: false }) as Readonly<Record<string, unknown>>[];

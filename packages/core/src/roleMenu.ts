@@ -110,6 +110,6 @@ export function canAccessPage(role: UserRole, page: PageId): boolean {
 }
 
 export function getPageForPath(path: string): PageId | undefined {
-  if (path === "/tasks/checklist" || path === "/tasks/delegation" || path === "/tasks/import") return "checklist_tasks";
+  if (path === "/tasks/checklist" || path === "/tasks/delegation" || path === "/tasks/import" || path === "/tasks/assigning-left") return "checklist_tasks";
   return ALL_MENU_ITEMS.find((item) => item.path === path)?.id;
 }

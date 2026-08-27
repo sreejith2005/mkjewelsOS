@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createTaskImportTemplate, hashTaskImportPayload, normalizeTaskImportWorkbook, parseTaskImportFile, TASK_IMPORT_HEADERS } from "./workbook";
+import { createTaskImportTemplate, dedupeTaskImportIssues, hashTaskImportPayload, normalizeTaskImportWorkbook, parseTaskImportFile, TASK_IMPORT_HEADERS } from "./workbook";
 import { LEGACY_TASK_HEADERS } from "./legacySheet";
 
 function task(overrides: Record<string, unknown>) {
@@ -35,6 +35,25 @@ describe("normalizeTaskImportWorkbook", () => {
     const source = `${LEGACY_TASK_HEADERS.join(",")}\r\n${LEGACY_TASK_HEADERS.map(() => "").join(",")}`;
     const parsed = await parseTaskImportFile(new File([source], "current.csv", { type: "text/csv" }));
     expect(parsed.sourceFormat).toBe("mk_daily_checklist_csv");
+  });
+
+  it("passes the one selected start date into current-sheet normalization", async () => {
+    const values: Record<string, string> = {
+      "EMPLOYEE NAME": "Named Person", DEPARTMENT: "Sales", "BRANCH NAME": "Bandra", "TASK TYPE": "TASK",
+      "CORE TASK": "Core", TASK: "Task", FREQUENCY: "Daily", "START TIME": "09:00", "DUE TIME": "18:00",
+      PRIORITY: "Medium", "EVIDENCE REQUIRED": "No", "VERIFICATION REQUIRED": "No", "BUDDY ALLOWED": "No", ACTIVE: "Yes",
+    };
+    const quoted = (value: string) => `"${value.replaceAll('"', '""')}"`;
+    const source = `${LEGACY_TASK_HEADERS.map(quoted).join(",")}\r\n${LEGACY_TASK_HEADERS.map((header) => quoted(values[header] ?? "")).join(",")}`;
+    const parsed = await parseTaskImportFile(new File([source], "current.csv", { type: "text/csv" }), { defaultStartsOn: "2026-09-02" });
+
+    expect(parsed.draftRows[0]).toMatchObject({ starts_on: "2026-09-02", planned_at: "2026-09-02 09:00" });
+    expect(parsed.issues.filter((issue) => issue.field === "TASK START DATE")).toEqual([]);
+  });
+
+  it("collapses repeated corrections without hiding affected rows", () => {
+    const duplicate = { sheet: "Tasks", row: 2, field: "START TIME", reason: "Start time is required", guidance: "Use HH:MM.", severity: "error" as const };
+    expect(dedupeTaskImportIssues([duplicate, duplicate, { ...duplicate, row: 3 }])).toEqual([duplicate, { ...duplicate, row: 3 }]);
   });
 
   it("rejects more than 2500 canonical rows", () => {

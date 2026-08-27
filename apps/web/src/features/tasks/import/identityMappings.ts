@@ -1,15 +1,37 @@
-import { identityRequirementKey, type TaskImportCanonicalRow, type TaskImportDraftRow } from "@jewelos/core";
+import type { TaskImportCanonicalRow, TaskImportDraftRow } from "@jewelos/core";
 import type { TaskBulkImportIssue } from "./workbook";
 
-export type TaskImportIdentityMappings = Readonly<Record<string, string>>;
-export function applyIdentityMappings(draftRows: readonly TaskImportDraftRow[], mappings: TaskImportIdentityMappings) {
+export type TaskImportIdentityCandidate = Readonly<{
+  id: string;
+  employee_name: string;
+  email: string;
+  branch_id: string;
+  department_id: string;
+  manager_id: string | null;
+}>;
+
+const normalized = (value: string) => value.trim().toLocaleLowerCase("en-IN").replace(/\s+/g, " ");
+const unique = (candidates: readonly TaskImportIdentityCandidate[], predicate: (candidate: TaskImportIdentityCandidate) => boolean) => {
+  const matches = candidates.filter(predicate);
+  return matches.length === 1 ? matches[0] : undefined;
+};
+
+export function applyIdentityMappings(draftRows: readonly TaskImportDraftRow[], candidates: readonly TaskImportIdentityCandidate[]) {
   const issues: TaskBulkImportIssue[] = [];
   const rows: TaskImportCanonicalRow[] = draftRows.map((row) => {
-    const assignee_profile_id = row.assignee_email ? "" : mappings[identityRequirementKey("assignee", row.assignee_name)] ?? "";
-    const verifier_profile_id = !row.verification_required ? "" : mappings[identityRequirementKey("verifier", row.verifier_label)] ?? "";
-    if (!row.assignee_email && !assignee_profile_id) issues.push({ sheet: "Tasks", row: row.source_row, field: "EMPLOYEE EMAIL", reason: "Employee identity mapping is required", guidance: "Select and confirm an active employee.", severity: "error" });
-    if (row.verification_required && !verifier_profile_id) issues.push({ sheet: "Tasks", row: row.source_row, field: "VERIFIER", reason: "Verifier identity mapping is required", guidance: "Select and confirm an active verifier.", severity: "error" });
-    return { ...row, assignee_profile_id, verifier_profile_id };
+    const email = normalized(row.assignee_email);
+    const name = normalized(row.assignee_name);
+    const assignee = email
+      ? unique(candidates, (candidate) => normalized(candidate.email) === email)
+      : name ? unique(candidates, (candidate) => normalized(candidate.employee_name) === name) : undefined;
+    const verifierLabel = normalized(row.verifier_label);
+    const explicitVerifier = row.verification_required && verifierLabel
+      ? unique(candidates, (candidate) => normalized(candidate.employee_name) === verifierLabel || normalized(candidate.email) === verifierLabel)
+      : undefined;
+    const manager = assignee?.manager_id ? candidates.find((candidate) => candidate.id === assignee.manager_id) : undefined;
+    const verifier = row.verification_required ? explicitVerifier ?? manager : undefined;
+    const assignment_status = assignee ? "assigned" : "assigning_left";
+    return { ...row, assignee_profile_id: assignee?.id ?? "", verifier_profile_id: verifier?.id ?? "", assignment_status };
   });
   return { rows, issues };
 }

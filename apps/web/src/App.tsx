@@ -47,6 +47,7 @@ const CRMPage = lazyPage("crm", () => import("@/pages/CRMPage").then((module) =>
 const TasksPage = lazyPage("tasks", () => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
 const RecurringTodoPage = lazyPage("recurring-todo", () => import("@/pages/RecurringTodoPage").then((module) => ({ default: module.RecurringTodoPage })));
 const TaskBulkImportPage = lazyPage("task-bulk-import", () => import("@/pages/TaskBulkImportPage").then((module) => ({ default: module.TaskBulkImportPage })));
+const AssigningLeftPage = lazyPage("assigning-left", () => import("@/pages/AssigningLeftPage").then((module) => ({ default: module.AssigningLeftPage })));
 const TeamDirectoryPage = lazyPage("team-directory", () => import("@/pages/TeamDirectoryPage").then((module) => ({ default: module.TeamDirectoryPage })));
 const ReportsPage = lazyPage("reports", () => import("@/pages/ReportsPage").then((module) => ({ default: module.ReportsPage })));
 const SettingsPage = lazyPage("settings", () => import("@/pages/SettingsPage").then((module) => ({ default: module.SettingsPage })));
@@ -303,7 +304,7 @@ function AppShell() {
     : currentPage === "users" ? <TeamDirectoryPage />
     : currentPage === "crm" ? <CRMPage />
     : currentPage === "dropdown_master" ? <DropdownMasterPage />
-      : currentPage === "checklist_tasks" ? path === "/tasks/import" ? <TaskBulkImportPage onBack={() => navigate("/tasks")} /> : <TasksPage />
+      : currentPage === "checklist_tasks" ? path === "/tasks/import" ? <TaskBulkImportPage onBack={() => navigate("/tasks")} /> : path === "/tasks/assigning-left" ? <AssigningLeftPage /> : <TasksPage />
       : currentPage === "recurring_todo" ? <RecurringTodoPage />
       : currentPage === "availability" ? <AvailabilityPage />
           : currentPage === "forms_library" ? <FormsPage />

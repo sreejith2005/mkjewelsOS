@@ -14,7 +14,7 @@ vi.mock("@jewelos/api-client", () => ({
   },
 }));
 
-import { loadTaskImportBatches, validateTaskBulkImport } from "./api";
+import { assignImportedTask, loadAssigningLeftTasks, loadTaskImportBatches, validateTaskBulkImport } from "./api";
 
 describe("validateTaskBulkImport", () => {
   it("keeps the Supabase client context while invoking the validation RPC", async () => {
@@ -24,6 +24,20 @@ describe("validateTaskBulkImport", () => {
     });
 
     await expect(validateTaskBulkImport({ tasks: [] }, "a".repeat(64))).resolves.toMatchObject({ valid: true });
+  });
+});
+
+describe("Assigning Left API", () => {
+  it("loads the protected admin queue", async () => {
+    restRpc.mockResolvedValueOnce({ data: [{ record_kind: "task", id: "task-1" }], error: null });
+    await expect(loadAssigningLeftTasks()).resolves.toEqual([{ record_kind: "task", id: "task-1" }]);
+    expect(restRpc).toHaveBeenCalledWith("list_assigning_left_tasks", undefined);
+  });
+
+  it("assigns a queued record through the audited RPC", async () => {
+    restRpc.mockResolvedValueOnce({ data: { assignment_status: "assigned" }, error: null });
+    await expect(assignImportedTask("template", "template-1", "profile-1")).resolves.toMatchObject({ assignment_status: "assigned" });
+    expect(restRpc).toHaveBeenCalledWith("assign_imported_task_with_audit", { p_record_kind: "template", p_record_id: "template-1", p_user_profile_id: "profile-1" });
   });
 });
 

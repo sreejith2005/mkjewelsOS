@@ -5,6 +5,7 @@ export const TASK_IMPORT_CHUNK_SIZE = 100;
 export type ImportScheduleKind = "one_time" | "daily" | "weekly" | "monthly" | "quarterly" | "yearly" | "as_required";
 export type TaskImportDestination = "tasks" | "recurring_todo";
 export type TaskImportCompletionMode = "delegation" | "checklist";
+export type TaskImportAssignmentStatus = "assigned" | "assigning_left";
 
 export type TaskImportChecklist = Readonly<{ item_text: string; required: boolean }>;
 export type TaskImportCanonicalRow = Readonly<{
@@ -14,6 +15,7 @@ export type TaskImportCanonicalRow = Readonly<{
   assignee_name: string; verifier_label: string; verifier_profile_id: string; starts_on: string; start_time: string;
   due_time: string; planned_at: string; due_at: string; recurrence_rule: string; requires_upload: boolean;
   verification_required: boolean; buddy_assignment_allowed: boolean; is_active: boolean;
+  assignment_status: TaskImportAssignmentStatus;
   checklist: readonly TaskImportChecklist[];
 }>;
 export type TaskImportDraftRow = Omit<TaskImportCanonicalRow, "assignee_profile_id" | "verifier_profile_id">;

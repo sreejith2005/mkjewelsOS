@@ -9,13 +9,36 @@ const row = (overrides: Record<string, string> = {}) => Object.fromEntries(LEGAC
 } as Record<string, string>)[header] ?? ""]));
 
 describe("current task sheet", () => {
-  it("does not fill down blank identity and scope fields", () => {
-    const second = row({ "EMPLOYEE EMAIL": "", "EMPLOYEE NAME": "", "BRANCH NAME": "" });
+  it("keeps blank identity unassigned while filling only grouped operational context", () => {
+    const second = row({
+      "EMPLOYEE EMAIL": "",
+      "EMPLOYEE NAME": "",
+      "BRANCH NAME": "",
+      "START TIME": "",
+      "DUE TIME": "",
+      "EVIDENCE REQUIRED": "",
+    });
     const result = normalizeLegacyTaskSheet([row(), second]);
-    expect(result.issues).toEqual(expect.arrayContaining([
-      expect.objectContaining({ row: 3, field: "EMPLOYEE EMAIL" }),
-      expect.objectContaining({ row: 3, field: "BRANCH NAME" }),
-    ]));
+    expect(result.issues).toEqual([]);
+    expect(result.draftRows[1]).toMatchObject({
+      assignee_email: "",
+      assignee_name: "",
+      branch: "Bandra",
+      start_time: "09:00",
+      due_time: "18:00",
+      requires_upload: false,
+    });
+  });
+
+  it("uses one import start date for every blank scheduled row without duplicate date errors", () => {
+    const result = normalizeLegacyTaskSheet([
+      row({ "TASK START DATE": "" }),
+      row({ "TASK START DATE": "", FREQUENCY: "Yearly" }),
+    ], { defaultStartsOn: "2026-09-01" });
+
+    expect(result.issues.filter((item) => item.field === "TASK START DATE")).toEqual([]);
+    expect(result.draftRows.map((item) => item.starts_on)).toEqual(["2026-09-01", "2026-09-01"]);
+    expect(result.draftRows[1]?.recurrence_rule).toBe("FREQ=YEARLY;BYMONTH=9;BYMONTHDAY=1");
   });
 
   it("turns a checklist row into a core-titled task with one item", () => {
@@ -23,7 +46,7 @@ describe("current task sheet", () => {
     expect(result.draftRows[0]).toMatchObject({ task_type: "checklist", title: "Opening", checklist: [{ item_text: "Open shutters", required: true }] });
   });
 
-  it("requires explicit mapping when only an employee name is present", () => {
+  it("collects written employee names for automatic batch matching", () => {
     const result = normalizeLegacyTaskSheet([row({ "EMPLOYEE EMAIL": "", "EMPLOYEE NAME": "Named Person" })]);
     expect(result.identityRequirements).toEqual([expect.objectContaining({ kind: "assignee", label: "Named Person", source_rows: [2] })]);
   });
