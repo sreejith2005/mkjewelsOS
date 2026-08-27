@@ -73,3 +73,21 @@ export function countTaskFeedStatuses(tasks: readonly TaskFeedLike[], now: Date 
     return counts;
   }, { all: 0, overdue: 0, pending: 0 });
 }
+
+/** Keeps the strict current-day board focused while retaining independently overdue work. */
+export function isTaskFeedItemInCurrentDayOrOverdue(
+  task: TaskFeedLike,
+  start: Date | string,
+  end: Date | string,
+  now: Date | string = new Date(),
+): boolean {
+  const deadline = effectiveTaskDeadline(task);
+  if (!deadline) return false;
+  const deadlineMs = new Date(deadline).getTime();
+  const startMs = new Date(start).getTime();
+  const endMs = new Date(end).getTime();
+  if ([deadlineMs, startMs, endMs].some(Number.isNaN)) return false;
+  if (deadlineMs >= startMs && deadlineMs <= endMs) return true;
+  if (["completed", "rejected", "blocked"].includes(task.status ?? "")) return false;
+  return isTaskFeedItemOverdue(task, now);
+}

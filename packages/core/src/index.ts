@@ -35,6 +35,7 @@ export {
   countTaskFeedStatuses,
   effectiveTaskDeadline,
   groupTaskFeedRows,
+  isTaskFeedItemInCurrentDayOrOverdue,
   isTaskFeedItemOverdue,
   splitAssignedTaskFeed,
   taskMatchesStatus,

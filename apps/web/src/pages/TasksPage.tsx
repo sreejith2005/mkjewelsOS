@@ -57,8 +57,8 @@ export function TasksPage() {
       const start = `${today}T00:00:00.000+05:30`;
       const end = `${today}T23:59:59.999+05:30`;
       const loadWorkspace = () => Promise.all([
-        loadTaskFeed(profile.id, start, end, { includeBlockedCoverage: canManage }),
-        hasAdminTaskView ? loadTaskFeed(profile.id, start, end, { delegated: true }) : Promise.resolve([]),
+        loadTaskFeed(profile.id, start, end, { includeBlockedCoverage: canManage, includeOverdue: true }),
+        hasAdminTaskView ? loadTaskFeed(profile.id, start, end, { delegated: true, includeOverdue: true }) : Promise.resolve([]),
         loadTaskFeedReferenceData().catch(() => ({ categories: [] })),
       ]);
       const applyWorkspace = async (

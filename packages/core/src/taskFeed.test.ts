@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countTaskFeedStatuses, effectiveTaskDeadline, groupTaskFeedRows, splitAssignedTaskFeed, taskMatchesStatus } from "./taskFeed";
+import { countTaskFeedStatuses, effectiveTaskDeadline, groupTaskFeedRows, isTaskFeedItemInCurrentDayOrOverdue, splitAssignedTaskFeed, taskMatchesStatus } from "./taskFeed";
 
 const now = "2026-08-07T12:00:00.000Z";
 
@@ -33,6 +33,16 @@ describe("task feed presentation", () => {
     expect(taskMatchesStatus(tasks[0]!, "overdue", now)).toBe(true);
     expect(taskMatchesStatus(tasks[0]!, "pending", now)).toBe(false);
     expect(taskMatchesStatus(tasks[2]!, "pending", now)).toBe(true);
+  });
+
+  it("keeps today pending work with independently overdue prior occurrences", () => {
+    const start = "2026-08-07T00:00:00.000+05:30";
+    const end = "2026-08-07T23:59:59.999+05:30";
+
+    expect(isTaskFeedItemInCurrentDayOrOverdue(task("yesterday", "user-1", "pending", "2026-08-06T12:00:00.000Z"), start, end, now)).toBe(true);
+    expect(isTaskFeedItemInCurrentDayOrOverdue(task("today", "user-1", "pending", "2026-08-07T12:00:00.000Z"), start, end, now)).toBe(true);
+    expect(isTaskFeedItemInCurrentDayOrOverdue(task("tomorrow", "user-1", "pending", "2026-08-08T12:00:00.000Z"), start, end, now)).toBe(false);
+    expect(isTaskFeedItemInCurrentDayOrOverdue(task("rejected", "user-1", "rejected", "2026-08-06T12:00:00.000Z"), start, end, now)).toBe(false);
   });
 
   it("puts assigned checklist work in My Tasks and assigned delegation work in Delegated", () => {
