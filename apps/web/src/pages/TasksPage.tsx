@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Plus, RefreshCw, Upload } from "lucide-react";
 import { countTaskFeedStatuses, deriveTaskMutationCapability, kolkataDateKey, splitAssignedTaskFeed, taskMatchesStatus, type TaskFeedStatusFilter } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthContext";
@@ -43,39 +43,53 @@ export function TasksPage() {
   const [formBundles, setFormBundles] = useState<FormBundle[]>([]);
   const [formDynamicOptions, setFormDynamicOptions] = useState<DynamicOptions>({ users: [], branches: [], departments: [] });
   const [formTarget, setFormTarget] = useState<TaskBundle | null>(null);
+  const refreshGeneration = useRef(0);
   const canManage = profile ? ["super_admin", "admin", "manager"].includes(profile.user_role) : false;
   const hasAdminTaskView = profile ? ["super_admin", "admin"].includes(profile.user_role) : false;
 
   const refresh = useCallback(async () => {
     if (!profile) return;
+    const generation = ++refreshGeneration.current;
     setLoading(true);
     setError(null);
     try {
       const today = kolkataDateKey(new Date());
       const start = `${today}T00:00:00.000+05:30`;
       const end = `${today}T23:59:59.999+05:30`;
-      const [assignedTasks, authoredTasks, nextCategories] = await prepareRecurringTasksThenLoad(ensureMyRecurringTasks, () => Promise.all([
+      const loadWorkspace = () => Promise.all([
         loadTaskFeed(profile.id, start, end, { includeBlockedCoverage: canManage }),
         hasAdminTaskView ? loadTaskFeed(profile.id, start, end, { delegated: true }) : Promise.resolve([]),
         loadTaskFeedReferenceData().catch(() => ({ categories: [] })),
-      ]));
-      const assignedSplit = splitAssignedTaskFeed(assignedTasks);
-      const nextMyTasks = hasAdminTaskView ? assignedTasks : assignedSplit.myTasks;
-      const nextDelegatedTasks = hasAdminTaskView ? authoredTasks : assignedSplit.delegatedTasks;
-      const nextTasks = [...nextMyTasks, ...nextDelegatedTasks.filter((task) => !nextMyTasks.some((myTask) => myTask.id === task.id))];
-      const [forms, dynamicOptions] = await Promise.all([
-        loadTaskForms([...new Set(nextTasks.flatMap((task) => task.requires_form && task.form_template_id ? [task.form_template_id] : []))], nextTasks.flatMap((task) => task.id ? [task.id] : [])),
-        loadFormDynamicOptions(),
       ]);
-      setMyTasks(nextMyTasks);
-      setDelegatedTasks(nextDelegatedTasks);
-      setCategories(nextCategories.categories);
-      setFormBundles(forms.bundles);
-      setFormDynamicOptions(dynamicOptions);
+      const applyWorkspace = async (
+        [assignedTasks, authoredTasks, nextCategories]: Awaited<ReturnType<typeof loadWorkspace>>,
+        workspaceGeneration: number,
+      ) => {
+        const assignedSplit = splitAssignedTaskFeed(assignedTasks);
+        const nextMyTasks = hasAdminTaskView ? assignedTasks : assignedSplit.myTasks;
+        const nextDelegatedTasks = hasAdminTaskView ? authoredTasks : assignedSplit.delegatedTasks;
+        const nextTasks = [...nextMyTasks, ...nextDelegatedTasks.filter((task) => !nextMyTasks.some((myTask) => myTask.id === task.id))];
+        const [forms, dynamicOptions] = await Promise.all([
+          loadTaskForms([...new Set(nextTasks.flatMap((task) => task.requires_form && task.form_template_id ? [task.form_template_id] : []))], nextTasks.flatMap((task) => task.id ? [task.id] : [])),
+          loadFormDynamicOptions(),
+        ]);
+        if (workspaceGeneration !== refreshGeneration.current) return;
+        setMyTasks(nextMyTasks);
+        setDelegatedTasks(nextDelegatedTasks);
+        setCategories(nextCategories.categories);
+        setFormBundles(forms.bundles);
+        setFormDynamicOptions(dynamicOptions);
+      };
+      const initialWorkspace = await prepareRecurringTasksThenLoad(ensureMyRecurringTasks, loadWorkspace, async (refreshedWorkspace) => {
+        const refreshedGeneration = ++refreshGeneration.current;
+        await applyWorkspace(refreshedWorkspace, refreshedGeneration);
+        if (refreshedGeneration === refreshGeneration.current) setLoading(false);
+      });
+      await applyWorkspace(initialWorkspace, generation);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to load tasks");
+      if (generation === refreshGeneration.current) setError(caught instanceof Error ? caught.message : "Unable to load tasks");
     } finally {
-      setLoading(false);
+      if (generation === refreshGeneration.current) setLoading(false);
     }
   }, [canManage, hasAdminTaskView, profile]);
 

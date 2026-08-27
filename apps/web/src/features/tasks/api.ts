@@ -31,9 +31,12 @@ export type TaskReferenceData = {
 };
 export type TaskFeedReferenceData = Pick<TaskReferenceData, "categories">;
 
-export async function ensureMyRecurringTasks(): Promise<void> {
-  const { error } = await supabase.functions.invoke("ensure-my-recurring-tasks", { method: "POST" });
+export type RecurringTaskPreparation = Readonly<{ created: number }>;
+
+export async function ensureMyRecurringTasks(): Promise<RecurringTaskPreparation> {
+  const { data, error } = await supabase.functions.invoke("ensure-my-recurring-tasks", { method: "POST" });
   fail("Prepare recurring tasks", error);
+  return { created: typeof data === "object" && data !== null && "created" in data && typeof data.created === "number" ? data.created : 0 };
 }
 
 function fail(message: string, error: { message: string } | null): asserts error is null {

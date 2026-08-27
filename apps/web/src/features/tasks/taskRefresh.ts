@@ -1,10 +1,15 @@
 export async function prepareRecurringTasksThenLoad<T>(
-  prepare: () => Promise<unknown>,
+  prepare: () => Promise<{ created?: number } | void>,
   load: () => Promise<T>,
+  onRecurringTasksCreated?: (tasks: T) => void | Promise<void>,
 ): Promise<T> {
-  // The day feed must not wait on a best-effort recurring-task catch-up.
-  // Persisted assignments are already authoritative and should render as soon
-  // as their realtime event arrives.
-  void prepare().catch(() => undefined);
-  return load();
+  // Render the persisted feed immediately, then reload only when the
+  // background catch-up actually creates a due occurrence. This does not
+  // rely on a realtime event reaching the open Tasks screen.
+  const preparation = prepare();
+  const initialTasks = await load();
+  void preparation.then(async (outcome) => {
+    if (outcome?.created && onRecurringTasksCreated) await onRecurringTasksCreated(await load());
+  }).catch(() => undefined);
+  return initialTasks;
 }
