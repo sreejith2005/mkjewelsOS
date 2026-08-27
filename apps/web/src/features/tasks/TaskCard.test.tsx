@@ -1,11 +1,66 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { TaskMutationCapability } from "@jewelos/core";
+import type { TaskBundle } from "./api";
+import { TaskCard } from "./TaskCard";
 
-describe("TaskCard required-form actions", () => {
-  it("offers a single Complete form action and suppresses separate completion controls", async () => {
-    const source = await import("./TaskCard?raw").then((module) => module.default);
+afterEach(cleanup);
 
-    expect(source).toContain('const formOnlyAction = task.requires_form && !completed;');
-    expect(source).toContain("Complete form");
-    expect(source).toContain("!formOnlyAction && !readOnly && !completed && !blocked");
+const capability: TaskMutationCapability = {
+  access: "doer",
+  canMutate: true,
+  canUseElevatedActions: false,
+  watcherLabel: null,
+};
+
+const task = {
+  actual_datetime: null,
+  assignee_id: "doer-1",
+  assigneeName: "Ashwini Kamble",
+  assignees: [{ id: "doer-1", name: "Ashwini Kamble" }],
+  branch_id: "branch-1",
+  category_id: null,
+  checklist_completion_pct: 0,
+  checklists: [],
+  core_task_label: null,
+  created_by: "manager-1",
+  delay_minutes: null,
+  department_id: "department-1",
+  description: null,
+  due_datetime: null,
+  form_template_id: null,
+  hasAttachment: false,
+  hasFormSubmission: false,
+  id: "task-1",
+  isWatchedByViewer: false,
+  planned_datetime: "2026-08-27T10:00:00.000Z",
+  priority: "medium",
+  requires_form: false,
+  requires_remark: false,
+  requires_upload: false,
+  revised_datetime: null,
+  source: "manual",
+  status: "pending",
+  task_template_id: null,
+  task_type: "delegation",
+  tenant_id: "tenant-1",
+  title: "Direct completion task",
+  verifier_user_profile_id: null,
+} as TaskBundle;
+
+describe("TaskCard direct completion", () => {
+  it("shows a Complete action beside an eligible task and does not expose Start or Delegate", async () => {
+    const onAction = vi.fn().mockResolvedValue(undefined);
+
+    render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={task} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Direct completion task Pending/ }));
+    expect(screen.queryByRole("button", { name: "Start" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Delegate" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Complete task: Direct completion task" }));
+
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ kind: "complete", remark: "" }));
   });
 });

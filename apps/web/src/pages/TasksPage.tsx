@@ -5,7 +5,6 @@ import { useAuth } from "@/auth/AuthContext";
 import { Button, Modal, Notice } from "@/components/ui";
 import {
   createDelegationTask,
-  delegateTask,
   ensureMyRecurringTasks,
   loadTaskFeed,
   loadTaskAuthoringReferenceData,
@@ -16,7 +15,6 @@ import {
   type TaskBundle,
   type TaskReferenceData,
 } from "@/features/tasks/api";
-import { DelegateTaskModal } from "@/features/tasks/DelegateTaskModal";
 import { TaskCard, type TaskCardAction } from "@/features/tasks/TaskCard";
 import { TaskComposer } from "@/features/tasks/TaskComposer";
 import { TaskFilterBar } from "@/features/tasks/TaskFilterBar";
@@ -39,7 +37,6 @@ export function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
-  const [delegateTarget, setDelegateTarget] = useState<TaskBundle | null>(null);
   const [formBundles, setFormBundles] = useState<FormBundle[]>([]);
   const [formDynamicOptions, setFormDynamicOptions] = useState<DynamicOptions>({ users: [], branches: [], departments: [] });
   const [formTarget, setFormTarget] = useState<TaskBundle | null>(null);
@@ -117,10 +114,6 @@ export function TasksPage() {
       viewerRole: profile.user_role,
     });
     if (!capability.canMutate) throw new Error("You do not have permission to update this task");
-    if (action.kind === "delegate") {
-      setDelegateTarget(task);
-      return;
-    }
     if (action.kind === "fill_form") { setFormTarget(task); return; }
     if (action.kind === "upload") await uploadTaskAttachment(profile.tenant_id, task.id, action.file);
     else if (action.kind === "revise") await reviseTask(task.id, action.datetime, action.reason);
@@ -161,9 +154,6 @@ export function TasksPage() {
       {canManage ? <div className="fixed bottom-[86px] right-4 z-20 flex gap-2 md:bottom-8 md:right-8"><Button onClick={() => { window.history.pushState({}, "", "/tasks/import"); window.dispatchEvent(new PopStateEvent("popstate")); }} variant="secondary"><Upload className="size-4" />Bulk Import</Button><Button aria-label="Create task" className="min-h-14 rounded-2xl bg-task-accent px-5 text-task-text shadow-xl hover:bg-task-accent/90" onClick={() => void openComposer()}><Plus className="size-6" />Create Task</Button></div> : null}
 
       {composerOpen && canManage && references && profile ? <TaskComposer data={references} onClose={() => setComposerOpen(false)} onCreated={() => { setComposerOpen(false); void refresh(); }} onSave={createDelegationTask} onUploadAttachment={(taskId, file) => uploadTaskAttachment(profile.tenant_id, taskId, file)} profile={profile} /> : null}
-
-
-      {delegateTarget && references && profile ? <DelegateTaskModal canManage={canManage} currentUserId={profile.id} onClose={() => setDelegateTarget(null)} onDelegate={async (fromUserId, toUserId, reason) => { if (!delegateTarget.id) throw new Error("Task identifier is missing"); await delegateTask(delegateTarget.id, fromUserId, toUserId, reason); setDelegateTarget(null); await refresh(); }} task={delegateTarget} users={references.users} /> : null}
       {formTarget?.id && formTarget.form_template_id ? (() => { const form = formBundles.find((item) => item.id === formTarget.form_template_id); return form ? <Modal onClose={() => setFormTarget(null)} title={`Required form: ${form.name}`} wide><FormRenderer definition={{ name: form.name, description: form.description ?? undefined, fields: form.fields }} dynamicOptions={formDynamicOptions} onSubmit={async (answers) => { await submitForm(form.id, answers, formTarget.task_type === "delegation" ? "delegation_task" : "checklist_task", formTarget.id as string); setFormTarget(null); await refresh(); }} /></Modal> : <Modal onClose={() => setFormTarget(null)} title="Required form"><Notice tone="danger">The exact required form version is not available to this account.</Notice></Modal>; })() : null}
     </section>
   );
