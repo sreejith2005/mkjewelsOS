@@ -23,6 +23,6 @@ describe("Recurring / To-Do workspace contract", () => {
 
     expect(source).toContain("materializeRecurringTemplate");
     expect(source).toContain("const templateId = await saveRecurringTemplate(id, payload);");
-    expect(source).toContain("await materializeRecurringTemplate(templateId);");
+    expect(source).toContain("await materializeRecurringTemplate(templateId, payload);");
   });
 });

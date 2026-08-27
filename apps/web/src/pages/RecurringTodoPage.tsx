@@ -399,7 +399,7 @@ export function RecurringTodoPage() {
     payload: Parameters<typeof saveRecurringTemplate>[1],
   ) => {
     const templateId = await saveRecurringTemplate(id, payload);
-    await materializeRecurringTemplate(templateId);
+    await materializeRecurringTemplate(templateId, payload);
     setEditing(undefined);
     await load();
   };

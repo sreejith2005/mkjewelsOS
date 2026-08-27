@@ -1,5 +1,5 @@
 import { supabase } from "@jewelos/api-client";
-import type { Json } from "@jewelos/core";
+import { kolkataDateKey, shouldGenerateRecurringTask, type Json } from "@jewelos/core";
 import { parseRecurringWorkspace, type RecurringWorkspace } from "./model";
 export { parseRecurringWorkspace, type RecurringInstance, type RecurringTemplate, type RecurringWorkspace } from "./model";
 
@@ -16,13 +16,41 @@ export async function saveRecurringTemplate(id: string | null, payload: Json): P
   return data;
 }
 
-export async function materializeRecurringTemplate(templateId: string): Promise<{ created: number }> {
+function scheduleIsDueOn(payload: Json, targetDate: string): boolean {
+  if (payload === null || Array.isArray(payload) || typeof payload !== "object") return false;
+  const scheduleKind = typeof payload.schedule_kind === "string" ? payload.schedule_kind : "recurring";
+  const startsOn = typeof payload.starts_on === "string" ? payload.starts_on : undefined;
+  if (scheduleKind === "as_required") return false;
+  if (scheduleKind === "one_time") return startsOn === targetDate;
+  if (typeof payload.recurrence_rule !== "string") return false;
+  try {
+    return shouldGenerateRecurringTask(payload.recurrence_rule, targetDate, startsOn);
+  } catch {
+    return false;
+  }
+}
+
+export async function materializeRecurringTemplate(
+  templateId: string,
+  payload?: Json,
+  targetDate = kolkataDateKey(new Date()),
+): Promise<{ created: number }> {
   const { data, error } = await supabase.functions.invoke("materialize-recurring-schedule", {
     body: { template_id: templateId },
     method: "POST",
   });
-  if (error) throw new Error(`Prepare recurring task: ${error.message}`);
-  return data as { created: number };
+  if (!error) return data as { created: number };
+  if (!payload || !scheduleIsDueOn(payload, targetDate)) return { created: 0 };
+
+  // This RPC is authenticated, role-checked, and audited in Postgres. It is
+  // a narrow fallback for a due occurrence when Edge Function availability is
+  // transient; it never lets the browser choose an arbitrary due date.
+  const { data: taskId, error: fallbackError } = await supabase.rpc("run_recurring_todo_template_now_with_audit", {
+    p_target_date: targetDate,
+    p_template_id: templateId,
+  });
+  if (fallbackError) throw new Error("Unable to create today's recurring task");
+  return { created: taskId ? 1 : 0 };
 }
 
 export async function deleteRecurringTemplate(id: string): Promise<string> {
