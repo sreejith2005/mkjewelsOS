@@ -103,6 +103,7 @@ export const loadTaskReferenceData = loadTaskAuthoringReferenceData;
 
 const TASK_FEED_PAGE_SIZE = 1_000;
 const TASK_FEED_ID_BATCH_SIZE = 200;
+const TASK_DETAIL_ID_BATCH_SIZE = 50;
 
 type TaskFeedPage = { data: TaskFeedRow[]; error: { message: string } | null };
 type TaskFeedPageResponse = { data: TaskFeedRow[] | null; error: { message: string } | null };
@@ -225,7 +226,7 @@ export async function loadTaskFeed(
   const groupedRows = groupTaskFeedRows(scopedRows);
   const watchedTaskIds = new Set(watcherRows.map((row) => row.task_instance_id));
   const taskIds = groupedRows.flatMap(({ row }) => row.id ? [row.id] : []);
-  const detailBatches = taskFeedIdBatches(taskIds);
+  const detailBatches = taskFeedIdBatches(taskIds, TASK_DETAIL_ID_BATCH_SIZE);
   const [checklistResults, attachmentResults, submissionResults] = await Promise.all([
     Promise.all(detailBatches.map((ids) => supabase.from("task_checklists").select("*").in("task_instance_id", ids).order("sort_order"))),
     Promise.all(detailBatches.map((ids) => supabase.from("task_attachments").select("task_instance_id").in("task_instance_id", ids))),
