@@ -1,29 +1,37 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { equalityFilters } = vi.hoisted(() => ({ equalityFilters: [] as Array<[string, unknown]> }));
+const { equalityFilters, identifierFilters, taskRows } = vi.hoisted(() => ({
+  equalityFilters: [] as Array<[string, unknown]>,
+  identifierFilters: [] as Array<{ table: string; values: unknown[] }>,
+  taskRows: [] as Array<Record<string, unknown>>,
+}));
 
-function query() {
-  const result = { data: [], error: null };
+function query(table: string) {
+  const result = () => ({ data: table === "v_all_tasks" ? taskRows : [], error: null });
   const builder = {
     eq(column: string, value: unknown) { equalityFilters.push([column, value]); return builder; },
     gte() { return builder; },
     is() { return builder; },
-    in() { return builder; },
+    in(_column: string, values: unknown[]) { identifierFilters.push({ table, values }); return builder; },
     lte() { return builder; },
     or() { return builder; },
     order() { return builder; },
-    range() { return Promise.resolve(result); },
+    range() { return Promise.resolve(result()); },
     select() { return builder; },
-    then(resolve: (value: typeof result) => unknown) { return Promise.resolve(result).then(resolve); },
+    then(resolve: (value: ReturnType<typeof result>) => unknown) { return Promise.resolve(result()).then(resolve); },
   };
   return builder;
 }
 
-vi.mock("@jewelos/api-client", () => ({ supabase: { from: () => query() } }));
+vi.mock("@jewelos/api-client", () => ({ supabase: { from: (table: string) => query(table) } }));
 
 import { loadTaskFeed, taskFeedCurrentOrOverdueFilter, taskFeedIdBatches } from "./api";
 
-beforeEach(() => equalityFilters.splice(0));
+beforeEach(() => {
+  equalityFilters.splice(0);
+  identifierFilters.splice(0);
+  taskRows.splice(0);
+});
 
 describe("task feed effective-deadline scope", () => {
   it("requests today plus only unfinished historical effective deadlines", () => {
@@ -44,5 +52,25 @@ describe("task feed effective-deadline scope", () => {
 
     expect(equalityFilters).toContainEqual(["created_by", "admin-1"]);
     expect(equalityFilters).not.toContainEqual(["task_type", "delegation"]);
+  });
+
+  it("batches checklist, attachment, and form detail requests for large task feeds", async () => {
+    taskRows.push(...Array.from({ length: 201 }, (_, index) => ({
+      actual_datetime: null,
+      assignee_id: `user-${index}`,
+      due_datetime: null,
+      form_template_id: null,
+      id: `task-${index}`,
+      planned_datetime: "2026-08-28T12:00:00.000+05:30",
+      revised_datetime: null,
+      status: "pending",
+      task_type: index % 2 ? "delegation" : "checklist",
+    })));
+
+    await loadTaskFeed("admin-1", "2026-08-28T00:00:00.000+05:30", "2026-08-28T23:59:59.999+05:30", { delegated: true });
+
+    for (const table of ["task_checklists", "task_attachments", "form_submissions"]) {
+      expect(identifierFilters.filter((item) => item.table === table).map((item) => item.values.length)).toEqual([200, 1]);
+    }
   });
 });

@@ -225,29 +225,27 @@ export async function loadTaskFeed(
   const groupedRows = groupTaskFeedRows(scopedRows);
   const watchedTaskIds = new Set(watcherRows.map((row) => row.task_instance_id));
   const taskIds = groupedRows.flatMap(({ row }) => row.id ? [row.id] : []);
-  const [checklistsResult, attachmentsResult, submissionsResult] = taskIds.length
-    ? await Promise.all([
-      supabase.from("task_checklists").select("*").in("task_instance_id", taskIds).order("sort_order"),
-      supabase.from("task_attachments").select("task_instance_id").in("task_instance_id", taskIds),
-      supabase.from("form_submissions").select("linked_record_id,linked_module,form_template_id").in("linked_record_id", taskIds),
-    ])
-    : [
-      { data: [] as TaskChecklist[], error: null },
-      { data: [] as Array<{ task_instance_id: string }>, error: null },
-      { data: [] as Array<{ form_template_id: string; linked_module: string | null; linked_record_id: string | null }>, error: null },
-    ];
-  fail("Load task checklists", checklistsResult.error);
-  fail("Load task attachments", attachmentsResult.error);
-  fail("Load task form submissions", submissionsResult.error);
+  const detailBatches = taskFeedIdBatches(taskIds);
+  const [checklistResults, attachmentResults, submissionResults] = await Promise.all([
+    Promise.all(detailBatches.map((ids) => supabase.from("task_checklists").select("*").in("task_instance_id", ids).order("sort_order"))),
+    Promise.all(detailBatches.map((ids) => supabase.from("task_attachments").select("task_instance_id").in("task_instance_id", ids))),
+    Promise.all(detailBatches.map((ids) => supabase.from("form_submissions").select("linked_record_id,linked_module,form_template_id").in("linked_record_id", ids))),
+  ]);
+  for (const result of checklistResults) fail("Load task checklists", result.error);
+  for (const result of attachmentResults) fail("Load task attachments", result.error);
+  for (const result of submissionResults) fail("Load task form submissions", result.error);
+  const checklists = checklistResults.flatMap((result) => result.data ?? []) as TaskChecklist[];
+  const attachments = attachmentResults.flatMap((result) => result.data ?? []);
+  const submissions = submissionResults.flatMap((result) => result.data ?? []);
   const checklistsByTask = new Map<string, TaskChecklist[]>();
-  for (const item of checklistsResult.data) {
+  for (const item of checklists) {
     const list = checklistsByTask.get(item.task_instance_id) ?? [];
     list.push(item);
     checklistsByTask.set(item.task_instance_id, list);
   }
   const userNames = new Map(users.map((user) => [user.id, user.employee_name]));
-  const attachedTasks = new Set(attachmentsResult.data.map((row) => row.task_instance_id));
-  const matchingSubmissions = new Set(submissionsResult.data.flatMap((row) =>
+  const attachedTasks = new Set(attachments.map((row) => row.task_instance_id));
+  const matchingSubmissions = new Set(submissions.flatMap((row) =>
     row.linked_record_id && row.linked_module
       ? [`${row.linked_record_id}|${row.linked_module}|${row.form_template_id}`]
       : []));
