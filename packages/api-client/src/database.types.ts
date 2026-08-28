@@ -4755,6 +4755,73 @@ export type Database = {
           },
         ]
       }
+      production_demo_data_retirements: {
+        Row: {
+          actor_profile_id: string
+          backup_reference: string
+          created_at: string
+          executed_at: string | null
+          expires_at: string
+          id: string
+          maintenance_acknowledged: boolean
+          manifest: Json
+          manifest_hash: string
+          removed_counts: Json | null
+          state: string
+          tenant_id: string
+        }
+        Insert: {
+          actor_profile_id: string
+          backup_reference: string
+          created_at?: string
+          executed_at?: string | null
+          expires_at: string
+          id?: string
+          maintenance_acknowledged?: boolean
+          manifest: Json
+          manifest_hash: string
+          removed_counts?: Json | null
+          state: string
+          tenant_id: string
+        }
+        Update: {
+          actor_profile_id?: string
+          backup_reference?: string
+          created_at?: string
+          executed_at?: string | null
+          expires_at?: string
+          id?: string
+          maintenance_acknowledged?: boolean
+          manifest?: Json
+          manifest_hash?: string
+          removed_counts?: Json | null
+          state?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_demo_data_retirements_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_demo_data_retirements_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_demo_data_retirements_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       resignations: {
         Row: {
           company_assets_returned: boolean
@@ -7689,6 +7756,15 @@ export type Database = {
         Args: { p_instance_stage_id: string; p_reason: string }
         Returns: undefined
       }
+      execute_production_demo_data_retirement: {
+        Args: {
+          p_actor_auth_user_id: string
+          p_confirmation: string
+          p_manifest_hash: string
+          p_operation_id: string
+        }
+        Returns: Json
+      }
       fail_crm_sync_run: {
         Args: {
           p_request_key: string
@@ -8048,6 +8124,14 @@ export type Database = {
         }
         Returns: string
       }
+      preview_production_demo_data_retirement: {
+        Args: {
+          p_actor_auth_user_id: string
+          p_backup_reference: string
+          p_maintenance_acknowledged: boolean
+        }
+        Returns: Json
+      }
       process_notification_events: {
         Args: { p_limit?: number }
         Returns: {
@@ -8055,6 +8139,49 @@ export type Database = {
           events_failed: number
           events_processed: number
         }[]
+      }
+      production_demo_data_retirement_actor: {
+        Args: { p_actor_auth_user_id: string }
+        Returns: {
+          account_status: Database["public"]["Enums"]["user_account_status"]
+          auth_user_id: string
+          branch_id: string
+          buddy_id: string | null
+          created_at: string | null
+          created_by: string | null
+          department_id: string
+          designation_id: string | null
+          email: string
+          employee_code: string
+          employee_name: string
+          first_name: string | null
+          id: string
+          is_login_enabled: boolean | null
+          last_name: string | null
+          official_email: string | null
+          official_mobile: string | null
+          personal_email: string | null
+          personal_mobile: string | null
+          reports_to_user_id: string | null
+          secondary_buddy_id: string | null
+          tenant_id: string
+          updated_at: string | null
+          updated_by: string | null
+          user_role: Database["public"]["Enums"]["user_role"]
+          username: string | null
+          week_off: string[]
+          working_status: Database["public"]["Enums"]["working_status"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      production_demo_data_retirement_manifest: {
+        Args: { p_tenant_id: string }
+        Returns: Json
       }
       publish_fms_flow_with_audit: {
         Args: { p_flow_id: string }
