@@ -1,8 +1,29 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@jewelos/api-client", () => ({ supabase: {} }));
+const { equalityFilters } = vi.hoisted(() => ({ equalityFilters: [] as Array<[string, unknown]> }));
 
-import { taskFeedCurrentOrOverdueFilter, taskFeedIdBatches } from "./api";
+function query() {
+  const result = { data: [], error: null };
+  const builder = {
+    eq(column: string, value: unknown) { equalityFilters.push([column, value]); return builder; },
+    gte() { return builder; },
+    is() { return builder; },
+    in() { return builder; },
+    lte() { return builder; },
+    or() { return builder; },
+    order() { return builder; },
+    range() { return Promise.resolve(result); },
+    select() { return builder; },
+    then(resolve: (value: typeof result) => unknown) { return Promise.resolve(result).then(resolve); },
+  };
+  return builder;
+}
+
+vi.mock("@jewelos/api-client", () => ({ supabase: { from: () => query() } }));
+
+import { loadTaskFeed, taskFeedCurrentOrOverdueFilter, taskFeedIdBatches } from "./api";
+
+beforeEach(() => equalityFilters.splice(0));
 
 describe("task feed effective-deadline scope", () => {
   it("requests today plus only unfinished historical effective deadlines", () => {
@@ -13,5 +34,15 @@ describe("task feed effective-deadline scope", () => {
 
   it("batches task identifiers before requesting detailed assignee rows", () => {
     expect(taskFeedIdBatches(["a", "b", "c", "d", "e"], 2)).toEqual([["a", "b"], ["c", "d"], ["e"]]);
+  });
+
+  it("includes authored checklist and delegation instances in the delegated workspace", async () => {
+    await loadTaskFeed("admin-1", "2026-08-28T00:00:00.000+05:30", "2026-08-28T23:59:59.999+05:30", {
+      delegated: true,
+      includeOverdue: true,
+    });
+
+    expect(equalityFilters).toContainEqual(["created_by", "admin-1"]);
+    expect(equalityFilters).not.toContainEqual(["task_type", "delegation"]);
   });
 });

@@ -162,7 +162,6 @@ export async function loadTaskFeed(
       (deadlineFilter
         ? loadTaskFeedPages((from, to) => supabase.from("v_all_tasks").select("*").or(deadlineFilter)
           .eq("created_by", viewerId)
-          .eq("task_type", "delegation")
           .order("planned_datetime", { ascending: false })
           .range(from, to))
         : supabase.from("v_all_tasks").select("*").gte("planned_datetime", startIso).lte("planned_datetime", endIso)

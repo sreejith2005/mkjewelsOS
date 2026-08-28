@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Button, Notice } from "@/components/ui";
 import type { AssigningLeftRecord, TaskImportIdentityCandidate } from "./api";
 
+const number = new Intl.NumberFormat("en-IN");
+
 type Props = Readonly<{
   records: readonly AssigningLeftRecord[];
   candidates: readonly TaskImportIdentityCandidate[];
@@ -13,6 +15,10 @@ export function AssigningLeftPanel({ records, candidates, busy, onAssign }: Prop
   const [selections, setSelections] = useState<Record<string, string>>({});
   if (!records.length) return <Notice tone="success">Nothing is waiting for assignment.</Notice>;
   return <div className="space-y-3">
+    <div aria-live="polite" className="rounded-xl border border-task-border bg-task-muted px-4 py-3">
+      <p className="text-lg font-semibold text-task-text">{number.format(records.length)} {records.length === 1 ? "task" : "tasks"} awaiting assignment</p>
+      <p className="mt-1 text-sm text-task-text-muted">This total updates whenever an assignment is completed.</p>
+    </div>
     {records.map((record) => {
       const selected = selections[record.id] ?? "";
       return <article className="rounded-xl border border-task-border bg-task-bg p-4" key={`${record.record_kind}-${record.id}`}>

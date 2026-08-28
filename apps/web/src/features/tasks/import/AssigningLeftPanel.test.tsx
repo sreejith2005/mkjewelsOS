@@ -17,3 +17,15 @@ it("assigns an unresolved record without exposing technical import controls", ()
   expect(onAssign).toHaveBeenCalledWith("task", "task-1", "profile-1");
   expect(screen.queryByText(/row hash|profile id/i)).toBeNull();
 });
+
+it("shows the live number of records still awaiting assignment", () => {
+  const record = { record_kind: "template" as const, id: "template-1", title: "Open showroom", destination: "Recurring / To-Do", branch_id: "branch-1", department_id: "department-1", starts_at: "2026-08-28", verification_pending: false, created_at: "2026-08-28T08:00:00Z" };
+  render(<AssigningLeftPanel
+    busy={false}
+    candidates={[]}
+    onAssign={vi.fn()}
+    records={[record, { ...record, id: "template-2", title: "Close showroom" }]}
+  />);
+
+  expect(screen.getByText("2 tasks awaiting assignment")).toBeTruthy();
+});
