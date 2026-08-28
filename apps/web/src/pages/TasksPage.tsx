@@ -116,6 +116,10 @@ export function TasksPage() {
     if (!capability.canMutate) throw new Error("You do not have permission to update this task");
     if (action.kind === "fill_form") { setFormTarget(task); return; }
     if (action.kind === "upload") await uploadTaskAttachment(profile.tenant_id, task.id, action.file);
+    else if (action.kind === "upload_and_complete") {
+      await uploadTaskAttachment(profile.tenant_id, task.id, action.file);
+      await updateTask(task.id, "complete");
+    }
     else if (action.kind === "revise") await reviseTask(task.id, action.datetime, action.reason);
     else if (action.kind === "checklist") await updateTask(task.id, "checklist", { checklistId: action.checklistId, completed: action.completed });
     else if (action.kind === "complete") await updateTask(task.id, "complete", { remark: action.remark });

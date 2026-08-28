@@ -9,6 +9,7 @@ export type TaskCardAction =
   | { checklistId: string; completed: boolean; kind: "checklist" }
   | { kind: "complete"; remark: string }
   | { file: File; kind: "upload" }
+  | { file: File; kind: "upload_and_complete" }
   | { kind: "fill_form" }
   | { datetime: string; kind: "revise"; reason: string };
 
@@ -39,6 +40,7 @@ export function TaskCard({ capability, categoryLabel, onAction, task: taskInput 
   const formOnlyAction = task.requires_form && !completed;
   const canComplete = checklistProgress.canCompleteRequiredItems && (!task.requires_upload || task.hasAttachment) && (!task.requires_form || task.hasFormSubmission);
   const canShowDirectComplete = !formOnlyAction && !readOnly && !completed && !blocked;
+  const canShowDirectUpload = canShowDirectComplete && task.requires_upload && !task.hasAttachment;
   const act = async (action: TaskCardAction) => {
     setBusy(true);
     setError(null);
@@ -50,14 +52,14 @@ export function TaskCard({ capability, categoryLabel, onAction, task: taskInput 
       setBusy(false);
     }
   };
-  const upload = async (event: ChangeEvent<HTMLInputElement>) => {
+  const upload = async (event: ChangeEvent<HTMLInputElement>, kind: "upload" | "upload_and_complete" = "upload") => {
     const file = event.target.files?.[0];
     if (!file) return;
     if (file.size > 10 * 1024 * 1024 || !["image/jpeg", "image/png", "application/pdf"].includes(file.type)) {
       setError("Upload a JPG, PNG, or PDF up to 10 MB.");
       return;
     }
-    await act({ kind: "upload", file });
+    await act({ kind, file });
   };
   const statusLabel = completed ? "Completed" : blocked ? "Coverage required" : overdue ? "Overdue" : task.status === "in_progress" ? "In Progress" : "Pending";
   const StatusIcon = completed ? CheckCircle2 : blocked ? PauseCircle : overdue ? AlertTriangle : Clock;
@@ -82,7 +84,7 @@ export function TaskCard({ capability, categoryLabel, onAction, task: taskInput 
         </span>
         <ChevronDown className={cn("size-4 shrink-0 text-task-text-muted transition-transform", expanded && "rotate-180")} />
       </button>
-      {canShowDirectComplete ? <Button aria-label={`Complete task: ${task.title ?? "task"}`} className="shrink-0 bg-task-accent text-task-text hover:bg-task-accent/90" disabled={busy || !canComplete || Boolean(task.requires_remark && !remark.trim())} onClick={() => void act({ kind: "complete", remark })} type="button"><CheckCircle2 />Complete</Button> : null}
+      {canShowDirectUpload ? <label className="inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-task-accent px-4 py-2 text-sm font-semibold text-task-text transition hover:bg-task-accent/90"><FileUp className="size-4" />Upload<input accept="image/jpeg,image/png,application/pdf" aria-label={`Upload task: ${task.title ?? "task"}`} className="sr-only" disabled={busy} onChange={(event) => void upload(event, "upload_and_complete")} type="file" /></label> : canShowDirectComplete ? <Button aria-label={`Complete task: ${task.title ?? "task"}`} className="shrink-0 bg-task-accent text-task-text hover:bg-task-accent/90" disabled={busy || !canComplete || Boolean(task.requires_remark && !remark.trim())} onClick={() => void act({ kind: "complete", remark })} type="button"><CheckCircle2 />Complete</Button> : null}
     </div>
     {expanded ? <div className="flex flex-col gap-4 border-t border-task-border bg-task-muted p-4">
       {error ? <Notice tone="danger">{error}</Notice> : null}

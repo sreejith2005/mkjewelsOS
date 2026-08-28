@@ -9,6 +9,14 @@ export type FormBundle = FormTemplate & { fields: FormFieldDefinition[]; submiss
 const fail = (label: string, error: { message: string } | null) => { if (error) throw new Error(`${label}: ${error.message}`); };
 const object = (value: Json | null): Record<string, Json> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, Json> : {};
 
+/** Keeps `linked_record_id=in.(...)` filters within the server request-line limit; bulk import can produce thousands of task ids. */
+const SUBMISSION_ID_BATCH_SIZE = 100;
+const chunk = <T>(items: readonly T[], size: number): T[][] => {
+  const batches: T[][] = [];
+  for (let index = 0; index < items.length; index += size) batches.push([...items.slice(index, index + size)]);
+  return batches;
+};
+
 export function toDefinition(template: FormTemplate, fields: FormField[]): FormTemplateDefinition {
   return normalizeFormDefinition({ name: template.name, description: template.description ?? undefined,
     permissions: { roles: ((object(template.permissions).roles ?? []) as string[]).filter((role): role is import("@jewelos/core").UserRole => ["super_admin","admin","manager","hr","crm","staff","doer","housekeeping"].includes(role)) },
@@ -28,13 +36,15 @@ export async function loadForms(): Promise<{ bundles: FormBundle[]; submissions:
 }
 export async function loadTaskForms(templateIds: string[], taskIds: string[]): Promise<{ bundles: FormBundle[]; submissions: FormSubmission[] }> {
   if (!templateIds.length) return { bundles: [], submissions: [] };
-  const [templates, fields, submissions] = await Promise.all([
+  const [templates, fields, submissionBatches] = await Promise.all([
     supabase.from("form_templates").select("*").in("id", templateIds).limit(templateIds.length),
     supabase.from("form_fields").select("*").in("form_template_id", templateIds).order("sort_order").limit(1000),
-    taskIds.length ? supabase.from("form_submissions").select("*").in("linked_record_id", taskIds).in("form_template_id", templateIds).order("submitted_at", { ascending: false }).limit(500) : Promise.resolve({ data: [] as FormSubmission[], error: null }),
-  ]); fail("Load task forms", templates.error); fail("Load task form fields", fields.error); fail("Load task form submissions", submissions.error);
+    Promise.all(chunk(taskIds, SUBMISSION_ID_BATCH_SIZE).map((ids) =>
+      supabase.from("form_submissions").select("*").in("linked_record_id", ids).in("form_template_id", templateIds).order("submitted_at", { ascending: false }).limit(500))),
+  ]); fail("Load task forms", templates.error); fail("Load task form fields", fields.error);
+  for (const batch of submissionBatches) fail("Load task form submissions", batch.error);
   const fieldsByTemplate = new Map<string, FormField[]>(); for (const item of fields.data ?? []) fieldsByTemplate.set(item.form_template_id, [...(fieldsByTemplate.get(item.form_template_id) ?? []), item]);
-  const submissionRows = submissions.data ?? []; const counts = new Map<string, number>(); for (const item of submissionRows) counts.set(item.form_template_id, (counts.get(item.form_template_id) ?? 0) + 1);
+  const submissionRows = submissionBatches.flatMap((batch) => batch.data ?? []); const counts = new Map<string, number>(); for (const item of submissionRows) counts.set(item.form_template_id, (counts.get(item.form_template_id) ?? 0) + 1);
   return { bundles: (templates.data ?? []).map((item) => ({ ...item, fields: toDefinition(item, fieldsByTemplate.get(item.id) ?? []).fields as FormFieldDefinition[], submissionCount: counts.get(item.id) ?? 0 })), submissions: submissionRows };
 }
 export async function loadFormDynamicOptions() {

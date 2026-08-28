@@ -55,12 +55,24 @@ describe("TaskCard direct completion", () => {
 
     render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={task} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Direct completion task Pending/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Direct completion task/ }));
     expect(screen.queryByRole("button", { name: "Start" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Delegate" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Complete task: Direct completion task" }));
 
     await waitFor(() => expect(onAction).toHaveBeenCalledWith({ kind: "complete", remark: "" }));
+  });
+
+  it("uses a header Upload action that requests upload and completion for evidence tasks", async () => {
+    const onAction = vi.fn().mockResolvedValue(undefined);
+    const file = new File(["evidence"], "evidence.png", { type: "image/png" });
+
+    render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, requires_upload: true, title: "Upload completion task" }} />);
+
+    fireEvent.change(screen.getByLabelText("Upload task: Upload completion task"), { target: { files: [file] } });
+
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ file, kind: "upload_and_complete" }));
+    expect(screen.queryByRole("button", { name: "Complete task: Upload completion task" })).toBeNull();
   });
 });
