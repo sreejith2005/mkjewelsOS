@@ -23,8 +23,8 @@
 ### Task 1: Add the guarded database contract
 
 **Files:**
-- Create: `supabase/migrations/0104_production_demo_data_retirement.sql`
-- Create: `supabase/tests/0104_production_demo_data_retirement.test.sql`
+- Create: `supabase/migrations/0106_production_demo_data_retirement.sql`
+- Create: `supabase/tests/0106_production_demo_data_retirement.test.sql`
 - Modify: `packages/api-client/src/database.types.ts`
 
 **Interfaces:**
@@ -37,9 +37,9 @@ Create two tenant fixtures containing active super admin/admin/inactive-super-ad
 
 - [ ] **Step 2: Run focused pgTAP to demonstrate it fails**
 
-Run `supabase.cmd test db --local supabase/tests/0104_production_demo_data_retirement.test.sql`.
+Run `supabase.cmd test db --local supabase/tests/0106_production_demo_data_retirement.test.sql`.
 
-Expected: FAIL because migration `0104` does not exist.
+Expected: FAIL because migration `0106` does not exist.
 
 - [ ] **Step 3: Implement the operation ledger and inventory RPC**
 
@@ -137,7 +137,7 @@ Run the focused Vitest file and `pnpm.cmd exec turbo run typecheck --filter=web 
 ### Task 4: Add Storage/worker validation and the operational runbook
 
 **Files:**
-- Modify: `supabase/tests/0104_production_demo_data_retirement.test.sql`
+- Modify: `supabase/tests/0106_production_demo_data_retirement.test.sql`
 - Create: `docs/operations/production-demo-data-retirement-runbook.md`
 
 - [ ] **Step 1: Add failing Storage/maintenance tests**
@@ -163,7 +163,7 @@ Run `supabase.cmd db reset`, `supabase.cmd test db`, `supabase.cmd db lint --loc
 
 - [ ] **Step 1: Run staging read-only preflight**
 
-After interactive staging confirmation, run `git rev-parse HEAD`, `git status --short`, `supabase.cmd migration list --linked`, and `supabase.cmd db push --linked --dry-run`. Verify only reviewed migration `0104` is pending.
+After interactive staging confirmation, run `git rev-parse HEAD`, `git status --short`, `supabase.cmd migration list --linked`, and `supabase.cmd db push --linked --dry-run`. Verify only reviewed migration `0106` is pending.
 
 - [ ] **Step 2: Deploy and rehearse only in staging**
 
