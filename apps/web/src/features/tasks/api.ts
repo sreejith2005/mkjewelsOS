@@ -227,10 +227,12 @@ export async function loadTaskFeed(
   const watchedTaskIds = new Set(watcherRows.map((row) => row.task_instance_id));
   const taskIds = groupedRows.flatMap(({ row }) => row.id ? [row.id] : []);
   const detailBatches = taskFeedIdBatches(taskIds, TASK_DETAIL_ID_BATCH_SIZE);
+  const formTaskIds = groupedRows.flatMap(({ row }) => row.id && row.requires_form && row.form_template_id ? [row.id] : []);
+  const submissionBatches = taskFeedIdBatches(formTaskIds, TASK_DETAIL_ID_BATCH_SIZE);
   const [checklistResults, attachmentResults, submissionResults] = await Promise.all([
     Promise.all(detailBatches.map((ids) => supabase.from("task_checklists").select("*").in("task_instance_id", ids).order("sort_order"))),
     Promise.all(detailBatches.map((ids) => supabase.from("task_attachments").select("task_instance_id").in("task_instance_id", ids))),
-    Promise.all(detailBatches.map((ids) => supabase.from("form_submissions").select("linked_record_id,linked_module,form_template_id").in("linked_record_id", ids))),
+    Promise.all(submissionBatches.map((ids) => supabase.from("form_submissions").select("linked_record_id,linked_module,form_template_id").in("linked_record_id", ids))),
   ]);
   for (const result of checklistResults) fail("Load task checklists", result.error);
   for (const result of attachmentResults) fail("Load task attachments", result.error);

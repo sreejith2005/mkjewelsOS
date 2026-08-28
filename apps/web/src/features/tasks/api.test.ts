@@ -69,8 +69,9 @@ describe("task feed effective-deadline scope", () => {
 
     await loadTaskFeed("admin-1", "2026-08-28T00:00:00.000+05:30", "2026-08-28T23:59:59.999+05:30", { delegated: true });
 
-    for (const table of ["task_checklists", "task_attachments", "form_submissions"]) {
+    for (const table of ["task_checklists", "task_attachments"]) {
       expect(identifierFilters.filter((item) => item.table === table).map((item) => item.values.length)).toEqual([50, 50, 50, 50, 1]);
     }
+    expect(identifierFilters.filter((item) => item.table === "form_submissions")).toEqual([]);
   });
 });
