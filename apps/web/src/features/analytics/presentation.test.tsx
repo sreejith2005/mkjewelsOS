@@ -56,10 +56,11 @@ describe("dashboard and report presentation contracts", () => {
     expect(source).toContain("grid gap-3 sm:hidden");
   });
 
-  it("keeps chart essentials available in a text table", async () => {
+  it("keeps chart essentials available through a labelled SVG trend", async () => {
     const source = await import("./DashboardView?raw").then((module) => module.default as string);
-    expect(source).toContain("Task completion trend");
-    expect(source).toContain("<table");
-    expect(source).toContain("Completed");
+    expect(source).toContain("Task Performance Trend");
+    expect(source).toContain('aria-label="Task completion trend with directly labelled daily values"');
+    expect(source).toContain("role=\"img\"");
+    expect(source).toContain("{point.completed}");
   });
 });

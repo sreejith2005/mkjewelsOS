@@ -8,7 +8,7 @@ select function_owner_is('public','resolve_fms_stage_assignees',array['uuid','uu
 select function_owner_is('public','start_fms_instance_with_audit',array['uuid','text','task_priority','jsonb','uuid','uuid','uuid'],'postgres','start RPC owner is postgres');
 select ok(has_function_privilege('authenticated','start_fms_instance_with_audit(uuid,text,task_priority,jsonb,uuid,uuid,uuid)','EXECUTE'),'authenticated users execute the audited start RPC');
 select ok(not has_function_privilege('anon','start_fms_instance_with_audit(uuid,text,task_priority,jsonb,uuid,uuid,uuid)','EXECUTE'),'anonymous users cannot execute start');
-select ok((select pg_get_functiondef('resolve_fms_stage_assignees(uuid,uuid,uuid)'::regprocedure) like '%u.branch_id=v_instance.branch_id%u.department_id=v_instance.department_id%'),'explicit owner selection is validated against both instance scope fields');
+select ok((select pg_get_functiondef('resolve_fms_stage_assignees(uuid,uuid,uuid)'::regprocedure) like '%assert_direct_assignment_user(p_selected_user,v_instance.tenant_id,''FMS'')%'),'explicit owner selection is validated by the shared direct-assignment scope guard');
 
 select * from finish();
 rollback;

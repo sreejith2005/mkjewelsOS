@@ -113,6 +113,13 @@ select is(mark_all_notifications_read(),1,'mark all affects only current unread 
 reset role;
 
 -- Event idempotency, conditions, recipient deduplication, delay and cooldown.
+-- The task-assignment normalizer rejects stale event payloads. Seed a real
+-- active assignment so this outbox exercise proves recipient normalization
+-- rather than bypassing it with a synthetic source record.
+insert into task_instances(id,tenant_id,branch_id,department_id,task_type,title,priority,status,planned_datetime,created_by,source)
+values('9b110000-0000-0000-0000-000000000001','1b110000-0000-0000-0000-000000000001','2b110000-0000-0000-0000-000000000001','3b110000-0000-0000-0000-000000000001','delegation','Notification outbox source task','high','pending',now()+interval '1 day','4b110000-0000-0000-0000-000000000001','manual');
+insert into task_assignees(task_instance_id,user_profile_id,role_at_task,is_original,is_active)
+values('9b110000-0000-0000-0000-000000000001','4b110000-0000-0000-0000-000000000003','doer',true,true);
 select lives_ok($$select enqueue_notification_event('1b110000-0000-0000-0000-000000000001','2b110000-0000-0000-0000-000000000001','3b110000-0000-0000-0000-000000000001','task_assigned','tasks','9b110000-0000-0000-0000-000000000001',null,'{"actor_name":"System","assignee_name":"Notification Staff","task_title":"Synthetic high task","planned_datetime":"2026-08-10T12:00:00Z","priority":"high","_assigned_user_ids":["4b110000-0000-0000-0000-000000000003"],"_task_creator_id":"4b110000-0000-0000-0000-000000000001","_link_url":"/tasks/checklist"}','task_assigned:synthetic:1',now())$$,'canonical event is accepted');
 select lives_ok($$select enqueue_notification_event('1b110000-0000-0000-0000-000000000001','2b110000-0000-0000-0000-000000000001','3b110000-0000-0000-0000-000000000001','task_assigned','tasks','9b110000-0000-0000-0000-000000000001',null,'{"task_title":"Replay"}','task_assigned:synthetic:1',now())$$,'event replay is idempotent');
 select is((select count(*)::int from notification_events where idempotency_key='task_assigned:synthetic:1'),1,'event idempotency key prevents duplicates');
@@ -158,7 +165,7 @@ reset role;
 insert into task_instances(id,tenant_id,branch_id,department_id,task_type,title,priority,status,planned_datetime,created_by,source)
 values('9b110000-0000-0000-0000-000000000010','1b110000-0000-0000-0000-000000000001','2b110000-0000-0000-0000-000000000001','3b110000-0000-0000-0000-000000000001','delegation','Notification integration task','high','pending',now()-interval '1 hour','4b110000-0000-0000-0000-000000000001','manual');
 insert into task_assignees(id,task_instance_id,user_profile_id,role_at_task,is_original,is_active) values('9c110000-0000-0000-0000-000000000010','9b110000-0000-0000-0000-000000000010','4b110000-0000-0000-0000-000000000003','doer',true,true);
-select is((select count(*)::int from notification_events where source_record_id='9b110000-0000-0000-0000-000000000010' and event_type='task_assigned'),1,'task assignment emits canonical event transactionally');
+select is((select count(*)::int from notifications where source_record_id='9b110000-0000-0000-0000-000000000010' and event_type='task_assigned'),1,'task assignment creates the immediate in-app notification transactionally');
 update task_instances set status='completed',actual_datetime=now(),updated_by='4b110000-0000-0000-0000-000000000003' where id='9b110000-0000-0000-0000-000000000010';
 select is((select count(*)::int from notification_events where source_record_id='9b110000-0000-0000-0000-000000000010' and event_type='task_completed'),1,'task completion emits canonical event transactionally');
 update task_instances set status='pending',actual_datetime=null where id='9b110000-0000-0000-0000-000000000010';

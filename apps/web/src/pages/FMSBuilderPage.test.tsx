@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FmsData } from "@/features/fms/api";
@@ -41,19 +41,16 @@ describe("published FMS quick start", () => {
     expect(create.parentElement?.className).toContain("flex-wrap");
   });
 
-  it("starts in one click without rendering start settings and opens the new instance", async () => {
+  it("keeps published workflow starts in their process form", async () => {
     mocks.loadFmsBuilderData.mockResolvedValue(data);
-    mocks.startFmsInstance.mockResolvedValue({ instance_id: "instance-1", reference_number: "FMS-1" });
     const user = userEvent.setup();
     render(<FMSBuilderPage />);
 
     await user.click(screen.getByRole("button", { name: "Flow library" }));
     await screen.findByText("Sales intake");
     expect(screen.queryByText("Instance title")).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Start instance" }));
-
-    await waitFor(() => expect(mocks.startFmsInstance).toHaveBeenCalledWith(expect.objectContaining({ flowId: "flow", title: "Sales intake", branchId: "andheri", departmentId: "sales", firstAssigneeId: "owner", context: {} })));
-    expect(await screen.findByText("Live instance instance-1")).toBeTruthy();
-    expect(screen.queryByText("Start workflow")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Start instance" })).toBeNull();
+    expect(screen.getByText("Published workflows run from their process form.")).toBeTruthy();
+    expect(mocks.startFmsInstance).not.toHaveBeenCalled();
   });
 });
