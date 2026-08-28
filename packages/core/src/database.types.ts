@@ -7156,6 +7156,14 @@ export type Database = {
         }
         Returns: Json
       }
+      assign_imported_task_with_audit_v0104: {
+        Args: {
+          p_record_id: string
+          p_record_kind: string
+          p_user_profile_id: string
+        }
+        Returns: Json
+      }
       audit_super_admin_password_reset: {
         Args: { p_actor_auth_user_id: string; p_target_profile_id: string }
         Returns: undefined
@@ -7407,6 +7415,10 @@ export type Database = {
         Returns: boolean
       }
       commit_task_bulk_import_chunk: {
+        Args: { p_batch_id: string; p_rows: Json }
+        Returns: Json
+      }
+      commit_task_bulk_import_chunk_v0104: {
         Args: { p_batch_id: string; p_rows: Json }
         Returns: Json
       }
