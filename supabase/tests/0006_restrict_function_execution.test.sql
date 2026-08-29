@@ -39,7 +39,7 @@ select is((
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
-), 287, 'exactly 287 postgres-owned public application functions exist in the current migration set');
+), 288, 'exactly 288 postgres-owned public application functions exist in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -62,7 +62,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 147, 'authenticated can execute exactly 147 reviewed public application functions');
+), 148, 'authenticated can execute exactly 148 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -70,7 +70,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('service_role', p.oid, 'EXECUTE')
-), 43, 'service_role can execute exactly 43 reviewed public application functions');
+), 44, 'service_role can execute exactly 44 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -78,7 +78,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('postgres', p.oid, 'EXECUTE')
-), 287, 'postgres retains owner execution on every public application function');
+), 288, 'postgres retains owner execution on every public application function');
 
 -- Exact authenticated allowlist: baseline, Forms, and reviewed FMS entry points.
 select ok(has_function_privilege('authenticated', 'current_profile()', 'EXECUTE'), 'authenticated executes current_profile');
@@ -180,7 +180,8 @@ select is((
       'save_branch_settings_with_audit(uuid,jsonb,integer,uuid)',
       'get_task_template_directory(jsonb)',
       'set_task_template_schedule_with_audit(uuid,date)',
-      'delete_task_template_with_audit(uuid)'
+      'delete_task_template_with_audit(uuid)',
+      'is_user_week_off_on_date(uuid,date)'
     ]::text[])
   )
   select count(*)::integer
@@ -227,6 +228,7 @@ select is((
       ,'finish_report_export(uuid,uuid,text,text,integer,text)'
       ,'claim_report_export_cleanup(integer)'
       ,'mark_report_export_cleaned(uuid)'
+      ,'is_user_week_off_on_date(uuid,date)'
     )
 ), 30, 'service_role has exactly 30 reviewed post-dashboard grant additions');
 select ok(has_table_privilege('service_role', 'task_templates', 'SELECT'), 'service_role retains task_templates SELECT');

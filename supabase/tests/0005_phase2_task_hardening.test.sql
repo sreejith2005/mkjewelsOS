@@ -445,13 +445,22 @@ select throws_ok(format(
   '40000000-0000-0000-0000-000000000005',
   '40000000-0000-0000-0000-000000000005', 'Self transfer'
 ), '22023', 'Self-delegation is not allowed', 'self-transfer fails');
+-- Migration 0109 adopted the reference rule that completing another user's work
+-- is an exception which has to be explained, so this manager-driven completion
+-- now carries the on-behalf remark.
 select lives_ok(format(
-  'select update_task_with_audit(%L::uuid,%L,null,null,null)',
-  (select id from task_instances where title = 'Manager own branch task'), 'complete'
+  'select update_task_with_audit(%L::uuid,%L,null,null,%L)',
+  (select id from task_instances where title = 'Manager own branch task'), 'complete',
+  'Completed on behalf during branch review'
 ), 'task with no outstanding required checks completes');
 reset role;
+select is((select completion_mode from task_instances where title = 'Manager own branch task'), 'on_behalf',
+  'a manager completing another doer''s work is recorded as an on-behalf completion');
 select is((select count(*)::integer from task_assignees where task_instance_id = (select id from task_instances where title = 'Manager own branch task') and role_at_task = 'doer' and is_active and completed_at is not null), 2, 'completion timestamps every active doer');
-select ok(exists (select 1 from audit_logs where action = 'task_complete' and record_id = (select id from task_instances where title = 'Manager own branch task') and old_value is not null and new_value is not null), 'completion writes complete before/after audit history');
+-- 0109 separates an on-behalf completion from the doer's own completion in the
+-- audit trail, matching the reference's TASK COMPLETED / TASK COMPLETED ON
+-- BEHALF distinction.
+select ok(exists (select 1 from audit_logs where action = 'task_complete_on_behalf' and record_id = (select id from task_instances where title = 'Manager own branch task') and old_value is not null and new_value is not null), 'completion writes complete before/after audit history');
 
 -- Completion gates use separate synthetic tasks for independent proof.
 insert into task_instances (id, tenant_id, branch_id, department_id, category_id, task_type, title, planned_datetime, requires_upload, requires_remark, requires_form, form_template_id, created_by)
