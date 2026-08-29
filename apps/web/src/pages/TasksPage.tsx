@@ -38,7 +38,7 @@ export function TasksPage() {
   const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [formBundles, setFormBundles] = useState<FormBundle[]>([]);
-  const [formDynamicOptions, setFormDynamicOptions] = useState<DynamicOptions>({ users: [], branches: [], departments: [] });
+  const [formDynamicOptions, setFormDynamicOptions] = useState<DynamicOptions>({ users: [], branches: [], departments: [], masters: [] });
   const [formTarget, setFormTarget] = useState<TaskBundle | null>(null);
   const refreshGeneration = useRef(0);
   const canManage = profile ? ["super_admin", "admin", "manager"].includes(profile.user_role) : false;
@@ -158,7 +158,7 @@ export function TasksPage() {
       {canManage ? <div className="fixed bottom-[86px] right-4 z-20 flex gap-2 md:bottom-8 md:right-8">{hasAdminTaskView ? <Button onClick={() => { window.history.pushState({}, "", "/tasks/assigning-left"); window.dispatchEvent(new PopStateEvent("popstate")); }} variant="secondary"><UserRoundPlus className="size-4" />Assigning Left</Button> : null}<Button onClick={() => { window.history.pushState({}, "", "/tasks/import"); window.dispatchEvent(new PopStateEvent("popstate")); }} variant="secondary"><Upload className="size-4" />Bulk Import</Button><Button aria-label="Create task" className="min-h-14 rounded-2xl bg-task-accent px-5 text-task-text shadow-xl hover:bg-task-accent/90" onClick={() => void openComposer()}><Plus className="size-6" />Create Task</Button></div> : null}
 
       {composerOpen && canManage && references && profile ? <TaskComposer data={references} onClose={() => setComposerOpen(false)} onCreated={() => { setComposerOpen(false); void refresh(); }} onSave={createDelegationTask} onUploadAttachment={(taskId, file) => uploadTaskAttachment(profile.tenant_id, taskId, file)} profile={profile} /> : null}
-      {formTarget?.id && formTarget.form_template_id ? (() => { const form = formBundles.find((item) => item.id === formTarget.form_template_id); return form ? <Modal onClose={() => setFormTarget(null)} title={`Required form: ${form.name}`} wide><FormRenderer definition={{ name: form.name, description: form.description ?? undefined, fields: form.fields }} dynamicOptions={formDynamicOptions} onSubmit={async (answers) => { await submitForm(form.id, answers, formTarget.task_type === "delegation" ? "delegation_task" : "checklist_task", formTarget.id as string); setFormTarget(null); await refresh(); }} /></Modal> : <Modal onClose={() => setFormTarget(null)} title="Required form"><Notice tone="danger">The exact required form version is not available to this account.</Notice></Modal>; })() : null}
+      {formTarget?.id && formTarget.form_template_id ? (() => { const form = formBundles.find((item) => item.id === formTarget.form_template_id); return form ? <Modal onClose={() => setFormTarget(null)} title={`Required form: ${form.name}`} wide><FormRenderer definition={{ name: form.name, description: form.description ?? undefined, sections: form.sections, fields: form.fields }} dynamicOptions={formDynamicOptions} onSubmit={async (answers) => { await submitForm(form.id, answers, formTarget.task_type === "delegation" ? "delegation_task" : "checklist_task", formTarget.id as string); setFormTarget(null); await refresh(); }} /></Modal> : <Modal onClose={() => setFormTarget(null)} title="Required form"><Notice tone="danger">The exact required form version is not available to this account.</Notice></Modal>; })() : null}
     </section>
   );
 }

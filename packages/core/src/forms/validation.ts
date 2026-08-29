@@ -1,5 +1,7 @@
 import { validateFormDefinition } from "./definition";
 import { normalizeFormAnswer } from "./answers";
+import { formOptionValues } from "./options";
+import { fieldSectionKey, formSections, reachableSectionKeys } from "./sections";
 import type { FormAnswer, FormAnswers, FormFieldDefinition, FormTemplateDefinition, FormValidationIssue, FormValidationResult } from "./types";
 import { isEmptyFormValue, isFormFieldVisible } from "./visibility";
 
@@ -37,11 +39,11 @@ export function validateFormField(field: FormFieldDefinition, value: FormAnswer 
     if (field.type === "phone" && (!PHONE.test(canonicalValue) || digits.length < 7 || digits.length > 15)) return { code: "invalid_phone", fieldKey: field.key, message: `${field.label} must be a valid phone number` };
     if (field.type === "date" && !isValidCalendarDate(canonicalValue)) return { code: "invalid_date", fieldKey: field.key, message: `${field.label} must be a valid date` };
     if (field.type === "datetime" && (!DATETIME.test(canonicalValue) || !isValidCalendarDate(canonicalValue.slice(0, 10)) || Number.isNaN(Date.parse(canonicalValue)))) return { code: "invalid_datetime", fieldKey: field.key, message: `${field.label} must be a valid datetime` };
-    if ((field.type === "select" || field.type === "radio") && !field.options?.includes(canonicalValue)) return { code: "invalid_option", fieldKey: field.key, message: `${field.label} contains an invalid option` };
+    if ((field.type === "select" || field.type === "radio") && !formOptionValues(field.options).includes(canonicalValue)) return { code: "invalid_option", fieldKey: field.key, message: `${field.label} contains an invalid option` };
     if (field.validation?.minLength !== undefined && canonicalValue.length < field.validation.minLength) return { code: "min_length", fieldKey: field.key, message: `${field.label} is too short` };
     if (field.validation?.maxLength !== undefined && canonicalValue.length > field.validation.maxLength) return { code: "max_length", fieldKey: field.key, message: `${field.label} is too long` };
   }
-  if (Array.isArray(canonicalValue) && canonicalValue.some((item) => !field.options?.includes(item))) return { code: "invalid_option", fieldKey: field.key, message: `${field.label} contains an invalid option` };
+  if (Array.isArray(canonicalValue) && canonicalValue.some((item) => !formOptionValues(field.options).includes(item))) return { code: "invalid_option", fieldKey: field.key, message: `${field.label} contains an invalid option` };
   if (typeof canonicalValue === "number") {
     if (field.type === "rating" && (!Number.isInteger(canonicalValue) || canonicalValue < 1 || canonicalValue > 5)) return { code: "invalid_rating", fieldKey: field.key, message: `${field.label} must be an integer from 1 to 5` };
     if (field.validation?.min !== undefined && canonicalValue < field.validation.min) return { code: "minimum", fieldKey: field.key, message: `${field.label} is below the minimum` };
@@ -54,8 +56,11 @@ export function validateCompleteForm(template: FormTemplateDefinition, answers: 
   const definitionIssues = validateFormDefinition(template);
   const keys = new Set(template.fields.map((field) => field.key));
   const answerIssues: FormValidationIssue[] = Object.keys(answers).filter((key) => !keys.has(key)).map((fieldKey) => ({ code: "unknown_answer", fieldKey, message: `Unknown answer key: ${fieldKey}` }));
+  const sections = formSections(template);
+  const reachable = reachableSectionKeys(template, answers);
   const normalized: Record<string, FormAnswer> = {};
   for (const field of [...template.fields].sort((a, b) => a.sortOrder - b.sortOrder)) {
+    if (!reachable.has(fieldSectionKey(field, sections))) continue;
     const value = answers[field.key];
     const issue = validateFormField(field, value, normalized);
     if (issue) answerIssues.push(issue);

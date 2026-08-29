@@ -3708,10 +3708,71 @@ export type Database = {
           },
         ]
       }
+      fms_workflow_mutation_keys: {
+        Row: {
+          actor_id: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          linked_module: string
+          linked_record_id: string
+          mutation_key: string
+          response: Json | null
+          tenant_id: string
+        }
+        Insert: {
+          actor_id: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          linked_module: string
+          linked_record_id: string
+          mutation_key: string
+          response?: Json | null
+          tenant_id: string
+        }
+        Update: {
+          actor_id?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          linked_module?: string
+          linked_record_id?: string
+          mutation_key?: string
+          response?: Json | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fms_workflow_mutation_keys_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_workflow_mutation_keys_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_workflow_mutation_keys_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       form_fields: {
         Row: {
+          branch_logic: Json | null
           conditional_logic: Json | null
           created_at: string | null
+          dropdown_master_type: string | null
+          dropdown_option_snapshot: Json | null
           field_key: string
           field_name: string
           field_type: string
@@ -3723,15 +3784,20 @@ export type Database = {
           is_editable: boolean
           is_required: boolean
           is_shown: boolean
+          option_source: string | null
           options: Json | null
           placeholder: string | null
+          rule_definition: Json | null
           sort_order: number
           updated_at: string
           validation: Json
         }
         Insert: {
+          branch_logic?: Json | null
           conditional_logic?: Json | null
           created_at?: string | null
+          dropdown_master_type?: string | null
+          dropdown_option_snapshot?: Json | null
           field_key?: string
           field_name: string
           field_type: string
@@ -3743,15 +3809,20 @@ export type Database = {
           is_editable?: boolean
           is_required?: boolean
           is_shown?: boolean
+          option_source?: string | null
           options?: Json | null
           placeholder?: string | null
+          rule_definition?: Json | null
           sort_order?: number
           updated_at?: string
           validation?: Json
         }
         Update: {
+          branch_logic?: Json | null
           conditional_logic?: Json | null
           created_at?: string | null
+          dropdown_master_type?: string | null
+          dropdown_option_snapshot?: Json | null
           field_key?: string
           field_name?: string
           field_type?: string
@@ -3763,8 +3834,10 @@ export type Database = {
           is_editable?: boolean
           is_required?: boolean
           is_shown?: boolean
+          option_source?: string | null
           options?: Json | null
           placeholder?: string | null
+          rule_definition?: Json | null
           sort_order?: number
           updated_at?: string
           validation?: Json
@@ -3942,6 +4015,7 @@ export type Database = {
           permissions: Json
           published_at: string | null
           published_by: string | null
+          sections: Json
           tenant_id: string
           updated_at: string | null
           updated_by: string | null
@@ -3963,6 +4037,7 @@ export type Database = {
           permissions?: Json
           published_at?: string | null
           published_by?: string | null
+          sections?: Json
           tenant_id: string
           updated_at?: string | null
           updated_by?: string | null
@@ -3984,6 +4059,7 @@ export type Database = {
           permissions?: Json
           published_at?: string | null
           published_by?: string | null
+          sections?: Json
           tenant_id?: string
           updated_at?: string | null
           updated_by?: string | null
@@ -4755,6 +4831,73 @@ export type Database = {
           },
         ]
       }
+      production_demo_data_retirements: {
+        Row: {
+          actor_profile_id: string
+          backup_reference: string
+          created_at: string
+          executed_at: string | null
+          expires_at: string
+          id: string
+          maintenance_acknowledged: boolean
+          manifest: Json
+          manifest_hash: string
+          removed_counts: Json | null
+          state: string
+          tenant_id: string
+        }
+        Insert: {
+          actor_profile_id: string
+          backup_reference: string
+          created_at?: string
+          executed_at?: string | null
+          expires_at: string
+          id?: string
+          maintenance_acknowledged?: boolean
+          manifest: Json
+          manifest_hash: string
+          removed_counts?: Json | null
+          state: string
+          tenant_id: string
+        }
+        Update: {
+          actor_profile_id?: string
+          backup_reference?: string
+          created_at?: string
+          executed_at?: string | null
+          expires_at?: string
+          id?: string
+          maintenance_acknowledged?: boolean
+          manifest?: Json
+          manifest_hash?: string
+          removed_counts?: Json | null
+          state?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_demo_data_retirements_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_demo_data_retirements_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_demo_data_retirements_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       resignations: {
         Row: {
           company_assets_returned: boolean
@@ -5511,6 +5654,20 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "dropdown_masters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_instances_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_instances_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
           {
@@ -7507,6 +7664,10 @@ export type Database = {
         }
         Returns: string
       }
+      create_dropdown_list_with_audit: {
+        Args: { p_master_type: string; p_options: Json }
+        Returns: string
+      }
       create_fms_revision_with_audit: {
         Args: { p_flow_id: string }
         Returns: string
@@ -7705,6 +7866,15 @@ export type Database = {
         Args: { p_instance_stage_id: string; p_reason: string }
         Returns: undefined
       }
+      execute_production_demo_data_retirement: {
+        Args: {
+          p_actor_auth_user_id: string
+          p_confirmation: string
+          p_manifest_hash: string
+          p_operation_id: string
+        }
+        Returns: Json
+      }
       fail_crm_sync_run: {
         Args: {
           p_request_key: string
@@ -7771,6 +7941,19 @@ export type Database = {
       form_condition_matches: {
         Args: { p_answers: Json; p_condition: Json }
         Returns: boolean
+      }
+      form_field_option_values: {
+        Args: { p_master_type: string; p_options: Json; p_tenant_id: string }
+        Returns: Json
+      }
+      form_field_section_key: {
+        Args: { p_group_name: string; p_sections: Json }
+        Returns: string
+      }
+      form_option_values: { Args: { p_options: Json }; Returns: Json }
+      form_reachable_sections: {
+        Args: { p_answers: Json; p_template_id: string }
+        Returns: string[]
       }
       get_crm_client_detail: { Args: { p_client_id: string }; Returns: Json }
       get_crm_document_path: {
@@ -7941,6 +8124,10 @@ export type Database = {
         Args: { p_target_date: string; p_user_profile_id: string }
         Returns: boolean
       }
+      is_user_week_off_on_date: {
+        Args: { p_target_date: string; p_user_profile_id: string }
+        Returns: boolean
+      }
       is_valid_fms_due_date: { Args: { p_value: string }; Returns: boolean }
       is_valid_fms_timing_rule: { Args: { p_rule: Json }; Returns: boolean }
       is_valid_form_date: { Args: { p_value: string }; Returns: boolean }
@@ -8032,11 +8219,16 @@ export type Database = {
         Returns: string
       }
       next_employee_code: { Args: never; Returns: string }
-      normalize_form_fields: { Args: { p_fields: Json }; Returns: Json }
+      normalize_form_fields: {
+        Args: { p_fields: Json; p_sections?: Json }
+        Returns: Json
+      }
+      normalize_form_options: { Args: { p_options: Json }; Returns: Json }
       normalize_form_permissions: {
         Args: { p_permissions: Json }
         Returns: Json
       }
+      normalize_form_sections: { Args: { p_sections: Json }; Returns: Json }
       normalize_indian_phone: { Args: { p_value: string }; Returns: string }
       normalize_task_checklist: { Args: { p_checklist: Json }; Returns: Json }
       notification_condition_matches: {
@@ -8065,6 +8257,14 @@ export type Database = {
         }
         Returns: string
       }
+      preview_production_demo_data_retirement: {
+        Args: {
+          p_actor_auth_user_id: string
+          p_backup_reference: string
+          p_maintenance_acknowledged: boolean
+        }
+        Returns: Json
+      }
       process_notification_events: {
         Args: { p_limit?: number }
         Returns: {
@@ -8072,6 +8272,49 @@ export type Database = {
           events_failed: number
           events_processed: number
         }[]
+      }
+      production_demo_data_retirement_actor: {
+        Args: { p_actor_auth_user_id: string }
+        Returns: {
+          account_status: Database["public"]["Enums"]["user_account_status"]
+          auth_user_id: string
+          branch_id: string
+          buddy_id: string | null
+          created_at: string | null
+          created_by: string | null
+          department_id: string
+          designation_id: string | null
+          email: string
+          employee_code: string
+          employee_name: string
+          first_name: string | null
+          id: string
+          is_login_enabled: boolean | null
+          last_name: string | null
+          official_email: string | null
+          official_mobile: string | null
+          personal_email: string | null
+          personal_mobile: string | null
+          reports_to_user_id: string | null
+          secondary_buddy_id: string | null
+          tenant_id: string
+          updated_at: string | null
+          updated_by: string | null
+          user_role: Database["public"]["Enums"]["user_role"]
+          username: string | null
+          week_off: string[]
+          working_status: Database["public"]["Enums"]["working_status"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      production_demo_data_retirement_manifest: {
+        Args: { p_tenant_id: string }
+        Returns: Json
       }
       publish_fms_flow_with_audit: {
         Args: { p_flow_id: string }
@@ -8605,6 +8848,20 @@ export type Database = {
           instance_id: string
           reference_number: string
         }[]
+      }
+      submit_fms_form_and_progress_with_audit: {
+        Args: {
+          p_answers: Json
+          p_checklist?: Json
+          p_form_template_id: string
+          p_idempotency_key: string
+          p_linked_module: string
+          p_linked_record_id: string
+          p_next_assignee_id?: string
+          p_outcome?: string
+          p_remark?: string
+        }
+        Returns: Json
       }
       submit_form_base_with_audit: {
         Args: {

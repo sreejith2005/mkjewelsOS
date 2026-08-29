@@ -15,6 +15,33 @@ export type FormRuleOperator = FormConditionOperator | "not_contains" | "in" | "
 export type FormAnswer = string | number | boolean | readonly string[];
 export type FormAnswers = Readonly<Record<string, FormAnswer | null | undefined>>;
 
+/**
+ * An option carries a stable `value` and a renameable `label`. Answers, branch
+ * rules, and conditions always store the `value`, so renaming a label never
+ * breaks a saved submission or a conditional rule.
+ */
+export type FormOption = Readonly<{ value: string; label: string }>;
+
+/** Absent means the options are stored inline on the field. */
+export type FormOptionSource = Readonly<{ kind: "master"; masterType: string }>;
+
+/** Every branch target is a later section, or the end of the form. */
+export const FORM_SUBMIT_TARGET = "__submit__";
+
+export type FormBranch = Readonly<{
+  operator: FormConditionOperator;
+  value?: FormAnswer | undefined;
+  targetSectionKey: string;
+}>;
+
+export type FormSectionDefinition = Readonly<{
+  key: string;
+  title: string;
+  description?: string | undefined;
+  /** Where the respondent goes after this section. Absent means the next section in order. */
+  next?: string | undefined;
+}>;
+
 export type FormCondition = Readonly<{
   fieldKey: string;
   operator: FormConditionOperator;
@@ -48,12 +75,15 @@ export type FormFieldDefinition = Readonly<{
   label: string;
   type: FormFieldType;
   sortOrder: number;
+  sectionKey?: string | undefined;
   required?: boolean | undefined;
   shown?: boolean | undefined;
   editable?: boolean | undefined;
   placeholder?: string | undefined;
   helperText?: string | undefined;
-  options?: readonly string[] | undefined;
+  options?: readonly FormOption[] | undefined;
+  optionSource?: FormOptionSource | undefined;
+  branches?: readonly FormBranch[] | undefined;
   validation?: FormValidation | undefined;
   condition?: FormCondition | undefined;
   rule?: FormRule | undefined;
@@ -62,6 +92,7 @@ export type FormFieldDefinition = Readonly<{
 export type FormTemplateDefinition = Readonly<{
   name: string;
   description?: string | undefined;
+  sections?: readonly FormSectionDefinition[] | undefined;
   fields: readonly FormFieldDefinition[];
   permissions?: Readonly<{ roles: readonly UserRole[] }> | undefined;
 }>;

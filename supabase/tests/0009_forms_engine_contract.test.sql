@@ -81,7 +81,7 @@ select ok(has_function_privilege('authenticated','review_form_submission_with_au
 select ok(not has_function_privilege('anon','submit_form_with_audit(uuid,jsonb,text,uuid)','EXECUTE'),'anon cannot execute submit RPC');
 select ok(not has_function_privilege('service_role','submit_form_with_audit(uuid,jsonb,text,uuid)','EXECUTE'),'service role cannot execute submit RPC');
 select ok(not has_function_privilege('public','submit_form_with_audit(uuid,jsonb,text,uuid)','EXECUTE'),'PUBLIC cannot execute submit RPC');
-select ok(not has_function_privilege('authenticated','normalize_form_fields(jsonb)','EXECUTE'),'authenticated cannot execute owner helper');
+select ok(not has_function_privilege('authenticated','normalize_form_fields(jsonb,jsonb)','EXECUTE'),'authenticated cannot execute owner helper');
 select ok(not has_table_privilege('authenticated','form_templates','INSERT,UPDATE,DELETE'),'authenticated cannot directly mutate templates');
 select ok(not has_table_privilege('authenticated','form_fields','INSERT,UPDATE,DELETE'),'authenticated cannot directly mutate fields');
 select ok(not has_table_privilege('authenticated','form_submissions','INSERT,UPDATE,DELETE'),'authenticated cannot directly mutate submissions');
@@ -120,7 +120,7 @@ select is((select lifecycle::text from form_templates where name='Phase 4 Compre
 select is((select count(*)::int from form_fields where form_template_id=(select id from form_templates where name='Phase 4 Comprehensive')),19,'all supported fields are stored');
 select is((select min(sort_order)::int from form_fields where form_template_id=(select id from form_templates where name='Phase 4 Comprehensive')),0,'field ordering starts at zero');
 select is((select max(sort_order)::int from form_fields where form_template_id=(select id from form_templates where name='Phase 4 Comprehensive')),18,'field ordering is contiguous');
-select is((select options from form_fields where form_template_id=(select id from form_templates where name='Phase 4 Comprehensive') and field_key='select_value'),'["Show", "Hide"]'::jsonb,'options are stored in canonical trimmed form');
+select is((select options from form_fields where form_template_id=(select id from form_templates where name='Phase 4 Comprehensive') and field_key='select_value'),'[{"value": "Show", "label": "Show"}, {"value": "Hide", "label": "Hide"}]'::jsonb,'options are stored trimmed and with a stable identity');
 select is((select count(*)::int from audit_logs where action='form_draft_created' and record_id=(select id from form_templates where name='Phase 4 Comprehensive')),1,'draft creation is audited transactionally');
 
 set local role authenticated;

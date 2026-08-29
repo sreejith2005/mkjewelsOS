@@ -39,14 +39,14 @@ select is((
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
-), 288, 'exactly 288 postgres-owned public application functions exist in the current migration set');
+), 296, 'exactly 296 postgres-owned public application functions exist in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres' and p.prosecdef
-), 248, 'exactly 248 public application functions are SECURITY DEFINER in the current migration set');
+), 250, 'exactly 250 public application functions are SECURITY DEFINER in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -62,7 +62,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 148, 'authenticated can execute exactly 148 reviewed public application functions');
+), 150, 'authenticated can execute exactly 150 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -78,7 +78,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('postgres', p.oid, 'EXECUTE')
-), 288, 'postgres retains owner execution on every public application function');
+), 296, 'postgres retains owner execution on every public application function');
 
 -- Exact authenticated allowlist: baseline, Forms, and reviewed FMS entry points.
 select ok(has_function_privilege('authenticated', 'current_profile()', 'EXECUTE'), 'authenticated executes current_profile');
@@ -191,7 +191,7 @@ select is((
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
     and p.oid::regprocedure::text not in (select identity from expected)
-), 42, 'authenticated has exactly 42 reviewed post-dashboard grant additions');
+), 44, 'authenticated has exactly 44 reviewed post-dashboard grant additions');
 
 -- Exact service-role allowlist and preservation of recurrence table reads.
 select ok(has_function_privilege('service_role', 'invite_profile_with_audit(uuid,uuid,text,text,uuid,uuid,uuid,text,text,text[],user_role,text,uuid)', 'EXECUTE'), 'service_role executes invite_profile_with_audit');

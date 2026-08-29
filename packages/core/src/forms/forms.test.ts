@@ -16,6 +16,8 @@ import {
   type FormTemplateDefinition,
 } from "./index";
 
+const opts = (...labels: readonly string[]) => labels.map((label) => ({ value: label.trim(), label: label.trim() }));
+
 const field = (type: FormFieldDefinition["type"], overrides: Partial<FormFieldDefinition> = {}): FormFieldDefinition => ({
   key: `field_${type}`,
   label: type,
@@ -31,7 +33,7 @@ describe("Forms definition contract", () => {
     const fields = FORM_FIELD_TYPES.map((type, sortOrder) => field(type, {
       key: `field_${sortOrder}`,
       sortOrder,
-      options: ["One"] && (["select", "multiselect", "radio"].includes(type) ? ["One"] : undefined),
+      options: ["select", "multiselect", "radio"].includes(type) ? opts("One") : undefined,
     }));
     expect(checkFormPublishability(template(fields))).toEqual({ valid: true, issues: [] });
   });
@@ -47,15 +49,15 @@ describe("Forms definition contract", () => {
 
   it("rejects duplicate keys, gaps, invalid options, layout requirements, and invalid bounds", () => {
     const issues = validateFormDefinition(template([
-      field("select", { key: "same", options: ["A", "A"] }),
-      field("divider", { key: "same", sortOrder: 3, required: true, options: ["bad"], validation: { min: 2, max: 1 } }),
+      field("select", { key: "same", options: opts("A", "A") }),
+      field("divider", { key: "same", sortOrder: 3, required: true, options: opts("bad"), validation: { min: 2, max: 1 } }),
     ]));
     expect(new Set(issues.map((issue) => issue.code))).toEqual(expect.objectContaining(new Set(["invalid_options", "duplicate_key", "invalid_order", "unexpected_options", "layout_required", "invalid_validation"])));
   });
 
   it("canonicalizes option whitespace and rejects duplicates after trimming", () => {
-    expect(normalizeFormDefinition(template([field("select", { options: [" Option ", "Other"] })])).fields[0]?.options).toEqual(["Option", "Other"]);
-    expect(validateFormDefinition(template([field("select", { options: ["Option", " Option "] })]))).toEqual(expect.arrayContaining([expect.objectContaining({ code: "invalid_options" })]));
+    expect(normalizeFormDefinition(template([field("select", { options: opts(" Option ", "Other") })])).fields[0]?.options).toEqual(opts("Option", "Other"));
+    expect(validateFormDefinition(template([field("select", { options: opts("Option", " Option ") })]))).toEqual(expect.arrayContaining([expect.objectContaining({ code: "invalid_options" })]));
   });
 
   it("rejects missing, forward, and self dependencies, which also prevents cycles", () => {
@@ -135,13 +137,13 @@ describe("Forms visibility and answer validation", () => {
     expect(validateFormField(field("phone"), "12", {})?.code).toBe("invalid_phone");
     expect(validateFormField(field("date"), "not-date", {})?.code).toBe("invalid_date");
     expect(validateFormField(field("datetime"), "2026-08-08", {})?.code).toBe("invalid_datetime");
-    expect(validateFormField(field("select", { options: ["A"] }), "B", {})?.code).toBe("invalid_option");
-    expect(validateFormField(field("radio", { options: ["A"] }), "A", {})).toBeUndefined();
-    expect(validateFormField(field("multiselect", { options: ["A", "B"] }), ["A", "C"], {})?.code).toBe("invalid_option");
+    expect(validateFormField(field("select", { options: opts("A") }), "B", {})?.code).toBe("invalid_option");
+    expect(validateFormField(field("radio", { options: opts("A") }), "A", {})).toBeUndefined();
+    expect(validateFormField(field("multiselect", { options: opts("A", "B") }), ["A", "C"], {})?.code).toBe("invalid_option");
   });
 
   it.each(["text", "email", "phone", "select", "date", "datetime", "user_dropdown", "branch_dropdown", "department_dropdown"] as const)("rejects a whitespace-only required %s value", (type) => {
-    const options = type === "select" ? { options: ["Option"] } : {};
+    const options = type === "select" ? { options: opts("Option") } : {};
     expect(validateFormField(field(type, { required: true, ...options }), "   ", {})?.code).toBe("required");
   });
 
@@ -156,7 +158,7 @@ describe("Forms visibility and answer validation", () => {
     expect(validateFormField(field("text"), ["x"], {})?.code).toBe("invalid_shape");
     expect(validateFormField(field("number"), "1", {})?.code).toBe("invalid_shape");
     expect(validateFormField(field("checkbox"), "true", {})?.code).toBe("invalid_shape");
-    expect(validateFormField(field("multiselect", { options: ["A"] }), "A", {})?.code).toBe("invalid_shape");
+    expect(validateFormField(field("multiselect", { options: opts("A") }), "A", {})?.code).toBe("invalid_shape");
   });
 
   it("rejects unknown answer keys", () => {
@@ -178,7 +180,7 @@ describe("Forms answer normalization and formatting", () => {
     const fields = [
       field("number", { key: "amount" }),
       field("text", { key: "hidden", sortOrder: 1, condition: { fieldKey: "amount", operator: "equals", value: 2 } }),
-      field("multiselect", { key: "choices", sortOrder: 2, options: ["A", "B"] }),
+      field("multiselect", { key: "choices", sortOrder: 2, options: opts("A", "B") }),
     ];
     expect(normalizeFormAnswers(template(fields), { amount: "0", hidden: "secret", choices: [" A ", "A", "B"] })).toEqual({ amount: 0, choices: ["A", "B"] });
   });

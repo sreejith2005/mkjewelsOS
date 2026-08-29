@@ -1,5 +1,5 @@
 import { supabase } from "@jewelos/api-client";
-import type { Tables } from "@jewelos/core";
+import type { FormMasterOption, Json, Tables } from "@jewelos/core";
 
 export type MasterOption = Pick<Tables<"dropdown_masters">, "id" | "master_type" | "label" | "value" | "sort_order" | "is_active">;
 const cached = new Map<string, Promise<MasterOption[]>>();
@@ -12,3 +12,15 @@ export function loadMasterOptions(types: readonly string[], activeOnly = true): 
   cached.set(key, request); return request;
 }
 export function invalidateMasterOptions() { cached.clear(); }
+
+/** The Dropdown Master rows in the shape the forms engine resolves references with. */
+export const toFormMasterOptions = (options: readonly MasterOption[]): FormMasterOption[] =>
+  options.map((option) => ({ masterType: option.master_type, value: option.value, label: option.label }));
+
+/** Creates a brand-new Dropdown Master list and returns its master_type key. */
+export async function createMasterList(masterType: string, options: readonly { value: string; label: string }[]): Promise<string> {
+  const { data, error } = await supabase.rpc("create_dropdown_list_with_audit", { p_master_type: masterType, p_options: options as unknown as Json });
+  if (error) throw new Error(error.message);
+  invalidateMasterOptions();
+  return (data as string | null) ?? masterType;
+}

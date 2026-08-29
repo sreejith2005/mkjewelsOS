@@ -313,6 +313,7 @@ export function RecurringTodoPage() {
     users: [],
     branches: [],
     departments: [],
+    masters: [],
   });
   const [formTarget, setFormTarget] = useState<RecurringInstance | null>(null);
   const [tab, setTab] = useState<Tab>("today");
@@ -880,6 +881,7 @@ export function RecurringTodoPage() {
                   definition={{
                     name: form.name,
                     description: form.description ?? undefined,
+                    sections: form.sections,
                     fields: form.fields,
                   }}
                   dynamicOptions={formOptions}

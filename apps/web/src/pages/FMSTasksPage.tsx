@@ -10,7 +10,7 @@ import { loadFmsRuntime, setFmsInstanceStatus, type FmsInstance } from "@/featur
 import { filterFmsInstances } from "@/features/fms/runtimeView";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 
-const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: [] };
+const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: [], masters: [] };
 type Runtime = Awaited<ReturnType<typeof loadFmsRuntime>>;
 
 export function FMSTasksPage({ embedded = false, query: externalQuery, initialInstanceId }: { embedded?: boolean; query?: string; initialInstanceId?: string }) {
