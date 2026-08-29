@@ -5360,6 +5360,9 @@ export type Database = {
           branch_id: string | null
           buddy_assignment_allowed: boolean
           category_id: string | null
+          completed_by: string | null
+          completion_delay_minutes: number | null
+          completion_mode: string | null
           completion_remark: string | null
           core_task_label: string | null
           coverage_original_assignee_id: string | null
@@ -5376,6 +5379,7 @@ export type Database = {
           form_template_id: string | null
           id: string
           last_followup_at: string | null
+          on_time_status: string | null
           planned_datetime: string
           priority: Database["public"]["Enums"]["task_priority"] | null
           requires_form: boolean
@@ -5404,6 +5408,9 @@ export type Database = {
           branch_id?: string | null
           buddy_assignment_allowed?: boolean
           category_id?: string | null
+          completed_by?: string | null
+          completion_delay_minutes?: number | null
+          completion_mode?: string | null
           completion_remark?: string | null
           core_task_label?: string | null
           coverage_original_assignee_id?: string | null
@@ -5420,6 +5427,7 @@ export type Database = {
           form_template_id?: string | null
           id?: string
           last_followup_at?: string | null
+          on_time_status?: string | null
           planned_datetime: string
           priority?: Database["public"]["Enums"]["task_priority"] | null
           requires_form?: boolean
@@ -5448,6 +5456,9 @@ export type Database = {
           branch_id?: string | null
           buddy_assignment_allowed?: boolean
           category_id?: string | null
+          completed_by?: string | null
+          completion_delay_minutes?: number | null
+          completion_mode?: string | null
           completion_remark?: string | null
           core_task_label?: string | null
           coverage_original_assignee_id?: string | null
@@ -5464,6 +5475,7 @@ export type Database = {
           form_template_id?: string | null
           id?: string
           last_followup_at?: string | null
+          on_time_status?: string | null
           planned_datetime?: string
           priority?: Database["public"]["Enums"]["task_priority"] | null
           requires_form?: boolean
@@ -7639,6 +7651,10 @@ export type Database = {
         Args: { p_template_id: string }
         Returns: string
       }
+      delete_task_template_with_audit: {
+        Args: { p_template_id: string }
+        Returns: Json
+      }
       detect_crm_followup_events: {
         Args: { p_limit?: number; p_now?: string }
         Returns: {
@@ -7810,6 +7826,7 @@ export type Database = {
         Args: { p_batch_id: string }
         Returns: Json
       }
+      get_task_template_directory: { Args: { p_filter?: Json }; Returns: Json }
       hold_fms_instance_with_audit: {
         Args: { p_instance_id: string; p_reason: string }
         Returns: undefined
@@ -8562,6 +8579,10 @@ export type Database = {
       set_recurring_todo_template_active_with_audit: {
         Args: { p_active: boolean; p_template_id: string }
         Returns: boolean
+      }
+      set_task_template_schedule_with_audit: {
+        Args: { p_starts_on: string; p_template_id: string }
+        Returns: Json
       }
       start_fms_from_form_submission_with_audit: {
         Args: { p_submission_id: string }

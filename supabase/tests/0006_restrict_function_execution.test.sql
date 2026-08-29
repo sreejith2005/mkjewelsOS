@@ -39,14 +39,14 @@ select is((
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
-), 284, 'exactly 284 postgres-owned public application functions exist in the current migration set');
+), 287, 'exactly 287 postgres-owned public application functions exist in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres' and p.prosecdef
-), 245, 'exactly 245 public application functions are SECURITY DEFINER in the current migration set');
+), 248, 'exactly 248 public application functions are SECURITY DEFINER in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -62,7 +62,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 144, 'authenticated can execute exactly 144 reviewed public application functions');
+), 147, 'authenticated can execute exactly 147 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -78,7 +78,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('postgres', p.oid, 'EXECUTE')
-), 284, 'postgres retains owner execution on every public application function');
+), 287, 'postgres retains owner execution on every public application function');
 
 -- Exact authenticated allowlist: baseline, Forms, and reviewed FMS entry points.
 select ok(has_function_privilege('authenticated', 'current_profile()', 'EXECUTE'), 'authenticated executes current_profile');
@@ -177,7 +177,10 @@ select is((
       'get_report_export_download_url(uuid)', 'can_read_report_export_object(text)',
       'save_user_preferences_with_audit(jsonb)',
       'save_tenant_settings_with_audit(jsonb,integer,uuid)',
-      'save_branch_settings_with_audit(uuid,jsonb,integer,uuid)'
+      'save_branch_settings_with_audit(uuid,jsonb,integer,uuid)',
+      'get_task_template_directory(jsonb)',
+      'set_task_template_schedule_with_audit(uuid,date)',
+      'delete_task_template_with_audit(uuid)'
     ]::text[])
   )
   select count(*)::integer
