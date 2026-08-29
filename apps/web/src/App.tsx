@@ -43,6 +43,7 @@ const DashboardPage = lazyPage("dashboard", () => import("@/pages/DashboardPage"
 const DropdownMasterPage = lazyPage("dropdown-master", () => import("@/pages/DropdownMasterPage").then((module) => ({ default: module.DropdownMasterPage })));
 const FormsPage = lazyPage("forms", () => import("@/pages/FormsPage").then((module) => ({ default: module.FormsPage })));
 const FMSBuilderPage = lazyPage("fms", () => import("@/pages/FMSBuilderPage").then((module) => ({ default: module.FMSBuilderPage })));
+const FMSTasksPage = lazyPage("fms-tasks", () => import("@/pages/FMSTasksPage").then((module) => ({ default: module.FMSTasksPage })));
 const NotificationsPage = lazyPage("notifications", () => import("@/pages/NotificationsPage").then((module) => ({ default: module.NotificationsPage })));
 const CRMPage = lazyPage("crm", () => import("@/pages/CRMPage").then((module) => ({ default: module.CRMPage })));
 const TasksPage = lazyPage("tasks", () => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
@@ -315,7 +316,7 @@ function AppShell() {
       : currentPage === "task_templates" ? <TaskTemplatesPage />
       : currentPage === "availability" ? <AvailabilityPage />
           : currentPage === "forms_library" ? <FormsPage />
-            : currentPage === "fms_tasks" ? <FMSBuilderPage />
+            : currentPage === "fms_tasks" ? <FMSTasksPage />
               : currentPage === "fms_builder" ? <FMSBuilderPage />
                 : currentPage === "notifications" ? <NotificationsPage onNavigate={navigate} />
             : <DashboardPage />;

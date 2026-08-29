@@ -69,6 +69,21 @@ export async function loadFmsRuntime(): Promise<{ instances: FmsInstance[]; stag
 export async function startFmsInstance(input: { flowId: string; title: string; priority: "high" | "medium" | "low"; context: Json; branchId: string; departmentId: string; firstAssigneeId: string | null }): Promise<FmsStartResult> { const { data, error } = await supabase.rpc("start_fms_instance_with_audit", { p_flow_id: input.flowId, p_title: input.title, p_priority: input.priority, p_context: input.context, p_branch_id: input.branchId, p_department_id: input.departmentId, ...(input.firstAssigneeId ? { p_first_assignee_id: input.firstAssigneeId } : {}) }); fail("Start FMS instance", error); const result = data?.[0]; if (!result) throw new Error("Start FMS instance returned no reference"); return result; }
 export const claimFmsStage = async (id: string) => { const { error } = await supabase.rpc("claim_fms_stage_with_audit", { p_instance_stage_id: id }); fail("Claim FMS stage", error); };
 export const completeFmsStage = async (id: string, outcome: string, remark: string, checklist: Record<string, boolean>, nextAssigneeId: string | null) => { const { error } = await supabase.rpc("complete_fms_stage_with_audit", { p_instance_stage_id: id, p_checklist: checklist, ...(outcome ? { p_outcome: outcome } : {}), ...(remark ? { p_remark: remark } : {}), ...(nextAssigneeId ? { p_next_assignee_id: nextAssigneeId } : {}) }); fail("Complete FMS stage", error); };
+export async function submitFmsFormAndProgress(input: { formTemplateId: string; answers: Json; instanceStageId: string; idempotencyKey: string; outcome: string; remark: string; checklist: Record<string, boolean>; nextAssigneeId: string | null }) {
+  const { data, error } = await supabase.rpc("submit_fms_form_and_progress_with_audit" as never, {
+    p_form_template_id: input.formTemplateId,
+    p_answers: input.answers,
+    p_linked_module: "fms_stage",
+    p_linked_record_id: input.instanceStageId,
+    p_idempotency_key: input.idempotencyKey,
+    ...(input.outcome ? { p_outcome: input.outcome } : {}),
+    ...(input.remark ? { p_remark: input.remark } : {}),
+    p_checklist: input.checklist,
+    ...(input.nextAssigneeId ? { p_next_assignee_id: input.nextAssigneeId } : {}),
+  } as never);
+  fail("Submit and progress FMS stage", error);
+  return data;
+}
 export const reviewFmsStage = async (id: string, decision: "approved" | "rejected" | "revision_requested", remark: string, nextAssigneeId: string | null) => { const { error } = await supabase.rpc("review_fms_stage_with_audit", { p_instance_stage_id: id, p_decision: decision, ...(remark ? { p_remark: remark } : {}), ...(nextAssigneeId ? { p_next_assignee_id: nextAssigneeId } : {}) }); fail("Review FMS stage", error); };
 export const reassignFmsStage = async (id: string, from: string, to: string, reason: string) => { const { error } = await supabase.rpc("reassign_fms_stage_with_audit", { p_instance_stage_id: id, p_from_user_id: from, p_to_user_id: to, p_reason: reason }); fail("Reassign FMS stage", error); };
 export const moveFmsStageBackward = async (id: string, target: string, reason: string, assignee: string | null) => { const { error } = await supabase.rpc("move_fms_stage_backward_with_audit", { p_instance_stage_id: id, p_target_stage_id: target, p_reason: reason, ...(assignee ? { p_assignee_id: assignee } : {}) }); fail("Move FMS stage backward", error); };

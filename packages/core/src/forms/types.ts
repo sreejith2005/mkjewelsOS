@@ -11,6 +11,7 @@ export const FORM_DRAFT_FIELD_TYPES = [...FORM_FIELD_TYPES, "file"] as const;
 
 export type FormFieldType = (typeof FORM_DRAFT_FIELD_TYPES)[number];
 export type FormConditionOperator = "equals" | "not_equals" | "contains" | "not_empty";
+export type FormRuleOperator = FormConditionOperator | "not_contains" | "in" | "not_in" | "greater_than" | "less_than" | "greater_than_or_equal" | "less_than_or_equal" | "is_empty";
 export type FormAnswer = string | number | boolean | readonly string[];
 export type FormAnswers = Readonly<Record<string, FormAnswer | null | undefined>>;
 
@@ -19,6 +20,20 @@ export type FormCondition = Readonly<{
   operator: FormConditionOperator;
   value?: FormAnswer | undefined;
 }>;
+
+export type FormRulePredicate = Readonly<{
+  kind: "predicate";
+  fieldKey: string;
+  operator: FormRuleOperator;
+  value?: FormAnswer | readonly FormAnswer[] | undefined;
+}>;
+
+export type FormRuleGroup = Readonly<{
+  kind: "all" | "any";
+  rules: readonly FormRule[];
+}>;
+
+export type FormRule = FormRulePredicate | FormRuleGroup;
 
 export type FormValidation = Readonly<{
   minLength?: number | undefined;
@@ -41,6 +56,7 @@ export type FormFieldDefinition = Readonly<{
   options?: readonly string[] | undefined;
   validation?: FormValidation | undefined;
   condition?: FormCondition | undefined;
+  rule?: FormRule | undefined;
 }>;
 
 export type FormTemplateDefinition = Readonly<{

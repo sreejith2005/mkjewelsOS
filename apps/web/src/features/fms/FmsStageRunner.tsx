@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { deriveFmsTransitionCapability, type FmsStageDefinition } from "@jewelos/core";
+import { deriveFmsTransitionCapability, type FmsStageDefinition, type Json } from "@jewelos/core";
 import { Button, Field, Modal, Notice } from "@/components/ui";
 import { AssigneePicker } from "@/components/assignees/AssigneePicker";
 import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer";
-import { submitForm, type FormBundle } from "@/features/forms/api";
+import { type FormBundle } from "@/features/forms/api";
 import {
   claimFmsStage,
   completeFmsStage,
@@ -11,6 +11,7 @@ import {
   moveFmsStageBackward,
   reassignFmsStage,
   requestFmsRevision,
+  submitFmsFormAndProgress,
   reviewFmsStage,
   signedFmsEvidenceUrl,
   updateFmsChecklistItem,
@@ -51,6 +52,7 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(shouldOpenInitialForm);
+  const [formMutationKey] = useState(() => crypto.randomUUID());
   const [managedAction, setManagedAction] = useState<ManagedAction | null>(null);
   const [fromUser, setFromUser] = useState("");
   const [targetUser, setTargetUser] = useState("");
@@ -122,7 +124,7 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
       </div>
     </> : <p className="text-xs text-soft-grey">{capability.reason}</p>}
     {capability.canReassign && (stage.assigned_to?.length ?? 0) > 0 ? <Button disabled={busy} onClick={() => openManagedAction("reassign")} variant="secondary">Reassign</Button> : null}
-    {showForm && linkedForm ? <Modal onClose={() => setShowForm(false)} title={`${requiresLinkedForm ? "Required" : "Optional"} form: ${linkedForm.name} v${linkedForm.version}`} wide><FormRenderer definition={{ name: linkedForm.name, description: linkedForm.description ?? undefined, fields: linkedForm.fields }} dynamicOptions={formOptions} onSubmit={async (answers) => { await submitForm(linkedForm.id, answers, "fms_stage", stage.id); setShowForm(false); await onRefresh(); }} /></Modal> : null}
+    {showForm && linkedForm ? <Modal onClose={() => setShowForm(false)} title={`${requiresLinkedForm ? "Required" : "Optional"} form: ${linkedForm.name} v${linkedForm.version}`} wide><FormRenderer definition={{ name: linkedForm.name, description: linkedForm.description ?? undefined, fields: linkedForm.fields }} dynamicOptions={formOptions} onSubmit={async (answers) => { await submitFmsFormAndProgress({ formTemplateId: linkedForm.id, answers: answers as unknown as Json, instanceStageId: stage.id, idempotencyKey: formMutationKey, outcome, remark, checklist: checklistPayload, nextAssigneeId: nextAssignee || null }); setShowForm(false); await onRefresh(); }} workflowHint /></Modal> : null}
     {managedAction ? <Modal onClose={() => setManagedAction(null)} title={managedAction.replace("_", " ")}>
       <div className="space-y-3">
         {managedAction === "reassign" ? <Field label="Current assignee"><select className="field" onChange={(event) => setFromUser(event.target.value)} value={fromUser}>{(stage.assigned_to ?? []).map((id) => <option key={id} value={id}>{users.find((user) => user.id === id)?.employee_name ?? "Historical user"}</option>)}</select></Field> : null}

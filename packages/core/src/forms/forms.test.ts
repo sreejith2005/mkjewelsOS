@@ -3,6 +3,7 @@ import {
   FORM_FIELD_TYPES,
   checkFormPublishability,
   evaluateFormCondition,
+  evaluateFormRule,
   formatFormSubmission,
   isEmptyFormValue,
   isFormFieldVisible,
@@ -78,6 +79,26 @@ describe("Forms definition contract", () => {
 });
 
 describe("Forms visibility and answer validation", () => {
+  it("evaluates nested universal rules without evaluating code", () => {
+    const rule = {
+      kind: "all" as const,
+      rules: [
+        { kind: "predicate" as const, fieldKey: "call_status", operator: "in" as const, value: ["connected", "ringing"] },
+        { kind: "any" as const, rules: [
+          { kind: "predicate" as const, fieldKey: "interest", operator: "equals" as const, value: "interested" },
+          { kind: "predicate" as const, fieldKey: "follow_up", operator: "not_empty" as const },
+        ] },
+      ],
+    };
+    expect(evaluateFormRule(rule, { call_status: "connected", interest: "interested" })).toBe(true);
+    expect(evaluateFormRule(rule, { call_status: "connected", interest: "lost" })).toBe(false);
+  });
+
+  it("supports universal negative and numeric comparisons", () => {
+    expect(evaluateFormRule({ kind: "predicate", fieldKey: "attempt", operator: "greater_than_or_equal", value: 3 }, { attempt: 3 })).toBe(true);
+    expect(evaluateFormRule({ kind: "predicate", fieldKey: "status", operator: "not_in", value: ["closed", "lost"] }, { status: "active" })).toBe(true);
+    expect(evaluateFormRule({ kind: "predicate", fieldKey: "remark", operator: "is_empty" }, { remark: "" })).toBe(true);
+  });
   it.each([
     [{ fieldKey: "source", operator: "equals" as const, value: "yes" }, { source: "yes" }, true],
     [{ fieldKey: "source", operator: "not_equals" as const, value: "no" }, { source: "yes" }, true],
