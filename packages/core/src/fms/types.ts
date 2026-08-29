@@ -27,18 +27,23 @@ export type FmsAssigneeRule = Readonly<{
 
 export type FmsChecklistItemDefinition = Readonly<{ key: string; label: string; required: boolean }>;
 export type FmsTimingMethod = "completion_date" | "tat_hours" | "days_before_date" | "specific_time";
-export type FmsDecisionMode = "normal" | "yes_no";
+export type FmsDecisionMode = "normal" | "yes_no" | "decision";
+export type FmsDecisionOption = Readonly<{ key: string; label: string }>;
 /** A conditional step either observes the workflow Status supplied at start, or a prior Yes/No decision. */
-export type FmsConditionalRule = Readonly<{ field: "status"; operator: FmsStatusConditionOperator; value: string } | { decisionStageKey: string; outcome: "yes" | "no" }>;
+export type FmsConditionalRule = Readonly<{ field: "status"; operator: FmsStatusConditionOperator; value: string } | { decisionStageKey: string; outcome: string } | { decisionStageKey: string; decisionOptionKey: string }>;
 export type FmsSlaRule = Readonly<{
   timingMethod?: FmsTimingMethod | undefined;
+  deadlineEnabled?: boolean | undefined;
   dueDate: string;
   tatHours?: number | undefined;
+  tatMinutes?: number | undefined;
+  tatUnit?: "hours" | "minutes" | undefined;
   futureDate?: string | undefined;
   daysBefore?: number | undefined;
   clockTime?: string | undefined;
   triggerStageKey?: string | undefined;
   decisionMode?: FmsDecisionMode | undefined;
+  decisionOptions?: readonly FmsDecisionOption[] | undefined;
   conditional?: FmsConditionalRule | undefined;
 }>;
 export type FmsBranchRule = Readonly<{

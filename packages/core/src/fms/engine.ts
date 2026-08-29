@@ -1,5 +1,5 @@
 import type { UserRole } from "../roleMenu";
-import { FMS_ASSIGNEE_TYPES, FMS_BRANCH_OPERATORS, FMS_STAGE_TYPES, FMS_STATUS_CONDITION_OPERATORS, type FmsAssignmentCandidate, type FmsAssigneeRule, type FmsBranchRule, type FmsChecklistItemDefinition, type FmsFlowDefinition, type FmsInstanceStatus, type FmsStageActorState, type FmsStageDefinition, type FmsStageStatus, type FmsTimingMethod, type FmsTransitionCapability, type FmsValidationIssue } from "./types";
+import { FMS_ASSIGNEE_TYPES, FMS_BRANCH_OPERATORS, FMS_STAGE_TYPES, FMS_STATUS_CONDITION_OPERATORS, type FmsAssignmentCandidate, type FmsAssigneeRule, type FmsBranchRule, type FmsChecklistItemDefinition, type FmsDecisionOption, type FmsFlowDefinition, type FmsInstanceStatus, type FmsStageActorState, type FmsStageDefinition, type FmsStageStatus, type FmsTimingMethod, type FmsTransitionCapability, type FmsValidationIssue } from "./types";
 
 const KEY = /^[a-z][a-z0-9_]{0,63}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -11,6 +11,7 @@ const bool = (value: unknown, fallback = false) => typeof value === "boolean" ? 
 const array = <T>(value: unknown): T[] => Array.isArray(value) ? value as T[] : [];
 const TIMING_METHODS = new Set<FmsTimingMethod>(["completion_date", "tat_hours", "days_before_date", "specific_time"]);
 const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
+const legacyDecisionOptions: readonly FmsDecisionOption[] = [{ key: "yes", label: "Yes" }, { key: "no", label: "No" }];
 
 export function normalizeFmsDefinition(input: FmsFlowDefinition): FmsFlowDefinition {
   const stages = [...input.stages].sort((a, b) => a.order - b.order || a.key.localeCompare(b.key)).map((stage, order) => ({
@@ -29,14 +30,17 @@ export function normalizeFmsDefinition(input: FmsFlowDefinition): FmsFlowDefinit
     splitToFlowId: text(stage.splitToFlowId) || undefined,
     sla: {
       timingMethod: TIMING_METHODS.has(stage.sla?.timingMethod as FmsTimingMethod) ? stage.sla.timingMethod as FmsTimingMethod : "completion_date",
-      dueDate: text(stage.sla?.dueDate),
-      decisionMode: stage.sla?.decisionMode === "yes_no" ? "yes_no" as const : "normal" as const,
+      dueDate: text(stage.sla?.dueDate), deadlineEnabled: stage.sla?.deadlineEnabled !== false,
+      decisionMode: stage.sla?.decisionMode === "yes_no" || stage.sla?.decisionMode === "decision" ? "decision" as const : "normal" as const,
+      ...(stage.sla?.decisionMode === "yes_no" || stage.sla?.decisionMode === "decision" ? { decisionOptions: (array<FmsDecisionOption>(stage.sla?.decisionOptions).map((option) => ({ key: text(option.key).toLowerCase(), label: text(option.label) })).filter((option) => option.key && option.label).length ? array<FmsDecisionOption>(stage.sla?.decisionOptions).map((option) => ({ key: text(option.key).toLowerCase(), label: text(option.label) })).filter((option) => option.key && option.label) : legacyDecisionOptions) } : {}),
       ...(Number.isFinite(stage.sla?.tatHours) ? { tatHours: Number(stage.sla.tatHours) } : {}),
+      ...(Number.isFinite(stage.sla?.tatMinutes) ? { tatMinutes: Number(stage.sla.tatMinutes) } : Number.isFinite(stage.sla?.tatHours) ? { tatMinutes: Math.round(Number(stage.sla.tatHours) * 60) } : {}),
+      ...(stage.sla?.tatUnit === "hours" || stage.sla?.tatUnit === "minutes" ? { tatUnit: stage.sla.tatUnit } : {}),
       ...(text(stage.sla?.futureDate) ? { futureDate: text(stage.sla.futureDate) } : {}),
       ...(Number.isFinite(stage.sla?.daysBefore) ? { daysBefore: Number(stage.sla.daysBefore) } : {}),
       ...(text(stage.sla?.clockTime) ? { clockTime: text(stage.sla.clockTime) } : {}),
       ...(text(stage.sla?.triggerStageKey) ? { triggerStageKey: text(stage.sla.triggerStageKey).toLowerCase() } : {}),
-      ...(stage.sla?.conditional && "field" in stage.sla.conditional ? { conditional: { field: stage.sla.conditional.field, operator: stage.sla.conditional.operator, value: text(stage.sla.conditional.value) } } : stage.sla?.conditional && "decisionStageKey" in stage.sla.conditional ? { conditional: { decisionStageKey: text(stage.sla.conditional.decisionStageKey).toLowerCase(), outcome: stage.sla.conditional.outcome } } : {}),
+      ...(stage.sla?.conditional && "field" in stage.sla.conditional ? { conditional: { field: stage.sla.conditional.field, operator: stage.sla.conditional.operator, value: text(stage.sla.conditional.value) } } : stage.sla?.conditional && "decisionStageKey" in stage.sla.conditional ? { conditional: { decisionStageKey: text(stage.sla.conditional.decisionStageKey).toLowerCase(), decisionOptionKey: text("decisionOptionKey" in stage.sla.conditional ? stage.sla.conditional.decisionOptionKey : stage.sla.conditional.outcome).toLowerCase() } } : {}),
     },
   }));
   return { ...input, name: text(input.name), description: text(input.description) || undefined, manualTrigger: true, stages };
@@ -76,18 +80,19 @@ export function validateFmsDefinition(raw: FmsFlowDefinition): readonly FmsValid
     if (!KEY.test(stage.key) || keys.has(stage.key)) add("invalid_stage_key", "Stage keys must be unique stable identifiers"); keys.add(stage.key);
     if (!stage.name || stage.name.length > 150 || !FMS_STAGE_TYPES.includes(stage.type)) add("invalid_stage", "Stage name or type is invalid");
     if (stage.type === "end") add("legacy_end_stage", "End nodes are no longer used. Leave the final executable stage without a next connection instead");
-    if (!AUTO.has(stage.type) && stage.sla.timingMethod === "completion_date" && !validDate(stage.sla.dueDate)) add("invalid_deadline", "Choose a valid completion due date");
-    if (!AUTO.has(stage.type) && stage.sla.timingMethod === "tat_hours" && (!Number.isFinite(stage.sla.tatHours) || stage.sla.tatHours! <= 0 || stage.sla.tatHours! > 8760)) add("invalid_deadline", "TAT must be between 0 and 8,760 hours");
-    if (!AUTO.has(stage.type) && stage.sla.timingMethod === "days_before_date" && (!validDate(stage.sla.futureDate ?? "") || !Number.isInteger(stage.sla.daysBefore) || stage.sla.daysBefore! < 0 || stage.sla.daysBefore! > 3650)) add("invalid_deadline", "Choose a future date and a valid number of days before it");
-    if (!AUTO.has(stage.type) && stage.sla.timingMethod === "specific_time" && (!validDate(stage.sla.dueDate) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(stage.sla.clockTime ?? ""))) add("invalid_deadline", "Choose a valid date and clock time");
+    if (!AUTO.has(stage.type) && stage.sla.deadlineEnabled !== false && stage.sla.timingMethod === "completion_date" && !validDate(stage.sla.dueDate)) add("invalid_deadline", "Choose a valid completion due date");
+    if (!AUTO.has(stage.type) && stage.sla.deadlineEnabled !== false && stage.sla.timingMethod === "tat_hours" && (!Number.isFinite(stage.sla.tatMinutes) || stage.sla.tatMinutes! <= 0 || stage.sla.tatMinutes! > 525600)) add("invalid_deadline", "TAT must be between 1 minute and 8,760 hours");
+    if (!AUTO.has(stage.type) && stage.sla.deadlineEnabled !== false && stage.sla.timingMethod === "days_before_date" && (!validDate(stage.sla.futureDate ?? "") || !Number.isInteger(stage.sla.daysBefore) || stage.sla.daysBefore! < 0 || stage.sla.daysBefore! > 3650)) add("invalid_deadline", "Choose a future date and a valid number of days before it");
+    if (!AUTO.has(stage.type) && stage.sla.deadlineEnabled !== false && stage.sla.timingMethod === "specific_time" && (!validDate(stage.sla.dueDate) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(stage.sla.clockTime ?? ""))) add("invalid_deadline", "Choose a valid date and clock time");
     if (stage.sla.triggerStageKey) { const trigger = byKey.get(stage.sla.triggerStageKey); if (!trigger || trigger.order >= stage.order) add("invalid_deadline_trigger", "Timing can only start from an earlier step"); }
-    if (stage.sla.decisionMode === "yes_no" && (AUTO.has(stage.type) || stageIndex === 0)) add("invalid_decision", "Yes/No decisions are available on human steps after the initial Form");
+    if (stage.sla.decisionMode === "decision" && (AUTO.has(stage.type) || stageIndex === 0 || !stage.sla.decisionOptions?.length || new Set(stage.sla.decisionOptions.map((option) => option.key)).size !== stage.sla.decisionOptions.length || stage.sla.decisionOptions.some((option) => !KEY.test(option.key) || !option.label))) add("invalid_decision", "Decision steps need unique options on human steps after the initial Form");
     if (stage.sla.conditional) {
       if ("field" in stage.sla.conditional) {
         if (stage.sla.conditional.field !== "status" || !FMS_STATUS_CONDITION_OPERATORS.includes(stage.sla.conditional.operator) || !text(stage.sla.conditional.value)) add("invalid_conditional", "A Status condition needs a supported operator and value");
       } else {
         const decision = byKey.get(stage.sla.conditional.decisionStageKey);
-        if (!decision || decision.order >= stage.order || decision.sla.decisionMode !== "yes_no") add("invalid_conditional", "A condition must reference an earlier Yes/No decision step");
+        const optionKey = "decisionOptionKey" in stage.sla.conditional ? stage.sla.conditional.decisionOptionKey : stage.sla.conditional.outcome;
+        if (!decision || decision.order >= stage.order || decision.sla.decisionMode !== "decision" || !decision.sla.decisionOptions?.some((option) => option.key === optionKey)) add("invalid_conditional", "A condition must reference an earlier configured decision option");
       }
     }
     if (new Set(stage.checklist.map((item) => item.key)).size !== stage.checklist.length || stage.checklist.some((item) => !KEY.test(item.key) || !item.label)) add("invalid_checklist", "Checklist keys must be unique and labels are required");
