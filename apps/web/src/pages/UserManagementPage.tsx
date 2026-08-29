@@ -767,7 +767,7 @@ export function AddUserForm({
             Cancel
           </Button>
           <Button disabled={saving || created} type="submit">
-            {saving ? "Creatingâ€¦" : "Create user"}
+            {saving ? "Creating…" : "Create user"}
           </Button>
         </div>
       </form>
@@ -888,7 +888,7 @@ export function UserManagementPage() {
           <div>
             <h1 className="font-display text-3xl text-gold">Team</h1>
             <p className="text-sm text-soft-grey">
-              {users.length} authorized profiles Â·{" "}
+              {users.length} authorized profiles ·{" "}
               {users.filter((user) => user.account_status === "active").length}{" "}
               active
             </p>
@@ -945,7 +945,7 @@ export function UserManagementPage() {
         </div>
       </div>
       {loading ? (
-        <p className="py-12 text-center text-gold">Loading usersâ€¦</p>
+        <p className="py-12 text-center text-gold">Loading users…</p>
       ) : view === "organization" ? (
         <Organization profiles={users} />
       ) : (
@@ -984,13 +984,13 @@ export function UserManagementPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-soft-grey">
-                    {user.personal_mobile ?? "â€”"}
+                    {user.personal_mobile ?? "—"}
                   </td>
                   <td className="px-4 py-3 text-soft-grey">{user.email}</td>
                   <td className="px-4 py-3 text-soft-grey">
                     {data.profiles.find(
                       (item) => item.id === user.reports_to_user_id,
-                    )?.employee_name ?? "â€”"}
+                    )?.employee_name ?? "—"}
                   </td>
                   <td className="px-4 py-3">
                     <span className="rounded bg-gold/10 px-2 py-1 text-xs text-gold">

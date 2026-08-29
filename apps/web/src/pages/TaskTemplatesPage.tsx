@@ -47,7 +47,7 @@ function prettyTime(value: string | null): string {
 function Chip({ children, tone }: { children: string; tone: "gold" | "muted" }) {
   return (
     <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${
+      className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
         tone === "gold" ? "bg-gold/15 text-gold" : "bg-task-border/60 text-task-text-muted"
       }`}
     >
@@ -59,7 +59,7 @@ function Chip({ children, tone }: { children: string; tone: "gold" | "muted" }) 
 function EvidenceFlag({ required }: { required: boolean }) {
   return (
     <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${
+      className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
         required ? "bg-warning/15 text-warning" : "bg-success/15 text-success"
       }`}
     >
@@ -72,12 +72,18 @@ function StatusText({ row }: { row: TaskTemplateDirectoryRow }) {
   const label = templateStatusLabel(row);
   const tone =
     label === "ACTIVE" ? "text-success" : label === "INACTIVE" ? "text-task-text-muted" : "text-warning";
-  return <span className={`text-xs font-semibold uppercase tracking-wider ${tone}`}>{label}</span>;
+  return <span className={`whitespace-nowrap text-[10px] font-semibold uppercase tracking-wider ${tone}`}>{label}</span>;
 }
 
+/**
+ * The four row actions stay on one line. Letting them wrap turns every row into
+ * a four-line block, which is what made the directory unreadable at real row
+ * counts; the cell shrinks to its content instead so the table keeps its shape.
+ */
 function RowActions({
   row,
   busy,
+  compact = false,
   onEdit,
   onSchedule,
   onToggle,
@@ -85,22 +91,24 @@ function RowActions({
 }: {
   row: TaskTemplateDirectoryRow;
   busy: boolean;
+  compact?: boolean;
   onEdit: () => void;
   onSchedule: () => void;
   onToggle: () => void;
   onDelete: () => void;
 }) {
   const activateBlocked = !row.is_active && !templateCanActivate(row);
+  const style = "min-h-7 whitespace-nowrap rounded-md px-2.5 py-1 text-[11px] font-semibold";
   return (
-    <div className="flex flex-wrap gap-1.5">
-      <Button className="min-h-8 px-3 py-1 text-xs" disabled={busy} onClick={onEdit} variant="secondary">
+    <div className={`flex items-center gap-1 ${compact ? "flex-wrap" : "flex-nowrap"}`}>
+      <Button className={style} disabled={busy} onClick={onEdit} variant="secondary">
         Edit
       </Button>
-      <Button className="min-h-8 px-3 py-1 text-xs" disabled={busy} onClick={onSchedule} variant="secondary">
+      <Button className={style} disabled={busy} onClick={onSchedule} variant="secondary">
         Schedule
       </Button>
       <Button
-        className="min-h-8 px-3 py-1 text-xs"
+        className={style}
         disabled={busy || activateBlocked}
         onClick={onToggle}
         title={activateBlocked ? "Set a task start date before activating this schedule." : undefined}
@@ -108,7 +116,7 @@ function RowActions({
       >
         {row.is_active ? "Deactivate" : "Activate"}
       </Button>
-      <Button className="min-h-8 px-3 py-1 text-xs" disabled={busy} onClick={onDelete} variant="danger">
+      <Button className={style} disabled={busy} onClick={onDelete} variant="danger">
         Delete
       </Button>
     </div>
@@ -351,11 +359,11 @@ export function TaskTemplatesPage() {
         ) : (
           <>
             <div className="hidden overflow-x-auto rounded-2xl border border-task-border lg:block">
-              <table className="w-full min-w-[80rem] text-left text-sm">
-                <thead className="bg-charcoal text-xs uppercase tracking-wider text-soft-grey">
+              <table className="w-full min-w-[72rem] table-auto text-left text-xs">
+                <thead className="bg-charcoal text-[10px] uppercase tracking-wider text-soft-grey">
                   <tr>
                     {headers.map((header) => (
-                      <th className="whitespace-nowrap p-3 font-semibold" key={header}>
+                      <th className="whitespace-nowrap px-2 py-2 font-semibold" key={header}>
                         {header}
                       </th>
                     ))}
@@ -363,31 +371,31 @@ export function TaskTemplatesPage() {
                 </thead>
                 <tbody>
                   {visible.map((row) => (
-                    <tr className="border-t border-task-border align-middle" key={row.id}>
-                      <td className="whitespace-nowrap p-3 uppercase text-task-text">{row.assignee_name || "—"}</td>
-                      <td className="whitespace-nowrap p-3 uppercase text-task-text-muted">{row.department_name || "—"}</td>
-                      <td className="min-w-72 p-3 font-semibold text-white">{row.title}</td>
-                      <td className="p-3">
+                    <tr className="border-t border-task-border align-middle hover:bg-gold/5" key={row.id}>
+                      <td className="whitespace-nowrap px-2 py-2 uppercase text-task-text">{row.assignee_name || "—"}</td>
+                      <td className="whitespace-nowrap px-2 py-2 uppercase text-task-text-muted">{row.department_name || "—"}</td>
+                      <td className="w-full min-w-64 px-2 py-2 font-semibold text-white">{row.title}</td>
+                      <td className="px-2 py-2">
                         <Chip tone={templateWorkTypeLabel(row) === "UPLOAD" ? "muted" : "gold"}>
                           {templateWorkTypeLabel(row)}
                         </Chip>
                       </td>
-                      <td className="whitespace-nowrap p-3 text-task-text-muted">{templateFrequencyLabel(row)}</td>
-                      <td className="whitespace-nowrap p-3 text-task-text-muted">{prettyDate(row.starts_on)}</td>
-                      <td className="whitespace-nowrap p-3 text-task-text-muted">{prettyTime(row.planned_time)}</td>
-                      <td className="whitespace-nowrap p-3 text-task-text-muted">
+                      <td className="whitespace-nowrap px-2 py-2 text-task-text-muted">{templateFrequencyLabel(row)}</td>
+                      <td className="whitespace-nowrap px-2 py-2 text-task-text-muted">{prettyDate(row.starts_on)}</td>
+                      <td className="whitespace-nowrap px-2 py-2 text-task-text-muted">{prettyTime(row.planned_time)}</td>
+                      <td className="whitespace-nowrap px-2 py-2 text-task-text-muted">
                         {prettyTime(row.due_time ?? row.planned_time)}
                       </td>
-                      <td className="p-3">
+                      <td className="px-2 py-2">
                         <EvidenceFlag required={row.requires_upload} />
                       </td>
-                      <td className="whitespace-nowrap p-3 text-xs uppercase tracking-wider text-task-text-muted">
+                      <td className="whitespace-nowrap px-2 py-2 text-[10px] uppercase tracking-wider text-task-text-muted">
                         {templateSourceLabel(row)}
                       </td>
-                      <td className="whitespace-nowrap p-3">
+                      <td className="whitespace-nowrap px-2 py-2">
                         <StatusText row={row} />
                       </td>
-                      <td className="p-3">
+                      <td className="w-px whitespace-nowrap px-2 py-2">
                         <RowActions
                           busy={busyId === row.id}
                           onDelete={() => remove(row)}
@@ -431,6 +439,7 @@ export function TaskTemplatesPage() {
                   <div className="mt-4">
                     <RowActions
                       busy={busyId === row.id}
+                      compact
                       onDelete={() => remove(row)}
                       onEdit={() => void openEdit(row)}
                       onSchedule={() => openSchedule(row)}
