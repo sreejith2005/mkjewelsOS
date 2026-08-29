@@ -34,8 +34,6 @@ export type TaskTemplateDirectoryRow = Readonly<{
   schedule_status: "ready" | "paused" | "needs_start_date" | "assigning_left";
   source: "web_app" | "bulk_import";
   checklist_count: number;
-  open_instance_count: number;
-  preserved_instance_count: number;
   created_at: string | null;
   updated_at: string | null;
 }>;

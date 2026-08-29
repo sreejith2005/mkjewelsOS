@@ -1,5 +1,5 @@
 begin;
-select plan(22);
+select plan(24);
 
 -- Contract surface -----------------------------------------------------------
 
@@ -95,6 +95,20 @@ select is(
   (select count(*) from jsonb_array_elements(get_task_template_directory(jsonb_build_object('search','undated'))->'templates')),
   1::bigint,
   'the directory search narrows the result set'
+);
+
+-- 0110 removed the two per-row instance counts that could not use an index and
+-- that nothing rendered; the directory must stay a single-pass read.
+select ok(
+  (select not (entry ? 'open_instance_count' or entry ? 'preserved_instance_count')
+   from jsonb_array_elements(get_task_template_directory('{}'::jsonb)->'templates') as t(entry)
+   where entry->>'id'='10850000-0000-4000-8000-000000000001'),
+  'the directory row carries no per-row instance counts'
+);
+select ok(
+  (select count(*) from pg_indexes where schemaname='public'
+     and indexname in ('idx_task_instances_template','idx_task_import_items_template','idx_task_import_row_registry_template')) = 3,
+  'template lookups are indexed in task_instances and both import tables'
 );
 
 select throws_ok(
