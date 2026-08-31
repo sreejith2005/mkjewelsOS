@@ -2194,6 +2194,7 @@ export type Database = {
           head_id: string | null
           id: string
           is_active: boolean | null
+          module_context: string | null
           name: string
           tenant_id: string
           updated_at: string | null
@@ -2207,6 +2208,7 @@ export type Database = {
           head_id?: string | null
           id?: string
           is_active?: boolean | null
+          module_context?: string | null
           name: string
           tenant_id: string
           updated_at?: string | null
@@ -2220,6 +2222,7 @@ export type Database = {
           head_id?: string | null
           id?: string
           is_active?: boolean | null
+          module_context?: string | null
           name?: string
           tenant_id?: string
           updated_at?: string | null
@@ -2860,6 +2863,12 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      fms_context_assignee_defaults: {
+        Row: { id: string; tenant_id: string; module_context: string; user_profile_id: string; created_by: string; updated_by: string; created_at: string; updated_at: string }
+        Insert: { id?: string; tenant_id: string; module_context: string; user_profile_id: string; created_by: string; updated_by: string; created_at?: string; updated_at?: string }
+        Update: { id?: string; tenant_id?: string; module_context?: string; user_profile_id?: string; created_by?: string; updated_by?: string; created_at?: string; updated_at?: string }
+        Relationships: []
       }
       fms_instance_checklist_items: {
         Row: {
@@ -8691,6 +8700,14 @@ export type Database = {
       save_fms_flow_draft_with_audit: {
         Args: { p_flow_id: string; p_metadata: Json; p_stages: Json }
         Returns: string
+      }
+      save_fms_context_assignee_default_with_audit: {
+        Args: { p_module_context: string; p_user_profile_id: string }
+        Returns: undefined
+      }
+      set_fms_flow_context_with_audit: {
+        Args: { p_flow_id: string; p_module_context: string | null }
+        Returns: undefined
       }
       save_form_draft_with_audit: {
         Args: { p_fields: Json; p_payload: Json; p_template_id: string }

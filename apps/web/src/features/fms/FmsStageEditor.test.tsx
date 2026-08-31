@@ -49,19 +49,23 @@ describe("FMS stage editor", () => {
     expect(screen.queryByLabelText("Primary assignee")).toBeNull();
     expect(screen.queryByLabelText("Fallback assignee")).toBeNull();
   });
-  it("offers all supported timing methods without minute-based SLA fields", async () => {
+  it("offers optional deadlines and a normalized hours/minutes TAT", async () => {
     const user = userEvent.setup();
     render(<Harness />);
+    expect(screen.getByLabelText("Set deadline")).toBeTruthy();
     expect(screen.getByLabelText("Completion due date").getAttribute("type")).toBe("date");
     await user.click(screen.getByRole("button", { name: /TAT \(hours\)/ }));
-    expect(screen.getByLabelText("TAT (hours)")).toBeTruthy();
+    expect(screen.getByLabelText("TAT value")).toBeTruthy();
+    await user.selectOptions(screen.getByLabelText("TAT unit"), "minutes");
+    expect((screen.getByLabelText("TAT unit") as HTMLSelectElement).value).toBe("minutes");
     expect(screen.getByLabelText("Trigger from")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: /Days before date/ }));
     expect(screen.getByLabelText("Future date")).toBeTruthy();
     expect(screen.getByLabelText("Days before")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: /Specific clock time/ }));
     expect(screen.getByLabelText("Clock time")).toBeTruthy();
-    expect(screen.queryByLabelText("SLA minutes")).toBeNull();
+    await user.click(screen.getByLabelText("Set deadline"));
+    expect(screen.queryByLabelText("TAT value")).toBeNull();
     expect(screen.queryByLabelText("Escalate after")).toBeNull();
   });
   it("requires the initial details form but keeps every later form attachment optional", async () => {
@@ -73,10 +77,12 @@ describe("FMS stage editor", () => {
     await user.click(screen.getByLabelText("Attach an optional form"));
     expect(screen.getByLabelText("Optional linked form")).toBeTruthy();
   });
-  it("configures a Status condition and retains the earlier Yes or No alternative", async () => {
+  it("configures a Status condition and derives dynamic earlier-decision options", async () => {
     const user = userEvent.setup();
     render(<DecisionHarness />);
-    await user.click(screen.getByRole("button", { name: /Decision step \(Yes\/No\)/ }));
+    await user.click(screen.getByRole("button", { name: /Decision step/ }));
+    await user.click(screen.getByRole("button", { name: "Add decision option" }));
+    await user.type(screen.getByLabelText("Decision option 3"), " Call Back Required");
     await user.click(screen.getByRole("button", { name: "Edit follow up" }));
     const conditional = screen.getByLabelText("Enable conditional step");
     await user.click(conditional);
@@ -90,5 +96,6 @@ describe("FMS stage editor", () => {
     expect((screen.getByLabelText("Condition operator") as HTMLSelectElement).value).toBe("not_contains");
     await user.selectOptions(screen.getByLabelText("Condition field"), "decision");
     expect((screen.getByLabelText("Earlier decision") as HTMLSelectElement).value).toBe("decision");
+    expect(screen.getByLabelText("Run when answer is").textContent).toContain("Call Back Required");
   });
 });

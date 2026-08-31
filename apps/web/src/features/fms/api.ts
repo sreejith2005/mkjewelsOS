@@ -6,7 +6,7 @@ const fail = (label: string, error: DbError) => { if (error) throw new Error(`${
 
 export type FmsFlowRow = {
   id: string; family_id: string; version: number; name: string; description: string | null; status: "draft" | "published" | "archived";
-  scope_type: "tenant" | "branch" | "department"; branch_id: string | null; department_id: string | null; is_active: boolean; usage_count: number;
+  scope_type: "tenant" | "branch" | "department"; branch_id: string | null; department_id: string | null; module_context?: string | null; is_active: boolean; usage_count: number;
 };
 export type FmsStageRow = {
   id: string; fms_flow_id: string; stage_key: string; name: string; method: string | null; step_type: FmsFlowDefinition["stages"][number]["type"];
@@ -21,7 +21,7 @@ export type FmsChecklistItem = { id: string; fms_instance_stage_id: string; item
 export type FmsEvidence = { id: string; fms_instance_stage_id: string; storage_path: string; original_filename: string; mime_type: string; size_bytes: number; uploaded_by: string; created_at: string };
 export type FmsLog = { id: string; fms_instance_stage_id: string; actor_id: string | null; action: string; details: Json | null; created_at: string | null };
 export type FmsAvailability = "present" | "absent" | "half_day" | "remote";
-export type FmsData = { flows: FmsFlowRow[]; stages: FmsStageRow[]; assignees: Array<{ fms_stage_id: string; assignee_type: string; user_profile_id: string | null; fallback_user_profile_id?: string | null; role_value: string | null; allow_next_selection: boolean; sort_order: number }>; branchRules: Array<{ id: string; fms_stage_id: string; source_type: string; source_key: string | null; condition_operator: string; condition_value: string | null; next_stage_id: string | null; next_flow_id: string | null; label: string | null; sort_order: number | null }>; forms: Array<{ id: string; name: string; version: number }>; statusOptions?: Array<{ label: string; value: string }>; users: Array<{ id: string; employee_name: string; employee_code?: string; account_status?: string; user_role: string; branch_id: string; department_id: string; working_status: string; is_login_enabled: boolean | null }>; availability: Array<{ user_profile_id: string; status: FmsAvailability }>; branches: Array<{ id: string; name: string }>; departments: Array<{ id: string; branch_id: string | null; name: string }> };
+export type FmsData = { flows: FmsFlowRow[]; stages: FmsStageRow[]; assignees: Array<{ fms_stage_id: string; assignee_type: string; user_profile_id: string | null; fallback_user_profile_id?: string | null; role_value: string | null; allow_next_selection: boolean; sort_order: number }>; branchRules: Array<{ id: string; fms_stage_id: string; source_type: string; source_key: string | null; condition_operator: string; condition_value: string | null; next_stage_id: string | null; next_flow_id: string | null; label: string | null; sort_order: number | null }>; forms: Array<{ id: string; name: string; version: number }>; statusOptions?: Array<{ label: string; value: string }>; contextDefaults?: Array<{ module_context: string; user_profile_id: string }>; users: Array<{ id: string; employee_name: string; employee_code?: string; account_status?: string; user_role: string; branch_id: string; department_id: string; working_status: string; is_login_enabled: boolean | null }>; availability: Array<{ user_profile_id: string; status: FmsAvailability }>; branches: Array<{ id: string; name: string }>; departments: Array<{ id: string; branch_id: string | null; name: string }> };
 export type FmsStartResult = { instance_id: string; reference_number: string };
 
 function dateInKolkata(date: Date): string {
@@ -43,15 +43,17 @@ export async function loadFmsBuilderData(): Promise<FmsData> {
     supabase.from("branches").select("id,name").eq("is_active", true).order("name").limit(100),
     supabase.from("departments").select("id,branch_id,name").eq("is_active", true).order("name").limit(300),
     supabase.from("user_availability").select("user_profile_id,status").eq("date", kolkataDate).limit(1000),
+    supabase.from("fms_context_assignee_defaults").select("module_context,user_profile_id").limit(100),
   ]);
   results.forEach((result) => fail("Load FMS builder", result.error));
-  return { flows: results[0].data as FmsFlowRow[], stages: results[1].data as FmsStageRow[], assignees: results[2].data ?? [], branchRules: results[3].data ?? [], forms: results[4].data ?? [], statusOptions: results[5].data ?? [], users: results[6].data ?? [], branches: results[7].data ?? [], departments: results[8].data ?? [], availability: results[9].data ?? [] };
+  return { flows: results[0].data as FmsFlowRow[], stages: results[1].data as FmsStageRow[], assignees: results[2].data ?? [], branchRules: results[3].data ?? [], forms: results[4].data ?? [], statusOptions: results[5].data ?? [], users: results[6].data ?? [], branches: results[7].data ?? [], departments: results[8].data ?? [], availability: results[9].data ?? [], contextDefaults: results[10].data ?? [] };
 }
 
 export async function saveFmsDraft(flowId: string | null, definition: FmsFlowDefinition): Promise<string> {
-  const metadata = { name: definition.name, description: definition.description ?? "", scope_type: definition.scope, branch_id: definition.branchId ?? "", department_id: definition.departmentId ?? "", trigger_type: "manual", is_active: true };
-  const { data, error } = await supabase.rpc("save_fms_flow_draft_with_audit", { p_flow_id: flowId as string, p_metadata: metadata as Json, p_stages: definition.stages as unknown as Json }); fail("Save FMS draft", error); if (!data) throw new Error("Save FMS draft returned no ID"); return data;
+  const metadata = { name: definition.name, description: definition.description ?? "", scope_type: definition.scope, branch_id: definition.branchId ?? "", department_id: definition.departmentId ?? "", module_context: definition.moduleContext ?? "", trigger_type: "manual", is_active: true };
+  const { data, error } = await supabase.rpc("save_fms_flow_draft_with_audit", { p_flow_id: flowId as string, p_metadata: metadata as Json, p_stages: definition.stages as unknown as Json }); fail("Save FMS draft", error); if (!data) throw new Error("Save FMS draft returned no ID"); const { error: contextError } = await supabase.rpc("set_fms_flow_context_with_audit", { p_flow_id: data, p_module_context: definition.moduleContext ?? null }); fail("Save FMS workflow context", contextError); return data;
 }
+export const saveFmsContextAssigneeDefault = async (moduleContext: string, userProfileId: string) => { const { error } = await supabase.rpc("save_fms_context_assignee_default_with_audit", { p_module_context: moduleContext, p_user_profile_id: userProfileId }); fail("Save FMS default assignee", error); };
 export const reviseFmsFlow = async (id: string) => { const { data, error } = await supabase.rpc("create_fms_revision_with_audit", { p_flow_id: id }); fail("Create FMS revision", error); return data; };
 export const publishFmsFlow = async (id: string) => { const { error } = await supabase.rpc("publish_fms_flow_with_audit", { p_flow_id: id }); fail("Publish FMS flow", error); };
 export const archiveFmsFlow = async (id: string, reason: string) => { const { error } = await supabase.rpc("archive_fms_flow_with_audit", { p_flow_id: id, p_reason: reason }); fail("Archive FMS flow", error); };
