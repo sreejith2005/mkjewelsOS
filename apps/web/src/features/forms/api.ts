@@ -65,12 +65,32 @@ export function toDefinition(template: FormTemplate, fields: FormField[]): FormT
     }) });
 }
 
+/** Submissions left behind by a deleted form count towards no template. */
+const countByTemplate = (submissions: readonly FormSubmission[]) => {
+  const counts = new Map<string, number>();
+  for (const submission of submissions) if (submission.form_template_id) counts.set(submission.form_template_id, (counts.get(submission.form_template_id) ?? 0) + 1);
+  return counts;
+};
+
+/**
+ * Deleting a form stamps the exact template and questions it was answered on
+ * onto every submission it collected, so the answers stay readable afterwards.
+ */
+export function deletedFormBundle(submission: FormSubmission): FormBundle | null {
+  const snapshot = object(submission.template_snapshot);
+  const template = snapshot.template;
+  if (!template || typeof template !== "object" || Array.isArray(template)) return null;
+  const row = template as unknown as FormTemplate;
+  const fields = (Array.isArray(snapshot.fields) ? snapshot.fields : []) as unknown as FormField[];
+  return { ...row, fields: toDefinition(row, fields).fields as FormFieldDefinition[], sections: parseSections(row.sections), submissionCount: 0 };
+}
+
 export async function loadForms(): Promise<{ bundles: FormBundle[]; submissions: FormSubmission[] }> {
   const [templates, fields, submissions] = await Promise.all([supabase.from("form_templates").select("*").order("updated_at", { ascending: false }).limit(200), supabase.from("form_fields").select("*").order("sort_order").limit(2000), supabase.from("form_submissions").select("*").order("submitted_at", { ascending: false }).limit(500)]);
   fail("Load forms", templates.error); fail("Load form fields", fields.error); fail("Load form submissions", submissions.error);
   const fieldRows = fields.data ?? []; const submissionRows = submissions.data ?? []; const templateRows = templates.data ?? [];
   const fieldsByTemplate = new Map<string, FormField[]>(); for (const field of fieldRows) fieldsByTemplate.set(field.form_template_id, [...(fieldsByTemplate.get(field.form_template_id) ?? []), field]);
-  const counts = new Map<string, number>(); for (const submission of submissionRows) counts.set(submission.form_template_id, (counts.get(submission.form_template_id) ?? 0) + 1);
+  const counts = countByTemplate(submissionRows);
   return { bundles: templateRows.map((template) => ({ ...template, fields: toDefinition(template, fieldsByTemplate.get(template.id) ?? []).fields as FormFieldDefinition[], sections: parseSections(template.sections), submissionCount: counts.get(template.id) ?? 0 })), submissions: submissionRows };
 }
 export async function loadTaskForms(templateIds: string[], taskIds: string[]): Promise<{ bundles: FormBundle[]; submissions: FormSubmission[] }> {
@@ -83,7 +103,7 @@ export async function loadTaskForms(templateIds: string[], taskIds: string[]): P
   ]); fail("Load task forms", templates.error); fail("Load task form fields", fields.error);
   for (const batch of submissionBatches) fail("Load task form submissions", batch.error);
   const fieldsByTemplate = new Map<string, FormField[]>(); for (const item of fields.data ?? []) fieldsByTemplate.set(item.form_template_id, [...(fieldsByTemplate.get(item.form_template_id) ?? []), item]);
-  const submissionRows = submissionBatches.flatMap((batch) => batch.data ?? []); const counts = new Map<string, number>(); for (const item of submissionRows) counts.set(item.form_template_id, (counts.get(item.form_template_id) ?? 0) + 1);
+  const submissionRows = submissionBatches.flatMap((batch) => batch.data ?? []); const counts = countByTemplate(submissionRows);
   return { bundles: (templates.data ?? []).map((item) => ({ ...item, fields: toDefinition(item, fieldsByTemplate.get(item.id) ?? []).fields as FormFieldDefinition[], sections: parseSections(item.sections), submissionCount: counts.get(item.id) ?? 0 })), submissions: submissionRows };
 }
 export async function loadFormDynamicOptions() {
@@ -101,7 +121,36 @@ export const savePublishedForm = async (id: string, payload: Json, fields: Json)
 export const reviseForm = async (id: string) => { const { error } = await supabase.rpc("create_form_revision_with_audit", { p_source_template_id: id, p_payload: {} }); fail("Create form revision", error); };
 export const publishForm = async (id: string) => { const { error } = await supabase.rpc("publish_form_with_audit", { p_template_id: id }); fail("Publish form", error); };
 export const archiveForm = async (id: string) => { const { error } = await supabase.rpc("archive_form_with_audit", { p_template_id: id }); fail("Archive form", error); };
-export const deleteForm = async (id: string) => { const { error } = await supabase.rpc("delete_form_with_audit", { p_template_id: id }); fail("Delete form", error); };
+/**
+ * What deleting a form takes with it. The warning shown before the author
+ * confirms and the summary shown afterwards read the same server report, so
+ * they can never disagree about what happened.
+ */
+export type FormDeletionImpact = {
+  form: { id: string; name: string; version: number; lifecycle: string };
+  submissions: number;
+  taskTemplates: number;
+  tasks: number;
+  starterAssignments: number;
+  flows: readonly {
+    id: string; name: string; version: number; status: string;
+    stages: readonly string[] | null; activeInstances: number;
+    /** A published workflow comes off the air; only one draft may exist per family, so a family already being edited is archived instead. */
+    action: "reverted_to_draft" | "archived" | "unchanged";
+  }[];
+};
+export const formDeletionImpact = async (id: string): Promise<FormDeletionImpact> => {
+  const { data, error } = await supabase.rpc("form_deletion_impact", { p_template_id: id });
+  fail("Check form deletion", error);
+  if (!data) throw new Error("Check form deletion: the server did not describe the impact");
+  return data as unknown as FormDeletionImpact;
+};
+export const deleteForm = async (id: string): Promise<FormDeletionImpact> => {
+  const { data, error } = await supabase.rpc("delete_form_with_audit", { p_template_id: id });
+  fail("Delete form", error);
+  if (!data) throw new Error("Delete form: the server did not confirm the deletion");
+  return data as unknown as FormDeletionImpact;
+};
 export const duplicateForm = async (id: string, name?: string) => {
   const { data, error } = await supabase.rpc("duplicate_form_with_audit", { p_source_template_id: id, ...(name ? { p_name: name } : {}) });
   fail("Duplicate form", error);

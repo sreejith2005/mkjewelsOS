@@ -3828,7 +3828,7 @@ export type Database = {
           branch_id: string | null
           data: Json
           department_id: string | null
-          form_template_id: string
+          form_template_id: string | null
           id: string
           linked_module: string | null
           linked_record_id: string | null
@@ -3838,6 +3838,7 @@ export type Database = {
           status: Database["public"]["Enums"]["form_submission_status"]
           submitted_at: string | null
           submitted_by: string | null
+          template_snapshot: Json | null
           tenant_id: string
           updated_at: string
         }
@@ -3845,7 +3846,7 @@ export type Database = {
           branch_id?: string | null
           data?: Json
           department_id?: string | null
-          form_template_id: string
+          form_template_id?: string | null
           id?: string
           linked_module?: string | null
           linked_record_id?: string | null
@@ -3855,6 +3856,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["form_submission_status"]
           submitted_at?: string | null
           submitted_by?: string | null
+          template_snapshot?: Json | null
           tenant_id: string
           updated_at?: string
         }
@@ -3862,7 +3864,7 @@ export type Database = {
           branch_id?: string | null
           data?: Json
           department_id?: string | null
-          form_template_id?: string
+          form_template_id?: string | null
           id?: string
           linked_module?: string | null
           linked_record_id?: string | null
@@ -3872,6 +3874,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["form_submission_status"]
           submitted_at?: string | null
           submitted_by?: string | null
+          template_snapshot?: Json | null
           tenant_id?: string
           updated_at?: string
         }
@@ -7709,7 +7712,7 @@ export type Database = {
       }
       delete_form_with_audit: {
         Args: { p_template_id: string }
-        Returns: string
+        Returns: Json
       }
       delete_recurring_todo_template_with_audit: {
         Args: { p_template_id: string }
@@ -7840,6 +7843,10 @@ export type Database = {
       form_condition_matches: {
         Args: { p_answers: Json; p_condition: Json }
         Returns: boolean
+      }
+      form_deletion_impact: {
+        Args: { p_template_id: string }
+        Returns: Json
       }
       get_crm_client_detail: { Args: { p_client_id: string }; Returns: Json }
       get_crm_document_path: {

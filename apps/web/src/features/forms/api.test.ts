@@ -3,7 +3,7 @@ import { isFormFieldVisible } from "@jewelos/core";
 
 vi.mock("@jewelos/api-client", () => ({ supabase: {} }));
 
-import { deleteForm, publishAsNewForm, savePublishedForm, startFmsFromFormSubmission, toDefinition, type FormField, type FormTemplate } from "./api";
+import { deletedFormBundle, deleteForm, publishAsNewForm, savePublishedForm, startFmsFromFormSubmission, toDefinition, type FormField, type FormSubmission, type FormTemplate } from "./api";
 
 describe("toDefinition", () => {
   it("does not turn a NULL database condition into a conditional field", () => {
@@ -36,13 +36,43 @@ describe("publishAsNewForm", () => {
 });
 
 describe("deleteForm", () => {
-  it("uses the audited deletion RPC for every deletable lifecycle", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: "deleted-form", error: null });
+  it("uses the audited deletion RPC and reports what it took with it", async () => {
+    const impact = { form: { id: "published-form", name: "Walk-in", version: 1, lifecycle: "published" }, submissions: 2, taskTemplates: 0, tasks: 0, starterAssignments: 0, flows: [] };
+    const rpc = vi.fn().mockResolvedValue({ data: impact, error: null });
     const { supabase } = await import("@jewelos/api-client");
     Object.assign(supabase, { rpc });
 
-    await expect(deleteForm("published-form")).resolves.toBeUndefined();
+    await expect(deleteForm("published-form")).resolves.toEqual(impact);
     expect(rpc).toHaveBeenCalledWith("delete_form_with_audit", { p_template_id: "published-form" });
+  });
+
+  it("refuses to report a deletion the server did not confirm", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    const { supabase } = await import("@jewelos/api-client");
+    Object.assign(supabase, { rpc });
+
+    await expect(deleteForm("published-form")).rejects.toThrow("did not confirm");
+  });
+});
+
+describe("deletedFormBundle", () => {
+  const submission = (snapshot: unknown) => ({ form_template_id: null, template_snapshot: snapshot } as unknown as FormSubmission);
+
+  it("reads a submission whose form was deleted from the snapshot it kept", () => {
+    const bundle = deletedFormBundle(submission({
+      template: { id: "gone", name: "Walk-in", version: 3, description: null, permissions: { roles: ["staff"] }, sections: [] },
+      fields: [{ id: "field-1", field_key: "customer_name", field_name: "Customer name", field_type: "text", sort_order: 0,
+        is_required: true, is_shown: true, is_editable: true, placeholder: null, helper_text: null, options: null, validation: {}, conditional_logic: null }],
+    }));
+
+    expect(bundle?.name).toBe("Walk-in");
+    expect(bundle?.version).toBe(3);
+    expect(bundle?.fields.map((field) => field.label)).toEqual(["Customer name"]);
+  });
+
+  it("has nothing to show for a submission whose form still exists", () => {
+    expect(deletedFormBundle(submission(null))).toBeNull();
+    expect(deletedFormBundle(submission({ fields: [] }))).toBeNull();
   });
 });
 
