@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import type { Json } from "@jewelos/core";
 import { Button, Field, Notice } from "@/components/ui";
 import type { TaskReferenceData, TaskTemplate } from "./api";
@@ -18,8 +18,6 @@ function frequencyOf(template: TaskTemplate | null): string {
 export function TaskTemplateForm({ data, template, onCancel, onSave }: { data: TaskReferenceData; template: TaskTemplate | null; onCancel: () => void; onSave: (id: string | null, payload: Json) => Promise<void> }) {
   void onCancel;
   const [user, setUser] = useState(template?.default_assignee_user_id ?? "");
-  const [department, setDepartment] = useState(template?.department_id ?? "");
-  const [branch, setBranch] = useState(template?.branch_id ?? "");
   const [title, setTitle] = useState(template?.title ?? "");
   const [description, setDescription] = useState(template?.description ?? "");
   const [frequency, setFrequency] = useState(() => frequencyOf(template));
@@ -30,16 +28,17 @@ export function TaskTemplateForm({ data, template, onCancel, onSave }: { data: T
   const [buddy, setBuddy] = useState(template?.buddy_assignment_allowed ?? true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const assignee = useMemo(() => data.users.find((candidate) => candidate.id === user), [data.users, user]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!user || !title || !start || !startTime || !dueTime) { setError("Complete all required task details."); return; }
+    if (!assignee || !title || !start || !startTime || !dueTime) { setError("Complete all required task details."); return; }
     if (dueTime <= startTime) { setError("Due Time must be later than the Scheduled Start Time."); return; }
     setSaving(true);
     try {
       await onSave(template?.id ?? null, {
         title, description, recurrence_rule: FREQUENCIES.find(([value]) => value === frequency)?.[2] ?? "FREQ=DAILY", schedule_kind: frequency, starts_on: start, planned_time: startTime, due_time: dueTime,
-        priority: "medium", branch_id: branch, department_id: department, default_assignee_type: "specific_user", default_assignee_user_id: user, default_assignee_role: "",
+        priority: "medium", branch_id: assignee.branch_id, department_id: assignee.department_id, default_assignee_type: "specific_user", default_assignee_user_id: assignee.id, default_assignee_role: "",
         task_type: mode === "task" ? "delegation" : "checklist", buddy_assignment_allowed: buddy, checklist_items: [], requires_upload: mode === "task", requires_remark: false, requires_form: false, form_template_id: "", is_active: true,
         verification_required: false, verifier_user_profile_id: "", followup_enabled: false, personal_performance_enabled: true,
       });
@@ -47,11 +46,10 @@ export function TaskTemplateForm({ data, template, onCancel, onSave }: { data: T
   };
 
   return <form className="space-y-3" onSubmit={(event) => void submit(event)}>{error ? <Notice tone="danger">{error}</Notice> : null}
-    <section className="rounded-2xl border border-task-border bg-task-bg p-4"><p className="mb-4 text-xs font-semibold uppercase tracking-wider">1 · Assignment</p><div className="grid gap-4 sm:grid-cols-2">
+    <section className="rounded-2xl border border-task-border bg-task-bg p-4"><p className="mb-4 text-xs font-semibold uppercase tracking-wider">1 · Assignment</p>
       <Field label="Assign To User *"><select className="field" required value={user} onChange={(event) => setUser(event.target.value)}><option value="">Select user</option>{data.users.map((candidate) => candidate.id ? <option key={candidate.id} value={candidate.id}>{candidate.employee_name}</option> : null)}</select></Field>
-      <Field label="Department"><select className="field" value={department} onChange={(event) => setDepartment(event.target.value)}><option value=""> </option>{data.departments.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}</select></Field>
-      <Field label="Branch"><select className="field" value={branch} onChange={(event) => setBranch(event.target.value)}><option value=""> </option>{data.branches.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}</select></Field>
-    </div><div className="mt-4"><Field label="Core Task *"><input className="field" required placeholder="Enter the responsibility / task name" value={title} onChange={(event) => setTitle(event.target.value)} /></Field></div><div className="mt-4"><Field label="Description"><textarea className="field min-h-24" placeholder="What should be completed?" value={description} onChange={(event) => setDescription(event.target.value)} /></Field></div></section>
+      {assignee ? <p className="mt-3 text-sm text-task-text-muted">Branch and department are automatically taken from this user’s profile.</p> : null}
+      <div className="mt-4"><Field label="Core Task *"><input className="field" required placeholder="Enter the responsibility / task name" value={title} onChange={(event) => setTitle(event.target.value)} /></Field></div><div className="mt-4"><Field label="Description"><textarea className="field min-h-24" placeholder="What should be completed?" value={description} onChange={(event) => setDescription(event.target.value)} /></Field></div></section>
     <section className="rounded-2xl border border-task-border bg-task-bg p-4"><p className="mb-4 text-xs font-semibold uppercase tracking-wider">2 · Schedule</p><div className="grid gap-4 sm:grid-cols-2">
       <Field label="Frequency *"><select className="field" value={frequency} onChange={(event) => setFrequency(event.target.value)}>{FREQUENCIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field><Field label="Task Start Date *"><input className="field" required type="date" value={start} onChange={(event) => setStart(event.target.value)} /></Field><Field label="Scheduled Start Time"><input className="field" required type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} /></Field><Field label="Due Time"><input className="field" required type="time" value={dueTime} onChange={(event) => setDueTime(event.target.value)} /></Field>
     </div>{!start ? <Notice tone="task">Select a start date.</Notice> : null}</section>

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TaskReferenceData } from "./api";
 import { TaskTemplateForm } from "./TaskForms";
@@ -16,13 +16,12 @@ const referenceData = {
 
 describe("recurring schedule form", () => {
 
-  it("shows only the legacy recurring schedule fields", () => {
-    render(<TaskTemplateForm data={referenceData} onCancel={vi.fn()} onSave={vi.fn()} template={null} />);
+  it("uses the selected user's branch and department without showing scope selectors", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(<TaskTemplateForm data={referenceData} onCancel={vi.fn()} onSave={onSave} template={null} />);
 
     for (const label of [
       "Assign To User *",
-      "Department",
-      "Branch",
       "Core Task *",
       "Description",
       "Frequency *",
@@ -34,6 +33,8 @@ describe("recurring schedule form", () => {
     ]) expect(screen.getByLabelText(label)).toBeTruthy();
 
     for (const label of [
+      "Department",
+      "Branch",
       "Priority",
       "Schedule Status",
       "Completion Remark Required",
@@ -41,6 +42,19 @@ describe("recurring schedule form", () => {
       "Form Required",
       "Verification Required",
     ]) expect(screen.queryByLabelText(label)).toBeNull();
+
+    fireEvent.change(screen.getByLabelText("Assign To User *"), { target: { value: "user-1" } });
+    fireEvent.change(screen.getByLabelText("Core Task *"), { target: { value: "Open showroom" } });
+    fireEvent.change(screen.getByLabelText("Scheduled Start Time"), { target: { value: "09:00" } });
+    fireEvent.change(screen.getByLabelText("Due Time"), { target: { value: "18:00" } });
+    fireEvent.submit(screen.getByRole("button", { name: "Save Task" }).closest("form") as HTMLFormElement);
+
+    await vi.waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0]?.[1]).toMatchObject({
+      branch_id: "branch-1",
+      department_id: "department-1",
+      default_assignee_user_id: "user-1",
+    });
   });
 
 });
