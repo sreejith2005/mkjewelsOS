@@ -43,6 +43,11 @@ function DecisionHarness() {
 }
 
 describe("FMS stage editor", () => {
+  it("defaults the initial Form deadline to off while later steps remain on", () => {
+    expect(newFmsStage("form", 0).sla.deadlineEnabled).toBe(false);
+    expect(newFmsStage("task", 1).sla.deadlineEnabled).toBe(true);
+  });
+
   it("keeps assignment controls out of each individual stage", () => {
     render(<Harness />);
     expect(screen.queryByLabelText("Department")).toBeNull();
