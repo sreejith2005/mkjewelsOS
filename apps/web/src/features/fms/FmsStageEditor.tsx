@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import {
   FMS_BRANCH_OPERATORS,
-  FMS_STATUS_CONDITION_OPERATORS,
   type FmsBranchRule,
   type FmsSlaRule,
   type FmsStageDefinition,
@@ -18,8 +17,6 @@ const timingOptions: readonly { value: FmsTimingMethod; label: string; help: str
   { value: "days_before_date", label: "Days before date", help: "Due a fixed number of days before a future date." },
   { value: "specific_time", label: "Specific clock time", help: "Due on a selected date at a selected time." },
 ];
-const defaultStatusOptions = ["Busy", "DND", "Follow Up", "Interested", "Not Interested", "Proposal", "Ringing", "demo call done", "required follow up", "yes"] as const;
-const statusOperatorLabel: Record<typeof FMS_STATUS_CONDITION_OPERATORS[number], string> = { equals: "equals", not_equals: "not equals", greater_than: "greater than", less_than: "less than", greater_than_or_equal: "greater than & equals", less_than_or_equal: "less than and equals", contains: "contains", not_contains: "not contains" };
 
 export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; onChange: (value: FmsStageDefinition) => void; onDelete: () => void }) {
   const update = (patch: Partial<FmsStageDefinition>) => onChange({ ...stage, ...patch });
@@ -32,14 +29,12 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { st
   const human = humanTypes.includes(stage.type);
   const canChooseNext = !["branch", "parallel_start", "end"].includes(stage.type);
   const [showAdditional, setShowAdditional] = useState(!!stage.method || !!stage.formTemplateId || stage.requiresUpload || stage.requiresRemark || stage.requiresNextDoerHandoff || stage.canReject || stage.canRequestRevision || stage.canEscalate);
-  const [showConditional, setShowConditional] = useState(!!stage.sla.conditional);
-  const statusCondition = stage.sla.conditional && "field" in stage.sla.conditional ? stage.sla.conditional : undefined;
-  const decisionCondition = stage.sla.conditional && !("field" in stage.sla.conditional) ? stage.sla.conditional : undefined;
-  const statusOptions = [...new Map([...(data.statusOptions ?? []), ...defaultStatusOptions.map((label) => ({ label, value: label }))].map((option) => [option.value.toLowerCase(), option])).values()];
+  const [showConditional, setShowConditional] = useState(!!stage.sla.conditional && "decisionStageKey" in stage.sla.conditional);
+  const decisionCondition = stage.sla.conditional && "decisionStageKey" in stage.sla.conditional ? stage.sla.conditional : undefined;
 
   useEffect(() => {
     setShowAdditional(!!stage.method || !!stage.formTemplateId || stage.requiresUpload || stage.requiresRemark || stage.requiresNextDoerHandoff || stage.canReject || stage.canRequestRevision || stage.canEscalate);
-    setShowConditional(!!stage.sla.conditional);
+    setShowConditional(!!stage.sla.conditional && "decisionStageKey" in stage.sla.conditional);
   }, [stage.key]);
 
   const changeBranchRule = (index: number, patch: Partial<FmsBranchRule>) => update({ branchRules: stage.branchRules.map((rule, ruleIndex) => ruleIndex === index ? { ...rule, ...patch } : rule).map((rule, order) => ({ ...rule, order })) });
@@ -86,8 +81,8 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { st
     </section>
 
     {!firstStage && human ? <section className="space-y-3 border-t border-gold/15 pt-4">
-      <label className="flex items-start gap-2 rounded-xl border border-gold/20 p-3 text-sm"><input aria-label="Enable conditional step" checked={showConditional && !!stage.sla.conditional} onChange={(event) => { setShowConditional(event.target.checked); updateSla({ conditional: event.target.checked ? { field: "status", operator: "equals", value: statusOptions[0]?.value ?? "" } : undefined }); }} type="checkbox" /><span><b className="block text-white">Conditional (optional)</b><span className="text-xs text-soft-grey">Run this step only when the workflow Status matches the selected value.</span></span></label>
-      {showConditional && stage.sla.conditional ? <div className="grid gap-3 rounded-xl border border-gold/15 bg-white/[0.02] p-3 sm:grid-cols-2"><Field label="Field"><select aria-label="Condition field" className="field" onChange={(event) => { const decision = earlierDecisions.at(-1); updateSla({ conditional: event.target.value === "decision" && decision ? { decisionStageKey: decision.key, decisionOptionKey: decision.sla.decisionOptions?.[0]?.key ?? "" } : { field: "status", operator: "equals", value: statusOptions[0]?.value ?? "" } }); }} value={statusCondition ? "status" : "decision"}><option value="status">Status</option>{earlierDecisions.length ? <option value="decision">Earlier Decision Step</option> : null}</select></Field>{statusCondition ? <><Field label="Operator"><select aria-label="Condition operator" className="field" onChange={(event) => updateSla({ conditional: { ...statusCondition, operator: event.target.value as typeof FMS_STATUS_CONDITION_OPERATORS[number] } })} value={statusCondition.operator}>{FMS_STATUS_CONDITION_OPERATORS.map((operator) => <option key={operator} value={operator}>{statusOperatorLabel[operator]}</option>)}</select></Field><Field label="Status value"><select aria-label="Status value" className="field" onChange={(event) => updateSla({ conditional: { ...statusCondition, value: event.target.value } })} value={statusCondition.value}><option value="">Select value</option>{statusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></Field></> : decisionCondition ? <DynamicDecisionCondition condition={decisionCondition} decisions={earlierDecisions} updateSla={updateSla} /> : null}</div> : null}
+      <label className="flex items-start gap-2 rounded-xl border border-gold/20 p-3 text-sm"><input aria-label="Enable conditional step" checked={showConditional && !!decisionCondition} disabled={!earlierDecisions.length} onChange={(event) => { const decision = earlierDecisions.at(-1); setShowConditional(event.target.checked); updateSla({ conditional: event.target.checked && decision ? { decisionStageKey: decision.key, decisionOptionKey: decision.sla.decisionOptions?.[0]?.key ?? "" } : undefined }); }} type="checkbox" /><span><b className="block text-white">Conditional (optional)</b><span className="text-xs text-soft-grey">{earlierDecisions.length ? "Run this step only for a selected outcome from an earlier Decision Step." : "Add an earlier Decision Step to define this condition."}</span></span></label>
+      {showConditional && decisionCondition ? <div className="grid gap-3 rounded-xl border border-gold/15 bg-white/[0.02] p-3 sm:grid-cols-2"><DynamicDecisionCondition condition={decisionCondition} decisions={earlierDecisions} updateSla={updateSla} /></div> : null}
     </section> : null}
 
     {canChooseNext ? <Field label="On completion, go to"><StageSelect others={others} value={stage.defaultNextStageKey} onChange={(value) => update({ defaultNextStageKey: value })} /></Field> : null}

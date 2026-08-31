@@ -5,12 +5,10 @@ export const FMS_STAGE_TYPES = ["task", "approval", "form", "notification", "bra
 export const FMS_AUTHORING_STAGE_TYPES = ["form", "task", "approval", "branch", "parallel_start", "parallel_join", "notification"] as const;
 export const FMS_ASSIGNEE_TYPES = ["specific_user", "role", "manager", "department_head", "previous_step_doer", "reporter"] as const;
 export const FMS_BRANCH_OPERATORS = ["equals", "not_equals", "contains", "greater_than", "greater_than_or_equal", "less_than", "less_than_or_equal", "in", "not_empty", "default"] as const;
-export const FMS_STATUS_CONDITION_OPERATORS = ["equals", "not_equals", "greater_than", "less_than", "greater_than_or_equal", "less_than_or_equal", "contains", "not_contains"] as const;
 
 export type FmsStageType = typeof FMS_STAGE_TYPES[number];
 export type FmsAssigneeType = typeof FMS_ASSIGNEE_TYPES[number];
 export type FmsBranchOperator = typeof FMS_BRANCH_OPERATORS[number];
-export type FmsStatusConditionOperator = typeof FMS_STATUS_CONDITION_OPERATORS[number];
 export type FmsCompletionRule = "all_doers" | "any_doer" | "manager_approval";
 export type FmsJoinRule = "all" | "any" | "specific";
 export type FmsLifecycle = "draft" | "published" | "archived";
@@ -29,8 +27,8 @@ export type FmsChecklistItemDefinition = Readonly<{ key: string; label: string; 
 export type FmsTimingMethod = "completion_date" | "tat_hours" | "days_before_date" | "specific_time";
 export type FmsDecisionMode = "normal" | "yes_no" | "decision";
 export type FmsDecisionOption = Readonly<{ key: string; label: string }>;
-/** A conditional step either observes the workflow Status supplied at start, or a configured prior decision option. */
-export type FmsConditionalRule = Readonly<{ field: "status"; operator: FmsStatusConditionOperator; value: string } | { decisionStageKey: string; outcome: string } | { decisionStageKey: string; decisionOptionKey: string }>;
+/** A conditional step activates only for one configured option of an earlier Decision Step. */
+export type FmsConditionalRule = Readonly<{ decisionStageKey: string; outcome: string } | { decisionStageKey: string; decisionOptionKey: string }>;
 export type FmsSlaRule = Readonly<{
   timingMethod?: FmsTimingMethod | undefined;
   deadlineEnabled?: boolean | undefined;

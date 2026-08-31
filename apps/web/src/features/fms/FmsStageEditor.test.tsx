@@ -77,7 +77,7 @@ describe("FMS stage editor", () => {
     await user.click(screen.getByLabelText("Attach an optional form"));
     expect(screen.getByLabelText("Optional linked form")).toBeTruthy();
   });
-  it("configures a Status condition and derives dynamic earlier-decision options", async () => {
+  it("configures conditions only from dynamic earlier-decision options", async () => {
     const user = userEvent.setup();
     render(<DecisionHarness />);
     await user.click(screen.getByRole("button", { name: /Decision step/ }));
@@ -86,16 +86,10 @@ describe("FMS stage editor", () => {
     await user.click(screen.getByRole("button", { name: "Edit follow up" }));
     const conditional = screen.getByLabelText("Enable conditional step");
     await user.click(conditional);
-    expect((screen.getByLabelText("Condition field") as HTMLSelectElement).value).toBe("status");
-    expect((screen.getByLabelText("Status value") as HTMLSelectElement).value).toBe("follow_up");
-    expect(screen.getByLabelText("Status value").textContent).toContain("Busy");
-    expect(screen.getByLabelText("Status value").textContent).toContain("Not Interested");
-    expect(screen.getByLabelText("Condition operator").textContent).toContain("not equals");
-    expect(screen.getByLabelText("Condition operator").textContent).toContain("not contains");
-    await user.selectOptions(screen.getByLabelText("Condition operator"), "not_contains");
-    expect((screen.getByLabelText("Condition operator") as HTMLSelectElement).value).toBe("not_contains");
-    await user.selectOptions(screen.getByLabelText("Condition field"), "decision");
     expect((screen.getByLabelText("Earlier decision") as HTMLSelectElement).value).toBe("decision");
     expect(screen.getByLabelText("Run when answer is").textContent).toContain("Call Back Required");
+    expect(screen.queryByLabelText("Condition field")).toBeNull();
+    expect(screen.queryByLabelText("Condition operator")).toBeNull();
+    expect(screen.queryByLabelText("Status value")).toBeNull();
   });
 });

@@ -1,5 +1,5 @@
 import type { UserRole } from "../roleMenu";
-import { FMS_ASSIGNEE_TYPES, FMS_BRANCH_OPERATORS, FMS_STAGE_TYPES, FMS_STATUS_CONDITION_OPERATORS, type FmsAssignmentCandidate, type FmsAssigneeRule, type FmsBranchRule, type FmsChecklistItemDefinition, type FmsDecisionOption, type FmsFlowDefinition, type FmsInstanceStatus, type FmsStageActorState, type FmsStageDefinition, type FmsStageStatus, type FmsTimingMethod, type FmsTransitionCapability, type FmsValidationIssue } from "./types";
+import { FMS_ASSIGNEE_TYPES, FMS_BRANCH_OPERATORS, FMS_STAGE_TYPES, type FmsAssignmentCandidate, type FmsAssigneeRule, type FmsBranchRule, type FmsChecklistItemDefinition, type FmsDecisionOption, type FmsFlowDefinition, type FmsInstanceStatus, type FmsStageActorState, type FmsStageDefinition, type FmsStageStatus, type FmsTimingMethod, type FmsTransitionCapability, type FmsValidationIssue } from "./types";
 
 const KEY = /^[a-z][a-z0-9_]{0,63}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -40,7 +40,7 @@ export function normalizeFmsDefinition(input: FmsFlowDefinition): FmsFlowDefinit
       ...(Number.isFinite(stage.sla?.daysBefore) ? { daysBefore: Number(stage.sla.daysBefore) } : {}),
       ...(text(stage.sla?.clockTime) ? { clockTime: text(stage.sla.clockTime) } : {}),
       ...(text(stage.sla?.triggerStageKey) ? { triggerStageKey: text(stage.sla.triggerStageKey).toLowerCase() } : {}),
-      ...(stage.sla?.conditional && "field" in stage.sla.conditional ? { conditional: { field: stage.sla.conditional.field, operator: stage.sla.conditional.operator, value: text(stage.sla.conditional.value) } } : stage.sla?.conditional && "decisionStageKey" in stage.sla.conditional ? (() => { const decisionOptionKey = text("decisionOptionKey" in stage.sla.conditional ? stage.sla.conditional.decisionOptionKey : stage.sla.conditional.outcome).toLowerCase(); return { conditional: { decisionStageKey: text(stage.sla.conditional.decisionStageKey).toLowerCase(), decisionOptionKey, outcome: decisionOptionKey } }; })() : {}),
+      ...(stage.sla?.conditional && "decisionStageKey" in stage.sla.conditional ? (() => { const decisionOptionKey = text("decisionOptionKey" in stage.sla.conditional ? stage.sla.conditional.decisionOptionKey : stage.sla.conditional.outcome).toLowerCase(); return { conditional: { decisionStageKey: text(stage.sla.conditional.decisionStageKey).toLowerCase(), decisionOptionKey, outcome: decisionOptionKey } }; })() : {}),
     },
   }));
   return { ...input, name: text(input.name), description: text(input.description) || undefined, manualTrigger: true, stages };
@@ -87,13 +87,9 @@ export function validateFmsDefinition(raw: FmsFlowDefinition): readonly FmsValid
     if (stage.sla.triggerStageKey) { const trigger = byKey.get(stage.sla.triggerStageKey); if (!trigger || trigger.order >= stage.order) add("invalid_deadline_trigger", "Timing can only start from an earlier step"); }
     if (stage.sla.decisionMode === "yes_no" && (AUTO.has(stage.type) || stageIndex === 0 || !stage.sla.decisionOptions?.length || new Set(stage.sla.decisionOptions.map((option) => option.key)).size !== stage.sla.decisionOptions.length || stage.sla.decisionOptions.some((option) => !KEY.test(option.key) || !option.label))) add("invalid_decision", "Decision steps need unique options on human steps after the initial Form");
     if (stage.sla.conditional) {
-      if ("field" in stage.sla.conditional) {
-        if (stage.sla.conditional.field !== "status" || !FMS_STATUS_CONDITION_OPERATORS.includes(stage.sla.conditional.operator) || !text(stage.sla.conditional.value)) add("invalid_conditional", "A Status condition needs a supported operator and value");
-      } else {
-        const decision = byKey.get(stage.sla.conditional.decisionStageKey);
-        const optionKey = "decisionOptionKey" in stage.sla.conditional ? stage.sla.conditional.decisionOptionKey : stage.sla.conditional.outcome;
-        if (!decision || decision.order >= stage.order || decision.sla.decisionMode !== "yes_no" || !decision.sla.decisionOptions?.some((option) => option.key === optionKey)) add("invalid_conditional", "A condition must reference an earlier configured decision option");
-      }
+      const decision = byKey.get(stage.sla.conditional.decisionStageKey);
+      const optionKey = "decisionOptionKey" in stage.sla.conditional ? stage.sla.conditional.decisionOptionKey : stage.sla.conditional.outcome;
+      if (!decision || decision.order >= stage.order || decision.sla.decisionMode !== "yes_no" || !decision.sla.decisionOptions?.some((option) => option.key === optionKey)) add("invalid_conditional", "A condition must reference an earlier configured decision option");
     }
     if (new Set(stage.checklist.map((item) => item.key)).size !== stage.checklist.length || stage.checklist.some((item) => !KEY.test(item.key) || !item.label)) add("invalid_checklist", "Checklist keys must be unique and labels are required");
     if (stageIndex === 0 && !stage.formTemplateId) add("missing_form", "The initial Form requires an exact published template version");
