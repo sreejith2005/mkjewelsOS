@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
-import type { FormFieldDefinition } from "@jewelos/core";
-import { readGuidedConditionLinks, setGuidedFollowUp } from "./guidedConditions";
+import type { FormFieldDefinition, FormSectionDefinition } from "@jewelos/core";
+import { readAnswerRoutes, readGuidedConditionLinks, setAnswerRoute, setGuidedFollowUp } from "./guidedConditions";
 
 const fields: readonly FormFieldDefinition[] = [
   { key: "metal", label: "Metal", type: "select", sortOrder: 0, options: [{ value: "gold", label: "Gold" }, { value: "silver", label: "Silver" }] },
   { key: "karat", label: "Gold purity", type: "text", sortOrder: 1 },
   { key: "polish", label: "Silver finish", type: "text", sortOrder: 2 },
+];
+
+const sections: readonly FormSectionDefinition[] = [
+  { key: "section_1", title: "Start" },
+  { key: "silver_details", title: "Silver details" },
 ];
 
 describe("guided answer follow-ups", () => {
@@ -38,5 +43,23 @@ describe("guided answer follow-ups", () => {
       { kind: "predicate", fieldKey: "metal", operator: "equals", value: "gold" },
       { kind: "predicate", fieldKey: "metal", operator: "equals", value: "silver" },
     ] });
+  });
+
+  it("projects an answer's question and section routes in one readable map", () => {
+    const questionRouted = setGuidedFollowUp(fields, "metal", "gold", "karat");
+    const bothRouted = setAnswerRoute(questionRouted, "metal", "silver", { kind: "section", sectionKey: "silver_details" });
+
+    expect(readAnswerRoutes(bothRouted, sections, "metal")).toEqual(new Map([
+      ["gold", { kind: "question", questionKey: "karat" }],
+      ["silver", { kind: "section", sectionKey: "silver_details" }],
+    ]));
+  });
+
+  it("replaces only the selected answer's section route", () => {
+    const sectionRouted = setAnswerRoute(fields, "metal", "gold", { kind: "section", sectionKey: "silver_details" });
+    const continued = setAnswerRoute(sectionRouted, "metal", "gold", { kind: "continue" });
+
+    expect(sectionRouted[0]?.branches).toEqual([{ operator: "equals", value: "gold", targetSectionKey: "silver_details" }]);
+    expect(continued[0]?.branches).toBeUndefined();
   });
 });

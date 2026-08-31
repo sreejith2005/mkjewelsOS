@@ -89,44 +89,37 @@ const openEditor = async (user: ReturnType<typeof userEvent.setup>, label: strin
 };
 
 describe("Authoring a conditional question", () => {
-  it("shows a question only when an earlier answer matches", async () => {
+  it("maps a target question from an earlier question's actual answer choices", async () => {
     const user = userEvent.setup();
     render(<FormBuilder bundle={bundle} dynamicOptions={dynamicOptions} onClose={() => undefined} onSaved={async () => undefined} />);
 
     const row = await openEditor(user, "Karat");
-    await user.click(within(row).getByLabelText(/Only when earlier answers match/));
+    await user.selectOptions(within(row).getByLabelText("Show Karat when question"), "metal");
 
-    // The first comparison defaults to the only earlier question and its first answer.
-    expect((within(row).getByRole("combobox", { name: "Question" }) as HTMLSelectElement).value).toBe("metal");
-    expect((within(row).getByRole("combobox", { name: "Answer" }) as HTMLSelectElement).value).toBe("gold");
-    expect(screen.getAllByText(/Shown when Metal is gold/).length).toBeGreaterThan(0);
-
-    await user.selectOptions(within(row).getByRole("combobox", { name: "Answer" }), "silver");
-    expect(screen.getAllByText(/Shown when Metal is silver/).length).toBeGreaterThan(0);
+    const answer = within(row).getByLabelText("Show Karat when answer") as HTMLSelectElement;
+    expect(answer.options[1]?.text).toBe("Gold");
+    expect(answer.options[2]?.text).toBe("Silver");
+    await user.selectOptions(answer, "silver");
+    expect(screen.getAllByText("Silver -> Ask Karat").length).toBeGreaterThan(0);
   });
 
-  it("offers the first question no conditions, because nothing comes before it", async () => {
+  it("explains why the first question cannot have a previous-answer condition", async () => {
     const user = userEvent.setup();
     render(<FormBuilder bundle={bundle} dynamicOptions={dynamicOptions} onClose={() => undefined} onSaved={async () => undefined} />);
 
     const row = await openEditor(user, "Metal");
-    expect(within(row).queryByLabelText(/Only when earlier answers match/)).toBeNull();
-    expect(within(row).getByText(/Add a question before this one/)).toBeTruthy();
+    expect(within(row).queryByLabelText("Show Metal when question")).toBeNull();
+    expect(within(row).getByText(/Add a choose-one question before this one/)).toBeTruthy();
   });
 
-  it("combines several comparisons with all or any", async () => {
+  it("keeps technical rule syntax out of the normal builder", async () => {
     const user = userEvent.setup();
     render(<FormBuilder bundle={bundle} dynamicOptions={dynamicOptions} onClose={() => undefined} onSaved={async () => undefined} />);
 
     const row = await openEditor(user, "Karat");
-    await user.click(within(row).getByLabelText(/Only when earlier answers match/));
-    await user.click(within(row).getByRole("button", { name: /Add condition/ }));
-
-    await user.selectOptions(within(row).getByRole("combobox", { name: /Match all or any condition/ }), "any");
-    const answers = within(row).getAllByRole("combobox", { name: "Answer" });
-    await user.selectOptions(answers[1]!, "silver");
-
-    expect(screen.getAllByText(/Shown when Metal is gold or Metal is silver/).length).toBeGreaterThan(0);
+    expect(within(row).queryByText("Advanced settings")).toBeNull();
+    expect(within(row).queryByText("Add condition")).toBeNull();
+    expect(within(row).queryByLabelText("Match all or any condition")).toBeNull();
   });
 
   it("drops the condition when the question it reads is deleted", async () => {
@@ -134,12 +127,12 @@ describe("Authoring a conditional question", () => {
     render(<FormBuilder bundle={bundle} dynamicOptions={dynamicOptions} onClose={() => undefined} onSaved={async () => undefined} />);
 
     const row = await openEditor(user, "Karat");
-    await user.click(within(row).getByLabelText(/Only when earlier answers match/));
-    expect(screen.getAllByText(/Shown when Metal is gold/).length).toBeGreaterThan(0);
+    await user.selectOptions(within(row).getByLabelText("Show Karat when question"), "metal");
+    expect(screen.getAllByText("Gold -> Ask Karat").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: "Remove Metal" }));
 
-    expect(screen.queryByText(/Shown when Metal/)).toBeNull();
+    expect(screen.queryByText("Gold -> Ask Karat")).toBeNull();
   });
 
   it("keeps internal keys out of the builder", async () => {

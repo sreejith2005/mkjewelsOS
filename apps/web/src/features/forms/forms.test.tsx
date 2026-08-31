@@ -55,6 +55,27 @@ const conditionalBundle = {
   ],
 } as unknown as FormBundle;
 
+const nestedBundle = {
+  id: "form-2", name: "Detailed metal enquiry", description: null, lifecycle: "draft", permissions: { roles: ["staff"] },
+  sections: [{ key: "section_1", title: "Section 1" }], submissionCount: 0,
+  fields: [
+    { key: "metal", label: "Metal", type: "select", sortOrder: 0, sectionKey: "section_1", options: [{ value: "gold", label: "Gold" }, { value: "silver", label: "Silver" }] },
+    { key: "gold_purity", label: "Gold purity", type: "select", sortOrder: 1, sectionKey: "section_1", options: [{ value: "22k", label: "22K" }, { value: "18k", label: "18K" }] },
+    { key: "certificate", label: "Certificate number", type: "text", sortOrder: 2, sectionKey: "section_1" },
+    { key: "silver_finish", label: "Silver finish", type: "text", sortOrder: 3, sectionKey: "section_1" },
+  ],
+} as unknown as FormBundle;
+
+const sectionBundle = {
+  id: "form-3", name: "Customer route", description: null, lifecycle: "draft", permissions: { roles: ["staff"] }, submissionCount: 0,
+  sections: [{ key: "section_1", title: "Start" }, { key: "individual_details", title: "Individual details" }, { key: "business_details", title: "Business details" }],
+  fields: [
+    { key: "customer_type", label: "Customer type", type: "select", sortOrder: 0, sectionKey: "section_1", options: [{ value: "individual", label: "Individual" }, { value: "business", label: "Business" }] },
+    { key: "name", label: "Name", type: "text", sortOrder: 1, sectionKey: "individual_details" },
+    { key: "company", label: "Company", type: "text", sortOrder: 2, sectionKey: "business_details" },
+  ],
+} as unknown as FormBundle;
+
 describe("Filling a branching form", () => {
   it("shows only the section the controlling answer leads to, and switches branches live", async () => {
     const user = userEvent.setup();
@@ -182,32 +203,90 @@ describe("Form builder internal keys", () => {
     const placeholder = screen.getByLabelText("Placeholder");
     expect(screen.queryByLabelText("Internal key")).toBeNull();
     expect(helper.compareDocumentPosition(placeholder) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByText("Minimum length").closest("details")?.open).toBe(false);
-    expect(screen.getByText("Advanced settings")).toBeTruthy();
+    expect(screen.queryByText("Advanced settings")).toBeNull();
+    expect(screen.getByText(/Add a choose-one question before this one/)).toBeTruthy();
   });
 });
 
 describe("Form builder follow-up questions", () => {
-  it("connects an answer to a later question with plain-language controls", async () => {
+  it("maps each answer to a different later question and shows the route overview", async () => {
     const user = userEvent.setup();
     render(<FormBuilder bundle={conditionalBundle} dynamicOptions={{ users: [], branches: [], departments: [], masters: [] }} onClose={() => {}} onSaved={async () => {}} />);
 
     await user.click(screen.getByLabelText("Edit Metal"));
-    await user.selectOptions(screen.getByLabelText("Follow-up after Gold"), "gold_purity");
+    await user.selectOptions(screen.getByLabelText("Route after Gold"), "question:gold_purity");
+    await user.selectOptions(screen.getByLabelText("Route after Silver"), "question:silver_finish");
 
-    expect(screen.getByText("If Gold is selected, ask Gold purity.")).toBeTruthy();
+    expect(screen.getAllByText("Gold -> Ask Gold purity").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Silver -> Ask Silver finish").length).toBeGreaterThan(0);
+    expect(screen.getByText("Routing overview")).toBeTruthy();
   });
 
-  it("lets an author test the answer path and start the preview again", async () => {
+  it("lets an author map a target question from an earlier question's real options", async () => {
+    const user = userEvent.setup();
+    render(<FormBuilder bundle={conditionalBundle} dynamicOptions={{ users: [], branches: [], departments: [], masters: [] }} onClose={() => {}} onSaved={async () => {}} />);
+
+    await user.click(screen.getByLabelText("Edit Gold purity"));
+    await user.selectOptions(screen.getByLabelText("Show Gold purity when question"), "metal");
+
+    const answer = screen.getByLabelText("Show Gold purity when answer") as HTMLSelectElement;
+    expect(answer.options).toHaveLength(3);
+    expect(answer.options[1]?.text).toBe("Gold");
+    expect(answer.options[2]?.text).toBe("Silver");
+
+    await user.selectOptions(answer, "gold");
+    expect(screen.getByText("Gold -> Ask Gold purity")).toBeTruthy();
+  });
+
+  it("opens the real form only in preview mode and returns to the builder", async () => {
     const user = userEvent.setup();
     render(<FormBuilder bundle={conditionalBundle} dynamicOptions={{ users: [], branches: [], departments: [], masters: [] }} onClose={() => {}} onSaved={async () => {}} />);
 
     await user.click(screen.getByLabelText("Edit Metal"));
-    await user.selectOptions(screen.getByLabelText("Follow-up after Gold"), "gold_purity");
+    await user.selectOptions(screen.getByLabelText("Route after Gold"), "question:gold_purity");
+    await user.click(screen.getByRole("button", { name: "Preview form" }));
+
+    expect(screen.getByRole("button", { name: "Close preview" })).toBeTruthy();
+    expect(screen.queryByText("What happens after each answer?")).toBeNull();
     await user.selectOptions(screen.getByLabelText("Metal"), "gold");
     expect(screen.getByLabelText("Gold purity")).toBeTruthy();
 
-    await user.click(screen.getByRole("button", { name: "Start preview again" }));
-    expect(screen.queryByLabelText("Gold purity")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Close preview" }));
+    expect(screen.getByText("What happens after each answer?")).toBeTruthy();
+  });
+
+  it("supports a long nested path while keeping the other branch hidden", async () => {
+    const user = userEvent.setup();
+    render(<FormBuilder bundle={nestedBundle} dynamicOptions={{ users: [], branches: [], departments: [], masters: [] }} onClose={() => {}} onSaved={async () => {}} />);
+
+    await user.click(screen.getByLabelText("Edit Metal"));
+    await user.selectOptions(screen.getByLabelText("Route after Gold"), "question:gold_purity");
+    await user.selectOptions(screen.getByLabelText("Route after Silver"), "question:silver_finish");
+    await user.click(screen.getByLabelText("Edit Gold purity"));
+    await user.selectOptions(screen.getByLabelText("Route after 22K"), "question:certificate");
+    await user.click(screen.getByRole("button", { name: "Preview form" }));
+
+    await user.selectOptions(screen.getByLabelText("Metal"), "gold");
+    expect(screen.getByLabelText("Gold purity")).toBeTruthy();
+    expect(screen.queryByLabelText("Silver finish")).toBeNull();
+    await user.selectOptions(screen.getByLabelText("Gold purity"), "22k");
+    expect(screen.getByLabelText("Certificate number")).toBeTruthy();
+    expect(screen.queryByLabelText("Silver finish")).toBeNull();
+  });
+
+  it("maps each source answer directly to a later section", async () => {
+    const user = userEvent.setup();
+    render(<FormBuilder bundle={sectionBundle} dynamicOptions={{ users: [], branches: [], departments: [], masters: [] }} onClose={() => {}} onSaved={async () => {}} />);
+
+    await user.click(screen.getByLabelText("Edit Customer type"));
+    await user.selectOptions(screen.getByLabelText("Route after Individual"), "section:individual_details");
+    await user.selectOptions(screen.getByLabelText("Route after Business"), "section:business_details");
+    expect(screen.getAllByText("Individual -> Skip to Individual details").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Business -> Skip to Business details").length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: "Preview form" }));
+    await user.selectOptions(screen.getByLabelText("Customer type"), "business");
+    expect(screen.getByLabelText("Company")).toBeTruthy();
+    expect(screen.queryByLabelText("Name")).toBeNull();
   });
 });

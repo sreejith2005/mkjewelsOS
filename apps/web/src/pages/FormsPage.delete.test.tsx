@@ -101,3 +101,16 @@ describe("Deleting a form that is in use", () => {
   });
 });
 
+describe("Opening the Forms workspace", () => {
+  it("replaces the library with the full builder instead of opening a modal", async () => {
+    mocks.loadForms.mockResolvedValue({ bundles: [], submissions: [] });
+    const user = userEvent.setup();
+    render(<FormsPage />);
+
+    await user.click(await screen.findByRole("button", { name: "New form" }));
+
+    expect(screen.getByText("Builder")).toBeTruthy();
+    expect(screen.queryByText("Forms Library")).toBeNull();
+  });
+});
+
