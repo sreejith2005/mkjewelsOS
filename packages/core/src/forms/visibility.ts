@@ -14,12 +14,28 @@ export function evaluateFormCondition(condition: FormCondition, answers: FormAns
   return evaluateFormRule({ kind: "predicate", ...condition }, answers);
 }
 
-function comparable(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+/**
+ * Ordered comparison works on numbers and on strings that sort correctly, which
+ * covers the ISO `date`/`datetime` answers the builder offers these operators for.
+ * Returns undefined when the two sides cannot be ordered against each other.
+ */
+function compare(source: unknown, expected: unknown): number | undefined {
+  const left = typeof source === "string" && source.trim() !== "" && Number.isFinite(Number(source)) ? Number(source) : source;
+  const right = typeof expected === "string" && expected.trim() !== "" && Number.isFinite(Number(expected)) ? Number(expected) : expected;
+  if (typeof left === "number" && typeof right === "number" && Number.isFinite(left) && Number.isFinite(right)) return left < right ? -1 : left > right ? 1 : 0;
+  if (typeof left === "string" && typeof right === "string") return left < right ? -1 : left > right ? 1 : 0;
+  return undefined;
+}
+
+function ordered(source: unknown, expected: unknown, accept: (result: number) => boolean): boolean {
+  const result = compare(source, expected);
+  return result !== undefined && accept(result);
 }
 
 function isOneOf(value: unknown, expected: unknown): boolean {
-  return Array.isArray(expected) && expected.some((item) => item === value);
+  const candidates = Array.isArray(expected) ? expected : [expected];
+  if (Array.isArray(value)) return value.some((item) => candidates.some((candidate) => candidate === item));
+  return candidates.some((candidate) => candidate === value);
 }
 
 function evaluatePredicate(predicate: FormRulePredicate, answers: FormAnswers): boolean {
@@ -33,10 +49,10 @@ function evaluatePredicate(predicate: FormRulePredicate, answers: FormAnswers): 
     case "not_in": return !isOneOf(source, predicate.value);
     case "not_empty": return !isEmptyFormValue(source);
     case "is_empty": return isEmptyFormValue(source);
-    case "greater_than": return comparable(source) !== undefined && comparable(predicate.value)! < comparable(source)!;
-    case "less_than": return comparable(source) !== undefined && comparable(predicate.value)! > comparable(source)!;
-    case "greater_than_or_equal": return comparable(source) !== undefined && comparable(predicate.value)! <= comparable(source)!;
-    case "less_than_or_equal": return comparable(source) !== undefined && comparable(predicate.value)! >= comparable(source)!;
+    case "greater_than": return ordered(source, predicate.value, (result) => result > 0);
+    case "less_than": return ordered(source, predicate.value, (result) => result < 0);
+    case "greater_than_or_equal": return ordered(source, predicate.value, (result) => result >= 0);
+    case "less_than_or_equal": return ordered(source, predicate.value, (result) => result <= 0);
   }
 }
 

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { TaskReferenceData, TaskTemplate } from "./api";
+import type { TaskReferenceData } from "./api";
 import { TaskTemplateForm } from "./TaskForms";
 
 const referenceData = {

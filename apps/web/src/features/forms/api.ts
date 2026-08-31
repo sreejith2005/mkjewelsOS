@@ -1,6 +1,6 @@
 import { supabase } from "@jewelos/api-client";
 import type { Json, Tables } from "@jewelos/core";
-import { normalizeFormDefinition, parseFormOptions, type FormBranch, type FormFieldDefinition, type FormSectionDefinition, type FormTemplateDefinition } from "@jewelos/core";
+import { normalizeFormDefinition, parseFormOptions, type FormBranch, type FormFieldDefinition, type FormRule, type FormSectionDefinition, type FormTemplateDefinition } from "@jewelos/core";
 import { loadMasterOptions, toFormMasterOptions } from "@/features/dropdowns/api";
 
 export type FormTemplate = Tables<"form_templates">;
@@ -34,6 +34,17 @@ const parseBranches = (value: Json | null): FormBranch[] => array(value).flatMap
   if (!target || !operator) return [];
   return [{ operator, ...(record.value === undefined || record.value === null ? {} : { value: record.value as FormBranch["value"] }), targetSectionKey: target }];
 });
+/**
+ * `form_fields.conditional_logic` carries either the legacy single condition or,
+ * since visibility rules landed, a `{kind}` rule tree. Both keep working.
+ */
+const parseVisibility = (value: Json | null): { rule?: FormRule } | { condition?: FormFieldDefinition["condition"] } | Record<string, never> => {
+  const record = object(value);
+  if (!Object.keys(record).length) return {};
+  return typeof record.kind === "string"
+    ? { rule: record as unknown as FormRule }
+    : { condition: record as unknown as FormFieldDefinition["condition"] };
+};
 const parseOptionSource = (source: string | null, masterType: string | null) =>
   source === "dropdown_master" && masterType ? { kind: "master" as const, masterType } : undefined;
 
@@ -43,14 +54,14 @@ export function toDefinition(template: FormTemplate, fields: FormField[]): FormT
     ...(sections.length ? { sections } : {}),
     permissions: { roles: ((object(template.permissions).roles ?? []) as string[]).filter((role): role is import("@jewelos/core").UserRole => ["super_admin","admin","manager","hr","crm","staff","doer","housekeeping"].includes(role)) },
     fields: fields.map((field) => {
-      const condition = object(field.conditional_logic);
+      const visibility = parseVisibility(field.conditional_logic);
       const optionSource = parseOptionSource(field.option_source, field.dropdown_master_type);
       const branches = parseBranches(field.branch_logic);
       return { id: field.id, key: field.field_key, label: field.field_name, type: field.field_type as FormFieldDefinition["type"], sortOrder: field.sort_order, required: field.is_required, shown: field.is_shown, editable: field.is_editable, placeholder: field.placeholder ?? undefined, helperText: field.helper_text ?? undefined,
         ...(sections.length && field.group_name ? { sectionKey: field.group_name } : {}),
         ...(optionSource ? { optionSource } : { options: parseFormOptions(field.options) }),
         ...(branches.length ? { branches } : {}),
-        validation: object(field.validation) as FormFieldDefinition["validation"], ...(Object.keys(condition).length ? { condition: condition as FormFieldDefinition["condition"] } : {}) };
+        validation: object(field.validation) as FormFieldDefinition["validation"], ...visibility };
     }) });
 }
 

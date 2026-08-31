@@ -1,5 +1,6 @@
 export * from "./types";
 export * from "./options";
+export * from "./rules";
 export * from "./sections";
 export * from "./definition";
 export * from "./visibility";

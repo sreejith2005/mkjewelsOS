@@ -39,14 +39,14 @@ select is((
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
-), 296, 'exactly 296 postgres-owned public application functions exist in the current migration set');
+), 304, 'exactly 304 postgres-owned public application functions exist in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres' and p.prosecdef
-), 250, 'exactly 250 public application functions are SECURITY DEFINER in the current migration set');
+), 253, 'exactly 253 public application functions are SECURITY DEFINER in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -62,7 +62,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 150, 'authenticated can execute exactly 150 reviewed public application functions');
+), 152, 'authenticated can execute exactly 152 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -78,7 +78,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('postgres', p.oid, 'EXECUTE')
-), 296, 'postgres retains owner execution on every public application function');
+), 304, 'postgres retains owner execution on every public application function');
 
 -- Exact authenticated allowlist: baseline, Forms, and reviewed FMS entry points.
 select ok(has_function_privilege('authenticated', 'current_profile()', 'EXECUTE'), 'authenticated executes current_profile');
@@ -141,6 +141,8 @@ select is((
       'hold_fms_instance_with_audit(uuid,text)',
       'move_fms_stage_backward_with_audit(uuid,uuid,text,uuid)',
       'publish_fms_flow_with_audit(uuid)',
+      'save_fms_context_assignee_default_with_audit(text,uuid)',
+      'set_fms_flow_context_with_audit(uuid,text)',
       'reassign_fms_stage_with_audit(uuid,uuid,uuid,text)',
       'register_fms_evidence_with_audit(uuid,text,text,text,bigint)',
       'request_fms_revision_with_audit(uuid,uuid,text,uuid)',

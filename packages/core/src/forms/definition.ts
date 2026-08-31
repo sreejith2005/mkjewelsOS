@@ -1,4 +1,5 @@
 import { FORM_OPTION_TYPES, parseFormOptions } from "./options";
+import { normalizeFormRule, validateFormRule } from "./rules";
 import { fieldSectionKey, formSections } from "./sections";
 import { FORM_DRAFT_FIELD_TYPES, FORM_SUBMIT_TARGET, type FormBranch, type FormFieldDefinition, type FormSectionDefinition, type FormTemplateDefinition, type FormValidationIssue } from "./types";
 
@@ -45,6 +46,8 @@ export function normalizeFormDefinition(template: FormTemplateDefinition): FormT
     .map(({ field, sectionIndex }, sortOrder): FormFieldDefinition => {
       const options = parseFormOptions(field.options);
       const branches = normalizeBranches(field);
+      // A rule supersedes the single legacy condition, so only one of the two survives.
+      const rule = normalizeFormRule(field.rule);
       return Object.freeze({
         ...(field.id ? { id: field.id } : {}),
         key: requiredText(field.key).toLowerCase(),
@@ -62,7 +65,7 @@ export function normalizeFormDefinition(template: FormTemplateDefinition): FormT
           : options ? { options: Object.freeze(options.map((option) => Object.freeze({ value: requiredText(option.value), label: requiredText(option.label) }))) } : {}),
         ...(branches ? { branches } : {}),
         ...(field.validation ? { validation: Object.freeze({ ...field.validation }) } : {}),
-        ...(field.condition ? { condition: Object.freeze({ ...field.condition, fieldKey: requiredText(field.condition.fieldKey).toLowerCase() }) } : {}),
+        ...(rule ? { rule } : field.condition ? { condition: Object.freeze({ ...field.condition, fieldKey: requiredText(field.condition.fieldKey).toLowerCase() }) } : {}),
       });
     });
   return Object.freeze({
@@ -162,6 +165,8 @@ export function validateFormDefinition(template: FormTemplateDefinition): readon
     } else if (options.length > 0 || field.optionSource) issues.push({ code: "unexpected_options", fieldKey: field.key, message: "This field type cannot define options" });
     if (LAYOUT_TYPES.has(field.type) && field.required) issues.push({ code: "layout_required", fieldKey: field.key, message: "Layout fields cannot be required" });
     validateBranches(template, field, issues);
+    issues.push(...validateFormRule(field.rule, field, earlier));
+    if (field.rule && field.condition) issues.push({ code: "conflicting_condition", fieldKey: field.key, message: (field.label || field.key) + " cannot define both a condition and a rule" });
     if (field.condition) {
       if (field.condition.fieldKey === field.key) issues.push({ code: "self_dependency", fieldKey: field.key, message: "A field cannot depend on itself" });
       else if (!earlier.has(field.condition.fieldKey)) issues.push({ code: "invalid_dependency", fieldKey: field.key, message: "Conditions must reference an earlier field" });
