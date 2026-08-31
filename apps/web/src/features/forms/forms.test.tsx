@@ -2,10 +2,17 @@
 import { useState } from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { FORM_SUBMIT_TARGET, type FormOption, type FormTemplateDefinition } from "@jewelos/core";
+import { FormBuilder, nextFormFieldKey } from "./FormBuilder";
+import type { FormBundle } from "./api";
 import { FormRenderer, type DynamicOptions } from "./FormRenderer";
 import { OptionListEditor } from "./OptionListEditor";
+
+vi.mock("@/features/dropdowns/api", () => ({
+  loadMasterOptions: vi.fn(async () => []),
+  toFormMasterOptions: vi.fn(() => []),
+}));
 
 afterEach(cleanup);
 
@@ -37,6 +44,16 @@ const onboarding: FormTemplateDefinition = {
     { key: "gst_number", label: "GST Number", type: "text", sortOrder: 3, sectionKey: "business_details", required: true },
   ],
 };
+
+const conditionalBundle = {
+  id: "form-1", name: "Metal details", description: null, lifecycle: "draft", permissions: { roles: ["staff"] },
+  sections: [{ key: "section_1", title: "Section 1" }], submissionCount: 0,
+  fields: [
+    { key: "metal", label: "Metal", type: "select", sortOrder: 0, sectionKey: "section_1", options: [{ value: "gold", label: "Gold" }, { value: "silver", label: "Silver" }] },
+    { key: "gold_purity", label: "Gold purity", type: "text", sortOrder: 1, sectionKey: "section_1" },
+    { key: "silver_finish", label: "Silver finish", type: "text", sortOrder: 2, sectionKey: "section_1" },
+  ],
+} as unknown as FormBundle;
 
 describe("Filling a branching form", () => {
   it("shows only the section the controlling answer leads to, and switches branches live", async () => {
@@ -144,5 +161,53 @@ describe("Entering dropdown options", () => {
 
     await user.click(screen.getByLabelText("Delete Instagram"));
     expect(screen.getAllByRole("listitem").map((item) => item.textContent)).toEqual([expect.stringContaining("Google")]);
+  });
+});
+
+describe("Form builder internal keys", () => {
+  it("allocates an unused key after a field was removed", () => {
+    expect(nextFormFieldKey([
+      { key: "field_1" },
+      { key: "field_3" },
+    ])).toBe("field_2");
+  });
+
+  it("keeps the normal field editor focused on respondent-facing settings", async () => {
+    const user = userEvent.setup();
+    render(<FormBuilder dynamicOptions={{ users: [], branches: [], departments: [], masters: [] }} onClose={() => {}} onSaved={async () => {}} />);
+
+    await user.click(screen.getByRole("button", { name: "Text" }));
+
+    const helper = screen.getByLabelText("Helper text");
+    const placeholder = screen.getByLabelText("Placeholder");
+    expect(screen.queryByLabelText("Internal key")).toBeNull();
+    expect(helper.compareDocumentPosition(placeholder) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText("Minimum length").closest("details")?.open).toBe(false);
+    expect(screen.getByText("Advanced settings")).toBeTruthy();
+  });
+});
+
+describe("Form builder follow-up questions", () => {
+  it("connects an answer to a later question with plain-language controls", async () => {
+    const user = userEvent.setup();
+    render(<FormBuilder bundle={conditionalBundle} dynamicOptions={{ users: [], branches: [], departments: [], masters: [] }} onClose={() => {}} onSaved={async () => {}} />);
+
+    await user.click(screen.getByLabelText("Edit Metal"));
+    await user.selectOptions(screen.getByLabelText("Follow-up after Gold"), "gold_purity");
+
+    expect(screen.getByText("If Gold is selected, ask Gold purity.")).toBeTruthy();
+  });
+
+  it("lets an author test the answer path and start the preview again", async () => {
+    const user = userEvent.setup();
+    render(<FormBuilder bundle={conditionalBundle} dynamicOptions={{ users: [], branches: [], departments: [], masters: [] }} onClose={() => {}} onSaved={async () => {}} />);
+
+    await user.click(screen.getByLabelText("Edit Metal"));
+    await user.selectOptions(screen.getByLabelText("Follow-up after Gold"), "gold_purity");
+    await user.selectOptions(screen.getByLabelText("Metal"), "gold");
+    expect(screen.getByLabelText("Gold purity")).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Start preview again" }));
+    expect(screen.queryByLabelText("Gold purity")).toBeNull();
   });
 });

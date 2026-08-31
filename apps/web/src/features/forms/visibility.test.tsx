@@ -142,18 +142,11 @@ describe("Authoring a conditional question", () => {
     expect(screen.queryByText(/Shown when Metal/)).toBeNull();
   });
 
-  it("keeps the condition pointing at a question that was renamed", async () => {
+  it("keeps internal keys out of the builder", async () => {
     const user = userEvent.setup();
     render(<FormBuilder bundle={bundle} dynamicOptions={dynamicOptions} onClose={() => undefined} onSaved={async () => undefined} />);
 
-    const karatRow = await openEditor(user, "Karat");
-    await user.click(within(karatRow).getByLabelText(/Only when earlier answers match/));
-
     const metalRow = await openEditor(user, "Metal");
-    const key = within(metalRow).getByRole("textbox", { name: "Internal key" });
-    await user.clear(key);
-    await user.type(key, "metal_choice");
-
-    expect(screen.getAllByText(/Shown when Metal is gold/).length).toBeGreaterThan(0);
+    expect(within(metalRow).queryByRole("textbox", { name: "Internal key" })).toBeNull();
   });
 });
