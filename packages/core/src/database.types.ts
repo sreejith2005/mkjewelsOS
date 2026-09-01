@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -2194,7 +2194,6 @@ export type Database = {
           head_id: string | null
           id: string
           is_active: boolean | null
-          module_context: string | null
           name: string
           tenant_id: string
           updated_at: string | null
@@ -2208,7 +2207,6 @@ export type Database = {
           head_id?: string | null
           id?: string
           is_active?: boolean | null
-          module_context?: string | null
           name: string
           tenant_id: string
           updated_at?: string | null
@@ -2222,7 +2220,6 @@ export type Database = {
           head_id?: string | null
           id?: string
           is_active?: boolean | null
-          module_context?: string | null
           name?: string
           tenant_id?: string
           updated_at?: string | null
@@ -2660,6 +2657,89 @@ export type Database = {
           },
         ]
       }
+      fms_context_assignee_defaults: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          module_context: string
+          tenant_id: string
+          updated_at: string
+          updated_by: string
+          user_profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          module_context: string
+          tenant_id: string
+          updated_at?: string
+          updated_by: string
+          user_profile_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          module_context?: string
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string
+          user_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fms_context_assignee_defaults_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_context_assignee_defaults_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_context_assignee_defaults_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_context_assignee_defaults_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_context_assignee_defaults_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_context_assignee_defaults_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_context_assignee_defaults_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fms_evidence: {
         Row: {
           created_at: string
@@ -2757,6 +2837,7 @@ export type Database = {
           family_id: string
           id: string
           is_active: boolean | null
+          module_context: string | null
           name: string
           published_by: string | null
           scope_type: string
@@ -2779,6 +2860,7 @@ export type Database = {
           family_id?: string
           id?: string
           is_active?: boolean | null
+          module_context?: string | null
           name: string
           published_by?: string | null
           scope_type?: string
@@ -2801,6 +2883,7 @@ export type Database = {
           family_id?: string
           id?: string
           is_active?: boolean | null
+          module_context?: string | null
           name?: string
           published_by?: string | null
           scope_type?: string
@@ -2863,12 +2946,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      fms_context_assignee_defaults: {
-        Row: { id: string; tenant_id: string; module_context: string; user_profile_id: string; created_by: string; updated_by: string; created_at: string; updated_at: string }
-        Insert: { id?: string; tenant_id: string; module_context: string; user_profile_id: string; created_by: string; updated_by: string; created_at?: string; updated_at?: string }
-        Update: { id?: string; tenant_id?: string; module_context?: string; user_profile_id?: string; created_by?: string; updated_by?: string; created_at?: string; updated_at?: string }
-        Relationships: []
       }
       fms_instance_checklist_items: {
         Row: {
@@ -3477,6 +3554,7 @@ export type Database = {
           can_move_backward: boolean | null
           can_reject: boolean | null
           can_request_revision: boolean | null
+          canvas_position: Json | null
           checklist_definition: Json
           completion_rule:
             | Database["public"]["Enums"]["fms_completion_rule"]
@@ -3511,6 +3589,7 @@ export type Database = {
           can_move_backward?: boolean | null
           can_reject?: boolean | null
           can_request_revision?: boolean | null
+          canvas_position?: Json | null
           checklist_definition?: Json
           completion_rule?:
             | Database["public"]["Enums"]["fms_completion_rule"]
@@ -3545,6 +3624,7 @@ export type Database = {
           can_move_backward?: boolean | null
           can_reject?: boolean | null
           can_request_revision?: boolean | null
+          canvas_position?: Json | null
           checklist_definition?: Json
           completion_rule?:
             | Database["public"]["Enums"]["fms_completion_rule"]
@@ -3892,6 +3972,104 @@ export type Database = {
             columns: ["form_template_id"]
             isOneToOne: false
             referencedRelation: "form_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      form_submission_files: {
+        Row: {
+          created_at: string
+          field_key: string
+          form_submission_id: string | null
+          form_template_id: string
+          id: string
+          mime_type: string
+          original_filename: string
+          removed_at: string | null
+          removed_by: string | null
+          size_bytes: number
+          storage_path: string
+          tenant_id: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          field_key: string
+          form_submission_id?: string | null
+          form_template_id: string
+          id?: string
+          mime_type: string
+          original_filename: string
+          removed_at?: string | null
+          removed_by?: string | null
+          size_bytes: number
+          storage_path: string
+          tenant_id: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          field_key?: string
+          form_submission_id?: string | null
+          form_template_id?: string
+          id?: string
+          mime_type?: string
+          original_filename?: string
+          removed_at?: string | null
+          removed_by?: string | null
+          size_bytes?: number
+          storage_path?: string
+          tenant_id?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_submission_files_form_submission_id_fkey"
+            columns: ["form_submission_id"]
+            isOneToOne: false
+            referencedRelation: "form_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submission_files_form_template_id_fkey"
+            columns: ["form_template_id"]
+            isOneToOne: false
+            referencedRelation: "form_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submission_files_removed_by_fkey"
+            columns: ["removed_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submission_files_removed_by_fkey"
+            columns: ["removed_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submission_files_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submission_files_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submission_files_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
         ]
@@ -7408,6 +7586,10 @@ export type Database = {
         Args: { p_submission_id: string }
         Returns: boolean
       }
+      can_read_form_upload_object: {
+        Args: { p_name: string }
+        Returns: boolean
+      }
       can_read_report_export_object: {
         Args: { p_name: string }
         Returns: boolean
@@ -7430,6 +7612,10 @@ export type Database = {
         Returns: boolean
       }
       can_write_fms_evidence_object: {
+        Args: { p_name: string }
+        Returns: boolean
+      }
+      can_write_form_upload_object: {
         Args: { p_name: string }
         Returns: boolean
       }
@@ -7816,10 +8002,7 @@ export type Database = {
         Args: { p_template_id: string }
         Returns: string
       }
-      delete_form_with_audit: {
-        Args: { p_template_id: string }
-        Returns: Json
-      }
+      delete_form_with_audit: { Args: { p_template_id: string }; Returns: Json }
       delete_recurring_todo_template_with_audit: {
         Args: { p_template_id: string }
         Returns: string
@@ -7934,6 +8117,15 @@ export type Database = {
         Args: { p_rule: Json; p_tenant_id: string }
         Returns: string
       }
+      fms_stage_route_target: {
+        Args: {
+          p_instance_id: string
+          p_instance_stage_id: string
+          p_outcome: string
+          p_stage_id: string
+        }
+        Returns: string
+      }
       fms_stage_deadline_for_instance: {
         Args: { p_instance_id: string; p_rule: Json; p_tenant_id: string }
         Returns: string
@@ -7950,10 +8142,16 @@ export type Database = {
         Args: { p_actual: string; p_expected: string; p_operator: string }
         Returns: boolean
       }
+      form_answer_is_empty: { Args: { p_value: Json }; Returns: boolean }
+      form_compare_values: {
+        Args: { p_left: Json; p_right: Json }
+        Returns: number
+      }
       form_condition_matches: {
         Args: { p_answers: Json; p_condition: Json }
         Returns: boolean
       }
+      form_deletion_impact: { Args: { p_template_id: string }; Returns: Json }
       form_field_option_values: {
         Args: { p_master_type: string; p_options: Json; p_tenant_id: string }
         Returns: Json
@@ -7962,14 +8160,18 @@ export type Database = {
         Args: { p_group_name: string; p_sections: Json }
         Returns: string
       }
-      form_deletion_impact: {
-        Args: { p_template_id: string }
-        Returns: Json
-      }
       form_option_values: { Args: { p_options: Json }; Returns: Json }
       form_reachable_sections: {
         Args: { p_answers: Json; p_template_id: string }
         Returns: string[]
+      }
+      form_value_contains: {
+        Args: { p_expected: Json; p_source: Json }
+        Returns: boolean
+      }
+      form_value_in: {
+        Args: { p_expected: Json; p_source: Json }
+        Returns: boolean
       }
       get_crm_client_detail: { Args: { p_client_id: string }; Returns: Json }
       get_crm_document_path: {
@@ -7985,6 +8187,7 @@ export type Database = {
         Returns: Json
       }
       get_dashboard_metrics: { Args: { p_context?: Json }; Returns: Json }
+      get_form_upload_path: { Args: { p_file_id: string }; Returns: string }
       get_home_summary: { Args: { p_context?: Json }; Returns: Json }
       get_my_daily_checklist_status: { Args: never; Returns: Json }
       get_my_fms_starter_assignments: {
@@ -8244,6 +8447,15 @@ export type Database = {
         Args: { p_permissions: Json }
         Returns: Json
       }
+      normalize_form_rule: {
+        Args: {
+          p_depth?: number
+          p_earlier: string[]
+          p_field_key: string
+          p_rule: Json
+        }
+        Returns: Json
+      }
       normalize_form_sections: { Args: { p_sections: Json }; Returns: Json }
       normalize_indian_phone: { Args: { p_value: string }; Returns: string }
       normalize_task_checklist: { Args: { p_checklist: Json }; Returns: Json }
@@ -8422,6 +8634,17 @@ export type Database = {
       register_fms_evidence_with_audit: {
         Args: {
           p_instance_stage_id: string
+          p_mime_type: string
+          p_original_filename: string
+          p_size_bytes: number
+          p_storage_path: string
+        }
+        Returns: string
+      }
+      register_form_upload: {
+        Args: {
+          p_field_key: string
+          p_form_template_id: string
           p_mime_type: string
           p_original_filename: string
           p_size_bytes: number
@@ -8704,17 +8927,13 @@ export type Database = {
         }
         Returns: Json
       }
-      save_fms_flow_draft_with_audit: {
-        Args: { p_flow_id: string; p_metadata: Json; p_stages: Json }
-        Returns: string
-      }
       save_fms_context_assignee_default_with_audit: {
         Args: { p_module_context: string; p_user_profile_id: string }
         Returns: undefined
       }
-      set_fms_flow_context_with_audit: {
-        Args: { p_flow_id: string; p_module_context: string | null }
-        Returns: undefined
+      save_fms_flow_draft_with_audit: {
+        Args: { p_flow_id: string; p_metadata: Json; p_stages: Json }
+        Returns: string
       }
       save_form_draft_with_audit: {
         Args: { p_fields: Json; p_payload: Json; p_template_id: string }
@@ -8825,6 +9044,10 @@ export type Database = {
       }
       send_recurring_followup_with_audit: {
         Args: { p_message: string; p_task_id: string }
+        Returns: undefined
+      }
+      set_fms_flow_context_with_audit: {
+        Args: { p_flow_id: string; p_module_context?: string }
         Returns: undefined
       }
       set_fms_instance_status_with_audit: {
@@ -9377,3 +9600,4 @@ export const Constants = {
     },
   },
 } as const
+

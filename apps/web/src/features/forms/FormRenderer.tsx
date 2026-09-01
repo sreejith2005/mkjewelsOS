@@ -1,13 +1,54 @@
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import { normalizeFormAnswers, resolveFormOptions, validateCompleteForm, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition } from "@jewelos/core";
 import { Button, Notice } from "@/components/ui";
+import { signedFormFileUrl, uploadFormFile } from "./api";
 
 export type DynamicOptions = { users: Array<{ id: string; label: string }>; branches: Array<{ id: string; label: string }>; departments: Array<{ id: string; branchId: string | null; label: string }>; masters: FormMasterOption[] };
 const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: [], masters: [] };
 const NUMBER_TYPES = new Set(["number", "currency", "rating"]);
 const SELECT_TYPES = new Set(["select", "user_dropdown", "branch_dropdown", "department_dropdown"]);
 
-export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initialAnswers = {}, onSubmit, preview = false, readOnly = false, workflowHint = false }: { definition: FormTemplateDefinition; dynamicOptions?: DynamicOptions; initialAnswers?: FormAnswers; onSubmit?: (answers: FormAnswers) => Promise<void>; preview?: boolean; readOnly?: boolean; workflowHint?: boolean }) {
+/** A file field's answer is the id of a row already registered via `register_form_upload` — the upload happens up front, ahead of the eventual `onSubmit`. */
+function FileFieldControl({ disabled, field, onChange, registerRef, templateId, value }: { disabled: boolean; field: FormFieldDefinition; onChange: (value: FormAnswer) => void; registerRef: (node: HTMLElement | null) => void; templateId?: string | undefined; value: FormAnswer | undefined }) {
+  const [uploading, setUploading] = useState(false);
+  const [viewing, setViewing] = useState(false);
+  const [name, setName] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const fileId = typeof value === "string" && value ? value : null;
+
+  if (!templateId) return <Notice>File upload isn't available until the form is saved.</Notice>;
+
+  const onFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]; event.target.value = "";
+    if (!file) return;
+    setUploading(true); setError(null);
+    try { const uploaded = await uploadFormFile(templateId, field.key, file); setName(uploaded.name); onChange(uploaded.id); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : "Upload failed"); }
+    finally { setUploading(false); }
+  };
+  const view = async () => {
+    if (!fileId) return;
+    setViewing(true); setError(null);
+    try { window.open(await signedFormFileUrl(fileId), "_blank", "noopener"); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : "Could not open file"); }
+    finally { setViewing(false); }
+  };
+
+  return <div className="flex flex-col gap-2">
+    {fileId
+      ? <div className="flex flex-wrap items-center gap-2 text-sm text-champagne">
+          <span>{name ?? "File uploaded"}</span>
+          <Button disabled={viewing} onClick={() => void view()} type="button" variant="secondary">{viewing ? "Opening..." : "View"}</Button>
+          {!disabled ? <Button onClick={() => { onChange(""); setName(null); }} type="button" variant="ghost">Replace</Button> : null}
+        </div>
+      : disabled ? <span className="text-sm text-soft-grey">No file uploaded</span>
+      : <input accept="image/jpeg,image/png,image/webp,application/pdf" disabled={uploading} onChange={(event) => void onFile(event)} ref={registerRef} type="file" />}
+    {uploading ? <span className="text-xs text-soft-grey">Uploading...</span> : null}
+    {error ? <span className="text-xs text-red-400">{error}</span> : null}
+  </div>;
+}
+
+export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initialAnswers = {}, onSubmit, preview = false, readOnly = false, templateId, workflowHint = false }: { definition: FormTemplateDefinition; dynamicOptions?: DynamicOptions; initialAnswers?: FormAnswers; onSubmit?: (answers: FormAnswers) => Promise<void>; preview?: boolean; readOnly?: boolean; templateId?: string; workflowHint?: boolean }) {
   const [answers, setAnswers] = useState<Record<string, FormAnswer>>(() => Object.fromEntries(Object.entries(initialAnswers).filter((entry): entry is [string, FormAnswer] => entry[1] !== null && entry[1] !== undefined)));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -40,7 +81,9 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
   const renderField = (field: FormFieldDefinition) => {
     if (field.type === "section_header") return <h3 className="text-lg font-semibold text-gold" key={field.key}>{field.label}</h3>;
     if (field.type === "divider") return <hr className="border-gold/20" key={field.key} />;
-    if (field.type === "file") return <Notice key={field.key} tone="danger">File fields are unavailable until private upload storage is approved.</Notice>;
+    if (field.type === "file") { const disabled = readOnly || field.editable === false; return <label className="block" key={field.key}><span className="label">{field.label}{field.required ? " *" : ""}</span>{field.helperText ? <span className="mb-1 block text-xs text-soft-grey">{field.helperText}</span> : null}
+      <FileFieldControl disabled={disabled} field={field} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} templateId={templateId} value={answers[field.key]} />
+    </label>; }
     const value = answers[field.key]; const disabled = readOnly || field.editable === false; const dynamic = optionsFor(field.type); const staticOptions = field.options ?? [];
     const selectOptions = dynamic.length ? dynamic : staticOptions.map((option) => ({ id: option.value, label: option.label })); const inputType = NUMBER_TYPES.has(field.type) ? "number" : field.type === "datetime" ? "datetime-local" : field.type;
     const onText = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => { const raw = event.target.value; set(field.key, NUMBER_TYPES.has(field.type) ? (raw === "" ? "" : Number(raw)) : raw); };

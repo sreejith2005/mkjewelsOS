@@ -170,3 +170,33 @@ export async function startFmsFromFormSubmission(submissionId: string): Promise<
   return row ? { instanceId: row.instance_id as string, referenceNumber: row.reference_number as string } : null;
 }
 export const reviewSubmission = async (id: string, decision: "approved" | "rejected", notes: string) => { const { error } = await supabase.rpc("review_form_submission_with_audit", { p_submission_id: id, p_decision: decision, p_review_notes: notes }); fail("Review submission", error); };
+
+const ALLOWED_UPLOAD_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
+export function validateFormUploadFile(file: Pick<File, "name" | "size" | "type">): string | null {
+  return ALLOWED_UPLOAD_MIME_TYPES.has(file.type) && /\.(jpg|jpeg|png|webp|pdf)$/i.test(file.name) && file.size >= 1 && file.size <= 10 * 1024 * 1024
+    ? null
+    : "Use a JPG, PNG, WebP, or PDF up to 10 MB.";
+}
+
+/** Uploaded before the form is submitted; `submit_form_with_audit` links the file to the submission it ends up in. */
+export async function uploadFormFile(templateId: string, fieldKey: string, file: File): Promise<{ id: string; name: string }> {
+  const validationError = validateFormUploadFile(file); if (validationError) throw new Error(validationError);
+  const safeName = file.name.replace(/[^A-Za-z0-9._-]/g, "_").slice(-120);
+  const tenant = (await supabase.rpc("current_tenant_id")).data; if (!tenant) throw new Error("Tenant context is unavailable.");
+  const path = `${tenant}/${templateId}/${crypto.randomUUID()}_${safeName}`;
+  const upload = await supabase.storage.from("form-uploads").upload(path, file, { contentType: file.type, upsert: false });
+  fail("Upload file", upload.error);
+  try {
+    const { data, error } = await supabase.rpc("register_form_upload", { p_form_template_id: templateId, p_field_key: fieldKey, p_storage_path: path, p_original_filename: safeName, p_mime_type: file.type, p_size_bytes: file.size });
+    fail("Register uploaded file", error);
+    return { id: data as string, name: safeName };
+  } catch (error) {
+    try { await supabase.storage.from("form-uploads").remove([path]); } catch { /* registration error remains authoritative */ }
+    throw error;
+  }
+}
+export async function signedFormFileUrl(fileId: string) {
+  const pathResult = await supabase.rpc("get_form_upload_path", { p_file_id: fileId }); fail("Load uploaded file", pathResult.error);
+  const signed = await supabase.storage.from("form-uploads").createSignedUrl(pathResult.data as string, 60); fail("Sign uploaded file", signed.error);
+  return signed.data!.signedUrl;
+}

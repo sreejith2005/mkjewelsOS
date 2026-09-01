@@ -885,6 +885,7 @@ export function RecurringTodoPage() {
                     fields: form.fields,
                   }}
                   dynamicOptions={formOptions}
+                  templateId={form.id}
                   onSubmit={async (answers) => {
                     await submitForm(
                       form.id,

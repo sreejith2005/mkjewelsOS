@@ -152,7 +152,7 @@ select ok((select published_by is not null and published_at is not null from for
 select is((select count(*)::int from audit_logs where action='form_published' and record_id=(select id from form_templates where name='Phase 4 Comprehensive')),1,'publishing is audited');
 select throws_ok($$update form_templates set name='Mutated' where name='Phase 4 Comprehensive'$$,'42501',null,'authenticated cannot mutate a published template directly');
 select lives_ok($$select save_form_draft_with_audit(null,'{"name":"Deferred File","branch_id":"29000000-0000-0000-0000-000000000001"}','[{"key":"upload","label":"Upload","type":"file"}]')$$,'file field may be saved in a draft');
-select throws_ok($$select publish_form_with_audit((select id from form_templates where name='Deferred File'))$$,'0A000',null,'publishing a file field fails clearly');
+select lives_ok($$select publish_form_with_audit((select id from form_templates where name='Deferred File'))$$,'a form with a file field now publishes (see 0119_form_file_field_uploads.test.sql for the upload lifecycle)');
 select lives_ok($$select create_form_revision_with_audit((select id from form_templates where name='Phase 4 Comprehensive'),'{}')$$,'published form creates a revision');
 select is((select max(version)::int from form_templates where family_id=(select family_id from form_templates where name='Phase 4 Comprehensive' and lifecycle='published')),2,'revision increments family version');
 select throws_ok($$select create_form_revision_with_audit((select id from form_templates where name='Phase 4 Comprehensive' and lifecycle='published'),'{}')$$,'23505',null,'only one family draft is allowed');

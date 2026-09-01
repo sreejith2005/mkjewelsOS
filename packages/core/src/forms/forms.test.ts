@@ -73,10 +73,10 @@ describe("Forms definition contract", () => {
     expect(validateFormDefinition({ name: "", description: "x".repeat(2001), fields: Array.from({ length: 101 }, (_, index) => field("text", { key: `f_${index}`, sortOrder: index })) }).map((issue) => issue.code)).toEqual(expect.arrayContaining(["invalid_name", "invalid_description", "too_many_fields"]));
   });
 
-  it("allows a file placeholder in a draft but rejects publication", () => {
+  it("allows a file field to be drafted and published", () => {
     const draft = template([field("file")]);
     expect(validateFormDefinition(draft)).toEqual([]);
-    expect(checkFormPublishability(draft).issues.map((issue) => issue.code)).toContain("file_storage_deferred");
+    expect(checkFormPublishability(draft).valid).toBe(true);
   });
 });
 
