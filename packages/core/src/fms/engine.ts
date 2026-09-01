@@ -1,5 +1,5 @@
 import type { UserRole } from "../roleMenu";
-import { FMS_ASSIGNEE_TYPES, FMS_BRANCH_OPERATORS, FMS_STAGE_TYPES, type FmsAssignmentCandidate, type FmsAssigneeRule, type FmsBranchRule, type FmsChecklistItemDefinition, type FmsDecisionOption, type FmsFlowDefinition, type FmsInstanceStatus, type FmsStageActorState, type FmsStageDefinition, type FmsStageStatus, type FmsTimingMethod, type FmsTransitionCapability, type FmsValidationIssue } from "./types";
+import { FMS_ASSIGNEE_TYPES, FMS_BRANCH_OPERATORS, FMS_STAGE_TYPES, type FmsAssignmentCandidate, type FmsAssigneeRule, type FmsBranchRule, type FmsChecklistItemDefinition, type FmsDecisionOption, type FmsFlowDefinition, type FmsInstanceStatus, type FmsStageActorState, type FmsStageDefinition, type FmsStageStatus, type FmsTimingMethod, type FmsTransitionCapability, type FmsValidationContext, type FmsValidationIssue } from "./types";
 
 const KEY = /^[a-z][a-z0-9_]{0,63}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -28,6 +28,7 @@ export function normalizeFmsDefinition(input: FmsFlowDefinition): FmsFlowDefinit
     parallelTargetStageKeys: array<string>(stage.parallelTargetStageKeys).map((key) => text(key).toLowerCase()).filter(Boolean),
     joinRequiredStageKeys: array<string>(stage.joinRequiredStageKeys).map((key) => text(key).toLowerCase()).filter(Boolean),
     splitToFlowId: text(stage.splitToFlowId) || undefined,
+    position: Number.isFinite(stage.position?.x) && Number.isFinite(stage.position?.y) ? { x: Math.max(0, Math.round(stage.position!.x)), y: Math.max(0, Math.round(stage.position!.y)) } : undefined,
     sla: {
       timingMethod: TIMING_METHODS.has(stage.sla?.timingMethod as FmsTimingMethod) ? stage.sla.timingMethod as FmsTimingMethod : "completion_date",
       dueDate: text(stage.sla?.dueDate), deadlineEnabled: stage.sla?.deadlineEnabled !== false,
@@ -46,10 +47,21 @@ export function normalizeFmsDefinition(input: FmsFlowDefinition): FmsFlowDefinit
   return { ...input, name: text(input.name), description: text(input.description) || undefined, manualTrigger: true, stages };
 }
 
+/** True when the stage carries its own ordered routes instead of a single successor. */
+export function hasFmsStageRouting(stage: FmsStageDefinition): boolean {
+  return stage.type !== "branch" && stage.type !== "parallel_start" && stage.branchRules.length > 0;
+}
+
+/** The fallback route of a routed stage, or `defaultNextStageKey` when none is configured. */
+export function fmsFallbackStageKey(stage: FmsStageDefinition): string | undefined {
+  return stage.branchRules.find((rule) => rule.operator === "default")?.nextStageKey ?? stage.defaultNextStageKey;
+}
+
 export function fmsOutgoingStageKeys(stage: FmsStageDefinition): readonly string[] {
   if (stage.type === "branch") return stage.branchRules.flatMap((rule) => rule.nextStageKey ? [rule.nextStageKey] : []);
   if (stage.type === "parallel_start") return stage.parallelTargetStageKeys;
-  return stage.defaultNextStageKey ? [stage.defaultNextStageKey] : [];
+  const routed = stage.branchRules.flatMap((rule) => rule.nextStageKey ? [rule.nextStageKey] : []);
+  return [...new Set(stage.defaultNextStageKey ? [...routed, stage.defaultNextStageKey] : routed)];
 }
 
 export function reachableFmsStageKeys(definition: FmsFlowDefinition): ReadonlySet<string> {
@@ -67,7 +79,37 @@ function hasUnsupportedCycle(definition: FmsFlowDefinition): boolean {
   return definition.stages.some((stage) => visit(stage.key));
 }
 
-export function validateFmsDefinition(raw: FmsFlowDefinition): readonly FmsValidationIssue[] {
+const ROUTE_VALUE_FREE = new Set<string>(["default", "not_empty"]);
+
+/**
+ * Ordered routes on an ordinary step. They are additive: a step without routes
+ * still moves to `defaultNextStageKey`, exactly as every published flow does.
+ */
+function validateStageRoutes(stage: FmsStageDefinition, byKey: ReadonlyMap<string, FmsStageDefinition>, context: FmsValidationContext, add: (code: string, message: string) => void): void {
+  const fields = stage.formTemplateId ? context.formFields?.[stage.formTemplateId] : undefined;
+  if (stage.branchRules.filter((rule) => rule.operator === "default").length > 1) add("conflicting_fallback_route", "A step can define only one fallback route");
+  if (stage.branchRules.some((rule) => rule.nextFlowId)) add("invalid_route_target", "A conditional route must point to a step in this workflow");
+  for (const rule of stage.branchRules) {
+    const label = rule.label ? `"${rule.label}"` : `Route ${rule.order + 1}`;
+    if (!FMS_BRANCH_OPERATORS.includes(rule.operator)) add("invalid_route_operator", `${label} uses an unsupported condition`);
+    if (!rule.nextStageKey) { add("route_without_destination", `${label} has no destination step`); continue; }
+    if (!byKey.has(rule.nextStageKey)) continue;
+    if (rule.operator === "default") continue;
+    if (rule.source === "outcome" && stage.sla.decisionMode !== "yes_no") add("route_without_decision", `${label} routes on this step's outcome, so make this step a Decision step`);
+    if (rule.source === "outcome" && stage.sla.decisionMode === "yes_no" && !stage.sla.decisionOptions?.some((option) => option.key === String(rule.value ?? ""))) add("invalid_route_value", `${label} matches an outcome that this step no longer offers`);
+    if (rule.source !== "outcome" && !rule.sourceKey) { add("invalid_route_source", `${label} needs the question or process field that decides it`); continue; }
+    if (!ROUTE_VALUE_FREE.has(rule.operator) && (rule.value === undefined || rule.value === null || rule.value === "" || Array.isArray(rule.value) && rule.value.length === 0)) add("invalid_route_value", `${label} needs the answer it should match`);
+    if (rule.source !== "form_answer") continue;
+    if (!stage.formTemplateId) { add("route_without_form", `${label} routes on a form answer, so link a Form to this step`); continue; }
+    if (!fields) continue;
+    const field = fields.find((item) => item.key === rule.sourceKey);
+    if (!field) { add("route_field_missing", `${label} uses a question that is no longer in the linked Form`); continue; }
+    const expected = Array.isArray(rule.value) ? rule.value.map(String) : [String(rule.value ?? "")];
+    if (field.optionValues?.length && !ROUTE_VALUE_FREE.has(rule.operator) && rule.operator !== "contains" && expected.some((value) => !field.optionValues!.includes(value))) add("route_value_missing", `${label} matches an option that "${field.label}" no longer offers`);
+  }
+}
+
+export function validateFmsDefinition(raw: FmsFlowDefinition, context: FmsValidationContext = {}): readonly FmsValidationIssue[] {
   const definition = normalizeFmsDefinition(raw); const issues: FmsValidationIssue[] = []; const keys = new Set<string>(); const byKey = new Map(definition.stages.map((stage) => [stage.key, stage]));
   if (!definition.name || definition.name.length > 150) issues.push({ code: "invalid_name", message: "Flow name must contain 1 to 150 characters" });
   if (definition.version !== undefined && (!Number.isInteger(definition.version) || definition.version < 1)) issues.push({ code: "invalid_version", message: "Version must be a positive integer" });
@@ -94,11 +136,13 @@ export function validateFmsDefinition(raw: FmsFlowDefinition): readonly FmsValid
     if (new Set(stage.checklist.map((item) => item.key)).size !== stage.checklist.length || stage.checklist.some((item) => !KEY.test(item.key) || !item.label)) add("invalid_checklist", "Checklist keys must be unique and labels are required");
     if (stageIndex === 0 && !stage.formTemplateId) add("missing_form", "The initial Form requires an exact published template version");
     if (stage.formTemplateId && !UUID.test(stage.formTemplateId)) add("invalid_form", "Linked form ID is invalid");
+    if (stage.formTemplateId && UUID.test(stage.formTemplateId) && context.availableFormIds && !context.availableFormIds.includes(stage.formTemplateId)) add("missing_linked_form", "The linked Form is no longer an available published version");
     if (!AUTO.has(stage.type) && !stage.assigneeRules.length) add("missing_assignee", "Executable stages require an assignee rule");
     if (stage.assigneeRules.some((rule) => !FMS_ASSIGNEE_TYPES.includes(rule.type) || rule.type === "specific_user" && (!UUID.test(rule.userProfileId ?? "") || rule.fallbackUserProfileId !== undefined && !UUID.test(rule.fallbackUserProfileId)) || rule.type !== "specific_user" && rule.fallbackUserProfileId !== undefined || rule.type === "role" && !rule.role)) add("invalid_assignee", "Assignee rule is incomplete");
     if (!stage.allowMultipleDoers && stage.completionRule === "all_doers") add("incompatible_completion_rule", "all_doers requires multiple doers");
     if (stage.type === "approval" && stage.completionRule !== "manager_approval") add("incompatible_completion_rule", "Approval stages require manager_approval");
     for (const next of fmsOutgoingStageKeys(stage)) if (!byKey.has(next)) add("dangling_reference", `Stage references missing stage ${next}`);
+    if (hasFmsStageRouting(stage)) validateStageRoutes(stage, byKey, context, add);
     if (stage.type === "branch") { const defaults = stage.branchRules.filter((rule) => rule.operator === "default"); if (!stage.branchRules.length || defaults.length !== 1 || stage.branchRules.at(-1)?.operator !== "default") add("invalid_branch", "Branch stages require one final default route"); if (stage.branchRules.some((rule) => !FMS_BRANCH_OPERATORS.includes(rule.operator) || rule.source !== "outcome" && !rule.sourceKey || rule.operator !== "default" && rule.value === undefined && rule.operator !== "not_empty" || (!!rule.nextStageKey === !!rule.nextFlowId))) add("invalid_branch", "Branch rules contain invalid source, operator, value, or target"); }
     if (stage.type === "parallel_start" && !stage.parallelTargetStageKeys.length) add("invalid_parallel", "Parallel start requires targets");
     if (stage.type === "parallel_join" && (!stage.joinRule || stage.joinRule === "specific" && !stage.joinRequiredStageKeys.length)) add("invalid_join", "Parallel join configuration is incomplete");

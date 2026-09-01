@@ -44,6 +44,12 @@ export type FmsSlaRule = Readonly<{
   decisionOptions?: readonly FmsDecisionOption[] | undefined;
   conditional?: FmsConditionalRule | undefined;
 }>;
+/**
+ * An ordered outgoing route. `branch` stages have always used these rules; since
+ * stage-level routing landed, any step may also carry them, and the runtime
+ * evaluates them on completion before falling back to `defaultNextStageKey`.
+ * A stage with no rules keeps the historical single-successor behaviour.
+ */
 export type FmsBranchRule = Readonly<{
   id: string;
   source: "outcome" | "context" | "form_answer";
@@ -81,6 +87,8 @@ export type FmsStageDefinition = Readonly<{
   joinRule?: FmsJoinRule | undefined;
   joinRequiredStageKeys: readonly string[];
   splitToFlowId?: string | undefined;
+  /** Editor-only canvas coordinates. Absent means "use the computed layout"; the runtime never reads this. */
+  position?: Readonly<{ x: number; y: number }> | undefined;
   sla: FmsSlaRule;
 }>;
 
@@ -97,6 +105,14 @@ export type FmsFlowDefinition = Readonly<{
   moduleContext?: string | undefined;
   manualTrigger: true;
   stages: readonly FmsStageDefinition[];
+}>;
+
+/** A linked form question, reduced to what FMS route configuration and validation need. */
+export type FmsFormFieldRef = Readonly<{ key: string; label: string; optionValues?: readonly string[] | undefined }>;
+/** Optional Forms knowledge so route validation can catch a removed form, question, or option. */
+export type FmsValidationContext = Readonly<{
+  formFields?: Readonly<Record<string, readonly FmsFormFieldRef[]>> | undefined;
+  availableFormIds?: readonly string[] | undefined;
 }>;
 
 export type FmsValidationIssue = Readonly<{ code: string; message: string; stageKey?: string | undefined }>;

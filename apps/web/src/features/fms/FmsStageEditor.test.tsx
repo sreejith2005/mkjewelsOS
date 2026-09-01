@@ -9,7 +9,9 @@ import { newFmsStage } from "./definition";
 import { FmsStageEditor } from "./FmsStageEditor";
 
 const data: FmsData = {
-  flows: [], stages: [], assignees: [], branchRules: [], forms: [{ id: "00000000-0000-4000-8000-000000000001", name: "Initial details", version: 1 }], statusOptions: [{ label: "Follow Up", value: "follow_up" }, { label: "Interested", value: "interested" }], availability: [],
+  flows: [], stages: [], assignees: [], branchRules: [], forms: [{ id: "00000000-0000-4000-8000-000000000001", name: "Initial details", version: 1 }],
+  formFields: { "00000000-0000-4000-8000-000000000001": [{ key: "customer_type", label: "Customer type", optionValues: ["retail", "wholesale", "distributor"] }, { key: "notes", label: "Notes" }] },
+  statusOptions: [{ label: "Follow Up", value: "follow_up" }, { label: "Interested", value: "interested" }], availability: [],
   branches: [{ id: "b1", name: "Main" }],
   departments: [{ id: "d1", branch_id: null, name: "Sales" }],
   users: [
@@ -29,6 +31,16 @@ function LaterFormHarness() {
   const first = { ...newFmsStage("form", 0), key: "initial", formTemplateId: data.forms[0]!.id };
   const [later, setLater] = useState<FmsStageDefinition>(() => ({ ...newFmsStage("form", 1), key: "later" }));
   return <FmsStageEditor data={data} onChange={setLater} onDelete={() => undefined} stage={later} stages={[first, later]} />;
+}
+
+let latestStage: FmsStageDefinition | null = null;
+
+function RoutingHarness() {
+  const first = { ...newFmsStage("form", 0), key: "initial", name: "Initial details", formTemplateId: data.forms[0]!.id, defaultNextStageKey: "qualify" };
+  const wholesale = { ...newFmsStage("task", 2), key: "wholesale_desk", name: "Wholesale desk" };
+  const [stage, setStage] = useState<FmsStageDefinition>(() => ({ ...newFmsStage("task", 1), key: "qualify", name: "Customer qualification", formTemplateId: data.forms[0]!.id }));
+  latestStage = stage;
+  return <FmsStageEditor data={data} onChange={(value) => { latestStage = value; setStage(value); }} onDelete={() => undefined} stage={stage} stages={[first, stage, wholesale]} />;
 }
 
 function DecisionHarness() {
@@ -73,14 +85,34 @@ describe("FMS stage editor", () => {
     expect(screen.queryByLabelText("TAT value")).toBeNull();
     expect(screen.queryByLabelText("Escalate after")).toBeNull();
   });
-  it("requires the initial details form but keeps every later form attachment optional", async () => {
-    const user = userEvent.setup();
+  it("shows the linked form selector directly, without an optional-information toggle", () => {
     render(<LaterFormHarness />);
+    expect(screen.queryByLabelText("Add additional information")).toBeNull();
     expect(screen.queryByLabelText("Initial details form")).toBeNull();
-    expect(screen.queryByLabelText("Optional linked form")).toBeNull();
-    await user.click(screen.getByLabelText("Add additional information"));
-    await user.click(screen.getByLabelText("Attach an optional form"));
-    expect(screen.getByLabelText("Optional linked form")).toBeTruthy();
+    const select = screen.getByLabelText("Linked form") as HTMLSelectElement;
+    expect(select.value).toBe("");
+    expect(select.textContent).toContain("Initial details");
+  });
+
+  it("keeps instructions and completion controls available but secondary", () => {
+    render(<Harness />);
+    expect(screen.getByLabelText("How / instructions")).toBeTruthy();
+    expect(screen.getByText("How / instructions (optional)").tagName).toBe("SUMMARY");
+    expect(screen.getByText("Completion controls").tagName).toBe("SUMMARY");
+    expect(screen.getByLabelText("Require evidence")).toBeTruthy();
+  });
+
+  it("routes on a linked form answer using the stable field key and option value", async () => {
+    const user = userEvent.setup();
+    render(<RoutingHarness />);
+    await user.click(screen.getByRole("button", { name: "Add conditional route" }));
+    expect((screen.getByLabelText("Route 1 source") as HTMLSelectElement).value).toBe("form_answer");
+    expect((screen.getByLabelText("Route 1 question") as HTMLSelectElement).value).toBe("customer_type");
+    await user.selectOptions(screen.getByLabelText("Route 1 answer"), "wholesale");
+    await user.selectOptions(screen.getByLabelText("Route 1 then go to"), "wholesale_desk");
+    const rule = latestStage!.branchRules[0]!;
+    expect(rule).toMatchObject({ source: "form_answer", sourceKey: "customer_type", operator: "equals", value: "wholesale", nextStageKey: "wholesale_desk" });
+    expect(screen.getByText("Otherwise (fallback) go to")).toBeTruthy();
   });
   it("configures conditions only from dynamic earlier-decision options", async () => {
     const user = userEvent.setup();

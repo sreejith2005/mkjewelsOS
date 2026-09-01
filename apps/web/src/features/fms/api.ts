@@ -1,5 +1,7 @@
 import { supabase } from "@jewelos/api-client";
-import type { FmsFlowDefinition, Json } from "@jewelos/core";
+import type { FmsFlowDefinition, FmsFormFieldRef, Json } from "@jewelos/core";
+import { formOptionValues, parseFormOptions } from "@jewelos/core";
+import { loadMasterOptions } from "@/features/dropdowns/api";
 
 type DbError = { message: string } | null;
 const fail = (label: string, error: DbError) => { if (error) throw new Error(`${label}: ${error.message}`); };
@@ -13,7 +15,7 @@ export type FmsStageRow = {
   sort_order: number; is_required: boolean; planned_time_rule: Json; completion_rule: "all_doers" | "any_doer" | "manager_approval" | null; allow_multiple_doers: boolean | null;
   requires_upload: boolean | null; requires_remark: boolean | null; checklist_definition: Json; form_template_id: string | null; requires_next_doer_handoff: boolean | null;
   can_move_backward: boolean | null; can_reject: boolean | null; can_request_revision: boolean | null; can_escalate: boolean | null; default_next_stage_id: string | null;
-  parallel_target_stage_ids: string[]; join_rule: "all" | "any" | "specific" | null; join_required_stage_ids: string[] | null; split_to_flow_id: string | null;
+  parallel_target_stage_ids: string[]; join_rule: "all" | "any" | "specific" | null; join_required_stage_ids: string[] | null; split_to_flow_id: string | null; canvas_position?: { x: number; y: number } | null;
 };
 export type FmsInstance = { id: string; fms_flow_id: string; reference_number: string; title: string; status: "active" | "completed" | "cancelled" | "on_hold" | "overdue"; priority: "high" | "medium" | "low" | null; context: Json; branch_id: string | null; department_id: string | null; started_by: string; started_at: string | null; completed_at: string | null; parent_instance_id: string | null; flow_version: number };
 export type FmsInstanceStage = { id: string; fms_instance_id: string; fms_stage_id: string; status: string; assigned_to: string[] | null; planned_datetime: string | null; actual_datetime: string | null; delay_minutes: number | null; sla_breached: boolean | null; form_submission_id: string | null; remark: string | null; outcome: string | null; completed_by: string | null; escalation_count: number };
@@ -21,7 +23,7 @@ export type FmsChecklistItem = { id: string; fms_instance_stage_id: string; item
 export type FmsEvidence = { id: string; fms_instance_stage_id: string; storage_path: string; original_filename: string; mime_type: string; size_bytes: number; uploaded_by: string; created_at: string };
 export type FmsLog = { id: string; fms_instance_stage_id: string; actor_id: string | null; action: string; details: Json | null; created_at: string | null };
 export type FmsAvailability = "present" | "absent" | "half_day" | "remote";
-export type FmsData = { flows: FmsFlowRow[]; stages: FmsStageRow[]; assignees: Array<{ fms_stage_id: string; assignee_type: string; user_profile_id: string | null; fallback_user_profile_id?: string | null; role_value: string | null; allow_next_selection: boolean; sort_order: number }>; branchRules: Array<{ id: string; fms_stage_id: string; source_type: string; source_key: string | null; condition_operator: string; condition_value: string | null; next_stage_id: string | null; next_flow_id: string | null; label: string | null; sort_order: number | null }>; forms: Array<{ id: string; name: string; version: number }>; statusOptions?: Array<{ label: string; value: string }>; contextDefaults?: Array<{ module_context: string; user_profile_id: string }>; users: Array<{ id: string; employee_name: string; employee_code?: string; account_status?: string; user_role: string; branch_id: string; department_id: string; working_status: string; is_login_enabled: boolean | null }>; availability: Array<{ user_profile_id: string; status: FmsAvailability }>; branches: Array<{ id: string; name: string }>; departments: Array<{ id: string; branch_id: string | null; name: string }> };
+export type FmsData = { flows: FmsFlowRow[]; stages: FmsStageRow[]; assignees: Array<{ fms_stage_id: string; assignee_type: string; user_profile_id: string | null; fallback_user_profile_id?: string | null; role_value: string | null; allow_next_selection: boolean; sort_order: number }>; branchRules: Array<{ id: string; fms_stage_id: string; source_type: string; source_key: string | null; condition_operator: string; condition_value: string | null; next_stage_id: string | null; next_flow_id: string | null; label: string | null; sort_order: number | null }>; forms: Array<{ id: string; name: string; version: number }>; formFields: Record<string, readonly FmsFormFieldRef[]>; statusOptions?: Array<{ label: string; value: string }>; contextDefaults?: Array<{ module_context: string; user_profile_id: string }>; users: Array<{ id: string; employee_name: string; employee_code?: string; account_status?: string; user_role: string; branch_id: string; department_id: string; working_status: string; is_login_enabled: boolean | null }>; availability: Array<{ user_profile_id: string; status: FmsAvailability }>; branches: Array<{ id: string; name: string }>; departments: Array<{ id: string; branch_id: string | null; name: string }> };
 export type FmsStartResult = { instance_id: string; reference_number: string };
 
 function dateInKolkata(date: Date): string {
@@ -38,6 +40,7 @@ export async function loadFmsBuilderData(): Promise<FmsData> {
     supabase.from("fms_stage_assignees").select("*").order("sort_order").limit(1000),
     supabase.from("fms_branch_rules").select("*").order("sort_order").limit(1000),
     supabase.from("form_templates").select("id,name,version").eq("lifecycle", "published").eq("is_active", true).order("name").limit(300),
+    supabase.from("form_fields").select("form_template_id,field_key,field_name,field_type,options,option_source,dropdown_master_type").order("sort_order").limit(3000),
     supabase.from("dropdown_masters").select("label,value").eq("master_type", "buy_status").eq("is_active", true).order("sort_order").limit(300),
     supabase.from("user_profiles").select("id,employee_name,employee_code,account_status,user_role,branch_id,department_id,working_status,is_login_enabled").order("employee_name").limit(500),
     supabase.from("branches").select("id,name").eq("is_active", true).order("name").limit(100),
@@ -46,12 +49,34 @@ export async function loadFmsBuilderData(): Promise<FmsData> {
     supabase.from("fms_context_assignee_defaults").select("module_context,user_profile_id").limit(100),
   ]);
   results.forEach((result) => fail("Load FMS builder", result.error));
-  return { flows: results[0].data as FmsFlowRow[], stages: results[1].data as FmsStageRow[], assignees: results[2].data ?? [], branchRules: results[3].data ?? [], forms: results[4].data ?? [], statusOptions: results[5].data ?? [], users: results[6].data ?? [], branches: results[7].data ?? [], departments: results[8].data ?? [], availability: results[9].data ?? [], contextDefaults: results[10].data ?? [] };
+  const forms = results[4].data ?? [];
+  return { flows: results[0].data as FmsFlowRow[], stages: results[1].data as FmsStageRow[], assignees: results[2].data ?? [], branchRules: results[3].data ?? [], forms, formFields: await formFieldIndex(results[5].data ?? [], forms.map((form) => form.id)), statusOptions: results[6].data ?? [], users: results[7].data ?? [], branches: results[8].data ?? [], departments: results[9].data ?? [], availability: results[10].data ?? [], contextDefaults: results[11].data ?? [] };
+}
+
+type FormFieldRow = { form_template_id: string; field_key: string; field_name: string; field_type: string; options: Json | null; option_source: string | null; dropdown_master_type: string | null };
+
+/**
+ * Indexes the published Forms' questions by template so FMS route configuration
+ * and publish readiness reference stable field keys and option values rather
+ * than display labels. Dropdown Master questions resolve through the master.
+ */
+async function formFieldIndex(rows: readonly FormFieldRow[], templateIds: readonly string[]): Promise<Record<string, readonly FmsFormFieldRef[]>> {
+  const linked = rows.filter((row) => templateIds.includes(row.form_template_id));
+  const masterTypes = [...new Set(linked.flatMap((row) => row.option_source === "dropdown_master" && row.dropdown_master_type ? [row.dropdown_master_type] : []))];
+  const masters = masterTypes.length ? await loadMasterOptions(masterTypes, true).catch(() => []) : [];
+  const index: Record<string, FmsFormFieldRef[]> = {};
+  for (const row of linked) {
+    const optionValues = row.option_source === "dropdown_master" && row.dropdown_master_type
+      ? masters.filter((option) => option.master_type === row.dropdown_master_type).map((option) => option.value)
+      : formOptionValues(parseFormOptions(row.options));
+    (index[row.form_template_id] ??= []).push({ key: row.field_key, label: row.field_name || row.field_key, ...(optionValues.length ? { optionValues } : {}) });
+  }
+  return index;
 }
 
 export async function saveFmsDraft(flowId: string | null, definition: FmsFlowDefinition): Promise<string> {
   const metadata = { name: definition.name, description: definition.description ?? "", scope_type: definition.scope, branch_id: definition.branchId ?? "", department_id: definition.departmentId ?? "", module_context: definition.moduleContext ?? "", trigger_type: "manual", is_active: true };
-  const { data, error } = await supabase.rpc("save_fms_flow_draft_with_audit", { p_flow_id: flowId as string, p_metadata: metadata as Json, p_stages: definition.stages as unknown as Json }); fail("Save FMS draft", error); if (!data) throw new Error("Save FMS draft returned no ID"); const { error: contextError } = await supabase.rpc("set_fms_flow_context_with_audit", { p_flow_id: data, p_module_context: definition.moduleContext ?? null }); fail("Save FMS workflow context", contextError); return data;
+  const { data, error } = await supabase.rpc("save_fms_flow_draft_with_audit", { p_flow_id: flowId as string, p_metadata: metadata as Json, p_stages: definition.stages as unknown as Json }); fail("Save FMS draft", error); if (!data) throw new Error("Save FMS draft returned no ID"); const { error: contextError } = await supabase.rpc("set_fms_flow_context_with_audit", { p_flow_id: data, ...(definition.moduleContext ? { p_module_context: definition.moduleContext } : {}) }); fail("Save FMS workflow context", contextError); return data;
 }
 export const saveFmsContextAssigneeDefault = async (moduleContext: string, userProfileId: string) => { const { error } = await supabase.rpc("save_fms_context_assignee_default_with_audit", { p_module_context: moduleContext, p_user_profile_id: userProfileId }); fail("Save FMS default assignee", error); };
 export const reviseFmsFlow = async (id: string) => { const { data, error } = await supabase.rpc("create_fms_revision_with_audit", { p_flow_id: id }); fail("Create FMS revision", error); return data; };

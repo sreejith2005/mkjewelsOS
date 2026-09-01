@@ -15,6 +15,6 @@ describe("FMS graph presentation", () => {
   it("labels conditional and parallel edges", () => {
     const branch = { ...newFmsStage("branch", 0), key: "route", branchRules: [{ id: "r", source: "outcome" as const, operator: "default" as const, nextStageKey: "done", order: 0 }] };
     const done = { ...newFmsStage("task", 1), key: "done" };
-    expect(fmsGraphEdges([branch, done])).toEqual([{ from: "route", to: "done", label: "Default", kind: "branch" }]);
+    expect(fmsGraphEdges([branch, done])).toEqual([{ from: "route", to: "done", label: "Otherwise", kind: "branch", ruleId: "r" }]);
   });
 });

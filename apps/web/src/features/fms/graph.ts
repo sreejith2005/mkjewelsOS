@@ -1,7 +1,16 @@
-import { fmsOutgoingStageKeys, type FmsFlowDefinition, type FmsStageDefinition } from "@jewelos/core";
+import { fmsOutgoingStageKeys, hasFmsStageRouting, type FmsBranchRule, type FmsFlowDefinition, type FmsStageDefinition } from "@jewelos/core";
 
 export type FmsGraphPosition = Readonly<{ x: number; y: number }>;
-export type FmsGraphEdge = Readonly<{ from: string; to: string; label?: string | undefined; kind: "default" | "branch" | "parallel" }>;
+export type FmsGraphEdge = Readonly<{ from: string; to: string; label?: string | undefined; kind: "default" | "branch" | "parallel"; ruleId?: string | undefined }>;
+
+/** The readable name of a route, used on the canvas edge and in the routing panel. */
+export function fmsRouteLabel(rule: FmsBranchRule): string {
+  if (rule.label?.trim()) return rule.label.trim();
+  if (rule.operator === "default") return "Otherwise";
+  const value = Array.isArray(rule.value) ? rule.value.join(", ") : String(rule.value ?? "");
+  const verb = rule.operator === "equals" ? "is" : rule.operator === "not_equals" ? "is not" : rule.operator === "in" ? "is one of" : rule.operator === "not_empty" ? "is answered" : rule.operator.replaceAll("_", " ");
+  return `${rule.sourceKey ?? "Outcome"} ${verb}${rule.operator === "not_empty" ? "" : ` ${value}`}`.trim();
+}
 
 const COLUMN_WIDTH = 264;
 const ROW_HEIGHT = 144;
@@ -36,10 +45,16 @@ export function fmsGraphEdges(stages: readonly FmsStageDefinition[]): readonly F
   const edges: FmsGraphEdge[] = [];
   for (const stage of stages) {
     if (stage.type === "branch") {
-      for (const rule of stage.branchRules) if (rule.nextStageKey) edges.push({ from: stage.key, to: rule.nextStageKey, label: rule.label ?? (rule.operator === "default" ? "Default" : `${rule.sourceKey ?? "Outcome"} ${rule.operator}`), kind: "branch" });
-    } else if (stage.type === "parallel_start") {
+      for (const rule of stage.branchRules) if (rule.nextStageKey) edges.push({ from: stage.key, to: rule.nextStageKey, label: fmsRouteLabel(rule), kind: "branch", ruleId: rule.id });
+      continue;
+    }
+    if (stage.type === "parallel_start") {
       for (const to of stage.parallelTargetStageKeys) edges.push({ from: stage.key, to, label: "Parallel", kind: "parallel" });
-    } else if (stage.defaultNextStageKey) edges.push({ from: stage.key, to: stage.defaultNextStageKey, kind: "default" });
+      continue;
+    }
+    if (hasFmsStageRouting(stage)) for (const rule of stage.branchRules) if (rule.nextStageKey) edges.push({ from: stage.key, to: rule.nextStageKey, label: fmsRouteLabel(rule), kind: "branch", ruleId: rule.id });
+    // A routed stage keeps its plain next step only when no fallback route covers it.
+    if (stage.defaultNextStageKey && !stage.branchRules.some((rule) => rule.operator === "default" && rule.nextStageKey)) edges.push({ from: stage.key, to: stage.defaultNextStageKey, label: hasFmsStageRouting(stage) ? "Otherwise" : undefined, kind: "default" });
   }
   return edges;
 }
@@ -47,6 +62,7 @@ export function fmsGraphEdges(stages: readonly FmsStageDefinition[]): readonly F
 export function fmsStageSummary(stage: FmsStageDefinition): string {
   if (stage.type === "end") return "Legacy completion node";
   if (stage.type === "branch") return `${stage.branchRules.length} route${stage.branchRules.length === 1 ? "" : "s"}`;
+  if (hasFmsStageRouting(stage)) return `${fmsOutgoingStageKeys(stage).length} route${fmsOutgoingStageKeys(stage).length === 1 ? "" : "s"}`;
   if (stage.type === "parallel_start") return `${stage.parallelTargetStageKeys.length} parallel path${stage.parallelTargetStageKeys.length === 1 ? "" : "s"}`;
   if (stage.sla.decisionMode === "decision" || stage.sla.decisionMode === "yes_no") return `${stage.sla.decisionOptions?.map((option) => option.label).join(" / ") || "Decision"} decision`;
   if (stage.formTemplateId) return "Pinned form";

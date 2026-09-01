@@ -1,5 +1,5 @@
 begin;
-select plan(10);
+select plan(11);
 
 select has_table('public','fms_context_assignee_defaults','context defaults are durable configuration');
 select policies_are('public','fms_context_assignee_defaults',array['fms_context_assignee_defaults_select'],'context defaults have tenant-scoped read policy');
@@ -9,7 +9,11 @@ select ok(public.is_valid_fms_timing_rule('{"deadlineEnabled":false,"dueDate":""
 select ok(public.is_valid_fms_timing_rule('{"timingMethod":"tat_hours","tatMinutes":30,"dueDate":""}'::jsonb),'minute TAT is valid');
 select ok(not public.is_valid_fms_timing_rule('{"decisionMode":"decision","decisionOptions":[{"key":"yes","label":"Yes"}],"dueDate":"2099-01-01"}'::jsonb),'decision rule requires at least two options');
 select ok(public.is_valid_fms_timing_rule('{"deadlineEnabled":false,"decisionMode":"decision","decisionOptions":[{"key":"connected","label":"Call Connected"},{"key":"callback","label":"Call Back Required"}],"conditional":{"decisionStageKey":"introduction_call","decisionOptionKey":"connected"}}'::jsonb),'disabled deadline preserves and validates dynamic decision mapping');
-select ok(public.is_valid_fms_timing_rule('{"deadlineEnabled":false,"conditional":{"field":"status","operator":"equals","value":"interested"}}'::jsonb),'disabled deadline preserves existing status conditions');
+-- 0116 deliberately narrowed authoring to Decision Step options, so a legacy
+-- status condition is no longer accepted when a rule is written...
+select ok(not public.is_valid_fms_timing_rule('{"deadlineEnabled":false,"conditional":{"field":"status","operator":"equals","value":"interested"}}'::jsonb),'authoring no longer accepts a legacy status condition');
+-- ...while the runtime still honours the ones already stored on published flows.
+select ok((select pg_get_functiondef('activate_fms_stage_internal(uuid,uuid,uuid,uuid,integer)'::regprocedure) like '%{conditional,field}%'),'the runtime still evaluates existing status conditions');
 select ok(not public.is_valid_fms_timing_rule('{"deadlineEnabled":false,"decisionMode":"decision","decisionOptions":[{"key":"connected","label":"Call Connected"}],"conditional":{"decisionStageKey":"introduction_call","decisionOptionKey":"removed"}}'::jsonb),'disabled deadline does not bypass malformed dynamic rules');
 
 select * from finish();

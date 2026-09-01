@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateFmsDelay, calculateFmsProgress, deriveFmsTransitionCapability, evaluateFmsBranchRule, fmsStatusLabel, isFmsCompletionSatisfied, isFmsJoinReady, normalizeFmsDefinition, reachableFmsStageKeys, resolveFmsBranch, validateFmsAssignmentCandidate, validateFmsDefinition, type FmsFlowDefinition, type FmsStageDefinition } from ".";
+import { calculateFmsDelay, fmsOutgoingStageKeys, hasFmsStageRouting, calculateFmsProgress, deriveFmsTransitionCapability, evaluateFmsBranchRule, fmsStatusLabel, isFmsCompletionSatisfied, isFmsJoinReady, normalizeFmsDefinition, reachableFmsStageKeys, resolveFmsBranch, validateFmsAssignmentCandidate, validateFmsDefinition, type FmsFlowDefinition, type FmsStageDefinition } from ".";
 
 const stage = (patch: Partial<FmsStageDefinition> & Pick<FmsStageDefinition, "key" | "name" | "type" | "order">): FmsStageDefinition => ({ required: true, completionRule: patch.type === "approval" ? "manager_approval" : "any_doer", allowMultipleDoers: false, requiresUpload: false, requiresRemark: false, checklist: [], assigneeRules: ["branch", "parallel_start", "parallel_join", "notification", "end"].includes(patch.type) ? [] : [{ type: "reporter" }], requiresNextDoerHandoff: false, canMoveBackward: false, canReject: false, canRequestRevision: false, canEscalate: false, branchRules: [], parallelTargetStageKeys: [], joinRequiredStageKeys: [], sla: { dueDate: "2099-12-31" }, ...patch });
 const flow = (stages: FmsStageDefinition[]): FmsFlowDefinition => ({ name: "Order flow", description: "test", scope: "tenant", manualTrigger: true, stages });
@@ -38,6 +38,28 @@ describe("FMS definitions", () => {
     const legacy = flow([stage({ key: "form", name: "Form", type: "form", formTemplateId: formId, order: 0, defaultNextStageKey: "follow_up" }), stage({ key: "follow_up", name: "Follow up", type: "task", order: 1, sla: { dueDate: "2099-12-31", conditional: { field: "status", operator: "equals", value: "interested" } as never } })]);
     expect(normalizeFmsDefinition(legacy).stages[1]?.sla.conditional).toBeUndefined();
   });
+  it("keeps a legacy single-successor step exactly as it was", () => { const value = good().stages[0]!; expect(hasFmsStageRouting(value)).toBe(false); expect(fmsOutgoingStageKeys(value)).toEqual(["done"]); });
+
+  const routed = (rules: FmsStageDefinition["branchRules"], patch: Partial<FmsStageDefinition> = {}) => flow([
+    stage({ key: "start_form", name: "Start", type: "form", order: 0, formTemplateId: formId, defaultNextStageKey: "qualify" }),
+    stage({ key: "qualify", name: "Qualify", type: "task", order: 1, formTemplateId: formId, defaultNextStageKey: "retail", branchRules: rules, ...patch }),
+    stage({ key: "retail", name: "Retail", type: "task", order: 2, defaultNextStageKey: "close" }),
+    stage({ key: "wholesale", name: "Wholesale", type: "task", order: 3, defaultNextStageKey: "close" }),
+    stage({ key: "close", name: "Close", type: "task", order: 4 }),
+  ]);
+  const formContext = { formFields: { [formId]: [{ key: "customer_type", label: "Customer type", optionValues: ["retail", "wholesale"] }] } };
+  const route = (patch: Partial<FmsStageDefinition["branchRules"][number]> = {}) => ({ id: "r1", source: "form_answer" as const, sourceKey: "customer_type", operator: "equals" as const, value: "wholesale", nextStageKey: "wholesale", order: 0, ...patch });
+
+  it("lets one step lead to several next steps and converge again", () => { const definition = normalizeFmsDefinition(routed([route()])); expect(fmsOutgoingStageKeys(definition.stages[1]!)).toEqual(["wholesale", "retail"]); expect(validateFmsDefinition(definition, formContext)).toEqual([]); expect([...reachableFmsStageKeys(definition)].sort()).toEqual(["close", "qualify", "retail", "start_form", "wholesale"]); });
+  it("rejects a route with no destination", () => expect(validateFmsDefinition(routed([route({ nextStageKey: undefined })]), formContext).some((issue) => issue.code === "route_without_destination")).toBe(true));
+  it("rejects a route whose form question was deleted", () => expect(validateFmsDefinition(routed([route({ sourceKey: "removed_question" })]), formContext).some((issue) => issue.code === "route_field_missing")).toBe(true));
+  it("rejects a route matching an option the question no longer offers", () => expect(validateFmsDefinition(routed([route({ value: "distributor" })]), formContext).some((issue) => issue.code === "route_value_missing")).toBe(true));
+  it("rejects routing on a form answer with no linked form", () => expect(validateFmsDefinition(routed([route()], { formTemplateId: undefined }), formContext).some((issue) => issue.code === "route_without_form")).toBe(true));
+  it("rejects more than one fallback route on a step", () => expect(validateFmsDefinition(routed([route({ id: "r1", operator: "default", nextStageKey: "retail" }), route({ id: "r2", operator: "default", nextStageKey: "wholesale" })]), formContext).some((issue) => issue.code === "conflicting_fallback_route")).toBe(true));
+  it("rejects routing on an outcome that the step does not offer", () => expect(validateFmsDefinition(routed([route({ source: "outcome", sourceKey: undefined, value: "yes" })]), formContext).some((issue) => issue.code === "route_without_decision")).toBe(true));
+  it("flags a linked form that is no longer an available published version", () => expect(validateFmsDefinition(good(), { availableFormIds: [] }).some((issue) => issue.code === "missing_linked_form")).toBe(true));
+  it("resolves a form answer to the first matching route", () => { const rules = [route(), route({ id: "r2", value: "retail", nextStageKey: "retail", order: 1 })]; expect(resolveFmsBranch(rules, { formAnswers: { customer_type: "retail" } })?.nextStageKey).toBe("retail"); expect(resolveFmsBranch(rules, { formAnswers: { customer_type: "distributor" } })).toBeNull(); });
+
   it("validates each timing method", () => { expect(validateFmsDefinition(flow([stage({ key: "form", name: "Form", type: "form", formTemplateId: formId, order: 0, sla: { timingMethod: "tat_hours", dueDate: "", tatHours: 3 } })]))).toEqual([]); expect(validateFmsDefinition(flow([stage({ key: "form", name: "Form", type: "form", formTemplateId: formId, order: 0, sla: { timingMethod: "specific_time", dueDate: "2099-12-31", clockTime: "25:00" } })])).some((item) => item.code === "invalid_deadline")).toBe(true); });
   it("returns graph reachability", () => expect([...reachableFmsStageKeys(good())]).toEqual(["start_form", "done"]));
 });
