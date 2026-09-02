@@ -7,7 +7,7 @@ it("assigns an unresolved record without exposing technical import controls", ()
   const onAssign = vi.fn();
   render(<AssigningLeftPanel
     busy={false}
-    candidates={[{ id: "profile-1", employee_name: "Employee One", email: "employee@example.invalid", branch_id: "branch-1", department_id: "department-1", manager_id: null }]}
+    candidates={[{ id: "profile-1", employee_name: "Employee One", email: "employee@example.invalid", branch_id: "branch-1", department_id: "department-1", manager_id: null, import_aliases: [] }]}
     onAssign={onAssign}
     records={[{ record_kind: "task", id: "task-1", title: "Count stock", destination: "Tasks", branch_id: "branch-1", department_id: "department-1", starts_at: "2026-08-27T09:00:00Z", verification_pending: false, created_at: "2026-08-27T08:00:00Z" }]}
   />);

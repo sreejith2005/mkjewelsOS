@@ -2,13 +2,14 @@ import { describe, expect, it } from "vitest";
 import { applyIdentityMappings } from "./identityMappings";
 import { normalizeLegacyTaskSheet, LEGACY_TASK_HEADERS } from "./legacySheet";
 
-const candidate = (overrides: Partial<{ id: string; employee_name: string; email: string; branch_id: string; department_id: string; manager_id: string | null }> = {}) => ({
+const candidate = (overrides: Partial<{ id: string; employee_name: string; email: string; branch_id: string; department_id: string; manager_id: string | null; import_aliases: string[] }> = {}) => ({
   id: "00000000-0000-4000-8000-000000000001",
   employee_name: "Named Person",
   email: "named@example.com",
   branch_id: "branch-1",
   department_id: "department-1",
   manager_id: null,
+  import_aliases: [],
   ...overrides,
 });
 
@@ -49,5 +50,33 @@ describe("automatic identity preview", () => {
     const result = applyIdentityMappings(draftRow({ "VERIFICATION REQUIRED": "Yes", VERIFIER: "Unknown verifier" }), [employee]);
 
     expect(result.rows[0]).toMatchObject({ assignee_profile_id: employee.id, verifier_profile_id: "", assignment_status: "assigned" });
+  });
+
+  it("falls back to a unique employee name when the spreadsheet email is obsolete", () => {
+    const result = applyIdentityMappings(draftRow({ "EMPLOYEE EMAIL": "old-address@example.com" }), [candidate()]);
+
+    expect(result.rows[0]).toMatchObject({ assignee_profile_id: candidate().id, assignment_status: "assigned" });
+  });
+
+  it("matches a shortened first-and-last name to one unique full roster name", () => {
+    const employee = candidate({ employee_name: "Named Middle Person" });
+    const result = applyIdentityMappings(draftRow({ "EMPLOYEE NAME": "Named Person" }), [employee]);
+
+    expect(result.rows[0]).toMatchObject({ assignee_profile_id: employee.id, assignment_status: "assigned" });
+  });
+
+  it("uses a remembered import alias to disambiguate duplicate active names", () => {
+    const selected = candidate({ import_aliases: ["Named Person"] });
+    const duplicate = candidate({ id: "00000000-0000-4000-8000-000000000002", email: "duplicate@example.com" });
+    const result = applyIdentityMappings(draftRow(), [selected, duplicate]);
+
+    expect(result.rows[0]).toMatchObject({ assignee_profile_id: selected.id, assignment_status: "assigned" });
+  });
+
+  it("groups unresolved written names instead of counting every affected row as a separate question", () => {
+    const rows = [...draftRow(), ...draftRow({ TASK: "Second task" })];
+    const result = applyIdentityMappings(rows, [candidate(), candidate({ id: "00000000-0000-4000-8000-000000000002" })]);
+
+    expect(result.unresolvedAssignees).toEqual([{ label: "Named Person", source_rows: [2, 2] }]);
   });
 });

@@ -5556,6 +5556,57 @@ export type Database = {
           },
         ]
       }
+      task_import_identity_aliases: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          normalized_label: string
+          source_label: string
+          tenant_id: string
+          updated_at: string
+          updated_by: string
+          user_profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          normalized_label: string
+          source_label: string
+          tenant_id: string
+          updated_at?: string
+          updated_by: string
+          user_profile_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          normalized_label?: string
+          source_label?: string
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string
+          user_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_import_identity_aliases_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_import_identity_aliases_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_import_items: {
         Row: {
           batch_id: string
@@ -7789,6 +7840,10 @@ export type Database = {
         Args: { p_batch_id: string; p_rows: Json }
         Returns: Json
       }
+      commit_task_bulk_import_chunk_v0105: {
+        Args: { p_batch_id: string; p_rows: Json }
+        Returns: Json
+      }
       complete_crm_followup: {
         Args: {
           p_expected_version: number
@@ -8396,6 +8451,7 @@ export type Database = {
           email: string
           employee_name: string
           id: string
+          import_aliases: string[]
           manager_id: string
         }[]
       }
@@ -8577,6 +8633,10 @@ export type Database = {
       }
       reconcile_all_assignment_coverage_with_audit: {
         Args: { p_date: string; p_reason?: string; p_user_profile_id: string }
+        Returns: Json
+      }
+      reconcile_task_import_assignments: {
+        Args: { p_rows: Json }
         Returns: Json
       }
       reconcile_duplicate_production_identity_profiles: {
@@ -8986,6 +9046,10 @@ export type Database = {
         }
         Returns: Json
       }
+      save_task_import_identity_alias_with_audit: {
+        Args: { p_source_label: string; p_user_profile_id: string }
+        Returns: Json
+      }
       save_task_template_with_audit: {
         Args: { p_payload: Json; p_template_id: string }
         Returns: string
@@ -9226,6 +9290,22 @@ export type Database = {
         }
       }
       task_import_business_fingerprint: {
+        Args: { p_row: Json }
+        Returns: string
+      }
+      task_import_compact_identity_label: {
+        Args: { p_value: string }
+        Returns: string
+      }
+      task_import_fingerprint_row: {
+        Args: { p_row: Json }
+        Returns: Json
+      }
+      task_import_normalized_identity_label: {
+        Args: { p_value: string }
+        Returns: string
+      }
+      task_import_resolve_assignee: {
         Args: { p_row: Json }
         Returns: string
       }
@@ -9600,4 +9680,3 @@ export const Constants = {
     },
   },
 } as const
-

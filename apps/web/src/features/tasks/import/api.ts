@@ -9,11 +9,31 @@ export async function validateTaskBulkImport(payload: TaskBulkImportPayload, has
 export async function submitTaskBulkImport(payload: TaskBulkImportPayload, hash: string, fileLabel: string): Promise<{ batch_id: string; created_count: number; replayed: boolean; outcome: string }> { return unwrap(await supabase.rpc("import_task_bulk_with_audit", { p_payload: payload as unknown as Json, p_import_hash: hash, p_file_label: fileLabel }), "Import tasks"); }
 export async function loadTaskImportBatches(): Promise<TaskImportBatch[]> { const result = await supabase.from("task_import_batches").select("id,created_at,safe_file_label,requested_count,valid_count,error_count,one_time_count,recurring_count,initial_instance_count,outcome,created_by").order("created_at", { ascending: false }).limit(20); if (result.error) throw new Error(`Load import history: ${result.error.message}`); return result.data as TaskImportBatch[]; }
 
-export type TaskImportIdentityCandidate = Readonly<{ id: string; employee_name: string; email: string; branch_id: string; department_id: string; manager_id: string | null }>;
+export type TaskImportIdentityCandidate = Readonly<{ id: string; employee_name: string; email: string; branch_id: string; department_id: string; manager_id: string | null; import_aliases: string[] }>;
 export type TaskImportChunkOutcome = Readonly<{ created: number; rejected: number; replayed: number; assigning_left_count: number; outcome: string; issues: Array<{ row: number; field: string; reason: string; guidance: string; code: string }> }>;
 export async function loadTaskImportIdentityCandidates(): Promise<TaskImportIdentityCandidate[]> { return unwrap(await supabase.rpc("list_task_import_identity_candidates"), "Load identity candidates"); }
 export async function beginCurrentSheetTaskImport(hash: string, fileLabel: string, requestedCount: number): Promise<{ batch_id: string; outcome: string; replayed: boolean }> { return unwrap(await supabase.rpc("begin_task_bulk_import", { p_import_hash: hash, p_file_label: fileLabel, p_requested_count: requestedCount }), "Begin task import"); }
 export async function commitCurrentSheetTaskImportChunk(batchId: string, rows: readonly TaskImportCanonicalRow[]): Promise<TaskImportChunkOutcome> { return unwrap(await supabase.rpc("commit_task_bulk_import_chunk", { p_batch_id: batchId, p_rows: rows as unknown as Json }), "Commit task import chunk"); }
+
+type TaskImportIdentityRpcClient = {
+  rpc(name: "save_task_import_identity_alias_with_audit", args: { p_source_label: string; p_user_profile_id: string }): Promise<{ data: unknown; error: { message: string } | null }>;
+  rpc(name: "reconcile_task_import_assignments", args: { p_rows: Json }): Promise<{ data: unknown; error: { message: string } | null }>;
+};
+
+export async function saveTaskImportIdentityAlias(sourceLabel: string, userProfileId: string) {
+  const client = supabase as unknown as TaskImportIdentityRpcClient;
+  return unwrap<{ saved: boolean }>(await client.rpc("save_task_import_identity_alias_with_audit", {
+    p_source_label: sourceLabel,
+    p_user_profile_id: userProfileId,
+  }), "Remember employee name");
+}
+
+export async function reconcileTaskImportAssignments(rows: readonly TaskImportCanonicalRow[]) {
+  const client = supabase as unknown as TaskImportIdentityRpcClient;
+  return unwrap<{ updated_count: number }>(await client.rpc("reconcile_task_import_assignments", {
+    p_rows: rows as unknown as Json,
+  }), "Reconcile imported assignments");
+}
 
 export type AssigningLeftRecord = Readonly<{
   record_kind: "task" | "template";
