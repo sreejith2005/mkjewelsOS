@@ -72,7 +72,7 @@ Deno.test("binds the purge to the verified identity and de-duplicates modules", 
   });
 });
 
-Deno.test("maps a denied purge to 403 without leaking the database message", async () => {
+Deno.test("maps a denied purge to 403 and reports the database reason", async () => {
   const response = await handleDemoDataPurge(post({ action: "purge", modules: ["tasks"], confirmation: "DELETE" }), {
     getUser: async () => ({ id: verifiedUserId }),
     rpc: async () => ({ data: null, error: { code: "42501", message: "Demo-data purge denied" } }),
@@ -80,7 +80,7 @@ Deno.test("maps a denied purge to 403 without leaking the database message", asy
   });
 
   assertEquals(response.status, 403);
-  assertEquals(await response.json(), { error: "Purge was denied or invalid" });
+  assertEquals(await response.json(), { error: "Demo-data purge denied (42501)" });
 });
 
 Deno.test("reads counts without any confirmation", async () => {

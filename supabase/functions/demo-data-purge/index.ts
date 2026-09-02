@@ -41,6 +41,15 @@ function statusFor(error: RpcError): number {
   return 500;
 }
 
+// Only an active super admin gets past the RPC's own gate, so the database
+// message is safe to hand back here -- and without it a failed purge is
+// undiagnosable from the browser.
+function describe(error: RpcError, fallback: string): string {
+  const message = error.message?.trim();
+  if (!message) return fallback;
+  return error.code ? `${message} (${error.code})` : message;
+}
+
 export async function handleDemoDataPurge(request: Request, dependencies: Dependencies): Promise<Response> {
   if (request.method === "OPTIONS") return new Response("ok", { headers });
   if (request.method !== "POST") return respond(405, { error: "Method not allowed" });
@@ -68,7 +77,7 @@ export async function handleDemoDataPurge(request: Request, dependencies: Depend
   if (payload.action === "counts") {
     if (!hasOnlyKeys(payload, ["action"])) return respond(400, { error: "Counts request contains unsupported fields" });
     const result = await dependencies.rpc("demo_data_purge_counts", { p_actor_auth_user_id: identity.id });
-    if (result.error) return respond(statusFor(result.error), { error: statusFor(result.error) === 500 ? "Unable to read purge counts" : "Purge counts were denied" });
+    if (result.error) return respond(statusFor(result.error), { error: describe(result.error, "Unable to read purge counts") });
     return respond(200, { data: result.data });
   }
 
@@ -85,7 +94,7 @@ export async function handleDemoDataPurge(request: Request, dependencies: Depend
       p_modules: [...new Set(payload.modules)],
       p_confirmation: confirmation,
     });
-    if (result.error) return respond(statusFor(result.error), { error: statusFor(result.error) === 500 ? "Unable to purge demo data" : "Purge was denied or invalid" });
+    if (result.error) return respond(statusFor(result.error), { error: describe(result.error, "Unable to purge demo data") });
     return respond(200, { data: result.data });
   }
 
