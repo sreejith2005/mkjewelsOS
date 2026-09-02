@@ -41,9 +41,20 @@ describe("current task sheet", () => {
     expect(result.draftRows[1]?.recurrence_rule).toBe("FREQ=YEARLY;BYMONTH=9;BYMONTHDAY=1");
   });
 
-  it("turns a checklist row into a core-titled task with one item", () => {
-    const result = normalizeLegacyTaskSheet([row({ "TASK TYPE": "CHECK LIST", "CORE TASK": "Opening", TASK: "Open shutters" })]);
-    expect(result.draftRows[0]).toMatchObject({ task_type: "checklist", title: "Opening", checklist: [{ item_text: "Open shutters", required: true }] });
+  it("uses TASK as the checklist headline while retaining CORE TASK and the checklist item", () => {
+    const result = normalizeLegacyTaskSheet([row({
+      "TASK TYPE": "CHECK LIST",
+      "CORE TASK": "Opening",
+      TASK: "Open shutters",
+      "TASK DESCRIPTION": "Unlock the front shutters before opening.",
+    })]);
+    expect(result.draftRows[0]).toMatchObject({
+      task_type: "checklist",
+      title: "Open shutters",
+      core_task_label: "Opening",
+      description: "Unlock the front shutters before opening.",
+      checklist: [{ item_text: "Open shutters", required: true }],
+    });
   });
 
   it("collects written employee names for automatic batch matching", () => {

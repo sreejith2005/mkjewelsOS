@@ -61,7 +61,7 @@ export function normalizeLegacyTaskSheet(rows: readonly Row[], options: LegacyTa
     if (verification && verifier) addRequirement(requirements, "verifier", verifier, sourceRow);
     const plannedAt = startsOn ? `${startsOn} ${startTime}` : ""; const dueAt = startsOn ? `${startsOn} ${dueTime}` : "";
     drafts.push({ source_row: sourceRow, task_key: `legacy-${sourceRow}`, destination: schedule.destination, schedule_kind: scheduleKind,
-      task_type: taskType ?? "delegation", core_task_label: core, title: taskType === "checklist" ? core || task : task,
+      task_type: taskType ?? "delegation", core_task_label: core, title: task,
       description: value(row, "TASK DESCRIPTION"), priority: value(row, "PRIORITY").toLowerCase(), branch, department, category: "",
       assignee_email: email, assignee_name: name, verifier_label: verifier, starts_on: startsOn, start_time: startTime, due_time: dueTime,
       planned_at: plannedAt, due_at: dueAt, recurrence_rule: schedule.recurrenceRule, requires_upload: evidenceRequired,

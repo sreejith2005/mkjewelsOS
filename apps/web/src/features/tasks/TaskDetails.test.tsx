@@ -77,6 +77,7 @@ const fullTask = {
 
 function renderExpanded(task: TaskBundle = fullTask) {
   render(<TaskCard capability={capability} categoryLabel="Opening" onAction={vi.fn().mockResolvedValue(undefined)} task={task} />);
+  expect(screen.getByText(task.title!)).not.toBeNull();
   fireEvent.click(screen.getByRole("button", { name: /View details/i }));
   return within(screen.getByRole("region", { name: `Details for ${task.title}` }));
 }

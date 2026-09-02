@@ -127,7 +127,7 @@ Start time and due time represent different concepts:
 
 - `TASK TYPE = TASK` creates delegation-mode work.
 - `TASK TYPE = CHECK LIST` or `CHECKLIST` creates checklist-mode work.
-- For a legacy checklist row, `CORE TASK` becomes the task title and `TASK` becomes one required checklist item.
+- For every legacy row, `TASK` becomes the task title. For checklist rows, `CORE TASK` remains the operational grouping label and `TASK` also remains the required checklist item.
 - Evidence requirement is independent of task type.
 - Evidence-required tasks expose **Upload** as their primary action; successful upload is followed by completion through the existing audited flow.
 - Required-form tasks must complete their linked form before task completion.
@@ -350,7 +350,7 @@ It must not:
 - shows description, checklist items, evidence upload, required form action, completion remark, and permitted revision controls when expanded;
 - keeps upload-required completion and direct completion behavior intact.
 
-Current limitation: although expansion already exists, it does not present the full operational context from the source sheet. Department, branch, core task, explicit start/deadline labels, schedule frequency, verification information, buddy rule, and schedule state are not all visible.
+The current checkout presents the full authorized operational context in the expanded card, including department, branch, core task, explicit start/deadline labels, schedule frequency, verification information, buddy rule, and schedule state. Employee email and internal import/database identifiers remain intentionally hidden.
 
 ## 10. Deployed state at this checkpoint
 
@@ -419,7 +419,7 @@ Every listed implementation file has a corresponding focused test or database co
 
 ### Status
 
-Design prepared; implementation has **not** started at this checkpoint.
+Implemented in the current checkout. Local verification and hosted/release proof must still be reported separately for each subsequent change.
 
 ### User requirement
 
