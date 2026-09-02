@@ -220,7 +220,7 @@ export function FormBuilder({ bundle, dynamicOptions, onClose, onSaved }: { bund
           {sections.slice(index + 1).map((option) => <option key={option.key} value={option.key}>Go to {option.title}</option>)}
           <option value={FORM_SUBMIT_TARGET}>Submit the form</option>
         </select></Field>
-        <div className="flex items-end gap-1"><Button aria-label="Move section up" className="size-9 min-h-9 p-0" disabled={index === 0} onClick={() => moveSection(index, -1)} type="button" variant="ghost"><ChevronUp className="size-4" /></Button><Button aria-label="Move section down" className="size-9 min-h-9 p-0" disabled={index === sections.length - 1} onClick={() => moveSection(index, 1)} type="button" variant="ghost"><ChevronDown className="size-4" /></Button><Button aria-label={`Delete ${section.title}`} className="size-9 min-h-9 p-0" disabled={sections.length === 1} onClick={() => { if (window.confirm(`Delete "${section.title}" and its questions?`)) removeSection(section.key); }} type="button" variant="danger"><Trash2 className="size-4" /></Button></div>
+        <div className="flex items-end gap-1"><Button aria-label="Move section up" className="size-11 min-h-11 p-0" disabled={index === 0} onClick={() => moveSection(index, -1)} type="button" variant="ghost"><ChevronUp className="size-4" /></Button><Button aria-label="Move section down" className="size-11 min-h-11 p-0" disabled={index === sections.length - 1} onClick={() => moveSection(index, 1)} type="button" variant="ghost"><ChevronDown className="size-4" /></Button><Button aria-label={`Delete ${section.title}`} className="size-11 min-h-11 p-0" disabled={sections.length === 1} onClick={() => { if (window.confirm(`Delete "${section.title}" and its questions?`)) removeSection(section.key); }} type="button" variant="danger"><Trash2 className="size-4" /></Button></div>
       </article>)}</div>
     </section></details>
 
@@ -238,7 +238,7 @@ export function FormBuilder({ bundle, dynamicOptions, onClose, onSaved }: { bund
   </div>{routingMap ? <FormRoutingMap fields={form.fields} onClose={() => setRoutingMap(false)} onNavigate={selectField} sections={sections} /> : null}</section>;
 }
 
-function AddFieldMenu({ onAdd, onClose }: { onAdd: (type: FieldKind["type"]) => void; onClose: () => void }) { return <section aria-label="Choose question type" className="mt-2 rounded-xl border border-gold/30 bg-charcoal/80 p-3"><div className="mb-2 flex items-center justify-between"><p className="text-sm font-semibold text-champagne">Choose a question type</p><Button aria-label="Close question types" className="size-8 min-h-8 p-0" onClick={onClose} type="button" variant="ghost"><X className="size-4" /></Button></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">{FIELD_KINDS.map((kind) => <FieldPaletteButton key={kind.type} kind={kind} onAdd={onAdd} />)}</div></section>; }
+function AddFieldMenu({ onAdd, onClose }: { onAdd: (type: FieldKind["type"]) => void; onClose: () => void }) { return <section aria-label="Choose question type" className="mt-2 rounded-xl border border-gold/30 bg-charcoal/80 p-3"><div className="mb-2 flex items-center justify-between"><p className="text-sm font-semibold text-champagne">Choose a question type</p><Button aria-label="Close question types" className="size-11 min-h-11 p-0" onClick={onClose} type="button" variant="ghost"><X className="size-4" /></Button></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">{FIELD_KINDS.map((kind) => <FieldPaletteButton key={kind.type} kind={kind} onAdd={onAdd} />)}</div></section>; }
 
 function FieldPaletteButton({ kind, onAdd }: { kind: FieldKind; onAdd: (type: FieldKind["type"]) => void }) { const Icon = kind.icon; return <button className="flex min-h-20 flex-col items-center justify-center gap-1 rounded-xl border border-gold/20 bg-charcoal/40 px-2 text-center text-xs font-semibold text-champagne transition hover:border-gold hover:bg-gold/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold" onClick={() => onAdd(kind.type)} type="button"><span className="grid size-8 place-items-center rounded-full bg-gold/10 text-gold"><Icon className="size-4" /></span>{kind.label}</button>; }
 
@@ -253,9 +253,9 @@ function CompactFieldRow({ field, fields, index, editing, dynamicOptions, master
     <span className="grid size-8 place-items-center rounded-full bg-gold/10 text-gold"><Icon className="size-4" /></span>
     <button className="min-w-0 flex-1 text-left" onClick={onEdit} type="button"><span className="block truncate font-semibold text-champagne">{name}</span><span className="block truncate text-xs text-soft-grey">{fieldLabel(field.type)}{field.required ? " · required" : ""}{field.branches?.length ? ` · ${field.branches.length} branch${field.branches.length === 1 ? "" : "es"}` : ""}</span>{summary ? <span className="mt-1 inline-flex max-w-full items-center gap-1 rounded-full bg-gold/10 px-2 py-0.5 text-xs text-gold"><Filter className="size-3 shrink-0" /><span className="truncate">Shown when {summary}</span></span> : null}</button>
     {optionPreview ? <span className="hidden max-w-40 truncate text-xs text-soft-grey xl:block">{optionPreview}</span> : null}
-    <Button aria-label={`Edit ${name}`} className="size-9 min-h-9 p-0" onClick={onEdit} type="button" variant="ghost"><Pencil className="size-4" /></Button>
-    <Button aria-label={`Duplicate ${name}`} className="size-9 min-h-9 p-0" onClick={() => onDuplicate(index)} type="button" variant="ghost"><Copy className="size-4" /></Button>
-    <Button aria-label={`Remove ${name}`} className="size-9 min-h-9 p-0" onClick={() => onRemove(index)} type="button" variant="danger"><Trash2 className="size-4" /></Button>
+    <Button aria-label={`Edit ${name}`} className="size-11 min-h-11 p-0" onClick={onEdit} type="button" variant="ghost"><Pencil className="size-4" /></Button>
+    <Button aria-label={`Duplicate ${name}`} className="size-11 min-h-11 p-0" onClick={() => onDuplicate(index)} type="button" variant="ghost"><Copy className="size-4" /></Button>
+    <Button aria-label={`Remove ${name}`} className="size-11 min-h-11 p-0" onClick={() => onRemove(index)} type="button" variant="danger"><Trash2 className="size-4" /></Button>
   </div>{editing ? <><FieldEditor dynamicOptions={dynamicOptions} field={field} fields={fields} index={index} masterOptions={masterOptions} onChangeType={onChangeType} onMasterCreated={onMasterCreated} onPatch={onPatch} onSetQuestionCondition={onSetQuestionCondition} onSetRoute={onSetRoute} sections={sections} /><button aria-label={`Add question after ${name}`} className="flex w-full items-center justify-center gap-1 border-t border-dashed border-gold/20 py-2 text-xs font-medium text-gold hover:bg-gold/5" onClick={onAddAfter} type="button"><Plus className="size-3.5" />Add question here</button></> : null}</article>;
 }
 
@@ -465,7 +465,7 @@ function PredicateRow({ predicate, sources, lead, masterOptions, dynamicOptions,
       {operators.map((operator) => <option key={operator} value={operator}>{FORM_OPERATOR_LABELS[operator]}</option>)}
     </select></Field>
     {valueless ? <span aria-hidden className="hidden sm:block" /> : <Field label="Answer"><PredicateValueInput onChange={(value) => onChange({ ...predicate, value })} options={options} predicate={predicate} source={source} /></Field>}
-    <Button aria-label="Remove condition" className="size-9 min-h-9 p-0" onClick={onRemove} type="button" variant="danger"><Trash2 className="size-4" /></Button>
+    <Button aria-label="Remove condition" className="size-11 min-h-11 p-0" onClick={onRemove} type="button" variant="danger"><Trash2 className="size-4" /></Button>
   </div>;
 }
 
@@ -523,7 +523,7 @@ export function SectionBranchEditor({ field, index, masterOptions, sections, onP
         {laterSections.map((section) => <option key={section.key} value={section.key}>{section.title}</option>)}
         <option value={FORM_SUBMIT_TARGET}>Submit the form</option>
       </select></Field>
-      <Button aria-label="Remove branch" className="size-9 min-h-9 p-0" onClick={() => setBranches(branches.filter((_, item) => item !== position))} type="button" variant="danger"><Trash2 className="size-4" /></Button>
+      <Button aria-label="Remove branch" className="size-11 min-h-11 p-0" onClick={() => setBranches(branches.filter((_, item) => item !== position))} type="button" variant="danger"><Trash2 className="size-4" /></Button>
     </div>)}
     <Button className="min-h-9" disabled={!canBranch} onClick={() => setBranches([...branches, { operator: branchOperator, value: options[0]?.value ?? "", targetSectionKey: laterSections[0]?.key ?? FORM_SUBMIT_TARGET }])} type="button" variant="secondary"><Plus className="size-4" />Add branch</Button></> : null}
   </div>;

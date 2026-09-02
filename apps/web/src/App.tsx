@@ -29,6 +29,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { DailyChecklistManager } from "@/features/daily-checklists/DailyChecklistManager";
 import { DailyChecklistGate } from "@/features/daily-checklists/DailyChecklistGate";
 import { ThemeProvider, useTheme } from "@/theme/ThemeContext";
+import { useIsMobile } from "@/lib/useMediaQuery";
 import { SectionMaintenanceNotice } from "@/components/SectionMaintenanceNotice";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { saveSectionControls } from "@/features/settings/api";
@@ -329,7 +330,7 @@ function AppShell() {
       currentPage={currentPage}
       developerModeActive={isSuperAdmin && sectionControls.developer_mode_enabled}
       developerModeControl={isSuperAdmin ? <button aria-checked={sectionControls.developer_mode_enabled} className={`relative flex h-8 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition ${sectionControls.developer_mode_enabled ? "border-gold bg-gold text-obsidian" : "border-gold/30 text-gold hover:bg-gold/10"}`} disabled={savingSectionControls} onClick={() => void persistSectionControls({ ...sectionControls, developer_mode_enabled: !sectionControls.developer_mode_enabled })} role="switch" type="button"><span className={`size-2 rounded-full ${sectionControls.developer_mode_enabled ? "bg-obsidian" : "bg-task-text-muted"}`} />Developer Mode</button> : undefined}
-      developerSectionControls={isSuperAdmin ? <nav aria-label="Developer Mode section controls" className="flex gap-2 overflow-x-auto pb-1">{nav.map((item) => <label className="flex shrink-0 items-center gap-2 rounded-full border border-gold/20 px-3 py-1.5 text-xs text-champagne" key={item.id}><span>{item.label}</span><button aria-checked={sectionControls.section_availability[item.id]} aria-label={`${item.label} availability`} className={`relative h-5 w-9 rounded-full transition ${sectionControls.section_availability[item.id] ? "bg-success" : "bg-task-overdue"}`} disabled={savingSectionControls} onClick={() => void persistSectionControls({ ...sectionControls, section_availability: { ...sectionControls.section_availability, [item.id]: !sectionControls.section_availability[item.id] } })} role="switch" type="button"><span className={`absolute top-0.5 size-4 rounded-full bg-task-bg transition ${sectionControls.section_availability[item.id] ? "left-4" : "left-0.5"}`} /></button></label>)}</nav> : undefined}
+      developerSectionControls={isSuperAdmin ? <nav aria-label="Developer Mode section controls" className="scroll-x no-scrollbar flex gap-2 pb-1">{nav.map((item) => <label className="flex shrink-0 items-center gap-2 rounded-full border border-gold/20 px-3 py-1.5 text-xs text-champagne" key={item.id}><span>{item.label}</span><button aria-checked={sectionControls.section_availability[item.id]} aria-label={`${item.label} availability`} className={`relative h-5 w-9 rounded-full transition ${sectionControls.section_availability[item.id] ? "bg-success" : "bg-task-overdue"}`} disabled={savingSectionControls} onClick={() => void persistSectionControls({ ...sectionControls, section_availability: { ...sectionControls.section_availability, [item.id]: !sectionControls.section_availability[item.id] } })} role="switch" type="button"><span className={`absolute top-0.5 size-4 rounded-full bg-task-bg transition ${sectionControls.section_availability[item.id] ? "left-4" : "left-0.5"}`} /></button></label>)}</nav> : undefined}
       launcherItems={launcherItems}
       logoDarkUrl={logoDarkUrl}
       logoLightUrl={logoLightUrl}
@@ -364,8 +365,21 @@ function AuthenticatedApp() {
   return <AppShell />;
 }
 
+function AppToaster() {
+  const { theme } = useTheme();
+  const isMobile = useIsMobile();
+  // Bottom-right would sit under the mobile navigation bar, so on a phone the
+  // toast comes down from the top where nothing covers it.
+  return <Toaster
+    position={isMobile ? "top-center" : "bottom-right"}
+    richColors
+    theme={theme}
+    toastOptions={{ style: { fontSize: "0.9375rem" } }}
+  />;
+}
+
 export function App() {
   return (
-    <ThemeProvider><AuthProvider>{window.location.pathname === "/reset-password" ? <ResetPasswordPage /> : <AuthenticatedApp />}<Toaster position="bottom-right" richColors theme="dark" /></AuthProvider></ThemeProvider>
+    <ThemeProvider><AuthProvider>{window.location.pathname === "/reset-password" ? <ResetPasswordPage /> : <AuthenticatedApp />}<AppToaster /></AuthProvider></ThemeProvider>
   );
 }

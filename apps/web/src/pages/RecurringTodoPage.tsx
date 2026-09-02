@@ -517,7 +517,7 @@ export function RecurringTodoPage() {
               <CalendarClock className="size-5" />
             </span>
             <div>
-              <h1 className="font-display text-3xl text-gold">
+              <h1 className="font-display text-2xl sm:text-3xl text-gold">
                 Recurring / To-Do List
               </h1>
               <p className="text-sm text-soft-grey">
@@ -542,7 +542,7 @@ export function RecurringTodoPage() {
       </header>
       <div className="mx-auto max-w-7xl p-4 sm:p-6">
         {error ? <Notice tone="danger">{error}</Notice> : null}
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 xl:grid-cols-6">
           {(
             [
               ["Total", workspace.stats.total],
@@ -559,20 +559,20 @@ export function RecurringTodoPage() {
             ] as const
           ).map(([label, value]) => (
             <div
-              className="rounded-xl border border-task-border bg-charcoal p-4"
+              className="rounded-xl border border-task-border bg-charcoal p-3 sm:p-4"
               key={label}
             >
-              <p className="text-xs uppercase text-task-text-muted">{label}</p>
-              <p className="mt-1 text-2xl font-semibold text-task-text">
+              <p className="text-[11px] uppercase leading-tight text-task-text-muted sm:text-xs">{label}</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums text-task-text sm:text-2xl">
                 {value}
               </p>
             </div>
           ))}
         </div>
-        <div className="mt-5 flex gap-2 overflow-x-auto border-b border-task-border">
+        <div className="scroll-x no-scrollbar mt-5 flex gap-2 border-b border-task-border">
           {tabs.map(([value, label]) => (
             <button
-              className={`shrink-0 border-b-2 px-3 py-3 text-sm ${tab === value ? "border-gold text-gold" : "border-transparent text-task-text-muted"}`}
+              className={`min-h-12 shrink-0 border-b-2 px-3 py-3 text-sm font-semibold ${tab === value ? "border-gold text-gold" : "border-transparent text-task-text-muted"}`}
               key={value}
               onClick={() => setTab(value)}
               type="button"

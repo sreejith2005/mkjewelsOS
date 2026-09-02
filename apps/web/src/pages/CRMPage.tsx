@@ -90,14 +90,16 @@ export function CRMPage() {
   return <section className="mx-auto max-w-7xl space-y-5">
     <header className="rounded-2xl border border-task-border bg-task-bg p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2"><UsersRound className="size-6 text-task-accent"/><h1 className="text-2xl font-bold text-task-text">MK Jewels CRM</h1></div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2"><UsersRound className="size-6 shrink-0 text-task-accent"/><h1 className="text-xl font-bold text-task-text sm:text-2xl">MK Jewels CRM</h1></div>
           <p className="mt-1 text-sm text-task-text-muted">Walk-ins, client history, and follow-up work—inside JewelOS.</p>
         </div>
-        <Button onClick={() => { setDetail(null); setSection("walkins"); }}><ClipboardPenLine className="size-4"/>Register walk-in</Button>
+        <Button className="w-full sm:w-auto" onClick={() => { setDetail(null); setSection("walkins"); }}><ClipboardPenLine className="size-4"/>Register walk-in</Button>
       </div>
-      <nav aria-label="CRM workspace" className="mt-5 flex flex-wrap gap-2 border-t border-task-border pt-4">
-        {CRM_SECTIONS.map((item) => <Button key={item.id} onClick={() => { setDetail(null); setSection(item.id); }} variant={section === item.id ? "primary" : "secondary"}>{item.label}</Button>)}
+      {/* A wrapping row of three long labels cost three rows on a phone; one
+          swipeable segmented control keeps the sections on a single line. */}
+      <nav aria-label="CRM workspace" className="scroll-x no-scrollbar mt-5 flex gap-2 border-t border-task-border pt-4">
+        {CRM_SECTIONS.map((item) => <button className={`min-h-11 shrink-0 whitespace-nowrap rounded-lg px-4 text-sm font-semibold transition ${section === item.id ? "bg-task-accent text-white" : "bg-task-muted text-task-text-muted hover:text-task-text"}`} key={item.id} onClick={() => { setDetail(null); setSection(item.id); }} type="button">{item.label}</button>)}
       </nav>
     </header>
     {success ? <Notice tone="success">{success}</Notice> : null}

@@ -73,7 +73,7 @@ export function TaskCard({ capability, categoryLabel, onAction, task: taskInput 
         <StatusIcon className={cn("mt-0.5 size-5 shrink-0", completed ? "text-success" : blocked ? "text-task-warning" : overdue ? "text-task-overdue" : "text-task-accent")} />
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
-            <span className={cn("text-sm font-semibold text-task-text", completed && "line-through text-task-text-muted")}>{task.title}</span>
+            <span className={cn("text-[15px] font-semibold leading-snug text-task-text sm:text-sm", completed && "line-through text-task-text-muted")}>{task.title}</span>
             <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-semibold", completed ? "border-success/40 bg-success/10 text-success" : blocked ? "border-task-warning/50 bg-task-warning/10 text-task-text" : overdue ? "border-task-overdue/40 bg-task-overdue/10 text-task-overdue" : "border-task-border bg-task-muted text-task-text-muted")}>{statusLabel}</span>
             {capability.watcherLabel ? <span className="inline-flex items-center gap-1 rounded-full bg-task-accent-soft px-2 py-0.5 text-[10px] font-semibold text-task-text"><Eye className="size-3" />{capability.watcherLabel}</span> : null}
           </span>
@@ -85,7 +85,7 @@ export function TaskCard({ capability, categoryLabel, onAction, task: taskInput 
           </span>
           {!formOnlyAction && task.checklists.length > 0 ? <span className="mt-3 flex items-center gap-2"><span className="h-1.5 flex-1 overflow-hidden rounded-full bg-task-muted"><span className="block h-full rounded-full bg-task-accent" style={{ width: `${checklistProgress.displayPercent}%` }} /></span><span className="text-xs tabular-nums text-task-text-muted">{checklistProgress.completedItems}/{checklistProgress.totalItems}</span></span> : null}
         </span>
-        <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-task-text-muted"><span>{expanded ? "Hide details" : "View details"}</span><ChevronDown className={cn("size-4 transition-transform", expanded && "rotate-180")} /></span>
+        <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-task-text-muted"><span className="sr-only sm:not-sr-only">{expanded ? "Hide details" : "View details"}</span><ChevronDown className={cn("size-4 transition-transform", expanded && "rotate-180")} /></span>
       </button>
       {canShowDirectUpload ? <label className="inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-task-accent px-4 py-2 text-sm font-semibold text-task-text transition hover:bg-task-accent/90"><FileUp className="size-4" />Upload<input accept="image/jpeg,image/png,application/pdf" aria-label={`Upload task: ${task.title ?? "task"}`} className="sr-only" disabled={busy} onChange={(event) => void upload(event, "upload_and_complete")} type="file" /></label> : canShowDirectComplete ? <Button aria-label={`Complete task: ${task.title ?? "task"}`} className="shrink-0 bg-task-accent text-task-text hover:bg-task-accent/90" disabled={busy || !canComplete || Boolean(task.requires_remark && !remark.trim())} onClick={() => void act({ kind: "complete", remark })} type="button"><CheckCircle2 />Complete</Button> : null}
     </div>

@@ -98,7 +98,7 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { st
     {human ? <section className="space-y-2 border-t border-gold/15 pt-4">
       <details className="group rounded-xl border border-gold/15" open={!!stage.method}>
         <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-champagne">How / instructions{stage.method ? "" : " (optional)"}</summary>
-        <div className="px-3 pb-3"><textarea aria-label="How / instructions" className="field min-h-16 text-sm" onChange={(event) => update({ method: event.target.value })} placeholder="e.g. Get WhatsApp PO confirmation" value={stage.method ?? ""} /></div>
+        <div className="px-3 pb-3"><textarea aria-label="How / instructions" className="field min-h-16 md:text-sm" onChange={(event) => update({ method: event.target.value })} placeholder="e.g. Get WhatsApp PO confirmation" value={stage.method ?? ""} /></div>
       </details>
       <details className="rounded-xl border border-gold/15" open={optionCheckboxes.some(({ key }) => stage[key])}>
         <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-champagne">Completion controls</summary>
@@ -154,7 +154,7 @@ function RouteRow({ rule, index, stage, others, fields, decision, changeRule, mo
   return <article className="space-y-2 rounded-xl border border-gold/20 bg-white/[0.02] p-3" key={rule.id}>
     <div className="flex items-center gap-2">
       <span className="rounded-full bg-gold/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold">Route {index + 1}</span>
-      <input aria-label={`Route ${index + 1} label`} className="field h-9 flex-1 text-xs" maxLength={60} onChange={(event) => changeRule(index, { label: event.target.value })} placeholder="Label shown on the connection" value={rule.label ?? ""} />
+      <input aria-label={`Route ${index + 1} label`} className="field min-h-11 flex-1 md:text-xs" maxLength={60} onChange={(event) => changeRule(index, { label: event.target.value })} placeholder="Label shown on the connection" value={rule.label ?? ""} />
       <button aria-label={`Move route ${index + 1} up`} className="rounded p-1 text-soft-grey hover:text-gold disabled:opacity-40" disabled={index === 0} onClick={() => moveRule(index, -1)} type="button"><ArrowUp className="size-4" /></button>
       <button aria-label={`Move route ${index + 1} down`} className="rounded p-1 text-soft-grey hover:text-gold disabled:opacity-40" disabled={index === stage.branchRules.length - 1} onClick={() => moveRule(index, 1)} type="button"><ArrowDown className="size-4" /></button>
       <button aria-label={`Delete route ${index + 1}`} className="rounded p-1 text-soft-grey hover:text-danger" onClick={remove} type="button"><Trash2 className="size-4" /></button>

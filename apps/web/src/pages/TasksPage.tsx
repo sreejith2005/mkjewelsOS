@@ -105,6 +105,11 @@ export function TasksPage() {
     return tasks.filter((task) => taskMatchesStatus(task, statusFilter));
   }, [statusFilter, tasks]);
 
+  const navigateTo = (path: string) => {
+    window.history.pushState({}, "", path);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  };
+
   const handleAction = async (task: TaskBundle, action: TaskCardAction) => {
     if (!task.id || !profile) throw new Error("Task identifier is missing");
     const capability = deriveTaskMutationCapability({
@@ -134,19 +139,23 @@ export function TasksPage() {
         <div><h2 className="text-2xl font-semibold text-task-text">Tasks</h2><p className="text-sm text-task-text-muted">Assigned, watched, coverage-blocked, and delegated work in one place.</p></div>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto border-b border-task-border bg-task-bg px-3 pt-3 sm:px-5">
+      <div className="scroll-x no-scrollbar flex items-stretch gap-2 border-b border-task-border bg-task-bg px-3 pt-3 sm:px-5">
         {([
           ["mine", "My Tasks", myTasks.length],
           ["delegated", "Delegated", delegatedTasks.length],
         ] as const).map(([view, label, count]) => <button
           aria-pressed={workspaceView === view}
-          className={`relative shrink-0 px-3 pb-3 text-sm font-medium ${workspaceView === view ? "text-task-text after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-task-accent" : "text-task-text-muted"}`}
+          className={`relative min-h-11 shrink-0 px-3 pb-3 text-sm font-semibold ${workspaceView === view ? "text-task-text after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-task-accent" : "text-task-text-muted"}`}
           key={view}
           onClick={() => setWorkspaceView(view)}
           type="button"
         >
           {label} <span className="tabular-nums">({count})</span>
         </button>)}
+        {canManage ? <div className="ml-auto flex shrink-0 items-center gap-1 pb-2">
+          {hasAdminTaskView ? <button aria-label="Assigning Left" className="flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 text-sm font-semibold text-task-text-muted transition hover:bg-task-muted" onClick={() => navigateTo("/tasks/assigning-left")} type="button"><UserRoundPlus className="size-5 shrink-0" /><span className="hidden sm:inline">Assigning Left</span></button> : null}
+          <button aria-label="Bulk Import" className="flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 text-sm font-semibold text-task-text-muted transition hover:bg-task-muted" onClick={() => navigateTo("/tasks/import")} type="button"><Upload className="size-5 shrink-0" /><span className="hidden sm:inline">Bulk Import</span></button>
+        </div> : null}
       </div>
 
       <TaskFilterBar counts={counts} onStatusChange={setStatusFilter} status={statusFilter} />
@@ -155,7 +164,9 @@ export function TasksPage() {
         {error ? <div className="flex flex-col gap-3 rounded-xl border border-danger/40 bg-danger/10 p-4"><Notice tone="danger">{error}</Notice><Button className="self-start border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={() => void refresh()} variant="secondary"><RefreshCw />Retry</Button></div> : loading ? <div aria-label="Loading tasks" className="flex flex-col gap-3">{[0, 1, 2].map((item) => <div className="h-28 animate-pulse rounded-2xl border border-task-border bg-task-muted" key={item} />)}</div> : scopedTasks.length === 0 ? <div className="flex min-h-[48dvh] flex-col items-center justify-center px-5 text-center"><span className="mb-5 flex size-20 items-center justify-center rounded-[1.75rem] bg-task-muted text-task-accent"><CheckCircle2 className="size-10" /></span><h2 className="text-2xl font-semibold text-task-text">No Tasks Here</h2><p className="mt-1 max-w-sm text-sm text-task-text-muted">It seems that you don’t have any tasks in this list.</p></div> : <div className="flex flex-col gap-3">{profile ? scopedTasks.map((task) => <TaskCard capability={deriveTaskMutationCapability({ assigneeIds: task.assignees.map((assignee) => assignee.id), isWatcher: task.isWatchedByViewer, viewerId: profile.id, viewerRole: profile.user_role })} categoryLabel={task.category_id ? categoryNames.get(task.category_id) ?? "Uncategorized" : "Uncategorized"} key={task.id} onAction={(action) => handleAction(task, action)} task={task} />) : null}</div>}
       </div>
 
-      {canManage ? <div className="fixed bottom-[86px] right-4 z-20 flex gap-2 md:bottom-8 md:right-8">{hasAdminTaskView ? <Button onClick={() => { window.history.pushState({}, "", "/tasks/assigning-left"); window.dispatchEvent(new PopStateEvent("popstate")); }} variant="secondary"><UserRoundPlus className="size-4" />Assigning Left</Button> : null}<Button onClick={() => { window.history.pushState({}, "", "/tasks/import"); window.dispatchEvent(new PopStateEvent("popstate")); }} variant="secondary"><Upload className="size-4" />Bulk Import</Button><Button aria-label="Create task" className="min-h-14 rounded-2xl bg-task-accent px-5 text-task-text shadow-xl hover:bg-task-accent/90" onClick={() => void openComposer()}><Plus className="size-6" />Create Task</Button></div> : null}
+      {canManage ? <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-20 md:bottom-8 md:right-8">
+        <Button aria-label="Create task" className="size-14 rounded-full bg-task-accent p-0 text-task-text shadow-xl hover:bg-task-accent/90 md:h-14 md:w-auto md:rounded-2xl md:px-5" onClick={() => void openComposer()}><Plus className="size-6" /><span className="hidden md:inline">Create Task</span></Button>
+      </div> : null}
 
       {composerOpen && canManage && references && profile ? <TaskComposer data={references} onClose={() => setComposerOpen(false)} onCreated={() => { setComposerOpen(false); void refresh(); }} onSave={createDelegationTask} onUploadAttachment={(taskId, file) => uploadTaskAttachment(profile.tenant_id, taskId, file)} profile={profile} /> : null}
       {formTarget?.id && formTarget.form_template_id ? (() => { const form = formBundles.find((item) => item.id === formTarget.form_template_id); return form ? <Modal onClose={() => setFormTarget(null)} title={`Required form: ${form.name}`} wide><FormRenderer definition={{ name: form.name, description: form.description ?? undefined, sections: form.sections, fields: form.fields }} dynamicOptions={formDynamicOptions} templateId={form.id} onSubmit={async (answers) => { await submitForm(form.id, answers, formTarget.task_type === "delegation" ? "delegation_task" : "checklist_task", formTarget.id as string); setFormTarget(null); await refresh(); }} /></Modal> : <Modal onClose={() => setFormTarget(null)} title="Required form"><Notice tone="danger">The exact required form version is not available to this account.</Notice></Modal>; })() : null}

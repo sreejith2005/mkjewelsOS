@@ -886,7 +886,7 @@ export function UserManagementPage() {
             <UserCog className="h-5 w-5" />
           </span>
           <div>
-            <h1 className="font-display text-3xl text-gold">Team</h1>
+            <h1 className="font-display text-2xl sm:text-3xl text-gold">Team</h1>
             <p className="text-sm text-soft-grey">
               {users.length} authorized profiles ·{" "}
               {users.filter((user) => user.account_status === "active").length}{" "}
@@ -902,7 +902,7 @@ export function UserManagementPage() {
         ) : null}
       </header>
       {error ? <Notice tone="danger">{error}</Notice> : null}
-      <div className="glass-card mb-4 grid gap-3 rounded-xl p-4 sm:grid-cols-[1fr_180px_auto]">
+      <div className="glass-card mb-4 grid gap-3 rounded-xl p-4 sm:grid-cols-2 lg:grid-cols-[1fr_180px_auto]">
         <label className="relative">
           <Search className="absolute left-3 top-3 h-4 w-4 text-soft-grey" />
           <input
@@ -949,7 +949,45 @@ export function UserManagementPage() {
       ) : view === "organization" ? (
         <Organization profiles={users} />
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gold/15">
+        <>
+        {/* A 920px table is unusable on a phone, so the same rows render as
+            cards below the large breakpoint. */}
+        <div className="grid gap-3 lg:hidden">
+          {users.map((user) => (
+            <article className="rounded-xl border border-gold/15 bg-charcoal p-4" key={user.id}>
+              <div className="flex items-start gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gold font-semibold text-obsidian">{initials(user.employee_name)}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="break-words font-semibold text-white">{user.employee_name}</p>
+                  <p className="text-xs text-soft-grey">{user.employee_code}</p>
+                </div>
+                {canEdit ? (
+                  <Button aria-label={`Edit ${user.employee_name}`} className="size-11 shrink-0 p-0" onClick={() => setEditing(user)} variant="ghost">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                ) : null}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="rounded bg-gold/10 px-2 py-1 text-xs text-gold">{titleCase(user.user_role)}</span>
+                <Status value={user.account_status} />
+              </div>
+              <dl className="mt-3 grid gap-1.5 border-t border-gold/10 pt-3 text-sm">
+                {[
+                  ["Mobile", user.personal_mobile ?? "—"],
+                  ["Email", user.email],
+                  ["Reports to", data.profiles.find((item) => item.id === user.reports_to_user_id)?.employee_name ?? "—"],
+                ].map(([label, value]) => (
+                  <div className="flex justify-between gap-3" key={label}>
+                    <dt className="shrink-0 text-xs text-soft-grey">{label}</dt>
+                    <dd className="min-w-0 break-words text-right text-sm text-champagne">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </article>
+          ))}
+          {users.length === 0 ? <p className="rounded-xl border border-gold/15 p-10 text-center text-soft-grey">No users match this view.</p> : null}
+        </div>
+        <div className="hidden overflow-x-auto rounded-xl border border-gold/15 lg:block">
           <table className="w-full min-w-[920px] text-left text-sm">
             <thead className="border-b border-gold/15 bg-charcoal text-xs uppercase text-soft-grey">
               <tr>
@@ -1022,6 +1060,7 @@ export function UserManagementPage() {
             </p>
           ) : null}
         </div>
+        </>
       )}
       {editing ? (
         <EditUser

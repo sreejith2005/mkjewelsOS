@@ -5,9 +5,35 @@
 @layer base {
   :root { color-scheme: light; --color-obsidian: 248 250 252; --color-gold: 212 175 55; --color-gold-secondary: 184 134 11; --color-charcoal: 255 255 255; --color-champagne: 30 41 59; --color-soft-grey: 100 116 139; --color-danger: 244 63 94; --color-success: 34 197 94; --color-warning: 245 158 11; --color-white: 30 41 59; --color-task-bg: 255 255 255; --color-task-muted: 248 250 252; --color-task-border: 226 232 240; --color-task-text: 30 41 59; --color-task-text-muted: 100 116 139; --color-task-accent: 245 158 11; --color-task-accent-soft: 255 251 235; --color-task-overdue: 244 63 94; --color-task-warning: 245 158 11; }
   html[data-theme="dark"] { color-scheme: dark; --color-obsidian: 18 15 12; --color-gold: 215 181 113; --color-gold-secondary: 235 211 162; --color-charcoal: 32 27 22; --color-champagne: 241 233 217; --color-soft-grey: 181 172 159; --color-danger: 220 118 112; --color-success: 121 169 130; --color-warning: 220 174 82; --color-white: 255 250 241; --color-task-bg: 32 27 22; --color-task-muted: 48 41 33; --color-task-border: 82 71 58; --color-task-text: 255 250 241; --color-task-text-muted: 194 184 170; --color-task-accent: 215 181 113; --color-task-accent-soft: 72 58 37; --color-task-overdue: 239 133 128; --color-task-warning: 220 174 82; }
-  html { background: rgb(var(--color-obsidian)); }
+
+  html {
+    background: rgb(var(--color-obsidian));
+    /* Stop iOS/Android from inflating text in "text boosting" mode, which is a
+       common cause of a page reading as randomly zoomed in on a phone. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
   body {
-    @apply min-h-screen bg-obsidian font-sans text-white antialiased;
+    @apply min-h-[100dvh] bg-obsidian font-sans text-white antialiased;
+    /* A stray wide child must never let the whole page pan sideways on a phone.
+       `clip` (not `hidden`) keeps `position: sticky` headers working. */
+    overflow-x: clip;
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Removes the 300ms double-tap-to-zoom delay on controls without taking away
+     pinch-to-zoom, which stays available for accessibility. */
+  a,
+  button,
+  label,
+  select,
+  summary,
+  [role="button"],
+  [role="switch"],
+  [role="tab"] {
+    touch-action: manipulation;
   }
 
   button,
@@ -16,12 +42,68 @@
   textarea {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-obsidian;
   }
+
+  /* Native checkboxes and radios render around 13px, which is well under a
+     comfortable touch target for staff working one-handed on a phone. */
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 1.15rem;
+    height: 1.15rem;
+    accent-color: rgb(var(--color-task-accent));
+    flex-shrink: 0;
+  }
+
+  /* iOS Safari auto-zooms the page whenever a focused control renders below
+     16px, and never zooms back out. Every control is at least 16px on phones. */
+  @media (max-width: 767px) {
+    input:not([type="checkbox"]):not([type="radio"]),
+    select,
+    textarea {
+      font-size: 16px;
+    }
+  }
 }
 
 @layer utilities {
   html[data-table-density="compact"] table td,
   html[data-table-density="compact"] table th {
     @apply py-1.5;
+  }
+
+  /* Horizontal strips (tabs, chips, wide tables) scroll smoothly and never drag
+     the page along with them. */
+  .scroll-x {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Clears the mobile bottom navigation plus the home-indicator inset. */
+  .pb-mobile-nav {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+
+  @media (min-width: 768px) {
+    .pb-mobile-nav {
+      padding-bottom: 0;
+    }
+  }
+
+  .px-safe {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 }
 
@@ -31,7 +113,7 @@
   }
 
   .field {
-    @apply min-h-11 w-full rounded-lg border border-task-border bg-task-bg px-3 py-2 text-sm text-task-text placeholder:text-task-text-muted disabled:cursor-not-allowed disabled:opacity-50;
+    @apply min-h-11 w-full rounded-lg border border-task-border bg-task-bg px-3 py-2 text-base text-task-text placeholder:text-task-text-muted disabled:cursor-not-allowed disabled:opacity-50 md:text-sm;
   }
 
   .label {
@@ -39,6 +121,6 @@
   }
 
   .task-field {
-    @apply min-h-11 w-full rounded-lg border border-task-border bg-task-bg px-3 py-2 text-sm text-task-text placeholder:text-task-text-muted disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-task-accent focus-visible:ring-offset-task-bg;
+    @apply min-h-11 w-full rounded-lg border border-task-border bg-task-bg px-3 py-2 text-base text-task-text placeholder:text-task-text-muted disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-task-accent focus-visible:ring-offset-task-bg md:text-sm;
   }
 }

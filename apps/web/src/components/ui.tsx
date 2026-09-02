@@ -97,14 +97,22 @@ export function Modal({
         tabIndex={-1}
         onKeyDown={trapFocus}
         className={cn(
-          "max-h-[94dvh] w-full overflow-y-auto rounded-t-2xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl sm:rounded-2xl",
+          "max-h-[92dvh] w-full overflow-y-auto overscroll-contain rounded-t-2xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl sm:max-h-[90dvh] sm:rounded-2xl",
           tone === "light" ? "border border-task-border bg-task-bg text-task-text" : "glass-card",
           wide ? "sm:max-w-4xl" : "sm:max-w-lg",
         )}
       >
-        <header className="mb-5 flex items-center justify-between gap-4">
-          <h2 className={cn("text-xl font-semibold", tone === "light" ? "text-task-text" : "font-display text-2xl text-gold")} id={titleId}>{title}</h2>
-          <Button aria-label="Close dialog" className={cn("size-10 p-0", tone === "light" && "text-task-text-muted hover:bg-task-muted hover:text-task-text")} onClick={onClose} variant="ghost">
+        {/* The sheet keeps its title and close button reachable while a long
+            form scrolls, which on a phone is the only way back out. */}
+        <header
+          className={cn(
+            "sticky top-0 z-10 -mx-5 -mt-5 mb-5 flex items-center justify-between gap-3 px-5 pb-3 pt-2 sm:pt-5",
+            tone === "light" ? "bg-task-bg" : "bg-charcoal",
+          )}
+        >
+          <span aria-hidden className="absolute inset-x-0 top-2 mx-auto h-1 w-10 rounded-full bg-task-text-muted/40 sm:hidden" />
+          <h2 className={cn("min-w-0 flex-1 pt-4 text-lg font-semibold sm:pt-0 sm:text-xl", tone === "light" ? "text-task-text" : "font-display text-2xl text-gold")} id={titleId}>{title}</h2>
+          <Button aria-label="Close dialog" className={cn("mt-4 size-11 shrink-0 p-0 sm:mt-0", tone === "light" && "text-task-text-muted hover:bg-task-muted hover:text-task-text")} onClick={onClose} variant="ghost">
             <X />
           </Button>
         </header>

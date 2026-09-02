@@ -19,14 +19,14 @@ export function TaskFilterBar({ counts, onStatusChange, status }: {
         {filters.map((filter) => (
           <button
             aria-pressed={status === filter}
-            className={cn("relative flex min-h-14 min-w-0 items-center justify-center gap-1 px-1 pb-1 text-[11px] font-medium text-task-text-muted sm:text-sm", status === filter && "text-task-text after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-task-accent")}
+            className={cn("relative flex min-h-14 min-w-0 items-center justify-center gap-1.5 px-1 pb-1 text-xs font-semibold text-task-text-muted sm:text-sm", status === filter && "text-task-text after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-task-accent")}
             key={filter}
             onClick={() => onStatusChange(filter)}
             type="button"
           >
             <span className={cn("size-3 shrink-0 rounded-full", STATUS_DOT[filter])} />
             <span>{filter[0]!.toUpperCase() + filter.slice(1)}</span>
-            <span aria-label={`${counts[filter]} tasks`} className="tabular-nums">- {counts[filter]}</span>
+            <span aria-label={`${counts[filter]} tasks`} className="tabular-nums">({counts[filter]})</span>
           </button>
         ))}
       </div>

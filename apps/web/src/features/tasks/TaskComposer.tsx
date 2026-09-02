@@ -118,7 +118,7 @@ export function TaskComposer({ data, onClose, onCreated, onSave, onUploadAttachm
           </label>
           <label className="border-b border-task-border px-1 py-3">
             <span className="sr-only">Task description</span>
-            <textarea className="min-h-24 w-full resize-y bg-task-muted p-3 text-sm text-task-text placeholder:text-task-text-muted focus-visible:ring-task-accent" onChange={(event) => setDescription(event.target.value)} placeholder="Add Description" value={description} />
+            <textarea className="min-h-24 w-full resize-y rounded-xl bg-task-muted p-3 text-base md:text-sm text-task-text placeholder:text-task-text-muted focus-visible:ring-task-accent" onChange={(event) => setDescription(event.target.value)} placeholder="Add Description" value={description} />
           </label>
           <section className="border-b border-task-border py-3">
             <button aria-expanded={checklistOpen} className="flex min-h-11 w-full items-center justify-between text-sm font-semibold text-task-text" onClick={() => setChecklistOpen((current) => !current)} type="button"><span className="flex items-center gap-2"><Plus className="size-4" />Add Checklist</span><ChevronDown className={cn("size-4 transition-transform", checklistOpen ? "rotate-180" : "")} /></button>

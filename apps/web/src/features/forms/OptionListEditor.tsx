@@ -60,12 +60,12 @@ export function OptionListEditor({ options, onChange }: { options: readonly Form
       <Check className="size-4 shrink-0 text-success" />
       {editingValue === option.value
         ? <><input aria-label={`Rename ${option.label}`} className="field h-9 flex-1" onChange={(event) => setEditingLabel(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); rename(option.value); } if (event.key === "Escape") setEditingValue(null); }} ref={editRef} value={editingLabel} />
-          <Button aria-label="Save option" className="size-9 min-h-9 p-0" onClick={() => rename(option.value)} type="button" variant="secondary"><Check className="size-4" /></Button>
-          <Button aria-label="Cancel rename" className="size-9 min-h-9 p-0" onClick={() => setEditingValue(null)} type="button" variant="ghost"><X className="size-4" /></Button></>
+          <Button aria-label="Save option" className="size-11 min-h-11 p-0" onClick={() => rename(option.value)} type="button" variant="secondary"><Check className="size-4" /></Button>
+          <Button aria-label="Cancel rename" className="size-11 min-h-11 p-0" onClick={() => setEditingValue(null)} type="button" variant="ghost"><X className="size-4" /></Button></>
         : <><span className="min-w-0 flex-1 truncate text-sm text-champagne">{option.label}</span>
           <span className="hidden font-mono text-[10px] text-soft-grey sm:inline">{option.value}</span>
-          <Button aria-label={`Edit ${option.label}`} className="size-9 min-h-9 p-0" onClick={() => { setEditingValue(option.value); setEditingLabel(option.label); }} type="button" variant="ghost"><Pencil className="size-4" /></Button>
-          <Button aria-label={`Delete ${option.label}`} className="size-9 min-h-9 p-0" onClick={() => onChange(options.filter((item) => item.value !== option.value))} type="button" variant="danger"><Trash2 className="size-4" /></Button></>}
+          <Button aria-label={`Edit ${option.label}`} className="size-11 min-h-11 p-0" onClick={() => { setEditingValue(option.value); setEditingLabel(option.label); }} type="button" variant="ghost"><Pencil className="size-4" /></Button>
+          <Button aria-label={`Delete ${option.label}`} className="size-11 min-h-11 p-0" onClick={() => onChange(options.filter((item) => item.value !== option.value))} type="button" variant="danger"><Trash2 className="size-4" /></Button></>}
     </li>)}</ul> : null}
     <div className="flex items-center gap-2">
       <span className="w-20 shrink-0 text-xs text-soft-grey">Option {options.length + 1}</span>

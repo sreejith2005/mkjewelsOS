@@ -43,7 +43,7 @@ function FileFieldControl({ disabled, field, onChange, registerRef, templateId, 
           {!disabled ? <Button onClick={() => { onChange(""); setName(null); }} type="button" variant="ghost">Replace</Button> : null}
         </div>
       : disabled ? <span className="text-sm text-soft-grey">No file uploaded</span>
-      : <input accept="image/jpeg,image/png,image/webp,application/pdf" disabled={uploading} onChange={(event) => void onFile(event)} ref={registerRef} type="file" />}
+      : <input accept="image/jpeg,image/png,image/webp,application/pdf" className="block w-full text-sm text-champagne file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-lg file:border-0 file:bg-gold file:px-4 file:text-sm file:font-semibold file:text-obsidian" disabled={uploading} onChange={(event) => void onFile(event)} ref={registerRef} type="file" />}
     {uploading ? <span className="text-xs text-soft-grey">Uploading...</span> : null}
     {error ? <span className="text-xs text-red-400">{error}</span> : null}
   </div>;
@@ -90,7 +90,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
     if (field.type === "checkbox" && checkboxOptions.length) {
       const selected = Array.isArray(value) ? value : [];
       return <fieldset className="space-y-2" key={field.key}><legend className="label">{field.label}{field.required ? " *" : ""}</legend>{field.helperText ? <p className="text-xs text-soft-grey">{field.helperText}</p> : null}
-        <div className="grid gap-2">{checkboxOptions.map((option, index) => <label className="flex min-h-10 items-center gap-3 rounded-lg border border-gold/15 px-3 py-2 text-sm text-champagne transition hover:border-gold/40" key={option.value}><input checked={selected.includes(option.value)} disabled={disabled} onChange={(event) => set(field.key, event.target.checked ? [...selected, option.value] : selected.filter((item) => item !== option.value))} ref={index === 0 ? register(field.key) : undefined} type="checkbox" />{option.label}</label>)}</div>
+        <div className="grid gap-2">{checkboxOptions.map((option, index) => <label className="flex min-h-12 items-center gap-3 rounded-lg border border-gold/15 px-3 py-2 text-sm text-champagne transition hover:border-gold/40" key={option.value}><input checked={selected.includes(option.value)} disabled={disabled} onChange={(event) => set(field.key, event.target.checked ? [...selected, option.value] : selected.filter((item) => item !== option.value))} ref={index === 0 ? register(field.key) : undefined} type="checkbox" />{option.label}</label>)}</div>
       </fieldset>;
     }
     if (field.type === "rating") return <fieldset className="space-y-2" key={field.key}><legend className="label">{field.label}{field.required ? " *" : ""}</legend>{field.helperText ? <p className="text-xs text-soft-grey">{field.helperText}</p> : null}<RatingField disabled={disabled} label={field.label} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} value={typeof value === "number" ? value : undefined} /></fieldset>;
@@ -99,9 +99,9 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
     return <label className="block" key={field.key}><span className="label">{field.label}{field.required ? " *" : ""}</span>{field.helperText ? <span className="mb-1 block text-xs text-soft-grey">{field.helperText}</span> : null}
       {field.type === "textarea" ? <textarea className="field" disabled={disabled} id={field.key} onChange={onText} placeholder={field.placeholder} ref={register(field.key)} value={typeof value === "string" ? value : ""} />
         : SELECT_TYPES.has(field.type) ? <select className="field" disabled={disabled} id={field.key} onChange={onText} ref={register(field.key)} value={typeof value === "string" ? value : ""}><option value="">Select</option>{selectOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select>
-        : field.type === "checkbox" ? <input checked={value === true} disabled={disabled} id={field.key} onChange={(event) => set(field.key, event.target.checked)} ref={register(field.key)} type="checkbox" />
+        : field.type === "checkbox" ? <span className="flex min-h-12 items-center gap-3 rounded-lg border border-gold/15 px-3 py-2 text-sm text-champagne"><input checked={value === true} disabled={disabled} id={field.key} onChange={(event) => set(field.key, event.target.checked)} ref={register(field.key)} type="checkbox" /><span>{field.placeholder ?? "Yes"}</span></span>
         : field.type === "multiselect" ? <select className="field" disabled={disabled} id={field.key} multiple onChange={(event) => set(field.key, [...event.target.selectedOptions].map((option) => option.value))} ref={register(field.key)} value={Array.isArray(value) ? value : []}>{staticOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
-        : field.type === "radio" ? <span className="flex flex-wrap gap-3">{staticOptions.map((option, index) => <label className="text-sm text-champagne" key={option.value}><input checked={value === option.value} disabled={disabled} name={field.key} onChange={() => set(field.key, option.value)} ref={index === 0 ? register(field.key) : undefined} type="radio" /> {option.label}</label>)}</span>
+        : field.type === "radio" ? <span className="grid gap-2">{staticOptions.map((option, index) => <label className="flex min-h-12 items-center gap-3 rounded-lg border border-gold/15 px-3 py-2 text-sm text-champagne transition hover:border-gold/40" key={option.value}><input checked={value === option.value} disabled={disabled} name={field.key} onChange={() => set(field.key, option.value)} ref={index === 0 ? register(field.key) : undefined} type="radio" /><span>{option.label}</span></label>)}</span>
         : <input className="field" disabled={disabled} id={field.key} onChange={onText} placeholder={field.placeholder} ref={register(field.key)} step={NUMBER_TYPES.has(field.type) ? "any" : undefined} type={inputType} value={typeof value === "string" || typeof value === "number" ? value : ""} />}
     </label>;
   };
@@ -116,6 +116,6 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
       {showSectionTitles ? <header className="mb-3"><h3 className="text-base font-semibold text-gold">{section.title}</h3>{section.description ? <p className="text-xs text-soft-grey">{section.description}</p> : null}</header> : null}
       <div className="flex flex-col gap-4">{fields.map(renderField)}</div>
     </section>)}
-    {!readOnly && resolved.fields.length > 0 ? <Button className="w-full sm:w-auto" disabled={busy || preview || success} type="submit">{busy ? "Submitting..." : "Submit form"}</Button> : null}
+    {!readOnly && resolved.fields.length > 0 ? <div className="sticky bottom-0 -mx-1 mt-2 border-t border-gold/15 bg-task-bg/95 px-1 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none"><Button className="min-h-12 w-full sm:w-auto" disabled={busy || preview || success} type="submit">{busy ? "Submitting..." : "Submit form"}</Button></div> : null}
   </form>;
 }

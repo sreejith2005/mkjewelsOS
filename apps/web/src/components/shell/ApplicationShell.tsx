@@ -82,7 +82,7 @@ export function ApplicationShell({
 
   return (
     <div className="min-h-screen bg-obsidian">
-      <header className={cn("sticky top-0 z-30 flex items-center border-b border-task-border bg-task-bg px-3 md:fixed md:inset-x-0 md:border-gold/20 md:bg-charcoal/95 md:px-5 md:backdrop-blur", developerModeActive ? "min-h-14 flex-wrap py-2 md:min-h-16" : "h-14 md:h-16")}>
+      <header className={cn("sticky top-0 z-30 flex items-center border-b border-task-border bg-task-bg px-3 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] md:fixed md:inset-x-0 md:border-gold/20 md:bg-charcoal/95 md:px-5 md:backdrop-blur", developerModeActive ? "min-h-14 flex-wrap py-2 md:min-h-16" : "h-14 md:h-16")}>
         <div className="flex w-full items-center">
         <Button aria-label="Toggle sidebar" className="mr-3 hidden size-10 p-0 md:inline-flex" onClick={() => setSidebarOpen(!sidebarOpen)} variant="ghost">
           {sidebarOpen ? <PanelLeftClose /> : <Menu />}
@@ -138,8 +138,8 @@ export function ApplicationShell({
         </nav> : null}
       </aside>
 
-      <main className={cn("min-h-[calc(100dvh-3.5rem)] pb-[70px] md:min-h-screen md:pb-0 md:pt-16 md:transition-[padding]", developerModeActive && "md:pt-28", sidebarOpen && "md:pl-64")}>
-        <div className={cn(fullBleed ? "w-full p-3 sm:p-5 [&>section]:max-w-none [&>section]:mx-0" : "mx-auto max-w-7xl p-4 sm:p-6")}>{children}</div>
+      <main className={cn("pb-mobile-nav min-h-[calc(100dvh-3.5rem)] md:min-h-screen md:pt-16 md:transition-[padding]", developerModeActive && "md:pt-28", sidebarOpen && "md:pl-64")}>
+        <div className={cn(fullBleed ? "w-full p-4 sm:p-6 [&>section]:max-w-none [&>section]:mx-0" : "mx-auto max-w-7xl p-4 sm:p-6")}>{children}</div>
       </main>
 
       <MobileBottomNav onNavigate={navigate} onOpenApps={() => onAppsOpenChange(true)} onOpenMore={() => onMoreOpenChange(true)} path={path} />

@@ -283,7 +283,7 @@ export function TaskTemplatesPage() {
               <ListChecks className="size-5" />
             </span>
             <div>
-              <h1 className="font-display text-3xl text-gold">Task Templates</h1>
+              <h1 className="font-display text-2xl sm:text-3xl text-gold">Task Templates</h1>
               <p className="text-sm text-soft-grey">Recurring rules, schedules and source-linked task templates.</p>
             </div>
           </div>
