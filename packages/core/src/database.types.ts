@@ -7174,29 +7174,41 @@ export type Database = {
         Row: {
           actual_datetime: string | null
           assignee_id: string | null
+          assignment_status: string | null
           branch_id: string | null
+          branch_name: string | null
+          buddy_assignment_allowed: boolean | null
           category_id: string | null
           checklist_completion_pct: number | null
           core_task_label: string | null
           created_by: string | null
           delay_minutes: number | null
           department_id: string | null
+          department_name: string | null
           description: string | null
           due_datetime: string | null
+          due_time: string | null
           form_template_id: string | null
           id: string | null
+          is_active: boolean | null
           planned_datetime: string | null
+          planned_time: string | null
           priority: Database["public"]["Enums"]["task_priority"] | null
           requires_form: boolean | null
           requires_remark: boolean | null
           requires_upload: boolean | null
           revised_datetime: string | null
+          schedule_kind: string | null
+          scheduled_date: string | null
           source: string | null
+          starts_on: string | null
           status: Database["public"]["Enums"]["task_status"] | null
           task_template_id: string | null
           task_type: Database["public"]["Enums"]["task_type"] | null
           tenant_id: string | null
           title: string | null
+          verification_required: boolean | null
+          verification_status: string | null
           verifier_user_profile_id: string | null
         }
         Relationships: []

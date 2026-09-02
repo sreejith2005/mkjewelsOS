@@ -36,11 +36,12 @@ export {
   effectiveTaskDeadline,
   groupTaskFeedRows,
   isTaskFeedItemInCurrentDayOrOverdue,
+  isRecurringOrWorkflowTask,
   isTaskFeedItemOverdue,
   splitAssignedTaskFeed,
   taskMatchesStatus,
 } from "./taskFeed";
-export type { GroupedTaskFeedRow, TaskFeedLike, TaskFeedStatusFilter } from "./taskFeed";
+export type { GroupedTaskFeedRow, SplittableAssignedTask, TaskFeedLike, TaskFeedStatusFilter } from "./taskFeed";
 export { normalizeTaskParticipants } from "./taskParticipants";
 export type { TaskParticipants } from "./taskParticipants";
 export * from "./taskCoverage.ts";

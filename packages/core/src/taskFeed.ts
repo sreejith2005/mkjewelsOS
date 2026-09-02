@@ -40,9 +40,23 @@ export function groupTaskFeedRows<T extends TaskFeedLike>(rows: readonly T[]): G
   return [...grouped.values()];
 }
 
-export function splitAssignedTaskFeed<T extends { task_type: string | null }>(tasks: readonly T[]) {
+export type SplittableAssignedTask = Readonly<{
+  task_template_id?: string | null;
+  task_type: string | null;
+}>;
+
+/**
+ * My Tasks holds recurring work of any schedule (occurrences generated from a task template)
+ * plus FMS stage work. Everything else assigned from the Tasks section is one-time work and
+ * belongs in Delegated.
+ */
+export function isRecurringOrWorkflowTask(task: SplittableAssignedTask): boolean {
+  return Boolean(task.task_template_id) || task.task_type === "fms";
+}
+
+export function splitAssignedTaskFeed<T extends SplittableAssignedTask>(tasks: readonly T[]) {
   return tasks.reduce<{ delegatedTasks: T[]; myTasks: T[] }>((result, task) => {
-    (task.task_type === "delegation" ? result.delegatedTasks : result.myTasks).push(task);
+    (isRecurringOrWorkflowTask(task) ? result.myTasks : result.delegatedTasks).push(task);
     return result;
   }, { delegatedTasks: [], myTasks: [] });
 }

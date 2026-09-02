@@ -11,6 +11,9 @@ export type TaskTemplate = Tables<"task_templates">;
 export type AvailabilityStatus = Enums<"availability_status">;
 export type AvailabilityEntry = Pick<Tables<"user_availability">, "user_profile_id" | "date" | "status" | "reason">;
 
+/** Shown when a designated verifier is outside the roster this viewer is authorized to read. */
+const VERIFIER_FALLBACK_NAME = "Verifier unavailable";
+
 export type TaskBundle = TaskFeedRow & {
   assignees: Array<{ id: string; name: string }>;
   assigneeName: string;
@@ -18,6 +21,7 @@ export type TaskBundle = TaskFeedRow & {
   hasAttachment: boolean;
   hasFormSubmission: boolean;
   isWatchedByViewer: boolean;
+  verifierName: string | null;
 };
 
 export type TaskReferenceData = {
@@ -264,6 +268,9 @@ export async function loadTaskFeed(
         ? matchingSubmissions.has(`${row.id}|${row.task_type === "delegation" ? "delegation_task" : "checklist_task"}|${row.form_template_id}`)
       : false,
       isWatchedByViewer: Boolean(row.id && watchedTaskIds.has(row.id) && !assigneeIds.includes(viewerId)),
+      verifierName: row.verifier_user_profile_id
+        ? userNames.get(row.verifier_user_profile_id) ?? VERIFIER_FALLBACK_NAME
+        : null,
     };
   });
 }

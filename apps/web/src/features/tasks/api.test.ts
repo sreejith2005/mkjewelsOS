@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { equalityFilters, identifierFilters, taskRows } = vi.hoisted(() => ({
+const { equalityFilters, identifierFilters, taskRows, taskUsers } = vi.hoisted(() => ({
   equalityFilters: [] as Array<[string, unknown]>,
   identifierFilters: [] as Array<{ table: string; values: unknown[] }>,
   taskRows: [] as Array<Record<string, unknown>>,
+  taskUsers: [] as Array<{ employee_name: string | null; id: string | null }>,
 }));
 
 function query(table: string) {
-  const result = () => ({ data: table === "v_all_tasks" ? taskRows : [], error: null });
+  const result = () => ({ data: table === "v_all_tasks" ? taskRows : table === "v_task_users" ? taskUsers : [], error: null });
   const builder = {
     eq(column: string, value: unknown) { equalityFilters.push([column, value]); return builder; },
     gte() { return builder; },
@@ -31,6 +32,7 @@ beforeEach(() => {
   equalityFilters.splice(0);
   identifierFilters.splice(0);
   taskRows.splice(0);
+  taskUsers.splice(0);
 });
 
 describe("task feed effective-deadline scope", () => {
@@ -73,5 +75,48 @@ describe("task feed effective-deadline scope", () => {
       expect(identifierFilters.filter((item) => item.table === table).map((item) => item.values.length)).toEqual([50, 50, 50, 50, 1]);
     }
     expect(identifierFilters.filter((item) => item.table === "form_submissions")).toEqual([]);
+  });
+
+  it("resolves the designated verifier from the existing bounded roster load", async () => {
+    taskRows.push({
+      actual_datetime: null,
+      assignee_id: "doer-1",
+      due_datetime: null,
+      form_template_id: null,
+      id: "task-1",
+      planned_datetime: "2026-08-28T12:00:00.000+05:30",
+      revised_datetime: null,
+      status: "pending",
+      task_type: "checklist",
+      verifier_user_profile_id: "verifier-1",
+    });
+    taskUsers.push(
+      { employee_name: "Ashwini Kamble", id: "doer-1" },
+      { employee_name: "Nikita Patil", id: "verifier-1" },
+    );
+
+    const [result] = await loadTaskFeed("admin-1", "2026-08-28T00:00:00.000+05:30", "2026-08-28T23:59:59.999+05:30", { delegated: true });
+
+    expect(result?.assigneeName).toBe("Ashwini Kamble");
+    expect(result?.verifierName).toBe("Nikita Patil");
+  });
+
+  it("uses a neutral verifier fallback when the visible roster cannot resolve the profile", async () => {
+    taskRows.push({
+      actual_datetime: null,
+      assignee_id: "doer-1",
+      due_datetime: null,
+      form_template_id: null,
+      id: "task-1",
+      planned_datetime: "2026-08-28T12:00:00.000+05:30",
+      revised_datetime: null,
+      status: "pending",
+      task_type: "checklist",
+      verifier_user_profile_id: "verifier-1",
+    });
+
+    const [result] = await loadTaskFeed("admin-1", "2026-08-28T00:00:00.000+05:30", "2026-08-28T23:59:59.999+05:30", { delegated: true });
+
+    expect(result?.verifierName).toBe("Verifier unavailable");
   });
 });

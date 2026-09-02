@@ -45,13 +45,15 @@ describe("task feed presentation", () => {
     expect(isTaskFeedItemInCurrentDayOrOverdue(task("rejected", "user-1", "rejected", "2026-08-06T12:00:00.000Z"), start, end, now)).toBe(false);
   });
 
-  it("puts assigned checklist work in My Tasks and assigned delegation work in Delegated", () => {
+  it("puts every recurring occurrence in My Tasks and one-time assigned work in Delegated", () => {
     const assigned = [
-      { ...task("personal", "viewer"), task_type: "checklist" },
-      { ...task("recurring", "viewer"), task_type: "checklist", task_template_id: "template" },
-      { ...task("delegated", "viewer"), task_type: "delegation" },
+      { ...task("daily-checklist", "viewer"), task_type: "checklist", task_template_id: "daily-template" },
+      { ...task("weekly-delegation", "viewer"), task_type: "delegation", task_template_id: "weekly-template" },
+      { ...task("fms-stage", "viewer"), task_type: "fms", task_template_id: null },
+      { ...task("one-time-checklist", "viewer"), task_type: "checklist", task_template_id: null },
+      { ...task("one-time-delegation", "viewer"), task_type: "delegation", task_template_id: null },
     ];
-    expect(splitAssignedTaskFeed(assigned)).toEqual({ myTasks: assigned.slice(0, 2), delegatedTasks: assigned.slice(2) });
+    expect(splitAssignedTaskFeed(assigned)).toEqual({ myTasks: assigned.slice(0, 3), delegatedTasks: assigned.slice(3) });
   });
 
   it("uses revised, then independent due, then planned datetime", () => {
