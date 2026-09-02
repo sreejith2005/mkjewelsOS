@@ -174,7 +174,7 @@ describe("Builder edits keep rules pointing somewhere", () => {
     expect(operatorsForFieldType("number")).toContain("greater_than");
     expect(operatorsForFieldType("number")).not.toContain("contains");
     expect(operatorsForFieldType("multiselect")).toContain("contains");
-    expect(operatorsForFieldType("checkbox")).toEqual(["equals", "not_equals"]);
+    expect(operatorsForFieldType("checkbox")).toContain("contains");
   });
 });
 

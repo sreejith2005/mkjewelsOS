@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ProductionDemoDataRetirementCard } from "./ProductionDemoDataRetirementCard";
 
@@ -13,19 +12,18 @@ describe("ProductionDemoDataRetirementCard", () => {
   });
 
   it("requires preview and the exact confirmation before execution", async () => {
-    const user = userEvent.setup();
     const onPreview = vi.fn().mockResolvedValue(preview);
     const onExecute = vi.fn();
     render(<ProductionDemoDataRetirementCard isSuperAdmin onExecute={onExecute} onPreview={onPreview} />);
 
     expect((screen.getByRole("button", { name: "Preview demo-data retirement" }) as HTMLButtonElement).disabled).toBe(true);
-    await user.type(screen.getByLabelText("Backup reference"), "provider-backup-2026-08-28");
-    await user.click(screen.getByLabelText("Maintenance window confirmed"));
-    await user.click(screen.getByRole("button", { name: "Preview demo-data retirement" }));
+    fireEvent.change(screen.getByLabelText("Backup reference"), { target: { value: "provider-backup-2026-08-28" } });
+    fireEvent.click(screen.getByLabelText("Maintenance window confirmed"));
+    fireEvent.click(screen.getByRole("button", { name: "Preview demo-data retirement" }));
     expect(await screen.findByText("Task instances: 2")).toBeTruthy();
     expect((screen.getByRole("button", { name: "Retire demo data" }) as HTMLButtonElement).disabled).toBe(true);
-    await user.type(screen.getByLabelText("Confirmation"), "RETIRE DEMO DATA");
-    await user.click(screen.getByRole("button", { name: "Retire demo data" }));
+    fireEvent.change(screen.getByLabelText("Confirmation"), { target: { value: "RETIRE DEMO DATA" } });
+    fireEvent.click(screen.getByRole("button", { name: "Retire demo data" }));
     expect(onExecute).toHaveBeenCalledWith({ confirmation: "RETIRE DEMO DATA", manifestHash: preview.manifest_hash, operationId: preview.operation_id });
   });
 });

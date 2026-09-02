@@ -11,7 +11,7 @@ function linkFromPredicate(rule: FormRule): GuidedConditionLink | null {
   if (rule.kind !== "predicate") return null;
   const predicate = rule as FormRulePredicate;
   const value = predicate.value;
-  if (predicate.operator !== "equals" || (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean")) return null;
+  if ((predicate.operator !== "equals" && predicate.operator !== "contains") || (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean")) return null;
   return { sourceKey: predicate.fieldKey, optionValue: value };
 }
 
@@ -34,10 +34,10 @@ function sameLink(left: GuidedConditionLink, right: GuidedConditionLink): boolea
   return left.sourceKey === right.sourceKey && left.optionValue === right.optionValue;
 }
 
-function writeLinks(field: FormFieldDefinition, links: readonly GuidedConditionLink[]): FormFieldDefinition {
+function writeLinks(field: FormFieldDefinition, links: readonly GuidedConditionLink[], fields: readonly FormFieldDefinition[]): FormFieldDefinition {
   const { condition: _condition, rule: _rule, ...withoutRule } = field;
   if (links.length === 0) return withoutRule;
-  const predicates = links.map(({ sourceKey, optionValue }) => ({ kind: "predicate" as const, fieldKey: sourceKey, operator: "equals" as const, value: optionValue }));
+  const predicates = links.map(({ sourceKey, optionValue }) => ({ kind: "predicate" as const, fieldKey: sourceKey, operator: fields.find((item) => item.key === sourceKey)?.type === "checkbox" || fields.find((item) => item.key === sourceKey)?.type === "multiselect" ? "contains" as const : "equals" as const, value: optionValue }));
   return { ...withoutRule, rule: predicates.length === 1 ? predicates[0]! : { kind: "any", rules: predicates } };
 }
 
@@ -56,7 +56,7 @@ export function setGuidedFollowUp(
     const withoutLink = current.filter((existing) => !sameLink(existing, link));
     const next = field.key === targetKey ? [...withoutLink, link] : withoutLink;
     if (next.length === current.length && next.every((item, index) => sameLink(item, current[index]!))) return field;
-    return writeLinks(field, next);
+    return writeLinks(field, next, fields);
   });
 }
 
@@ -73,7 +73,7 @@ export function readAnswerRoutes(
   const source = fields.find((field) => field.key === sourceKey);
   const knownSections = new Set(sections.map((section) => section.key));
   for (const branch of source?.branches ?? []) {
-    if (branch.operator !== "equals" || branch.value === undefined) continue;
+    if ((branch.operator !== "equals" && branch.operator !== "contains") || branch.value === undefined) continue;
     if (branch.targetSectionKey === FORM_SUBMIT_TARGET) routes.set(branch.value, { kind: "submit" });
     else if (knownSections.has(branch.targetSectionKey)) routes.set(branch.value, { kind: "section", sectionKey: branch.targetSectionKey });
   }
@@ -91,9 +91,10 @@ export function setAnswerRoute(
   if (route.kind === "question") return setGuidedFollowUp(withoutQuestionRoute, sourceKey, optionValue, route.questionKey);
   return withoutQuestionRoute.map((field) => {
     if (field.key !== sourceKey) return field;
-    const remaining = (field.branches ?? []).filter((branch) => !(branch.operator === "equals" && sameLink({ sourceKey, optionValue }, { sourceKey, optionValue: branch.value ?? "" })));
+    const remaining = (field.branches ?? []).filter((branch) => !((branch.operator === "equals" || branch.operator === "contains") && sameLink({ sourceKey, optionValue }, { sourceKey, optionValue: branch.value ?? "" })));
     if (route.kind === "continue") return remaining.length ? { ...field, branches: remaining } : { ...field, branches: undefined };
     const targetSectionKey = route.kind === "submit" ? FORM_SUBMIT_TARGET : route.sectionKey;
-    return { ...field, branches: [...remaining, { operator: "equals", value: optionValue, targetSectionKey }] };
+    const operator = field.type === "checkbox" || field.type === "multiselect" ? "contains" as const : "equals" as const;
+    return { ...field, branches: [...remaining, { operator, value: optionValue, targetSectionKey }] };
   });
 }

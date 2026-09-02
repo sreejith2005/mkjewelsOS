@@ -1,7 +1,7 @@
 import type { FormFieldDefinition, FormOption, FormTemplateDefinition } from "./types";
 
 /** Field types whose answers must be one of a configured option list. */
-export const FORM_OPTION_TYPES: ReadonlySet<string> = new Set(["select", "multiselect", "radio"]);
+export const FORM_OPTION_TYPES: ReadonlySet<string> = new Set(["select", "multiselect", "radio", "checkbox"]);
 
 /** A Dropdown Master row, reduced to what the forms engine needs. */
 export type FormMasterOption = Readonly<{ masterType: string; value: string; label: string }>;

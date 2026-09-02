@@ -128,6 +128,36 @@ describe("Filling a branching form", () => {
     render(<FormRenderer definition={{ name: "Legacy", fields: [{ key: "visitor", label: "Visitor name", type: "text", sortOrder: 0 }] }} />);
     expect(screen.getByLabelText(/Visitor name/)).toBeTruthy();
   });
+
+  it("renders option-backed Checkbox as a normal multi-answer checkbox group and submits stable values", async () => {
+    const user = userEvent.setup();
+    const submitted: unknown[] = [];
+    render(<FormRenderer definition={{ name: "Services", fields: [{
+      key: "services", label: "Which services are required?", type: "checkbox", sortOrder: 0, required: true,
+      options: [{ value: "repair", label: "Repair" }, { value: "clean", label: "Cleaning" }, { value: "inspect", label: "Inspection" }],
+    }] }} onSubmit={async (answers) => { submitted.push(answers); }} />);
+
+    expect(screen.queryByRole("listbox")).toBeNull();
+    await user.click(screen.getByRole("checkbox", { name: "Repair" }));
+    await user.click(screen.getByRole("checkbox", { name: "Inspection" }));
+    await user.click(screen.getByRole("button", { name: /Submit form/ }));
+
+    expect(submitted).toEqual([{ services: ["repair", "inspect"] }]);
+  });
+
+  it("renders Rating as a keyboard-operable five-star radiogroup and submits a number", async () => {
+    const user = userEvent.setup();
+    const submitted: unknown[] = [];
+    render(<FormRenderer definition={{ name: "Feedback", fields: [{ key: "rating", label: "Satisfaction", type: "rating", sortOrder: 0, required: true }] }} onSubmit={async (answers) => { submitted.push(answers); }} />);
+
+    expect(screen.getByRole("radiogroup", { name: "Satisfaction" })).toBeTruthy();
+    const third = screen.getByRole("radio", { name: "3 stars" });
+    third.focus();
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("radio", { name: "4 stars" }).getAttribute("aria-checked")).toBe("true");
+    await user.click(screen.getByRole("button", { name: /Submit form/ }));
+    expect(submitted).toEqual([{ rating: 4 }]);
+  });
 });
 
 function OptionHarness({ initial = [] }: { initial?: readonly FormOption[] }) {
@@ -197,19 +227,74 @@ describe("Form builder internal keys", () => {
     const user = userEvent.setup();
     render(<FormBuilder dynamicOptions={{ users: [], branches: [], departments: [], masters: [] }} onClose={() => {}} onSaved={async () => {}} />);
 
+    await user.click(screen.getByRole("button", { name: "Add question to Section 1" }));
+    expect(screen.queryByRole("button", { name: "Multi-select" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Text" }));
 
     const helper = screen.getByLabelText("Helper text");
     const placeholder = screen.getByLabelText("Placeholder");
     expect(screen.queryByLabelText("Internal key")).toBeNull();
     expect(helper.compareDocumentPosition(placeholder) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.queryByText("Advanced settings")).toBeNull();
+    expect(screen.getByText("Advanced settings")).toBeTruthy();
     expect(screen.getByText(/Add a choose-one question before this one/)).toBeTruthy();
+  });
+
+  it("inserts a question beside the active card instead of using a top palette", async () => {
+    const user = userEvent.setup();
+    render(<FormBuilder bundle={conditionalBundle} dynamicOptions={{ users: [], branches: [], departments: [], masters: [] }} onClose={() => {}} onSaved={async () => {}} />);
+
+    expect(screen.queryByRole("region", { name: "Add fields" })).toBeNull();
+    await user.click(screen.getByLabelText("Edit Metal"));
+    await user.click(screen.getByRole("button", { name: "Add question after Metal" }));
+    await user.click(screen.getByRole("button", { name: "Rating" }));
+
+    const metal = screen.getByLabelText("Edit Metal").closest("article")!;
+    const rating = screen.getByLabelText("Edit Rating").closest("article")!;
+    expect(metal.compareDocumentPosition(rating) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getAllByLabelText("Question")).toHaveLength(1);
+  });
+
+  it("changes a field type while preserving stable choice options", async () => {
+    const user = userEvent.setup();
+    render(<FormBuilder bundle={conditionalBundle} dynamicOptions={{ users: [], branches: [], departments: [], masters: [] }} onClose={() => {}} onSaved={async () => {}} />);
+
+    await user.click(screen.getByLabelText("Edit Metal"));
+    await user.selectOptions(screen.getByLabelText("Field type"), "checkbox");
+    expect((screen.getByLabelText("Field type") as HTMLSelectElement).value).toBe("checkbox");
+    expect(screen.getAllByText("Gold").length).toBeGreaterThan(0);
+    expect(screen.getByText(/first selected routed option/i)).toBeTruthy();
+  });
+
+  it("opens only one editor and jumps from the form outline", async () => {
+    const user = userEvent.setup();
+    render(<FormBuilder bundle={conditionalBundle} dynamicOptions={{ users: [], branches: [], departments: [], masters: [] }} onClose={() => {}} onSaved={async () => {}} />);
+
+    await user.click(screen.getByRole("button", { name: "Go to Gold purity" }));
+    expect(screen.getAllByLabelText("Question")).toHaveLength(1);
+    expect((screen.getByLabelText("Question") as HTMLInputElement).value).toBe("Gold purity");
+    await user.click(screen.getByRole("button", { name: "Go to Silver finish" }));
+    expect(screen.getAllByLabelText("Question")).toHaveLength(1);
+    expect((screen.getByLabelText("Question") as HTMLInputElement).value).toBe("Silver finish");
+  });
+
+  it("shows every question in the optional routing map and navigates back to a selected node", async () => {
+    const user = userEvent.setup();
+    render(<FormBuilder bundle={conditionalBundle} dynamicOptions={{ users: [], branches: [], departments: [], masters: [] }} onClose={() => {}} onSaved={async () => {}} />);
+
+    await user.click(screen.getByRole("button", { name: "Open routing map" }));
+    expect(screen.getByRole("dialog", { name: "Form routing map" })).toBeTruthy();
+    expect(screen.getByText("Start")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open Metal" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open Gold purity" })).toBeTruthy();
+    expect(screen.getByText("End")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Open Gold purity" }));
+    expect(screen.queryByRole("dialog", { name: "Form routing map" })).toBeNull();
+    expect((screen.getByLabelText("Question") as HTMLInputElement).value).toBe("Gold purity");
   });
 });
 
 describe("Form builder follow-up questions", () => {
-  it("maps each answer to a different later question and shows the route overview", async () => {
+  it("maps each answer to a different later question in an accessible routing graph", async () => {
     const user = userEvent.setup();
     render(<FormBuilder bundle={conditionalBundle} dynamicOptions={{ users: [], branches: [], departments: [], masters: [] }} onClose={() => {}} onSaved={async () => {}} />);
 
@@ -217,9 +302,12 @@ describe("Form builder follow-up questions", () => {
     await user.selectOptions(screen.getByLabelText("Route after Gold"), "question:gold_purity");
     await user.selectOptions(screen.getByLabelText("Route after Silver"), "question:silver_finish");
 
-    expect(screen.getAllByText("Gold -> Ask Gold purity").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Silver -> Ask Silver finish").length).toBeGreaterThan(0);
-    expect(screen.getByText("Routing overview")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Open routing map" }));
+    expect(screen.getByRole("dialog", { name: "Form routing map" })).toBeTruthy();
+    expect(screen.getAllByText("Gold").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Gold purity").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Silver").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Silver finish").length).toBeGreaterThan(0);
   });
 
   it("lets an author map a target question from an earlier question's real options", async () => {
@@ -235,7 +323,9 @@ describe("Form builder follow-up questions", () => {
     expect(answer.options[2]?.text).toBe("Silver");
 
     await user.selectOptions(answer, "gold");
-    expect(screen.getByText("Gold -> Ask Gold purity")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Open routing map" }));
+    expect(screen.getAllByText("Gold").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Gold purity").length).toBeGreaterThan(0);
   });
 
   it("opens the real form only in preview mode and returns to the builder", async () => {

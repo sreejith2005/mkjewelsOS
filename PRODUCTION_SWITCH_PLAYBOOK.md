@@ -1,6 +1,6 @@
 # JewelOS production switch playbook
 
-Last source review: 2026-08-20 (Asia/Kolkata)
+Last source review: 2026-08-29 (Asia/Kolkata)
 
 This is the release procedure for the active JewelOS repository. It separates
 what source code is configured to do from what has actually been verified in a
@@ -47,7 +47,7 @@ Web/mobile client  ---- HTTPS ---------> hosted Supabase project
 `index.html`. It does not prove that a Vercel project, domain, environment
 variables, or deployment is currently connected.
 
-Migrations `0001` through `0070` are in source. The database contains task,
+Migrations `0001` through `0109` are in source. The database contains task,
 forms, FMS, CRM, notification, report/export, roster, and operational-control
 contracts. Confirm the real linked project and migration history before every
 hosted write; do not infer it from this file or Git.

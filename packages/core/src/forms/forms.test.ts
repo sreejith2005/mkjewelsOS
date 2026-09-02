@@ -60,6 +60,11 @@ describe("Forms definition contract", () => {
     expect(validateFormDefinition(template([field("select", { options: opts("Option", " Option ") })]))).toEqual(expect.arrayContaining([expect.objectContaining({ code: "invalid_options" })]));
   });
 
+  it("accepts stable options on checkbox questions without requiring legacy checkboxes to have options", () => {
+    expect(validateFormDefinition(template([field("checkbox", { options: opts("Repair", "Cleaning") })]))).toEqual([]);
+    expect(validateFormDefinition(template([field("checkbox")]))).toEqual([]);
+  });
+
   it("rejects missing, forward, and self dependencies, which also prevents cycles", () => {
     const issues = validateFormDefinition(template([
       field("text", { key: "a", condition: { fieldKey: "b", operator: "equals", value: "yes" } }),
@@ -121,9 +126,18 @@ describe("Forms visibility and answer validation", () => {
     expect(validateFormField(conditional, undefined, { show: false })).toBeUndefined();
   });
 
-  it("requires a required checkbox to be true", () => {
+  it("keeps optionless legacy checkbox boolean validation", () => {
     expect(validateFormField(field("checkbox", { required: true }), false, {} as const)?.code).toBe("required");
     expect(validateFormField(field("checkbox", { required: true }), true, {} as const)).toBeUndefined();
+  });
+
+  it("validates option-backed checkbox questions as multi-answer arrays", () => {
+    const checkbox = field("checkbox", { required: true, options: opts("Repair", "Cleaning") });
+    expect(validateFormField(checkbox, [], {})?.code).toBe("required");
+    expect(validateFormField(checkbox, ["Repair", "Cleaning"], {})).toBeUndefined();
+    expect(validateFormField(checkbox, ["Repair", "Repair"], {})?.code).toBe("invalid_shape");
+    expect(validateFormField(checkbox, ["Unknown"], {})?.code).toBe("invalid_option");
+    expect(validateFormField(checkbox, true, {})?.code).toBe("invalid_shape");
   });
 
   it("accepts numerical zero and validates numeric and rating bounds", () => {
@@ -158,6 +172,7 @@ describe("Forms visibility and answer validation", () => {
     expect(validateFormField(field("text"), ["x"], {})?.code).toBe("invalid_shape");
     expect(validateFormField(field("number"), "1", {})?.code).toBe("invalid_shape");
     expect(validateFormField(field("checkbox"), "true", {})?.code).toBe("invalid_shape");
+    expect(validateFormField(field("checkbox", { options: opts("A") }), true, {})?.code).toBe("invalid_shape");
     expect(validateFormField(field("multiselect", { options: opts("A") }), "A", {})?.code).toBe("invalid_shape");
   });
 
@@ -194,7 +209,15 @@ describe("Forms answer normalization and formatting", () => {
   });
 
   it("formats from stable keys without storing a label-keyed duplicate", () => {
-    const rows = formatFormSubmission([field("currency", { key: "amount" }), field("checkbox", { key: "confirmed", sortOrder: 1 })], { amount: 1250, confirmed: true });
-    expect(rows.map((row) => [row.key, row.label, row.value])).toEqual([["amount", "currency", expect.stringContaining("1,250")], ["confirmed", "checkbox", "Yes"]]);
+    const rows = formatFormSubmission([
+      field("currency", { key: "amount" }),
+      field("checkbox", { key: "confirmed", sortOrder: 1 }),
+      field("checkbox", { key: "services", sortOrder: 2, options: [{ value: "repair", label: "Repair" }, { value: "clean", label: "Cleaning" }] }),
+    ], { amount: 1250, confirmed: true, services: ["repair", "clean"] });
+    expect(rows.map((row) => [row.key, row.label, row.value])).toEqual([
+      ["amount", "currency", expect.stringContaining("1,250")],
+      ["confirmed", "checkbox", "Yes"],
+      ["services", "checkbox", "Repair, Cleaning"],
+    ]);
   });
 });

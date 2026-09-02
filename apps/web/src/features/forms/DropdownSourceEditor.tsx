@@ -15,6 +15,7 @@ const masterKey = (name: string) => name.trim().toLowerCase().replace(/[^a-z0-9]
  */
 export function DropdownSourceEditor({ field, index, masterOptions, onPatch, onMasterCreated }: { field: FormFieldDefinition; index: number; masterOptions: MasterOption[]; onPatch: (index: number, patch: Partial<FormFieldDefinition>) => void; onMasterCreated: () => Promise<void> }) {
   const usingMaster = !!field.optionSource;
+  const checkbox = field.type === "checkbox";
   const [publishName, setPublishName] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
@@ -38,9 +39,9 @@ export function DropdownSourceEditor({ field, index, masterOptions, onPatch, onM
   };
 
   return <div className="space-y-3 rounded-lg border border-gold/15 bg-obsidian/40 p-3 sm:col-span-2">
-    <span className="label mb-0">Dropdown options</span>
+    <span className="label mb-0">{checkbox ? "Answer choices" : "Dropdown options"}</span>
     <div className="flex flex-wrap gap-4">
-      <label className="text-sm text-champagne"><input checked={!usingMaster} name={`source-${field.key}`} onChange={() => onPatch(index, { optionSource: undefined, options: options as readonly FormOption[] })} type="radio" /> Create new dropdown</label>
+      <label className="text-sm text-champagne"><input checked={!usingMaster} name={`source-${field.key}`} onChange={() => onPatch(index, { optionSource: undefined, options: options as readonly FormOption[] })} type="radio" /> {checkbox ? "Create answer choices" : "Create new dropdown"}</label>
       <label className="text-sm text-champagne"><input checked={usingMaster} name={`source-${field.key}`} onChange={() => onPatch(index, { optionSource: { kind: "master", masterType: field.optionSource?.masterType ?? categories[0] ?? "" }, options: undefined })} type="radio" /> Use existing Dropdown Master</label>
     </div>
 
@@ -54,7 +55,7 @@ export function DropdownSourceEditor({ field, index, masterOptions, onPatch, onM
       <p className="flex items-center gap-1.5 text-xs text-soft-grey"><Database className="size-3.5" />Options stay in sync with Dropdown Master.</p>
     </div> : <div className="space-y-3">
       <OptionListEditor onChange={(next) => onPatch(index, { options: next })} options={options} />
-      <label className="flex items-center gap-2 text-sm text-champagne"><input checked={addToMaster} disabled={!options.length} onChange={(event) => { setAddToMaster(event.target.checked); setPublishError(null); }} type="checkbox" /> Also add this dropdown to Dropdown Master</label>
+      <label className="flex items-center gap-2 text-sm text-champagne"><input checked={addToMaster} disabled={!options.length} onChange={(event) => { setAddToMaster(event.target.checked); setPublishError(null); }} type="checkbox" /> {checkbox ? "Also add these choices to Dropdown Master" : "Also add this dropdown to Dropdown Master"}</label>
       {addToMaster ? <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
         <Field label="Dropdown Master list name"><input className="field" onChange={(event) => setPublishName(event.target.value)} placeholder="e.g. Lead Source" value={publishName} /></Field>
         <Button className="min-h-10" disabled={publishing} onClick={() => void publish()} type="button" variant="secondary"><Plus className="size-4" />{publishing ? "Adding…" : "Add to Dropdown Master"}</Button>

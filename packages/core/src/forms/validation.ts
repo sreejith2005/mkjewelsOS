@@ -26,12 +26,13 @@ function isValidCalendarDate(value: string): boolean {
 export function validateFormField(field: FormFieldDefinition, value: FormAnswer | null | undefined, answers: FormAnswers): FormValidationIssue | undefined {
   if (LAYOUT_TYPES.has(field.type) || !isFormFieldVisible(field, answers)) return undefined;
   const canonicalValue = STRING_TYPES.has(field.type) && typeof value === "string" ? value.trim() : value;
-  if (field.required && (isEmptyFormValue(canonicalValue) || (field.type === "checkbox" && canonicalValue !== true))) return { code: "required", fieldKey: field.key, message: `${field.label} is required` };
+  const optionBackedCheckbox = field.type === "checkbox" && ((field.options?.length ?? 0) > 0 || field.optionSource !== undefined);
+  if (field.required && (isEmptyFormValue(canonicalValue) || (field.type === "checkbox" && !optionBackedCheckbox && canonicalValue !== true))) return { code: "required", fieldKey: field.key, message: `${field.label} is required` };
   if (isEmptyFormValue(canonicalValue)) return undefined;
   if (STRING_TYPES.has(field.type) && typeof canonicalValue !== "string") return { code: "invalid_shape", fieldKey: field.key, message: `${field.label} must be text` };
   if ((field.type === "number" || field.type === "currency" || field.type === "rating") && (typeof canonicalValue !== "number" || !Number.isFinite(canonicalValue))) return { code: "invalid_shape", fieldKey: field.key, message: `${field.label} must be a number` };
-  if (field.type === "checkbox" && typeof canonicalValue !== "boolean") return { code: "invalid_shape", fieldKey: field.key, message: `${field.label} must be true or false` };
-  if (field.type === "multiselect" && (!Array.isArray(canonicalValue) || canonicalValue.some((item) => typeof item !== "string") || new Set(canonicalValue).size !== canonicalValue.length)) return { code: "invalid_shape", fieldKey: field.key, message: `${field.label} must be a unique list of options` };
+  if (field.type === "checkbox" && !optionBackedCheckbox && typeof canonicalValue !== "boolean") return { code: "invalid_shape", fieldKey: field.key, message: `${field.label} must be true or false` };
+  if ((field.type === "multiselect" || optionBackedCheckbox) && (!Array.isArray(canonicalValue) || canonicalValue.some((item) => typeof item !== "string") || new Set(canonicalValue).size !== canonicalValue.length)) return { code: "invalid_shape", fieldKey: field.key, message: `${field.label} must be a unique list of options` };
   if (typeof canonicalValue === "string") {
     if (canonicalValue.length > 5000) return { code: "too_long", fieldKey: field.key, message: `${field.label} is too long` };
     if (field.type === "email" && !EMAIL.test(canonicalValue)) return { code: "invalid_email", fieldKey: field.key, message: `${field.label} must be a valid email` };

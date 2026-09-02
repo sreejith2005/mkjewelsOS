@@ -157,7 +157,7 @@ export function validateFormDefinition(template: FormTemplateDefinition): readon
       if (field.optionSource) {
         if (!field.optionSource.masterType.trim() || field.optionSource.masterType.length > 100) issues.push({ code: "invalid_option_source", fieldKey: field.key, message: "Choose a Dropdown Master list for this question" });
         if (options.length) issues.push({ code: "duplicated_option_source", fieldKey: field.key, message: "A Dropdown Master question must not copy the master options" });
-      } else if (options.length === 0 || options.length > 100
+      } else if ((options.length === 0 && field.type !== "checkbox") || options.length > 100
         || new Set(options.map((option) => option.value)).size !== options.length
         || options.some((option) => !option.value || !option.label || option.value.length > 200 || option.label.length > 200)) {
         issues.push({ code: "invalid_options", fieldKey: field.key, message: "Option fields require 1 to 100 uniquely identified options" });

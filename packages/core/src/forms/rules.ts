@@ -31,10 +31,8 @@ export function operatorsForFieldType(type: FormFieldDefinition["type"]): readon
       return ["equals", "not_equals", "greater_than", "greater_than_or_equal", "less_than", "less_than_or_equal", "not_empty", "is_empty"];
     case "select": case "radio": case "user_dropdown": case "branch_dropdown": case "department_dropdown":
       return ["equals", "not_equals", "in", "not_in", "not_empty", "is_empty"];
-    case "multiselect":
+    case "multiselect": case "checkbox":
       return ["contains", "not_contains", "in", "not_in", "not_empty", "is_empty"];
-    case "checkbox":
-      return ["equals", "not_equals"];
     default:
       return ["equals", "not_equals", "contains", "not_contains", "not_empty", "is_empty"];
   }

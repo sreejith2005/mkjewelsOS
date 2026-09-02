@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, type FormEvent } from "react";
 import { normalizeFormAnswers, resolveFormOptions, validateCompleteForm, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition } from "@jewelos/core";
 import { Button, Notice } from "@/components/ui";
 import { signedFormFileUrl, uploadFormFile } from "./api";
+import { RatingField } from "./RatingField";
 
 export type DynamicOptions = { users: Array<{ id: string; label: string }>; branches: Array<{ id: string; label: string }>; departments: Array<{ id: string; branchId: string | null; label: string }>; masters: FormMasterOption[] };
 const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: [], masters: [] };
@@ -85,6 +86,14 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
       <FileFieldControl disabled={disabled} field={field} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} templateId={templateId} value={answers[field.key]} />
     </label>; }
     const value = answers[field.key]; const disabled = readOnly || field.editable === false; const dynamic = optionsFor(field.type); const staticOptions = field.options ?? [];
+    const checkboxOptions = staticOptions.length ? staticOptions : dynamic.map((option) => ({ value: option.id, label: option.label }));
+    if (field.type === "checkbox" && checkboxOptions.length) {
+      const selected = Array.isArray(value) ? value : [];
+      return <fieldset className="space-y-2" key={field.key}><legend className="label">{field.label}{field.required ? " *" : ""}</legend>{field.helperText ? <p className="text-xs text-soft-grey">{field.helperText}</p> : null}
+        <div className="grid gap-2">{checkboxOptions.map((option, index) => <label className="flex min-h-10 items-center gap-3 rounded-lg border border-gold/15 px-3 py-2 text-sm text-champagne transition hover:border-gold/40" key={option.value}><input checked={selected.includes(option.value)} disabled={disabled} onChange={(event) => set(field.key, event.target.checked ? [...selected, option.value] : selected.filter((item) => item !== option.value))} ref={index === 0 ? register(field.key) : undefined} type="checkbox" />{option.label}</label>)}</div>
+      </fieldset>;
+    }
+    if (field.type === "rating") return <fieldset className="space-y-2" key={field.key}><legend className="label">{field.label}{field.required ? " *" : ""}</legend>{field.helperText ? <p className="text-xs text-soft-grey">{field.helperText}</p> : null}<RatingField disabled={disabled} label={field.label} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} value={typeof value === "number" ? value : undefined} /></fieldset>;
     const selectOptions = dynamic.length ? dynamic : staticOptions.map((option) => ({ id: option.value, label: option.label })); const inputType = NUMBER_TYPES.has(field.type) ? "number" : field.type === "datetime" ? "datetime-local" : field.type;
     const onText = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => { const raw = event.target.value; set(field.key, NUMBER_TYPES.has(field.type) ? (raw === "" ? "" : Number(raw)) : raw); };
     return <label className="block" key={field.key}><span className="label">{field.label}{field.required ? " *" : ""}</span>{field.helperText ? <span className="mb-1 block text-xs text-soft-grey">{field.helperText}</span> : null}

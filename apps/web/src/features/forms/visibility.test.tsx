@@ -100,7 +100,10 @@ describe("Authoring a conditional question", () => {
     expect(answer.options[1]?.text).toBe("Gold");
     expect(answer.options[2]?.text).toBe("Silver");
     await user.selectOptions(answer, "silver");
-    expect(screen.getAllByText("Silver -> Ask Karat").length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("button", { name: "Open routing map" }));
+    const map = screen.getByRole("dialog", { name: "Form routing map" });
+    expect(within(map).getByText("Silver")).toBeTruthy();
+    expect(within(map).getAllByText("Karat").length).toBeGreaterThan(0);
   });
 
   it("explains why the first question cannot have a previous-answer condition", async () => {
@@ -117,7 +120,7 @@ describe("Authoring a conditional question", () => {
     render(<FormBuilder bundle={bundle} dynamicOptions={dynamicOptions} onClose={() => undefined} onSaved={async () => undefined} />);
 
     const row = await openEditor(user, "Karat");
-    expect(within(row).queryByText("Advanced settings")).toBeNull();
+    expect(within(row).getByText("Advanced settings")).toBeTruthy();
     expect(within(row).queryByText("Add condition")).toBeNull();
     expect(within(row).queryByLabelText("Match all or any condition")).toBeNull();
   });
@@ -128,11 +131,10 @@ describe("Authoring a conditional question", () => {
 
     const row = await openEditor(user, "Karat");
     await user.selectOptions(within(row).getByLabelText("Show Karat when question"), "metal");
-    expect(screen.getAllByText("Gold -> Ask Karat").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: "Remove Metal" }));
-
-    expect(screen.queryByText("Gold -> Ask Karat")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Open routing map" }));
+    expect(within(screen.getByRole("dialog", { name: "Form routing map" })).queryByText("Gold")).toBeNull();
   });
 
   it("keeps internal keys out of the builder", async () => {

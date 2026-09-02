@@ -1,7 +1,7 @@
 # JewelOS technical handoff
 
-Last source audit: 2026-08-20 (Asia/Kolkata)
-Repository checkpoint: `884bb23` (`main`, clean before this documentation update)
+Last source audit: 2026-08-29 (Asia/Kolkata)
+Repository checkpoint: `5292f8c` (`main`, source checkpoint before this documentation update)
 
 This is the operational handoff for the current JewelOS codebase. It describes
 what the repository contains at the checkpoint above. It does **not** assert
@@ -127,7 +127,7 @@ and timing-rule execution where a human deadline is not meaningful.
 
 ## 4. Database and security state
 
-Migrations `0001` through `0070` are present. They are append-only history;
+Migrations `0001` through `0109` are present. They are append-only history;
 never edit an applied file. The major groups are:
 
 | Range | Contract |
@@ -139,6 +139,12 @@ never edit an applied file. The major groups are:
 | `0046-0056` | production identity/roster repair and controlled section maintenance |
 | `0057-0063` | FMS deletion, assignment notifications, week-off authority, automatic-stage timing, FMS forms and starter assignments |
 | `0064-0070` | audited CSV task import, optional categories, valid shared departments, immediate task alerts, task-RPC reconciliation and immediate recurring-task delivery |
+| `0071-0079` | CRM migration registry, field definitions, legacy mappings, staged import, historical timeline and visit-form preservation |
+| `0080-0083` | task bulk-import workspace, CRM sync ingestion, FMS runtime repair and CRM sync checkpoint reads |
+| `0084-0096` | centralized task coverage, recurring completion, direct assignee search, protected form completion, user credentials, roster and username-login controls |
+| `0097-0100` | designation daily checklists, validator repair, active-doer mutation restriction, and task deadline/evidence contracts |
+| `0101-0105` | resumable current-sheet task import, tenant realtime refresh, recurring catch-up, zero-touch imports, and organization fallback retries |
+| `0106-0109` | guarded demo-data retirement, settings mutation-key RLS, task-template management, and recurring to-do reference parity |
 
 RLS and minimum grants are the security boundary. Sensitive workflows use
 `SECURITY DEFINER` RPCs with in-function active profile/tenant/role checks and
@@ -180,9 +186,11 @@ unavailable does not justify calling database/RLS/RPC behaviour verified.
 4. **External delivery:** in-app task alerts are transactional. Outbox/provider
    delivery is a separate operational dependency and must be configured,
    authenticated, monitored, and tested without exposing secrets.
-5. **Quality gates:** source has no checked-in CI workflow under `.github` at
-   this checkpoint. Add CI and authenticated browser E2E coverage before a
-   frequent production release cadence.
+5. **Quality gates:** source includes a CI workflow for frozen install, core
+   and web unit tests, type checking, build, and whitespace validation. Its
+   hosted execution status and authenticated browser E2E coverage remain
+   unverified; add role-based browser coverage before a frequent production
+   release cadence.
 6. **Roster authority:** never run an authoritative roster apply that retires
    active accounts without explicit approval of the collision list.
 
