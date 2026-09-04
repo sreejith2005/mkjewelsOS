@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { kolkataDateKey } from "@jewelos/core";
 import {
   CalendarClock,
@@ -162,6 +162,29 @@ function WorkCard({
     await verifyRecurringTask(task.id, decision, note);
     await onChanged();
   };
+  // The image upload used to be fired with a bare .then(): a rejected RPC became
+  // an unhandled promise rejection, so a refused upload looked to the user like
+  // nothing had happened at all, however many times it was retried. The failure
+  // is now shown on the card, and the input is cleared so the same file can be
+  // picked again.
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const uploadImage = async (event: ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    const file = event.target.files?.[0];
+    if (!file || !profile) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      await completeRecurringTaskWithImage(profile.tenant_id, task.id, file);
+      await onChanged();
+    } catch (caught) {
+      setUploadError(caught instanceof Error ? caught.message : "Upload failed");
+    } finally {
+      setUploading(false);
+      input.value = "";
+    }
+  };
   const canComplete =
     task.checklist
       .filter((item) => item.is_required)
@@ -252,18 +275,11 @@ function WorkCard({
         {!task.requires_form && task.task_type === "delegation" && task.requires_upload && !task.has_attachment ? (
           <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-gold/30 px-4 py-2 text-sm font-semibold text-gold">
             <Upload className="size-4" />
-            Upload image to complete
+            {uploading ? "Uploading…" : "Upload image to complete"}
             <input
               className="sr-only"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file && profile)
-                  void completeRecurringTaskWithImage(
-                    profile.tenant_id,
-                    task.id,
-                    file,
-                  ).then(onChanged);
-              }}
+              disabled={uploading}
+              onChange={(event) => void uploadImage(event)}
               accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
               type="file"
             />
@@ -289,6 +305,7 @@ function WorkCard({
           </>
         ) : null}
       </div>
+      {uploadError ? <div className="mt-3"><Notice tone="danger">{uploadError}</Notice></div> : null}
     </article>
   );
 }

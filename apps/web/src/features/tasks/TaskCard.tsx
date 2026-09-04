@@ -43,7 +43,11 @@ export function TaskCard({ capability, categoryLabel, onAction, task: taskInput 
   const formOnlyAction = task.requires_form && !completed;
   const canComplete = checklistProgress.canCompleteRequiredItems && (!task.requires_upload || task.hasAttachment) && (!task.requires_form || task.hasFormSubmission);
   const canShowDirectComplete = !formOnlyAction && !readOnly && !completed && !blocked;
-  const canShowDirectUpload = canShowDirectComplete && task.requires_upload && !task.hasAttachment;
+  // The header upload button completes the task in one atomic RPC, so it may
+  // only be offered when every other precondition already holds. Offering it
+  // against an unfinished required checklist produced an upload that always
+  // failed, no matter how many times it was retried.
+  const canShowDirectUpload = canShowDirectComplete && task.requires_upload && !task.hasAttachment && checklistProgress.canCompleteRequiredItems;
   const act = async (action: TaskCardAction) => {
     setBusy(true);
     setError(null);
@@ -51,18 +55,26 @@ export function TaskCard({ capability, categoryLabel, onAction, task: taskInput 
       await onAction(action);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Task update failed");
+      setExpanded(true);
     } finally {
       setBusy(false);
     }
   };
   const upload = async (event: ChangeEvent<HTMLInputElement>, kind: "upload" | "upload_and_complete" = "upload") => {
+    const input = event.currentTarget;
     const file = event.target.files?.[0];
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024 || !["image/jpeg", "image/png", "application/pdf"].includes(file.type)) {
-      setError("Upload a JPG, PNG, or PDF up to 10 MB.");
+    if (file.size < 1 || file.size > 10 * 1024 * 1024 || !["image/jpeg", "image/png", "image/webp", "application/pdf"].includes(file.type)) {
+      setError("Upload a JPG, PNG, WebP, or PDF up to 10 MB.");
+      setExpanded(true);
+      input.value = "";
       return;
     }
-    await act({ kind, file });
+    try {
+      await act({ kind, file });
+    } finally {
+      input.value = "";
+    }
   };
   const statusLabel = completed ? "Completed" : blocked ? "Coverage required" : overdue ? "Overdue" : task.status === "in_progress" ? "In Progress" : "Pending";
   const StatusIcon = completed ? CheckCircle2 : blocked ? PauseCircle : overdue ? AlertTriangle : Clock;

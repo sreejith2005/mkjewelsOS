@@ -20,6 +20,7 @@ import { TaskCard, type TaskCardAction } from "@/features/tasks/TaskCard";
 import { TaskComposer } from "@/features/tasks/TaskComposer";
 import { TaskFilterBar } from "@/features/tasks/TaskFilterBar";
 import { prepareRecurringTasksThenLoad } from "@/features/tasks/taskRefresh";
+import { shouldShowTaskLoading } from "@/features/tasks/taskLoading";
 import { loadFormDynamicOptions, loadTaskForms, submitForm, type FormBundle } from "@/features/forms/api";
 import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
@@ -42,6 +43,7 @@ export function TasksPage() {
   const [formDynamicOptions, setFormDynamicOptions] = useState<DynamicOptions>({ users: [], branches: [], departments: [], masters: [] });
   const [formTarget, setFormTarget] = useState<TaskBundle | null>(null);
   const refreshGeneration = useRef(0);
+  const hasCompletedInitialLoad = useRef(false);
   const canManage = profile ? ["super_admin", "admin", "manager"].includes(profile.user_role) : false;
   const hasAdminTaskView = profile ? ["super_admin", "admin"].includes(profile.user_role) : false;
 
@@ -87,10 +89,14 @@ export function TasksPage() {
     } catch (caught) {
       if (generation === refreshGeneration.current) setError(caught instanceof Error ? caught.message : "Unable to load tasks");
     } finally {
-      if (generation === refreshGeneration.current) setLoading(false);
+      if (generation === refreshGeneration.current) {
+        hasCompletedInitialLoad.current = true;
+        setLoading(false);
+      }
     }
   }, [canManage, hasAdminTaskView, profile]);
 
+  useEffect(() => { hasCompletedInitialLoad.current = false; }, [profile?.id]);
   useEffect(() => { void refresh(); }, [refresh]);
   useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: TASK_TOPICS, refresh });
 
@@ -160,7 +166,7 @@ export function TasksPage() {
       <TaskFilterBar counts={counts} onStatusChange={setStatusFilter} status={statusFilter} />
 
       <div className="w-full p-3 sm:p-5">
-        {error ? <div className="flex flex-col gap-3 rounded-xl border border-danger/40 bg-danger/10 p-4"><Notice tone="danger">{error}</Notice><Button className="self-start border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={() => void refresh()} variant="secondary"><RefreshCw />Retry</Button></div> : loading ? <div aria-label="Loading tasks" className="flex flex-col gap-3">{[0, 1, 2].map((item) => <div className="h-28 animate-pulse rounded-2xl border border-task-border bg-task-muted" key={item} />)}</div> : scopedTasks.length === 0 ? <div className="flex min-h-[48dvh] flex-col items-center justify-center px-5 text-center"><span className="mb-5 flex size-20 items-center justify-center rounded-[1.75rem] bg-task-muted text-task-accent"><CheckCircle2 className="size-10" /></span><h2 className="text-2xl font-semibold text-task-text">No Tasks Here</h2><p className="mt-1 max-w-sm text-sm text-task-text-muted">It seems that you don’t have any tasks in this list.</p></div> : <div className="flex flex-col gap-3">{profile ? scopedTasks.map((task) => <TaskCard capability={deriveTaskMutationCapability({ assigneeIds: task.assignees.map((assignee) => assignee.id), isWatcher: task.isWatchedByViewer, viewerId: profile.id, viewerRole: profile.user_role })} categoryLabel={task.category_id ? categoryNames.get(task.category_id) ?? "Uncategorized" : "Uncategorized"} key={task.id} onAction={(action) => handleAction(task, action)} task={task} />) : null}</div>}
+        {error ? <div className="flex flex-col gap-3 rounded-xl border border-danger/40 bg-danger/10 p-4"><Notice tone="danger">{error}</Notice><Button className="self-start border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={() => void refresh()} variant="secondary"><RefreshCw />Retry</Button></div> : shouldShowTaskLoading(loading, hasCompletedInitialLoad.current) ? <div aria-label="Loading tasks" className="flex flex-col gap-3">{[0, 1, 2].map((item) => <div className="h-28 animate-pulse rounded-2xl border border-task-border bg-task-muted" key={item} />)}</div> : scopedTasks.length === 0 ? <div className="flex min-h-[48dvh] flex-col items-center justify-center px-5 text-center"><span className="mb-5 flex size-20 items-center justify-center rounded-[1.75rem] bg-task-muted text-task-accent"><CheckCircle2 className="size-10" /></span><h2 className="text-2xl font-semibold text-task-text">No Tasks Here</h2><p className="mt-1 max-w-sm text-sm text-task-text-muted">It seems that you don’t have any tasks in this list.</p></div> : <div className="flex flex-col gap-3">{profile ? scopedTasks.map((task) => <TaskCard capability={deriveTaskMutationCapability({ assigneeIds: task.assignees.map((assignee) => assignee.id), isWatcher: task.isWatchedByViewer, viewerId: profile.id, viewerRole: profile.user_role })} categoryLabel={task.category_id ? categoryNames.get(task.category_id) ?? "Uncategorized" : "Uncategorized"} key={task.id} onAction={(action) => handleAction(task, action)} task={task} />) : null}</div>}
       </div>
 
       {canManage ? <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-20 md:bottom-8 md:right-8">

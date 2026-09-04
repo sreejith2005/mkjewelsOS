@@ -35,4 +35,28 @@ describe("useTenantRealtimeRefresh", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(5); });
     expect(refresh).toHaveBeenCalledTimes(1);
   });
+
+  it("waits for an active refresh before applying a burst as one follow-up refresh", async () => {
+    vi.useFakeTimers();
+    let resolveFirstRefresh: (() => void) | undefined;
+    const refresh = vi.fn().mockImplementationOnce(() => new Promise<void>((resolve) => { resolveFirstRefresh = resolve; })).mockResolvedValue(undefined);
+    let listener: (() => void) | undefined;
+    subscription.subscribe.mockImplementation((_tenantId: string, _topics: string[], next: () => void) => {
+      listener = next;
+      return vi.fn();
+    });
+    render(<Probe refresh={refresh} />);
+
+    act(() => { listener?.(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(5); });
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    act(() => { listener?.(); listener?.(); listener?.(); listener?.(); listener?.(); listener?.(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(5); });
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    await act(async () => { resolveFirstRefresh?.(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(5); });
+    expect(refresh).toHaveBeenCalledTimes(2);
+  });
 });

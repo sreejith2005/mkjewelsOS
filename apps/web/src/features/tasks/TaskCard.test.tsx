@@ -103,4 +103,29 @@ describe("TaskCard direct completion", () => {
     await waitFor(() => expect(onAction).toHaveBeenCalledWith({ file, kind: "upload_and_complete" }));
     expect(screen.queryByRole("button", { name: "Complete task: Upload completion task" })).toBeNull();
   });
+
+  it("withholds the one-shot upload button while a required checklist item is outstanding", () => {
+    const onAction = vi.fn().mockResolvedValue(undefined);
+
+    render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, requires_upload: true, title: "Checklist upload task", checklists: [{ completed_at: null, completed_by: null, id: "item-1", is_completed: false, is_required: true, item_text: "Photograph the tray", sort_order: 1, task_instance_id: "task-1" }] }} />);
+
+    expect(screen.queryByLabelText("Upload task: Checklist upload task")).toBeNull();
+    expect(screen.getByRole("button", { name: "Complete task: Checklist upload task" })).toHaveProperty("disabled", true);
+  });
+
+  it("shows an upload failure and lets the user retry the same supported file", async () => {
+    const onAction = vi.fn().mockRejectedValueOnce(new Error("Upload failed")).mockResolvedValueOnce(undefined);
+    const file = new File(["evidence"], "evidence.webp", { type: "image/webp" });
+
+    render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, requires_upload: true, title: "Retry upload task" }} />);
+
+    const input = screen.getByLabelText("Upload task: Retry upload task") as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => expect(screen.getByText("Upload failed")).toBeTruthy());
+    expect(input.value).toBe("");
+
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(2));
+  });
 });
