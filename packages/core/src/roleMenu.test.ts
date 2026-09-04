@@ -23,8 +23,15 @@ describe("task workspace navigation", () => {
     expect(canAccessPage("super_admin", "recurring_todo")).toBe(true);
   });
 
-  it("makes employee progress reachable from Task Templates for leaders", () => {
-    expect(getMenuForRole("manager")).toContainEqual({ id: "task_templates", label: "Task Templates", path: "/task-templates" });
-    expect(getMenuForRole("hr")).toContainEqual({ id: "task_templates", label: "Task Templates", path: "/task-templates" });
+  it("gives leaders one Task Control destination for templates, progress and evidence", () => {
+    const item = { id: "task_templates", label: "Task Control", path: "/task-templates" };
+    expect(getMenuForRole("manager")).toContainEqual(item);
+    expect(getMenuForRole("hr")).toContainEqual(item);
+  });
+
+  it("retires the separate evidence destination into Task Control", () => {
+    expect(getPageForPath("/task-evidence")).toBe("task_templates");
+    expect(getMenuForRole("super_admin")).not.toContainEqual(expect.objectContaining({ id: "task_evidence" }));
+    expect(canAccessPage("manager", "task_evidence")).toBe(false);
   });
 });

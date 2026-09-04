@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-describe("Task Templates directory", () => {
+const templatesTab = () => import("@/features/taskControl/TemplatesTab?raw").then((module) => module.default);
+const page = () => import("./TaskTemplatesPage?raw").then((module) => module.default);
+
+describe("Task Control templates directory", () => {
   it("shows the reference column set and row actions", async () => {
-    const source = await import("./TaskTemplatesPage?raw").then((module) => module.default);
+    const source = await templatesTab();
     for (const header of [
       "User",
       "Department",
@@ -19,15 +22,13 @@ describe("Task Templates directory", () => {
     ]) {
       expect(source).toContain(`"${header}"`);
     }
-    for (const action of ["Edit", "Schedule", "Deactivate", "Delete", "Add Task", "Refresh", "Reset"]) {
+    for (const action of ["Edit", "Schedule", "Deactivate", "Delete"]) {
       expect(source).toContain(action);
     }
-    expect(source).toContain("All Departments");
-    expect(source).toContain("All Users");
   });
 
   it("keeps every table row on a single line", async () => {
-    const source = await import("./TaskTemplatesPage?raw").then((module) => module.default);
+    const source = await templatesTab();
 
     // The four actions wrapping is what turned each row into a four-line block,
     // so the table variant must stay nowrap and the cell must shrink to content.
@@ -40,13 +41,35 @@ describe("Task Templates directory", () => {
   });
 
   it("reads the directory through the audited RPC only", async () => {
-    const source = await import("./TaskTemplatesPage?raw").then((module) => module.default);
+    const source = await page();
 
     expect(source).toContain("loadTaskTemplateDirectory");
     expect(source).toContain("setTaskTemplateSchedule");
     expect(source).toContain("deleteTaskTemplate");
     expect(source).toContain("setRecurringTemplateActive");
-    expect(source).toContain('const canManageTemplates = profile ? ["super_admin", "admin"].includes(profile.user_role) : false');
-    expect(source).toContain("Employee Progress");
+    expect(source).toContain('const MANAGE_ROLES = ["super_admin", "admin"]');
+  });
+});
+
+describe("Task Control workspace", () => {
+  it("gathers progress, evidence and templates behind one shared filter", async () => {
+    const source = await page();
+
+    for (const panel of ["OverviewTab", "PeopleTab", "EvidenceTab", "TemplatesTab", "TaskControlFilterBar"]) {
+      expect(source).toContain(panel);
+    }
+    // One snapshot call, so the progress and evidence panels can never render
+    // numbers taken from two different filter states.
+    expect(source).toContain("fetchTaskControlSnapshot(filters, page, pageSize)");
+    expect(source).toContain("Add Task");
+    expect(source).toContain("Refresh");
+  });
+
+  it("reserves the workspace for authorized leaders and templates for admins", async () => {
+    const source = await page();
+
+    expect(source).toContain('const OVERSIGHT_ROLES = ["super_admin", "admin", "manager", "hr"]');
+    expect(source).toContain('tab !== "templates" || canManageTemplates');
+    expect(source).toContain("Task Control is available only to authorized leaders.");
   });
 });

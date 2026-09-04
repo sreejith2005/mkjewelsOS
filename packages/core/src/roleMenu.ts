@@ -18,6 +18,8 @@ export const PAGE_IDS = [
   "checklist_tasks",
   "recurring_todo",
   "task_templates",
+  // Retired as a destination: evidence is now a panel inside Task Control. The id
+  // stays because the database section-availability contract still declares it.
   "task_evidence",
   "delegation_tasks",
   "fms_tasks",
@@ -46,8 +48,7 @@ export const ALL_MENU_ITEMS: readonly MenuItem[] = [
   { id: "crm", label: "CRM", path: "/crm" },
   { id: "checklist_tasks", label: "Tasks", path: "/tasks" },
   { id: "recurring_todo", label: "Recurring / To-Do", path: "/recurring-todo" },
-  { id: "task_templates", label: "Task Templates", path: "/task-templates" },
-  { id: "task_evidence", label: "Task Evidence", path: "/task-evidence" },
+  { id: "task_templates", label: "Task Control", path: "/task-templates" },
   { id: "fms_builder", label: "FMS", path: "/fms" },
   { id: "forms_library", label: "Forms Library", path: "/forms" },
   { id: "meeting_ai", label: "Meeting AI", path: "/meeting-ai" },
@@ -75,7 +76,7 @@ const COMMON_WORK_PAGES: readonly PageId[] = [
 export const ROLE_PAGES: Readonly<Record<UserRole, readonly PageId[]>> = {
   super_admin: PAGE_IDS,
   admin: PAGE_IDS.filter((page) => page !== "dropdown_master"),
-  manager: [...COMMON_WORK_PAGES, "crm", "users", "reports", "task_templates", "task_evidence"],
+  manager: [...COMMON_WORK_PAGES, "crm", "users", "reports", "task_templates"],
   hr: [
     "home",
     "dashboard",
@@ -86,7 +87,6 @@ export const ROLE_PAGES: Readonly<Record<UserRole, readonly PageId[]>> = {
     "reports",
     "settings",
     "task_templates",
-    "task_evidence",
   ],
   crm: [...COMMON_WORK_PAGES, "crm", "reports"],
   staff: COMMON_WORK_PAGES,
@@ -116,6 +116,9 @@ export function canAccessPage(role: UserRole, page: PageId): boolean {
 }
 
 export function getPageForPath(path: string): PageId | undefined {
+  // Task evidence used to be its own destination; it is now a panel inside Task
+  // Control, so old links and bookmarks land on the workspace that absorbed it.
+  if (path === "/task-evidence") return "task_templates";
   if (path === "/tasks/checklist" || path === "/tasks/delegation" || path === "/tasks/import" || path === "/tasks/assigning-left") return "checklist_tasks";
   return ALL_MENU_ITEMS.find((item) => item.path === path)?.id;
 }

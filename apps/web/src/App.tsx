@@ -51,7 +51,6 @@ const CRMPage = lazyPage("crm", () => import("@/pages/CRMPage").then((module) =>
 const TasksPage = lazyPage("tasks", () => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
 const RecurringTodoPage = lazyPage("recurring-todo", () => import("@/pages/RecurringTodoPage").then((module) => ({ default: module.RecurringTodoPage })));
 const TaskTemplatesPage = lazyPage("task-templates", () => import("@/pages/TaskTemplatesPage").then((module) => ({ default: module.TaskTemplatesPage })));
-const TaskEvidencePage = lazyPage("task-evidence", () => import("@/pages/TaskEvidencePage").then((module) => ({ default: module.TaskEvidencePage })));
 const TaskBulkImportPage = lazyPage("task-bulk-import", () => import("@/pages/TaskBulkImportPage").then((module) => ({ default: module.TaskBulkImportPage })));
 const AssigningLeftPage = lazyPage("assigning-left", () => import("@/pages/AssigningLeftPage").then((module) => ({ default: module.AssigningLeftPage })));
 const TeamDirectoryPage = lazyPage("team-directory", () => import("@/pages/TeamDirectoryPage").then((module) => ({ default: module.TeamDirectoryPage })));
@@ -85,7 +84,6 @@ const IMPLEMENTED_PAGES = new Set<PageId>([
   "checklist_tasks",
   "recurring_todo",
   "task_templates",
-  "task_evidence",
   "users",
   "availability",
   "dropdown_master",
@@ -105,7 +103,6 @@ const FULL_WIDTH_PAGES = new Set<PageId>([
   "checklist_tasks",
   "recurring_todo",
   "task_templates",
-  "task_evidence",
   "reports",
   "settings",
   "fms_builder",
@@ -121,8 +118,7 @@ const APP_DESCRIPTIONS: Partial<Record<PageId, string>> = {
   users: "Browse employees by department and manage authorized accounts.",
   availability: "Record real working availability.",
   recurring_todo: "Manage recurring schedules, personal work, verification, follow-ups, and coverage.",
-  task_templates: "Review, schedule, and manage every user's task templates in one place.",
-  task_evidence: "Track every file uploaded against a task and every upload still outstanding.",
+  task_templates: "Track progress, chase overdue work, review evidence, and manage every task template in one place.",
   dropdown_master: "Maintain active master values.",
   reports: "Preview fixed reports and manage private CSV exports.",
   settings: "Manage account preferences and authorized organization defaults.",
@@ -311,7 +307,7 @@ function AppShell() {
   const allowed = IMPLEMENTED_PAGES.has(requestedPage) && canAccessPage(profile.user_role, requestedPage);
   const currentPage: PageId = allowed ? requestedPage : "dashboard";
   const sectionUnderMaintenance = !isSuperAdmin && isSectionUnderMaintenance(sectionControls, currentPage);
-  const pageContent = sectionUnderMaintenance ? <SectionMaintenanceNotice section={currentPage === "checklist_tasks" ? "Tasks" : currentPage === "forms_library" ? "Forms Library" : currentPage === "fms_builder" ? "FMS" : currentPage === "dropdown_master" ? "Dropdown Master" : currentPage === "fms_tasks" ? "FMS Tasks" : currentPage === "task_templates" ? "Task Templates" : currentPage.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())} /> : currentPage === "home" ? <HomePage onNavigate={navigate} />
+  const pageContent = sectionUnderMaintenance ? <SectionMaintenanceNotice section={currentPage === "checklist_tasks" ? "Tasks" : currentPage === "forms_library" ? "Forms Library" : currentPage === "fms_builder" ? "FMS" : currentPage === "dropdown_master" ? "Dropdown Master" : currentPage === "fms_tasks" ? "FMS Tasks" : currentPage === "task_templates" ? "Task Control" : currentPage.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())} /> : currentPage === "home" ? <HomePage onNavigate={navigate} />
     : currentPage === "dashboard" ? <DashboardPage />
     : currentPage === "reports" ? <ReportsPage />
     : currentPage === "settings" ? <><SettingsPage /><div className="mx-auto w-full max-w-7xl px-4 pb-8"><DailyChecklistManager role={profile.user_role} /></div></>
@@ -321,7 +317,6 @@ function AppShell() {
       : currentPage === "checklist_tasks" ? path === "/tasks/import" ? <TaskBulkImportPage onBack={() => navigate("/tasks")} /> : path === "/tasks/assigning-left" ? <AssigningLeftPage /> : <TasksPage />
       : currentPage === "recurring_todo" ? <RecurringTodoPage />
       : currentPage === "task_templates" ? <TaskTemplatesPage />
-      : currentPage === "task_evidence" ? <TaskEvidencePage />
       : currentPage === "availability" ? <AvailabilityPage />
           : currentPage === "forms_library" ? <FormsPage />
             : currentPage === "fms_tasks" ? <FMSTasksPage />

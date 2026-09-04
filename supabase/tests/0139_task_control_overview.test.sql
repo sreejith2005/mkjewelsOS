@@ -1,0 +1,12 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path=public,extensions;
+select plan(6);
+select has_function('public','get_employee_task_progress',array['jsonb'],'employee progress RPC still exists');
+select function_privs_are('public','get_employee_task_progress',array['jsonb'],'authenticated',array['EXECUTE'],'authenticated keeps the protected progress grant');
+select is((select prosecdef from pg_proc where oid='public.get_employee_task_progress(jsonb)'::regprocedure),true,'employee progress stays security definer');
+select ok(position($$'overdue'$$ in pg_get_functiondef('public.get_employee_task_progress(jsonb)'::regprocedure))>0,'progress reports an overdue count');
+select ok(position($$user_profile_id=v_user$$ in pg_get_functiondef('public.get_employee_task_progress(jsonb)'::regprocedure))>0,'progress accepts the shared user filter');
+select ok(position($$v_branch:=v_actor.branch_id$$ in pg_get_functiondef('public.get_employee_task_progress(jsonb)'::regprocedure))>0,'manager scope is still narrowed to the caller branch');
+select * from finish();
+rollback;
