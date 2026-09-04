@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -5592,6 +5592,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "task_import_identity_aliases_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_import_identity_aliases_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "task_import_identity_aliases_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -5599,10 +5613,31 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "task_import_identity_aliases_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_import_identity_aliases_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "task_import_identity_aliases_user_profile_id_fkey"
             columns: ["user_profile_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_import_identity_aliases_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
         ]
@@ -7856,6 +7891,10 @@ export type Database = {
         Args: { p_batch_id: string; p_rows: Json }
         Returns: Json
       }
+      commit_task_bulk_import_chunk_v0130: {
+        Args: { p_batch_id: string; p_rows: Json }
+        Returns: Json
+      }
       complete_crm_followup: {
         Args: {
           p_expected_version: number
@@ -7939,6 +7978,15 @@ export type Database = {
       }
       create_form_revision_with_audit: {
         Args: { p_payload?: Json; p_source_template_id: string }
+        Returns: string
+      }
+      create_manual_task_with_mode_with_audit: {
+        Args: {
+          p_checklist: Json
+          p_doer_ids: string[]
+          p_payload: Json
+          p_watcher_ids: string[]
+        }
         Returns: string
       }
       create_recurring_task_instance: {
@@ -8078,6 +8126,49 @@ export type Database = {
         Args: { p_template_id: string }
         Returns: Json
       }
+      demo_data_purge_actor: {
+        Args: { p_actor_auth_user_id: string }
+        Returns: {
+          account_status: Database["public"]["Enums"]["user_account_status"]
+          auth_user_id: string
+          branch_id: string
+          buddy_id: string | null
+          created_at: string | null
+          created_by: string | null
+          department_id: string
+          designation_id: string | null
+          email: string
+          employee_code: string
+          employee_name: string
+          first_name: string | null
+          id: string
+          is_login_enabled: boolean | null
+          last_name: string | null
+          official_email: string | null
+          official_mobile: string | null
+          personal_email: string | null
+          personal_mobile: string | null
+          reports_to_user_id: string | null
+          secondary_buddy_id: string | null
+          tenant_id: string
+          updated_at: string | null
+          updated_by: string | null
+          user_role: Database["public"]["Enums"]["user_role"]
+          username: string | null
+          week_off: string[]
+          working_status: Database["public"]["Enums"]["working_status"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      demo_data_purge_counts: {
+        Args: { p_actor_auth_user_id: string }
+        Returns: Json
+      }
       detect_crm_followup_events: {
         Args: { p_limit?: number; p_now?: string }
         Returns: {
@@ -8184,15 +8275,6 @@ export type Database = {
         Args: { p_rule: Json; p_tenant_id: string }
         Returns: string
       }
-      fms_stage_route_target: {
-        Args: {
-          p_instance_id: string
-          p_instance_stage_id: string
-          p_outcome: string
-          p_stage_id: string
-        }
-        Returns: string
-      }
       fms_stage_deadline_for_instance: {
         Args: { p_instance_id: string; p_rule: Json; p_tenant_id: string }
         Returns: string
@@ -8204,6 +8286,15 @@ export type Database = {
           p_stage_id: string
         }
         Returns: boolean
+      }
+      fms_stage_route_target: {
+        Args: {
+          p_instance_id: string
+          p_instance_stage_id: string
+          p_outcome: string
+          p_stage_id: string
+        }
+        Returns: string
       }
       fms_status_condition_matches: {
         Args: { p_actual: string; p_expected: string; p_operator: string }
@@ -8254,6 +8345,7 @@ export type Database = {
         Returns: Json
       }
       get_dashboard_metrics: { Args: { p_context?: Json }; Returns: Json }
+      get_employee_task_progress: { Args: { p_context?: Json }; Returns: Json }
       get_form_upload_path: { Args: { p_file_id: string }; Returns: string }
       get_home_summary: { Args: { p_context?: Json }; Returns: Json }
       get_my_daily_checklist_status: { Args: never; Returns: Json }
@@ -8620,6 +8712,14 @@ export type Database = {
         Args: { p_template_id: string }
         Returns: string
       }
+      purge_demo_data: {
+        Args: {
+          p_actor_auth_user_id: string
+          p_confirmation: string
+          p_modules: string[]
+        }
+        Returns: Json
+      }
       queue_fms_starter_assignments: {
         Args: { p_assigned_by: string; p_flow_id: string }
         Returns: undefined
@@ -8647,10 +8747,6 @@ export type Database = {
         Args: { p_date: string; p_reason?: string; p_user_profile_id: string }
         Returns: Json
       }
-      reconcile_task_import_assignments: {
-        Args: { p_rows: Json }
-        Returns: Json
-      }
       reconcile_duplicate_production_identity_profiles: {
         Args: never
         Returns: undefined
@@ -8661,6 +8757,10 @@ export type Database = {
       }
       reconcile_short_deadline_coverage_with_audit: {
         Args: { p_date: string; p_reason?: string; p_user_profile_id: string }
+        Returns: Json
+      }
+      reconcile_task_import_assignments: {
+        Args: { p_rows: Json }
         Returns: Json
       }
       record_availability_range_with_audit: {
@@ -9309,18 +9409,21 @@ export type Database = {
         Args: { p_value: string }
         Returns: string
       }
-      task_import_fingerprint_row: {
-        Args: { p_row: Json }
-        Returns: Json
-      }
+      task_import_fingerprint_row: { Args: { p_row: Json }; Returns: Json }
+      task_import_legacy_checklist_row: { Args: { p_row: Json }; Returns: Json }
       task_import_normalized_identity_label: {
         Args: { p_value: string }
         Returns: string
       }
-      task_import_resolve_assignee: {
-        Args: { p_row: Json }
-        Returns: string
+      task_import_repair_checklist_headline: {
+        Args: {
+          p_actor_user_id: string
+          p_headline: string
+          p_registry_id: string
+        }
+        Returns: number
       }
+      task_import_resolve_assignee: { Args: { p_row: Json }; Returns: string }
       task_in_reporting_scope: {
         Args: {
           p_actor: Database["public"]["Tables"]["user_profiles"]["Row"]

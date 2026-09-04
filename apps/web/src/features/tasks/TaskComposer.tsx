@@ -28,6 +28,7 @@ export function TaskComposer({ data, onClose, onCreated, onSave, onUploadAttachm
 }) {
   const [panel, setPanel] = useState<Panel>(null);
   const [title, setTitle] = useState("");
+  const [taskMode, setTaskMode] = useState<"task" | "checklist">("task");
   const [description, setDescription] = useState("");
   const [planned, setPlanned] = useState("");
   const [priority, setPriority] = useState<Enums<"task_priority">>("high");
@@ -86,11 +87,12 @@ export function TaskComposer({ data, onClose, onCreated, onSave, onUploadAttachm
         priority,
         branch_id: selectedDoer.branch_id,
         department_id: selectedDoer.department_id,
-        requires_upload: false,
+        task_type: taskMode === "task" ? "delegation" : "checklist",
+        requires_upload: taskMode === "task",
         requires_remark: false,
         requires_form: Boolean(formTemplateId),
         form_template_id: formTemplateId,
-      }, [...participants.doerIds], [...participants.watcherIds], checklist.map((item, sort_order) => ({ item_text: item, is_required: true, sort_order })));
+      }, [...participants.doerIds], [...participants.watcherIds], taskMode === "checklist" ? checklist.map((item, sort_order) => ({ item_text: item, is_required: true, sort_order })) : []);
       if (attachment) await onUploadAttachment(taskId, attachment);
       toast.success("Task assigned", { description: `Sent to ${participants.doerIds.length} user${participants.doerIds.length === 1 ? "" : "s"}.` });
       onCreated();
@@ -120,10 +122,11 @@ export function TaskComposer({ data, onClose, onCreated, onSave, onUploadAttachm
             <span className="sr-only">Task description</span>
             <textarea className="min-h-24 w-full resize-y rounded-xl bg-task-muted p-3 text-base md:text-sm text-task-text placeholder:text-task-text-muted focus-visible:ring-task-accent" onChange={(event) => setDescription(event.target.value)} placeholder="Add Description" value={description} />
           </label>
-          <section className="border-b border-task-border py-3">
+          <fieldset className="border-b border-task-border py-3"><legend className="mb-2 text-sm font-semibold text-task-text">Task type</legend><div className="grid grid-cols-2 gap-2"><button aria-pressed={taskMode === "task"} className={cn("min-h-11 rounded-lg border px-3 text-sm", taskMode === "task" ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border text-task-text-muted")} onClick={() => { setTaskMode("task"); setChecklist([]); setChecklistOpen(false); }} type="button">Task — upload to complete</button><button aria-pressed={taskMode === "checklist"} className={cn("min-h-11 rounded-lg border px-3 text-sm", taskMode === "checklist" ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border text-task-text-muted")} onClick={() => setTaskMode("checklist")} type="button">Checklist — tick every item</button></div></fieldset>
+          {taskMode === "checklist" ? <section className="border-b border-task-border py-3">
             <button aria-expanded={checklistOpen} className="flex min-h-11 w-full items-center justify-between text-sm font-semibold text-task-text" onClick={() => setChecklistOpen((current) => !current)} type="button"><span className="flex items-center gap-2"><Plus className="size-4" />Add Checklist</span><ChevronDown className={cn("size-4 transition-transform", checklistOpen ? "rotate-180" : "")} /></button>
             {checklistOpen ? <div className="mt-2 space-y-2"><input className="task-field" onChange={(event) => setChecklistDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addChecklistItem(); } }} placeholder="Type and hit Enter" value={checklistDraft} />{checklist.map((item, index) => <div className="flex items-center gap-3 rounded-xl border border-task-border bg-task-muted px-3 py-2 text-sm text-task-text" key={`${item}-${index}`}><input aria-label={`Required checklist item ${index + 1}`} checked readOnly type="checkbox" /><span className="min-w-0 flex-1 truncate">{item}</span><button aria-label={`Remove checklist item ${index + 1}`} className="text-task-text-muted hover:text-task-text" onClick={() => setChecklist((current) => current.filter((_, itemIndex) => itemIndex !== index))} type="button"><X className="size-4" /></button></div>)}</div> : null}
-          </section>
+          </section> : null}
 
           <div className="grid grid-cols-2 gap-2 border-b border-task-border py-3">
             <TaskSelector id="users" open={panel === "users"} panel={usersPanel}><ChipSelector active={panel === "users"} Icon={Users} label="Users" onClick={() => togglePanel("users")} summary={doers.length ? `${doers.length} user${doers.length === 1 ? "" : "s"}` : undefined} /></TaskSelector>

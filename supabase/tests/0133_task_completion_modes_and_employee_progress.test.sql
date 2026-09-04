@@ -1,0 +1,11 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path=public,extensions;
+select plan(5);
+select has_function('public','create_manual_task_with_mode_with_audit',array['jsonb','uuid[]','uuid[]','jsonb'],'explicit manual task mode RPC exists');
+select has_function('public','get_employee_task_progress',array['jsonb'],'employee progress RPC exists');
+select function_privs_are('public','create_manual_task_with_mode_with_audit',array['jsonb','uuid[]','uuid[]','jsonb'],'authenticated',array['EXECUTE'],'authenticated receives the protected creation grant');
+select function_privs_are('public','get_employee_task_progress',array['jsonb'],'authenticated',array['EXECUTE'],'authenticated receives the protected progress grant');
+select is((select prosecdef from pg_proc where oid='public.get_employee_task_progress(jsonb)'::regprocedure),true,'employee progress is security definer');
+select * from finish();
+rollback;

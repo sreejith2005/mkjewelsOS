@@ -7,5 +7,8 @@ describe("HomeView work queue", () => {
     expect(source).not.toContain("Your day at a glance");
     expect(source).not.toContain("Quick Actions");
     expect(source).toContain("Action required");
+    expect(source).not.toContain("openTasks.slice(0, 4)");
+    expect(source).toContain("All open tasks");
+    expect(source).toContain("overflow-y-auto");
   });
 });

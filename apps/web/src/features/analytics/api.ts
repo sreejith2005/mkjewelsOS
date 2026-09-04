@@ -1,8 +1,9 @@
 import {supabase} from "@jewelos/api-client";
-import type {DashboardPayload,HomeSummary} from "./types";
+import type {DashboardPayload,EmployeeProgress,HomeSummary} from "./types";
 
 export async function fetchHomeSummary():Promise<HomeSummary>{const [summary,starters]=await Promise.all([supabase.rpc("get_home_summary",{p_context:{}}),supabase.rpc("get_my_fms_starter_assignments")]);if(summary.error)throw summary.error;if(starters.error)throw starters.error;return {...summary.data as unknown as HomeSummary,fms_starters:(starters.data??[]) as HomeSummary["fms_starters"]};}
 export async function fetchDashboardMetrics(context:Readonly<Record<string,string>>):Promise<DashboardPayload>{const {data,error}=await supabase.rpc("get_dashboard_metrics",{p_context:context});if(error)throw error;return data as unknown as DashboardPayload;}
+export async function fetchEmployeeTaskProgress(context:Readonly<Record<string,string>>):Promise<EmployeeProgress>{const {data,error}=await supabase.rpc("get_employee_task_progress" as never,{p_context:context} as never);if(error)throw error;return data as EmployeeProgress;}
 
 export type ReportingOptions = {
   branches: Array<{id:string;name:string}>;

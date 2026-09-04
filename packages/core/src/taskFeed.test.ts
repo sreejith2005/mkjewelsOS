@@ -29,7 +29,7 @@ describe("task feed presentation", () => {
       task("progress", "user-1", "in_progress"),
       task("done", "user-1", "completed", "2026-08-06T12:00:00.000Z"),
     ];
-    expect(countTaskFeedStatuses(tasks, now)).toEqual({ all: 4, overdue: 1, pending: 2 });
+    expect(countTaskFeedStatuses(tasks, now)).toEqual({ completed: 1, open: 3, overdue: 1, pending: 2 });
     expect(taskMatchesStatus(tasks[0]!, "overdue", now)).toBe(true);
     expect(taskMatchesStatus(tasks[0]!, "pending", now)).toBe(false);
     expect(taskMatchesStatus(tasks[2]!, "pending", now)).toBe(true);

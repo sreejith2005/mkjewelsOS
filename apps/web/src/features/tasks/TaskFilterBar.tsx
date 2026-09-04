@@ -2,7 +2,7 @@ import type { TaskFeedStatusFilter } from "@jewelos/core";
 import { cn } from "@/lib/utils";
 
 const STATUS_DOT: Record<TaskFeedStatusFilter, string> = {
-  all: "bg-task-text-muted",
+  completed: "bg-success",
   overdue: "bg-task-overdue",
   pending: "border-2 border-task-overdue bg-task-bg",
 };
@@ -12,7 +12,7 @@ export function TaskFilterBar({ counts, onStatusChange, status }: {
   onStatusChange: (value: TaskFeedStatusFilter) => void;
   status: TaskFeedStatusFilter;
 }) {
-  const filters: TaskFeedStatusFilter[] = ["pending", "overdue", "all"];
+  const filters: TaskFeedStatusFilter[] = ["pending", "overdue", "completed"];
   return (
     <section aria-label="Task filters" className="border-b border-task-border bg-task-bg">
       <div className="grid grid-cols-3 bg-task-accent-soft px-1 pt-1">

@@ -128,7 +128,6 @@ export function TasksPage() {
     else if (action.kind === "revise") await reviseTask(task.id, action.datetime, action.reason);
     else if (action.kind === "checklist") await updateTask(task.id, "checklist", { checklistId: action.checklistId, completed: action.completed });
     else if (action.kind === "complete") await updateTask(task.id, "complete", { remark: action.remark });
-    else await updateTask(task.id, "start");
     await refresh();
   };
 
@@ -141,8 +140,8 @@ export function TasksPage() {
 
       <div className="scroll-x no-scrollbar flex items-stretch gap-2 border-b border-task-border bg-task-bg px-3 pt-3 sm:px-5">
         {([
-          ["mine", "My Tasks", myTasks.length],
-          ["delegated", "Delegated", delegatedTasks.length],
+          ["mine", "My Tasks", countTaskFeedStatuses(myTasks).open],
+          ["delegated", "Delegated", countTaskFeedStatuses(delegatedTasks).open],
         ] as const).map(([view, label, count]) => <button
           aria-pressed={workspaceView === view}
           className={`relative min-h-11 shrink-0 px-3 pb-3 text-sm font-semibold ${workspaceView === view ? "text-task-text after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-task-accent" : "text-task-text-muted"}`}

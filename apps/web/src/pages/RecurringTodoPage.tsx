@@ -122,8 +122,8 @@ function WorkCard({
   const { profile } = useAuth();
   const isOwnWork = task.assignees.some((assignee) => assignee.id === profile?.id);
   const canVerify = canManage || task.verifier_user_profile_id === profile?.id;
-  const act = async (action: "start" | "complete") => {
-    if (action === "complete") {
+  const act = async () => {
+    {
       // The doer's own remark, never a placeholder: a template that requires a
       // remark and an on-behalf completion both have to be explained.
       const needsRemark = Boolean(task.requires_remark) || !isOwnWork;
@@ -140,8 +140,6 @@ function WorkCard({
         "complete",
         entered?.trim() ? { remark: entered.trim() } : undefined,
       );
-    } else {
-      await updateTask(task.id, "start");
     }
     await onChanged();
   };
@@ -244,17 +242,9 @@ function WorkCard({
       ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
         {task.requires_form && task.status !== "completed" && task.coverage_status !== "coverage_required" ? <Button disabled={!task.form_template_id} onClick={() => window.dispatchEvent(new CustomEvent("recurring-form-request", { detail: task }))}><CheckCircle2 className="size-4" />Complete form</Button> : null}
-        {!task.requires_form && task.task_type === "checklist" && task.status !== "completed" ? <Button aria-label="Complete checklist" onClick={() => void act("complete")}><CheckCircle2 className="size-4" />Complete checklist</Button> : null}
-        {!task.requires_form && task.task_type !== "checklist" &&
-        (task.status === "pending" || task.status === "rejected") &&
-        task.coverage_status !== "coverage_required" ? (
-          <Button onClick={() => void act("start")} variant="secondary">
-            <Play className="size-4" />
-            Start
-          </Button>
-        ) : null}
-        {!task.requires_form && task.task_type !== "checklist" && task.status === "in_progress" && canComplete ? (
-          <Button onClick={() => void act("complete")}>
+        {!task.requires_form && task.task_type === "checklist" && task.status !== "completed" ? <Button aria-label="Complete checklist" onClick={() => void act()}><CheckCircle2 className="size-4" />Complete checklist</Button> : null}
+        {!task.requires_form && task.task_type !== "checklist" && task.status !== "completed" && task.coverage_status !== "coverage_required" && canComplete ? (
+          <Button onClick={() => void act()}>
             <CheckCircle2 className="size-4" />
             Complete
           </Button>

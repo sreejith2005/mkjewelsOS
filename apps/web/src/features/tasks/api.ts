@@ -281,15 +281,15 @@ export async function createDelegationTask(
   watcherIds: string[],
   checklist: Json,
 ): Promise<string> {
-  const { data, error } = await supabase.rpc("create_delegation_task_with_audit", {
+  const { data, error } = await supabase.rpc("create_manual_task_with_mode_with_audit" as never, {
     p_payload: payload,
     p_doer_ids: doerIds,
     p_watcher_ids: watcherIds,
     p_checklist: checklist,
-  });
+  } as never);
   fail("Create delegation task", error);
   if (!data) throw new Error("Task creation did not return an identifier");
-  return data;
+  return data as string;
 }
 
 export async function saveTaskTemplate(templateId: string | null, payload: Json): Promise<void> {
@@ -310,7 +310,7 @@ export async function createFromTemplate(templateId: string, plannedDatetime: st
 
 export async function updateTask(
   taskId: string,
-  action: "start" | "checklist" | "complete",
+  action: "checklist" | "complete",
   options: { checklistId?: string; completed?: boolean; remark?: string } = {},
 ): Promise<void> {
   const { error } = await supabase.rpc("update_task_with_audit", {

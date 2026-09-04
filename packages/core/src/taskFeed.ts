@@ -1,6 +1,6 @@
 import { calculateSla } from "./sla";
 
-export type TaskFeedStatusFilter = "all" | "overdue" | "pending";
+export type TaskFeedStatusFilter = "completed" | "overdue" | "pending";
 
 export type TaskFeedLike = Readonly<{
   actual_datetime: string | null;
@@ -73,7 +73,7 @@ export function taskMatchesStatus(
   filter: TaskFeedStatusFilter,
   now: Date | string = new Date(),
 ): boolean {
-  if (filter === "all") return true;
+  if (filter === "completed") return task.status === "completed";
   const overdue = isTaskFeedItemOverdue(task, now);
   if (filter === "overdue") return overdue;
   return !overdue && task.status !== "completed";
@@ -81,11 +81,12 @@ export function taskMatchesStatus(
 
 export function countTaskFeedStatuses(tasks: readonly TaskFeedLike[], now: Date | string = new Date()) {
   return tasks.reduce((counts, task) => {
-    counts.all += 1;
+    if (task.status === "completed") counts.completed += 1;
+    else counts.open += 1;
     if (isTaskFeedItemOverdue(task, now)) counts.overdue += 1;
     else if (task.status !== "completed") counts.pending += 1;
     return counts;
-  }, { all: 0, overdue: 0, pending: 0 });
+  }, { completed: 0, open: 0, overdue: 0, pending: 0 });
 }
 
 /** Keeps the strict current-day board focused while retaining independently overdue work. */
