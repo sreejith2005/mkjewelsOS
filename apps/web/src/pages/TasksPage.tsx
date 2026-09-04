@@ -11,6 +11,7 @@ import {
   loadTaskFeedReferenceData,
   reviseTask,
   updateTask,
+  uploadAndCompleteTask,
   uploadTaskAttachment,
   type TaskBundle,
   type TaskReferenceData,
@@ -122,8 +123,7 @@ export function TasksPage() {
     if (action.kind === "fill_form") { setFormTarget(task); return; }
     if (action.kind === "upload") await uploadTaskAttachment(profile.tenant_id, task.id, action.file);
     else if (action.kind === "upload_and_complete") {
-      await uploadTaskAttachment(profile.tenant_id, task.id, action.file);
-      await updateTask(task.id, "complete");
+      await uploadAndCompleteTask(profile.tenant_id, task.id, action.file);
     }
     else if (action.kind === "revise") await reviseTask(task.id, action.datetime, action.reason);
     else if (action.kind === "checklist") await updateTask(task.id, "checklist", { checklistId: action.checklistId, completed: action.completed });

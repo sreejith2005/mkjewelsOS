@@ -370,6 +370,29 @@ export async function uploadTaskAttachment(
   }
 }
 
+/** Upload object first, then atomically record evidence and complete its normal task. */
+export async function uploadAndCompleteTask(tenantId: string, taskId: string, file: File): Promise<void> {
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `${tenantId}/${taskId}/${crypto.randomUUID()}-${safeName}`;
+  const { error: uploadError } = await supabase.storage.from("task-attachments").upload(path, file, {
+    cacheControl: "3600",
+    contentType: file.type,
+    upsert: false,
+  });
+  fail("Upload task attachment", uploadError);
+  const { error } = await supabase.rpc("complete_uploaded_task_with_audit" as never, {
+    p_task_id: taskId,
+    p_file_url: path,
+  } as never);
+  if (!error) return;
+  try {
+    await supabase.storage.from("task-attachments").remove([path]);
+  } catch {
+    // Preserve the authoritative completion error if best-effort object cleanup fails.
+  }
+  throw new Error(error.message);
+}
+
 export async function completeRecurringTaskWithImage(tenantId: string, taskId: string, file: File): Promise<void> {
   const extension = file.name.toLowerCase().match(/\.[a-z0-9]+$/)?.[0];
   if (!extension || ![".jpg", ".jpeg", ".png", ".webp"].includes(extension) || !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) throw new Error("Upload a JPEG, PNG, or WebP image no larger than 5 MiB.");
