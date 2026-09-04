@@ -22,4 +22,9 @@ describe("task workspace navigation", () => {
     expect(canAccessPage("staff", "recurring_todo")).toBe(false);
     expect(canAccessPage("super_admin", "recurring_todo")).toBe(true);
   });
+
+  it("makes employee progress reachable from Task Templates for leaders", () => {
+    expect(getMenuForRole("manager")).toContainEqual({ id: "task_templates", label: "Task Templates", path: "/task-templates" });
+    expect(getMenuForRole("hr")).toContainEqual({ id: "task_templates", label: "Task Templates", path: "/task-templates" });
+  });
 });

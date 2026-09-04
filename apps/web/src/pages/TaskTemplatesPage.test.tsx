@@ -46,6 +46,7 @@ describe("Task Templates directory", () => {
     expect(source).toContain("setTaskTemplateSchedule");
     expect(source).toContain("deleteTaskTemplate");
     expect(source).toContain("setRecurringTemplateActive");
-    expect(source).toContain('["super_admin", "admin"].includes(profile.user_role)');
+    expect(source).toContain('const canManageTemplates = profile ? ["super_admin", "admin"].includes(profile.user_role) : false');
+    expect(source).toContain("Employee Progress");
   });
 });

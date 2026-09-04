@@ -7,6 +7,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { Button, Field, Modal, Notice } from "@/components/ui";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { TaskTemplateForm } from "@/features/tasks/TaskForms";
+import { EmployeeProgressPanel } from "@/features/analytics/EmployeeProgressPanel";
 import { loadTaskAuthoringReferenceData, type TaskReferenceData, type TaskTemplate } from "@/features/tasks/api";
 import { materializeRecurringTemplate, saveRecurringTemplate, setRecurringTemplateActive } from "@/features/recurringTodo/api";
 import {
@@ -125,7 +126,9 @@ function RowActions({
 
 export function TaskTemplatesPage() {
   const { profile } = useAuth();
-  const authorized = profile ? ["super_admin", "admin"].includes(profile.user_role) : false;
+  const authorized = profile ? ["super_admin", "admin", "manager", "hr"].includes(profile.user_role) : false;
+  const canManageTemplates = profile ? ["super_admin", "admin"].includes(profile.user_role) : false;
+  const progressOnly = profile ? ["manager", "hr"].includes(profile.user_role) : false;
   const [rows, setRows] = useState<TaskTemplateDirectoryRow[]>([]);
   const [references, setReferences] = useState<TaskReferenceData | null>(null);
   const [search, setSearch] = useState("");
@@ -137,9 +140,13 @@ export function TaskTemplatesPage() {
   const [editing, setEditing] = useState<TaskTemplate | null | undefined>(undefined);
   const [scheduling, setScheduling] = useState<TaskTemplateDirectoryRow | null>(null);
   const [scheduleDate, setScheduleDate] = useState(todayKey());
+  const [showEmployeeProgress, setShowEmployeeProgress] = useState(false);
 
   const load = useCallback(async () => {
-    if (!authorized) return;
+    if (!canManageTemplates) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -154,7 +161,7 @@ export function TaskTemplatesPage() {
     } finally {
       setLoading(false);
     }
-  }, [authorized, search]);
+  }, [canManageTemplates, search]);
 
   useEffect(() => {
     void load();
@@ -257,7 +264,8 @@ export function TaskTemplatesPage() {
     });
   };
 
-  if (!authorized) return <Notice tone="danger">Task Templates is available only to administrators.</Notice>;
+  if (!authorized) return <Notice tone="danger">Employee progress is available only to authorized leaders.</Notice>;
+  const employeeProgressVisible = progressOnly || showEmployeeProgress;
 
   const headers = [
     "User",
@@ -283,24 +291,28 @@ export function TaskTemplatesPage() {
               <ListChecks className="size-5" />
             </span>
             <div>
-              <h1 className="font-display text-2xl sm:text-3xl text-gold">Task Templates</h1>
-              <p className="text-sm text-soft-grey">Recurring rules, schedules and source-linked task templates.</p>
+              <h1 className="font-display text-2xl sm:text-3xl text-gold">{employeeProgressVisible ? "Employee Task Progress" : "Task Templates"}</h1>
+              <p className="text-sm text-soft-grey">{employeeProgressVisible ? "Assigned, completed, and remaining work in your authorized scope." : "Recurring rules, schedules and source-linked task templates."}</p>
             </div>
           </div>
           <div className="flex gap-2">
-            <Button onClick={() => setEditing(null)}>
+            {!progressOnly ? <Button className="bg-gold text-obsidian hover:bg-gold/90" onClick={() => setShowEmployeeProgress(true)}>
+              Employee Progress
+            </Button> : null}
+            {canManageTemplates ? <Button onClick={() => setEditing(null)}>
               <Plus className="size-4" />
               Add Task
-            </Button>
-            <Button onClick={() => void load()} variant="secondary">
+            </Button> : null}
+            {canManageTemplates ? <Button onClick={() => void load()} variant="secondary">
               <RefreshCw className="size-4" />
               Refresh
-            </Button>
+            </Button> : null}
           </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-[100rem] space-y-4 p-4 sm:p-6">
+        {employeeProgressVisible ? <section className="space-y-4">{canManageTemplates ? <div className="flex justify-end"><Button onClick={() => setShowEmployeeProgress(false)} variant="secondary">Back to templates</Button></div> : null}<EmployeeProgressPanel context={{ preset: "today" }} role={profile!.user_role} /></section> : <>
         {error ? <Notice tone="danger">{error}</Notice> : null}
 
         <div className="grid gap-3 rounded-2xl border border-task-border bg-charcoal p-4 md:grid-cols-[1fr_1fr_1fr_auto]">
@@ -458,6 +470,7 @@ export function TaskTemplatesPage() {
             </div>
           </>
         )}
+        </>}
       </div>
 
       {editing !== undefined && references ? (

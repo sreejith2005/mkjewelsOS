@@ -73,7 +73,7 @@ const COMMON_WORK_PAGES: readonly PageId[] = [
 export const ROLE_PAGES: Readonly<Record<UserRole, readonly PageId[]>> = {
   super_admin: PAGE_IDS,
   admin: PAGE_IDS.filter((page) => page !== "dropdown_master"),
-  manager: [...COMMON_WORK_PAGES, "crm", "users", "reports"],
+  manager: [...COMMON_WORK_PAGES, "crm", "users", "reports", "task_templates"],
   hr: [
     "home",
     "dashboard",
@@ -83,6 +83,7 @@ export const ROLE_PAGES: Readonly<Record<UserRole, readonly PageId[]>> = {
     "availability",
     "reports",
     "settings",
+    "task_templates",
   ],
   crm: [...COMMON_WORK_PAGES, "crm", "reports"],
   staff: COMMON_WORK_PAGES,
