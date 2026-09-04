@@ -5326,6 +5326,9 @@ export type Database = {
           created_at: string | null
           file_url: string
           id: string
+          mime_type: string | null
+          original_filename: string | null
+          size_bytes: number | null
           task_instance_id: string
           uploaded_by: string | null
         }
@@ -5333,6 +5336,9 @@ export type Database = {
           created_at?: string | null
           file_url: string
           id?: string
+          mime_type?: string | null
+          original_filename?: string | null
+          size_bytes?: number | null
           task_instance_id: string
           uploaded_by?: string | null
         }
@@ -5340,6 +5346,9 @@ export type Database = {
           created_at?: string | null
           file_url?: string
           id?: string
+          mime_type?: string | null
+          original_filename?: string | null
+          size_bytes?: number | null
           task_instance_id?: string
           uploaded_by?: string | null
         }
@@ -7918,6 +7927,10 @@ export type Database = {
         Args: { p_file_url: string; p_task_id: string }
         Returns: undefined
       }
+      complete_uploaded_task_with_audit: {
+        Args: { p_file_url: string; p_task_id: string }
+        Returns: undefined
+      }
       configure_invited_profile_coverage_with_audit: {
         Args: {
           p_creator_profile_id: string
@@ -8383,6 +8396,11 @@ export type Database = {
         Returns: Json
       }
       get_section_availability: { Args: never; Returns: Json }
+      get_task_attachment_path: {
+        Args: { p_attachment_id: string }
+        Returns: string
+      }
+      get_task_evidence_workspace: { Args: { p_filter?: Json }; Returns: Json }
       get_task_import_batch_status: {
         Args: { p_batch_id: string }
         Returns: Json
@@ -9353,6 +9371,10 @@ export type Database = {
       sync_crm_contacts: {
         Args: { p_actor: string; p_client_id: string }
         Returns: undefined
+      }
+      task_attachment_display_name: {
+        Args: { p_storage_path: string }
+        Returns: string
       }
       task_bulk_import_validation: {
         Args: { p_hash: string; p_payload: Json }

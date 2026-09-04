@@ -5,6 +5,7 @@ import {
   CheckSquare,
   ClipboardList,
   FileSpreadsheet,
+  FolderCheck,
   GitBranch,
   Home,
   LayoutDashboard,
@@ -50,6 +51,7 @@ const CRMPage = lazyPage("crm", () => import("@/pages/CRMPage").then((module) =>
 const TasksPage = lazyPage("tasks", () => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
 const RecurringTodoPage = lazyPage("recurring-todo", () => import("@/pages/RecurringTodoPage").then((module) => ({ default: module.RecurringTodoPage })));
 const TaskTemplatesPage = lazyPage("task-templates", () => import("@/pages/TaskTemplatesPage").then((module) => ({ default: module.TaskTemplatesPage })));
+const TaskEvidencePage = lazyPage("task-evidence", () => import("@/pages/TaskEvidencePage").then((module) => ({ default: module.TaskEvidencePage })));
 const TaskBulkImportPage = lazyPage("task-bulk-import", () => import("@/pages/TaskBulkImportPage").then((module) => ({ default: module.TaskBulkImportPage })));
 const AssigningLeftPage = lazyPage("assigning-left", () => import("@/pages/AssigningLeftPage").then((module) => ({ default: module.AssigningLeftPage })));
 const TeamDirectoryPage = lazyPage("team-directory", () => import("@/pages/TeamDirectoryPage").then((module) => ({ default: module.TeamDirectoryPage })));
@@ -63,6 +65,7 @@ const PAGE_ICONS: Record<PageId, typeof Home> = {
   checklist_tasks: CheckSquare,
   recurring_todo: CalendarCheck,
   task_templates: ListChecks,
+  task_evidence: FolderCheck,
   delegation_tasks: ClipboardList,
   fms_tasks: GitBranch,
   fms_builder: GitBranch,
@@ -82,6 +85,7 @@ const IMPLEMENTED_PAGES = new Set<PageId>([
   "checklist_tasks",
   "recurring_todo",
   "task_templates",
+  "task_evidence",
   "users",
   "availability",
   "dropdown_master",
@@ -101,6 +105,7 @@ const FULL_WIDTH_PAGES = new Set<PageId>([
   "checklist_tasks",
   "recurring_todo",
   "task_templates",
+  "task_evidence",
   "reports",
   "settings",
   "fms_builder",
@@ -117,6 +122,7 @@ const APP_DESCRIPTIONS: Partial<Record<PageId, string>> = {
   availability: "Record real working availability.",
   recurring_todo: "Manage recurring schedules, personal work, verification, follow-ups, and coverage.",
   task_templates: "Review, schedule, and manage every user's task templates in one place.",
+  task_evidence: "Track every file uploaded against a task and every upload still outstanding.",
   dropdown_master: "Maintain active master values.",
   reports: "Preview fixed reports and manage private CSV exports.",
   settings: "Manage account preferences and authorized organization defaults.",
@@ -315,6 +321,7 @@ function AppShell() {
       : currentPage === "checklist_tasks" ? path === "/tasks/import" ? <TaskBulkImportPage onBack={() => navigate("/tasks")} /> : path === "/tasks/assigning-left" ? <AssigningLeftPage /> : <TasksPage />
       : currentPage === "recurring_todo" ? <RecurringTodoPage />
       : currentPage === "task_templates" ? <TaskTemplatesPage />
+      : currentPage === "task_evidence" ? <TaskEvidencePage />
       : currentPage === "availability" ? <AvailabilityPage />
           : currentPage === "forms_library" ? <FormsPage />
             : currentPage === "fms_tasks" ? <FMSTasksPage />

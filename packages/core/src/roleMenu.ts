@@ -18,6 +18,7 @@ export const PAGE_IDS = [
   "checklist_tasks",
   "recurring_todo",
   "task_templates",
+  "task_evidence",
   "delegation_tasks",
   "fms_tasks",
   "fms_builder",
@@ -46,6 +47,7 @@ export const ALL_MENU_ITEMS: readonly MenuItem[] = [
   { id: "checklist_tasks", label: "Tasks", path: "/tasks" },
   { id: "recurring_todo", label: "Recurring / To-Do", path: "/recurring-todo" },
   { id: "task_templates", label: "Task Templates", path: "/task-templates" },
+  { id: "task_evidence", label: "Task Evidence", path: "/task-evidence" },
   { id: "fms_builder", label: "FMS", path: "/fms" },
   { id: "forms_library", label: "Forms Library", path: "/forms" },
   { id: "meeting_ai", label: "Meeting AI", path: "/meeting-ai" },
@@ -73,7 +75,7 @@ const COMMON_WORK_PAGES: readonly PageId[] = [
 export const ROLE_PAGES: Readonly<Record<UserRole, readonly PageId[]>> = {
   super_admin: PAGE_IDS,
   admin: PAGE_IDS.filter((page) => page !== "dropdown_master"),
-  manager: [...COMMON_WORK_PAGES, "crm", "users", "reports", "task_templates"],
+  manager: [...COMMON_WORK_PAGES, "crm", "users", "reports", "task_templates", "task_evidence"],
   hr: [
     "home",
     "dashboard",
@@ -84,6 +86,7 @@ export const ROLE_PAGES: Readonly<Record<UserRole, readonly PageId[]>> = {
     "reports",
     "settings",
     "task_templates",
+    "task_evidence",
   ],
   crm: [...COMMON_WORK_PAGES, "crm", "reports"],
   staff: COMMON_WORK_PAGES,

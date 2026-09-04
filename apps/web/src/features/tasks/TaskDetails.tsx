@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { calculateTaskChecklistProgress } from "@jewelos/core";
 import type { TaskBundle } from "./api";
+import { TaskAttachmentList } from "./TaskAttachmentList";
 
 const FREQUENCY_LABEL: Record<string, string> = {
   as_required: "As Required",
@@ -98,5 +99,6 @@ export function TaskDetails({ statusLabel, task }: { statusLabel: string; task: 
           <dd className="mt-0.5 text-sm text-task-text">{value}</dd>
         </div>)}
     </dl>
+    {task.hasAttachment && task.id ? <TaskAttachmentList taskId={task.id} /> : null}
   </div>;
 }
