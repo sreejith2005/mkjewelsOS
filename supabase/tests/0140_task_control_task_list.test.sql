@@ -1,0 +1,13 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path=public,extensions;
+select plan(7);
+select has_function('public','get_task_evidence_workspace',array['jsonb'],'workspace RPC still exists');
+select function_privs_are('public','get_task_evidence_workspace',array['jsonb'],'authenticated',array['EXECUTE'],'authenticated keeps the protected workspace grant');
+select is((select prosecdef from pg_proc where oid='public.get_task_evidence_workspace(jsonb)'::regprocedure),true,'workspace stays security definer');
+select ok(position($$'tasks',tasks.value$$ in pg_get_functiondef('public.get_task_evidence_workspace(jsonb)'::regprocedure))>0,'workspace returns the task page');
+select ok(position($$'attachments',coalesce($$ in pg_get_functiondef('public.get_task_evidence_workspace(jsonb)'::regprocedure))>0,'each task carries its own evidence inline');
+select ok(position($$Task view is invalid$$ in pg_get_functiondef('public.get_task_evidence_workspace(jsonb)'::regprocedure))>0,'the task view is validated against a fixed list');
+select ok(position($$v_branch:=v_actor.branch_id$$ in pg_get_functiondef('public.get_task_evidence_workspace(jsonb)'::regprocedure))>0,'manager scope is still narrowed to the caller branch');
+select * from finish();
+rollback;

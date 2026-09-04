@@ -1,7 +1,7 @@
 import { fetchEmployeeTaskProgress, fetchReportingOptions, type ReportingOptions } from "@/features/analytics/api";
 import type { EmployeeProgress, ProgressCounts } from "@/features/analytics/types";
 import { fetchTaskEvidenceWorkspace } from "@/features/taskEvidence/api";
-import type { EvidenceWorkspace } from "@/features/taskEvidence/types";
+import type { EvidenceWorkspace, TaskView } from "@/features/taskEvidence/types";
 import { evidenceFilter, progressContext, type TaskControlFilters } from "./filters";
 
 /**
@@ -22,12 +22,13 @@ export type TaskControlSnapshot = Readonly<{ progress: EmployeeProgress; evidenc
  */
 export async function fetchTaskControlSnapshot(
   filters: TaskControlFilters,
+  view: TaskView,
   page: number,
   pageSize: number,
 ): Promise<TaskControlSnapshot> {
   const [progress, evidence] = await Promise.all([
     fetchEmployeeTaskProgress(progressContext(filters)),
-    fetchTaskEvidenceWorkspace(evidenceFilter(filters, page, pageSize)),
+    fetchTaskEvidenceWorkspace(evidenceFilter(filters, view, page, pageSize)),
   ]);
   return {
     progress: { employees: counts(progress.employees), departments: counts(progress.departments), branches: counts(progress.branches) },

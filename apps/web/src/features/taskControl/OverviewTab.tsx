@@ -116,8 +116,8 @@ export function OverviewTab({
                 </li>
               ))}
             </ul>
-            <button className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-gold hover:underline" onClick={() => onOpenTab("evidence")} type="button">
-              Open evidence workspace <ArrowRight className="size-3" />
+            <button className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-gold hover:underline" onClick={() => onOpenTab("tasks")} type="button">
+              Open the full task list <ArrowRight className="size-3" />
             </button>
           </>
         )}

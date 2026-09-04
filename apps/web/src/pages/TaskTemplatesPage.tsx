@@ -16,7 +16,7 @@ import {
 } from "@/features/taskTemplates/api";
 import { fetchReportingOptions, fetchTaskControlSnapshot, type ReportingOptions, type TaskControlSnapshot } from "@/features/taskControl/api";
 import { TaskControlFilterBar } from "@/features/taskControl/FilterBar";
-import { EvidenceTab } from "@/features/taskControl/EvidenceTab";
+import { TasksTab } from "@/features/taskControl/TasksTab";
 import { OverviewTab } from "@/features/taskControl/OverviewTab";
 import { PeopleTab } from "@/features/taskControl/PeopleTab";
 import { TemplatesTab } from "@/features/taskControl/TemplatesTab";
@@ -24,6 +24,7 @@ import {
   defaultFilters, rangeIsValid, tenantToday, TASK_CONTROL_TABS,
   type TaskControlFilters, type TaskControlTab,
 } from "@/features/taskControl/filters";
+import type { TaskView } from "@/features/taskEvidence/types";
 import { errorMessage } from "@/lib/format";
 
 const OVERSIGHT_ROLES = ["super_admin", "admin", "manager", "hr"];
@@ -33,14 +34,14 @@ const BRANCH_SELECT_ROLES = ["super_admin", "admin", "hr"];
 const TAB_LABELS: Readonly<Record<TaskControlTab, string>> = {
   overview: "Overview",
   people: "People",
-  evidence: "Evidence",
+  tasks: "Tasks",
   templates: "Templates",
 };
 
 const TAB_DESCRIPTIONS: Readonly<Record<TaskControlTab, string>> = {
   overview: "Who is behind, what is overdue, and which evidence is still missing.",
   people: "Assigned, completed, remaining and overdue work for every person in scope.",
-  evidence: "Every file uploaded against a task, and every upload still outstanding.",
+  tasks: "Every task assigned in scope — checklist and upload alike — with its evidence on the row.",
   templates: "Recurring rules, schedules and source-linked task templates.",
 };
 
@@ -74,6 +75,7 @@ export function TaskTemplatesPage() {
 
   const [tab, setTab] = useState<TaskControlTab>(() => initialTab(tabs));
   const [filters, setFilters] = useState<TaskControlFilters>(() => defaultFilters());
+  const [view, setView] = useState<TaskView>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
@@ -109,13 +111,13 @@ export function TaskTemplatesPage() {
     setSnapshotLoading(true);
     setSnapshotError(null);
     try {
-      setSnapshot(await fetchTaskControlSnapshot(filters, page, pageSize));
+      setSnapshot(await fetchTaskControlSnapshot(filters, view, page, pageSize));
     } catch (caught) {
       setSnapshotError(errorMessage(caught));
     } finally {
       setSnapshotLoading(false);
     }
-  }, [authorized, filters, page, pageSize]);
+  }, [authorized, filters, page, pageSize, view]);
 
   const loadTemplates = useCallback(async () => {
     if (!canManageTemplates) return;
@@ -293,7 +295,7 @@ export function TaskTemplatesPage() {
           onChange={changeFilters}
           onReset={() => changeFilters(defaultFilters())}
           options={options}
-          showSearch={tab === "evidence" || tab === "templates"}
+          showSearch={tab === "tasks" || tab === "templates"}
           users={users}
         />
 
@@ -313,18 +315,20 @@ export function TaskTemplatesPage() {
               <OverviewTab
                 evidence={snapshot.evidence}
                 onOpenTab={changeTab}
-                onSelectUser={(row) => focusUser(row.user_profile_id, "people")}
+                onSelectUser={(row) => focusUser(row.user_profile_id, "tasks")}
                 progress={snapshot.progress}
               />
             ) : tab === "people" ? (
-              <PeopleTab onSelectUser={(row) => focusUser(row.user_profile_id, "evidence")} progress={snapshot.progress} />
+              <PeopleTab onSelectUser={(row) => focusUser(row.user_profile_id, "tasks")} progress={snapshot.progress} />
             ) : (
-              <EvidenceTab
+              <TasksTab
                 evidence={snapshot.evidence}
                 onPage={setPage}
                 onPageSize={(size) => { setPageSize(size); setPage(1); }}
+                onView={(next) => { setView(next); setPage(1); }}
                 page={page}
                 pageSize={pageSize}
+                view={view}
               />
             )
           ) : null}

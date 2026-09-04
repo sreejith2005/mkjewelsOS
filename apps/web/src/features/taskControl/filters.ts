@@ -1,3 +1,5 @@
+import type { TaskView } from "@/features/taskEvidence/types";
+
 /**
  * The Task Control workspace runs every panel -- overview, people, evidence and
  * templates -- off one filter object. Both server contracts it calls
@@ -5,7 +7,7 @@
  * same keys, so the translation below is a projection, never a re-interpretation.
  */
 
-export const TASK_CONTROL_TABS = ["overview", "people", "evidence", "templates"] as const;
+export const TASK_CONTROL_TABS = ["overview", "people", "tasks", "templates"] as const;
 export type TaskControlTab = (typeof TASK_CONTROL_TABS)[number];
 
 export const RANGE_PRESETS = ["today", "last_7_days", "last_30_days", "this_month", "custom"] as const;
@@ -75,10 +77,11 @@ export function progressContext(filters: TaskControlFilters): Record<string, str
 
 export function evidenceFilter(
   filters: TaskControlFilters,
+  view: TaskView,
   page: number,
   pageSize: number,
 ): Record<string, string | number> {
-  const filter: Record<string, string | number> = { ...scopeKeys(filters), page, page_size: pageSize };
+  const filter: Record<string, string | number> = { ...scopeKeys(filters), view, page, page_size: pageSize };
   if (filters.search.trim()) filter.search = filters.search.trim();
   return filter;
 }

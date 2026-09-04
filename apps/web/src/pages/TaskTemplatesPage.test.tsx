@@ -55,12 +55,12 @@ describe("Task Control workspace", () => {
   it("gathers progress, evidence and templates behind one shared filter", async () => {
     const source = await page();
 
-    for (const panel of ["OverviewTab", "PeopleTab", "EvidenceTab", "TemplatesTab", "TaskControlFilterBar"]) {
+    for (const panel of ["OverviewTab", "PeopleTab", "TasksTab", "TemplatesTab", "TaskControlFilterBar"]) {
       expect(source).toContain(panel);
     }
     // One snapshot call, so the progress and evidence panels can never render
     // numbers taken from two different filter states.
-    expect(source).toContain("fetchTaskControlSnapshot(filters, page, pageSize)");
+    expect(source).toContain("fetchTaskControlSnapshot(filters, view, page, pageSize)");
     expect(source).toContain("Add Task");
     expect(source).toContain("Refresh");
   });

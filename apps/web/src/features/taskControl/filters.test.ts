@@ -28,14 +28,15 @@ describe("task control filters", () => {
   it("projects the same scope into both server contracts", () => {
     const filters = { ...base, branch_id: "b1", user_profile_id: "u1", search: "  audit  " };
     expect(progressContext(filters)).toEqual({ from: "2026-03-01", to: "2026-03-18", branch_id: "b1", user_profile_id: "u1" });
-    expect(evidenceFilter(filters, 2, 25)).toEqual({
-      from: "2026-03-01", to: "2026-03-18", branch_id: "b1", user_profile_id: "u1", page: 2, page_size: 25, search: "audit",
+    expect(evidenceFilter(filters, "awaiting_evidence", 2, 25)).toEqual({
+      from: "2026-03-01", to: "2026-03-18", branch_id: "b1", user_profile_id: "u1",
+      view: "awaiting_evidence", page: 2, page_size: 25, search: "audit",
     });
   });
 
   it("omits empty scope keys and an empty search rather than sending blanks", () => {
     expect(progressContext(base)).toEqual({ from: "2026-03-01", to: "2026-03-18" });
-    expect(evidenceFilter({ ...base, search: "   " }, 1, 10)).not.toHaveProperty("search");
+    expect(evidenceFilter({ ...base, search: "   " }, "all", 1, 10)).not.toHaveProperty("search");
   });
 
   it("rejects inverted and over-long ranges before the server does", () => {
