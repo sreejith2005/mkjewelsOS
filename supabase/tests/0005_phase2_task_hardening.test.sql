@@ -468,18 +468,23 @@ values
   ('71000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001','50000000-0000-0000-0000-000000000001','delegation','Required checklist gate','2026-08-12 09:00 Asia/Kolkata',false,false,false,null,'40000000-0000-0000-0000-000000000001'),
   ('71000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001','50000000-0000-0000-0000-000000000001','delegation','Required upload gate','2026-08-12 09:00 Asia/Kolkata',true,false,false,null,'40000000-0000-0000-0000-000000000001'),
   ('71000000-0000-0000-0000-000000000003','10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001','50000000-0000-0000-0000-000000000001','delegation','Required form gate','2026-08-12 09:00 Asia/Kolkata',false,false,true,'60000000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000001'),
-  ('71000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001','50000000-0000-0000-0000-000000000001','delegation','Required remark gate','2026-08-12 09:00 Asia/Kolkata',false,true,false,null,'40000000-0000-0000-0000-000000000001');
+  ('71000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001','50000000-0000-0000-0000-000000000001','delegation','Required remark gate','2026-08-12 09:00 Asia/Kolkata',false,true,false,null,'40000000-0000-0000-0000-000000000001'),
+  ('71000000-0000-0000-0000-000000000005','10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001','50000000-0000-0000-0000-000000000001','delegation','Outstanding checklist','2026-08-12 09:00 Asia/Kolkata',false,false,false,null,'40000000-0000-0000-0000-000000000001');
 insert into task_assignees (task_instance_id,user_profile_id,role_at_task,is_active)
 select id,'40000000-0000-0000-0000-000000000004','doer',true from task_instances where id::text like '71000000%';
 insert into task_checklists (id,task_instance_id,item_text,is_required,is_completed,sort_order)
-values ('72000000-0000-0000-0000-000000000001','71000000-0000-0000-0000-000000000001','Required item',true,false,0);
+values ('72000000-0000-0000-0000-000000000001','71000000-0000-0000-0000-000000000001','Required item',true,false,0),
+  ('72000000-0000-0000-0000-000000000002','71000000-0000-0000-0000-000000000005','Outstanding required item',true,false,0);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000004', true);
 select set_config('request.jwt.claim.role', 'authenticated', true);
-select throws_ok($$select update_task_with_audit('71000000-0000-0000-0000-000000000001','complete')$$, '23514', 'Complete all required checklist items first', 'required incomplete checklist blocks completion');
 select lives_ok($$select update_task_with_audit('71000000-0000-0000-0000-000000000001','checklist','72000000-0000-0000-0000-000000000001',true)$$, 'authorized doer can complete required checklist item');
 select lives_ok($$select update_task_with_audit('71000000-0000-0000-0000-000000000001','complete')$$, 'completed required checklist permits completion');
+-- An outstanding checklist never blocks completion; completing closes it.
+select lives_ok($$select update_task_with_audit('71000000-0000-0000-0000-000000000005','complete')$$, 'outstanding required checklist does not block completion');
+select is((select is_completed from task_checklists where id='72000000-0000-0000-0000-000000000002'), true, 'completion closes the outstanding checklist item');
+select is((select completed_by from task_checklists where id='72000000-0000-0000-0000-000000000002'), '40000000-0000-0000-0000-000000000004'::uuid, 'the completing actor is recorded on the closed checklist item');
 select throws_ok($$select update_task_with_audit('71000000-0000-0000-0000-000000000002','complete')$$, '23514', 'A required upload is missing', 'required upload is enforced');
 select throws_ok($$select update_task_with_audit('71000000-0000-0000-0000-000000000003','complete')$$, '23514', 'The required task form submission is missing', 'required form is enforced');
 select throws_ok($$select update_task_with_audit('71000000-0000-0000-0000-000000000004','complete')$$, '23514', 'A completion remark is required', 'required remark is enforced');

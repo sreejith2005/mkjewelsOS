@@ -104,13 +104,41 @@ describe("TaskCard direct completion", () => {
     expect(screen.queryByRole("button", { name: "Complete task: Upload completion task" })).toBeNull();
   });
 
-  it("withholds the one-shot upload button while a required checklist item is outstanding", () => {
+  it("keeps the completion action available while a required checklist item is outstanding", async () => {
     const onAction = vi.fn().mockResolvedValue(undefined);
+    const checklists = [{ completed_at: null, completed_by: null, id: "item-1", is_completed: false, is_required: true, item_text: "Photograph the tray", sort_order: 1, task_instance_id: "task-1" }];
 
-    render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, requires_upload: true, title: "Checklist upload task", checklists: [{ completed_at: null, completed_by: null, id: "item-1", is_completed: false, is_required: true, item_text: "Photograph the tray", sort_order: 1, task_instance_id: "task-1" }] }} />);
+    render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, checklists, title: "Checklist task" }} />);
 
-    expect(screen.queryByLabelText("Upload task: Checklist upload task")).toBeNull();
-    expect(screen.getByRole("button", { name: "Complete task: Checklist upload task" })).toHaveProperty("disabled", true);
+    const complete = screen.getByRole("button", { name: "Complete task: Checklist task" });
+    expect(complete).toHaveProperty("disabled", false);
+
+    fireEvent.click(complete);
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ kind: "complete", remark: "" }));
+  });
+
+  it("offers the one-shot upload while a required checklist item is outstanding", async () => {
+    const onAction = vi.fn().mockResolvedValue(undefined);
+    const file = new File(["evidence"], "evidence.png", { type: "image/png" });
+    const checklists = [{ completed_at: null, completed_by: null, id: "item-1", is_completed: false, is_required: true, item_text: "Photograph the tray", sort_order: 1, task_instance_id: "task-1" }];
+
+    render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, checklists, requires_upload: true, title: "Checklist upload task" }} />);
+
+    fireEvent.change(screen.getByLabelText("Upload task: Checklist upload task"), { target: { files: [file] } });
+
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ file, kind: "upload_and_complete" }));
+  });
+
+  it("still lets a doer tick an individual checklist item", async () => {
+    const onAction = vi.fn().mockResolvedValue(undefined);
+    const checklists = [{ completed_at: null, completed_by: null, id: "item-1", is_completed: false, is_required: true, item_text: "Photograph the tray", sort_order: 1, task_instance_id: "task-1" }];
+
+    render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, checklists, title: "Checklist task" }} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /View details/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Mark complete" }));
+
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ checklistId: "item-1", completed: true, kind: "checklist" }));
   });
 
   it("shows an upload failure and lets the user retry the same supported file", async () => {

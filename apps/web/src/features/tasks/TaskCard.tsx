@@ -41,13 +41,14 @@ export function TaskCard({ capability, categoryLabel, onAction, task: taskInput 
   const blocked = task.status === "blocked";
   const readOnly = !capability.canMutate || task.task_type === "fms";
   const formOnlyAction = task.requires_form && !completed;
-  const canComplete = checklistProgress.canCompleteRequiredItems && (!task.requires_upload || task.hasAttachment) && (!task.requires_form || task.hasFormSubmission);
+  // An outstanding checklist never withholds the completion action. Imported
+  // occurrences each carry one required item repeating the task headline, and
+  // hiding the action behind it left every such task uncompletable. Completion
+  // closes the remaining items server-side (migration 0142), so the checklist
+  // records the work instead of gating it.
+  const canComplete = (!task.requires_upload || task.hasAttachment) && (!task.requires_form || task.hasFormSubmission);
   const canShowDirectComplete = !formOnlyAction && !readOnly && !completed && !blocked;
-  // The header upload button completes the task in one atomic RPC, so it may
-  // only be offered when every other precondition already holds. Offering it
-  // against an unfinished required checklist produced an upload that always
-  // failed, no matter how many times it was retried.
-  const canShowDirectUpload = canShowDirectComplete && task.requires_upload && !task.hasAttachment && checklistProgress.canCompleteRequiredItems;
+  const canShowDirectUpload = canShowDirectComplete && task.requires_upload && !task.hasAttachment;
   const act = async (action: TaskCardAction) => {
     setBusy(true);
     setError(null);
