@@ -1,5 +1,5 @@
 begin;
-select plan(8);
+select plan(10);
 
 -- The approved contract never auto-assigns a reporting manager. It routes an
 -- absent original through primary then secondary buddy for the exact work date,
@@ -51,6 +51,15 @@ select is((select effective_assignee_id from resolve_task_coverage('86400000-000
 select ok(position('reports_to_user_id' in pg_get_functiondef('public.resolve_task_coverage(uuid,date)'::regprocedure)) = 0, 'resolver does not automatically choose the reporting manager');
 select ok(position('not between v_today and v_today+1' in pg_get_functiondef('public.resolve_fms_stage_assignees(uuid,uuid,uuid)'::regprocedure)) = 0, 'FMS assignment resolution is not limited to today or tomorrow');
 select ok(position('not between v_today and v_today+1' in pg_get_functiondef('public.apply_task_assignment_coverage()'::regprocedure)) = 0, 'ordinary task assignment is not limited to today or tomorrow');
+
+-- Returning an employee to present must restore their unfinished work, even if
+-- it was already moved to a buddy while they were absent.
+set local role authenticated;
+select set_config('request.jwt.claim.sub','86000000-0000-4000-8000-000000000001',true);
+select set_config('request.jwt.claim.role','authenticated',true);
+select record_availability_with_audit('86400000-0000-4000-8000-000000000002',(now() at time zone 'Asia/Kolkata')::date+2,'present','returned to work');
+select ok(exists(select 1 from task_assignees where task_instance_id='86500000-0000-4000-8000-000000000001' and user_profile_id='86400000-0000-4000-8000-000000000002' and is_active), 'present original assignee regains the task');
+select ok(not exists(select 1 from task_assignees where task_instance_id='86500000-0000-4000-8000-000000000001' and user_profile_id='86400000-0000-4000-8000-000000000004' and is_active), 'buddy coverage ends when the original assignee returns');
 
 select * from finish();
 rollback;

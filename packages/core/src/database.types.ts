@@ -7224,6 +7224,8 @@ export type Database = {
           buddy_assignment_allowed: boolean | null
           category_id: string | null
           checklist_completion_pct: number | null
+          coverage_original_assignee_id: string | null
+          coverage_status: string | null
           core_task_label: string | null
           created_by: string | null
           delay_minutes: number | null

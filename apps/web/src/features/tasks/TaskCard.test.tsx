@@ -26,6 +26,9 @@ const task = {
   category_id: null,
   checklist_completion_pct: 0,
   checklists: [],
+  coverageOriginalAssigneeName: null,
+  coverage_original_assignee_id: null,
+  coverage_status: null,
   core_task_label: null,
   created_by: "manager-1",
   delay_minutes: null,
@@ -63,6 +66,16 @@ const task = {
 } as TaskBundle;
 
 describe("TaskCard direct completion", () => {
+  it("identifies work covered for an absent colleague", () => {
+    render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={vi.fn()} task={{
+      ...task,
+      coverageOriginalAssigneeName: "Nikita Patil",
+      coverage_status: "covered",
+    } as TaskBundle} />);
+
+    expect(screen.getByText("Covering for: Nikita Patil")).toBeTruthy();
+  });
+
   it("keeps operational details collapsed behind a named accessible disclosure", () => {
     render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={vi.fn()} task={{ ...task, description: "Inspect every showcase before opening." }} />);
 

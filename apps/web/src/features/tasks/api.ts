@@ -17,6 +17,7 @@ const VERIFIER_FALLBACK_NAME = "Verifier unavailable";
 export type TaskBundle = TaskFeedRow & {
   assignees: Array<{ id: string; name: string }>;
   assigneeName: string;
+  coverageOriginalAssigneeName: string | null;
   checklists: TaskChecklist[];
   hasAttachment: boolean;
   hasFormSubmission: boolean;
@@ -265,6 +266,9 @@ export async function loadTaskFeed(
       ...row,
       assignees,
       assigneeName: assignees.length ? assignees.map((assignee) => assignee.name).join(", ") : "Unassigned",
+      coverageOriginalAssigneeName: row.coverage_original_assignee_id
+        ? userNames.get(row.coverage_original_assignee_id) ?? "Assigned colleague"
+        : null,
       checklists: row.id ? checklistsByTask.get(row.id) ?? [] : [],
       hasAttachment: row.id ? attachedTasks.has(row.id) : false,
       hasFormSubmission: row.id && row.form_template_id && row.task_type
