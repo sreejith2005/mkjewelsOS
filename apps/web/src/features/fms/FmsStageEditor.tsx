@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, GitBranch, Plus, Trash2 } from "lucide-react";
 import {
   FMS_BRANCH_OPERATORS,
+  fmsFieldOptions,
+  hasFmsStageFallback,
   hasFmsStageRouting,
   type FmsBranchOperator,
   type FmsBranchRule,
@@ -12,6 +14,7 @@ import {
 } from "@jewelos/core";
 import { Button, Field } from "@/components/ui";
 import type { FmsData } from "./api";
+import { newerFormVersion } from "./definition";
 
 const humanTypes: readonly FmsStageDefinition["type"][] = ["form", "task", "approval"];
 const timingOptions: readonly { value: FmsTimingMethod; label: string; help: string }[] = [
@@ -142,14 +145,16 @@ function StageRouting({ stage, others, fields, decision, update, changeRule, mov
 
     {stage.branchRules.map((rule, index) => <RouteRow decision={decision} fields={fields} index={index} key={rule.id} others={others} rule={rule} stage={stage} changeRule={changeRule} moveRule={moveRule} remove={() => update({ branchRules: stage.branchRules.filter((_, ruleIndex) => ruleIndex !== index).map((item, order) => ({ ...item, order })) })} />)}
 
-    <Field label={routed ? "Otherwise (fallback) go to" : "Continue to"}><StageSelect others={others} value={stage.defaultNextStageKey} onChange={(value) => update({ defaultNextStageKey: value })} /></Field>
+    <Field label={routed ? "Otherwise (fallback) go to" : "Continue to"}><StageSelect label={routed ? "Otherwise (fallback) go to" : "Continue to"} others={others} value={stage.defaultNextStageKey} onChange={(value) => update({ defaultNextStageKey: value })} /></Field>
+    {routed && !hasFmsStageFallback(stage) ? <p className="rounded-lg border border-danger/40 bg-danger/5 p-2 text-xs text-danger">Choose an Otherwise destination. An answer that matches no route must still have somewhere to go.</p> : null}
     {routed && !stage.formTemplateId && stage.branchRules.some((rule) => rule.source === "form_answer") ? <p className="rounded-lg border border-danger/40 bg-danger/5 p-2 text-xs text-danger">Link a Form above so these answers exist at run time.</p> : null}
+    {stage.formTemplateId && !fields.length ? <p className="rounded-lg border border-gold/25 bg-gold/5 p-2 text-xs text-champagne">No branchable fields available in this form.</p> : null}
   </section>;
 }
 
 function RouteRow({ rule, index, stage, others, fields, decision, changeRule, moveRule, remove }: { rule: FmsBranchRule; index: number; stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; fields: readonly FmsFormFieldRef[]; decision: boolean; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void; remove: () => void }) {
   const field = rule.source === "form_answer" ? fields.find((item) => item.key === rule.sourceKey) : undefined;
-  const options = rule.source === "outcome" ? (stage.sla.decisionOptions ?? []).map((option) => ({ value: option.key, label: option.label })) : (field?.optionValues ?? []).map((value) => ({ value, label: value }));
+  const options = rule.source === "outcome" ? (stage.sla.decisionOptions ?? []).map((option) => ({ value: option.key, label: option.label })) : fmsFieldOptions(field);
   const selected = Array.isArray(rule.value) ? rule.value.map(String) : [String(rule.value ?? "")].filter(Boolean);
   return <article className="space-y-2 rounded-xl border border-gold/20 bg-white/[0.02] p-3" key={rule.id}>
     <div className="flex items-center gap-2">
@@ -187,15 +192,21 @@ function TimingFields({ sla, earlierStages, updateSla }: { sla: FmsSlaRule; earl
 }
 
 function LinkedForm({ data, firstStage, stage, update }: { data: FmsData; firstStage: boolean; stage: FmsStageDefinition; update: (patch: Partial<FmsStageDefinition>) => void }) {
-  const missing = !!stage.formTemplateId && !data.forms.some((form) => form.id === stage.formTemplateId);
-  const options = <>{data.forms.map((form) => <option key={form.id} value={form.id}>{form.name} · v{form.version}</option>)}{missing ? <option value={stage.formTemplateId}>Unavailable form (removed or unpublished)</option> : null}</>;
+  const pinned = data.forms.find((form) => form.id === stage.formTemplateId);
+  const missing = !!stage.formTemplateId && !pinned;
+  const newer = newerFormVersion(data.forms, stage.formTemplateId);
+  const options = <>{data.forms.map((form) => <option key={form.id} value={form.id}>{form.name} · v{form.version}{form.lifecycle === "published" ? "" : " (pinned)"}</option>)}{missing ? <option value={stage.formTemplateId}>Unavailable form (removed or unpublished)</option> : null}</>;
+  /** Revisions copy every question key, so re-pinning keeps the configured routes valid. */
+  const upgrade = newer ? <p className="rounded-lg border border-gold/30 bg-gold/5 p-2 text-xs text-champagne">Version {newer.version} of this Form is published. <button className="font-semibold text-gold underline" onClick={() => update({ formTemplateId: newer.id })} type="button">Use v{newer.version}</button> to pick up its current questions and answers. Routes keep matching because question and answer identities do not change between versions.</p> : null;
   if (firstStage) return <div className="space-y-2">
     <select aria-label="Initial details form" className="field" onChange={(event) => update({ formTemplateId: event.target.value || undefined })} value={stage.formTemplateId ?? ""}><option value="">Select the initial Form</option>{options}</select>
     {missing ? <p className="rounded-lg border border-danger/40 bg-danger/5 p-2 text-xs text-danger">This Form is no longer an available published version. Choose another before publishing.</p> : null}
+    {upgrade}
   </div>;
   return <div className="space-y-2">
     <select aria-label="Linked form" className="field" onChange={(event) => update({ formTemplateId: event.target.value || undefined })} value={stage.formTemplateId ?? ""}><option value="">No form — complete this step without one</option>{options}</select>
     {missing ? <p className="rounded-lg border border-danger/40 bg-danger/5 p-2 text-xs text-danger">This Form is no longer an available published version. Choose another before publishing.</p> : null}
+    {upgrade}
   </div>;
 }
 

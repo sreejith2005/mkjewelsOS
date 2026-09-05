@@ -9,7 +9,9 @@ select is((select proconfig from pg_proc where oid='fms_stage_route_target(uuid,
 select ok(not has_function_privilege('authenticated','fms_stage_route_target(uuid,uuid,uuid,text)','EXECUTE'),'clients cannot resolve routes directly');
 select ok(not has_function_privilege('service_role','fms_stage_route_target(uuid,uuid,uuid,text)','EXECUTE'),'service role cannot resolve routes directly');
 select ok(has_function_privilege('authenticated','complete_fms_stage_with_audit(uuid,text,text,jsonb,uuid)','EXECUTE'),'authenticated users still complete stages');
-select ok((select pg_get_functiondef('complete_fms_stage_with_audit(uuid,text,text,jsonb,uuid)'::regprocedure) like '%fms_stage_route_target%'),'stage completion consults the configured routes');
+-- 0142 supersedes the resolver with `fms_stage_matched_route`, which returns the
+-- winning rule as well as its destination; the routing contract is unchanged.
+select ok((select pg_get_functiondef('complete_fms_stage_with_audit(uuid,text,text,jsonb,uuid)'::regprocedure) like '%fms_stage_matched_route%'),'stage completion consults the configured routes');
 select ok((select pg_get_functiondef('complete_fms_stage_with_audit(uuid,text,text,jsonb,uuid)'::regprocedure) like '%v_next=v_stage.default_next_stage_id%'),'stage completion still falls back to the historical single successor');
 
 -- The shared matcher the resolver uses.

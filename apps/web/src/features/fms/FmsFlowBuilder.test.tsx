@@ -42,8 +42,8 @@ vi.mock("./FmsGraphCanvas", () => ({
 const formId = "00000000-0000-4000-8000-000000000001";
 const data = {
   flows: [], stages: [], assignees: [], branchRules: [],
-  forms: [{ id: formId, name: "Intake", version: 1 }],
-  formFields: { [formId]: [{ key: "customer_type", label: "Customer type", optionValues: ["retail", "wholesale"] }] },
+  forms: [{ id: formId, name: "Intake", version: 1, family_id: "fam-intake", lifecycle: "published" }],
+  formFields: { [formId]: [{ key: "customer_type", label: "Customer type", options: [{ value: "retail", label: "Retail buyer" }, { value: "wholesale", label: "Wholesale buyer" }], optionValues: ["retail", "wholesale"] }] },
   users: [], availability: [], branches: [], departments: [], contextDefaults: [],
 } as unknown as FmsData;
 

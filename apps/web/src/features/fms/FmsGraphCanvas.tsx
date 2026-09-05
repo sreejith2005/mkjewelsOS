@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type WheelEvent } from "react";
 import { CheckSquare, Copy, FileText, Flag, GitBranch, Layers, Maximize, Merge, Minus, MousePointer2, Plus, ShieldCheck, Trash2, Zap } from "lucide-react";
-import { fmsOutgoingStageKeys, hasFmsStageRouting, type FmsFlowDefinition, type FmsStageDefinition } from "@jewelos/core";
+import { fmsOutgoingStageKeys, hasFmsStageRouting, type FmsFlowDefinition, type FmsFormFieldRef, type FmsStageDefinition } from "@jewelos/core";
 import { cn } from "@/lib/utils";
 import { fmsGraphEdges, fmsStageSummary, fmsTimingSummary, layoutFmsDefinition, type FmsGraphEdge, type FmsGraphPosition } from "./graph";
 
@@ -39,8 +39,10 @@ type Drag =
 const overlaps = (point: FmsGraphPosition, box: Readonly<{ x: number; y: number; width: number; height: number }>) =>
   point.x < box.x + box.width && point.x + NODE_WIDTH > box.x && point.y < box.y + box.height && point.y + NODE_HEIGHT > box.y;
 
-export function FmsGraphCanvas({ definition, selectedKey, invalidKeys, onSelect, onDelete, onDuplicate, onAddAfter, onConnect, onDisconnect, onReconnect, onMove }: {
+export function FmsGraphCanvas({ definition, formFields, selectedKey, invalidKeys, onSelect, onDelete, onDuplicate, onAddAfter, onConnect, onDisconnect, onReconnect, onMove }: {
   definition: FmsFlowDefinition;
+  /** The linked Forms' questions, so a route edge reads as its question and answer labels. */
+  formFields: Readonly<Record<string, readonly FmsFormFieldRef[]>>;
   selectedKey: string | null;
   invalidKeys: ReadonlySet<string>;
   onSelect: (key: string) => void;
@@ -56,7 +58,7 @@ export function FmsGraphCanvas({ definition, selectedKey, invalidKeys, onSelect,
   const dragRef = useRef<Drag | null>(null);
   const hasCenteredRef = useRef(false);
   const layout = useMemo(() => layoutFmsDefinition(definition), [definition]);
-  const edges = useMemo(() => fmsGraphEdges(definition.stages), [definition.stages]);
+  const edges = useMemo(() => fmsGraphEdges(definition.stages, formFields), [definition.stages, formFields]);
   const [offsets, setOffsets] = useState<Record<string, FmsGraphPosition>>({});
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);

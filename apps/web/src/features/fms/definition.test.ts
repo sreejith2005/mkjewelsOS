@@ -15,6 +15,20 @@ describe("FMS web definition adapter", () => {
     ], assignees:[{fms_stage_id:"s1",assignee_type:"reporter",user_profile_id:null,role_value:null,allow_next_selection:false,sort_order:0}], branchRules:[], forms:[], formFields:{}, users:[], availability:[], branches:[], departments:[] } satisfies FmsData;
     const definition=flowToDefinition(flow,data); expect(definition.version).toBe(3); expect(definition.stages[0]?.defaultNextStageKey).toBe("done"); expect(definition.stages[0]?.assigneeRules).toEqual([]); expect(definition.stages[0]?.sla.dueDate).toBe("2099-12-30"); expect(definition.stages[1]?.type).toBe("end");
   });
+  it("restores a multi-value route on load and leaves single answers alone", async () => {
+    const { parseBranchRuleValue } = await import("./definition");
+    expect(parseBranchRuleValue("in", '["bought","interested"]')).toEqual(["bought", "interested"]);
+    expect(parseBranchRuleValue("in", "bought, interested")).toEqual(["bought", "interested"]);
+    expect(parseBranchRuleValue("equals", "bought")).toBe("bought");
+    expect(parseBranchRuleValue("equals", null)).toBeUndefined();
+  });
+  it("offers the newest published version of a pinned Form family", async () => {
+    const { newerFormVersion } = await import("./definition");
+    const forms = [{ id: "v1", name: "Purchase", version: 1, family_id: "fam", lifecycle: "archived" }, { id: "v2", name: "Purchase", version: 2, family_id: "fam", lifecycle: "published" }];
+    expect(newerFormVersion(forms, "v1")?.id).toBe("v2");
+    expect(newerFormVersion(forms, "v2")).toBeUndefined();
+    expect(newerFormVersion(forms, undefined)).toBeUndefined();
+  });
   it("repairs simple incoming routes when a stage is removed", async () => {
     const { removeFmsStage } = await import("./definition");
     const first = { ...newFmsStage("form", 0), key: "first", defaultNextStageKey: "middle" };

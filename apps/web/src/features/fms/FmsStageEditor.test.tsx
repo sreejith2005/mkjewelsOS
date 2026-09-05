@@ -9,8 +9,8 @@ import { newFmsStage } from "./definition";
 import { FmsStageEditor } from "./FmsStageEditor";
 
 const data: FmsData = {
-  flows: [], stages: [], assignees: [], branchRules: [], forms: [{ id: "00000000-0000-4000-8000-000000000001", name: "Initial details", version: 1 }],
-  formFields: { "00000000-0000-4000-8000-000000000001": [{ key: "customer_type", label: "Customer type", optionValues: ["retail", "wholesale", "distributor"] }, { key: "notes", label: "Notes" }] },
+  flows: [], stages: [], assignees: [], branchRules: [], forms: [{ id: "00000000-0000-4000-8000-000000000001", name: "Initial details", version: 1, family_id: "fam-1", lifecycle: "published" }],
+  formFields: { "00000000-0000-4000-8000-000000000001": [{ key: "customer_type", label: "Customer type", options: [{ value: "retail", label: "Retail buyer" }, { value: "wholesale", label: "Wholesale buyer" }, { value: "distributor", label: "Distributor" }], optionValues: ["retail", "wholesale", "distributor"] }, { key: "notes", label: "Notes" }] },
   statusOptions: [{ label: "Follow Up", value: "follow_up" }, { label: "Interested", value: "interested" }], availability: [],
   branches: [{ id: "b1", name: "Main" }],
   departments: [{ id: "d1", branch_id: null, name: "Sales" }],
@@ -113,6 +113,23 @@ describe("FMS stage editor", () => {
     const rule = latestStage!.branchRules[0]!;
     expect(rule).toMatchObject({ source: "form_answer", sourceKey: "customer_type", operator: "equals", value: "wholesale", nextStageKey: "wholesale_desk" });
     expect(screen.getByText("Otherwise (fallback) go to")).toBeTruthy();
+  });
+  it("offers the question's option labels while still matching on the stable option value", async () => {
+    const user = userEvent.setup();
+    render(<RoutingHarness />);
+    await user.click(screen.getByRole("button", { name: "Add conditional route" }));
+    const answers = screen.getByLabelText("Route 1 answer") as HTMLSelectElement;
+    expect([...answers.options].map((option) => option.textContent)).toEqual(["Select an answer", "Retail buyer", "Wholesale buyer", "Distributor"]);
+    await user.selectOptions(answers, "Wholesale buyer");
+    expect(latestStage!.branchRules[0]!.value).toBe("wholesale");
+  });
+  it("warns until an unmatched answer has somewhere to go", async () => {
+    const user = userEvent.setup();
+    render(<RoutingHarness />);
+    await user.click(screen.getByRole("button", { name: "Add conditional route" }));
+    expect(screen.getByText(/An answer that matches no route must still have somewhere to go/)).toBeTruthy();
+    await user.selectOptions(screen.getByLabelText("Otherwise (fallback) go to"), "wholesale_desk");
+    expect(screen.queryByText(/An answer that matches no route must still have somewhere to go/)).toBeNull();
   });
   it("configures conditions only from dynamic earlier-decision options", async () => {
     const user = userEvent.setup();

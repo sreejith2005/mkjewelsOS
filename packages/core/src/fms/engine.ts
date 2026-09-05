@@ -1,5 +1,5 @@
 import type { UserRole } from "../roleMenu";
-import { FMS_ASSIGNEE_TYPES, FMS_BRANCH_OPERATORS, FMS_STAGE_TYPES, type FmsAssignmentCandidate, type FmsAssigneeRule, type FmsBranchRule, type FmsChecklistItemDefinition, type FmsDecisionOption, type FmsFlowDefinition, type FmsInstanceStatus, type FmsStageActorState, type FmsStageDefinition, type FmsStageStatus, type FmsTimingMethod, type FmsTransitionCapability, type FmsValidationContext, type FmsValidationIssue } from "./types";
+import { FMS_ASSIGNEE_TYPES, FMS_BRANCH_OPERATORS, FMS_STAGE_TYPES, type FmsAssignmentCandidate, type FmsAssigneeRule, type FmsBranchRule, type FmsChecklistItemDefinition, type FmsDecisionOption, type FmsFlowDefinition, type FmsFormFieldOption, type FmsFormFieldRef, type FmsInstanceStatus, type FmsStageActorState, type FmsStageDefinition, type FmsStageStatus, type FmsTimingMethod, type FmsTransitionCapability, type FmsValidationContext, type FmsValidationIssue } from "./types";
 
 const KEY = /^[a-z][a-z0-9_]{0,63}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -57,6 +57,18 @@ export function fmsFallbackStageKey(stage: FmsStageDefinition): string | undefin
   return stage.branchRules.find((rule) => rule.operator === "default")?.nextStageKey ?? stage.defaultNextStageKey;
 }
 
+/** True when an unmatched answer has somewhere deterministic to go. */
+export function hasFmsStageFallback(stage: FmsStageDefinition): boolean {
+  return fmsFallbackStageKey(stage) !== undefined;
+}
+
+/** The answers a linked question offers, tolerating a ref that carries values only. */
+export function fmsFieldOptions(field: FmsFormFieldRef | undefined): readonly FmsFormFieldOption[] {
+  if (!field) return [];
+  if (field.options?.length) return field.options;
+  return (field.optionValues ?? []).map((value) => ({ value, label: value }));
+}
+
 export function fmsOutgoingStageKeys(stage: FmsStageDefinition): readonly string[] {
   if (stage.type === "branch") return stage.branchRules.flatMap((rule) => rule.nextStageKey ? [rule.nextStageKey] : []);
   if (stage.type === "parallel_start") return stage.parallelTargetStageKeys;
@@ -88,6 +100,7 @@ const ROUTE_VALUE_FREE = new Set<string>(["default", "not_empty"]);
 function validateStageRoutes(stage: FmsStageDefinition, byKey: ReadonlyMap<string, FmsStageDefinition>, context: FmsValidationContext, add: (code: string, message: string) => void): void {
   const fields = stage.formTemplateId ? context.formFields?.[stage.formTemplateId] : undefined;
   if (stage.branchRules.filter((rule) => rule.operator === "default").length > 1) add("conflicting_fallback_route", "A step can define only one fallback route");
+  if (!hasFmsStageFallback(stage)) add("route_without_fallback", "Give this step an Otherwise destination so an answer that matches no route cannot strand the workflow");
   if (stage.branchRules.some((rule) => rule.nextFlowId)) add("invalid_route_target", "A conditional route must point to a step in this workflow");
   for (const rule of stage.branchRules) {
     const label = rule.label ? `"${rule.label}"` : `Route ${rule.order + 1}`;
@@ -105,7 +118,8 @@ function validateStageRoutes(stage: FmsStageDefinition, byKey: ReadonlyMap<strin
     const field = fields.find((item) => item.key === rule.sourceKey);
     if (!field) { add("route_field_missing", `${label} uses a question that is no longer in the linked Form`); continue; }
     const expected = Array.isArray(rule.value) ? rule.value.map(String) : [String(rule.value ?? "")];
-    if (field.optionValues?.length && !ROUTE_VALUE_FREE.has(rule.operator) && rule.operator !== "contains" && expected.some((value) => !field.optionValues!.includes(value))) add("route_value_missing", `${label} matches an option that "${field.label}" no longer offers`);
+    const offered = fmsFieldOptions(field);
+    if (offered.length && !ROUTE_VALUE_FREE.has(rule.operator) && rule.operator !== "contains" && expected.some((value) => !offered.some((option) => option.value === value))) add("route_value_missing", `${label} matches an option that "${field.label}" no longer offers`);
   }
 }
 

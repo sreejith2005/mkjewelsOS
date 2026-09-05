@@ -107,8 +107,14 @@ export type FmsFlowDefinition = Readonly<{
   stages: readonly FmsStageDefinition[];
 }>;
 
-/** A linked form question, reduced to what FMS route configuration and validation need. */
-export type FmsFormFieldRef = Readonly<{ key: string; label: string; optionValues?: readonly string[] | undefined }>;
+/** A selectable answer of a linked form question: a stable `value` with a renameable `label`. */
+export type FmsFormFieldOption = Readonly<{ value: string; label: string }>;
+/**
+ * A linked form question, reduced to what FMS route configuration and validation
+ * need. `optionValues` stays the matched identity; `options` adds the labels the
+ * builder and the canvas display, so a renamed option never changes a route.
+ */
+export type FmsFormFieldRef = Readonly<{ key: string; label: string; optionValues?: readonly string[] | undefined; options?: readonly FmsFormFieldOption[] | undefined }>;
 /** Optional Forms knowledge so route validation can catch a removed form, question, or option. */
 export type FmsValidationContext = Readonly<{
   formFields?: Readonly<Record<string, readonly FmsFormFieldRef[]>> | undefined;

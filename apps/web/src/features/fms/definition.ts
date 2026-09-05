@@ -20,8 +20,32 @@ export function removeFmsStage(stages: readonly FmsStageDefinition[], key: strin
   }));
 }
 
+/** The newest published version of the same Form family, when the stage pins an older one. */
+export function newerFormVersion(forms: FmsData["forms"], formTemplateId: string | undefined): FmsData["forms"][number] | undefined {
+  const pinned = forms.find((form) => form.id === formTemplateId);
+  if (!pinned) return undefined;
+  const latest = forms.filter((form) => form.family_id === pinned.family_id && form.lifecycle === "published").sort((left, right) => right.version - left.version)[0];
+  return latest && latest.id !== pinned.id && latest.version > pinned.version ? latest : undefined;
+}
+
+/**
+ * `fms_branch_rules.condition_value` is a text column, so a multi-value `in`
+ * route is persisted as its JSON text. Restore the array on load; every other
+ * operator keeps the plain string it was saved as.
+ */
+export function parseBranchRuleValue(operator: string, raw: string | null): unknown {
+  if (raw === null) return undefined;
+  if (operator !== "in") return raw;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map(String) : [raw];
+  } catch {
+    return raw.split(",").map((item) => item.trim()).filter(Boolean);
+  }
+}
+
 export function flowToDefinition(flow: FmsFlowRow | null, data: FmsData): FmsFlowDefinition {
   if (!flow) return { name: "", description: "", scope: "tenant", manualTrigger: true, stages: [] };
   const rows = data.stages.filter((stage) => stage.fms_flow_id === flow.id); const keyById = new Map(rows.map((stage) => [stage.id, stage.stage_key]));
-  return normalizeFmsDefinition({ id: flow.id, familyId: flow.family_id, version: flow.version, lifecycle: flow.status, name: flow.name, description: flow.description ?? "", scope: flow.scope_type, branchId: flow.branch_id ?? undefined, departmentId: flow.department_id ?? undefined, moduleContext: flow.module_context ?? undefined, manualTrigger: true, stages: rows.map((stage) => ({ key: stage.stage_key, name: stage.name, method: stage.method ?? "", type: stage.step_type, order: stage.sort_order, required: stage.is_required, completionRule: stage.completion_rule ?? "any_doer", allowMultipleDoers: stage.allow_multiple_doers ?? false, requiresUpload: stage.requires_upload ?? false, requiresRemark: stage.requires_remark ?? false, checklist: Array.isArray(stage.checklist_definition) ? stage.checklist_definition as never : [], formTemplateId: stage.form_template_id ?? undefined, assigneeRules: data.assignees.filter((item) => item.fms_stage_id === stage.id && item.assignee_type === "specific_user").map((item) => ({ type: "specific_user" as const, userProfileId: item.user_profile_id ?? undefined, fallbackUserProfileId: item.fallback_user_profile_id ?? undefined, allowNextSelection: item.allow_next_selection })), requiresNextDoerHandoff: stage.requires_next_doer_handoff ?? false, canMoveBackward: stage.can_move_backward ?? false, canReject: stage.can_reject ?? false, canRequestRevision: stage.can_request_revision ?? false, canEscalate: stage.can_escalate ?? false, defaultNextStageKey: stage.default_next_stage_id ? keyById.get(stage.default_next_stage_id) : undefined, branchRules: data.branchRules.filter((item) => item.fms_stage_id === stage.id).map((item) => ({ id: item.id, source: item.source_type as never, sourceKey: item.source_key ?? undefined, operator: item.condition_operator as never, value: item.condition_value ?? undefined, nextStageKey: item.next_stage_id ? keyById.get(item.next_stage_id) : undefined, nextFlowId: item.next_flow_id ?? undefined, order: item.sort_order ?? 0, label: item.label ?? undefined })), parallelTargetStageKeys: stage.parallel_target_stage_ids.map((id) => keyById.get(id)).filter((key): key is string => !!key), joinRule: stage.join_rule ?? undefined, joinRequiredStageKeys: (stage.join_required_stage_ids ?? []).map((id) => keyById.get(id)).filter((key): key is string => !!key), splitToFlowId: stage.split_to_flow_id ?? undefined, position: stage.canvas_position ?? undefined, sla: stage.planned_time_rule as never })) });
+  return normalizeFmsDefinition({ id: flow.id, familyId: flow.family_id, version: flow.version, lifecycle: flow.status, name: flow.name, description: flow.description ?? "", scope: flow.scope_type, branchId: flow.branch_id ?? undefined, departmentId: flow.department_id ?? undefined, moduleContext: flow.module_context ?? undefined, manualTrigger: true, stages: rows.map((stage) => ({ key: stage.stage_key, name: stage.name, method: stage.method ?? "", type: stage.step_type, order: stage.sort_order, required: stage.is_required, completionRule: stage.completion_rule ?? "any_doer", allowMultipleDoers: stage.allow_multiple_doers ?? false, requiresUpload: stage.requires_upload ?? false, requiresRemark: stage.requires_remark ?? false, checklist: Array.isArray(stage.checklist_definition) ? stage.checklist_definition as never : [], formTemplateId: stage.form_template_id ?? undefined, assigneeRules: data.assignees.filter((item) => item.fms_stage_id === stage.id && item.assignee_type === "specific_user").map((item) => ({ type: "specific_user" as const, userProfileId: item.user_profile_id ?? undefined, fallbackUserProfileId: item.fallback_user_profile_id ?? undefined, allowNextSelection: item.allow_next_selection })), requiresNextDoerHandoff: stage.requires_next_doer_handoff ?? false, canMoveBackward: stage.can_move_backward ?? false, canReject: stage.can_reject ?? false, canRequestRevision: stage.can_request_revision ?? false, canEscalate: stage.can_escalate ?? false, defaultNextStageKey: stage.default_next_stage_id ? keyById.get(stage.default_next_stage_id) : undefined, branchRules: data.branchRules.filter((item) => item.fms_stage_id === stage.id).map((item) => ({ id: item.id, source: item.source_type as never, sourceKey: item.source_key ?? undefined, operator: item.condition_operator as never, value: parseBranchRuleValue(item.condition_operator, item.condition_value), nextStageKey: item.next_stage_id ? keyById.get(item.next_stage_id) : undefined, nextFlowId: item.next_flow_id ?? undefined, order: item.sort_order ?? 0, label: item.label ?? undefined })), parallelTargetStageKeys: stage.parallel_target_stage_ids.map((id) => keyById.get(id)).filter((key): key is string => !!key), joinRule: stage.join_rule ?? undefined, joinRequiredStageKeys: (stage.join_required_stage_ids ?? []).map((id) => keyById.get(id)).filter((key): key is string => !!key), splitToFlowId: stage.split_to_flow_id ?? undefined, position: stage.canvas_position ?? undefined, sla: stage.planned_time_rule as never })) });
 }

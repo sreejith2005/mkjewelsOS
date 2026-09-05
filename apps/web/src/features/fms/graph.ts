@@ -1,15 +1,22 @@
-import { fmsOutgoingStageKeys, hasFmsStageRouting, type FmsBranchRule, type FmsFlowDefinition, type FmsStageDefinition } from "@jewelos/core";
+import { fmsFieldOptions, fmsOutgoingStageKeys, hasFmsStageRouting, type FmsBranchRule, type FmsFlowDefinition, type FmsFormFieldRef, type FmsStageDefinition } from "@jewelos/core";
+
+/** Resolves a route's question/answer identifiers to the Form's current display labels. */
+export type FmsRouteNaming = Readonly<{ fields?: readonly FmsFormFieldRef[] | undefined; decisionOptions?: readonly Readonly<{ key: string; label: string }>[] | undefined }>;
 
 export type FmsGraphPosition = Readonly<{ x: number; y: number }>;
 export type FmsGraphEdge = Readonly<{ from: string; to: string; label?: string | undefined; kind: "default" | "branch" | "parallel"; ruleId?: string | undefined }>;
 
 /** The readable name of a route, used on the canvas edge and in the routing panel. */
-export function fmsRouteLabel(rule: FmsBranchRule): string {
+export function fmsRouteLabel(rule: FmsBranchRule, naming: FmsRouteNaming = {}): string {
   if (rule.label?.trim()) return rule.label.trim();
   if (rule.operator === "default") return "Otherwise";
-  const value = Array.isArray(rule.value) ? rule.value.join(", ") : String(rule.value ?? "");
+  const field = rule.source === "form_answer" ? naming.fields?.find((item) => item.key === rule.sourceKey) : undefined;
+  const answers = rule.source === "outcome" ? (naming.decisionOptions ?? []).map((option) => ({ value: option.key, label: option.label })) : fmsFieldOptions(field);
+  const readable = (value: unknown) => answers.find((option) => option.value === String(value))?.label ?? String(value ?? "");
+  const value = Array.isArray(rule.value) ? rule.value.map(readable).join(", ") : readable(rule.value);
+  const question = field?.label ?? (rule.source === "outcome" ? "Outcome" : rule.sourceKey ?? "Outcome");
   const verb = rule.operator === "equals" ? "is" : rule.operator === "not_equals" ? "is not" : rule.operator === "in" ? "is one of" : rule.operator === "not_empty" ? "is answered" : rule.operator.replaceAll("_", " ");
-  return `${rule.sourceKey ?? "Outcome"} ${verb}${rule.operator === "not_empty" ? "" : ` ${value}`}`.trim();
+  return `${question} ${verb}${rule.operator === "not_empty" ? "" : ` ${value}`}`.trim();
 }
 
 const COLUMN_WIDTH = 264;
@@ -41,18 +48,19 @@ export function layoutFmsDefinition(definition: FmsFlowDefinition): ReadonlyMap<
   }));
 }
 
-export function fmsGraphEdges(stages: readonly FmsStageDefinition[]): readonly FmsGraphEdge[] {
+export function fmsGraphEdges(stages: readonly FmsStageDefinition[], formFields: Readonly<Record<string, readonly FmsFormFieldRef[]>> = {}): readonly FmsGraphEdge[] {
   const edges: FmsGraphEdge[] = [];
   for (const stage of stages) {
+    const naming: FmsRouteNaming = { fields: stage.formTemplateId ? formFields[stage.formTemplateId] : undefined, decisionOptions: stage.sla.decisionOptions };
     if (stage.type === "branch") {
-      for (const rule of stage.branchRules) if (rule.nextStageKey) edges.push({ from: stage.key, to: rule.nextStageKey, label: fmsRouteLabel(rule), kind: "branch", ruleId: rule.id });
+      for (const rule of stage.branchRules) if (rule.nextStageKey) edges.push({ from: stage.key, to: rule.nextStageKey, label: fmsRouteLabel(rule, naming), kind: "branch", ruleId: rule.id });
       continue;
     }
     if (stage.type === "parallel_start") {
       for (const to of stage.parallelTargetStageKeys) edges.push({ from: stage.key, to, label: "Parallel", kind: "parallel" });
       continue;
     }
-    if (hasFmsStageRouting(stage)) for (const rule of stage.branchRules) if (rule.nextStageKey) edges.push({ from: stage.key, to: rule.nextStageKey, label: fmsRouteLabel(rule), kind: "branch", ruleId: rule.id });
+    if (hasFmsStageRouting(stage)) for (const rule of stage.branchRules) if (rule.nextStageKey) edges.push({ from: stage.key, to: rule.nextStageKey, label: fmsRouteLabel(rule, naming), kind: "branch", ruleId: rule.id });
     // A routed stage keeps its plain next step only when no fallback route covers it.
     if (stage.defaultNextStageKey && !stage.branchRules.some((rule) => rule.operator === "default" && rule.nextStageKey)) edges.push({ from: stage.key, to: stage.defaultNextStageKey, label: hasFmsStageRouting(stage) ? "Otherwise" : undefined, kind: "default" });
   }

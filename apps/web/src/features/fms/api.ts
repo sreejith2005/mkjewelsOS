@@ -1,6 +1,6 @@
 import { supabase } from "@jewelos/api-client";
-import type { FmsFlowDefinition, FmsFormFieldRef, Json } from "@jewelos/core";
-import { formOptionValues, parseFormOptions } from "@jewelos/core";
+import type { FmsFlowDefinition, FmsFormFieldOption, FmsFormFieldRef, Json } from "@jewelos/core";
+import { parseFormOptions } from "@jewelos/core";
 import { loadMasterOptions } from "@/features/dropdowns/api";
 
 type DbError = { message: string } | null;
@@ -23,7 +23,7 @@ export type FmsChecklistItem = { id: string; fms_instance_stage_id: string; item
 export type FmsEvidence = { id: string; fms_instance_stage_id: string; storage_path: string; original_filename: string; mime_type: string; size_bytes: number; uploaded_by: string; created_at: string };
 export type FmsLog = { id: string; fms_instance_stage_id: string; actor_id: string | null; action: string; details: Json | null; created_at: string | null };
 export type FmsAvailability = "present" | "absent" | "half_day" | "remote";
-export type FmsData = { flows: FmsFlowRow[]; stages: FmsStageRow[]; assignees: Array<{ fms_stage_id: string; assignee_type: string; user_profile_id: string | null; fallback_user_profile_id?: string | null; role_value: string | null; allow_next_selection: boolean; sort_order: number }>; branchRules: Array<{ id: string; fms_stage_id: string; source_type: string; source_key: string | null; condition_operator: string; condition_value: string | null; next_stage_id: string | null; next_flow_id: string | null; label: string | null; sort_order: number | null }>; forms: Array<{ id: string; name: string; version: number }>; formFields: Record<string, readonly FmsFormFieldRef[]>; statusOptions?: Array<{ label: string; value: string }>; contextDefaults?: Array<{ module_context: string; user_profile_id: string }>; users: Array<{ id: string; employee_name: string; employee_code?: string; account_status?: string; user_role: string; branch_id: string; department_id: string; working_status: string; is_login_enabled: boolean | null }>; availability: Array<{ user_profile_id: string; status: FmsAvailability }>; branches: Array<{ id: string; name: string }>; departments: Array<{ id: string; branch_id: string | null; name: string }> };
+export type FmsData = { flows: FmsFlowRow[]; stages: FmsStageRow[]; assignees: Array<{ fms_stage_id: string; assignee_type: string; user_profile_id: string | null; fallback_user_profile_id?: string | null; role_value: string | null; allow_next_selection: boolean; sort_order: number }>; branchRules: Array<{ id: string; fms_stage_id: string; source_type: string; source_key: string | null; condition_operator: string; condition_value: string | null; next_stage_id: string | null; next_flow_id: string | null; label: string | null; sort_order: number | null }>; forms: Array<{ id: string; name: string; version: number; family_id: string; lifecycle: string }>; formFields: Record<string, readonly FmsFormFieldRef[]>; statusOptions?: Array<{ label: string; value: string }>; contextDefaults?: Array<{ module_context: string; user_profile_id: string }>; users: Array<{ id: string; employee_name: string; employee_code?: string; account_status?: string; user_role: string; branch_id: string; department_id: string; working_status: string; is_login_enabled: boolean | null }>; availability: Array<{ user_profile_id: string; status: FmsAvailability }>; branches: Array<{ id: string; name: string }>; departments: Array<{ id: string; branch_id: string | null; name: string }> };
 export type FmsStartResult = { instance_id: string; reference_number: string };
 
 function dateInKolkata(date: Date): string {
@@ -39,8 +39,7 @@ export async function loadFmsBuilderData(): Promise<FmsData> {
     supabase.from("fms_stages").select("*").order("sort_order").limit(1000),
     supabase.from("fms_stage_assignees").select("*").order("sort_order").limit(1000),
     supabase.from("fms_branch_rules").select("*").order("sort_order").limit(1000),
-    supabase.from("form_templates").select("id,name,version").eq("lifecycle", "published").eq("is_active", true).order("name").limit(300),
-    supabase.from("form_fields").select("form_template_id,field_key,field_name,field_type,options,option_source,dropdown_master_type").order("sort_order").limit(3000),
+    supabase.from("form_templates").select("id,name,version,family_id,lifecycle").eq("lifecycle", "published").eq("is_active", true).order("name").limit(300),
     supabase.from("dropdown_masters").select("label,value").eq("master_type", "buy_status").eq("is_active", true).order("sort_order").limit(300),
     supabase.from("user_profiles").select("id,employee_name,employee_code,account_status,user_role,branch_id,department_id,working_status,is_login_enabled").order("employee_name").limit(500),
     supabase.from("branches").select("id,name").eq("is_active", true).order("name").limit(100),
@@ -49,8 +48,25 @@ export async function loadFmsBuilderData(): Promise<FmsData> {
     supabase.from("fms_context_assignee_defaults").select("module_context,user_profile_id").limit(100),
   ]);
   results.forEach((result) => fail("Load FMS builder", result.error));
-  const forms = results[4].data ?? [];
-  return { flows: results[0].data as FmsFlowRow[], stages: results[1].data as FmsStageRow[], assignees: results[2].data ?? [], branchRules: results[3].data ?? [], forms, formFields: await formFieldIndex(results[5].data ?? [], forms.map((form) => form.id)), statusOptions: results[6].data ?? [], users: results[7].data ?? [], branches: results[8].data ?? [], departments: results[9].data ?? [], availability: results[10].data ?? [], contextDefaults: results[11].data ?? [] };
+  const stages = results[1].data as FmsStageRow[];
+  const forms = await withPinnedFormVersions(results[4].data ?? [], stages);
+  return { flows: results[0].data as FmsFlowRow[], stages, assignees: results[2].data ?? [], branchRules: results[3].data ?? [], forms, formFields: await formFieldIndex(forms.map((form) => form.id)), statusOptions: results[5].data ?? [], users: results[6].data ?? [], branches: results[7].data ?? [], departments: results[8].data ?? [], availability: results[9].data ?? [], contextDefaults: results[10].data ?? [] };
+}
+
+type FormRef = FmsData["forms"][number];
+
+/**
+ * A stage pins an exact Form version, and publishing a Form revision archives
+ * the version it replaces. Without the archived rows the builder would lose the
+ * questions of a flow that is still perfectly runnable, so pinned versions are
+ * loaded alongside the currently published ones.
+ */
+async function withPinnedFormVersions(published: readonly FormRef[], stages: readonly FmsStageRow[]): Promise<FormRef[]> {
+  const pinned = [...new Set(stages.flatMap((stage) => stage.form_template_id ? [stage.form_template_id] : []))].filter((id) => !published.some((form) => form.id === id));
+  if (!pinned.length) return [...published];
+  const { data, error } = await supabase.from("form_templates").select("id,name,version,family_id,lifecycle").in("id", pinned).limit(300);
+  fail("Load pinned FMS form versions", error);
+  return [...published, ...(data ?? [])];
 }
 
 type FormFieldRow = { form_template_id: string; field_key: string; field_name: string; field_type: string; options: Json | null; option_source: string | null; dropdown_master_type: string | null };
@@ -60,19 +76,26 @@ type FormFieldRow = { form_template_id: string; field_key: string; field_name: s
  * and publish readiness reference stable field keys and option values rather
  * than display labels. Dropdown Master questions resolve through the master.
  */
-async function formFieldIndex(rows: readonly FormFieldRow[], templateIds: readonly string[]): Promise<Record<string, readonly FmsFormFieldRef[]>> {
-  const linked = rows.filter((row) => templateIds.includes(row.form_template_id));
-  const masterTypes = [...new Set(linked.flatMap((row) => row.option_source === "dropdown_master" && row.dropdown_master_type ? [row.dropdown_master_type] : []))];
+async function formFieldIndex(templateIds: readonly string[]): Promise<Record<string, readonly FmsFormFieldRef[]>> {
+  if (!templateIds.length) return {};
+  const { data, error } = await supabase.from("form_fields").select("form_template_id,field_key,field_name,field_type,options,option_source,dropdown_master_type").in("form_template_id", [...templateIds]).order("sort_order").limit(5000);
+  fail("Load FMS form questions", error);
+  const rows = (data ?? []) as FormFieldRow[];
+  const masterTypes = [...new Set(rows.flatMap((row) => row.option_source === "dropdown_master" && row.dropdown_master_type ? [row.dropdown_master_type] : []))];
   const masters = masterTypes.length ? await loadMasterOptions(masterTypes, true).catch(() => []) : [];
   const index: Record<string, FmsFormFieldRef[]> = {};
-  for (const row of linked) {
-    const optionValues = row.option_source === "dropdown_master" && row.dropdown_master_type
-      ? masters.filter((option) => option.master_type === row.dropdown_master_type).map((option) => option.value)
-      : formOptionValues(parseFormOptions(row.options));
-    (index[row.form_template_id] ??= []).push({ key: row.field_key, label: row.field_name || row.field_key, ...(optionValues.length ? { optionValues } : {}) });
+  for (const row of rows) {
+    if (STRUCTURAL_FIELD_TYPES.has(row.field_type)) continue;
+    const options: FmsFormFieldOption[] = row.option_source === "dropdown_master" && row.dropdown_master_type
+      ? masters.filter((option) => option.master_type === row.dropdown_master_type).map((option) => ({ value: option.value, label: option.label || option.value }))
+      : (parseFormOptions(row.options) ?? []).map((option) => ({ value: option.value, label: option.label || option.value }));
+    (index[row.form_template_id] ??= []).push({ key: row.field_key, label: row.field_name || row.field_key, ...(options.length ? { options, optionValues: options.map((option) => option.value) } : {}) });
   }
   return index;
 }
+
+/** Layout-only questions carry no answer, so they can never decide a route. */
+const STRUCTURAL_FIELD_TYPES: ReadonlySet<string> = new Set(["section_header", "divider"]);
 
 export async function saveFmsDraft(flowId: string | null, definition: FmsFlowDefinition): Promise<string> {
   const metadata = { name: definition.name, description: definition.description ?? "", scope_type: definition.scope, branch_id: definition.branchId ?? "", department_id: definition.departmentId ?? "", module_context: definition.moduleContext ?? "", trigger_type: "manual", is_active: true };
