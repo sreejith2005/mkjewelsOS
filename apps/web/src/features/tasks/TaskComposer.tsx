@@ -55,7 +55,7 @@ export function TaskComposer({ data, onClose, onCreated, onSave, onUploadAttachm
     if (!user.id || user.tenant_id !== profile.tenant_id) return false;
     if (authoringScope === "tenant") return true;
     if (authoringScope === "branch") return user.branch_id === profile.branch_id;
-    return user.branch_id === profile.branch_id && user.department_id === profile.department_id;
+    return user.department_id === profile.department_id;
   }), [authoringScope, data.users, profile.branch_id, profile.department_id, profile.tenant_id]);
   const priorityLabel = priorityOptions.find((option) => option.value === priority)?.label ?? priority;
   const attachedForm = data.forms.find((form) => form.id === formTemplateId);
