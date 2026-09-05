@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { CalendarDays, Check, ChevronDown, FileText, Flag, Paperclip, Plus, Rocket, Users, UserRoundCheck, X } from "lucide-react";
-import { normalizeTaskParticipants, type Enums, type Json } from "@jewelos/core";
+import { deriveTaskAuthoringCapability, normalizeTaskParticipants, type Enums, type Json } from "@jewelos/core";
 import type { UserProfile } from "@/types";
 import { Button, Modal, Notice } from "@/components/ui";
 import { toast } from "sonner";
@@ -47,7 +47,16 @@ export function TaskComposer({ data, onClose, onCreated, onSave, onUploadAttachm
   const priorityOptions = useMemo(() => data.priorities.flatMap((option) => option.value === "high" || option.value === "medium" || option.value === "low"
     ? [{ ...option, value: option.value as Enums<"task_priority"> }]
     : []), [data.priorities]);
-  const eligiblePeople = useMemo(() => data.users.filter((user) => user.id && user.tenant_id === profile.tenant_id), [data.users, profile.tenant_id]);
+  const authoringScope = deriveTaskAuthoringCapability({
+    userRole: profile.user_role,
+    designationValue: data.designations.find((designation) => designation.id === profile.designation_id)?.value,
+  }).scope;
+  const eligiblePeople = useMemo(() => data.users.filter((user) => {
+    if (!user.id || user.tenant_id !== profile.tenant_id) return false;
+    if (authoringScope === "tenant") return true;
+    if (authoringScope === "branch") return user.branch_id === profile.branch_id;
+    return user.branch_id === profile.branch_id && user.department_id === profile.department_id;
+  }), [authoringScope, data.users, profile.branch_id, profile.department_id, profile.tenant_id]);
   const priorityLabel = priorityOptions.find((option) => option.value === priority)?.label ?? priority;
   const attachedForm = data.forms.find((form) => form.id === formTemplateId);
 

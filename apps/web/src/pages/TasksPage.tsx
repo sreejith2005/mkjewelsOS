@@ -45,6 +45,7 @@ export function TasksPage() {
   const refreshGeneration = useRef(0);
   const hasCompletedInitialLoad = useRef(false);
   const canManage = profile ? ["super_admin", "admin", "manager"].includes(profile.user_role) : false;
+  const canCreateTasks = Boolean(profile);
   const hasAdminTaskView = profile ? ["super_admin", "admin"].includes(profile.user_role) : false;
 
   const refresh = useCallback(async () => {
@@ -169,11 +170,11 @@ export function TasksPage() {
         {error ? <div className="flex flex-col gap-3 rounded-xl border border-danger/40 bg-danger/10 p-4"><Notice tone="danger">{error}</Notice><Button className="self-start border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={() => void refresh()} variant="secondary"><RefreshCw />Retry</Button></div> : shouldShowTaskLoading(loading, hasCompletedInitialLoad.current) ? <div aria-label="Loading tasks" className="flex flex-col gap-3">{[0, 1, 2].map((item) => <div className="h-28 animate-pulse rounded-2xl border border-task-border bg-task-muted" key={item} />)}</div> : scopedTasks.length === 0 ? <div className="flex min-h-[48dvh] flex-col items-center justify-center px-5 text-center"><span className="mb-5 flex size-20 items-center justify-center rounded-[1.75rem] bg-task-muted text-task-accent"><CheckCircle2 className="size-10" /></span><h2 className="text-2xl font-semibold text-task-text">No Tasks Here</h2><p className="mt-1 max-w-sm text-sm text-task-text-muted">It seems that you don’t have any tasks in this list.</p></div> : <div className="flex flex-col gap-3">{profile ? scopedTasks.map((task) => <TaskCard capability={deriveTaskMutationCapability({ assigneeIds: task.assignees.map((assignee) => assignee.id), isWatcher: task.isWatchedByViewer, viewerId: profile.id, viewerRole: profile.user_role })} categoryLabel={task.category_id ? categoryNames.get(task.category_id) ?? "Uncategorized" : "Uncategorized"} key={task.id} onAction={(action) => handleAction(task, action)} task={task} />) : null}</div>}
       </div>
 
-      {canManage ? <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-20 md:bottom-8 md:right-8">
+      {canCreateTasks ? <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-20 md:bottom-8 md:right-8">
         <Button aria-label="Create task" className="size-14 rounded-full bg-task-accent p-0 text-task-text shadow-xl hover:bg-task-accent/90 md:h-14 md:w-auto md:rounded-2xl md:px-5" onClick={() => void openComposer()}><Plus className="size-6" /><span className="hidden md:inline">Create Task</span></Button>
       </div> : null}
 
-      {composerOpen && canManage && references && profile ? <TaskComposer data={references} onClose={() => setComposerOpen(false)} onCreated={() => { setComposerOpen(false); void refresh(); }} onSave={createDelegationTask} onUploadAttachment={(taskId, file) => uploadTaskAttachment(profile.tenant_id, taskId, file)} profile={profile} /> : null}
+      {composerOpen && canCreateTasks && references && profile ? <TaskComposer data={references} onClose={() => setComposerOpen(false)} onCreated={() => { setComposerOpen(false); void refresh(); }} onSave={createDelegationTask} onUploadAttachment={(taskId, file) => uploadTaskAttachment(profile.tenant_id, taskId, file)} profile={profile} /> : null}
       {formTarget?.id && formTarget.form_template_id ? (() => { const form = formBundles.find((item) => item.id === formTarget.form_template_id); return form ? <Modal onClose={() => setFormTarget(null)} title={`Required form: ${form.name}`} wide><FormRenderer definition={{ name: form.name, description: form.description ?? undefined, sections: form.sections, fields: form.fields }} dynamicOptions={formDynamicOptions} templateId={form.id} onSubmit={async (answers) => { await submitForm(form.id, answers, formTarget.task_type === "delegation" ? "delegation_task" : "checklist_task", formTarget.id as string); setFormTarget(null); await refresh(); }} /></Modal> : <Modal onClose={() => setFormTarget(null)} title="Required form"><Notice tone="danger">The exact required form version is not available to this account.</Notice></Modal>; })() : null}
     </section>
   );

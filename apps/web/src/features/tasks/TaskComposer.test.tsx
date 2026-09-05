@@ -18,13 +18,20 @@ const data = {
   categories: [{ id: "category-1", label: "Operations" }],
   priorities: [{ id: "priority-high", label: "High", value: "high" }],
   departments: [{ branch_id: "branch-1", id: "department-1", name: "Sales" }],
+  designations: [],
   forms: [{ id: "form-1", name: "Stock count" }],
   templates: [],
-  users: [{ branch_id: "branch-1", buddy_id: null, secondary_buddy_id: null, reports_to_user_id: null, department_id: "department-1", employee_code: "E-1", employee_name: "Ashwini", first_name: "Ashwini", id: "doer-1", last_name: null, tenant_id: "tenant-1", user_role: "staff", working_status: "active" }],
+  users: [
+    { branch_id: "branch-1", buddy_id: null, secondary_buddy_id: null, reports_to_user_id: null, department_id: "department-1", employee_code: "E-1", employee_name: "Ashwini", first_name: "Ashwini", id: "user-1", last_name: null, tenant_id: "tenant-1", user_role: "staff", working_status: "active" },
+    { branch_id: "branch-1", buddy_id: null, secondary_buddy_id: null, reports_to_user_id: null, department_id: "department-1", employee_code: "E-2", employee_name: "Teammate", first_name: "Teammate", id: "doer-1", last_name: null, tenant_id: "tenant-1", user_role: "staff", working_status: "active" },
+    { branch_id: "branch-1", buddy_id: null, secondary_buddy_id: null, reports_to_user_id: null, department_id: "department-2", employee_code: "E-3", employee_name: "Other department", first_name: "Other", id: "doer-2", last_name: "department", tenant_id: "tenant-1", user_role: "staff", working_status: "active" },
+  ],
 } as TaskReferenceData;
 
 const profile = {
   branch_id: "branch-1",
+  department_id: "department-1",
+  designation_id: null,
   id: "user-1",
   tenant_id: "tenant-1",
   user_role: "manager",
@@ -43,6 +50,16 @@ function renderComposer(overrides: Partial<Parameters<typeof TaskComposer>[0]> =
 }
 
 describe("TaskComposer selector panels", () => {
+  it("limits normal staff to themselves and colleagues in their department", () => {
+    renderComposer({ profile: { ...profile, user_role: "staff" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /Users/i }));
+
+    expect(screen.getByLabelText("Ashwini")).toBeTruthy();
+    expect(screen.getByLabelText("Teammate")).toBeTruthy();
+    expect(screen.queryByLabelText("Other department")).toBeNull();
+  });
+
   it("keeps an opened selector panel anchored to the selector that opened it", () => {
     renderComposer();
 

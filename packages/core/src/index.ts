@@ -51,6 +51,8 @@ export { calculateDailyChecklistProgress, validateDailyChecklistDraft } from "./
 export type { DailyChecklistDraft, DailyChecklistItem, DailyChecklistStatus } from "./dailyChecklist";
 export { deriveTaskMutationCapability } from "./taskCapabilities";
 export type { TaskMutationCapability } from "./taskCapabilities";
+export { deriveTaskAuthoringCapability } from "./taskAuthoringCapabilities";
+export type { TaskAuthoringCapability, TaskAuthoringScope } from "./taskAuthoringCapabilities";
 export {
   ADMIN_SET_PASSWORD_LENGTH,
   validateAdminSetPassword,

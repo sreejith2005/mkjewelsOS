@@ -29,6 +29,7 @@ export type TaskReferenceData = {
   categories: Array<Pick<Tables<"dropdown_masters">, "id" | "label">>;
   priorities: Array<Pick<Tables<"dropdown_masters">, "id" | "label" | "value">>;
   departments: Array<Pick<Tables<"departments">, "id" | "name" | "branch_id">>;
+  designations: Array<Pick<Tables<"dropdown_masters">, "id" | "value">>;
   forms: Array<Pick<Tables<"form_templates">, "id" | "name">>;
   templates: TaskTemplate[];
   users: TaskUser[];
@@ -78,12 +79,13 @@ export async function loadAvailabilityForDate(date: string): Promise<Availabilit
 }
 
 export async function loadTaskAuthoringReferenceData(): Promise<TaskReferenceData> {
-  const [users, branchesResult, departmentsResult, categories, priorities, templatesResult, formsResult] = await Promise.all([
+  const [users, branchesResult, departmentsResult, categories, priorities, designations, templatesResult, formsResult] = await Promise.all([
     loadAvailabilityUsers(),
     supabase.from("branches").select("id,name").eq("is_active", true).order("name"),
     supabase.from("departments").select("id,name,branch_id").eq("is_active", true).order("name"),
     loadTaskCategoryOptions(),
     loadMasterOptions(["task_priority"]),
+    loadMasterOptions(["designation"]),
     supabase.from("task_templates").select("*").eq("task_type", "checklist").order("created_at", { ascending: false }),
     supabase.from("form_templates").select("id,name").eq("is_active", true).order("name"),
   ]);
@@ -96,6 +98,7 @@ export async function loadTaskAuthoringReferenceData(): Promise<TaskReferenceDat
     branches: branchesResult.data,
     categories,
     priorities: priorities.map(({ id, label, value }) => ({ id, label, value })),
+    designations: designations.map(({ id, value }) => ({ id, value })),
     departments: departmentsResult.data,
     templates: templatesResult.data,
     forms: formsResult.data,
