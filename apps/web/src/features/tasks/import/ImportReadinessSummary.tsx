@@ -12,7 +12,7 @@ type Props = Readonly<{
 const number = new Intl.NumberFormat("en-IN");
 
 export function ImportReadinessSummary({ total, assigned, assigningLeft, named, recurring, startDate, unresolvedLabels, unresolvedNamed }: Props) {
-  const date = startDate ? new Date(`${startDate}T00:00:00+05:30`).toLocaleDateString("en-IN", { dateStyle: "medium" }) : "Not selected";
+  const date = startDate ? new Date(`${startDate}T00:00:00+05:30`).toLocaleDateString("en-IN", { dateStyle: "medium", timeZone: "Asia/Kolkata" }) : "Not selected";
   const cards = [
     ["Total records", number.format(total)],
     ["Names written", number.format(named)],
