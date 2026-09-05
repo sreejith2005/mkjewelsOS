@@ -1,5 +1,5 @@
 begin;
-select plan(10);
+select plan(12);
 
 -- The approved contract never auto-assigns a reporting manager. It routes an
 -- absent original through primary then secondary buddy for the exact work date,
@@ -52,11 +52,24 @@ select ok(position('reports_to_user_id' in pg_get_functiondef('public.resolve_ta
 select ok(position('not between v_today and v_today+1' in pg_get_functiondef('public.resolve_fms_stage_assignees(uuid,uuid,uuid)'::regprocedure)) = 0, 'FMS assignment resolution is not limited to today or tomorrow');
 select ok(position('not between v_today and v_today+1' in pg_get_functiondef('public.apply_task_assignment_coverage()'::regprocedure)) = 0, 'ordinary task assignment is not limited to today or tomorrow');
 
--- Returning an employee to present must restore their unfinished work, even if
--- it was already moved to a buddy while they were absent.
+-- Existing work can be planned before its actual deadline. It must still move
+-- to coverage when the original assignee becomes absent on that deadline date.
+update user_availability set status='present'
+where user_profile_id='86400000-0000-4000-8000-000000000004'
+  and date=(now() at time zone 'Asia/Kolkata')::date+2;
+insert into task_instances(id,tenant_id,branch_id,department_id,task_type,title,status,planned_datetime,due_datetime,created_by)
+values('86500000-0000-4000-8000-000000000002','86100000-0000-4000-8000-000000000001','86200000-0000-4000-8000-000000000001','86300000-0000-4000-8000-000000000001','delegation','Earlier planned coverage task','pending',((((now() at time zone 'Asia/Kolkata')::date+1)::text)||' 09:00 Asia/Kolkata')::timestamptz,((((now() at time zone 'Asia/Kolkata')::date+2)::text)||' 18:00 Asia/Kolkata')::timestamptz,'86400000-0000-4000-8000-000000000001');
+insert into task_assignees(task_instance_id,user_profile_id,role_at_task,is_original,is_active)
+values('86500000-0000-4000-8000-000000000002','86400000-0000-4000-8000-000000000002','doer',true,true);
 set local role authenticated;
 select set_config('request.jwt.claim.sub','86000000-0000-4000-8000-000000000001',true);
 select set_config('request.jwt.claim.role','authenticated',true);
+select record_availability_with_audit('86400000-0000-4000-8000-000000000002',(now() at time zone 'Asia/Kolkata')::date+2,'absent','mid-day absence');
+select ok(exists(select 1 from task_assignees where task_instance_id='86500000-0000-4000-8000-000000000002' and user_profile_id='86400000-0000-4000-8000-000000000004' and is_active), 'existing task due today moves to the available buddy');
+select ok(not exists(select 1 from task_assignees where task_instance_id='86500000-0000-4000-8000-000000000002' and user_profile_id='86400000-0000-4000-8000-000000000002' and is_active), 'existing absent assignee no longer has the due-today task');
+
+-- Returning an employee to present must restore their unfinished work, even if
+-- it was already moved to a buddy while they were absent.
 select record_availability_with_audit('86400000-0000-4000-8000-000000000002',(now() at time zone 'Asia/Kolkata')::date+2,'present','returned to work');
 select ok(exists(select 1 from task_assignees where task_instance_id='86500000-0000-4000-8000-000000000001' and user_profile_id='86400000-0000-4000-8000-000000000002' and is_active), 'present original assignee regains the task');
 select ok(not exists(select 1 from task_assignees where task_instance_id='86500000-0000-4000-8000-000000000001' and user_profile_id='86400000-0000-4000-8000-000000000004' and is_active), 'buddy coverage ends when the original assignee returns');
