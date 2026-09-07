@@ -1,6 +1,6 @@
 export type HomeTask={id:string;title:string;task_type:string;priority:"high"|"medium"|"low";status:string;due_at:string;overdue:boolean;checklist_completion:number|null};
-export type HomeFms={stage_id:string;instance_id:string;reference_number:string;instance_title:string;stage_name:string;status:string;planned_datetime:string|null;sla_breached:boolean};
-export type HomeFmsStarter={id:string;fms_flow_id:string;form_template_id:string;flow_name:string;stage_name:string;assigned_at:string};
+export type HomeFms={stage_id:string;instance_id:string;form_template_id:string|null;form_name:string|null;reference_number:string;instance_title:string;stage_name:string;status:string;planned_datetime:string|null;sla_breached:boolean};
+export type HomeFmsStarter={id:string;fms_flow_id:string;form_template_id:string;form_name:string;flow_name:string;stage_name:string;assigned_at:string};
 export type HomeForm={task_id:string;form_template_id:string;form_name:string;task_title:string;due_at:string};
 export type HomeFollowup={id:string;client_id:string;subject:string|null;due_date:string;status:string;overdue:boolean};
 export type HomeActivity={id:string;action:string;module:string;created_at:string};

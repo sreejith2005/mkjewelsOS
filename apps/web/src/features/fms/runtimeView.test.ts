@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getMenuForRole } from "@jewelos/core";
-import { eligibleFmsUsers, filterFmsInstances, isInitialFmsDefinition, parseFmsContext, priorFmsDefinitions, shouldOpenInitialFmsForm } from "./runtimeView";
+import { eligibleFmsUsers, filterFmsInstances, isInitialFmsDefinition, parseFmsContext, priorFmsDefinitions, shouldOpenFmsForm, shouldOpenInitialFmsForm } from "./runtimeView";
 import type { FmsData, FmsInstance, FmsInstanceStage, FmsStageRow } from "./api";
 
 const instance = (patch: Partial<FmsInstance> = {}): FmsInstance => ({ id: "i1", fms_flow_id: "f1", reference_number: "FMS-1", title: "Order check", status: "active", priority: "medium", context: {}, branch_id: "b1", department_id: "d1", started_by: "u1", started_at: null, completed_at: null, parent_instance_id: null, flow_version: 1, ...patch });
@@ -24,6 +24,7 @@ describe("FMS runtime view rules", () => {
   it("offers only earlier activated definitions as revision targets", () => { const current = definition({ id: "s3", sort_order: 2 }); const rows = [definition(), definition({ id: "s2", sort_order: 1 }), current, definition({ id: "other", fms_flow_id: "f2", sort_order: 0 })]; expect(priorFmsDefinitions(rows, [runtimeStage(), runtimeStage({ id: "r2", fms_stage_id: "s2" })], "f1", current).map((item) => item.id)).toEqual(["s1", "s2"]); });
   it("requires a linked form only on the first definition", () => { const later = definition({ id: "s2", sort_order: 1, form_template_id: "form" }); const rows = [later, definition()]; expect(isInitialFmsDefinition(rows, rows[1]!)).toBe(true); expect(isInitialFmsDefinition(rows, later)).toBe(false); });
   it("opens an unsubmitted actionable first Form immediately", () => { const first = definition({ step_type: "form", form_template_id: "form" }); expect(shouldOpenInitialFmsForm([first], first, runtimeStage())).toBe(true); expect(shouldOpenInitialFmsForm([first], first, runtimeStage({ form_submission_id: "submission" }))).toBe(false); });
+  it("opens an assigned later pinned form when its exact deep link requests it", () => { const later = definition({ form_template_id: "form-2", id: "s2", sort_order: 1 }); expect(shouldOpenFmsForm([definition(), later], later, runtimeStage({ fms_stage_id: "s2" }), "form-2")).toBe(true); expect(shouldOpenFmsForm([definition(), later], later, runtimeStage({ fms_stage_id: "s2" }), "different-form")).toBe(false); });
   it("accepts an object context", () => expect(parseFmsContext('{"source":"manual"}')).toEqual({ source: "manual" }));
   it.each(["[]", "null", '"value"'])("rejects non-object context %s", (value) => expect(() => parseFmsContext(value)).toThrow("JSON object"));
   it("rejects more than 50 context keys", () => expect(() => parseFmsContext(JSON.stringify(Object.fromEntries(Array.from({ length: 51 }, (_, index) => [`key_${index}`, index]))))).toThrow("50 keys"));

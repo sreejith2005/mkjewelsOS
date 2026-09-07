@@ -24,6 +24,8 @@ import { shouldShowTaskLoading } from "@/features/tasks/taskLoading";
 import { loadFormDynamicOptions, loadTaskForms, submitForm, type FormBundle } from "@/features/forms/api";
 import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
+import { fmsFormDeepLinkPath } from "@/features/fms/deepLink";
+import { loadFmsTaskDeepLink } from "@/features/tasks/api";
 
 type TaskWorkspaceView = "mine" | "delegated";
 const TASK_TOPICS = ["tasks", "forms", "organization"] as const;
@@ -128,6 +130,11 @@ export function TasksPage() {
     });
     if (!capability.canMutate) throw new Error("You do not have permission to update this task");
     if (action.kind === "fill_form") { setFormTarget(task); return; }
+    if (action.kind === "fill_fms_form") {
+      if (!task.form_template_id) throw new Error("The FMS stage has no pinned form");
+      navigateTo(fmsFormDeepLinkPath(await loadFmsTaskDeepLink(task.id, task.form_template_id)));
+      return;
+    }
     if (action.kind === "upload") await uploadTaskAttachment(profile.tenant_id, task.id, action.file);
     else if (action.kind === "upload_and_complete") {
       await uploadAndCompleteTask(profile.tenant_id, task.id, action.file);

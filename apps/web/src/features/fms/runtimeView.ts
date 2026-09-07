@@ -23,6 +23,11 @@ export function shouldOpenInitialFmsForm(definitions: FmsStageRow[], current: Fm
     && ["pending", "in_progress", "in_review", "overdue"].includes(runtime.status);
 }
 
+export function shouldOpenFmsForm(definitions: FmsStageRow[], current: FmsStageRow, runtime: Pick<FmsInstanceStage, "status" | "form_submission_id">, requestedFormTemplateId?: string) {
+  return !runtime.form_submission_id && !!current.form_template_id && ["pending", "in_progress", "in_review", "overdue"].includes(runtime.status)
+    && (shouldOpenInitialFmsForm(definitions, current, runtime) || current.form_template_id === requestedFormTemplateId);
+}
+
 export function filterFmsInstances(input: { instances: FmsInstance[]; stages: FmsInstanceStage[]; profileId: string; tab: "mine" | "started" | "branch"; query: string; status: string; priority: string; overdueOnly: boolean; now?: string }) {
   return input.instances.filter((instance) => {
     const stages = input.stages.filter((stage) => stage.fms_instance_id === instance.id);

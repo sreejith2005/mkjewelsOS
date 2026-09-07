@@ -39,6 +39,17 @@ export type TaskFeedReferenceData = Pick<TaskReferenceData, "categories">;
 
 export type RecurringTaskPreparation = Readonly<{ created: number }>;
 
+/** Resolves a feed row to its authorized FMS instance and confirms its pinned form before navigation. */
+export async function loadFmsTaskDeepLink(instanceStageId: string, formTemplateId: string): Promise<{ instanceId: string; instanceStageId: string; formTemplateId: string }> {
+  const { data, error } = await supabase.from("fms_instance_stages").select("fms_instance_id,fms_stage_id").eq("id", instanceStageId).maybeSingle();
+  fail("Load FMS task", error);
+  if (!data) throw new Error("FMS stage is no longer available");
+  const stage = await supabase.from("fms_stages").select("form_template_id").eq("id", data.fms_stage_id).maybeSingle();
+  fail("Load FMS form", stage.error);
+  if (stage.data?.form_template_id !== formTemplateId) throw new Error("FMS stage does not require this exact pinned form");
+  return { instanceId: data.fms_instance_id, instanceStageId, formTemplateId };
+}
+
 export async function ensureMyRecurringTasks(): Promise<RecurringTaskPreparation> {
   const { data, error } = await supabase.functions.invoke("ensure-my-recurring-tasks", { method: "POST" });
   fail("Prepare recurring tasks", error);

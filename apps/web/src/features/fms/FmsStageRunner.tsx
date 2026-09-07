@@ -24,7 +24,7 @@ import {
   type FmsStageRow,
 } from "./api";
 import type { UserProfile } from "@/types";
-import { eligibleFmsUsers, isInitialFmsDefinition, priorFmsDefinitions, shouldOpenInitialFmsForm } from "./runtimeView";
+import { eligibleFmsUsers, isInitialFmsDefinition, priorFmsDefinitions, shouldOpenFmsForm } from "./runtimeView";
 
 type ManagedAction = "reassign" | "backward" | "revision" | "escalate";
 
@@ -43,7 +43,7 @@ export function runtimeDecisionOptions(plannedRule: Record<string, unknown>): re
   return plannedRule.decisionMode === "yes_no" ? [{ key: "yes", label: "Yes" }, { key: "no", label: "No" }] : [];
 }
 
-export function FmsStageRunner({ instance, instanceStages, stage, definition, definitions, checklist, evidence, users, branches, departments, profile, forms, formOptions, onRefresh }: {
+export function FmsStageRunner({ instance, instanceStages, stage, definition, definitions, checklist, evidence, users, branches, departments, profile, forms, formOptions, onRefresh, requestedFormTemplateId }: {
   instance: FmsInstance;
   instanceStages: FmsInstanceStage[];
   stage: FmsInstanceStage;
@@ -58,9 +58,10 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
   forms: FormBundle[];
   formOptions: DynamicOptions;
   onRefresh: () => Promise<void>;
+  requestedFormTemplateId?: string;
 }) {
   const requiresLinkedForm = isInitialFmsDefinition(definitions, definition);
-  const shouldOpenInitialForm = shouldOpenInitialFmsForm(definitions, definition, stage);
+  const shouldOpenInitialForm = shouldOpenFmsForm(definitions, definition, stage, requestedFormTemplateId);
   const [remark, setRemark] = useState("");
   const [outcome, setOutcome] = useState("");
   const [nextAssignee, setNextAssignee] = useState("");

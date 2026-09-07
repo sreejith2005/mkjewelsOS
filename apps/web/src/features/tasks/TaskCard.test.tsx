@@ -66,6 +66,16 @@ const task = {
 } as TaskBundle;
 
 describe("TaskCard direct completion", () => {
+  it("marks a linked FMS form action explicitly and delegates its stage identity", async () => {
+    const onAction = vi.fn().mockResolvedValue(undefined);
+
+    render(<TaskCard capability={capability} categoryLabel="FMS" onAction={onAction} task={{ ...task, form_template_id: "form-1", requires_form: true, task_type: "fms", title: "KYC form" }} />);
+
+    expect(screen.getAllByText("FMS").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: /View details/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Complete FMS form" }));
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ kind: "fill_fms_form" }));
+  });
   it("identifies work covered for an absent colleague", () => {
     render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={vi.fn()} task={{
       ...task,

@@ -9,11 +9,13 @@ import { FmsStageRunner } from "@/features/fms/FmsStageRunner";
 import { loadFmsRuntime, setFmsInstanceStatus, type FmsInstance } from "@/features/fms/api";
 import { filterFmsInstances } from "@/features/fms/runtimeView";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
+import { parseFmsFormDeepLink } from "@/features/fms/deepLink";
 
 const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: [], masters: [] };
 type Runtime = Awaited<ReturnType<typeof loadFmsRuntime>>;
 
 export function FMSTasksPage({ embedded = false, query: externalQuery, initialInstanceId }: { embedded?: boolean; query?: string; initialInstanceId?: string }) {
+  const deepLink = parseFmsFormDeepLink(window.location.href);
   const { profile } = useAuth();
   const [runtime, setRuntime] = useState<Runtime>();
   const [forms, setForms] = useState<FormBundle[]>([]);
@@ -25,7 +27,7 @@ export function FMSTasksPage({ embedded = false, query: externalQuery, initialIn
   const [priority, setPriority] = useState("all");
   const [overdue, setOverdue] = useState(false);
   const [selected, setSelected] = useState<FmsInstance | null>(null);
-  const [openInstanceId, setOpenInstanceId] = useState(initialInstanceId ?? "");
+  const [openInstanceId, setOpenInstanceId] = useState(initialInstanceId ?? deepLink?.instanceId ?? "");
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -77,7 +79,7 @@ export function FMSTasksPage({ embedded = false, query: externalQuery, initialIn
         <div className="mt-4 h-2 overflow-hidden rounded-full bg-charcoal"><div className="h-full bg-gold" style={{ width: `${progress.percent}%` }} /></div><p className="mt-1 text-xs text-soft-grey">{progress.completed}/{progress.total} required stages · {progress.percent}%</p>
         {parent || children.length ? <p className="mt-2 text-xs text-soft-grey">Lineage: {parent ? `parent ${parent.reference_number}` : "root"}{children.length ? ` · children ${children.map((item) => item.reference_number).join(", ")}` : ""}</p> : null}
       </header>
-      {stages.map((stage) => { const definition = runtime.definitions.find((item) => item.id === stage.fms_stage_id); return definition ? <FmsStageRunner branches={formOptions.branches} checklist={runtime.checklist.filter((item) => item.fms_instance_stage_id === stage.id)} definition={definition} definitions={runtime.definitions} departments={formOptions.departments} evidence={runtime.evidence.filter((item) => item.fms_instance_stage_id === stage.id)} formOptions={formOptions} forms={forms} instance={selected} instanceStages={stages} key={stage.id} onRefresh={refresh} profile={profile} stage={stage} users={runtime.users} /> : null; })}
+      {stages.map((stage) => { const definition = runtime.definitions.find((item) => item.id === stage.fms_stage_id); const requested = deepLink?.instanceStageId === stage.id ? deepLink.formTemplateId : null; return definition ? <FmsStageRunner branches={formOptions.branches} checklist={runtime.checklist.filter((item) => item.fms_instance_stage_id === stage.id)} definition={definition} definitions={runtime.definitions} departments={formOptions.departments} evidence={runtime.evidence.filter((item) => item.fms_instance_stage_id === stage.id)} formOptions={formOptions} forms={forms} instance={selected} instanceStages={stages} key={stage.id} onRefresh={refresh} profile={profile} {...(requested ? { requestedFormTemplateId: requested } : {})} stage={stage} users={runtime.users} /> : null; })}
       <section className="rounded-2xl border border-gold/20 p-4"><h2 className="mb-3 font-semibold">Immutable timeline</h2><ol className="space-y-2">{runtime.logs.filter((log) => stages.some((stage) => stage.id === log.fms_instance_stage_id)).map((log) => <li className="border-l border-gold/30 pl-3 text-sm" key={log.id}><b>{log.action.replaceAll("_", " ")}</b><span className="block text-xs text-soft-grey">{log.created_at ? new Date(log.created_at).toLocaleString("en-IN") : "—"} · actor {log.actor_id ?? "system"}</span>{log.details ? <code className="block overflow-x-auto text-xs text-soft-grey">{JSON.stringify(log.details)}</code> : null}</li>)}</ol></section>
     </section>;
   }
