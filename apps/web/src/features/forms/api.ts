@@ -169,6 +169,14 @@ export async function startFmsFromFormSubmission(submissionId: string): Promise<
   const row = Array.isArray(data) ? data[0] : data;
   return row ? { instanceId: row.instance_id as string, referenceNumber: row.reference_number as string } : null;
 }
+/** Submits the Home-selected starter assignment atomically, retaining its exact flow identity. */
+export async function submitFmsStarterAssignment(formTemplateId: string, starterAssignmentId: string, answers: object): Promise<void> {
+  const { error } = await supabase.rpc("submit_fms_form_and_progress_with_audit" as never, {
+    p_form_template_id: formTemplateId, p_answers: answers as Json, p_linked_module: "fms_entry", p_linked_record_id: starterAssignmentId,
+    p_idempotency_key: crypto.randomUUID(),
+  } as never);
+  fail("Start linked FMS", error);
+}
 export const reviewSubmission = async (id: string, decision: "approved" | "rejected", notes: string) => { const { error } = await supabase.rpc("review_form_submission_with_audit", { p_submission_id: id, p_decision: decision, p_review_notes: notes }); fail("Review submission", error); };
 
 const ALLOWED_UPLOAD_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);

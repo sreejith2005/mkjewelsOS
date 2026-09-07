@@ -1,0 +1,10 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path=public,extensions;
+select plan(5);
+select function_owner_is('public','submit_fms_form_and_progress_with_audit',array['uuid','jsonb','text','uuid','uuid','text','text','jsonb','uuid'],'postgres','starter submission remains postgres owned');
+select ok(not has_function_privilege('anon','submit_fms_form_and_progress_with_audit(uuid,jsonb,text,uuid,uuid,text,text,jsonb,uuid)','EXECUTE'),'anonymous callers cannot start a starter assignment');
+select ok((select pg_get_functiondef('submit_fms_form_and_progress_with_audit(uuid,jsonb,text,uuid,uuid,text,text,jsonb,uuid)'::regprocedure) like '%fms_starter_assignments where id=p_linked_record_id%'),'entry submission locks the exact starter assignment');
+select ok((select pg_get_functiondef('submit_fms_form_and_progress_with_audit(uuid,jsonb,text,uuid,uuid,text,text,jsonb,uuid)'::regprocedure) like '%user_profile_id=v_actor.id%' and pg_get_functiondef('submit_fms_form_and_progress_with_audit(uuid,jsonb,text,uuid,uuid,text,text,jsonb,uuid)'::regprocedure) like '%status=''pending''%'),'starter assignment is actor-owned and pending');
+select ok((select pg_get_functiondef('submit_fms_form_and_progress_with_audit(uuid,jsonb,text,uuid,uuid,text,text,jsonb,uuid)'::regprocedure) like '%starter_assignment_id%'),'audit and response retain starter identity');
+select * from finish(); rollback;
