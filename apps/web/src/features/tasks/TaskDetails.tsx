@@ -41,7 +41,7 @@ function verificationLabel(task: TaskBundle): string {
 }
 
 function evidenceLabel(task: TaskBundle): string {
-  if (!task.requires_upload) return "Not required";
+  if (task.task_type === "checklist" || !task.requires_upload) return "Not required";
   return task.hasAttachment ? "Evidence required · Uploaded" : "Evidence required";
 }
 

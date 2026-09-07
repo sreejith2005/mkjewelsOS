@@ -90,7 +90,7 @@ describe("TaskDetails", () => {
     for (const label of ["Assigned to", "Branch", "Department", "Task type", "Core task", "Frequency", "Start", "Due", "Priority", "Evidence", "Verification", "Verifier", "Buddy coverage", "Schedule state", "Status", "Checklist"]) {
       expect(details.getAllByText(label).length).toBeGreaterThan(0);
     }
-    for (const value of ["Ashwini Kamble", "Pune Camp", "Retail Operations", "Checklist", "Showroom opening", "Daily", "Evidence required · Uploaded", "Verification pending", "Nikita Patil", "Buddy coverage allowed", "Schedule paused", "Pending"]) {
+    for (const value of ["Ashwini Kamble", "Pune Camp", "Retail Operations", "Checklist", "Showroom opening", "Daily", "Not required", "Verification pending", "Nikita Patil", "Buddy coverage allowed", "Schedule paused", "Pending"]) {
       expect(details.getAllByText(value).length).toBeGreaterThan(0);
     }
     expect(details.getByText(/2 Sept 2026, 9:00 am/i)).not.toBeNull();

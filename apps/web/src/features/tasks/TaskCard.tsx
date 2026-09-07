@@ -41,14 +41,18 @@ export function TaskCard({ capability, categoryLabel, onAction, task: taskInput 
   const blocked = task.status === "blocked";
   const readOnly = !capability.canMutate || task.task_type === "fms";
   const formOnlyAction = task.requires_form && !completed;
+  // Checklists are a click-to-complete task type. Older imports copied the
+  // sheet's evidence flag onto checklist records, so normalize defensively in
+  // the UI while migration 0148 repairs persisted import data.
+  const requiresEvidence = task.task_type !== "checklist" && task.requires_upload;
   // An outstanding checklist never withholds the completion action. Imported
   // occurrences each carry one required item repeating the task headline, and
   // hiding the action behind it left every such task uncompletable. Completion
-  // closes the remaining items server-side (migration 0142), so the checklist
+  // closes the remaining items server-side (migration 0143), so the checklist
   // records the work instead of gating it.
-  const canComplete = (!task.requires_upload || task.hasAttachment) && (!task.requires_form || task.hasFormSubmission);
+  const canComplete = (!requiresEvidence || task.hasAttachment) && (!task.requires_form || task.hasFormSubmission);
   const canShowDirectComplete = !formOnlyAction && !readOnly && !completed && !blocked;
-  const canShowDirectUpload = canShowDirectComplete && task.requires_upload && !task.hasAttachment;
+  const canShowDirectUpload = canShowDirectComplete && requiresEvidence && !task.hasAttachment;
   const act = async (action: TaskCardAction) => {
     setBusy(true);
     setError(null);
@@ -109,7 +113,7 @@ export function TaskCard({ capability, categoryLabel, onAction, task: taskInput 
       {blocked ? <Notice tone="task">Coverage required. An authorized manager must resolve coverage through a future database-backed workflow; no simulated resolution is available here.</Notice> : null}
       {!formOnlyAction ? task.checklists.map((item) => <div className="flex items-start gap-3 text-sm text-task-text" key={item.id}><button aria-label={item.is_completed ? "Mark incomplete" : "Mark complete"} className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded border", item.is_completed ? "border-task-accent bg-task-accent text-task-text" : "border-task-border bg-task-bg")} disabled={busy || completed || readOnly || blocked} onClick={() => void act({ kind: "checklist", checklistId: item.id, completed: !item.is_completed })} type="button">{item.is_completed ? <Check className="size-3" /> : null}</button><span className={cn(item.is_completed && "line-through text-task-text-muted")}>{item.item_text}{item.is_required ? <span className="ml-1 text-task-overdue">*</span> : null}</span></div>) : null}
       {formOnlyAction && !readOnly && !blocked ? <Button disabled={busy || !task.form_template_id} onClick={() => void act({ kind: "fill_form" })} type="button"><CheckCircle2 />Complete form</Button> : null}
-      {!formOnlyAction && !readOnly && task.requires_upload && !completed ? <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-task-border bg-task-bg p-3 text-sm text-task-text"><FileUp className="size-4" /><span>{task.hasAttachment ? "Evidence uploaded · add another" : "Upload required evidence"}</span><input accept="image/jpeg,image/png,image/webp,application/pdf" className="sr-only" disabled={busy} onChange={(event) => void upload(event)} type="file" /></label> : null}
+      {!formOnlyAction && !readOnly && requiresEvidence && !completed ? <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-task-border bg-task-bg p-3 text-sm text-task-text"><FileUp className="size-4" /><span>{task.hasAttachment ? "Evidence uploaded · add another" : "Upload required evidence"}</span><input accept="image/jpeg,image/png,image/webp,application/pdf" className="sr-only" disabled={busy} onChange={(event) => void upload(event)} type="file" /></label> : null}
       {!formOnlyAction && !readOnly && task.requires_remark && !completed ? <Field label="Completion remark"><textarea className="task-field min-h-16" onChange={(event) => setRemark(event.target.value)} value={remark} /></Field> : null}
       {task.task_type === "fms" ? <Notice tone="task">FMS stage actions arrive in Phase 3; this stage is read-only in the unified feed.</Notice> : null}
       {!formOnlyAction && capability.canUseElevatedActions && task.task_type === "delegation" && !completed && !blocked ? <form className="grid gap-3 rounded-xl border border-task-border bg-task-bg p-3 sm:grid-cols-[1fr_1fr_auto]" onSubmit={(event) => { event.preventDefault(); void act({ kind: "revise", datetime: new Date(revision).toISOString(), reason: revisionReason }); }}><Field label="Revised date"><input className="task-field" onChange={(event) => setRevision(event.target.value)} required type="datetime-local" value={revision} /></Field><Field label="Reason"><input className="task-field" onChange={(event) => setRevisionReason(event.target.value)} required value={revisionReason} /></Field><Button className="self-end bg-task-accent text-task-text hover:bg-task-accent/90" disabled={busy} type="submit">Revise</Button></form> : null}

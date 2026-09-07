@@ -142,6 +142,28 @@ describe("TaskCard direct completion", () => {
     await waitFor(() => expect(onAction).toHaveBeenCalledWith({ file, kind: "upload_and_complete" }));
   });
 
+  it("treats an imported checklist as click-to-complete even when legacy data requires evidence", async () => {
+    const onAction = vi.fn().mockResolvedValue(undefined);
+
+    render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{
+      ...task,
+      requires_upload: true,
+      task_type: "checklist",
+      title: "Open the showroom",
+    }} />);
+
+    expect(screen.queryByLabelText("Upload task: Open the showroom")).toBeNull();
+    const complete = screen.getByRole("button", { name: "Complete task: Open the showroom" });
+    expect(complete).toHaveProperty("disabled", false);
+
+    fireEvent.click(screen.getByRole("button", { name: /View details/i }));
+    expect(screen.getByText("Evidence").parentElement?.textContent).toBe("EvidenceNot required");
+    expect(screen.queryByText("Upload required evidence")).toBeNull();
+
+    fireEvent.click(complete);
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ kind: "complete", remark: "" }));
+  });
+
   it("still lets a doer tick an individual checklist item", async () => {
     const onAction = vi.fn().mockResolvedValue(undefined);
     const checklists = [{ completed_at: null, completed_by: null, id: "item-1", is_completed: false, is_required: true, item_text: "Photograph the tray", sort_order: 1, task_instance_id: "task-1" }];
