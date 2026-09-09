@@ -16,8 +16,10 @@ import {
 } from "lucide-react";
 import {
   canAccessPage, canBypassSectionMaintenance, DEFAULT_SECTION_CONTROLS, isSectionUnderMaintenance, validateSectionControls,
-  getMenuForRole,
+  getImplementedMenuForRole,
+  getLauncherMenuForRole,
   getPageForPath,
+  isImplementedPage,
   type PageId,
 } from "@jewelos/core";
 import { AuthProvider, useAuth } from "@/auth/AuthContext";
@@ -77,24 +79,6 @@ const PAGE_ICONS: Record<PageId, typeof Home> = {
   settings: Settings,
 };
 
-const IMPLEMENTED_PAGES = new Set<PageId>([
-  "home",
-  "dashboard",
-  "checklist_tasks",
-  "recurring_todo",
-  "task_templates",
-  "users",
-  "availability",
-  "dropdown_master",
-  "forms_library",
-  "fms_tasks",
-  "fms_builder",
-  "notifications",
-  "crm",
-  "reports",
-  "settings",
-]);
-
 const FULL_WIDTH_PAGES = new Set<PageId>([
   "home",
   "dashboard",
@@ -107,20 +91,6 @@ const FULL_WIDTH_PAGES = new Set<PageId>([
   "fms_builder",
   "fms_tasks",
 ]);
-
-const APP_DESCRIPTIONS: Partial<Record<PageId, string>> = {
-  home: "See today's authorized work, linked forms, FMS stages, and activity.",
-  dashboard: "Review truthful operational analytics and transparent formulas.",
-  crm: "Manage clients, walk-ins, interactions, follow-ups, and documents.",
-  fms_builder: "Run, build, and control every workflow from one place.",
-  users: "Browse employees by department and manage authorized accounts.",
-  availability: "Record real working availability.",
-  recurring_todo: "Manage recurring schedules, personal work, verification, follow-ups, and coverage.",
-  task_templates: "Track progress, chase overdue work, review evidence, and manage every task template in one place.",
-  dropdown_master: "Maintain active master values.",
-  reports: "Preview fixed reports and manage private CSV exports.",
-  settings: "Manage account preferences and authorized organization defaults.",
-};
 
 function usePathname() {
   const [path, setPath] = useState(window.location.pathname);
@@ -277,18 +247,15 @@ function AppShell() {
     document.documentElement.dataset.tableDensity = preferences.table_density;
     return () => { delete document.documentElement.dataset.tableDensity; };
   }, [preferences.table_density]);
-  const menu = useMemo(() => profile
-    ? getMenuForRole(profile.user_role).filter((item) => IMPLEMENTED_PAGES.has(item.id))
-    : [], [profile]);
+  const menu = useMemo(() => profile ? getImplementedMenuForRole(profile.user_role) : [], [profile]);
   const nav = useMemo(() => menu.map((item) => ({
     ...item,
     Icon: PAGE_ICONS[item.id],
     label: item.label,
   })), [menu]);
-  const launcherItems = useMemo<LauncherItem[]>(() => nav.flatMap((item) => {
-    const description = APP_DESCRIPTIONS[item.id];
-    return description ? [{ ...item, description }] : [];
-  }), [nav]);
+  const launcherItems = useMemo<LauncherItem[]>(() => profile
+    ? getLauncherMenuForRole(profile.user_role).map((item) => ({ ...item, Icon: PAGE_ICONS[item.id] }))
+    : [], [profile]);
   if (!profile) return null;
   const isSuperAdmin = canBypassSectionMaintenance(profile.user_role);
   const persistSectionControls = async (nextControls: typeof sectionControls) => {
@@ -302,7 +269,7 @@ function AppShell() {
     }
   };
   const requestedPage = getPageForPath(path) ?? "home";
-  const allowed = IMPLEMENTED_PAGES.has(requestedPage) && canAccessPage(profile.user_role, requestedPage);
+  const allowed = isImplementedPage(requestedPage) && canAccessPage(profile.user_role, requestedPage);
   const currentPage: PageId = allowed ? requestedPage : "dashboard";
   const sectionUnderMaintenance = !isSuperAdmin && isSectionUnderMaintenance(sectionControls, currentPage);
   const pageContent = sectionUnderMaintenance ? <SectionMaintenanceNotice section={currentPage === "checklist_tasks" ? "Tasks" : currentPage === "forms_library" ? "Forms Library" : currentPage === "fms_builder" ? "FMS" : currentPage === "dropdown_master" ? "Dropdown Master" : currentPage === "task_templates" ? "Task Control" : currentPage.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())} /> : currentPage === "home" ? <HomePage onNavigate={navigate} />

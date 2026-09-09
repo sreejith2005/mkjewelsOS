@@ -42,6 +42,8 @@ export type MenuItem = Readonly<{
   path: string;
 }>;
 
+export type LauncherMenuItem = MenuItem & Readonly<{ description: string }>;
+
 export const ALL_MENU_ITEMS: readonly MenuItem[] = [
   { id: "home", label: "Home", path: "/" },
   { id: "dashboard", label: "Dashboard", path: "/dashboard" },
@@ -59,6 +61,41 @@ export const ALL_MENU_ITEMS: readonly MenuItem[] = [
   { id: "dropdown_master", label: "Dropdown Master", path: "/dropdown-master" },
   { id: "settings", label: "Settings", path: "/settings" },
 ] as const;
+
+export const IMPLEMENTED_PAGE_IDS: readonly PageId[] = [
+  "home",
+  "dashboard",
+  "checklist_tasks",
+  "recurring_todo",
+  "task_templates",
+  "users",
+  "availability",
+  "dropdown_master",
+  "forms_library",
+  "fms_tasks",
+  "fms_builder",
+  "notifications",
+  "crm",
+  "reports",
+  "settings",
+] as const;
+
+const IMPLEMENTED_PAGES = new Set<PageId>(IMPLEMENTED_PAGE_IDS);
+
+const APP_DESCRIPTIONS: Partial<Readonly<Record<PageId, string>>> = {
+  home: "See today's authorized work, linked forms, FMS stages, and activity.",
+  dashboard: "Review truthful operational analytics and transparent formulas.",
+  crm: "Manage clients, walk-ins, interactions, follow-ups, and documents.",
+  fms_tasks: "Run assigned stages and authorized workflows.",
+  fms_builder: "Run live workflows and design versioned process flows.",
+  users: "Browse employees by department and manage authorized accounts.",
+  availability: "Record real working availability.",
+  recurring_todo: "Manage recurring schedules, personal work, verification, follow-ups, and coverage.",
+  task_templates: "Track progress, chase overdue work, review evidence, and manage every task template in one place.",
+  dropdown_master: "Maintain active master values.",
+  reports: "Preview fixed reports and manage private CSV exports.",
+  settings: "Manage account preferences and authorized organization defaults.",
+};
 
 const COMMON_WORK_PAGES: readonly PageId[] = [
   "home",
@@ -111,6 +148,21 @@ export function getMenuForRole(role: UserRole): readonly MenuItem[] {
   return ALL_MENU_ITEMS.filter((item) => allowed.has(item.id));
 }
 
+export function isImplementedPage(page: PageId): boolean {
+  return IMPLEMENTED_PAGES.has(page);
+}
+
+export function getImplementedMenuForRole(role: UserRole): readonly MenuItem[] {
+  return getMenuForRole(role).filter((item) => isImplementedPage(item.id));
+}
+
+export function getLauncherMenuForRole(role: UserRole): readonly LauncherMenuItem[] {
+  return getImplementedMenuForRole(role).flatMap((item) => {
+    const description = APP_DESCRIPTIONS[item.id];
+    return description ? [{ ...item, description }] : [];
+  });
+}
+
 export function canAccessPage(role: UserRole, page: PageId): boolean {
   return allowedPages(role).includes(page);
 }
@@ -119,6 +171,7 @@ export function getPageForPath(path: string): PageId | undefined {
   // Task evidence used to be its own destination; it is now a panel inside Task
   // Control, so old links and bookmarks land on the workspace that absorbed it.
   if (path === "/task-evidence") return "task_templates";
+  if (path === "/tasks/fms") return "fms_tasks";
   if (path === "/tasks/checklist" || path === "/tasks/delegation" || path === "/tasks/import" || path === "/tasks/assigning-left") return "checklist_tasks";
   // FMS form deep links point at /tasks/fms; the unified FMS section absorbs them.
   if (path === "/tasks/fms") return "fms_builder";
