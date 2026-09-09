@@ -4,6 +4,7 @@ import {
   type PageId,
   type UserRole,
 } from "@jewelos/core";
+import type { ThemeName } from "@/theme/theme";
 
 export type NativeTopLevelRoute = "Home" | "Tasks" | "Fms" | "Crm";
 
@@ -45,4 +46,8 @@ export function resolveNativeDestination(path: string): NativeDestination | null
 
 export function buildLauncherItems(role: UserRole): readonly ShellLauncherItem[] {
   return getLauncherMenuForRole(role);
+}
+
+export function themeToggleLabel(name: ThemeName): string {
+  return name === "dark" ? "Switch to light mode" : "Switch to dark mode";
 }

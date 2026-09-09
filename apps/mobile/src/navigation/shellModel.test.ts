@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLauncherItems, pathForTopLevelRoute, resolveNativeDestination } from "./shellModel";
+import { buildLauncherItems, pathForTopLevelRoute, resolveNativeDestination, themeToggleLabel } from "./shellModel";
 
 describe("resolveNativeDestination", () => {
   it.each([
@@ -45,4 +45,9 @@ it("uses the approved web paths for visible native tabs", () => {
   expect(pathForTopLevelRoute("Tasks")).toBe("/tasks");
   expect(pathForTopLevelRoute("Fms")).toBe("/tasks/fms");
   expect(pathForTopLevelRoute("Crm")).toBe("/crm");
+});
+
+it("describes the theme the toggle will activate", () => {
+  expect(themeToggleLabel("light")).toBe("Switch to dark mode");
+  expect(themeToggleLabel("dark")).toBe("Switch to light mode");
 });
