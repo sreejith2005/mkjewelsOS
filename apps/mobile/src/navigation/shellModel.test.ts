@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { buildLauncherItems, pathForTopLevelRoute, resolveNativeDestination, themeToggleLabel } from "./shellModel";
+import {
+  buildLauncherItems,
+  isTaskPath,
+  pathForTopLevelRoute,
+  resolveNativeDestination,
+  themeToggleLabel,
+} from "./shellModel";
 
 describe("resolveNativeDestination", () => {
   it.each([
     ["/", "Home"],
     ["/tasks", "Tasks"],
     ["/tasks/checklist", "Tasks"],
+    ["/tasks/delegation", "Tasks"],
+    ["/tasks/import", "Tasks"],
+    ["/tasks/assigning-left", "Tasks"],
     ["/tasks/fms", "Fms"],
     ["/crm", "Crm"],
   ] as const)("maps %s to the implemented %s tab", (path, route) => {
@@ -19,6 +28,13 @@ describe("resolveNativeDestination", () => {
   it("rejects unknown paths", () => {
     expect(resolveNativeDestination("/not-a-jewelos-page")).toBeNull();
   });
+});
+
+it("selects Tasks for every approved task workspace path", () => {
+  expect(isTaskPath("/tasks")).toBe(true);
+  expect(isTaskPath("/tasks/fms")).toBe(true);
+  expect(isTaskPath("/tasks/import")).toBe(true);
+  expect(isTaskPath("/task-templates")).toBe(false);
 });
 
 describe("buildLauncherItems", () => {
