@@ -31,11 +31,13 @@
 - Create: `apps/mobile/src/navigation/shellModel.test.ts`
 - Create: `apps/mobile/src/navigation/shellModel.ts`
 - Modify: `apps/mobile/src/navigation/types.ts`
+- Modify: `apps/web/src/App.tsx`
+- Modify: `packages/core/src/index.ts`
 - Modify: `packages/core/src/roleMenu.test.ts`
 - Modify: `packages/core/src/roleMenu.ts`
 
 **Interfaces:**
-- Consumes: `getMenuForRole(role)`, `getPageForPath(path)`, `PageId`, `UserRole` from `@jewelos/core`.
+- Consumes: `getImplementedMenuForRole(role)`, `getLauncherMenuForRole(role)`, `getPageForPath(path)`, `PageId`, `UserRole` from `@jewelos/core`.
 - Produces: `NativeTopLevelRoute = "Home" | "Tasks" | "Fms" | "Crm"`; `resolveNativeDestination(path): { kind: "tab"; route: NativeTopLevelRoute } | { kind: "section"; page: PageId } | null`; `buildLauncherItems(role): readonly ShellLauncherItem[]`; `pathForTopLevelRoute(route): string`.
 
 - [ ] **Step 1: Record repository and machine baseline**
@@ -97,11 +99,10 @@ describe("resolveNativeDestination", () => {
 });
 
 describe("buildLauncherItems", () => {
-  it("keeps core menu order and excludes destinations without approved app descriptions", () => {
+  it("keeps the approved web launcher order and descriptions", () => {
     const items = buildLauncherItems("staff");
     expect(items.map((item) => item.id)).toEqual([
-      "home", "dashboard", "checklist_tasks", "fms_builder", "forms_library",
-      "availability", "reports", "settings",
+      "home", "dashboard", "fms_builder", "availability", "reports", "settings",
     ]);
   });
 
@@ -130,17 +131,23 @@ Expected: FAIL because `shellModel.ts` and its exports do not exist. The existin
 
 - [ ] **Step 5: Implement the minimal pure shell model**
 
-First add this regression assertion to `packages/core/src/roleMenu.test.ts` and run it to observe RED:
+First add these regression assertions to `packages/core/src/roleMenu.test.ts` and run them to observe RED:
 
 ```ts
 expect(getPageForPath("/tasks/fms")).toBe("fms_tasks");
+expect(getImplementedMenuForRole("staff").every((item) => item.id !== "meeting_ai")).toBe(true);
+expect(getLauncherMenuForRole("staff").map((item) => item.id)).toEqual([
+  "home", "dashboard", "fms_builder", "availability", "reports", "settings",
+]);
 ```
 
-Then extend the special task-path mapping in `packages/core/src/roleMenu.ts` so `/tasks/fms` resolves to `fms_tasks`. This fixes the current mismatch where the approved Home screen links to `/tasks/fms` but the shared resolver does not recognize it. Run the focused core test to observe GREEN.
+Then extend the special task-path mapping in `packages/core/src/roleMenu.ts` so `/tasks/fms` resolves to `fms_tasks`. This fixes the current mismatch where the approved Home screen links to `/tasks/fms` but the shared resolver does not recognize it.
 
-Create `shellModel.ts` with typed top-level route/path maps, the same implemented-page set and launcher descriptions used by the web shell, and pure functions matching the interfaces above. Use `getPageForPath()` rather than duplicating alias handling. Do not import React Native, React Navigation, or icon components into this module.
+Move the web's `IMPLEMENTED_PAGES` and `APP_DESCRIPTIONS` values from `apps/web/src/App.tsx` into typed exports in `roleMenu.ts`. Implement `getImplementedMenuForRole(role)` and `getLauncherMenuForRole(role)` there, export them through `packages/core/src/index.ts`, and refactor the web `AppShell` to use those functions. Keep only the web icon mapping in `App.tsx`. This prevents the Android launcher from copying a second list that can drift. Run the focused core test and the web suite to observe GREEN.
 
-Update `types.ts` so `TabParamList` contains only the renderable content tabs `Home`, `Tasks`, `Fms`, and `Crm`. Remove `More` as a screen because More is an action sheet, not a destination. Retain all existing detail-stack parameter types.
+Create `shellModel.ts` with typed top-level route/path maps and pure functions matching the interfaces above. Build launcher data from `getLauncherMenuForRole()` and use `getPageForPath()` rather than duplicating shared lists or alias handling. Do not import React Native, React Navigation, or icon components into this module.
+
+Do not remove the legacy `More` tab type yet: `AppTabs.tsx` still consumes it at this checkpoint. Task 4 removes `More` atomically with the replacement shell so the intermediate checkout remains type-safe. Retain all existing detail-stack parameter types.
 
 - [ ] **Step 6: Run the focused test and verify GREEN**
 
@@ -150,6 +157,7 @@ Run:
 npm --prefix apps/mobile run test -- src/navigation/shellModel.test.ts
 npm --prefix apps/mobile run typecheck
 pnpm.cmd --filter @jewelos/core test -- src/roleMenu.test.ts
+pnpm.cmd --filter web test
 ```
 
 Expected: shell-model tests pass and TypeScript reports no errors.
@@ -157,7 +165,7 @@ Expected: shell-model tests pass and TypeScript reports no errors.
 - [ ] **Step 7: Commit only the shell contract**
 
 ```powershell
-git add -- apps/mobile/src/navigation/shellModel.test.ts apps/mobile/src/navigation/shellModel.ts apps/mobile/src/navigation/types.ts packages/core/src/roleMenu.test.ts packages/core/src/roleMenu.ts
+git add -- apps/mobile/src/navigation/shellModel.test.ts apps/mobile/src/navigation/shellModel.ts apps/mobile/src/navigation/types.ts apps/web/src/App.tsx packages/core/src/index.ts packages/core/src/roleMenu.test.ts packages/core/src/roleMenu.ts
 git diff --cached --check
 git commit -m "feat(mobile): define approved shell navigation contract"
 ```
