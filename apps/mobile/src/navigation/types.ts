@@ -19,7 +19,6 @@ export type RootStackParamList = {
   ClientDetail: { clientId: string };
   Walkin: { clientId?: string };
   Followups: undefined;
-  Section: { page: PageId };
   Profile: undefined;
 };
 
@@ -28,11 +27,11 @@ export type TabParamList = {
   Tasks: undefined;
   Fms: undefined;
   Crm: undefined;
-  More: undefined;
+  Section: { page: PageId };
 };
 
 /** The order tabs appear in when the viewer's role allows them. */
-export const TAB_ORDER = ["Home", "Tasks", "Fms", "Crm", "More"] as const;
+export const TAB_ORDER = ["Home", "Tasks", "Fms", "Crm", "Section"] as const;
 
 /** The page each tab stands for, so role checks stay driven by `@jewelos/core`. */
 export const TAB_PAGE: Readonly<Record<keyof TabParamList, PageId | null>> = {
@@ -40,5 +39,5 @@ export const TAB_PAGE: Readonly<Record<keyof TabParamList, PageId | null>> = {
   Tasks: "checklist_tasks",
   Fms: "fms_tasks",
   Crm: "crm",
-  More: null,
+  Section: null,
 };

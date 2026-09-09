@@ -1,118 +1,168 @@
-import { useMemo } from "react";
-import { StyleSheet, View } from "react-native";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { canAccessPage } from "@jewelos/core";
-import { useProfile } from "@/auth/AuthProvider";
-import { makeStyles } from "@/theme/makeStyles";
-import { useAppTheme } from "@/theme/ThemeProvider";
-import { Text } from "@/ui/Text";
-import { HomeScreen } from "@/screens/HomeScreen";
-import { TasksScreen } from "@/screens/TasksScreen";
-import { FmsTasksScreen } from "@/screens/FmsTasksScreen";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { View } from "react-native";
+import { createBottomTabNavigator, type BottomTabBarProps, type BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import { useNavigation } from "@react-navigation/native";
+import {
+  CalendarCheck, CheckSquare, ClipboardList, FileSpreadsheet, FolderCheck, GitBranch,
+  Home, LayoutDashboard, ListChecks, ListFilter, Settings, Users,
+} from "lucide-react-native";
+import { canAccessPage, type PageId } from "@jewelos/core";
+import { useAuth, useProfile } from "@/auth/AuthProvider";
+import { AppLauncher, type LauncherItem } from "@/components/shell/AppLauncher";
+import { MobileBottomNav } from "@/components/shell/MobileBottomNav";
+import { MobileHeader } from "@/components/shell/MobileHeader";
+import { MoreSheet } from "@/components/shell/MoreSheet";
+import { titleCase } from "@/lib/format";
+import {
+  buildLauncherItems, pathForTopLevelRoute, resolveNativeDestination, type NativeTopLevelRoute,
+} from "@/navigation/shellModel";
+import type { TabParamList } from "@/navigation/types";
 import { CrmScreen } from "@/screens/CrmScreen";
-import { MoreScreen } from "@/screens/MoreScreen";
-import { TAB_PAGE, type TabParamList } from "@/navigation/types";
+import { FmsTasksScreen } from "@/screens/FmsTasksScreen";
+import { HomeScreen } from "@/screens/HomeScreen";
+import { SectionScreen } from "@/screens/SectionScreen";
+import { TasksScreen } from "@/screens/TasksScreen";
 
 const Tab = createBottomTabNavigator<TabParamList>();
 
-const TAB_LABEL: Record<keyof TabParamList, string> = {
-  Home: "Home",
-  Tasks: "Tasks",
-  Fms: "FMS",
-  Crm: "CRM",
-  More: "More",
+const PAGE_ICONS: Record<PageId, LauncherItem["Icon"]> = {
+  home: Home,
+  dashboard: LayoutDashboard,
+  crm: Users,
+  checklist_tasks: CheckSquare,
+  recurring_todo: CalendarCheck,
+  task_templates: ListChecks,
+  task_evidence: FolderCheck,
+  delegation_tasks: ClipboardList,
+  fms_tasks: GitBranch,
+  fms_builder: GitBranch,
+  forms_library: ClipboardList,
+  meeting_ai: ClipboardList,
+  notifications: ClipboardList,
+  users: Users,
+  availability: CalendarCheck,
+  reports: FileSpreadsheet,
+  dropdown_master: ListFilter,
+  settings: Settings,
 };
 
-/**
- * A glyph rather than an icon font. Five tabs of text-only labels read as a
- * toolbar; a mark above each label is what makes a bottom bar scannable at a
- * glance without pulling in an icon package for five shapes.
- */
-const TAB_MARK: Record<keyof TabParamList, string> = {
-  Home: "◆",
-  Tasks: "✓",
-  Fms: "⇄",
-  Crm: "☺",
-  More: "⋯",
-};
+type ShellState = Readonly<{
+  appsOpen: boolean;
+  moreOpen: boolean;
+  path: string;
+  setAppsOpen: (open: boolean) => void;
+  setMoreOpen: (open: boolean) => void;
+  setPath: (path: string) => void;
+}>;
 
-function TabIcon({ name, focused }: { name: keyof TabParamList; focused: boolean }) {
-  const styles = useStyles();
+const ShellContext = createContext<ShellState | null>(null);
+
+function useShell(): ShellState {
+  const shell = useContext(ShellContext);
+  if (!shell) throw new Error("useShell must be used within AppTabs");
+  return shell;
+}
+
+function usePathNavigation() {
+  const navigation = useNavigation<BottomTabNavigationProp<TabParamList>>();
+  const profile = useProfile();
+  const { setPath } = useShell();
+
+  return useCallback((path: string) => {
+    const destination = resolveNativeDestination(path);
+    if (!destination) return;
+    const page: PageId = destination.kind === "section"
+      ? destination.page
+      : destination.route === "Home"
+        ? "home"
+        : destination.route === "Tasks"
+          ? "checklist_tasks"
+          : destination.route === "Fms"
+            ? "fms_tasks"
+            : "crm";
+    if (!canAccessPage(profile.user_role, page)) return;
+    setPath(path);
+    if (destination.kind === "tab") navigation.navigate(destination.route);
+    else navigation.navigate("Section", { page: destination.page });
+  }, [navigation, profile.user_role, setPath]);
+}
+
+function ShellPage({ children }: { children: ReactNode }) {
+  const profile = useProfile();
+  const { setMoreOpen } = useShell();
+  const navigate = usePathNavigation();
   return (
-    <View style={styles.icon}>
-      <Text tone={focused ? "primary" : "muted"} variant="subtitle">
-        {TAB_MARK[name]}
-      </Text>
+    <View className="flex-1 bg-obsidian">
+      <MobileHeader onNavigate={navigate} onOpenMore={() => setMoreOpen(true)} profileName={profile.employee_name} />
+      <View className="flex-1">{children}</View>
     </View>
   );
 }
 
-/**
- * The bottom bar. Which tabs exist is decided by the same `canAccessPage` table
- * the web sidebar uses, so a role never sees a destination the server would
- * refuse — and every page a role can reach that is not a tab is listed under
- * More, so nothing becomes unreachable by being left out of five slots.
- */
-export function AppTabs() {
-  const profile = useProfile();
-  const theme = useAppTheme();
-  const styles = useStyles();
+function HomeTab() { return <ShellPage><HomeScreen /></ShellPage>; }
+function TasksTab() { return <ShellPage><TasksScreen /></ShellPage>; }
+function FmsTab() { return <ShellPage><FmsTasksScreen /></ShellPage>; }
+function CrmTab() { return <ShellPage><CrmScreen /></ShellPage>; }
+function SectionTab() { return <ShellPage><SectionScreen /></ShellPage>; }
 
-  const tabs = useMemo(() => {
-    const visible = (Object.keys(TAB_PAGE) as (keyof TabParamList)[]).filter((name) => {
-      const page = TAB_PAGE[name];
-      return page === null || canAccessPage(profile.user_role, page);
-    });
-    return visible;
-  }, [profile.user_role]);
+function ParityTabBar({ state }: BottomTabBarProps) {
+  const { branch, logout } = useAuth();
+  const profile = useProfile();
+  const shell = useShell();
+  const navigate = usePathNavigation();
+  const current = state.routes[state.index];
+  const currentPath = current?.name === "Section"
+    ? shell.path
+    : pathForTopLevelRoute((current?.name ?? "Home") as NativeTopLevelRoute);
+  const launcherItems = useMemo<LauncherItem[]>(() =>
+    buildLauncherItems(profile.user_role).map((item) => ({ ...item, Icon: PAGE_ICONS[item.id] })),
+  [profile.user_role]);
 
   return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.textMuted,
-        tabBarStyle: styles.bar,
-        tabBarLabelStyle: styles.label,
-        tabBarItemStyle: styles.item,
-      }}
-    >
-      {tabs.map((name) => (
-        <Tab.Screen
-          component={SCREENS[name]}
-          key={name}
-          name={name}
-          options={{
-            title: TAB_LABEL[name],
-            tabBarAccessibilityLabel: TAB_LABEL[name],
-            tabBarIcon: ({ focused }) => <TabIcon focused={focused} name={name} />,
-          }}
-        />
-      ))}
-    </Tab.Navigator>
+    <>
+      <MobileBottomNav
+        onNavigate={navigate}
+        onOpenApps={() => shell.setAppsOpen(true)}
+        onOpenMore={() => shell.setMoreOpen(true)}
+        path={currentPath}
+      />
+      <AppLauncher items={launcherItems} onClose={() => shell.setAppsOpen(false)} onNavigate={navigate} visible={shell.appsOpen} />
+      <MoreSheet
+        branchName={branch?.name ?? "Branch unavailable"}
+        items={launcherItems}
+        onClose={() => shell.setMoreOpen(false)}
+        onLogout={logout}
+        onNavigate={navigate}
+        profileName={profile.employee_name}
+        roleLabel={titleCase(profile.user_role)}
+        visible={shell.moreOpen}
+      />
+    </>
   );
 }
 
-const SCREENS = {
-  Home: HomeScreen,
-  Tasks: TasksScreen,
-  Fms: FmsTasksScreen,
-  Crm: CrmScreen,
-  More: MoreScreen,
-} as const satisfies Record<keyof TabParamList, () => React.JSX.Element | null>;
+/** Native routing underneath the approved four-action web phone shell. */
+export function AppTabs() {
+  const [appsOpen, setAppsOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [path, setPath] = useState("/");
+  const shell = useMemo<ShellState>(() => ({
+    appsOpen, moreOpen, path, setAppsOpen, setMoreOpen, setPath,
+  }), [appsOpen, moreOpen, path]);
 
-const useStyles = makeStyles((theme) => StyleSheet.create({
-  bar: {
-    backgroundColor: theme.colors.surface,
-    borderTopColor: theme.colors.border,
-    borderTopWidth: 1,
-    // Android's own gesture inset is added by the navigator; this is the room
-    // the labels themselves need so a tab stays a 48dp target.
-    height: 64,
-    paddingTop: 6,
-    paddingBottom: 8,
-  },
-  item: { minHeight: theme.touchTarget },
-  label: { fontSize: theme.fontSize.caption, fontWeight: "600" },
-  icon: { minHeight: 22, alignItems: "center", justifyContent: "center" },
-}));
+  return (
+    <ShellContext.Provider value={shell}>
+      <Tab.Navigator
+        backBehavior="history"
+        screenOptions={{ headerShown: false, lazy: true }}
+        tabBar={(props) => <ParityTabBar {...props} />}
+      >
+        <Tab.Screen component={HomeTab} name="Home" />
+        <Tab.Screen component={TasksTab} name="Tasks" />
+        <Tab.Screen component={FmsTab} name="Fms" />
+        <Tab.Screen component={CrmTab} name="Crm" />
+        <Tab.Screen component={SectionTab} name="Section" />
+      </Tab.Navigator>
+    </ShellContext.Provider>
+  );
+}

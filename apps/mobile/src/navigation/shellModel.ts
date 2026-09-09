@@ -4,7 +4,7 @@ import {
   type PageId,
   type UserRole,
 } from "@jewelos/core";
-import type { ThemeName } from "@/theme/theme";
+import type { ThemeName } from "@jewelos/ui-tokens";
 
 export type NativeTopLevelRoute = "Home" | "Tasks" | "Fms" | "Crm";
 
@@ -32,6 +32,19 @@ const PAGE_ROUTE: Partial<Readonly<Record<PageId, NativeTopLevelRoute>>> = {
   fms_tasks: "Fms",
   crm: "Crm",
 };
+
+const TASK_PATHS = new Set([
+  "/tasks",
+  "/tasks/checklist",
+  "/tasks/delegation",
+  "/tasks/fms",
+  "/tasks/import",
+  "/tasks/assigning-left",
+]);
+
+export function isTaskPath(path: string): boolean {
+  return TASK_PATHS.has(path);
+}
 
 export function pathForTopLevelRoute(route: NativeTopLevelRoute): string {
   return ROUTE_PATH[route];
