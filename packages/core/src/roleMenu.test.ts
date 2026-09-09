@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { canAccessPage, getMenuForRole, getPageForPath } from "./roleMenu";
+import {
+  canAccessPage,
+  getImplementedMenuForRole,
+  getLauncherMenuForRole,
+  getMenuForRole,
+  getPageForPath,
+} from "./roleMenu";
 
 describe("task workspace navigation", () => {
   it("exposes one Tasks menu item", () => {
@@ -13,6 +19,22 @@ describe("task workspace navigation", () => {
     expect(getPageForPath("/tasks/delegation")).toBe("checklist_tasks");
     expect(getPageForPath("/tasks/import")).toBe("checklist_tasks");
     expect(getPageForPath("/tasks/assigning-left")).toBe("checklist_tasks");
+    expect(getPageForPath("/tasks/fms")).toBe("fms_tasks");
+  });
+
+  it("keeps unfinished menu destinations out of implemented navigation", () => {
+    expect(getImplementedMenuForRole("staff").every((item) => item.id !== "meeting_ai")).toBe(true);
+  });
+
+  it("builds the approved launcher from shared descriptions", () => {
+    expect(getLauncherMenuForRole("staff").map((item) => item.id)).toEqual([
+      "home",
+      "dashboard",
+      "fms_builder",
+      "availability",
+      "reports",
+      "settings",
+    ]);
   });
 
   it("reserves recurring schedule management for admin roles", () => {
