@@ -3,3 +3,4 @@ export * from "./delivery";
 export * from "./events";
 export * from "./rules";
 export * from "./template";
+export * from "./inbox";

@@ -1,16 +1,10 @@
-import { EVENT_VARIABLES, isSafeInternalLink, validateRule, validateTemplateText, type NotificationEventType } from "@jewelos/core";
+import { EVENT_VARIABLES, filterNotificationInbox, isSafeInternalLink, notificationDestination, validateRule, validateTemplateText, type NotificationEventType } from "@jewelos/core";
 import type { InboxNotification, RuleDraft } from "./types";
 
 export type InboxFilters = Readonly<{ unreadOnly: boolean; eventType: string; priority: string; search: string }>;
 
 export function filterInbox(items: readonly InboxNotification[], filters: InboxFilters): InboxNotification[] {
-  const query = filters.search.trim().toLocaleLowerCase();
-  return items.filter((item) =>
-    (!filters.unreadOnly || !item.is_read)
-    && (!filters.eventType || item.event_type === filters.eventType)
-    && (!filters.priority || item.priority === filters.priority)
-    && (!query || `${item.title} ${item.message}`.toLocaleLowerCase().includes(query)),
-  );
+  return filterNotificationInbox(items, filters);
 }
 
 export function unreadBadge(count: number): string { return count > 99 ? "99+" : String(count); }
@@ -41,9 +35,7 @@ export function inboxDisplayState(loading: boolean, error: string | null, count:
   return count === 0 ? "empty" : "ready";
 }
 
-export function notificationDestination(link: string | null): string | null {
-  return isSafeInternalLink(link) ? link : null;
-}
+export { notificationDestination };
 
 export function validateTemplateDraft(eventType: NotificationEventType, title: string, body: string, link: string | null): readonly string[] {
   const validation = validateTemplateText(eventType, title, body);
