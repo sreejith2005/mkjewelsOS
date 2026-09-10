@@ -5,6 +5,7 @@ import { EmptyState } from "@/ui/states";
 import type { TabParamList } from "@/navigation/types";
 import { DashboardScreen } from "@/screens/DashboardScreen";
 import { NotificationsScreen } from "@/screens/NotificationsScreen";
+import { AvailabilityScreen } from "@/screens/AvailabilityScreen";
 
 type Route = RouteProp<TabParamList, "Section">;
 
@@ -18,6 +19,7 @@ export function SectionScreen({ onNavigate }: { onNavigate: (path: string) => vo
   const { params } = useRoute<Route>();
   if (params.page === "dashboard") return <DashboardScreen />;
   if (params.page === "notifications") return <NotificationsScreen onNavigate={onNavigate} />;
+  if (params.page === "availability") return <AvailabilityScreen />;
   const label = ALL_MENU_ITEMS.find((item) => item.id === params.page)?.label ?? "This section";
   return (
     <Screen>
