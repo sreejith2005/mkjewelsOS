@@ -8,6 +8,8 @@ import { NotificationsScreen } from "@/screens/NotificationsScreen";
 import { AvailabilityScreen } from "@/screens/AvailabilityScreen";
 import { ReportsScreen } from "@/screens/ReportsScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
+import { FmsTasksScreen } from "@/screens/FmsTasksScreen";
+import { FormsLibraryScreen } from "@/screens/FormsLibraryScreen";
 
 type Route = RouteProp<TabParamList, "Section">;
 
@@ -24,6 +26,10 @@ export function SectionScreen({ onNavigate }: { onNavigate: (path: string) => vo
   if (params.page === "availability") return <AvailabilityScreen />;
   if (params.page === "reports") return <ReportsScreen />;
   if (params.page === "settings") return <SettingsScreen />;
+  // The approved web FMS destination opens on the viewer's live workflow
+  // tasks. Managers additionally receive the builder library in a later view.
+  if (params.page === "fms_builder" || params.page === "fms_tasks") return <FmsTasksScreen />;
+  if (params.page === "forms_library") return <FormsLibraryScreen />;
   const label = ALL_MENU_ITEMS.find((item) => item.id === params.page)?.label ?? "This section";
   return (
     <Screen>
