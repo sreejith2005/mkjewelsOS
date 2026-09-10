@@ -98,7 +98,10 @@ function HomeTab() { return <ShellPage><HomeScreen /></ShellPage>; }
 function TasksTab() { return <ShellPage><TasksScreen /></ShellPage>; }
 function FmsTab() { return <ShellPage><FmsTasksScreen /></ShellPage>; }
 function CrmTab() { return <ShellPage><CrmScreen /></ShellPage>; }
-function SectionTab() { return <ShellPage><SectionScreen /></ShellPage>; }
+function SectionTab() {
+  const navigate = usePathNavigation();
+  return <ShellPage><SectionScreen onNavigate={navigate} /></ShellPage>;
+}
 
 function ParityTabBar({ navigation, state }: BottomTabBarProps) {
   const { branch, logout } = useAuth();
