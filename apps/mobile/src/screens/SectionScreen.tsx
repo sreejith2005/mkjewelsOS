@@ -7,6 +7,7 @@ import { DashboardScreen } from "@/screens/DashboardScreen";
 import { NotificationsScreen } from "@/screens/NotificationsScreen";
 import { AvailabilityScreen } from "@/screens/AvailabilityScreen";
 import { ReportsScreen } from "@/screens/ReportsScreen";
+import { SettingsScreen } from "@/screens/SettingsScreen";
 
 type Route = RouteProp<TabParamList, "Section">;
 
@@ -22,6 +23,7 @@ export function SectionScreen({ onNavigate }: { onNavigate: (path: string) => vo
   if (params.page === "notifications") return <NotificationsScreen onNavigate={onNavigate} />;
   if (params.page === "availability") return <AvailabilityScreen />;
   if (params.page === "reports") return <ReportsScreen />;
+  if (params.page === "settings") return <SettingsScreen />;
   const label = ALL_MENU_ITEMS.find((item) => item.id === params.page)?.label ?? "This section";
   return (
     <Screen>
