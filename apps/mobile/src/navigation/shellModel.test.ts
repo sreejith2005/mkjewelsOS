@@ -2,10 +2,37 @@ import { describe, expect, it } from "vitest";
 import {
   buildLauncherItems,
   isTaskPath,
+  navigatePath,
   pathForTopLevelRoute,
   resolveNativeDestination,
   themeToggleLabel,
 } from "./shellModel";
+
+describe("navigatePath", () => {
+  it("sends a bottom-navigation task press to the supplied tab navigator", () => {
+    const calls: string[] = [];
+
+    expect(navigatePath("/tasks", "staff", {
+      navigateSection: (page) => calls.push(`section:${page}`),
+      navigateTab: (route) => calls.push(`tab:${route}`),
+      setPath: (path) => calls.push(`path:${path}`),
+    })).toBe(true);
+
+    expect(calls).toEqual(["path:/tasks", "tab:Tasks"]);
+  });
+
+  it("does not navigate to a role-forbidden destination", () => {
+    const calls: string[] = [];
+
+    expect(navigatePath("/crm", "housekeeping", {
+      navigateSection: (page) => calls.push(`section:${page}`),
+      navigateTab: (route) => calls.push(`tab:${route}`),
+      setPath: (path) => calls.push(`path:${path}`),
+    })).toBe(false);
+
+    expect(calls).toEqual([]);
+  });
+});
 
 describe("resolveNativeDestination", () => {
   it.each([

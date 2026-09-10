@@ -1,4 +1,5 @@
 import {
+  canAccessPage,
   getLauncherMenuForRole,
   getPageForPath,
   type PageId,
@@ -18,6 +19,12 @@ export type ShellLauncherItem = Readonly<{
 export type NativeDestination =
   | Readonly<{ kind: "tab"; route: NativeTopLevelRoute }>
   | Readonly<{ kind: "section"; page: PageId }>;
+
+export type NativeNavigationHandlers = Readonly<{
+  navigateSection: (page: PageId) => void;
+  navigateTab: (route: NativeTopLevelRoute) => void;
+  setPath: (path: string) => void;
+}>;
 
 const ROUTE_PATH: Readonly<Record<NativeTopLevelRoute, string>> = {
   Home: "/",
@@ -55,6 +62,31 @@ export function resolveNativeDestination(path: string): NativeDestination | null
   if (!page) return null;
   const route = PAGE_ROUTE[page];
   return route ? { kind: "tab", route } : { kind: "section", page };
+}
+
+/** Execute a web-path navigation request against the native tab shell. */
+export function navigatePath(
+  path: string,
+  role: UserRole,
+  handlers: NativeNavigationHandlers,
+): boolean {
+  const destination = resolveNativeDestination(path);
+  if (!destination) return false;
+  const page: PageId = destination.kind === "section"
+    ? destination.page
+    : destination.route === "Home"
+      ? "home"
+      : destination.route === "Tasks"
+        ? "checklist_tasks"
+        : destination.route === "Fms"
+          ? "fms_tasks"
+          : "crm";
+  if (!canAccessPage(role, page)) return false;
+
+  handlers.setPath(path);
+  if (destination.kind === "tab") handlers.navigateTab(destination.route);
+  else handlers.navigateSection(destination.page);
+  return true;
 }
 
 export function buildLauncherItems(role: UserRole): readonly ShellLauncherItem[] {
