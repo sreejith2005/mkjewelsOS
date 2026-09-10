@@ -105,6 +105,8 @@ export const saveFmsContextAssigneeDefault = async (moduleContext: string, userP
 export const reviseFmsFlow = async (id: string) => { const { data, error } = await supabase.rpc("create_fms_revision_with_audit", { p_flow_id: id }); fail("Create FMS revision", error); return data; };
 export const publishFmsFlow = async (id: string) => { const { error } = await supabase.rpc("publish_fms_flow_with_audit", { p_flow_id: id }); fail("Publish FMS flow", error); };
 export const archiveFmsFlow = async (id: string, reason: string) => { const { error } = await supabase.rpc("archive_fms_flow_with_audit", { p_flow_id: id, p_reason: reason }); fail("Archive FMS flow", error); };
+export const setFmsFlowActive = async (id: string, active: boolean, reason?: string) => { const { error } = await supabase.rpc("set_fms_flow_active_with_audit" as any, { p_flow_id: id, p_active: active, ...(reason ? { p_reason: reason } : {}) }); fail(active ? "Resume FMS flow" : "Pause FMS flow", error); };
+export const restoreFmsFlow = async (id: string, reason?: string) => { const { error } = await supabase.rpc("restore_fms_flow_with_audit" as any, { p_flow_id: id, ...(reason ? { p_reason: reason } : {}) }); fail("Restore FMS flow", error); };
 export const deleteFmsFlow = async (id: string) => { const { error } = await supabase.rpc("delete_fms_flow_with_audit" as any, { p_flow_id: id }); fail("Delete FMS flow", error); };
 
 export async function loadFmsRuntime(): Promise<{ instances: FmsInstance[]; stages: FmsInstanceStage[]; definitions: FmsStageRow[]; flows: FmsFlowRow[]; checklist: FmsChecklistItem[]; evidence: FmsEvidence[]; logs: FmsLog[]; users: FmsData["users"] }> {

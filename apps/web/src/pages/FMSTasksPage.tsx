@@ -14,7 +14,7 @@ import { parseFmsFormDeepLink } from "@/features/fms/deepLink";
 const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: [], masters: [] };
 type Runtime = Awaited<ReturnType<typeof loadFmsRuntime>>;
 
-export function FMSTasksPage({ embedded = false, query: externalQuery, initialInstanceId }: { embedded?: boolean; query?: string; initialInstanceId?: string }) {
+export function FMSTasksPage({ embedded = false, query: externalQuery, initialInstanceId, flowIds, heading }: { embedded?: boolean; query?: string; initialInstanceId?: string; flowIds?: readonly string[]; heading?: string }) {
   const deepLink = parseFmsFormDeepLink(window.location.href);
   const { profile } = useAuth();
   const [runtime, setRuntime] = useState<Runtime>();
@@ -53,7 +53,8 @@ export function FMSTasksPage({ embedded = false, query: externalQuery, initialIn
   }, [openInstanceId, runtime]);
 
   const activeQuery = externalQuery ?? query;
-  const instances = useMemo(() => filterFmsInstances({ instances: runtime?.instances ?? [], stages: runtime?.stages ?? [], profileId: profile?.id ?? "", tab, query: activeQuery, status, priority, overdueOnly: overdue }), [activeQuery, overdue, priority, profile?.id, runtime, status, tab]);
+  const scopedInstances = useMemo(() => (runtime?.instances ?? []).filter((instance) => !flowIds || flowIds.includes(instance.fms_flow_id)), [flowIds, runtime]);
+  const instances = useMemo(() => filterFmsInstances({ instances: scopedInstances, stages: runtime?.stages ?? [], profileId: profile?.id ?? "", tab, query: activeQuery, status, priority, overdueOnly: overdue }), [activeQuery, overdue, priority, profile?.id, runtime, scopedInstances, status, tab]);
 
   if (!profile) return null;
   const canManage = ["super_admin", "admin", "manager"].includes(profile.user_role);
@@ -85,7 +86,7 @@ export function FMSTasksPage({ embedded = false, query: externalQuery, initialIn
   }
 
   return <section className={embedded ? "w-full" : "mx-auto max-w-7xl"}>
-    <header className="mb-5"><h2 className="text-xl font-semibold text-white">Live instances</h2><p className="text-sm text-soft-grey">Processes assigned to you, started by you, or visible to your branch.</p></header>
+    <header className="mb-5"><h2 className="text-xl font-semibold text-white">{heading ?? "Live instances"}</h2><p className="text-sm text-soft-grey">Processes assigned to you, started by you, or visible to your branch.</p></header>
     {error ? <div className="mb-3"><Notice tone="danger">{error} <button className="underline" onClick={() => void refresh()} type="button">Retry</button></Notice></div> : null}
     <div className="scroll-x no-scrollbar mb-4 flex gap-2">{([["mine", "My Stages"], ["started", "Started by Me"], ...(canManage ? [["branch", "Branch View"] as const] : [])] as const).map(([value, label]) => <button className={`min-h-11 shrink-0 whitespace-nowrap rounded-lg px-4 text-sm font-semibold transition ${tab === value ? "bg-gold text-obsidian" : "bg-charcoal text-champagne"}`} key={value} onClick={() => setTab(value)} type="button">{label}</button>)}</div>
     <div className="mb-5 grid gap-2 sm:grid-cols-4"><label className="relative"><Search className="absolute left-3 top-3 size-4 text-soft-grey" /><input aria-label="Search FMS instances" className="field pl-9" onChange={(event) => setQuery(event.target.value)} placeholder="Search reference or title" value={query} /></label><select aria-label="Status filter" className="field" onChange={(event) => setStatus(event.target.value)} value={status}><option value="all">All statuses</option>{["active", "overdue", "on_hold", "completed", "cancelled"].map((item) => <option key={item}>{item}</option>)}</select><select aria-label="Priority filter" className="field" onChange={(event) => setPriority(event.target.value)} value={priority}><option value="all">All priorities</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select><label className="field flex items-center gap-2"><input checked={overdue} onChange={(event) => setOverdue(event.target.checked)} type="checkbox" /> Overdue only</label></div>

@@ -45,7 +45,6 @@ const DashboardPage = lazyPage("dashboard", () => import("@/pages/DashboardPage"
 const DropdownMasterPage = lazyPage("dropdown-master", () => import("@/pages/DropdownMasterPage").then((module) => ({ default: module.DropdownMasterPage })));
 const FormsPage = lazyPage("forms", () => import("@/pages/FormsPage").then((module) => ({ default: module.FormsPage })));
 const FMSBuilderPage = lazyPage("fms", () => import("@/pages/FMSBuilderPage").then((module) => ({ default: module.FMSBuilderPage })));
-const FMSTasksPage = lazyPage("fms-tasks", () => import("@/pages/FMSTasksPage").then((module) => ({ default: module.FMSTasksPage })));
 const NotificationsPage = lazyPage("notifications", () => import("@/pages/NotificationsPage").then((module) => ({ default: module.NotificationsPage })));
 const CRMPage = lazyPage("crm", () => import("@/pages/CRMPage").then((module) => ({ default: module.CRMPage })));
 const TasksPage = lazyPage("tasks", () => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
@@ -113,8 +112,7 @@ const APP_DESCRIPTIONS: Partial<Record<PageId, string>> = {
   home: "See today's authorized work, linked forms, FMS stages, and activity.",
   dashboard: "Review truthful operational analytics and transparent formulas.",
   crm: "Manage clients, walk-ins, interactions, follow-ups, and documents.",
-  fms_tasks: "Run assigned stages and authorized workflows.",
-  fms_builder: "Run live workflows and design versioned process flows.",
+  fms_builder: "Run, build, and control every workflow from one place.",
   users: "Browse employees by department and manage authorized accounts.",
   availability: "Record real working availability.",
   recurring_todo: "Manage recurring schedules, personal work, verification, follow-ups, and coverage.",
@@ -307,7 +305,7 @@ function AppShell() {
   const allowed = IMPLEMENTED_PAGES.has(requestedPage) && canAccessPage(profile.user_role, requestedPage);
   const currentPage: PageId = allowed ? requestedPage : "dashboard";
   const sectionUnderMaintenance = !isSuperAdmin && isSectionUnderMaintenance(sectionControls, currentPage);
-  const pageContent = sectionUnderMaintenance ? <SectionMaintenanceNotice section={currentPage === "checklist_tasks" ? "Tasks" : currentPage === "forms_library" ? "Forms Library" : currentPage === "fms_builder" ? "FMS" : currentPage === "dropdown_master" ? "Dropdown Master" : currentPage === "fms_tasks" ? "FMS Tasks" : currentPage === "task_templates" ? "Task Control" : currentPage.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())} /> : currentPage === "home" ? <HomePage onNavigate={navigate} />
+  const pageContent = sectionUnderMaintenance ? <SectionMaintenanceNotice section={currentPage === "checklist_tasks" ? "Tasks" : currentPage === "forms_library" ? "Forms Library" : currentPage === "fms_builder" ? "FMS" : currentPage === "dropdown_master" ? "Dropdown Master" : currentPage === "task_templates" ? "Task Control" : currentPage.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())} /> : currentPage === "home" ? <HomePage onNavigate={navigate} />
     : currentPage === "dashboard" ? <DashboardPage />
     : currentPage === "reports" ? <ReportsPage />
     : currentPage === "settings" ? <><SettingsPage /><div className="mx-auto w-full max-w-7xl px-4 pb-8"><DailyChecklistManager role={profile.user_role} /></div></>
@@ -319,7 +317,6 @@ function AppShell() {
       : currentPage === "task_templates" ? <TaskTemplatesPage />
       : currentPage === "availability" ? <AvailabilityPage />
           : currentPage === "forms_library" ? <FormsPage />
-            : currentPage === "fms_tasks" ? <FMSTasksPage />
               : currentPage === "fms_builder" ? <FMSBuilderPage />
                 : currentPage === "notifications" ? <NotificationsPage onNavigate={navigate} />
             : <DashboardPage />;
