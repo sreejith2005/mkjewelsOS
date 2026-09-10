@@ -6,7 +6,7 @@ import {
   CalendarCheck, CheckSquare, ClipboardList, FileSpreadsheet, FolderCheck, GitBranch,
   Home, LayoutDashboard, ListChecks, ListFilter, Settings, Users,
 } from "lucide-react-native";
-import { canAccessPage, type PageId } from "@jewelos/core";
+import type { PageId } from "@jewelos/core";
 import { useAuth, useProfile } from "@/auth/AuthProvider";
 import { AppLauncher, type LauncherItem } from "@/components/shell/AppLauncher";
 import { MobileBottomNav } from "@/components/shell/MobileBottomNav";
@@ -14,7 +14,7 @@ import { MobileHeader } from "@/components/shell/MobileHeader";
 import { MoreSheet } from "@/components/shell/MoreSheet";
 import { titleCase } from "@/lib/format";
 import {
-  buildLauncherItems, pathForTopLevelRoute, resolveNativeDestination, type NativeTopLevelRoute,
+  buildLauncherItems, navigatePath, pathForTopLevelRoute, type NativeTopLevelRoute,
 } from "@/navigation/shellModel";
 import type { TabParamList } from "@/navigation/types";
 import { CrmScreen } from "@/screens/CrmScreen";
@@ -63,27 +63,18 @@ function useShell(): ShellState {
   return shell;
 }
 
-function usePathNavigation() {
-  const navigation = useNavigation<BottomTabNavigationProp<TabParamList>>();
+function usePathNavigation(navigationOverride?: BottomTabNavigationProp<TabParamList>) {
+  const contextualNavigation = useNavigation<BottomTabNavigationProp<TabParamList>>();
+  const navigation = navigationOverride ?? contextualNavigation;
   const profile = useProfile();
   const { setPath } = useShell();
 
   return useCallback((path: string) => {
-    const destination = resolveNativeDestination(path);
-    if (!destination) return;
-    const page: PageId = destination.kind === "section"
-      ? destination.page
-      : destination.route === "Home"
-        ? "home"
-        : destination.route === "Tasks"
-          ? "checklist_tasks"
-          : destination.route === "Fms"
-            ? "fms_tasks"
-            : "crm";
-    if (!canAccessPage(profile.user_role, page)) return;
-    setPath(path);
-    if (destination.kind === "tab") navigation.navigate(destination.route);
-    else navigation.navigate("Section", { page: destination.page });
+    navigatePath(path, profile.user_role, {
+      navigateSection: (page) => navigation.navigate("Section", { page }),
+      navigateTab: (route) => navigation.navigate(route),
+      setPath,
+    });
   }, [navigation, profile.user_role, setPath]);
 }
 
@@ -105,11 +96,14 @@ function FmsTab() { return <ShellPage><FmsTasksScreen /></ShellPage>; }
 function CrmTab() { return <ShellPage><CrmScreen /></ShellPage>; }
 function SectionTab() { return <ShellPage><SectionScreen /></ShellPage>; }
 
-function ParityTabBar({ state }: BottomTabBarProps) {
+function ParityTabBar({ navigation, state }: BottomTabBarProps) {
   const { branch, logout } = useAuth();
   const profile = useProfile();
   const shell = useShell();
-  const navigate = usePathNavigation();
+  // A custom tab bar is rendered by the navigator, not by a tab screen. Its
+  // ambient navigation context can therefore be the parent root stack. Use the
+  // tab-bar navigation prop explicitly so Home/Tasks target registered tabs.
+  const navigate = usePathNavigation(navigation);
   const current = state.routes[state.index];
   const currentPath = current?.name === "Section"
     ? shell.path
