@@ -63,19 +63,23 @@ function useShell(): ShellState {
   return shell;
 }
 
-function usePathNavigation(navigationOverride?: BottomTabNavigationProp<TabParamList>) {
+type RouteHandlers = Readonly<{
+  navigateSection: (page: PageId) => void;
+  navigateTab: (route: NativeTopLevelRoute) => void;
+}>;
+
+function usePathNavigation(override?: RouteHandlers) {
   const contextualNavigation = useNavigation<BottomTabNavigationProp<TabParamList>>();
-  const navigation = navigationOverride ?? contextualNavigation;
   const profile = useProfile();
   const { setPath } = useShell();
 
   return useCallback((path: string) => {
     navigatePath(path, profile.user_role, {
-      navigateSection: (page) => navigation.navigate("Section", { page }),
-      navigateTab: (route) => navigation.navigate(route),
+      navigateSection: override?.navigateSection ?? ((page) => contextualNavigation.navigate("Section", { page })),
+      navigateTab: override?.navigateTab ?? ((route) => contextualNavigation.navigate(route)),
       setPath,
     });
-  }, [navigation, profile.user_role, setPath]);
+  }, [contextualNavigation, override, profile.user_role, setPath]);
 }
 
 function ShellPage({ children }: { children: ReactNode }) {
@@ -103,7 +107,11 @@ function ParityTabBar({ navigation, state }: BottomTabBarProps) {
   // A custom tab bar is rendered by the navigator, not by a tab screen. Its
   // ambient navigation context can therefore be the parent root stack. Use the
   // tab-bar navigation prop explicitly so Home/Tasks target registered tabs.
-  const navigate = usePathNavigation(navigation);
+  const tabHandlers = useMemo<RouteHandlers>(() => ({
+    navigateSection: (page) => navigation.navigate("Section", { page }),
+    navigateTab: (route) => navigation.navigate(route),
+  }), [navigation]);
+  const navigate = usePathNavigation(tabHandlers);
   const current = state.routes[state.index];
   const currentPath = current?.name === "Section"
     ? shell.path
