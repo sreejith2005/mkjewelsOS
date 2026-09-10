@@ -3,6 +3,7 @@ import { ALL_MENU_ITEMS } from "@jewelos/core";
 import { Screen } from "@/ui/Screen";
 import { EmptyState } from "@/ui/states";
 import type { TabParamList } from "@/navigation/types";
+import { DashboardScreen } from "@/screens/DashboardScreen";
 
 type Route = RouteProp<TabParamList, "Section">;
 
@@ -14,6 +15,7 @@ type Route = RouteProp<TabParamList, "Section">;
  */
 export function SectionScreen() {
   const { params } = useRoute<Route>();
+  if (params.page === "dashboard") return <DashboardScreen />;
   const label = ALL_MENU_ITEMS.find((item) => item.id === params.page)?.label ?? "This section";
   return (
     <Screen>
