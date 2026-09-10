@@ -8068,6 +8068,7 @@ export type Database = {
         Args: { p_operation: string; p_payload: Json }
         Returns: string
       }
+      current_availability_week_start: { Args: never; Returns: string }
       current_branch_id: { Args: never; Returns: string }
       current_profile: {
         Args: never
@@ -8781,6 +8782,15 @@ export type Database = {
       }
       reconcile_task_import_assignments: {
         Args: { p_rows: Json }
+        Returns: Json
+      }
+      record_availability_days_with_audit: {
+        Args: {
+          p_dates: string[]
+          p_reason: string
+          p_status: Database["public"]["Enums"]["availability_status"]
+          p_user_profile_id: string
+        }
         Returns: Json
       }
       record_availability_range_with_audit: {

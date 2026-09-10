@@ -29,6 +29,13 @@ export type {
   RecurringAssignment,
   RecurringAvailabilityProfile,
 } from "./recurrence";
+export {
+  availabilityWeekDays,
+  availabilityWeekEnd,
+  availabilityWeekStart,
+  isWithinAvailabilityWeek,
+} from "./availabilityWeek";
+export type { AvailabilityWeekDay } from "./availabilityWeek";
 export { calculateDelayMinutes, calculateSla } from "./sla";
 export type { SlaResult, SlaStatus } from "./sla";
 export {

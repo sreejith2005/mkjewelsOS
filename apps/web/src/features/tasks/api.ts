@@ -90,6 +90,16 @@ export async function loadAvailabilityForDate(date: string): Promise<Availabilit
   return result.data;
 }
 
+export async function loadAvailabilityForRange(startDate: string, endDate: string): Promise<AvailabilityEntry[]> {
+  const result = await supabase.from("user_availability")
+    .select("user_profile_id,date,status,reason")
+    .gte("date", startDate)
+    .lte("date", endDate)
+    .order("date");
+  fail("Load availability week", result.error);
+  return result.data;
+}
+
 export async function loadTaskAuthoringReferenceData(): Promise<TaskReferenceData> {
   const [users, branchesResult, departmentsResult, categories, priorities, designations, templatesResult, formsResult] = await Promise.all([
     loadAvailabilityUsers(),
@@ -438,13 +448,36 @@ export async function recordAvailability(
   fail("Record availability", error);
 }
 
+export type AvailabilityCoverageSummary = {
+  primary_buddy: number;
+  secondary_buddy: number;
+  reporting_manager: number;
+  coverage_required: number;
+  manager_review: number;
+};
+
+/** Absence handovers reported by the availability RPCs; absent keys mean zero. */
+function readCoverageSummary(payload: Json | null): AvailabilityCoverageSummary {
+  const summary = payload && typeof payload === "object" && !Array.isArray(payload) && payload.coverage_summary
+    && typeof payload.coverage_summary === "object" && !Array.isArray(payload.coverage_summary)
+    ? payload.coverage_summary : {};
+  const count = (key: string) => typeof summary[key] === "number" ? summary[key] : 0;
+  return {
+    primary_buddy: count("primary_buddy"),
+    secondary_buddy: count("secondary_buddy"),
+    reporting_manager: count("reporting_manager"),
+    coverage_required: count("coverage_required"),
+    manager_review: count("manager_review"),
+  };
+}
+
 export async function recordAvailabilityRange(
   userProfileId: string,
   startDate: string,
   endDate: string,
   status: AvailabilityStatus,
   reason: string,
-): Promise<{ primary_buddy: number; secondary_buddy: number; reporting_manager: number; coverage_required: number; manager_review: number }> {
+): Promise<AvailabilityCoverageSummary> {
   const { data, error } = await supabase.rpc("record_availability_range_with_audit", {
     p_user_profile_id: userProfileId,
     p_start_date: startDate,
@@ -453,9 +486,21 @@ export async function recordAvailabilityRange(
     p_reason: reason,
   });
   fail("Record availability range", error);
-  const summary = data && typeof data === "object" && !Array.isArray(data) && data.coverage_summary
-    && typeof data.coverage_summary === "object" && !Array.isArray(data.coverage_summary)
-    ? data.coverage_summary : {};
-  const count = (key: string) => typeof summary[key] === "number" ? summary[key] : 0;
-  return { primary_buddy: count("primary_buddy"), secondary_buddy: count("secondary_buddy"), reporting_manager: count("reporting_manager"), coverage_required: count("coverage_required"), manager_review: count("manager_review") };
+  return readCoverageSummary(data);
+}
+
+export async function recordAvailabilityDays(
+  userProfileId: string,
+  dates: readonly string[],
+  status: AvailabilityStatus,
+  reason: string,
+): Promise<AvailabilityCoverageSummary> {
+  const { data, error } = await supabase.rpc("record_availability_days_with_audit", {
+    p_user_profile_id: userProfileId,
+    p_dates: [...dates],
+    p_status: status,
+    p_reason: reason,
+  });
+  fail("Record availability days", error);
+  return readCoverageSummary(data);
 }
