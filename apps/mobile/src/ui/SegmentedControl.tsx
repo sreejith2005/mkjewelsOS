@@ -28,6 +28,7 @@ export function SegmentedControl<T extends string>({
       contentContainerStyle={styles.row}
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={styles.container}
     >
       {options.map((option) => {
         const selected = option.value === value;
@@ -58,6 +59,9 @@ export function SegmentedControl<T extends string>({
 }
 
 const useStyles = makeStyles((theme) => StyleSheet.create({
+  // A horizontal ScrollView inside a vertical screen must hug its content;
+  // otherwise Android lets it consume the remaining height of the page.
+  container: { flexGrow: 0 },
   row: { flexDirection: "row", gap: theme.space.sm, paddingRight: theme.space.md },
   segment: {
     minHeight: 40,

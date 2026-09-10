@@ -1,0 +1,460 @@
+import { getSupabase as db } from "@jewelos/api-client/client";
+import { groupTaskFeedRows, isTaskFeedItemInCurrentDayOrOverdue, type Database, type Enums, type Json, type Tables } from "@jewelos/core";
+import { loadMasterOptions } from "../dropdowns/api";
+import { newRequestKey, uploadBody, type UploadSource } from "../runtime";
+
+export type TaskFeedRow = Database["public"]["Views"]["v_all_tasks"]["Row"];
+export type TaskUser = Pick<Tables<"user_profiles">,
+  "id" | "tenant_id" | "branch_id" | "department_id" | "employee_code" | "employee_name" |
+  "first_name" | "last_name" | "user_role" | "working_status" | "buddy_id" | "secondary_buddy_id" | "reports_to_user_id">;
+export type TaskChecklist = Tables<"task_checklists">;
+export type TaskTemplate = Tables<"task_templates">;
+export type AvailabilityStatus = Enums<"availability_status">;
+export type AvailabilityEntry = Pick<Tables<"user_availability">, "user_profile_id" | "date" | "status" | "reason">;
+
+/** Shown when a designated verifier is outside the roster this viewer is authorized to read. */
+const VERIFIER_FALLBACK_NAME = "Verifier unavailable";
+
+export type TaskBundle = TaskFeedRow & {
+  assignees: Array<{ id: string; name: string }>;
+  assigneeName: string;
+  coverageOriginalAssigneeName: string | null;
+  checklists: TaskChecklist[];
+  hasAttachment: boolean;
+  hasFormSubmission: boolean;
+  isWatchedByViewer: boolean;
+  verifierName: string | null;
+};
+
+export type TaskReferenceData = {
+  branches: Array<Pick<Tables<"branches">, "id" | "name">>;
+  categories: Array<Pick<Tables<"dropdown_masters">, "id" | "label">>;
+  priorities: Array<Pick<Tables<"dropdown_masters">, "id" | "label" | "value">>;
+  departments: Array<Pick<Tables<"departments">, "id" | "name" | "branch_id">>;
+  designations: Array<Pick<Tables<"dropdown_masters">, "id" | "value">>;
+  forms: Array<Pick<Tables<"form_templates">, "id" | "name">>;
+  templates: TaskTemplate[];
+  users: TaskUser[];
+};
+export type TaskFeedReferenceData = Pick<TaskReferenceData, "categories">;
+
+export type RecurringTaskPreparation = Readonly<{ created: number }>;
+
+export async function ensureMyRecurringTasks(): Promise<RecurringTaskPreparation> {
+  const { data, error } = await db().functions.invoke("ensure-my-recurring-tasks", { method: "POST" });
+  fail("Prepare recurring tasks", error);
+  return { created: typeof data === "object" && data !== null && "created" in data && typeof data.created === "number" ? data.created : 0 };
+}
+
+function fail(message: string, error: { message: string } | null): asserts error is null {
+  if (error) throw new Error(`${message}: ${error.message}`);
+}
+
+export async function loadTaskCategoryOptions(): Promise<TaskReferenceData["categories"]> {
+  return (await loadMasterOptions(["task_category"])).map(({ id, label }) => ({ id, label }));
+}
+
+export async function loadTaskFeedReferenceData(): Promise<TaskFeedReferenceData> {
+  return { categories: await loadTaskCategoryOptions() };
+}
+
+export async function loadAvailabilityUsers(): Promise<TaskUser[]> {
+  const result = await db().from("user_profiles")
+    .select("id,tenant_id,branch_id,department_id,employee_code,employee_name,first_name,last_name,user_role,working_status,buddy_id,secondary_buddy_id,reports_to_user_id")
+    .in("account_status", ["active", "invited"])
+    .eq("working_status", "active")
+    .order("first_name")
+    .order("last_name");
+  fail("Load availability users", result.error);
+  return result.data.map((user) => ({
+    ...user,
+    employee_name: [user.first_name, user.last_name].filter((name): name is string => Boolean(name?.trim())).join(" ") || user.employee_name,
+  }));
+}
+
+export async function loadAvailabilityForDate(date: string): Promise<AvailabilityEntry[]> {
+  const result = await db().from("user_availability")
+    .select("user_profile_id,date,status,reason")
+    .eq("date", date);
+  fail("Load availability", result.error);
+  return result.data;
+}
+
+export async function loadAvailabilityDepartments(): Promise<Array<Pick<Tables<"departments">, "id" | "name">>> {
+  const result = await db().from("departments")
+    .select("id,name")
+    .eq("is_active", true)
+    .order("name");
+  fail("Load availability departments", result.error);
+  return result.data;
+}
+
+export async function loadTaskAuthoringReferenceData(): Promise<TaskReferenceData> {
+  const [users, branchesResult, departmentsResult, categories, priorities, designations, templatesResult, formsResult] = await Promise.all([
+    loadAvailabilityUsers(),
+    db().from("branches").select("id,name").eq("is_active", true).order("name"),
+    db().from("departments").select("id,name,branch_id").eq("is_active", true).order("name"),
+    loadTaskCategoryOptions(),
+    loadMasterOptions(["task_priority"]),
+    loadMasterOptions(["designation"]),
+    db().from("task_templates").select("*").eq("task_type", "checklist").order("created_at", { ascending: false }),
+    db().from("form_templates").select("id,name").eq("is_active", true).order("name"),
+  ]);
+  fail("Load branches", branchesResult.error);
+  fail("Load departments", departmentsResult.error);
+  fail("Load templates", templatesResult.error);
+  fail("Load forms", formsResult.error);
+  return {
+    users,
+    branches: branchesResult.data,
+    categories,
+    priorities: priorities.map(({ id, label, value }) => ({ id, label, value })),
+    designations: designations.map(({ id, value }) => ({ id, value })),
+    departments: departmentsResult.data,
+    templates: templatesResult.data,
+    forms: formsResult.data,
+  };
+}
+
+/** @deprecated Use the bounded loaders for each task surface. */
+export const loadTaskReferenceData = loadTaskAuthoringReferenceData;
+
+const TASK_FEED_PAGE_SIZE = 1_000;
+const TASK_FEED_ID_BATCH_SIZE = 200;
+const TASK_DETAIL_ID_BATCH_SIZE = 50;
+
+type TaskFeedPage = { data: TaskFeedRow[]; error: { message: string } | null };
+type TaskFeedPageResponse = { data: TaskFeedRow[] | null; error: { message: string } | null };
+
+export function taskFeedIdBatches(ids: readonly string[], batchSize = TASK_FEED_ID_BATCH_SIZE): string[][] {
+  const batches: string[][] = [];
+  for (let index = 0; index < ids.length; index += batchSize) batches.push([...ids.slice(index, index + batchSize)]);
+  return batches;
+}
+
+async function loadTaskFeedPages(loadPage: (from: number, to: number) => PromiseLike<TaskFeedPageResponse>): Promise<TaskFeedPage> {
+  const rows: TaskFeedRow[] = [];
+  for (let from = 0; ; from += TASK_FEED_PAGE_SIZE) {
+    const page = await loadPage(from, from + TASK_FEED_PAGE_SIZE - 1);
+    if (page.error) return { data: [], error: page.error };
+    const pageRows = page.data ?? [];
+    rows.push(...pageRows);
+    if (pageRows.length < TASK_FEED_PAGE_SIZE) return { data: rows, error: null };
+  }
+}
+
+/** PostgREST predicate for current work plus unfinished historical work, using revised → due → planned deadline order. */
+export function taskFeedCurrentOrOverdueFilter(startIso: string, endIso: string): string {
+  const current = [
+    `and(revised_datetime.gte.${startIso},revised_datetime.lte.${endIso})`,
+    `and(revised_datetime.is.null,due_datetime.gte.${startIso},due_datetime.lte.${endIso})`,
+    `and(revised_datetime.is.null,due_datetime.is.null,planned_datetime.gte.${startIso},planned_datetime.lte.${endIso})`,
+  ];
+  const historicalUnfinished = [
+    `and(revised_datetime.lt.${startIso},status.not.in.(completed,rejected,blocked))`,
+    `and(revised_datetime.is.null,due_datetime.lt.${startIso},status.not.in.(completed,rejected,blocked))`,
+    `and(revised_datetime.is.null,due_datetime.is.null,planned_datetime.lt.${startIso},status.not.in.(completed,rejected,blocked))`,
+  ];
+  return [
+    ...current,
+    ...historicalUnfinished,
+  ].join(",");
+}
+
+export async function loadTaskFeed(
+  viewerId: string,
+  startIso: string,
+  endIso: string,
+  options: { delegated?: boolean; includeBlockedCoverage?: boolean; includeOverdue?: boolean } = {},
+): Promise<TaskBundle[]> {
+  const watcherPromise = db().from("task_watchers")
+    .select("task_instance_id")
+    .eq("user_profile_id", viewerId);
+  const usersPromise = db().from("v_task_users").select("id,employee_name");
+  let rows: TaskFeedRow[] = [];
+  let watcherRows: Array<{ task_instance_id: string }> = [];
+  let users: Array<{ employee_name: string | null; id: string | null }> = [];
+  const deadlineFilter = options.includeOverdue ? taskFeedCurrentOrOverdueFilter(startIso, endIso) : null;
+
+  if (options.delegated) {
+    const [taskResult, watcherResult, usersResult] = await Promise.all([
+      (deadlineFilter
+        ? loadTaskFeedPages((from, to) => db().from("v_all_tasks").select("*").or(deadlineFilter)
+          .eq("created_by", viewerId)
+          .order("planned_datetime", { ascending: false })
+          .range(from, to))
+        : db().from("v_all_tasks").select("*").gte("planned_datetime", startIso).lte("planned_datetime", endIso)
+          .order("planned_datetime", { ascending: true })),
+      watcherPromise,
+      usersPromise,
+    ]);
+    fail("Load delegated tasks", taskResult.error);
+    fail("Load task watchers", watcherResult.error);
+    fail("Load task users", usersResult.error);
+    rows = taskResult.data ?? [];
+    watcherRows = watcherResult.data;
+    users = usersResult.data;
+  } else {
+    const [assignedResult, watcherResult, coverageResult, usersResult] = await Promise.all([
+      (deadlineFilter
+        ? loadTaskFeedPages((from, to) => db().from("v_all_tasks").select("*").or(deadlineFilter)
+          .eq("assignee_id", viewerId)
+          .order("planned_datetime", { ascending: false })
+          .range(from, to))
+        : db().from("v_all_tasks").select("*").gte("planned_datetime", startIso).lte("planned_datetime", endIso)
+          .order("planned_datetime", { ascending: true })),
+      watcherPromise,
+      options.includeBlockedCoverage
+        ? (deadlineFilter
+          ? loadTaskFeedPages((from, to) => db().from("v_all_tasks").select("*").or(deadlineFilter)
+            .eq("status", "blocked")
+            .is("assignee_id", null)
+            .order("planned_datetime", { ascending: false })
+            .range(from, to))
+          : db().from("v_all_tasks").select("*").gte("planned_datetime", startIso).lte("planned_datetime", endIso)
+            .order("planned_datetime", { ascending: true }))
+        : Promise.resolve({ data: [] as TaskFeedRow[], error: null }),
+      usersPromise,
+    ]);
+    fail("Load assigned tasks", assignedResult.error);
+    fail("Load task watchers", watcherResult.error);
+    fail("Load coverage tasks", coverageResult.error);
+    fail("Load task users", usersResult.error);
+    watcherRows = watcherResult.data;
+    users = usersResult.data;
+    const visibleTaskIds = [...new Set([
+      ...(assignedResult.data ?? []).flatMap((row) => row.id ? [row.id] : []),
+      ...watcherRows.map((row) => row.task_instance_id),
+    ])];
+    const visibleTaskResults = await Promise.all(taskFeedIdBatches(visibleTaskIds).map((taskIds) => deadlineFilter
+      ? loadTaskFeedPages((from, to) => db().from("v_all_tasks").select("*").or(deadlineFilter)
+        .in("id", taskIds)
+        .order("planned_datetime", { ascending: false })
+        .range(from, to))
+      : db().from("v_all_tasks").select("*").gte("planned_datetime", startIso).lte("planned_datetime", endIso)
+        .in("id", taskIds)
+        .order("planned_datetime", { ascending: true })));
+    for (const result of visibleTaskResults) fail("Load assigned and watched task details", result.error);
+    rows = [...visibleTaskResults.flatMap((result) => result.data ?? []), ...(coverageResult.data ?? [])];
+  }
+
+  const scopedRows = options.includeOverdue
+    ? rows.filter((row) => isTaskFeedItemInCurrentDayOrOverdue(row, startIso, endIso))
+    : rows;
+  const groupedRows = groupTaskFeedRows(scopedRows);
+  const watchedTaskIds = new Set(watcherRows.map((row) => row.task_instance_id));
+  const taskIds = groupedRows.flatMap(({ row }) => row.id ? [row.id] : []);
+  const detailBatches = taskFeedIdBatches(taskIds, TASK_DETAIL_ID_BATCH_SIZE);
+  const formTaskIds = groupedRows.flatMap(({ row }) => row.id && row.requires_form && row.form_template_id ? [row.id] : []);
+  const submissionBatches = taskFeedIdBatches(formTaskIds, TASK_DETAIL_ID_BATCH_SIZE);
+  const [checklistResults, attachmentResults, submissionResults] = await Promise.all([
+    Promise.all(detailBatches.map((ids) => db().from("task_checklists").select("*").in("task_instance_id", ids).order("sort_order"))),
+    Promise.all(detailBatches.map((ids) => db().from("task_attachments").select("task_instance_id").in("task_instance_id", ids))),
+    Promise.all(submissionBatches.map((ids) => db().from("form_submissions").select("linked_record_id,linked_module,form_template_id").in("linked_record_id", ids))),
+  ]);
+  for (const result of checklistResults) fail("Load task checklists", result.error);
+  for (const result of attachmentResults) fail("Load task attachments", result.error);
+  for (const result of submissionResults) fail("Load task form submissions", result.error);
+  const checklists = checklistResults.flatMap((result) => result.data ?? []) as TaskChecklist[];
+  const attachments = attachmentResults.flatMap((result) => result.data ?? []);
+  const submissions = submissionResults.flatMap((result) => result.data ?? []);
+  const checklistsByTask = new Map<string, TaskChecklist[]>();
+  for (const item of checklists) {
+    const list = checklistsByTask.get(item.task_instance_id) ?? [];
+    list.push(item);
+    checklistsByTask.set(item.task_instance_id, list);
+  }
+  const userNames = new Map(users.map((user) => [user.id, user.employee_name]));
+  const attachedTasks = new Set(attachments.map((row) => row.task_instance_id));
+  const matchingSubmissions = new Set(submissions.flatMap((row) =>
+    row.linked_record_id && row.linked_module
+      ? [`${row.linked_record_id}|${row.linked_module}|${row.form_template_id}`]
+      : []));
+  return groupedRows.map(({ assigneeIds, row }) => {
+    const assignees = assigneeIds.map((id) => ({ id, name: userNames.get(id) ?? "Assigned user" }));
+    return {
+      ...row,
+      assignees,
+      assigneeName: assignees.length ? assignees.map((assignee) => assignee.name).join(", ") : "Unassigned",
+      coverageOriginalAssigneeName: row.coverage_original_assignee_id
+        ? userNames.get(row.coverage_original_assignee_id) ?? "Assigned colleague"
+        : null,
+      checklists: row.id ? checklistsByTask.get(row.id) ?? [] : [],
+      hasAttachment: row.id ? attachedTasks.has(row.id) : false,
+      hasFormSubmission: row.id && row.form_template_id && row.task_type
+        ? matchingSubmissions.has(`${row.id}|${row.task_type === "delegation" ? "delegation_task" : "checklist_task"}|${row.form_template_id}`)
+      : false,
+      isWatchedByViewer: Boolean(row.id && watchedTaskIds.has(row.id) && !assigneeIds.includes(viewerId)),
+      verifierName: row.verifier_user_profile_id
+        ? userNames.get(row.verifier_user_profile_id) ?? VERIFIER_FALLBACK_NAME
+        : null,
+    };
+  });
+}
+
+export async function createDelegationTask(
+  payload: Json,
+  doerIds: string[],
+  watcherIds: string[],
+  checklist: Json,
+): Promise<string> {
+  const { data, error } = await db().rpc("create_manual_task_with_mode_with_audit" as never, {
+    p_payload: payload,
+    p_doer_ids: doerIds,
+    p_watcher_ids: watcherIds,
+    p_checklist: checklist,
+  } as never);
+  fail("Create delegation task", error);
+  if (!data) throw new Error("Task creation did not return an identifier");
+  return data as string;
+}
+
+export async function saveTaskTemplate(templateId: string | null, payload: Json): Promise<void> {
+  const { error } = await db().rpc("save_task_template_with_audit", {
+    p_template_id: templateId as string,
+    p_payload: payload,
+  });
+  fail("Save task template", error);
+}
+
+export async function createFromTemplate(templateId: string, plannedDatetime: string): Promise<void> {
+  const { error } = await db().rpc("use_task_template_with_audit", {
+    p_template_id: templateId,
+    p_planned_datetime: plannedDatetime,
+  });
+  fail("Create task from template", error);
+}
+
+export async function updateTask(
+  taskId: string,
+  action: "checklist" | "complete",
+  options: { checklistId?: string; completed?: boolean; remark?: string } = {},
+): Promise<void> {
+  const { error } = await db().rpc("update_task_with_audit", {
+    p_task_id: taskId,
+    p_action: action,
+    ...(options.checklistId ? { p_checklist_id: options.checklistId } : {}),
+    ...(options.completed !== undefined ? { p_completed: options.completed } : {}),
+    ...(options.remark ? { p_remark: options.remark } : {}),
+  });
+  fail("Update task", error);
+}
+
+export async function delegateTask(taskId: string, fromUserId: string, toUserId: string, reason: string): Promise<void> {
+  const { error } = await db().rpc("delegate_task_with_audit", {
+    p_task_id: taskId,
+    p_from_user_id: fromUserId,
+    p_to_user_id: toUserId,
+    p_reason: reason,
+  });
+  fail("Delegate task", error);
+}
+
+export async function reviseTask(taskId: string, revisedDatetime: string, reason: string): Promise<void> {
+  const { error } = await db().rpc("revise_task_datetime_with_audit", {
+    p_task_id: taskId,
+    p_revised_datetime: revisedDatetime,
+    p_reason: reason,
+  });
+  fail("Revise task date", error);
+}
+
+export async function uploadTaskAttachment(
+  tenantId: string,
+  taskId: string,
+  file: UploadSource,
+): Promise<void> {
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `${tenantId}/${taskId}/${newRequestKey()}-${safeName}`;
+  const { error: uploadError } = await db().storage.from("task-attachments").upload(path, uploadBody(file), {
+    cacheControl: "3600",
+    contentType: file.type,
+    upsert: false,
+  });
+  fail("Upload task attachment", uploadError);
+  const { error } = await db().rpc("add_task_attachment_with_audit", {
+    p_task_id: taskId,
+    p_file_url: path,
+  });
+  if (error) {
+    try {
+      await db().storage.from("task-attachments").remove([path]);
+    } catch {
+      // The original transactional database error is the UI contract even if
+      // best-effort orphan cleanup cannot reach Storage.
+    }
+    throw new Error(error.message);
+  }
+}
+
+/** Upload object first, then atomically record evidence and complete its normal task. */
+export async function uploadAndCompleteTask(tenantId: string, taskId: string, file: UploadSource): Promise<void> {
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `${tenantId}/${taskId}/${newRequestKey()}-${safeName}`;
+  const { error: uploadError } = await db().storage.from("task-attachments").upload(path, uploadBody(file), {
+    cacheControl: "3600",
+    contentType: file.type,
+    upsert: false,
+  });
+  fail("Upload task attachment", uploadError);
+  const { error } = await db().rpc("complete_uploaded_task_with_audit" as never, {
+    p_task_id: taskId,
+    p_file_url: path,
+  } as never);
+  if (!error) return;
+  try {
+    await db().storage.from("task-attachments").remove([path]);
+  } catch {
+    // Preserve the authoritative completion error if best-effort object cleanup fails.
+  }
+  throw new Error(error.message);
+}
+
+export async function completeRecurringTaskWithImage(tenantId: string, taskId: string, file: UploadSource): Promise<void> {
+  const extension = file.name.toLowerCase().match(/\.[a-z0-9]+$/)?.[0];
+  if (!extension || ![".jpg", ".jpeg", ".png", ".webp"].includes(extension) || !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) throw new Error("Upload a JPEG, PNG, or WebP image no larger than 5 MiB.");
+  const path = `${tenantId}/${taskId}/${newRequestKey()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+  const { error: uploadError } = await db().storage.from("task-attachments").upload(path, uploadBody(file), { cacheControl: "3600", contentType: file.type, upsert: false });
+  fail("Upload task evidence", uploadError);
+  const { error } = await (db().rpc as unknown as (name: "complete_recurring_task_with_image_with_audit", args: { p_task_id: string; p_file_url: string }) => Promise<{ error: { message: string } | null }>)("complete_recurring_task_with_image_with_audit", { p_task_id: taskId, p_file_url: path });
+  if (!error) return;
+  try { await db().storage.from("task-attachments").remove([path]); } catch { /* preserve the authoritative RPC error */ }
+  throw new Error(error.message);
+}
+
+export async function recordAvailability(
+  userProfileId: string,
+  date: string,
+  status: AvailabilityStatus,
+  reason: string,
+): Promise<void> {
+  const { error } = await db().rpc("record_availability_with_audit", {
+    p_user_profile_id: userProfileId,
+    p_date: date,
+    p_status: status,
+    p_reason: reason,
+  });
+  fail("Record availability", error);
+}
+
+export async function recordAvailabilityRange(
+  userProfileId: string,
+  startDate: string,
+  endDate: string,
+  status: AvailabilityStatus,
+  reason: string,
+): Promise<{ primary_buddy: number; secondary_buddy: number; reporting_manager: number; coverage_required: number; manager_review: number }> {
+  const { data, error } = await db().rpc("record_availability_range_with_audit", {
+    p_user_profile_id: userProfileId,
+    p_start_date: startDate,
+    p_end_date: endDate,
+    p_status: status,
+    p_reason: reason,
+  });
+  fail("Record availability range", error);
+  const summary = data && typeof data === "object" && !Array.isArray(data) && data.coverage_summary
+    && typeof data.coverage_summary === "object" && !Array.isArray(data.coverage_summary)
+    ? data.coverage_summary : {};
+  const count = (key: string) => typeof summary[key] === "number" ? summary[key] : 0;
+  return { primary_buddy: count("primary_buddy"), secondary_buddy: count("secondary_buddy"), reporting_manager: count("reporting_manager"), coverage_required: count("coverage_required"), manager_review: count("manager_review") };
+}
