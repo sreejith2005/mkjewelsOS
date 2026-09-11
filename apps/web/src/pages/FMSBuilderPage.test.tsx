@@ -14,7 +14,11 @@ const mocks = vi.hoisted(() => ({
   deleteFmsFlow: vi.fn(),
 }));
 
-vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ profile: { id: "admin", user_role: "admin", branch_id: "andheri", department_id: "admin" } as UserProfile }) }));
+vi.mock("@/auth/AuthContext", async () => {
+  const { builtinAccessContext } = await vi.importActual<typeof import("@jewelos/core")>("@jewelos/core");
+  const profile = { id: "admin", user_role: "admin", branch_id: "andheri", department_id: "admin" } as UserProfile;
+  return { useAuth: () => ({ profile, access: builtinAccessContext(profile) }) };
+});
 vi.mock("@/features/fms/api", async () => ({
   loadFmsBuilderData: mocks.loadFmsBuilderData,
   loadFmsRuntime: mocks.loadFmsRuntime,

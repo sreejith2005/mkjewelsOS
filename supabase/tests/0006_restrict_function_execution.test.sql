@@ -39,14 +39,14 @@ select is((
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
-), 310, 'exactly 310 postgres-owned public application functions exist in the current migration set');
+), 323, 'exactly 323 postgres-owned public application functions exist in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres' and p.prosecdef
-), 259, 'exactly 259 public application functions are SECURITY DEFINER in the current migration set');
+), 271, 'exactly 271 public application functions are SECURITY DEFINER in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -62,7 +62,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 157, 'authenticated can execute exactly 157 reviewed public application functions');
+), 167, 'authenticated can execute exactly 167 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -78,7 +78,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('postgres', p.oid, 'EXECUTE')
-), 310, 'postgres retains owner execution on every public application function');
+), 323, 'postgres retains owner execution on every public application function');
 
 -- Exact authenticated allowlist: baseline, Forms, and reviewed FMS entry points.
 select ok(has_function_privilege('authenticated', 'current_profile()', 'EXECUTE'), 'authenticated executes current_profile');
@@ -185,7 +185,12 @@ select is((
       'delete_task_template_with_audit(uuid)',
       'is_user_week_off_on_date(uuid,date)',
       'get_form_upload_path(uuid)', 'register_form_upload(uuid,text,text,text,text,bigint)',
-      'can_read_form_upload_object(text)', 'can_write_form_upload_object(text)'
+      'can_read_form_upload_object(text)', 'can_write_form_upload_object(text)',
+      'has_permission(text)', 'module_accessible(text,boolean)',
+      'assert_module_enabled(text)', 'assert_module_access(text)',
+      'get_my_access_context()', 'get_permission_admin_context()',
+      'get_user_access_breakdown(uuid)', 'save_role_permissions_with_audit(user_role,jsonb)',
+      'save_designation_permissions_with_audit(uuid,jsonb)', 'save_user_access_with_audit(uuid,jsonb,text)'
     ]::text[])
   )
   select count(*)::integer

@@ -7,6 +7,7 @@ import { Button, Field, Modal, Notice } from "@/components/ui";
 import { errorMessage, titleCase } from "@/lib/format";
 import type { DropdownMaster } from "@/types";
 import { invalidateMasterOptions } from "@/features/dropdowns/api";
+import { hasPermission } from "@jewelos/core";
 
 const REQUIRED_EMPTY_CATEGORIES = ["designation", "week_off", "resignation_reason", "task_category", "task_priority", "crm_source", "client_type", "potential_category", "product_category", "buy_status", "not_bought_reason", "communication_preference"] as const;
 
@@ -62,7 +63,7 @@ function DropdownEditor({ item, category, onClose, onSaved }: { item: DropdownMa
 }
 
 export function DropdownMasterPage() {
-  const { profile } = useAuth();
+  const { access, profile } = useAuth();
   const [items, setItems] = useState<DropdownMaster[]>([]);
   const [category, setCategory] = useState("designation");
   const [editing, setEditing] = useState<DropdownMaster | null | undefined>(undefined);
@@ -98,8 +99,8 @@ export function DropdownMasterPage() {
     }
   };
 
-  if (profile?.user_role !== "super_admin") {
-    return <Notice tone="danger">Dropdown Master is restricted to super_admin users. Database RLS also rejects writes from every other role.</Notice>;
+  if (!hasPermission(access, "dropdowns.manage")) {
+    return <Notice tone="danger">Changing dropdown values requires the Dropdown Master permission. The database rejects writes from everyone else.</Notice>;
   }
 
   return (

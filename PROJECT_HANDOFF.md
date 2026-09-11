@@ -145,6 +145,19 @@ never edit an applied file. The major groups are:
 | `0097-0100` | designation daily checklists, validator repair, active-doer mutation restriction, and task deadline/evidence contracts |
 | `0101-0105` | resumable current-sheet task import, tenant realtime refresh, recurring catch-up, zero-touch imports, and organization fallback retries |
 | `0106-0109` | guarded demo-data retirement, settings mutation-key RLS, task-template management, and recurring to-do reference parity |
+| `0156` | granular permissions, dashboard authority, and server-enforced Developer Mode section availability |
+
+**Access control (0156).** `permission_effective_for()` is the only permission
+resolver (protected → Super Admin authority; authority-derived → effective
+role; otherwise user override > designation override > tenant role row >
+catalog default). `user_access_profiles.dashboard_authority` sets the
+effective role that `current_profile()` / `current_role_level()` return, so
+existing role-scoped RLS/RPC rules honour it. Section availability is enforced
+by `assert_module_enabled/access()` inside section RPCs and restrictive
+`module_accessible()` SELECT policies, independently of the Developer Mode
+strip. Management UI: `/settings/permissions` (Super Admin). Design:
+`docs/superpowers/plans/2026-09-11-granular-permissions.md`; manual pass:
+`docs/REGRESSION_CHECKLIST.md`.
 
 RLS and minimum grants are the security boundary. Sensitive workflows use
 `SECURITY DEFINER` RPCs with in-function active profile/tenant/role checks and
@@ -193,6 +206,13 @@ unavailable does not justify calling database/RLS/RPC behaviour verified.
    release cadence.
 6. **Roster authority:** never run an authoritative roster apply that retires
    active accounts without explicit approval of the collision list.
+7. **Permissions (0156):** task visibility/management scope follows dashboard
+   authority and is not independently grantable. A per-user deny of an
+   embedded section (Tasks, FMS, Forms, Availability, Recurring, Notifications)
+   hides and blocks the section in the app, but its shared runtime RPCs stay
+   callable because Home and other sections use them; Developer Mode disables
+   them for everyone. Deploy migration 0156 before the updated `invite-user`
+   Edge Function.
 
 ## 7. Recommended next-agent workflow
 

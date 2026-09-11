@@ -17,6 +17,7 @@ import { parseFmsFormDeepLink } from "@/features/fms/deepLink";
 import { FmsFlowBuilder } from "@/features/fms/FmsFlowBuilder";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { FMSTasksPage } from "./FMSTasksPage";
+import { hasPermission } from "@jewelos/core";
 
 type Runtime = Awaited<ReturnType<typeof loadFmsRuntime>>;
 type FlowState = "live" | "paused" | "draft" | "archived";
@@ -42,8 +43,8 @@ const STATE_STYLES: Record<FlowState, string> = {
 const flowState = (flow: FmsFlowRow): FlowState => flow.status === "draft" ? "draft" : flow.status === "archived" ? "archived" : flow.is_active ? "live" : "paused";
 
 export function FMSBuilderPage() {
-  const { profile } = useAuth();
-  const canManage = !!profile && ["super_admin", "admin"].includes(profile.user_role);
+  const { access, profile } = useAuth();
+  const canManage = hasPermission(access, "fms.manage");
   const [data, setData] = useState<FmsData>();
   const [runtime, setRuntime] = useState<Runtime>();
   const [error, setError] = useState<string | null>(null);

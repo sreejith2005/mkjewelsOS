@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarCheck, Search, Users } from "lucide-react";
 import type { Enums } from "@jewelos/core";
+import { hasPermission } from "@jewelos/core";
 import { supabase } from "@jewelos/api-client";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
@@ -13,7 +14,7 @@ function today(): string { return new Date().toLocaleDateString("en-CA", { timeZ
 const statusLabels: Record<Enums<"availability_status">, string> = { present: "Present", absent: "Absent", half_day: "Half day", remote: "Remote" };
 
 export function AvailabilityPage() {
-  const { profile } = useAuth();
+  const { access, profile } = useAuth();
   const [users, setUsers] = useState<TaskUser[]>([]);
   const [entries, setEntries] = useState<AvailabilityEntry[]>([]);
   const [search, setSearch] = useState("");
@@ -27,7 +28,7 @@ export function AvailabilityPage() {
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
   const [coverageSummary, setCoverageSummary] = useState<{ primary_buddy: number; secondary_buddy: number; reporting_manager: number; coverage_required: number; manager_review: number } | null>(null);
-  const canLogOthers = profile ? ["super_admin", "admin", "manager", "hr"].includes(profile.user_role) : false;
+  const canLogOthers = hasPermission(access, "availability.manage_others");
   const date = startDate;
 
   const load = useCallback(async () => {

@@ -9,12 +9,13 @@ import { RuleManager } from "@/features/notifications/RuleBuilder";
 import { TemplateManager } from "@/features/notifications/TemplateEditor";
 import { loadActiveRecipientProfiles, loadInbox, loadProviders, loadRules, loadTemplates, subscribeToInbox } from "@/features/notifications/api";
 import type { InboxNotification, NotificationRuleRow, NotificationTemplateRow, ProviderAvailability } from "@/features/notifications/types";
+import { hasPermission } from "@jewelos/core";
 
 type Tab = "inbox" | "templates" | "rules" | "logs";
 
 export function NotificationsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
-  const { profile } = useAuth();
-  const isAdmin = profile?.user_role === "super_admin" || profile?.user_role === "admin";
+  const { access, profile } = useAuth();
+  const isAdmin = hasPermission(access, "notifications.manage");
   const [tab,setTab]=useState<Tab>("inbox"); const [items,setItems]=useState<InboxNotification[]>([]); const [templates,setTemplates]=useState<NotificationTemplateRow[]>([]); const [rules,setRules]=useState<NotificationRuleRow[]>([]); const [providers,setProviders]=useState<ProviderAvailability[]>([]); const [profiles,setProfiles]=useState<Array<{id:string;employee_name:string;user_role:string}>>([]); const [loading,setLoading]=useState(true); const [error,setError]=useState<string|null>(null); const [adminError,setAdminError]=useState<string|null>(null);
   const refreshInbox=useCallback(async()=>{if(!profile)return;setError(null);try{setItems(await loadInbox(profile.id));}catch(caught){setError(caught instanceof Error?caught.message:"Notifications could not be loaded");}},[profile]);
   const refreshAdmin=useCallback(async()=>{if(!isAdmin)return;setAdminError(null);try{const [nextTemplates,nextRules,nextProviders,nextProfiles]=await Promise.all([loadTemplates(),loadRules(),loadProviders(),loadActiveRecipientProfiles()]);setTemplates(nextTemplates);setRules(nextRules);setProviders(nextProviders);setProfiles(nextProfiles);}catch(caught){setAdminError(caught instanceof Error?caught.message:"Notification administration could not be loaded");}},[isAdmin]);

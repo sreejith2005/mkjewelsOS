@@ -179,3 +179,58 @@ paths, inspect the staged diff, run `git diff --cached --check`, and perform a
 credential-safe staged scan. Never include `.env`, `.supabase`,
 `supabase/.temp`, secrets, exports, or customer data. A Git push is not a
 Supabase migration/function/web-host deployment or production verification.
+
+## Regression-Safe Development Rules
+
+This application contains production functionality that must be treated as protected behavior.
+
+Before modifying an existing feature, inspect and understand its current implementation and dependencies.
+
+Prefer the smallest safe change that satisfies the requested requirement.
+
+DO NOT rewrite, replace, refactor, or restructure working functionality unless it is strictly necessary for the requested change.
+
+Every new feature must preserve existing behavior unless the user explicitly requests a behavior change.
+
+When modifying shared components, services, database queries, authentication, authorization, routing, task logic, notification logic, or state management, identify all existing consumers before changing the implementation.
+
+After every change, run the relevant existing tests and perform regression checks on related functionality.
+
+Never assume that because a new feature works, the task is complete. Verify that existing workflows still work.
+
+When fixing a bug, fix the underlying cause rather than introducing a narrowly scoped workaround that may create inconsistencies elsewhere.
+
+Do not duplicate business logic in multiple places. Reuse the existing source of truth.
+
+Do not introduce a second implementation of an existing system when the existing system can be extended safely.
+
+For authorization specifically:
+- Never rely solely on frontend visibility or route hiding for security.
+- Enforce authorization at the appropriate backend/API/database boundary.
+- Centralize permission resolution.
+- Do not scatter hard-coded role checks throughout the application.
+- Role permissions, user-specific overrides, dashboard authority, and feature availability must remain conceptually separate.
+- Any permission change must be tested for both allowed and denied access.
+- Never allow client-controlled role/permission values to determine authorization.
+
+Before marking a task complete, verify:
+1. The requested feature works.
+2. Existing related functionality still works.
+3. Unauthorized access is actually blocked.
+4. Direct URL/API access cannot bypass the new restriction.
+5. No duplicate or conflicting permission logic has been introduced.
+6. Existing users retain their previous behavior unless intentionally changed.
+
+### Authorization map (migration 0156)
+
+- The permission resolver is `permission_effective_for()` in the database;
+  `packages/core/src/permissions` mirrors it for previews and is kept in parity
+  by `catalog.migration.test.ts`. Use `has_permission('<key>')` in SQL and
+  `hasPermission(access, "<key>")` in clients instead of new role lists.
+- Dashboard authority is applied by `current_profile()` / `current_role_level()`;
+  resolve actors through `current_profile()`, never an inline
+  `user_profiles where auth_user_id = auth.uid()` lookup.
+- A new section RPC must call `assert_module_enabled('<page>')` (or
+  `assert_module_access` when it is used only by that section), and a new
+  section-owned table needs a restrictive `module_accessible` SELECT policy.
+- The manual regression pass lives in `docs/REGRESSION_CHECKLIST.md`.

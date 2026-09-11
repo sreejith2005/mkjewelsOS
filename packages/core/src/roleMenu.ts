@@ -173,6 +173,9 @@ export function getPageForPath(path: string): PageId | undefined {
   if (path === "/task-evidence") return "task_templates";
   if (path === "/tasks/fms") return "fms_tasks";
   if (path === "/tasks/checklist" || path === "/tasks/delegation" || path === "/tasks/import" || path === "/tasks/assigning-left") return "checklist_tasks";
+  // Permission management lives inside Settings; the page itself additionally
+  // requires the protected permissions.manage permission.
+  if (path === "/settings/permissions") return "settings";
   // FMS form deep links point at /tasks/fms; the unified FMS section absorbs them.
   if (path === "/tasks/fms") return "fms_builder";
   return ALL_MENU_ITEMS.find((item) => item.path === path)?.id;

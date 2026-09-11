@@ -109,12 +109,20 @@ Deno.serve(async (request: Request) => {
     .eq("auth_user_id", userData.user.id)
     .maybeSingle();
   if (profileError) return json(500, { error: "Unable to verify inviter permissions" });
-  if (!callerProfile || !["super_admin", "admin"].includes(callerProfile.user_role)) {
-    return json(403, { error: "Only super_admin or admin can invite users" });
-  }
+  if (!callerProfile) return json(403, { error: "Only users with user-management permission can invite users" });
   if (callerProfile.working_status === "resigned" || callerProfile.is_login_enabled === false) {
     return json(403, { error: "This account is not allowed to invite users" });
   }
+  // Resolve access with the caller's own session so dashboard authority,
+  // permission overrides, and Developer Mode apply exactly as they do in the app.
+  const { data: callerAccessData, error: accessError } = await callerClient.rpc("get_my_access_context");
+  const callerAccess = callerAccessData as { effective_role?: unknown; permissions?: Record<string, unknown> } | null;
+  if (accessError || !callerAccess) return json(500, { error: "Unable to verify inviter permissions" });
+  if (callerAccess.permissions?.["users.manage"] !== true) {
+    return json(403, { error: "Only users with user-management permission can invite users" });
+  }
+  const { error: sectionError } = await callerClient.rpc("assert_module_enabled", { p_page: "users" });
+  if (sectionError) return json(403, { error: "The Users section is currently unavailable" });
 
   let body: InviteBody;
   try {
@@ -135,8 +143,8 @@ Deno.serve(async (request: Request) => {
     if (existingProfile) return json(200, { user_profile_id: existingProfile.id, already_exists: true });
     const userRole = requiredString(body.user_role, "user_role");
     if (!USER_ROLES.has(userRole)) throw new Error("user_role is invalid");
-    if (callerProfile.user_role === "admin" && userRole === "super_admin") {
-      return json(403, { error: "Admin users cannot create a super_admin" });
+    if (callerAccess.effective_role !== "super_admin" && userRole === "super_admin") {
+      return json(403, { error: "Only a super_admin can create a super_admin" });
     }
     if (!Array.isArray(body.week_off) || body.week_off.some((day) => typeof day !== "string")) {
       throw new Error("week_off must be an array of strings");

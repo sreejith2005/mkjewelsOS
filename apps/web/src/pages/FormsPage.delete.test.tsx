@@ -12,7 +12,11 @@ const mocks = vi.hoisted(() => ({
   deleteForm: vi.fn(),
 }));
 
-vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ profile: { id: "admin", tenant_id: "tenant", user_role: "admin" } as UserProfile }) }));
+vi.mock("@/auth/AuthContext", async () => {
+  const { builtinAccessContext } = await vi.importActual<typeof import("@jewelos/core")>("@jewelos/core");
+  const profile = { id: "admin", tenant_id: "tenant", user_role: "admin" } as UserProfile;
+  return { useAuth: () => ({ profile, access: builtinAccessContext(profile) }) };
+});
 vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealtimeRefresh: () => undefined }));
 vi.mock("@/features/forms/FormBuilder", () => ({ FormBuilder: () => <div>Builder</div> }));
 vi.mock("@/features/forms/api", () => ({

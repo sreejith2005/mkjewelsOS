@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui";
 import { Panel } from "@/features/analytics/components";
-import { type DailyChecklistItem, type UserRole } from "@jewelos/core";
+import { hasPermission, type DailyChecklistItem } from "@jewelos/core";
+import { useAuth } from "@/auth/AuthContext";
 import { loadDailyChecklistManagement, saveDailyChecklist, type DailyChecklistRecord } from "./api";
 
-const permitted = (role: UserRole) => role === "super_admin" || role === "hr";
 const emptyItems = (): DailyChecklistItem[] => [{ id: crypto.randomUUID(), text: "" }];
 
 function parsePastedChecklistLines(value: string): string[] {
@@ -17,7 +17,9 @@ function errorMessage(cause: unknown, fallback: string): string {
   return fallback;
 }
 
-export function DailyChecklistManager({ role }: { role: UserRole }) {
+export function DailyChecklistManager() {
+  const { access } = useAuth();
+  const canManage = hasPermission(access, "daily_checklists.manage");
   const [records, setRecords] = useState<readonly DailyChecklistRecord[]>([]);
   const [designations, setDesignations] = useState<readonly { id: string; label: string }[]>([]);
   const [selected, setSelected] = useState("");
@@ -47,11 +49,11 @@ export function DailyChecklistManager({ role }: { role: UserRole }) {
   };
 
   useEffect(() => {
-    if (permitted(role)) void load();
-  }, [role]);
+    if (canManage) void load();
+  }, [canManage]);
 
   const selectedRecord = useMemo(() => records.find((item) => item.designationId === selected) ?? null, [records, selected]);
-  if (!permitted(role)) return null;
+  if (!canManage) return null;
 
   const choose = (designationId: string) => {
     const record = records.find((item) => item.designationId === designationId);

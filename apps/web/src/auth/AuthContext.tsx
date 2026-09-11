@@ -2,16 +2,25 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@jewelos/api-client";
 import type { Branch, UserProfile } from "@/types";
-import { DEFAULT_USER_PREFERENCES, type UserPreferences } from "@jewelos/core";
+import { DEFAULT_USER_PREFERENCES, builtinAccessContext, validateAccessContext, type AccessContext, type UserPreferences } from "@jewelos/core";
+import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { usernameLoginFunctionError } from "./functionError";
 
 type AuthStatus = "loading" | "signed_out" | "authenticated" | "incomplete" | "blocked";
 
 type AuthContextValue = {
+  /** Server-resolved permissions and dashboard authority for the signed-in user. */
+  access: AccessContext | null;
   branch: Branch | null;
   logout: () => Promise<void>;
+  /**
+   * The signed-in profile. `user_role` is the effective role (dashboard
+   * authority when one is set), matching what the database's role-level rules
+   * see; the assigned role is `access.baseRole`.
+   */
   profile: UserProfile | null;
   preferences: UserPreferences;
+  refreshAccess: () => Promise<void>;
   refreshPreferences: () => Promise<void>;
   session: Session | null;
   signIn: (username: string, password: string) => Promise<string | null>;
@@ -21,9 +30,22 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+async function fetchAccessContext(profile: UserProfile): Promise<AccessContext> {
+  const { data, error } = await supabase.rpc("get_my_access_context");
+  // Before migration 0156 is deployed the RPC does not exist. Fall back to the
+  // shipped role behaviour; the database remains the authorization boundary.
+  if (error) return builtinAccessContext(profile);
+  try {
+    return validateAccessContext(data);
+  } catch {
+    return builtinAccessContext(profile);
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [access, setAccess] = useState<AccessContext | null>(null);
   const [branch, setBranch] = useState<Branch | null>(null);
   const [preferences, setPreferences] = useState<UserPreferences>(DEFAULT_USER_PREFERENCES);
   const [status, setStatus] = useState<AuthStatus>("loading");
@@ -33,6 +55,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshPreferences = useCallback(async () => {
     const { data } = await supabase.from("user_preferences").select("preferences").maybeSingle();
     setPreferences((data?.preferences as UserPreferences | undefined) ?? DEFAULT_USER_PREFERENCES);
+  }, []);
+
+  const applyProfile = useCallback(async (nextProfile: UserProfile) => {
+    const nextAccess = await fetchAccessContext(nextProfile);
+    setAccess(nextAccess);
+    setProfile({ ...nextProfile, user_role: nextAccess.effectiveRole });
   }, []);
 
   const loadProfile = useCallback(async (nextSession: Session) => {
@@ -49,17 +77,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     if (!nextProfile) {
       setProfile(null);
+      setAccess(null);
       setBranch(null);
       setStatus("incomplete");
       setStatusMessage("Your account is not fully set up. Please contact your admin.");
       return;
     }
 
-    setProfile(nextProfile);
     // `account_status` is introduced by migration 0016. Keep the established
     // active-session guard authoritative until that migration is present.
     const accountIsExplicitlyBlocked = nextProfile.account_status != null && nextProfile.account_status !== "active";
     if (accountIsExplicitlyBlocked || nextProfile.working_status === "resigned" || nextProfile.is_login_enabled === false) {
+      setProfile(nextProfile);
       forcedSignOut.current = true;
       setStatus("blocked");
       setStatusMessage(
@@ -74,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    await applyProfile(nextProfile);
     const { data: nextBranch } = await supabase
       .from("branches")
       .select("*")
@@ -83,7 +113,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await refreshPreferences();
     setStatusMessage(null);
     setStatus("authenticated");
-  }, [refreshPreferences]);
+  }, [applyProfile, refreshPreferences]);
+
+  /**
+   * Reloads the signed-in profile and access snapshot. Called when permission,
+   * authority, or organization data changes so the UI never keeps stale access;
+   * the server re-evaluates on every request regardless.
+   */
+  const refreshAccess = useCallback(async () => {
+    if (!session) return;
+    const { data: nextProfile, error } = await supabase
+      .from("user_profiles")
+      .select("*")
+      .eq("auth_user_id", session.user.id)
+      .maybeSingle();
+    if (error || !nextProfile) return;
+    await applyProfile(nextProfile);
+  }, [applyProfile, session]);
+
+  useTenantRealtimeRefresh({ tenantId: status === "authenticated" ? profile?.tenant_id : null, topics: ["settings", "organization"], refresh: refreshAccess });
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    const onVisible = () => { if (document.visibilityState === "visible") void refreshAccess(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [refreshAccess, status]);
 
   useEffect(() => {
     let active = true;
@@ -100,6 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!active) return;
         setSession(null);
         setProfile(null);
+        setAccess(null);
         setBranch(null);
         setStatus("signed_out");
         setStatusMessage("Your session has expired. Please sign in again.");
@@ -116,6 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setSession(null);
         setProfile(null);
+        setAccess(null);
         setBranch(null);
         setStatusMessage(null);
         setStatus("signed_out");
@@ -150,7 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ branch, logout, preferences, profile, refreshPreferences, session, signIn, status, statusMessage }}>
+    <AuthContext.Provider value={{ access, branch, logout, preferences, profile, refreshAccess, refreshPreferences, session, signIn, status, statusMessage }}>
       {children}
     </AuthContext.Provider>
   );

@@ -15,11 +15,14 @@ import {
   Users,
 } from "lucide-react";
 import {
-  canAccessPage, canBypassSectionMaintenance, DEFAULT_SECTION_CONTROLS, isSectionUnderMaintenance, validateSectionControls,
-  getImplementedMenuForRole,
+  ALL_MENU_ITEMS, DEFAULT_SECTION_CONTROLS, validateSectionControls,
+  builtinAccessContext,
+  getAccessibleMenu,
   getLauncherMenuForRole,
   getPageForPath,
+  hasPermission,
   isImplementedPage,
+  resolvePageAccess,
   type PageId,
 } from "@jewelos/core";
 import { AuthProvider, useAuth } from "@/auth/AuthContext";
@@ -57,6 +60,7 @@ const AssigningLeftPage = lazyPage("assigning-left", () => import("@/pages/Assig
 const TeamDirectoryPage = lazyPage("team-directory", () => import("@/pages/TeamDirectoryPage").then((module) => ({ default: module.TeamDirectoryPage })));
 const ReportsPage = lazyPage("reports", () => import("@/pages/ReportsPage").then((module) => ({ default: module.ReportsPage })));
 const SettingsPage = lazyPage("settings", () => import("@/pages/SettingsPage").then((module) => ({ default: module.SettingsPage })));
+const PermissionManagementPage = lazyPage("permission-management", () => import("@/features/permissions/PermissionManagementPage").then((module) => ({ default: module.PermissionManagementPage })));
 
 const PAGE_ICONS: Record<PageId, typeof Home> = {
   home: Home,
@@ -221,7 +225,7 @@ function IncompleteAccount() {
 }
 
 function AppShell() {
-  const { branch, logout, preferences, profile } = useAuth();
+  const { access, branch, logout, preferences, profile } = useAuth();
   const { theme, setTheme } = useTheme();
   const { navigate, path } = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -247,17 +251,26 @@ function AppShell() {
     document.documentElement.dataset.tableDensity = preferences.table_density;
     return () => { delete document.documentElement.dataset.tableDensity; };
   }, [preferences.table_density]);
-  const menu = useMemo(() => profile ? getImplementedMenuForRole(profile.user_role) : [], [profile]);
+  // Navigation, route guard, and maintenance overlay all come from one
+  // decision: feature availability first, then the user's permission.
+  const effectiveAccess = useMemo(() => access ?? (profile ? builtinAccessContext(profile) : null), [access, profile]);
+  const menu = useMemo(() => effectiveAccess ? getAccessibleMenu(effectiveAccess, sectionControls) : [], [effectiveAccess, sectionControls]);
   const nav = useMemo(() => menu.map((item) => ({
     ...item,
     Icon: PAGE_ICONS[item.id],
     label: item.label,
   })), [menu]);
-  const launcherItems = useMemo<LauncherItem[]>(() => profile
-    ? getLauncherMenuForRole(profile.user_role).map((item) => ({ ...item, Icon: PAGE_ICONS[item.id] }))
-    : [], [profile]);
-  if (!profile) return null;
-  const isSuperAdmin = canBypassSectionMaintenance(profile.user_role);
+  const launcherItems = useMemo<LauncherItem[]>(() => {
+    const accessible = new Set(menu.map((item) => item.id));
+    // The Super Admin launcher lists every implemented section with its
+    // description; keep only the ones this user can open.
+    return getLauncherMenuForRole("super_admin")
+      .filter((item) => accessible.has(item.id))
+      .map((item) => ({ ...item, Icon: PAGE_ICONS[item.id] }));
+  }, [menu]);
+  if (!profile || !effectiveAccess) return null;
+  const isSuperAdmin = hasPermission(effectiveAccess, "developer_mode.manage");
+  const disabledSectionCount = ALL_MENU_ITEMS.filter((item) => isImplementedPage(item.id) && sectionControls.section_availability[item.id] === false).length;
   const persistSectionControls = async (nextControls: typeof sectionControls) => {
     setSavingSectionControls(true);
     try {
@@ -269,13 +282,21 @@ function AppShell() {
     }
   };
   const requestedPage = getPageForPath(path) ?? "home";
-  const allowed = isImplementedPage(requestedPage) && canAccessPage(profile.user_role, requestedPage);
-  const currentPage: PageId = allowed ? requestedPage : "dashboard";
-  const sectionUnderMaintenance = !isSuperAdmin && isSectionUnderMaintenance(sectionControls, currentPage);
-  const pageContent = sectionUnderMaintenance ? <SectionMaintenanceNotice section={currentPage === "checklist_tasks" ? "Tasks" : currentPage === "forms_library" ? "Forms Library" : currentPage === "fms_builder" ? "FMS" : currentPage === "dropdown_master" ? "Dropdown Master" : currentPage === "task_templates" ? "Task Control" : currentPage.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())} /> : currentPage === "home" ? <HomePage onNavigate={navigate} />
+  // Permission management sits under Settings but depends only on the
+  // protected permission, so a Super Admin can never be locked out of it.
+  const showPermissionManagement = path === "/settings/permissions" && hasPermission(effectiveAccess, "permissions.manage");
+  const requestedAccess = showPermissionManagement ? "allowed" : resolvePageAccess(effectiveAccess, sectionControls, requestedPage);
+  // A section the user may not open lands on their Dashboard (as before) or,
+  // when that is not permitted either, on their first permitted section.
+  const fallbackPage = menu.some((item) => item.id === "dashboard") ? "dashboard" : menu[0]?.id;
+  const currentPage: PageId = requestedAccess === "denied" ? fallbackPage ?? requestedPage : requestedPage;
+  const pageAccess = requestedAccess === "denied" && !fallbackPage ? "denied" : requestedAccess === "denied" ? "allowed" : requestedAccess;
+  const pageContent = showPermissionManagement ? <PermissionManagementPage onBack={() => navigate("/settings")} />
+    : pageAccess === "denied" ? <div className="p-4"><Notice tone="danger">No sections are available to your account. Contact your Super Admin.</Notice></div>
+    : pageAccess === "disabled" ? <SectionMaintenanceNotice section={currentPage === "checklist_tasks" ? "Tasks" : currentPage === "forms_library" ? "Forms Library" : currentPage === "fms_builder" ? "FMS" : currentPage === "dropdown_master" ? "Dropdown Master" : currentPage === "task_templates" ? "Task Control" : currentPage.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())} /> : currentPage === "home" ? <HomePage onNavigate={navigate} />
     : currentPage === "dashboard" ? <DashboardPage />
     : currentPage === "reports" ? <ReportsPage />
-    : currentPage === "settings" ? <><SettingsPage /><div className="mx-auto w-full max-w-7xl px-4 pb-8"><DailyChecklistManager role={profile.user_role} /></div></>
+    : currentPage === "settings" ? <><SettingsPage /><div className="mx-auto w-full max-w-7xl px-4 pb-8"><DailyChecklistManager /></div></>
     : currentPage === "users" ? <TeamDirectoryPage />
     : currentPage === "crm" ? <CRMPage />
     : currentPage === "dropdown_master" ? <DropdownMasterPage />
@@ -295,7 +316,7 @@ function AppShell() {
       branch={branch}
       currentPage={currentPage}
       developerModeActive={isSuperAdmin && sectionControls.developer_mode_enabled}
-      developerModeControl={isSuperAdmin ? <button aria-checked={sectionControls.developer_mode_enabled} className={`relative flex h-8 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition ${sectionControls.developer_mode_enabled ? "border-gold bg-gold text-obsidian" : "border-gold/30 text-gold hover:bg-gold/10"}`} disabled={savingSectionControls} onClick={() => void persistSectionControls({ ...sectionControls, developer_mode_enabled: !sectionControls.developer_mode_enabled })} role="switch" type="button"><span className={`size-2 rounded-full ${sectionControls.developer_mode_enabled ? "bg-obsidian" : "bg-task-text-muted"}`} />Developer Mode</button> : undefined}
+      developerModeControl={isSuperAdmin ? <button aria-checked={sectionControls.developer_mode_enabled} className={`relative flex h-8 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition ${sectionControls.developer_mode_enabled ? "border-gold bg-gold text-obsidian" : "border-gold/30 text-gold hover:bg-gold/10"}`} disabled={savingSectionControls} onClick={() => void persistSectionControls({ ...sectionControls, developer_mode_enabled: !sectionControls.developer_mode_enabled })} role="switch" type="button"><span className={`size-2 rounded-full ${sectionControls.developer_mode_enabled ? "bg-obsidian" : "bg-task-text-muted"}`} />Developer Mode{disabledSectionCount ? ` · ${disabledSectionCount} off` : ""}</button> : undefined}
       developerSectionControls={isSuperAdmin ? <nav aria-label="Developer Mode section controls" className="scroll-x no-scrollbar flex gap-2 pb-1">{nav.map((item) => <label className="flex shrink-0 items-center gap-2 rounded-full border border-gold/20 px-3 py-1.5 text-xs text-champagne" key={item.id}><span>{item.label}</span><button aria-checked={sectionControls.section_availability[item.id]} aria-label={`${item.label} availability`} className={`relative h-5 w-9 rounded-full transition ${sectionControls.section_availability[item.id] ? "bg-success" : "bg-task-overdue"}`} disabled={savingSectionControls} onClick={() => void persistSectionControls({ ...sectionControls, section_availability: { ...sectionControls.section_availability, [item.id]: !sectionControls.section_availability[item.id] } })} role="switch" type="button"><span className={`absolute top-0.5 size-4 rounded-full bg-task-bg transition ${sectionControls.section_availability[item.id] ? "left-4" : "left-0.5"}`} /></button></label>)}</nav> : undefined}
       launcherItems={launcherItems}
       logoDarkUrl={logoDarkUrl}

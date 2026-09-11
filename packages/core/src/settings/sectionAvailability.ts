@@ -1,4 +1,5 @@
 import { PAGE_IDS, type PageId, type UserRole } from "../roleMenu";
+import { SECTION_PARENT } from "../permissions/catalog";
 
 export type SectionAvailability = Readonly<Record<PageId, boolean>>;
 
@@ -32,8 +33,15 @@ export function validateSectionControls(input: unknown): SectionControls {
   };
 }
 
+/**
+ * A disabled section stays disabled whether or not the Developer Mode control
+ * strip is showing. `developer_mode_enabled` only controls the strip; tying
+ * enforcement to it re-enabled every section as soon as a Super Admin hid the
+ * strip. Legacy sub-pages follow their parent section.
+ */
 export function isSectionUnderMaintenance(controls: SectionControls, page: PageId): boolean {
-  return controls.developer_mode_enabled && !controls.section_availability[page];
+  const parent = SECTION_PARENT[page];
+  return controls.section_availability[page] === false || (parent !== undefined && controls.section_availability[parent] === false);
 }
 
 export function canBypassSectionMaintenance(role: UserRole): boolean {

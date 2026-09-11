@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Archive, Copy, Pencil, Plus, Search, Send, Trash2 } from "lucide-react";
-import { formatFormAnswer, resolveFieldOptions, type FormAnswers, type FormMasterOption } from "@jewelos/core";
+import { hasPermission, formatFormAnswer, resolveFieldOptions, type FormAnswers, type FormMasterOption } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Modal, Notice } from "@/components/ui";
 import { archiveForm, deletedFormBundle, deleteForm, formDeletionImpact, loadFormDynamicOptions, loadForms, publishAsNewForm, publishForm, reviewSubmission, startFmsFromFormSubmission, submitFmsStarterAssignment, submitForm, type FormBundle, type FormDeletionImpact, type FormSubmission } from "@/features/forms/api";
@@ -9,18 +9,17 @@ import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 
 const EMPTY: DynamicOptions = { users: [], branches: [], departments: [], masters: [] };
-const AUTHORS = new Set(["super_admin", "admin", "manager"]);
 /** Answers store option values; resolve the field (Dropdown Master included) so the reader sees labels. */
 const display = (field: import("@jewelos/core").FormFieldDefinition, value: FormAnswers[string], masters: readonly FormMasterOption[]) =>
   formatFormAnswer({ ...field, options: resolveFieldOptions(field, masters) }, value);
 
 export function FormsPage() {
-  const { profile } = useAuth(); const [data, setData] = useState<{ bundles: FormBundle[]; submissions: FormSubmission[] }>(); const [options, setOptions] = useState<DynamicOptions>(EMPTY); const [error, setError] = useState<string | null>(null); const [tab, setTab] = useState<"templates" | "submissions">("templates"); const [edit, setEdit] = useState<FormBundle | null | undefined>(); const [fill, setFill] = useState<FormBundle | null>(null); const [view, setView] = useState<FormSubmission | null>(null); const [query, setQuery] = useState(""); const [life, setLife] = useState("active"); const [remove, setRemove] = useState<FormBundle | null>(null); const [removed, setRemoved] = useState<FormDeletionImpact | null>(null);
+  const { access, profile } = useAuth(); const [data, setData] = useState<{ bundles: FormBundle[]; submissions: FormSubmission[] }>(); const [options, setOptions] = useState<DynamicOptions>(EMPTY); const [error, setError] = useState<string | null>(null); const [tab, setTab] = useState<"templates" | "submissions">("templates"); const [edit, setEdit] = useState<FormBundle | null | undefined>(); const [fill, setFill] = useState<FormBundle | null>(null); const [view, setView] = useState<FormSubmission | null>(null); const [query, setQuery] = useState(""); const [life, setLife] = useState("active"); const [remove, setRemove] = useState<FormBundle | null>(null); const [removed, setRemoved] = useState<FormDeletionImpact | null>(null);
   const starter = useMemo(() => { const params = new URLSearchParams(window.location.search); const id = params.get("fmsStarter"); const formTemplateId = params.get("form"); return id && formTemplateId ? { id, formTemplateId } : null; }, []);
   const refresh = useCallback(async () => { try { setError(null); const [forms, dynamic] = await Promise.all([loadForms(), loadFormDynamicOptions()]); setData(forms); setOptions(dynamic); } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to load Forms"); } }, []); useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => { if (!starter || !data) return; const pinned = data.bundles.find((bundle) => bundle.id === starter.formTemplateId); if (pinned) setFill(pinned); }, [data, starter]);
   useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["forms", "tasks", "fms", "organization"], refresh });
-  const author = !!profile && AUTHORS.has(profile.user_role); const families = useMemo(() => { const groups = new Map<string, FormBundle[]>(); for (const item of data?.bundles ?? []) groups.set(item.family_id, [...(groups.get(item.family_id) ?? []), item]); return [...groups.values()].map((items) => items.sort((a, b) => b.version - a.version)).filter((items) => items.some((item) => `${item.name} ${item.description ?? ""}`.toLowerCase().includes(query.toLowerCase()) && (life === "all" || life === "active" ? item.lifecycle !== "archived" : item.lifecycle === life))).sort((a, b) => a[0]!.name.localeCompare(b[0]!.name)); }, [data, life, query]);
+  const author = hasPermission(access, "forms.manage"); const families = useMemo(() => { const groups = new Map<string, FormBundle[]>(); for (const item of data?.bundles ?? []) groups.set(item.family_id, [...(groups.get(item.family_id) ?? []), item]); return [...groups.values()].map((items) => items.sort((a, b) => b.version - a.version)).filter((items) => items.some((item) => `${item.name} ${item.description ?? ""}`.toLowerCase().includes(query.toLowerCase()) && (life === "all" || life === "active" ? item.lifecycle !== "archived" : item.lifecycle === life))).sort((a, b) => a[0]!.name.localeCompare(b[0]!.name)); }, [data, life, query]);
   if (!profile) return null;
   const runPublish = (id: string) => void publishForm(id).then(refresh).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Publish failed"));
   const runPublishAsNew = (id: string) => void publishAsNewForm(id).then(refresh).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Publish as new form failed"));

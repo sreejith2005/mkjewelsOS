@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useMemo,useState} from "react";
-import {REPORT_CATALOG,parseReportFilters,reportsForRole,type ReportDefinition,type ReportFilters} from "@jewelos/core";
+import { hasPermission,REPORT_CATALOG,parseReportFilters,reportsForRole,type ReportDefinition,type ReportFilters} from "@jewelos/core";
 import {Download,RefreshCw,RotateCcw,Square,Upload} from "lucide-react";
 import {useAuth} from "@/auth/AuthContext";
 import {Button} from "@/components/ui";
@@ -14,7 +14,7 @@ function writeUrl(report:string,filters:ReportFilters){const params=new URLSearc
 function renderCell(value:unknown){if(value===null||value===undefined||value==="")return "—";if(typeof value==="boolean")return value?"Yes":"No";if(typeof value==="number")return Number.isInteger(value)?value.toLocaleString("en-IN"):value.toFixed(1);const text=String(value);if(/^\d{4}-\d{2}-\d{2}T/.test(text))return new Date(text).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"});return titleCase(text);}
 
 export function ReportsView(){
-  const {profile}=useAuth();
+  const {access,profile}=useAuth();
   const catalog=useMemo(()=>reportsForRole(profile!.user_role),[profile]);
   const requested=new URLSearchParams(window.location.search).get("report");
   const [definition,setDefinition]=useState(()=>catalog.find((item)=>item.key===requested)??catalog[0]!);
@@ -35,7 +35,7 @@ export function ReportsView(){
   const totalPages=Math.max(1,Math.ceil((data?.total??0)/filters.page_size));
   const scopedDepartments=options.departments.filter((item)=>!filters.branch_id||item.branch_id===null||item.branch_id===filters.branch_id);
   return <PageSurface>
-    <PageHeading title="Reports & Exports" description="Fixed, role-authorized reports with bounded previews and private asynchronous CSV exports." actions={definition.exportEligible?<Button disabled={exporting} onClick={()=>void doExport()}><Upload/>{exporting?"Queuing…":"Request CSV export"}</Button>:undefined}/>
+    <PageHeading title="Reports & Exports" description="Fixed, role-authorized reports with bounded previews and private asynchronous CSV exports." actions={definition.exportEligible&&hasPermission(access,"reports.export")?<Button disabled={exporting} onClick={()=>void doExport()}><Upload/>{exporting?"Queuing…":"Request CSV export"}</Button>:undefined}/>
     {message?<p aria-live="polite" className="mb-4 rounded-lg border border-success/40 bg-task-bg p-3 text-sm text-success">{message}</p>:null}
     <div className="mb-4 rounded-xl border border-task-border bg-task-bg p-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

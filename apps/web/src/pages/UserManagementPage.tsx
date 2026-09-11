@@ -14,7 +14,7 @@ import {
   Trash2,
   UserCog,
 } from "lucide-react";
-import {
+import { hasPermission,
   ADMIN_SET_PASSWORD_LENGTH,
   USER_ROLES,
   validateAdminSetPassword,
@@ -827,7 +827,7 @@ function Organization({ profiles }: { profiles: UserProfile[] }) {
 }
 
 export function UserManagementPage() {
-  const { profile: caller } = useAuth();
+  const { access, profile: caller } = useAuth();
   const [data, setData] = useState<Data>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -876,7 +876,7 @@ export function UserManagementPage() {
     [data.profiles, search, status],
   );
   if (!caller) return null;
-  const canEdit = ["super_admin", "admin"].includes(caller.user_role);
+  const canEdit = hasPermission(access, "users.manage");
   const InviteUser = AddUserForm;
   return (
     <section>

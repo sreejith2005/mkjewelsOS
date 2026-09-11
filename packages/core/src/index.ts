@@ -68,6 +68,7 @@ export * from "./crm";
 export * from "./analytics";
 export * from "./reports";
 export * from "./settings";
+export * from "./permissions";
 export * from "./identity";
 export * from "./taskImport";
 export * from "./taskCardState";

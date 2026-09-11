@@ -1,14 +1,22 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { UserRole } from "@jewelos/core";
 import { DailyChecklistManager } from "./DailyChecklistManager";
 
 const apiMocks = vi.hoisted(() => ({
   loadDailyChecklistManagement: vi.fn(),
   saveDailyChecklist: vi.fn(),
 }));
+const signedIn = vi.hoisted(() => ({ role: "hr" as UserRole }));
 
 vi.mock("./api", () => apiMocks);
+// Management is gated by the daily_checklists.manage permission; the built-in
+// access for a role reproduces the defaults (Super Admin and HR).
+vi.mock("@/auth/AuthContext", async () => {
+  const { builtinAccessContext } = await vi.importActual<typeof import("@jewelos/core")>("@jewelos/core");
+  return { useAuth: () => ({ access: builtinAccessContext({ id: "signed-in", user_role: signedIn.role }) }) };
+});
 
 describe("DailyChecklistManager", () => {
   afterEach(cleanup);
@@ -23,12 +31,14 @@ describe("DailyChecklistManager", () => {
   });
 
   it("does not expose checklist management to staff", () => {
-    render(<DailyChecklistManager role="staff" />);
+    signedIn.role = "staff";
+    render(<DailyChecklistManager />);
     expect(screen.queryByRole("heading", { name: "Daily checklists" })).toBeNull();
   });
 
   it("replaces checklist items from pasted non-empty lines", async () => {
-    render(<DailyChecklistManager role="hr" />);
+    signedIn.role = "hr";
+    render(<DailyChecklistManager />);
     await screen.findByRole("option", { name: "CRM Executive" });
 
     fireEvent.change(screen.getByLabelText("Designation"), { target: { value: "designation-1" } });
@@ -43,7 +53,8 @@ describe("DailyChecklistManager", () => {
   });
 
   it("confirms a successful save without waiting for another management reload", async () => {
-    render(<DailyChecklistManager role="hr" />);
+    signedIn.role = "hr";
+    render(<DailyChecklistManager />);
     await screen.findByRole("option", { name: "CRM Executive" });
 
     fireEvent.change(screen.getByLabelText("Designation"), { target: { value: "designation-1" } });
@@ -58,7 +69,8 @@ describe("DailyChecklistManager", () => {
 
   it("shows the server save error instead of a generic message", async () => {
     apiMocks.saveDailyChecklist.mockRejectedValue({ message: "Daily checklist changed; refresh and retry" });
-    render(<DailyChecklistManager role="hr" />);
+    signedIn.role = "hr";
+    render(<DailyChecklistManager />);
     await screen.findByRole("option", { name: "CRM Executive" });
 
     fireEvent.change(screen.getByLabelText("Designation"), { target: { value: "designation-1" } });

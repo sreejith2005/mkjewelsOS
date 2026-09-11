@@ -8398,6 +8398,35 @@ export type Database = {
         Returns: Json
       }
       get_section_availability: { Args: never; Returns: Json }
+      assert_module_access: { Args: { p_page: string }; Returns: undefined }
+      assert_module_enabled: { Args: { p_page: string }; Returns: undefined }
+      get_my_access_context: { Args: never; Returns: Json }
+      get_permission_admin_context: { Args: never; Returns: Json }
+      get_user_access_breakdown: { Args: { p_profile_id: string }; Returns: Json }
+      has_permission: { Args: { p_key: string }; Returns: boolean }
+      module_accessible: {
+        Args: { p_page: string; p_require_permission?: boolean }
+        Returns: boolean
+      }
+      save_designation_permissions_with_audit: {
+        Args: { p_designation_id: string; p_overrides: Json }
+        Returns: Json
+      }
+      save_role_permissions_with_audit: {
+        Args: {
+          p_permissions: Json
+          p_role: Database["public"]["Enums"]["user_role"]
+        }
+        Returns: Json
+      }
+      save_user_access_with_audit: {
+        Args: {
+          p_dashboard_authority?: string
+          p_overrides: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
       get_task_attachment_path: {
         Args: { p_attachment_id: string }
         Returns: string
