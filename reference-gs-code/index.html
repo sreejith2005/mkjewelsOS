@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111317">
+  <title>Daily Work</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root{
+      --bg:#f4f5f7;--panel:#fff;--ink:#17191d;--muted:#727986;--line:#e4e7ec;--line2:#d7dbe2;
+      --gold:#c7a45f;--gold-dark:#906c2b;--gold-soft:#faf4e8;--dark:#111317;--dark2:#1b1f25;
+      --green:#18865b;--green-soft:#eaf7f0;--red:#c43b45;--red-soft:#fff0f2;--amber:#b87516;--amber-soft:#fff5e5;
+      --blue:#315fc1;--blue-soft:#eef3ff;--shadow:0 10px 30px rgba(19,24,32,.07);--radius:18px;--header:70px;--drawer:310px;
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth} body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased} button,input,select,textarea{font:inherit} button{cursor:pointer} .hidden{display:none!important}
+    .authShell{min-height:100vh;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(440px,.95fr);background:#fff}
+    .authHero{position:relative;overflow:hidden;background:linear-gradient(145deg,#101216,#20242a);padding:64px;color:#fff;display:flex;flex-direction:column;justify-content:space-between}
+    .authHero:after{content:"";position:absolute;width:520px;height:520px;border-radius:50%;right:-180px;top:-160px;background:radial-gradient(circle,rgba(199,164,95,.35),rgba(199,164,95,0));pointer-events:none}
+    .authBrand{display:flex;gap:13px;align-items:center;position:relative;z-index:1}.mark{width:48px;height:48px;border-radius:14px;background:linear-gradient(145deg,#e0c382,#a97827);display:grid;place-items:center;color:#151515;font-weight:950}.authBrand h1{font-size:18px;margin:0}.authBrand p{font-size:11px;color:#adb3bd;margin:4px 0 0}.heroCopy{max-width:620px;position:relative;z-index:1}.heroCopy h2{font-size:48px;line-height:1.05;margin:0 0 18px;letter-spacing:-.045em}.heroCopy p{font-size:15px;line-height:1.7;color:#c1c6ce;max-width:560px}.heroPoints{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:30px}.heroPoint{padding:12px 14px;border:1px solid rgba(255,255,255,.09);border-radius:13px;background:rgba(255,255,255,.035);font-size:11px;color:#d7dbe1}.authFoot{font-size:10px;color:#7f8793;position:relative;z-index:1}
+    .authPane{display:flex;align-items:center;justify-content:center;padding:42px}.authCard{width:min(470px,100%)}.authCard h2{font-size:29px;margin:0;letter-spacing:-.03em}.authCard>p{color:var(--muted);font-size:12px;margin:8px 0 25px;line-height:1.55}.authTabs{display:flex;gap:7px;margin-bottom:20px}.authTab{border:1px solid var(--line);background:#fff;padding:8px 11px;border-radius:9px;font-size:11px;font-weight:800}.authTab.active{background:var(--dark);color:#fff;border-color:var(--dark)}
+    .field{display:flex;flex-direction:column;gap:6px;min-width:0}.field label{font-size:11px;font-weight:850;color:#565d68}.field input,.field select,.field textarea{width:100%;border:1px solid #dce0e7;border-radius:11px;padding:11px 12px;background:#fff;outline:0;color:#202329}.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(199,164,95,.14)}.field textarea{min-height:108px;resize:vertical}.authForm{display:grid;gap:13px}.authActions{display:flex;gap:9px;align-items:center;margin-top:4px}.linkBtn{border:0;background:transparent;padding:5px 0;font-size:11px;color:var(--gold-dark);font-weight:850}.helper{font-size:10.5px;color:var(--muted);line-height:1.45}.mandatory{color:var(--red);font-weight:900}
+    .btn{border:1px solid var(--line2);background:#fff;color:#24272d;border-radius:11px;padding:10px 14px;font-size:12px;font-weight:820;display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:.16s;box-shadow:0 2px 7px rgba(20,24,31,.025)}.btn:hover{transform:translateY(-1px);box-shadow:0 5px 14px rgba(20,24,31,.07)}.btn.primary{background:var(--dark);color:#fff;border-color:var(--dark)}.btn.gold{background:var(--gold);color:#161616;border-color:var(--gold)}.btn.success{background:var(--green-soft);color:#146c49;border-color:#cae9da}.btn.danger{background:var(--red-soft);color:#a42f38;border-color:#f1cbd0}.btn.warn{background:var(--amber-soft);color:#875b14;border-color:#efd9b5}.btn.small{padding:7px 10px;border-radius:9px;font-size:10.5px}.btn.block{width:100%}
+    .appShell{min-height:100vh}.topbar{height:var(--header);position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:13px;padding:0 22px;background:rgba(255,255,255,.96);backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
+    .hamburger{width:43px;height:43px;border:1px solid var(--line2);border-radius:12px;background:#fff;display:grid;place-items:center}.hamburger svg{width:21px}.topBrand{display:flex;align-items:center;gap:9px}.topBrand .miniMark{width:34px;height:34px;border-radius:10px;background:linear-gradient(145deg,#d8ba79,#a7792b);display:grid;place-items:center;font-size:10px;font-weight:950}.divider{width:1px;height:28px;background:var(--line)}.pageHead{flex:1;min-width:0}.pageHead h1{font-size:18px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pageHead p{margin:3px 0 0;font-size:10.5px;color:var(--muted)}.actorBox{text-align:right;min-width:0}.actorBox strong{display:block;font-size:11px;max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.actorBox span{font-size:9.5px;color:var(--muted);font-weight:800;letter-spacing:.04em}.notifPill{min-width:31px;height:31px;border:1px solid var(--line);border-radius:10px;background:#fff;display:grid;place-items:center;font-size:11px;font-weight:900}
+    .drawer{position:fixed;z-index:90;left:0;top:0;bottom:0;width:var(--drawer);background:var(--dark);color:#fff;transform:translateX(-103%);transition:.23s;box-shadow:18px 0 55px rgba(0,0,0,.24);display:flex;flex-direction:column}.drawer.open{transform:none}.drawerHead{display:flex;gap:11px;align-items:center;padding:19px;border-bottom:1px solid rgba(255,255,255,.08)}.drawerHead h2{margin:0;font-size:15px}.drawerHead p{margin:4px 0 0;font-size:10.5px;color:#9ca4b0}.drawerClose{margin-left:auto;width:35px;height:35px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:#20242a;color:#fff;font-size:21px}.drawerBody{padding:12px;overflow:auto}.navLabel{font-size:9.5px;color:#707987;letter-spacing:.12em;text-transform:uppercase;font-weight:900;padding:12px 11px 5px}.navBtn{width:100%;border:0;background:transparent;color:#c9ced6;padding:10px 11px;border-radius:10px;text-align:left;font-size:12px;font-weight:760;margin:2px 0;display:flex;align-items:center;gap:10px}.navBtn:hover{background:#20242a;color:#fff}.navBtn.active{background:#252a31;color:#fff;box-shadow:inset 3px 0 0 var(--gold)}.navIcon{width:20px;text-align:center}.drawerUser{margin:12px 2px 4px;padding:13px;border:1px solid rgba(255,255,255,.08);border-radius:13px;background:#191c21}.drawerUser strong{display:block;font-size:11px}.drawerUser span{display:block;font-size:9px;color:#8e96a1;margin-top:4px}.overlay{position:fixed;z-index:80;inset:0;background:rgba(7,9,12,.48);backdrop-filter:blur(2px);opacity:0;visibility:hidden;transition:.2s}.overlay.open{opacity:1;visibility:visible}
+    .content{width:min(1580px,100%);margin:0 auto;padding:22px 24px 42px}.page{display:none}.page.active{display:block}.pageIntro{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:2px 0 17px}.pageIntro h2{font-size:23px;margin:0;letter-spacing:-.02em}.pageIntro p{margin:5px 0 0;font-size:11px;color:var(--muted)}.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.cards{display:grid;grid-template-columns:repeat(7,minmax(125px,1fr));gap:11px;margin-bottom:17px}.metric{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:var(--shadow);position:relative;overflow:hidden}.metric:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:#d7dae1}.metric.good:before{background:var(--green)}.metric.bad:before{background:var(--red)}.metric.warn:before{background:var(--amber)}.metric.info:before{background:var(--blue)}.metric .mLabel{font-size:10px;color:var(--muted);font-weight:850}.metric .mValue{font-size:28px;font-weight:930;margin-top:8px;letter-spacing:-.03em}.metric .mSub{font-size:9px;color:#9298a2;margin-top:6px}.panel,.formCard{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}.panelHead{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}.panelHead h3{font-size:13px;margin:0}.panelHead p{font-size:9.5px;color:var(--muted);margin:3px 0 0}.panelBody{padding:15px}.split{display:grid;grid-template-columns:minmax(0,2fr) minmax(300px,.9fr);gap:15px}
+    .filters{display:grid;grid-template-columns:repeat(6,minmax(140px,1fr));gap:9px;padding:13px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);margin-bottom:12px}.formTitle{padding:17px 19px;border-bottom:1px solid var(--line)}.formTitle h3{font-size:16px;margin:0}.formTitle p{font-size:10.5px;color:var(--muted);margin:5px 0 0}.formContent{padding:19px}.formSection{padding-bottom:18px;margin-bottom:18px;border-bottom:1px solid var(--line)}.formSection:last-child{border-bottom:0;margin-bottom:0;padding-bottom:0}.sectionTitle{font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#555c68;margin-bottom:11px}.formGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.full{grid-column:1/-1}.toggleLine{display:flex;gap:9px;flex-wrap:wrap}.toggleBox{display:flex;align-items:center;gap:7px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#f8f9fb;font-size:10.5px;font-weight:780}.callout{padding:10px 12px;border-radius:10px;background:var(--gold-soft);border:1px solid #eadab8;color:#705724;font-size:10.5px;font-weight:750}.securityCallout{padding:12px 13px;border-radius:12px;background:var(--blue-soft);border:1px solid #d9e3ff;color:#31549d;font-size:10.5px;line-height:1.5}
+    .taskList{display:grid;gap:11px}.taskCard{background:#fff;border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow);overflow:hidden}.taskTop{display:flex;gap:11px;align-items:flex-start;padding:14px 15px}.taskMain{flex:1;min-width:0}.taskTitle{font-size:14px;font-weight:900}.taskDesc{font-size:10.5px;color:var(--muted);margin-top:4px;line-height:1.45}.chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:9px}.chip,.status{display:inline-flex;align-items:center;border-radius:999px;padding:5px 8px;font-size:9.5px;font-weight:850}.chip{background:#f1f3f6;color:#59616c}.chip.gold{background:var(--gold-soft);color:#74591f}.chip.red{background:var(--red-soft);color:#a32f38}.chip.green{background:var(--green-soft);color:#176d4b}.chip.blue{background:var(--blue-soft);color:#315db0}.status{white-space:nowrap;background:#f1f3f6;color:#5b6370}.status.PENDING,.status.REASSIGNED{background:#f1f3f6;color:#5c6470}.status.IN_PROGRESS{background:var(--blue-soft);color:#315db0}.status.OVERDUE,.status.REJECTED{background:var(--red-soft);color:#a4323a}.status.COMPLETED,.status.COMPLETED_LATE{background:var(--green-soft);color:#176d4b}.status.AWAITING_VERIFICATION{background:var(--amber-soft);color:#8b5d12}.progress{height:6px;background:#eceef2;border-radius:99px;overflow:hidden;margin-top:9px}.progress span{display:block;height:100%;background:linear-gradient(90deg,#b88c3b,#d4b36d)}.checkList{padding:0 15px 11px}.checkItem{display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-top:1px dashed #e9ecf1}.checkItem input{margin-top:2px;accent-color:var(--green)}.checkItem span{font-size:10.5px;line-height:1.4}.taskActions{padding:9px 14px;border-top:1px solid var(--line);background:#fbfbfc;display:flex;gap:7px;flex-wrap:wrap;align-items:center}.evidenceFlag{font-size:9.5px;font-weight:850;padding:5px 8px;border-radius:999px}.evidenceFlag.required{color:#9a3038;background:var(--red-soft)}.evidenceFlag.optional{color:#176d4b;background:var(--green-soft)}.evidenceSwitch{border:1px solid var(--line);border-radius:999px;background:#f1f3f6;padding:6px 10px;font-size:9.5px;font-weight:900;cursor:pointer}.evidenceSwitch.on{background:var(--gold-soft);border-color:#e4cf9f;color:#72571f}.evidenceSwitch.off{background:var(--green-soft);border-color:#cce8da;color:#176d4b}.empty{padding:35px 18px;border:1px dashed #d7dce4;border-radius:14px;background:#fff;text-align:center;color:var(--muted);font-size:11px}
+    .tableWrap{overflow:auto;max-width:100%}table{width:100%;border-collapse:separate;border-spacing:0;font-size:10.5px}th,td{padding:10px 11px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:top}th{position:sticky;top:0;background:#f8f9fb;color:#59616d;text-transform:uppercase;letter-spacing:.05em;font-size:9.3px;font-weight:900;z-index:3}td.wrap{white-space:normal;min-width:220px;line-height:1.4}tbody tr:hover td{background:#fcfcfd}.tag{font-size:9px;font-weight:850;padding:4px 7px;border-radius:999px;background:#f1f3f6}.pager{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-top:1px solid var(--line);font-size:10px;color:var(--muted)}
+    .modal{position:fixed;z-index:120;inset:0;background:rgba(8,10,13,.56);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:18px}.modal.open{display:flex}.modalCard{width:min(700px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:18px;box-shadow:0 30px 90px rgba(0,0,0,.28)}.modalHead{padding:15px 17px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}.modalHead h3{font-size:14px;margin:0}.modalBody{padding:17px}.xBtn{width:34px;height:34px;border:0;border-radius:10px;background:#f0f2f5;font-size:20px}.toast{position:fixed;z-index:200;right:17px;bottom:17px;max-width:min(420px,calc(100vw - 34px));padding:12px 14px;border-radius:12px;color:#fff;background:#1b1e23;box-shadow:0 14px 34px rgba(0,0,0,.2);font-size:11px;font-weight:760;display:none}.toast.show{display:block}.toast.success{background:#176d4b}.toast.error{background:#a42f38}.loader{position:fixed;z-index:180;inset:0;background:rgba(255,255,255,.7);backdrop-filter:blur(2px);display:none;align-items:center;justify-content:center}.loader.show{display:flex}.loaderBox{display:flex;gap:11px;align-items:center;padding:13px 15px;background:#fff;border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow)}.spinner{width:27px;height:27px;border-radius:50%;border:3px solid #eceef2;border-top-color:var(--gold-dark);animation:spin .75s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+    .profileGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.profileItem{padding:12px;border:1px solid var(--line);border-radius:12px;background:#fafbfc}.profileItem small{display:block;font-size:9px;color:var(--muted);font-weight:800;text-transform:uppercase}.profileItem strong{display:block;font-size:12px;margin-top:5px}.roleBadge{display:inline-flex;padding:5px 8px;border-radius:999px;background:var(--dark);color:#fff;font-size:9px;font-weight:900}
+    @media(max-width:1200px){.cards{grid-template-columns:repeat(4,1fr)}.filters{grid-template-columns:repeat(3,1fr)}.split{grid-template-columns:1fr}}
+    @media(max-width:850px){.authShell{grid-template-columns:1fr}.authHero{display:none}.authPane{min-height:100vh;padding:24px}.content{padding:14px 12px 28px}.topbar{height:64px;padding:0 11px}.topBrand,.divider{display:none}.pageHead p{display:none}.actorBox strong{max-width:140px}.cards{grid-template-columns:repeat(2,1fr);gap:8px}.filters{grid-template-columns:1fr 1fr}.formGrid{grid-template-columns:1fr}.full{grid-column:auto}.pageIntro{align-items:flex-start}.pageIntro h2{font-size:20px}.taskTop{flex-direction:column}.profileGrid{grid-template-columns:1fr}}
+    @media(max-width:500px){.actorBox{display:none}.notifPill{margin-left:auto}.drawer{width:min(88vw,310px)}.filters{grid-template-columns:1fr}.pageIntro{display:block}.pageIntro .toolbar{margin-top:10px}.btn{padding:9px 11px}.cards{grid-template-columns:1fr 1fr}.metric{padding:13px}.metric .mValue{font-size:24px}}
+
+    /* ===== FRESH V3 / FULL SCREEN / MOBILE ===== */
+    html,body{min-height:100%;width:100%;overflow-x:hidden}
+    body,.appShell,#appView{min-height:100dvh}
+    .appShell{width:100%;display:flex;flex-direction:column}
+    .content{width:100%;max-width:none;flex:1;padding-left:clamp(12px,2vw,28px);padding-right:clamp(12px,2vw,28px)}
+    .mobileTaskCards{display:none}
+    .mobileAdminCard{background:#fff;border:1px solid var(--line);border-radius:15px;padding:14px;box-shadow:var(--shadow);display:grid;gap:8px}
+    .mobileAdminCard .row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;font-size:11px}
+    .mobileAdminCard .row small{color:var(--muted);font-weight:800;text-transform:uppercase;font-size:9px}
+    .mobileAdminCard .row strong{text-align:right;overflow-wrap:anywhere}
+    .bulkDrop{border:2px dashed #d7dbe2;border-radius:16px;padding:22px;background:#fafbfc;text-align:center}
+    .bulkDrop input{max-width:100%}
+    .bulkSteps{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 16px}
+    .bulkStep{padding:10px;border-radius:12px;background:#fff;border:1px solid var(--line);font-size:10px;font-weight:850;text-align:center}
+    .bulkSummary{display:grid;grid-template-columns:repeat(6,minmax(110px,1fr));gap:9px;margin:12px 0}
+    .bulkSummary .metric{padding:13px}
+    .bulkPreviewError{color:var(--red);font-weight:800;white-space:normal;min-width:260px}
+    .fileMeta{font-size:10px;color:var(--muted);margin-top:8px}
+    @media(max-width:680px){
+      body{background:#f5f6f8}.content{padding:12px 10px 24px}.topbar{position:sticky;top:0}
+      .desktopAdminTable{display:none}.mobileTaskCards{display:grid;gap:10px}
+      .bulkSteps{grid-template-columns:1fr 1fr}.bulkSummary{grid-template-columns:1fr 1fr}.bulkDrop{padding:16px 10px}
+      .pageIntro{gap:10px}.pageIntro .toolbar{width:100%}.pageIntro .toolbar .btn{flex:1}
+      .modal{padding:8px}.modalCard{max-height:96dvh;border-radius:14px}.modalBody{padding:14px}
+      .taskActions .btn{flex:1 1 calc(50% - 6px)}.taskActions{gap:6px}
+      .taskCard{border-radius:14px}.taskTitle{font-size:14px}.chips{gap:5px}.chip{font-size:9px}
+      .authPane{min-height:100dvh}.authCard{width:100%}
+    }
+
+    /* ===== V5 EMPLOYEE TASK BOARD / WORK FORM ===== */
+    .myTaskBoard{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden}
+    .myTaskBoardHead{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 14px;border-bottom:1px solid var(--line);background:#fff}
+    .taskTabs{display:flex;align-items:center;gap:4px;overflow-x:auto;scrollbar-width:none}.taskTabs::-webkit-scrollbar{display:none}
+    .taskTab{position:relative;border:0;background:transparent;color:#7b818b;padding:17px 13px 15px;display:flex;align-items:center;gap:7px;white-space:nowrap;font-size:11px;font-weight:760;border-bottom:3px solid transparent}
+    .taskTab strong{font-size:11px}.taskTab>span:last-child{font-variant-numeric:tabular-nums;color:#9aa0a9}.taskTab.active{color:#17191d;border-bottom-color:var(--gold)}.taskTab.active>span:last-child{color:#17191d}
+    .tabDot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:0 0 auto}.tabDot.pending{border:2px solid #d14a54;background:#fff}.tabDot.progressDot{background:#f5a63d}.tabDot.overdue{background:#ef5f67}.tabDot.complete{background:#18b97a;position:relative}.tabDot.complete:after{content:'✓';position:absolute;color:#fff;font-size:7px;left:2px;top:-1px;font-weight:950}
+    .taskBoardSearch{padding:8px 0;min-width:220px}.taskBoardSearch input{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 11px;outline:0;font-size:11px}.taskBoardSearch input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(199,164,95,.12)}
+    .taskQueue{padding:8px;display:grid;gap:7px;background:#f7f8fa;min-height:150px}
+    .taskQueueRow{width:100%;border:1px solid #e0e4ea;background:#fff;border-radius:12px;padding:12px 14px;display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:12px;text-align:left;transition:.16s;box-shadow:0 2px 8px rgba(18,23,31,.03)}
+    .taskQueueRow:hover{border-color:#d1b77e;transform:translateY(-1px);box-shadow:0 7px 18px rgba(18,23,31,.07)}
+    .taskQueueId{font-size:9px;color:#9299a4;font-weight:900;letter-spacing:.03em}.taskQueueTitle{font-size:12px;font-weight:870;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.taskQueueMeta{font-size:9.5px;color:var(--muted);font-weight:730;white-space:nowrap}.taskQueueArrow{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;background:#f1f3f6;color:#777f8b;font-size:16px}
+    .taskQueueRowV8{width:100%;border:1px solid #e0e4ea;background:#fff;border-radius:12px;padding:12px 14px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(18,23,31,.03)}
+    .taskQueueRowV8:hover{border-color:#d1b77e;box-shadow:0 7px 18px rgba(18,23,31,.07)}
+    .taskQueueInfo{min-width:0;display:grid;gap:4px}.taskQueueInfo .taskQueueTitle{white-space:normal}.taskQueueInfo .taskQueueMeta{white-space:normal}
+    .workFormBtn{border:1px solid #d8bd84;background:var(--gold-soft);color:#6f531e;border-radius:10px;padding:9px 12px;font-size:10px;font-weight:900;white-space:nowrap;transition:.16s}.workFormBtn:hover{background:#f1dfb7;transform:translateY(-1px)}
+    .taskAssignmentForm{display:grid;gap:0}.assignmentFormSection{border:1px solid var(--line);border-radius:15px;padding:18px;margin-bottom:14px;background:#fff;box-shadow:0 3px 12px rgba(18,23,31,.035)}
+    .assignmentFormSection .sectionTitle{margin-bottom:14px}.assignmentFormFooter{position:sticky;bottom:0;z-index:6;display:flex;justify-content:flex-end;padding:13px 0 2px;background:linear-gradient(180deg,rgba(247,248,250,0),#fff 32%)}
+    .assignmentFormFooter .btn{min-width:160px}.taskAssignmentForm .formGrid{gap:14px}.taskAssignmentForm textarea{min-height:96px}
+
+    .taskQueueEmpty{padding:40px 18px;text-align:center;color:var(--muted);font-size:11px;background:#fff;border-radius:12px}
+    .taskWorkTop{display:flex;align-items:center;gap:12px;margin-bottom:14px}.taskWorkTop h2{margin:2px 0 0;font-size:22px;letter-spacing:-.02em}.taskWorkEyebrow{font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:900}.backWorkBtn{width:40px;height:40px;border-radius:11px;border:1px solid var(--line2);background:#fff;font-size:20px;display:grid;place-items:center}
+    .workCard{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden}.workHero{padding:18px 20px;border-bottom:1px solid var(--line)}.workHeroTitle{font-size:18px;font-weight:930;line-height:1.25}.workHeroDesc{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5}.workMeta{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+    .workProgressHead{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 20px;background:#fafbfc;border-bottom:1px solid var(--line)}.workProgressLabel{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:900}.workProgressRing{width:26px;height:26px;border-radius:50%;border:4px solid #e3e6eb;position:relative}.workProgressRing span{position:absolute;inset:-4px;border-radius:50%;border:4px solid transparent;border-top-color:var(--gold);transform:rotate(35deg)}.workProgressCount{font-size:11px;color:var(--muted);font-weight:850}
+    .workChecklist{display:grid}.workCheckRow{display:flex;gap:12px;align-items:flex-start;padding:14px 20px;border-bottom:1px solid #edf0f3;cursor:pointer}.workCheckRow:last-child{border-bottom:0}.workCheckRow:hover{background:#fcfcfd}.workCheckRow input{width:17px;height:17px;margin:1px 0 0;accent-color:var(--green);flex:0 0 auto}.workCheckRow span{font-size:12px;line-height:1.45;font-weight:650}.workCheckRow.done span{text-decoration:line-through;color:#8a919c}
+    .workEvidence{margin:14px 20px 0;padding:15px;border:1px solid #ecd9af;border-radius:13px;background:var(--gold-soft)}.workEvidenceTitle{font-size:12px;font-weight:900}.workEvidenceSub{font-size:10px;color:#78602c;margin:4px 0 11px}.workEvidenceLine{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.workEvidenceLine input{max-width:100%;font-size:10.5px}.workEvidenceCount{font-size:10px;font-weight:850;color:#765a21}
+    .workSubmitBar{padding:17px 20px 20px;display:flex;align-items:center;justify-content:space-between;gap:14px;border-top:1px solid var(--line);margin-top:14px;background:#fbfbfc}.workSubmitHint{font-size:10px;color:var(--muted);line-height:1.45}.workSubmitBtn{min-width:170px}.workSubmitBtn[disabled]{opacity:.45;cursor:not-allowed;transform:none!important;box-shadow:none!important}.workDoneBanner{margin:18px 20px;padding:14px 16px;border-radius:12px;background:var(--green-soft);color:#176d4b;font-size:12px;font-weight:850;border:1px solid #cae7d8}
+    .performanceGrid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr);gap:15px}.performancePanel{min-height:250px}.performanceScoreRow{display:flex;align-items:center;gap:22px}.performanceScore{width:132px;height:132px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto;background:conic-gradient(var(--green) var(--score,0%),#edf0f3 0)}.performanceScoreInner{width:102px;height:102px;border-radius:50%;background:#fff;display:grid;place-items:center;text-align:center;box-shadow:inset 0 0 0 1px var(--line)}.performanceScoreInner strong{display:block;font-size:29px;line-height:1;font-weight:950}.performanceScoreInner span{display:block;font-size:9px;color:var(--muted);font-weight:800;margin-top:4px}.performanceFacts{display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:9px;flex:1}.performanceFact{padding:13px;border:1px solid var(--line);border-radius:13px;background:#fafbfc}.performanceFact small{display:block;font-size:9px;color:var(--muted);font-weight:850}.performanceFact strong{display:block;font-size:21px;margin-top:5px}.weekScore{font-size:44px;font-weight:950;letter-spacing:-.05em;line-height:1}.weekBar{height:9px;border-radius:99px;background:#edf0f3;overflow:hidden;margin:14px 0 18px}.weekBar span{display:block;height:100%;background:var(--green);border-radius:inherit}.weekStats{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.syncPill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 8px;font-size:9px;font-weight:850;border:1px solid var(--line);background:#f7f8fa;color:var(--muted)}.syncPill.saving{background:var(--amber-soft);border-color:#efd9b5;color:#8a5d15}.syncPill.saved{background:var(--green-soft);border-color:#cae7d8;color:#176d4b}.syncPill.error{background:var(--red-soft);border-color:#f1cbd0;color:#a42f38}.workProgressRight{display:flex;align-items:center;gap:9px}.taskInlineLoading{padding:34px;text-align:center;color:var(--muted);font-size:11px}.taskInlineLoading strong{display:block;color:var(--ink);font-size:13px;margin-bottom:5px}.workCheckRow{min-height:52px;touch-action:manipulation}.workCheckRow input{cursor:pointer}.workCheckRow.saving{background:#fffaf0}.workCheckRow.saveError{background:#fff3f4}.performanceCards{grid-template-columns:repeat(6,minmax(125px,1fr))}
+    @media(max-width:760px){.myTaskBoardHead{display:block;padding:0}.taskTabs{padding:0 6px;position:sticky;top:64px;z-index:8;background:#fff}.taskTab{padding:14px 9px 12px}.taskBoardSearch{min-width:0;padding:9px 10px;border-top:1px solid var(--line)}.taskQueue{padding:7px}.taskQueueRow{grid-template-columns:minmax(0,1fr) auto;gap:7px 10px;padding:13px 12px;min-height:62px}.taskQueueId{grid-column:1}.taskQueueTitle{grid-column:1;font-size:12px;white-space:normal}.taskQueueMeta{grid-column:1;white-space:normal}.taskQueueArrow{grid-column:2;grid-row:1/4}.taskQueueRowV8{grid-template-columns:minmax(0,1fr);gap:9px;padding:13px 12px}.taskQueueRowV8 .taskQueueId{grid-column:auto}.taskQueueInfo{grid-column:auto}.workFormBtn{width:100%;min-height:42px}.assignmentFormSection{padding:14px 12px}.assignmentFormFooter{padding-bottom:max(8px,env(safe-area-inset-bottom))}.assignmentFormFooter .btn{width:100%}.workHero,.workProgressHead,.workCheckRow{padding-left:14px;padding-right:14px}.workCheckRow{padding-top:15px;padding-bottom:15px}.workEvidence{margin-left:12px;margin-right:12px}.workSubmitBar{padding:14px;display:grid;position:sticky;bottom:0;z-index:7;box-shadow:0 -10px 24px rgba(19,24,32,.07)}.workSubmitBtn{width:100%;min-width:0;min-height:46px}.taskWorkTop h2{font-size:18px}.performanceGrid{grid-template-columns:1fr}.performanceScoreRow{align-items:flex-start}.performanceScore{width:112px;height:112px}.performanceScoreInner{width:86px;height:86px}.performanceFacts{grid-template-columns:1fr 1fr}.performanceCards{grid-template-columns:1fr 1fr}.content{padding-bottom:max(30px,env(safe-area-inset-bottom))}}
+  
+    .templateChecklistCell{white-space:normal;line-height:1.55;min-width:180px}.templateChecklistCell br+br{display:none}.templateActions{display:flex;gap:6px;flex-wrap:wrap}.btn.danger{background:#fff0f1;color:#a33238;border-color:#f1c9cc}.btn.danger:hover{background:#ffe6e8}
+</style>
+</head>
+<body>
+<div id="loginView" class="authShell">
+  <section class="authHero">
+    <div class="authBrand"><div class="mark">DW</div><div><h1>Daily Work</h1><p>Task & Checklist Operating System</p></div></div>
+    <div class="heroCopy"><h2>One place for daily work, follow-up and accountability.</h2><p>Employees see only their own work. Process Coordinators can follow up across the organization. Admins control users, departments, recurring tasks and system masters.</p><div class="heroPoints"><div class="heroPoint">Evidence upload only when the task requires it</div><div class="heroPoint">In-app + email pending-task reminders</div><div class="heroPoint">Daily / Weekly / Monthly / Yearly recurrence</div><div class="heroPoint">Complete-on-behalf audit trail</div></div></div>
+    <div class="authFoot">Secure email + password access · Google Apps Script</div>
+  </section>
+  <section class="authPane">
+    <div class="authCard">
+      <div id="loginPanel">
+        <h2>Welcome back</h2><p>Sign in using the email registered in User Management.</p>
+        <form class="authForm" onsubmit="submitLogin(event)">
+          <div class="field"><label>Email Address</label><input id="loginEmail" type="email" required autocomplete="username"></div>
+          <div class="field"><label>Password</label><input id="loginPassword" type="password" required autocomplete="current-password"></div>
+          <button class="btn primary block" type="submit">Login</button>
+          <button class="linkBtn" type="button" onclick="showAuthPanel('forgot')">Forgot Password?</button>
+        </form>
+      </div>
+      <div id="forgotPanel" class="hidden">
+        <h2>Forgot Password</h2><p>We will email a 6-digit OTP to your registered email address.</p>
+        <form class="authForm" onsubmit="requestOtp(event)"><div class="field"><label>Registered Email</label><input id="forgotEmail" type="email" required></div><button class="btn primary block" type="submit">Send OTP</button></form>
+        <div id="resetArea" class="hidden" style="margin-top:18px"><form class="authForm" onsubmit="resetWithOtp(event)"><div class="field"><label>6-Digit OTP</label><input id="resetOtp" inputmode="numeric" maxlength="6" required></div><div class="field"><label>New Password</label><input id="resetPassword" type="password" minlength="8" required></div><button class="btn gold block" type="submit">Reset Password</button></form></div>
+        <button class="linkBtn" type="button" onclick="showAuthPanel('login')">← Back to Login</button>
+      </div>
+      <div id="firstAdminPanel" class="hidden">
+        <h2>Create First Super Admin</h2><p>This one-time setup appears only when no login account exists.</p>
+        <form class="authForm" onsubmit="createFirstAdmin(event)">
+          <div class="field"><label>Name</label><input id="firstName" required></div>
+          <div class="field"><label>Email</label><input id="firstEmail" type="email" required></div>
+          <div class="field"><label>Department</label><input id="firstDept" placeholder="Optional — assign later"></div>
+          <div class="field"><label>Password</label><input id="firstPassword" type="password" minlength="8" required></div>
+          <button class="btn gold block" type="submit">Create Super Admin</button>
+        </form>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="appView" class="appShell hidden">
+  <header class="topbar">
+    <button class="hamburger" id="menuBtn" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="topBrand"><div class="miniMark">DW</div><strong>Daily Work</strong></div><div class="divider"></div>
+    <div class="pageHead"><h1 id="pageTitle">Dashboard</h1><p id="todayText"></p></div>
+    <button class="notifPill" onclick="goPage('notifications')" title="Notifications">🔔 <span id="notifCount">0</span></button>
+    <div class="actorBox"><strong id="actorName"></strong><span id="actorRole"></span></div>
+  </header>
+  <aside class="drawer" id="drawer">
+    <div class="drawerHead"><div class="mark" style="width:42px;height:42px">DW</div><div><h2>Daily Work</h2><p>Task & Checklist Control</p></div><button class="drawerClose" onclick="closeDrawer()">×</button></div>
+    <div class="drawerBody">
+      <div id="drawerUser" class="drawerUser"></div>
+      <div class="navLabel">Operations</div>
+      <button class="navBtn active" data-page="dashboard"><span class="navIcon">▦</span>Dashboard</button>
+      <button class="navBtn" data-page="tasks"><span class="navIcon">✓</span>My Tasks</button>
+      <button class="navBtn role-taskmanager" data-page="followup"><span class="navIcon">◎</span>Task Follow-Up</button>
+      <button class="navBtn role-taskmanager" data-page="addtask"><span class="navIcon">＋</span>Add New Task</button>
+      <div class="navLabel role-taskmanager">Control</div>
+      <button class="navBtn role-taskmanager" data-page="templates"><span class="navIcon">☷</span>Task Templates</button>
+      <button class="navBtn" data-page="verification"><span class="navIcon">◉</span>Verification</button>
+      <button class="navBtn" data-page="notifications"><span class="navIcon">🔔</span>Notifications</button>
+      <button class="navBtn" data-page="leave"><span class="navIcon">◫</span>Leave / Availability</button>
+      <div class="navLabel role-admin">Administration</div>
+      <button class="navBtn role-admin" data-page="users"><span class="navIcon">♙</span>User Management</button>
+      <button class="navBtn role-admin" data-page="departments"><span class="navIcon">◇</span>Department Management</button>
+      <button class="navBtn role-admin" data-page="branches"><span class="navIcon">⌖</span>Branch Management</button>
+      <button class="navBtn role-admin" data-page="bulk"><span class="navIcon">⇧</span>Bulk Upload</button>
+      <button class="navBtn role-admin" data-page="holidays"><span class="navIcon">◷</span>Holiday Management</button>
+      <button class="navBtn role-admin" data-page="audit"><span class="navIcon">⌁</span>Audit Logs</button>
+      <button class="navBtn role-admin" data-page="settings"><span class="navIcon">⚙</span>System Settings</button>
+      <div class="navLabel">Account</div>
+      <button class="navBtn" data-page="profile"><span class="navIcon">○</span>My Profile</button>
+      <button class="navBtn" onclick="logoutNow()"><span class="navIcon">⇥</span>Logout</button>
+    </div>
+  </aside>
+  <div class="overlay" id="overlay"></div>
+
+  <main class="content">
+    <section class="page active" id="page-dashboard">
+      <div class="pageIntro">
+        <div><h2 id="dashHeading">My Performance</h2><p id="dashSub">Fast personal performance snapshot. Your task list stays inside My Tasks.</p></div>
+        <div class="toolbar"><button class="btn" onclick="showDashboard(true)">↻ Refresh Performance</button></div>
+      </div>
+      <div class="cards performanceCards" id="dashboardCards"></div>
+      <div class="performanceGrid">
+        <div class="panel performancePanel"><div class="panelHead"><div><h3>Today’s Completion</h3><p>Your progress for today only.</p></div><span id="dashboardUpdated" class="syncPill saved">Live</span></div><div class="panelBody" id="performanceBox"></div></div>
+        <div class="panel performancePanel"><div class="panelHead"><div><h3>This Week</h3><p>Completion and on-time performance.</p></div></div><div class="panelBody" id="weekPerformanceBox"></div></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-tasks">
+      <div class="pageIntro"><div><h2>My Tasks</h2><p>Today’s work is shown automatically. Previous unfinished work stays under Overdue.</p></div><div class="toolbar"><button class="btn" onclick="loadMyTasks(true)">↻ Refresh</button></div></div>
+      <div class="myTaskBoard">
+        <div class="myTaskBoardHead">
+          <div class="taskTabs" id="myTaskTabs">
+            <button class="taskTab active" data-bucket="PENDING" onclick="setMyTaskTab('PENDING')"><span class="tabDot pending"></span><strong>Pending</strong><span id="myCountPending">0</span></button>
+            <button class="taskTab" data-bucket="OVERDUE" onclick="setMyTaskTab('OVERDUE')"><span class="tabDot overdue"></span><strong>Overdue</strong><span id="myCountOverdue">0</span></button>
+            <button class="taskTab" data-bucket="COMPLETED" onclick="setMyTaskTab('COMPLETED')"><span class="tabDot complete"></span><strong>Completed</strong><span id="myCountCompleted">0</span></button>
+          </div>
+          <div class="taskBoardSearch"><input id="myTaskSearch" placeholder="Search task" oninput="renderMyTaskBoard()"></div>
+        </div>
+        <div class="taskQueue" id="myTaskList"></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-taskwork">
+      <div class="taskWorkTop"><button class="backWorkBtn" onclick="goBackToMyTasks()">←</button><div><div class="taskWorkEyebrow">Task Work Form</div><h2 id="workTaskTitle">Task</h2></div></div>
+      <div id="taskWorkForm"></div>
+    </section>
+
+    <section class="page" id="page-followup"><div class="pageIntro"><div><h2>Task Follow-Up</h2><p>All employee tasks for Process Coordinator / Admin follow-up and reminders.</p></div><div class="toolbar"><button class="btn" onclick="loadFollowUpTasks()">↻ Refresh</button></div></div><div class="filters"><div class="field"><label>Date</label><input id="fuDate" type="date"></div><div class="field"><label>Employee</label><select id="fuUser"></select></div><div class="field"><label>Department</label><select id="fuDept"></select></div><div class="field"><label>Branch</label><select id="fuBranch"></select></div><div class="field"><label>Frequency</label><select id="fuFrequency"><option value="">All Frequencies</option><option>DAILY</option><option>WEEKLY</option><option>MONTHLY</option><option>QUARTERLY</option><option>YEARLY</option><option>ONE TIME</option><option>AS REQUIRED</option></select></div><div class="field"><label>Status</label><select id="fuStatus"><option value="">All Status</option><option>PENDING</option><option>IN PROGRESS</option><option>OVERDUE</option><option>AWAITING VERIFICATION</option><option>REJECTED</option><option>COMPLETED</option><option>COMPLETED LATE</option></select></div><div class="field"><label>Priority</label><select id="fuPriority"><option value="">All Priority</option><option>LOW</option><option>MEDIUM</option><option>HIGH</option><option>CRITICAL</option></select></div><div class="field full"><label>Search</label><input id="fuSearch" placeholder="Task / employee / department"></div></div><div class="toolbar" style="margin-bottom:12px"><button class="btn primary" onclick="loadFollowUpTasks()">Apply Filters</button><button class="btn" onclick="resetFollowUpFilters()">Reset</button></div><div class="taskList" id="followUpTaskList"></div><div class="panel" style="margin-top:16px"><div class="panelHead"><div><h3>Reminder / Follow-Up History</h3><p>Latest reminders sent by coordinators and admins.</p></div><button class="btn small" onclick="loadFollowUpLog()">↻ Refresh</button></div><div class="tableWrap"><table><thead><tr><th>Time</th><th>Employee</th><th>Task</th><th>Status</th><th>Remark</th><th>Followed By</th><th>Email</th></tr></thead><tbody id="followLogBody"></tbody></table></div></div></section>
+
+    <section class="page" id="page-addtask"><div class="pageIntro"><div><h2>Add New Task</h2><p>Create one-time or recurring work for any employee.</p></div></div><div class="formCard"><div class="formTitle"><h3>Task Assignment Form</h3><p>Fill the form below. Recurring tasks continue automatically from the Start Date until the template is manually deactivated.</p></div><div class="formContent"><input type="hidden" id="editTemplateId" value="">
+<form id="taskForm" class="taskAssignmentForm" onsubmit="submitTask(event)"><div class="formSection assignmentFormSection"><div class="sectionTitle">1 · Assignment</div><div class="formGrid"><div class="field"><label>Assign To User *</label><select id="fUser" required onchange="syncTaskDepartment()"></select></div><div class="field"><label>Department</label><input id="fDepartment" readonly></div><div class="field"><label>Branch</label><input id="fBranch" readonly></div><div class="field full"><label>Core Task *</label><input id="fTask" required placeholder="Enter the responsibility / task name"></div><div class="field full"><label>Description</label><textarea id="fDescription" placeholder="What should be completed?"></textarea></div></div></div><div class="formSection assignmentFormSection"><div class="sectionTitle">2 · Schedule</div><div class="formGrid"><div class="field"><label>Frequency *</label><select id="fFrequency" onchange="updateFrequencyHint()" required><option>DAILY</option><option>WEEKLY</option><option>MONTHLY</option><option>QUARTERLY</option><option>YEARLY</option><option>ONE TIME</option><option>AS REQUIRED</option></select></div><div class="field"><label>Task Start Date *</label><input id="fStartDate" type="date" onchange="updateFrequencyHint()" required></div><div class="field"><label>Scheduled Start Time</label><input id="fStartTime" type="time"></div><div class="field"><label>Due Time</label><input id="fDueTime" type="time"></div><div class="field full"><div class="callout" id="frequencyHint">Select a start date.</div></div></div></div><div class="formSection assignmentFormSection"><div class="sectionTitle">3 · Task Controls</div><div class="formGrid"><div class="field"><label>Task Type *</label><select id="fWorkType"><option value="CHECKBOX">CHECKBOX — Tap to complete</option><option value="UPLOAD">UPLOAD — Upload file to complete</option></select></div><div class="field"><label>Buddy Assignment Allowed</label><select id="fBuddy"><option value="YES">Yes</option><option value="NO">No</option></select></div></div></div><div class="assignmentFormFooter"><button class="btn gold" id="taskSaveBtn" type="submit">Save Task</button></div></form></div></div></section>
+
+    <section class="page" id="page-templates"><div class="pageIntro"><div><h2>Task Templates</h2><p>Recurring rules, schedules and source-linked task templates.</p></div><div class="toolbar"><button class="btn gold" onclick="goPage('addtask')">＋ Add Task</button><button class="btn" onclick="loadTemplates()">↻ Refresh</button></div></div><div class="panel"><div class="tableWrap"><table><thead><tr><th>User</th><th>Department</th><th>Task</th><th>Task Type</th><th>Frequency</th><th>Start Date</th><th>Start</th><th>Due</th><th>Evidence</th><th>Source</th><th>Status</th><th>Action</th></tr></thead>
+<div class="filters" style="margin-bottom:15px">
+  <div class="field">
+    <label>Department Filter</label>
+    <select id="templateDepartmentFilter" onchange="applyTemplateFilters()">
+      <option value="">All Departments</option>
+    </select>
+  </div>
+  <div class="field">
+    <label>User Filter</label>
+    <select id="templateUserFilter" onchange="applyTemplateFilters()">
+      <option value="">All Users</option>
+    </select>
+  </div>
+  <div class="field" style="justify-content:end">
+    <button class="btn" onclick="resetTemplateFilters()">Reset</button>
+  </div>
+</div>
+<tbody id="templateBody"></tbody></table></div></div></section>
+
+    <section class="page" id="page-verification"><div class="pageIntro"><div><h2>Verification</h2><p>Tasks where you are the verifier. Admin/Super Admin can view all.</p></div><button class="btn" onclick="loadVerification()">↻ Refresh</button></div><div class="panel"><div class="tableWrap"><table><thead><tr><th>Date</th><th>Task</th><th>Performer</th><th>Verifier</th><th>Department</th><th>Completed</th><th>Action</th></tr></thead><tbody id="verificationBody"></tbody></table></div></div></section>
+
+    <section class="page" id="page-notifications"><div class="pageIntro"><div><h2>Notifications</h2><p>Pending-task reminders and system notifications for your login.</p></div><button class="btn" onclick="loadNotifications()">↻ Refresh</button></div><div class="panel"><div class="tableWrap"><table><thead><tr><th>Status</th><th>Created</th><th>Type</th><th>Title</th><th>Message</th><th>Action</th></tr></thead><tbody id="notificationBody"></tbody></table></div></div></section>
+
+    <section class="page" id="page-users"><div class="pageIntro"><div><h2>User Management</h2><p>Add/edit employees, branch, roles, email login, managers, buddies and passwords.</p></div><button class="btn gold" onclick="openUserModal()">＋ Add User</button></div><div id="userMobileCards" class="mobileTaskCards"></div><div class="panel desktopAdminTable"><div class="tableWrap"><table><thead><tr><th>Name</th><th>Department</th><th>Branch</th><th>Designation</th><th>Email</th><th>Role</th><th>Weekly Off</th><th>Manager</th><th>Action</th></tr></thead><tbody id="usersBody"></tbody></table></div></div></section>
+
+    <section class="page" id="page-departments"><div class="pageIntro"><div><h2>Department Management</h2><p>Create and maintain departments from the web app.</p></div><button class="btn gold" onclick="openDepartmentModal()">＋ Add Department</button></div><div id="departmentMobileCards" class="mobileTaskCards"></div><div class="panel desktopAdminTable"><div class="tableWrap"><table><thead><tr><th>Department</th><th>Code</th><th>Department Head</th><th>Status</th><th>Action</th></tr></thead><tbody id="departmentBody"></tbody></table></div></div></section>
+
+    <section class="page" id="page-branches"><div class="pageIntro"><div><h2>Branch Management</h2><p>Create branches first, then assign every user to the correct Branch Name.</p></div><button class="btn gold" onclick="openBranchModal()">＋ Add Branch</button></div><div id="branchMobileCards" class="mobileTaskCards"></div><div class="panel desktopAdminTable"><div class="tableWrap"><table><thead><tr><th>Branch Name</th><th>Code</th><th>Location</th><th>Status</th><th>Action</th></tr></thead><tbody id="branchBody"></tbody></table></div></div></section>
+
+    <section class="page" id="page-bulk"><div class="pageIntro"><div><h2>Bulk Upload</h2><p>Fresh V8 entry: upload one Excel workbook to add Branches, Departments, Users and Task Templates. Recurring tasks have no end date.</p></div><div class="toolbar"><button class="btn" onclick="downloadBulkTemplate()">⬇ Excel Format</button><button class="btn" onclick="loadBulkHistory()">↻ History</button></div></div><div class="bulkSteps"><div class="bulkStep">1 · Download Empty Excel / Fill</div><div class="bulkStep">2 · Upload & Validate</div><div class="bulkStep">3 · Preview Valid / Invalid</div><div class="bulkStep">4 · Import Valid Rows</div></div><div class="panel"><div class="panelBody"><div class="bulkDrop"><strong>Upload Daily Work Bulk Excel</strong><div class="helper" style="margin:6px 0 12px">Supported sheets: BRANCHES, DEPARTMENTS, USERS, TASKS. Maximum 5,000 data rows.</div><input id="bulkFile" type="file" accept=".xlsx,.xls"><div id="bulkFileMeta" class="fileMeta">No file selected.</div><div class="toolbar" style="justify-content:center;margin-top:13px"><button class="btn primary" onclick="readBulkWorkbook()">Validate & Preview</button><button id="bulkImportBtn" class="btn gold" onclick="importBulkNow()" disabled>Import Valid Rows</button></div></div><div id="bulkSummary" class="bulkSummary"></div><div id="bulkPreviewCards" class="mobileTaskCards"></div><div class="tableWrap desktopAdminTable"><table><thead><tr><th>Sheet</th><th>Row</th><th>Status</th><th>Record</th><th>Errors</th></tr></thead><tbody id="bulkPreviewBody"><tr><td colspan="5">Upload a workbook to preview.</td></tr></tbody></table></div></div></div><div class="panel" style="margin-top:14px"><div class="panelHead"><div><h3>Bulk Import History</h3><p>Latest batches and row counts.</p></div></div><div class="tableWrap"><table><thead><tr><th>Batch</th><th>File</th><th>Uploaded By</th><th>Time</th><th>Total</th><th>Valid</th><th>Invalid</th><th>Status</th></tr></thead><tbody id="bulkHistoryBody"></tbody></table></div></div></section>
+
+    <section class="page" id="page-leave"><div class="pageIntro"><div><h2>Leave / Availability</h2><p>Employees can submit their own leave; Admin can record leave for any employee.</p></div><button class="btn gold" onclick="openLeaveModal()">＋ Add Leave</button></div><div class="panel"><div class="tableWrap"><table><thead><tr><th>Employee</th><th>Department</th><th>Type</th><th>From</th><th>To</th><th>Status</th><th>Approval</th><th>Reason</th></tr></thead><tbody id="leaveBody"></tbody></table></div></div></section>
+
+    <section class="page" id="page-holidays"><div class="pageIntro"><div><h2>Holiday Management</h2><p>Maintain organization holidays used by task assignment logic.</p></div><button class="btn gold" onclick="openHolidayModal()">＋ Add Holiday</button></div><div class="panel"><div class="tableWrap"><table><thead><tr><th>Date</th><th>Holiday</th><th>Branch / Location</th></tr></thead><tbody id="holidayBody"></tbody></table></div></div></section>
+
+    <section class="page" id="page-audit"><div class="pageIntro"><div><h2>Audit Logs</h2><p>Trace task, security and administration actions.</p></div><button class="btn" onclick="loadAudit()">↻ Refresh</button></div><div class="filters"><div class="field full"><label>Search</label><input id="auditSearch" placeholder="User / action / task"></div></div><div class="panel"><div class="tableWrap"><table><thead><tr><th>Timestamp</th><th>User</th><th>Task ID</th><th>Action</th><th>Previous</th><th>New</th></tr></thead><tbody id="auditBody"></tbody></table></div></div></section>
+
+    <section class="page" id="page-settings"><div class="pageIntro"><div><h2>System Settings</h2><p>Application-level settings. Evidence requirement is controlled per task template by Super Admin.</p></div></div><div class="panel"><div class="tableWrap"><table><thead><tr><th>Setting</th><th>Value</th><th>Description</th><th>Updated</th><th>By</th><th>Action</th></tr></thead><tbody id="settingsBody"></tbody></table></div></div></section>
+
+    <section class="page" id="page-profile"><div class="pageIntro"><div><h2>My Profile</h2><p>Your current employee and login information.</p></div></div><div class="split"><div class="panel"><div class="panelHead"><h3>Profile</h3></div><div class="panelBody"><div class="profileGrid" id="profileGrid"></div></div></div><div class="panel"><div class="panelHead"><h3>Change Password</h3></div><div class="panelBody"><form class="authForm" onsubmit="changePassword(event)"><div class="field"><label>Current Password</label><input id="cpCurrent" type="password" required></div><div class="field"><label>New Password</label><input id="cpNew" type="password" minlength="8" required></div><button class="btn primary" type="submit">Change Password</button></form></div></div></div></section>
+  </main>
+</div>
+
+<div class="modal" id="evidenceModal"><div class="modalCard"><div class="modalHead"><h3>Upload Work</h3><button class="xBtn" onclick="closeModal('evidenceModal')">×</button></div><div class="modalBody"><div class="field"><label>File / Photo *</label><input id="evidenceFile" type="file" accept="image/*,.pdf,.xlsx,.xls,.doc,.docx"></div><div class="toolbar" style="margin-top:14px"><button class="btn gold" onclick="uploadEvidenceNow()">Upload Work</button><button class="btn" onclick="closeModal('evidenceModal')">Cancel</button></div></div></div></div>
+<div class="modal" id="userModal"><div class="modalCard"><div class="modalHead"><h3 id="userModalTitle">Add User</h3><button class="xBtn" onclick="closeModal('userModal')">×</button></div><div class="modalBody"><form id="userForm" onsubmit="saveUserForm(event)"><input id="uId" type="hidden"><div class="formGrid"><div class="field"><label>Employee Name *</label><input id="uName" required></div><div class="field"><label>Employee ID</label><input id="uEmployeeId"></div><div class="field"><label>Department *</label><select id="uDept" required></select></div><div class="field"><label>Branch Name *</label><select id="uBranch" required></select></div><div class="field"><label>Designation</label><input id="uDesignation"></div><div class="field"><label>Email *</label><input id="uEmail" type="email" required></div><div class="field"><label>Contact</label><input id="uContact"></div><div class="field"><label>Weekly Off</label><select id="uWeeklyOff"><option value="">None</option><option>Sunday</option><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option></select></div><div class="field"><label>Role *</label><select id="uRole"><option value="EMPLOYEE">Employee</option><option value="PROCESS COORDINATOR">Process Coordinator</option><option value="ADMIN">Admin</option><option class="superRoleOption" value="SUPER ADMIN">Super Admin</option></select></div><div class="field"><label>Reporting Manager</label><select id="uManager"></select></div><div class="field"><label>Primary Buddy</label><select id="uPrimaryBuddy"></select></div><div class="field"><label>Secondary Buddy</label><select id="uSecondaryBuddy"></select></div><div class="field"><label>Status</label><select id="uStatus"><option>ACTIVE</option><option>INACTIVE</option></select></div><div class="field full"><label id="uPasswordLabel">Password *</label><input id="uPassword" type="password" minlength="8"><div class="helper">For existing users, leave blank to keep the current password. Admin can also use Reset Password from the user table.</div></div></div><div class="toolbar" style="margin-top:15px"><button class="btn gold" type="submit">Save User</button><button class="btn" type="button" onclick="closeModal('userModal')">Cancel</button></div></form></div></div></div>
+<div class="modal" id="departmentModal"><div class="modalCard" style="width:min(520px,100%)"><div class="modalHead"><h3>Department</h3><button class="xBtn" onclick="closeModal('departmentModal')">×</button></div><div class="modalBody"><form onsubmit="saveDepartmentForm(event)"><input id="dId" type="hidden"><div class="authForm"><div class="field"><label>Department Name *</label><input id="dName" required></div><div class="field"><label>Department Code</label><input id="dCode" maxlength="20" placeholder="Example: CRM"></div><div class="field"><label>Department Head</label><select id="dHead"></select></div><div class="field"><label>Status</label><select id="dStatus"><option>ACTIVE</option><option>INACTIVE</option></select></div><button class="btn gold" type="submit">Save Department</button></div></form></div></div></div>
+<div class="modal" id="branchModal"><div class="modalCard" style="width:min(560px,100%)"><div class="modalHead"><h3 id="branchModalTitle">Add Branch</h3><button class="xBtn" onclick="closeModal('branchModal')">×</button></div><div class="modalBody"><form id="branchForm" onsubmit="saveBranchForm(event)"><input id="bId" type="hidden"><div class="authForm"><div class="field"><label>Branch Name *</label><input id="bName" required></div><div class="field"><label>Branch Code</label><input id="bCode" maxlength="20"></div><div class="field"><label>Location</label><input id="bLocation"></div><div class="field"><label>Status</label><select id="bStatus"><option>ACTIVE</option><option>INACTIVE</option></select></div><button class="btn gold" type="submit">Save Branch</button></div></form></div></div></div>
+<div class="modal" id="leaveModal"><div class="modalCard" style="width:min(580px,100%)"><div class="modalHead"><h3>Add Leave / Availability</h3><button class="xBtn" onclick="closeModal('leaveModal')">×</button></div><div class="modalBody"><form onsubmit="saveLeaveForm(event)"><div class="formGrid"><div class="field full role-admin" id="leaveUserWrap"><label>User</label><select id="lUser"></select></div><div class="field"><label>From Date *</label><input id="lFrom" type="date" required></div><div class="field"><label>To Date *</label><input id="lTo" type="date" required></div><div class="field"><label>Availability Status</label><select id="lStatus"><option>LEAVE</option><option>ABSENT</option><option>WEEKLY OFF</option><option>WORKING</option></select></div><div class="field"><label>Leave Type</label><input id="lType" value="LEAVE"></div><div class="field full"><label>Reason</label><textarea id="lReason"></textarea></div></div><div class="toolbar" style="margin-top:13px"><button class="btn gold" type="submit">Save</button></div></form></div></div></div>
+<div class="modal" id="holidayModal"><div class="modalCard" style="width:min(520px,100%)"><div class="modalHead"><h3>Add Holiday</h3><button class="xBtn" onclick="closeModal('holidayModal')">×</button></div><div class="modalBody"><form class="authForm" onsubmit="saveHolidayForm(event)"><div class="field"><label>Date *</label><input id="hDate" type="date" required></div><div class="field"><label>Holiday Name *</label><input id="hName" required></div><div class="field"><label>Branch / Location</label><input id="hBranch"></div><button class="btn gold" type="submit">Save Holiday</button></form></div></div></div>
+<div class="modal" id="scheduleModal"><div class="modalCard" style="width:min(520px,100%)"><div class="modalHead"><h3>Template Schedule</h3><button class="xBtn" onclick="closeModal('scheduleModal')">×</button></div><div class="modalBody"><div id="scheduleTaskName" class="securityCallout" style="margin-bottom:12px"></div><div class="authForm"><div class="field"><label>Task Start Date *</label><input id="scheduleStartDate" type="date"></div><div class="callout">Recurring tasks continue from this date until the template is deactivated.</div><button class="btn gold" onclick="saveTemplateSchedule()">Save Schedule</button></div></div></div></div>
+<div class="modal" id="reminderModal"><div class="modalCard" style="width:min(560px,100%)"><div class="modalHead"><h3>Send Pending Task Reminder</h3><button class="xBtn" onclick="closeModal('reminderModal')">×</button></div><div class="modalBody"><div id="reminderTaskInfo" class="securityCallout" style="margin-bottom:12px"></div><div class="field"><label>Follow-Up / Reminder Remark *</label><textarea id="reminderRemark" placeholder="Example: Please complete this task before 4:00 PM and upload evidence."></textarea></div><div class="helper" style="margin-top:7px">The employee will receive both an in-app notification and email reminder.</div><div class="toolbar" style="margin-top:13px"><button class="btn gold" onclick="sendReminderNow()">Send In-App + Email</button></div></div></div></div>
+<div class="modal" id="resetPasswordModal"><div class="modalCard" style="width:min(500px,100%)"><div class="modalHead"><h3>Reset User Password</h3><button class="xBtn" onclick="closeModal('resetPasswordModal')">×</button></div><div class="modalBody"><div id="resetUserName" class="callout" style="margin-bottom:12px"></div><div class="field"><label>New Password *</label><input id="adminResetPassword" type="password" minlength="8"></div><button class="btn gold" style="margin-top:13px" onclick="resetPasswordNow()">Set New Password</button></div></div></div>
+<div class="loader" id="loader"><div class="loaderBox"><div class="spinner"></div><strong style="font-size:11px">Loading...</strong></div></div><div class="toast" id="toast"></div>
+
+<script>
+var state={token:localStorage.getItem('dw_session')||'',boot:null,page:'dashboard',busy:0,evidenceTaskId:'',reminderTaskId:'',resetUserId:'',templateRows:[],scheduleTemplateId:'',adminUsers:[],departments:[],branches:[],bulkPayload:null,bulkPreview:null,myTaskRows:[],myTaskTab:'PENDING',workTask:null,dashboardCache:null,dashboardLoadedAt:0,dashboardDirty:false,myTasksLoadedAt:0,myTasksDirty:true,pendingChecklistChanges:{},checklistFlushTimer:null,checklistSyncing:false};
+function $(id){return document.getElementById(id)}
+function esc(s){return String(s==null?'':s).replace(/[&<>'"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]})}
+function showLoader(v){if(v===undefined)v=true;state.busy+=v?1:-1;if(state.busy<0)state.busy=0;$('loader').classList.toggle('show',state.busy>0)}
+function toast(msg,type){type=type||'success';var t=$('toast');t.textContent=msg;t.className='toast show '+type;clearTimeout(t._tm);t._tm=setTimeout(function(){t.className='toast'},3500)}
+function server(fn,args,ok,isPublic){args=args||[];showLoader();var runner=google.script.run.withSuccessHandler(function(v){showLoader(false);if(ok)ok(v)}).withFailureHandler(function(err){showLoader(false);handleError(err)});var callArgs=isPublic?args:[state.token].concat(args);runner[fn].apply(runner,callArgs)}
+function serverSilent(fn,args,ok,fail,isPublic){args=args||[];var runner=google.script.run.withSuccessHandler(function(v){if(ok)ok(v)}).withFailureHandler(function(err){if(fail)fail(err);else handleError(err)});var callArgs=isPublic?args:[state.token].concat(args);runner[fn].apply(runner,callArgs)}
+function handleError(err){var m=err&&err.message?err.message:String(err||'Unexpected error');if(m.indexOf('SESSION_REQUIRED')>=0||m.indexOf('SESSION_EXPIRED')>=0||m.indexOf('ACCOUNT_INACTIVE')>=0){clearSession();toast('Your session has expired. Please log in again.','error');return}toast(m,'error')}
+function clearSession(){state.token='';state.boot=null;localStorage.removeItem('dw_session');$('appView').classList.add('hidden');$('loginView').classList.remove('hidden');showAuthPanel('login')}
+window.addEventListener('load',function(){bindNav();$('menuBtn').onclick=toggleDrawer;$('overlay').onclick=closeDrawer;server('getPublicBootstrap',[],function(pub){if(pub.needsFirstAdmin){showAuthPanel('first')}else if(state.token){resumeSession()}else showAuthPanel('login')},true)});
+function showAuthPanel(which){['loginPanel','forgotPanel','firstAdminPanel'].forEach(function(id){$(id).classList.add('hidden')});$(which==='forgot'?'forgotPanel':which==='first'?'firstAdminPanel':'loginPanel').classList.remove('hidden')}
+function submitLogin(e){e.preventDefault();server('login',[$('loginEmail').value,$('loginPassword').value],function(r){state.token=r.token;localStorage.setItem('dw_session',r.token);$('loginPassword').value='';resumeSession()},true)}
+function createFirstAdmin(e){e.preventDefault();server('createFirstSuperAdmin',[{name:$('firstName').value,email:$('firstEmail').value,department:$('firstDept').value,password:$('firstPassword').value}],function(r){toast(r.message);showAuthPanel('login');$('loginEmail').value=$('firstEmail').value},true)}
+function requestOtp(e){e.preventDefault();server('requestPasswordReset',[$('forgotEmail').value],function(r){toast(r.message);$('resetArea').classList.remove('hidden')},true)}
+function resetWithOtp(e){e.preventDefault();server('resetPasswordWithOtp',[{email:$('forgotEmail').value,otp:$('resetOtp').value,newPassword:$('resetPassword').value}],function(r){toast(r.message);showAuthPanel('login');$('loginEmail').value=$('forgotEmail').value},true)}
+function resumeSession(){server('getSessionBootstrap',[],function(b){state.boot=b;state.dashboardCache=b.dashboard||null;state.dashboardLoadedAt=Date.now();state.dashboardDirty=false;$('loginView').classList.add('hidden');$('appView').classList.remove('hidden');renderShell();goPage('dashboard')})}
+function logoutNow(){if(!state.token){clearSession();return}server('logout',[],function(){clearSession();toast('Logged out')})}
+function bindNav(){document.querySelectorAll('.navBtn[data-page]').forEach(function(b){b.onclick=function(){goPage(b.getAttribute('data-page'))}})}
+function toggleDrawer(){var o=!$('drawer').classList.contains('open');$('drawer').classList.toggle('open',o);$('overlay').classList.toggle('open',o)}function closeDrawer(){$('drawer').classList.remove('open');$('overlay').classList.remove('open')}
+function renderShell(){var a=state.boot.actor,p=state.boot.permissions;$('actorName').textContent=a.name;$('actorRole').textContent=state.boot.role;$('todayText').textContent='Today · '+prettyDate(state.boot.today);$('notifCount').textContent=state.boot.notificationUnread||0;$('drawerUser').innerHTML='<strong>'+esc(a.name)+'</strong><span>'+esc(state.boot.role)+' · '+esc(a.department||'')+(a.branch?' · '+esc(a.branch):'')+'</span>';state.branches=state.boot.branches||[];document.querySelectorAll('.role-taskmanager').forEach(function(x){x.classList.toggle('hidden',!p.manageTasks)});document.querySelectorAll('.role-admin').forEach(function(x){x.classList.toggle('hidden',!p.manageUsers)});document.querySelectorAll('.superRoleOption').forEach(function(x){x.classList.toggle('hidden',state.boot.role!=='SUPER ADMIN')});document.querySelectorAll('.super-only').forEach(function(x){x.classList.toggle('hidden',!p.manageEvidenceRules)});$('fuDate').value=state.boot.today;$('fStartDate').value=state.boot.today;populateCommonSelects();renderProfile()}
+function pageTitles(){return{dashboard:'Dashboard',tasks:'My Tasks',followup:'Task Follow-Up',addtask:'Add New Task',templates:'Task Templates',verification:'Verification',notifications:'Notifications',users:'User Management',departments:'Department Management',branches:'Branch Management',bulk:'Bulk Upload',leave:'Leave / Availability',holidays:'Holiday Management',audit:'Audit Logs',settings:'System Settings',profile:'My Profile',taskwork:'Task Work'}}
+function goPage(page){var target=$('page-'+page);if(!target)return;state.page=page;document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});target.classList.add('active');document.querySelectorAll('.navBtn[data-page]').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-page')===page)});$('pageTitle').textContent=pageTitles()[page]||'Daily Work';closeDrawer();window.scrollTo({top:0,behavior:'smooth'});if(page==='dashboard')showDashboard(false);if(page==='tasks')loadMyTasks(false);if(page==='followup')loadFollowUpTasks();if(page==='templates')loadTemplates();if(page==='verification')loadVerification();if(page==='notifications')loadNotifications();if(page==='users')loadUsers();if(page==='departments')loadDepartments();if(page==='branches')loadBranches();if(page==='bulk'){loadBulkHistory();resetBulkUi(false)}if(page==='leave')loadLeave();if(page==='holidays')loadHolidays();if(page==='audit')loadAudit();if(page==='settings')loadSettings();if(page==='profile')renderProfile()}
+function populateCommonSelects(){var users=state.boot.users||[],depts=state.boot.departments||[],branches=state.boot.branches||[];function uopts(blank){return (blank?'<option value="">All Users</option>':'<option value="">Select user</option>')+users.map(function(u){return '<option value="'+esc(u.id)+'">'+esc(u.name)+(u.department?' — '+esc(u.department):'')+'</option>'}).join('')}function dopts(blank){return (blank?'<option value="">All Departments</option>':'<option value="">Select department</option>')+depts.map(function(d){return '<option>'+esc(d)+'</option>'}).join('')}function bopts(blank){return (blank?'<option value="">All Branches</option>':'<option value="">Select branch</option>')+branches.map(function(b){return '<option>'+esc(b)+'</option>'}).join('')}['fuUser'].forEach(function(id){if($(id))$(id).innerHTML=uopts(true)});['fUser','lUser'].forEach(function(id){if($(id))$(id).innerHTML=uopts(false)});['fuDept'].forEach(function(id){if($(id))$(id).innerHTML=dopts(true)});if($('uDept'))$('uDept').innerHTML=dopts(false);if($('uBranch'))$('uBranch').innerHTML=bopts(false);if($('fuBranch'))$('fuBranch').innerHTML=bopts(true);if($('fVerifier'))$('fVerifier').innerHTML='<option value="">Select verifier</option>'+users.map(function(u){return '<option>'+esc(u.name)+'</option>'}).join('');['uManager','uPrimaryBuddy','uSecondaryBuddy','dHead'].forEach(function(id){if($(id))$(id).innerHTML='<option value="">None</option>'+users.map(function(u){return '<option>'+esc(u.name)+'</option>'}).join('')})}
+function showDashboard(force){if(!state.boot)return;var fresh=state.dashboardCache&&!state.dashboardDirty&&(Date.now()-state.dashboardLoadedAt<60000);if(!force&&fresh){renderDashboard(state.dashboardCache);return}if($('dashboardUpdated')){$('dashboardUpdated').textContent='Refreshing';$('dashboardUpdated').className='syncPill saving'}serverSilent('getMyPerformanceDashboard',[],function(d){state.dashboardCache=d;state.dashboardLoadedAt=Date.now();state.dashboardDirty=false;renderDashboard(d)},function(err){if(state.dashboardCache)renderDashboard(state.dashboardCache);handleError(err)})}
+function refreshDashboard(){showDashboard(true)}
+function renderDashboard(d){d=d||{};var data=[['Today Tasks',d.todayTotal||0,''],['Completed',d.completedToday||0,'good'],['Open Today',d.openToday!=null?d.openToday:(d.pendingToday||0),'warn'],['Overdue',d.overdueBacklog||0,'bad'],['On Time',d.onTimePct||0,'good'],['Week Completion',d.weekCompletionPct||0,'info']];$('dashboardCards').innerHTML=data.map(function(x){return '<div class="metric '+x[2]+'"><div class="mLabel">'+x[0]+'</div><div class="mValue">'+x[1]+(x[0]==='On Time'||x[0]==='Week Completion'?'%':'')+'</div><div class="mSub">'+(x[0]==='Overdue'?'Previous unfinished':'Today')+'</div></div>'}).join('');var pct=Math.max(0,Math.min(100,Number(d.completionPct||0)));$('performanceBox').innerHTML='<div class="performanceScoreRow"><div class="performanceScore" style="--score:'+pct+'%"><div class="performanceScoreInner"><div><strong>'+pct+'%</strong><span>COMPLETION</span></div></div></div><div class="performanceFacts"><div class="performanceFact"><small>Completed Today</small><strong>'+(d.completedToday||0)+'</strong></div><div class="performanceFact"><small>Awaiting Verification</small><strong>'+(d.awaitingVerificationToday||0)+'</strong></div><div class="performanceFact"><small>Completed Late</small><strong>'+(d.completedLateToday||0)+'</strong></div><div class="performanceFact"><small>Previous Overdue</small><strong>'+(d.overdueBacklog||0)+'</strong></div></div></div>';$('weekPerformanceBox').innerHTML='<div class="weekScore">'+(d.weekCompletionPct||0)+'%</div><div class="helper">Week completion rate · '+esc(d.weekStartLabel||'')+' to Today</div><div class="weekBar"><span style="width:'+Math.max(0,Math.min(100,Number(d.weekCompletionPct||0)))+'%"></span></div><div class="weekStats"><div class="performanceFact"><small>Week Tasks</small><strong>'+(d.weekTotal||0)+'</strong></div><div class="performanceFact"><small>Week Completed</small><strong>'+(d.weekCompleted||0)+'</strong></div><div class="performanceFact"><small>On Time</small><strong>'+(d.onTimePct||0)+'%</strong></div><div class="performanceFact"><small>Pending Today</small><strong>'+(d.pendingToday||0)+'</strong></div></div>';if($('dashboardUpdated')){$('dashboardUpdated').textContent='Updated '+(d.lastUpdatedTime||'now');$('dashboardUpdated').className='syncPill saved'}}
+function loadMyTasks(force){var fresh=!state.myTasksDirty&&state.myTasksLoadedAt&&(Date.now()-state.myTasksLoadedAt<45000);if(!force&&fresh){renderMyTaskBoard();return}if($('myTaskList')&&!state.myTaskRows.length)$('myTaskList').innerHTML='<div class="taskInlineLoading"><strong>Loading your tasks…</strong>Please wait a moment.</div>';serverSilent('listTasks',[{scope:'MY_BOARD'}],function(rows){state.myTaskRows=rows||[];state.myTasksLoadedAt=Date.now();state.myTasksDirty=false;renderMyTaskBoard()},function(err){handleError(err);if($('myTaskList'))$('myTaskList').innerHTML='<div class="taskQueueEmpty">Could not load tasks. Tap Refresh to try again.</div>'})}
+function setMyTaskTab(tab){state.myTaskTab=tab;document.querySelectorAll('#myTaskTabs .taskTab').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-bucket')===tab)});renderMyTaskBoard()}
+function shortTaskId(id){id=String(id||'');var parts=id.split('-');return parts.length>2?parts.slice(-2).join('-'):id.slice(-10)}
+
+function renderMyTaskBoard(){
+var rows=state.myTaskRows||[],search=($('myTaskSearch')&&$('myTaskSearch').value||'').trim().toLowerCase();
+var counts={'PENDING':0,'OVERDUE':0,'COMPLETED':0};
+rows.forEach(function(t){if(counts[t.taskBucket]!=null)counts[t.taskBucket]++});
+$('myCountPending').textContent=counts.PENDING;
+$('myCountOverdue').textContent=counts.OVERDUE;
+$('myCountCompleted').textContent=counts.COMPLETED;
+
+var filtered=rows.filter(function(t){
+ if(t.taskBucket!==state.myTaskTab)return false;
+ if(!search)return true;
+ return [t.coreTask,t.description,t.department,t.branch].join(' ').toLowerCase().indexOf(search)>=0;
+});
+
+var el=$('myTaskList');
+if(!filtered.length){
+ el.innerHTML='<div class="taskQueueEmpty">No tasks found.</div>';return;
+}
+
+el.innerHTML=filtered.map(function(t){
+var info='<span class="taskQueueId">'+esc(shortTaskId(t.taskId))+
+'</span><div class="taskQueueInfo"><span class="taskQueueTitle">'+esc(t.coreTask)+
+'</span><span class="taskQueueMeta">Due '+esc(t.dueTime||'—')+'</span></div>';
+
+if(t.taskBucket==='COMPLETED'){
+ return '<div class="taskQueueRowV8">'+info+
+ '<span class="status COMPLETED">COMPLETED</span></div>';
+}
+
+var type=String(t.workType||t.taskType||'CHECKBOX').toUpperCase();
+
+if(type!=='UPLOAD'){
+return '<div class="taskQueueRowV8">'+info+
+'<label class="taskInlineCheck"><input type="checkbox" onchange="completeInlineCheckbox(\''+esc(t.taskId)+'\',this)" />'+
+'<span>Complete</span></label></div>';
+}
+
+return '<div class="taskQueueRowV8">'+info+
+'<button class="workFormBtn" onclick="openInlineUpload(\''+esc(t.taskId)+'\')">Upload</button></div>';
+
+}).join('');
+}
+
+
+function completeInlineCheckbox(id,el){
+if(!el.checked)return;
+el.disabled=true;
+serverSilent('completeTask',[{taskId:id,remark:''}],function(res){
+var t=(state.myTaskRows||[]).find(x=>x.taskId===id);
+if(t){t.status=res.status||'COMPLETED';t.taskBucket='COMPLETED';}
+toast('Task completed');
+renderMyTaskBoard();
+},function(err){
+el.checked=false;
+el.disabled=false;
+handleError(err);
+});
+}
+
+
+function openInlineUpload(id){
+var t=(state.myTaskRows||[]).find(x=>x.taskId===id);
+if(!t)return;
+state.uploadTask=t;
+
+var modal=document.getElementById('inlineUploadModal');
+if(!modal){
+modal=document.createElement('div');
+modal.id='inlineUploadModal';
+modal.className='modal open';
+document.body.appendChild(modal);
+}else{
+modal.className='modal open';
+}
+
+modal.innerHTML='<div class="modalCard"><div class="modalHead"><h3>Upload Work</h3>'+
+'<button class="xBtn" onclick="closeInlineUpload()">×</button></div>'+
+'<div class="modalBody"><strong>'+esc(t.coreTask)+'</strong><br><br>'+
+'<input id="inlineUploadFile" type="file">'+
+'<br><br><button class="btn gold" onclick="submitInlineUpload()">Upload</button></div></div>';
+}
+
+function closeInlineUpload(){
+var m=document.getElementById('inlineUploadModal');
+if(m)m.className='modal';
+}
+
+function submitInlineUpload(){
+var t=state.uploadTask;
+var f=document.getElementById('inlineUploadFile').files[0];
+if(!f){toast('Select file','error');return;}
+
+var r=new FileReader();
+r.onload=function(){
+serverSilent('uploadTaskEvidence',[{
+taskId:t.taskId,
+fileName:f.name,
+mimeType:f.type,
+base64:String(r.result).split(',')[1]
+}],function(res){
+t.attachmentCount=res.attachmentCount||1;
+t.status='COMPLETED';
+t.taskBucket='COMPLETED';
+mergeWorkTaskIntoCache(t);
+closeInlineUpload();
+toast('Task completed');
+renderMyTaskBoard();
+},handleError);
+};
+r.readAsDataURL(f);
+}
+
+function loadFollowUpTasks(){server('listTasks',[{date:$('fuDate').value||state.boot.today,userId:$('fuUser').value,department:$('fuDept').value,branch:$('fuBranch').value,frequency:$('fuFrequency').value,status:$('fuStatus').value,priority:$('fuPriority').value,search:$('fuSearch').value}],function(rows){renderTaskCards('followUpTaskList',rows,false);loadFollowUpLog()})}
+function resetFollowUpFilters(){$('fuDate').value=state.boot.today;$('fuUser').value='';$('fuDept').value='';$('fuBranch').value='';$('fuFrequency').value='';$('fuStatus').value='';$('fuPriority').value='';$('fuSearch').value='';loadFollowUpTasks()}
+function renderTaskCards(targetId,rows,compact){
+ var el=$(targetId);
+ if(!rows||!rows.length){el.innerHTML='<div class="empty">No tasks found for this view.</div>';return}
+ el.innerHTML=rows.map(function(t){
+   var done=['COMPLETED','COMPLETED LATE','AWAITING VERIFICATION'].indexOf(t.status)>=0;
+   var wt=String(t.workType||t.taskType||'CHECKBOX').toUpperCase();
+   var action='';
+
+   if(!done && t.canAct){
+      if(wt==='UPLOAD'){
+        action='<button class="btn small gold" onclick="openEvidence(\''+esc(t.taskId)+'\')">Upload</button>';
+      }else{
+        action='<label class="inlineTaskCheck"><input type="checkbox" onchange="completeTaskFromCard(\''+esc(t.taskId)+'\',this.checked,this)" ><span> '+esc(t.coreTask)+'</span></label>';
+      }
+   }else{
+      action='<span class="completedBadge">✓ Completed</span>';
+   }
+
+   return '<div class="taskCardInline">'+
+   '<div class="taskMain"><div class="taskTitle">'+esc(t.coreTask)+'</div>'+
+   '<div class="taskMeta">Due '+esc(t.dueTime||'')+'</div></div>'+
+   '<div class="taskAction">'+action+'</div>'+
+   '</div>';
+ }).join('');
+}
+
+function completeTaskFromCard(taskId,checked,el){
+ if(!checked) return;
+ el.disabled=true;
+ serverSilent('completeTask',[{taskId:taskId,remark:''}],function(){
+   var card=el.closest('.taskCardInline');
+   if(card){
+     card.querySelector('.taskAction').innerHTML='<span class="completedBadge">✓ Completed</span>';
+   }
+   toast('Task completed');
+   if(typeof loadMyTasks==='function') setTimeout(loadMyTasks,300);
+ },function(err){
+   el.checked=false;
+   el.disabled=false;
+   handleError(err);
+ });
+}
+
+function startTaskNow(id){server('startTask',[id],function(){toast('Task started');reloadCurrentTasks()})}
+function toggleChecklist(taskId,checkId,completed){server('setChecklistStatus',[{taskId:taskId,checklistId:checkId,completed:completed}],function(){reloadCurrentTasks()})}
+function completeTaskNow(id,onBehalf){var remark='';if(onBehalf){remark=prompt('Mandatory follow-up/completion remark for completing on behalf:','')||'';if(!remark){toast('Remark is required for completion on behalf.','error');return}}server('completeTask',[{taskId:id,remark:remark}],function(r){toast('Task '+(r.completionMode==='ON BEHALF'?'completed on behalf':'completed'));reloadCurrentTasks()})}
+function reloadCurrentTasks(){if(state.page==='dashboard')showDashboard(true);else if(state.page==='followup')loadFollowUpTasks();else loadMyTasks(true)}
+function openEvidence(id){state.evidenceTaskId=id;$('evidenceFile').value='';openModal('evidenceModal')}
+function uploadEvidenceNow(){var f=$('evidenceFile').files[0];if(!f){toast('Select a work file/photo.','error');return}if(f.size>7*1024*1024){toast('File must be smaller than 7 MB.','error');return}var r=new FileReader();r.onload=function(){server('uploadTaskEvidence',[{taskId:state.evidenceTaskId,fileName:f.name,mimeType:f.type,base64:String(r.result).split(',')[1]||''}],function(){toast('Work uploaded');closeModal('evidenceModal');reloadCurrentTasks()})};r.readAsDataURL(f)}
+function openReminder(id,user,task){state.reminderTaskId=id;$('reminderRemark').value='';$('reminderTaskInfo').textContent=user+' · '+task;openModal('reminderModal')}
+function sendReminderNow(){var remark=$('reminderRemark').value.trim();if(!remark){toast('Enter a follow-up remark.','error');return}server('sendTaskReminder',[{taskId:state.reminderTaskId,remark:remark}],function(r){toast('Reminder sent · '+r.emailStatus);closeModal('reminderModal');loadFollowUpLog()})}
+function loadFollowUpLog(){server('listFollowUpLog',[{date:$('fuDate').value||''}],function(rows){$('followLogBody').innerHTML=rows.length?rows.map(function(r){return '<tr><td>'+esc(r.timestamp)+'</td><td>'+esc(r.employee)+'</td><td class="wrap">'+esc(r.task)+'</td><td>'+esc(r.status)+'</td><td class="wrap">'+esc(r.remark)+'</td><td>'+esc(r.followedBy)+'</td><td>'+esc(r.emailStatus)+'</td></tr>'}).join(''):'<tr><td colspan="7">No follow-up records yet.</td></tr>'})}
+function syncTaskDepartment(){var u=(state.boot.users||[]).find(function(x){return x.id===$('fUser').value});$('fDepartment').value=u?u.department:'';if($('fBranch'))$('fBranch').value=u?u.branch:''}
+function toggleVerifier(){$('verifierWrap').classList.toggle('hidden',$('fVerification').value!=='YES')}
+function updateFrequencyHint(){var f=$('fFrequency').value,d=$('fStartDate').value;if(!d){$('frequencyHint').textContent='Select a start date.';return}var dt=new Date(d+'T12:00:00');var day=dt.toLocaleDateString('en-US',{weekday:'long'});var text=f==='DAILY'?'Every day from '+prettyDate(d):f==='WEEKLY'?'Every '+day+' from '+prettyDate(d):f==='MONTHLY'?'Every month on day '+Number(d.slice(8,10)):f==='QUARTERLY'?'Every 3 months from '+prettyDate(d):f==='YEARLY'?'Every year on '+prettyDate(d).replace(/\d{4}/,'').trim():f==='ONE TIME'?'Only on '+prettyDate(d):'Created initially on '+prettyDate(d)+'; further instances when required.';$('frequencyHint').textContent=text}
+function submitTask(e){e.preventDefault();var p={userId:$('fUser').value,department:$('fDepartment').value,coreTask:$('fTask').value,description:$('fDescription').value,frequency:$('fFrequency').value,startDate:$('fStartDate').value,priority:'MEDIUM',startTime:$('fStartTime').value,dueTime:$('fDueTime').value,workType:$('fWorkType').value,evidenceRequired:$('fWorkType').value==='UPLOAD'?'YES':'NO',verificationRequired:false,verifier:'',buddyAllowed:$('fBuddy').value==='YES'};server($('editTemplateId').value?'updateTemplate':'addNewTask',[Object.assign(p,{templateId:$('editTemplateId').value})],function(r){toast(r.message);$('editTemplateId').value='';e.target.reset();$('fStartDate').value=state.boot.today;if($('fWorkType'))$('fWorkType').value='CHECKBOX';var btn=$('taskSaveBtn');if(btn)btn.textContent='Save Task';updateFrequencyHint();goPage('templates')})}
+function loadTemplates(){
+server('listTaskTemplates',[],function(rows){
+ state.templateRows=rows;
+ var dept=$('templateDepartmentFilter'), usr=$('templateUserFilter');
+ if(dept && dept.options.length===1){
+   [...new Set(rows.map(r=>r.department).filter(Boolean))].forEach(x=>dept.add(new Option(x,x)));
+ }
+ if(usr && usr.options.length===1){
+   [...new Set(rows.map(r=>r.user).filter(Boolean))].forEach(x=>usr.add(new Option(x,x)));
+ }
+ renderTemplateRows(rows);
+})
+}
+function applyTemplateFilters(){
+ var d=$('templateDepartmentFilter').value;
+ var u=$('templateUserFilter').value;
+ renderTemplateRows(state.templateRows.filter(r=>(!d||r.department===d)&&(!u||r.user===u)));
+}
+function resetTemplateFilters(){
+ $('templateDepartmentFilter').value='';
+ $('templateUserFilter').value='';
+ renderTemplateRows(state.templateRows);
+}
+function renderTemplateRows(rows){
+$('templateBody').innerHTML=rows.length?rows.map(function(r){
+var needs=String(r.scheduleStatus).toUpperCase()==='NEEDS START DATE';
+var isUpload=String(r.workType||'').toUpperCase()==='UPLOAD';
+var typeChip='<span class="chip '+(isUpload?'blue':'gold')+'">'+(isUpload?'UPLOAD':'CHECKBOX')+'</span>';
+var evidenceFlag='<span class="evidenceFlag '+(isUpload?'required':'optional')+'">'+(isUpload?'Required':'Not Required')+'</span>';
+var action='<div class="templateActions"><button class="btn small" onclick="editTemplate(\''+esc(r.templateId)+'\')">Edit</button><button class="btn small" onclick="openSchedule(\''+esc(r.templateId)+'\')">Schedule</button><button class="btn small" onclick="toggleTemplate(\''+esc(r.templateId)+'\','+(r.active!=='ACTIVE')+')">'+(r.active==='ACTIVE'?'Deactivate':'Activate')+'</button>'+(r.canDeleteTemplate?'<button class="btn small danger" onclick="deleteTemplate(\''+esc(r.templateId)+'\',\''+esc((r.task||'').replace(/'/g,"\\'"))+'\')">Delete</button>':'')+'</div>';
+return '<tr><td>'+esc(r.user)+'</td><td>'+esc(r.department)+'</td><td><strong>'+esc(r.task)+'</strong></td><td>'+typeChip+'</td><td>'+esc(r.frequency)+'</td><td>'+esc(prettyDate(r.startDate))+'</td><td>'+esc(r.startTime)+'</td><td>'+esc(r.dueTime)+'</td><td>'+evidenceFlag+'</td><td>'+esc(r.source)+'</td><td>'+esc(needs?'NEEDS START DATE':r.active)+'</td><td>'+action+'</td></tr>'
+}).join(''):'<tr><td colspan="12">No templates found.</td></tr>';
+}
+function editTemplate(id){
+  server('getTemplateForEdit',[id],function(t){
+    if(!t){toast('Task template not found','error');return;}
+
+    // Open Add Task page first so form elements exist (section id is page-addtask, lowercase)
+    goPage('addtask');
+
+    setTimeout(function(){
+      if($('fUser')){ $('fUser').value=t.userId||''; syncTaskDepartment(); }
+      if($('fDepartment')) $('fDepartment').value=t.department||'';
+      if($('fTask')) $('fTask').value=t.task||'';
+      if($('fDescription')) $('fDescription').value=t.description||'';
+      if($('fFrequency')) $('fFrequency').value=t.frequency||'DAILY';
+      if($('fStartDate')) $('fStartDate').value=t.startDate||state.boot.today;
+      if($('fStartTime')) $('fStartTime').value=t.startTime||'';
+      if($('fDueTime')) $('fDueTime').value=t.dueTime||'';
+      if($('fWorkType')) $('fWorkType').value=(t.workType==='UPLOAD')?'UPLOAD':'CHECKBOX';
+      if($('fBuddy')) $('fBuddy').value=t.buddyAllowed===false?'NO':'YES';
+      if($('editTemplateId')) $('editTemplateId').value=id;
+
+      var btn=$('taskSaveBtn');
+      if(btn) btn.textContent='Update Task';
+
+      updateFrequencyHint();
+
+      var form=document.getElementById('taskForm');
+      if(form) form.scrollIntoView({behavior:'smooth',block:'start'});
+    },300);
+  });
+}
+function toggleTemplate(id,a){server('setTemplateActive',[id,a],function(){toast(a?'Template activated':'Template deactivated');loadTemplates()})}
+function deleteTemplate(id,name){if(!confirm('Delete this task template: '+(name||'Task')+'?\n\nPending / In Progress / Overdue live instances will also be removed. Completed work and history will be preserved.'))return;server('deleteTaskTemplate',[id],function(r){toast('Task deleted');state.myTasksDirty=true;state.dashboardDirty=true;loadTemplates()})}
+function toggleEvidenceRule(id,required){server('setTemplateEvidenceRequired',[id,required],function(){toast(required?'Evidence required':'Evidence not required');loadTemplates();if(state.page==='tasks')loadMyTasks()})}
+function openSchedule(id){var r=state.templateRows.find(function(x){return x.templateId===id});if(!r)return;state.scheduleTemplateId=id;$('scheduleTaskName').textContent=(r.user?r.user+' · ':'')+r.task+' · '+r.frequency;$('scheduleStartDate').value=r.startDate||state.boot.today;openModal('scheduleModal')}
+function saveTemplateSchedule(){var s=$('scheduleStartDate').value;if(!s){toast('Select a start date.','error');return}server('updateTemplateSchedule',[{templateId:state.scheduleTemplateId,startDate:s}],function(){toast('Schedule saved');closeModal('scheduleModal');loadTemplates()})}
+function loadVerification(){server('listVerificationTasks',[{}],function(rows){$('verificationBody').innerHTML=rows.length?rows.map(function(r){return '<tr><td>'+esc(prettyDate(r.taskDate))+'</td><td>'+esc(r.coreTask)+'</td><td>'+esc(r.performer)+'</td><td>'+esc(r.verifier)+'</td><td>'+esc(r.department)+'</td><td>'+esc(r.completedAt)+'</td><td><button class="btn small success" onclick="verifyNow(\''+esc(r.taskId)+'\',\'VERIFIED\')">Verify</button> <button class="btn small danger" onclick="verifyNow(\''+esc(r.taskId)+'\',\'REJECTED\')">Reject</button></td></tr>'}).join(''):'<tr><td colspan="7">No tasks awaiting your verification.</td></tr>'})}
+function verifyNow(id,d){var remark=d==='REJECTED'?(prompt('Rejection reason:','')||''):(prompt('Verification remark (optional):','')||'');if(d==='REJECTED'&&!remark){toast('Rejection reason is required.','error');return}server('verifyTask',[{taskId:id,decision:d,remark:remark}],function(){toast(d==='VERIFIED'?'Task verified':'Task rejected');loadVerification()})}
+function loadNotifications(){server('listNotifications',[],function(rows){$('notificationBody').innerHTML=rows.length?rows.map(function(r){return '<tr><td><span class="tag">'+esc(r.status)+'</span></td><td>'+esc(r.createdAt)+'</td><td>'+esc(r.type)+'</td><td>'+esc(r.title)+'</td><td class="wrap">'+esc(r.message)+'</td><td>'+(r.status==='UNREAD'?'<button class="btn small" onclick="markRead(\''+esc(r.id)+'\')">Mark Read</button>':'')+'</td></tr>'}).join(''):'<tr><td colspan="6">No notifications.</td></tr>'})}
+function markRead(id){server('markNotificationRead',[id],function(){loadNotifications();state.boot.notificationUnread=Math.max(0,(state.boot.notificationUnread||0)-1);$('notifCount').textContent=state.boot.notificationUnread})}
+function loadUsers(){server('listUsersAdmin',[],function(rows){state.adminUsers=rows;populateAdminUserSelects();$('usersBody').innerHTML=rows.length?rows.map(function(u){return '<tr><td><strong>'+esc(u.name)+'</strong></td><td>'+esc(u.department)+'</td><td>'+esc(u.branch||'')+'</td><td>'+esc(u.designation)+'</td><td>'+esc(u.email)+'</td><td><span class="roleBadge">'+esc(u.role)+'</span></td><td>'+esc(u.weeklyOff)+'</td><td>'+esc(u.manager)+'</td><td><button class="btn small" onclick="editUser(\''+esc(u.id)+'\')">Edit</button> <button class="btn small warn" onclick="openResetPassword(\''+esc(u.id)+'\')">Reset Password</button></td></tr>'}).join(''):'<tr><td colspan="9">No users found.</td></tr>';$('userMobileCards').innerHTML=rows.length?rows.map(function(u){return '<div class="mobileAdminCard"><div class="row"><small>Name</small><strong>'+esc(u.name)+'</strong></div><div class="row"><small>Department</small><strong>'+esc(u.department)+'</strong></div><div class="row"><small>Branch</small><strong>'+esc(u.branch||'—')+'</strong></div><div class="row"><small>Role</small><strong>'+esc(u.role)+'</strong></div><div class="row"><small>Email</small><strong>'+esc(u.email)+'</strong></div><div class="toolbar"><button class="btn small" onclick="editUser(\''+esc(u.id)+'\')">Edit</button><button class="btn small warn" onclick="openResetPassword(\''+esc(u.id)+'\')">Reset Password</button></div></div>'}).join(''):'<div class="empty">No users found.</div>'})}
+function populateAdminUserSelects(){var users=state.adminUsers.length?state.adminUsers:(state.boot.users||[]),depts=state.boot.departments||[];if($('uDept'))$('uDept').innerHTML='<option value="">Select department</option>'+depts.map(function(d){return '<option>'+esc(d)+'</option>'}).join('');if($('uBranch'))$('uBranch').innerHTML='<option value="">Select branch</option>'+(state.boot.branches||[]).map(function(b){return '<option>'+esc(b)+'</option>'}).join('');['uManager','uPrimaryBuddy','uSecondaryBuddy','dHead'].forEach(function(id){if($(id))$(id).innerHTML='<option value="">None</option>'+users.map(function(u){return '<option>'+esc(u.name)+'</option>'}).join('')});$('lUser').innerHTML='<option value="">Select user</option>'+users.map(function(u){return '<option value="'+esc(u.id)+'">'+esc(u.name)+'</option>'}).join('')}
+function openUserModal(){$('userForm').reset();$('uId').value='';$('uPassword').required=true;$('uPasswordLabel').textContent='Password *';$('userModalTitle').textContent='Add User';populateAdminUserSelects();openModal('userModal')}
+function editUser(id){var u=state.adminUsers.find(function(x){return x.id===id});if(!u)return;populateAdminUserSelects();$('uId').value=u.id;$('uName').value=u.name;$('uEmployeeId').value=u.employeeId;$('uDept').value=u.department;$('uBranch').value=u.branch||'';$('uDesignation').value=u.designation;$('uEmail').value=u.email;$('uContact').value=u.contact;$('uWeeklyOff').value=u.weeklyOff;$('uRole').value=u.role;$('uManager').value=u.manager;$('uPrimaryBuddy').value=u.primaryBuddy;$('uSecondaryBuddy').value=u.secondaryBuddy;$('uStatus').value=u.status;$('uPassword').value='';$('uPassword').required=false;$('uPasswordLabel').textContent='New Password (optional)';$('userModalTitle').textContent='Edit User';openModal('userModal')}
+function saveUserForm(e){e.preventDefault();var p={userId:$('uId').value,name:$('uName').value,employeeId:$('uEmployeeId').value,department:$('uDept').value,branch:$('uBranch').value,designation:$('uDesignation').value,email:$('uEmail').value,contact:$('uContact').value,weeklyOff:$('uWeeklyOff').value,role:$('uRole').value,manager:$('uManager').value,primaryBuddy:$('uPrimaryBuddy').value,secondaryBuddy:$('uSecondaryBuddy').value,status:$('uStatus').value,active:$('uStatus').value,password:$('uPassword').value};server('saveUser',[p],function(){toast(p.userId?'User updated':'User created');closeModal('userModal');reloadBootstrapKeepPage('users')})}
+function openResetPassword(id){var u=state.adminUsers.find(function(x){return x.id===id});state.resetUserId=id;$('resetUserName').textContent=u?u.name:'';$('adminResetPassword').value='';openModal('resetPasswordModal')}
+function resetPasswordNow(){var p=$('adminResetPassword').value;if(p.length<8){toast('Password must be at least 8 characters.','error');return}server('resetUserPassword',[{userId:state.resetUserId,password:p}],function(){toast('Password reset');closeModal('resetPasswordModal')})}
+function loadDepartments(){server('listDepartmentsAdmin',[],function(rows){state.departments=rows;$('departmentBody').innerHTML=rows.length?rows.map(function(d){return '<tr><td><strong>'+esc(d.name)+'</strong></td><td>'+esc(d.code||'')+'</td><td>'+esc(d.head)+'</td><td>'+esc(d.status)+'</td><td><button class="btn small" onclick="editDepartment(\''+esc(d.id)+'\')">Edit</button></td></tr>'}).join(''):'<tr><td colspan="5">No departments found.</td></tr>';$('departmentMobileCards').innerHTML=rows.length?rows.map(function(d){return '<div class="mobileAdminCard"><div class="row"><small>Department</small><strong>'+esc(d.name)+'</strong></div><div class="row"><small>Code</small><strong>'+esc(d.code||'—')+'</strong></div><div class="row"><small>Head</small><strong>'+esc(d.head||'—')+'</strong></div><div class="row"><small>Status</small><strong>'+esc(d.status)+'</strong></div><button class="btn small" onclick="editDepartment(\''+esc(d.id)+'\')">Edit</button></div>'}).join(''):'<div class="empty">No departments found.</div>'})}
+function openDepartmentModal(){$('dId').value='';$('dName').value='';$('dCode').value='';$('dHead').value='';$('dStatus').value='ACTIVE';openModal('departmentModal')}
+function editDepartment(id){var d=state.departments.find(function(x){return x.id===id});if(!d)return;$('dId').value=d.id;$('dName').value=d.name;$('dCode').value=d.code||'';$('dHead').value=d.head;$('dStatus').value=d.status;openModal('departmentModal')}
+function saveDepartmentForm(e){e.preventDefault();server('saveDepartment',[{departmentId:$('dId').value,name:$('dName').value,code:$('dCode').value,head:$('dHead').value,status:$('dStatus').value}],function(){toast('Department saved');closeModal('departmentModal');reloadBootstrapKeepPage('departments')})}
+function loadBranches(){server('listBranchesAdmin',[],function(rows){state.branches=rows;$('branchBody').innerHTML=rows.length?rows.map(function(b){return '<tr><td><strong>'+esc(b.name)+'</strong></td><td>'+esc(b.code||'')+'</td><td>'+esc(b.location||'')+'</td><td>'+esc(b.status)+'</td><td><button class="btn small" onclick="editBranch(\''+esc(b.id)+'\')">Edit</button></td></tr>'}).join(''):'<tr><td colspan="5">No branches found. Add a branch before creating new users.</td></tr>';$('branchMobileCards').innerHTML=rows.length?rows.map(function(b){return '<div class="mobileAdminCard"><div class="row"><small>Branch</small><strong>'+esc(b.name)+'</strong></div><div class="row"><small>Code</small><strong>'+esc(b.code||'—')+'</strong></div><div class="row"><small>Location</small><strong>'+esc(b.location||'—')+'</strong></div><div class="row"><small>Status</small><strong>'+esc(b.status)+'</strong></div><button class="btn small" onclick="editBranch(\''+esc(b.id)+'\')">Edit</button></div>'}).join(''):'<div class="empty">No branches found. Add a branch before creating users.</div>'})}
+function openBranchModal(){$('branchForm').reset();$('bId').value='';$('bStatus').value='ACTIVE';$('branchModalTitle').textContent='Add Branch';openModal('branchModal')}
+function editBranch(id){var b=state.branches.find(function(x){return x.id===id});if(!b)return;$('bId').value=b.id;$('bName').value=b.name;$('bCode').value=b.code||'';$('bLocation').value=b.location||'';$('bStatus').value=b.status;$('branchModalTitle').textContent='Edit Branch';openModal('branchModal')}
+function saveBranchForm(e){e.preventDefault();server('saveBranch',[{branchId:$('bId').value,name:$('bName').value,code:$('bCode').value,location:$('bLocation').value,status:$('bStatus').value}],function(){toast('Branch saved');closeModal('branchModal');reloadBootstrapKeepPage('branches')})}
+function loadLeave(){server('listLeaveRecords',[],function(rows){$('leaveBody').innerHTML=rows.length?rows.map(function(r){return '<tr><td>'+esc(r.employee)+'</td><td>'+esc(r.department)+'</td><td>'+esc(r.leaveType)+'</td><td>'+esc(prettyDate(r.fromDate))+'</td><td>'+esc(prettyDate(r.toDate))+'</td><td>'+esc(r.status)+'</td><td>'+esc(r.approval)+'</td><td class="wrap">'+esc(r.reason)+'</td></tr>'}).join(''):'<tr><td colspan="8">No leave / availability records.</td></tr>'})}
+function openLeaveModal(){$('lFrom').value=state.boot.today;$('lTo').value=state.boot.today;$('lReason').value='';$('leaveUserWrap').classList.toggle('hidden',!state.boot.permissions.manageUsers);if(state.boot.permissions.manageUsers)$('lUser').value='';openModal('leaveModal')}
+function saveLeaveForm(e){e.preventDefault();server('saveLeaveRecord',[{userId:state.boot.permissions.manageUsers?$('lUser').value:state.boot.actor.id,fromDate:$('lFrom').value,toDate:$('lTo').value,status:$('lStatus').value,leaveType:$('lType').value,reason:$('lReason').value,approvalStatus:state.boot.permissions.manageUsers?'APPROVED':'PENDING'}],function(){toast('Leave / availability saved');closeModal('leaveModal');loadLeave()})}
+function loadHolidays(){server('listHolidays',[],function(rows){$('holidayBody').innerHTML=rows.length?rows.map(function(r){return '<tr><td>'+esc(prettyDate(r.date))+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.branch)+'</td></tr>'}).join(''):'<tr><td colspan="3">No holidays found.</td></tr>'})}
+function openHolidayModal(){$('hDate').value='';$('hName').value='';$('hBranch').value='';openModal('holidayModal')}
+function saveHolidayForm(e){e.preventDefault();server('saveHoliday',[{date:$('hDate').value,name:$('hName').value,branch:$('hBranch').value}],function(){toast('Holiday added');closeModal('holidayModal');loadHolidays()})}
+function loadAudit(){server('listAuditLog',[{search:$('auditSearch').value}],function(rows){$('auditBody').innerHTML=rows.length?rows.map(function(r){return '<tr><td>'+esc(r.timestamp)+'</td><td>'+esc(r.user)+'</td><td>'+esc(r.taskId)+'</td><td>'+esc(r.action)+'</td><td class="wrap">'+esc(r.previous)+'</td><td class="wrap">'+esc(r.next)+'</td></tr>'}).join(''):'<tr><td colspan="6">No audit records.</td></tr>'})}
+function loadSettings(){server('listSystemSettings',[],function(rows){$('settingsBody').innerHTML=rows.length?rows.map(function(r,i){return '<tr><td><strong>'+esc(r.setting)+'</strong></td><td><input id="setVal'+i+'" value="'+esc(r.value)+'" style="width:130px;border:1px solid #dce0e7;border-radius:8px;padding:7px"></td><td class="wrap">'+esc(r.description)+'</td><td>'+esc(r.updatedAt)+'</td><td>'+esc(r.updatedBy)+'</td><td><button class="btn small" onclick="saveSetting(\''+esc(r.setting)+'\','+i+',\''+esc((r.description||'').replace(/'/g,"\\'"))+'\')">Save</button></td></tr>'}).join(''):'<tr><td colspan="6">No settings.</td></tr>'})}
+function saveSetting(k,i,d){server('saveSystemSetting',[{setting:k,value:$('setVal'+i).value,description:d}],function(){toast('Setting saved');loadSettings()})}
+function resetBulkUi(clearFile){state.bulkPreview=null;if(clearFile){state.bulkPayload=null;$('bulkFile').value='';$('bulkFileMeta').textContent='No file selected.'}$('bulkImportBtn').disabled=true;$('bulkSummary').innerHTML='';$('bulkPreviewBody').innerHTML='<tr><td colspan="5">Upload a workbook to preview.</td></tr>';if($('bulkPreviewCards'))$('bulkPreviewCards').innerHTML=''}
+function readBulkWorkbook(){var file=$('bulkFile').files[0];if(!file){toast('Please select an Excel file.','error');return}if(typeof XLSX==='undefined'){toast('Excel reader library did not load. Refresh and try again.','error');return}var reader=new FileReader();reader.onload=function(e){try{var wb=XLSX.read(e.target.result,{type:'array',cellDates:false});var sheets={};wb.SheetNames.forEach(function(name){var key=String(name||'').trim();if(['BRANCHES','DEPARTMENTS','USERS','TASKS'].indexOf(key.toUpperCase())<0)return;var rows=XLSX.utils.sheet_to_json(wb.Sheets[name],{defval:'',raw:false,dateNF:'yyyy-mm-dd'});rows.forEach(function(r,i){r.__ROW_NUMBER=i+2});sheets[key]=rows});state.bulkPayload={fileName:file.name,sheets:sheets};$('bulkFileMeta').textContent=file.name+' · '+Math.round(file.size/1024)+' KB · '+Object.keys(sheets).length+' data sheets found';server('previewBulkImport',[state.bulkPayload],function(r){state.bulkPreview=r;renderBulkPreview(r);$('bulkImportBtn').disabled=r.valid<1})}catch(err){toast('Could not read Excel: '+err.message,'error')}};reader.readAsArrayBuffer(file)}
+function renderBulkPreview(r){var bs=r.bySheet||{};var cards=[['Total Rows',r.total,''],['Valid',r.valid,'good'],['Invalid',r.invalid,r.invalid?'bad':'good'],['Branches',(bs.BRANCHES||{}).valid||0,''],['Users',(bs.USERS||{}).valid||0,''],['Task Rows',(bs.TASKS||{}).valid||0,'']];$('bulkSummary').innerHTML=cards.map(function(x){return '<div class="metric '+x[2]+'"><div class="mLabel">'+x[0]+'</div><div class="mValue">'+x[1]+'</div></div>'}).join('');var rows=r.rows||[];$('bulkPreviewBody').innerHTML=rows.length?rows.map(function(x){return '<tr><td>'+esc(x.sheet)+'</td><td>'+x.rowNumber+'</td><td><span class="tag">'+(x.valid?'VALID':'INVALID')+'</span></td><td class="wrap">'+esc(x.key||'')+'</td><td class="bulkPreviewError">'+esc((x.errors||[]).join(' | '))+'</td></tr>'}).join(''):'<tr><td colspan="5">No data rows found.</td></tr>';$('bulkPreviewCards').innerHTML=rows.slice(0,100).map(function(x){return '<div class="mobileAdminCard"><div class="row"><small>'+esc(x.sheet)+' row '+x.rowNumber+'</small><strong>'+(x.valid?'VALID':'INVALID')+'</strong></div><div class="row"><small>Record</small><strong>'+esc(x.key||'—')+'</strong></div>'+(x.errors&&x.errors.length?'<div class="helper" style="color:var(--red)">'+esc(x.errors.join(' | '))+'</div>':'')+'</div>'}).join('')}
+function importBulkNow(){if(!state.bulkPayload||!state.bulkPreview||state.bulkPreview.valid<1){toast('Validate an Excel file with at least one valid row first.','error');return}if(!confirm('Import '+state.bulkPreview.valid+' valid rows? Invalid rows will be rejected and logged.'))return;server('importBulkData',[state.bulkPayload],function(r){toast(r.message);$('bulkImportBtn').disabled=true;loadBulkHistory();reloadBootstrapKeepPage('bulk')})}
+function loadBulkHistory(){server('listBulkImportHistory',[],function(rows){$('bulkHistoryBody').innerHTML=rows.length?rows.map(function(r){return '<tr><td>'+esc(r.batchId)+'</td><td>'+esc(r.fileName)+'</td><td>'+esc(r.uploadedBy)+'</td><td>'+esc(r.timestamp)+'</td><td>'+r.total+'</td><td>'+r.valid+'</td><td>'+r.invalid+'</td><td><span class="tag">'+esc(r.status)+'</span></td></tr>'}).join(''):'<tr><td colspan="8">No bulk imports yet.</td></tr>'})}
+function downloadBulkTemplate(){if(typeof XLSX==='undefined'){toast('Excel library did not load. Refresh and try again.','error');return}var wb=XLSX.utils.book_new();var instructions=[['DAILY WORK — FRESH V8 BULK UPLOAD TEMPLATE'],['This workbook contains headers only. Add only your real organization data.'],['Use the exact sheet names and headers. Do not rename headers.'],['Recommended import order: BRANCHES → DEPARTMENTS → USERS → TASKS.'],['New users require PASSWORD with at least 8 characters. Existing users may leave PASSWORD blank to keep the current password.'],['Each user must have a valid BRANCH NAME and DEPARTMENT.'],['TASK TYPE accepts CHECKBOX or UPLOAD only. CHECKBOX = employee taps to complete. UPLOAD = employee must upload a file to complete.'],['Recurring tasks have START DATE only and continue until the template is deactivated.'],['Dates: YYYY-MM-DD. Times: HH:MM.'],['Allowed frequencies: DAILY, WEEKLY, MONTHLY, QUARTERLY, YEARLY, ONE TIME, AS REQUIRED.']];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(instructions),'INSTRUCTIONS');var b=[['BRANCH NAME','BRANCH CODE','LOCATION','STATUS']];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(b),'BRANCHES');var d=[['DEPARTMENT NAME','DEPARTMENT CODE','DEPARTMENT HEAD','STATUS']];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(d),'DEPARTMENTS');var u=[['EMPLOYEE NAME','EMPLOYEE ID','DEPARTMENT','BRANCH NAME','DESIGNATION','EMAIL ADDRESS','CONTACT NUMBER','WEEKLY OFF','REPORTING MANAGER','PRIMARY BUDDY','SECONDARY BUDDY','ROLE','PASSWORD','STATUS']];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(u),'USERS');var t=[['EMPLOYEE EMAIL','EMPLOYEE NAME','DEPARTMENT','BRANCH NAME','CORE TASK','TASK DESCRIPTION','TASK TYPE','FREQUENCY','TASK START DATE','START TIME','DUE TIME','PRIORITY','VERIFICATION REQUIRED','VERIFIER','BUDDY ALLOWED','ACTIVE']];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(t),'TASKS');XLSX.writeFile(wb,'Daily_Work_Fresh_V8_Bulk_Upload_Template.xlsx')}
+function renderProfile(){if(!state.boot)return;var a=state.boot.actor;var items=[['Name',a.name],['Role',state.boot.role],['Department',a.department],['Branch',a.branch],['Designation',a.designation],['Email',a.email],['Contact',a.contact],['Weekly Off',a.weeklyOff],['Reporting Manager',a.manager],['Primary Buddy',a.primaryBuddy],['Secondary Buddy',a.secondaryBuddy]];$('profileGrid').innerHTML=items.map(function(x){return '<div class="profileItem"><small>'+x[0]+'</small><strong>'+esc(x[1]||'—')+'</strong></div>'}).join('')}
+function changePassword(e){e.preventDefault();server('changeOwnPassword',[{currentPassword:$('cpCurrent').value,newPassword:$('cpNew').value}],function(){toast('Password changed');e.target.reset()})}
+function reloadBootstrapKeepPage(page){server('getSessionBootstrap',[],function(b){state.boot=b;renderShell();goPage(page)})}
+function openModal(id){$(id).classList.add('open')}function closeModal(id){$(id).classList.remove('open')}
+function prettyDate(s){if(!s)return'';var d=new Date(s+'T12:00:00');return isNaN(d)?s:d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}
+</script>
+</body>
+</html>

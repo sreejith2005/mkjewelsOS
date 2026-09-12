@@ -19,7 +19,9 @@ describe("task workspace navigation", () => {
     expect(getPageForPath("/tasks/delegation")).toBe("checklist_tasks");
     expect(getPageForPath("/tasks/import")).toBe("checklist_tasks");
     expect(getPageForPath("/tasks/assigning-left")).toBe("checklist_tasks");
-    expect(getPageForPath("/tasks/fms")).toBe("fms_tasks");
+    // Assigned FMS work is a Tasks surface. It must not require builder access
+    // or fall through to Dashboard when opened from Home or Notifications.
+    expect(getPageForPath("/tasks/fms")).toBe("checklist_tasks");
   });
 
   it("keeps unfinished menu destinations out of implemented navigation", () => {

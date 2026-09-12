@@ -1,0 +1,233 @@
+import { getSupabase as db } from "@jewelos/api-client/client";
+import type { Json, Tables } from "@jewelos/core";
+import { normalizeFormDefinition, parseFormOptions, type FormBranch, type FormFieldDefinition, type FormRule, type FormSectionDefinition, type FormTemplateDefinition } from "@jewelos/core";
+import { loadMasterOptions, toFormMasterOptions } from "../dropdowns/api";
+import { newRequestKey, uploadBody, type UploadFileMeta, type UploadSource } from "../runtime";
+
+export type FormTemplate = Tables<"form_templates">;
+export type FormField = Tables<"form_fields">;
+export type FormSubmission = Tables<"form_submissions">;
+export type FormBundle = FormTemplate & { fields: FormFieldDefinition[]; sections: FormSectionDefinition[]; submissionCount: number };
+const fail = (label: string, error: { message: string } | null) => { if (error) throw new Error(`${label}: ${error.message}`); };
+const object = (value: Json | null): Record<string, Json> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, Json> : {};
+
+/** Keeps `linked_record_id=in.(...)` filters within the server request-line limit; bulk import can produce thousands of task ids. */
+const SUBMISSION_ID_BATCH_SIZE = 100;
+const chunk = <T>(items: readonly T[], size: number): T[][] => {
+  const batches: T[][] = [];
+  for (let index = 0; index < items.length; index += size) batches.push([...items.slice(index, index + size)]);
+  return batches;
+};
+
+const array = (value: Json | null): Json[] => Array.isArray(value) ? value : [];
+const parseSections = (value: Json | null): FormSectionDefinition[] => array(value).flatMap((entry) => {
+  const record = object(entry as Json);
+  const key = typeof record.key === "string" ? record.key : "";
+  if (!key) return [];
+  return [{ key, title: typeof record.title === "string" ? record.title : key,
+    ...(typeof record.description === "string" ? { description: record.description } : {}),
+    ...(typeof record.next === "string" ? { next: record.next } : {}) }];
+});
+const parseBranches = (value: Json | null): FormBranch[] => array(value).flatMap((entry) => {
+  const record = object(entry as Json);
+  const target = typeof record.targetSectionKey === "string" ? record.targetSectionKey : "";
+  const operator = record.operator as FormBranch["operator"];
+  if (!target || !operator) return [];
+  return [{ operator, ...(record.value === undefined || record.value === null ? {} : { value: record.value as FormBranch["value"] }), targetSectionKey: target }];
+});
+/**
+ * `form_fields.conditional_logic` carries either the legacy single condition or,
+ * since visibility rules landed, a `{kind}` rule tree. Both keep working.
+ */
+const parseVisibility = (value: Json | null): { rule?: FormRule } | { condition?: FormFieldDefinition["condition"] } | Record<string, never> => {
+  const record = object(value);
+  if (!Object.keys(record).length) return {};
+  return typeof record.kind === "string"
+    ? { rule: record as unknown as FormRule }
+    : { condition: record as unknown as FormFieldDefinition["condition"] };
+};
+const parseOptionSource = (source: string | null, masterType: string | null) =>
+  source === "dropdown_master" && masterType ? { kind: "master" as const, masterType } : undefined;
+
+export function toDefinition(template: FormTemplate, fields: FormField[]): FormTemplateDefinition {
+  const sections = parseSections(template.sections);
+  return normalizeFormDefinition({ name: template.name, description: template.description ?? undefined,
+    ...(sections.length ? { sections } : {}),
+    permissions: { roles: ((object(template.permissions).roles ?? []) as string[]).filter((role): role is import("@jewelos/core").UserRole => ["super_admin","admin","manager","hr","crm","staff","doer","housekeeping"].includes(role)) },
+    fields: fields.map((field) => {
+      const visibility = parseVisibility(field.conditional_logic);
+      const optionSource = parseOptionSource(field.option_source, field.dropdown_master_type);
+      const branches = parseBranches(field.branch_logic);
+      return { id: field.id, key: field.field_key, label: field.field_name, type: field.field_type as FormFieldDefinition["type"], sortOrder: field.sort_order, required: field.is_required, shown: field.is_shown, editable: field.is_editable, placeholder: field.placeholder ?? undefined, helperText: field.helper_text ?? undefined,
+        ...(sections.length && field.group_name ? { sectionKey: field.group_name } : {}),
+        ...(optionSource ? { optionSource } : { options: parseFormOptions(field.options) }),
+        ...(branches.length ? { branches } : {}),
+        validation: object(field.validation) as FormFieldDefinition["validation"], ...visibility };
+    }) });
+}
+
+/** Submissions left behind by a deleted form count towards no template. */
+const countByTemplate = (submissions: readonly FormSubmission[]) => {
+  const counts = new Map<string, number>();
+  for (const submission of submissions) if (submission.form_template_id) counts.set(submission.form_template_id, (counts.get(submission.form_template_id) ?? 0) + 1);
+  return counts;
+};
+
+/**
+ * Deleting a form stamps the exact template and questions it was answered on
+ * onto every submission it collected, so the answers stay readable afterwards.
+ */
+export function deletedFormBundle(submission: FormSubmission): FormBundle | null {
+  const snapshot = object(submission.template_snapshot);
+  const template = snapshot.template;
+  if (!template || typeof template !== "object" || Array.isArray(template)) return null;
+  const row = template as unknown as FormTemplate;
+  const fields = (Array.isArray(snapshot.fields) ? snapshot.fields : []) as unknown as FormField[];
+  return { ...row, fields: toDefinition(row, fields).fields as FormFieldDefinition[], sections: parseSections(row.sections), submissionCount: 0 };
+}
+
+export async function loadForms(): Promise<{ bundles: FormBundle[]; submissions: FormSubmission[] }> {
+  const [templates, fields, submissions] = await Promise.all([db().from("form_templates").select("*").order("updated_at", { ascending: false }).limit(200), db().from("form_fields").select("*").order("sort_order").limit(2000), db().from("form_submissions").select("*").order("submitted_at", { ascending: false }).limit(500)]);
+  fail("Load forms", templates.error); fail("Load form fields", fields.error); fail("Load form submissions", submissions.error);
+  const fieldRows = fields.data ?? []; const submissionRows = submissions.data ?? []; const templateRows = templates.data ?? [];
+  const fieldsByTemplate = new Map<string, FormField[]>(); for (const field of fieldRows) fieldsByTemplate.set(field.form_template_id, [...(fieldsByTemplate.get(field.form_template_id) ?? []), field]);
+  const counts = countByTemplate(submissionRows);
+  return { bundles: templateRows.map((template) => ({ ...template, fields: toDefinition(template, fieldsByTemplate.get(template.id) ?? []).fields as FormFieldDefinition[], sections: parseSections(template.sections), submissionCount: counts.get(template.id) ?? 0 })), submissions: submissionRows };
+}
+export async function loadTaskForms(templateIds: string[], taskIds: string[]): Promise<{ bundles: FormBundle[]; submissions: FormSubmission[] }> {
+  if (!templateIds.length) return { bundles: [], submissions: [] };
+  const [templates, fields, submissionBatches] = await Promise.all([
+    db().from("form_templates").select("*").in("id", templateIds).limit(templateIds.length),
+    db().from("form_fields").select("*").in("form_template_id", templateIds).order("sort_order").limit(1000),
+    Promise.all(chunk(taskIds, SUBMISSION_ID_BATCH_SIZE).map((ids) =>
+      db().from("form_submissions").select("*").in("linked_record_id", ids).in("form_template_id", templateIds).order("submitted_at", { ascending: false }).limit(500))),
+  ]); fail("Load task forms", templates.error); fail("Load task form fields", fields.error);
+  for (const batch of submissionBatches) fail("Load task form submissions", batch.error);
+  const fieldsByTemplate = new Map<string, FormField[]>(); for (const item of fields.data ?? []) fieldsByTemplate.set(item.form_template_id, [...(fieldsByTemplate.get(item.form_template_id) ?? []), item]);
+  const submissionRows = submissionBatches.flatMap((batch) => batch.data ?? []); const counts = countByTemplate(submissionRows);
+  return { bundles: (templates.data ?? []).map((item) => ({ ...item, fields: toDefinition(item, fieldsByTemplate.get(item.id) ?? []).fields as FormFieldDefinition[], sections: parseSections(item.sections), submissionCount: counts.get(item.id) ?? 0 })), submissions: submissionRows };
+}
+export async function loadFormDynamicOptions() {
+  const [users, branches, departments, masters] = await Promise.all([
+    db().from("v_task_users").select("id,employee_name").eq("working_status", "active").order("employee_name").limit(500),
+    db().from("branches").select("id,name").eq("is_active", true).order("name").limit(100),
+    db().from("departments").select("id,name,branch_id").eq("is_active", true).order("name").limit(500),
+    loadMasterOptions([], true).catch(() => []),
+  ]);
+  fail("Load form users", users.error); fail("Load form branches", branches.error); fail("Load form departments", departments.error);
+  return { users: (users.data ?? []).flatMap((row) => row.id && row.employee_name ? [{ id: row.id, label: row.employee_name }] : []), branches: (branches.data ?? []).map((row) => ({ id: row.id, label: row.name })), departments: (departments.data ?? []).map((row) => ({ id: row.id, branchId: row.branch_id, label: row.name })), masters: toFormMasterOptions(masters) };
+}
+export const saveDraft = async (id: string | null, payload: Json, fields: Json) => { const { error } = await db().rpc("save_form_draft_with_audit", { p_template_id: id as string, p_payload: payload, p_fields: fields }); fail("Save form draft", error); };
+export const savePublishedForm = async (id: string, payload: Json, fields: Json) => { const { error } = await db().rpc("save_published_form_with_audit", { p_template_id: id, p_payload: payload, p_fields: fields }); fail("Save published form", error); };
+export const reviseForm = async (id: string) => { const { data, error } = await db().rpc("create_form_revision_with_audit", { p_source_template_id: id, p_payload: {} }); fail("Create form revision", error); if (!data) throw new Error("Create form revision: the server did not return the new draft"); return data as string; };
+export const publishForm = async (id: string) => { const { error } = await db().rpc("publish_form_with_audit", { p_template_id: id }); fail("Publish form", error); };
+export const archiveForm = async (id: string) => { const { error } = await db().rpc("archive_form_with_audit", { p_template_id: id }); fail("Archive form", error); };
+/**
+ * What deleting a form takes with it. The warning shown before the author
+ * confirms and the summary shown afterwards read the same server report, so
+ * they can never disagree about what happened.
+ */
+export type FormDeletionImpact = {
+  form: { id: string; name: string; version: number; lifecycle: string };
+  submissions: number;
+  taskTemplates: number;
+  tasks: number;
+  starterAssignments: number;
+  flows: readonly {
+    id: string; name: string; version: number; status: string;
+    stages: readonly string[] | null; activeInstances: number;
+    /** A published workflow comes off the air; only one draft may exist per family, so a family already being edited is archived instead. */
+    action: "reverted_to_draft" | "archived" | "unchanged";
+  }[];
+};
+export const formDeletionImpact = async (id: string): Promise<FormDeletionImpact> => {
+  const { data, error } = await db().rpc("form_deletion_impact", { p_template_id: id });
+  fail("Check form deletion", error);
+  if (!data) throw new Error("Check form deletion: the server did not describe the impact");
+  return data as unknown as FormDeletionImpact;
+};
+export const deleteForm = async (id: string): Promise<FormDeletionImpact> => {
+  const { data, error } = await db().rpc("delete_form_with_audit", { p_template_id: id });
+  fail("Delete form", error);
+  if (!data) throw new Error("Delete form: the server did not confirm the deletion");
+  return data as unknown as FormDeletionImpact;
+};
+export const duplicateForm = async (id: string, name?: string) => {
+  const { data, error } = await db().rpc("duplicate_form_with_audit", { p_source_template_id: id, ...(name ? { p_name: name } : {}) });
+  fail("Duplicate form", error);
+  if (!data) throw new Error("Duplicate form: the server did not return the new draft");
+  return data;
+};
+export const publishAsNewForm = async (id: string) => {
+  const draftId = await duplicateForm(id);
+  await publishForm(draftId);
+  return draftId;
+};
+export const submitForm = async (id: string, answers: object, linkedModule?: string, linkedRecordId?: string) => { const { data, error } = await db().rpc("submit_form_with_audit", { p_form_template_id: id, p_answers: answers as Json, ...(linkedModule ? { p_linked_module: linkedModule } : {}), ...(linkedRecordId ? { p_linked_record_id: linkedRecordId } : {}) }); fail("Submit form", error); if (!data) throw new Error("Submit form: the server did not return a submission id"); return data as string; };
+export async function startFmsFromFormSubmission(submissionId: string): Promise<{ instanceId: string; referenceNumber: string } | null> {
+  const { data, error } = await db().rpc("start_fms_from_form_submission_with_audit", { p_submission_id: submissionId });
+  fail("Start linked FMS", error);
+  const row = Array.isArray(data) ? data[0] : data;
+  return row ? { instanceId: row.instance_id as string, referenceNumber: row.reference_number as string } : null;
+}
+/** Submits the exact Home-selected starter assignment so workflows sharing a form cannot be confused. */
+/**
+ * Submits a starter assignment's form, which starts the process server-side in
+ * the same transaction and returns the instance it created.
+ *
+ * The instance id is what lets the caller continue into whatever step the
+ * answers activated. Discarding it stranded the user on whichever screen they
+ * happened to come from once the form was accepted.
+ */
+export async function submitFmsStarterAssignment(formTemplateId: string, starterAssignmentId: string, answers: object): Promise<FmsStarterResult> {
+  const { data, error } = await db().rpc("submit_fms_form_and_progress_with_audit" as never, {
+    p_form_template_id: formTemplateId,
+    p_answers: answers as Json,
+    p_linked_module: "fms_entry",
+    p_linked_record_id: starterAssignmentId,
+    p_idempotency_key: crypto.randomUUID(),
+  } as never);
+  fail("Start linked FMS", error);
+  return readFmsStarterResult(data);
+}
+
+export type FmsStarterResult = { instanceId: string | null; referenceNumber: string | null };
+
+/** A replayed idempotent submission returns its original response, so tolerate a missing instance. */
+export function readFmsStarterResult(data: unknown): FmsStarterResult {
+  const payload = (data ?? {}) as Record<string, unknown>;
+  const instanceId = typeof payload.instance_id === "string" ? payload.instance_id : null;
+  const referenceNumber = typeof payload.reference_number === "string" ? payload.reference_number : null;
+  return { instanceId, referenceNumber };
+}
+export const reviewSubmission = async (id: string, decision: "approved" | "rejected", notes: string) => { const { error } = await db().rpc("review_form_submission_with_audit", { p_submission_id: id, p_decision: decision, p_review_notes: notes }); fail("Review submission", error); };
+
+const ALLOWED_UPLOAD_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
+export function validateFormUploadFile(file: UploadFileMeta): string | null {
+  return ALLOWED_UPLOAD_MIME_TYPES.has(file.type) && /\.(jpg|jpeg|png|webp|pdf)$/i.test(file.name) && file.size >= 1 && file.size <= 10 * 1024 * 1024
+    ? null
+    : "Use a JPG, PNG, WebP, or PDF up to 10 MB.";
+}
+
+/** Uploaded before the form is submitted; `submit_form_with_audit` links the file to the submission it ends up in. */
+export async function uploadFormFile(templateId: string, fieldKey: string, file: UploadSource): Promise<{ id: string; name: string }> {
+  const validationError = validateFormUploadFile(file); if (validationError) throw new Error(validationError);
+  const safeName = file.name.replace(/[^A-Za-z0-9._-]/g, "_").slice(-120);
+  const tenant = (await db().rpc("current_tenant_id")).data; if (!tenant) throw new Error("Tenant context is unavailable.");
+  const path = `${tenant}/${templateId}/${newRequestKey()}_${safeName}`;
+  const upload = await db().storage.from("form-uploads").upload(path, uploadBody(file), { contentType: file.type, upsert: false });
+  fail("Upload file", upload.error);
+  try {
+    const { data, error } = await db().rpc("register_form_upload", { p_form_template_id: templateId, p_field_key: fieldKey, p_storage_path: path, p_original_filename: safeName, p_mime_type: file.type, p_size_bytes: file.size });
+    fail("Register uploaded file", error);
+    return { id: data as string, name: safeName };
+  } catch (error) {
+    try { await db().storage.from("form-uploads").remove([path]); } catch { /* registration error remains authoritative */ }
+    throw error;
+  }
+}
+export async function signedFormFileUrl(fileId: string) {
+  const pathResult = await db().rpc("get_form_upload_path", { p_file_id: fileId }); fail("Load uploaded file", pathResult.error);
+  const signed = await db().storage.from("form-uploads").createSignedUrl(pathResult.data as string, 60); fail("Sign uploaded file", signed.error);
+  return signed.data!.signedUrl;
+}

@@ -221,6 +221,41 @@ Before marking a task complete, verify:
 5. No duplicate or conflicting permission logic has been introduced.
 6. Existing users retain their previous behavior unless intentionally changed.
 
+### Protected cross-surface workflows
+
+Home alerts, Notifications, Tasks, a direct URL, the web app, and the native app
+are **entry surfaces onto one persisted work item** — not separate features. A
+change to a task, FMS, or form identifier, route, completion path, or
+notification state is a change to every one of them at once.
+
+Before changing any of those, inventory the consumers across `apps/web`,
+`apps/mobile`, `packages/core`, `packages/data`, and `supabase/migrations`, and
+cover the change with tests on more than one surface.
+
+- **Identify assigned work by its assignment, never by inference.** A starter
+  assignment is addressed by `fms_starter_assignment_id`; a runtime step by
+  `fms_instance_id` + `fms_instance_stage_id`. One form template backs many
+  assignments, so inferring work from a form id opens someone else's work.
+- **One destination contract.** `fmsAssignedWorkPath` / `parseFmsAssignedWorkPath`
+  in `@jewelos/core` are the only definition of an FMS work link; native maps the
+  same union in `apps/mobile/src/features/fms/assignedWorkNavigation.ts`. Do not
+  add a client-local deep-link helper.
+- **Submission and completion are one server-side transaction.** Submitting the
+  required form and completing/progressing its stage must not be two client
+  calls that can half-fail.
+- **Notification state is derived from durable work state.** A notification is
+  closed by a trigger on the underlying assignment completing, so completion is
+  correct regardless of which surface the user finished the work on. Never mark
+  a notification read from the client as a proxy for completion, and preserve
+  history (`is_read`, `read_at`) instead of deleting rows.
+- **A task feed must not hide open work.** Date-window filters apply to dated
+  work only; open FMS work stays visible regardless of its date, including when
+  it is future-dated or has no date. The filter lives in
+  `taskFeedCurrentOrOverdueFilter` — both API layers call it, neither copies it.
+- **Builder and canvas edits need mobile parity checks.** A web-only fix to the
+  FMS builder, the forms builder, or their canvases is incomplete until the
+  native surface is checked at phone width.
+
 ### Authorization map (migration 0156)
 
 - The permission resolver is `permission_effective_for()` in the database;

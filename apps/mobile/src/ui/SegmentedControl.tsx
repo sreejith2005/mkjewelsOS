@@ -1,4 +1,5 @@
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { Pressable } from "@/ui/Pressable";
 import { makeStyles } from "@/theme/makeStyles";
 import { Text } from "@/ui/Text";
 

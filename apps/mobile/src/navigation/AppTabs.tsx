@@ -197,7 +197,7 @@ function useSectionControls(): SectionControls {
   return controls;
 }
 
-/** Native routing underneath the approved four-action web phone shell. */
+/** Native routing underneath the approved phone shell: a Home/Tasks dock and a navigation drawer. */
 export function AppTabs() {
   const access = useAccess();
   const controls = useSectionControls();

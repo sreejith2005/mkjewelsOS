@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { colorScheme } from "nativewind";
 import { DEFAULT_THEME, themeFor, type Theme, type ThemeName } from "@/theme/theme";
 import { log } from "@/lib/log";
 
@@ -44,6 +45,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       active = false;
     };
   }, []);
+
+  // NativeWind resolves `dark:` variants and the palette variables from its own
+  // colour-scheme state, which otherwise follows the phone's system setting —
+  // not a `dark` class on a parent view. Without this, a phone in system dark
+  // mode drew every web-ported component (header, task cards) in the dark
+  // palette while the rest of the app was light.
+  useEffect(() => {
+    colorScheme.set(name);
+  }, [name]);
 
   const setTheme = useCallback((next: ThemeName) => {
     setName(next);

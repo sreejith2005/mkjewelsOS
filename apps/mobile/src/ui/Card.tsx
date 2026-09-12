@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, View, type ViewStyle } from "react-native";
+import { StyleSheet, View, type ViewStyle } from "react-native";
+import { Pressable } from "@/ui/Pressable";
 import { makeStyles } from "@/theme/makeStyles";
 import { Text } from "@/ui/Text";
 

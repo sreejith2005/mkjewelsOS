@@ -1,4 +1,5 @@
-import { ActivityIndicator, Pressable, StyleSheet, View, type ViewStyle } from "react-native";
+import { ActivityIndicator, StyleSheet, View, type ViewStyle } from "react-native";
+import { Pressable } from "@/ui/Pressable";
 import { makeStyles } from "@/theme/makeStyles";
 import { useAppTheme } from "@/theme/ThemeProvider";
 import { Text } from "@/ui/Text";

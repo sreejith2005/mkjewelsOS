@@ -81,6 +81,38 @@ devtools: `supabase.rpc(...)` / `supabase.from(...)` with the user's session).
 - [ ] Build, publish, pause, archive an FMS flow (ADM). A user denied `fms.manage` cannot.
 - [ ] Author, publish, archive a form (MGR). A user denied `forms.manage` cannot.
 
+### Assigned FMS work (one work item, many entry surfaces)
+
+Run signed in as the assignee, and repeat the whole block on web and on an
+Android phone-sized device.
+
+- [ ] **Starter assignment.** A pending starter assignment appears on Home and in
+      Tasks with an `FMS` tag. Opening it from either surface lands directly on
+      the assigned form — no Dashboard, no Forms Library, no flow picker.
+- [ ] **Form-only runtime stage.** Opening it lands on that exact stage's form.
+      Submitting completes the stage and advances the flow in one step; the row
+      leaves the open feed without a manual second completion.
+- [ ] **Runtime stage with extra evidence/approval.** Submitting the form does
+      **not** silently close the stage; it stays open for its remaining
+      requirement and still appears in the feed.
+- [ ] **Form-less runtime stage.** The card offers "Open FMS workflow" and lands
+      on the stage workspace rather than dead-ending.
+- [ ] **Unrelated user.** Another user's starter assignment and runtime stage are
+      absent from their feed and their direct links are refused.
+- [ ] **Notification completion.** The assignment notification leaves the unread
+      list once the work is completed from *any* surface, and the notification
+      remains in history (read, not deleted).
+- [ ] **Direct deep links.** Pasting `/tasks/fms?starter=…&form=…` and
+      `/tasks/fms?instance=…&stage=…&form=…` opens the exact surface on refresh;
+      browser Back returns without a blank screen. An incomplete link shows an
+      explicit invalid-link state, never a Dashboard fallback.
+- [ ] **Completed/withdrawn work.** Its link shows an explicit finished or
+      unavailable state instead of an empty form.
+- [ ] **Date independence.** A future-dated and an undated open FMS item both
+      remain visible in the feed.
+- [ ] **Narrow web viewport.** Repeat at 320/375/390 CSS px with no document-level
+      horizontal scroll.
+
 ### Notifications
 
 - [ ] Task assignment creates an in-app notification; read / mark-all-read work.

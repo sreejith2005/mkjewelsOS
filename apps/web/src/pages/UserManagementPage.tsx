@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { hasPermission,
   ADMIN_SET_PASSWORD_LENGTH,
+  eligibleBuddies,
   USER_ROLES,
   validateAdminSetPassword,
   type Json,
@@ -24,7 +25,6 @@ import { hasPermission,
 import { supabase } from "@jewelos/api-client";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Field, Modal, Notice } from "@/components/ui";
-import { eligibleBuddies } from "@/features/users/buddyEligibility";
 import { refreshSessionForSensitiveAction } from "@/lib/edgeSession";
 import { edgeFunctionErrorMessage, initials, PHONE_PATTERN, titleCase } from "@/lib/format";
 import type { Branch, Department, DropdownMaster, UserProfile } from "@/types";

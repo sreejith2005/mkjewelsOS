@@ -84,6 +84,10 @@ export function pageForTopLevelRoute(route: NativeTopLevelRoute): PageId {
 }
 
 export function resolveNativeDestination(path: string): NativeDestination | null {
+  // `/tasks/fms` is authorized as Tasks on both clients, but natively the FMS
+  // tab owns that workspace. A link carrying assigned-work parameters is
+  // resolved by `fmsAssignedWorkRoute` at the call site; a bare path lands here.
+  if (path === "/tasks/fms" || path.startsWith("/tasks/fms?")) return { kind: "tab", route: "Fms" };
   const page = getPageForPath(path);
   if (!page) return null;
   const route = PAGE_ROUTE[page];
@@ -103,7 +107,12 @@ export function pageDecision(shell: ShellAccess, page: PageId): PageAccessDecisi
 export function navigatePath(path: string, shell: ShellAccess, handlers: NativeNavigationHandlers): boolean {
   const destination = resolveNativeDestination(path);
   if (!destination) return false;
-  const page = destination.kind === "section" ? destination.page : ROUTE_PAGE[destination.route];
+  // Authorize by the page the path itself maps to, not by the page the tab
+  // stands for. `/tasks/fms` is assigned work owned by Tasks, but it opens the
+  // FMS tab, whose own page is the builder — gating on the tab would refuse an
+  // employee their own assigned step.
+  const page = getPageForPath(path)
+    ?? (destination.kind === "section" ? destination.page : ROUTE_PAGE[destination.route]);
   if (pageDecision(shell, page) === "denied") return false;
 
   handlers.setPath(path);

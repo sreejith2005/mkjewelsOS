@@ -1,5 +1,4 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@jewelos/core";
+import { createJewelosClient, setSupabaseClient, type JewelosClient } from "./client";
 
 type RuntimeProcess = {
   env?: Record<string, string | undefined>;
@@ -32,7 +31,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export const supabase: SupabaseClient<Database> = createClient<Database>(
-  supabaseUrl,
-  supabaseAnonKey,
-);
+export const supabase: JewelosClient = createJewelosClient({
+  url: supabaseUrl,
+  anonKey: supabaseAnonKey,
+});
+
+// Shared data modules read through the registered singleton. React Native
+// registers its own client from the mobile entry instead of importing this
+// browser-specific environment module.
+setSupabaseClient(supabase);

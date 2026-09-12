@@ -39,6 +39,10 @@ const task = {
   due_time: null,
   effective_due_datetime: null,
   form_template_id: null,
+  fms_work_source: null,
+  fms_instance_id: null,
+  fms_instance_stage_id: null,
+  fms_starter_assignment_id: null,
   hasAttachment: false,
   hasFormSubmission: false,
   id: "task-1",
@@ -70,12 +74,21 @@ describe("TaskCard direct completion", () => {
   it("marks a linked FMS form action explicitly and delegates its stage identity", async () => {
     const onAction = vi.fn().mockResolvedValue(undefined);
 
-    render(<TaskCard capability={capability} categoryLabel="FMS" onAction={onAction} task={{ ...task, form_template_id: "form-1", requires_form: true, task_type: "fms", title: "KYC form" }} />);
+    render(<TaskCard capability={capability} categoryLabel="FMS" onAction={onAction} task={{ ...task, form_template_id: "form-1", fms_work_source: "fms_stage", fms_instance_id: "instance-5", fms_instance_stage_id: "stage-3", requires_form: true, task_type: "fms", title: "KYC form" }} />);
 
     expect(screen.getAllByText("FMS").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: /View details/i }));
     fireEvent.click(screen.getByRole("button", { name: "Complete FMS form" }));
     await waitFor(() => expect(onAction).toHaveBeenCalledWith({ kind: "fill_fms_form" }));
+  });
+  it("opens the runtime workspace for an FMS stage that pins no form", async () => {
+    const onAction = vi.fn().mockResolvedValue(undefined);
+
+    render(<TaskCard capability={capability} categoryLabel="FMS" onAction={onAction} task={{ ...task, form_template_id: null, fms_work_source: "fms_stage", fms_instance_id: "instance-5", fms_instance_stage_id: "stage-3", requires_form: false, task_type: "fms", title: "Polishing step" }} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /View details/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Open FMS workflow" }));
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ kind: "open_fms_stage" }));
   });
   it("identifies work covered for an absent colleague", () => {
     render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={vi.fn()} task={{

@@ -1,5 +1,22 @@
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
-import { kolkataDateKey } from "@jewelos/core";
+import {
+  canManageRecurringWorkspace,
+  canPauseRecurringTemplate,
+  canRunRecurringTemplateNow,
+  deriveRecurringWorkCardState,
+  isRecurringInstanceInTab,
+  kolkataDateKey,
+  recurringPerformancePercents,
+  recurringPerformanceRows,
+  recurringStatusPill,
+  recurringTemplateDeletePrompt,
+  taskFormLinkedModule,
+  RECURRING_FREQUENCY_FILTERS,
+  RECURRING_PRIORITY_FILTERS,
+  RECURRING_STATUS_FILTERS,
+  RECURRING_TODO_TABS,
+  type RecurringTodoTab,
+} from "@jewelos/core";
 import {
   CalendarClock,
   Check,
@@ -43,8 +60,6 @@ import {
   sendRecurringFollowup,
   setRecurringTemplateActive,
   verifyRecurringTask,
-  recurringInstanceDisplayStatus,
-  recurringInstanceNeedsWork,
   EMPTY_RECURRING_STATS,
   type RecurringInstance,
   type RecurringTemplate,
@@ -52,18 +67,7 @@ import {
 } from "@/features/recurringTodo/api";
 import { titleCase } from "@/lib/format";
 
-type Tab =
-  | "today"
-  | "overdue"
-  | "rejected"
-  | "completed"
-  | "coverage"
-  | "manager_review"
-  | "my_work"
-  | "schedules"
-  | "verification"
-  | "followups"
-  | "performance";
+type Tab = RecurringTodoTab;
 const EMPTY: RecurringWorkspace = {
   templates: [],
   instances: [],
@@ -87,23 +91,20 @@ function dueLabel(value: string): string {
   });
 }
 
+const PILL_TONE = {
+  danger: "bg-danger/15 text-danger",
+  warning: "bg-warning/15 text-warning",
+  success: "bg-success/15 text-success",
+  neutral: "bg-gold/10 text-gold",
+} as const;
+
 function StatusPill({ task }: { task: RecurringInstance }) {
-  const special = task.coverage_status;
-  const displayStatus = recurringInstanceDisplayStatus(task);
-  const label = special ?? displayStatus;
-  const tone =
-    special === "coverage_required" || displayStatus === "overdue"
-      ? "bg-danger/15 text-danger"
-      : special === "manager_review"
-        ? "bg-warning/15 text-warning"
-        : displayStatus === "completed"
-          ? "bg-success/15 text-success"
-          : "bg-gold/10 text-gold";
+  const { label, tone } = recurringStatusPill(task);
   return (
     <span
-      className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase ${tone}`}
+      className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase ${PILL_TONE[tone]}`}
     >
-      {titleCase(label ?? "pending")}
+      {titleCase(label)}
     </span>
   );
 }
@@ -120,21 +121,20 @@ function WorkCard({
   onChanged: () => Promise<void>;
 }) {
   const { profile } = useAuth();
-  const isOwnWork = task.assignees.some((assignee) => assignee.id === profile?.id);
-  const canVerify = canManage || task.verifier_user_profile_id === profile?.id;
+  // Every decision this card makes is `@jewelos/core`'s, so the phone offers
+  // exactly the same actions under exactly the same conditions.
+  const state = deriveRecurringWorkCardState({
+    task,
+    viewerId: profile?.id,
+    canManage,
+    followupEnabled,
+  });
   const act = async () => {
     {
       // The doer's own remark, never a placeholder: a template that requires a
       // remark and an on-behalf completion both have to be explained.
-      const needsRemark = Boolean(task.requires_remark) || !isOwnWork;
-      const entered = needsRemark
-        ? window.prompt(
-            isOwnWork
-              ? "Completion remark"
-              : "Why are you completing this on behalf of the doer?",
-          )
-        : null;
-      if (needsRemark && !entered?.trim()) return;
+      const entered = state.needsRemark ? window.prompt(state.remarkPrompt) : null;
+      if (state.needsRemark && !entered?.trim()) return;
       await updateTask(
         task.id,
         "complete",
@@ -185,12 +185,6 @@ function WorkCard({
       input.value = "";
     }
   };
-  const canComplete =
-    task.checklist
-      .filter((item) => item.is_required)
-      .every((item) => item.is_completed) &&
-    (!task.requires_upload || task.has_attachment) &&
-    (!task.requires_form || task.has_form_submission);
   return (
     <article className="rounded-2xl border border-gold/15 bg-charcoal p-4">
       <div className="flex items-start justify-between gap-3">
@@ -244,7 +238,7 @@ function WorkCard({
           </ul>
         </details>
       ) : null}
-      {!task.requires_form && task.checklist.length ? (
+      {state.showChecklist ? (
         <div className="mt-3 space-y-2">
           {task.checklist.map((item) => (
             <button
@@ -264,15 +258,15 @@ function WorkCard({
         </div>
       ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
-        {task.requires_form && task.status !== "completed" && task.coverage_status !== "coverage_required" ? <Button disabled={!task.form_template_id} onClick={() => window.dispatchEvent(new CustomEvent("recurring-form-request", { detail: task }))}><CheckCircle2 className="size-4" />Complete form</Button> : null}
-        {!task.requires_form && task.task_type === "checklist" && task.status !== "completed" ? <Button aria-label="Complete checklist" onClick={() => void act()}><CheckCircle2 className="size-4" />Complete checklist</Button> : null}
-        {!task.requires_form && task.task_type !== "checklist" && task.status !== "completed" && task.coverage_status !== "coverage_required" && canComplete ? (
+        {state.showCompleteForm ? <Button disabled={state.completeFormDisabled} onClick={() => window.dispatchEvent(new CustomEvent("recurring-form-request", { detail: task }))}><CheckCircle2 className="size-4" />Complete form</Button> : null}
+        {state.showCompleteChecklist ? <Button aria-label="Complete checklist" onClick={() => void act()}><CheckCircle2 className="size-4" />Complete checklist</Button> : null}
+        {state.showComplete ? (
           <Button onClick={() => void act()}>
             <CheckCircle2 className="size-4" />
             Complete
           </Button>
         ) : null}
-        {!task.requires_form && task.task_type === "delegation" && task.requires_upload && !task.has_attachment ? (
+        {state.showUpload ? (
           <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-gold/30 px-4 py-2 text-sm font-semibold text-gold">
             <Upload className="size-4" />
             {uploading ? "Uploading…" : "Upload image to complete"}
@@ -285,15 +279,13 @@ function WorkCard({
             />
           </label>
         ) : null}
-        {!task.requires_form && followupEnabled && canManage && task.status !== "completed" ? (
+        {state.showFollowup ? (
           <Button onClick={() => void followup()} variant="secondary">
             <MessageSquareMore className="size-4" />
             Follow up
           </Button>
         ) : null}
-        {!task.requires_form && canVerify &&
-        task.status === "completed" &&
-        task.verification_status === "pending" ? (
+        {state.showVerify ? (
           <>
             <Button onClick={() => void verify("verified")}>
               <ShieldCheck className="size-4" />
@@ -337,8 +329,7 @@ export function RecurringTodoPage() {
   );
   // `get_recurring_todo_workspace` admits super_admin and admin only, so the
   // manager-only affordances this page used to render could never run.
-  const canManage =
-    !!profile && ["super_admin", "admin"].includes(profile.user_role);
+  const canManage = canManageRecurringWorkspace(profile?.user_role);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -403,76 +394,26 @@ export function RecurringTodoPage() {
   );
   const visibleTasks = useMemo(
     () =>
-      workspace.instances.filter((task) => {
-        const today = dateKey(new Date());
-        const plannedDate = dateKey(new Date(task.planned_datetime));
-        if (tab === "today")
-          return plannedDate === today && task.status !== "completed";
-        if (tab === "overdue")
-          return recurringInstanceDisplayStatus(task) === "overdue";
-        if (tab === "rejected") return task.status === "rejected";
-        if (tab === "completed") return task.status === "completed";
-        if (tab === "coverage")
-          return task.coverage_status === "coverage_required";
-        if (tab === "manager_review")
-          return task.coverage_status === "manager_review";
-        if (tab === "my_work")
-          return task.assignees.some((assignee) => assignee.id === profile?.id);
-        if (tab === "verification")
-          return (
-            task.status === "completed" &&
-            task.verification_status === "pending"
-          );
-        if (tab === "followups")
-          return (
-            recurringInstanceNeedsWork(task) &&
-            Boolean(
-              task.task_template_id &&
-                templateById.get(task.task_template_id)?.followup_enabled,
-            )
-          );
-        return false;
-      }),
+      workspace.instances.filter((task) =>
+        isRecurringInstanceInTab({
+          task,
+          tab,
+          viewerId: profile?.id,
+          todayKey: dateKey(new Date()),
+          plannedKey: dateKey(new Date(task.planned_datetime)),
+          followupEnabled: Boolean(
+            task.task_template_id &&
+              templateById.get(task.task_template_id)?.followup_enabled,
+          ),
+        }),
+      ),
     [profile?.id, tab, templateById, workspace.instances],
   );
 
-  const performance = useMemo(() => {
-    const rows = new Map<
-      string,
-      {
-        name: string;
-        assigned: number;
-        completed: number;
-        verified: number;
-        onTime: number;
-        delayed: number;
-        onBehalf: number;
-      }
-    >();
-    for (const task of workspace.instances)
-      for (const assignee of task.assignees) {
-        const current = rows.get(assignee.id) ?? {
-          name: assignee.name,
-          assigned: 0,
-          completed: 0,
-          verified: 0,
-          onTime: 0,
-          delayed: 0,
-          onBehalf: 0,
-        };
-        current.assigned += 1;
-        if (task.status === "completed") current.completed += 1;
-        if (task.verification_status === "verified") current.verified += 1;
-        if (task.on_time_status === "on_time") current.onTime += 1;
-        if (task.on_time_status === "delayed") current.delayed += 1;
-        if (task.completion_mode === "on_behalf") current.onBehalf += 1;
-        rows.set(assignee.id, current);
-      }
-    return [...rows.values()].sort(
-      (left, right) =>
-        right.completed - left.completed || left.name.localeCompare(right.name),
-    );
-  }, [workspace.instances]);
+  const performance = useMemo(
+    () => recurringPerformanceRows(workspace.instances),
+    [workspace.instances],
+  );
 
   const save = async (
     id: string | null,
@@ -484,12 +425,7 @@ export function RecurringTodoPage() {
     await load();
   };
   const remove = async (template: RecurringTemplate) => {
-    if (
-      !window.confirm(
-        `Delete ${template.title}? Used schedules will be archived to preserve task history.`,
-      )
-    )
-      return;
+    if (!window.confirm(recurringTemplateDeletePrompt(template.title))) return;
     await deleteRecurringTemplate(template.id);
     await load();
   };
@@ -502,19 +438,7 @@ export function RecurringTodoPage() {
     await load();
   };
 
-  const tabs: Array<[Tab, string]> = [
-    ["today", "Today"],
-    ["overdue", "Overdue"],
-    ["rejected", "Rejected"],
-    ["completed", "Completed"],
-    ["coverage", "Coverage Required"],
-    ["manager_review", "Manager Review"],
-    ["my_work", "My Work"],
-    ["schedules", "Schedules"],
-    ["verification", "Verification"],
-    ["followups", "Follow-ups"],
-    ["performance", "Performance"],
-  ];
+  const tabs = RECURRING_TODO_TABS;
   return (
     <section className="-m-4 min-h-[calc(100dvh-7.875rem)] bg-task-bg pb-24 text-task-text sm:-m-6 md:min-h-[calc(100vh-4rem)] md:pb-10">
       <header className="border-b border-task-border bg-charcoal px-4 py-5 sm:px-6">
@@ -633,13 +557,11 @@ export function RecurringTodoPage() {
             onChange={(event) => setStatusFilter(event.target.value)}
           >
             <option value="">All statuses</option>
-            {["pending", "in_progress", "completed", "rejected", "blocked"].map(
-              (value) => (
-                <option key={value} value={value}>
-                  {titleCase(value)}
-                </option>
-              ),
-            )}
+            {RECURRING_STATUS_FILTERS.map((value) => (
+              <option key={value} value={value}>
+                {titleCase(value)}
+              </option>
+            ))}
           </select>
           <select
             aria-label="Priority"
@@ -648,7 +570,7 @@ export function RecurringTodoPage() {
             onChange={(event) => setPriorityFilter(event.target.value)}
           >
             <option value="">All priorities</option>
-            {["high", "medium", "low"].map((value) => (
+            {RECURRING_PRIORITY_FILTERS.map((value) => (
               <option key={value} value={value}>
                 {titleCase(value)}
               </option>
@@ -674,13 +596,11 @@ export function RecurringTodoPage() {
             onChange={(event) => setKindFilter(event.target.value)}
           >
             <option value="">All frequencies</option>
-            {["daily", "weekly", "monthly", "quarterly", "yearly", "one_time", "as_required", "recurring"].map(
-              (value) => (
-                <option key={value} value={value}>
-                  {titleCase(value.replace("_", " "))}
-                </option>
-              ),
-            )}
+            {RECURRING_FREQUENCY_FILTERS.map((value) => (
+              <option key={value} value={value}>
+                {titleCase(value.replace("_", " "))}
+              </option>
+            ))}
           </select>
           <select
             aria-label="Department"
@@ -749,7 +669,7 @@ export function RecurringTodoPage() {
                     >
                       Edit
                     </Button>
-                    {template.schedule_kind !== "as_required" ? (
+                    {canPauseRecurringTemplate(template) ? (
                       <Button
                         onClick={() => void toggleActive(template)}
                         variant="secondary"
@@ -758,10 +678,7 @@ export function RecurringTodoPage() {
                       </Button>
                     ) : null}
                     <Button
-                      disabled={
-                        !template.is_active &&
-                        template.schedule_kind !== "as_required"
-                      }
+                      disabled={!canRunRecurringTemplateNow(template)}
                       onClick={() => void runNow(template)}
                     >
                       <Play className="size-4" />
@@ -801,7 +718,9 @@ export function RecurringTodoPage() {
                 </tr>
               </thead>
               <tbody>
-                {performance.map((row) => (
+                {performance.map((row) => {
+                  const percent = recurringPerformancePercents(row);
+                  return (
                   <tr className="border-t border-task-border" key={row.name}>
                     <td className="p-3 font-semibold text-white">{row.name}</td>
                     <td className="p-3">{row.assigned}</td>
@@ -810,22 +729,11 @@ export function RecurringTodoPage() {
                     <td className="p-3">{row.onTime}</td>
                     <td className="p-3">{row.delayed}</td>
                     <td className="p-3">{row.onBehalf}</td>
-                    <td className="p-3">
-                      {row.assigned
-                        ? Math.round((row.completed / row.assigned) * 100)
-                        : 0}
-                      %
-                    </td>
-                    <td className="p-3">
-                      {row.onTime + row.delayed
-                        ? Math.round(
-                            (row.onTime / (row.onTime + row.delayed)) * 100,
-                          )
-                        : 0}
-                      %
-                    </td>
+                    <td className="p-3">{percent.completion}%</td>
+                    <td className="p-3">{percent.onTime}%</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             {performance.length === 0 ? (
@@ -897,7 +805,7 @@ export function RecurringTodoPage() {
                     await submitForm(
                       form.id,
                       answers,
-                      formTarget.task_type === "delegation" ? "delegation_task" : "checklist_task",
+                      taskFormLinkedModule(formTarget.task_type),
                       formTarget.id,
                     );
                     setFormTarget(null);

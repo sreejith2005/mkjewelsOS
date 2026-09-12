@@ -10,7 +10,19 @@ export type TaskFeedLike = Readonly<{
   planned_datetime: string | null;
   revised_datetime: string | null;
   status: string | null;
+  task_type?: string | null;
 }>;
+
+const OPEN_FMS_STATUSES = new Set(["pending", "in_progress", "in_review", "overdue"]);
+
+/** PostgREST predicate for dated task work plus every currently actionable FMS assignment. */
+export function taskFeedCurrentOrOverdueFilter(startIso: string, endIso: string): string {
+  return [
+    `and(effective_due_datetime.gte.${startIso},effective_due_datetime.lte.${endIso})`,
+    `and(effective_due_datetime.lt.${startIso},status.not.in.(completed,rejected,blocked))`,
+    "and(task_type.eq.fms,status.in.(pending,in_progress,in_review,overdue))",
+  ].join(",");
+}
 
 export function effectiveTaskDeadline(task: Pick<TaskFeedLike, "due_datetime" | "planned_datetime" | "revised_datetime">): string | null {
   return task.revised_datetime ?? task.due_datetime ?? task.planned_datetime;
@@ -96,6 +108,7 @@ export function isTaskFeedItemInCurrentDayOrOverdue(
   end: Date | string,
   now: Date | string = new Date(),
 ): boolean {
+  if (task.task_type === "fms") return OPEN_FMS_STATUSES.has(task.status ?? "");
   const deadline = effectiveTaskDeadline(task);
   if (!deadline) return false;
   const deadlineMs = new Date(deadline).getTime();

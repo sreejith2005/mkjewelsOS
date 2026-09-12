@@ -1,14 +1,25 @@
-{
-  "extends": [
-    "expo/tsconfig.base",
-    "../../tsconfig.base.json"
-  ],
-  "compilerOptions": {
-    "moduleResolution": "Bundler",
-    "noEmit": true,
-    "strict": true
-  },
-  "include": [
-    "App.tsx"
-  ]
+﻿{
+    "extends":  [
+                    "expo/tsconfig.base",
+                    "../../tsconfig.base.json"
+                ],
+    "compilerOptions":  {
+                            "moduleResolution":  "Bundler",
+                            "noEmit":  true,
+                            "strict":  true,
+                            "paths":  {
+                                          "@/*":  [
+                                                      "./src/*"
+                                                  ]
+                                      },
+                            "baseUrl":  ".",
+                            "jsx":  "react-jsx"
+                        },
+    "include":  [
+                    "App.tsx",
+                    "index.js",
+                    "src/**/*.ts",
+                    "src/**/*.tsx",
+                    "nativewind-env.d.ts"
+                ]
 }

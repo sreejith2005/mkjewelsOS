@@ -1,5 +1,5 @@
 import { getSupabase as db } from "@jewelos/api-client/client";
-import { groupTaskFeedRows, isTaskFeedItemInCurrentDayOrOverdue, type Database, type Enums, type Json, type Tables } from "@jewelos/core";
+import { groupTaskFeedRows, isTaskFeedItemInCurrentDayOrOverdue, taskFeedCurrentOrOverdueFilter as coreTaskFeedCurrentOrOverdueFilter, type Database, type Enums, type Json, type Tables } from "@jewelos/core";
 import { loadMasterOptions } from "../dropdowns/api";
 import { newRequestKey, uploadBody, type UploadSource } from "../runtime";
 
@@ -39,6 +39,24 @@ export type TaskReferenceData = {
 export type TaskFeedReferenceData = Pick<TaskReferenceData, "categories">;
 
 export type RecurringTaskPreparation = Readonly<{ created: number }>;
+
+export async function loadFmsTaskStageLink(instanceStageId: string): Promise<{ instanceId: string; instanceStageId: string }> {
+  const { data, error } = await db().from("fms_instance_stages").select("fms_instance_id").eq("id", instanceStageId).maybeSingle();
+  fail("Load FMS task", error);
+  if (!data) throw new Error("FMS stage is no longer available");
+  return { instanceId: data.fms_instance_id, instanceStageId };
+}
+
+/** Resolves a feed row to its authorized FMS instance and confirms its pinned form before navigation. */
+export async function loadFmsTaskDeepLink(instanceStageId: string, formTemplateId: string): Promise<{ instanceId: string; instanceStageId: string; formTemplateId: string }> {
+  const { data, error } = await db().from("fms_instance_stages").select("fms_instance_id,fms_stage_id").eq("id", instanceStageId).maybeSingle();
+  fail("Load FMS task", error);
+  if (!data) throw new Error("FMS stage is no longer available");
+  const stage = await db().from("fms_stages").select("form_template_id").eq("id", data.fms_stage_id).maybeSingle();
+  fail("Load FMS form", stage.error);
+  if (stage.data?.form_template_id !== formTemplateId) throw new Error("FMS stage does not require this exact pinned form");
+  return { instanceId: data.fms_instance_id, instanceStageId, formTemplateId };
+}
 
 export async function ensureMyRecurringTasks(): Promise<RecurringTaskPreparation> {
   const { data, error } = await db().functions.invoke("ensure-my-recurring-tasks", { method: "POST" });
@@ -143,23 +161,7 @@ async function loadTaskFeedPages(loadPage: (from: number, to: number) => Promise
   }
 }
 
-/** PostgREST predicate for current work plus unfinished historical work, using revised → due → planned deadline order. */
-export function taskFeedCurrentOrOverdueFilter(startIso: string, endIso: string): string {
-  const current = [
-    `and(revised_datetime.gte.${startIso},revised_datetime.lte.${endIso})`,
-    `and(revised_datetime.is.null,due_datetime.gte.${startIso},due_datetime.lte.${endIso})`,
-    `and(revised_datetime.is.null,due_datetime.is.null,planned_datetime.gte.${startIso},planned_datetime.lte.${endIso})`,
-  ];
-  const historicalUnfinished = [
-    `and(revised_datetime.lt.${startIso},status.not.in.(completed,rejected,blocked))`,
-    `and(revised_datetime.is.null,due_datetime.lt.${startIso},status.not.in.(completed,rejected,blocked))`,
-    `and(revised_datetime.is.null,due_datetime.is.null,planned_datetime.lt.${startIso},status.not.in.(completed,rejected,blocked))`,
-  ];
-  return [
-    ...current,
-    ...historicalUnfinished,
-  ].join(",");
-}
+export const taskFeedCurrentOrOverdueFilter = coreTaskFeedCurrentOrOverdueFilter;
 
 export async function loadTaskFeed(
   viewerId: string,

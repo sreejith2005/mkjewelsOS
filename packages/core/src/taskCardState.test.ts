@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveTaskCardState, type TaskCardInput } from "./taskCardState";
+import { deriveTaskCardState, taskFormLinkedModule, type TaskCardInput } from "./taskCardState";
 import type { TaskMutationCapability } from "./taskCapabilities";
 
 const NOW = new Date("2026-09-09T10:00:00.000Z");
@@ -160,5 +160,16 @@ describe("deriveTaskCardState", () => {
       expect(state.showDirectComplete).toBe(false);
       expect(state.showReviseForm).toBe(false);
     });
+  });
+});
+
+describe("taskFormLinkedModule", () => {
+  it("files a delegation task's form under the only module the server accepts for it", () => {
+    expect(taskFormLinkedModule("delegation")).toBe("delegation_task");
+  });
+
+  it("files every other task's form as a checklist task", () => {
+    for (const type of ["checklist", "fms", null, undefined])
+      expect(taskFormLinkedModule(type)).toBe("checklist_task");
   });
 });

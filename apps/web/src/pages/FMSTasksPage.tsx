@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { calculateFmsProgress } from "@jewelos/core";
+import { calculateFmsProgress, parseFmsAssignedWorkPath } from "@jewelos/core";
 import { Search } from "lucide-react";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
@@ -9,13 +9,13 @@ import { FmsStageRunner } from "@/features/fms/FmsStageRunner";
 import { loadFmsRuntime, setFmsInstanceStatus, type FmsInstance } from "@/features/fms/api";
 import { filterFmsInstances } from "@/features/fms/runtimeView";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
-import { parseFmsFormDeepLink } from "@/features/fms/deepLink";
 
 const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: [], masters: [] };
 type Runtime = Awaited<ReturnType<typeof loadFmsRuntime>>;
 
 export function FMSTasksPage({ embedded = false, query: externalQuery, initialInstanceId, flowIds, heading }: { embedded?: boolean; query?: string; initialInstanceId?: string; flowIds?: readonly string[]; heading?: string }) {
-  const deepLink = parseFmsFormDeepLink(window.location.href);
+  const assignedWork = parseFmsAssignedWorkPath(window.location.href);
+  const deepLink = assignedWork?.kind === "stage_form" ? assignedWork : null;
   const { profile } = useAuth();
   const [runtime, setRuntime] = useState<Runtime>();
   const [forms, setForms] = useState<FormBundle[]>([]);

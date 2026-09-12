@@ -1,0 +1,11 @@
+/*
+ * NativeWind's entry stylesheet.
+ *
+ * It exists so the Tailwind directives run and the CSS variables declared in
+ * `tailwind.config.js` reach the app. The values of those variables come from
+ * `@jewelos/ui-tokens`, which is itself extracted from the web app's
+ * `apps/web/src/index.css` — that file remains the single source of the palette.
+ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

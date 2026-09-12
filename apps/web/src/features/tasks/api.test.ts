@@ -38,7 +38,7 @@ beforeEach(() => {
 describe("task feed effective-deadline scope", () => {
   it("requests today plus only unfinished historical effective deadlines", () => {
     expect(taskFeedCurrentOrOverdueFilter("2026-08-27T00:00:00.000+05:30", "2026-08-27T23:59:59.999+05:30")).toBe(
-      "and(effective_due_datetime.gte.2026-08-27T00:00:00.000+05:30,effective_due_datetime.lte.2026-08-27T23:59:59.999+05:30),and(effective_due_datetime.lt.2026-08-27T00:00:00.000+05:30,status.not.in.(completed,rejected,blocked))",
+      "and(effective_due_datetime.gte.2026-08-27T00:00:00.000+05:30,effective_due_datetime.lte.2026-08-27T23:59:59.999+05:30),and(effective_due_datetime.lt.2026-08-27T00:00:00.000+05:30,status.not.in.(completed,rejected,blocked)),and(task_type.eq.fms,status.in.(pending,in_progress,in_review,overdue))",
     );
   });
 

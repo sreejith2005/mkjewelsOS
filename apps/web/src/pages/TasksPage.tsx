@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Plus, RefreshCw, Upload, UserRoundPlus } from "lucide-react";
-import { countTaskFeedStatuses, deriveTaskMutationCapability, kolkataDateKey, splitAssignedTaskFeed, taskMatchesStatus, type TaskFeedStatusFilter } from "@jewelos/core";
+import { countTaskFeedStatuses, deriveTaskMutationCapability, kolkataDateKey, splitAssignedTaskFeed, taskFormLinkedModule, taskMatchesStatus, type TaskFeedStatusFilter } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Modal, Notice } from "@/components/ui";
 import {
@@ -24,7 +24,7 @@ import { shouldShowTaskLoading } from "@/features/tasks/taskLoading";
 import { loadFormDynamicOptions, loadTaskForms, submitForm, type FormBundle } from "@/features/forms/api";
 import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
-import { fmsFormDeepLinkPath } from "@/features/fms/deepLink";
+import { fmsAssignedWorkPath } from "@jewelos/core";
 import { loadFmsTaskDeepLink } from "@/features/tasks/api";
 
 type TaskWorkspaceView = "mine" | "delegated";
@@ -132,7 +132,19 @@ export function TasksPage() {
     if (action.kind === "fill_form") { setFormTarget(task); return; }
     if (action.kind === "fill_fms_form") {
       if (!task.form_template_id) throw new Error("The FMS stage has no pinned form");
-      navigateTo(fmsFormDeepLinkPath(await loadFmsTaskDeepLink(task.id, task.form_template_id)));
+      if (task.fms_work_source === "fms_starter" && task.fms_starter_assignment_id) {
+        navigateTo(fmsAssignedWorkPath({ kind: "starter_form", starterAssignmentId: task.fms_starter_assignment_id, formTemplateId: task.form_template_id }));
+      } else if (task.fms_instance_id && task.fms_instance_stage_id) {
+        navigateTo(fmsAssignedWorkPath({ kind: "stage_form", instanceId: task.fms_instance_id, instanceStageId: task.fms_instance_stage_id, formTemplateId: task.form_template_id }));
+      } else {
+        const legacy = await loadFmsTaskDeepLink(task.id, task.form_template_id);
+        navigateTo(fmsAssignedWorkPath({ kind: "stage_form", ...legacy }));
+      }
+      return;
+    }
+    if (action.kind === "open_fms_stage") {
+      if (!task.fms_instance_id) throw new Error("This FMS task has no runtime instance");
+      navigateTo(fmsAssignedWorkPath({ kind: "stage", instanceId: task.fms_instance_id, instanceStageId: task.fms_instance_stage_id ?? null }));
       return;
     }
     if (action.kind === "upload") await uploadTaskAttachment(profile.tenant_id, task.id, action.file);
@@ -182,7 +194,7 @@ export function TasksPage() {
       </div> : null}
 
       {composerOpen && canCreateTasks && references && profile ? <TaskComposer data={references} onClose={() => setComposerOpen(false)} onCreated={() => { setComposerOpen(false); void refresh(); }} onSave={createDelegationTask} onUploadAttachment={(taskId, file) => uploadTaskAttachment(profile.tenant_id, taskId, file)} profile={profile} /> : null}
-      {formTarget?.id && formTarget.form_template_id ? (() => { const form = formBundles.find((item) => item.id === formTarget.form_template_id); return form ? <Modal onClose={() => setFormTarget(null)} title={`Required form: ${form.name}`} wide><FormRenderer definition={{ name: form.name, description: form.description ?? undefined, sections: form.sections, fields: form.fields }} dynamicOptions={formDynamicOptions} templateId={form.id} onSubmit={async (answers) => { await submitForm(form.id, answers, formTarget.task_type === "delegation" ? "delegation_task" : "checklist_task", formTarget.id as string); setFormTarget(null); await refresh(); }} /></Modal> : <Modal onClose={() => setFormTarget(null)} title="Required form"><Notice tone="danger">The exact required form version is not available to this account.</Notice></Modal>; })() : null}
+      {formTarget?.id && formTarget.form_template_id ? (() => { const form = formBundles.find((item) => item.id === formTarget.form_template_id); return form ? <Modal onClose={() => setFormTarget(null)} title={`Required form: ${form.name}`} wide><FormRenderer definition={{ name: form.name, description: form.description ?? undefined, sections: form.sections, fields: form.fields }} dynamicOptions={formDynamicOptions} templateId={form.id} onSubmit={async (answers) => { await submitForm(form.id, answers, taskFormLinkedModule(formTarget.task_type), formTarget.id as string); setFormTarget(null); await refresh(); }} /></Modal> : <Modal onClose={() => setFormTarget(null)} title="Required form"><Notice tone="danger">The exact required form version is not available to this account.</Notice></Modal>; })() : null}
     </section>
   );
 }

@@ -13,11 +13,10 @@ import {
   type FmsData,
   type FmsFlowRow,
 } from "@/features/fms/api";
-import { parseFmsFormDeepLink } from "@/features/fms/deepLink";
 import { FmsFlowBuilder } from "@/features/fms/FmsFlowBuilder";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { FMSTasksPage } from "./FMSTasksPage";
-import { hasPermission } from "@jewelos/core";
+import { hasPermission, parseFmsAssignedWorkPath } from "@jewelos/core";
 
 type Runtime = Awaited<ReturnType<typeof loadFmsRuntime>>;
 type FlowState = "live" | "paused" | "draft" | "archived";
@@ -52,7 +51,7 @@ export function FMSBuilderPage() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [edit, setEdit] = useState<FmsFlowRow | null | undefined>();
-  const [tasksFor, setTasksFor] = useState<FlowFamily | "all" | null>(() => parseFmsFormDeepLink(window.location.href) ? "all" : null);
+  const [tasksFor, setTasksFor] = useState<FlowFamily | "all" | null>(() => parseFmsAssignedWorkPath(window.location.href) ? "all" : null);
   const [openInstanceId, setOpenInstanceId] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
 

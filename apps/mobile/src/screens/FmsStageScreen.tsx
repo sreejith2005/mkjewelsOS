@@ -235,6 +235,7 @@ export function FmsStageScreen() {
                 label={`Fill ${linkedForm.name}`}
                 onPress={() =>
                   navigation.navigate("FmsStageForm", {
+                    instanceId: params.instanceId,
                     instanceStageId: stage.id,
                     formTemplateId: linkedForm.id,
                   })

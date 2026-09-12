@@ -13,6 +13,7 @@ export type TaskCardAction =
   | { file: File; kind: "upload_and_complete" }
   | { kind: "fill_form" }
   | { kind: "fill_fms_form" }
+  | { kind: "open_fms_stage" }
   | { datetime: string; kind: "revise"; reason: string };
 
 const PRIORITY_CLASS: Record<Enums<"task_priority">, string> = {
@@ -43,6 +44,9 @@ export function TaskCard({ capability, categoryLabel, onAction, task: taskInput 
   const readOnly = !capability.canMutate || task.task_type === "fms";
   const formOnlyAction = task.requires_form && !completed;
   const fmsFormAction = task.task_type === "fms" && task.requires_form && !completed;
+  // A runtime stage without a pinned form is still assigned work. Without its own
+  // action the card is a dead end, so route it to the stage workspace instead.
+  const fmsStageAction = task.task_type === "fms" && !task.requires_form && !completed;
   // Checklists are a click-to-complete task type. Older imports copied the
   // sheet's evidence flag onto checklist records, so normalize defensively in
   // the UI while migration 0148 repairs persisted import data.
@@ -115,7 +119,7 @@ export function TaskCard({ capability, categoryLabel, onAction, task: taskInput 
       <TaskDetails statusLabel={statusLabel} task={taskInput} />
       {blocked ? <Notice tone="task">Coverage required. An authorized manager must resolve coverage through a future database-backed workflow; no simulated resolution is available here.</Notice> : null}
       {!formOnlyAction ? task.checklists.map((item) => <div className="flex items-start gap-3 text-sm text-task-text" key={item.id}><button aria-label={item.is_completed ? "Mark incomplete" : "Mark complete"} className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded border", item.is_completed ? "border-task-accent bg-task-accent text-task-text" : "border-task-border bg-task-bg")} disabled={busy || completed || readOnly || blocked} onClick={() => void act({ kind: "checklist", checklistId: item.id, completed: !item.is_completed })} type="button">{item.is_completed ? <Check className="size-3" /> : null}</button><span className={cn(item.is_completed && "line-through text-task-text-muted")}>{item.item_text}{item.is_required ? <span className="ml-1 text-task-overdue">*</span> : null}</span></div>) : null}
-      {fmsFormAction && !blocked ? <Button disabled={busy || !task.form_template_id} onClick={() => void act({ kind: "fill_fms_form" })} type="button"><CheckCircle2 />Complete FMS form</Button> : formOnlyAction && !readOnly && !blocked ? <Button disabled={busy || !task.form_template_id} onClick={() => void act({ kind: "fill_form" })} type="button"><CheckCircle2 />Complete form</Button> : null}
+      {fmsFormAction && !blocked ? <Button disabled={busy || !task.form_template_id} onClick={() => void act({ kind: "fill_fms_form" })} type="button"><CheckCircle2 />Complete FMS form</Button> : fmsStageAction && !blocked ? <Button disabled={busy} onClick={() => void act({ kind: "open_fms_stage" })} type="button"><CheckCircle2 />Open FMS workflow</Button> : formOnlyAction && !readOnly && !blocked ? <Button disabled={busy || !task.form_template_id} onClick={() => void act({ kind: "fill_form" })} type="button"><CheckCircle2 />Complete form</Button> : null}
       {!formOnlyAction && !readOnly && requiresEvidence && !completed ? <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-task-border bg-task-bg p-3 text-sm text-task-text"><FileUp className="size-4" /><span>{task.hasAttachment ? "Evidence uploaded · add another" : "Upload required evidence"}</span><input accept="image/jpeg,image/png,image/webp,application/pdf" className="sr-only" disabled={busy} onChange={(event) => void upload(event)} type="file" /></label> : null}
       {!formOnlyAction && !readOnly && task.requires_remark && !completed ? <Field label="Completion remark"><textarea className="task-field min-h-16" onChange={(event) => setRemark(event.target.value)} value={remark} /></Field> : null}
       {task.task_type === "fms" ? <Notice tone="task">FMS work is completed in its protected workflow runner.</Notice> : null}

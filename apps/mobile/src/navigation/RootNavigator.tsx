@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { NavigationContainer, DefaultTheme, type Theme as NavTheme } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "@/auth/AuthProvider";
+import { DailyChecklistGate } from "@/features/daily-checklists/DailyChecklistGate";
 import { useTheme } from "@/theme/ThemeProvider";
 import { Button } from "@/ui/Button";
 import { Screen } from "@/ui/Screen";
@@ -17,6 +18,9 @@ import { FormFillScreen } from "@/screens/FormFillScreen";
 import { ClientDetailScreen } from "@/screens/ClientDetailScreen";
 import { WalkinScreen } from "@/screens/WalkinScreen";
 import { ProfileScreen } from "@/screens/ProfileScreen";
+import { AssigningLeftScreen } from "@/screens/AssigningLeftScreen";
+import { PermissionManagementScreen } from "@/screens/PermissionManagementScreen";
+import { FmsBuilderScreen } from "@/screens/FmsBuilderScreen";
 import type { RootStackParamList } from "@/navigation/types";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -30,7 +34,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
  * make expensive.
  */
 export function RootNavigator() {
-  const { status, statusMessage, logout } = useAuth();
+  const { status, statusMessage, logout, profile } = useAuth();
   const { name, theme } = useTheme();
   const navigationTheme = useMemo<NavTheme>(() => ({
     ...DefaultTheme,
@@ -47,6 +51,7 @@ export function RootNavigator() {
   }), [name, theme]);
 
   return (
+    <>
     <NavigationContainer theme={navigationTheme}>
       {status === "restoring" ? (
         <Screen>
@@ -73,6 +78,9 @@ export function RootNavigator() {
           <Stack.Screen component={ClientDetailScreen} name="ClientDetail" options={{ title: "Client" }} />
           <Stack.Screen component={WalkinScreen} name="Walkin" options={{ title: "New walk-in" }} />
           <Stack.Screen component={ProfileScreen} name="Profile" options={{ title: "Profile" }} />
+          <Stack.Screen component={AssigningLeftScreen} name="AssigningLeft" options={{ title: "Assigning Left" }} />
+          <Stack.Screen component={PermissionManagementScreen} name="PermissionManagement" options={{ title: "Permission management" }} />
+          <Stack.Screen component={FmsBuilderScreen} name="FmsBuilder" options={{ title: "Workflow builder" }} />
         </Stack.Navigator>
       ) : status === "blocked" || status === "incomplete" ? (
         <Screen
@@ -87,5 +95,9 @@ export function RootNavigator() {
         <LoginScreen />
       )}
     </NavigationContainer>
+    {/* Outside the container because it is a blocking overlay, not a route —
+        the same position the web gives it beside the application shell. */}
+    {status === "authenticated" && profile ? <DailyChecklistGate profileId={profile.id} /> : null}
+    </>
   );
 }

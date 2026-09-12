@@ -53,6 +53,7 @@ const FMSBuilderPage = lazyPage("fms", () => import("@/pages/FMSBuilderPage").th
 const NotificationsPage = lazyPage("notifications", () => import("@/pages/NotificationsPage").then((module) => ({ default: module.NotificationsPage })));
 const CRMPage = lazyPage("crm", () => import("@/pages/CRMPage").then((module) => ({ default: module.CRMPage })));
 const TasksPage = lazyPage("tasks", () => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
+const FmsAssignedWorkPage = lazyPage("fms-assigned-work", () => import("@/pages/FmsAssignedWorkPage").then((module) => ({ default: module.FmsAssignedWorkPage })));
 const RecurringTodoPage = lazyPage("recurring-todo", () => import("@/pages/RecurringTodoPage").then((module) => ({ default: module.RecurringTodoPage })));
 const TaskTemplatesPage = lazyPage("task-templates", () => import("@/pages/TaskTemplatesPage").then((module) => ({ default: module.TaskTemplatesPage })));
 const TaskBulkImportPage = lazyPage("task-bulk-import", () => import("@/pages/TaskBulkImportPage").then((module) => ({ default: module.TaskBulkImportPage })));
@@ -97,18 +98,25 @@ const FULL_WIDTH_PAGES = new Set<PageId>([
 ]);
 
 function usePathname() {
-  const [path, setPath] = useState(window.location.pathname);
+  // The whole URL is tracked, not just the pathname, because pages addressed by
+  // query alone — assigned FMS work is one — move between destinations without
+  // the pathname changing. Storing only the pathname made React bail out of the
+  // identical state update, so the URL advanced while the view did not.
+  const [href, setHref] = useState(window.location.href);
   useEffect(() => {
-    const onPopState = () => setPath(window.location.pathname);
+    const onPopState = () => setHref(window.location.href);
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
   const navigate = (nextPath: string) => {
     const nextUrl = new URL(nextPath, window.location.origin);
-    if (`${nextUrl.pathname}${nextUrl.search}` !== `${window.location.pathname}${window.location.search}`) window.history.pushState({}, "", `${nextUrl.pathname}${nextUrl.search}`);
-    setPath(nextUrl.pathname);
+    const next = `${nextUrl.pathname}${nextUrl.search}`;
+    if (next !== `${window.location.pathname}${window.location.search}`) window.history.pushState({}, "", next);
+    setHref(nextUrl.href);
   };
-  return { navigate, path };
+  // Every existing route comparison is pathname-only, so keep `path` that shape.
+  const path = new URL(href, window.location.origin).pathname;
+  return { navigate, path, search: new URL(href, window.location.origin).search };
 }
 
 function LoginPage() {
@@ -227,7 +235,7 @@ function IncompleteAccount() {
 function AppShell() {
   const { access, branch, logout, preferences, profile } = useAuth();
   const { theme, setTheme } = useTheme();
-  const { navigate, path } = usePathname();
+  const { navigate, path, search } = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sectionControls, setSectionControls] = useState(DEFAULT_SECTION_CONTROLS);
@@ -299,7 +307,7 @@ function AppShell() {
     : currentPage === "users" ? <TeamDirectoryPage />
     : currentPage === "crm" ? <CRMPage />
     : currentPage === "dropdown_master" ? <DropdownMasterPage />
-      : currentPage === "checklist_tasks" ? path === "/tasks/import" ? <TaskBulkImportPage onBack={() => navigate("/tasks")} /> : path === "/tasks/assigning-left" ? <AssigningLeftPage /> : <TasksPage />
+      : currentPage === "checklist_tasks" ? path === "/tasks/import" ? <TaskBulkImportPage onBack={() => navigate("/tasks")} /> : path === "/tasks/assigning-left" ? <AssigningLeftPage /> : path === "/tasks/fms" ? <FmsAssignedWorkPage key={search} onNavigate={navigate} /> : <TasksPage />
       : currentPage === "recurring_todo" ? <RecurringTodoPage />
       : currentPage === "task_templates" ? <TaskTemplatesPage />
       : currentPage === "availability" ? <AvailabilityPage />

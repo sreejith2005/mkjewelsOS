@@ -11,6 +11,6 @@ describe("HomeView work queue", () => {
     expect(source).toContain("All open tasks");
     expect(source).toContain("overflow-y-auto");
     expect(source).toContain("starter.form_name");
-    expect(source).toContain("fmsFormDeepLinkPath");
+    expect(source).toContain("fmsAssignedWorkPath");
   });
 });

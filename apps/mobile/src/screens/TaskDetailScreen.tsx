@@ -3,12 +3,16 @@ import { RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
+  deriveTaskCardState,
+  deriveTaskMutationCapability,
   effectiveTaskDeadline,
   isTaskFeedItemOverdue,
   kolkataDateKey,
   type Tables,
 } from "@jewelos/core";
 import {
+  loadFmsTaskDeepLink,
+  loadFmsTaskStageLink,
   loadTaskFeed,
   updateTask,
   uploadAndCompleteTask,
@@ -19,7 +23,7 @@ import { useProfile } from "@/auth/AuthProvider";
 import { useAsyncData } from "@/lib/useAsyncData";
 import { formatDateTime, formatRelativeDeadline } from "@/lib/format";
 import { errorText, log } from "@/lib/log";
-import { pickFile, type PickSource } from "@/lib/pickFile";
+import { chooseSource, pickFile, type PickSource } from "@/lib/pickFile";
 import { makeStyles } from "@/theme/makeStyles";
 import { useAppTheme } from "@/theme/ThemeProvider";
 import { Button } from "@/ui/Button";
@@ -30,6 +34,7 @@ import { TextField } from "@/ui/TextField";
 import { ToggleField } from "@/forms/ToggleField";
 import { Banner, EmptyState, ErrorState, LoadingState } from "@/ui/states";
 import type { RootStackParamList } from "@/navigation/types";
+import { fmsAssignedWorkRouteForTask, navigateFmsAssignedWork } from "@/features/fms/assignedWorkNavigation";
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, "TaskDetail">;
@@ -96,9 +101,16 @@ export function TaskDetailScreen() {
   const needsForm = task.requires_form === true && !task.hasFormSubmission;
   const checklists: Tables<"task_checklists">[] = task.checklists ?? [];
   const remaining = checklists.filter((item) => !item.is_completed).length;
+  const capability = deriveTaskMutationCapability({
+    assigneeIds: task.assignees.map((assignee) => assignee.id),
+    isWatcher: task.isWatchedByViewer,
+    viewerId: profile.id,
+    viewerRole: profile.user_role,
+  });
+  const cardState = deriveTaskCardState({ task, hasAttachment: task.hasAttachment, hasFormSubmission: task.hasFormSubmission, checklists, capability });
 
   const completeWithImage = async (source: PickSource) => {
-    const picked = await pickFile(source);
+    const picked = await pickFile(source, { imagesOnly: true });
     if (!picked.ok) {
       if (!picked.cancelled) setActionError(picked.message);
       return;
@@ -113,6 +125,26 @@ export function TaskDetailScreen() {
       return;
     }
     await run(() => uploadTaskAttachment(profile.tenant_id, task.id ?? "", picked.file));
+  };
+
+  const openFmsStage = async () => {
+    await run(async () => {
+      // Migration 0160 puts the work identity on the feed row itself, so the
+      // common case needs no extra round trip. The lookups below remain only
+      // for rows served by an older view.
+      const direct = fmsAssignedWorkRouteForTask(task);
+      if (direct) {
+        navigateFmsAssignedWork(navigation, direct);
+        return;
+      }
+      if (task.form_template_id) {
+        const target = await loadFmsTaskDeepLink(task.id ?? "", task.form_template_id);
+        navigation.navigate("FmsStageForm", target);
+      } else {
+        const target = await loadFmsTaskStageLink(task.id ?? "");
+        navigation.navigate("FmsStage", target);
+      }
+    });
   };
 
   return (
@@ -162,7 +194,13 @@ export function TaskDetailScreen() {
         </Card>
       ) : null}
 
-      {checklists.length > 0 ? (
+      {task.task_type === "fms" ? <Card>
+        <Text tone="warm" variant="subtitle" weight="semibold">FMS workflow step</Text>
+        <Banner tone="warning">This feed row is read-only. Complete it through the workflow so routing, review, evidence, and audit rules remain intact.</Banner>
+        <Button busy={busy} label={task.form_template_id ? "Open workflow form" : "Open workflow step"} onPress={() => void openFmsStage()} />
+      </Card> : null}
+
+      {task.task_type !== "fms" && checklists.length > 0 ? (
         <Card>
           <Text tone="warm" variant="subtitle" weight="semibold">
             Checklist ({checklists.length - remaining}/{checklists.length})
@@ -182,7 +220,7 @@ export function TaskDetailScreen() {
         </Card>
       ) : null}
 
-      {needsForm && task.form_template_id ? (
+      {task.task_type !== "fms" && needsForm && task.form_template_id ? (
         <Card>
           <Text tone="warm" variant="subtitle" weight="semibold">
             Required form
@@ -194,13 +232,14 @@ export function TaskDetailScreen() {
               navigation.navigate("TaskForm", {
                 taskId: task.id ?? "",
                 formTemplateId: task.form_template_id ?? "",
+                taskType: task.task_type,
               })
             }
           />
         </Card>
       ) : null}
 
-      {!done ? (
+      {!done && task.task_type !== "fms" ? (
         <Card>
           <Text tone="warm" variant="subtitle" weight="semibold">
             Complete this task
@@ -214,22 +253,21 @@ export function TaskDetailScreen() {
             value={remark}
           />
           <View style={styles.actions}>
-            <Button
+            {cardState.showDirectComplete ? <Button
               busy={busy}
-              disabled={needsForm}
+              disabled={!cardState.canComplete}
               label="Mark complete"
               onPress={() => void run(() => updateTask(task.id ?? "", "complete", remark ? { remark } : {}))}
-            />
-            <Button busy={busy} label="Complete with photo" onPress={() => void completeWithImage("camera")} variant="secondary" />
+            /> : null}
+            {cardState.showDirectUpload ? <Button busy={busy} label="Upload" onPress={() => void chooseSource("Upload evidence", { imagesOnly: true }).then((source) => { if (source) void completeWithImage(source); })} variant="secondary" /> : null}
           </View>
           <View style={styles.actions}>
-            <Button busy={busy} label="Attach a file" onPress={() => void attach("document")} variant="ghost" />
-            <Button busy={busy} label="Attach a photo" onPress={() => void attach("library")} variant="ghost" />
+            <Button busy={busy} label="Attach a photo or file" onPress={() => void chooseSource("Attach a file").then((source) => { if (source) void attach(source); })} variant="ghost" />
           </View>
         </Card>
-      ) : (
+      ) : done ? (
         <Banner tone="success">{`Completed ${formatDateTime(task.actual_datetime, "today")}.`}</Banner>
-      )}
+      ) : null}
     </Screen>
   );
 }

@@ -3,26 +3,26 @@ import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
-  effectiveTaskDeadline,
-  isTaskFeedItemOverdue,
+  deriveTaskMutationCapability,
   kolkataDateKey,
   splitAssignedTaskFeed,
   taskMatchesStatus,
   type TaskFeedStatusFilter,
 } from "@jewelos/core";
-import { ensureMyRecurringTasks, loadTaskFeed, type TaskBundle } from "@jewelos/data/tasks/api";
+import { ensureMyRecurringTasks, loadTaskFeed, loadTaskFeedReferenceData, reviseTask, updateTask, uploadAndCompleteTask, type TaskBundle } from "@jewelos/data/tasks/api";
 import { useProfile } from "@/auth/AuthProvider";
+import { TaskCard as ParityTaskCard, type TaskCardAction } from "@/features/tasks/TaskCard";
 import { useAsyncData } from "@/lib/useAsyncData";
-import { formatRelativeDeadline, formatDateTime } from "@/lib/format";
 import { log } from "@/lib/log";
+import { pickFileFromChooser } from "@/lib/pickFile";
 import { makeStyles } from "@/theme/makeStyles";
 import { useAppTheme } from "@/theme/ThemeProvider";
-import { Card, StatusBadge } from "@/ui/Card";
+import { Button } from "@/ui/Button";
 import { Screen } from "@/ui/Screen";
 import { SegmentedControl } from "@/ui/SegmentedControl";
-import { Text } from "@/ui/Text";
 import { EmptyState, ErrorState, LoadingState } from "@/ui/states";
 import type { RootStackParamList } from "@/navigation/types";
+import { fmsAssignedWorkRouteForTask, navigateFmsAssignedWork } from "@/features/fms/assignedWorkNavigation";
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type Workspace = "mine" | "delegated";
@@ -55,16 +55,18 @@ export function TasksScreen() {
       log.warn("api", "could not prepare recurring tasks; showing the feed as it stands");
       log.debug("api", "recurring preparation error", error);
     });
-    const [assigned, authored] = await Promise.all([
+    const [assigned, authored, references] = await Promise.all([
       loadTaskFeed(profile.id, start, end, { includeBlockedCoverage: canManage, includeOverdue: true }),
       hasAdminView
         ? loadTaskFeed(profile.id, start, end, { delegated: true, includeOverdue: true })
         : Promise.resolve<TaskBundle[]>([]),
+      loadTaskFeedReferenceData().catch(() => ({ categories: [] })),
     ]);
     const split = splitAssignedTaskFeed(assigned);
     return {
       mine: hasAdminView ? assigned : split.myTasks,
       delegated: hasAdminView ? authored : split.delegatedTasks,
+      categories: references.categories,
     };
   }, [canManage, hasAdminView, profile.id]);
 
@@ -83,6 +85,35 @@ export function TasksScreen() {
       completed: source.filter((task) => taskMatchesStatus(task, "completed")).length,
     };
   }, [data, workspace]);
+  const categoryNames = useMemo(() => new Map((data?.categories ?? []).map((item) => [item.id, item.label])), [data?.categories]);
+
+  const handleAction = async (task: TaskBundle, action: TaskCardAction) => {
+    if (!task.id) throw new Error("Task identifier is missing");
+    if (action.kind === "fill_form") {
+      // FMS work is completed through its workflow surface, never the ordinary
+      // task form route, so resolve the FMS identity first.
+      const fms = fmsAssignedWorkRouteForTask(task);
+      if (fms) {
+        navigateFmsAssignedWork(navigation, fms);
+        return;
+      }
+      if (!task.form_template_id) throw new Error("The required form is missing");
+      navigation.navigate("TaskForm", {
+        taskId: task.id,
+        formTemplateId: task.form_template_id,
+        taskType: task.task_type,
+      });
+      return;
+    }
+    if (action.kind === "upload_and_complete") {
+      const picked = await pickFileFromChooser("Upload evidence", { imagesOnly: true });
+      if (!picked.ok) { if (picked.cancelled) return; throw new Error(picked.message); }
+      await uploadAndCompleteTask(profile.tenant_id, task.id, picked.file);
+    } else if (action.kind === "revise") await reviseTask(task.id, action.datetime, action.reason);
+    else if (action.kind === "checklist") await updateTask(task.id, "checklist", { checklistId: action.checklistId, completed: action.completed });
+    else await updateTask(task.id, "complete", { remark: action.remark });
+    await refresh();
+  };
 
   if (loading) return <Screen><LoadingState label="Loading your tasks…" /></Screen>;
   if (error && !data) return <Screen><ErrorState message={error} onRetry={() => void reload()} /></Screen>;
@@ -109,6 +140,15 @@ export function TasksScreen() {
           ]}
           value={status}
         />
+        {/* The follow-up to a desktop bulk import: rows that arrived without a
+            usable employee name. Administrators only, as on the web. */}
+        {profile.user_role === "super_admin" || profile.user_role === "admin" ? (
+          <Button
+            label="Assigning Left"
+            onPress={() => navigation.navigate("AssigningLeft")}
+            variant="secondary"
+          />
+        ) : null}
       </View>
 
       <FlatList
@@ -138,8 +178,11 @@ export function TasksScreen() {
           />
         }
         renderItem={({ item }) => (
-          <TaskCard
-            onPress={() => item.id && navigation.navigate("TaskDetail", { taskId: item.id })}
+          <ParityTaskCard
+            capability={deriveTaskMutationCapability({ assigneeIds: item.assignees.map((assignee) => assignee.id), isWatcher: item.isWatchedByViewer, viewerId: profile.id, viewerRole: profile.user_role })}
+            categoryLabel={item.category_id ? categoryNames.get(item.category_id) ?? "Uncategorized" : "Uncategorized"}
+            onAction={(action) => handleAction(item, action)}
+            onOpenDetails={() => item.id && navigation.navigate("TaskDetail", { taskId: item.id })}
             task={item}
           />
         )}
@@ -154,40 +197,6 @@ export function TasksScreen() {
   );
 }
 
-function TaskCard({ task, onPress }: { task: TaskBundle; onPress: () => void }) {
-  const styles = useStyles();
-  const overdue = isTaskFeedItemOverdue(task);
-  const deadline = effectiveTaskDeadline(task);
-  const relative = formatRelativeDeadline(deadline);
-  const done = task.status === "completed";
-
-  return (
-    <Card
-      accent={done ? "success" : overdue ? "danger" : "none"}
-      accessibilityHint="Opens the task"
-      accessibilityLabel={`${task.title ?? "Task"}${overdue ? ", overdue" : ""}`}
-      onPress={onPress}
-    >
-      <Text numberOfLines={2} variant="body" weight="semibold">
-        {task.title ?? "Untitled task"}
-      </Text>
-      <Text tone="muted" variant="caption">
-        {formatDateTime(deadline, "No deadline")}
-        {relative && !done ? ` · ${relative}` : ""}
-      </Text>
-      <View style={styles.badges}>
-        <StatusBadge
-          label={done ? "Completed" : overdue ? "Overdue" : "Pending"}
-          tone={done ? "success" : overdue ? "danger" : "neutral"}
-        />
-        {task.priority === "high" && !done ? <StatusBadge label="High" tone="warning" /> : null}
-        {task.requires_form ? <StatusBadge label="Form required" tone="primary" /> : null}
-        {task.assigneeName ? <StatusBadge label={task.assigneeName} /> : null}
-      </View>
-    </Card>
-  );
-}
-
 const useStyles = makeStyles((theme) => StyleSheet.create({
   controls: {
     gap: theme.space.sm,
@@ -197,5 +206,4 @@ const useStyles = makeStyles((theme) => StyleSheet.create({
   },
   listContent: { padding: theme.space.md, paddingTop: 0, gap: theme.space.sm },
   emptyContent: { flexGrow: 1 },
-  badges: { flexDirection: "row", flexWrap: "wrap", gap: theme.space.xs },
 }));

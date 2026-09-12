@@ -1,13 +1,14 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Pressable } from "@/ui/Pressable";
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { makeStyles } from "@/theme/makeStyles";
 import { Text } from "@/ui/Text";
 
 export type DateFieldProps = Readonly<{
   label: string;
-  /** `date` stores `YYYY-MM-DD`; `datetime` stores a full ISO instant. */
-  mode: "date" | "datetime";
+  /** `date` stores `YYYY-MM-DD`; `datetime` stores a full ISO instant; `time` stores `HH:MM`. */
+  mode: "date" | "datetime" | "time";
   value: string | null;
   disabled: boolean;
   invalid: boolean;
@@ -21,8 +22,19 @@ function localDateKey(date: Date): string {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
+/** `HH:MM` on a 24-hour clock, the value a web `<input type="time">` holds. */
+function clockKey(date: Date): string {
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
 function parse(value: string | null): Date | null {
   if (!value) return null;
+  const clock = /^(\d{2}):(\d{2})$/.exec(value);
+  if (clock) {
+    const date = new Date();
+    date.setHours(Number(clock[1]), Number(clock[2]), 0, 0);
+    return date;
+  }
   // A bare date must be read as local midnight. `new Date("2026-03-01")` parses
   // as UTC, which lands on the previous day in any timezone behind UTC.
   const bare = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -42,7 +54,7 @@ export function DateField({ label, mode, value, disabled, invalid, onChange }: D
   const [stage, setStage] = useState<"idle" | "date" | "time">("idle");
   const [draft, setDraft] = useState<Date | null>(null);
 
-  const commit = (date: Date) => onChange(mode === "date" ? localDateKey(date) : date.toISOString());
+  const commit = (date: Date) => onChange(mode === "date" ? localDateKey(date) : mode === "time" ? clockKey(date) : date.toISOString());
 
   const onPicked = (event: DateTimePickerEvent, picked?: Date) => {
     if (event.type === "dismissed" || !picked) {
@@ -71,17 +83,19 @@ export function DateField({ label, mode, value, disabled, invalid, onChange }: D
   const display = current
     ? mode === "date"
       ? current.toLocaleDateString("en-IN", { dateStyle: "medium" })
-      : current.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
+      : mode === "time"
+        ? clockKey(current)
+        : current.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
     : null;
 
   return (
     <View>
       <Pressable
-        accessibilityHint="Opens the date picker"
+        accessibilityHint={mode === "time" ? "Opens the time picker" : "Opens the date picker"}
         accessibilityLabel={`${label}${display ? `, ${display}` : ", not set"}`}
         accessibilityRole="button"
         disabled={disabled}
-        onPress={() => setStage("date")}
+        onPress={() => setStage(mode === "time" ? "time" : "date")}
         style={({ pressed }) => [
           styles.trigger,
           invalid && styles.invalid,
@@ -90,7 +104,7 @@ export function DateField({ label, mode, value, disabled, invalid, onChange }: D
         ]}
       >
         <Text numberOfLines={1} style={styles.value} tone={display ? "default" : "muted"} variant="body">
-          {display ?? (mode === "date" ? "Choose a date" : "Choose a date and time")}
+          {display ?? (mode === "date" ? "Choose a date" : mode === "time" ? "Choose a time" : "Choose a date and time")}
         </Text>
         {display && !disabled ? (
           <Pressable accessibilityLabel="Clear" accessibilityRole="button" hitSlop={8} onPress={() => onChange("")}>
@@ -104,9 +118,10 @@ export function DateField({ label, mode, value, disabled, invalid, onChange }: D
       {stage !== "idle" ? (
         <DateTimePicker
           display="default"
+          is24Hour
           mode={stage === "time" ? "time" : "date"}
           onChange={onPicked}
-          value={(stage === "time" ? draft : current) ?? new Date()}
+          value={(stage === "time" ? draft ?? current : current) ?? new Date()}
         />
       ) : null}
     </View>

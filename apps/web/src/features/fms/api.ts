@@ -149,3 +149,55 @@ export const setFmsInstanceStatus = async (id: string, action: "hold" | "resume"
 export const updateFmsChecklistItem = async (id: string, completed: boolean) => { const { error } = await supabase.rpc("update_fms_checklist_item_with_audit", { p_item_id: id, p_completed: completed }); fail("Update FMS checklist", error); };
 export async function uploadFmsEvidence(stageId: string, tenantId: string, file: File) { const extension = file.name.toLowerCase().match(/\.[^.]+$/)?.[0]; const allowed = new Set([".jpg", ".jpeg", ".png", ".webp", ".pdf"]); if (!extension || !allowed.has(extension) || file.size < 1 || file.size > 10 * 1024 * 1024 || !["image/jpeg", "image/png", "image/webp", "application/pdf"].includes(file.type)) throw new Error("Evidence must be a JPG, PNG, WebP, or PDF up to 10 MB"); const path = `${tenantId}/${stageId}/${crypto.randomUUID()}${extension}`; const { error: uploadError } = await supabase.storage.from("fms-evidence").upload(path, file, { contentType: file.type, upsert: false }); fail("Upload FMS evidence", uploadError); const { error } = await supabase.rpc("register_fms_evidence_with_audit", { p_instance_stage_id: stageId, p_storage_path: path, p_original_filename: file.name.slice(0, 240), p_mime_type: file.type, p_size_bytes: file.size }); fail("Register FMS evidence", error); }
 export async function signedFmsEvidenceUrl(path: string) { const { data, error } = await supabase.storage.from("fms-evidence").createSignedUrl(path, 60); fail("Open FMS evidence", error); if (!data) throw new Error("Signed URL was not created"); return data.signedUrl; }
+
+export type FmsAssignedStageBundle = {
+  instance: FmsInstance;
+  instanceStages: FmsInstanceStage[];
+  definitions: FmsStageRow[];
+  checklist: FmsChecklistItem[];
+  evidence: FmsEvidence[];
+  users: FmsData["users"];
+};
+
+/**
+ * Loads exactly one assigned FMS stage and nothing else.
+ *
+ * `loadFmsRuntime` exists to render the whole workspace, so it caps instances at
+ * 200 (newest first) and stages at 1500. Opening an assigned step through that
+ * loader silently fails whenever the instance falls outside those caps, and the
+ * deep link then lands on the generic instance list instead of the step. This
+ * query is scoped by id, so the step either loads or is genuinely unavailable to
+ * this user — a distinction the caller can act on.
+ *
+ * Returns `null` when RLS hides the instance or it no longer exists.
+ */
+export async function loadFmsAssignedStage(instanceId: string): Promise<FmsAssignedStageBundle | null> {
+  const instance = await supabase.from("fms_instances").select("*").eq("id", instanceId).maybeSingle();
+  fail("Load FMS instance", instance.error);
+  if (!instance.data) return null;
+  const row = instance.data as FmsInstance;
+
+  const [stages, definitions, users] = await Promise.all([
+    supabase.from("fms_instance_stages").select("*").eq("fms_instance_id", row.id).order("created_at"),
+    supabase.from("fms_stages").select("*").eq("fms_flow_id", row.fms_flow_id).order("sort_order"),
+    supabase.from("user_profiles").select("id,employee_name,user_role,branch_id,department_id,working_status,is_login_enabled").order("employee_name").limit(500),
+  ]);
+  [stages, definitions, users].forEach((result) => fail("Load FMS stage", result.error));
+  const instanceStages = (stages.data ?? []) as FmsInstanceStage[];
+  const stageIds = instanceStages.map((stage) => stage.id);
+
+  const [checklist, evidence] = await Promise.all([
+    stageIds.length ? supabase.from("fms_instance_checklist_items").select("*").in("fms_instance_stage_id", stageIds).order("sort_order") : Promise.resolve({ data: [], error: null }),
+    stageIds.length ? supabase.from("fms_evidence").select("*").in("fms_instance_stage_id", stageIds).is("removed_at", null).order("created_at") : Promise.resolve({ data: [], error: null }),
+  ]);
+  [checklist, evidence].forEach((result) => fail("Load FMS stage", result.error));
+
+  return {
+    instance: row,
+    instanceStages,
+    definitions: (definitions.data ?? []) as FmsStageRow[],
+    checklist: (checklist.data ?? []) as FmsChecklistItem[],
+    evidence: (evidence.data ?? []) as FmsEvidence[],
+    users: users.data ?? [],
+  };
+}

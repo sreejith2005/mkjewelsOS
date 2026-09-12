@@ -1,26 +1,20 @@
 import { useMemo, useState, type FormEvent } from "react";
-import type { Json } from "@jewelos/core";
+import {
+  buildRecurringTemplatePayload,
+  recurringTemplateFrequency,
+  validateRecurringTemplateDraft,
+  RECURRING_FREQUENCIES as FREQUENCIES,
+  type Json,
+} from "@jewelos/core";
 import { Button, Field, Notice } from "@/components/ui";
 import type { TaskReferenceData, TaskTemplate } from "./api";
-
-const FREQUENCIES = [
-  ["daily", "DAILY", "FREQ=DAILY"], ["weekly", "WEEKLY", "FREQ=WEEKLY"],
-  ["monthly", "MONTHLY", "FREQ=MONTHLY"], ["quarterly", "QUARTERLY", "FREQ=MONTHLY;INTERVAL=3"],
-  ["yearly", "YEARLY", "FREQ=YEARLY"], ["one_time", "ONE TIME", "FREQ=DAILY;COUNT=1"],
-  ["as_required", "AS REQUIRED", "FREQ=DAILY;COUNT=1"],
-] as const;
-
-function frequencyOf(template: TaskTemplate | null): string {
-  if (!template) return "daily";
-  return FREQUENCIES.some(([value]) => value === template.schedule_kind) ? template.schedule_kind : "daily";
-}
 
 export function TaskTemplateForm({ data, template, onCancel, onSave }: { data: TaskReferenceData; template: TaskTemplate | null; onCancel: () => void; onSave: (id: string | null, payload: Json) => Promise<void> }) {
   void onCancel;
   const [user, setUser] = useState(template?.default_assignee_user_id ?? "");
   const [title, setTitle] = useState(template?.title ?? "");
   const [description, setDescription] = useState(template?.description ?? "");
-  const [frequency, setFrequency] = useState(() => frequencyOf(template));
+  const [frequency, setFrequency] = useState(() => recurringTemplateFrequency(template));
   const [start, setStart] = useState(template?.starts_on ?? new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }));
   const [startTime, setStartTime] = useState(template?.planned_time?.slice(0, 5) ?? "");
   const [dueTime, setDueTime] = useState(template?.due_time?.slice(0, 5) ?? template?.planned_time?.slice(0, 5) ?? "");
@@ -32,16 +26,12 @@ export function TaskTemplateForm({ data, template, onCancel, onSave }: { data: T
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!assignee || !title || !start || !startTime || !dueTime) { setError("Complete all required task details."); return; }
-    if (dueTime <= startTime) { setError("Due Time must be later than the Scheduled Start Time."); return; }
+    const draft = { title, description, frequency, start, startTime, dueTime, mode, buddy };
+    const invalid = validateRecurringTemplateDraft(draft, assignee ?? null);
+    if (invalid || !assignee) { setError(invalid); return; }
     setSaving(true);
     try {
-      await onSave(template?.id ?? null, {
-        title, description, recurrence_rule: FREQUENCIES.find(([value]) => value === frequency)?.[2] ?? "FREQ=DAILY", schedule_kind: frequency, starts_on: start, planned_time: startTime, due_time: dueTime,
-        priority: "medium", branch_id: assignee.branch_id, department_id: assignee.department_id, default_assignee_type: "specific_user", default_assignee_user_id: assignee.id, default_assignee_role: "",
-        task_type: mode === "task" ? "delegation" : "checklist", buddy_assignment_allowed: buddy, checklist_items: [], requires_upload: mode === "task", requires_remark: false, requires_form: false, form_template_id: "", is_active: true,
-        verification_required: false, verifier_user_profile_id: "", followup_enabled: false, personal_performance_enabled: true,
-      });
+      await onSave(template?.id ?? null, buildRecurringTemplatePayload(draft, assignee) as Json);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to save task"); } finally { setSaving(false); }
   };
 

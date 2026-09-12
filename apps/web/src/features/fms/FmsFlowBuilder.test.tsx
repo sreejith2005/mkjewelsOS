@@ -153,4 +153,52 @@ describe("FMS builder graph wiring", () => {
     expect(screen.getByText(/issues? to resolve/)).toBeTruthy();
     expect(mocks.publishFmsFlow).not.toHaveBeenCalled();
   });
+
+  /**
+   * Compact-screen containment. jsdom does not lay anything out, so these lock
+   * in the structural choices that keep the builder inside a narrow viewport
+   * rather than measuring pixels: a stacking grid whose columns may shrink, a
+   * palette that scrolls inside itself, and named icon-only controls.
+   */
+  describe("compact layout", () => {
+    it("stacks the palette above the canvas until xl and lets both columns shrink", async () => {
+      await openBuilder();
+      const grid = document.querySelector("[class*='xl:grid-cols-']");
+      expect(grid).toBeTruthy();
+      // `minmax(0,1fr)` is what stops a wide canvas forcing document-level
+      // horizontal scroll; `1fr` alone would blow the grid out.
+      expect(grid!.className).toContain("minmax(0,1fr)");
+      // No column template below xl means one stacked column on a phone.
+      expect(grid!.className).not.toMatch(/(?<!xl:)grid-cols-\[/);
+    });
+
+    it("scrolls the building-block palette inside its own bounded height", async () => {
+      await openBuilder();
+      const palette = screen.getByText("Building blocks").closest("aside");
+      expect(palette).toBeTruthy();
+      expect(palette!.className).toContain("overflow-y-auto");
+      expect(palette!.className).toMatch(/max-h-/);
+    });
+
+    it("keeps the header actions reachable without widening the page", async () => {
+      await openBuilder();
+      const header = document.querySelector("header");
+      expect(header).toBeTruthy();
+      expect(header!.className).toMatch(/scroll-x|overflow-x-auto/);
+    });
+
+    it("gives every icon-only control an accessible name", async () => {
+      await openBuilder();
+      for (const name of ["Undo", "Redo", "Check workflow"]) {
+        expect(screen.getByRole("button", { name })).toBeTruthy();
+      }
+    });
+
+    it("lets the publish-readiness bar wrap instead of overflowing", async () => {
+      await openBuilder();
+      const bar = screen.getByText("Publish readiness").closest("section");
+      expect(bar).toBeTruthy();
+      expect(bar!.querySelector(".flex-wrap")).toBeTruthy();
+    });
+  });
 });

@@ -42,6 +42,14 @@ describe("navigatePath", () => {
     expect(calls).toEqual(["path:/tasks", "tab:Tasks"]);
   });
 
+  it("lets a staff user open assigned FMS work without FMS builder access", () => {
+    const { calls, handlers } = recorder();
+    // Assigned FMS work is authorized by Tasks, not by the builder section a
+    // regular employee has no reason to reach.
+    expect(navigatePath("/tasks/fms?instance=i-1&stage=s-1&form=f-1", shellFor("staff"), handlers)).toBe(true);
+    expect(calls).toEqual(["path:/tasks/fms?instance=i-1&stage=s-1&form=f-1", "tab:Fms"]);
+  });
+
   it("does not navigate to a permission-denied destination", () => {
     const { calls, handlers } = recorder();
     expect(navigatePath("/crm", shellFor("housekeeping"), handlers)).toBe(false);

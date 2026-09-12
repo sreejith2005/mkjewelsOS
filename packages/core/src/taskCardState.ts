@@ -102,3 +102,15 @@ export function deriveTaskCardState(input: {
     checklistProgress: calculateTaskChecklistProgress(checklists),
   };
 }
+
+/**
+ * The `linked_module` a task's form submission must be filed under.
+ *
+ * `submit_form_with_audit` accepts only `checklist_task` or `delegation_task`
+ * and re-checks the value against the task's own `task_type` (migration 0009),
+ * so a submission filed under anything else is refused outright. Both clients
+ * derive it here rather than repeating the ternary.
+ */
+export function taskFormLinkedModule(taskType: string | null | undefined): "checklist_task" | "delegation_task" {
+  return taskType === "delegation" ? "delegation_task" : "checklist_task";
+}

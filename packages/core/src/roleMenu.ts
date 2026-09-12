@@ -171,12 +171,11 @@ export function getPageForPath(path: string): PageId | undefined {
   // Task evidence used to be its own destination; it is now a panel inside Task
   // Control, so old links and bookmarks land on the workspace that absorbed it.
   if (path === "/task-evidence") return "task_templates";
-  if (path === "/tasks/fms") return "fms_tasks";
   if (path === "/tasks/checklist" || path === "/tasks/delegation" || path === "/tasks/import" || path === "/tasks/assigning-left") return "checklist_tasks";
   // Permission management lives inside Settings; the page itself additionally
   // requires the protected permissions.manage permission.
   if (path === "/settings/permissions") return "settings";
-  // FMS form deep links point at /tasks/fms; the unified FMS section absorbs them.
-  if (path === "/tasks/fms") return "fms_builder";
+  // Assigned FMS work is protected by Tasks access, independently of builder access.
+  if (path === "/tasks/fms") return "checklist_tasks";
   return ALL_MENU_ITEMS.find((item) => item.path === path)?.id;
 }

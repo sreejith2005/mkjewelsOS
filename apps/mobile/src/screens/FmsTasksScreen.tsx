@@ -9,6 +9,7 @@ import { useProfile } from "@/auth/AuthProvider";
 import { useAsyncData } from "@/lib/useAsyncData";
 import { makeStyles } from "@/theme/makeStyles";
 import { useAppTheme } from "@/theme/ThemeProvider";
+import { Button } from "@/ui/Button";
 import { Card, StatusBadge } from "@/ui/Card";
 import { Screen } from "@/ui/Screen";
 import { SearchField } from "@/ui/SearchField";
@@ -20,30 +21,42 @@ import type { RootStackParamList } from "@/navigation/types";
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type Tab = "mine" | "started" | "branch";
 
+/** The web `FMSTasksPage` still grants the Branch view by role. */
 const MANAGER_ROLES = new Set(["super_admin", "admin", "manager"]);
 const LIVE_STAGE_STATUSES = new Set(["pending", "in_progress", "in_review", "overdue"]);
 
+export type FmsTasksScreenProps = Readonly<{
+  /** Scope the list to one workflow family, as the web card's Tasks button does. */
+  flowIds?: readonly string[];
+  heading?: string;
+  onBack?: () => void;
+}>;
+
 /**
- * The live workflows a person is part of. Each card answers the one question a
- * phone user has — what is waiting on me, and how far along is this — and opens
- * the instance where the actual stage work happens.
+ * Live workflow instances — the web `FMSTasksPage`. Reached from a workflow
+ * card in the FMS console; each card opens the instance where the stage work
+ * happens.
  */
-export function FmsTasksScreen() {
+export function FmsTasksScreen({ flowIds, heading, onBack }: FmsTasksScreenProps) {
   const theme = useAppTheme();
   const styles = useStyles();
   const profile = useProfile();
   const navigation = useNavigation<Navigation>();
   const [tab, setTab] = useState<Tab>("mine");
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("active");
+  const [status, setStatus] = useState("all");
 
   const canManage = MANAGER_ROLES.has(profile.user_role);
   const { data, error, loading, refreshing, reload, refresh } = useAsyncData(loadFmsRuntime, []);
 
+  const scopedInstances = useMemo(
+    () => (data?.instances ?? []).filter((instance) => !flowIds || flowIds.includes(instance.fms_flow_id)),
+    [data, flowIds],
+  );
   const instances = useMemo(
     () =>
       filterFmsInstances({
-        instances: data?.instances ?? [],
+        instances: scopedInstances,
         stages: data?.stages ?? [],
         profileId: profile.id,
         tab,
@@ -52,7 +65,7 @@ export function FmsTasksScreen() {
         priority: "all",
         overdueOnly: false,
       }),
-    [data, profile.id, query, status, tab],
+    [data, profile.id, query, scopedInstances, status, tab],
   );
 
   const describe = useCallback(
@@ -79,30 +92,35 @@ export function FmsTasksScreen() {
   return (
     <Screen padded={false}>
       <View style={styles.controls}>
+        {onBack ? <Button label="Back to FMS" onPress={onBack} variant="ghost" /> : null}
+        <Text variant="title" weight="semibold">{heading ?? "Live instances"}</Text>
+        <Text tone="muted" variant="caption">Processes assigned to you, started by you, or visible to your branch.</Text>
+        <SegmentedControl
+          accessibilityLabel="Workflow view"
+          onChange={setTab}
+          options={[
+            { value: "mine", label: "My Stages" },
+            { value: "started", label: "Started by Me" },
+            ...(canManage ? ([{ value: "branch", label: "Branch View" }] as const) : []),
+          ]}
+          value={tab}
+        />
         <SearchField
-          accessibilityLabel="Search workflows"
+          accessibilityLabel="Search FMS instances"
           onChangeText={setQuery}
           placeholder="Search reference or title"
           value={query}
         />
         <SegmentedControl
-          accessibilityLabel="Workflow view"
-          onChange={setTab}
-          options={[
-            { value: "mine", label: "My steps" },
-            { value: "started", label: "Started by me" },
-            ...(canManage ? ([{ value: "branch", label: "Branch" }] as const) : []),
-          ]}
-          value={tab}
-        />
-        <SegmentedControl
-          accessibilityLabel="Workflow status"
+          accessibilityLabel="Status filter"
           onChange={setStatus}
           options={[
+            { value: "all", label: "All statuses" },
             { value: "active", label: "Active" },
             { value: "overdue", label: "Overdue" },
+            { value: "on_hold", label: "On hold" },
             { value: "completed", label: "Completed" },
-            { value: "all", label: "All" },
+            { value: "cancelled", label: "Cancelled" },
           ]}
           value={status}
         />
@@ -114,11 +132,7 @@ export function FmsTasksScreen() {
         keyExtractor={(instance) => instance.id}
         ListEmptyComponent={
           <EmptyState
-            message={
-              tab === "mine"
-                ? "No workflow steps are assigned to you right now."
-                : "Nothing matches this view."
-            }
+            message={tab === "mine" ? "No workflow steps are assigned to you right now." : "Nothing matches this view."}
             title="No FMS tasks"
           />
         }
@@ -139,15 +153,9 @@ export function FmsTasksScreen() {
               accessibilityHint="Opens the workflow and its steps"
               onPress={() => navigation.navigate("FmsInstance", { instanceId: item.id })}
             >
-              <Text tone="primary" variant="caption">
-                {item.reference_number}
-              </Text>
-              <Text numberOfLines={2} variant="body" weight="semibold">
-                {item.title}
-              </Text>
-              <Text tone="muted" variant="caption">
-                Current: {current.join(", ") || "Closed"}
-              </Text>
+              <Text tone="primary" variant="caption">{item.reference_number}</Text>
+              <Text numberOfLines={2} variant="body" weight="semibold">{item.title}</Text>
+              <Text tone="muted" variant="caption">Current: {current.join(", ") || "Closed"}</Text>
               <View
                 accessibilityLabel={`${progress.percent} percent complete`}
                 accessibilityRole="progressbar"

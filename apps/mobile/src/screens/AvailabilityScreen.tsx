@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { RefreshControl, StyleSheet, View } from "react-native";
 import { CalendarCheck, Users } from "lucide-react-native";
-import { normalizeAvailabilityRange, type Enums } from "@jewelos/core";
+import { hasPermission, normalizeAvailabilityRange, type Enums } from "@jewelos/core";
 import {
   loadAvailabilityDepartments,
   loadAvailabilityForDate,
@@ -10,7 +10,7 @@ import {
   type AvailabilityEntry,
   type TaskUser,
 } from "@jewelos/data/tasks/api";
-import { useProfile } from "@/auth/AuthProvider";
+import { useAccess, useProfile } from "@/auth/AuthProvider";
 import { DateField } from "@/forms/DateField";
 import { initials, titleCase } from "@/lib/format";
 import { errorText } from "@/lib/log";
@@ -59,7 +59,8 @@ export function AvailabilityScreen() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [coverage, setCoverage] = useState<CoverageSummary | null>(null);
-  const canLogOthers = ["super_admin", "admin", "manager", "hr"].includes(profile.user_role);
+  const access = useAccess();
+  const canLogOthers = hasPermission(access, "availability.manage_others");
   const { data, error, loading, refreshing, refresh, reload } = useAsyncData<Board>(async () => {
     const [allUsers, entries, departments] = await Promise.all([
       loadAvailabilityUsers(), loadAvailabilityForDate(startDate), loadAvailabilityDepartments(),

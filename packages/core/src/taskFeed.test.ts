@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countTaskFeedStatuses, effectiveTaskDeadline, groupTaskFeedRows, isTaskFeedItemInCurrentDayOrOverdue, splitAssignedTaskFeed, taskMatchesStatus } from "./taskFeed";
+import { countTaskFeedStatuses, effectiveTaskDeadline, groupTaskFeedRows, isTaskFeedItemInCurrentDayOrOverdue, splitAssignedTaskFeed, taskFeedCurrentOrOverdueFilter, taskMatchesStatus } from "./taskFeed";
 
 const now = "2026-08-07T12:00:00.000Z";
 
@@ -43,6 +43,21 @@ describe("task feed presentation", () => {
     expect(isTaskFeedItemInCurrentDayOrOverdue(task("today", "user-1", "pending", "2026-08-07T12:00:00.000Z"), start, end, now)).toBe(true);
     expect(isTaskFeedItemInCurrentDayOrOverdue(task("tomorrow", "user-1", "pending", "2026-08-08T12:00:00.000Z"), start, end, now)).toBe(false);
     expect(isTaskFeedItemInCurrentDayOrOverdue(task("rejected", "user-1", "rejected", "2026-08-06T12:00:00.000Z"), start, end, now)).toBe(false);
+  });
+
+  it("keeps every open FMS assignment regardless of its date", () => {
+    const start = "2026-08-07T00:00:00.000+05:30";
+    const end = "2026-08-07T23:59:59.999+05:30";
+
+    expect(isTaskFeedItemInCurrentDayOrOverdue({ ...task("future", "user-1", "pending", "2026-08-20T12:00:00.000Z"), task_type: "fms" }, start, end, now)).toBe(true);
+    expect(isTaskFeedItemInCurrentDayOrOverdue({ ...task("undated", "user-1"), planned_datetime: null, task_type: "fms" }, start, end, now)).toBe(true);
+    expect(isTaskFeedItemInCurrentDayOrOverdue({ ...task("done", "user-1", "completed"), task_type: "fms" }, start, end, now)).toBe(false);
+  });
+
+  it("builds one shared database predicate for dated work and all open FMS work", () => {
+    expect(taskFeedCurrentOrOverdueFilter("start", "end")).toBe(
+      "and(effective_due_datetime.gte.start,effective_due_datetime.lte.end),and(effective_due_datetime.lt.start,status.not.in.(completed,rejected,blocked)),and(task_type.eq.fms,status.in.(pending,in_progress,in_review,overdue))",
+    );
   });
 
   it("puts every recurring occurrence in My Tasks and one-time assigned work in Delegated", () => {

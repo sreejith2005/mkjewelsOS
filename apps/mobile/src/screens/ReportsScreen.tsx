@@ -4,7 +4,8 @@ import { FileBarChart, Upload } from "lucide-react-native";
 import { parseReportFilters, reportsForRole, type ReportDefinition, type ReportFilters } from "@jewelos/core";
 import { fetchReportingOptions } from "@jewelos/data/analytics/api";
 import { cancelExport, fetchReport, requestExport, retryExport, signedExportUrl, type ReportCell, type ReportPayload } from "@jewelos/data/reports/api";
-import { useProfile } from "@/auth/AuthProvider";
+import { hasPermission } from "@jewelos/core";
+import { useAccess, useProfile } from "@/auth/AuthProvider";
 import { DateField } from "@/forms/DateField";
 import { formatDateTime, titleCase } from "@/lib/format";
 import { errorText } from "@/lib/log";
@@ -32,6 +33,7 @@ const renderCell = (value: ReportCell): string => {
 
 export function ReportsScreen() {
   const profile = useProfile();
+  const access = useAccess();
   const theme = useAppTheme();
   const styles = useStyles();
   const catalog = useMemo(() => reportsForRole(profile.user_role), [profile.user_role]);
@@ -97,7 +99,7 @@ export function ReportsScreen() {
       {elevated && definition.filters.includes("department_id") ? <OptionPicker label="Department context" onChange={(selected) => changeFilter("department_id", selected[0])} options={[{ value: "", label: "All authorized departments" }, ...departments.map((item) => ({ value: item.id, label: item.name }))]} selected={[filters.department_id ?? ""]} /> : null}
       <View style={styles.fields}><View style={styles.field}><TextField autoCapitalize="none" label="Status" onChangeText={(value) => changeFilter("status", value.toLowerCase().replace(/\s+/g, "_"))} placeholder="All" value={filters.status ?? ""} /></View><View style={styles.field}><Text tone="muted" variant="label">Rows per page</Text><OptionPicker label="Rows per page" onChange={(selected) => changeFilter("page_size", Number(selected[0]))} options={[10, 25, 50, 100].map((size) => ({ value: String(size), label: String(size) }))} selected={[String(filters.page_size)]} /></View></View>
       <Text tone="muted" variant="caption">Maximum date range: {definition.maxDateRangeDays} days.</Text>
-      {definition.exportEligible ? <Button busy={busy === "export"} icon={<Upload color={theme.colors.onPrimary} size={18} />} label="Request CSV export" onPress={() => void exportReport()} /> : null}
+      {definition.exportEligible && hasPermission(access, "reports.export") ? <Button busy={busy === "export"} icon={<Upload color={theme.colors.onPrimary} size={18} />} label="Request CSV export" onPress={() => void exportReport()} /> : null}
     </Card>
     <View style={styles.sectionHeading}><Text variant="title" weight="semibold">{definition.name}</Text><Text tone="muted" variant="small">{preview.total.toLocaleString("en-IN")} authorized row{preview.total === 1 ? "" : "s"}</Text></View>
     {preview.rows.length === 0 ? <Card><Text style={styles.centered} tone="muted">No authorized rows match these filters.</Text></Card> : preview.rows.map((row, index) => <Card key={String(row[definition.columns[0]!.key] ?? index)}>{definition.columns.map((column) => <CardRow key={column.key} label={column.label} value={renderCell(row[column.key] ?? null)} />)}</Card>)}

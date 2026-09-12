@@ -1,5 +1,5 @@
 import { supabase } from "@jewelos/api-client";
-import { groupTaskFeedRows, isTaskFeedItemInCurrentDayOrOverdue, type Database, type Enums, type Json, type Tables } from "@jewelos/core";
+import { groupTaskFeedRows, isTaskFeedItemInCurrentDayOrOverdue, taskFeedCurrentOrOverdueFilter as coreTaskFeedCurrentOrOverdueFilter, type Database, type Enums, type Json, type Tables } from "@jewelos/core";
 import { loadMasterOptions } from "@/features/dropdowns/api";
 
 export type TaskFeedRow = Database["public"]["Views"]["v_all_tasks"]["Row"];
@@ -144,13 +144,7 @@ async function loadTaskFeedPages(loadPage: (from: number, to: number) => Promise
   }
 }
 
-/** PostgREST predicate for current work plus unfinished historical work, using revised → due → planned deadline order. */
-export function taskFeedCurrentOrOverdueFilter(startIso: string, endIso: string): string {
-  return [
-    `and(effective_due_datetime.gte.${startIso},effective_due_datetime.lte.${endIso})`,
-    `and(effective_due_datetime.lt.${startIso},status.not.in.(completed,rejected,blocked))`,
-  ].join(",");
-}
+export const taskFeedCurrentOrOverdueFilter = coreTaskFeedCurrentOrOverdueFilter;
 
 export async function loadTaskFeed(
   viewerId: string,

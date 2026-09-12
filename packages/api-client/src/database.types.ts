@@ -7233,6 +7233,10 @@ export type Database = {
           due_datetime: string | null
           due_time: string | null
           effective_due_datetime: string | null
+          fms_instance_id: string | null
+          fms_instance_stage_id: string | null
+          fms_starter_assignment_id: string | null
+          fms_work_source: string | null
           form_template_id: string | null
           id: string | null
           is_active: boolean | null

@@ -1,10 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
-import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { FlatList, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Bell, CheckCheck } from "lucide-react-native";
-import { filterNotificationInbox, notificationDestination } from "@jewelos/core";
-import { loadInbox, markAllNotifications, markNotification, subscribeToInbox } from "@jewelos/data/notifications/api";
-import type { InboxNotification } from "@jewelos/data/notifications/types";
-import { useProfile } from "@/auth/AuthProvider";
+import { filterNotificationInbox, hasPermission, notificationDestination } from "@jewelos/core";
+import {
+  loadActiveRecipientProfiles,
+  loadInbox,
+  loadProviders,
+  loadRules,
+  loadTemplates,
+  markAllNotifications,
+  markNotification,
+  subscribeToInbox,
+} from "@jewelos/data/notifications/api";
+import type {
+  InboxNotification,
+  NotificationRuleRow,
+  NotificationTemplateRow,
+  ProviderAvailability,
+} from "@jewelos/data/notifications/types";
+import { useAccess, useProfile } from "@/auth/AuthProvider";
+import { DeliveryLogs, ProviderStatus, RuleManager, TemplateManager } from "@/features/notifications/NotificationAdmin";
 import { formatDateTime, titleCase } from "@/lib/format";
 import { errorText } from "@/lib/log";
 import { useAsyncData } from "@/lib/useAsyncData";
@@ -18,10 +33,24 @@ import { SegmentedControl } from "@/ui/SegmentedControl";
 import { ErrorState, LoadingState, Banner } from "@/ui/states";
 import { Text } from "@/ui/Text";
 
+type Tab = "inbox" | "templates" | "rules" | "logs";
+type Profiles = Array<{ id: string; employee_name: string; user_role: string }>;
+
+const TABS: ReadonlyArray<{ value: Tab; label: string; admin?: boolean }> = [
+  { value: "inbox", label: "Inbox" },
+  { value: "templates", label: "Templates", admin: true },
+  { value: "rules", label: "Rules", admin: true },
+  { value: "logs", label: "Delivery logs", admin: true },
+];
+
+/** The web `NotificationsPage`: the inbox for everyone, administration for `notifications.manage`. */
 export function NotificationsScreen({ onNavigate }: { onNavigate: (path: string) => void }) {
   const profile = useProfile();
+  const access = useAccess();
   const theme = useAppTheme();
   const styles = useStyles();
+  const isAdmin = hasPermission(access, "notifications.manage");
+  const [tab, setTab] = useState<Tab>("inbox");
   const [search, setSearch] = useState("");
   const [eventType, setEventType] = useState("");
   const [priority, setPriority] = useState("");
@@ -29,12 +58,34 @@ export function NotificationsScreen({ onNavigate }: { onNavigate: (path: string)
   const [visible, setVisible] = useState(25);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<NotificationTemplateRow[]>([]);
+  const [rules, setRules] = useState<NotificationRuleRow[]>([]);
+  const [providers, setProviders] = useState<ProviderAvailability[]>([]);
+  const [profiles, setProfiles] = useState<Profiles>([]);
+  const [adminError, setAdminError] = useState<string | null>(null);
   const { data, error, loading, refreshing, refresh, reload } = useAsyncData(
     () => loadInbox(profile.id),
     [profile.id],
   );
 
+  const refreshAdmin = useCallback(async () => {
+    if (!isAdmin) return;
+    setAdminError(null);
+    try {
+      const [nextTemplates, nextRules, nextProviders, nextProfiles] = await Promise.all([loadTemplates(), loadRules(), loadProviders(), loadActiveRecipientProfiles()]);
+      setTemplates(nextTemplates);
+      setRules(nextRules);
+      setProviders(nextProviders);
+      setProfiles(nextProfiles);
+    } catch (caught) {
+      setAdminError(errorText(caught));
+    }
+  }, [isAdmin]);
+
   useEffect(() => subscribeToInbox(profile.id, () => { void refresh(); }), [profile.id, refresh]);
+  // Providers show in the header for administrators on every tab, as on web.
+  useEffect(() => { if (isAdmin) void refreshAdmin(); }, [isAdmin, refreshAdmin, tab]);
+
   const items = data ?? [];
   const eventTypes = useMemo(() => [...new Set(items.map((item) => item.event_type))].sort(), [items]);
   const filtered = useMemo(() => filterNotificationInbox(items, {
@@ -68,7 +119,35 @@ export function NotificationsScreen({ onNavigate }: { onNavigate: (path: string)
   };
 
   if (loading) return <LoadingState label="Loading notifications…" />;
-  if (error) return <ErrorState message={error} onRetry={() => void reload()} title="Could not load notifications" />;
+  if (error && !data) return <ErrorState message={error} onRetry={() => void reload()} title="Could not load notifications" />;
+
+  const header = (
+    <View style={styles.header}>
+      <View style={styles.titleRow}>
+        <Bell color={theme.colors.primary} size={22} />
+        <View style={styles.titleCopy}>
+          <Text variant="heading" weight="bold">Notifications</Text>
+          <Text tone="muted" variant="small">Inbox, reviewed rules, safe templates, and privacy-safe delivery history.</Text>
+        </View>
+      </View>
+      <Button label="Refresh" onPress={() => { void refresh(); void refreshAdmin(); }} variant="secondary" />
+      {isAdmin ? <ProviderStatus providers={providers} /> : null}
+      {adminError ? <Banner tone="danger">{`Notification administration: ${adminError}`}</Banner> : null}
+      <SegmentedControl accessibilityLabel="Notification sections" onChange={setTab} options={TABS.filter((item) => !item.admin || isAdmin)} value={tab} />
+    </View>
+  );
+
+  if (tab !== "inbox") {
+    return (
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {header}
+        {!isAdmin ? <Banner tone="danger">Only administrators can manage notification rules, templates, providers, and delivery logs.</Banner>
+          : tab === "templates" ? <TemplateManager onRefresh={refreshAdmin} providers={providers} templates={templates} />
+            : tab === "rules" ? <RuleManager onRefresh={refreshAdmin} profiles={profiles} providers={providers} rules={rules} templates={templates} />
+              : <DeliveryLogs />}
+      </ScrollView>
+    );
+  }
 
   return (
     <FlatList
@@ -79,7 +158,8 @@ export function NotificationsScreen({ onNavigate }: { onNavigate: (path: string)
       ListFooterComponent={visible < filtered.length ? <Button label="Load more" onPress={() => setVisible((value) => value + 25)} variant="secondary" /> : null}
       ListHeaderComponent={
         <View style={styles.header}>
-          <View style={styles.titleRow}><Bell color={theme.colors.primary} size={22} /><View style={styles.titleCopy}><Text variant="heading" weight="bold">Notifications</Text><Text tone="muted" variant="small">Inbox alerts for tasks, forms, workflows, and account activity.</Text></View></View>
+          {header}
+          {error ? <Banner tone="danger">{error}</Banner> : null}
           <SearchField accessibilityLabel="Search notifications" onChangeText={setSearch} placeholder="Search title or message" value={search} />
           <SegmentedControl accessibilityLabel="Notification read filter" onChange={setMode} options={[{ value: "all", label: "All messages" }, { value: "unread", label: "Unread only" }]} value={mode} />
           <View style={styles.filters}>

@@ -1,5 +1,7 @@
 packages:
-  - "apps/*"
+  # Keep mobile on its own hoisted npm install. React Native's native object
+  # paths exceed Windows limits under pnpm's isolated .pnpm layout.
+  - "apps/web"
   - "packages/*"
 
 nodeLinker: isolated
@@ -10,8 +12,6 @@ strictPeerDependencies: true
 overrides:
   "web>react": "18.3.1"
   "web>react-dom": "18.3.1"
-  "mobile>react": "19.2.3"
-  "mobile>react-dom": "19.2.3"
 
 minimumReleaseAgeExclude:
   - '@supabase/auth-js@2.112.1'
