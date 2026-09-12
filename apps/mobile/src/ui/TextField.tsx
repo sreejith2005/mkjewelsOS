@@ -2,6 +2,7 @@ import { forwardRef, useState } from "react";
 import { Pressable, StyleSheet, TextInput, View, type TextInputProps } from "react-native";
 import { makeStyles } from "@/theme/makeStyles";
 import { useAppTheme } from "@/theme/ThemeProvider";
+import { requiredMark } from "@/ui/requiredMark";
 import { Text } from "@/ui/Text";
 
 export type TextFieldProps = Omit<TextInputProps, "style"> &
@@ -32,7 +33,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
     <View style={styles.group}>
       <Text tone="warm" variant="label" weight="medium">
         {label}
-        {required ? " *" : ""}
+        {requiredMark(label, required)}
       </Text>
       {helperText ? (
         <Text tone="muted" variant="caption">

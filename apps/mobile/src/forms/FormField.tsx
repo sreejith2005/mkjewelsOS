@@ -9,6 +9,7 @@ import { DateField } from "@/forms/DateField";
 import { RatingField } from "@/forms/RatingField";
 import { ToggleField } from "@/forms/ToggleField";
 import { FileField } from "@/forms/FileField";
+import { requiredMark } from "@/ui/requiredMark";
 
 export type FormFieldProps = Readonly<{
   field: FormFieldDefinition;
@@ -205,7 +206,7 @@ function Labelled({
     <View style={styles.group}>
       <Text tone="warm" variant="label" weight="medium">
         {field.label}
-        {field.required ? " *" : ""}
+        {requiredMark(field.label, Boolean(field.required))}
       </Text>
       {field.helperText ? (
         <Text tone="muted" variant="caption">

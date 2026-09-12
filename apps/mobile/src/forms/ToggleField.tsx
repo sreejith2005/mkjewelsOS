@@ -1,5 +1,7 @@
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Pressable } from "@/ui/Pressable";
 import { makeStyles } from "@/theme/makeStyles";
+import { requiredMark } from "@/ui/requiredMark";
 import { Text } from "@/ui/Text";
 
 export type ToggleFieldProps = Readonly<{
@@ -36,7 +38,7 @@ export function ToggleField({ label, value, disabled, required, helperText, onCh
       <View style={styles.labels}>
         <Text variant="body">
           {label}
-          {required ? " *" : ""}
+          {requiredMark(label, required)}
         </Text>
         {helperText ? (
           <Text tone="muted" variant="caption">

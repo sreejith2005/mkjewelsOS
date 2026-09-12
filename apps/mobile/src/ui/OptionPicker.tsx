@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { FlatList, Pressable, StyleSheet, View } from "react-native";
+import { FlatList, StyleSheet, View } from "react-native";
+import { Pressable } from "@/ui/Pressable";
 import { makeStyles } from "@/theme/makeStyles";
 import { SearchField } from "@/ui/SearchField";
 import { Sheet } from "@/ui/Sheet";
@@ -90,7 +91,7 @@ export function OptionPicker({
         </Text>
       </Pressable>
 
-      <Sheet onClose={() => setOpen(false)} tall={options.length > SEARCH_THRESHOLD} title={label} visible={open}>
+      <Sheet onClose={() => setOpen(false)} scrollable={false} tall={options.length > SEARCH_THRESHOLD} title={label} visible={open}>
         {options.length > SEARCH_THRESHOLD ? (
           <SearchField
             accessibilityLabel={`Filter ${label}`}
