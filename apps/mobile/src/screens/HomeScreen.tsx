@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -10,10 +10,14 @@ import { formatDateTime, greetingFor, titleCase } from "@/lib/format";
 import { makeStyles } from "@/theme/makeStyles";
 import { useAppTheme } from "@/theme/ThemeProvider";
 import { Card, StatusBadge } from "@/ui/Card";
+// Trap 1: NativeWind drops a function-form `style` on react-native's Pressable.
+import { Pressable } from "@/ui/Pressable";
 import { Screen } from "@/ui/Screen";
 import { Text } from "@/ui/Text";
 import { EmptyState, ErrorState, LoadingState } from "@/ui/states";
 import type { RootStackParamList } from "@/navigation/types";
+import { fmsAssignedWorkRoute, navigateFmsAssignedWork } from "@/features/fms/assignedWorkNavigation";
+import type { HomeFms } from "@jewelos/data/analytics/types";
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 
@@ -30,8 +34,21 @@ export function HomeScreen() {
   const navigation = useNavigation<Navigation>();
   const { data, error, loading, refreshing, reload, refresh } = useAsyncData(fetchHomeSummary, []);
 
-  const openStage = useCallback(
-    (instanceId: string) => navigation.navigate("FmsInstance", { instanceId }),
+  /** Home opens the same exact surface the web Home does, via the shared union. */
+  const openAssignedStage = useCallback(
+    (stage: HomeFms) => {
+      const route = fmsAssignedWorkRoute(
+        stage.form_template_id
+          ? {
+              kind: "stage_form",
+              instanceId: stage.instance_id,
+              instanceStageId: stage.stage_id,
+              formTemplateId: stage.form_template_id,
+            }
+          : { kind: "stage", instanceId: stage.instance_id, instanceStageId: stage.stage_id },
+      );
+      navigateFmsAssignedWork(navigation, route);
+    },
     [navigation],
   );
 
@@ -150,7 +167,7 @@ export function HomeScreen() {
                 accent={stage.sla_breached ? "danger" : "warning"}
                 accessibilityHint="Opens the workflow"
                 key={stage.stage_id}
-                onPress={() => openStage(stage.instance_id)}
+                onPress={() => openAssignedStage(stage)}
               >
                 <Text variant="body" weight="semibold">
                   {stage.instance_title}
@@ -200,14 +217,40 @@ export function HomeScreen() {
   );
 }
 
+/**
+ * A collapsible block on the home screen.
+ *
+ * Open by default, and the state lives here rather than in storage, so it
+ * lasts for the session and the screen always opens showing the work. The
+ * body is hidden, never unmounted: collapsing a section must not throw away
+ * what it has already loaded, or expanding it again would cost a fetch.
+ *
+ * Presentation only — web has no equivalent control — so the titles and
+ * everything inside are untouched.
+ */
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   const styles = useStyles();
+  const [expanded, setExpanded] = useState(true);
   return (
     <View style={styles.section}>
-      <Text tone="warm" variant="subtitle" weight="semibold">
-        {title}
-      </Text>
-      {children}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        accessibilityLabel={title}
+        hitSlop={8}
+        onPress={() => setExpanded((open) => !open)}
+        style={({ pressed }) => [styles.sectionHeader, pressed && styles.sectionHeaderPressed]}
+      >
+        <Text style={styles.sectionTitle} tone="warm" variant="subtitle" weight="semibold">
+          {title}
+        </Text>
+        <Text tone="muted" variant="subtitle">
+          {expanded ? "⌃" : "⌄"}
+        </Text>
+      </Pressable>
+      <View style={[styles.sectionBody, !expanded && styles.sectionBodyHidden]}>
+        {children}
+      </View>
     </View>
   );
 }
@@ -239,4 +282,17 @@ const useStyles = makeStyles((theme) => StyleSheet.create({
   stats: { flexDirection: "row", marginTop: theme.space.xs },
   stat: { flex: 1, alignItems: "center", gap: 2 },
   section: { gap: theme.space.sm, marginTop: theme.space.sm },
+  // A full-width row at the minimum comfortable touch target, so the whole
+  // header is the control rather than just the words.
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.space.sm,
+    minHeight: theme.touchTarget,
+  },
+  sectionHeaderPressed: { opacity: 0.7 },
+  sectionTitle: { flex: 1, minWidth: 0 },
+  sectionBody: { gap: theme.space.sm },
+  sectionBodyHidden: { display: "none" },
 }));
