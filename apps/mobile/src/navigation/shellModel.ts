@@ -1,11 +1,18 @@
 import {
-  canAccessPage,
+  getAccessibleMenu,
   getLauncherMenuForRole,
   getPageForPath,
+  resolvePageAccess,
+  type AccessContext,
+  type MenuItem,
+  type PageAccessDecision,
   type PageId,
-  type UserRole,
+  type SectionControls,
 } from "@jewelos/core";
 import type { ThemeName } from "@jewelos/ui-tokens";
+
+/** The two high-frequency destinations retained in compact bottom navigation. */
+export const COMPACT_DOCK_PATHS = ["/", "/tasks"] as const;
 
 export type NativeTopLevelRoute = "Home" | "Tasks" | "Fms" | "Crm";
 
@@ -26,25 +33,40 @@ export type NativeNavigationHandlers = Readonly<{
   setPath: (path: string) => void;
 }>;
 
+/** Everything the shell's one access decision needs, as on web. */
+export type ShellAccess = Readonly<{ access: AccessContext; controls: SectionControls }>;
+
 const ROUTE_PATH: Readonly<Record<NativeTopLevelRoute, string>> = {
   Home: "/",
   Tasks: "/tasks",
-  Fms: "/tasks/fms",
+  Fms: "/fms",
   Crm: "/crm",
 };
 
+/**
+ * The unified FMS section (`fms_builder`) is its own tab. `fms_tasks` — what
+ * `@jewelos/core` still resolves `/tasks/fms` form deep links to — lands on the
+ * same tab, because that section absorbed the old workflow-task page.
+ */
 const PAGE_ROUTE: Partial<Readonly<Record<PageId, NativeTopLevelRoute>>> = {
   home: "Home",
   checklist_tasks: "Tasks",
+  fms_builder: "Fms",
   fms_tasks: "Fms",
   crm: "Crm",
+};
+
+const ROUTE_PAGE: Readonly<Record<NativeTopLevelRoute, PageId>> = {
+  Home: "home",
+  Tasks: "checklist_tasks",
+  Fms: "fms_builder",
+  Crm: "crm",
 };
 
 const TASK_PATHS = new Set([
   "/tasks",
   "/tasks/checklist",
   "/tasks/delegation",
-  "/tasks/fms",
   "/tasks/import",
   "/tasks/assigning-left",
 ]);
@@ -57,6 +79,10 @@ export function pathForTopLevelRoute(route: NativeTopLevelRoute): string {
   return ROUTE_PATH[route];
 }
 
+export function pageForTopLevelRoute(route: NativeTopLevelRoute): PageId {
+  return ROUTE_PAGE[route];
+}
+
 export function resolveNativeDestination(path: string): NativeDestination | null {
   const page = getPageForPath(path);
   if (!page) return null;
@@ -64,24 +90,21 @@ export function resolveNativeDestination(path: string): NativeDestination | null
   return route ? { kind: "tab", route } : { kind: "section", page };
 }
 
+/**
+ * The same decision the web shell makes: feature availability first, then the
+ * user's permission. A disabled section still opens — onto its maintenance
+ * notice — exactly as the web route does; only a denied one is refused.
+ */
+export function pageDecision(shell: ShellAccess, page: PageId): PageAccessDecision {
+  return resolvePageAccess(shell.access, shell.controls, page);
+}
+
 /** Execute a web-path navigation request against the native tab shell. */
-export function navigatePath(
-  path: string,
-  role: UserRole,
-  handlers: NativeNavigationHandlers,
-): boolean {
+export function navigatePath(path: string, shell: ShellAccess, handlers: NativeNavigationHandlers): boolean {
   const destination = resolveNativeDestination(path);
   if (!destination) return false;
-  const page: PageId = destination.kind === "section"
-    ? destination.page
-    : destination.route === "Home"
-      ? "home"
-      : destination.route === "Tasks"
-        ? "checklist_tasks"
-        : destination.route === "Fms"
-          ? "fms_tasks"
-          : "crm";
-  if (!canAccessPage(role, page)) return false;
+  const page = destination.kind === "section" ? destination.page : ROUTE_PAGE[destination.route];
+  if (pageDecision(shell, page) === "denied") return false;
 
   handlers.setPath(path);
   if (destination.kind === "tab") handlers.navigateTab(destination.route);
@@ -89,8 +112,19 @@ export function navigatePath(
   return true;
 }
 
-export function buildLauncherItems(role: UserRole): readonly ShellLauncherItem[] {
-  return getLauncherMenuForRole(role);
+/** Sections this user may open right now, in menu order. */
+export function accessibleMenu(shell: ShellAccess): readonly MenuItem[] {
+  return getAccessibleMenu(shell.access, shell.controls);
+}
+
+/**
+ * The Super Admin launcher lists every implemented section with its
+ * description; keep only the ones this user can open. This is the web
+ * shell's launcher rule verbatim.
+ */
+export function buildLauncherItems(shell: ShellAccess): readonly ShellLauncherItem[] {
+  const accessible = new Set(accessibleMenu(shell).map((item) => item.id));
+  return getLauncherMenuForRole("super_admin").filter((item) => accessible.has(item.id));
 }
 
 export function themeToggleLabel(name: ThemeName): string {

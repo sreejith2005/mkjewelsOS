@@ -5,9 +5,8 @@ import { Button } from "@/components/ui";
 import { initials, titleCase } from "@/lib/format";
 import type { Branch, UserProfile } from "@/types";
 import { cn } from "@/lib/utils";
-import { AppLauncher, type LauncherItem } from "./AppLauncher";
+import { MobileNavigationDrawer, type MobileNavigationDrawerItem } from "./MobileNavigationDrawer";
 import { MobileBottomNav } from "./MobileBottomNav";
-import { MoreSheet } from "./MoreSheet";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
 import { ThemeToggle, type Theme } from "@/components/ThemeToggle";
 
@@ -30,22 +29,20 @@ export function getSidebarNavigation(nav: readonly ShellNavItem[]): Readonly<{ p
 }
 
 export function ApplicationShell({
-  appsOpen,
   branch,
   children,
   currentPage,
   developerModeActive = false,
   developerModeControl,
   developerSectionControls,
+  drawerOpen,
   launcherItems,
   logoDarkUrl,
   logoLightUrl,
-  moreOpen,
   nav,
   navigate,
-  onAppsOpenChange,
+  onDrawerOpenChange,
   onLogout,
-  onMoreOpenChange,
   path,
   profile,
   sidebarOpen,
@@ -54,22 +51,20 @@ export function ApplicationShell({
   onThemeChange,
   fullBleed = false,
 }: {
-  appsOpen: boolean;
   branch: Branch | null;
   children: ReactNode;
   currentPage: PageId;
   developerModeActive?: boolean;
   developerModeControl?: ReactNode;
   developerSectionControls?: ReactNode;
-  launcherItems: readonly LauncherItem[];
+  drawerOpen: boolean;
+  launcherItems: readonly MobileNavigationDrawerItem[];
   logoDarkUrl: string;
   logoLightUrl: string;
-  moreOpen: boolean;
   nav: readonly ShellNavItem[];
   navigate: (path: string) => void;
-  onAppsOpenChange: (open: boolean) => void;
+  onDrawerOpenChange: (open: boolean) => void;
   onLogout: () => Promise<void>;
-  onMoreOpenChange: (open: boolean) => void;
   path: string;
   profile: UserProfile;
   sidebarOpen: boolean;
@@ -87,6 +82,9 @@ export function ApplicationShell({
         <Button aria-label="Toggle sidebar" className="mr-3 hidden size-10 p-0 md:inline-flex" onClick={() => setSidebarOpen(!sidebarOpen)} variant="ghost">
           {sidebarOpen ? <PanelLeftClose /> : <Menu />}
         </Button>
+        <Button aria-label="Open navigation" className="mr-2 size-10 p-0 md:hidden" onClick={() => onDrawerOpenChange(true)} variant="ghost">
+          <Menu />
+        </Button>
         <img alt="MK Jewels" className="h-7 w-28 object-contain object-left md:hidden" src={logoLightUrl} />
         <img alt="MK Jewels" className="hidden h-8 w-auto md:block" src={logoDarkUrl} />
         <div className="ml-auto flex items-center gap-2 md:gap-3">
@@ -94,14 +92,9 @@ export function ApplicationShell({
           {developerModeControl}
           <ThemeToggle onChange={onThemeChange} theme={theme} />
           <NotificationBell onNavigate={navigate} profileId={profile.id} />
-          <button
-            aria-label="Open more navigation"
-            className="flex size-10 items-center justify-center rounded-full bg-task-accent-soft text-sm font-bold text-task-text md:rounded-lg md:border md:border-gold/20 md:bg-obsidian md:text-gold"
-            onClick={() => onMoreOpenChange(true)}
-            type="button"
-          >
+          <span aria-label={profile.employee_name} className="flex size-10 items-center justify-center rounded-full bg-task-accent-soft text-sm font-bold text-task-text md:rounded-lg md:border md:border-gold/20 md:bg-obsidian md:text-gold" role="img">
             {initials(profile.employee_name)}
-          </button>
+          </span>
           <div className="hidden sm:block">
             <p className="max-w-36 truncate text-xs font-semibold text-white">{profile.employee_name}</p>
             <p className="text-[10px] uppercase tracking-wider text-gold">{titleCase(profile.user_role)}</p>
@@ -142,9 +135,8 @@ export function ApplicationShell({
         <div className={cn(fullBleed ? "w-full p-4 sm:p-6 [&>section]:max-w-none [&>section]:mx-0" : "mx-auto max-w-7xl p-4 sm:p-6")}>{children}</div>
       </main>
 
-      <MobileBottomNav onNavigate={navigate} onOpenApps={() => onAppsOpenChange(true)} onOpenMore={() => onMoreOpenChange(true)} path={path} />
-      {appsOpen ? <AppLauncher items={launcherItems} onClose={() => onAppsOpenChange(false)} onNavigate={navigate} /> : null}
-      {moreOpen ? <MoreSheet branchName={branch?.name ?? "Branch unavailable"} items={launcherItems} onClose={() => onMoreOpenChange(false)} onLogout={onLogout} onNavigate={navigate} profileName={profile.employee_name} roleLabel={titleCase(profile.user_role)} /> : null}
+      <MobileBottomNav onNavigate={navigate} path={path} />
+      {drawerOpen ? <MobileNavigationDrawer branchName={branch?.name ?? "Branch unavailable"} currentPath={path} items={launcherItems} onClose={() => onDrawerOpenChange(false)} onLogout={onLogout} onNavigate={navigate} profileName={profile.employee_name} roleLabel={titleCase(profile.user_role)} /> : null}
     </div>
   );
 }

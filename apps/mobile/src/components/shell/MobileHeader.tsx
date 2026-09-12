@@ -1,5 +1,5 @@
 import { Image, Pressable, Text, View } from "react-native";
-import { Bell } from "lucide-react-native";
+import { Bell, Menu } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { initials } from "@/lib/format";
 import { useTheme } from "@/theme/ThemeProvider";
@@ -10,12 +10,12 @@ const logoDark = require("../../../assets/logo-dark.jpeg") as number;
 
 type MobileHeaderProps = Readonly<{
   onNavigate: (path: string) => void;
-  onOpenMore: () => void;
+  onOpenNavigation: () => void;
   profileName: string;
 }>;
 
 /** The 56dp phone branch of the approved web ApplicationShell header. */
-export function MobileHeader({ onNavigate, onOpenMore, profileName }: MobileHeaderProps) {
+export function MobileHeader({ onNavigate, onOpenNavigation, profileName }: MobileHeaderProps) {
   const insets = useSafeAreaInsets();
   const { name } = useTheme();
 
@@ -25,6 +25,15 @@ export function MobileHeader({ onNavigate, onOpenMore, profileName }: MobileHead
       style={{ paddingTop: insets.top }}
     >
       <View className="h-14 flex-row items-center">
+        <Pressable
+          accessibilityLabel="Open navigation"
+          accessibilityRole="button"
+          className="mr-2 size-10 items-center justify-center rounded-lg active:bg-task-muted"
+          hitSlop={4}
+          onPress={onOpenNavigation}
+        >
+          <Menu className="text-task-text-muted" size={20} />
+        </Pressable>
         <Image
           accessibilityLabel="MK Jewels"
           className="h-7 w-28"
@@ -43,15 +52,9 @@ export function MobileHeader({ onNavigate, onOpenMore, profileName }: MobileHead
           >
             <Bell className="text-task-text-muted" size={19} />
           </Pressable>
-          <Pressable
-            accessibilityLabel="Open more navigation"
-            accessibilityRole="button"
-            className="size-10 items-center justify-center rounded-full bg-task-accent-soft"
-            hitSlop={4}
-            onPress={onOpenMore}
-          >
+          <View accessibilityLabel={profileName} accessibilityRole="image" className="size-10 items-center justify-center rounded-full bg-task-accent-soft">
             <Text className="text-sm font-bold text-task-text">{initials(profileName)}</Text>
-          </Pressable>
+          </View>
         </View>
       </View>
     </View>

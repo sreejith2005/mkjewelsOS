@@ -39,7 +39,7 @@ import { useIsMobile } from "@/lib/useMediaQuery";
 import { SectionMaintenanceNotice } from "@/components/SectionMaintenanceNotice";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { saveSectionControls } from "@/features/settings/api";
-import type { LauncherItem } from "@/components/shell/AppLauncher";
+import type { MobileNavigationDrawerItem } from "@/components/shell/MobileNavigationDrawer";
 import logoDarkUrl from "../../../mk-jewels-logos/WhatsApp Image 2026-06-24 at 13.01.41 (1).jpeg";
 import logoLightUrl from "../../../mk-jewels-logos/WhatsApp Image 2026-06-24 at 13.01.40 (1).jpeg";
 import { Toaster, toast } from "sonner";
@@ -229,8 +229,7 @@ function AppShell() {
   const { theme, setTheme } = useTheme();
   const { navigate, path } = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [appsOpen, setAppsOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [sectionControls, setSectionControls] = useState(DEFAULT_SECTION_CONTROLS);
   const [savingSectionControls, setSavingSectionControls] = useState(false);
   const refreshSectionControls = useCallback(async () => {
@@ -260,7 +259,7 @@ function AppShell() {
     Icon: PAGE_ICONS[item.id],
     label: item.label,
   })), [menu]);
-  const launcherItems = useMemo<LauncherItem[]>(() => {
+  const launcherItems = useMemo<MobileNavigationDrawerItem[]>(() => {
     const accessible = new Set(menu.map((item) => item.id));
     // The Super Admin launcher lists every implemented section with its
     // description; keep only the ones this user can open.
@@ -312,7 +311,6 @@ function AppShell() {
   return (
     <>
     <ApplicationShell
-      appsOpen={appsOpen}
       branch={branch}
       currentPage={currentPage}
       developerModeActive={isSuperAdmin && sectionControls.developer_mode_enabled}
@@ -321,12 +319,11 @@ function AppShell() {
       launcherItems={launcherItems}
       logoDarkUrl={logoDarkUrl}
       logoLightUrl={logoLightUrl}
-      moreOpen={moreOpen}
+      drawerOpen={drawerOpen}
       nav={nav}
       navigate={navigate}
-      onAppsOpenChange={setAppsOpen}
+      onDrawerOpenChange={setDrawerOpen}
       onLogout={logout}
-      onMoreOpenChange={setMoreOpen}
       path={path}
       profile={profile}
       setSidebarOpen={setSidebarOpen}

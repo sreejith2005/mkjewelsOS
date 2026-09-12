@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CheckCircle2, Home, Menu, PanelsTopLeft } from "lucide-react-native";
+import { CheckCircle2, Home } from "lucide-react-native";
 import { cn } from "@/lib/utils";
 import { isTaskPath } from "@/navigation/shellModel";
 
@@ -21,12 +21,10 @@ import { isTaskPath } from "@/navigation/shellModel";
  */
 type MobileBottomNavProps = {
   onNavigate: (path: string) => void;
-  onOpenApps: () => void;
-  onOpenMore: () => void;
   path: string;
 };
 
-export function MobileBottomNav({ onNavigate, onOpenApps, onOpenMore, path }: MobileBottomNavProps) {
+export function MobileBottomNav({ onNavigate, path }: MobileBottomNavProps) {
   const insets = useSafeAreaInsets();
 
   const destinations = [
@@ -34,8 +32,6 @@ export function MobileBottomNav({ onNavigate, onOpenApps, onOpenMore, path }: Mo
     // read as selected on arrival.
     { icon: Home, label: "Home", onSelect: () => onNavigate("/"), selected: path === "/" },
     { icon: CheckCircle2, label: "Tasks", onSelect: () => onNavigate("/tasks"), selected: isTaskPath(path) },
-    { icon: PanelsTopLeft, label: "My Apps", onSelect: onOpenApps, selected: false },
-    { icon: Menu, label: "More", onSelect: onOpenMore, selected: false },
   ] as const;
 
   return (
