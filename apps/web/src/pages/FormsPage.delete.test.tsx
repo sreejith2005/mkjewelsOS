@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   loadForms: vi.fn(),
   formDeletionImpact: vi.fn(),
   deleteForm: vi.fn(),
+  reviseForm: vi.fn(),
 }));
 
 vi.mock("@/auth/AuthContext", async () => {
@@ -18,7 +19,7 @@ vi.mock("@/auth/AuthContext", async () => {
   return { useAuth: () => ({ profile, access: builtinAccessContext(profile) }) };
 });
 vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealtimeRefresh: () => undefined }));
-vi.mock("@/features/forms/FormBuilder", () => ({ FormBuilder: () => <div>Builder</div> }));
+vi.mock("@/features/forms/FormBuilder", () => ({ FormBuilder: ({ bundle }: { bundle?: FormBundle }) => <div>Builder {bundle?.id ?? "new"}</div> }));
 vi.mock("@/features/forms/api", () => ({
   loadForms: mocks.loadForms,
   formDeletionImpact: mocks.formDeletionImpact,
@@ -26,7 +27,7 @@ vi.mock("@/features/forms/api", () => ({
   loadFormDynamicOptions: async () => ({ users: [], branches: [], departments: [], masters: [] }),
   deletedFormBundle: () => null,
   archiveForm: vi.fn(), publishForm: vi.fn(), publishAsNewForm: vi.fn(), reviewSubmission: vi.fn(),
-  startFmsFromFormSubmission: vi.fn(), submitForm: vi.fn(),
+  startFmsFromFormSubmission: vi.fn(), submitForm: vi.fn(), reviseForm: mocks.reviseForm,
 }));
 
 const bundle = {
@@ -113,8 +114,20 @@ describe("Opening the Forms workspace", () => {
 
     await user.click(await screen.findByRole("button", { name: "New form" }));
 
-    expect(screen.getByText("Builder")).toBeTruthy();
+    expect(screen.getByText(/Builder/)).toBeTruthy();
     expect(screen.queryByText("Forms Library")).toBeNull();
+  });
+
+  it("creates a draft revision before editing a published form with submissions", async () => {
+    mocks.loadForms.mockResolvedValue({ bundles: [bundle], submissions: [] });
+    mocks.reviseForm.mockResolvedValue("enquiry-revision");
+    const user = userEvent.setup();
+    render(<FormsPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+
+    expect(mocks.reviseForm).toHaveBeenCalledWith("enquiry");
+    expect(await screen.findByText("Builder enquiry-revision")).toBeTruthy();
   });
 });
 
