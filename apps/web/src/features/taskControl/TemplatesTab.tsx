@@ -1,27 +1,13 @@
 import { ListChecks } from "lucide-react";
+import { prettyTemplateDate, prettyTemplateTime } from "@jewelos/core";
 import { Button } from "@/components/ui";
 import {
   templateCanActivate, templateFrequencyLabel, templateSourceLabel, templateStatusLabel, templateWorkTypeLabel,
   type TaskTemplateDirectoryRow,
 } from "@/features/taskTemplates/api";
 
-export function prettyDate(value: string | null): string {
-  if (!value) return "—";
-  const parsed = new Date(`${value}T00:00:00+05:30`);
-  return Number.isNaN(parsed.getTime())
-    ? value
-    : parsed.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-}
-
-export function prettyTime(value: string | null): string {
-  if (!value) return "—";
-  const [hours, minutes] = value.split(":");
-  const hour = Number(hours);
-  if (!Number.isFinite(hour)) return value;
-  const suffix = hour < 12 ? "AM" : "PM";
-  const display = hour % 12 === 0 ? 12 : hour % 12;
-  return `${String(display).padStart(2, "0")}:${minutes ?? "00"} ${suffix}`;
-}
+export const prettyDate = prettyTemplateDate;
+export const prettyTime = prettyTemplateTime;
 
 function Chip({ children, tone }: { children: string; tone: "gold" | "muted" }) {
   return (

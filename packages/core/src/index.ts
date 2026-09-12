@@ -43,6 +43,7 @@ export {
   isRecurringOrWorkflowTask,
   isTaskFeedItemOverdue,
   splitAssignedTaskFeed,
+  taskFeedCurrentOrOverdueFilter,
   taskMatchesStatus,
 } from "./taskFeed";
 export type { GroupedTaskFeedRow, SplittableAssignedTask, TaskFeedLike, TaskFeedStatusFilter } from "./taskFeed";
@@ -61,6 +62,7 @@ export {
   ADMIN_SET_PASSWORD_LENGTH,
   validateAdminSetPassword,
 } from "./userCredentials";
+export { eligibleBuddies, type BuddyCandidate, type BuddyScope } from "./buddyEligibility";
 export * from "./forms";
 export * from "./fms";
 export * from "./notifications";
@@ -73,3 +75,6 @@ export * from "./identity";
 export * from "./taskImport";
 export * from "./taskCardState";
 export * from "./availability";
+export * from "./recurringTodo";
+export * from "./dropdownMaster.ts";
+export * from "./taskControlView.ts";

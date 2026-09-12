@@ -4,32 +4,17 @@ import { Button } from "@/components/ui";
 import { EmptyMessage, Panel, StatusDot } from "@/features/analytics/components";
 import { signedTaskEvidenceUrl } from "@/features/taskEvidence/api";
 import type { EvidenceWorkspace, TaskAttachmentSummary, TaskRow, TaskView } from "@/features/taskEvidence/types";
+import { evidenceFileSize, taskRowTone, TASK_VIEW_LABELS as CORE_TASK_VIEW_LABELS } from "@jewelos/core";
 import { titleCase } from "@/lib/format";
 
 const dateTime = (value: string | null) =>
   value ? new Date(value).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "—";
 
-export function fileSize(bytes: number | null): string {
-  if (bytes === null) return "—";
-  if (bytes < 1024) return `${bytes} B`;
-  return bytes < 1_048_576 ? `${(bytes / 1024).toFixed(0)} KB` : `${(bytes / 1_048_576).toFixed(1)} MB`;
-}
+export const fileSize = evidenceFileSize;
 
-export const TASK_VIEW_LABELS: ReadonlyArray<readonly [TaskView, string]> = [
-  ["all", "All tasks"],
-  ["remaining", "Not completed"],
-  ["overdue", "Overdue"],
-  ["completed", "Completed"],
-  ["checklist", "Checklist"],
-  ["upload", "Upload"],
-  ["awaiting_evidence", "Awaiting evidence"],
-];
+export const TASK_VIEW_LABELS = CORE_TASK_VIEW_LABELS as ReadonlyArray<readonly [TaskView, string]>;
 
-function statusTone(row: TaskRow) {
-  if (row.task_status === "completed") return "success" as const;
-  if (row.task_status === "rejected") return "danger" as const;
-  return row.overdue ? "danger" as const : "warning" as const;
-}
+const statusTone = taskRowTone;
 
 function WorkTypeChip({ row }: { row: TaskRow }) {
   return (

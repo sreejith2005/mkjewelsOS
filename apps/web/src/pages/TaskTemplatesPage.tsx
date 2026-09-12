@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarDays, ListChecks, Plus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import type { Json } from "@jewelos/core";
+import {
+  canManageTaskTemplates, canSelectTaskControlBranch, canViewTaskControl,
+  taskControlShowsSearch, taskControlTabsFor,
+  TASK_CONTROL_TAB_DESCRIPTIONS,
+  type Json,
+} from "@jewelos/core";
 import { supabase } from "@jewelos/api-client";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Field, Modal, Notice } from "@/components/ui";
@@ -21,28 +26,17 @@ import { OverviewTab } from "@/features/taskControl/OverviewTab";
 import { PeopleTab } from "@/features/taskControl/PeopleTab";
 import { TemplatesTab } from "@/features/taskControl/TemplatesTab";
 import {
-  defaultFilters, rangeIsValid, tenantToday, TASK_CONTROL_TABS,
+  defaultFilters, rangeIsValid, tenantToday,
   type TaskControlFilters, type TaskControlTab,
 } from "@/features/taskControl/filters";
 import type { TaskView } from "@/features/taskEvidence/types";
 import { errorMessage } from "@/lib/format";
-
-const OVERSIGHT_ROLES = ["super_admin", "admin", "manager", "hr"];
-const MANAGE_ROLES = ["super_admin", "admin"];
-const BRANCH_SELECT_ROLES = ["super_admin", "admin", "hr"];
 
 const TAB_LABELS: Readonly<Record<TaskControlTab, string>> = {
   overview: "Overview",
   people: "People",
   tasks: "Tasks",
   templates: "Templates",
-};
-
-const TAB_DESCRIPTIONS: Readonly<Record<TaskControlTab, string>> = {
-  overview: "Who is behind, what is overdue, and which evidence is still missing.",
-  people: "Assigned, completed, remaining and overdue work for every person in scope.",
-  tasks: "Every task assigned in scope — checklist and upload alike — with its evidence on the row.",
-  templates: "Recurring rules, schedules and source-linked task templates.",
 };
 
 function initialTab(available: readonly TaskControlTab[]): TaskControlTab {
@@ -66,12 +60,9 @@ function rememberTab(tab: TaskControlTab) {
 export function TaskTemplatesPage() {
   const { profile } = useAuth();
   const role = profile?.user_role ?? "staff";
-  const authorized = OVERSIGHT_ROLES.includes(role);
-  const canManageTemplates = MANAGE_ROLES.includes(role);
-  const tabs = useMemo<TaskControlTab[]>(
-    () => TASK_CONTROL_TABS.filter((tab) => tab !== "templates" || canManageTemplates),
-    [canManageTemplates],
-  );
+  const authorized = canViewTaskControl(role);
+  const canManageTemplates = canManageTaskTemplates(role);
+  const tabs = useMemo<TaskControlTab[]>(() => [...taskControlTabsFor(role)], [role]);
 
   const [tab, setTab] = useState<TaskControlTab>(() => initialTab(tabs));
   const [filters, setFilters] = useState<TaskControlFilters>(() => defaultFilters());
@@ -253,7 +244,7 @@ export function TaskTemplatesPage() {
             </span>
             <div>
               <h1 className="font-display text-2xl text-gold sm:text-3xl">Task Control</h1>
-              <p className="text-sm text-soft-grey">{TAB_DESCRIPTIONS[tab]}</p>
+              <p className="text-sm text-soft-grey">{TASK_CONTROL_TAB_DESCRIPTIONS[tab]}</p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -290,12 +281,12 @@ export function TaskTemplatesPage() {
 
       <div className="mx-auto max-w-[100rem] space-y-4 p-4 sm:p-6">
         <TaskControlFilterBar
-          canSelectBranch={BRANCH_SELECT_ROLES.includes(role)}
+          canSelectBranch={canSelectTaskControlBranch(role)}
           filters={filters}
           onChange={changeFilters}
           onReset={() => changeFilters(defaultFilters())}
           options={options}
-          showSearch={tab === "tasks" || tab === "templates"}
+          showSearch={taskControlShowsSearch(tab)}
           users={users}
         />
 

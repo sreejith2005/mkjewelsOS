@@ -47,7 +47,9 @@ describe("Task Control templates directory", () => {
     expect(source).toContain("setTaskTemplateSchedule");
     expect(source).toContain("deleteTaskTemplate");
     expect(source).toContain("setRecurringTemplateActive");
-    expect(source).toContain('const MANAGE_ROLES = ["super_admin", "admin"]');
+    // The role membership itself moved to `@jewelos/core` so mobile gates the
+    // same way; `taskControlView.test.ts` covers which roles are in the set.
+    expect(source).toContain("canManageTaskTemplates(role)");
   });
 });
 
@@ -68,8 +70,8 @@ describe("Task Control workspace", () => {
   it("reserves the workspace for authorized leaders and templates for admins", async () => {
     const source = await page();
 
-    expect(source).toContain('const OVERSIGHT_ROLES = ["super_admin", "admin", "manager", "hr"]');
-    expect(source).toContain('tab !== "templates" || canManageTemplates');
+    expect(source).toContain("canViewTaskControl(role)");
+    expect(source).toContain("taskControlTabsFor(role)");
     expect(source).toContain("Task Control is available only to authorized leaders.");
   });
 });
