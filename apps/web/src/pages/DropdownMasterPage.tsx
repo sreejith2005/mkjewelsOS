@@ -7,7 +7,7 @@ import { Button, Field, Modal, Notice } from "@/components/ui";
 import { errorMessage, titleCase } from "@/lib/format";
 import type { DropdownMaster } from "@/types";
 import { invalidateMasterOptions } from "@/features/dropdowns/api";
-import { hasPermission } from "@jewelos/core";
+import { dropdownMasterCounts, filterDropdownMasterItems, hasPermission } from "@jewelos/core";
 
 const REQUIRED_EMPTY_CATEGORIES = ["designation", "week_off", "resignation_reason", "task_category", "task_priority", "crm_source", "client_type", "potential_category", "product_category", "buy_status", "not_bought_reason", "communication_preference"] as const;
 
@@ -81,8 +81,8 @@ export function DropdownMasterPage() {
   useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["organization", "settings"], refresh: load });
 
   const categories = useMemo(() => Array.from(new Set([...REQUIRED_EMPTY_CATEGORIES, ...items.map((item) => item.master_type)])).sort(), [items]);
-  const categoryItems = useMemo(() => items.filter((item) => item.master_type === category && (status === "all" || (status === "active") === (item.is_active !== false)) && `${item.label} ${item.value} ${item.master_type}`.toLowerCase().includes(search.toLowerCase())), [category, items, search, status]);
-  const activeCount = categoryItems.filter((item) => item.is_active !== false).length;
+  const categoryItems = useMemo(() => filterDropdownMasterItems(items, category, status, search) as DropdownMaster[], [category, items, search, status]);
+  const counts = useMemo(() => dropdownMasterCounts(items, category, categoryItems), [categoryItems, category, items]);
 
   const remove = async (item: DropdownMaster) => {
     if (!window.confirm(`Delete “${item.label}”? This cannot be undone.`)) return;
@@ -113,7 +113,7 @@ export function DropdownMasterPage() {
       <div className="glass-card mb-5 rounded-xl p-4">
         <div className="mb-3 grid gap-3 sm:grid-cols-2"><label className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-soft-grey" /><input className="field pl-9" onChange={(event) => setSearch(event.target.value)} placeholder="Search label, code, or category" value={search} /></label><select className="field" onChange={(event) => setStatus(event.target.value as typeof status)} value={status}><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
         <Field label="Category"><select className="field" onChange={(e) => setCategory(e.target.value)} value={category}>{categories.map((item) => <option key={item} value={item}>{titleCase(item)}</option>)}</select></Field>
-        <div className="mt-4 grid grid-cols-3 gap-2 sm:flex sm:gap-3"><div className="rounded-lg border border-gold/20 bg-obsidian px-4 py-3"><p className="text-xl font-bold text-gold">{items.filter((item) => item.master_type === category).length}</p><p className="text-xs text-soft-grey">Total</p></div><div className="rounded-lg border border-success/30 bg-success/5 px-4 py-3"><p className="text-xl font-bold text-success">{activeCount}</p><p className="text-xs text-soft-grey">Active</p></div><div className="rounded-lg border border-soft-grey/20 px-4 py-3"><p className="text-xl font-bold text-soft-grey">{items.filter((item) => item.master_type === category && item.is_active === false).length}</p><p className="text-xs text-soft-grey">Inactive</p></div></div>
+        <div className="mt-4 grid grid-cols-3 gap-2 sm:flex sm:gap-3"><div className="rounded-lg border border-gold/20 bg-obsidian px-4 py-3"><p className="text-xl font-bold text-gold">{counts.total}</p><p className="text-xs text-soft-grey">Total</p></div><div className="rounded-lg border border-success/30 bg-success/5 px-4 py-3"><p className="text-xl font-bold text-success">{counts.active}</p><p className="text-xs text-soft-grey">Active</p></div><div className="rounded-lg border border-soft-grey/20 px-4 py-3"><p className="text-xl font-bold text-soft-grey">{counts.inactive}</p><p className="text-xs text-soft-grey">Inactive</p></div></div>
       </div>
       {loading ? <p className="py-10 text-center text-gold">Loading dropdowns…</p> : categoryItems.length === 0 ? <div className="glass-card rounded-xl p-10 text-center text-soft-grey">No items in {titleCase(category)} yet.</div> : (
         <div className="space-y-3">{categoryItems.map((item) => <article className={`glass-card flex flex-wrap items-center gap-3 rounded-xl p-4 sm:flex-nowrap sm:gap-4 ${item.is_active === false ? "opacity-50" : ""}`} key={item.id}><span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gold/10 text-sm font-bold text-gold">{item.sort_order ?? 0}</span><div className="min-w-0 flex-1"><h2 className="break-words font-semibold text-white">{item.label}</h2><p className="truncate font-mono text-xs text-soft-grey">{item.value}</p></div><span className={`shrink-0 rounded px-2 py-1 text-[10px] uppercase ${item.is_active === false ? "bg-soft-grey/10 text-soft-grey" : "bg-success/10 text-success"}`}>{item.is_active === false ? "Inactive" : "Active"}</span><div className="ml-auto flex shrink-0 gap-2"><Button aria-label={`Edit ${item.label}`} className="size-11 min-h-11 p-0" onClick={() => setEditing(item)} variant="secondary"><Pencil className="h-4 w-4" /></Button><Button aria-label={`Delete ${item.label}`} className="size-11 min-h-11 p-0" onClick={() => void remove(item)} variant="danger"><Trash2 className="h-4 w-4" /></Button></div></article>)}</div>
