@@ -146,19 +146,9 @@ async function loadTaskFeedPages(loadPage: (from: number, to: number) => Promise
 
 /** PostgREST predicate for current work plus unfinished historical work, using revised → due → planned deadline order. */
 export function taskFeedCurrentOrOverdueFilter(startIso: string, endIso: string): string {
-  const current = [
-    `and(revised_datetime.gte.${startIso},revised_datetime.lte.${endIso})`,
-    `and(revised_datetime.is.null,due_datetime.gte.${startIso},due_datetime.lte.${endIso})`,
-    `and(revised_datetime.is.null,due_datetime.is.null,planned_datetime.gte.${startIso},planned_datetime.lte.${endIso})`,
-  ];
-  const historicalUnfinished = [
-    `and(revised_datetime.lt.${startIso},status.not.in.(completed,rejected,blocked))`,
-    `and(revised_datetime.is.null,due_datetime.lt.${startIso},status.not.in.(completed,rejected,blocked))`,
-    `and(revised_datetime.is.null,due_datetime.is.null,planned_datetime.lt.${startIso},status.not.in.(completed,rejected,blocked))`,
-  ];
   return [
-    ...current,
-    ...historicalUnfinished,
+    `and(effective_due_datetime.gte.${startIso},effective_due_datetime.lte.${endIso})`,
+    `and(effective_due_datetime.lt.${startIso},status.not.in.(completed,rejected,blocked))`,
   ].join(",");
 }
 

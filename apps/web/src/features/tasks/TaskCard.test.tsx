@@ -37,6 +37,7 @@ const task = {
   description: null,
   due_datetime: null,
   due_time: null,
+  effective_due_datetime: null,
   form_template_id: null,
   hasAttachment: false,
   hasFormSubmission: false,

@@ -7234,6 +7234,7 @@ export type Database = {
           description: string | null
           due_datetime: string | null
           due_time: string | null
+          effective_due_datetime: string | null
           form_template_id: string | null
           id: string | null
           is_active: boolean | null

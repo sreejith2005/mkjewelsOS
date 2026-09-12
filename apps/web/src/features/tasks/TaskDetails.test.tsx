@@ -47,6 +47,7 @@ const fullTask = {
   description: "Inspect every showcase before opening.",
   due_datetime: "2026-09-02T04:30:00.000Z",
   due_time: "10:00:00",
+  effective_due_datetime: "2026-09-02T04:30:00.000Z",
   form_template_id: null,
   hasAttachment: true,
   hasFormSubmission: false,
