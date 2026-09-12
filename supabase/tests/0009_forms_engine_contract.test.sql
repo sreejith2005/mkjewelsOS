@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(125);
+select plan(131);
 
 -- Synthetic fixtures only. No production rows or personal information.
 insert into auth.users(id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
@@ -180,6 +180,26 @@ reset role;
 select is((select data->>'number_value' from form_submissions where submitted_by='49000000-0000-0000-0000-000000000005'),'0','numeric zero is retained');
 select ok(not (select data ? 'conditional_value' from form_submissions where submitted_by='49000000-0000-0000-0000-000000000005'),'hidden answer is stripped consistently');
 select is((select count(*)::int from audit_logs where action='form_submitted' and record_id=(select id from form_submissions where submitted_by='49000000-0000-0000-0000-000000000005')),1,'submission is audited transactionally');
+
+-- A submitted form must keep its own definition while its single live ID is edited.
+set local role authenticated;
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','a9000000-0000-0000-0000-000000000002',true);
+select lives_ok($$select save_form_draft_with_audit(null,
+  '{"name":"In-place history","description":"","permissions":{"roles":["staff"]},"sections":[]}',
+  '[{"key":"answer","label":"Original answer","type":"text"}]'::jsonb)$$,'admin creates an in-place history draft');
+select lives_ok($$select publish_form_with_audit((select id from form_templates where name='In-place history'))$$,'admin publishes the in-place history form');
+select set_config('request.jwt.claim.sub','a9000000-0000-0000-0000-000000000005',true);
+select lives_ok($$select submit_form_with_audit((select id from form_templates where name='In-place history' and lifecycle='published'),'{"answer":"before"}'::jsonb)$$,'staff submits the original in-place history form');
+select set_config('request.jwt.claim.sub','a9000000-0000-0000-0000-000000000002',true);
+select lives_ok($$select save_published_form_with_audit(
+  (select id from form_templates where name='In-place history' and lifecycle='published'),
+  '{"name":"In-place history edited","description":"","permissions":{"roles":["staff"]},"sections":[]}',
+  '[{"key":"answer","label":"Changed answer","type":"text"}]'::jsonb
+)$$,'admin edits a submitted published form in place');
+select is((select template_snapshot->'template'->>'name' from form_submissions where data->>'answer'='before'),'In-place history','submission keeps its original form name');
+select is((select template_snapshot->'fields'->0->>'field_name' from form_submissions where data->>'answer'='before'),'Original answer','submission keeps its original field label');
+reset role;
 
 set local role authenticated;
 select set_config('request.jwt.claim.role','authenticated',true);

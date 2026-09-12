@@ -118,16 +118,15 @@ describe("Opening the Forms workspace", () => {
     expect(screen.queryByText("Forms Library")).toBeNull();
   });
 
-  it("creates a draft revision before editing a published form with submissions", async () => {
+  it("opens the same published form instead of creating a revision", async () => {
     mocks.loadForms.mockResolvedValue({ bundles: [bundle], submissions: [] });
-    mocks.reviseForm.mockResolvedValue("enquiry-revision");
     const user = userEvent.setup();
     render(<FormsPage />);
 
     await user.click(await screen.findByRole("button", { name: "Edit" }));
 
-    expect(mocks.reviseForm).toHaveBeenCalledWith("enquiry");
-    expect(await screen.findByText("Builder enquiry-revision")).toBeTruthy();
+    expect(mocks.reviseForm).not.toHaveBeenCalled();
+    expect(await screen.findByText("Builder enquiry")).toBeTruthy();
   });
 });
 
