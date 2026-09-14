@@ -10,6 +10,7 @@ import { randomUUID } from "expo-crypto";
 import { setUuidFactory } from "@jewelos/data/runtime";
 import { AuthProvider } from "@/auth/AuthProvider";
 import { ErrorBoundary } from "@/ErrorBoundary";
+import { AppUpdatePrompt } from "@/features/appUpdate/AppUpdatePrompt";
 import { NetworkBanner } from "@/lib/NetworkBanner";
 import { startSupabaseSessionLifecycle } from "@/lib/supabase";
 import { RootNavigator } from "@/navigation/RootNavigator";
@@ -38,6 +39,7 @@ function Themed() {
       <ErrorBoundary>
         <AuthProvider>
           <NetworkBanner />
+          <AppUpdatePrompt />
           <RootNavigator />
         </AuthProvider>
       </ErrorBoundary>

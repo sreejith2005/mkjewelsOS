@@ -92,8 +92,12 @@ android {
         applicationId 'com.jewelos.mobile'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0.0"
+        // app.json is the single source of the version, so the one edit made by
+        // scripts/release-mobile.ps1 versions the APK. Android compares
+        // versionCode, and it must rise on every published release.
+        def appJson = new groovy.json.JsonSlurper().parse(new File(projectRoot, "app.json"))
+        versionCode appJson.expo.android.versionCode as Integer
+        versionName appJson.expo.version as String
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }

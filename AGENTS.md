@@ -180,6 +180,12 @@ credential-safe staged scan. Never include `.env`, `.supabase`,
 `supabase/.temp`, secrets, exports, or customer data. A Git push is not a
 Supabase migration/function/web-host deployment or production verification.
 
+Android releases to employees follow `docs/MOBILE_RELEASE_GUIDE.md` and are cut
+only with `scripts/release-mobile.ps1`. It publishes the signed APK and the
+`latest.json` update manifest that installed apps poll. Never hand-roll a
+release, reuse a `versionCode`, or publish a non-mobile GitHub release as
+"latest" in this repository.
+
 ## Regression-Safe Development Rules
 
 This application contains production functionality that must be treated as protected behavior.

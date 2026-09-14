@@ -214,8 +214,9 @@ buildTypes {
 
 ## Versioning
 
-Both values live in `app.json` and are copied into the native project by
-`expo prebuild`:
+Both values live only in `app.json`. `android/app/build.gradle` reads them at
+build time, and `scripts/release-mobile.ps1` bumps them. Do not edit them by
+hand for a release:
 
 ```json
 "version": "1.0.0",
@@ -232,9 +233,9 @@ predecessor.
 | next | 1.0.1 | 2 |
 | next | 1.1.0 | 3 |
 
-Note that installing an APK directly does **not** give the app any means of
-updating itself. Distribution and updates are a separate decision, deliberately
-left open in `docs/MOBILE_MIGRATION_PLAN.md`.
+Distribution and updates: the APK is published to GitHub Releases, and the
+in-app prompt (`src/features/appUpdate/`) offers each new build to installed
+phones. The whole procedure is in `docs/MOBILE_RELEASE_GUIDE.md`.
 
 ---
 
