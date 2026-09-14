@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { PanResponder, StyleSheet, View, type GestureResponderEvent, type NativeTouchEvent } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, type SharedValue } from "react-native-reanimated";
 import Svg, { G, Path, Polygon, Rect, Text as SvgText } from "react-native-svg";
-import { CheckSquare, Copy, FileText, Flag, GitBranch, Layers, Maximize, Merge, Minus, Plus, ShieldCheck, Trash2, X, Zap } from "lucide-react-native";
-import { fmsOutgoingStageKeys, hasFmsStageRouting, type FmsFlowDefinition, type FmsFormFieldRef, type FmsStageDefinition } from "@jewelos/core";
+import { CheckSquare, Copy, FileText, Flag, GitBranch, Layers, Maximize, Merge, Minus, Plus, RotateCcw, ShieldCheck, Trash2, X, Zap } from "lucide-react-native";
+import { FMS_MAX_ZOOM, FMS_MIN_ZOOM, fmsOutgoingStageKeys, hasFmsStageRouting, type FmsFlowDefinition, type FmsFormFieldRef, type FmsStageDefinition } from "@jewelos/core";
 import { fmsGraphEdges, fmsStageSummary, fmsTimingSummary, layoutFmsDefinition, type FmsGraphEdge, type FmsGraphPosition } from "@jewelos/data/fms/graph";
 import { makeStyles } from "@/theme/makeStyles";
 import { useAppTheme } from "@/theme/ThemeProvider";
 import { Pressable } from "@/ui/Pressable";
 import { Text } from "@/ui/Text";
+import { createFmsNodeDragSession } from "./fmsCanvasGesture";
 
 /**
  * The FMS workflow canvas — the web `FmsGraphCanvas` for touch.
@@ -21,8 +23,6 @@ import { Text } from "@/ui/Text";
 
 const NODE_WIDTH = 208;
 const NODE_HEIGHT = 104;
-const MIN_ZOOM = 0.3;
-const MAX_ZOOM = 2;
 const ZOOM_STEP = 1.15;
 const WORLD_SIZE = 6000;
 const FIT_PADDING = 80;
@@ -52,7 +52,7 @@ const curve = (startX: number, startY: number, endX: number, endY: number) => {
 
 type Drag =
   | Readonly<{ kind: "pan"; pointerX: number; pointerY: number; panX: number; panY: number }>
-  | { kind: "node"; key: string; origin: FmsGraphPosition; worldX: number; worldY: number; moved: boolean; last: FmsGraphPosition }
+  | { kind: "node"; key: string; origin: FmsGraphPosition; worldX: number; worldY: number; moved: boolean; session: ReturnType<typeof createFmsNodeDragSession> }
   | Readonly<{ kind: "connect"; from: string }>
   | Readonly<{ kind: "reconnect"; from: string; to: string; ruleId?: string | undefined }>;
 
@@ -85,15 +85,23 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
   const hasCenteredRef = useRef(false);
   const layout = useMemo(() => layoutFmsDefinition(definition), [definition]);
   const edges = useMemo(() => fmsGraphEdges(definition.stages, formFields), [definition.stages, formFields]);
-  const [offsets, setOffsets] = useState<Record<string, FmsGraphPosition>>({});
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [selection, setSelection] = useState<string | null>(selectedKey);
   const [connecting, setConnecting] = useState<Readonly<{ from: string; x: number; y: number }> | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [activeEdge, setActiveEdge] = useState<string | null>(null);
+  // Transient viewport and node movement stays off React's render loop. React
+  // receives one durable position update when a gesture ends.
+  const panX = useSharedValue(0);
+  const panY = useSharedValue(0);
+  const scale = useSharedValue(1);
+  const dragKey = useSharedValue<string | null>(null);
+  const dragX = useSharedValue(0);
+  const dragY = useSharedValue(0);
+  const viewportLive = useRef({ pan: { x: 0, y: 0 }, zoom: 1 });
+  const worldStyle = useAnimatedStyle(() => ({ transform: [{ translateX: panX.value }, { translateY: panY.value }, { scale: scale.value }] }));
 
-  useEffect(() => setOffsets((current) => Object.fromEntries(Object.entries(current).filter(([key]) => definition.stages.some((stage) => stage.key === key)))), [definition.stages]);
   useEffect(() => setSelection(selectedKey), [selectedKey]);
 
   const saved = useMemo(() => new Map(definition.stages.flatMap((stage) => stage.position ? [[stage.key, stage.position] as const] : [])), [definition.stages]);
@@ -101,8 +109,7 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
   /** A stage keeps its saved coordinates; without them it falls back to the computed layout. */
   const position = (key: string): FmsGraphPosition => {
     const base = saved.get(key) ?? layout.get(key) ?? { x: 60, y: 60 };
-    const offset = offsets[key] ?? { x: 0, y: 0 };
-    return { x: clamp(base.x + offset.x, 0, WORLD_SIZE - NODE_WIDTH), y: clamp(base.y + offset.y, 0, WORLD_SIZE - NODE_HEIGHT) };
+    return { x: clamp(base.x, 0, WORLD_SIZE - NODE_WIDTH), y: clamp(base.y, 0, WORLD_SIZE - NODE_HEIGHT) };
   };
 
   const fitView = () => {
@@ -113,23 +120,34 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
     const right = Math.max(...points.map((point) => point.x + NODE_WIDTH));
     const top = Math.min(...points.map((point) => point.y));
     const bottom = Math.max(...points.map((point) => point.y + NODE_HEIGHT));
-    const next = clamp(Math.min((width - FIT_PADDING) / Math.max(1, right - left), (height - FIT_PADDING) / Math.max(1, bottom - top)), MIN_ZOOM, 1);
-    setZoom(next);
-    setPan({ x: width / 2 - ((left + right) / 2) * next, y: height / 2 - ((top + bottom) / 2) * next });
+    const next = clamp(Math.min((width - FIT_PADDING) / Math.max(1, right - left), (height - FIT_PADDING) / Math.max(1, bottom - top)), FMS_MIN_ZOOM, 1);
+    const nextPan = { x: width / 2 - ((left + right) / 2) * next, y: height / 2 - ((top + bottom) / 2) * next };
+    viewportLive.current = { pan: nextPan, zoom: next };
+    scale.value = next; panX.value = nextPan.x; panY.value = nextPan.y;
+    setZoom(next); setPan(nextPan);
   };
 
   /** Zooms around the viewport centre so the content in the middle stays put. */
   const zoomBy = (factor: number) => {
     const anchorX = viewport.current.width / 2;
     const anchorY = viewport.current.height / 2;
-    const next = clamp(zoom * factor, MIN_ZOOM, MAX_ZOOM);
-    setPan({ x: anchorX - (anchorX - pan.x) * (next / zoom), y: anchorY - (anchorY - pan.y) * (next / zoom) });
-    setZoom(next);
+    const current = viewportLive.current;
+    const next = clamp(current.zoom * factor, FMS_MIN_ZOOM, FMS_MAX_ZOOM);
+    const nextPan = { x: anchorX - (anchorX - current.pan.x) * (next / current.zoom), y: anchorY - (anchorY - current.pan.y) * (next / current.zoom) };
+    viewportLive.current = { pan: nextPan, zoom: next };
+    scale.value = next; panX.value = nextPan.x; panY.value = nextPan.y;
+    setPan(nextPan); setZoom(next);
+  };
+  const resetView = () => {
+    const nextPan = { x: 0, y: 0 };
+    viewportLive.current = { pan: nextPan, zoom: 1 };
+    scale.value = 1; panX.value = 0; panY.value = 0;
+    setPan(nextPan); setZoom(1);
   };
 
   // The responder is created once, so it reads everything it needs through here.
   const live = useRef({ pan, zoom, position, edges, activeEdge, definition, props, saved, layout });
-  live.current = { pan, zoom, position, edges, activeEdge, definition, props, saved, layout };
+  live.current = { pan: viewportLive.current.pan, zoom: viewportLive.current.zoom, position, edges, activeEdge, definition, props, saved, layout };
 
   const toWorld = (pageX: number, pageY: number) => {
     const { pan: currentPan, zoom: currentZoom } = live.current;
@@ -200,7 +218,14 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
       if (key) {
         setSelection(key);
         const origin = current.position(key);
-        dragRef.current = { kind: "node", key, origin, worldX: world.x, worldY: world.y, moved: false, last: origin };
+        dragRef.current = {
+          kind: "node", key, origin, worldX: world.x, worldY: world.y, moved: false,
+          session: createFmsNodeDragSession({
+            key, origin, zoom: current.zoom,
+            preview: (_key, next) => { dragKey.value = key; dragX.value = next.x - origin.x; dragY.value = next.y - origin.y; },
+            commit: current.props.onMove,
+          }),
+        };
         return;
       }
       dragRef.current = { kind: "pan", pointerX: gesture.x0, pointerY: gesture.y0, panX: current.pan.x, panY: current.pan.y };
@@ -212,11 +237,12 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
         if (!pinch) { startPinch(touches); return; }
         const [first, second] = touches;
         if (!first || !second) return;
-        const next = clamp(pinch.zoom * (Math.hypot(first.pageX - second.pageX, first.pageY - second.pageY) / pinch.distance), MIN_ZOOM, MAX_ZOOM);
+        const next = clamp(pinch.zoom * (Math.hypot(first.pageX - second.pageX, first.pageY - second.pageY) / pinch.distance), FMS_MIN_ZOOM, FMS_MAX_ZOOM);
         const midX = (first.pageX + second.pageX) / 2 - viewport.current.x;
         const midY = (first.pageY + second.pageY) / 2 - viewport.current.y;
-        setZoom(next);
-        setPan({ x: midX - pinch.worldX * next, y: midY - pinch.worldY * next });
+        const nextPan = { x: midX - pinch.worldX * next, y: midY - pinch.worldY * next };
+        viewportLive.current = { pan: nextPan, zoom: next };
+        scale.value = next; panX.value = nextPan.x; panY.value = nextPan.y;
         return;
       }
       if (pinchRef.current) {
@@ -227,7 +253,12 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
       }
       const drag = dragRef.current;
       if (!drag) return;
-      if (drag.kind === "pan") { setPan({ x: drag.panX + (gesture.moveX - drag.pointerX), y: drag.panY + (gesture.moveY - drag.pointerY) }); return; }
+      if (drag.kind === "pan") {
+        const nextPan = { x: drag.panX + (gesture.moveX - drag.pointerX), y: drag.panY + (gesture.moveY - drag.pointerY) };
+        viewportLive.current = { ...viewportLive.current, pan: nextPan };
+        panX.value = nextPan.x; panY.value = nextPan.y;
+        return;
+      }
       const world = toWorld(gesture.moveX, gesture.moveY);
       if (drag.kind === "connect" || drag.kind === "reconnect") {
         setConnecting((current) => current ? { ...current, x: world.x, y: world.y } : current);
@@ -239,15 +270,12 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
       const dy = world.y - drag.worldY;
       if (!drag.moved && Math.hypot(dx * live.current.zoom, dy * live.current.zoom) < DRAG_THRESHOLD) return;
       drag.moved = true;
-      const base = live.current.saved.get(drag.key) ?? live.current.layout.get(drag.key) ?? { x: 60, y: 60 };
-      const next = { x: clamp(drag.origin.x + dx, 0, WORLD_SIZE - NODE_WIDTH), y: clamp(drag.origin.y + dy, 0, WORLD_SIZE - NODE_HEIGHT) };
-      drag.last = next;
-      setOffsets((current) => ({ ...current, [drag.key]: { x: next.x - base.x, y: next.y - base.y } }));
+      drag.session.update({ x: dx * live.current.zoom, y: dy * live.current.zoom });
     },
     onPanResponderRelease: (_event, gesture) => {
       const drag = dragRef.current;
       dragRef.current = null;
-      if (pinchRef.current) { pinchRef.current = null; return; }
+      if (pinchRef.current) { pinchRef.current = null; setPan(viewportLive.current.pan); setZoom(viewportLive.current.zoom); return; }
       const { props: current } = live.current;
       if (drag?.kind === "connect" || drag?.kind === "reconnect") {
         const target = nodeAt(toWorld(gesture.moveX || gesture.x0, gesture.moveY || gesture.y0));
@@ -260,14 +288,16 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
         setActiveEdge(null);
         return;
       }
+      if (drag?.kind === "pan") { setPan(viewportLive.current.pan); setZoom(viewportLive.current.zoom); return; }
       if (drag?.kind !== "node") return;
       if (!drag.moved) { current.onSelect(drag.key); return; }
-      current.onMove({ [drag.key]: drag.last });
-      setOffsets((offsetsNow) => Object.fromEntries(Object.entries(offsetsNow).filter(([key]) => key !== drag.key)));
+      drag.session.end();
+      dragKey.value = null; dragX.value = 0; dragY.value = 0;
     },
     onPanResponderTerminate: () => {
       dragRef.current = null;
       pinchRef.current = null;
+      dragKey.value = null; dragX.value = 0; dragY.value = 0;
       setConnecting(null);
       setDropTarget(null);
     },
@@ -297,7 +327,7 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
   return (
     <View ref={viewRef} onLayout={onLayout} style={styles.viewport} {...responder.panHandlers}>
       <Pressable accessibilityLabel="Workflow canvas" onPress={clearSelection} style={StyleSheet.absoluteFill}>
-        <View style={[styles.world, { transform: [{ translateX: pan.x }, { translateY: pan.y }, { scale: zoom }] }]}>
+        <Animated.View style={[styles.world, worldStyle]}>
           <Svg height={svgHeight} style={styles.svg} width={svgWidth}>
             {edges.map((edge) => {
               const from = position(edge.from);
@@ -363,7 +393,7 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
             const routed = hasFmsStageRouting(stage) || stage.type === "branch";
             const borderColor = dropTarget === stage.key ? theme.colors.success : invalid ? theme.colors.danger : active ? theme.colors.brand : theme.colors.borderStrong;
             return (
-              <View key={stage.key} style={[styles.nodeFrame, { left: point.x, top: point.y }]}>
+              <AnimatedNodeFrame dragKey={dragKey} dragX={dragX} dragY={dragY} nodeKey={stage.key} point={point} style={styles.nodeFrame}>
                 {index === 0 ? <View style={[styles.flag, styles.flagTop]}><Text tone="primary" variant="caption" weight="semibold">Starts here</Text></View> : null}
                 {isLeaf ? <View style={[styles.flag, styles.flagBottom]}><Text tone="success" variant="caption" weight="semibold">Completes here</Text></View> : null}
                 <Pressable
@@ -395,10 +425,10 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
                     <Plus color={theme.colors.brand} size={16} />
                   </Pressable>
                 ) : null}
-              </View>
+              </AnimatedNodeFrame>
             );
           })}
-        </View>
+        </Animated.View>
       </Pressable>
 
       <View style={styles.controls}>
@@ -406,6 +436,7 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
         <Text style={styles.zoomLabel} tone="warm" variant="caption">{`${Math.round(zoom * 100)}%`}</Text>
         <Pressable accessibilityLabel="Zoom in" onPress={() => zoomBy(ZOOM_STEP)} style={styles.control}><Plus color={theme.colors.brand} size={16} /></Pressable>
         <Pressable accessibilityLabel="Fit workflow to view" onPress={fitView} style={styles.control}><Maximize color={theme.colors.brand} size={16} /></Pressable>
+        <Pressable accessibilityLabel="Reset workflow view" onPress={resetView} style={styles.control}><RotateCcw color={theme.colors.brand} size={16} /></Pressable>
       </View>
       <View pointerEvents="none" style={styles.hint}>
         <Text tone="muted" variant="caption">
@@ -414,6 +445,21 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
       </View>
     </View>
   );
+}
+
+function AnimatedNodeFrame({ children, dragKey, dragX, dragY, nodeKey, point, style }: Readonly<{
+  children: ReactNode;
+  dragKey: SharedValue<string | null>;
+  dragX: SharedValue<number>;
+  dragY: SharedValue<number>;
+  nodeKey: string;
+  point: FmsGraphPosition;
+  style: object;
+}>) {
+  const previewStyle = useAnimatedStyle(() => ({
+    transform: dragKey.value === nodeKey ? [{ translateX: dragX.value }, { translateY: dragY.value }] : [{ translateX: 0 }, { translateY: 0 }],
+  }));
+  return <Animated.View style={[style, { left: point.x, top: point.y }, previewStyle]}>{children}</Animated.View>;
 }
 
 const useStyles = makeStyles((theme) => StyleSheet.create({

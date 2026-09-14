@@ -80,6 +80,14 @@ devtools: `supabase.rpc(...)` / `supabase.from(...)` with the user's session).
 - [ ] Start a flow, claim/complete/review a stage from FMS **and** from Home/Tasks.
 - [ ] Build, publish, pause, archive an FMS flow (ADM). A user denied `fms.manage` cannot.
 - [ ] Author, publish, archive a form (MGR). A user denied `forms.manage` cannot.
+- [ ] **Native Forms Builder.** Create a draft with sections, each field family,
+      static and Dropdown Master options, a visibility condition and an answer
+      route; preview, save, reopen and publish it. Confirm hardware Back warns
+      only when dirty and a failed/offline save retains the edits.
+- [ ] **Native FMS canvas.** Pan empty space, drag a node, pinch, connect,
+      reconnect, fit and reset at phone width. Confirm one tap selects without
+      moving, the stage editor scrolls separately, and rotation/resume does not
+      crash or lose the persisted node position.
 
 ### Assigned FMS work (one work item, many entry surfaces)
 

@@ -21,6 +21,7 @@ export type RootStackParamList = {
   FmsStage: { instanceId: string; instanceStageId: string };
   FmsStageForm: { instanceId: string; instanceStageId: string; formTemplateId: string };
   FormFill: { formTemplateId: string; starterAssignmentId?: string };
+  FormBuilder: { formTemplateId?: string } | undefined;
   FormSubmission: { submissionId: string };
   ClientDetail: { clientId: string };
   Walkin: { clientId?: string };

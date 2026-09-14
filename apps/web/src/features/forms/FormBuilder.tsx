@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Banknote, CalendarDays, CheckSquare, ChevronDown, ChevronUp, CircleDot, Copy, Eye, FileUp, Filter, GitBranch, Hash, ListChecks, Mail, Minus, Pencil, Phone, Plus, Split, Star, Trash2, Type, X } from "lucide-react";
-import { describeFormRule, FORM_LIST_OPERATORS, formRuleHasIncompletePredicate, FORM_OPERATOR_LABELS, FORM_SUBMIT_TARGET, FORM_VALUELESS_OPERATORS, normalizeFormDefinition, operatorsForFieldType, pruneFormRules, renameFormRuleField, validateFormDefinition, type FormAnswer, type FormBranch, type FormFieldDefinition, type FormOption, type FormRule, type FormRuleOperator, type FormRulePredicate, type FormSectionDefinition, type FormTemplateDefinition, type Json, type UserRole } from "@jewelos/core";
+import { createFormField, describeFormRule, FORM_LIST_OPERATORS, formRuleHasIncompletePredicate, FORM_OPERATOR_LABELS, FORM_SUBMIT_TARGET, FORM_VALUELESS_OPERATORS, nextFormFieldKey as sharedNextFormFieldKey, normalizeFormDefinition, operatorsForFieldType, pruneFormRules, renameFormRuleField, validateFormDefinition, type FormAnswer, type FormBranch, type FormFieldDefinition, type FormOption, type FormRule, type FormRuleOperator, type FormRulePredicate, type FormSectionDefinition, type FormTemplateDefinition, type Json, type UserRole } from "@jewelos/core";
 import { Button, Field, Notice } from "@/components/ui";
 import { loadMasterOptions, toFormMasterOptions, type MasterOption } from "@/features/dropdowns/api";
 import { saveDraft, savePublishedForm, type FormBundle } from "./api";
@@ -40,16 +40,9 @@ const sectionKeyFor = (title: string, used: readonly string[]) => {
   for (let suffix = 2; used.includes(candidate); suffix += 1) candidate = `${base}_${suffix}`;
   return candidate;
 };
-export const nextFormFieldKey = (fields: readonly Pick<FormFieldDefinition, "key">[]) => {
-  const used = new Set(fields.map((field) => field.key));
-  for (let suffix = 1; ; suffix += 1) {
-    const key = `field_${suffix}`;
-    if (!used.has(key)) return key;
-  }
-};
+export const nextFormFieldKey = sharedNextFormFieldKey;
 const newField = (type: FormFieldDefinition["type"], fields: readonly FormFieldDefinition[], sectionKey: string): FormFieldDefinition => ({
-  key: nextFormFieldKey(fields), label: fieldLabel(type), type, sortOrder: fields.length, sectionKey, required: false, shown: true, editable: true,
-  ...(OPTION_TYPES.has(type) ? { options: [{ value: "option_1", label: "Option 1" }] as readonly FormOption[] } : {}),
+  ...createFormField(type, fields, sectionKey), label: fieldLabel(type),
 });
 const initial = (bundle?: FormBundle): FormTemplateDefinition => ({
   name: bundle?.name ?? "", description: bundle?.description ?? "",

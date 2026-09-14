@@ -15,6 +15,7 @@ import { FmsInstanceScreen } from "@/screens/FmsInstanceScreen";
 import { FmsStageScreen } from "@/screens/FmsStageScreen";
 import { FmsStageFormScreen } from "@/screens/FmsStageFormScreen";
 import { FormFillScreen } from "@/screens/FormFillScreen";
+import { FormBuilderScreen } from "@/screens/FormBuilderScreen";
 import { ClientDetailScreen } from "@/screens/ClientDetailScreen";
 import { WalkinScreen } from "@/screens/WalkinScreen";
 import { ProfileScreen } from "@/screens/ProfileScreen";
@@ -75,6 +76,7 @@ export function RootNavigator() {
           <Stack.Screen component={FmsStageScreen} name="FmsStage" options={{ title: "Step" }} />
           <Stack.Screen component={FmsStageFormScreen} name="FmsStageForm" options={{ title: "Step form" }} />
           <Stack.Screen component={FormFillScreen} name="FormFill" options={{ title: "Form" }} />
+          <Stack.Screen component={FormBuilderScreen} name="FormBuilder" options={{ title: "Form builder" }} />
           <Stack.Screen component={ClientDetailScreen} name="ClientDetail" options={{ title: "Client" }} />
           <Stack.Screen component={WalkinScreen} name="Walkin" options={{ title: "New walk-in" }} />
           <Stack.Screen component={ProfileScreen} name="Profile" options={{ title: "Profile" }} />

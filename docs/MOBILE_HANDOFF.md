@@ -1047,10 +1047,49 @@ involve FMS.
 
 ### Still outstanding
 
-- The native canvas still uses `PanResponder` with React state per pointer move.
-  Moving it to Gesture Handler + Reanimated shared values needs device
-  verification, which was not available here.
+- The native canvas keeps its existing `PanResponder` hit-testing contract, but
+  viewport pan, pinch zoom and node-drag previews now use Reanimated shared
+  values instead of scheduling a React render for every pointer move. A node
+  position is persisted exactly once at gesture end. Fit and reset controls use
+  the shared `[0.5, 2]` zoom contract from `@jewelos/core`. Device verification
+  is still required because no Android target was connected.
 - `apps/mobile/vitest.config.ts` includes only `src/**/*.test.ts` and the app
   carries no React Native rendering preset, so component-level (`.tsx`) tests
-  for the canvas and for a native Forms Builder cannot run yet. That preset is a
-  prerequisite for the remaining native plans.
+  cannot run yet. Pure gesture-commit and Forms Builder lifecycle tests cover
+  the state boundaries; rendered interaction remains a device QA item.
+
+## Native Forms Builder and canvas follow-up (2026-09-14)
+
+Forms Library now opens a typed native `FormBuilder` route for new and existing
+templates. The phone workspace has a virtualized question outline, one focused
+editor sheet, sections, all field families, static and Dropdown Master choices,
+validation limits, visibility conditions, answer-to-section/submit routes,
+role permissions, unsaved-change protection, and an interactive preview that
+does not write submissions. Save and publish continue through the existing
+audited Forms RPCs; the draft API now returns the server-created template id so
+a new mobile draft is updated rather than duplicated on its next save.
+
+The deterministic field and section mutations are in
+`packages/core/src/forms/builder.ts`; web field creation now consumes the same
+key and default-field contract. Removing or renaming a field cleans dependent
+rules and answer paths rather than leaving broken references.
+
+### Evidence
+
+```text
+@jewelos/core test     39 files, 474 tests passed
+@jewelos/data test      9 files,  69 tests passed
+web test               65 files, 319 tests passed
+mobile test             9 files,  60 tests passed
+mobile typecheck        passed
+turbo typecheck         5/5 passed
+turbo build             5/5 passed
+Android assembleDebug   BUILD SUCCESSFUL; app-debug.apk, 83,589,475 bytes
+git diff --check        clean
+```
+
+There was no connected Android device and the in-app browser capability was not
+available, so authenticated navigation, real touch gestures, keyboard/rotation,
+and compact rendered web behavior were not observed. The APK is a debug build;
+it was not installed or launched and is not release evidence. No hosted
+Supabase or web deployment was performed in this follow-up.
