@@ -56,24 +56,32 @@ $IgnoredDirt = '^apps/mobile/android/\.kotlin/'
 function Write-Step([string]$Message) { Write-Host "`n==> $Message" -ForegroundColor Cyan }
 function Stop-Release([string]$Message) { throw "RELEASE STOPPED: $Message" }
 
+# Native tools (git, npm, Gradle, gh) write progress and warnings to stderr,
+# which Windows PowerShell 5.1 can raise as terminating errors under 'Stop'.
+# Their exit code is the real verdict, so the preference is relaxed per call.
 function Invoke-Checked([string]$What, [scriptblock]$Command) {
-  & $Command
+  $previous = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try { & $Command }
+  finally { $ErrorActionPreference = $previous }
   if ($LASTEXITCODE -ne 0) { Stop-Release "$What failed (exit code $LASTEXITCODE)." }
 }
 
-# Runs a native tool and returns its combined output. PowerShell 5.1 turns
-# redirected stderr into errors, so the preference is relaxed just for the call.
+# Runs a native tool and returns its exit code and combined output.
 function Invoke-Captured([string]$File, [string[]]$Arguments) {
   $previous = $ErrorActionPreference
   $ErrorActionPreference = 'Continue'
   try { $output = & $File @Arguments 2>&1 | ForEach-Object { "$_" } }
   finally { $ErrorActionPreference = $previous }
-  [pscustomobject]@{ ExitCode = $LASTEXITCODE; Text = ($output -join "`n") }
+  [pscustomobject]@{ ExitCode = $LASTEXITCODE; Lines = @($output); Text = (@($output) -join "`n") }
 }
 
+# Always wrap calls in @(): a function returning an empty array yields $null.
 function Get-SourceDirt {
-  $lines = git status --porcelain --untracked-files=all -- @SourcePaths
-  @($lines | Where-Object { $_ -and ($_.Substring(3) -notmatch $IgnoredDirt) })
+  $status = Invoke-Captured 'git' (@('status', '--porcelain', '--untracked-files=all', '--') + $SourcePaths)
+  if ($status.ExitCode -ne 0) { Stop-Release "git status failed:`n$($status.Text)" }
+  # Porcelain lines only; git's CRLF warnings arrive on the same stream.
+  $status.Lines | Where-Object { $_ -match '^[ MADRCU?!]{2} ' -and ($_.Substring(3) -notmatch $IgnoredDirt) }
 }
 
 function Write-Utf8NoBom([string]$Path, [string]$Text) {
@@ -82,13 +90,13 @@ function Write-Utf8NoBom([string]$Path, [string]$Text) {
 
 # --- 1. Preflight -------------------------------------------------------------
 Write-Step 'Preflight'
-$root = (git rev-parse --show-toplevel).Trim()
+$root = ((Invoke-Captured 'git' @('rev-parse', '--show-toplevel')).Lines | Select-Object -Last 1).Trim()
 Set-Location $root
 
-$branch = (git rev-parse --abbrev-ref HEAD).Trim()
+$branch = ((Invoke-Captured 'git' @('rev-parse', '--abbrev-ref', 'HEAD')).Lines | Select-Object -Last 1).Trim()
 if ($branch -ne 'main') { Stop-Release "releases are cut from main; this checkout is on '$branch'." }
 
-$dirt = Get-SourceDirt
+$dirt = @(Get-SourceDirt)
 if ($dirt.Count -gt 0) {
   Stop-Release ("uncommitted changes would be built into the APK. Commit or stash them first:`n" + ($dirt -join "`n"))
 }
@@ -158,7 +166,7 @@ $newCode = $current.Code + 1
 $tag = "mobile-v$newName"
 $requiredCode = if ($Mandatory) { $newCode } elseif ($published -and $published.PSObject.Properties['requiredVersionCode']) { [int]$published.requiredVersionCode } else { 0 }
 
-if (git tag --list $tag) { Stop-Release "tag $tag already exists locally." }
+if ((Invoke-Captured 'git' @('tag', '--list', $tag)).Text.Trim()) { Stop-Release "tag $tag already exists locally." }
 $existing = Invoke-Captured 'gh' @('release', 'view', $tag, '--repo', $Repo)
 if ($existing.ExitCode -eq 0) { Stop-Release "GitHub release $tag already exists." }
 
