@@ -47,6 +47,29 @@ export {
   taskMatchesStatus,
 } from "./taskFeed";
 export type { GroupedTaskFeedRow, SplittableAssignedTask, TaskFeedLike, TaskFeedStatusFilter } from "./taskFeed";
+export {
+  autoAssignFromDepartment,
+  buildVoiceTaskDraft,
+  matchDepartmentByLabel,
+  matchPersonBySpokenName,
+  resolveVoiceAssignment,
+  voiceDraftGapMessage,
+  voiceDraftGaps,
+} from "./voiceTaskDraft.ts";
+export type {
+  VoiceAssignmentCandidate,
+  VoiceAssignmentResolution,
+  VoiceAvailabilityEntry,
+  VoiceDepartment,
+  VoiceDraftGap,
+  VoiceResolutionContext,
+  VoiceTaskDraft,
+  VoiceTaskHints,
+  VoiceTaskMode,
+  VoiceTaskPriority,
+} from "./voiceTaskDraft.ts";
+export { matchPersonByLabel, normalizePersonLabel, personNameKey } from "./personMatching";
+export type { PersonMatchCandidate } from "./personMatching";
 export { normalizeTaskParticipants } from "./taskParticipants";
 export type { TaskParticipants } from "./taskParticipants";
 export * from "./taskCoverage.ts";

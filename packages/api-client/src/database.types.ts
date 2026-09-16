@@ -6946,6 +6946,42 @@ export type Database = {
         }
         Relationships: []
       }
+      voice_interpretation_quotas: {
+        Row: {
+          interpretations: number
+          updated_at: string
+          user_profile_id: string
+          window_started_at: string
+        }
+        Insert: {
+          interpretations?: number
+          updated_at?: string
+          user_profile_id: string
+          window_started_at?: string
+        }
+        Update: {
+          interpretations?: number
+          updated_at?: string
+          user_profile_id?: string
+          window_started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_interpretation_quotas_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: true
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_interpretation_quotas_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: true
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       walkin_entries: {
         Row: {
           branch_id: string
@@ -7947,6 +7983,10 @@ export type Database = {
       }
       consume_username_login_rate_limit: {
         Args: { p_rate_limit_key: string }
+        Returns: boolean
+      }
+      consume_voice_interpretation_quota: {
+        Args: { p_profile_id: string }
         Returns: boolean
       }
       correct_crm_interaction: {

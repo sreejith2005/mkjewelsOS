@@ -239,7 +239,15 @@ corrected by a reviewed forward migration, not by changing history.
    tenant scope, MIME/size, signed URL access, cleanup, and audit linkage.
 5. Service-role use is server-only and bypasses RLS. A JWT-disabled worker must
    authenticate a dedicated secret before parsing input or touching data.
-6. Vercel must retain HTTPS, separate staging/production environments, SPA
+6. `interpret-task-voice` needs an `OPENAI_API_KEY` Edge Function secret, set
+   in the Supabase dashboard (Edge Functions -> Secrets) so the key never lands
+   on a command line or in shell history, optionally with
+   `OPENAI_TRANSCRIBE_MODEL` / `OPENAI_EXTRACT_MODEL`. The key is server-only:
+   never a `VITE_*` variable, never in Git, terminal output, or chat. Without
+   it the worker answers 503 and the Tasks composer stays fully usable by hand.
+   The function keeps the default `verify_jwt`; do not add it to the
+   `verify_jwt = false` list in `supabase/config.toml`.
+7. Vercel must retain HTTPS, separate staging/production environments, SPA
    fallback, deployment logs/commit association, browser-safe variables only,
    and rollback to a known-good deployment. Deploy `apps/web/dist`, never the
    Vite dev server.

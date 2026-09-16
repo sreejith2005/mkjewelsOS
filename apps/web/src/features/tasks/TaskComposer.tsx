@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { CalendarDays, Check, ChevronDown, FileText, Flag, Paperclip, Plus, Rocket, Users, UserRoundCheck, X } from "lucide-react";
-import { deriveTaskAuthoringCapability, normalizeTaskParticipants, type Enums, type Json } from "@jewelos/core";
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { AlertTriangle, CalendarDays, Check, ChevronDown, FileText, Flag, Paperclip, Plus, Rocket, Users, UserRoundCheck, X } from "lucide-react";
+import { deriveTaskAuthoringCapability, normalizeTaskParticipants, voiceDraftGapMessage, type Enums, type Json, type VoiceDraftGap } from "@jewelos/core";
 import type { UserProfile } from "@/types";
 import { Button, Modal, Notice } from "@/components/ui";
 import { toast } from "sonner";
@@ -8,8 +8,29 @@ import { cn } from "@/lib/utils";
 import { ChipSelector } from "./ChipSelector";
 import type { TaskReferenceData } from "./api";
 import { AssigneePicker } from "@/components/assignees/AssigneePicker";
+import { VoiceTaskCapture } from "./VoiceTaskCapture";
+import type { VoiceTaskInterpretation } from "./voiceApi";
 
 type Panel = "users" | "due" | "priority" | "form" | "watchers" | null;
+
+/** Which selector a reported gap should open once the author dismisses the alert. */
+const GAP_PANEL: Readonly<Record<VoiceDraftGap, Exclude<Panel, null> | null>> = {
+  title: null,
+  assignee: "users",
+  due: "due",
+  checklist: null,
+};
+
+/**
+ * An ISO instant becomes the `datetime-local` value the due-date input needs,
+ * in the viewer's own clock.
+ */
+function toDateTimeLocal(iso: string): string {
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const offset = parsed.getTimezoneOffset() * 60_000;
+  return new Date(parsed.getTime() - offset).toISOString().slice(0, 16);
+}
 
 function TaskSelector({ children, id, open, panel }: { children: ReactNode; id: Exclude<Panel, null>; open: boolean; panel: ReactNode }) {
   return <div className="min-w-0" data-testid={`task-selector-${id}`}>
@@ -18,7 +39,9 @@ function TaskSelector({ children, id, open, panel }: { children: ReactNode; id: 
   </div>;
 }
 
-export function TaskComposer({ data, onClose, onCreated, onSave, onUploadAttachment, profile }: {
+export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, onSave, onUploadAttachment, profile }: {
+  /** Voice capture is offered only to authors the database grants `tasks.manage_team`. */
+  canUseVoice?: boolean;
   data: TaskReferenceData;
   onClose: () => void;
   onCreated: () => void;
@@ -41,6 +64,9 @@ export function TaskComposer({ data, onClose, onCreated, onSave, onUploadAttachm
   const [checklist, setChecklist] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [voiceGaps, setVoiceGaps] = useState<readonly VoiceDraftGap[]>([]);
+  const [gapAlertOpen, setGapAlertOpen] = useState(false);
+  const [assignmentReason, setAssignmentReason] = useState<string | null>(null);
 
   const branchNames = useMemo(() => new Map(data.branches.map((branch) => [branch.id, branch.name])), [data.branches]);
   const departmentNames = useMemo(() => new Map(data.departments.map((department) => [department.id, department.name])), [data.departments]);
@@ -69,8 +95,44 @@ export function TaskComposer({ data, onClose, onCreated, onSave, onUploadAttachm
     const nextDoer = nextDoers.slice(0, 1);
     setDoers(nextDoer);
     setWatchers((current) => current.filter((id) => !nextDoer.includes(id)));
+    setAssignmentReason(null);
     setPanel(null);
   };
+  /**
+   * Prefills the composer from an interpreted note. Only fields the note
+   * actually supplied are written, so a re-record never blanks something the
+   * author has already corrected by hand. The submit guards below are
+   * untouched: a gap still blocks Assign.
+   */
+  const applyVoiceDraft = useCallback((interpretation: VoiceTaskInterpretation) => {
+    const { draft } = interpretation;
+    setError(null);
+    if (draft.title) setTitle(draft.title);
+    if (draft.description) setDescription(draft.description);
+    setTaskMode(draft.taskType === "checklist" ? "checklist" : "task");
+    if (draft.taskType === "checklist") {
+      setChecklist([...draft.checklist]);
+      setChecklistOpen(draft.checklist.length > 0);
+    }
+    if (draft.priority) setPriority(draft.priority);
+    if (draft.plannedDatetime) setPlanned(toDateTimeLocal(draft.plannedDatetime));
+    if (draft.assigneeId && eligiblePeople.some((person) => person.id === draft.assigneeId)) {
+      setDoers([draft.assigneeId]);
+      setWatchers((current) => current.filter((id) => id !== draft.assigneeId));
+      setAssignmentReason(draft.assignmentReason);
+    } else {
+      setAssignmentReason(null);
+    }
+    setVoiceGaps(interpretation.gaps);
+    setGapAlertOpen(interpretation.gaps.length > 0);
+  }, [eligiblePeople]);
+
+  const dismissGapAlert = () => {
+    setGapAlertOpen(false);
+    const firstPanel = voiceGaps.map((gap) => GAP_PANEL[gap]).find((target): target is Exclude<Panel, null> => target !== null);
+    if (firstPanel) setPanel(firstPanel);
+  };
+
   const addChecklistItem = () => {
     const item = checklistDraft.trim();
     if (!item) return;
@@ -112,6 +174,15 @@ export function TaskComposer({ data, onClose, onCreated, onSave, onUploadAttachm
     }
   };
 
+  /** Gaps the author has not filled yet, so the warning clears as they work. */
+  const outstandingVoiceGaps = useMemo(() => voiceGaps.filter((gap) => gap === "title"
+    ? !title.trim()
+    : gap === "assignee"
+      ? doers.length === 0
+      : gap === "due"
+        ? !planned
+        : checklist.length === 0), [checklist.length, doers.length, planned, title, voiceGaps]);
+
   const usersPanel = <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} label="Assign user" multiple={false} onChange={updateDoers} people={eligiblePeople.flatMap((person) => person.id ? [{ ...person, id: person.id }] : [])} selectedIds={doers} />;
   const duePanel = <label><span className="mb-1 block text-xs font-semibold text-task-text">Due date and time</span><input className="task-field" min={new Date().toISOString().slice(0, 16)} onChange={(event) => { setPlanned(event.target.value); setPanel(null); }} type="datetime-local" value={planned} /></label>;
   const priorityPanel = <fieldset className="grid grid-cols-3 gap-2"><legend className="sr-only">Priority</legend>{priorityOptions.map((option) => <button className={cn("min-h-11 rounded-lg border text-sm", priority === option.value ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border text-task-text-muted")} key={option.id} onClick={() => { setPriority(option.value); setPanel(null); }} type="button">{priority === option.value ? <Check className="mr-1 inline size-4" /> : null}{option.label}</button>)}</fieldset>;
@@ -121,6 +192,23 @@ export function TaskComposer({ data, onClose, onCreated, onSave, onUploadAttachm
   return (
     <Modal onClose={onClose} title="Assign New Task" tone="light" wide>
       {error ? <div className="mb-4"><Notice tone="danger">{error}</Notice></div> : null}
+
+      {canUseVoice ? <VoiceTaskCapture onInterpreted={applyVoiceDraft} /> : null}
+
+      {gapAlertOpen ? <div className="mb-4 rounded-xl border border-danger/40 bg-danger/10 p-4" data-testid="voice-gap-alert" role="alertdialog" aria-labelledby="voice-gap-alert-title">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-danger" />
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-semibold text-danger" id="voice-gap-alert-title">Finish these before assigning</h3>
+            <ul className="mt-1 space-y-0.5 text-sm text-task-text">{voiceGaps.map((gap) => <li key={gap}>{voiceDraftGapMessage(gap)}</li>)}</ul>
+          </div>
+        </div>
+        <Button autoFocus className="mt-3 border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={dismissGapAlert} type="button" variant="secondary">Fill them in</Button>
+      </div> : null}
+
+      {!gapAlertOpen && outstandingVoiceGaps.length > 0 ? <div className="mb-4" data-testid="voice-gap-notice"><Notice tone="danger">Still missing: {outstandingVoiceGaps.map(voiceDraftGapMessage).join(" ")}</Notice></div> : null}
+
+      {assignmentReason ? <p className="mb-3 text-xs text-task-text-muted" data-testid="voice-assignment-reason">Assigned from your voice note · {assignmentReason}</p> : null}
 
       <form className="flex flex-col" onSubmit={(event) => void submitManual(event)}>
           <label className="border-b border-task-border px-1 pb-3">

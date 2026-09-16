@@ -1,4 +1,4 @@
-import type { UserRole } from "./roleMenu";
+import type { UserRole } from "./roleMenu.ts";
 
 export type TaskAuthoringScope = "department" | "branch" | "tenant";
 

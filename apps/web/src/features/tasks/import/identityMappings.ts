@@ -1,4 +1,4 @@
-import type { TaskImportCanonicalRow, TaskImportDraftRow } from "@jewelos/core";
+import { matchPersonByLabel, normalizePersonLabel, type TaskImportCanonicalRow, type TaskImportDraftRow } from "@jewelos/core";
 import type { TaskBulkImportIssue } from "./workbook";
 
 export type TaskImportIdentityCandidate = Readonly<{
@@ -11,26 +11,11 @@ export type TaskImportIdentityCandidate = Readonly<{
   import_aliases: readonly string[];
 }>;
 
-const normalized = (value: string) => value.trim().toLocaleLowerCase("en-IN").replace(/\s+/g, " ");
-const nameKey = (value: string) => {
-  const parts = normalized(value).replace(/[^\p{L}\p{N}]+/gu, " ").split(" ").filter(Boolean);
-  return parts.length > 1 ? `${parts[0]} ${parts.at(-1)}` : parts[0] ?? "";
-};
-const unique = (candidates: readonly TaskImportIdentityCandidate[], predicate: (candidate: TaskImportIdentityCandidate) => boolean) => {
-  const matches = candidates.filter(predicate);
-  return matches.length === 1 ? matches[0] : undefined;
-};
+const normalized = normalizePersonLabel;
 
+/** Delegates to the shared roster matcher; `import_aliases` is this surface's alias source. */
 function resolveIdentity(email: string, name: string, candidates: readonly TaskImportIdentityCandidate[]) {
-  const emailMatch = email ? unique(candidates, (candidate) => normalized(candidate.email) === email) : undefined;
-  if (emailMatch) return emailMatch;
-  if (!name) return undefined;
-  const aliasMatch = unique(candidates, (candidate) => candidate.import_aliases.some((alias) => normalized(alias) === name));
-  if (aliasMatch) return aliasMatch;
-  const exactNameMatch = unique(candidates, (candidate) => normalized(candidate.employee_name) === name);
-  if (exactNameMatch) return exactNameMatch;
-  const compactName = nameKey(name);
-  return compactName ? unique(candidates, (candidate) => nameKey(candidate.employee_name) === compactName) : undefined;
+  return matchPersonByLabel({ email, name }, candidates.map((candidate) => ({ ...candidate, aliases: candidate.import_aliases })));
 }
 
 export function applyIdentityMappings(draftRows: readonly TaskImportDraftRow[], candidates: readonly TaskImportIdentityCandidate[]) {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Plus, RefreshCw, Upload, UserRoundPlus } from "lucide-react";
-import { countTaskFeedStatuses, deriveTaskMutationCapability, kolkataDateKey, splitAssignedTaskFeed, taskFormLinkedModule, taskMatchesStatus, type TaskFeedStatusFilter } from "@jewelos/core";
+import { countTaskFeedStatuses, deriveTaskMutationCapability, hasPermission, kolkataDateKey, splitAssignedTaskFeed, taskFormLinkedModule, taskMatchesStatus, type TaskFeedStatusFilter } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Modal, Notice } from "@/components/ui";
 import {
@@ -31,7 +31,7 @@ type TaskWorkspaceView = "mine" | "delegated";
 const TASK_TOPICS = ["tasks", "forms", "organization"] as const;
 
 export function TasksPage() {
-  const { profile } = useAuth();
+  const { access, profile } = useAuth();
   const [statusFilter, setStatusFilter] = useState<TaskFeedStatusFilter>("pending");
   const [myTasks, setMyTasks] = useState<TaskBundle[]>([]);
   const [delegatedTasks, setDelegatedTasks] = useState<TaskBundle[]>([]);
@@ -49,6 +49,8 @@ export function TasksPage() {
   const canManage = profile ? ["super_admin", "admin", "manager"].includes(profile.user_role) : false;
   const canCreateTasks = Boolean(profile);
   const hasAdminTaskView = profile ? ["super_admin", "admin"].includes(profile.user_role) : false;
+  // The database resolves this key; the flag only decides whether the control is offered.
+  const canUseVoice = access ? hasPermission(access, "tasks.manage_team") : false;
 
   const refresh = useCallback(async () => {
     if (!profile) return;
@@ -193,7 +195,7 @@ export function TasksPage() {
         <Button aria-label="Create task" className="size-14 rounded-full bg-task-accent p-0 text-task-text shadow-xl hover:bg-task-accent/90 md:h-14 md:w-auto md:rounded-2xl md:px-5" onClick={() => void openComposer()}><Plus className="size-6" /><span className="hidden md:inline">Create Task</span></Button>
       </div> : null}
 
-      {composerOpen && canCreateTasks && references && profile ? <TaskComposer data={references} onClose={() => setComposerOpen(false)} onCreated={() => { setComposerOpen(false); void refresh(); }} onSave={createDelegationTask} onUploadAttachment={(taskId, file) => uploadTaskAttachment(profile.tenant_id, taskId, file)} profile={profile} /> : null}
+      {composerOpen && canCreateTasks && references && profile ? <TaskComposer canUseVoice={canUseVoice} data={references} onClose={() => setComposerOpen(false)} onCreated={() => { setComposerOpen(false); void refresh(); }} onSave={createDelegationTask} onUploadAttachment={(taskId, file) => uploadTaskAttachment(profile.tenant_id, taskId, file)} profile={profile} /> : null}
       {formTarget?.id && formTarget.form_template_id ? (() => { const form = formBundles.find((item) => item.id === formTarget.form_template_id); return form ? <Modal onClose={() => setFormTarget(null)} title={`Required form: ${form.name}`} wide><FormRenderer definition={{ name: form.name, description: form.description ?? undefined, sections: form.sections, fields: form.fields }} dynamicOptions={formDynamicOptions} templateId={form.id} onSubmit={async (answers) => { await submitForm(form.id, answers, taskFormLinkedModule(formTarget.task_type), formTarget.id as string); setFormTarget(null); await refresh(); }} /></Modal> : <Modal onClose={() => setFormTarget(null)} title="Required form"><Notice tone="danger">The exact required form version is not available to this account.</Notice></Modal>; })() : null}
     </section>
   );
