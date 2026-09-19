@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { AlertTriangle, CalendarDays, Check, ChevronDown, FileText, Flag, Paperclip, Plus, Rocket, Users, UserRoundCheck, X } from "lucide-react";
-import { deriveTaskAuthoringCapability, normalizeTaskParticipants, voiceDraftGapMessage, type Enums, type Json, type VoiceDraftGap } from "@jewelos/core";
+import { deriveTaskAuthoringCapability, normalizeTaskParticipants, voiceDraftGapMessage, voiceDraftGaps, type Enums, type Json, type VoiceDraftGap } from "@jewelos/core";
 import type { UserProfile } from "@/types";
 import { Button, Modal, Notice } from "@/components/ui";
 import { toast } from "sonner";
@@ -113,19 +113,35 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
     if (draft.taskType === "checklist") {
       setChecklist([...draft.checklist]);
       setChecklistOpen(draft.checklist.length > 0);
+    } else {
+      // Mirrors choosing "Task" by hand, which also discards checklist items.
+      setChecklist([]);
+      setChecklistOpen(false);
     }
     if (draft.priority) setPriority(draft.priority);
-    if (draft.plannedDatetime) setPlanned(toDateTimeLocal(draft.plannedDatetime));
-    if (draft.assigneeId && eligiblePeople.some((person) => person.id === draft.assigneeId)) {
+    const nextPlanned = draft.plannedDatetime ? toDateTimeLocal(draft.plannedDatetime) : "";
+    if (nextPlanned) setPlanned(nextPlanned);
+    const assigneeApplies = Boolean(draft.assigneeId) && eligiblePeople.some((person) => person.id === draft.assigneeId);
+    if (assigneeApplies && draft.assigneeId) {
       setDoers([draft.assigneeId]);
       setWatchers((current) => current.filter((id) => id !== draft.assigneeId));
       setAssignmentReason(draft.assignmentReason);
     } else {
       setAssignmentReason(null);
     }
-    setVoiceGaps(interpretation.gaps);
-    setGapAlertOpen(interpretation.gaps.length > 0);
-  }, [eligiblePeople]);
+    // Gaps are judged on what the form will hold, not on the server's list: an
+    // assignee outside this author's selectable users is dropped above and
+    // must surface as "User not selected", and anything already filled by
+    // hand is not a gap.
+    const gaps = voiceDraftGaps({
+      ...draft,
+      title: draft.title || title.trim(),
+      assigneeId: assigneeApplies ? draft.assigneeId : doers[0] ?? null,
+      plannedDatetime: nextPlanned || planned || null,
+    });
+    setVoiceGaps(gaps);
+    setGapAlertOpen(gaps.length > 0);
+  }, [doers, eligiblePeople, planned, title]);
 
   const dismissGapAlert = () => {
     setGapAlertOpen(false);

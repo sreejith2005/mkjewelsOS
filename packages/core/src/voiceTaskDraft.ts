@@ -90,28 +90,86 @@ export function matchPersonBySpokenName<T extends PersonMatchCandidate>(
 ): T | undefined {
   const exact = matchPersonByLabel({ name: spoken }, candidates);
   if (exact) return exact;
-  const target = normalizePersonLabel(spoken);
-  if (!target) return undefined;
+  const spokenTokens = spokenNameTokens(spoken);
+  if (spokenTokens.length === 0) return undefined;
+  const target = spokenTokens.join(" ");
+  const withoutHonorifics = matchPersonByLabel({ name: target }, candidates);
+  if (withoutHonorifics) return withoutHonorifics;
   const nameTokens = (person: T) => normalizePersonLabel(person.employee_name).replace(/[^\p{L}\p{N}]+/gu, " ").split(" ").filter(Boolean);
   const byFirstName = candidates.filter((person) => nameTokens(person)[0] === target);
   if (byFirstName.length === 1) return byFirstName[0];
   const byAnyToken = candidates.filter((person) => nameTokens(person).includes(target));
-  return byAnyToken.length === 1 ? byAnyToken[0] : undefined;
+  if (byAnyToken.length === 1) return byAnyToken[0];
+  if (byFirstName.length > 1 || byAnyToken.length > 1) return undefined;
+  // Transcription often slips one letter on an Indian name ("Rashma" for
+  // "Reshma"). Every spoken token must land within one edit of a distinct name
+  // token, and the result must still be unique.
+  const byNearSpelling = candidates.filter((person) => {
+    const tokens = nameTokens(person);
+    return spokenTokens.every((spokenToken) => spokenToken.length >= 4 && tokens.some((token) => withinOneEdit(spokenToken, token)));
+  });
+  return byNearSpelling.length === 1 ? byNearSpelling[0] : undefined;
 }
 
-/** Matches a spoken department against its name or its short code ("CRM", "MDO"). */
+/** Forms of address a spoken instruction wraps around a name ("Anil sir", "Priya ji"). */
+const SPOKEN_HONORIFICS = new Set(["mr", "mrs", "ms", "miss", "dr", "sir", "madam", "maam", "mam", "ji", "bhai", "chechi", "chetta", "chettan", "anna"]);
+
+function spokenNameTokens(value: string | null | undefined): string[] {
+  return normalizePersonLabel(value).replace(/[^\p{L}\p{N}]+/gu, " ").split(" ").filter((token) => token && !SPOKEN_HONORIFICS.has(token));
+}
+
+/** True when two words differ by at most one insertion, deletion, or substitution. */
+function withinOneEdit(left: string, right: string): boolean {
+  if (left === right) return true;
+  if (Math.abs(left.length - right.length) > 1) return false;
+  const [shorter, longer] = left.length <= right.length ? [left, right] : [right, left];
+  let index = 0;
+  while (index < shorter.length && shorter[index] === longer[index]) index += 1;
+  return shorter.length === longer.length
+    ? shorter.slice(index + 1) === longer.slice(index + 1)
+    : shorter.slice(index) === longer.slice(index + 1);
+}
+
+/** Words a speaker adds around a department ("the MDO department", "CRM team"). */
+const DEPARTMENT_FILLER_WORDS = new Set(["the", "department", "departments", "dept", "team", "section", "division", "unit", "staff", "people", "someone", "somebody", "anyone", "from", "in", "of"]);
+
+function departmentWords(value: string | null | undefined): string {
+  return normalizePersonLabel(value).replace(/[^\p{L}\p{N}]+/gu, " ").split(" ").filter((word) => word && !DEPARTMENT_FILLER_WORDS.has(word)).join(" ");
+}
+
+/** "M.D.O." and "m d o" are both the code "mdo". */
+function departmentCodeKey(value: string | null | undefined): string {
+  return normalizePersonLabel(value).replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+/**
+ * Matches a spoken department against its name or its short code ("CRM",
+ * "MDO"), tolerating filler words ("MDO department", "the CRM team"), spelled
+ * out codes ("M.D.O."), and the "Name (CODE)" form the extractor is shown.
+ */
 export function matchDepartmentByLabel(
   label: string | null | undefined,
   departments: readonly VoiceDepartment[],
 ): VoiceDepartment | undefined {
-  const target = normalizePersonLabel(label);
+  const raw = normalizePersonLabel(label);
+  if (!raw) return undefined;
+  const echoed = unique(departments, (department) => department.code
+    ? normalizePersonLabel(`${department.name} (${department.code})`) === raw
+    : false);
+  if (echoed) return echoed;
+  const target = departmentWords(raw);
   if (!target) return undefined;
-  const byCode = departments.filter((department) => normalizePersonLabel(department.code) === target);
-  if (byCode.length === 1) return byCode[0];
-  const byName = departments.filter((department) => normalizePersonLabel(department.name) === target);
-  if (byName.length === 1) return byName[0];
-  const byPartialName = departments.filter((department) => normalizePersonLabel(department.name).includes(target));
-  return byPartialName.length === 1 ? byPartialName[0] : undefined;
+  const targetCode = departmentCodeKey(target);
+  const byCode = unique(departments, (department) => Boolean(department.code) && departmentCodeKey(department.code) === targetCode);
+  if (byCode) return byCode;
+  const byName = unique(departments, (department) => departmentWords(department.name) === target);
+  if (byName) return byName;
+  return unique(departments, (department) => departmentWords(department.name).includes(target));
+}
+
+function unique<T>(items: readonly T[], predicate: (item: T) => boolean): T | undefined {
+  const matches = items.filter(predicate);
+  return matches.length === 1 ? matches[0] : undefined;
 }
 
 function isEligible(person: VoiceAssignmentCandidate, unavailableIds: ReadonlySet<string>): boolean {
@@ -156,14 +214,21 @@ export function resolveVoiceAssignment(
   hints: VoiceTaskHints,
   context: VoiceResolutionContext,
 ): VoiceAssignmentResolution {
+  const department = hints.department_hint ? matchDepartmentByLabel(hints.department_hint, context.departments) : undefined;
   if (hints.assignee_hint) {
     const person = matchPersonBySpokenName(hints.assignee_hint, context.people);
     if (person) return { assigneeId: person.id, reason: `Matched "${hints.assignee_hint.trim()}"` };
+    // "Reshma from CRM": a name shared across departments is settled by the
+    // department spoken with it, and must still be unique inside it.
+    const inDepartment = department
+      ? matchPersonBySpokenName(hints.assignee_hint, context.people.filter((candidate) => candidate.department_id === department.id))
+      : undefined;
+    if (inDepartment && department) return { assigneeId: inDepartment.id, reason: `Matched "${hints.assignee_hint.trim()}" in ${department.name}` };
   }
-  if (hints.department_hint) {
-    const department = matchDepartmentByLabel(hints.department_hint, context.departments);
-    if (department) return autoAssignFromDepartment(department, context);
-  }
+  if (department) return autoAssignFromDepartment(department, context);
+  // A department spoken where a person was expected ("give it to the CRM team").
+  const namedDepartment = hints.assignee_hint ? matchDepartmentByLabel(hints.assignee_hint, context.departments) : undefined;
+  if (namedDepartment) return autoAssignFromDepartment(namedDepartment, context);
   return { assigneeId: null, reason: null };
 }
 

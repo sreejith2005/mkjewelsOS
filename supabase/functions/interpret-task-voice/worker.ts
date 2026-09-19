@@ -81,15 +81,43 @@ export const VOICE_HINTS_JSON_SCHEMA = {
 
 export function buildExtractionInstructions(context: VoiceExtractionContext): string {
   return [
-    "You convert a spoken task instruction into structured fields for a task assignment form.",
-    `The current date and time in Asia/Kolkata is ${context.nowIso}. Resolve relative deadlines such as "tomorrow", "by Friday", or "in two hours" against it and answer with an ISO-8601 instant including the +05:30 offset.`,
-    "Return assignee_hint as the person's name exactly as spoken. Never invent a name that was not said, and never return an identifier.",
-    "Return department_hint only when a team or department was named instead of a person.",
+    "You convert a spoken task instruction into structured fields for a task assignment form at MK Jewels, a jewellery retailer in India.",
+    "The transcript is machine speech-to-text of Indian English that may mix in Hindi or Malayalam words, so names can be misspelt.",
+    `The current date and time in Asia/Kolkata is ${context.nowIso}. Resolve relative deadlines such as "tomorrow", "by Friday", "tonight", or "in two hours" against it and answer with an ISO-8601 instant including the +05:30 offset. A day without a time means 18:00 that day.`,
+    'title is a short imperative summary of the work in English, for example "Count the display stock". Never copy the whole transcript into the title.',
+    "Return assignee_hint as the person's name. When the spoken name clearly refers to one of the listed people, return that person's name exactly as listed; otherwise return it as spoken. Never invent a name that was not said, and never return an identifier.",
+    "Return department_hint when a team or department was named, using the department's name or code exactly as listed when it clearly refers to one of them.",
     'Use task_type "checklist" only when the note clearly lists several steps to tick off; otherwise "delegation" with an empty checklist_items array.',
     "Set any field the note did not supply to null (or an empty string for description). Do not guess a deadline, a person, or a priority that was not spoken.",
+    "If the transcript is not a work instruction at all - silence, noise, music or lyrics, a greeting, or unrelated talk - return an empty title and null for every hint.",
     context.departmentLabels.length > 0 ? `Departments that exist: ${context.departmentLabels.join(", ")}.` : "",
     context.peopleNames.length > 0 ? `People who may be assigned: ${context.peopleNames.join(", ")}.` : "",
   ].filter(Boolean).join("\n");
+}
+
+/** The transcription prompt budget. Whisper keeps only its final 224 tokens. */
+const TRANSCRIPTION_PROMPT_MAX_CHARS = 700;
+
+/**
+ * Vocabulary for the speech-to-text model. Without it an unfamiliar Indian name
+ * comes back misspelt, and a quiet clip can come back as invented text in
+ * another language. The staff list is cut to the budget at a name boundary.
+ */
+export function buildTranscriptionPrompt(context: VoiceExtractionContext): string {
+  let prompt = "A manager at MK Jewels assigns a task in Indian English: who does it, what to do, and when it is due.";
+  const departments = context.departmentLabels.length > 0 ? ` Departments: ${context.departmentLabels.join(", ")}.` : "";
+  if (prompt.length + departments.length <= TRANSCRIPTION_PROMPT_MAX_CHARS) prompt += departments;
+  const names: string[] = [];
+  for (const name of context.peopleNames) {
+    if (prompt.length + ` Staff: ${[...names, name].join(", ")}.`.length > TRANSCRIPTION_PROMPT_MAX_CHARS) break;
+    names.push(name);
+  }
+  return names.length > 0 ? `${prompt} Staff: ${names.join(", ")}.` : prompt;
+}
+
+/** True when the note carried nothing a task could be built from. */
+export function hintsCarryNoTask(hints: VoiceTaskHints): boolean {
+  return !hints.title && !hints.assignee_hint && !hints.department_hint && !hints.due_datetime && hints.checklist_items.length === 0;
 }
 
 function asString(value: unknown): string {
@@ -157,6 +185,7 @@ export async function interpretVoiceTask(
   const transcript = (await gateway.transcribe(upload)).trim();
   if (!transcript) throw new VoiceInterpretationError(422, "Nothing was said in the recording");
   const hints = parseExtractionHints(await gateway.extract(transcript, extraction), Date.parse(extraction.nowIso));
+  if (hintsCarryNoTask(hints)) throw new VoiceInterpretationError(422, "No task was heard in that recording. Check your microphone, speak clearly, and try again.");
   const draft = buildVoiceTaskDraft(hints, await loadResolution(hints));
   return { transcript, draft, gaps: voiceDraftGaps(draft) };
 }

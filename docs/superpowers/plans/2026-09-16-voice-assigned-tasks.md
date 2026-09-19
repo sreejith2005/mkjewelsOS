@@ -25,6 +25,34 @@ Two deviations from the design below, both deliberate:
   The browser enforces the 60 s cap and stops the recorder itself; the byte
   ceiling is the bound that does not depend on the client.
 
+## 0. Reliability fixes (2026-09-19)
+
+Field reports: notes came back as invented text in an unrelated language
+(a Chinese sentence became the task title), departments and names often failed
+to resolve, and the recorder misbehaved. Fixed without touching the write path:
+
+- **Transcription** now sends `language` (default `en`; optional secret
+  `OPENAI_TRANSCRIBE_LANGUAGE`, `auto` restores detection) and a vocabulary
+  `prompt` of department labels and staff names (`buildTranscriptionPrompt`,
+  capped at 700 characters).
+- **Extraction** is told the transcript is Indian English, to return listed
+  spellings for names/departments, and to return an empty draft for noise.
+  A draft with no title, person, department, deadline, or checklist is
+  refused with 422 (`hintsCarryNoTask`) instead of prefilling the form.
+- **Matching** (`voiceTaskDraft.ts`): department filler words, spelled-out
+  codes (`M.D.O.`) and the echoed `Name (CODE)` form resolve; honorifics
+  (`sir`, `ji`, `madam`...) are ignored; a unique one-edit misspelling of a
+  name of 4+ letters resolves; a shared name is settled by the department
+  spoken with it; a department spoken as the assignee auto-assigns.
+- **Scope parity**: the function now resolves the author's designation, so a
+  process coordinator's voice roster matches the composer's.
+- **Composer** computes gaps from what it actually applied, so an assignee the
+  author cannot select shows "User not selected", and a field filled by hand
+  before recording is not reported.
+- **Recorder**: one microphone per tap (a double tap opened two), a live level
+  meter, clips under 1 s or with no voice heard are refused before upload, and
+  a result arriving after the composer closed is dropped.
+
 ## 1. Requirement
 
 An owner/super admin/admin/manager records a short voice note in the Tasks

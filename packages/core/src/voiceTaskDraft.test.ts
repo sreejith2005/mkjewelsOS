@@ -64,6 +64,14 @@ describe("matchDepartmentByLabel", () => {
     expect(matchDepartmentByLabel("logistics", [crm, mdo])).toBeUndefined();
     expect(matchDepartmentByLabel("", [crm, mdo])).toBeUndefined();
   });
+
+  it("tolerates filler words, spelled-out codes, and the echoed label form", () => {
+    expect(matchDepartmentByLabel("MDO department", [crm, mdo])?.id).toBe("dept-mdo");
+    expect(matchDepartmentByLabel("the CRM team", [crm, mdo])?.id).toBe("dept-crm");
+    expect(matchDepartmentByLabel("M.D.O.", [crm, mdo])?.id).toBe("dept-mdo");
+    expect(matchDepartmentByLabel("Customer Relations (CRM)", [crm, mdo])?.id).toBe("dept-crm");
+    expect(matchDepartmentByLabel("department", [crm, mdo])).toBeUndefined();
+  });
 });
 
 describe("autoAssignFromDepartment", () => {
@@ -135,6 +143,34 @@ describe("resolveVoiceAssignment", () => {
 
   it("falls back to the department when the name matches nobody", () => {
     expect(resolveVoiceAssignment(hints({ assignee_hint: "Somebody Else", department_hint: "CRM" }), context).assigneeId).toBe("priya");
+  });
+
+  it("ignores a form of address around the spoken name", () => {
+    expect(resolveVoiceAssignment(hints({ assignee_hint: "Anil sir" }), context).assigneeId).toBe("anil");
+    expect(resolveVoiceAssignment(hints({ assignee_hint: "Priya ji" }), context).assigneeId).toBe("priya");
+  });
+
+  it("accepts a one-letter transcription slip only when it stays unique", () => {
+    expect(resolveVoiceAssignment(hints({ assignee_hint: "Rashma" }), context).assigneeId).toBe("reshma");
+    const twoNear = { ...context, people: [...people, person({ id: "rashmi", employee_name: "Rashmi Das" })] };
+    expect(resolveVoiceAssignment(hints({ assignee_hint: "Rashma" }), twoNear).assigneeId).toBeNull();
+    expect(resolveVoiceAssignment(hints({ assignee_hint: "Anu" }), { ...context, people: [person({ id: "anil", employee_name: "Anil Kumar" })] }).assigneeId).toBeNull();
+  });
+
+  it("settles a shared first name by the department spoken with it", () => {
+    const twoReshmas = {
+      ...context,
+      people: [
+        person({ id: "reshma", employee_name: "Reshma Menon" }),
+        person({ id: "reshma-mdo", employee_name: "Reshma Pillai", department_id: "dept-mdo" }),
+      ],
+    };
+    const resolution = resolveVoiceAssignment(hints({ assignee_hint: "Reshma", department_hint: "MDO" }), twoReshmas);
+    expect(resolution).toEqual({ assigneeId: "reshma-mdo", reason: 'Matched "Reshma" in Market Development' });
+  });
+
+  it("treats a department spoken in place of a person as the department", () => {
+    expect(resolveVoiceAssignment(hints({ assignee_hint: "MDO team" }), context)).toEqual({ assigneeId: "vivek", reason: "Lowest open load in Market Development" });
   });
 
   it("resolves nobody when neither a name nor a department is usable", () => {

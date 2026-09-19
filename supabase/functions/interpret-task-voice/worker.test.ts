@@ -4,6 +4,7 @@ import {
   VoiceInterpretationError,
   assertVoiceUpload,
   buildExtractionInstructions,
+  buildTranscriptionPrompt,
   interpretVoiceTask,
   parseExtractionHints,
   type VoiceAudioUpload,
@@ -168,4 +169,41 @@ Deno.test("interpretVoiceTask validates the upload before calling a paid API", a
     transcribe: () => Promise.reject(new Error("transcription must not run")),
     extract: () => Promise.reject(new Error("extraction must not run")),
   }, upload({ contentType: "text/plain" }), () => Promise.resolve(resolution), extraction), VoiceInterpretationError);
+});
+
+Deno.test("interpretVoiceTask refuses a transcript that carries no task instead of titling a task with it", async () => {
+  let resolved = false;
+  const error = await assertRejects(() => interpretVoiceTask({
+    transcribe: () => Promise.resolve("一個叫做兩顆心的感覺"),
+    extract: () => Promise.resolve({
+      title: "",
+      description: "",
+      assignee_hint: null,
+      department_hint: null,
+      due_datetime: null,
+      priority: null,
+      task_type: "delegation",
+      checklist_items: [],
+    }),
+  }, upload(), () => {
+    resolved = true;
+    return Promise.resolve(resolution);
+  }, extraction), VoiceInterpretationError);
+  assertEquals(error.status, 422);
+  assertEquals(resolved, false);
+});
+
+Deno.test("buildExtractionInstructions tells the model to drop non-instructions and use listed spellings", () => {
+  const instructions = buildExtractionInstructions(extraction);
+  assertEquals(instructions.includes("not a work instruction"), true);
+  assertEquals(instructions.includes("exactly as listed"), true);
+});
+
+Deno.test("buildTranscriptionPrompt carries the roster vocabulary within its budget", () => {
+  assertEquals(buildTranscriptionPrompt(extraction).includes("Staff: Priya Nair, Reshma Menon."), true);
+  assertEquals(buildTranscriptionPrompt(extraction).includes("Customer Relations (CRM)"), true);
+  const crowded = buildTranscriptionPrompt({ ...extraction, peopleNames: Array.from({ length: 500 }, (_, index) => `Person Number ${index}`) });
+  assertEquals(crowded.length <= 700, true);
+  assertEquals(crowded.endsWith("."), true);
+  assertEquals(/Person Number \d+$/.test(crowded.slice(0, -1)), true);
 });

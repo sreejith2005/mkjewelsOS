@@ -146,6 +146,29 @@ describe("TaskComposer voice capture", () => {
     expect(screen.queryByTestId("voice-gap-notice")).toBeNull();
   });
 
+  it("warns that no user is selected when the note resolved someone this author cannot pick", () => {
+    interpretationRef.current = interpretation({ assigneeId: "outside-scope" }, []);
+    const { onSave } = renderComposer();
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply voice note" }));
+
+    expect(screen.getByTestId("voice-gap-alert").textContent).toContain("User not selected.");
+    expect(screen.queryByTestId("voice-assignment-reason")).toBeNull();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it("does not report a gap the author already filled by hand before recording", () => {
+    interpretationRef.current = interpretation({ assigneeId: null, assignmentReason: null }, ["assignee"]);
+    renderComposer();
+
+    fireEvent.click(screen.getByRole("button", { name: /Users/i }));
+    fireEvent.click(screen.getByLabelText("Teammate"));
+    fireEvent.click(screen.getByRole("button", { name: "Apply voice note" }));
+
+    expect(screen.queryByTestId("voice-gap-alert")).toBeNull();
+    expect(screen.getByTestId("task-selector-users").textContent).toContain("1 user");
+  });
+
   it("keeps a missing deadline out of the form rather than guessing one", () => {
     interpretationRef.current = interpretation({ plannedDatetime: null }, ["due"]);
     renderComposer();

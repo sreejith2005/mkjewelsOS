@@ -4,6 +4,7 @@ import {
   VOICE_NOTE_MAX_BYTES,
   VoiceInterpretationError,
   buildExtractionInstructions,
+  buildTranscriptionPrompt,
   interpretVoiceTask,
   type VoiceAudioUpload,
   type VoiceExtractionContext,
@@ -117,19 +118,23 @@ Deno.serve(async (request: Request) => {
     const now = new Date();
     const { date: todayKey, time: nowTime } = kolkataParts(now);
 
-    const [departmentsResult, peopleResult] = await Promise.all([
+    const [departmentsResult, peopleResult, designationResult] = await Promise.all([
       admin.from("departments").select("id,name,code,head_id").eq("tenant_id", profile.tenant_id).eq("is_active", true),
       admin.from("user_profiles")
         .select("id,employee_name,first_name,last_name,branch_id,department_id,account_status,working_status")
         .eq("tenant_id", profile.tenant_id)
         .in("account_status", ["active", "invited"])
         .eq("working_status", "active"),
+      profile.designation_id
+        ? admin.from("dropdown_masters").select("value").eq("id", profile.designation_id).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
     ]);
     if (departmentsResult.error || peopleResult.error) return response(503, { error: "Roster is unavailable right now" });
 
-    // Mirrors the composer's assignee scope. The database stays the boundary:
-    // the task RPC re-authorizes whoever the author finally submits.
-    const scope = deriveTaskAuthoringCapability({ userRole: profile.user_role, designationValue: null }).scope;
+    // Mirrors the composer's assignee scope, designation included (a process
+    // coordinator authors tenant-wide). The database stays the boundary: the
+    // task RPC re-authorizes whoever the author finally submits.
+    const scope = deriveTaskAuthoringCapability({ userRole: profile.user_role, designationValue: designationResult.data?.value ?? null }).scope;
     const people = peopleResult.data.filter((person) => {
       if (scope === "tenant") return true;
       if (scope === "branch") return person.branch_id === profile.branch_id;
@@ -178,6 +183,13 @@ Deno.serve(async (request: Request) => {
         body.append("file", new File([input.bytes as BlobPart], input.filename, { type: input.contentType }));
         body.append("model", Deno.env.get("OPENAI_TRANSCRIBE_MODEL") ?? "gpt-4o-mini-transcribe");
         body.append("response_format", "text");
+        // Without a language the model auto-detects, and a quiet or noisy clip
+        // comes back as invented text in an unrelated language. English is the
+        // working language of the task form; OPENAI_TRANSCRIBE_LANGUAGE="auto"
+        // restores detection, any other ISO-639-1 code overrides it.
+        const language = Deno.env.get("OPENAI_TRANSCRIBE_LANGUAGE")?.trim() || "en";
+        if (language !== "auto") body.append("language", language);
+        body.append("prompt", buildTranscriptionPrompt(extraction));
         const result = await fetch("https://api.openai.com/v1/audio/transcriptions", { method: "POST", body, headers: { authorization: `Bearer ${openAiKey}` } });
         if (!result.ok) {
           console.error(`OpenAI transcription failed with ${result.status}`);
