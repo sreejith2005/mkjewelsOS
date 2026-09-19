@@ -160,6 +160,11 @@ export function TasksScreen() {
             variant="secondary"
           />
         ) : null}
+        <Button
+          label="Bulk Import"
+          onPress={() => navigation.navigate("TaskImport")}
+          variant="secondary"
+        />
       </View>
 
       <FlatList

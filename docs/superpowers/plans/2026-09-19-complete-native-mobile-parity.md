@@ -220,7 +220,7 @@ Commit: `feat(mobile): add secure voice task capture`
 - Consumes: existing web import normalization/identity/chunk behavior, audited import RPCs, `expo-document-picker`, `expo-file-system`, and an Expo-compatible XLSX reader selected as a direct mobile dependency.
 - Produces: shared import domain/data modules plus native steps `select -> validate -> map -> review -> run -> result`.
 
-- [ ] **Step 1: Move tests first and verify RED imports**
+- [x] **Step 1: Move tests first and verify RED imports**
 
 Copy the existing behavior tests into the shared packages with imports pointed at the intended new modules. Add an XLSX ArrayBuffer parsing test and a 1 MiB/500-row rejection test.
 
@@ -233,23 +233,23 @@ pnpm.cmd --filter @jewelos/data exec vitest run src/tasks/import --reporter=verb
 
 Expected: FAIL because shared modules are absent.
 
-- [ ] **Step 2: Extract shared import code and keep web shims**
+- [x] **Step 2: Extract shared import code and keep web shims**
 
 Move platform-independent normalization/hash/report logic to core and Supabase calls/chunk runner to data. Parameterize file-byte decoding so browser `File` and native `ArrayBuffer` feed the same workbook normalization. Keep web files as exports/adapters and run all existing web import tests.
 
-- [ ] **Step 3: Write native session RED tests**
+- [x] **Step 3: Write native session RED tests**
 
 Test legal state transitions, unresolved identity blocking, no inferred mappings, interrupted chunk resume coordinates, idempotent replay display, and clearing raw bytes after validation.
 
-- [ ] **Step 4: Implement the native import stack screen**
+- [x] **Step 4: Implement the native import stack screen**
 
 Accept `.csv`, `.xlsx`, and `.xls` through the document picker. Enforce extension, MIME, byte, and row limits before parsing. Present structural issues, explicit identity matching, correction export/share, review totals, bounded chunk progress, history, and an Assigning Left link. Keep raw file bytes and rows in memory only; persist no PII.
 
-- [ ] **Step 5: Register guarded navigation**
+- [x] **Step 5: Register guarded navigation**
 
 Show Bulk Import only when the same permission/capability as web allows it. Direct native navigation still loads the screen, checks access, and shows Access denied without invoking loaders when denied.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Run:
 
