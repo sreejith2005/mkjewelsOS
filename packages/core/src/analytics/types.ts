@@ -10,7 +10,7 @@ export type DateRange = Readonly<{
   timezone: string;
 }>;
 
-export type MetricFormat = "count" | "percentage" | "duration_minutes";
+export type MetricFormat = "count" | "percentage" | "score" | "duration_minutes";
 export type EmptyBehavior = "zero" | "no_data" | "not_applicable";
 
 export type MetricDefinition = Readonly<{

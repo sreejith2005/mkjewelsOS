@@ -8,7 +8,7 @@ import {
   isRecurringInstanceInTab,
   recurringInstanceDisplayStatus,
   recurringInstanceNeedsWork,
-  recurringPerformancePercents,
+  recurringPerformanceScores,
   recurringPerformanceRows,
   recurringRecurrenceRule,
   recurringStatusPill,
@@ -249,14 +249,17 @@ describe("recurringPerformanceRows", () => {
   });
 });
 
-describe("recurringPerformancePercents", () => {
-  it("reports completion and on-time shares, and zero rather than NaN with no work", () => {
+describe("recurringPerformanceScores", () => {
+  it("reports the shared pending and delayed scores, including assigned-but-unfinished work", () => {
     expect(
-      recurringPerformancePercents({ name: "Asha", assigned: 4, completed: 3, verified: 0, onTime: 3, delayed: 1, onBehalf: 0 }),
-    ).toEqual({ completion: 75, onTime: 75 });
+      recurringPerformanceScores({ name: "Asha", assigned: 4, completed: 3, verified: 0, onTime: 1, delayed: 2, onBehalf: 0 }),
+    ).toEqual({ pending: -25, delayed: -66.7 });
     expect(
-      recurringPerformancePercents({ name: "Bala", assigned: 0, completed: 0, verified: 0, onTime: 0, delayed: 0, onBehalf: 0 }),
-    ).toEqual({ completion: 0, onTime: 0 });
+      recurringPerformanceScores({ name: "Bala", assigned: 1, completed: 0, verified: 0, onTime: 0, delayed: 0, onBehalf: 0 }),
+    ).toEqual({ pending: -100, delayed: -100 });
+    expect(
+      recurringPerformanceScores({ name: "Chitra", assigned: 0, completed: 0, verified: 0, onTime: 0, delayed: 0, onBehalf: 0 }),
+    ).toEqual({ pending: null, delayed: null });
   });
 });
 

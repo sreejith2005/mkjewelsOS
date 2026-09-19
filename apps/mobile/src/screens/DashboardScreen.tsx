@@ -141,9 +141,9 @@ export function DashboardScreen() {
           return (
             <Card key={definition.key} style={styles.metricCard}>
               <Text tone="muted" variant="caption" weight="medium">{definition.displayName}</Text>
-              <Text variant="heading" weight="semibold">{formatMetric({ key: definition.key, value }, definition)}</Text>
+              <Text tone={definition.format === "score" && value !== null ? "danger" : "default"} variant="heading" weight="semibold">{formatMetric({ key: definition.key, value }, definition)}</Text>
               <Text tone={delta === null ? "muted" : delta > 0 ? "success" : delta < 0 ? "danger" : "muted"} variant="caption">
-                {delta === null ? (definition.comparable ? "Previous period unavailable" : "Current state") : `${delta > 0 ? "+" : ""}${definition.format === "percentage" ? `${delta.toFixed(1)} pp` : Math.round(delta).toLocaleString("en-IN")} vs previous period`}
+                {delta === null ? (definition.comparable ? "Previous period unavailable" : "Current state") : `${delta > 0 ? "+" : ""}${definition.format === "percentage" || definition.format === "score" ? `${delta.toFixed(1)} pp` : Math.round(delta).toLocaleString("en-IN")} vs previous period`}
               </Text>
               <Text tone="muted" variant="caption">{definition.definition}</Text>
             </Card>

@@ -19,16 +19,26 @@ describe("metric catalog and formatting", () => {
   it("has stable unique definitions with truthful empty behavior", () => {
     expect(new Set(METRIC_CATALOG.map((item)=>item.key)).size).toBe(METRIC_CATALOG.length);
     expect(METRIC_CATALOG.every((item)=>item.definition && item.dateWindow && item.scope)).toBe(true);
-    expect(METRIC_CATALOG.some((item)=>/revenue|sales conversion|target|product mix|loyalty|vip|score|ranking/i.test(`${item.key} ${item.displayName}`))).toBe(false);
+    expect(METRIC_CATALOG.some((item)=>/revenue|sales conversion|target|product mix|loyalty|vip|ranking/i.test(`${item.key} ${item.displayName}`))).toBe(false);
   });
   it("uses null for zero denominators", () => { expect(safeRate(0,0)).toBeNull(); expect(safeRate(3,4)).toBe(75); });
   it("formats counts, percentages, duration, no-data, and not-applicable", () => {
-    const rate=METRIC_CATALOG.find((item)=>item.key==="task_completion_rate")!;
+    const rate=METRIC_CATALOG.find((item)=>item.key==="people_availability_rate")!;
     const delay=METRIC_CATALOG.find((item)=>item.key==="average_completion_delay")!;
     expect(formatMetric({key:rate.key,value:75},rate)).toBe("75.0%");
     expect(formatMetric({key:rate.key,value:null},rate)).toBe("No data");
     expect(formatMetric({key:delay.key,value:90},delay)).toBe("1.5 hr");
     expect(formatMetric({key:delay.key,value:null},delay)).toBe("Not applicable");
+  });
+  it("replaces the completion rate with the two negative task scores", () => {
+    const pending=METRIC_CATALOG.find((item)=>item.key==="task_pending_score")!;
+    const delayed=METRIC_CATALOG.find((item)=>item.key==="task_delayed_score")!;
+    expect(METRIC_CATALOG.some((item)=>item.key==="task_completion_rate")).toBe(false);
+    expect([pending.displayName,delayed.displayName]).toEqual(["Pending score","Delayed score"]);
+    expect([pending.format,delayed.format]).toEqual(["score","score"]);
+    expect(formatMetric({key:pending.key,value:-93.9},pending)).toBe("−93.9%");
+    expect(formatMetric({key:delayed.key,value:-100},delayed)).toBe("−100.0%");
+    expect(formatMetric({key:pending.key,value:null},pending)).toBe("No data");
   });
   it("normalizes bounded chart series", () => expect(normalizeChartSeries([{label:"A",value:Number.NaN},{label:"B",value:2}],1)).toEqual([{label:"A",value:0}]));
 });

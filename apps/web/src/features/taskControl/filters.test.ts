@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  applyBranch, applyPreset, completionRate, defaultFilters, evidenceFilter, needsAttention,
+  applyBranch, applyPreset, defaultFilters, delayedScore, evidenceFilter, needsAttention, pendingScore,
   presetRange, progressContext, rangeIsValid, totals,
 } from "./filters";
 
 const base = { ...defaultFilters("2026-03-18"), from: "2026-03-01", to: "2026-03-18" };
 const person = (employee_name: string, assigned: number, completed: number, remaining: number, overdue: number) =>
-  ({ employee_name, assigned, completed, remaining, overdue });
+  ({ employee_name, assigned, completed, remaining, overdue, on_time_completed: 0 });
 
 describe("task control filters", () => {
   it("derives every preset range from the tenant-local day", () => {
@@ -45,10 +45,20 @@ describe("task control filters", () => {
     expect(rangeIsValid({ ...base, from: "2024-01-01" })).toBe(false);
   });
 
-  it("summarises progress without dividing by zero", () => {
-    expect(completionRate({ assigned: 0, completed: 0, remaining: 0, overdue: 0 })).toBe(0);
-    expect(completionRate({ assigned: 8, completed: 6, remaining: 2, overdue: 1 })).toBe(75);
-    expect(totals([person("A", 3, 1, 2, 1), person("B", 5, 5, 0, 0)])).toEqual({ assigned: 8, completed: 6, remaining: 2, overdue: 1 });
+  it("summarises progress as negative scores without dividing by zero", () => {
+    expect(pendingScore({ assigned: 0, completed: 0, remaining: 0, overdue: 0, on_time_completed: 0 })).toBeNull();
+    expect(delayedScore({ assigned: 0, completed: 0, remaining: 0, overdue: 0, on_time_completed: 0 })).toBeNull();
+    expect(pendingScore({ assigned: 8, completed: 6, remaining: 2, overdue: 1, on_time_completed: 2 })).toBe(-25);
+    expect(delayedScore({ assigned: 8, completed: 6, remaining: 2, overdue: 1, on_time_completed: 2 })).toBe(-66.7);
+    expect(delayedScore({ assigned: 33, completed: 0, remaining: 33, overdue: 0, on_time_completed: 0 })).toBe(-100);
+    expect(totals([person("A", 3, 1, 2, 1), person("B", 5, 5, 0, 0)])).toEqual({ assigned: 8, completed: 6, remaining: 2, overdue: 1, on_time_completed: 0 });
+  });
+
+  it("reports no delayed score when the server sent no on-time counts", () => {
+    const legacy = { assigned: 8, completed: 6, remaining: 2, overdue: 1 };
+    expect(delayedScore(legacy)).toBeNull();
+    expect(delayedScore(totals([legacy]))).toBeNull();
+    expect(pendingScore(legacy)).toBe(-25);
   });
 
   it("ranks the people who are behind, loudest signal first", () => {

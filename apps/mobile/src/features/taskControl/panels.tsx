@@ -1,15 +1,15 @@
 import { memo } from "react";
 import { StyleSheet, View } from "react-native";
-import { completionRate, type ProgressCounts } from "@jewelos/data/taskControl/filters";
+import { formatTaskPerformanceScore, TASK_DELAYED_SCORE_LABEL, TASK_PENDING_SCORE_LABEL } from "@jewelos/core";
+import { delayedScore, pendingScore, type ProgressCounts } from "@jewelos/data/taskControl/filters";
 import { makeStyles } from "@/theme/makeStyles";
-import { useAppTheme } from "@/theme/ThemeProvider";
 import { Card } from "@/ui/Card";
 import { Pressable } from "@/ui/Pressable";
 import { Text } from "@/ui/Text";
 
 export type Tone = "neutral" | "good" | "warn" | "bad";
 
-/** The five tiles above the Overview panel, with web's label and hint text. */
+/** The tiles above the Overview panel, with web's label and hint text. */
 export const StatTile = memo(function StatTile({
   label,
   value,
@@ -42,31 +42,38 @@ export const StatTile = memo(function StatTile({
 });
 
 /**
- * The completion share with the overdue share of the same bar called out, as
- * the web `CompletionBar` draws it.
+ * The pending and delayed scores beside the counts, as the web
+ * `ProgressTable` prints them: always in the danger tone, "No data" muted.
  */
-export const CompletionBar = memo(function CompletionBar({ row }: { row: ProgressCounts }) {
-  const theme = useAppTheme();
+export const ScoreStrip = memo(function ScoreStrip({ row }: { row: ProgressCounts }) {
   const styles = useStyles();
-  const done = completionRate(row);
-  const late = row.assigned === 0 ? 0 : Math.round((row.overdue / row.assigned) * 100);
   return (
-    <View style={styles.barRow}>
-      <View style={styles.track}>
-        <View style={[styles.fill, { width: `${done}%`, backgroundColor: theme.colors.success }]} />
-        <View
-          style={[styles.fill, { width: `${Math.min(late, 100 - done)}%`, backgroundColor: theme.colors.danger }]}
-        />
-      </View>
-      <Text tone="muted" variant="caption">{`${done}%`}</Text>
+    <View style={styles.counts}>
+      <Score label={TASK_PENDING_SCORE_LABEL} value={pendingScore(row)} />
+      <Score label={TASK_DELAYED_SCORE_LABEL} value={delayedScore(row)} />
     </View>
   );
 });
 
+function Score({ label, value }: { label: string; value: number | null }) {
+  const styles = useStyles();
+  return (
+    <View style={styles.score}>
+      <Text tone="muted" variant="caption">
+        {label}
+      </Text>
+      <Text tone={value === null ? "muted" : "danger"} weight="semibold">
+        {formatTaskPerformanceScore(value)}
+      </Text>
+    </View>
+  );
+}
+
 /**
  * One row of the web `ProgressTable`. A phone cannot show a seven-column table,
- * so the columns become a heading plus a counts strip — the same five numbers,
- * in the same order: assigned, completed, remaining, overdue, rate.
+ * so the columns become a heading plus a counts strip — the same numbers,
+ * in the same order: assigned, completed, remaining, overdue, pending score,
+ * delayed score.
  */
 export const ProgressRow = memo(function ProgressRow({
   title,
@@ -96,7 +103,7 @@ export const ProgressRow = memo(function ProgressRow({
         <Count label="Remaining" value={row.remaining} />
         <Count label="Overdue" tone={row.overdue > 0 ? "danger" : "muted"} value={row.overdue} />
       </View>
-      <CompletionBar row={row} />
+      <ScoreStrip row={row} />
     </>
   );
   if (!onPress) return <Card>{body}</Card>;
@@ -130,18 +137,9 @@ function Count({ label, value, tone = "muted" }: { label: string; value: number;
 const useStyles = makeStyles((theme) =>
   StyleSheet.create({
     tile: { flexGrow: 1, flexBasis: "30%", gap: 2 },
-    barRow: { flexDirection: "row", alignItems: "center", gap: theme.space.sm, marginTop: theme.space.xs },
-    track: {
-      flex: 1,
-      height: 6,
-      borderRadius: theme.radius.pill,
-      backgroundColor: theme.colors.taskMuted,
-      overflow: "hidden",
-      flexDirection: "row",
-    },
-    fill: { height: "100%" },
     counts: { flexDirection: "row", flexWrap: "wrap", gap: theme.space.sm, marginTop: theme.space.xs },
     count: { flexGrow: 1, flexBasis: "22%" },
+    score: { flexGrow: 1, flexBasis: "45%" },
     pressed: { opacity: 0.8 },
   }),
 );

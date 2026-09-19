@@ -10,6 +10,10 @@ import {
   TASK_CONTROL_TAB_LABELS,
   TASK_VIEW_LABELS,
   evidenceFileSize,
+  formatTaskPerformanceScore,
+  taskPendingScore,
+  TASK_DELAYED_SCORE_LABEL,
+  TASK_PENDING_SCORE_LABEL,
   type Json,
 } from "@jewelos/core";
 import {
@@ -19,9 +23,10 @@ import {
   type TaskControlSnapshot,
 } from "@jewelos/data/taskControl/api";
 import {
-  completionRate,
   defaultFilters,
+  delayedScore,
   needsAttention,
+  pendingScore,
   rangeIsValid,
   tenantToday,
   totals,
@@ -96,8 +101,8 @@ type Row =
  *
  * All four panels run off one filter object, exactly as web does, so a number
  * on one tab can always be trusted against a number on another. The filter bar
- * becomes a sheet, the progress tables become cards carrying the same five
- * numbers, and the twelve-column template table becomes a card with the same
+ * becomes a sheet, the progress tables become cards carrying the same counts
+ * and scores, and the twelve-column template table becomes a card with the same
  * twelve values and the same four actions. Every decision — who sees which tab,
  * which chips exist, how a row is toned — comes from `@jewelos/core`, and every
  * read and write goes through the same audited contracts in `@jewelos/data`.
@@ -336,7 +341,9 @@ export function TaskControlScreen() {
         kind: "note",
         key: "attention-total",
         text: `Across everyone in scope: ${people.completed} completed, ${people.remaining} remaining, ${people.overdue} overdue${
-          people.assigned > 0 ? ` (${completionRate(people)}% of ${people.assigned} assignments)` : ""
+          people.assigned > 0
+            ? ` across ${people.assigned} assignments. Pending score ${formatTaskPerformanceScore(pendingScore(people))}, delayed score ${formatTaskPerformanceScore(delayedScore(people))}`
+            : ""
         }. An assignment is one person on one task.`,
       });
     }
@@ -434,7 +441,8 @@ export function TaskControlScreen() {
 
   const totalPages = Math.max(1, Math.ceil((evidence?.tasks_total ?? 0) / pageSize));
   const stats = evidence?.stats;
-  const rate = !stats || stats.tasks_total === 0 ? 0 : Math.round((stats.completed / stats.tasks_total) * 100);
+  const taskPending = stats ? taskPendingScore({ assigned: stats.tasks_total, completed: stats.completed, onTimeCompleted: 0 }) : null;
+  const peopleDelayed = progress ? delayedScore(people) : null;
 
   return (
     <>
@@ -487,10 +495,16 @@ export function TaskControlScreen() {
                 <StatTile hint="Each task counted once" label="Tasks in range" value={count(stats.tasks_total)} />
                 <StatTile hint="Marked complete" label="Completed" tone="good" value={count(stats.completed)} />
                 <StatTile
-                  hint="Completed ÷ tasks in range"
-                  label="Completion rate"
-                  tone={rate >= 80 ? "good" : rate >= 50 ? "warn" : "bad"}
-                  value={`${rate}%`}
+                  hint="Completed ÷ tasks in range, minus 100"
+                  label={TASK_PENDING_SCORE_LABEL}
+                  tone={taskPending === null ? "neutral" : "bad"}
+                  value={formatTaskPerformanceScore(taskPending)}
+                />
+                <StatTile
+                  hint="On time ÷ completed assignments, minus 100"
+                  label={TASK_DELAYED_SCORE_LABEL}
+                  tone={peopleDelayed === null ? "neutral" : "bad"}
+                  value={formatTaskPerformanceScore(peopleDelayed)}
                 />
                 <StatTile
                   hint="Past the effective deadline"

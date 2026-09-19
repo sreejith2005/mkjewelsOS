@@ -1,4 +1,5 @@
 import type { TaskView } from "../taskEvidence/types";
+import { taskDelayedScore, taskPendingScore } from "@jewelos/core";
 
 /**
  * The Task Control workspace runs every panel -- overview, people, evidence and
@@ -92,27 +93,41 @@ export function rangeIsValid(filters: TaskControlFilters): boolean {
   return days <= 366;
 }
 
-export type ProgressCounts = Readonly<{ assigned: number; completed: number; remaining: number; overdue: number }>;
+export type ProgressCounts = Readonly<{ assigned: number; completed: number; remaining: number; overdue: number; on_time_completed?: number }>;
 
-export function completionRate(row: ProgressCounts): number {
-  return row.assigned === 0 ? 0 : Math.round((row.completed / row.assigned) * 100);
+/** Pending score for a progress row; `null` ("No data") when nothing is assigned. */
+export function pendingScore(row: ProgressCounts): number | null {
+  return taskPendingScore({ assigned: row.assigned, completed: row.completed, onTimeCompleted: row.on_time_completed ?? 0 });
+}
+
+/**
+ * Delayed score for a progress row. A server that predates on-time counts
+ * reports no `on_time_completed`; that is "No data", never a failing score.
+ */
+export function delayedScore(row: ProgressCounts): number | null {
+  if (row.on_time_completed === undefined) return null;
+  return taskDelayedScore({ assigned: row.assigned, completed: row.completed, onTimeCompleted: row.on_time_completed });
 }
 
 export function totals<T extends ProgressCounts>(rows: readonly T[]): ProgressCounts {
-  return rows.reduce<ProgressCounts>(
+  const summed = rows.reduce(
     (sum, row) => ({
       assigned: sum.assigned + row.assigned,
       completed: sum.completed + row.completed,
       remaining: sum.remaining + row.remaining,
       overdue: sum.overdue + row.overdue,
+      on_time_completed: sum.on_time_completed + (row.on_time_completed ?? 0),
     }),
-    { assigned: 0, completed: 0, remaining: 0, overdue: 0 },
+    { assigned: 0, completed: 0, remaining: 0, overdue: 0, on_time_completed: 0 },
   );
+  if (rows.every((row) => row.on_time_completed !== undefined)) return summed;
+  const { on_time_completed: _unknown, ...counts } = summed;
+  return counts;
 }
 
 /**
  * "Who is not completing" ordering: overdue work is the loudest signal, then the
- * size of the backlog, then the completion rate. People with nothing assigned
+ * size of the backlog, then the pending score. People with nothing assigned
  * are not behind on anything, so they are excluded rather than ranked at zero.
  */
 export function needsAttention<T extends ProgressCounts & { employee_name: string }>(rows: readonly T[]): T[] {
@@ -122,7 +137,7 @@ export function needsAttention<T extends ProgressCounts & { employee_name: strin
       (left, right) =>
         right.overdue - left.overdue ||
         right.remaining - left.remaining ||
-        completionRate(left) - completionRate(right) ||
+        (pendingScore(left) ?? 0) - (pendingScore(right) ?? 0) ||
         left.employee_name.localeCompare(right.employee_name),
     );
 }

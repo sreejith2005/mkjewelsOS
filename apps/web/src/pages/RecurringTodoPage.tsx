@@ -4,9 +4,10 @@ import {
   canPauseRecurringTemplate,
   canRunRecurringTemplateNow,
   deriveRecurringWorkCardState,
+  formatTaskPerformanceScore,
   isRecurringInstanceInTab,
   kolkataDateKey,
-  recurringPerformancePercents,
+  recurringPerformanceScores,
   recurringPerformanceRows,
   recurringStatusPill,
   recurringTemplateDeletePrompt,
@@ -713,13 +714,13 @@ export function RecurringTodoPage() {
                   <th className="p-3">On time</th>
                   <th className="p-3">Delayed</th>
                   <th className="p-3">On behalf</th>
-                  <th className="p-3">Completion</th>
-                  <th className="p-3">On time %</th>
+                  <th className="p-3 whitespace-nowrap">Pending score</th>
+                  <th className="p-3 whitespace-nowrap">Delayed score</th>
                 </tr>
               </thead>
               <tbody>
                 {performance.map((row) => {
-                  const percent = recurringPerformancePercents(row);
+                  const score = recurringPerformanceScores(row);
                   return (
                   <tr className="border-t border-task-border" key={row.name}>
                     <td className="p-3 font-semibold text-white">{row.name}</td>
@@ -729,8 +730,8 @@ export function RecurringTodoPage() {
                     <td className="p-3">{row.onTime}</td>
                     <td className="p-3">{row.delayed}</td>
                     <td className="p-3">{row.onBehalf}</td>
-                    <td className="p-3">{percent.completion}%</td>
-                    <td className="p-3">{percent.onTime}%</td>
+                    <td className={`p-3 tabular-nums ${score.pending === null ? "text-soft-grey" : "font-semibold text-task-overdue"}`}>{formatTaskPerformanceScore(score.pending)}</td>
+                    <td className={`p-3 tabular-nums ${score.delayed === null ? "text-soft-grey" : "font-semibold text-task-overdue"}`}>{formatTaskPerformanceScore(score.delayed)}</td>
                   </tr>
                   );
                 })}

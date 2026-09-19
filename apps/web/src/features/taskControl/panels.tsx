@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { completionRate, type ProgressCounts } from "./filters";
+import { formatTaskPerformanceScore } from "@jewelos/core";
+import { delayedScore, pendingScore, type ProgressCounts } from "./filters";
 
 export function StatTile({ label, value, hint, tone = "neutral" }: { label: string; value: string; hint: string; tone?: "neutral" | "good" | "warn" | "bad" }) {
   const valueTone = tone === "good" ? "text-success" : tone === "warn" ? "text-warning" : tone === "bad" ? "text-task-overdue" : "text-task-text";
@@ -12,19 +13,11 @@ export function StatTile({ label, value, hint, tone = "neutral" }: { label: stri
   );
 }
 
-/** The completion share, with the overdue share of the same bar called out in red. */
-export function CompletionBar({ row }: { row: ProgressCounts }) {
-  const done = completionRate(row);
-  const late = row.assigned === 0 ? 0 : Math.round((row.overdue / row.assigned) * 100);
+/** A task performance score, always in the danger colour; "No data" stays muted. */
+export function ScoreText({ value, className = "" }: { value: number | null; className?: string }) {
   return (
-    <span className="flex items-center gap-2">
-      <span aria-hidden className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-task-muted">
-        <span className="flex h-full">
-          <span className="h-full bg-success" style={{ width: `${done}%` }} />
-          <span className="h-full bg-task-overdue" style={{ width: `${Math.min(late, 100 - done)}%` }} />
-        </span>
-      </span>
-      <span className="tabular-nums text-task-text-muted">{done}%</span>
+    <span className={`tabular-nums ${value === null ? "text-task-text-muted" : "font-semibold text-task-overdue"} ${className}`}>
+      {formatTaskPerformanceScore(value)}
     </span>
   );
 }
@@ -48,7 +41,7 @@ export function ProgressTable<T extends ProgressCounts>({
       <table className="w-full min-w-[36rem] text-left text-xs">
         <thead className="text-[10px] uppercase tracking-wider text-task-text-muted">
           <tr>
-            {[...columns, "Assigned", "Completed", "Remaining", "Overdue", "Rate"].map((column) => (
+            {[...columns, "Assigned", "Completed", "Remaining", "Overdue", "Pending score", "Delayed score"].map((column) => (
               <th className="whitespace-nowrap px-2 py-2 font-semibold" key={column}>{column}</th>
             ))}
           </tr>
@@ -65,7 +58,8 @@ export function ProgressTable<T extends ProgressCounts>({
               <td className="px-2 py-2 tabular-nums text-success">{row.completed}</td>
               <td className="px-2 py-2 tabular-nums">{row.remaining}</td>
               <td className={`px-2 py-2 tabular-nums ${row.overdue > 0 ? "font-semibold text-task-overdue" : "text-task-text-muted"}`}>{row.overdue}</td>
-              <td className="px-2 py-2"><CompletionBar row={row} /></td>
+              <td className="whitespace-nowrap px-2 py-2"><ScoreText value={pendingScore(row)} /></td>
+              <td className="whitespace-nowrap px-2 py-2"><ScoreText value={delayedScore(row)} /></td>
             </tr>
           ))}
         </tbody>

@@ -1,5 +1,6 @@
 import type { EmptyBehavior, MetricDefinition, MetricValue } from "./types";
 import { USER_ROLES, type UserRole } from "../roleMenu";
+import { formatTaskPerformanceScore } from "../taskControlView";
 
 const ALL = USER_ROLES;
 const CRM = ["super_admin", "admin", "manager", "crm"] as const satisfies readonly UserRole[];
@@ -10,7 +11,8 @@ const metric = (definition: MetricDefinition) => definition;
 export const METRIC_CATALOG: readonly MetricDefinition[] = [
   metric({ key:"tasks_assigned",displayName:"Tasks assigned",definition:"Distinct tasks assigned in the selected local date window.",numerator:null,denominator:null,roles:ALL,sourceModule:"tasks",dateWindow:"Assignment is included when its effective planned date is inside the range.",scope:"Own work for regular roles; authorized branch, department, or tenant scope for elevated roles.",emptyBehavior:"zero",format:"count",comparable:true }),
   metric({ key:"tasks_completed",displayName:"Tasks completed",definition:"Distinct assigned tasks completed in the selected local date window.",numerator:null,denominator:null,roles:ALL,sourceModule:"tasks",dateWindow:"actual_datetime is inside the range.",scope:"Same as tasks assigned.",emptyBehavior:"zero",format:"count",comparable:true }),
-  metric({ key:"task_completion_rate",displayName:"Completion rate",definition:"Completed assigned tasks divided by assigned tasks in the selected range.",numerator:"tasks_completed",denominator:"tasks_assigned",roles:ALL,sourceModule:"tasks",dateWindow:"Uses the same selected range for numerator and denominator.",scope:"Same as tasks assigned.",emptyBehavior:"no_data",format:"percentage",comparable:true }),
+  metric({ key:"task_pending_score",displayName:"Pending score",definition:"Completed assigned tasks divided by assigned tasks, multiplied by 100 and reduced by 100. More negative means more work remains.",numerator:"tasks_completed",denominator:"tasks_assigned",roles:ALL,sourceModule:"tasks",dateWindow:"Uses one assigned-task cohort in the selected range.",scope:"Same as tasks assigned.",emptyBehavior:"no_data",format:"score",comparable:true }),
+  metric({ key:"task_delayed_score",displayName:"Delayed score",definition:"On-time completed tasks divided by completed tasks, multiplied by 100 and reduced by 100. More negative means more completed work was late; assigned work with nothing completed scores -100.",numerator:"on_time_completed",denominator:"tasks_completed",roles:ALL,sourceModule:"tasks",dateWindow:"Uses one assigned-task cohort in the selected range.",scope:"Same as tasks assigned.",emptyBehavior:"no_data",format:"score",comparable:true }),
   metric({ key:"on_time_completed",displayName:"On-time completed",definition:"Completed tasks whose actual completion time is not after the effective due time.",numerator:null,denominator:null,roles:ALL,sourceModule:"tasks",dateWindow:"actual_datetime is inside the range.",scope:"Same as tasks assigned.",emptyBehavior:"zero",format:"count",comparable:true }),
   metric({ key:"overdue_open",displayName:"Overdue open",definition:"Open tasks whose effective due time is before the report cutoff.",numerator:null,denominator:null,roles:ALL,sourceModule:"tasks",dateWindow:"Open-state snapshot at query time; never presented as historical as-of state.",scope:"Same as tasks assigned.",emptyBehavior:"zero",format:"count",comparable:false }),
   metric({ key:"average_completion_delay",displayName:"Average completion delay",definition:"Average positive delay in minutes across completed tasks; early completions contribute zero.",numerator:"sum of positive delay minutes",denominator:"completed tasks with a due and completion time",roles:ALL,sourceModule:"tasks",dateWindow:"actual_datetime is inside the range.",scope:"Same as tasks assigned.",emptyBehavior:"not_applicable",format:"duration_minutes",comparable:true }),
@@ -43,6 +45,7 @@ export function safeRate(numerator: number, denominator: number): number | null 
 
 export function formatMetric(value: MetricValue, definition: MetricDefinition): string {
   if (value.value === null) return definition.emptyBehavior === "not_applicable" ? "Not applicable" : "No data";
+  if (definition.format === "score") return formatTaskPerformanceScore(value.value);
   if (definition.format === "percentage") return `${value.value.toFixed(1)}%`;
   if (definition.format === "duration_minutes") {
     if (value.value < 60) return `${Math.round(value.value)} min`;

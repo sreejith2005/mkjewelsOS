@@ -8,10 +8,35 @@ import {
   prettyTemplateDate,
   prettyTemplateTime,
   taskControlShowsSearch,
+  taskDelayedScore,
+  taskPendingScore,
+  formatTaskPerformanceScore,
   taskControlTabsFor,
   taskRowTone,
   TASK_VIEW_LABELS,
 } from "./taskControlView.ts";
+
+describe("task performance scores", () => {
+  it("calculates pending and delayed negative scores with the approved zero-work rules", () => {
+    expect(taskPendingScore({ assigned: 100, completed: 75, remaining: 25, overdue: 0, onTimeCompleted: 25 })).toBe(-25);
+    expect(taskPendingScore({ assigned: 33, completed: 2, remaining: 31, overdue: 0, onTimeCompleted: 0 })).toBe(-93.9);
+    expect(taskDelayedScore({ assigned: 100, completed: 75, remaining: 25, overdue: 0, onTimeCompleted: 25 })).toBe(-66.7);
+    expect(taskDelayedScore({ assigned: 33, completed: 0, remaining: 33, overdue: 0, onTimeCompleted: 0 })).toBe(-100);
+    expect(taskPendingScore({ assigned: 0, completed: 0, remaining: 0, overdue: 0, onTimeCompleted: 0 })).toBeNull();
+    expect(formatTaskPerformanceScore(-93.9)).toBe("−93.9%");
+    expect(formatTaskPerformanceScore(null)).toBe("No data");
+  });
+
+  it("rounds halves away from zero like the database and never prints a plus sign", () => {
+    // 7 of 8 on time is -12.5; 1 of 16 complete is -93.75 -> -93.8 (Postgres round()).
+    expect(taskDelayedScore({ assigned: 8, completed: 8, onTimeCompleted: 7 })).toBe(-12.5);
+    expect(taskPendingScore({ assigned: 16, completed: 1, onTimeCompleted: 1 })).toBe(-93.8);
+    expect(taskPendingScore({ assigned: 4, completed: 4, onTimeCompleted: 4 })).toBe(0);
+    expect(formatTaskPerformanceScore(0)).toBe("−0.0%");
+    expect(formatTaskPerformanceScore(undefined)).toBe("No data");
+    expect(formatTaskPerformanceScore(Number.NaN)).toBe("No data");
+  });
+});
 
 describe("task control access", () => {
   it("opens for leaders only", () => {

@@ -12,6 +12,41 @@ export const TASK_CONTROL_OVERSIGHT_ROLES = ["super_admin", "admin", "manager", 
 export const TASK_CONTROL_MANAGE_ROLES = ["super_admin", "admin"] as const;
 export const TASK_CONTROL_BRANCH_SELECT_ROLES = ["super_admin", "admin", "hr"] as const;
 
+/**
+ * Task performance scores (docs/superpowers/specs/2026-09-18-task-performance-score-design.md).
+ * Both are negative percentages: 0 is perfect, -100 is nothing done / nothing
+ * on time. No assigned work is `null` ("No data"), never a failing score.
+ */
+export type TaskPerformanceCounts = Readonly<{
+  assigned: number;
+  completed: number;
+  onTimeCompleted: number;
+}>;
+
+/** One decimal, halves away from zero -- the same as Postgres `round(numeric, 1)`. */
+function roundScore(value: number): number {
+  const rounded = (Math.sign(value) * Math.round(Math.abs(value) * 10)) / 10;
+  return rounded === 0 ? 0 : rounded;
+}
+
+export function taskPendingScore({ assigned, completed }: TaskPerformanceCounts): number | null {
+  return assigned > 0 ? roundScore((completed / assigned) * 100 - 100) : null;
+}
+
+export function taskDelayedScore({ assigned, completed, onTimeCompleted }: TaskPerformanceCounts): number | null {
+  if (assigned === 0) return null;
+  return completed === 0 ? -100 : roundScore((onTimeCompleted / completed) * 100 - 100);
+}
+
+/** A score for display, with a true minus sign; perfect work reads "−0.0%". */
+export function formatTaskPerformanceScore(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "No data";
+  return `−${Math.abs(value).toFixed(1)}%`;
+}
+
+export const TASK_PENDING_SCORE_LABEL = "Pending score";
+export const TASK_DELAYED_SCORE_LABEL = "Delayed score";
+
 export const TASK_CONTROL_TAB_LABELS: ReadonlyArray<readonly ["overview" | "people" | "tasks" | "templates", string]> = [
   ["overview", "Overview"],
   ["people", "People"],

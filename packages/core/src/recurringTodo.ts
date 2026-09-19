@@ -1,4 +1,5 @@
 import { isTaskFeedItemOverdue, type TaskFeedLike } from "./taskFeed";
+import { taskDelayedScore, taskPendingScore } from "./taskControlView";
 
 /**
  * The Recurring / To-Do workspace, reduced to decisions.
@@ -163,10 +164,10 @@ export function recurringPerformanceRows(
 }
 
 /** The percentages the Performance table prints beside the counts. */
-export function recurringPerformancePercents(row: RecurringPerformanceRow): Readonly<{ completion: number; onTime: number }> {
+export function recurringPerformanceScores(row: RecurringPerformanceRow): Readonly<{ pending: number | null; delayed: number | null }> {
   return {
-    completion: row.assigned ? Math.round((row.completed / row.assigned) * 100) : 0,
-    onTime: row.onTime + row.delayed ? Math.round((row.onTime / (row.onTime + row.delayed)) * 100) : 0,
+    pending: taskPendingScore({ assigned: row.assigned, completed: row.completed, onTimeCompleted: row.onTime }),
+    delayed: taskDelayedScore({ assigned: row.assigned, completed: row.completed, onTimeCompleted: row.onTime }),
   };
 }
 

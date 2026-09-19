@@ -6,7 +6,10 @@ import {
   canManageRecurringWorkspace,
   isRecurringInstanceInTab,
   kolkataDateKey,
-  recurringPerformancePercents,
+  formatTaskPerformanceScore,
+  recurringPerformanceScores,
+  TASK_DELAYED_SCORE_LABEL,
+  TASK_PENDING_SCORE_LABEL,
   recurringPerformanceRows,
   recurringTemplateDeletePrompt,
   RECURRING_FREQUENCY_FILTERS,
@@ -243,7 +246,7 @@ export function RecurringTodoScreen() {
         );
       }
       if (item.kind === "performance") {
-        const percent = recurringPerformancePercents(item.performance);
+        const score = recurringPerformanceScores(item.performance);
         return (
           <Card>
             <Text weight="semibold">{item.performance.name}</Text>
@@ -256,8 +259,6 @@ export function RecurringTodoScreen() {
                   ["On time", item.performance.onTime],
                   ["Delayed", item.performance.delayed],
                   ["On behalf", item.performance.onBehalf],
-                  ["Completion", `${percent.completion}%`],
-                  ["On time %", `${percent.onTime}%`],
                 ] as const
               ).map(([label, value]) => (
                 <View key={label} style={styles.metric}>
@@ -265,6 +266,21 @@ export function RecurringTodoScreen() {
                     {label}
                   </Text>
                   <Text weight="semibold">{String(value)}</Text>
+                </View>
+              ))}
+              {(
+                [
+                  [TASK_PENDING_SCORE_LABEL, score.pending],
+                  [TASK_DELAYED_SCORE_LABEL, score.delayed],
+                ] as const
+              ).map(([label, value]) => (
+                <View key={label} style={styles.metric}>
+                  <Text tone="muted" variant="caption">
+                    {label}
+                  </Text>
+                  <Text tone={value === null ? "muted" : "danger"} weight="semibold">
+                    {formatTaskPerformanceScore(value)}
+                  </Text>
                 </View>
               ))}
             </View>
