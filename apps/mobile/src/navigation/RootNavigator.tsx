@@ -10,6 +10,7 @@ import { ErrorState, LoadingState } from "@/ui/states";
 import { AppTabs } from "@/navigation/AppTabs";
 import { LoginScreen } from "@/screens/LoginScreen";
 import { TaskDetailScreen } from "@/screens/TaskDetailScreen";
+import { TaskComposerScreen } from "@/features/tasks/TaskComposerScreen";
 import { TaskFormScreen } from "@/screens/TaskFormScreen";
 import { FmsInstanceScreen } from "@/screens/FmsInstanceScreen";
 import { FmsStageScreen } from "@/screens/FmsStageScreen";
@@ -70,6 +71,7 @@ export function RootNavigator() {
           }}
         >
           <Stack.Screen component={AppTabs} name="Tabs" options={{ headerShown: false }} />
+          <Stack.Screen component={TaskComposerScreen} name="TaskComposer" options={{ title: "Create Task" }} />
           <Stack.Screen component={TaskDetailScreen} name="TaskDetail" options={{ title: "Task" }} />
           <Stack.Screen component={TaskFormScreen} name="TaskForm" options={{ title: "Task form" }} />
           <Stack.Screen component={FmsInstanceScreen} name="FmsInstance" options={{ title: "Workflow" }} />

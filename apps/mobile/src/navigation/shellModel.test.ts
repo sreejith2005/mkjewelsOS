@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_SECTION_CONTROLS, builtinAccessContext, type AccessContext, type SectionControls, type UserRole } from "@jewelos/core";
 import {
   COMPACT_DOCK_PATHS,
+  TASKS_PRIMARY_ACTION,
   accessibleMenu,
   buildLauncherItems,
   isTaskPath,
@@ -12,6 +13,10 @@ import {
   themeToggleLabel,
   type ShellAccess,
 } from "./shellModel";
+
+it("registers task creation as the Tasks workspace primary action", () => {
+  expect(TASKS_PRIMARY_ACTION).toEqual({ label: "Create Task", route: "TaskComposer" });
+});
 
 const accessFor = (role: UserRole): AccessContext => builtinAccessContext({ id: `profile-${role}`, user_role: role });
 const shellFor = (role: UserRole, controls: SectionControls = DEFAULT_SECTION_CONTROLS): ShellAccess => ({ access: accessFor(role), controls });

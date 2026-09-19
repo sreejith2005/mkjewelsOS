@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { AlertTriangle, CalendarDays, Check, ChevronDown, FileText, Flag, Paperclip, Plus, Rocket, Users, UserRoundCheck, X } from "lucide-react";
-import { deriveTaskAuthoringCapability, normalizeTaskParticipants, voiceDraftGapMessage, voiceDraftGaps, type Enums, type Json, type VoiceDraftGap } from "@jewelos/core";
+import { buildManualTaskCreateRequest, deriveTaskAuthoringCapability, voiceDraftGapMessage, voiceDraftGaps, type Enums, type Json, type VoiceDraftGap } from "@jewelos/core";
 import type { UserProfile } from "@/types";
 import { Button, Modal, Notice } from "@/components/ui";
 import { toast } from "sonner";
@@ -159,29 +159,13 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
   const submitManual = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
-    if (!title.trim()) return setError("Add a task title.");
-    if (doers.length === 0) return setError("Select at least one user.");
-    const selectedDoer = eligiblePeople.find((person) => person.id === doers[0]);
-    if (!selectedDoer?.branch_id || !selectedDoer.department_id) return setError("The selected user needs an active branch and department.");
-    if (!planned) return setError("Choose a due date and time.");
+    const request = buildManualTaskCreateRequest({ title, description, plannedDatetime: planned, priority, mode: taskMode, selectedDoerIds: doers, selectedWatcherIds: watchers, formTemplateId, checklistItems: checklist, eligiblePeople: eligiblePeople.flatMap((person) => person.id ? [{ id: person.id, branchId: person.branch_id, departmentId: person.department_id, eligible: true }] : []) });
+    if ("error" in request) return setError(request.error.message);
     setSaving(true);
     try {
-      const participants = normalizeTaskParticipants(doers, watchers);
-      const taskId = await onSave({
-        title: title.trim(),
-        description: description.trim(),
-        planned_datetime: new Date(planned).toISOString(),
-        priority,
-        branch_id: selectedDoer.branch_id,
-        department_id: selectedDoer.department_id,
-        task_type: taskMode === "task" ? "delegation" : "checklist",
-        requires_upload: taskMode === "task",
-        requires_remark: false,
-        requires_form: Boolean(formTemplateId),
-        form_template_id: formTemplateId,
-      }, [...participants.doerIds], [...participants.watcherIds], taskMode === "checklist" ? checklist.map((item, sort_order) => ({ item_text: item, is_required: true, sort_order })) : []);
+      const taskId = await onSave(request.payload, [...request.doerIds], [...request.watcherIds], [...request.checklist]);
       if (attachment) await onUploadAttachment(taskId, attachment);
-      toast.success("Task assigned", { description: `Sent to ${participants.doerIds.length} user${participants.doerIds.length === 1 ? "" : "s"}.` });
+      toast.success("Task assigned", { description: `Sent to ${request.doerIds.length} user${request.doerIds.length === 1 ? "" : "s"}.` });
       onCreated();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to create task");

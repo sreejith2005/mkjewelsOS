@@ -49,7 +49,7 @@
 - Consumes: `deriveTaskAuthoringCapability`, `normalizeTaskParticipants`, `TaskReferenceData`, `createDelegationTask`, `uploadTaskAttachment`, authenticated profile/access.
 - Produces: `buildManualTaskCreateRequest(input): ManualTaskCreateRequest | { error: ManualTaskDraftError }`; native route `TaskComposer`; a visible Create Task action for every authenticated Tasks user.
 
-- [ ] **Step 1: Write failing core tests for the task payload and scope**
+- [x] **Step 1: Write failing core tests for the task payload and scope**
 
 Add literal fixtures proving task/checklist payloads, one-doer normalization, watcher de-duplication, required form, selected doer organization IDs, due-date validation, checklist validation, and authoring scope. The central assertion is:
 
@@ -74,17 +74,17 @@ expect(buildManualTaskCreateRequest(validInput)).toEqual({
 });
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `pnpm.cmd --filter @jewelos/core exec vitest run src/manualTaskDraft.test.ts --reporter=verbose`
 
 Expected: FAIL because `manualTaskDraft.ts` does not exist.
 
-- [ ] **Step 3: Implement and export the shared builder**
+- [x] **Step 3: Implement and export the shared builder**
 
 Define strict input/output types. Reject blank title, missing doer, invalid/ineligible selected doer, missing/invalid due instant, checklist mode with no non-empty items, and a watcher equal to the doer. Use the selected doer's branch and department; never trust caller-entered organization IDs.
 
-- [ ] **Step 4: Refactor web TaskComposer onto the shared builder**
+- [x] **Step 4: Refactor web TaskComposer onto the shared builder**
 
 Replace its inline payload construction with `buildManualTaskCreateRequest`. Preserve web copy, voice prefill, toast, attachment behavior, and current RPC call. Run the existing composer suite.
 
@@ -92,7 +92,7 @@ Run: `pnpm.cmd --filter web exec vitest run src/features/tasks/TaskComposer.test
 
 Expected: PASS with the existing web behavior unchanged.
 
-- [ ] **Step 5: Add native route/navigation RED test**
+- [x] **Step 5: Add native route/navigation RED test**
 
 Extend the navigation test so the registered Tasks action resolves to `TaskComposer` and the route parameter contract has no client-controlled role/scope parameter.
 
@@ -100,15 +100,15 @@ Run: `npm.cmd --prefix apps/mobile run test -- src/navigation/shellModel.test.ts
 
 Expected: FAIL because `TaskComposer` is not registered.
 
-- [ ] **Step 6: Build the native composer**
+- [x] **Step 6: Build the native composer**
 
 Use `Screen scroll`, `TextField`, `OptionPicker`, `DateField`, `ToggleField`, and `pickFileFromChooser`. Load `loadTaskAuthoringReferenceData`, compute eligible people with `deriveTaskAuthoringCapability`, and submit the shared request through `createDelegationTask`. If optional attachment upload fails after creation, keep the returned task ID in state and show `Retry attachment`; retry only `uploadTaskAttachment(taskId, file)`.
 
-- [ ] **Step 7: Add Tasks entry and background refresh**
+- [x] **Step 7: Add Tasks entry and background refresh**
 
 Add a safe-area-aware Create Task floating action, navigate to the composer, refresh on route return, and subscribe to `tasks`, `forms`, and `organization` tenant topics without clearing existing data during background refresh.
 
-- [ ] **Step 8: Verify and commit**
+- [x] **Step 8: Verify and commit**
 
 Run:
 

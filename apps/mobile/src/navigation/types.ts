@@ -9,6 +9,7 @@ import type { PageId } from "@jewelos/core";
  */
 export type RootStackParamList = {
   Tabs: undefined;
+  TaskComposer: undefined;
   TaskDetail: { taskId: string };
   /**
    * `taskType` decides the `linked_module` the submission is filed under, which

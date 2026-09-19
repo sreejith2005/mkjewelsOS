@@ -14,6 +14,9 @@ import type { ThemeName } from "@jewelos/ui-tokens";
 /** The two high-frequency destinations retained in compact bottom navigation. */
 export const COMPACT_DOCK_PATHS = ["/", "/tasks"] as const;
 
+/** The high-frequency action exposed directly from the native Tasks screen. */
+export const TASKS_PRIMARY_ACTION = { label: "Create Task", route: "TaskComposer" } as const;
+
 export type NativeTopLevelRoute = "Home" | "Tasks" | "Fms" | "Crm";
 
 export type ShellLauncherItem = Readonly<{

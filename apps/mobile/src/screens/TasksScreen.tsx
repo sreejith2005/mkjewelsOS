@@ -1,7 +1,9 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { Plus } from "lucide-react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   deriveTaskMutationCapability,
   kolkataDateKey,
@@ -10,6 +12,7 @@ import {
   type TaskFeedStatusFilter,
 } from "@jewelos/core";
 import { ensureMyRecurringTasks, loadTaskFeed, loadTaskFeedReferenceData, reviseTask, updateTask, uploadAndCompleteTask, type TaskBundle } from "@jewelos/data/tasks/api";
+import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
 import { useProfile } from "@/auth/AuthProvider";
 import { TaskCard as ParityTaskCard, type TaskCardAction } from "@/features/tasks/TaskCard";
 import { useAsyncData } from "@/lib/useAsyncData";
@@ -22,6 +25,7 @@ import { Screen } from "@/ui/Screen";
 import { SegmentedControl } from "@/ui/SegmentedControl";
 import { EmptyState, ErrorState, LoadingState } from "@/ui/states";
 import type { RootStackParamList } from "@/navigation/types";
+import { TASKS_PRIMARY_ACTION } from "@/navigation/shellModel";
 import { fmsAssignedWorkRouteForTask, navigateFmsAssignedWork } from "@/features/fms/assignedWorkNavigation";
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
@@ -39,6 +43,7 @@ export function TasksScreen() {
   const styles = useStyles();
   const profile = useProfile();
   const navigation = useNavigation<Navigation>();
+  const insets = useSafeAreaInsets();
   const [workspace, setWorkspace] = useState<Workspace>("mine");
   const [status, setStatus] = useState<TaskFeedStatusFilter>("pending");
 
@@ -68,9 +73,15 @@ export function TasksScreen() {
       delegated: hasAdminView ? authored : split.delegatedTasks,
       categories: references.categories,
     };
-  }, [canManage, hasAdminView, profile.id]);
+  }, [canManage, hasAdminView, profile.id, profile.tenant_id]);
 
   const { data, error, loading, refreshing, reload, refresh } = useAsyncData(load, [load]);
+  const firstFocus = useRef(true);
+  useFocusEffect(useCallback(() => {
+    if (firstFocus.current) { firstFocus.current = false; return; }
+    void refresh();
+  }, [refresh]));
+  useEffect(() => subscribeToTenantRealtime(profile.tenant_id, ["tasks", "forms", "organization"], () => void refresh()), [profile.tenant_id, refresh]);
 
   const tasks = useMemo(() => {
     const source = data ? data[workspace] : [];
@@ -152,7 +163,7 @@ export function TasksScreen() {
       </View>
 
       <FlatList
-        contentContainerStyle={tasks.length === 0 ? styles.emptyContent : styles.listContent}
+        contentContainerStyle={[tasks.length === 0 ? styles.emptyContent : styles.listContent, { paddingBottom: 88 + insets.bottom }]}
         data={tasks}
         // Tasks are keyed by their instance id; the feed view can repeat a row
         // per assignee, and the id is what makes a card one task.
@@ -193,6 +204,9 @@ export function TasksScreen() {
         windowSize={7}
         removeClippedSubviews
       />
+      <View pointerEvents="box-none" style={[styles.createAction, { bottom: theme.space.md + insets.bottom }]}>
+        <Button accessibilityHint="Opens the task creation form" icon={<Plus color={theme.colors.background} size={20} />} label={TASKS_PRIMARY_ACTION.label} onPress={() => navigation.navigate(TASKS_PRIMARY_ACTION.route)} />
+      </View>
     </Screen>
   );
 }
@@ -206,4 +220,5 @@ const useStyles = makeStyles((theme) => StyleSheet.create({
   },
   listContent: { padding: theme.space.md, paddingTop: 0, gap: theme.space.sm },
   emptyContent: { flexGrow: 1 },
+  createAction: { position: "absolute", right: theme.space.md },
 }));

@@ -81,6 +81,18 @@ export { deriveTaskMutationCapability } from "./taskCapabilities";
 export type { TaskMutationCapability } from "./taskCapabilities";
 export { deriveTaskAuthoringCapability } from "./taskAuthoringCapabilities";
 export type { TaskAuthoringCapability, TaskAuthoringScope } from "./taskAuthoringCapabilities";
+export { buildManualTaskCreateRequest } from "./manualTaskDraft";
+export type {
+  ManualTaskChecklistItem,
+  ManualTaskCreateRequest,
+  ManualTaskDraftError,
+  ManualTaskDraftInput,
+  ManualTaskDraftResult,
+  ManualTaskEligiblePerson,
+  ManualTaskMode,
+  ManualTaskPayload,
+  ManualTaskPriority,
+} from "./manualTaskDraft";
 export {
   ADMIN_SET_PASSWORD_LENGTH,
   validateAdminSetPassword,
