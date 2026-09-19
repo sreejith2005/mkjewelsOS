@@ -146,7 +146,7 @@ Commit: `feat(mobile): add complete native task creation`
 - Consumes: `VoiceTaskDraft`, `VoiceDraftGap`, `getSupabase`, `expo-audio` recorder/permission APIs, `pickFile` byte conversion pattern.
 - Produces: `interpretTaskVoiceNote(file: UploadSource): Promise<VoiceTaskInterpretation>` shared by web/native; native capture states `idle | recording | interpreting | error`.
 
-- [ ] **Step 1: Write shared interpretation RED tests**
+- [x] **Step 1: Write shared interpretation RED tests**
 
 Test valid response parsing, malformed response rejection, and extraction of the Edge Function's safe body error. The API accepts `UploadSource`, builds multipart data with the file name/type, invokes `interpret-task-voice`, and never logs content.
 
@@ -154,11 +154,11 @@ Run: `pnpm.cmd --filter @jewelos/data exec vitest run src/tasks/voice.test.ts --
 
 Expected: FAIL because the shared module does not exist.
 
-- [ ] **Step 2: Implement shared API and refactor web shim**
+- [x] **Step 2: Implement shared API and refactor web shim**
 
 Move response parsing and invocation into `packages/data`. Keep the web file as a re-export plus the browser `File` call site. Confirm existing web voice tests remain green.
 
-- [ ] **Step 3: Write native state-machine RED tests**
+- [x] **Step 3: Write native state-machine RED tests**
 
 Cover 60-second ceiling, permission denial, zero-byte result, stop/interruption, interpretation success, and retry. Test pure transitions rather than mocking a rendered native control.
 
@@ -166,21 +166,21 @@ Run: `npm.cmd --prefix apps/mobile run test -- src/features/tasks/voiceCaptureMo
 
 Expected: FAIL because the model does not exist.
 
-- [ ] **Step 4: Install and configure Expo audio**
+- [x] **Step 4: Install and configure Expo audio**
 
 Run from `apps/mobile`: `npx expo install expo-audio`.
 
 Configure the plugin with a JewelOS-specific microphone explanation, remove `android.permission.RECORD_AUDIO` from `blockedPermissions`, add it to `permissions`, and ensure the generated Android manifest no longer removes it. Use the Expo SDK 57-compatible version selected by `expo install`.
 
-- [ ] **Step 5: Implement native capture**
+- [x] **Step 5: Implement native capture**
 
 Use `requestRecordingPermissionsAsync`, `setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true })`, `useAudioRecorder(RecordingPresets.HIGH_QUALITY)`, and `useAudioRecorderState`. Stop at 60 seconds, read the cache URI into an `UploadableFile`, invoke the shared interpreter, delete the temporary recording in `finally`, then set audio mode back to non-recording. Do not enable background recording.
 
-- [ ] **Step 6: Apply interpretation to the composer**
+- [x] **Step 6: Apply interpretation to the composer**
 
 Use the same field-prefill semantics and gap messages as web: supplied values update fields, corrected manual values are not blanked, missing title/assignee/due/checklist stays blocking, and the author reviews everything before `createDelegationTask`.
 
-- [ ] **Step 7: Verify native dependency and commit**
+- [x] **Step 7: Verify native dependency and commit**
 
 Run:
 

@@ -32,11 +32,11 @@
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.REQUEST_INSTALL_PACKAGES"
       ],
       "blockedPermissions": [
-        "android.permission.RECORD_AUDIO",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE"
       ]
@@ -67,7 +67,14 @@
           "iCloudContainerEnvironment": "Production"
         }
       ],
-      "./plugins/withAndroidBuildBudget.js"
+      "./plugins/withAndroidBuildBudget.js",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "JewelOS needs microphone access only while you record a task instruction for review.",
+          "enableBackgroundRecording": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false

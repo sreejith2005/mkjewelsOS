@@ -5,8 +5,11 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   buildManualTaskCreateRequest,
   deriveTaskAuthoringCapability,
+  hasPermission,
+  voiceDraftGapMessage,
   type ManualTaskMode,
   type ManualTaskPriority,
+  type VoiceDraftGap,
 } from "@jewelos/core";
 import {
   createDelegationTask,
@@ -14,7 +17,8 @@ import {
   uploadTaskAttachment,
 } from "@jewelos/data/tasks/api";
 import type { UploadableFile } from "@jewelos/data/runtime";
-import { useProfile } from "@/auth/AuthProvider";
+import type { VoiceTaskInterpretation } from "@jewelos/data/tasks/voice";
+import { useAccess, useProfile } from "@/auth/AuthProvider";
 import { pickFileFromChooser } from "@/lib/pickFile";
 import { useAsyncData } from "@/lib/useAsyncData";
 import type { RootStackParamList } from "@/navigation/types";
@@ -26,6 +30,7 @@ import { Screen } from "@/ui/Screen";
 import { Banner, ErrorState, LoadingState } from "@/ui/states";
 import { Text } from "@/ui/Text";
 import { TextField } from "@/ui/TextField";
+import { VoiceTaskCapture } from "./VoiceTaskCapture";
 
 type Navigation = NativeStackNavigationProp<RootStackParamList, "TaskComposer">;
 
@@ -40,6 +45,7 @@ export function TaskComposerScreen() {
   const styles = useStyles();
   const navigation = useNavigation<Navigation>();
   const profile = useProfile();
+  const access = useAccess();
   const reference = useAsyncData(loadTaskAuthoringReferenceData, []);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -54,6 +60,8 @@ export function TaskComposerScreen() {
   const [createdTaskId, setCreatedTaskId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [voiceGaps, setVoiceGaps] = useState<readonly VoiceDraftGap[]>([]);
+  const [assignmentReason, setAssignmentReason] = useState<string | null>(null);
 
   const data = reference.data;
   const authoringScope = data ? deriveTaskAuthoringCapability({
@@ -74,6 +82,32 @@ export function TaskComposerScreen() {
     item.value === "high" || item.value === "medium" || item.value === "low"
       ? [{ value: item.value, label: item.label }]
       : []), [data?.priorities]);
+  const outstandingVoiceGaps = useMemo(() => voiceGaps.filter((gap) => gap === "title"
+    ? !title.trim()
+    : gap === "assignee"
+      ? doerIds.length === 0
+      : gap === "due"
+        ? !plannedDatetime
+        : !checklistText.split(/\r?\n/).some((item) => item.trim())), [checklistText, doerIds.length, plannedDatetime, title, voiceGaps]);
+
+  const applyVoiceDraft = (interpretation: VoiceTaskInterpretation) => {
+    const { draft } = interpretation;
+    setError(null);
+    if (draft.title) setTitle(draft.title);
+    if (draft.description) setDescription(draft.description);
+    setMode(draft.taskType === "checklist" ? "checklist" : "task");
+    if (draft.taskType === "checklist" && draft.checklist.length > 0) setChecklistText(draft.checklist.join("\n"));
+    if (draft.priority) setPriority(draft.priority);
+    if (draft.plannedDatetime) setPlannedDatetime(draft.plannedDatetime);
+    if (draft.assigneeId && eligiblePeople.some((person) => person.id === draft.assigneeId)) {
+      setDoerIds([draft.assigneeId]);
+      setWatcherIds((current) => current.filter((id) => id !== draft.assigneeId));
+      setAssignmentReason(draft.assignmentReason);
+    } else {
+      setAssignmentReason(null);
+    }
+    setVoiceGaps(interpretation.gaps);
+  };
 
   const chooseAttachment = async () => {
     const result = await pickFileFromChooser("Attach image or document");
@@ -166,6 +200,9 @@ export function TaskComposerScreen() {
     >
       {error ? <Banner tone="danger">{error}</Banner> : null}
       {createdTaskId ? <Banner tone="warning">The task is saved. Only the attachment still needs uploading.</Banner> : null}
+      {hasPermission(access, "tasks.manage_team") && !createdTaskId ? <VoiceTaskCapture onInterpreted={applyVoiceDraft} /> : null}
+      {outstandingVoiceGaps.length > 0 ? <Banner tone="warning">{`Finish before assigning: ${outstandingVoiceGaps.map(voiceDraftGapMessage).join(" ")}`}</Banner> : null}
+      {assignmentReason ? <Text tone="muted" variant="caption">Assigned from your voice note · {assignmentReason}</Text> : null}
       <TextField editable={!createdTaskId} label="Task title" maxLength={200} onChangeText={setTitle} required value={title} />
       <TextField editable={!createdTaskId} label="Description" multiline onChangeText={setDescription} value={description} />
       <View style={styles.fieldGroup}>

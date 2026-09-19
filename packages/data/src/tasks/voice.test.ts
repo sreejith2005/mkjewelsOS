@@ -1,0 +1,49 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const api = vi.hoisted(() => ({ invoke: vi.fn() }));
+vi.mock("@jewelos/api-client/client", () => ({
+  getSupabase: () => ({ functions: { invoke: api.invoke } }),
+}));
+
+import { interpretTaskVoiceNote } from "./voice";
+
+const recording = {
+  name: "voice-note.m4a",
+  size: 3,
+  type: "audio/mp4",
+  body: new Uint8Array([1, 2, 3]).buffer,
+} as const;
+
+beforeEach(() => api.invoke.mockReset());
+
+describe("interpretTaskVoiceNote", () => {
+  it("returns the validated interpretation and sends multipart audio", async () => {
+    api.invoke.mockResolvedValue({
+      data: {
+        transcript: "Assign stock count to Asha tomorrow",
+        draft: { title: "Stock count", description: "", taskType: "task", checklist: [] },
+        gaps: ["due"],
+      },
+      error: null,
+    });
+
+    await expect(interpretTaskVoiceNote(recording)).resolves.toEqual(expect.objectContaining({
+      transcript: "Assign stock count to Asha tomorrow",
+      gaps: ["due"],
+    }));
+    expect(api.invoke).toHaveBeenCalledWith("interpret-task-voice", expect.objectContaining({ method: "POST", body: expect.any(FormData) }));
+  });
+
+  it("rejects malformed function responses", async () => {
+    api.invoke.mockResolvedValue({ data: { transcript: 42 }, error: null });
+    await expect(interpretTaskVoiceNote(recording)).rejects.toThrow("The voice note could not be interpreted.");
+  });
+
+  it("uses the safe function body error when one is available", async () => {
+    api.invoke.mockResolvedValue({
+      data: null,
+      error: { context: new Response(JSON.stringify({ error: "The recording was too long." }), { headers: { "content-type": "application/json" }, status: 400 }) },
+    });
+    await expect(interpretTaskVoiceNote(recording)).rejects.toThrow("The recording was too long.");
+  });
+});

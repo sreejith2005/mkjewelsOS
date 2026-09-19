@@ -36,6 +36,9 @@ importers:
       '@jewelos/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@jewelos/data':
+        specifier: workspace:*
+        version: link:../../packages/data
       '@jewelos/ui-tokens':
         specifier: workspace:*
         version: link:../../packages/ui-tokens
