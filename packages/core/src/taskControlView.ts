@@ -110,7 +110,12 @@ export function prettyTemplateDate(value: string | null): string {
   const parsed = new Date(`${value}T00:00:00+05:30`);
   return Number.isNaN(parsed.getTime())
     ? value
-    : parsed.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    : parsed.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        timeZone: "Asia/Kolkata",
+      });
 }
 
 /** A template's start or due clock time, as a 12-hour label. */
