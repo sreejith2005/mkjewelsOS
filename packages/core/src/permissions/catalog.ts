@@ -61,6 +61,7 @@ export const PERMISSION_CATALOG = [
   modulePermission("dashboard.view", "dashboard", "Home & Dashboard", "Open Dashboard", "Operational analytics for the user's authorized scope."),
   modulePermission("tasks.view", "checklist_tasks", "Tasks", "Open Tasks", "Assigned tasks, manual tasks, and task import."),
   { key: "tasks.manage_team", kind: "authority", category: "Tasks", label: "Manage team tasks", description: "Create, edit, and delegate tasks for others. Follows Manager authority or higher.", defaultRoles: ["super_admin", "admin", "manager"], pageId: null },
+  { key: "tasks.voice_assign", kind: "action", category: "Tasks", label: "Assign tasks by voice", description: "Record a voice note that fills in the Assign Task form. Assignee scope is unchanged.", defaultRoles: ["super_admin", "admin", "manager", "hr"], pageId: null },
   { key: "tasks.view_all", kind: "authority", category: "Tasks", label: "View all tasks", description: "Tenant-wide task visibility. Follows Admin authority or higher.", defaultRoles: ["super_admin", "admin"], pageId: null },
   modulePermission("recurring_todo.view", "recurring_todo", "Tasks", "Open Recurring / To-Do", "Recurring schedules, verification, follow-ups, and coverage."),
   modulePermission("task_control.view", "task_templates", "Tasks", "Open Task Control", "Progress, overdue work, evidence, and task templates."),

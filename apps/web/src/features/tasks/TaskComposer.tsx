@@ -40,7 +40,7 @@ function TaskSelector({ children, id, open, panel }: { children: ReactNode; id: 
 }
 
 export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, onSave, onUploadAttachment, profile }: {
-  /** Voice capture is offered only to authors the database grants `tasks.manage_team`. */
+  /** Voice capture is offered only to authors the database grants `tasks.voice_assign`. */
   canUseVoice?: boolean;
   data: TaskReferenceData;
   onClose: () => void;

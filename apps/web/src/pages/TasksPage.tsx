@@ -50,7 +50,7 @@ export function TasksPage() {
   const canCreateTasks = Boolean(profile);
   const hasAdminTaskView = profile ? ["super_admin", "admin"].includes(profile.user_role) : false;
   // The database resolves this key; the flag only decides whether the control is offered.
-  const canUseVoice = access ? hasPermission(access, "tasks.manage_team") : false;
+  const canUseVoice = access ? hasPermission(access, "tasks.voice_assign") : false;
 
   const refresh = useCallback(async () => {
     if (!profile) return;

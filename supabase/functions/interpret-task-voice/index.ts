@@ -18,8 +18,12 @@ const corsHeaders = {
   "Content-Type": "application/json",
 };
 
-/** Roles are never listed here; `tasks.manage_team` is resolved by the database. */
-const VOICE_TASK_PERMISSION = "tasks.manage_team";
+/**
+ * Roles are never listed here. `tasks.voice_assign` (migration 0165) defaults to
+ * super_admin, admin, manager and hr, and is adjustable per role, designation
+ * and user in Settings -> Permissions; the database resolves it.
+ */
+const VOICE_TASK_PERMISSION = "tasks.voice_assign";
 const OPEN_TASK_STATUSES = ["pending", "in_progress", "in_review", "blocked", "overdue"];
 
 function response(status: number, body: Record<string, unknown>): Response {
@@ -83,9 +87,17 @@ Deno.serve(async (request: Request) => {
     .maybeSingle();
   if (profileError || !profile) return response(403, { error: "Active profile required" });
 
-  // The database resolves the permission; this worker never inspects the role.
-  const { data: permitted, error: permissionError } = await admin.rpc("permission_effective_for", { p_profile_id: profile.id, p_key: VOICE_TASK_PERMISSION });
-  if (permissionError || permitted !== true) return response(403, { error: "You cannot assign tasks to others" });
+  // Asked as the caller: has_permission resolves the signed-in user through
+  // auth.uid() and is the resolver authenticated users may execute. The
+  // service role deliberately cannot execute permission_effective_for.
+  // A failed check is reported as unavailable, never as a denial, so an
+  // infrastructure fault cannot masquerade as a missing permission.
+  const { data: permitted, error: permissionError } = await actorClient.rpc("has_permission", { p_key: VOICE_TASK_PERMISSION });
+  if (permissionError) {
+    console.error("Voice permission check failed", permissionError.message);
+    return response(503, { error: "Unable to check your permissions right now" });
+  }
+  if (permitted !== true) return response(403, { error: "Your role cannot assign tasks by voice. Ask a Super Admin to enable it in Settings -> Permissions." });
 
   const { data: allowed, error: limitError } = await admin.rpc("consume_voice_interpretation_quota", { p_profile_id: profile.id });
   if (limitError) return response(503, { error: "Voice interpretation is unavailable right now" });
