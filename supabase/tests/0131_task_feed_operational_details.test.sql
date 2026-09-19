@@ -1,5 +1,5 @@
 begin;
-select plan(22);
+select plan(26);
 
 select has_column('public','v_all_tasks','scheduled_date','feed exposes the instance schedule date');
 select has_column('public','v_all_tasks','assignment_status','feed exposes durable assignment state');
@@ -68,6 +68,7 @@ select set_config('request.jwt.claim.sub','13100000-0000-4000-8000-000000000001'
 select set_config('request.jwt.claim.role','authenticated',true);
 
 select is((select count(*)::integer from public.v_all_tasks),3,'ordinary assignee sees only two assigned tasks and the assigned FMS stage');
+select is((select count(*)::integer from public.v_task_feed_scope),3,'lightweight scope exposes the same authorized task identifiers');
 select is(
   (select jsonb_build_object('schedule_kind',schedule_kind,'starts_on',starts_on,'planned_time',planned_time,'due_time',due_time,'is_active',is_active,'verification_required',verification_required,'verification_status',verification_status,'buddy_assignment_allowed',buddy_assignment_allowed,'assignment_status',assignment_status) from public.v_all_tasks where id='13160000-0000-4000-8000-000000000001'),
   jsonb_build_object('schedule_kind','daily','starts_on','2026-09-01'::date,'planned_time','09:00'::time,'due_time','10:00'::time,'is_active',true,'verification_required',true,'verification_status','pending','buddy_assignment_allowed',false,'assignment_status','assigned'),
@@ -76,13 +77,24 @@ select is(
 select is((select branch_name||'|'||department_name from public.v_all_tasks where id='13160000-0000-4000-8000-000000000001'),'Pune Camp 131|Retail Operations 131','organization names match the task scope');
 select ok((select schedule_kind is null and starts_on is null and planned_time is null and due_time is null and is_active is null and verification_required is null from public.v_all_tasks where id='13160000-0000-4000-8000-000000000002'),'one-time task returns safe null template context');
 select ok(not exists(select 1 from public.v_all_tasks where id in ('13160000-0000-4000-8000-000000000003','13160000-0000-4000-8000-000000000004')),'unrelated and cross-tenant task rows remain invisible');
+select ok(not exists(select 1 from public.v_task_feed_scope where id in ('13160000-0000-4000-8000-000000000003','13160000-0000-4000-8000-000000000004')),'scope keeps unrelated and cross-tenant task identifiers invisible');
 select ok((select schedule_kind is null and starts_on is null and planned_time is null and due_time is null and is_active is null and verification_required is null from public.v_all_tasks where id='13173000-0000-4000-8000-000000000001'),'FMS rows remain queryable without invented schedule context');
+reset role;
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub','13100000-0000-4000-8000-000000000002',true);
+select is(
+  (select count(distinct id)::integer from public.v_task_feed_scope where created_by='13140000-0000-4000-8000-000000000002'),
+  4,
+  'privileged author discovers task and FMS identifiers without the wide feed projection'
+);
 reset role;
 
 set local role anon;
 select set_config('request.jwt.claim.sub','',true);
 select set_config('request.jwt.claim.role','anon',true);
 select throws_ok('select * from public.v_all_tasks','42501',null,'anonymous feed access is denied');
+select throws_ok('select * from public.v_task_feed_scope','42501',null,'anonymous scope access is denied');
 
 select * from finish();
 rollback;

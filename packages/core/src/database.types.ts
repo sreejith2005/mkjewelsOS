@@ -7300,6 +7300,19 @@ export type Database = {
         }
         Relationships: []
       }
+      v_task_feed_scope: {
+        Row: {
+          assignee_id: string | null
+          created_by: string | null
+          effective_due_datetime: string | null
+          id: string | null
+          planned_datetime: string | null
+          status: Database["public"]["Enums"]["task_status"] | null
+          task_type: Database["public"]["Enums"]["task_type"] | null
+          tenant_id: string | null
+        }
+        Relationships: []
+      }
       v_task_users: {
         Row: {
           branch_id: string | null

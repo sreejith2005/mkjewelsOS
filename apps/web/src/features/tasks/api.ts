@@ -126,6 +126,9 @@ const TASK_DETAIL_ID_BATCH_SIZE = 50;
 
 type TaskFeedPage = { data: TaskFeedRow[]; error: { message: string } | null };
 type TaskFeedPageResponse = { data: TaskFeedRow[] | null; error: { message: string } | null };
+type TaskScopeRow = Pick<Database["public"]["Views"]["v_task_feed_scope"]["Row"], "id">;
+type TaskScopePage = { data: TaskScopeRow[]; error: { message: string } | null };
+type TaskScopePageResponse = { data: TaskScopeRow[] | null; error: { message: string } | null };
 
 export function taskFeedIdBatches(ids: readonly string[], batchSize = TASK_FEED_ID_BATCH_SIZE): string[][] {
   const batches: string[][] = [];
@@ -144,13 +147,37 @@ async function loadTaskFeedPages(loadPage: (from: number, to: number) => Promise
   }
 }
 
+async function loadTaskScopePages(loadPage: (from: number, to: number) => PromiseLike<TaskScopePageResponse>): Promise<TaskScopePage> {
+  const rows: TaskScopeRow[] = [];
+  for (let from = 0; ; from += TASK_FEED_PAGE_SIZE) {
+    const page = await loadPage(from, from + TASK_FEED_PAGE_SIZE - 1);
+    if (page.error) return { data: [], error: page.error };
+    const pageRows = page.data ?? [];
+    rows.push(...pageRows);
+    if (pageRows.length < TASK_FEED_PAGE_SIZE) return { data: rows, error: null };
+  }
+}
+
+async function loadTaskRowsByIds(taskIds: readonly string[]): Promise<TaskFeedPage> {
+  const rows: TaskFeedRow[] = [];
+  for (const ids of taskFeedIdBatches(taskIds)) {
+    const result = await loadTaskFeedPages((from, to) => supabase.from("v_all_tasks").select("*")
+      .in("id", ids)
+      .order("planned_datetime", { ascending: false })
+      .range(from, to));
+    if (result.error) return { data: [], error: result.error };
+    rows.push(...result.data);
+  }
+  return { data: rows, error: null };
+}
+
 export const taskFeedCurrentOrOverdueFilter = coreTaskFeedCurrentOrOverdueFilter;
 
 export async function loadTaskFeed(
   viewerId: string,
   startIso: string,
   endIso: string,
-  options: { delegated?: boolean; includeBlockedCoverage?: boolean; includeOverdue?: boolean } = {},
+  options: { tenantId: string; delegated?: boolean; includeBlockedCoverage?: boolean; includeOverdue?: boolean },
 ): Promise<TaskBundle[]> {
   const watcherPromise = supabase.from("task_watchers")
     .select("task_instance_id")
@@ -162,65 +189,81 @@ export async function loadTaskFeed(
   const deadlineFilter = options.includeOverdue ? taskFeedCurrentOrOverdueFilter(startIso, endIso) : null;
 
   if (options.delegated) {
-    const [taskResult, watcherResult, usersResult] = await Promise.all([
+    const [scopeResult, watcherResult, usersResult] = await Promise.all([
       (deadlineFilter
-        ? loadTaskFeedPages((from, to) => supabase.from("v_all_tasks").select("*").or(deadlineFilter)
+        ? loadTaskScopePages((from, to) => supabase.from("v_task_feed_scope").select("id").or(deadlineFilter)
+          .eq("tenant_id", options.tenantId)
           .eq("created_by", viewerId)
-          .order("planned_datetime", { ascending: false })
+          .order("effective_due_datetime", { ascending: false })
+          .order("id", { ascending: false })
           .range(from, to))
-        : supabase.from("v_all_tasks").select("*").gte("planned_datetime", startIso).lte("planned_datetime", endIso)
+        : supabase.from("v_task_feed_scope").select("id")
+          .eq("tenant_id", options.tenantId)
+          .eq("created_by", viewerId)
+          .gte("planned_datetime", startIso).lte("planned_datetime", endIso)
           .order("planned_datetime", { ascending: true })),
       watcherPromise,
       usersPromise,
     ]);
-    fail("Load delegated tasks", taskResult.error);
+    fail("Load delegated task scope", scopeResult.error);
     fail("Load task watchers", watcherResult.error);
     fail("Load task users", usersResult.error);
-    rows = taskResult.data ?? [];
+    const taskResult = await loadTaskRowsByIds([...new Set(scopeResult.data.flatMap((row) => row.id ? [row.id] : []))]);
+    fail("Load delegated tasks", taskResult.error);
+    rows = taskResult.data;
     watcherRows = watcherResult.data;
     users = usersResult.data;
   } else {
-    const [assignedResult, watcherResult, coverageResult, usersResult] = await Promise.all([
+    const [assignedScopeResult, watcherResult, coverageScopeResult, usersResult] = await Promise.all([
       (deadlineFilter
-        ? loadTaskFeedPages((from, to) => supabase.from("v_all_tasks").select("*").or(deadlineFilter)
+        ? loadTaskScopePages((from, to) => supabase.from("v_task_feed_scope").select("id").or(deadlineFilter)
+          .eq("tenant_id", options.tenantId)
           .eq("assignee_id", viewerId)
-          .order("planned_datetime", { ascending: false })
+          .order("effective_due_datetime", { ascending: false })
+          .order("id", { ascending: false })
           .range(from, to))
-        : supabase.from("v_all_tasks").select("*").gte("planned_datetime", startIso).lte("planned_datetime", endIso)
+        : supabase.from("v_task_feed_scope").select("id")
+          .eq("tenant_id", options.tenantId)
+          .eq("assignee_id", viewerId)
+          .gte("planned_datetime", startIso).lte("planned_datetime", endIso)
           .order("planned_datetime", { ascending: true })),
       watcherPromise,
       options.includeBlockedCoverage
         ? (deadlineFilter
-          ? loadTaskFeedPages((from, to) => supabase.from("v_all_tasks").select("*").or(deadlineFilter)
+          ? loadTaskScopePages((from, to) => supabase.from("v_task_feed_scope").select("id").or(deadlineFilter)
+            .eq("tenant_id", options.tenantId)
             .eq("status", "blocked")
             .is("assignee_id", null)
-            .order("planned_datetime", { ascending: false })
+            .order("effective_due_datetime", { ascending: false })
+            .order("id", { ascending: false })
             .range(from, to))
-          : supabase.from("v_all_tasks").select("*").gte("planned_datetime", startIso).lte("planned_datetime", endIso)
+          : supabase.from("v_task_feed_scope").select("id")
+            .eq("tenant_id", options.tenantId)
+            .eq("status", "blocked")
+            .is("assignee_id", null)
+            .gte("planned_datetime", startIso).lte("planned_datetime", endIso)
             .order("planned_datetime", { ascending: true }))
-        : Promise.resolve({ data: [] as TaskFeedRow[], error: null }),
+        : Promise.resolve({ data: [] as TaskScopeRow[], error: null }),
       usersPromise,
     ]);
-    fail("Load assigned tasks", assignedResult.error);
+    fail("Load assigned task scope", assignedScopeResult.error);
     fail("Load task watchers", watcherResult.error);
-    fail("Load coverage tasks", coverageResult.error);
+    fail("Load coverage task scope", coverageScopeResult.error);
     fail("Load task users", usersResult.error);
     watcherRows = watcherResult.data;
     users = usersResult.data;
     const visibleTaskIds = [...new Set([
-      ...(assignedResult.data ?? []).flatMap((row) => row.id ? [row.id] : []),
+      ...assignedScopeResult.data.flatMap((row) => row.id ? [row.id] : []),
       ...watcherRows.map((row) => row.task_instance_id),
     ])];
-    const visibleTaskResults = await Promise.all(taskFeedIdBatches(visibleTaskIds).map((taskIds) => deadlineFilter
-      ? loadTaskFeedPages((from, to) => supabase.from("v_all_tasks").select("*").or(deadlineFilter)
-        .in("id", taskIds)
-        .order("planned_datetime", { ascending: false })
-        .range(from, to))
-      : supabase.from("v_all_tasks").select("*").gte("planned_datetime", startIso).lte("planned_datetime", endIso)
-        .in("id", taskIds)
-        .order("planned_datetime", { ascending: true })));
-    for (const result of visibleTaskResults) fail("Load assigned and watched task details", result.error);
-    rows = [...visibleTaskResults.flatMap((result) => result.data ?? []), ...(coverageResult.data ?? [])];
+    const coverageTaskIds = [...new Set(coverageScopeResult.data.flatMap((row) => row.id ? [row.id] : []))];
+    const [visibleTasksResult, coverageTasksResult] = await Promise.all([
+      loadTaskRowsByIds(visibleTaskIds),
+      loadTaskRowsByIds(coverageTaskIds),
+    ]);
+    fail("Load assigned and watched task details", visibleTasksResult.error);
+    fail("Load coverage tasks", coverageTasksResult.error);
+    rows = [...visibleTasksResult.data, ...coverageTasksResult.data];
   }
 
   const scopedRows = options.includeOverdue

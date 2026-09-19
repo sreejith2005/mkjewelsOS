@@ -60,9 +60,10 @@ export function TaskDetailScreen() {
   const load = useCallback(async () => {
     const today = kolkataDateKey(new Date());
     return loadTaskFeed(profile.id, `${today}T00:00:00.000+05:30`, `${today}T23:59:59.999+05:30`, {
+      tenantId: profile.tenant_id,
       includeOverdue: true,
     });
-  }, [profile.id]);
+  }, [profile.id, profile.tenant_id]);
 
   const { data, error, loading, refreshing, reload, refresh } = useAsyncData(load, [load]);
   const task = useMemo(() => data?.find((item) => item.id === params.taskId) ?? null, [data, params.taskId]);

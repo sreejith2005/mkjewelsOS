@@ -56,9 +56,9 @@ export function TasksScreen() {
       log.debug("api", "recurring preparation error", error);
     });
     const [assigned, authored, references] = await Promise.all([
-      loadTaskFeed(profile.id, start, end, { includeBlockedCoverage: canManage, includeOverdue: true }),
+      loadTaskFeed(profile.id, start, end, { tenantId: profile.tenant_id, includeBlockedCoverage: canManage, includeOverdue: true }),
       hasAdminView
-        ? loadTaskFeed(profile.id, start, end, { delegated: true, includeOverdue: true })
+        ? loadTaskFeed(profile.id, start, end, { tenantId: profile.tenant_id, delegated: true, includeOverdue: true })
         : Promise.resolve<TaskBundle[]>([]),
       loadTaskFeedReferenceData().catch(() => ({ categories: [] })),
     ]);
