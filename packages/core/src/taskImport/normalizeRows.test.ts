@@ -35,4 +35,3 @@ describe("normalizeImportRows", () => {
     expect(normalizeImportRows(withFrequency, { title: "Task", doerName: "Doer", frequency: "Frequency" }).blocked[0]?.reason).toMatch(/frequency/i);
   });
 });
-

@@ -24,7 +24,6 @@ export type TaskImportMapping = Readonly<{
 function normalizedHeader(value: string) {
   return value.trim().toLocaleLowerCase();
 }
-
 function parseRows(source: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
@@ -107,4 +106,3 @@ export function validateImportMapping(mapping: TaskImportMapping): string | null
   if (!mapping.doerName?.trim() && !mapping.doerEmail?.trim()) return "Map a doer name or doer email column";
   return null;
 }
-

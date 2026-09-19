@@ -7,4 +7,3 @@ it("exports safe issue metadata without source values", () => {
   expect(report).not.toContain("Tasks");
   expect(report).not.toMatch(/@/);
 });
-

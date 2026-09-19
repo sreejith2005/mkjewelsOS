@@ -14,4 +14,3 @@ export function taskImportOutcomeMessage(outcome: TaskImportOutcome): { tone: "s
   const queued = outcome.assigningLeft > 0 ? ` ${count(outcome.assigningLeft)} of them still need an assignee and are waiting in Assigning Left.` : "";
   return { tone: "success", text: `${count(outcome.created)} new records imported.${skipped}${queued}` };
 }
-

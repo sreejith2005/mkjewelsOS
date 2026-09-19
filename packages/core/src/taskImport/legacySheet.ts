@@ -71,9 +71,7 @@ export function normalizeLegacyTaskSheet(rows: readonly Row[], options: LegacyTa
   });
   return { draftRows: drafts, identityRequirements: [...requirements.values()], issues };
 }
-
 function addRequirement(map: Map<string, { key: string; kind: "assignee" | "verifier"; label: string; source_rows: number[] }>, kind: "assignee" | "verifier", label: string, row: number) {
   const key = identityRequirementKey(kind, label); const found = map.get(key);
   if (found) found.source_rows.push(row); else map.set(key, { key, kind, label, source_rows: [row] });
 }
-

@@ -18,7 +18,6 @@ const normalized = normalizePersonLabel;
 function resolveIdentity(email: string, name: string, candidates: readonly TaskImportIdentityCandidate[]) {
   return matchPersonByLabel({ email, name }, candidates.map((candidate) => ({ ...candidate, aliases: candidate.import_aliases })));
 }
-
 export function applyIdentityMappings(draftRows: readonly TaskImportDraftRow[], candidates: readonly TaskImportIdentityCandidate[]) {
   const issues: TaskBulkImportIssue[] = [];
   const unresolved = new Map<string, { label: string; source_rows: number[] }>();
@@ -42,4 +41,3 @@ export function applyIdentityMappings(draftRows: readonly TaskImportDraftRow[], 
   });
   return { rows, issues, unresolvedAssignees: [...unresolved.values()] };
 }
-

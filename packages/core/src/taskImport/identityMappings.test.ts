@@ -12,7 +12,6 @@ const candidate = (overrides: Partial<{ id: string; employee_name: string; email
   import_aliases: [],
   ...overrides,
 });
-
 const draftRow = (overrides: Record<string, string> = {}) => {
   const values = Object.fromEntries(LEGACY_TASK_HEADERS.map((header) => [header, ""]));
   Object.assign(values, { "EMPLOYEE NAME": "Named Person", DEPARTMENT: "Sales", "BRANCH NAME": "Bandra", "TASK TYPE": "TASK", "CORE TASK": "Core", TASK: "Task", FREQUENCY: "As Required", "START TIME": "09:00", "DUE TIME": "18:00", PRIORITY: "Medium", "EVIDENCE REQUIRED": "No", "VERIFICATION REQUIRED": "No", "BUDDY ALLOWED": "No", ACTIVE: "Yes", ...overrides });
@@ -80,4 +79,3 @@ describe("automatic identity preview", () => {
     expect(result.unresolvedAssignees).toEqual([{ label: "Named Person", source_rows: [2, 2] }]);
   });
 });
-

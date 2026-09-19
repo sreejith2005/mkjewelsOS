@@ -18,11 +18,9 @@ describe("parseTaskCsv", () => {
     expect(() => parseTaskCsv("Task, task \nStock count,Asha")).toThrow(/duplicate/i);
   });
 });
-
 describe("validateImportMapping", () => {
   it("requires title and a doer name or email", () => {
     expect(validateImportMapping({ title: "Task" })).toMatch(/doer/i);
     expect(validateImportMapping({ title: "Task", doerEmail: "Email" })).toBeNull();
   });
 });
-

@@ -26,7 +26,6 @@ describe("validateTaskBulkImport", () => {
     await expect(validateTaskBulkImport({ tasks: [] }, "a".repeat(64))).resolves.toMatchObject({ valid: true });
   });
 });
-
 describe("Assigning Left API", () => {
   it("loads the protected admin queue", async () => {
     restRpc.mockResolvedValueOnce({ data: [{ record_kind: "task", id: "task-1" }], error: null });
@@ -64,4 +63,3 @@ describe("loadTaskImportBatches", () => {
     await expect(loadTaskImportBatches()).resolves.toEqual([]);
   });
 });
-

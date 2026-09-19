@@ -67,4 +67,3 @@ describe("current task sheet", () => {
     expect(result.issues).toContainEqual(expect.objectContaining({ field: "ACTIVE" }));
   });
 });
-

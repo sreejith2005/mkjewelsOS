@@ -26,7 +26,6 @@ type Candidate = ImportedTaskRow & Readonly<{ group: string }>;
 function value(row: Readonly<Record<string, string>>, header: string | undefined) {
   return header ? (row[header] ?? "").trim() : "";
 }
-
 function frequency(raw: string): ImportFrequency | null {
   if (!raw || raw.toLocaleLowerCase() === "once") return "once";
   if (["daily", "weekly", "monthly"].includes(raw.toLocaleLowerCase())) return raw.toLocaleLowerCase() as ImportFrequency;
@@ -96,4 +95,3 @@ export function normalizeImportRows(parsed: ParsedTaskCsv, mapping: TaskImportMa
 
   return { accepted, blocked };
 }
-

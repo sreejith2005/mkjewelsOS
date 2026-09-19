@@ -22,4 +22,3 @@ describe("resumable task import chunks", () => {
     expect(result.assigningLeft).toBe(205);
   });
 });
-
