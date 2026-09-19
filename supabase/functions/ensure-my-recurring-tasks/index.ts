@@ -21,14 +21,19 @@ function kolkataToday(): string {
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return response(405, { error: "Method not allowed" });
-  const authorization = request.headers.get("authorization");
+  // Pass the token to getUser explicitly. A lowercase `authorization` global
+  // header sits beside supabase-js's own `Authorization: Bearer <anon key>`
+  // instead of replacing it, so the request carries two credentials and the
+  // lookup is rejected.
+  const token = request.headers.get("Authorization")?.match(/^Bearer\s+(.+)$/i)?.[1];
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!authorization || !supabaseUrl || !anonKey || !serviceRoleKey) return response(401, { error: "Authentication required" });
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) return response(500, { error: "Recurring task preparation is not configured" });
+  if (!token) return response(401, { error: "Authentication required" });
 
-  const actorClient = createClient(supabaseUrl, anonKey, { auth: { autoRefreshToken: false, persistSession: false }, global: { headers: { authorization } } });
-  const { data: userData, error: userError } = await actorClient.auth.getUser();
+  const actorClient = createClient(supabaseUrl, anonKey, { auth: { autoRefreshToken: false, persistSession: false }, global: { headers: { Authorization: `Bearer ${token}` } } });
+  const { data: userData, error: userError } = await actorClient.auth.getUser(token);
   if (userError || !userData.user) return response(401, { error: "Authentication required" });
 
   const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
