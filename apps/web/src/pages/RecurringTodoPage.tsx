@@ -16,6 +16,8 @@ import {
   RECURRING_PRIORITY_FILTERS,
   RECURRING_STATUS_FILTERS,
   RECURRING_TODO_TABS,
+  TASK_DELAYED_SCORE_LABEL,
+  TASK_PENDING_SCORE_LABEL,
   type RecurringTodoTab,
 } from "@jewelos/core";
 import {
@@ -714,8 +716,8 @@ export function RecurringTodoPage() {
                   <th className="p-3">On time</th>
                   <th className="p-3">Delayed</th>
                   <th className="p-3">On behalf</th>
-                  <th className="p-3 whitespace-nowrap">Pending score</th>
-                  <th className="p-3 whitespace-nowrap">Delayed score</th>
+                  <th className="p-3 whitespace-nowrap">{TASK_PENDING_SCORE_LABEL}</th>
+                  <th className="p-3 whitespace-nowrap">{TASK_DELAYED_SCORE_LABEL}</th>
                 </tr>
               </thead>
               <tbody>

@@ -23,7 +23,7 @@ describe("native task performance scores", () => {
   });
 
   it("uses the same labels on Task Control, Dashboard, and Recurring", () => {
-    expect([TASK_PENDING_SCORE_LABEL, TASK_DELAYED_SCORE_LABEL]).toEqual(["Pending score", "Delayed score"]);
+    expect([TASK_PENDING_SCORE_LABEL, TASK_DELAYED_SCORE_LABEL]).toEqual(["Work not done", "Work not done on time"]);
     const dashboard = METRIC_CATALOG.filter((item) => item.format === "score").map((item) => item.displayName);
     expect(dashboard).toEqual([TASK_PENDING_SCORE_LABEL, TASK_DELAYED_SCORE_LABEL]);
     expect(

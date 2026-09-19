@@ -34,7 +34,7 @@ describe("metric catalog and formatting", () => {
     const pending=METRIC_CATALOG.find((item)=>item.key==="task_pending_score")!;
     const delayed=METRIC_CATALOG.find((item)=>item.key==="task_delayed_score")!;
     expect(METRIC_CATALOG.some((item)=>item.key==="task_completion_rate")).toBe(false);
-    expect([pending.displayName,delayed.displayName]).toEqual(["Pending score","Delayed score"]);
+    expect([pending.displayName,delayed.displayName]).toEqual(["Work not done","Work not done on time"]);
     expect([pending.format,delayed.format]).toEqual(["score","score"]);
     expect(formatMetric({key:pending.key,value:-93.9},pending)).toBe("−93.9%");
     expect(formatMetric({key:delayed.key,value:-100},delayed)).toBe("−100.0%");

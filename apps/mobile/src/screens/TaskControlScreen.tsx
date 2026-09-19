@@ -342,7 +342,7 @@ export function TaskControlScreen() {
         key: "attention-total",
         text: `Across everyone in scope: ${people.completed} completed, ${people.remaining} remaining, ${people.overdue} overdue${
           people.assigned > 0
-            ? ` across ${people.assigned} assignments. Pending score ${formatTaskPerformanceScore(pendingScore(people))}, delayed score ${formatTaskPerformanceScore(delayedScore(people))}`
+            ? ` across ${people.assigned} assignments. ${TASK_PENDING_SCORE_LABEL} ${formatTaskPerformanceScore(pendingScore(people))}, ${TASK_DELAYED_SCORE_LABEL.toLowerCase()} ${formatTaskPerformanceScore(delayedScore(people))}`
             : ""
         }. An assignment is one person on one task.`,
       });

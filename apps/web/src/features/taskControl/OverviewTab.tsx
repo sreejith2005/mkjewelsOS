@@ -2,7 +2,7 @@ import { AlertTriangle, ArrowRight } from "lucide-react";
 import { Panel } from "@/features/analytics/components";
 import type { EmployeeProgress, EmployeeProgressRow } from "@/features/analytics/types";
 import type { EvidenceWorkspace } from "@/features/taskEvidence/types";
-import { formatTaskPerformanceScore, taskPendingScore } from "@jewelos/core";
+import { formatTaskPerformanceScore, taskPendingScore, TASK_DELAYED_SCORE_LABEL, TASK_PENDING_SCORE_LABEL } from "@jewelos/core";
 import { ProgressTable, ScoreText, StatTile } from "./panels";
 import { delayedScore, needsAttention, pendingScore, totals, type TaskControlTab } from "./filters";
 
@@ -40,8 +40,8 @@ export function OverviewTab({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <StatTile hint="Each task counted once" label="Tasks in range" value={stats.tasks_total.toLocaleString("en-IN")} />
         <StatTile hint="Marked complete" label="Completed" tone="good" value={stats.completed.toLocaleString("en-IN")} />
-        <StatTile hint="Completed ÷ tasks in range, minus 100" label="Pending score" tone={taskPending === null ? "neutral" : "bad"} value={formatTaskPerformanceScore(taskPending)} />
-        <StatTile hint="On time ÷ completed assignments, minus 100" label="Delayed score" tone={peopleDelayed === null ? "neutral" : "bad"} value={formatTaskPerformanceScore(peopleDelayed)} />
+        <StatTile hint="Completed ÷ tasks in range, minus 100" label={TASK_PENDING_SCORE_LABEL} tone={taskPending === null ? "neutral" : "bad"} value={formatTaskPerformanceScore(taskPending)} />
+        <StatTile hint="On time ÷ completed assignments, minus 100" label={TASK_DELAYED_SCORE_LABEL} tone={peopleDelayed === null ? "neutral" : "bad"} value={formatTaskPerformanceScore(peopleDelayed)} />
         <StatTile hint="Past the effective deadline" label="Overdue" tone={stats.overdue > 0 ? "bad" : "good"} value={stats.overdue.toLocaleString("en-IN")} />
         <StatTile hint="Upload required, no file yet" label="Awaiting evidence" tone={stats.upload_tasks_awaiting_evidence > 0 ? "warn" : "good"} value={stats.upload_tasks_awaiting_evidence.toLocaleString("en-IN")} />
       </div>
@@ -88,7 +88,7 @@ export function OverviewTab({
               {people.assigned > 0 ? ` across ${people.assigned} assignments` : ""}.{" "}
               {people.assigned > 0 ? (
                 <>
-                  Pending score <ScoreText value={pendingScore(people)} />, delayed score <ScoreText value={peopleDelayed} />.{" "}
+                  {TASK_PENDING_SCORE_LABEL} <ScoreText value={pendingScore(people)} />, {TASK_DELAYED_SCORE_LABEL.toLowerCase()} <ScoreText value={peopleDelayed} />.{" "}
                 </>
               ) : null}
               An assignment is one person on one task.

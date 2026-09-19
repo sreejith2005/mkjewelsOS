@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { formatTaskPerformanceScore } from "@jewelos/core";
+import { formatTaskPerformanceScore, TASK_DELAYED_SCORE_LABEL, TASK_PENDING_SCORE_LABEL } from "@jewelos/core";
 import { delayedScore, pendingScore, type ProgressCounts } from "./filters";
 
 export function StatTile({ label, value, hint, tone = "neutral" }: { label: string; value: string; hint: string; tone?: "neutral" | "good" | "warn" | "bad" }) {
@@ -41,7 +41,7 @@ export function ProgressTable<T extends ProgressCounts>({
       <table className="w-full min-w-[36rem] text-left text-xs">
         <thead className="text-[10px] uppercase tracking-wider text-task-text-muted">
           <tr>
-            {[...columns, "Assigned", "Completed", "Remaining", "Overdue", "Pending score", "Delayed score"].map((column) => (
+            {[...columns, "Assigned", "Completed", "Remaining", "Overdue", TASK_PENDING_SCORE_LABEL, TASK_DELAYED_SCORE_LABEL].map((column) => (
               <th className="whitespace-nowrap px-2 py-2 font-semibold" key={column}>{column}</th>
             ))}
           </tr>

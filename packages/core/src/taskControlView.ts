@@ -44,8 +44,8 @@ export function formatTaskPerformanceScore(value: number | null | undefined): st
   return `−${Math.abs(value).toFixed(1)}%`;
 }
 
-export const TASK_PENDING_SCORE_LABEL = "Pending score";
-export const TASK_DELAYED_SCORE_LABEL = "Delayed score";
+export const TASK_PENDING_SCORE_LABEL = "Work not done";
+export const TASK_DELAYED_SCORE_LABEL = "Work not done on time";
 
 export const TASK_CONTROL_TAB_LABELS: ReadonlyArray<readonly ["overview" | "people" | "tasks" | "templates", string]> = [
   ["overview", "Overview"],
