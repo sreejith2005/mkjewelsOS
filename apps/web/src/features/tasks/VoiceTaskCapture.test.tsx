@@ -25,9 +25,11 @@ class FakeRecorder extends EventTarget {
   }
 }
 
-/** Feeds the level meter a constant signal: 0 is silence, 0.1 is a speaking voice. */
-function installAudioContext(amplitude: number) {
+/** Feeds the level meter a constant signal: 0 is a dead mic, 0.01 a quiet voice, 0.1 a clear one. */
+function installAudioContext(amplitude: number, state: AudioContextState = "running") {
   class FakeAudioContext {
+    state = state;
+    resume() { return Promise.resolve(); }
     createAnalyser() {
       return { fftSize: 0, getFloatTimeDomainData: (samples: Float32Array) => samples.fill(amplitude) };
     }
@@ -105,12 +107,27 @@ describe("VoiceTaskCapture", () => {
     Reflect.deleteProperty(Blob.prototype, "arrayBuffer");
   });
 
-  it("refuses a silent clip instead of letting speech-to-text invent words", async () => {
+  it("sends a quiet voice that noise suppression has turned down", async () => {
+    installAudioContext(0.01);
+    render(<VoiceTaskCapture onInterpreted={vi.fn()} />);
+    await record(3_000);
+    expect(interpretTaskVoiceNote).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/no sound/)).toBeNull();
+  });
+
+  it("never refuses a clip the meter could not listen to because audio stayed suspended", async () => {
+    installAudioContext(0, "suspended");
+    render(<VoiceTaskCapture onInterpreted={vi.fn()} />);
+    await record(3_000);
+    expect(interpretTaskVoiceNote).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a dead or muted microphone instead of letting speech-to-text invent words", async () => {
     installAudioContext(0);
     render(<VoiceTaskCapture onInterpreted={vi.fn()} />);
     await record(3_000);
     expect(interpretTaskVoiceNote).not.toHaveBeenCalled();
-    expect(screen.getByText(/No voice was picked up/)).toBeTruthy();
+    expect(screen.getByText(/sent no sound at all/)).toBeTruthy();
   });
 
   it("refuses a mis-tap shorter than a second", async () => {
