@@ -86,6 +86,25 @@ describe("VoiceTaskCapture", () => {
     expect(stopTrack).toHaveBeenCalled();
   });
 
+  it("uploads the recording re-encoded as 16 kHz mono WAV", async () => {
+    installAudioContext(0.1);
+    class FakeOfflineAudioContext {
+      decodeAudioData() {
+        return Promise.resolve({ length: 16_000, numberOfChannels: 1, sampleRate: 16_000, getChannelData: () => new Float32Array(16_000).fill(0.3) });
+      }
+    }
+    vi.stubGlobal("OfflineAudioContext", FakeOfflineAudioContext);
+    // jsdom's Blob lacks arrayBuffer(); every browser with MediaRecorder has it.
+    Object.defineProperty(Blob.prototype, "arrayBuffer", { configurable: true, value: () => Promise.resolve(new ArrayBuffer(8)) });
+    render(<VoiceTaskCapture onInterpreted={vi.fn()} />);
+    await record(2_000);
+    const [sent, filename] = interpretTaskVoiceNote.mock.calls[0] as [Blob, string];
+    expect(filename).toBe("voice-note.wav");
+    expect(sent.type).toBe("audio/wav");
+    expect(sent.size).toBe(44 + 16_000 * 2);
+    Reflect.deleteProperty(Blob.prototype, "arrayBuffer");
+  });
+
   it("refuses a silent clip instead of letting speech-to-text invent words", async () => {
     installAudioContext(0);
     render(<VoiceTaskCapture onInterpreted={vi.fn()} />);

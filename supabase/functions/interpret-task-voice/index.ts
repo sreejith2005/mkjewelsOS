@@ -181,21 +181,42 @@ Deno.serve(async (request: Request) => {
       transcribe: async (input) => {
         const body = new FormData();
         body.append("file", new File([input.bytes as BlobPart], input.filename, { type: input.contentType }));
-        body.append("model", Deno.env.get("OPENAI_TRANSCRIBE_MODEL") ?? "gpt-4o-mini-transcribe");
-        body.append("response_format", "text");
+        // whisper-1 transcribes only what it hears and reports the audio's
+        // duration and per-segment no-speech probability, which the worker uses
+        // to refuse invented text. The gpt-4o transcribe models generate text
+        // and, on a clip they cannot hear, write fluent content that was never
+        // said; they remain available through OPENAI_TRANSCRIBE_MODEL.
+        const model = Deno.env.get("OPENAI_TRANSCRIBE_MODEL")?.trim() || "whisper-1";
+        const detailed = model === "whisper-1";
+        body.append("model", model);
+        body.append("response_format", detailed ? "verbose_json" : "json");
+        body.append("temperature", "0");
         // Without a language the model auto-detects, and a quiet or noisy clip
         // comes back as invented text in an unrelated language. English is the
         // working language of the task form; OPENAI_TRANSCRIBE_LANGUAGE="auto"
         // restores detection, any other ISO-639-1 code overrides it.
         const language = Deno.env.get("OPENAI_TRANSCRIBE_LANGUAGE")?.trim() || "en";
         if (language !== "auto") body.append("language", language);
-        body.append("prompt", buildTranscriptionPrompt(extraction));
+        const vocabulary = buildTranscriptionPrompt(extraction);
+        if (vocabulary) body.append("prompt", vocabulary);
         const result = await fetch("https://api.openai.com/v1/audio/transcriptions", { method: "POST", body, headers: { authorization: `Bearer ${openAiKey}` } });
         if (!result.ok) {
           console.error(`OpenAI transcription failed with ${result.status}`);
           throw new VoiceInterpretationError(502, "Voice interpretation is unavailable right now");
         }
-        return await result.text();
+        const payload = await result.json() as { text?: unknown; duration?: unknown; segments?: Array<{ no_speech_prob?: unknown; avg_logprob?: unknown }> };
+        const text = typeof payload.text === "string" ? payload.text : "";
+        const durationSeconds = typeof payload.duration === "number" ? payload.duration : null;
+        const segments = Array.isArray(payload.segments) ? payload.segments : [];
+        // Whisper's own verdict: every segment likely silence, or so unsure it
+        // is guessing. Either way the words were not heard.
+        const noSpeech = detailed && segments.length > 0
+          ? segments.every((segment) => (typeof segment.no_speech_prob === "number" && segment.no_speech_prob > 0.6)
+            || (typeof segment.avg_logprob === "number" && segment.avg_logprob < -1.2))
+          : null;
+        // Shape only, never the words: a voice note can carry personal content.
+        console.log(JSON.stringify({ event: "voice_transcribed", model, content_type: input.contentType, bytes: input.bytes.byteLength, duration_s: durationSeconds, words: text.split(/\s+/).filter(Boolean).length, segments: segments.length, no_speech: noSpeech }));
+        return { text, durationSeconds, noSpeech };
       },
       extract: async (transcript, context) => {
         const payload = await callOpenAi("chat/completions", openAiKey, {

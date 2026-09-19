@@ -199,11 +199,51 @@ Deno.test("buildExtractionInstructions tells the model to drop non-instructions 
   assertEquals(instructions.includes("exactly as listed"), true);
 });
 
-Deno.test("buildTranscriptionPrompt carries the roster vocabulary within its budget", () => {
-  assertEquals(buildTranscriptionPrompt(extraction).includes("Staff: Priya Nair, Reshma Menon."), true);
-  assertEquals(buildTranscriptionPrompt(extraction).includes("Customer Relations (CRM)"), true);
+Deno.test("buildTranscriptionPrompt is a spelling list only, never a scene the model could write to", () => {
+  assertEquals(buildTranscriptionPrompt(extraction), "Customer Relations (CRM), Priya Nair, Reshma Menon.");
+  assertEquals(/manager|assign|task/i.test(buildTranscriptionPrompt(extraction)), false);
   const crowded = buildTranscriptionPrompt({ ...extraction, peopleNames: Array.from({ length: 500 }, (_, index) => `Person Number ${index}`) });
-  assertEquals(crowded.length <= 700, true);
-  assertEquals(crowded.endsWith("."), true);
-  assertEquals(/Person Number \d+$/.test(crowded.slice(0, -1)), true);
+  assertEquals(crowded.length <= 600, true);
+  assertEquals(/Person Number \d+\.$/.test(crowded), true);
+  assertEquals(buildTranscriptionPrompt({ ...extraction, departmentLabels: [], peopleNames: [] }), "");
+});
+
+const INVENTED = "Hello Team, I request you to provide me with the updated details of your respective teams for the monthly report. Please ensure that the information is accurate and up-to-date. The deadline for submitting the report is the end of this week. Thank you for your prompt attention to this matter. Best regards, [Manager's Name]";
+
+Deno.test("interpretVoiceTask refuses a transcript longer than the audio could hold", async () => {
+  const error = await assertRejects(() => interpretVoiceTask({
+    transcribe: () => Promise.resolve({ text: INVENTED, durationSeconds: 5, noSpeech: false }),
+    extract: () => Promise.reject(new Error("extraction must not run")),
+  }, upload(), () => Promise.resolve(resolution), extraction), VoiceInterpretationError);
+  assertEquals(error.status, 422);
+});
+
+Deno.test("interpretVoiceTask refuses a clip the provider marks as no speech", async () => {
+  const error = await assertRejects(() => interpretVoiceTask({
+    transcribe: () => Promise.resolve({ text: "Thank you.", durationSeconds: 5, noSpeech: true }),
+    extract: () => Promise.reject(new Error("extraction must not run")),
+  }, upload(), () => Promise.resolve(resolution), extraction), VoiceInterpretationError);
+  assertEquals(error.status, 422);
+});
+
+Deno.test("interpretVoiceTask accepts a normally paced instruction", async () => {
+  const interpretation = await interpretVoiceTask({
+    transcribe: () => Promise.resolve({ text: "Ask Reshma to count the display stock by tomorrow five pm", durationSeconds: 5, noSpeech: false }),
+    extract: () => Promise.resolve({
+      title: "Count the display stock",
+      description: "",
+      assignee_hint: "Reshma Menon",
+      department_hint: null,
+      due_datetime: "2026-09-17T17:00:00+05:30",
+      priority: null,
+      task_type: "delegation",
+      checklist_items: [],
+    }),
+  }, upload({ contentType: "audio/wav", filename: "voice-note.wav" }), () => Promise.resolve(resolution), extraction);
+  assertEquals(interpretation.draft.assigneeId, "reshma");
+  assertEquals(interpretation.gaps, []);
+});
+
+Deno.test("assertVoiceUpload accepts a 60 second 16 kHz WAV", () => {
+  assertVoiceUpload(upload({ bytes: new Uint8Array(44 + 16_000 * 2 * 60), contentType: "audio/wav", filename: "voice-note.wav" }));
 });

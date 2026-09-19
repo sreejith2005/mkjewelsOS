@@ -15,8 +15,11 @@ import {
  * the author still presses Assign in the composer.
  */
 
-/** A 60 s Opus note is roughly 150 KB. The byte ceiling is the server-side bound. */
-export const VOICE_NOTE_MAX_BYTES = 1_048_576;
+/**
+ * The browser uploads 16 kHz mono 16-bit WAV (~1.9 MB for 60 s), falling back
+ * to its own ~150 KB Opus clip. The byte ceiling is the server-side bound.
+ */
+export const VOICE_NOTE_MAX_BYTES = 2_621_440;
 export const VOICE_NOTE_MAX_SECONDS = 60;
 
 export const VOICE_NOTE_CONTENT_TYPES: ReadonlySet<string> = new Set([
@@ -57,8 +60,19 @@ export type VoiceExtractionContext = Readonly<{
   peopleNames: readonly string[];
 }>;
 
+/**
+ * What speech-to-text heard. `durationSeconds` and `noSpeech` come from the
+ * provider's own segment analysis when the model reports it (whisper-1
+ * verbose_json); a model that reports neither leaves them null.
+ */
+export type VoiceTranscription = Readonly<{
+  text: string;
+  durationSeconds: number | null;
+  noSpeech: boolean | null;
+}>;
+
 export type VoiceInterpretationGateway = Readonly<{
-  transcribe: (upload: VoiceAudioUpload) => Promise<string>;
+  transcribe: (upload: VoiceAudioUpload) => Promise<string | VoiceTranscription>;
   extract: (transcript: string, context: VoiceExtractionContext) => Promise<unknown>;
 }>;
 
@@ -96,23 +110,44 @@ export function buildExtractionInstructions(context: VoiceExtractionContext): st
 }
 
 /** The transcription prompt budget. Whisper keeps only its final 224 tokens. */
-const TRANSCRIPTION_PROMPT_MAX_CHARS = 700;
+const TRANSCRIPTION_PROMPT_MAX_CHARS = 600;
 
 /**
- * Vocabulary for the speech-to-text model. Without it an unfamiliar Indian name
- * comes back misspelt, and a quiet clip can come back as invented text in
- * another language. The staff list is cut to the budget at a name boundary.
+ * Spellings for the speech-to-text model: department codes and staff names,
+ * nothing else. It must never describe a scene ("a manager assigns a task"):
+ * given one, a model that cannot hear the clip writes a plausible message to
+ * fit it instead of transcribing. Cut to the budget at a word boundary.
  */
 export function buildTranscriptionPrompt(context: VoiceExtractionContext): string {
-  let prompt = "A manager at MK Jewels assigns a task in Indian English: who does it, what to do, and when it is due.";
-  const departments = context.departmentLabels.length > 0 ? ` Departments: ${context.departmentLabels.join(", ")}.` : "";
-  if (prompt.length + departments.length <= TRANSCRIPTION_PROMPT_MAX_CHARS) prompt += departments;
-  const names: string[] = [];
-  for (const name of context.peopleNames) {
-    if (prompt.length + ` Staff: ${[...names, name].join(", ")}.`.length > TRANSCRIPTION_PROMPT_MAX_CHARS) break;
-    names.push(name);
+  const words: string[] = [];
+  let length = 0;
+  for (const word of [...context.departmentLabels, ...context.peopleNames]) {
+    if (length + word.length + 2 > TRANSCRIPTION_PROMPT_MAX_CHARS) break;
+    words.push(word);
+    length += word.length + 2;
   }
-  return names.length > 0 ? `${prompt} Staff: ${names.join(", ")}.` : prompt;
+  return words.length > 0 ? `${words.join(", ")}.` : "";
+}
+
+/** Faster than anyone dictates; more words than this per second were not spoken. */
+const MAX_WORDS_PER_SECOND = 4.5;
+
+function normalizeTranscription(value: string | VoiceTranscription): VoiceTranscription {
+  return typeof value === "string" ? { text: value, durationSeconds: null, noSpeech: null } : value;
+}
+
+/**
+ * Speech-to-text answers a clip it cannot hear with invented, fluent text. A
+ * transcript longer than the audio could hold, or one the provider itself
+ * marks as no speech, is refused rather than turned into a task.
+ */
+export function assertTranscriptWasSpoken(transcription: VoiceTranscription): void {
+  const unheard = "Your voice was not heard clearly. Check the microphone, speak close to it, and try again.";
+  if (transcription.noSpeech === true) throw new VoiceInterpretationError(422, unheard);
+  const duration = transcription.durationSeconds;
+  if (duration === null || !Number.isFinite(duration)) return;
+  const words = transcription.text.split(/\s+/).filter(Boolean).length;
+  if (words > Math.max(6, Math.ceil(duration * MAX_WORDS_PER_SECOND))) throw new VoiceInterpretationError(422, unheard);
 }
 
 /** True when the note carried nothing a task could be built from. */
@@ -182,8 +217,10 @@ export async function interpretVoiceTask(
   extraction: VoiceExtractionContext,
 ): Promise<VoiceInterpretation> {
   assertVoiceUpload(upload);
-  const transcript = (await gateway.transcribe(upload)).trim();
+  const transcription = normalizeTranscription(await gateway.transcribe(upload));
+  const transcript = transcription.text.trim();
   if (!transcript) throw new VoiceInterpretationError(422, "Nothing was said in the recording");
+  assertTranscriptWasSpoken(transcription);
   const hints = parseExtractionHints(await gateway.extract(transcript, extraction), Date.parse(extraction.nowIso));
   if (hintsCarryNoTask(hints)) throw new VoiceInterpretationError(422, "No task was heard in that recording. Check your microphone, speak clearly, and try again.");
   const draft = buildVoiceTaskDraft(hints, await loadResolution(hints));

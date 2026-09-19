@@ -53,6 +53,28 @@ to resolve, and the recorder misbehaved. Fixed without touching the write path:
   meter, clips under 1 s or with no voice heard are refused before upload, and
   a result arriving after the composer closed is dropped.
 
+Follow-up the same day: a 5 s note still came back as an invented
+~60-word "Hello Team ... [Manager's Name]" message. `gpt-4o-mini-transcribe`
+generates text, and when it cannot hear a clip it writes content that fits
+its prompt; the scene-setting prompt added above made that worse.
+
+- The default transcription model is now `whisper-1` (`verbose_json`,
+  temperature 0), which transcribes only and reports duration and per-segment
+  no-speech probability. `OPENAI_TRANSCRIBE_MODEL` still overrides.
+- The transcription prompt is a spelling list only (departments, staff
+  names), never a descriptive sentence.
+- `assertTranscriptWasSpoken` refuses a transcript with more than 4.5 words
+  per second of audio (minimum allowance 6 words) or one Whisper marks as no
+  speech, with a 422 the recorder shows.
+- The browser re-encodes the clip as 16 kHz mono 16-bit WAV
+  (`apps/web/src/features/tasks/voiceAudio.ts`) before upload, falling back to
+  the original clip if it cannot decode; the byte ceiling is 2.5 MB.
+- The function logs the clip's shape (bytes, type, duration, word and segment
+  counts), never the words.
+- Verified in real headless Chrome with a text-to-speech file as a fake
+  microphone: a 5 s WebM recording converted to a 4.98 s 16 kHz mono WAV that
+  an offline recogniser transcribed as recognisably the same sentence.
+
 ## 1. Requirement
 
 An owner/super admin/admin/manager records a short voice note in the Tasks

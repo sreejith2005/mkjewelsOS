@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Mic, RotateCcw, Square } from "lucide-react";
 import { Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { toTranscriptionWav } from "./voiceAudio";
 import { interpretTaskVoiceNote, type VoiceTaskInterpretation } from "./voiceApi";
 
 /** Matches the ceiling the Edge Function enforces on the uploaded clip. */
@@ -163,7 +164,10 @@ export function VoiceTaskCapture({ onInterpreted }: { onInterpreted: (interpreta
         return;
       }
       moveTo("interpreting");
-      interpretTaskVoiceNote(recording, `voice-note.${recording.type.includes("mp4") ? "mp4" : "webm"}`)
+      toTranscriptionWav(recording)
+        .then((wav) => wav
+          ? interpretTaskVoiceNote(wav, "voice-note.wav")
+          : interpretTaskVoiceNote(recording, `voice-note.${recording.type.includes("mp4") ? "mp4" : "webm"}`))
         .then((interpretation) => {
           if (!mountedRef.current) return;
           setTranscript(interpretation.transcript);
