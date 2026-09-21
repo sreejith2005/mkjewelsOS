@@ -102,6 +102,7 @@ export * from "./forms";
 export * from "./fms";
 export * from "./notifications";
 export * from "./crm";
+export * from "./crmWorkspace";
 export * from "./analytics";
 export * from "./reports";
 export * from "./settings";

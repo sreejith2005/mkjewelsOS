@@ -19,6 +19,9 @@ import { FmsStageFormScreen } from "@/screens/FmsStageFormScreen";
 import { FormFillScreen } from "@/screens/FormFillScreen";
 import { FormBuilderScreen } from "@/screens/FormBuilderScreen";
 import { ClientDetailScreen } from "@/screens/ClientDetailScreen";
+import { ClientEditorScreen } from "@/screens/ClientEditorScreen";
+import { CrmFollowupsScreen } from "@/screens/CrmFollowupsScreen";
+import { CrmMergeScreen } from "@/screens/CrmMergeScreen";
 import { WalkinScreen } from "@/screens/WalkinScreen";
 import { ProfileScreen } from "@/screens/ProfileScreen";
 import { AssigningLeftScreen } from "@/screens/AssigningLeftScreen";
@@ -82,6 +85,9 @@ export function RootNavigator() {
           <Stack.Screen component={FormFillScreen} name="FormFill" options={{ title: "Form" }} />
           <Stack.Screen component={FormBuilderScreen} name="FormBuilder" options={{ title: "Form builder" }} />
           <Stack.Screen component={ClientDetailScreen} name="ClientDetail" options={{ title: "Client" }} />
+          <Stack.Screen component={ClientEditorScreen} name="ClientEditor" options={{ title: "Client editor" }} />
+          <Stack.Screen component={CrmFollowupsScreen} name="CrmFollowups" options={{ title: "Follow-ups" }} />
+          <Stack.Screen component={CrmMergeScreen} name="CrmMerge" options={{ title: "Merge clients" }} />
           <Stack.Screen component={WalkinScreen} name="Walkin" options={{ title: "New walk-in" }} />
           <Stack.Screen component={ProfileScreen} name="Profile" options={{ title: "Profile" }} />
           <Stack.Screen component={AssigningLeftScreen} name="AssigningLeft" options={{ title: "Assigning Left" }} />

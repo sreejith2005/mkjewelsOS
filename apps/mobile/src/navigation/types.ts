@@ -26,6 +26,9 @@ export type RootStackParamList = {
   FormBuilder: { formTemplateId?: string } | undefined;
   FormSubmission: { submissionId: string };
   ClientDetail: { clientId: string };
+  ClientEditor: { clientId?: string } | undefined;
+  CrmFollowups: undefined;
+  CrmMerge: { survivorId: string };
   Walkin: { clientId?: string };
   Followups: undefined;
   AssigningLeft: undefined;
