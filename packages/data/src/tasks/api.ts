@@ -138,7 +138,10 @@ export async function loadTaskAuthoringReferenceData(): Promise<TaskReferenceDat
 export const loadTaskReferenceData = loadTaskAuthoringReferenceData;
 
 const TASK_FEED_PAGE_SIZE = 1_000;
-const TASK_FEED_ID_BATCH_SIZE = 200;
+// v_all_tasks applies several security-invoker joins. Keep each hydration
+// statement at the same proven bound as the follow-up detail queries so a
+// large delegated history cannot exhaust PostgreSQL's statement timeout.
+const TASK_FEED_ID_BATCH_SIZE = 50;
 const TASK_DETAIL_ID_BATCH_SIZE = 50;
 
 type TaskFeedPage = { data: TaskFeedRow[]; error: { message: string } | null };
@@ -185,6 +188,11 @@ async function loadTaskRowsByIds(taskIds: readonly string[]): Promise<TaskFeedPa
     if (result.error) return { data: [], error: result.error };
     rows.push(...result.data);
   }
+  rows.sort((left, right) => {
+    const leftTime = left.planned_datetime ? Date.parse(left.planned_datetime) : Number.NEGATIVE_INFINITY;
+    const rightTime = right.planned_datetime ? Date.parse(right.planned_datetime) : Number.NEGATIVE_INFINITY;
+    return rightTime - leftTime;
+  });
   return { data: rows, error: null };
 }
 

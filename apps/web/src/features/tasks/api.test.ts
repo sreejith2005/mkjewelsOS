@@ -10,12 +10,20 @@ const { equalityFilters, identifierFilters, selectedTables, taskRows, taskScopeR
 }));
 
 function query(table: string) {
-  const result = () => ({ data: table === "v_all_tasks" ? taskRows : table === "v_task_feed_scope" ? taskScopeRows : table === "v_task_users" ? taskUsers : [], error: null });
+  let includedIds: unknown[] | null = null;
+  const result = () => ({
+    data: table === "v_all_tasks"
+      ? taskRows
+        .filter((row) => !includedIds || includedIds.includes(row.id))
+        .sort((left, right) => String(right.planned_datetime).localeCompare(String(left.planned_datetime)))
+      : table === "v_task_feed_scope" ? taskScopeRows : table === "v_task_users" ? taskUsers : [],
+    error: null,
+  });
   const builder = {
     eq(column: string, value: unknown) { equalityFilters.push([column, value]); return builder; },
     gte() { return builder; },
     is() { return builder; },
-    in(_column: string, values: unknown[]) { identifierFilters.push({ table, values }); return builder; },
+    in(_column: string, values: unknown[]) { identifierFilters.push({ table, values }); includedIds = values; return builder; },
     lte() { return builder; },
     or() { return builder; },
     order() { return builder; },
@@ -104,11 +112,30 @@ describe("task feed effective-deadline scope", () => {
 
     await loadTaskFeed("admin-1", "2026-08-28T00:00:00.000+05:30", "2026-08-28T23:59:59.999+05:30", { tenantId: "tenant-1", delegated: true });
 
-    expect(identifierFilters.filter((item) => item.table === "v_all_tasks").map((item) => item.values.length)).toEqual([200, 1]);
+    expect(identifierFilters.filter((item) => item.table === "v_all_tasks").map((item) => item.values.length)).toEqual([50, 50, 50, 50, 1]);
     for (const table of ["task_checklists", "task_attachments"]) {
       expect(identifierFilters.filter((item) => item.table === table).map((item) => item.values.length)).toEqual([50, 50, 50, 50, 1]);
     }
     expect(identifierFilters.filter((item) => item.table === "form_submissions")).toEqual([]);
+  });
+
+  it("keeps delegated tasks globally date-ordered across hydration batches", async () => {
+    taskScopeRows.push(...Array.from({ length: 51 }, (_, index) => ({ id: `task-${index}` })));
+    taskRows.push(...Array.from({ length: 51 }, (_, index) => ({
+      actual_datetime: null,
+      assignee_id: `user-${index}`,
+      due_datetime: null,
+      form_template_id: null,
+      id: `task-${index}`,
+      planned_datetime: index === 50 ? "2026-08-28T12:00:00.000+05:30" : "2026-08-28T09:00:00.000+05:30",
+      revised_datetime: null,
+      status: "pending",
+      task_type: "delegation",
+    })));
+
+    const result = await loadTaskFeed("admin-1", "2026-08-28T00:00:00.000+05:30", "2026-08-28T23:59:59.999+05:30", { tenantId: "tenant-1", delegated: true });
+
+    expect(result[0]?.id).toBe("task-50");
   });
 
   it("resolves the designated verifier from the existing bounded roster load", async () => {
