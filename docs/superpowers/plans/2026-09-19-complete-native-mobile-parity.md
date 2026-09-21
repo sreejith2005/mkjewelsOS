@@ -288,27 +288,27 @@ Commit: `feat(mobile): port complete task bulk import`
 - Consumes: every export from `@jewelos/data/crm/api`, `deriveCrmCapability`, native picker/browser, shared CRM types/view model.
 - Produces: complete directory filters/pagination; create/edit/merge; interaction/follow-up/reassign; document upload/view/remove.
 
-- [ ] **Step 1: Add shared workspace RED tests**
+- [x] **Step 1: Add shared workspace RED tests**
 
 Test literal filter payloads, action availability for active same-branch/assigned actors, stale-version messaging, merge confirmation, follow-up validation, and document metadata validation.
 
-- [ ] **Step 2: Implement shared CRM workspace decisions**
+- [x] **Step 2: Implement shared CRM workspace decisions**
 
 Centralize filter construction and form validation without moving authorization out of the server. Refactor web consumers where they currently own those decisions and run CRM web tests.
 
-- [ ] **Step 3: Implement directory and client editing**
+- [x] **Step 3: Implement directory and client editing**
 
 Add every web directory filter and server pagination. Add new/edit client forms with phone duplicate check, validation, dirty guard, exact `record_version`, and safe error text.
 
-- [ ] **Step 4: Implement detail actions**
+- [x] **Step 4: Implement detail actions**
 
 Add tabs for timeline, walk-ins, follow-ups, documents, and links. Wire interaction logging, follow-up creation/actions, ownership reassignment, private document upload/signed viewing/removal, and refresh after confirmed server success.
 
-- [ ] **Step 5: Implement merge**
+- [x] **Step 5: Implement merge**
 
 Search/select an authorized duplicate, display survivor/duplicate facts, require the shared typed confirmation, call `mergeClients`, and navigate to the survivor after success.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Run core/data/web CRM tests, complete mobile tests/typecheck, workspace typecheck, and `git diff --check`.
 
@@ -336,23 +336,23 @@ Commit: `feat(mobile): complete native crm workflows`
 - Consumes: `loadForms`, `loadFormDynamicOptions`, `deletedFormBundle`, `reviewSubmission`, `formDeletionImpact`, `deleteForm`, `publishAsNewForm`, existing form builder/fill screens.
 - Produces: lifecycle-equivalent Forms Library and snapshot-safe submissions/review screens.
 
-- [ ] **Step 1: Write snapshot presentation RED tests**
+- [x] **Step 1: Write snapshot presentation RED tests**
 
 Test current template, deleted-template snapshot, missing inaccessible snapshot, option/master display, file answer identity, review state, and grouping by form family/version.
 
-- [ ] **Step 2: Implement shared presentation and refactor web**
+- [x] **Step 2: Implement shared presentation and refactor web**
 
 Move answer/grouping derivation out of `FormsPage` into core and prove the web Forms tests remain green.
 
-- [ ] **Step 3: Implement library lifecycle parity**
+- [x] **Step 3: Implement library lifecycle parity**
 
 Add every lifecycle filter plus publish-as-new, guarded delete impact/result, archive, duplicate, revise/edit, new form, fill, and submission count behavior. Preserve exact IDs and published-version protections.
 
-- [ ] **Step 4: Implement submissions and review**
+- [x] **Step 4: Implement submissions and review**
 
 Render grouped history and exact immutable snapshots. Open native signed URLs for uploaded answers. Authorized reviewers can approve/reject with optional notes and explicit confirmation; other users receive read-only history.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Run focused core Forms tests, `packages/data` Forms tests, web Forms tests, mobile tests/typecheck, full workspace typecheck, and `git diff --check`.
 
@@ -377,27 +377,27 @@ Commit: `feat(mobile): complete forms lifecycle and review parity`
 - Consumes: `filterDropdownMasterItems`, dropdown audited mutation, user directory reporting IDs, existing admin permissions.
 - Produces: status-filter/delete parity and a filtered, cycle-safe native organization hierarchy.
 
-- [ ] **Step 1: Add Dropdown status/delete RED tests**
+- [x] **Step 1: Add Dropdown status/delete RED tests**
 
 Test all/active/inactive filtering through the real shared filter and the delete/deactivate mutation boundary for allowed/denied users.
 
-- [ ] **Step 2: Implement Dropdown parity**
+- [x] **Step 2: Implement Dropdown parity**
 
 Add the status picker and the same guarded delete behavior/copy as web. Preserve stable values and user-safe constraint errors.
 
-- [ ] **Step 3: Write organization tree RED tests**
+- [x] **Step 3: Write organization tree RED tests**
 
 Test multiple roots, missing manager, filtered manager, cycle detection, stable ordering, and descendant counts with literal user fixtures.
 
-- [ ] **Step 4: Implement native hierarchy view**
+- [x] **Step 4: Implement native hierarchy view**
 
 Add List/Organization tabs, reuse current search/status/branch/department filters, render virtualized expandable tree rows, and retain edit actions where permitted.
 
-- [ ] **Step 5: Audit remaining admin screens against current web**
+- [x] **Step 5: Audit remaining admin screens against current web**
 
 Use an explicit parity matrix of tabs, filters, reads, mutations, denied states, and exports for Notifications, Reports, Settings, permissions, and daily checklists. For every discovered behavioral gap, add a failing focused test before the narrow fix. Record each closed row in `MOBILE_PARITY_PLAYBOOK.md` with source paths and validation evidence.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Run affected core/data/web/mobile tests, complete typechecks, web build, and `git diff --check`.
 
@@ -418,27 +418,27 @@ Commit: `feat(mobile): close native administration parity gaps`
 - Consumes: all prior tasks and every current `IMPLEMENTED_PAGES`/menu destination.
 - Produces: a zero-open-gap matrix for screens, actions, permission states, realtime topics, deep links, upload paths, and responsive/accessibility checks.
 
-- [ ] **Step 1: Build the executable parity matrix**
+- [x] **Step 1: Build the executable parity matrix**
 
 For every web route and supporting workflow, list web source, native source, shared core/data contract, reads, writes, filters/tabs, deep links, realtime topics, allowed/denied roles, upload behavior, and device test. Mark a row closed only from source plus test/device evidence.
 
-- [ ] **Step 2: Add a navigation coverage RED test**
+- [x] **Step 2: Add a navigation coverage RED test**
 
 Assert every current implemented menu ID resolves to a non-placeholder native destination and every nested path used by Home/Notifications/Tasks/FMS has an exact typed target.
 
-- [ ] **Step 3: Reconcile realtime and deep links**
+- [x] **Step 3: Reconcile realtime and deep links**
 
 Add missing topic subscriptions through the shared realtime API, preserving data during refresh. Exercise exact FMS starter/stage, form submission, CRM client, notification, and task IDs across entry surfaces.
 
-- [ ] **Step 4: Run responsive/accessibility audit and fix findings by TDD**
+- [x] **Step 4: Run responsive/accessibility audit and fix findings by TDD**
 
 Check portrait, landscape, compact height, keyboard open, font scale, light/dark, safe areas, sheets, long lists, touch targets, labels/roles/state, error focus, and Android back/dirty guards. Add a focused test for each logic/navigation defect before its fix; record rendered-only findings with screenshots/device evidence.
 
-- [ ] **Step 5: Complete the matrix and regression checklist**
+- [x] **Step 5: Complete the matrix and regression checklist**
 
 Every web feature must be Closed or explicitly blocked by an external service/device state. A code gap cannot be labeled external.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Run all core/data/web/mobile tests, all typechecks, web build, Expo Android export, and `git diff --check`.
 
@@ -461,7 +461,7 @@ Commit: `test(mobile): prove complete cross-surface parity`
 - Consumes: completed parity matrix, maintained `scripts/release-mobile.ps1`, untracked production signing configuration, connected authorized Android device.
 - Produces: versioned signed APK, `latest.json`, signature/install proof, and authenticated role-based walkthrough record.
 
-- [ ] **Step 1: Run the complete pre-release gate**
+- [x] **Step 1: Run the complete pre-release gate**
 
 Run:
 
@@ -478,7 +478,7 @@ git diff --check
 
 Expected: all commands exit 0 with exact counts recorded.
 
-- [ ] **Step 2: Run database gates only if this branch adds a migration**
+- [x] **Step 2: Run database gates only if this branch adds a migration** (not applicable: no migration/schema change)
 
 Use local Supabase reset, focused and full pgTAP, and local lint. Do not run a linked push without a separate approved release action.
 
@@ -494,7 +494,7 @@ Confirm `adb devices -l`, install with `adb install -r` when signatures match or
 
 For representative ordinary, Manager/Process Coordinator, Admin, and Super Admin accounts, verify every permitted section, Create Task/manual/voice/import, completion/forms/FMS deep links, CRM, administration, denied routes, theme, back behavior, background/resume, upload, and sign-out. Use only synthetic or approved test records and remove them through normal audited operations.
 
-- [ ] **Step 6: Record evidence and commit**
+- [x] **Step 6: Record automated evidence and commit** (release/device evidence remains blocked by Steps 3–5)
 
 Document exact APK/manifest paths, version, hash, signature fingerprint, commands, test counts, device/build identity, walkthrough results, and any external blocker. Keep automated, local database, hosted, Git, release, and device evidence separate.
 

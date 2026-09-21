@@ -1093,3 +1093,39 @@ available, so authenticated navigation, real touch gestures, keyboard/rotation,
 and compact rendered web behavior were not observed. The APK is a debug build;
 it was not installed or launched and is not release evidence. No hosted
 Supabase or web deployment was performed in this follow-up.
+
+## Complete web-to-native parity implementation (2026-09-21)
+
+The native client now carries the previously missing authoring and management
+workflows: complete manual task creation, foreground-only voice capture with
+review, CSV/XLSX bulk import and recovery, the full CRM workspace, Forms
+lifecycle/submission review, Dropdown status management, and a cycle-safe user
+organization hierarchy. Shared decisions were added to `packages/core` and
+Supabase access remains in `packages/data`; no migration, RLS, RPC, Storage
+policy, or generated database type changed in this branch.
+
+The route-by-route evidence and remaining device-only checks are recorded in
+`docs/MOBILE_PARITY_MATRIX.md` and `docs/REGRESSION_CHECKLIST.md`.
+
+### Automated evidence
+
+```text
+@jewelos/core test      50 files, 549 tests passed
+@jewelos/data test      12 files,  80 tests passed
+web test                66 files, 326 tests passed
+mobile test             13 files,  79 tests passed
+turbo typecheck          5/5 packages passed
+mobile typecheck         passed
+web production build     passed
+Expo Android export      passed, 3,644 modules, 8.9 MB Hermes bundle
+git diff --check         passed for every committed tranche
+```
+
+The Expo export used non-secret placeholder client values because this isolated
+worktree intentionally has no `apps/mobile/.env`; it proves bundling, not a
+production connection. The standard signed release script was not run because
+releases are restricted to `main`, this work is intentionally isolated on
+`feat/complete-native-parity`, and its production `.env` is absent. `adb devices
+-l` reported no connected device. Consequently there is no signed APK,
+installation, runtime log, authenticated role walkthrough, hosted deployment,
+or production verification from this branch yet.

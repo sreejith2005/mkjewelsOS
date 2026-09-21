@@ -5,6 +5,7 @@ dist/
 supabase/.temp/
 supabase/.branches/
 .expo/
+apps/mobile/dist-android-parity/
 .env
 .env.local
 .env.*.local
