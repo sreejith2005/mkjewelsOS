@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { Alert, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import {
   ADMIN_SET_PASSWORD_LENGTH,
@@ -18,7 +18,9 @@ import {
   type UserDirectoryData,
   type UserDirectoryProfile,
 } from "@jewelos/data/users/api";
+import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
 import { useAccess, useProfile } from "@/auth/AuthProvider";
+import { OrganizationTree } from "@/features/users/OrganizationTree";
 import { titleCase } from "@/lib/format";
 import { errorText } from "@/lib/log";
 import { useAsyncData } from "@/lib/useAsyncData";
@@ -31,6 +33,7 @@ import { OptionPicker } from "@/ui/OptionPicker";
 import { Screen } from "@/ui/Screen";
 import { SearchField } from "@/ui/SearchField";
 import { Sheet } from "@/ui/Sheet";
+import { SegmentedControl } from "@/ui/SegmentedControl";
 import { Banner, ErrorState, LoadingState } from "@/ui/states";
 import { Text } from "@/ui/Text";
 import { TextField } from "@/ui/TextField";
@@ -60,9 +63,12 @@ export function UsersScreen() {
   const [search, setSearch] = useState("");
   const [branchFilter, setBranchFilter] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [view, setView] = useState<"list" | "organization">("list");
   const [editing, setEditing] = useState<UserDirectoryProfile | null>(null);
   const [inviting, setInviting] = useState(false);
   const state = useAsyncData(loadUserDirectory, []);
+  useEffect(() => profile.tenant_id ? subscribeToTenantRealtime(profile.tenant_id, ["organization", "settings"], () => void state.refresh()) : undefined, [profile.tenant_id, state.refresh]);
   const canManage = hasPermission(access, "users.manage");
   const superAdmin = profile.user_role === "super_admin";
   const data = state.data;
@@ -78,9 +84,10 @@ export function UsersScreen() {
       (item) =>
         (!branchFilter || item.branch_id === branchFilter) &&
         (!departmentFilter || item.department_id === departmentFilter) &&
+        (!statusFilter || item.account_status === statusFilter) &&
         (!needle || `${item.employee_name} ${item.employee_code} ${item.email}`.toLowerCase().includes(needle)),
     );
-  }, [branchFilter, data, departmentFilter, search]);
+  }, [branchFilter, data, departmentFilter, search, statusFilter]);
 
   const branchNames = useMemo(() => new Map((data?.branches ?? []).map((item) => [item.id, item.name])), [data]);
   const departmentNames = useMemo(() => new Map((data?.departments ?? []).map((item) => [item.id, item.name])), [data]);
@@ -93,8 +100,8 @@ export function UsersScreen() {
   return (
     <>
       <ListScreen
-        data={visible}
-        empty={<Card><Text tone="muted">No employees match the selected filters.</Text></Card>}
+        data={view === "list" ? visible : []}
+        empty={view === "organization" ? <OrganizationTree profiles={visible} canManage={canManage} onEdit={setEditing} /> : <Card><Text tone="muted">No employees match the selected filters.</Text></Card>}
         keyExtractor={(item) => item.id}
         refreshControl={
           <RefreshControl
@@ -122,12 +129,19 @@ export function UsersScreen() {
             <StatusBadge label={`${data.profiles.length} employees`} tone="primary" />
           </View>
           {canManage ? <Button label="Add user" onPress={() => setInviting(true)} /> : null}
+          <SegmentedControl accessibilityLabel="Employee directory view" options={[{ value: "list", label: "List" }, { value: "organization", label: "Organization" }]} value={view} onChange={setView} />
           {state.error ? <Banner tone="danger">{state.error}</Banner> : null}
           <SearchField
             accessibilityLabel="Search employees"
             onChangeText={setSearch}
             placeholder="Search employee, code, or email"
             value={search}
+          />
+          <OptionPicker
+            label="Filter status"
+            onChange={(values) => setStatusFilter(values[0] ?? "")}
+            options={[{ value: "", label: "All statuses" }, ...ACCOUNT_STATUSES.map((status) => ({ value: status, label: titleCase(status) }))]}
+            selected={[statusFilter]}
           />
           <OptionPicker
             label="Filter branch"

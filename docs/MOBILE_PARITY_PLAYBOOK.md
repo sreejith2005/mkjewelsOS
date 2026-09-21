@@ -226,7 +226,7 @@ Each cost real time. Do not rediscover them.
 
 ## 7. Parity tracker
 
-Status as of 2026-09-12. Verify before trusting; update after every session.
+Status as of 2026-09-21. Source parity is tracked in `MOBILE_PARITY_MATRIX.md`; authenticated device proof remains a separate release gate.
 
 ### Done — behaviour matches web
 
@@ -250,6 +250,11 @@ Status as of 2026-09-12. Verify before trusting; update after every session.
 | Forms fill | `FormFillScreen`, `forms/` | |
 | Assigning Left | `AssigningLeftScreen` | |
 | Uploads | `lib/pickFile.ts` | Camera, gallery, files |
+| Task creation and import | `TaskComposerScreen`, `TaskImportScreen`, `VoiceTaskCapture` | Manual, voice-assisted, CSV/XLSX, correction/resume, Assigning Left |
+| CRM | `CrmScreen`, `ClientEditorScreen`, `ClientDetailScreen`, `CrmFollowupsScreen`, `CrmMergeScreen`, `WalkinScreen` | Directory filters, client mutations, visits, follow-ups, merge, documents, links |
+| Forms library and review | `FormsLibraryScreen`, `FormBuilderScreen`, `FormSubmissionsScreen`, `FormSubmissionScreen` | Lifecycle, authoring, fill, immutable snapshots, file access, approve/reject, delete impact |
+| Dropdown Master | `DropdownMasterScreen` | Status/search/category filters, counts, create/edit, safe deactivate/reactivate |
+| User organization | `UsersScreen`, `features/users/OrganizationTree` | List and hierarchy, status/branch/department/search filters, cycle-safe reporting tree |
 
 ### Partial — thin against web
 
@@ -257,16 +262,11 @@ Status as of 2026-09-12. Verify before trusting; update after every session.
 | --- | --- | --- | --- |
 | Recurring / To-Do | `RecurringTodoPage.tsx` (919) | `RecurringTodoScreen.tsx` + `features/recurringTodo/*` | Feature-complete against web. Two defects reported from the device on 2026-09-12 are fixed (slow load, unscrollable sheet). **Still not exercised on the phone by a person.** |
 | Task Control | `TaskTemplatesPage.tsx` + `features/taskControl` | `TaskControlScreen.tsx` + `features/taskControl/*` | **Full parity as of 2026-09-12, but never used on the phone by a person.** Filter sheet, all four tabs, seven view chips, server pagination, signed-URL evidence, all four template actions. Decisions in `packages/core/src/taskControlView.ts`; web consumes the same functions. |
-| Dropdown Master | `DropdownMasterPage.tsx` | `DropdownMasterScreen.tsx` | Total / Active / Inactive tiles added 2026-09-12 from shared `dropdownMasterCounts`. **Still missing the all/active/inactive status filter web has**; mobile always filters as "all". |
-| CRM | `CRMPage.tsx` + `features/crm` (10 files) | `CrmScreen`, `ClientDetailScreen`, `WalkinScreen` | Verify merge dialog, follow-ups panel, document upload against web. |
-| Forms library | `FormsPage.tsx` + `features/forms` | `FormsLibraryScreen.tsx`, `FormBuilderScreen.tsx`, `features/forms/formBuilderController.ts` | Native authoring added 2026-09-14: virtualized outline, focused editor, sections, field families, static/Dropdown Master sources, visibility, answer routing, permissions, audited save/publish, and no-write preview. Submission review still needs a native management surface. Rendered device QA remains outstanding. |
-| Users | `UserManagementPage.tsx` (1084) | `UsersScreen.tsx` (561) | Directory and editors ported. Check org-chart/hierarchy views. |
 
 ### Not ported — deliberate
 
 | Feature | Reason |
 | --- | --- |
-| Task bulk import (`/tasks/import`) | Spreadsheet workflow; desktop only. Assigning Left is ported. |
 | Meeting AI | Not implemented on web either. |
 
 ### Known divergences and defects

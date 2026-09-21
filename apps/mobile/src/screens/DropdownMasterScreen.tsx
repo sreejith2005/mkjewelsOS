@@ -1,8 +1,9 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { Alert, RefreshControl, StyleSheet, View } from "react-native";
 import { changeMasterOption, loadAllMasterOptions, type MasterOption } from "@jewelos/data/dropdowns/api";
 import { dropdownMasterCounts, filterDropdownMasterItems, hasPermission } from "@jewelos/core";
-import { useAccess } from "@/auth/AuthProvider";
+import { useAuth } from "@/auth/AuthProvider";
+import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
 import { useAsyncData } from "@/lib/useAsyncData";
 import { makeStyles } from "@/theme/makeStyles";
 import { useAppTheme } from "@/theme/ThemeProvider";
@@ -21,20 +22,22 @@ const REQUIRED = ["designation","week_off","resignation_reason","task_category",
 const slug = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
 
 export function DropdownMasterScreen() {
-  const access = useAccess();
+  const { access, profile } = useAuth();
   const theme = useAppTheme();
   const styles = useStyles();
   const [category, setCategory] = useState("designation");
   const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<"all" | "active" | "inactive">("all");
   const [editing, setEditing] = useState<MasterOption | null | undefined>(undefined);
   const state = useAsyncData(loadAllMasterOptions, []);
+  useEffect(() => profile?.tenant_id ? subscribeToTenantRealtime(profile.tenant_id, ["organization", "settings"], () => void state.refresh()) : undefined, [profile?.tenant_id, state.refresh]);
   const items = useMemo(() => state.data ?? [], [state.data]);
   const categories = useMemo(() => [...new Set([...REQUIRED, ...items.map((item) => item.master_type)])].sort(), [items]);
   // The same two decisions the web page makes, from the same core functions,
   // so the tiles and the rows cannot disagree between the two clients.
   const rows = useMemo(
-    () => filterDropdownMasterItems(items, category, "all", search) as MasterOption[],
-    [category, items, search],
+    () => filterDropdownMasterItems(items, category, status, search) as MasterOption[],
+    [category, items, search, status],
   );
   const counts = useMemo(() => dropdownMasterCounts(items, category, rows), [category, items, rows]);
 
@@ -49,7 +52,7 @@ export function DropdownMasterScreen() {
         empty={<Card><Text tone="muted">No items in this category.</Text></Card>}
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl colors={[theme.colors.primary]} onRefresh={() => void state.refresh()} refreshing={state.refreshing} />}
-        renderItem={({ item }) => <DropdownRow item={item} onEdit={setEditing} />}
+        renderItem={({ item }) => <DropdownRow item={item} onEdit={setEditing} onToggle={() => Alert.alert(`${item.is_active ? "Deactivate" : "Reactivate"} item?`, `${item.label} will ${item.is_active ? "stop appearing in new selections" : "be available for selection again"}. Existing records keep their stored value.`, [{ text: "Cancel", style: "cancel" }, { text: item.is_active ? "Deactivate" : "Reactivate", style: item.is_active ? "destructive" : "default", onPress: () => void changeMasterOption({ id: item.id, masterType: item.master_type, label: item.label, value: item.value, sortOrder: item.sort_order ?? 0, active: !item.is_active }).then(() => state.refresh()).catch((caught) => Alert.alert("Unable to change item", caught instanceof Error ? caught.message : "Please try again.")) }])} />}
         header={
           <>
             <View style={styles.heading}>
@@ -58,6 +61,7 @@ export function DropdownMasterScreen() {
             </View>
             <OptionPicker label="Category" options={categories.map((value) => ({ value, label: value.replaceAll("_", " ") }))} selected={[category]} onChange={(values) => setCategory(values[0] ?? category)} />
             <SearchField accessibilityLabel="Search dropdown items" onChangeText={setSearch} placeholder="Label or value" value={search} />
+            <OptionPicker label="Status" options={[{ value: "all", label: "All statuses" }, { value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]} selected={[status]} onChange={(values) => setStatus((values[0] ?? "all") as typeof status)} />
             <View style={styles.stats}>
               <Card style={styles.stat}><Text variant="title" tone="primary" weight="bold">{String(counts.total)}</Text><Text variant="caption" tone="muted">Total</Text></Card>
               <Card style={styles.stat}><Text variant="title" tone="success" weight="bold">{String(counts.active)}</Text><Text variant="caption" tone="muted">Active</Text></Card>
@@ -73,7 +77,7 @@ export function DropdownMasterScreen() {
   );
 }
 
-const DropdownRow = memo(function DropdownRow({ item, onEdit }: { item: MasterOption; onEdit: (item: MasterOption) => void }) {
+const DropdownRow = memo(function DropdownRow({ item, onEdit, onToggle }: { item: MasterOption; onEdit: (item: MasterOption) => void; onToggle: () => void }) {
   const styles = useStyles();
   return (
     <Card accent={item.is_active ? "success" : "none"}>
@@ -81,6 +85,7 @@ const DropdownRow = memo(function DropdownRow({ item, onEdit }: { item: MasterOp
       <CardRow label="Value" value={item.value} />
       <CardRow label="Sort order" value={String(item.sort_order ?? 0)} />
       <Button label="Edit item" variant="secondary" onPress={() => onEdit(item)} />
+      <Button label={item.is_active ? "Deactivate item" : "Reactivate item"} variant={item.is_active ? "danger" : "secondary"} onPress={onToggle} />
     </Card>
   );
 });
