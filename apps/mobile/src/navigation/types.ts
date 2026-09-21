@@ -25,6 +25,7 @@ export type RootStackParamList = {
   FormFill: { formTemplateId: string; starterAssignmentId?: string };
   FormBuilder: { formTemplateId?: string } | undefined;
   FormSubmission: { submissionId: string };
+  FormSubmissions: undefined;
   ClientDetail: { clientId: string };
   ClientEditor: { clientId?: string } | undefined;
   CrmFollowups: undefined;

@@ -18,6 +18,8 @@ import { FmsStageScreen } from "@/screens/FmsStageScreen";
 import { FmsStageFormScreen } from "@/screens/FmsStageFormScreen";
 import { FormFillScreen } from "@/screens/FormFillScreen";
 import { FormBuilderScreen } from "@/screens/FormBuilderScreen";
+import { FormSubmissionsScreen } from "@/screens/FormSubmissionsScreen";
+import { FormSubmissionScreen } from "@/screens/FormSubmissionScreen";
 import { ClientDetailScreen } from "@/screens/ClientDetailScreen";
 import { ClientEditorScreen } from "@/screens/ClientEditorScreen";
 import { CrmFollowupsScreen } from "@/screens/CrmFollowupsScreen";
@@ -84,6 +86,8 @@ export function RootNavigator() {
           <Stack.Screen component={FmsStageFormScreen} name="FmsStageForm" options={{ title: "Step form" }} />
           <Stack.Screen component={FormFillScreen} name="FormFill" options={{ title: "Form" }} />
           <Stack.Screen component={FormBuilderScreen} name="FormBuilder" options={{ title: "Form builder" }} />
+          <Stack.Screen component={FormSubmissionsScreen} name="FormSubmissions" options={{ title: "Form submissions" }} />
+          <Stack.Screen component={FormSubmissionScreen} name="FormSubmission" options={{ title: "Submission" }} />
           <Stack.Screen component={ClientDetailScreen} name="ClientDetail" options={{ title: "Client" }} />
           <Stack.Screen component={ClientEditorScreen} name="ClientEditor" options={{ title: "Client editor" }} />
           <Stack.Screen component={CrmFollowupsScreen} name="CrmFollowups" options={{ title: "Follow-ups" }} />

@@ -1,11 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { FileText } from "lucide-react-native";
-import { archiveForm, duplicateForm, loadForms, publishForm, reviseForm, type FormBundle } from "@jewelos/data/forms/api";
+import { archiveForm, duplicateForm, loadForms, publishAsNewForm, publishForm, reviseForm, type FormBundle } from "@jewelos/data/forms/api";
 import { hasPermission } from "@jewelos/core";
-import { useAccess } from "@/auth/AuthProvider";
+import { useAuth } from "@/auth/AuthProvider";
+import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
+import { FormLifecycleActions } from "@/features/forms/FormLifecycleActions";
 import { formatDateTime, titleCase } from "@/lib/format";
 import { useAsyncData } from "@/lib/useAsyncData";
 import type { RootStackParamList } from "@/navigation/types";
@@ -25,14 +27,16 @@ type Tab = "templates" | "submissions";
 
 export function FormsLibraryScreen() {
   const navigation = useNavigation<Navigation>();
-  const access = useAccess();
+  const { access, profile } = useAuth();
   const theme = useAppTheme();
   const styles = useStyles();
   const [tab, setTab] = useState<Tab>("templates");
   const [query, setQuery] = useState("");
   const [lifecycle, setLifecycle] = useState("active");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<FormBundle | null>(null);
   const { data, error, loading, refreshing, refresh, reload } = useAsyncData(loadForms, []);
+  useEffect(() => profile?.tenant_id ? subscribeToTenantRealtime(profile.tenant_id, ["forms", "tasks", "fms", "organization"], () => void refresh()) : undefined, [profile?.tenant_id, refresh]);
   const bundles = useMemo(() => (data?.bundles ?? []).filter((item) => {
     const matchesQuery = `${item.name} ${item.description ?? ""}`.toLowerCase().includes(query.trim().toLowerCase());
     const matchesLife = lifecycle === "all" || lifecycle === "active" ? item.lifecycle !== "archived" : item.lifecycle === lifecycle;
@@ -66,18 +70,19 @@ export function FormsLibraryScreen() {
     {tab === "templates" ? <>
       <SearchField accessibilityLabel="Search forms" onChangeText={setQuery} placeholder="Find a form to fill" value={query} />
       <OptionPicker label="Lifecycle filter" onChange={(selected) => setLifecycle(selected[0] ?? "active")} options={[{ value: "active", label: "Current and drafts" }, { value: "published", label: "Published" }, { value: "draft", label: "Drafts" }, { value: "archived", label: "Archived history" }, { value: "all", label: "All lifecycle" }]} selected={[lifecycle]} />
-      {bundles.length === 0 ? <Card><Text style={styles.centered} tone="muted">No forms match these filters.</Text></Card> : bundles.map((form) => <FormCard busy={busyId === form.id} canAuthor={canAuthor} form={form} key={form.id} onArchive={() => void act(form, () => archiveForm(form.id))} onDuplicate={() => void act(form, () => duplicateForm(form.id))} onEdit={() => navigation.navigate("FormBuilder", { formTemplateId: form.id })} onFill={() => navigation.navigate("FormFill", { formTemplateId: form.id })} onPublish={() => void act(form, () => publishForm(form.id))} onRevise={() => void reviseAndEdit(form)} />)}
+      {bundles.length === 0 ? <Card><Text style={styles.centered} tone="muted">No forms match these filters.</Text></Card> : bundles.map((form) => <FormCard busy={busyId === form.id} canAuthor={canAuthor} form={form} key={form.id} onArchive={() => void act(form, () => archiveForm(form.id))} onDelete={() => setDeleting(form)} onDuplicate={() => void act(form, () => duplicateForm(form.id))} onEdit={() => navigation.navigate("FormBuilder", { formTemplateId: form.id })} onFill={() => navigation.navigate("FormFill", { formTemplateId: form.id })} onPublish={() => void act(form, () => publishForm(form.id))} onPublishAsNew={() => Alert.alert("Publish as a separate form?", "Active workflow stages will keep their current pinned version.", [{ text: "Cancel", style: "cancel" }, { text: "Publish as new", onPress: () => void act(form, () => publishAsNewForm(form.id)) }])} onRevise={() => void reviseAndEdit(form)} />)}
     </> : (data?.submissions ?? []).length === 0 ? <Card><Text style={styles.centered} tone="muted">No submissions visible to your account.</Text></Card> : (data?.submissions ?? []).map((submission) => {
       const form = submission.form_template_id ? bundleById.get(submission.form_template_id) : undefined;
-      return <Card key={submission.id}><View style={styles.cardHeading}><View style={styles.titleCopy}><Text weight="semibold">{form?.name ?? "Historical form"}</Text><Text tone="muted" variant="caption">Filled {formatDateTime(submission.submitted_at, "")}</Text></View><StatusBadge label={titleCase(submission.status)} tone={submission.status === "approved" ? "success" : submission.status === "rejected" ? "danger" : "warning"} /></View><Text tone="muted" variant="caption">{submission.linked_module ? `Linked to ${titleCase(submission.linked_module)}` : "Standalone form"}</Text></Card>;
+      return <Card key={submission.id} onPress={() => navigation.navigate("FormSubmission", { submissionId: submission.id })}><View style={styles.cardHeading}><View style={styles.titleCopy}><Text weight="semibold">{form?.name ?? "Historical form"}</Text><Text tone="muted" variant="caption">Filled {formatDateTime(submission.submitted_at, "")}</Text></View><StatusBadge label={titleCase(submission.status)} tone={submission.status === "approved" ? "success" : submission.status === "rejected" ? "danger" : "warning"} /></View><Text tone="muted" variant="caption">{submission.linked_module ? `Linked to ${titleCase(submission.linked_module)}` : "Standalone form"}</Text></Card>;
     })}
+    <FormLifecycleActions form={deleting} onClose={() => setDeleting(null)} onDeleted={async () => { await refresh(); }} />
   </Screen>;
 }
 
-function FormCard({ form, onFill, canAuthor, busy, onPublish, onRevise, onArchive, onDuplicate, onEdit }: { form: FormBundle; onFill: () => void; canAuthor: boolean; busy: boolean; onPublish: () => void; onRevise: () => void; onArchive: () => void; onDuplicate: () => void; onEdit: () => void }) {
+function FormCard({ form, onFill, canAuthor, busy, onPublish, onPublishAsNew, onRevise, onArchive, onDelete, onDuplicate, onEdit }: { form: FormBundle; onFill: () => void; canAuthor: boolean; busy: boolean; onPublish: () => void; onPublishAsNew: () => void; onRevise: () => void; onArchive: () => void; onDelete: () => void; onDuplicate: () => void; onEdit: () => void }) {
   const styles = useStyles();
   const roles = Array.isArray((form.permissions as { roles?: unknown })?.roles) ? ((form.permissions as { roles: string[] }).roles.join(", ") || "none") : "none";
-  return <Card accent={form.lifecycle === "published" ? "primary" : "none"}><View style={styles.cardHeading}><View style={styles.titleCopy}><Text weight="semibold">{form.name}</Text>{form.description ? <Text tone="muted" variant="small">{form.description}</Text> : null}</View><StatusBadge label={`v${form.version} ${titleCase(form.lifecycle)}`} tone={form.lifecycle === "published" ? "success" : form.lifecycle === "draft" ? "warning" : "neutral"} /></View><View style={styles.badges}><StatusBadge label={`${form.fields.length} fields`} /><StatusBadge label={`${form.submissionCount} submissions`} /></View><Text tone="muted" variant="caption">Roles: {roles}</Text>{form.lifecycle === "published" ? <Button label="Fill form" onPress={onFill} variant="secondary" /> : null}{canAuthor ? <View style={styles.actions}>{form.lifecycle === "draft" ? <><Button busy={busy} label="Edit form" onPress={onEdit} variant="secondary" /><Button busy={busy} label="Publish" onPress={onPublish} /></> : null}{form.lifecycle === "published" ? <><Button busy={busy} label="Create revision" onPress={onRevise} variant="secondary" /><Button busy={busy} label="Archive" onPress={onArchive} variant="secondary" /></> : null}<Button busy={busy} label="Duplicate" onPress={onDuplicate} variant="ghost" /></View> : null}</Card>;
+  return <Card accent={form.lifecycle === "published" ? "primary" : "none"}><View style={styles.cardHeading}><View style={styles.titleCopy}><Text weight="semibold">{form.name}</Text>{form.description ? <Text tone="muted" variant="small">{form.description}</Text> : null}</View><StatusBadge label={`v${form.version} ${titleCase(form.lifecycle)}`} tone={form.lifecycle === "published" ? "success" : form.lifecycle === "draft" ? "warning" : "neutral"} /></View><View style={styles.badges}><StatusBadge label={`${form.fields.length} fields`} /><StatusBadge label={`${form.submissionCount} submissions`} /></View><Text tone="muted" variant="caption">Roles: {roles}</Text>{form.lifecycle === "published" ? <Button label="Fill form" onPress={onFill} variant="secondary" /> : null}{canAuthor ? <View style={styles.actions}>{form.lifecycle === "draft" ? <><Button busy={busy} label="Edit form" onPress={onEdit} variant="secondary" /><Button busy={busy} label="Publish" onPress={onPublish} /><Button busy={busy} label="Publish as new" onPress={onPublishAsNew} variant="secondary" /></> : null}{form.lifecycle === "published" ? <><Button busy={busy} label="Create revision" onPress={onRevise} variant="secondary" /><Button busy={busy} label="Archive" onPress={onArchive} variant="secondary" /></> : null}<Button busy={busy} label="Duplicate" onPress={onDuplicate} variant="ghost" /><Button busy={busy} label="Delete" onPress={onDelete} variant="danger" /></View> : null}</Card>;
 }
 
 const useStyles = makeStyles((theme) => StyleSheet.create({ titleRow: { flexDirection: "row", alignItems: "flex-start", gap: theme.space.sm }, titleCopy: { flex: 1, minWidth: 0, gap: 2 }, centered: { textAlign: "center" }, cardHeading: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: theme.space.sm }, badges: { flexDirection: "row", flexWrap: "wrap", gap: theme.space.xs }, actions: { flexDirection: "row", flexWrap: "wrap", gap: theme.space.sm } }));
