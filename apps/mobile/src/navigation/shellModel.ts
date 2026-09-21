@@ -17,6 +17,17 @@ export const COMPACT_DOCK_PATHS = ["/", "/tasks"] as const;
 /** The high-frequency action exposed directly from the native Tasks screen. */
 export const TASKS_PRIMARY_ACTION = { label: "Create Task", route: "TaskComposer" } as const;
 
+/** Typed destinations used by Home, notifications, and cross-surface work links. */
+export const NATIVE_WORK_ROUTES = {
+  task: "TaskDetail",
+  fmsInstance: "FmsInstance",
+  fmsStage: "FmsStage",
+  fmsStageForm: "FmsStageForm",
+  formSubmission: "FormSubmission",
+  crmClient: "ClientDetail",
+  notificationInbox: "Section",
+} as const;
+
 export type NativeTopLevelRoute = "Home" | "Tasks" | "Fms" | "Crm";
 
 export type ShellLauncherItem = Readonly<{

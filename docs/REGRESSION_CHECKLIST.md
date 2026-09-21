@@ -140,3 +140,14 @@ Android phone-sized device.
 - [ ] Personal preferences save for every role.
 - [ ] Organization settings: ADM yes, MGR no; branch defaults: MGR own branch only.
 - [ ] Daily checklist management: SA and HR only unless granted.
+
+### Native parity release gate
+
+- [ ] Create a manual task and checklist on Android, including one doer, watchers, deadline, priority, required form, and attachment; retry an attachment failure without creating a duplicate task.
+- [ ] Record and review a voice task, deny then grant microphone permission, hit the 60-second limit, and verify temporary audio is removed.
+- [ ] Import current CSV and canonical XLSX through the Android file picker; map an ambiguous identity, share a correction report, resume a partial batch, and finish Assigning Left.
+- [ ] Exercise CRM create/edit, duplicate-phone refusal, interaction, walk-in, follow-up transitions, reassignment, merge confirmation, and private document upload/view/remove for allowed and denied roles.
+- [ ] Exercise Forms create/edit/publish/revise/archive/duplicate/publish-as-new/delete-impact, fill, immutable deleted-form submission, signed file answer, and approve/reject for reviewer and read-only roles.
+- [ ] Filter Dropdown Master by all/active/inactive and deactivate/reactivate an item without changing its stable value.
+- [ ] Switch Users between list and organization views; apply search/status/branch/department filters and confirm missing-manager/cycle warnings do not freeze the UI.
+- [ ] Repeat portrait, landscape, compact height, keyboard-open, large-font, light/dark, safe-area, Android Back, offline/retry, and pull-to-refresh checks for every row in `MOBILE_PARITY_MATRIX.md`.

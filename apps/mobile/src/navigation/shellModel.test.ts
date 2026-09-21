@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SECTION_CONTROLS, builtinAccessContext, type AccessContext, type SectionControls, type UserRole } from "@jewelos/core";
+import { ALL_MENU_ITEMS, DEFAULT_SECTION_CONTROLS, IMPLEMENTED_PAGE_IDS, builtinAccessContext, type AccessContext, type SectionControls, type UserRole } from "@jewelos/core";
 import {
   COMPACT_DOCK_PATHS,
   TASKS_PRIMARY_ACTION,
+  NATIVE_WORK_ROUTES,
   accessibleMenu,
   buildLauncherItems,
   isTaskPath,
@@ -141,6 +142,12 @@ it("uses the approved web paths for visible native tabs", () => {
   expect(pathForTopLevelRoute("Tasks")).toBe("/tasks");
   expect(pathForTopLevelRoute("Fms")).toBe("/fms");
   expect(pathForTopLevelRoute("Crm")).toBe("/crm");
+});
+
+it("resolves every implemented web menu destination and every exact work-item target", () => {
+  const implemented = new Set(IMPLEMENTED_PAGE_IDS);
+  expect(ALL_MENU_ITEMS.filter((item) => implemented.has(item.id)).every((item) => resolveNativeDestination(item.path) !== null)).toBe(true);
+  expect(NATIVE_WORK_ROUTES).toEqual({ task: "TaskDetail", fmsInstance: "FmsInstance", fmsStage: "FmsStage", fmsStageForm: "FmsStageForm", formSubmission: "FormSubmission", crmClient: "ClientDetail", notificationInbox: "Section" });
 });
 
 it("describes the theme the toggle will activate", () => {
