@@ -47,7 +47,7 @@ beforeEach(() => {
       payload: null,
       draftRows: [{ ...draft, start_time: opening?.startTime ?? "", due_time: opening?.dueTime ?? "" }],
       identityRequirements: [],
-      requiredTimingPresets: complete ? [] : ["opening" as const],
+      requiredTimingPresets: ["opening" as const],
       issues,
       errors: issues.map((item) => item.reason),
     };
@@ -71,7 +71,7 @@ describe("TaskBulkImportPage", () => {
       timingPresets: { opening: { startTime: "08:00", dueTime: "" } },
     })));
     fireEvent.change(await screen.findByLabelText("Opening due time"), { target: { value: "10:00" } });
-    await waitFor(() => expect(screen.queryByLabelText("Opening start time")).toBeNull());
+    await waitFor(() => expect((screen.getByLabelText("Opening due time") as HTMLInputElement).value).toBe("10:00"));
     const importButton = screen.getByRole("button", { name: /Import all 1 record/i }) as HTMLButtonElement;
     expect(importButton.disabled).toBe(false);
   });

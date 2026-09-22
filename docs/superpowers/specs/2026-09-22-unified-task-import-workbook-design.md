@@ -256,10 +256,13 @@ business fingerprints remain authoritative.
 
 The implementation does not add a second persistence path, perform browser-side
 task inserts, store raw workbook contents, or put authorization decisions in
-the template. No schema migration is expected because all selected cadences can
-use the current `schedule_kind`, RRULE, template checklist, and task instance
-contracts. If implementation proves a database contract must change, work
-stops and this design is revised before adding a migration.
+the template. All selected cadences use the current `schedule_kind`, RRULE,
+template checklist, and task instance contracts. Final review found that the
+existing private import implementation selected the first category when `KRA`
+was blank. Forward migration `0166_task_import_optional_category.sql` narrows
+that lookup so blank `KRA` persists `category_id = null`; it leaves the public
+RPC signature, authorization, audit, schema types, and recurrence contracts
+unchanged.
 
 ## Error handling
 

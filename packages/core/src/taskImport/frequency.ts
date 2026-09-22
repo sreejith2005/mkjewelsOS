@@ -51,6 +51,7 @@ const MANUAL = new Set([
   "per call",
   "per enquiry",
   "per visit",
+  "per refill",
   "per piece/batch",
   "per job",
   "per issue",

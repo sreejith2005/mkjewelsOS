@@ -66,6 +66,15 @@ describe("normalizeTaskImportWorkbook", () => {
     expect(parsed.issues[0]).toMatchObject({ field: "headers" });
   });
 
+  it("rejects case-changed business headers instead of silently dropping their values", async () => {
+    const changed = IDEAL_TASK_IMPORT_HEADERS.map((header) => header === "TASK FREQUENCY" ? "task frequency" : header);
+    const values = changed.map((header) => header === "MAIN TASK" ? "Open showroom" : header === "task frequency" ? "Daily" : "");
+    const source = `${changed.join(",")}\r\n${values.join(",")}`;
+    const parsed = await parseTaskImportFile(new File([source], "changed.csv", { type: "text/csv" }));
+    expect(parsed.sourceFormat).toBe("unknown");
+    expect(parsed.issues).toEqual([expect.objectContaining({ field: "headers" })]);
+  });
+
   it("keeps old canonical workbooks compatible", async () => {
     const book = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([

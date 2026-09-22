@@ -106,7 +106,8 @@ export function normalizeBusinessTaskSheet(rows: readonly Row[], options: Busine
   if (rows.length > TASK_IMPORT_MAX_ROWS) issues.push(issue(1, "sheet", "Tasks sheet can contain at most 2500 rows", "Split the source before importing."));
 
   rows.slice(0, TASK_IMPORT_MAX_ROWS).forEach((row, index) => {
-    const sourceRow = index + 2;
+    const physicalRow = row.__rowNum__;
+    const sourceRow = typeof physicalRow === "number" && Number.isInteger(physicalRow) ? physicalRow + 1 : index + 2;
     const inspectedHeaders = options.format === "compact_work_list" ? COMPACT_TASK_IMPORT_HEADERS : IDEAL_TASK_IMPORT_HEADERS;
     if (inspectedHeaders.some((header) => unsafe(value(row, header)))) {
       issues.push(issue(sourceRow, "cell", "Formula or control character is not allowed", "Enter plain text only."));
@@ -140,13 +141,13 @@ export function normalizeBusinessTaskSheet(rows: readonly Row[], options: Busine
     if (explicitDue && !TIME.test(explicitDue)) issues.push(issue(sourceRow, "DUE TIME", "Due time is invalid", "Use 24-hour HH:MM."));
     const startPreset = options.timingPresets?.[plan.startTimingPreset];
     const duePreset = options.timingPresets?.[plan.dueTimingPreset];
-    if (!explicitStart && !validTimingWindow(startPreset)) {
+    if (!explicitStart) {
       requiredPresets.add(plan.startTimingPreset);
-      issues.push(issue(sourceRow, "START TIME", `${plan.startTimingPreset} timing preset is required`, "Choose the missing timing preset above the preview."));
+      if (!validTimingWindow(startPreset)) issues.push(issue(sourceRow, "START TIME", `${plan.startTimingPreset} timing preset is required`, "Choose the missing timing preset above the preview."));
     }
-    if (!explicitDue && !validTimingWindow(duePreset)) {
+    if (!explicitDue) {
       requiredPresets.add(plan.dueTimingPreset);
-      issues.push(issue(sourceRow, "DUE TIME", `${plan.dueTimingPreset} timing preset is required`, "Choose the missing timing preset above the preview."));
+      if (!validTimingWindow(duePreset)) issues.push(issue(sourceRow, "DUE TIME", `${plan.dueTimingPreset} timing preset is required`, "Choose the missing timing preset above the preview."));
     }
     const startTime = explicitStart || startPreset?.startTime || "";
     const dueTime = explicitDue || duePreset?.dueTime || "";
@@ -162,7 +163,6 @@ export function normalizeBusinessTaskSheet(rows: readonly Row[], options: Busine
     const buddy = optionalBoolean("BUDDY ALLOWED", true);
     const active = optionalBoolean("ACTIVE", true);
     const verifier = value(row, "VERIFIER");
-    if (verification && !verifier) issues.push(issue(sourceRow, "VERIFIER", "Verifier is required when verification is required", "Enter a verifier name or email."));
     if (verification && verifier) addRequirement(requirements, "verifier", verifier, sourceRow);
 
     const priority = (value(row, "PRIORITY") || "medium").toLowerCase();

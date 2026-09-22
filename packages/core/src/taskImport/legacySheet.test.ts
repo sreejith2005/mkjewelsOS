@@ -73,7 +73,7 @@ describe("current task sheet", () => {
       "START TIME": "",
       "DUE TIME": "",
     })], { timingPresets: { opening: { startTime: "08:00", dueTime: "10:00" } } });
-    expect(result.requiredTimingPresets).toEqual([]);
+    expect(result.requiredTimingPresets).toEqual(["opening"]);
     expect(result.draftRows[0]).toMatchObject({ start_time: "08:00", due_time: "10:00" });
   });
 

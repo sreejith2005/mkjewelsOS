@@ -31,7 +31,7 @@ describe("business task sheets", () => {
     });
 
     expect(result.issues).toEqual([]);
-    expect(result.requiredTimingPresets).toEqual([]);
+    expect(result.requiredTimingPresets).toEqual(["manual"]);
     expect(result.draftRows).toHaveLength(1);
     expect(result.draftRows[0]).toMatchObject({
       source_row: 2,
@@ -165,7 +165,43 @@ describe("business task sheets", () => {
         evening: { startTime: "", dueTime: "19:00" },
       },
     });
-    expect(result.requiredTimingPresets).toEqual(["evening"]);
+    expect(result.requiredTimingPresets).toEqual(["evening", "morning"]);
     expect(result.issues).toContainEqual(expect.objectContaining({ field: "DUE TIME" }));
+  });
+
+  it("keeps a configured preset visible when its due time conflicts with an explicit row start", () => {
+    const result = normalizeBusinessTaskSheet([
+      businessRow({
+        "MAIN TASK": "Late review",
+        "TASK FREQUENCY": "Daily",
+        "START TIME": "15:00",
+      }),
+    ], {
+      format: "ideal_business_sheet",
+      defaultStartsOn: "2026-09-22",
+      timingPresets: { general: { startTime: "09:00", dueTime: "12:00" } },
+    });
+    expect(result.requiredTimingPresets).toEqual(["general"]);
+    expect(result.issues).toContainEqual(expect.objectContaining({ field: "DUE TIME", reason: "Due time must be later than start time" }));
+  });
+
+  it("retains the physical worksheet row number after a blank line", () => {
+    const source = { ...businessRow({ "MAIN TASK": "Physical row four" }), __rowNum__: 3 };
+    const result = normalizeBusinessTaskSheet([source], {
+      format: "ideal_business_sheet",
+      timingPresets: { manual: { startTime: "09:00", dueTime: "18:00" } },
+    });
+    expect(result.draftRows[0]?.source_row).toBe(4);
+  });
+
+  it("allows a blank verifier so the assignee manager fallback can run", () => {
+    const result = normalizeBusinessTaskSheet([
+      businessRow({ "MAIN TASK": "Verify closing", "VERIFICATION REQUIRED": "Yes" }),
+    ], {
+      format: "ideal_business_sheet",
+      timingPresets: { manual: { startTime: "09:00", dueTime: "18:00" } },
+    });
+    expect(result.issues).toEqual([]);
+    expect(result.draftRows[0]).toMatchObject({ verification_required: true, verifier_label: "" });
   });
 });

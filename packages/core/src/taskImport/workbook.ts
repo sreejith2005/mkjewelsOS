@@ -74,7 +74,7 @@ export async function parseTaskImportFile(file: TaskImportReadableFile, options:
   const book = XLSX.read(await file.arrayBuffer(), { type: "array", raw: false, cellFormula: false });
   const first = book.Sheets[book.SheetNames[0]!]!;
   const firstRows = XLSX.utils.sheet_to_json(first, { defval: "", raw: false }) as Readonly<Record<string, unknown>>[];
-  const headerRow = (XLSX.utils.sheet_to_json(first, { header: 1, defval: "", raw: false }) as unknown[][])[0]?.map((header) => String(header).trim().toUpperCase()) ?? [];
+  const headerRow = (XLSX.utils.sheet_to_json(first, { header: 1, defval: "", raw: false }) as unknown[][])[0]?.map((header) => String(header)) ?? [];
   const detected = ([
     [IDEAL_TASK_IMPORT_HEADERS, "ideal_business_sheet"],
     [COMPACT_TASK_IMPORT_HEADERS, "compact_work_list"],

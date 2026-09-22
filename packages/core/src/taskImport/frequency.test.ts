@@ -115,6 +115,7 @@ describe("task import frequency planning", () => {
     "Per Call",
     "Per Enquiry",
     "Per Visit",
+    "Per Refill",
     "Per Piece/Batch",
     "Per Job",
     "Per Issue",

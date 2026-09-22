@@ -4,7 +4,8 @@ Last updated: 22 September 2026 (Asia/Kolkata)
 
 Authoritative repository: `C:\Users\MIS\Downloads\MKJewelOS\jewelos`
 
-Current source checkpoint when this document was updated: `383d058` on the local unified-import feature branch
+Current source checkpoint when this document was updated: the local
+`feat/unified-task-import-workbook` branch after final review corrections
 
 ## September 2026 unified workbook update
 
@@ -42,12 +43,13 @@ fuzzy header matching:
 4. previously downloaded canonical four-sheet workbooks.
 
 When a row leaves start/due time blank, the web and native import screens ask
-only for timing presets required by the parsed frequencies. Explicit valid row
-times win. Each requested preset must contain valid `HH:MM` values with a due
-time later than its start time. The retained local file is reparsed after date
-or preset changes, with stale asynchronous parse results ignored. The file
-handle exists only while the screen is mounted; raw source rows are not added
-to persisted import metadata.
+only for timing presets used by the parsed frequencies. Those controls remain
+visible after valid values are entered so they can still be corrected. Explicit
+valid row times win. Each requested preset must contain valid `HH:MM` values
+with a due time later than its start time. The retained local file is reparsed
+after date or preset changes, with stale asynchronous parse results ignored.
+The file handle exists only while the screen is mounted; raw source rows are
+not added to persisted import metadata.
 
 The expanded frequency vocabulary is closed and explicit. It includes daily
 opening/morning/closing variants, weekly and multi-day rules, monthly dates and
@@ -59,17 +61,21 @@ such as blank, As Required, Ongoing, Campaign-Based, Shoot Days, `Per ...`, and
 `After ...` create inactive As Required templates for Run Now; the importer
 does not invent trigger dates.
 
-The existing limits and server contracts remain unchanged: 2 MiB per file,
-2,500 source rows, resumable 100-row commits, exact identity confirmation,
-server-side authorization/audit, and cross-file idempotency. No schema, RPC,
-RLS, Storage, or generated database-type change was required for this update.
+The existing limits and public server contract remain unchanged: 2 MiB per
+file, 2,500 source rows, resumable 100-row commits, exact identity confirmation,
+server-side authorization/audit, and cross-file idempotency. Forward migration
+`0166_task_import_optional_category.sql` corrects the existing private import
+implementation so a blank `KRA` remains uncategorized instead of selecting the
+first category. It does not change a table, public RPC signature, RLS, Storage,
+grants, or generated database types.
 
 Local verification for this update included 127 focused core import tests,
 the full core suite (655 tests), the full web suite (347 tests), and the full
 native suite (82 tests). Web/core/native TypeScript checks passed, the forced
 monorepo production build passed, and a clean Android Expo export bundled 3,647
 modules successfully. The attached six-column file parsed as 2,294 draft rows
-with zero issues when complete timing presets were supplied. Automated ExcelJS
+with zero issues when its six required timing presets (`opening`, `morning`,
+`general`, `evening`, `closing`, and `manual`) were supplied. Automated ExcelJS
 inspection confirmed one worksheet, frozen/filter metadata, widths, comments,
 styles, and one-row parser round-trip. This is local evidence only: the
 in-app browser-control surface and an authenticated local browser session were
