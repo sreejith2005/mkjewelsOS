@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Mic, RotateCcw, Square } from "lucide-react";
+import { VOICE_TASK_SPEAKING_EXAMPLE, VOICE_TASK_SPEAKING_GUIDE } from "@jewelos/core";
 import { Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { toTranscriptionWav } from "./voiceAudio";
@@ -263,8 +264,35 @@ export function VoiceTaskCapture({ onInterpreted }: { onInterpreted: (interpreta
         </div>
         {transcript && state === "idle" ? <button aria-label="Record again" className="flex size-11 shrink-0 items-center justify-center rounded-lg text-task-text-muted hover:bg-task-bg" onClick={() => void start()} type="button"><RotateCcw className="size-4" /></button> : null}
       </div>
+      {state === "recording" || state === "starting" || (state === "idle" && !transcript) ? <VoiceSpeakingGuide active={state === "recording"} /> : null}
       {transcript ? <p className="mt-3 rounded-lg bg-task-bg p-2 text-xs italic text-task-text-muted" data-testid="voice-transcript">“{transcript}”</p> : null}
       {error ? <div className="mt-3"><Notice tone="danger">{error}</Notice></div> : null}
     </section>
+  );
+}
+
+/**
+ * What to say, in order, so the author does not forget the assignee or the
+ * deadline mid-sentence. Display only: the interpreted draft is still checked
+ * by the composer's gap rules.
+ */
+function VoiceSpeakingGuide({ active }: { active: boolean }) {
+  return (
+    <div className="mt-3 rounded-lg bg-task-bg p-3" data-testid="voice-speaking-guide">
+      <p className="mb-2 text-xs font-semibold text-task-text">{active ? "Speak in this order" : "What to say"}</p>
+      <ol className="grid gap-1.5 sm:grid-cols-2">
+        {VOICE_TASK_SPEAKING_GUIDE.map((step, index) => (
+          <li className="flex items-start gap-2 text-xs" key={step.id}>
+            <span className={cn("flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold", step.required ? "bg-task-accent text-task-text" : "bg-task-muted text-task-text-muted")}>{index + 1}</span>
+            <span className="min-w-0">
+              <span className="font-semibold text-task-text">{step.label}</span>
+              <span className={cn("ml-1 text-[10px] font-semibold uppercase", step.required ? "text-danger" : "text-task-text-muted")}>{step.required ? "Required" : "Optional"}</span>
+              <span className="block text-task-text-muted">{step.hint}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-2 text-[11px] italic text-task-text-muted">Example: {VOICE_TASK_SPEAKING_EXAMPLE}</p>
+    </div>
   );
 }

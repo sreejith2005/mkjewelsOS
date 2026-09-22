@@ -6,7 +6,7 @@ import {
   CalendarCheck, CheckSquare, ClipboardList, FileSpreadsheet, FolderCheck, GitBranch,
   Home, LayoutDashboard, ListChecks, ListFilter, Settings, Users,
 } from "lucide-react-native";
-import { DEFAULT_SECTION_CONTROLS, type PageId, type SectionControls } from "@jewelos/core";
+import { DEFAULT_SECTION_CONTROLS, hasPermission, type PageId, type SectionControls } from "@jewelos/core";
 import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
 import { loadSectionControls } from "@jewelos/data/settings/api";
 import { useAccess, useAuth, useProfile } from "@/auth/AuthProvider";
@@ -14,6 +14,7 @@ import { SectionMaintenanceNotice } from "@/components/SectionMaintenanceNotice"
 import { MobileBottomNav } from "@/components/shell/MobileBottomNav";
 import { MobileHeader } from "@/components/shell/MobileHeader";
 import { MobileNavigationDrawer, type MobileNavigationDrawerItem } from "@/components/shell/MobileNavigationDrawer";
+import { GlobalVoiceTaskButton } from "@/features/tasks/GlobalVoiceTaskButton";
 import { titleCase } from "@/lib/format";
 import {
   buildLauncherItems, navigatePath, pageDecision, pageForTopLevelRoute, pathForTopLevelRoute,
@@ -105,20 +106,26 @@ function SectionGate({ page, children }: { page: PageId; children: ReactNode }) 
   return <>{children}</>;
 }
 
-function ShellPage({ children }: { children: ReactNode }) {
+function ShellPage({ children, raiseVoiceAction = false }: { children: ReactNode; raiseVoiceAction?: boolean }) {
   const profile = useProfile();
-  const { setDrawerOpen } = useShell();
+  const { setDrawerOpen, shellAccess } = useShell();
   const navigate = usePathNavigation();
+  // Offered on the same terms as the Create Task voice card, and only while
+  // the Tasks section is open to this user.
+  const canUseVoice = hasPermission(shellAccess.access, "tasks.manage_team") && pageDecision(shellAccess, "checklist_tasks") === "allowed";
   return (
     <View className="flex-1 bg-obsidian">
       <MobileHeader onNavigate={navigate} onOpenNavigation={() => setDrawerOpen(true)} profileName={profile.employee_name} />
-      <View className="flex-1">{children}</View>
+      <View className="flex-1">
+        {children}
+        {canUseVoice ? <GlobalVoiceTaskButton raised={raiseVoiceAction} /> : null}
+      </View>
     </View>
   );
 }
 
 function TopLevelTab({ route, children }: { route: NativeTopLevelRoute; children: ReactNode }) {
-  return <ShellPage><SectionGate page={pageForTopLevelRoute(route)}>{children}</SectionGate></ShellPage>;
+  return <ShellPage raiseVoiceAction={route === "Tasks"}><SectionGate page={pageForTopLevelRoute(route)}>{children}</SectionGate></ShellPage>;
 }
 
 function HomeTab() { return <TopLevelTab route="Home"><HomeScreen /></TopLevelTab>; }

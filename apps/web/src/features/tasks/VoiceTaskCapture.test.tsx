@@ -149,4 +149,22 @@ describe("VoiceTaskCapture", () => {
     await act(async () => { resolve({ transcript: "late", draft: {}, gaps: [] }); });
     expect(onInterpreted).not.toHaveBeenCalled();
   });
+
+  it("shows what to say, in order, before and while recording, and steps aside once interpreted", async () => {
+    installAudioContext(0.1);
+    render(<VoiceTaskCapture onInterpreted={vi.fn()} />);
+    const guide = () => screen.queryByTestId("voice-speaking-guide");
+    expect(guide()?.textContent).toContain("What to say");
+    const labels = [...guide()!.querySelectorAll("li")].map((item) => item.textContent ?? "");
+    expect(labels[0]).toMatch(/^1Task.*Required/);
+    expect(labels[1]).toMatch(/^2Details.*Optional/);
+    expect(labels[2]).toMatch(/^3Assign to.*Required/);
+    expect(labels[3]).toMatch(/^4Deadline.*Required/);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Record a task instruction" })); });
+    expect(guide()?.textContent).toContain("Speak in this order");
+    await act(async () => { vi.advanceTimersByTime(2_000); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Stop recording" })); });
+    expect(screen.getByTestId("voice-transcript")).toBeTruthy();
+    expect(guide()).toBeNull();
+  });
 });
