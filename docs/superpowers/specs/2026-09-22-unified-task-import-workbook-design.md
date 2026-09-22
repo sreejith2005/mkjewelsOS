@@ -1,7 +1,7 @@
 # Unified Task Import Workbook Design
 
 Date: 2026-09-22
-Status: Approved in chat; pending written-spec review
+Status: Implemented locally
 
 ## Goal
 

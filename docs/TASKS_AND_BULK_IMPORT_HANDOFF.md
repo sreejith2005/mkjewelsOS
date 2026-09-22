@@ -1,10 +1,80 @@
 # JewelOS Tasks and Bulk Import — Complete Context and Handoff
 
-Last updated: 2 September 2026 (Asia/Kolkata)
+Last updated: 22 September 2026 (Asia/Kolkata)
 
 Authoritative repository: `C:\Users\MIS\Downloads\MKJewelOS\jewelos`
 
-Current source checkpoint when this document was written: `4fccac3` on `main`
+Current source checkpoint when this document was updated: `383d058` on the local unified-import feature branch
+
+## September 2026 unified workbook update
+
+The current **Download format** action now generates a single worksheet named
+`Tasks`, rather than the earlier four-sheet technical workbook. Its one header
+row and one importable example row are generated from the same shared column
+descriptor used by parser tests. The worksheet freezes row 1, filters the
+20-column range, wraps long text, bounds column widths, distinguishes the only
+universally required field, and adds a short comment to every header.
+
+The 20 columns, in order, are `EMPLOYEE NAME`, `EMPLOYEE EMAIL`, `MAIN TASK`,
+`TASK DESCRIPTION`, `TASK TYPE`, `TASK FREQUENCY`, `CHECKPOINTS`, `KRA`,
+`CORE TASK`, `DEPARTMENT`, `BRANCH NAME`, `TASK START DATE`, `START TIME`,
+`DUE TIME`, `PRIORITY`, `EVIDENCE REQUIRED`, `VERIFICATION REQUIRED`,
+`VERIFIER`, `BUDDY ALLOWED`, and `ACTIVE`.
+
+`MAIN TASK` is the only universally required cell. Blank optional values use
+these defaults:
+
+- task type: `TASK` / delegation;
+- frequency: manual `As Required`;
+- priority: `medium`;
+- evidence and verification: `No`;
+- buddy allowed: `Yes`;
+- active: `Yes` for scheduled work and always inactive for As Required work;
+- blank employee identity: Assigning Left, never name or email fill-down.
+
+The upload parser recognizes exactly four header contracts. It does not use
+fuzzy header matching:
+
+1. the new one-sheet 20-column workbook or CSV;
+2. the six-column operational CSV (`EMPLOYEE NAME`, `DESIGNATION`, `MAIN TASK`,
+   `TASK TYPE`, `TASK FREQUENCY`, `KRA`);
+3. the earlier 18-column operational CSV documented below;
+4. previously downloaded canonical four-sheet workbooks.
+
+When a row leaves start/due time blank, the web and native import screens ask
+only for timing presets required by the parsed frequencies. Explicit valid row
+times win. Each requested preset must contain valid `HH:MM` values with a due
+time later than its start time. The retained local file is reparsed after date
+or preset changes, with stale asynchronous parse results ignored. The file
+handle exists only while the screen is mounted; raw source rows are not added
+to persisted import metadata.
+
+The expanded frequency vocabulary is closed and explicit. It includes daily
+opening/morning/closing variants, weekly and multi-day rules, monthly dates and
+ranges, 15-day intervals, annual rules, and the observed compound spellings.
+`2x Daily`, `3x Daily`, `Morning & Evening`, and `Morning & Closing` create one
+daily card with multiple checklist checkpoints, not duplicate cards. A written
+`CHECKPOINTS` cell overrides generated checkpoint labels. Event-driven labels
+such as blank, As Required, Ongoing, Campaign-Based, Shoot Days, `Per ...`, and
+`After ...` create inactive As Required templates for Run Now; the importer
+does not invent trigger dates.
+
+The existing limits and server contracts remain unchanged: 2 MiB per file,
+2,500 source rows, resumable 100-row commits, exact identity confirmation,
+server-side authorization/audit, and cross-file idempotency. No schema, RPC,
+RLS, Storage, or generated database-type change was required for this update.
+
+Local verification for this update included 127 focused core import tests,
+the full core suite (655 tests), the full web suite (347 tests), and the full
+native suite (82 tests). Web/core/native TypeScript checks passed, the forced
+monorepo production build passed, and a clean Android Expo export bundled 3,647
+modules successfully. The attached six-column file parsed as 2,294 draft rows
+with zero issues when complete timing presets were supplied. Automated ExcelJS
+inspection confirmed one worksheet, frozen/filter metadata, widths, comments,
+styles, and one-row parser round-trip. This is local evidence only: the
+in-app browser-control surface and an authenticated local browser session were
+not available for an interactive route walkthrough; no hosted migration,
+deployment, installed-device check, or desktop-Excel visual proof was performed.
 
 ## 1. Why this document exists
 
