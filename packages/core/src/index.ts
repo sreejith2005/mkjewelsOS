@@ -53,6 +53,8 @@ export {
   matchDepartmentByLabel,
   matchPersonBySpokenName,
   resolveVoiceAssignment,
+  VOICE_TASK_SPEAKING_EXAMPLE,
+  VOICE_TASK_SPEAKING_GUIDE,
   voiceDraftGapMessage,
   voiceDraftGaps,
 } from "./voiceTaskDraft.ts";
@@ -63,6 +65,7 @@ export type {
   VoiceDepartment,
   VoiceDraftGap,
   VoiceResolutionContext,
+  VoiceSpeakingStep,
   VoiceTaskDraft,
   VoiceTaskHints,
   VoiceTaskMode,

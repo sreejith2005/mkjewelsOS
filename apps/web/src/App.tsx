@@ -34,6 +34,7 @@ import { lazyPage } from "@/lib/lazyPage";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { DailyChecklistManager } from "@/features/daily-checklists/DailyChecklistManager";
 import { DailyChecklistGate } from "@/features/daily-checklists/DailyChecklistGate";
+import { GlobalVoiceTaskButton } from "@/features/tasks/GlobalVoiceTaskButton";
 import { ThemeProvider, useTheme } from "@/theme/ThemeContext";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import { SectionMaintenanceNotice } from "@/components/SectionMaintenanceNotice";
@@ -298,6 +299,10 @@ function AppShell() {
   const fallbackPage = menu.some((item) => item.id === "dashboard") ? "dashboard" : menu[0]?.id;
   const currentPage: PageId = requestedAccess === "denied" ? fallbackPage ?? requestedPage : requestedPage;
   const pageAccess = requestedAccess === "denied" && !fallbackPage ? "denied" : requestedAccess === "denied" ? "allowed" : requestedAccess;
+  // Voice assignment everywhere, offered on the same terms as inside Tasks:
+  // the database-resolved key, and only while the Tasks section is open.
+  const canUseGlobalVoice = (access ? hasPermission(access, "tasks.voice_assign") : false)
+    && resolvePageAccess(effectiveAccess, sectionControls, "checklist_tasks") === "allowed";
   const pageContent = showPermissionManagement ? <PermissionManagementPage onBack={() => navigate("/settings")} />
     : pageAccess === "denied" ? <div className="p-4"><Notice tone="danger">No sections are available to your account. Contact your Super Admin.</Notice></div>
     : pageAccess === "disabled" ? <SectionMaintenanceNotice section={currentPage === "checklist_tasks" ? "Tasks" : currentPage === "forms_library" ? "Forms Library" : currentPage === "fms_builder" ? "FMS" : currentPage === "dropdown_master" ? "Dropdown Master" : currentPage === "task_templates" ? "Task Control" : currentPage.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())} /> : currentPage === "home" ? <HomePage onNavigate={navigate} />
@@ -342,6 +347,7 @@ function AppShell() {
     >
       <LazyPageErrorBoundary onNavigate={navigate} resetKey={path}><Suspense fallback={<div className="flex min-h-48 items-center justify-center text-gold">Loading…</div>}>{pageContent}</Suspense></LazyPageErrorBoundary>
     </ApplicationShell>
+    {canUseGlobalVoice ? <GlobalVoiceTaskButton profile={profile} raised={currentPage === "checklist_tasks"} /> : null}
     <DailyChecklistGate profileId={profile.id} />
     </>
   );

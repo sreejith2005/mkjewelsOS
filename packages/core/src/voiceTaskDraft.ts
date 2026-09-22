@@ -273,3 +273,29 @@ const GAP_MESSAGES: Readonly<Record<VoiceDraftGap, string>> = {
 export function voiceDraftGapMessage(gap: VoiceDraftGap): string {
   return GAP_MESSAGES[gap];
 }
+
+export type VoiceSpeakingStep = Readonly<{
+  id: "task" | "details" | "assignee" | "due" | "priority" | "checklist";
+  label: string;
+  hint: string;
+  /** Always needed before the task can be assigned. */
+  required: boolean;
+  /** The gap reported when this part is left out, so the prompt and the check agree. */
+  gap: VoiceDraftGap | null;
+}>;
+
+/**
+ * What to say, in the order the author should say it. Shown while recording so
+ * the required parts are not forgotten; every required step is one the
+ * composer would otherwise report through `voiceDraftGaps`.
+ */
+export const VOICE_TASK_SPEAKING_GUIDE: readonly VoiceSpeakingStep[] = [
+  { id: "task", label: "Task", hint: "What needs to be done", required: true, gap: "title" },
+  { id: "details", label: "Details", hint: "Any extra instructions", required: false, gap: null },
+  { id: "assignee", label: "Assign to", hint: "Person's name or department", required: true, gap: "assignee" },
+  { id: "due", label: "Deadline", hint: "Date and time, e.g. \"tomorrow 5 pm\"", required: true, gap: "due" },
+  { id: "priority", label: "Priority", hint: "High, medium or low", required: false, gap: null },
+  { id: "checklist", label: "Checklist items", hint: "Only for a checklist - say each item", required: false, gap: "checklist" },
+];
+
+export const VOICE_TASK_SPEAKING_EXAMPLE = "\"Prepare the weekly stock report, include the new bangle designs, assign it to Reshma, due tomorrow at 5 pm, high priority.\"";

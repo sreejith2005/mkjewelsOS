@@ -4,10 +4,12 @@ import {
   buildVoiceTaskDraft,
   matchDepartmentByLabel,
   resolveVoiceAssignment,
+  VOICE_TASK_SPEAKING_GUIDE,
   voiceDraftGapMessage,
   voiceDraftGaps,
   type VoiceAssignmentCandidate,
   type VoiceDepartment,
+  type VoiceDraftGap,
   type VoiceResolutionContext,
   type VoiceTaskHints,
 } from "./voiceTaskDraft.ts";
@@ -206,5 +208,21 @@ describe("voiceDraftGaps", () => {
   it("reports a missing title, due date, and empty checklist", () => {
     const draft = buildVoiceTaskDraft(hints({ title: "   ", due_datetime: null, task_type: "checklist", checklist_items: [] }), context);
     expect(voiceDraftGaps(draft)).toEqual(["title", "assignee", "due", "checklist"]);
+  });
+});
+
+describe("VOICE_TASK_SPEAKING_GUIDE", () => {
+  it("asks for the task first, then details, the assignee, and the deadline", () => {
+    expect(VOICE_TASK_SPEAKING_GUIDE.map((step) => step.id).slice(0, 4)).toEqual(["task", "details", "assignee", "due"]);
+  });
+
+  it("prompts for every part the composer can report as missing", () => {
+    const allGaps: readonly VoiceDraftGap[] = ["title", "assignee", "due", "checklist"];
+    const prompted = VOICE_TASK_SPEAKING_GUIDE.flatMap((step) => step.gap ? [step.gap] : []);
+    expect([...prompted].sort()).toEqual([...allGaps].sort());
+  });
+
+  it("marks exactly the always-required parts as required", () => {
+    expect(VOICE_TASK_SPEAKING_GUIDE.filter((step) => step.required).map((step) => step.gap)).toEqual(["title", "assignee", "due"]);
   });
 });
