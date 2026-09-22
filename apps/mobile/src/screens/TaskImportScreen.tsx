@@ -14,6 +14,7 @@ import {
   isTaskImportDraftSourceFormat,
   kolkataDateKey,
   parseTaskImportFile,
+  partitionTaskImportRows,
   taskImportOutcomeMessage,
   taskImportPayloadHashSource,
   type TaskBulkImportIssue,
@@ -48,7 +49,16 @@ import { Screen } from "@/ui/Screen";
 import { Banner, EmptyState, ErrorState } from "@/ui/states";
 import { Text } from "@/ui/Text";
 import { initialImportSession, reduceImportSession } from "@/features/taskImport/importSession";
-import { taskImportTimingWindowsValid, updateTaskImportTimingPreset } from "@/features/taskImport/timingPresets";
+import {
+  taskImportActionLabel,
+  taskImportBlockedReminder,
+  taskImportReadinessCounts,
+} from "@/features/taskImport/readiness";
+import {
+  initialTaskImportTimingPresets,
+  taskImportTimingWindowsValid,
+  updateTaskImportTimingPreset,
+} from "@/features/taskImport/timingPresets";
 
 type Navigation = NativeStackNavigationProp<RootStackParamList, "TaskImport">;
 type SelectedImportFile = Readonly<{ name: string; uri: string; size: number; type: string }>;
@@ -69,7 +79,7 @@ export function TaskImportScreen() {
   const [session, dispatch] = useReducer(reduceImportSession, initialImportSession);
   const [startDate, setStartDate] = useState(() => kolkataDateKey(new Date()));
   const [selectedFile, setSelectedFile] = useState<SelectedImportFile | null>(null);
-  const [timingPresets, setTimingPresets] = useState<TaskImportTimingPresets>({});
+  const [timingPresets, setTimingPresets] = useState<TaskImportTimingPresets>(initialTaskImportTimingPresets);
   const [requiredTimingPresets, setRequiredTimingPresets] = useState<readonly TaskImportTimingPresetKey[]>([]);
   const [payload, setPayload] = useState<TaskBulkImportPayload | null>(null);
   const [draftRows, setDraftRows] = useState<readonly TaskImportDraftRow[]>([]);
@@ -80,8 +90,11 @@ export function TaskImportScreen() {
   const [busy, setBusy] = useState(false);
   const parseRequestId = useRef(0);
 
-  const mapped = useMemo(() => applyIdentityMappings(draftRows, candidates), [candidates, draftRows]);
-  const readyRows = issues.length === 0 ? mapped.rows : [];
+  const eligibility = useMemo(() => partitionTaskImportRows(draftRows, issues), [draftRows, issues]);
+  const mapped = useMemo(() => applyIdentityMappings(eligibility.readyRows, candidates), [candidates, eligibility.readyRows]);
+  const readyRows = mapped.rows;
+  const readiness = taskImportReadinessCounts(readyRows, eligibility.blockedRows.length);
+  const blockedReminder = taskImportBlockedReminder(readiness.blocked);
   const candidateOptions = useMemo(() => candidates.map((candidate) => ({ value: candidate.id, label: candidate.employee_name })), [candidates]);
 
   const refreshReference = async () => {
@@ -155,7 +168,7 @@ export function TaskImportScreen() {
     const asset = result.assets[0];
     if (!asset) return;
     const selected = { name: asset.name, uri: asset.uri, size: asset.size ?? 0, type: asset.mimeType ?? "" };
-    const presets: TaskImportTimingPresets = {};
+    const presets = initialTaskImportTimingPresets();
     setSelectedFile(selected);
     setTimingPresets(presets);
     setRequiredTimingPresets([]);
@@ -216,7 +229,7 @@ export function TaskImportScreen() {
   };
 
   const importCurrentSheet = async () => {
-    if (!readyRows.length || mapped.unresolvedAssignees.length > 0) return;
+    if (!readyRows.length) return;
     setBusy(true);
     dispatch({ type: "run" });
     try {
@@ -225,7 +238,7 @@ export function TaskImportScreen() {
       const started = await beginCurrentSheetTaskImport(hash, session.fileLabel || "task-import.csv", readyRows.length);
       dispatch({ type: "progress", processed: session.processed, batchId: started.batch_id });
       if (started.replayed && started.outcome !== "in_progress" && started.outcome !== "partial") {
-        dispatch({ type: "complete", message: "This file was already imported. No duplicate tasks were created." });
+        dispatch({ type: "complete", message: `This file was already imported. No duplicate tasks were created.${blockedReminder}` });
       } else {
         const remaining = readyRows.slice(session.processed);
         const outcome = await runTaskImportChunks(
@@ -234,7 +247,7 @@ export function TaskImportScreen() {
           (batchId, rows) => commitCurrentSheetTaskImportChunk(batchId, rows as typeof readyRows),
           (processed) => dispatch({ type: "progress", processed: session.processed + processed, batchId: started.batch_id }),
         );
-        dispatch({ type: "complete", message: taskImportOutcomeMessage(outcome).text });
+        dispatch({ type: "complete", message: `${taskImportOutcomeMessage(outcome).text}${blockedReminder}` });
       }
       setHistory(await loadTaskImportBatches());
     } catch (caught) {
@@ -262,7 +275,7 @@ export function TaskImportScreen() {
     <Screen scroll>
       <View style={styles.heading}>
         <Text tone="primary" variant="heading" weight="semibold">Task Bulk Import</Text>
-        <Text tone="muted" variant="small">Upload once. Exact employee matches are assigned automatically; unclear names stay blocked for confirmation or Assigning Left.</Text>
+        <Text tone="muted" variant="small">Upload once. Exact employee matches are assigned automatically; unclear names can be confirmed now or imported safely to Assigning Left.</Text>
       </View>
       <Banner tone="info">Accepts the one-sheet 20-column format, six-column work list, earlier 18-column CSV, and existing canonical workbook, up to 2 MiB and 2,500 records.</Banner>
       {session.error ? <Banner tone="danger">{session.error}</Banner> : null}
@@ -296,10 +309,17 @@ export function TaskImportScreen() {
       {session.total > 0 ? (
         <Card>
           <Text variant="title" weight="semibold">Review</Text>
-          <CardRow label="Records" value={session.total.toLocaleString("en-IN")} />
-          <CardRow label="Issues" value={issues.length.toLocaleString("en-IN")} />
-          <CardRow label="Unresolved" value={mapped.unresolvedAssignees.length.toLocaleString("en-IN")} />
-          {session.stage === "run" ? <CardRow label="Progress" value={`${session.processed}/${session.total}`} /> : null}
+          {draftRows.length > 0 ? <>
+            <CardRow label="Source records" value={draftRows.length.toLocaleString("en-IN")} />
+            <CardRow label="Ready to import" value={readiness.ready.toLocaleString("en-IN")} />
+            <CardRow label="Blocked rows" value={readiness.blocked.toLocaleString("en-IN")} />
+            <CardRow label="Assigned automatically" value={readiness.assigned.toLocaleString("en-IN")} />
+            <CardRow label="Assigning Left" value={readiness.assigningLeft.toLocaleString("en-IN")} />
+            {session.stage === "run" ? <CardRow label="Progress" value={`${session.processed}/${readiness.ready}`} /> : null}
+          </> : <>
+            <CardRow label="Records" value={session.total.toLocaleString("en-IN")} />
+            <CardRow label="Issues" value={issues.length.toLocaleString("en-IN")} />
+          </>}
           {issues.length > 0 ? <Button label="Share correction report" onPress={() => void shareCorrections()} variant="secondary" /> : null}
           {payload ? (
             <View style={styles.actions}>
@@ -308,7 +328,7 @@ export function TaskImportScreen() {
             </View>
           ) : null}
           {draftRows.length > 0 ? (
-            <Button busy={busy} disabled={issues.length > 0 || mapped.unresolvedAssignees.length > 0} label={`Import all ${draftRows.length} record${draftRows.length === 1 ? "" : "s"}`} onPress={() => void importCurrentSheet()} />
+            <Button busy={busy} disabled={!readyRows.length || eligibility.globalIssues.length > 0} label={taskImportActionLabel(draftRows.length, readyRows.length)} onPress={() => void importCurrentSheet()} />
           ) : null}
         </Card>
       ) : null}
