@@ -18,6 +18,10 @@ export const IDEAL_TASK_IMPORT_HEADERS = [
   "BUDDY ALLOWED", "ACTIVE",
 ] as const;
 
+export const IDEAL_TASK_IMPORT_TEMPLATE_HEADERS = IDEAL_TASK_IMPORT_HEADERS.map((header) =>
+  header === "MAIN TASK" ? "MAIN TASK * (REQUIRED)" : header,
+);
+
 export const COMPACT_TASK_IMPORT_HEADERS = [
   "EMPLOYEE NAME", "DESIGNATION", "MAIN TASK", "TASK TYPE", "TASK FREQUENCY", "KRA",
 ] as const;

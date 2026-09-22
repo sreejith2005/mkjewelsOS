@@ -44,6 +44,28 @@ describe("normalizeTaskImportWorkbook", () => {
     expect(parsed.sourceFormat).toBe(expected);
   });
 
+  it("accepts the visibly labeled required header from Download format", async () => {
+    const displayed = IDEAL_TASK_IMPORT_HEADERS.map((header) => header === "MAIN TASK" ? "MAIN TASK * (REQUIRED)" : header);
+    const values = displayed.map((header) => header === "MAIN TASK * (REQUIRED)" ? "Open showroom" : "");
+    const source = `${displayed.join(",")}\r\n${values.join(",")}`;
+    const parsed = await parseTaskImportFile(new File([source], "tasks.csv", { type: "text/csv" }), {
+      timingPresets: { manual: { startTime: "09:00", dueTime: "18:00" } },
+    });
+    expect(parsed.sourceFormat).toBe("ideal_business_sheet");
+    expect(parsed.issues).toEqual([]);
+    expect(parsed.draftRows[0]?.title).toBe("Open showroom");
+  });
+
+  it("preserves physical row numbers while adapting the labeled required header", async () => {
+    const displayed = IDEAL_TASK_IMPORT_HEADERS.map((header) => header === "MAIN TASK" ? "MAIN TASK * (REQUIRED)" : header);
+    const values = displayed.map((header) => header === "MAIN TASK * (REQUIRED)" ? "Open showroom" : "");
+    const source = `${displayed.join(",")}\r\n\r\n${values.join(",")}`;
+    const parsed = await parseTaskImportFile(new File([source], "tasks.csv", { type: "text/csv" }), {
+      timingPresets: { manual: { startTime: "09:00", dueTime: "18:00" } },
+    });
+    expect(parsed.draftRows[0]?.source_row).toBe(3);
+  });
+
   it("routes a one-sheet Tasks workbook through the business adapter", async () => {
     const book = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([

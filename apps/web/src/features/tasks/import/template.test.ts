@@ -13,8 +13,20 @@ describe("task import download format", () => {
     expect(sheet.views[0]).toMatchObject({ state: "frozen", ySplit: 1 });
     expect(sheet.autoFilter).toEqual("A1:T2");
     expect(sheet.getRow(1).font.bold).toBe(true);
-    expect(sheet.getCell("C1").note).toBeTruthy();
-    expect(sheet.getRow(1).values).toEqual([undefined, ...IDEAL_TASK_IMPORT_HEADERS]);
+    expect(sheet.getCell("C1").value).toBe("MAIN TASK * (REQUIRED)");
+    expect(sheet.getRow(1).values).toEqual([
+      undefined,
+      ...IDEAL_TASK_IMPORT_HEADERS.map((header) => header === "MAIN TASK" ? "MAIN TASK * (REQUIRED)" : header),
+    ]);
+    expect(sheet.getRow(1).eachCell((cell) => expect(cell.note).toBeUndefined())).toBeUndefined();
+    expect(sheet.getCell("C1").dataValidation).toMatchObject({
+      showInputMessage: true,
+      promptTitle: "Required column",
+    });
+    expect(sheet.getCell("A1").dataValidation).toMatchObject({
+      showInputMessage: true,
+      promptTitle: "Optional column",
+    });
     expect(sheet.columns.every((column) => (column.width ?? 0) >= 12 && (column.width ?? 0) <= 48)).toBe(true);
     expect(sheet.getCell("D2").alignment?.wrapText).toBe(true);
     expect(sheet.getCell("C1").fill).not.toEqual(sheet.getCell("A1").fill);
@@ -38,7 +50,8 @@ describe("task import download format", () => {
     expect(sheet.columnCount).toBe(TASK_IMPORT_BUSINESS_COLUMNS.length);
     TASK_IMPORT_BUSINESS_COLUMNS.forEach((column, index) => {
       expect(sheet.getColumn(index + 1).width).toBe(column.width);
-      expect(sheet.getCell(1, index + 1).note).toBe(column.comment);
+      expect(sheet.getCell(1, index + 1).note).toBeUndefined();
+      expect(sheet.getCell(1, index + 1).dataValidation.prompt).toBe(column.comment);
     });
   });
 });

@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { TASK_IMPORT_BUSINESS_COLUMNS } from "@jewelos/core";
+import { IDEAL_TASK_IMPORT_TEMPLATE_HEADERS, TASK_IMPORT_BUSINESS_COLUMNS } from "@jewelos/core";
 
 const COLORS = {
   accent: "FFF59E0B",
@@ -16,8 +16,8 @@ export async function createTaskImportTemplateBytes(): Promise<ArrayBuffer> {
   workbook.created = new Date(0);
   workbook.modified = new Date(0);
   const sheet = workbook.addWorksheet("Tasks", { views: [{ state: "frozen", ySplit: 1 }] });
-  sheet.columns = TASK_IMPORT_BUSINESS_COLUMNS.map((column) => ({
-    header: column.header,
+  sheet.columns = TASK_IMPORT_BUSINESS_COLUMNS.map((column, index) => ({
+    header: IDEAL_TASK_IMPORT_TEMPLATE_HEADERS[index]!,
     key: column.header,
     width: column.width,
   }));
@@ -33,7 +33,14 @@ export async function createTaskImportTemplateBytes(): Promise<ArrayBuffer> {
     header.fill = { type: "pattern", pattern: "solid", fgColor: { argb: column.required ? COLORS.accent : COLORS.optional } };
     header.alignment = { vertical: "middle", wrapText: true };
     header.border = { bottom: { style: "thin", color: { argb: COLORS.border } } };
-    header.note = column.comment;
+    header.dataValidation = {
+      type: "custom",
+      allowBlank: true,
+      formulae: ["TRUE"],
+      showInputMessage: true,
+      promptTitle: column.required ? "Required column" : "Optional column",
+      prompt: column.comment,
+    };
 
     const example = sheet.getCell(2, index + 1);
     example.font = { color: { argb: COLORS.text }, size: 10 };

@@ -4,6 +4,7 @@ import { LEGACY_TASK_HEADERS, normalizeLegacyTaskSheet } from "./legacySheet";
 import {
   COMPACT_TASK_IMPORT_HEADERS,
   IDEAL_TASK_IMPORT_HEADERS,
+  IDEAL_TASK_IMPORT_TEMPLATE_HEADERS,
   normalizeBusinessTaskSheet,
 } from "./businessSheet";
 import type { TaskImportTimingPresets } from "./frequency";
@@ -75,13 +76,24 @@ export async function parseTaskImportFile(file: TaskImportReadableFile, options:
   const first = book.Sheets[book.SheetNames[0]!]!;
   const firstRows = XLSX.utils.sheet_to_json(first, { defval: "", raw: false }) as Readonly<Record<string, unknown>>[];
   const headerRow = (XLSX.utils.sheet_to_json(first, { header: 1, defval: "", raw: false }) as unknown[][])[0]?.map((header) => String(header)) ?? [];
-  const detected = ([
-    [IDEAL_TASK_IMPORT_HEADERS, "ideal_business_sheet"],
-    [COMPACT_TASK_IMPORT_HEADERS, "compact_work_list"],
-    [LEGACY_TASK_HEADERS, "mk_daily_checklist_csv"],
-  ] as const).find(([expected]) => exactly(headerRow, expected))?.[1];
+  const matched = ([
+    [IDEAL_TASK_IMPORT_TEMPLATE_HEADERS, "ideal_business_sheet", true],
+    [IDEAL_TASK_IMPORT_HEADERS, "ideal_business_sheet", false],
+    [COMPACT_TASK_IMPORT_HEADERS, "compact_work_list", false],
+    [LEGACY_TASK_HEADERS, "mk_daily_checklist_csv", false],
+  ] as const).find(([expected]) => exactly(headerRow, expected));
+  const detected = matched?.[1];
   if (detected === "ideal_business_sheet" || detected === "compact_work_list") {
-    const normalized = normalizeBusinessTaskSheet(firstRows, { ...options, format: detected });
+    const businessRows = matched?.[2]
+      ? firstRows.map((row) => {
+        const adapted = { ...row, "MAIN TASK": row["MAIN TASK * (REQUIRED)"] };
+        if (typeof row.__rowNum__ === "number") {
+          Object.defineProperty(adapted, "__rowNum__", { value: row.__rowNum__, enumerable: false });
+        }
+        return adapted;
+      })
+      : firstRows;
+    const normalized = normalizeBusinessTaskSheet(businessRows, { ...options, format: detected });
     const issues = dedupeTaskImportIssues(normalized.issues);
     return { sourceFormat: detected, payload: null, ...normalized, issues, errors: issues.map((item) => `Tasks row ${item.row}: ${item.reason}`) };
   }
