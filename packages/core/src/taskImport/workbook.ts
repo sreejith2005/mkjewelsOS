@@ -79,7 +79,7 @@ export async function parseTaskImportFile(file: TaskImportReadableFile, options:
     [IDEAL_TASK_IMPORT_HEADERS, "ideal_business_sheet"],
     [COMPACT_TASK_IMPORT_HEADERS, "compact_work_list"],
     [LEGACY_TASK_HEADERS, "mk_daily_checklist_csv"],
-  ] as const).find(([expected]) => headerRow.join("|") === expected.join("|"))?.[1];
+  ] as const).find(([expected]) => exactly(headerRow, expected))?.[1];
   if (detected === "ideal_business_sheet" || detected === "compact_work_list") {
     const normalized = normalizeBusinessTaskSheet(firstRows, { ...options, format: detected });
     const issues = dedupeTaskImportIssues(normalized.issues);

@@ -75,6 +75,13 @@ describe("normalizeTaskImportWorkbook", () => {
     expect(parsed.issues).toEqual([expect.objectContaining({ field: "headers" })]);
   });
 
+  it("rejects a malformed header containing the comparison delimiter", async () => {
+    const source = "EMPLOYEE NAME,DESIGNATION,MAIN TASK,TASK TYPE|TASK FREQUENCY,KRA\r\nNamed Person,Sales,Open showroom,Daily,Operations";
+    const parsed = await parseTaskImportFile(new File([source], "malformed.csv", { type: "text/csv" }));
+    expect(parsed.sourceFormat).toBe("unknown");
+    expect(parsed.issues).toEqual([expect.objectContaining({ field: "headers" })]);
+  });
+
   it("keeps old canonical workbooks compatible", async () => {
     const book = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([

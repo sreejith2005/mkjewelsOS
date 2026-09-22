@@ -82,4 +82,14 @@ describe("current task sheet", () => {
     expect(result.draftRows).toHaveLength(1);
     expect(result.draftRows[0]?.checklist).toHaveLength(2);
   });
+
+  it("blocks a populated row beyond the server source-row limit", () => {
+    const source = { ...row(), __rowNum__: 2501 };
+    const result = normalizeLegacyTaskSheet([source]);
+    expect(result.issues).toContainEqual(expect.objectContaining({
+      row: 2502,
+      field: "sheet",
+      reason: "Task rows must stay within worksheet row 2501",
+    }));
+  });
 });

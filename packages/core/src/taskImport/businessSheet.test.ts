@@ -194,6 +194,19 @@ describe("business task sheets", () => {
     expect(result.draftRows[0]?.source_row).toBe(4);
   });
 
+  it("blocks a populated row beyond the server source-row limit", () => {
+    const source = { ...businessRow({ "MAIN TASK": "Too far down" }), __rowNum__: 2501 };
+    const result = normalizeBusinessTaskSheet([source], {
+      format: "ideal_business_sheet",
+      timingPresets: { manual: { startTime: "09:00", dueTime: "18:00" } },
+    });
+    expect(result.issues).toContainEqual(expect.objectContaining({
+      row: 2502,
+      field: "sheet",
+      reason: "Task rows must stay within worksheet row 2501",
+    }));
+  });
+
   it("allows a blank verifier so the assignee manager fallback can run", () => {
     const result = normalizeBusinessTaskSheet([
       businessRow({ "MAIN TASK": "Verify closing", "VERIFICATION REQUIRED": "Yes" }),

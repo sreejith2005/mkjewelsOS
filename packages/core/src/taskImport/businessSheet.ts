@@ -108,6 +108,9 @@ export function normalizeBusinessTaskSheet(rows: readonly Row[], options: Busine
   rows.slice(0, TASK_IMPORT_MAX_ROWS).forEach((row, index) => {
     const physicalRow = row.__rowNum__;
     const sourceRow = typeof physicalRow === "number" && Number.isInteger(physicalRow) ? physicalRow + 1 : index + 2;
+    if (sourceRow > TASK_IMPORT_MAX_ROWS + 1) {
+      issues.push(issue(sourceRow, "sheet", "Task rows must stay within worksheet row 2501", "Remove leading blank rows or split the source before importing."));
+    }
     const inspectedHeaders = options.format === "compact_work_list" ? COMPACT_TASK_IMPORT_HEADERS : IDEAL_TASK_IMPORT_HEADERS;
     if (inspectedHeaders.some((header) => unsafe(value(row, header)))) {
       issues.push(issue(sourceRow, "cell", "Formula or control character is not allowed", "Enter plain text only."));

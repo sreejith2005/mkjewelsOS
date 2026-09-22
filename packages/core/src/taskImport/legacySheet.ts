@@ -38,6 +38,9 @@ export function normalizeLegacyTaskSheet(rows: readonly Row[], options: LegacyTa
   rows.slice(0, TASK_IMPORT_MAX_ROWS).forEach((row, index) => {
     const physicalRow = row.__rowNum__;
     const sourceRow = typeof physicalRow === "number" && Number.isInteger(physicalRow) ? physicalRow + 1 : index + 2;
+    if (sourceRow > TASK_IMPORT_MAX_ROWS + 1) {
+      issues.push(issue(sourceRow, "sheet", "Task rows must stay within worksheet row 2501", "Remove leading blank rows or split the source before importing."));
+    }
     const groupedValue = (header: typeof GROUP_CONTEXT_HEADERS[number]) => {
       const current = value(row, header);
       if (current) context.set(header, current);
