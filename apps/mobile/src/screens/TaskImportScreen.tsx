@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -11,6 +11,7 @@ import {
   chunkTaskImportRows,
   createCorrectionReportCsv,
   hasPermission,
+  isTaskImportDraftSourceFormat,
   kolkataDateKey,
   parseTaskImportFile,
   taskImportOutcomeMessage,
@@ -18,6 +19,8 @@ import {
   type TaskBulkImportIssue,
   type TaskBulkImportPayload,
   type TaskImportDraftRow,
+  type TaskImportTimingPresetKey,
+  type TaskImportTimingPresets,
 } from "@jewelos/core";
 import {
   beginCurrentSheetTaskImport,
@@ -45,8 +48,14 @@ import { Screen } from "@/ui/Screen";
 import { Banner, EmptyState, ErrorState } from "@/ui/states";
 import { Text } from "@/ui/Text";
 import { initialImportSession, reduceImportSession } from "@/features/taskImport/importSession";
+import { taskImportTimingWindowsValid, updateTaskImportTimingPreset } from "@/features/taskImport/timingPresets";
 
 type Navigation = NativeStackNavigationProp<RootStackParamList, "TaskImport">;
+type SelectedImportFile = Readonly<{ name: string; uri: string; size: number; type: string }>;
+
+const TIMING_LABELS: Readonly<Record<TaskImportTimingPresetKey, string>> = {
+  general: "General", opening: "Opening", morning: "Morning", closing: "Closing", evening: "Evening", manual: "Manual Run Now",
+};
 
 async function sha256(source: string): Promise<string> {
   return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, source);
@@ -59,6 +68,9 @@ export function TaskImportScreen() {
   const allowed = hasPermission(access, "tasks.view");
   const [session, dispatch] = useReducer(reduceImportSession, initialImportSession);
   const [startDate, setStartDate] = useState(() => kolkataDateKey(new Date()));
+  const [selectedFile, setSelectedFile] = useState<SelectedImportFile | null>(null);
+  const [timingPresets, setTimingPresets] = useState<TaskImportTimingPresets>({});
+  const [requiredTimingPresets, setRequiredTimingPresets] = useState<readonly TaskImportTimingPresetKey[]>([]);
   const [payload, setPayload] = useState<TaskBulkImportPayload | null>(null);
   const [draftRows, setDraftRows] = useState<readonly TaskImportDraftRow[]>([]);
   const [candidates, setCandidates] = useState<readonly TaskImportIdentityCandidate[]>([]);
@@ -66,6 +78,7 @@ export function TaskImportScreen() {
   const [validation, setValidation] = useState<TaskImportValidation | null>(null);
   const [history, setHistory] = useState<readonly TaskImportBatch[]>([]);
   const [busy, setBusy] = useState(false);
+  const parseRequestId = useRef(0);
 
   const mapped = useMemo(() => applyIdentityMappings(draftRows, candidates), [candidates, draftRows]);
   const readyRows = issues.length === 0 ? mapped.rows : [];
@@ -91,6 +104,47 @@ export function TaskImportScreen() {
     if (draftRows.length > 0) dispatch({ type: "mapped", unresolved: mapped.unresolvedAssignees.length });
   }, [draftRows.length, mapped.unresolvedAssignees.length]);
 
+  const parseSelectedFile = async (selected: SelectedImportFile, selectedStartDate: string, presets: TaskImportTimingPresets, reset = false) => {
+    const requestId = ++parseRequestId.current;
+    setBusy(true);
+    if (reset) {
+      setPayload(null);
+      setDraftRows([]);
+      setIssues([]);
+      setValidation(null);
+    }
+    try {
+      const file = new File(selected.uri);
+      const parsed = await parseTaskImportFile({
+        name: selected.name,
+        size: selected.size || file.size,
+        type: selected.type,
+        arrayBuffer: () => file.arrayBuffer(),
+      }, { defaultStartsOn: selectedStartDate, timingPresets: presets });
+      if (requestId !== parseRequestId.current) return;
+      setIssues(parsed.issues);
+      setRequiredTimingPresets(parsed.requiredTimingPresets);
+      if (isTaskImportDraftSourceFormat(parsed.sourceFormat)) {
+        setPayload(null);
+        setDraftRows(parsed.draftRows);
+        dispatch({ type: "parsed", total: parsed.draftRows.length, unresolved: 0, issues: parsed.issues.length });
+      } else if (parsed.payload) {
+        setDraftRows([]);
+        setPayload(parsed.payload);
+        dispatch({ type: "parsed", total: parsed.payload.tasks.length, unresolved: 0, issues: parsed.issues.length });
+      } else {
+        setDraftRows([]);
+        setPayload(null);
+        dispatch({ type: "failed", message: parsed.errors.join(" ") || "The file could not be read." });
+      }
+    } catch (caught) {
+      if (requestId === parseRequestId.current) dispatch({ type: "failed", message: errorText(caught) });
+    } finally {
+      // The selected URI is only a picker-cache handle retained while this screen is mounted.
+      if (requestId === parseRequestId.current) setBusy(false);
+    }
+  };
+
   const selectFile = async () => {
     const result = await DocumentPicker.getDocumentAsync({
       copyToCacheDirectory: true,
@@ -100,37 +154,24 @@ export function TaskImportScreen() {
     if (result.canceled) return;
     const asset = result.assets[0];
     if (!asset) return;
-    const file = new File(asset.uri);
-    const safeLabel = asset.name.replace(/[^A-Za-z0-9._ -]/g, "_");
-    dispatch({ type: "selected", fileLabel: safeLabel });
-    setBusy(true);
-    setPayload(null);
-    setDraftRows([]);
-    setIssues([]);
-    setValidation(null);
-    try {
-      const parsed = await parseTaskImportFile({
-        name: asset.name,
-        size: asset.size ?? file.size,
-        type: asset.mimeType ?? "",
-        arrayBuffer: () => file.arrayBuffer(),
-      }, { defaultStartsOn: startDate });
-      setIssues(parsed.issues);
-      if (parsed.sourceFormat === "mk_daily_checklist_csv") {
-        setDraftRows(parsed.draftRows);
-        dispatch({ type: "parsed", total: parsed.draftRows.length, unresolved: 0, issues: parsed.issues.length });
-      } else if (parsed.payload) {
-        setPayload(parsed.payload);
-        dispatch({ type: "parsed", total: parsed.payload.tasks.length, unresolved: 0, issues: parsed.issues.length });
-      } else {
-        dispatch({ type: "failed", message: parsed.errors.join(" ") || "The file could not be read." });
-      }
-    } catch (caught) {
-      dispatch({ type: "failed", message: errorText(caught) });
-    } finally {
-      // `file` is only a handle to the picker cache. No bytes or parsed source rows are persisted.
-      setBusy(false);
-    }
+    const selected = { name: asset.name, uri: asset.uri, size: asset.size ?? 0, type: asset.mimeType ?? "" };
+    const presets: TaskImportTimingPresets = {};
+    setSelectedFile(selected);
+    setTimingPresets(presets);
+    setRequiredTimingPresets([]);
+    dispatch({ type: "selected", fileLabel: asset.name.replace(/[^A-Za-z0-9._ -]/g, "_") });
+    await parseSelectedFile(selected, startDate, presets, true);
+  };
+
+  const changeStartDate = (next: string) => {
+    setStartDate(next);
+    if (selectedFile && next) void parseSelectedFile(selectedFile, next, timingPresets);
+  };
+
+  const changeTiming = (key: TaskImportTimingPresetKey, field: "startTime" | "dueTime", nextValue: string) => {
+    const next = updateTaskImportTimingPreset(timingPresets, key, field, nextValue);
+    setTimingPresets(next);
+    if (selectedFile) void parseSelectedFile(selectedFile, startDate, next);
   };
 
   const confirmIdentity = async (label: string, userId: string) => {
@@ -223,7 +264,7 @@ export function TaskImportScreen() {
         <Text tone="primary" variant="heading" weight="semibold">Task Bulk Import</Text>
         <Text tone="muted" variant="small">Upload once. Exact employee matches are assigned automatically; unclear names stay blocked for confirmation or Assigning Left.</Text>
       </View>
-      <Banner tone="info">Accepts the current 18-column CSV and canonical .xlsx workbook, up to 2 MiB and 2,500 records.</Banner>
+      <Banner tone="info">Accepts the one-sheet 20-column format, six-column work list, earlier 18-column CSV, and existing canonical workbook, up to 2 MiB and 2,500 records.</Banner>
       {session.error ? <Banner tone="danger">{session.error}</Banner> : null}
       {session.result ? <Banner tone="success">{session.result}</Banner> : null}
       <Card>
@@ -233,9 +274,24 @@ export function TaskImportScreen() {
         </View>
         <View style={styles.field}>
           <Text tone="muted" variant="label">Start blank schedules from</Text>
-          <DateField disabled={busy} invalid={false} label="Start schedules from" mode="date" onChange={setStartDate} value={startDate} />
+          <DateField disabled={busy} invalid={false} label="Start schedules from" mode="date" onChange={changeStartDate} value={startDate} />
         </View>
       </Card>
+
+      {requiredTimingPresets.map((key) => {
+        const window = timingPresets[key] ?? { startTime: "", dueTime: "" };
+        const invalid = !taskImportTimingWindowsValid([key], timingPresets);
+        return (
+          <Card key={key} accent="warning">
+            <Text variant="title" weight="semibold">{TIMING_LABELS[key]} timing for blank cells</Text>
+            <Text tone="muted" variant="small">Choose a same-day window. Due time must be later than start time.</Text>
+            <View style={styles.field}>
+              <DateField disabled={busy} invalid={invalid} label={`${TIMING_LABELS[key]} start time`} mode="time" onChange={(next) => changeTiming(key, "startTime", next)} value={window.startTime} />
+              <DateField disabled={busy} invalid={invalid} label={`${TIMING_LABELS[key]} due time`} mode="time" onChange={(next) => changeTiming(key, "dueTime", next)} value={window.dueTime} />
+            </View>
+          </Card>
+        );
+      })}
 
       {session.total > 0 ? (
         <Card>
@@ -252,7 +308,7 @@ export function TaskImportScreen() {
             </View>
           ) : null}
           {draftRows.length > 0 ? (
-            <Button busy={busy} disabled={issues.length > 0 || mapped.unresolvedAssignees.length > 0} label={`Import all ${readyRows.length} records`} onPress={() => void importCurrentSheet()} />
+            <Button busy={busy} disabled={issues.length > 0 || mapped.unresolvedAssignees.length > 0} label={`Import all ${draftRows.length} record${draftRows.length === 1 ? "" : "s"}`} onPress={() => void importCurrentSheet()} />
           ) : null}
         </Card>
       ) : null}
