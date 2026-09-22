@@ -84,7 +84,11 @@ function dateParts(value: string) {
 }
 
 export function normalizeTaskFrequencyLabel(raw: string): string {
-  return raw.normalize("NFKC")
+  return raw
+    .replace(/\u00e2\u0080\u0093/g, "\u2013")
+    .replace(/\u00e2\u0080\u0094/g, "\u2014")
+    .replace(/\u00c3\u0097/g, "\u00d7")
+    .normalize("NFKC")
     .replace(/\s*[\u2013\u2014]\s*/g, " - ")
     .replace(/\u00d7/g, "x")
     .trim()

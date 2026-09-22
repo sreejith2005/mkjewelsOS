@@ -1,6 +1,12 @@
 import * as XLSX from "xlsx";
 import { TASK_IMPORT_MAX_BYTES, TASK_IMPORT_MAX_ROWS } from "../taskImport";
 import { LEGACY_TASK_HEADERS, normalizeLegacyTaskSheet } from "./legacySheet";
+import {
+  COMPACT_TASK_IMPORT_HEADERS,
+  IDEAL_TASK_IMPORT_HEADERS,
+  normalizeBusinessTaskSheet,
+} from "./businessSheet";
+import type { TaskImportTimingPresets } from "./frequency";
 
 export const TASK_IMPORT_HEADERS = ["task_key", "task_mode", "title", "description", "priority", "branch", "department", "category", "primary_doer_email", "doer_emails", "watcher_emails", "planned_at", "recurrence_kind", "recurrence_interval", "weekly_days", "monthly_day", "monthly_nth", "monthly_weekday", "ends_on", "requires_upload", "requires_remark", "published_form"] as const;
 const CHECKLIST_HEADERS = ["task_key", "item_text", "required"] as const;
@@ -9,7 +15,7 @@ export type TaskBulkImportChecklist = Readonly<{ item_text: string; required: bo
 export type TaskBulkImportTask = Readonly<{ task_key: string; task_mode: "one_time" | "recurring"; title: string; description: string; priority: string; branch: string; department: string; category: string; primary_doer_email: string; doer_emails: readonly string[]; watcher_emails: readonly string[]; planned_at: string; recurrence_kind: string; recurrence_interval: number; weekly_days: readonly string[]; monthly_day: string; monthly_nth: string; monthly_weekday: string; ends_on: string; requires_upload: boolean; requires_remark: boolean; published_form: string; checklist: readonly TaskBulkImportChecklist[] }>;
 export type TaskBulkImportPayload = Readonly<{ tasks: readonly TaskBulkImportTask[] }>;
 export type WorkbookNormalization = Readonly<{ payload: TaskBulkImportPayload | null; errors: readonly string[]; issues: readonly TaskBulkImportIssue[] }>;
-export type ParseTaskImportOptions = Readonly<{ defaultStartsOn?: string }>;
+export type ParseTaskImportOptions = Readonly<{ defaultStartsOn?: string; timingPresets?: TaskImportTimingPresets }>;
 export type TaskImportReadableFile = Readonly<{
   name: string;
   size: number;
@@ -61,22 +67,40 @@ export function dedupeTaskImportIssues(issues: readonly TaskBulkImportIssue[]) {
 }
 
 export async function parseTaskImportFile(file: TaskImportReadableFile, options: ParseTaskImportOptions = {}) {
-  if (file.size > TASK_IMPORT_MAX_BYTES) return { sourceFormat: "unknown" as const, payload: null, draftRows: [], identityRequirements: [], errors: ["File exceeds 2 MiB"], issues: [entry("Upload", 0, "file", "File exceeds 2 MiB", "Reduce the workbook size.")] };
+  if (file.size > TASK_IMPORT_MAX_BYTES) return { sourceFormat: "unknown" as const, payload: null, draftRows: [], identityRequirements: [], requiredTimingPresets: [], errors: ["File exceeds 2 MiB"], issues: [entry("Upload", 0, "file", "File exceeds 2 MiB", "Reduce the workbook size.")] };
   const extension = file.name.toLowerCase().split(".").pop();
-  if (extension !== "xlsx" && extension !== "csv") return { sourceFormat: "unknown" as const, payload: null, draftRows: [], identityRequirements: [], errors: ["Only .xlsx or .csv files are supported"], issues: [entry("Upload", 0, "file", "Unsupported file extension", "Choose an .xlsx or .csv file.")] };
-  if (file.type && !["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "text/csv", "application/csv"].includes(file.type)) return { sourceFormat: "unknown" as const, payload: null, draftRows: [], identityRequirements: [], errors: ["File type does not match Excel or CSV"], issues: [entry("Upload", 0, "file", "Unexpected MIME type", "Export as .xlsx or CSV.")] };
+  if (extension !== "xlsx" && extension !== "csv") return { sourceFormat: "unknown" as const, payload: null, draftRows: [], identityRequirements: [], requiredTimingPresets: [], errors: ["Only .xlsx or .csv files are supported"], issues: [entry("Upload", 0, "file", "Unsupported file extension", "Choose an .xlsx or .csv file.")] };
+  if (file.type && !["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "text/csv", "application/csv"].includes(file.type)) return { sourceFormat: "unknown" as const, payload: null, draftRows: [], identityRequirements: [], requiredTimingPresets: [], errors: ["File type does not match Excel or CSV"], issues: [entry("Upload", 0, "file", "Unexpected MIME type", "Export as .xlsx or CSV.")] };
   const book = XLSX.read(await file.arrayBuffer(), { type: "array", raw: false, cellFormula: false });
   const first = book.Sheets[book.SheetNames[0]!]!;
   const firstRows = XLSX.utils.sheet_to_json(first, { defval: "", raw: false }) as Readonly<Record<string, unknown>>[];
   const headerRow = (XLSX.utils.sheet_to_json(first, { header: 1, defval: "", raw: false }) as unknown[][])[0]?.map((header) => String(header).trim().toUpperCase()) ?? [];
-  if (extension === "csv" && headerRow.join("|") === LEGACY_TASK_HEADERS.join("|")) {
+  const detected = ([
+    [IDEAL_TASK_IMPORT_HEADERS, "ideal_business_sheet"],
+    [COMPACT_TASK_IMPORT_HEADERS, "compact_work_list"],
+    [LEGACY_TASK_HEADERS, "mk_daily_checklist_csv"],
+  ] as const).find(([expected]) => headerRow.join("|") === expected.join("|"))?.[1];
+  if (detected === "ideal_business_sheet" || detected === "compact_work_list") {
+    const normalized = normalizeBusinessTaskSheet(firstRows, { ...options, format: detected });
+    const issues = dedupeTaskImportIssues(normalized.issues);
+    return { sourceFormat: detected, payload: null, ...normalized, issues, errors: issues.map((item) => `Tasks row ${item.row}: ${item.reason}`) };
+  }
+  if (detected === "mk_daily_checklist_csv") {
     const legacy = normalizeLegacyTaskSheet(firstRows, options);
     const issues = dedupeTaskImportIssues(legacy.issues);
     return { sourceFormat: "mk_daily_checklist_csv" as const, payload: null, ...legacy, issues, errors: issues.map((item) => `Tasks row ${item.row}: ${item.reason}`) };
   }
   const sheets: Record<string, readonly Readonly<Record<string, unknown>>[]> = {};
   for (const name of book.SheetNames) sheets[extension === "csv" ? "Tasks" : name] = XLSX.utils.sheet_to_json(book.Sheets[name]!, { defval: "", raw: false }) as Readonly<Record<string, unknown>>[];
-  return { sourceFormat: "canonical" as const, draftRows: [], identityRequirements: [], ...normalizeTaskImportWorkbook(sheets) };
+  const canonicalSheet = book.Sheets.Tasks;
+  const canonicalHeaders = canonicalSheet
+    ? ((XLSX.utils.sheet_to_json(canonicalSheet, { header: 1, defval: "", raw: false }) as unknown[][])[0] ?? []).map((header) => String(header).trim().toLowerCase())
+    : [];
+  if (extension === "xlsx" && exactly(canonicalHeaders, TASK_IMPORT_HEADERS)) {
+    return { sourceFormat: "canonical" as const, draftRows: [], identityRequirements: [], requiredTimingPresets: [], ...normalizeTaskImportWorkbook(sheets) };
+  }
+  const structural = entry("Tasks", 1, "headers", "Headers do not match a supported task import format", "Use the one-sheet Download format, the six-column work list, the earlier 18-column sheet, or an existing canonical workbook.");
+  return { sourceFormat: "unknown" as const, payload: null, draftRows: [], identityRequirements: [], requiredTimingPresets: [], issues: [structural], errors: [structural.reason] };
 }
 export const parseTaskWorkbook = parseTaskImportFile;
 export function taskImportPayloadHashSource(payload: TaskBulkImportPayload): string { return JSON.stringify({ tasks: [...payload.tasks].sort((a, b) => a.task_key.localeCompare(b.task_key)) }); }

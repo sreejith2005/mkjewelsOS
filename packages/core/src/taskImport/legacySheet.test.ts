@@ -66,4 +66,20 @@ describe("current task sheet", () => {
     const result = normalizeLegacyTaskSheet([row({ FREQUENCY: "As Required", ACTIVE: "" })]);
     expect(result.issues).toContainEqual(expect.objectContaining({ field: "ACTIVE" }));
   });
+
+  it("uses the frequency timing preset only when legacy times are blank", () => {
+    const result = normalizeLegacyTaskSheet([row({
+      FREQUENCY: "Daily – Opening",
+      "START TIME": "",
+      "DUE TIME": "",
+    })], { timingPresets: { opening: { startTime: "08:00", dueTime: "10:00" } } });
+    expect(result.requiredTimingPresets).toEqual([]);
+    expect(result.draftRows[0]).toMatchObject({ start_time: "08:00", due_time: "10:00" });
+  });
+
+  it("uses the shared checkpoint plan without duplicating the task row", () => {
+    const result = normalizeLegacyTaskSheet([row({ FREQUENCY: "2× Daily" })]);
+    expect(result.draftRows).toHaveLength(1);
+    expect(result.draftRows[0]?.checklist).toHaveLength(2);
+  });
 });

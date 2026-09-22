@@ -1,11 +1,12 @@
 import {
-  buildImportSchedule,
   identityRequirementKey,
   normalizeImportBoolean,
-  normalizeLegacyFrequency,
+  planTaskImportFrequency,
   TASK_IMPORT_MAX_ROWS,
   type TaskImportDraftRow,
   type TaskImportIdentityRequirement,
+  type TaskImportTimingPresetKey,
+  type TaskImportTimingPresets,
 } from "../taskImport";
 import type { TaskBulkImportIssue } from "./workbook";
 
@@ -14,16 +15,24 @@ type Row = Readonly<Record<string, unknown>>;
 const value = (row: Row, header: typeof LEGACY_TASK_HEADERS[number]) => String(row[header] ?? "").trim();
 const issue = (row: number, field: string, reason: string, guidance: string): TaskBulkImportIssue => ({ sheet: "Tasks", row, field, reason, guidance, severity: "error" });
 const TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const unsafe = (text: string) => /^[=+\-@]/.test(text) || /[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(text);
+const validDate = (text: string) => {
+  const match = DATE.exec(text); if (!match) return false;
+  const year = Number(match[1]); const month = Number(match[2]); const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.getUTCDate() === day;
+};
 
-export type LegacyTaskSheetNormalization = Readonly<{ draftRows: readonly TaskImportDraftRow[]; identityRequirements: readonly TaskImportIdentityRequirement[]; issues: readonly TaskBulkImportIssue[] }>;
-export type LegacyTaskSheetOptions = Readonly<{ defaultStartsOn?: string }>;
+export type LegacyTaskSheetNormalization = Readonly<{ draftRows: readonly TaskImportDraftRow[]; identityRequirements: readonly TaskImportIdentityRequirement[]; issues: readonly TaskBulkImportIssue[]; requiredTimingPresets: readonly TaskImportTimingPresetKey[] }>;
+export type LegacyTaskSheetOptions = Readonly<{ defaultStartsOn?: string; timingPresets?: TaskImportTimingPresets }>;
 const GROUP_CONTEXT_HEADERS = ["BRANCH NAME", "START TIME", "DUE TIME", "EVIDENCE REQUIRED"] as const;
 
 export function normalizeLegacyTaskSheet(rows: readonly Row[], options: LegacyTaskSheetOptions = {}): LegacyTaskSheetNormalization {
   const issues: TaskBulkImportIssue[] = [];
   const drafts: TaskImportDraftRow[] = [];
   const requirements = new Map<string, { key: string; kind: "assignee" | "verifier"; label: string; source_rows: number[] }>();
+  const requiredPresets = new Set<TaskImportTimingPresetKey>();
   const context = new Map<typeof GROUP_CONTEXT_HEADERS[number], string>();
   if (rows.length > TASK_IMPORT_MAX_ROWS) issues.push(issue(1, "sheet", "Tasks sheet can contain at most 2500 rows", "Split the source before importing."));
   rows.slice(0, TASK_IMPORT_MAX_ROWS).forEach((row, index) => {
@@ -45,31 +54,37 @@ export function normalizeLegacyTaskSheet(rows: readonly Row[], options: LegacyTa
     const core = value(row, "CORE TASK"); const task = value(row, "TASK");
     if (!task) issues.push(issue(sourceRow, "TASK", "Task is required", "Enter a task."));
     if (taskType === "checklist" && !core) issues.push(issue(sourceRow, "CORE TASK", "Core task is required for checklist rows", "Enter the checklist title."));
-    let scheduleKind: ReturnType<typeof normalizeLegacyFrequency> = "daily";
-    try { scheduleKind = normalizeLegacyFrequency(value(row, "FREQUENCY")); } catch { issues.push(issue(sourceRow, "FREQUENCY", "Frequency is unsupported", "Use One Time, Daily, Weekly, Monthly, Quarterly, Yearly, or As Required.")); }
     const sourceStartsOn = value(row, "TASK START DATE");
+    const startsOnCandidate = sourceStartsOn || options.defaultStartsOn || "";
+    let plan: ReturnType<typeof planTaskImportFrequency>;
+    try { plan = planTaskImportFrequency(value(row, "FREQUENCY"), validDate(startsOnCandidate) ? startsOnCandidate : "2000-01-01", task || "Task"); }
+    catch { issues.push(issue(sourceRow, "FREQUENCY", "Frequency is unsupported", "Use a supported frequency from the downloaded format.")); plan = planTaskImportFrequency("", "", task || "Task"); }
+    const scheduleKind = plan.scheduleKind;
     const startsOn = sourceStartsOn || (scheduleKind === "as_required" ? "" : options.defaultStartsOn ?? "");
-    const startTime = groupedValue("START TIME"); const dueTime = groupedValue("DUE TIME");
+    const groupedStartTime = groupedValue("START TIME"); const groupedDueTime = groupedValue("DUE TIME");
+    const startPreset = options.timingPresets?.[plan.startTimingPreset]; const duePreset = options.timingPresets?.[plan.dueTimingPreset];
+    if (!groupedStartTime && !startPreset) requiredPresets.add(plan.startTimingPreset);
+    if (!groupedDueTime && !duePreset) requiredPresets.add(plan.dueTimingPreset);
+    const startTime = groupedStartTime || startPreset?.startTime || ""; const dueTime = groupedDueTime || duePreset?.dueTime || "";
     if (!TIME.test(startTime)) issues.push(issue(sourceRow, "START TIME", "Start time is required", "Use HH:MM."));
     if (!TIME.test(dueTime) || dueTime <= startTime) issues.push(issue(sourceRow, "DUE TIME", "Due time must be later than start time", "Use a same-day HH:MM deadline."));
-    let schedule: ReturnType<typeof buildImportSchedule> = { destination: "recurring_todo", recurrenceRule: "" };
-    try { schedule = buildImportSchedule(scheduleKind, startsOn); } catch (error) { issues.push(issue(sourceRow, "TASK START DATE", error instanceof Error ? error.message : "Start date is invalid", "Choose one valid start date above the import.")); }
+    if (scheduleKind !== "as_required" && !validDate(startsOn)) issues.push(issue(sourceRow, "TASK START DATE", "Start date must use YYYY-MM-DD", "Choose one valid start date above the import."));
     const boolean = (header: "EVIDENCE REQUIRED" | "VERIFICATION REQUIRED" | "BUDDY ALLOWED" | "ACTIVE") => { try { return normalizeImportBoolean(value(row, header)); } catch { issues.push(issue(sourceRow, header, `${header} is required`, "Use Yes or No.")); return false; } };
     const evidenceRequired = (() => { try { return normalizeImportBoolean(groupedValue("EVIDENCE REQUIRED")); } catch { issues.push(issue(sourceRow, "EVIDENCE REQUIRED", "EVIDENCE REQUIRED is required", "Use Yes or No on the first row of each group.")); return false; } })();
     const verification = boolean("VERIFICATION REQUIRED"); const active = boolean("ACTIVE"); const verifier = value(row, "VERIFIER");
     if (verification && !verifier) issues.push(issue(sourceRow, "VERIFIER", "Verifier is required", "Enter a verifier name for explicit mapping."));
     if (verification && verifier) addRequirement(requirements, "verifier", verifier, sourceRow);
     const plannedAt = startsOn ? `${startsOn} ${startTime}` : ""; const dueAt = startsOn ? `${startsOn} ${dueTime}` : "";
-    drafts.push({ source_row: sourceRow, task_key: `legacy-${sourceRow}`, destination: schedule.destination, schedule_kind: scheduleKind,
+    drafts.push({ source_row: sourceRow, task_key: `legacy-${sourceRow}`, destination: plan.destination, schedule_kind: scheduleKind,
       task_type: taskType ?? "delegation", core_task_label: core, title: task,
       description: value(row, "TASK DESCRIPTION"), priority: value(row, "PRIORITY").toLowerCase(), branch, department, category: "",
       assignee_email: email, assignee_name: name, verifier_label: verifier, starts_on: startsOn, start_time: startTime, due_time: dueTime,
-      planned_at: plannedAt, due_at: dueAt, recurrence_rule: schedule.recurrenceRule, requires_upload: evidenceRequired,
+      planned_at: plannedAt, due_at: dueAt, recurrence_rule: plan.recurrenceRule, requires_upload: evidenceRequired,
       verification_required: verification, buddy_assignment_allowed: boolean("BUDDY ALLOWED"), is_active: scheduleKind === "as_required" ? false : active,
       assignment_status: "assigning_left",
-      checklist: taskType === "checklist" && task ? [{ item_text: task, required: true }] : [] });
+      checklist: (plan.generatedCheckpoints.length ? plan.generatedCheckpoints : taskType === "checklist" && task ? [task] : []).map((item_text) => ({ item_text, required: true })) });
   });
-  return { draftRows: drafts, identityRequirements: [...requirements.values()], issues };
+  return { draftRows: drafts, identityRequirements: [...requirements.values()], issues, requiredTimingPresets: [...requiredPresets].sort() };
 }
 function addRequirement(map: Map<string, { key: string; kind: "assignee" | "verifier"; label: string; source_rows: number[] }>, kind: "assignee" | "verifier", label: string, row: number) {
   const key = identityRequirementKey(kind, label); const found = map.get(key);

@@ -6,3 +6,4 @@ export * from "./correctionReport";
 export * from "./outcomeMessage";
 export * from "./workbook";
 export * from "./frequency";
+export * from "./businessSheet";

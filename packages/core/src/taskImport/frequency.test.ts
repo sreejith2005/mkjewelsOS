@@ -7,6 +7,8 @@ describe("task import frequency planning", () => {
     ["Daily — Closing", "daily - closing"],
     ["Daily / As Required", "daily/as required"],
     ["3× Daily", "3x daily"],
+    ["Daily \u00e2\u0080\u0093 Opening", "daily - opening"],
+    ["2\u00c3\u0097 Daily", "2x daily"],
   ])("normalizes %s without losing meaning", (source, expected) => {
     expect(normalizeTaskFrequencyLabel(source)).toBe(expected);
   });

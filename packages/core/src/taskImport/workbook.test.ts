@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createTaskImportTemplate, dedupeTaskImportIssues, hashTaskImportPayload, normalizeTaskImportWorkbook, parseTaskImportFile, TASK_IMPORT_HEADERS } from "./workbook";
 import { LEGACY_TASK_HEADERS } from "./legacySheet";
+import { COMPACT_TASK_IMPORT_HEADERS, IDEAL_TASK_IMPORT_HEADERS } from "./businessSheet";
+import * as XLSX from "xlsx";
 
 function task(overrides: Record<string, unknown>) {
   return Object.fromEntries(TASK_IMPORT_HEADERS.map((header) => [header, overrides[header] ?? ""]));
@@ -35,6 +37,45 @@ describe("normalizeTaskImportWorkbook", () => {
     const source = `${LEGACY_TASK_HEADERS.join(",")}\r\n${LEGACY_TASK_HEADERS.map(() => "").join(",")}`;
     const parsed = await parseTaskImportFile(new File([source], "current.csv", { type: "text/csv" }));
     expect(parsed.sourceFormat).toBe("mk_daily_checklist_csv");
+  });
+
+  it.each([
+    [IDEAL_TASK_IMPORT_HEADERS, "ideal_business_sheet"],
+    [COMPACT_TASK_IMPORT_HEADERS, "compact_work_list"],
+  ] as const)("detects the supported business CSV signature", async (headers, expected) => {
+    const source = `${headers.join(",")}\r\n${headers.map(() => "").join(",")}`;
+    const parsed = await parseTaskImportFile(new File([source], "tasks.csv", { type: "text/csv" }));
+    expect(parsed.sourceFormat).toBe(expected);
+  });
+
+  it("routes a one-sheet Tasks workbook through the business adapter", async () => {
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([
+      Array.from(IDEAL_TASK_IMPORT_HEADERS),
+      IDEAL_TASK_IMPORT_HEADERS.map((header) => header === "MAIN TASK" ? "Open showroom" : ""),
+    ]), "Tasks");
+    const bytes = XLSX.write(book, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+    const parsed = await parseTaskImportFile(new File([bytes], "tasks.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }), { timingPresets: { manual: { startTime: "09:00", dueTime: "18:00" } } });
+    expect(parsed.sourceFormat).toBe("ideal_business_sheet");
+    expect(parsed.draftRows).toHaveLength(1);
+  });
+
+  it("returns one structural issue for unknown headers", async () => {
+    const source = "EMPLOYEE,WORK,FREQUENCY\r\nPerson,Task,Daily";
+    const parsed = await parseTaskImportFile(new File([source], "unknown.csv", { type: "text/csv" }));
+    expect(parsed.sourceFormat).toBe("unknown");
+    expect(parsed.issues).toHaveLength(1);
+    expect(parsed.issues[0]).toMatchObject({ field: "headers" });
+  });
+
+  it("keeps old canonical workbooks compatible", async () => {
+    const bytes = XLSX.write(createTaskImportTemplate(), { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+    const parsed = await parseTaskImportFile(new File([bytes], "canonical.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }));
+    expect(parsed.sourceFormat).toBe("canonical");
   });
 
   it("passes the one selected start date into current-sheet normalization", async () => {
