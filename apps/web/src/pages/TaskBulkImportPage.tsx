@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import * as XLSX from "xlsx";
 import { Download, Upload } from "lucide-react";
 import { chunkTaskImportRows, kolkataDateKey, type TaskImportDraftRow } from "@jewelos/core";
 import { Button, Notice } from "@/components/ui";
@@ -14,7 +13,7 @@ import { applyIdentityMappings } from "@/features/tasks/import/identityMappings"
 import { ImportReadinessSummary } from "@/features/tasks/import/ImportReadinessSummary";
 import { IdentityConfirmationPanel } from "@/features/tasks/import/IdentityConfirmationPanel";
 import { taskImportOutcomeMessage } from "@/features/tasks/import/outcomeMessage";
-import { createTaskImportTemplate, hashTaskImportPayload, parseTaskImportFile, type TaskBulkImportIssue, type TaskBulkImportPayload } from "@/features/tasks/import/workbook";
+import { hashTaskImportPayload, parseTaskImportFile, type TaskBulkImportIssue, type TaskBulkImportPayload } from "@/features/tasks/import/workbook";
 
 function downloadBlob(contents: BlobPart, name: string, type: string) { const url=URL.createObjectURL(new Blob([contents],{type})); const anchor=document.createElement("a"); anchor.href=url; anchor.download=name; anchor.click(); URL.revokeObjectURL(url); }
 async function hashRows(rows: readonly unknown[]) { const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(JSON.stringify(rows))); return [...new Uint8Array(digest)].map((item)=>item.toString(16).padStart(2,"0")).join(""); }
@@ -50,7 +49,7 @@ export function TaskBulkImportPage({ onBack }: { onBack: () => void }) {
     return [...groups.values()];
   },[issues]);
 
-  const download=()=>{const bytes=XLSX.write(createTaskImportTemplate(),{bookType:"xlsx",type:"array"});downloadBlob(bytes,"mk-jewels-task-bulk-import.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");};
+  const download=async()=>{setBusy(true);setError(null);try{const {createTaskImportTemplateBytes}=await import("@/features/tasks/import/template");const bytes=await createTaskImportTemplateBytes();downloadBlob(bytes,"mk-jewels-task-bulk-import.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");}catch(caught){setError(caught instanceof Error?caught.message:"Unable to create the import format");}finally{setBusy(false);}};
   const parseSelectedFile=useCallback(async(file:File,selectedStartDate:string)=>{setBusy(true);setError(null);setResult(null);setValidation(null);setPayload(null);setDraftRows([]);setProgress(0);try{const parsed=await parseTaskImportFile(file,{defaultStartsOn:selectedStartDate});setFileLabel(file.name.replace(/[^A-Za-z0-9._ -]/g,"_"));setIssues(parsed.issues);if(parsed.sourceFormat==="mk_daily_checklist_csv")setDraftRows(parsed.draftRows);else if(parsed.payload)setPayload(parsed.payload);else setError(parsed.errors.join(" "));}catch(caught){setError(caught instanceof Error?caught.message:"Unable to read file");}finally{setBusy(false);}},[]);
   const upload=async(file?:File)=>{if(!file)return;setSourceFile(file);await parseSelectedFile(file,startDate);};
   const changeStartDate=async(nextDate:string)=>{setStartDate(nextDate);if(sourceFile&&nextDate)await parseSelectedFile(sourceFile,nextDate);};
@@ -61,7 +60,7 @@ export function TaskBulkImportPage({ onBack }: { onBack: () => void }) {
   const correction=()=>downloadBlob(createCorrectionReportCsv(issues),"task-import-corrections.csv","text/csv;charset=utf-8");
 
   return <section className="-m-4 min-h-[calc(100dvh-7.875rem)] bg-task-bg p-4 text-task-text sm:-m-6 sm:p-6"><div className="mx-auto max-w-6xl space-y-5">
-    <header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-semibold">Task Bulk Import</h1><p className="mt-1 text-sm text-task-text-muted">Upload once. JewelOS assigns exact matches automatically and keeps unresolved work in Assigning Left.</p></div><div className="flex flex-wrap gap-2"><Button onClick={onBack} variant="secondary">Back to tasks</Button><Button onClick={()=>navigate("/tasks/assigning-left")} variant="secondary">Assigning Left</Button><Button onClick={download}><Download className="size-4"/>Download format</Button></div></header>
+    <header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-semibold">Task Bulk Import</h1><p className="mt-1 text-sm text-task-text-muted">Upload once. JewelOS assigns exact matches automatically and keeps unresolved work in Assigning Left.</p></div><div className="flex flex-wrap gap-2"><Button onClick={onBack} variant="secondary">Back to tasks</Button><Button onClick={()=>navigate("/tasks/assigning-left")} variant="secondary">Assigning Left</Button><Button disabled={busy} onClick={()=>void download()}><Download className="size-4"/>Download format</Button></div></header>
     <Notice tone="task">Accepts the current 18-column CSV and canonical workbook, up to 2 MiB and 2,500 records. Written names are matched automatically. Blank or unclear names do not stop the import.</Notice>
     {error?<Notice tone="danger">{error}</Notice>:null}{result?<Notice tone={result.tone}>{result.text}</Notice>:null}
     <div className="rounded-xl border border-task-border bg-task-bg p-4"><div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_14rem] sm:items-end"><label><span className="label">Final task sheet</span><input accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" className="task-field mt-1" onChange={(event)=>void upload(event.target.files?.[0])} type="file"/></label><label><span className="label">Start schedules from</span><input className="task-field mt-1" max="2100-12-31" min="2020-01-01" onChange={(event)=>void changeStartDate(event.target.value)} type="date" value={startDate}/></label></div></div>

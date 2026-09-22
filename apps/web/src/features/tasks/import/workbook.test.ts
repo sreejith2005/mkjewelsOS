@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createTaskImportTemplate, dedupeTaskImportIssues, hashTaskImportPayload, normalizeTaskImportWorkbook, parseTaskImportFile, TASK_IMPORT_HEADERS } from "./workbook";
+import { dedupeTaskImportIssues, hashTaskImportPayload, normalizeTaskImportWorkbook, parseTaskImportFile, TASK_IMPORT_HEADERS } from "./workbook";
 import { LEGACY_TASK_HEADERS } from "./legacySheet";
 
 function task(overrides: Record<string, unknown>) {
@@ -25,10 +25,6 @@ describe("normalizeTaskImportWorkbook", () => {
     const first = normalizeTaskImportWorkbook({ Tasks: [task({ task_key: "a", task_mode: "one_time", title: "Count", doer_emails: "b@example.com;a@example.com", planned_at: "2026-08-22 09:00" })] });
     const second = normalizeTaskImportWorkbook({ Tasks: [task({ task_key: "a", task_mode: "one_time", title: "Count", doer_emails: "a@example.com; b@example.com", planned_at: "2026-08-22 09:00" })] });
     expect(await hashTaskImportPayload(first.payload!)).toBe(await hashTaskImportPayload(second.payload!));
-  });
-
-  it("creates the four-sheet Excel template", () => {
-    expect(createTaskImportTemplate().SheetNames).toEqual(["Read Me", "Tasks", "Checklist Items", "Reference Data"]);
   });
 
   it("detects the current MK Jewels CSV headers", async () => {

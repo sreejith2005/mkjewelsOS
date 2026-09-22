@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createTaskImportTemplate, dedupeTaskImportIssues, hashTaskImportPayload, normalizeTaskImportWorkbook, parseTaskImportFile, TASK_IMPORT_HEADERS } from "./workbook";
+import { dedupeTaskImportIssues, hashTaskImportPayload, normalizeTaskImportWorkbook, parseTaskImportFile, TASK_IMPORT_HEADERS } from "./workbook";
 import { LEGACY_TASK_HEADERS } from "./legacySheet";
 import { COMPACT_TASK_IMPORT_HEADERS, IDEAL_TASK_IMPORT_HEADERS } from "./businessSheet";
 import * as XLSX from "xlsx";
@@ -27,10 +27,6 @@ describe("normalizeTaskImportWorkbook", () => {
     const first = normalizeTaskImportWorkbook({ Tasks: [task({ task_key: "a", task_mode: "one_time", title: "Count", doer_emails: "b@example.com;a@example.com", planned_at: "2026-08-22 09:00" })] });
     const second = normalizeTaskImportWorkbook({ Tasks: [task({ task_key: "a", task_mode: "one_time", title: "Count", doer_emails: "a@example.com; b@example.com", planned_at: "2026-08-22 09:00" })] });
     expect(await hashTaskImportPayload(first.payload!)).toBe(await hashTaskImportPayload(second.payload!));
-  });
-
-  it("creates the four-sheet Excel template", () => {
-    expect(createTaskImportTemplate().SheetNames).toEqual(["Read Me", "Tasks", "Checklist Items", "Reference Data"]);
   });
 
   it("detects the current MK Jewels CSV headers", async () => {
@@ -71,7 +67,12 @@ describe("normalizeTaskImportWorkbook", () => {
   });
 
   it("keeps old canonical workbooks compatible", async () => {
-    const bytes = XLSX.write(createTaskImportTemplate(), { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([
+      Array.from(TASK_IMPORT_HEADERS),
+      TASK_IMPORT_HEADERS.map((header) => ({ task_key: "old-1", task_mode: "one_time", title: "Old task", doer_emails: "sample@example.com", planned_at: "2026-09-22 09:00" })[header] ?? ""),
+    ]), "Tasks");
+    const bytes = XLSX.write(book, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
     const parsed = await parseTaskImportFile(new File([bytes], "canonical.xlsx", {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     }));

@@ -1,6 +1,5 @@
 export {
   TASK_IMPORT_HEADERS,
-  createTaskImportTemplate,
   dedupeTaskImportIssues,
   hashTaskImportPayload,
   normalizeTaskImportWorkbook,
