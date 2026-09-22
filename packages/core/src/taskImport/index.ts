@@ -7,3 +7,4 @@ export * from "./outcomeMessage";
 export * from "./workbook";
 export * from "./frequency";
 export * from "./businessSheet";
+export * from "./eligibility";
