@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   COMPACT_TASK_IMPORT_HEADERS,
   IDEAL_TASK_IMPORT_HEADERS,
+  isTaskImportDraftSourceFormat,
   normalizeBusinessTaskSheet,
 } from "./businessSheet";
 
@@ -9,6 +10,11 @@ const businessRow = (overrides: Record<string, string> = {}) =>
   Object.fromEntries(IDEAL_TASK_IMPORT_HEADERS.map((header) => [header, overrides[header] ?? ""]));
 
 describe("business task sheets", () => {
+  it("identifies every draft-format adapter without including canonical workbooks", () => {
+    expect(["ideal_business_sheet", "compact_work_list", "mk_daily_checklist_csv"].every(isTaskImportDraftSourceFormat)).toBe(true);
+    expect(isTaskImportDraftSourceFormat("canonical")).toBe(false);
+  });
+
   it("publishes the exact compact source signature", () => {
     expect(COMPACT_TASK_IMPORT_HEADERS).toEqual([
       "EMPLOYEE NAME", "DESIGNATION", "MAIN TASK", "TASK TYPE", "TASK FREQUENCY", "KRA",
@@ -146,5 +152,20 @@ describe("business task sheets", () => {
     });
     expect(result.requiredTimingPresets).toEqual(["general"]);
     expect(result.issues).toContainEqual(expect.objectContaining({ field: "START TIME" }));
+  });
+
+  it("requires complete windows for compound morning and evening timing", () => {
+    const result = normalizeBusinessTaskSheet([
+      businessRow({ "MAIN TASK": "Review follow-ups", "TASK FREQUENCY": "Morning & Evening" }),
+    ], {
+      format: "ideal_business_sheet",
+      defaultStartsOn: "2026-09-22",
+      timingPresets: {
+        morning: { startTime: "09:00", dueTime: "12:00" },
+        evening: { startTime: "", dueTime: "19:00" },
+      },
+    });
+    expect(result.requiredTimingPresets).toEqual(["evening"]);
+    expect(result.issues).toContainEqual(expect.objectContaining({ field: "DUE TIME" }));
   });
 });

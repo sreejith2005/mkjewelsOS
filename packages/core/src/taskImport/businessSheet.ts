@@ -78,6 +78,7 @@ const PRIORITIES = new Set(["low", "medium", "high"]);
 const unsafe = (text: string) => /^[=+\-@]/.test(text.trim()) || /[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(text);
 const value = (row: Row, header: string) => String(row[header] ?? "").trim();
 const issue = (row: number, field: string, reason: string, guidance: string): TaskBulkImportIssue => ({ sheet: "Tasks", row, field, reason, guidance, severity: "error" });
+const validTimingWindow = (window: { startTime: string; dueTime: string } | undefined) => Boolean(window && TIME.test(window.startTime) && TIME.test(window.dueTime) && window.dueTime > window.startTime);
 
 function validDate(value: string) {
   const match = DATE.exec(value);
@@ -139,11 +140,11 @@ export function normalizeBusinessTaskSheet(rows: readonly Row[], options: Busine
     if (explicitDue && !TIME.test(explicitDue)) issues.push(issue(sourceRow, "DUE TIME", "Due time is invalid", "Use 24-hour HH:MM."));
     const startPreset = options.timingPresets?.[plan.startTimingPreset];
     const duePreset = options.timingPresets?.[plan.dueTimingPreset];
-    if (!explicitStart && (!startPreset || !TIME.test(startPreset.startTime))) {
+    if (!explicitStart && !validTimingWindow(startPreset)) {
       requiredPresets.add(plan.startTimingPreset);
       issues.push(issue(sourceRow, "START TIME", `${plan.startTimingPreset} timing preset is required`, "Choose the missing timing preset above the preview."));
     }
-    if (!explicitDue && (!duePreset || !TIME.test(duePreset.dueTime))) {
+    if (!explicitDue && !validTimingWindow(duePreset)) {
       requiredPresets.add(plan.dueTimingPreset);
       issues.push(issue(sourceRow, "DUE TIME", `${plan.dueTimingPreset} timing preset is required`, "Choose the missing timing preset above the preview."));
     }

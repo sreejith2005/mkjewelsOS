@@ -17,6 +17,7 @@ const issue = (row: number, field: string, reason: string, guidance: string): Ta
 const TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const unsafe = (text: string) => /^[=+\-@]/.test(text) || /[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(text);
+const validTimingWindow = (window: { startTime: string; dueTime: string } | undefined) => Boolean(window && TIME.test(window.startTime) && TIME.test(window.dueTime) && window.dueTime > window.startTime);
 const validDate = (text: string) => {
   const match = DATE.exec(text); if (!match) return false;
   const year = Number(match[1]); const month = Number(match[2]); const day = Number(match[3]);
@@ -63,8 +64,8 @@ export function normalizeLegacyTaskSheet(rows: readonly Row[], options: LegacyTa
     const startsOn = sourceStartsOn || (scheduleKind === "as_required" ? "" : options.defaultStartsOn ?? "");
     const groupedStartTime = groupedValue("START TIME"); const groupedDueTime = groupedValue("DUE TIME");
     const startPreset = options.timingPresets?.[plan.startTimingPreset]; const duePreset = options.timingPresets?.[plan.dueTimingPreset];
-    if (!groupedStartTime && !startPreset) requiredPresets.add(plan.startTimingPreset);
-    if (!groupedDueTime && !duePreset) requiredPresets.add(plan.dueTimingPreset);
+    if (!groupedStartTime && !validTimingWindow(startPreset)) requiredPresets.add(plan.startTimingPreset);
+    if (!groupedDueTime && !validTimingWindow(duePreset)) requiredPresets.add(plan.dueTimingPreset);
     const startTime = groupedStartTime || startPreset?.startTime || ""; const dueTime = groupedDueTime || duePreset?.dueTime || "";
     if (!TIME.test(startTime)) issues.push(issue(sourceRow, "START TIME", "Start time is required", "Use HH:MM."));
     if (!TIME.test(dueTime) || dueTime <= startTime) issues.push(issue(sourceRow, "DUE TIME", "Due time must be later than start time", "Use a same-day HH:MM deadline."));
