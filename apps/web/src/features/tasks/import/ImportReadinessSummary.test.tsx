@@ -4,9 +4,13 @@ import { expect, it } from "vitest";
 import { ImportReadinessSummary } from "./ImportReadinessSummary";
 
 it("summarizes a large import without rendering one correction per row", () => {
-  render(<ImportReadinessSummary assigned={1061} assigningLeft={871} named={1203} recurring={1932} startDate="2026-08-27" total={1932} unresolvedLabels={6} unresolvedNamed={142} />);
-  expect(screen.getByText("Names written")).toBeTruthy();
-  expect(screen.getByText("1,203")).toBeTruthy();
+  render(<ImportReadinessSummary assigned={1061} assigningLeft={871} blocked={68} ready={1932} recurring={1932} startDate="2026-08-27" total={2000} unresolvedLabels={6} unresolvedNamed={142} />);
+  expect(screen.getByText("Source records")).toBeTruthy();
+  expect(screen.getByText("2,000")).toBeTruthy();
+  expect(screen.getByText("Ready to import")).toBeTruthy();
+  expect(screen.getByText("1,932")).toBeTruthy();
+  expect(screen.getByText("Blocked rows")).toBeTruthy();
+  expect(screen.getByText("68")).toBeTruthy();
   expect(screen.getByText("1,061")).toBeTruthy();
   expect(screen.getByText("871")).toBeTruthy();
   expect(screen.getByText("Assigning Left")).toBeTruthy();
