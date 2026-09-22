@@ -2,10 +2,10 @@
 
 Last updated: 22 September 2026 (Asia/Kolkata)
 
-Authoritative repository: `C:\Users\MIS\Downloads\MKJewelOS\jewelos`
+Authoritative repository: `C:\Users\MIS\Downloads\MKJewelOS`
 
-Current source checkpoint when this document was updated: the local
-`feat/unified-task-import-workbook` branch after final review corrections
+Current source checkpoint when this document was updated: local `main`, after
+the default-timing and partial-row import implementation and local verification
 
 ## September 2026 unified workbook update
 
@@ -81,6 +81,46 @@ styles, and one-row parser round-trip. This is local evidence only: the
 in-app browser-control surface and an authenticated local browser session were
 not available for an interactive route walkthrough; no hosted migration,
 deployment, installed-device check, or desktop-Excel visual proof was performed.
+
+## September 2026 default timing and partial-row update
+
+Web and native now begin every import with shared store-hour defaults. The
+`general`, `opening`, and `morning` families use 11:00-13:00; `closing` and
+`evening` use 18:00-20:00; and event-driven/manual work uses the full working
+day, 11:00-20:00. Frequencies that explicitly span the day, including
+`Throughout Day`, `2x Daily`, `3x Daily`, `Morning & Evening`, and
+`Morning & Closing`, also span 11:00-20:00. Multi-occurrence labels still
+produce one daily task with multiple checkpoints.
+
+Valid explicit row times continue to override these defaults. An invalid
+explicit time is never silently replaced: that row remains blocked for
+correction. A genuinely unsupported frequency also blocks only its own row.
+Blank frequency, `As Required`, `Per Customer`, `Per Lead`, `After Visit`, and
+the other recognized event-driven labels use the full-day manual window and
+remain inactive Run Now templates rather than invented calendar occurrences.
+
+Import readiness is partitioned by source row. Rows with no error-severity
+issues can be imported immediately; malformed rows stay in the correction
+report and can be corrected and uploaded later. File/header-level issues block
+the whole file because row boundaries cannot be trusted. Unresolved assignee
+names or emails do not block otherwise valid work: those rows enter Assigning
+Left for deliberate assignment, without guessing an employee. Only the ready
+subset is identity-reconciled, fingerprinted, batched, and committed, so a
+later corrected upload remains protected by the existing idempotency contract.
+
+This change does not alter the canonical four-sheet contract, database schema,
+RPC signatures, RLS, Storage, grants, audit behavior, or generated database
+types. Aggregate verification against the 2,294-row source CSV found 72
+distinct frequency spellings, 2,294 ready rows, zero blocked rows, and no
+issues under the shared defaults. A synthetic mixed file proved that one valid
+row remains importable while one unsupported-frequency row is held back.
+
+Fresh local verification passed the full core suite (699 tests), web suite
+(353 tests), native suite (89 tests), focused task-import pgTAP tests (38 tests
+across three files), forced monorepo typecheck and production build, and a clean
+Android Expo export (3,650 modules). This remains local evidence: no hosted
+migration or deployment was required or performed, and no authenticated
+browser or installed-device walkthrough was performed.
 
 ## 1. Why this document exists
 

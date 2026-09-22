@@ -1,7 +1,7 @@
 # Task Import Default Timing and Partial Import Design
 
 Date: 2026-09-22
-Status: Approved design; implementation pending
+Status: Implemented and locally verified
 
 ## Goal
 
