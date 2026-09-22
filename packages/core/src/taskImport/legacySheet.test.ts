@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LEGACY_TASK_HEADERS, normalizeLegacyTaskSheet } from "./legacySheet";
+import { createDefaultTaskImportTimingPresets } from "./frequency";
 
 const row = (overrides: Record<string, string> = {}) => Object.fromEntries(LEGACY_TASK_HEADERS.map((header) => [header, overrides[header] ?? ({
   "EMPLOYEE EMAIL": "person@example.com", "EMPLOYEE NAME": "Person", DEPARTMENT: "Sales", "BRANCH NAME": "Bandra",
@@ -81,6 +82,28 @@ describe("current task sheet", () => {
     const result = normalizeLegacyTaskSheet([row({ FREQUENCY: "2× Daily" })]);
     expect(result.draftRows).toHaveLength(1);
     expect(result.draftRows[0]?.checklist).toHaveLength(2);
+  });
+
+  it("uses store-hour defaults for blank legacy times", () => {
+    const result = normalizeLegacyTaskSheet([row({
+      FREQUENCY: "Daily - Closing",
+      "START TIME": "",
+      "DUE TIME": "",
+    })], { timingPresets: createDefaultTaskImportTimingPresets() });
+
+    expect(result.issues).toEqual([]);
+    expect(result.draftRows[0]).toMatchObject({ start_time: "18:00", due_time: "20:00" });
+  });
+
+  it("lets a valid explicit legacy time override only its side of the default", () => {
+    const result = normalizeLegacyTaskSheet([row({
+      FREQUENCY: "Daily - Closing",
+      "START TIME": "17:30",
+      "DUE TIME": "",
+    })], { timingPresets: createDefaultTaskImportTimingPresets() });
+
+    expect(result.issues).toEqual([]);
+    expect(result.draftRows[0]).toMatchObject({ start_time: "17:30", due_time: "20:00" });
   });
 
   it("blocks a populated row beyond the server source-row limit", () => {

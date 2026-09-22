@@ -4,6 +4,26 @@ export type TaskImportTimingPresetKey = "general" | "opening" | "morning" | "clo
 export type TaskImportTimeWindow = Readonly<{ startTime: string; dueTime: string }>;
 export type TaskImportTimingPresets = Readonly<Partial<Record<TaskImportTimingPresetKey, TaskImportTimeWindow>>>;
 
+const DEFAULT_WINDOWS: Readonly<Record<TaskImportTimingPresetKey, TaskImportTimeWindow>> = {
+  general: { startTime: "11:00", dueTime: "13:00" },
+  opening: { startTime: "11:00", dueTime: "13:00" },
+  morning: { startTime: "11:00", dueTime: "13:00" },
+  closing: { startTime: "18:00", dueTime: "20:00" },
+  evening: { startTime: "18:00", dueTime: "20:00" },
+  manual: { startTime: "11:00", dueTime: "20:00" },
+};
+
+export function createDefaultTaskImportTimingPresets(): TaskImportTimingPresets {
+  return {
+    general: { ...DEFAULT_WINDOWS.general },
+    opening: { ...DEFAULT_WINDOWS.opening },
+    morning: { ...DEFAULT_WINDOWS.morning },
+    closing: { ...DEFAULT_WINDOWS.closing },
+    evening: { ...DEFAULT_WINDOWS.evening },
+    manual: { ...DEFAULT_WINDOWS.manual },
+  };
+}
+
 export type TaskImportFrequencyPlan = Readonly<{
   scheduleKind: ImportScheduleKind;
   destination: TaskImportDestination;
@@ -27,7 +47,6 @@ const DAILY = new Set([
   "daily/per refill",
   "daily/weekly",
   "daily/monthly",
-  "throughout day",
 ]);
 
 const WEEKLY_ANCHORED = new Set(["weekly", "weekly/as required", "weekly/as scheduled"]);
@@ -140,8 +159,9 @@ export function planTaskImportFrequency(raw: string, startsOn: string, title: st
   if (frequency === "daily - opening") return plan("daily", "FREQ=DAILY", "opening", "opening");
   if (frequency === "daily - morning") return plan("daily", "FREQ=DAILY", "morning", "morning");
   if (frequency === "daily - closing") return plan("daily", "FREQ=DAILY", "closing", "closing");
-  if (frequency === "2x daily") return plan("daily", "FREQ=DAILY", "general", "general", numberedCheckpoints(2, title));
-  if (frequency === "3x daily") return plan("daily", "FREQ=DAILY", "general", "general", numberedCheckpoints(3, title));
+  if (frequency === "throughout day") return plan("daily", "FREQ=DAILY", "opening", "closing");
+  if (frequency === "2x daily") return plan("daily", "FREQ=DAILY", "opening", "closing", numberedCheckpoints(2, title));
+  if (frequency === "3x daily") return plan("daily", "FREQ=DAILY", "opening", "closing", numberedCheckpoints(3, title));
   if (frequency === "morning & evening") return plan("daily", "FREQ=DAILY", "morning", "evening", [`Morning: ${title}`, `Evening: ${title}`]);
   if (frequency === "morning & closing") return plan("daily", "FREQ=DAILY", "morning", "closing", [`Morning: ${title}`, `Closing: ${title}`]);
   if (WEEKLY_ANCHORED.has(frequency)) {

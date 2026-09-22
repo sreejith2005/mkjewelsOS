@@ -5,6 +5,7 @@ import {
   isTaskImportDraftSourceFormat,
   normalizeBusinessTaskSheet,
 } from "./businessSheet";
+import { createDefaultTaskImportTimingPresets } from "./frequency";
 
 const businessRow = (overrides: Record<string, string> = {}) =>
   Object.fromEntries(IDEAL_TASK_IMPORT_HEADERS.map((header) => [header, overrides[header] ?? ""]));
@@ -43,6 +44,71 @@ describe("business task sheets", () => {
       is_active: false,
       assignment_status: "assigning_left",
     });
+  });
+
+  it.each([
+    ["Daily - Opening", "11:00", "13:00", 0],
+    ["As Required", "11:00", "20:00", 0],
+    ["Throughout Day", "11:00", "20:00", 0],
+    ["3x Daily", "11:00", "20:00", 3],
+  ])("uses store-hour defaults for %s", (frequency, startTime, dueTime, checkpoints) => {
+    const result = normalizeBusinessTaskSheet([
+      businessRow({ "MAIN TASK": "Synthetic task", "TASK FREQUENCY": frequency }),
+    ], {
+      format: "ideal_business_sheet",
+      defaultStartsOn: "2026-09-22",
+      timingPresets: createDefaultTaskImportTimingPresets(),
+    });
+
+    expect(result.issues).toEqual([]);
+    expect(result.draftRows).toHaveLength(1);
+    expect(result.draftRows[0]).toMatchObject({ start_time: startTime, due_time: dueTime });
+    expect(result.draftRows[0]?.checklist).toHaveLength(checkpoints);
+  });
+
+  it("lets valid explicit times override only their side of a default window", () => {
+    const startOverride = normalizeBusinessTaskSheet([
+      businessRow({
+        "MAIN TASK": "Synthetic opening task",
+        "TASK FREQUENCY": "Daily - Opening",
+        "START TIME": "12:00",
+      }),
+    ], {
+      format: "ideal_business_sheet",
+      defaultStartsOn: "2026-09-22",
+      timingPresets: createDefaultTaskImportTimingPresets(),
+    });
+    const dueOverride = normalizeBusinessTaskSheet([
+      businessRow({
+        "MAIN TASK": "Synthetic opening task",
+        "TASK FREQUENCY": "Daily - Opening",
+        "DUE TIME": "14:00",
+      }),
+    ], {
+      format: "ideal_business_sheet",
+      defaultStartsOn: "2026-09-22",
+      timingPresets: createDefaultTaskImportTimingPresets(),
+    });
+
+    expect(startOverride.draftRows[0]).toMatchObject({ start_time: "12:00", due_time: "13:00" });
+    expect(dueOverride.draftRows[0]).toMatchObject({ start_time: "11:00", due_time: "14:00" });
+  });
+
+  it("does not replace an invalid explicit time with a store-hour default", () => {
+    const result = normalizeBusinessTaskSheet([
+      businessRow({
+        "MAIN TASK": "Synthetic opening task",
+        "TASK FREQUENCY": "Daily - Opening",
+        "START TIME": "eleven",
+      }),
+    ], {
+      format: "ideal_business_sheet",
+      defaultStartsOn: "2026-09-22",
+      timingPresets: createDefaultTaskImportTimingPresets(),
+    });
+
+    expect(result.issues).toContainEqual(expect.objectContaining({ field: "START TIME" }));
+    expect(result.draftRows[0]).toMatchObject({ start_time: "eleven", due_time: "13:00" });
   });
 
   it("uses explicit newline checkpoints instead of generated checkpoints", () => {

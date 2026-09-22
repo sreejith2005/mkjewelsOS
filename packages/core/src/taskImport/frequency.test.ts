@@ -1,7 +1,113 @@
 import { describe, expect, it } from "vitest";
-import { normalizeTaskFrequencyLabel, planTaskImportFrequency } from "./frequency";
+import {
+  createDefaultTaskImportTimingPresets,
+  normalizeTaskFrequencyLabel,
+  planTaskImportFrequency,
+} from "./frequency";
+
+const OBSERVED_TIMING_CASES = [
+  ["", "manual", "manual"],
+  ["13th Monthly", "general", "general"],
+  ["1st Monthly", "general", "general"],
+  ["1st Week Monthly", "general", "general"],
+  ["2\u00c3\u0097 Daily", "opening", "closing"],
+  ["3\u00c3\u0097 Daily", "opening", "closing"],
+  ["7th Monthly", "general", "general"],
+  ["After Customer Visit", "manual", "manual"],
+  ["After Event", "manual", "manual"],
+  ["After Serving", "manual", "manual"],
+  ["After Shoot", "manual", "manual"],
+  ["After Visit", "manual", "manual"],
+  ["Annual", "general", "general"],
+  ["As Applicable", "manual", "manual"],
+  ["As Assigned", "manual", "manual"],
+  ["As Required", "manual", "manual"],
+  ["As Required/Ongoing", "manual", "manual"],
+  ["As Scheduled", "manual", "manual"],
+  ["Campaign-Based", "manual", "manual"],
+  ["Daily", "general", "general"],
+  ["Daily / As Required", "general", "general"],
+  ["Daily \u00e2\u0080\u0093 Closing", "closing", "closing"],
+  ["Daily \u00e2\u0080\u0093 Morning", "morning", "morning"],
+  ["Daily \u00e2\u0080\u0093 Opening", "opening", "opening"],
+  ["Daily \u00e2\u0080\u0093 T-1", "general", "general"],
+  ["Daily/As Assigned", "general", "general"],
+  ["Daily/As Posted", "general", "general"],
+  ["Daily/As Required", "general", "general"],
+  ["Daily/As Scheduled", "general", "general"],
+  ["Daily/Monthly", "general", "general"],
+  ["Daily/Ongoing", "general", "general"],
+  ["Daily/Per Refill", "general", "general"],
+  ["Daily/Weekly", "general", "general"],
+  ["Every 15 Days", "general", "general"],
+  ["Every Monday", "general", "general"],
+  ["Monday & Thursday", "general", "general"],
+  ["Monday & Thursday/As Required", "general", "general"],
+  ["Monthly", "general", "general"],
+  ["Monthly / As Required", "general", "general"],
+  ["Monthly \u00e2\u0080\u0093 1st to 5th", "general", "general"],
+  ["Monthly/As Required", "general", "general"],
+  ["Monthly/As Scheduled", "general", "general"],
+  ["Morning & Closing", "morning", "closing"],
+  ["Morning & Evening", "morning", "evening"],
+  ["Ongoing", "manual", "manual"],
+  ["Per Bag", "manual", "manual"],
+  ["Per CAM Piece", "manual", "manual"],
+  ["Per Call", "manual", "manual"],
+  ["Per Customer", "manual", "manual"],
+  ["Per Customer/As Applicable", "manual", "manual"],
+  ["Per Enquiry", "manual", "manual"],
+  ["Per Follow-Up", "manual", "manual"],
+  ["Per Interaction", "manual", "manual"],
+  ["Per Issue", "manual", "manual"],
+  ["Per Job", "manual", "manual"],
+  ["Per Lead", "manual", "manual"],
+  ["Per Lost Lead", "manual", "manual"],
+  ["Per Movement", "manual", "manual"],
+  ["Per Not-Bought Customer", "manual", "manual"],
+  ["Per Parcel", "manual", "manual"],
+  ["Per Piece/Batch", "manual", "manual"],
+  ["Per Product", "manual", "manual"],
+  ["Per Prospect", "manual", "manual"],
+  ["Per Receipt", "manual", "manual"],
+  ["Per Video Call", "manual", "manual"],
+  ["Per Visit", "manual", "manual"],
+  ["Shoot Days", "manual", "manual"],
+  ["Sunday", "general", "general"],
+  ["Throughout Day", "opening", "closing"],
+  ["Weekly", "general", "general"],
+  ["Weekly/As Required", "general", "general"],
+  ["Weekly/As Scheduled", "general", "general"],
+] as const;
 
 describe("task import frequency planning", () => {
+  it("keeps every observed frequency on its approved timing family", () => {
+    expect(OBSERVED_TIMING_CASES).toHaveLength(72);
+    for (const [frequency, startTimingPreset, dueTimingPreset] of OBSERVED_TIMING_CASES) {
+      expect(planTaskImportFrequency(frequency, "2026-09-22", "Synthetic task")).toMatchObject({
+        startTimingPreset,
+        dueTimingPreset,
+      });
+    }
+  });
+
+  it("creates independent store-hour timing defaults", () => {
+    const first = createDefaultTaskImportTimingPresets();
+    const second = createDefaultTaskImportTimingPresets();
+
+    expect(first).toEqual({
+      general: { startTime: "11:00", dueTime: "13:00" },
+      opening: { startTime: "11:00", dueTime: "13:00" },
+      morning: { startTime: "11:00", dueTime: "13:00" },
+      closing: { startTime: "18:00", dueTime: "20:00" },
+      evening: { startTime: "18:00", dueTime: "20:00" },
+      manual: { startTime: "11:00", dueTime: "20:00" },
+    });
+    expect(first).not.toBe(second);
+    expect(first.general).not.toBe(second.general);
+    expect(first.manual).not.toBe(second.manual);
+  });
+
   it.each([
     ["Daily – Opening", "daily - opening"],
     ["Daily — Closing", "daily - closing"],
@@ -69,7 +175,11 @@ describe("task import frequency planning", () => {
     ["Morning & Closing", ["Morning: Update follow-ups", "Closing: Update follow-ups"]],
   ])("creates one daily card with labeled checkpoints for %s", (frequency, checkpoints) => {
     expect(planTaskImportFrequency(frequency, "2026-09-22", "Update follow-ups"))
-      .toMatchObject({ scheduleKind: "daily", generatedCheckpoints: checkpoints });
+      .toMatchObject({
+        scheduleKind: "daily",
+        destination: "recurring_todo",
+        generatedCheckpoints: checkpoints,
+      });
   });
 
   it.each([
@@ -140,6 +250,27 @@ describe("task import frequency planning", () => {
       recurrenceRule: "FREQ=DAILY",
       startTimingPreset: "manual",
       dueTimingPreset: "manual",
+    });
+  });
+
+  it.each([
+    ["Daily - Opening", "opening", "opening"],
+    ["Daily - Morning", "morning", "morning"],
+    ["Daily - Closing", "closing", "closing"],
+    ["Throughout Day", "opening", "closing"],
+    ["2x Daily", "opening", "closing"],
+    ["3x Daily", "opening", "closing"],
+    ["Morning & Evening", "morning", "evening"],
+    ["Morning & Closing", "morning", "closing"],
+    ["As Required", "manual", "manual"],
+    ["Per Customer", "manual", "manual"],
+    ["Per Lead", "manual", "manual"],
+    ["After Visit", "manual", "manual"],
+    ["", "manual", "manual"],
+  ])("selects the store-hour timing family for %s", (frequency, start, due) => {
+    expect(planTaskImportFrequency(frequency, "2026-09-22", "Task")).toMatchObject({
+      startTimingPreset: start,
+      dueTimingPreset: due,
     });
   });
 
