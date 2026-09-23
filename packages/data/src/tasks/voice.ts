@@ -8,6 +8,14 @@ export type VoiceTaskInterpretation = Readonly<{
   gaps: readonly VoiceDraftGap[];
 }>;
 
+/** React Native FormData streams this local file through its URI multipart part. */
+export type NativeVoiceRecording = Readonly<{
+  uri: string;
+  name: string;
+  size: number;
+  type: string;
+}>;
+
 /** The Edge Function reports its safe user message in the response body. */
 async function interpretationFailure(error: unknown, fallback: string): Promise<Error> {
   const context = (error as { context?: unknown }).context;
@@ -39,11 +47,16 @@ function asInterpretation(value: unknown): VoiceTaskInterpretation {
  * Sends an ephemeral recording to the interpretation function. The response is
  * only a draft: creation remains a separate reviewed, audited task mutation.
  */
-export async function interpretTaskVoiceNote(file: UploadSource): Promise<VoiceTaskInterpretation> {
-  const bytes = uploadBody(file);
-  const audio = bytes instanceof Blob ? bytes : new Blob([bytes], { type: file.type });
+export async function interpretTaskVoiceNote(file: UploadSource | NativeVoiceRecording): Promise<VoiceTaskInterpretation> {
   const body = new FormData();
-  body.append("audio", audio, file.name);
+  if ("uri" in file) {
+    // React Native's FormData accepts a URI part; the DOM type only describes browser Blob parts.
+    body.append("audio", { uri: file.uri, name: file.name, type: file.type } as unknown as Blob);
+  } else {
+    const bytes = uploadBody(file);
+    const audio = bytes instanceof Blob ? bytes : new Blob([bytes], { type: file.type });
+    body.append("audio", audio, file.name);
+  }
   const { data, error } = await db().functions.invoke("interpret-task-voice", { method: "POST", body });
   if (error) throw await interpretationFailure(error, "Unable to interpret the voice note.");
   return asInterpretation(data);

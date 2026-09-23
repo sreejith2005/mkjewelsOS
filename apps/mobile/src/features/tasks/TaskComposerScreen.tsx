@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Component, useMemo, useState, type ErrorInfo, type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -21,6 +21,7 @@ import type { VoiceTaskInterpretation } from "@jewelos/data/tasks/voice";
 import { useAccess, useProfile } from "@/auth/AuthProvider";
 import { pickFileFromChooser } from "@/lib/pickFile";
 import { useAsyncData } from "@/lib/useAsyncData";
+import { log } from "@/lib/log";
 import type { RootStackParamList } from "@/navigation/types";
 import { DateField } from "@/forms/DateField";
 import { makeStyles } from "@/theme/makeStyles";
@@ -33,6 +34,22 @@ import { TextField } from "@/ui/TextField";
 import { VoiceTaskCapture } from "./VoiceTaskCapture";
 
 type Navigation = NativeStackNavigationProp<RootStackParamList, "TaskComposer">;
+
+/** A recorder native-module failure must not take the manual task form down with it. */
+class VoiceCaptureBoundary extends Component<Readonly<{ children: ReactNode }>, Readonly<{ failed: boolean }>> {
+  override state = { failed: false };
+
+  static getDerivedStateFromError(): Readonly<{ failed: boolean }> { return { failed: true }; }
+
+  override componentDidCatch(error: Error, _info: ErrorInfo): void {
+    log.error("startup", "voice capture failed to render", error);
+  }
+
+  override render(): ReactNode {
+    if (this.state.failed) return <Banner tone="danger">Voice recording is unavailable. You can still assign this task manually.</Banner>;
+    return this.props.children;
+  }
+}
 
 function personLabel(person: Readonly<{ employee_name: string | null; first_name: string | null; last_name: string | null; employee_code: string | null }>): string {
   const name = person.employee_name?.trim()
@@ -200,7 +217,7 @@ export function TaskComposerScreen() {
     >
       {error ? <Banner tone="danger">{error}</Banner> : null}
       {createdTaskId ? <Banner tone="warning">The task is saved. Only the attachment still needs uploading.</Banner> : null}
-      {hasPermission(access, "tasks.manage_team") && !createdTaskId ? <VoiceTaskCapture onInterpreted={applyVoiceDraft} /> : null}
+      {hasPermission(access, "tasks.voice_assign") && !createdTaskId ? <VoiceCaptureBoundary><VoiceTaskCapture onInterpreted={applyVoiceDraft} /></VoiceCaptureBoundary> : null}
       {outstandingVoiceGaps.length > 0 ? <Banner tone="warning">{`Finish before assigning: ${outstandingVoiceGaps.map(voiceDraftGapMessage).join(" ")}`}</Banner> : null}
       {assignmentReason ? <Text tone="muted" variant="caption">Assigned from your voice note · {assignmentReason}</Text> : null}
       <TextField editable={!createdTaskId} label="Task title" maxLength={200} onChangeText={setTitle} required value={title} />

@@ -112,7 +112,7 @@ function ShellPage({ children, raiseVoiceAction = false }: { children: ReactNode
   const navigate = usePathNavigation();
   // Offered on the same terms as the Create Task voice card, and only while
   // the Tasks section is open to this user.
-  const canUseVoice = hasPermission(shellAccess.access, "tasks.manage_team") && pageDecision(shellAccess, "checklist_tasks") === "allowed";
+  const canUseVoice = hasPermission(shellAccess.access, "tasks.voice_assign") && pageDecision(shellAccess, "checklist_tasks") === "allowed";
   return (
     <View className="flex-1 bg-obsidian">
       <MobileHeader onNavigate={navigate} onOpenNavigation={() => setDrawerOpen(true)} profileName={profile.employee_name} />

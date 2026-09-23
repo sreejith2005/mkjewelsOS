@@ -46,4 +46,20 @@ describe("interpretTaskVoiceNote", () => {
     });
     await expect(interpretTaskVoiceNote(recording)).rejects.toThrow("The recording was too long.");
   });
+
+  it("passes a native recording URI to multipart upload without constructing a Blob", async () => {
+    const OriginalFormData = globalThis.FormData;
+    const parts: Array<[string, unknown]> = [];
+    class NativeFormData {
+      append(name: string, value: unknown) { parts.push([name, value]); }
+    }
+    vi.stubGlobal("FormData", NativeFormData);
+    api.invoke.mockResolvedValue({ data: { transcript: "Count stock", draft: {}, gaps: [] }, error: null });
+    try {
+      await interpretTaskVoiceNote({ uri: "file:///cache/voice-note.m4a", name: "voice-note.m4a", size: 3, type: "audio/mp4" });
+      expect(parts).toEqual([["audio", { uri: "file:///cache/voice-note.m4a", name: "voice-note.m4a", type: "audio/mp4" }]]);
+    } finally {
+      vi.stubGlobal("FormData", OriginalFormData);
+    }
+  });
 });

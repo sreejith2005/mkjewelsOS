@@ -46,13 +46,13 @@ export function VoiceTaskCapture({ onInterpreted }: { onInterpreted: (value: Voi
         return;
       }
       file = new File(uri);
-      const body = await file.arrayBuffer();
-      dispatch({ type: "stopped", size: body.byteLength });
-      if (body.byteLength === 0) return;
+      const size = file.size;
+      dispatch({ type: "stopped", size });
+      if (size === 0) return;
       const interpretation = await interpretTaskVoiceNote({
-        body,
+        uri,
         name: "voice-note.m4a",
-        size: body.byteLength,
+        size,
         type: "audio/mp4",
       });
       dispatch({ type: "interpreted", transcript: interpretation.transcript });

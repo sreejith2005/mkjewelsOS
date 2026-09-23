@@ -72,6 +72,7 @@ export type FmsGraphCanvasProps = Readonly<{
   onDisconnect: (from: string, to: string, ruleId?: string) => void;
   onReconnect: (from: string, previousTo: string, nextTo: string, ruleId?: string) => void;
   onMove: (positions: Readonly<Record<string, FmsGraphPosition>>) => void;
+  showGestureHint?: boolean;
 }>;
 
 export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
@@ -438,11 +439,11 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
         <Pressable accessibilityLabel="Fit workflow to view" onPress={fitView} style={styles.control}><Maximize color={theme.colors.brand} size={16} /></Pressable>
         <Pressable accessibilityLabel="Reset workflow view" onPress={resetView} style={styles.control}><RotateCcw color={theme.colors.brand} size={16} /></Pressable>
       </View>
-      <View pointerEvents="none" style={styles.hint}>
+      {props.showGestureHint ? <View pointerEvents="none" style={styles.hint}>
         <Text tone="muted" variant="caption">
           {connecting ? "Drop on a step to connect · release on empty space to cancel" : "Drag a card to move it · drag empty space to pan · pinch to zoom · drag a card’s right dot onto another card to connect · tap a connection to remove it or drag its arrow end to move it"}
         </Text>
-      </View>
+      </View> : null}
     </View>
   );
 }

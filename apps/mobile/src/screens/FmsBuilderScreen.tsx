@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import { CheckCircle2, FileText, Redo2, Save, Send, TestTube2, Undo2, UserRoundPlus } from "lucide-react-native";
 import { normalizeFmsDefinition, validateFmsDefinition, type FmsFlowDefinition, type FmsStageDefinition } from "@jewelos/core";
@@ -9,6 +9,7 @@ import { fmsDepartmentLabel } from "@jewelos/data/fms/departments";
 import { newRequestKey } from "@jewelos/data/runtime";
 import { FmsGraphCanvas } from "@/features/fms/FmsGraphCanvas";
 import { FmsStageEditor } from "@/features/fms/FmsStageEditor";
+import { builderCanvasHeight } from "@/features/fms/builderLayout";
 import { errorText } from "@/lib/log";
 import { useAsyncData } from "@/lib/useAsyncData";
 import type { RootStackParamList } from "@/navigation/types";
@@ -58,6 +59,7 @@ export function FmsBuilderScreen() {
 function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: FmsFlowRow | null; data: FmsData; duplicate: boolean; onClose: () => void; onSaved: () => Promise<void> }) {
   const theme = useAppTheme();
   const styles = useStyles();
+  const { height: windowHeight } = useWindowDimensions();
   const navigation = useNavigation();
   const initial = useMemo(() => { const value = flowToDefinition(flow, data); return duplicate ? { ...value, id: undefined, familyId: undefined, version: 1, lifecycle: "draft" as const, name: `${value.name} (Copy)` } : value; }, [data, duplicate, flow]);
   const [definition, setDefinition] = useState<FmsFlowDefinition>(initial);
@@ -71,6 +73,7 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [assigning, setAssigning] = useState(false);
+  const [canvasExpanded, setCanvasExpanded] = useState(false);
 
   const normalized = useMemo(() => normalizeFmsDefinition(definition), [definition]);
   const issues = useMemo(() => validateFmsDefinition(normalized, { formFields: data.formFields, availableFormIds: data.forms.map((form) => form.id) }), [data.formFields, data.forms, normalized]);
@@ -210,7 +213,8 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
           <Text tone="muted" variant="caption">{dirty ? "Unsaved changes" : "Draft saved"}</Text>
         </View>
       </View>
-      <ScrollView contentContainerStyle={styles.toolbar} horizontal showsHorizontalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.toolbar} horizontal showsHorizontalScrollIndicator={false} style={styles.toolbarScroll}>
+        <Button label={canvasExpanded ? "Smaller canvas" : "Expand canvas"} onPress={() => setCanvasExpanded((current) => !current)} variant="ghost" />
         <Button disabled={!past.length} icon={<Undo2 color={theme.colors.primary} size={16} />} label="Undo" onPress={undo} variant="ghost" />
         <Button disabled={!future.length} icon={<Redo2 color={theme.colors.primary} size={16} />} label="Redo" onPress={redo} variant="ghost" />
         <Button icon={<TestTube2 color={theme.colors.primary} size={16} />} label="Check workflow" onPress={() => { setSuccess(issues.length ? null : "Workflow check passed"); setError(issues.length ? "Workflow check found issues. Review Publish readiness." : null); }} variant="secondary" />
@@ -220,7 +224,7 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
       {error ? <Banner tone="danger">{error}</Banner> : null}
       {success ? <Banner tone="success">{success}</Banner> : null}
 
-      <View style={styles.canvasRegion}>
+      <View style={[styles.canvasRegion, { height: builderCanvasHeight(windowHeight, canvasExpanded) }]}>
         <FmsGraphCanvas
           definition={normalized}
           formFields={data.formFields}
@@ -234,6 +238,7 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
           onReconnect={reconnect}
           onSelect={setSelectedKey}
           selectedKey={selected?.key ?? null}
+          showGestureHint={canvasExpanded}
         />
       </View>
 
@@ -243,6 +248,7 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
         style={styles.flex}
       >
         <Text tone="muted" variant="caption">The initial Form starts the workflow. The final unconnected step completes it.</Text>
+        <Text tone="muted" variant="caption">Tap a canvas card to configure it. Expand the canvas to move and connect steps.</Text>
         <Text tone="warm" variant="caption" weight="semibold">BUILDING BLOCKS</Text>
       <Pressable accessibilityRole="button" onPress={() => add("task")} style={({ pressed }) => [styles.block, styles.blockPrimary, pressed && styles.pressed]}>
         <UserRoundPlus color={theme.colors.brand} size={18} />
@@ -375,10 +381,10 @@ function DefaultAssigneesSheet({ data, definition, onChange, onClose }: { data: 
 const useStyles = makeStyles((theme) => StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", gap: theme.space.sm },
   flex: { flex: 1, minWidth: 0 },
-  /** A bounded canvas region: tall enough to build in, never tall enough to push the editor off-screen. */
-  canvasRegion: { height: 360, flexShrink: 0 },
+  canvasRegion: { flexShrink: 0 },
   details: { gap: theme.space.md, paddingBottom: theme.space.lg },
-  toolbar: { gap: theme.space.xs, paddingRight: theme.space.md },
+  toolbarScroll: { flexGrow: 0, maxHeight: theme.touchTarget + theme.space.sm },
+  toolbar: { alignItems: "center", gap: theme.space.xs, paddingRight: theme.space.md },
   block: { flexDirection: "row", alignItems: "center", gap: theme.space.sm, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.lg, backgroundColor: theme.colors.surface, padding: theme.space.sm },
   blockPrimary: { borderColor: theme.colors.borderStrong, backgroundColor: theme.colors.brandSoft },
   blockRow: { flexDirection: "row", gap: theme.space.sm },
