@@ -1,5 +1,5 @@
-import {AlarmClock,ArrowRight,Gem} from "lucide-react";
-import {useEffect,type ReactNode} from "react";
+import {AlarmClock,ArrowRight,ChevronDown,Gem} from "lucide-react";
+import {useEffect,useId,useState,type ReactNode} from "react";
 import {useAuth} from "@/auth/AuthContext";
 import {titleCase} from "@/lib/format";
 import {fetchHomeSummary} from "@/features/analytics/api";
@@ -30,5 +30,6 @@ export function HomeView({onNavigate}:{onNavigate:(path:string)=>void}){
   </section>;
 }
 function HeroStat({label,value}:{label:string;value:number}){return <div className="min-w-0 text-center"><p className="text-2xl font-semibold leading-tight tabular-nums text-white">{value}</p><p className="truncate text-xs text-champagne/60">{label}</p></div>}
-function ActionGroup({title,children}:{title:string;children:ReactNode}){return <div className="min-w-0 space-y-3"><h3 className="text-sm font-semibold uppercase tracking-wide text-task-text-muted">{title}</h3>{children}</div>}
+/** Collapsible like the native Home sections: open by default, session-only state, and the body is hidden rather than unmounted. */
+function ActionGroup({title,children}:{title:string;children:ReactNode}){const [expanded,setExpanded]=useState(true);const bodyId=useId();return <div className="min-w-0 space-y-3"><h3><button aria-controls={bodyId} aria-expanded={expanded} className="flex min-h-11 w-full items-center justify-between gap-3 text-left text-sm font-semibold uppercase tracking-wide text-task-text-muted" onClick={()=>setExpanded((open)=>!open)} type="button"><span className="min-w-0 truncate">{title}</span><ChevronDown aria-hidden className={`size-4 shrink-0 transition-transform ${expanded?"rotate-180":""}`}/></button></h3><div className="space-y-3" hidden={!expanded} id={bodyId}>{children}</div></div>}
 function ActionItem({title,description,label,overdue,onOpen}:{title:string;description:string;label:string;overdue:boolean;onOpen:()=>void}){return <button className="flex w-full gap-3 rounded-2xl border border-task-border bg-task-bg p-4 text-left transition hover:border-gold/50 hover:bg-task-muted active:bg-task-muted" onClick={onOpen} type="button"><span className="mt-1.5"><StatusDot tone={overdue?"danger":"warning"}/></span><span className="min-w-0 flex-1"><span className="block break-words text-[15px] font-semibold leading-snug">{title}</span><span className="mt-1 block text-sm text-task-text-muted">{description}</span><span className={`mt-2 block text-xs font-semibold ${overdue?"text-task-overdue":"text-task-accent"}`}>{label}</span></span></button>}
