@@ -37,7 +37,7 @@ export function deriveTaskMutationCapability({
     watcherLabel: !isWatcher
       ? null
       : canUseElevatedActions
-        ? `Watching · ${ELEVATED_ACCESS_LABELS[viewerRole]} access`
-        : "Watching · read only",
+        ? `In Loop · ${ELEVATED_ACCESS_LABELS[viewerRole]} access`
+        : "In Loop",
   };
 }

@@ -12,7 +12,7 @@ describe("task mutation capability", () => {
       access: "read_only",
       canMutate: false,
       canUseElevatedActions: false,
-      watcherLabel: "Watching · read only",
+      watcherLabel: "In Loop",
     });
   });
 
@@ -35,7 +35,7 @@ describe("task mutation capability", () => {
       access: "elevated",
       canMutate: true,
       canUseElevatedActions: true,
-      watcherLabel: "Watching · manager access",
+      watcherLabel: "In Loop · manager access",
     });
   });
 

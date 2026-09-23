@@ -41,7 +41,9 @@ describe("task feed presentation", () => {
 
     expect(isTaskFeedItemInCurrentDayOrOverdue(task("yesterday", "user-1", "pending", "2026-08-06T12:00:00.000Z"), start, end, now)).toBe(true);
     expect(isTaskFeedItemInCurrentDayOrOverdue(task("today", "user-1", "pending", "2026-08-07T12:00:00.000Z"), start, end, now)).toBe(true);
-    expect(isTaskFeedItemInCurrentDayOrOverdue(task("tomorrow", "user-1", "pending", "2026-08-08T12:00:00.000Z"), start, end, now)).toBe(false);
+    expect(isTaskFeedItemInCurrentDayOrOverdue({ ...task("tomorrow-recurring", "user-1", "pending", "2026-08-08T12:00:00.000Z"), task_template_id: "daily-template" }, start, end, now)).toBe(false);
+    expect(isTaskFeedItemInCurrentDayOrOverdue({ ...task("tomorrow-one-time", "user-1", "pending", "2026-08-08T12:00:00.000Z"), task_template_id: null }, start, end, now)).toBe(true);
+    expect(isTaskFeedItemInCurrentDayOrOverdue({ ...task("tomorrow-done", "user-1", "completed", "2026-08-08T12:00:00.000Z"), task_template_id: null }, start, end, now)).toBe(false);
     expect(isTaskFeedItemInCurrentDayOrOverdue(task("rejected", "user-1", "rejected", "2026-08-06T12:00:00.000Z"), start, end, now)).toBe(false);
   });
 
@@ -56,7 +58,7 @@ describe("task feed presentation", () => {
 
   it("builds one shared database predicate for dated work and all open FMS work", () => {
     expect(taskFeedCurrentOrOverdueFilter("start", "end")).toBe(
-      "and(effective_due_datetime.gte.start,effective_due_datetime.lte.end),and(effective_due_datetime.lt.start,status.not.in.(completed,rejected,blocked)),and(task_type.eq.fms,status.in.(pending,in_progress,in_review,overdue))",
+      "and(effective_due_datetime.gte.start,effective_due_datetime.lte.end),and(effective_due_datetime.lt.start,status.not.in.(completed,rejected,blocked)),and(effective_due_datetime.gt.end,task_template_id.is.null,status.not.in.(completed,rejected,blocked)),and(task_type.eq.fms,status.in.(pending,in_progress,in_review,overdue))",
     );
   });
 

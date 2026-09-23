@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -19,6 +19,8 @@ import {
   uploadTaskAttachment,
   type TaskBundle,
 } from "@jewelos/data/tasks/api";
+import { addTaskComment, loadTaskComments } from "@jewelos/data/tasks/comments";
+import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
 import { useProfile } from "@/auth/AuthProvider";
 import { useAsyncData } from "@/lib/useAsyncData";
 import { formatDateTime, formatRelativeDeadline } from "@/lib/format";
@@ -35,6 +37,7 @@ import { ToggleField } from "@/forms/ToggleField";
 import { Banner, EmptyState, ErrorState, LoadingState } from "@/ui/states";
 import type { RootStackParamList } from "@/navigation/types";
 import { fmsAssignedWorkRouteForTask, navigateFmsAssignedWork } from "@/features/fms/assignedWorkNavigation";
+import { TaskRemarkComposer, TaskRemarksCard } from "@/features/tasks/TaskRemarks";
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, "TaskDetail">;
@@ -67,6 +70,12 @@ export function TaskDetailScreen() {
 
   const { data, error, loading, refreshing, reload, refresh } = useAsyncData(load, [load]);
   const task = useMemo(() => data?.find((item) => item.id === params.taskId) ?? null, [data, params.taskId]);
+  // FMS feed rows are workflow stages, not task records, so they carry no remark thread.
+  const remarksTaskId = task && task.task_type !== "fms" ? task.id : null;
+  const loadRemarks = useCallback(async () => (remarksTaskId ? loadTaskComments(remarksTaskId) : []), [remarksTaskId]);
+  const remarks = useAsyncData(loadRemarks, [loadRemarks]);
+  const refreshRemarks = remarks.refresh;
+  useEffect(() => subscribeToTenantRealtime(profile.tenant_id, ["tasks"], () => void refreshRemarks()), [profile.tenant_id, refreshRemarks]);
 
   const run = async (action: () => Promise<unknown>) => {
     if (busy) return;
@@ -158,6 +167,14 @@ export function TaskDetailScreen() {
           tintColor={theme.colors.primary}
         />
       }
+      footer={remarksTaskId ? (
+        <TaskRemarkComposer
+          onSend={async (comment) => {
+            await addTaskComment(remarksTaskId, comment);
+            await refreshRemarks();
+          }}
+        />
+      ) : undefined}
       scroll
     >
       {actionError ? <Banner tone="danger">{actionError}</Banner> : null}
@@ -172,6 +189,7 @@ export function TaskDetailScreen() {
             tone={done ? "success" : overdue ? "danger" : "neutral"}
           />
           {task.priority ? <StatusBadge label={`${task.priority} priority`} /> : null}
+          {capability.watcherLabel ? <StatusBadge label={capability.watcherLabel} tone="primary" /> : null}
         </View>
       </View>
 
@@ -268,6 +286,10 @@ export function TaskDetailScreen() {
         </Card>
       ) : done ? (
         <Banner tone="success">{`Completed ${formatDateTime(task.actual_datetime, "today")}.`}</Banner>
+      ) : null}
+
+      {remarksTaskId ? (
+        <TaskRemarksCard comments={remarks.data} error={remarks.error} loading={remarks.loading} viewerId={profile.id} />
       ) : null}
     </Screen>
   );

@@ -10,16 +10,22 @@ export type TaskFeedLike = Readonly<{
   planned_datetime: string | null;
   revised_datetime: string | null;
   status: string | null;
+  task_template_id?: string | null;
   task_type?: string | null;
 }>;
 
 const OPEN_FMS_STATUSES = new Set(["pending", "in_progress", "in_review", "overdue"]);
 
-/** PostgREST predicate for dated task work plus every currently actionable FMS assignment. */
+/**
+ * PostgREST predicate for dated task work, upcoming open one-time tasks, and every currently
+ * actionable FMS assignment. Recurring occurrences (task_template_id set) stay on their own day
+ * so a schedule never floods the board with future copies.
+ */
 export function taskFeedCurrentOrOverdueFilter(startIso: string, endIso: string): string {
   return [
     `and(effective_due_datetime.gte.${startIso},effective_due_datetime.lte.${endIso})`,
     `and(effective_due_datetime.lt.${startIso},status.not.in.(completed,rejected,blocked))`,
+    `and(effective_due_datetime.gt.${endIso},task_template_id.is.null,status.not.in.(completed,rejected,blocked))`,
     "and(task_type.eq.fms,status.in.(pending,in_progress,in_review,overdue))",
   ].join(",");
 }
@@ -101,7 +107,7 @@ export function countTaskFeedStatuses(tasks: readonly TaskFeedLike[], now: Date 
   }, { completed: 0, open: 0, overdue: 0, pending: 0 });
 }
 
-/** Keeps the strict current-day board focused while retaining independently overdue work. */
+/** Keeps the current-day board focused while retaining overdue work and upcoming one-time tasks. */
 export function isTaskFeedItemInCurrentDayOrOverdue(
   task: TaskFeedLike,
   start: Date | string,
@@ -117,5 +123,6 @@ export function isTaskFeedItemInCurrentDayOrOverdue(
   if ([deadlineMs, startMs, endMs].some(Number.isNaN)) return false;
   if (deadlineMs >= startMs && deadlineMs <= endMs) return true;
   if (["completed", "rejected", "blocked"].includes(task.status ?? "")) return false;
+  if (deadlineMs > endMs) return !task.task_template_id;
   return isTaskFeedItemOverdue(task, now);
 }

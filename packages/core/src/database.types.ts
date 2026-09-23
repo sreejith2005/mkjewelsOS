@@ -7308,6 +7308,7 @@ export type Database = {
           id: string | null
           planned_datetime: string | null
           status: Database["public"]["Enums"]["task_status"] | null
+          task_template_id: string | null
           task_type: Database["public"]["Enums"]["task_type"] | null
           tenant_id: string | null
         }
@@ -7407,6 +7408,10 @@ export type Database = {
       }
       add_task_attachment_with_audit: {
         Args: { p_file_url: string; p_task_id: string }
+        Returns: string
+      }
+      add_task_comment_with_audit: {
+        Args: { p_comment: string; p_task_id: string }
         Returns: string
       }
       apply_authoritative_admin_roles: {
@@ -8628,6 +8633,16 @@ export type Database = {
       }
       list_assigning_left_tasks: { Args: never; Returns: Json }
       list_crm_followups: { Args: { p_filter?: Json }; Returns: Json[] }
+      list_task_comments: {
+        Args: { p_task_id: string }
+        Returns: {
+          author_id: string
+          author_name: string
+          comment: string
+          created_at: string
+          id: string
+        }[]
+      }
       list_designation_daily_checklists: { Args: never; Returns: Json }
       list_notification_delivery_logs: {
         Args: {
