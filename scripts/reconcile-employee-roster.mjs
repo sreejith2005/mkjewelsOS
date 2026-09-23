@@ -1,6 +1,6 @@
 // Reconciles Supabase Auth and user profiles with an approved employee sheet.
 //
-//   node scripts/reconcile-employee-roster.mjs --dry-run|--apply <roster.tsv> [--report <file>]
+//   node scripts/reconcile-employee-roster.mjs --dry-run|--apply <roster.tsv> [--report <file>] [--payload <file>]
 //
 // The sheet is the HR export pasted as tab-separated text: EMPLOYEE NAME,
 // BRANCH, DEPARTMENT, DESIGNATION, PERSONAL MOBILE, OFFICIAL MOBILE, PERSONAL
@@ -96,9 +96,11 @@ function matchRoster(rows, profiles) {
 }
 
 async function main() {
-  const [mode, file, reportFlag, reportFile] = process.argv.slice(2);
-  if (!file || !["--dry-run", "--apply"].includes(mode) || (reportFlag && (reportFlag !== "--report" || !reportFile))) {
-    throw new Error("Usage: node scripts/reconcile-employee-roster.mjs --dry-run|--apply <roster.tsv> [--report <file>]");
+  const [mode, file, ...options] = process.argv.slice(2);
+  const option = (name) => { const at = options.indexOf(name); return at >= 0 ? options[at + 1] : undefined; };
+  const reportFile = option("--report"); const payloadFile = option("--payload");
+  if (!file || !["--dry-run", "--apply"].includes(mode) || options.length % 2 || options.some((value, at) => at % 2 === 0 && !["--report", "--payload"].includes(value))) {
+    throw new Error("Usage: node scripts/reconcile-employee-roster.mjs --dry-run|--apply <roster.tsv> [--report <file>] [--payload <file>]");
   }
   const { url, key } = loadCredentials();
   const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -142,6 +144,18 @@ async function main() {
     ];
     writeFileSync(reportFile, `${lines.join("\n")}\n`);
   }
+  // The exact RPC arguments, so the database step can be rehearsed in a
+  // rolled-back transaction. New employees join only once they exist.
+  const reconcilePayload = () => ({
+    p_roster: [...matches].map(([row, profile]) => ({
+      profile_id: profile.id, employee_name: row.employeeName, first_name: row.firstName, last_name: row.lastName, username: row.username,
+      work_email: row.workEmail, personal_email: row.personalEmail, personal_mobile: row.personalMobile, official_mobile: row.officialMobile,
+      branch: row.branch, department: row.department, designation: row.designation, week_off: row.weekOff, access_level: row.level,
+      employee_code: row.employeeCode,
+    })),
+    p_retire: retire.map(({ profile, mergeInto }) => ({ profile_id: profile.id, merge_into_profile_id: mergeInto?.id ?? null })),
+  });
+  if (payloadFile) writeFileSync(payloadFile, JSON.stringify(reconcilePayload()));
   if (mode === "--dry-run") { console.log(JSON.stringify(summary)); return; }
 
   // 1. New employees go through the same audited creation contract as the
@@ -184,15 +198,7 @@ async function main() {
   }
 
   // 3. Profiles, duplicates and leavers in one audited transaction.
-  const { data: result, error: reconcileError } = await db.rpc("reconcile_employee_roster_with_audit", {
-    p_roster: [...matches].map(([row, profile]) => ({
-      profile_id: profile.id, employee_name: row.employeeName, first_name: row.firstName, last_name: row.lastName, username: row.username,
-      work_email: row.workEmail, personal_email: row.personalEmail, personal_mobile: row.personalMobile, official_mobile: row.officialMobile,
-      branch: row.branch, department: row.department, designation: row.designation, week_off: row.weekOff, access_level: row.level,
-      employee_code: row.employeeCode,
-    })),
-    p_retire: retire.map(({ profile, mergeInto }) => ({ profile_id: profile.id, merge_into_profile_id: mergeInto?.id ?? null })),
-  });
+  const { data: result, error: reconcileError } = await db.rpc("reconcile_employee_roster_with_audit", reconcilePayload());
   if (reconcileError || !result) throw new Error(`Profile reconciliation failed after Auth email changes; rerun to complete. ${reconcileError?.message ?? ""}`);
 
   // 4. Passwords, only after every login identity is final.

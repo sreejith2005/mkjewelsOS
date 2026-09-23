@@ -1,5 +1,5 @@
 begin;
-select plan(17);
+select plan(18);
 
 select has_function('public','reconcile_employee_roster_with_audit',array['jsonb','jsonb'],'roster reconciliation is one database contract');
 select ok(has_function_privilege('service_role','reconcile_employee_roster_with_audit(jsonb,jsonb)','EXECUTE')
@@ -12,7 +12,8 @@ select ('16700000-0000-4000-8000-00000000000'||n)::uuid,'authenticated','authent
 from generate_series(1,7) n;
 insert into public.tenants(id,name,slug) values('16710000-0000-4000-8000-000000000001','Roster 167','roster-167');
 insert into public.branches(id,tenant_id,name,code) values('16720000-0000-4000-8000-000000000001','16710000-0000-4000-8000-000000000001','ROSTER BRANCH 167','R167');
-insert into public.departments(id,tenant_id,branch_id,name,code) values('16730000-0000-4000-8000-000000000001','16710000-0000-4000-8000-000000000001',null,'ROSTER DEPT 167','D167');
+insert into public.departments(id,tenant_id,branch_id,name,code) values('16730000-0000-4000-8000-000000000001','16710000-0000-4000-8000-000000000001',null,'ROSTER DEPT 167','D167'),
+  ('16730000-0000-4000-8000-000000000002','16710000-0000-4000-8000-000000000001',null,'ROSTER DEPT 167B','D167B');
 -- 1 super admin (earliest, the system actor), 2 kept, 3 duplicate of 2,
 -- 4 leaver, 5 reports to duplicate, 6 reports to and buddies with leaver,
 -- 7 leaver without links.
@@ -26,11 +27,17 @@ insert into public.dropdown_masters(tenant_id,master_type,label,value,sort_order
 values('16710000-0000-4000-8000-000000000001','designation','ROSTER ROLE 167','roster_role_167',1,'16740000-0000-4000-8000-000000000001');
 update public.user_profiles set reports_to_user_id='16740000-0000-4000-8000-000000000003' where id='16740000-0000-4000-8000-000000000005';
 update public.user_profiles set reports_to_user_id='16740000-0000-4000-8000-000000000004',buddy_id='16740000-0000-4000-8000-000000000004' where id='16740000-0000-4000-8000-000000000006';
+-- The kept employee moves department with buddy 5 (listed later in the roster)
+-- while buddy 6 stays behind: the production buddy-scope failure.
+update public.user_profiles set buddy_id='16740000-0000-4000-8000-000000000005',secondary_buddy_id='16740000-0000-4000-8000-000000000006' where id='16740000-0000-4000-8000-000000000002';
 
 create function pg_temp.roster() returns jsonb language sql as $$
   select jsonb_build_array(jsonb_build_object('profile_id','16740000-0000-4000-8000-000000000002','employee_name','KEEP PERSON','first_name','KEEP','last_name','PERSON',
     'username','keepperson167','work_email','keep-167@example.invalid','personal_email','','personal_mobile','9876543210','official_mobile','',
-    'branch','roster branch 167','department','ROSTER DEPT 167','designation','roster role 167','week_off',jsonb_build_array(lower(to_char(now() at time zone 'Asia/Kolkata','FMDay'))),'access_level','USER','employee_code','167'))
+    'branch','roster branch 167','department','ROSTER DEPT 167B','designation','roster role 167','week_off',jsonb_build_array(lower(to_char(now() at time zone 'Asia/Kolkata','FMDay'))),'access_level','USER','employee_code','167'),
+    jsonb_build_object('profile_id','16740000-0000-4000-8000-000000000005','employee_name','REPORT ONE','first_name','REPORT','last_name','ONE',
+    'username','reportone167','work_email','report-167@example.invalid','personal_email','','personal_mobile','','official_mobile','',
+    'branch','ROSTER BRANCH 167','department','ROSTER DEPT 167B','designation','ROSTER ROLE 167','week_off','[]'::jsonb,'access_level','USER','employee_code',''))
 $$;
 create function pg_temp.retire() returns jsonb language sql as $$
   select jsonb_build_array(
@@ -56,7 +63,7 @@ select throws_ok($$select public.reconcile_employee_roster_with_audit(pg_temp.ro
 create temp table result_167 as select public.reconcile_employee_roster_with_audit(pg_temp.roster(),pg_temp.retire()) as r;
 reset role;
 
-select is((select (r->>'updated')::int from result_167),1,'one roster profile is written');
+select is((select (r->>'updated')::int from result_167),2,'both roster profiles are written');
 select is((select (r->>'retired')::int from result_167),3,'duplicate and leavers are retired');
 select results_eq($$select username,email,official_email,employee_code,personal_mobile,week_off,account_status::text,is_login_enabled from public.user_profiles where id='16740000-0000-4000-8000-000000000002'$$,
   $$values ('keepperson167'::text,'keep-167@example.invalid'::text,'keep-167@example.invalid'::text,'167'::text,'9876543210'::text,array[lower(to_char(now() at time zone 'Asia/Kolkata','FMDay'))]::text[],'active'::text,true)$$,
@@ -67,7 +74,9 @@ select is((select count(*)::int from public.user_profiles where id in ('16740000
 select is((select user_role::text from public.user_profiles where id='16740000-0000-4000-8000-000000000001'),'super_admin','the Super Admin is untouched');
 select ok((select r->'deletable' @> jsonb_build_array(jsonb_build_object('profile_id','16740000-0000-4000-8000-000000000003')) and r->'deletable' @> jsonb_build_array(jsonb_build_object('profile_id','16740000-0000-4000-8000-000000000007')) from result_167),'unlinked duplicate and leaver are reported as deletable');
 select ok((select not (r->'deletable' @> jsonb_build_array(jsonb_build_object('profile_id','16740000-0000-4000-8000-000000000004'))) from result_167),'a leaver with organisation history is kept');
-select is((select count(*)::int from public.audit_logs where tenant_id='16710000-0000-4000-8000-000000000001' and action in ('employee_roster_reconciled','roster_duplicate_retired','roster_employee_retired','roster_duplicate_links_merged','roster_leaver_links_cleared')),6,'every change is audited');
+select is((select count(*)::int from public.audit_logs where tenant_id='16710000-0000-4000-8000-000000000001' and action in ('employee_roster_reconciled','roster_duplicate_retired','roster_employee_retired','roster_duplicate_links_merged','roster_leaver_links_cleared','roster_buddy_link_cleared')),8,'every change is audited');
+select results_eq($$select buddy_id,secondary_buddy_id from public.user_profiles where id='16740000-0000-4000-8000-000000000002'$$,
+  $$values ('16740000-0000-4000-8000-000000000005'::uuid,null::uuid)$$,'a buddy moving with the employee is kept regardless of row order, one left behind is dropped');
 
 select ok(exists(select 1 from public.user_availability where user_profile_id='16740000-0000-4000-8000-000000000002' and date=(now() at time zone 'Asia/Kolkata')::date and source='weekly_off'),'a week off falling today is materialised by the Super Admin actor, as in the app');
 
