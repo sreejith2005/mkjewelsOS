@@ -33,7 +33,9 @@ function toDateTimeLocal(iso: string): string {
 }
 
 function TaskSelector({ children, id, open, panel }: { children: ReactNode; id: Exclude<Panel, null>; open: boolean; panel: ReactNode }) {
-  return <div className="min-w-0" data-testid={`task-selector-${id}`}>
+  // An open panel takes the whole row: squeezed into a half-width grid cell, the
+  // people picker clipped its search field and names at phone width.
+  return <div className={cn("min-w-0", open && "col-span-2")} data-testid={`task-selector-${id}`}>
     {children}
     {open ? <div className="mt-2 max-h-[min(26rem,50dvh)] overflow-y-auto rounded-xl border border-task-border bg-task-muted p-3" data-testid={`task-panel-${id}`}>{panel}</div> : null}
   </div>;
@@ -187,7 +189,7 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
   const duePanel = <label><span className="mb-1 block text-xs font-semibold text-task-text">Due date and time</span><input className="task-field" min={new Date().toISOString().slice(0, 16)} onChange={(event) => { setPlanned(event.target.value); setPanel(null); }} type="datetime-local" value={planned} /></label>;
   const priorityPanel = <fieldset className="grid grid-cols-3 gap-2"><legend className="sr-only">Priority</legend>{priorityOptions.map((option) => <button className={cn("min-h-11 rounded-lg border text-sm", priority === option.value ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border text-task-text-muted")} key={option.id} onClick={() => { setPriority(option.value); setPanel(null); }} type="button">{priority === option.value ? <Check className="mr-1 inline size-4" /> : null}{option.label}</button>)}</fieldset>;
   const formPanel = <div><label><span className="mb-1 block text-xs font-semibold text-task-text">Required form</span><select className="task-field" onChange={(event) => { setFormTemplateId(event.target.value); setPanel(null); }} value={formTemplateId}><option value="">No form required</option>{data.forms.map((form) => <option key={form.id} value={form.id}>{form.name}</option>)}</select></label><p className="mt-2 text-xs text-task-text-muted">The selected form must be completed before this task can be finished.</p></div>;
-  const watchersPanel = <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} disabledIds={doers} label="In Loop · read only" multiple onChange={(nextWatchers) => { setWatchers(nextWatchers); setPanel(null); }} people={eligiblePeople.flatMap((person) => person.id ? [{ ...person, id: person.id }] : [])} selectedIds={watchers} />;
+  const watchersPanel = <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} disabledIds={doers} label="In Loop · read only" multiple onChange={setWatchers} people={eligiblePeople.flatMap((person) => person.id ? [{ ...person, id: person.id }] : [])} selectedIds={watchers} />;
 
   return (
     <Modal onClose={onClose} title="Assign New Task" tone="light" wide>

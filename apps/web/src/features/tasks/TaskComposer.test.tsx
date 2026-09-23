@@ -81,6 +81,19 @@ describe("TaskComposer selector panels", () => {
     });
   });
 
+  it("gives an open people picker the full row and keeps In Loop open for several picks", () => {
+    renderComposer();
+
+    fireEvent.click(screen.getByRole("button", { name: /Users/i }));
+    expect(screen.getByTestId("task-selector-users").className).toContain("col-span-2");
+    expect(screen.getByTestId("task-selector-due").className).not.toContain("col-span-2");
+
+    fireEvent.click(screen.getByRole("button", { name: /In Loop/i }));
+    expect(screen.getByLabelText("Search in loop · read only")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Teammate"));
+    expect(screen.getByTestId("task-panel-watchers")).toBeTruthy();
+  });
+
   it("does not expose recurrence authoring in manual Tasks", () => {
     renderComposer();
     expect(screen.queryByLabelText("Repeat")).toBeNull();
