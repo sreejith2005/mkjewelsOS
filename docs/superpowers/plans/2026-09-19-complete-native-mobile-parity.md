@@ -482,9 +482,11 @@ Expected: all commands exit 0 with exact counts recorded.
 
 Use local Supabase reset, focused and full pgTAP, and local lint. Do not run a linked push without a separate approved release action.
 
-- [ ] **Step 3: Produce release through the maintained script**
+- [x] **Step 3: Produce release through the maintained script**
 
 Increment `versionCode`/version, then use `scripts/release-mobile.ps1`. Do not hand-roll the release or expose keystore properties. Verify APK contains `assets/index.android.bundle`, application ID is `com.jewelos.mobile`, and signature/certificate matches the established release key.
+
+Completed 2026-09-23: `mobile-v1.0.2` / `versionCode` 3 was built, signed, tagged and published by the maintained script. The public manifest, APK hash, embedded bundle, package identity and established MK Jewels release certificate were independently rechecked after publication.
 
 - [ ] **Step 4: Install and run standalone**
 
@@ -494,7 +496,7 @@ Confirm `adb devices -l`, install with `adb install -r` when signatures match or
 
 For representative ordinary, Manager/Process Coordinator, Admin, and Super Admin accounts, verify every permitted section, Create Task/manual/voice/import, completion/forms/FMS deep links, CRM, administration, denied routes, theme, back behavior, background/resume, upload, and sign-out. Use only synthetic or approved test records and remove them through normal audited operations.
 
-- [x] **Step 6: Record automated evidence and commit** (release/device evidence remains blocked by Steps 3–5)
+- [x] **Step 6: Record automated and release evidence and commit** (device evidence remains blocked by Steps 4–5)
 
 Document exact APK/manifest paths, version, hash, signature fingerprint, commands, test counts, device/build identity, walkthrough results, and any external blocker. Keep automated, local database, hosted, Git, release, and device evidence separate.
 

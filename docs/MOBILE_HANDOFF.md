@@ -1113,7 +1113,7 @@ The route-by-route evidence and remaining device-only checks are recorded in
 @jewelos/core test      50 files, 549 tests passed
 @jewelos/data test      12 files,  80 tests passed
 web test                66 files, 326 tests passed
-mobile test             13 files,  79 tests passed
+mobile test             16 files,  92 tests passed (released main recheck 2026-09-23)
 turbo typecheck          5/5 packages passed
 mobile typecheck         passed
 web production build     passed
@@ -1121,11 +1121,21 @@ Expo Android export      passed, 3,644 modules, 8.9 MB Hermes bundle
 git diff --check         passed for every committed tranche
 ```
 
-The Expo export used non-secret placeholder client values because this isolated
-worktree intentionally has no `apps/mobile/.env`; it proves bundling, not a
-production connection. The standard signed release script was not run because
-releases are restricted to `main`, this work is intentionally isolated on
-`feat/complete-native-parity`, and its production `.env` is absent. `adb devices
--l` reported no connected device. Consequently there is no signed APK,
-installation, runtime log, authenticated role walkthrough, hosted deployment,
-or production verification from this branch yet.
+The initial Expo export used non-secret placeholder client values in the
+isolated worktree, so that export proved bundling rather than a production
+connection. After integration into `main`, the maintained release workflow ran
+against the production mobile environment and published signed release
+`mobile-v1.0.2` (`versionCode` 3) on 2026-09-23. Independent verification found
+package `com.jewelos.mobile`, the MK Jewels release certificate, a 43,367,411
+byte APK, and SHA-256
+`67030c98a2c0a7ea354fabc03adc73121a54aa0564262424815a907ee0dc5638` in both
+the local archive and the public `latest.json`. The release tag resolves to
+commit `6cfabe903cab7d58cb97037ded7062156f62d484`, matching `main` and
+`origin/main` at publication time.
+
+`adb devices -l` still reported no connected device on 2026-09-23. The signed
+artifact, public update discovery, package identity, version and signature are
+therefore verified, but installation, Metro-free runtime logs, and the
+role-by-role authenticated phone walkthrough remain device-only evidence. No
+hosted Supabase schema/function change or web deployment was part of this
+parity release.
