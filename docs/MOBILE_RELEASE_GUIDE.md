@@ -350,7 +350,15 @@ Invoke-RestMethod https://github.com/sreejith2005/mkjewelsOS/releases/latest/dow
 
 ## 9. Instructions for AI agents (new chats)
 
-When asked to "publish", "release", "ship", or "update the app":
+The user's standing instruction is to publish each completed mobile-affecting
+change through this procedure, including work started in a new chat. A separate
+"publish" request is not needed once the implementation and required gates pass.
+Do not release documentation-only edits. If a gate fails, stop and report it;
+never publish an unverified build. Use the same permanent APK link in §0 for
+every version. A `-Mandatory` update still needs explicit user approval.
+
+When handling a mobile-affecting change or asked to "publish", "release",
+"ship", or "update the app":
 
 1. Read `AGENTS.md` and this guide. Run `git status --short --branch`.
 2. Make sure the requested changes are committed. Never commit another
@@ -359,8 +367,8 @@ When asked to "publish", "release", "ship", or "update the app":
    long timeout or background execution: the build takes 20–40 min. Do **not**
    hand-roll Gradle builds, bump versions manually, or create GitHub releases
    by hand, except for the recovery steps in §4.
-4. Report the version, versionCode, release URL, and the manifest check result.
-   Remind the user to push `main`.
+4. Push the release commit to `origin/main`, verify `HEAD == origin/main`, then
+   report the version, versionCode, release URL, and manifest check result.
 5. Ask the user before using `-Mandatory`. It interrupts every employee.
 6. Do not change: the package id, the signing setup, the manifest URL or asset
    names (`JewelOS.apk`, `latest.json`), the `mobile-v<version>` tag format,

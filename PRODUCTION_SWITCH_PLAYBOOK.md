@@ -10,7 +10,7 @@ hosted environment. Read `AGENTS.md` and `PROJECT_HANDOFF.md` first.
 
 The only deployable repository is:
 
-`C:\Users\MIS\Downloads\MKJewelOS\jewelos`
+`C:\Users\MIS\Downloads\MKJewelOS`
 
 Retired prototype/Base44 projects are not release inputs or targets. Do not
 build, publish, deploy, or import from them.
@@ -78,7 +78,7 @@ Follow `LOCAL_DEVELOPMENT.md` for local variables and synthetic users. Typical
 local database startup is:
 
 ```powershell
-Set-Location 'C:\Users\MIS\Downloads\MKJewelOS\jewelos'
+Set-Location 'C:\Users\MIS\Downloads\MKJewelOS'
 supabase.cmd start
 supabase.cmd db reset
 pnpm.cmd seed:local

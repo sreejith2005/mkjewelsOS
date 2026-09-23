@@ -5,9 +5,9 @@ publishing anything in this repository.
 
 ## Repository authority
 
-The only JewelOS implementation is this nested repository:
+The only JewelOS implementation is this repository:
 
-`C:\Users\MIS\Downloads\MKJewelOS\jewelos`
+`C:\Users\MIS\Downloads\MKJewelOS`
 
 Run Git, pnpm, Supabase, and file operations from that directory. Confirm the
 Git root with `git rev-parse --show-toplevel` before any commit or publish.
@@ -128,7 +128,7 @@ active conflicting account.
 3. Search current source, migrations, tests, and call sites before changing an
    interface. Do not guess a database/RPC contract from UI code alone.
 4. Use `pnpm.cmd` and `supabase.cmd` on this Windows host. PowerShell `.ps1`
-   shims may be blocked. Run commands from this nested repository.
+   shims may be blocked. Run commands from this repository root.
 5. Make the smallest scoped change. Do not build adjacent modules merely
    because their tables or menus already exist.
 6. For migrations and edge functions, test unauthenticated, inactive,
@@ -185,6 +185,20 @@ only with `scripts/release-mobile.ps1`. It publishes the signed APK and the
 `latest.json` update manifest that installed apps poll. Never hand-roll a
 release, reuse a `versionCode`, or publish a non-mobile GitHub release as
 "latest" in this repository.
+
+**Standing user release instruction (2026-09-23):** After completing an
+authorized change that affects the employee Android app (`apps/mobile/**` or
+mobile-consumed shared code/configuration), run the required checks, commit the
+reviewed paths, publish the next signed Android update with
+`scripts/release-mobile.ps1`, push its release commit to `origin/main`, and
+verify the public `latest.json` and APK asset. Do this as part of the task,
+including in new chats, without asking again for routine release approval.
+Stop and report if a required gate fails; do not publish an unverified APK.
+For web changes, check native parity and include any needed native work before
+the release. Documentation-only edits do not require a new APK. `-Mandatory`
+still requires explicit user approval because it blocks employees until they
+update. The permanent employee download link is
+`https://github.com/sreejith2005/mkjewelsOS/releases/latest/download/JewelOS.apk`.
 
 ## Regression-Safe Development Rules
 

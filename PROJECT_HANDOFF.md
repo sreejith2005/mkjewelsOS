@@ -11,7 +11,7 @@ environment.
 
 ## 1. Authority and truth boundaries
 
-Work only in `C:\Users\MIS\Downloads\MKJewelOS\jewelos`. Read `AGENTS.md`,
+Work only in `C:\Users\MIS\Downloads\MKJewelOS`. Read `AGENTS.md`,
 then this document, before changing the product.
 
 The retired prototype/Base44 projects are not part of the current development
