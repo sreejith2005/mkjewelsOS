@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { initialImportSession, reduceImportSession } from "./importSession";
+import { initialImportSession, reduceImportSession, taskImportResumeOffset } from "./importSession";
 
 describe("native task import session", () => {
   it("moves from file selection to review without retaining raw bytes", () => {
@@ -29,6 +29,55 @@ describe("native task import session", () => {
       processed: 100,
       error: "Connection lost",
     });
+  });
+
+  it("resets progress when a corrected import starts a different batch", () => {
+    const completed = {
+      ...initialImportSession,
+      stage: "result" as const,
+      total: 4,
+      processed: 4,
+      batchId: "old-batch",
+    };
+
+    expect(reduceImportSession(completed, {
+      type: "progress",
+      processed: 0,
+      batchId: "corrected-batch",
+    })).toMatchObject({
+      processed: 0,
+      batchId: "corrected-batch",
+    });
+  });
+
+  it("keeps progress monotonic while resuming the same batch", () => {
+    const interrupted = {
+      ...initialImportSession,
+      stage: "review" as const,
+      total: 205,
+      processed: 100,
+      batchId: "batch-1",
+    };
+
+    expect(reduceImportSession(interrupted, {
+      type: "progress",
+      processed: 50,
+      batchId: "batch-1",
+    })).toMatchObject({
+      processed: 100,
+      batchId: "batch-1",
+    });
+  });
+
+  it("resumes only the batch that owns the saved cursor", () => {
+    const interrupted = {
+      ...initialImportSession,
+      processed: 100,
+      batchId: "batch-1",
+    };
+
+    expect(taskImportResumeOffset(interrupted, "batch-1")).toBe(100);
+    expect(taskImportResumeOffset(interrupted, "corrected-batch")).toBe(0);
   });
 
   it("describes idempotent replay without reporting new work", () => {

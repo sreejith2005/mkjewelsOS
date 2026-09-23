@@ -48,7 +48,7 @@ import { OptionPicker } from "@/ui/OptionPicker";
 import { Screen } from "@/ui/Screen";
 import { Banner, EmptyState, ErrorState } from "@/ui/states";
 import { Text } from "@/ui/Text";
-import { initialImportSession, reduceImportSession } from "@/features/taskImport/importSession";
+import { initialImportSession, reduceImportSession, taskImportResumeOffset } from "@/features/taskImport/importSession";
 import {
   taskImportActionLabel,
   taskImportBlockedReminder,
@@ -236,16 +236,17 @@ export function TaskImportScreen() {
       for (const chunk of chunkTaskImportRows(readyRows)) await reconcileTaskImportAssignments(chunk);
       const hash = await sha256(JSON.stringify(readyRows));
       const started = await beginCurrentSheetTaskImport(hash, session.fileLabel || "task-import.csv", readyRows.length);
-      dispatch({ type: "progress", processed: session.processed, batchId: started.batch_id });
+      const resumeOffset = taskImportResumeOffset(session, started.batch_id);
+      dispatch({ type: "progress", processed: resumeOffset, batchId: started.batch_id });
       if (started.replayed && started.outcome !== "in_progress" && started.outcome !== "partial") {
         dispatch({ type: "complete", message: `This file was already imported. No duplicate tasks were created.${blockedReminder}` });
       } else {
-        const remaining = readyRows.slice(session.processed);
+        const remaining = readyRows.slice(resumeOffset);
         const outcome = await runTaskImportChunks(
           started.batch_id,
           remaining,
           (batchId, rows) => commitCurrentSheetTaskImportChunk(batchId, rows as typeof readyRows),
-          (processed) => dispatch({ type: "progress", processed: session.processed + processed, batchId: started.batch_id }),
+          (processed) => dispatch({ type: "progress", processed: resumeOffset + processed, batchId: started.batch_id }),
         );
         dispatch({ type: "complete", message: `${taskImportOutcomeMessage(outcome).text}${blockedReminder}` });
       }

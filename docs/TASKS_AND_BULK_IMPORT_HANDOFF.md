@@ -116,7 +116,7 @@ issues under the shared defaults. A synthetic mixed file proved that one valid
 row remains importable while one unsupported-frequency row is held back.
 
 Fresh local verification passed the full core suite (699 tests), web suite
-(353 tests), native suite (89 tests), focused task-import pgTAP tests (38 tests
+(353 tests), native suite (92 tests), focused task-import pgTAP tests (38 tests
 across three files), forced monorepo typecheck and production build, and a clean
 Android Expo export (3,650 modules). This remains local evidence: no hosted
 migration or deployment was required or performed, and no authenticated

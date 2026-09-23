@@ -35,6 +35,10 @@ export const initialImportSession: ImportSession = {
   error: null,
 };
 
+export function taskImportResumeOffset(session: ImportSession, batchId: string): number {
+  return session.batchId === batchId ? session.processed : 0;
+}
+
 export function reduceImportSession(state: ImportSession, event: ImportSessionEvent): ImportSession {
   if (event.type === "reset") return initialImportSession;
   if (event.type === "selected") return {
@@ -55,7 +59,12 @@ export function reduceImportSession(state: ImportSession, event: ImportSessionEv
   if (event.type === "run") return { ...state, stage: "run", error: null, batchId: event.batchId ?? state.batchId };
   if (event.type === "progress") return {
     ...state,
-    processed: Math.min(state.total, Math.max(state.processed, event.processed)),
+    processed: Math.min(
+      state.total,
+      event.batchId && event.batchId !== state.batchId
+        ? Math.max(0, event.processed)
+        : Math.max(state.processed, event.processed),
+    ),
     batchId: event.batchId ?? state.batchId,
   };
   if (event.type === "failed") return { ...state, stage: "review", error: event.message, rawBytesHeld: false };
