@@ -14,4 +14,14 @@ describe("Employee Directory account administration", () => {
     );
     expect(editorSource).toContain("Delete user");
   });
+
+  it("hides former employees by default through the shared core rule", async () => {
+    const source = await import("./TeamDirectoryPage?raw").then(
+      (module) => module.default,
+    );
+
+    expect(source).toContain("useState(false); const [showFormer");
+    expect(source).toContain("(showFormer || !isFormerEmployee(employee))");
+    expect(source).toContain("Show former employees");
+  });
 });

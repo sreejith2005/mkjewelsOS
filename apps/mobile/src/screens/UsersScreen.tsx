@@ -4,6 +4,7 @@ import {
   ADMIN_SET_PASSWORD_LENGTH,
   eligibleBuddies,
   hasPermission,
+  isFormerEmployee,
   USER_ROLES,
   validateAdminSetPassword,
   type Json,
@@ -84,11 +85,15 @@ export function UsersScreen() {
       (item) =>
         (!branchFilter || item.branch_id === branchFilter) &&
         (!departmentFilter || item.department_id === departmentFilter) &&
+        // Former employees keep their profile for history; they appear only
+        // when the Left status is chosen.
+        (statusFilter === "left" || !isFormerEmployee(item)) &&
         (!statusFilter || item.account_status === statusFilter) &&
         (!needle || `${item.employee_name} ${item.employee_code} ${item.email}`.toLowerCase().includes(needle)),
     );
   }, [branchFilter, data, departmentFilter, search, statusFilter]);
 
+  const formerCount = useMemo(() => (data?.profiles ?? []).filter(isFormerEmployee).length, [data]);
   const branchNames = useMemo(() => new Map((data?.branches ?? []).map((item) => [item.id, item.name])), [data]);
   const departmentNames = useMemo(() => new Map((data?.departments ?? []).map((item) => [item.id, item.name])), [data]);
   const designationNames = useMemo(() => new Map((data?.designations ?? []).map((item) => [item.id, item.label])), [data]);
@@ -126,7 +131,8 @@ export function UsersScreen() {
           <View style={styles.heading}>
             <Text tone="primary" variant="heading" weight="semibold">Employee Directory</Text>
             <Text tone="muted" variant="small">{visible.length} people - organised by branch and department.</Text>
-            <StatusBadge label={`${data.profiles.length} employees`} tone="primary" />
+            <StatusBadge label={`${data.profiles.length - formerCount} employees`} tone="primary" />
+            {formerCount > 0 && statusFilter !== "left" ? <Text tone="muted" variant="small">{formerCount} former employees hidden - choose Left in Filter status to see them.</Text> : null}
           </View>
           {canManage ? <Button label="Add user" onPress={() => setInviting(true)} /> : null}
           <SegmentedControl accessibilityLabel="Employee directory view" options={[{ value: "list", label: "List" }, { value: "organization", label: "Organization" }]} value={view} onChange={setView} />

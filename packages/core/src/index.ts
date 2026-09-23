@@ -101,6 +101,7 @@ export {
   validateAdminSetPassword,
 } from "./userCredentials";
 export { eligibleBuddies, type BuddyCandidate, type BuddyScope } from "./buddyEligibility";
+export { isFormerEmployee, type EmploymentState } from "./formerEmployees";
 export * from "./forms";
 export * from "./fms";
 export * from "./notifications";
