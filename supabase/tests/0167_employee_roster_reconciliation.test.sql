@@ -1,5 +1,5 @@
 begin;
-select plan(15);
+select plan(17);
 
 select has_function('public','reconcile_employee_roster_with_audit',array['jsonb','jsonb'],'roster reconciliation is one database contract');
 select ok(has_function_privilege('service_role','reconcile_employee_roster_with_audit(jsonb,jsonb)','EXECUTE')
@@ -30,7 +30,7 @@ update public.user_profiles set reports_to_user_id='16740000-0000-4000-8000-0000
 create function pg_temp.roster() returns jsonb language sql as $$
   select jsonb_build_array(jsonb_build_object('profile_id','16740000-0000-4000-8000-000000000002','employee_name','KEEP PERSON','first_name','KEEP','last_name','PERSON',
     'username','keepperson167','work_email','keep-167@example.invalid','personal_email','','personal_mobile','9876543210','official_mobile','',
-    'branch','roster branch 167','department','ROSTER DEPT 167','designation','roster role 167','week_off',jsonb_build_array('friday'),'access_level','USER','employee_code','167'))
+    'branch','roster branch 167','department','ROSTER DEPT 167','designation','roster role 167','week_off',jsonb_build_array(lower(to_char(now() at time zone 'Asia/Kolkata','FMDay'))),'access_level','USER','employee_code','167'))
 $$;
 create function pg_temp.retire() returns jsonb language sql as $$
   select jsonb_build_array(
@@ -49,6 +49,9 @@ select throws_ok($$select public.reconcile_employee_roster_with_audit(pg_temp.ro
 reset role;
 set local role service_role;
 select set_config('request.jwt.claim.role','service_role',true);
+-- Like the operator script, the service caller has no signed-in user.
+select set_config('request.jwt.claim.sub','',true);
+select throws_ok($$update public.user_profiles set week_off=array[lower(to_char(now() at time zone 'Asia/Kolkata','FMDay'))] where id='16740000-0000-4000-8000-000000000006'$$,'42501',null,'a week off falling today needs an administrator actor (the production failure)');
 select throws_ok($$select public.reconcile_employee_roster_with_audit(pg_temp.roster(),jsonb_build_array(jsonb_build_object('profile_id','16740000-0000-4000-8000-000000000001')))$$,'22023',null,'the system Super Admin cannot be retired');
 create temp table result_167 as select public.reconcile_employee_roster_with_audit(pg_temp.roster(),pg_temp.retire()) as r;
 reset role;
@@ -56,7 +59,7 @@ reset role;
 select is((select (r->>'updated')::int from result_167),1,'one roster profile is written');
 select is((select (r->>'retired')::int from result_167),3,'duplicate and leavers are retired');
 select results_eq($$select username,email,official_email,employee_code,personal_mobile,week_off,account_status::text,is_login_enabled from public.user_profiles where id='16740000-0000-4000-8000-000000000002'$$,
-  $$values ('keepperson167'::text,'keep-167@example.invalid'::text,'keep-167@example.invalid'::text,'167'::text,'9876543210'::text,array['friday']::text[],'active'::text,true)$$,
+  $$values ('keepperson167'::text,'keep-167@example.invalid'::text,'keep-167@example.invalid'::text,'167'::text,'9876543210'::text,array[lower(to_char(now() at time zone 'Asia/Kolkata','FMDay'))]::text[],'active'::text,true)$$,
   'the kept profile takes the approved identity, including the username the duplicate released');
 select is((select reports_to_user_id from public.user_profiles where id='16740000-0000-4000-8000-000000000005'),'16740000-0000-4000-8000-000000000002'::uuid,'reports of a duplicate move to the kept profile');
 select results_eq($$select reports_to_user_id,buddy_id from public.user_profiles where id='16740000-0000-4000-8000-000000000006'$$,$$values (null::uuid,null::uuid)$$,'links to a leaver are cleared');
@@ -65,6 +68,8 @@ select is((select user_role::text from public.user_profiles where id='16740000-0
 select ok((select r->'deletable' @> jsonb_build_array(jsonb_build_object('profile_id','16740000-0000-4000-8000-000000000003')) and r->'deletable' @> jsonb_build_array(jsonb_build_object('profile_id','16740000-0000-4000-8000-000000000007')) from result_167),'unlinked duplicate and leaver are reported as deletable');
 select ok((select not (r->'deletable' @> jsonb_build_array(jsonb_build_object('profile_id','16740000-0000-4000-8000-000000000004'))) from result_167),'a leaver with organisation history is kept');
 select is((select count(*)::int from public.audit_logs where tenant_id='16710000-0000-4000-8000-000000000001' and action in ('employee_roster_reconciled','roster_duplicate_retired','roster_employee_retired','roster_duplicate_links_merged','roster_leaver_links_cleared')),6,'every change is audited');
+
+select ok(exists(select 1 from public.user_availability where user_profile_id='16740000-0000-4000-8000-000000000002' and date=(now() at time zone 'Asia/Kolkata')::date and source='weekly_off'),'a week off falling today is materialised by the Super Admin actor, as in the app');
 
 select * from finish();
 rollback;
