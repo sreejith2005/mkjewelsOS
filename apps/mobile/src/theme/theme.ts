@@ -1,18 +1,11 @@
 import { fontSize, radius, space, themes, touchTarget, type ThemeName, type ThemePalette } from "@jewelos/ui-tokens";
+import { withAlpha } from "./color";
 
 export type { ThemeName, ThemePalette };
 
 /** Matches the web app, where light is the default and dark is opt-in. */
 export const DEFAULT_THEME: ThemeName = "light";
 
-/** `#RRGGBB` plus an alpha as `rgba()`; React Native has no colour-mix function. */
-function withAlpha(hex: string, alpha: number): string {
-  const value = hex.replace("#", "");
-  const r = Number.parseInt(value.slice(0, 2), 16);
-  const g = Number.parseInt(value.slice(2, 4), 16);
-  const b = Number.parseInt(value.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
 
 /**
  * A resolved theme, built from the palette the web app actually uses.

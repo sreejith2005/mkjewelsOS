@@ -31,3 +31,8 @@ export function filterNotificationInbox<T extends NotificationInboxItem>(
 export function notificationDestination(link: string | null): string | null {
   return isSafeInternalLink(link) ? link : null;
 }
+
+/** The count drawn on the notification bell; anything past 99 reads "99+". */
+export function unreadBadge(count: number): string {
+  return count > 99 ? "99+" : String(count);
+}

@@ -1,12 +1,13 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Linking, RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { deriveCrmCapability } from "@jewelos/core";
 import { loadClient, loadCrmOptions, removeDocument, signedDocumentUrl, uploadCrmDocument } from "@jewelos/data/crm/api";
+import { mapTimeline } from "@jewelos/data/crm/viewModel";
 import { useAuth } from "@/auth/AuthProvider";
 import { ClientActionSheet } from "@/features/crm/ClientActionSheets";
-import { formatDate, formatDateTime, titleCase } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
 import { pickFileFromChooser } from "@/lib/pickFile";
 import { useAsyncData } from "@/lib/useAsyncData";
 import { makeStyles } from "@/theme/makeStyles";
@@ -17,7 +18,7 @@ import { PromptSheet } from "@/ui/PromptSheet";
 import { Screen } from "@/ui/Screen";
 import { SegmentedControl } from "@/ui/SegmentedControl";
 import { Text } from "@/ui/Text";
-import { EmptyState, ErrorState, LoadingState } from "@/ui/states";
+import { Banner, EmptyState, ErrorState, LoadingState } from "@/ui/states";
 import type { RootStackParamList } from "@/navigation/types";
 
 type Route = RouteProp<RootStackParamList, "ClientDetail">;
@@ -40,6 +41,7 @@ export function ClientDetailScreen() {
     return { detail, options };
   }, [params.clientId]);
   const { data, error, loading, refreshing, reload, refresh } = useAsyncData(load, [load]);
+  const timeline = useMemo(() => mapTimeline(data?.detail.timeline ?? []), [data?.detail.timeline]);
   if (loading && !data) return <Screen><LoadingState label="Loading the client…" /></Screen>;
   if (error && !data) return <Screen><ErrorState message={error} onRetry={() => void reload()} /></Screen>;
   if (!data || !profile) return <Screen><EmptyState message="This client is outside what you are authorised to see." title="Client not available" /></Screen>;
@@ -61,8 +63,9 @@ export function ClientDetailScreen() {
     finally { setBusy(false); }
   };
   return <Screen refreshControl={<RefreshControl colors={[theme.colors.primary]} refreshing={refreshing} onRefresh={() => void refresh()} />} scroll>
-    <View style={styles.header}><Text variant="title" weight="semibold">{name}</Text><View style={styles.badges}><StatusBadge label={`${client.total_visits} visit${client.total_visits === 1 ? "" : "s"}`} /><StatusBadge label={titleCase(client.status)} tone="primary" /></View></View>
-    {actionError || error ? <Text tone="danger">{actionError ?? error}</Text> : null}
+    {params.notice ? <Banner tone="success">{params.notice}</Banner> : null}
+    <View style={styles.header}><Text variant="title" weight="semibold">{name}</Text><Text tone="muted" variant="small">{`${client.phone}${client.email ? ` · ${client.email}` : ""}`}</Text><View style={styles.badges}><StatusBadge label={`${client.total_visits} visits`} /><StatusBadge label={`Last visit ${client.last_visit_date ?? "—"}`} /><StatusBadge label={`Next follow-up ${client.next_visit_date ?? "—"}`} tone={client.next_visit_date ? "warning" : "neutral"} /></View></View>
+    {actionError || error ? <Banner tone="danger">{actionError ?? error ?? ""}</Banner> : null}
     <View style={styles.actions}>
       {capability.canLogInteraction ? <Button label="Log interaction" onPress={() => setAction("interaction")} /> : null}
       {capability.canManageFollowups ? <Button label="Follow-up" variant="secondary" onPress={() => setAction("followup")} /> : null}
@@ -71,9 +74,9 @@ export function ClientDetailScreen() {
       {capability.canMergeClients ? <Button label="Merge" variant="danger" onPress={() => navigation.navigate("CrmMerge", { survivorId: client.id })} /> : null}
       <Button label="Record walk-in" variant="secondary" onPress={() => navigation.navigate("Walkin", { clientId: client.id })} />
     </View>
-    <Card><CardRow label="Phone" value={client.phone} />{client.billing_phone ? <CardRow label="Alternate phone" value={client.billing_phone} /> : null}{client.email ? <CardRow label="Email" value={client.email} /> : null}<CardRow label="Location" value={[client.city, client.state, client.pincode].filter(Boolean).join(", ") || "—"} /><CardRow label="Communication" value={client.communication_preference ?? "—"} /><CardRow label="Consent" value={client.communication_consent === true ? "Recorded" : client.communication_consent === false ? "Not granted" : "Not recorded"} /></Card>
+    <Card><CardRow label="Billing phone" value={client.billing_phone || "—"} /><CardRow label="Location" value={[client.city, client.state, client.pincode].filter(Boolean).join(", ") || "—"} /><CardRow label="Communication" value={client.communication_preference ?? "—"} /><CardRow label="Consent" value={client.communication_consent === true ? "Recorded" : client.communication_consent === false ? "Not granted" : "Not recorded"} /></Card>
     <SegmentedControl accessibilityLabel="Client sections" options={[{ value: "timeline", label: "Timeline" }, { value: "walkins", label: "Walk-ins" }, { value: "followups", label: "Follow-ups" }, { value: "documents", label: "Documents" }, { value: "links", label: "Links" }]} value={tab} onChange={setTab} />
-    {tab === "timeline" ? (detail.timeline.length ? detail.timeline.map((item) => <Card key={item.id}><Text weight="semibold">{item.subject ?? titleCase(item.event_type)}</Text>{item.outcome ?? item.summary ? <Text tone="muted">{item.outcome ?? item.summary}</Text> : null}<Text tone="muted" variant="caption">{formatDateTime(item.occurred_at)}</Text></Card>) : <EmptyState title="No history" message="Nothing has been recorded for this client yet." />) : null}
+    {tab === "timeline" ? (timeline.length ? timeline.map((item) => <Card key={item.id}><Text weight="semibold">{`${item.label}${item.subject ? ` · ${item.subject}` : ""}`}</Text>{item.outcome ? <Text tone="muted">{item.outcome}</Text> : null}<Text tone="muted" variant="caption">{formatDateTime(item.occurred_at)}</Text></Card>) : <EmptyState title="No timeline events." message="Nothing has been recorded for this client yet." />) : null}
     {tab === "walkins" ? (detail.walkins.length ? detail.walkins.map((item) => <Card key={item.id}><Text weight="semibold">{formatDateTime(item.visit_date)}</Text><Text tone="muted">{item.product_bought ? "Product bought" : "No purchase recorded"}{item.buy_status ? ` · ${item.buy_status}` : ""}</Text>{item.remark ? <Text>{item.remark}</Text> : null}</Card>) : <EmptyState title="No walk-ins" message="No visits have been recorded." />) : null}
     {tab === "followups" ? (detail.followups.length ? detail.followups.map((item) => <Card key={item.id}><Text weight="semibold">{item.subject ?? "Follow-up"}</Text><Text tone="muted">Due {formatDate(item.due_date)}</Text><StatusBadge label={item.status} />{item.outcome ? <Text>Outcome: {item.outcome}</Text> : null}{item.cancel_reason ? <Text>Cancelled: {item.cancel_reason}</Text> : null}</Card>) : <EmptyState title="No follow-ups" message="No follow-up history is recorded." />) : null}
     {tab === "documents" ? <>{capability.canManageDocuments ? <Button full busy={busy} label="Upload private document" onPress={() => void upload()} /> : null}{detail.documents.length ? detail.documents.map((item) => <Card key={item.id}><Text weight="semibold">{item.original_filename}</Text><Text tone="muted" variant="caption">{item.mime_type} · {Math.ceil(item.size_bytes / 1024)} KB</Text><View style={styles.actions}><Button label="View" variant="secondary" onPress={() => void signedDocumentUrl(item.id).then((url) => Linking.openURL(url)).catch((caught) => setActionError(caught instanceof Error ? caught.message : "Document access failed."))} />{capability.canManageDocuments ? <Button label="Remove" variant="danger" onPress={() => setRemoveId(item.id)} /> : null}</View></Card>) : <EmptyState title="No documents" message="No private documents are attached." />}</> : null}

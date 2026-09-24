@@ -1139,3 +1139,27 @@ therefore verified, but installation, Metro-free runtime logs, and the
 role-by-role authenticated phone walkthrough remain device-only evidence. No
 hosted Supabase schema/function change or web deployment was part of this
 parity release.
+
+## Full web-to-native source audit (2026-09-24)
+
+Every web page was compared with its native screen by extracting user-visible
+strings, actions, permission gates, and data calls. The gaps closed are listed in
+`docs/MOBILE_PARITY_MATRIX.md` ("2026-09-24 full source audit"). Two were defects
+rather than missing UI:
+
+- `TaskDetailScreen` searched only the viewer's assigned feed, so a task opened
+  from the Delegated tab (or a coverage-blocked task for a manager) showed "Task
+  not available". It now reads the same feeds as the list via
+  `features/tasks/taskWorkspace.ts`.
+- The native walk-in form sent the CRM source's dropdown `value` as `source_id`;
+  `record_crm_walkin` casts that to UUID, so any walk-in with a source failed.
+
+Shared-rule moves: task detail labels (`packages/core/src/taskDetails.ts`, web
+`TaskDetails` now consumes them), `taskEvidenceFileError`, `unreadBadge`, and the
+checklist-never-owes-evidence rule inside `deriveTaskCardState`. No migration,
+RPC, RLS, Storage policy, or generated type changed.
+
+Deliberately not ported: the Production demo-data retirement card (a one-off
+super-admin maintenance operation). Home's My Tasks group lists 25 open tasks and
+then links to Tasks instead of web's inner scroll box, because a nested scroller
+fights the page on a phone.

@@ -7,7 +7,7 @@ export function filterInbox(items: readonly InboxNotification[], filters: InboxF
   return filterNotificationInbox(items, filters);
 }
 
-export function unreadBadge(count: number): string { return count > 99 ? "99+" : String(count); }
+export { unreadBadge } from "@jewelos/core";
 
 export function recentNotifications(items: readonly InboxNotification[], limit = 5): InboxNotification[] {
   return [...items].sort((a,b) => Date.parse(b.created_at ?? "")-Date.parse(a.created_at ?? "")).slice(0,limit);

@@ -43,6 +43,6 @@ describe("initials", () => {
 
 describe("greetingFor", () => {
   it("always produces a greeting, even for an unknown timezone", () => {
-    expect(["Good morning", "Good afternoon", "Good evening", "Hello"]).toContain(greetingFor("Asia/Kolkata"));
+    expect(["Good Morning", "Good Afternoon", "Good Evening", "Hello"]).toContain(greetingFor("Asia/Kolkata"));
   });
 });

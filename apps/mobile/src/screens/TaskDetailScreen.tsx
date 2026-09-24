@@ -5,15 +5,20 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   deriveTaskCardState,
   deriveTaskMutationCapability,
-  effectiveTaskDeadline,
-  isTaskFeedItemOverdue,
-  kolkataDateKey,
+  formatIndiaDateTime,
+  taskBuddyCoverageLabel,
+  taskEvidenceFileError,
+  taskEvidenceLabel,
+  taskFrequencyLabel,
+  taskScheduleStateLabel,
+  taskTypeLabel,
+  taskVerificationLabel,
   type Tables,
 } from "@jewelos/core";
 import {
   loadFmsTaskDeepLink,
   loadFmsTaskStageLink,
-  loadTaskFeed,
+  reviseTask,
   updateTask,
   uploadAndCompleteTask,
   uploadTaskAttachment,
@@ -23,9 +28,9 @@ import { addTaskComment, loadTaskComments } from "@jewelos/data/tasks/comments";
 import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
 import { useProfile } from "@/auth/AuthProvider";
 import { useAsyncData } from "@/lib/useAsyncData";
-import { formatDateTime, formatRelativeDeadline } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
 import { errorText, log } from "@/lib/log";
-import { chooseSource, pickFile, type PickSource } from "@/lib/pickFile";
+import { pickFileFromChooser } from "@/lib/pickFile";
 import { makeStyles } from "@/theme/makeStyles";
 import { useAppTheme } from "@/theme/ThemeProvider";
 import { Button } from "@/ui/Button";
@@ -33,22 +38,51 @@ import { Card, CardRow, StatusBadge } from "@/ui/Card";
 import { Screen } from "@/ui/Screen";
 import { Text } from "@/ui/Text";
 import { TextField } from "@/ui/TextField";
+import { DateField } from "@/forms/DateField";
 import { ToggleField } from "@/forms/ToggleField";
 import { Banner, EmptyState, ErrorState, LoadingState } from "@/ui/states";
 import type { RootStackParamList } from "@/navigation/types";
 import { fmsAssignedWorkRouteForTask, navigateFmsAssignedWork } from "@/features/fms/assignedWorkNavigation";
+import { TaskAttachmentList } from "@/features/tasks/TaskAttachmentList";
 import { TaskRemarkComposer, TaskRemarksCard } from "@/features/tasks/TaskRemarks";
+import { findWorkspaceTask, loadTaskWorkspace } from "@/features/tasks/taskWorkspace";
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, "TaskDetail">;
 
+/** The web card's expanded panel: every value comes from the bounded feed row. */
+function detailRows(task: TaskBundle, statusLabel: string): Array<{ label: string; value: string }> {
+  const checklist = task.checklists ?? [];
+  const done = checklist.filter((item) => item.is_completed).length;
+  const revised = formatIndiaDateTime(task.revised_datetime);
+  const due = formatIndiaDateTime(task.due_datetime);
+  const rows: Array<{ label: string; value: string | null | undefined }> = [
+    { label: "Assigned to", value: task.assigneeName },
+    { label: "Branch", value: task.branch_name },
+    { label: "Department", value: task.department_name },
+    { label: "Task type", value: taskTypeLabel(task.task_type) },
+    { label: "Core task", value: task.core_task_label },
+    { label: "Frequency", value: taskFrequencyLabel(task.schedule_kind) },
+    { label: "Start", value: formatIndiaDateTime(task.planned_datetime) },
+    { label: "Due", value: revised ? `Revised deadline: ${revised}${due ? `\nOriginal due: ${due}` : ""}` : due },
+    { label: "Priority", value: task.priority ? task.priority[0]!.toUpperCase() + task.priority.slice(1) : null },
+    { label: "Evidence", value: taskEvidenceLabel(task, task.hasAttachment) },
+    { label: "Verification", value: taskVerificationLabel(task) },
+    { label: "Verifier", value: task.verifierName },
+    { label: "Buddy coverage", value: taskBuddyCoverageLabel(task.buddy_assignment_allowed) },
+    { label: "Schedule state", value: taskScheduleStateLabel(task) },
+    { label: "Status", value: statusLabel },
+    { label: "Checklist", value: checklist.length > 0 ? `${done} of ${checklist.length} complete` : null },
+  ];
+  return rows.flatMap((row) => row.value ? [{ label: row.label, value: row.value }] : []);
+}
+
 /**
- * One task, and every action it allows.
+ * One task, and every action it allows — the web task card's expanded panel.
  *
- * Which actions are offered follows the task's own record — a required form, a
- * checklist, an evidence upload — and the server re-checks all of it. Nothing
- * here decides whether a person may complete a task; hiding a button is a
- * courtesy, and `update_task_with_audit` is the actual gate.
+ * Which actions are offered comes from `deriveTaskCardState` in core, the same
+ * decision the task list uses, and the server re-checks all of it. Hiding a
+ * button is a courtesy; `update_task_with_audit` is the actual gate.
  */
 export function TaskDetailScreen() {
   const theme = useAppTheme();
@@ -57,25 +91,26 @@ export function TaskDetailScreen() {
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<Route>();
   const [remark, setRemark] = useState("");
+  const [revision, setRevision] = useState("");
+  const [revisionReason, setRevisionReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [attachmentsVersion, setAttachmentsVersion] = useState(0);
 
-  const load = useCallback(async () => {
-    const today = kolkataDateKey(new Date());
-    return loadTaskFeed(profile.id, `${today}T00:00:00.000+05:30`, `${today}T23:59:59.999+05:30`, {
-      tenantId: profile.tenant_id,
-      includeOverdue: true,
-    });
-  }, [profile.id, profile.tenant_id]);
-
+  // The same two feeds the Tasks list shows, so a delegated or coverage-blocked
+  // task opened from the list is always found here.
+  const load = useCallback(() => loadTaskWorkspace(profile), [profile]);
   const { data, error, loading, refreshing, reload, refresh } = useAsyncData(load, [load]);
-  const task = useMemo(() => data?.find((item) => item.id === params.taskId) ?? null, [data, params.taskId]);
+  const task = useMemo(() => findWorkspaceTask(data, params.taskId), [data, params.taskId]);
   // FMS feed rows are workflow stages, not task records, so they carry no remark thread.
   const remarksTaskId = task && task.task_type !== "fms" ? task.id : null;
   const loadRemarks = useCallback(async () => (remarksTaskId ? loadTaskComments(remarksTaskId) : []), [remarksTaskId]);
   const remarks = useAsyncData(loadRemarks, [loadRemarks]);
   const refreshRemarks = remarks.refresh;
-  useEffect(() => subscribeToTenantRealtime(profile.tenant_id, ["tasks"], () => void refreshRemarks()), [profile.tenant_id, refreshRemarks]);
+  useEffect(() => subscribeToTenantRealtime(profile.tenant_id, ["tasks"], () => {
+    void refresh();
+    void refreshRemarks();
+  }), [profile.tenant_id, refresh, refreshRemarks]);
 
   const run = async (action: () => Promise<unknown>) => {
     if (busy) return;
@@ -84,6 +119,7 @@ export function TaskDetailScreen() {
     try {
       await action();
       await refresh();
+      setAttachmentsVersion((value) => value + 1);
     } catch (caught) {
       log.error("api", "task action failed", caught);
       setActionError(errorText(caught));
@@ -105,36 +141,41 @@ export function TaskDetailScreen() {
     );
   }
 
-  const deadline = effectiveTaskDeadline(task);
-  const overdue = isTaskFeedItemOverdue(task);
-  const done = task.status === "completed";
-  const needsForm = task.requires_form === true && !task.hasFormSubmission;
   const checklists: Tables<"task_checklists">[] = task.checklists ?? [];
-  const remaining = checklists.filter((item) => !item.is_completed).length;
   const capability = deriveTaskMutationCapability({
     assigneeIds: task.assignees.map((assignee) => assignee.id),
     isWatcher: task.isWatchedByViewer,
     viewerId: profile.id,
     viewerRole: profile.user_role,
   });
-  const cardState = deriveTaskCardState({ task, hasAttachment: task.hasAttachment, hasFormSubmission: task.hasFormSubmission, checklists, capability });
+  const state = deriveTaskCardState({ task, hasAttachment: task.hasAttachment, hasFormSubmission: task.hasFormSubmission, checklists, capability });
+  const { blocked, completed, formOnlyAction, overdue, readOnly, requiresEvidence } = state;
+  const fmsFormAction = task.task_type === "fms" && Boolean(task.requires_form) && !completed;
+  const fmsStageAction = task.task_type === "fms" && !task.requires_form && !completed;
+  const statusLabel = completed ? "Completed" : blocked ? "Coverage required" : overdue ? "Overdue" : task.status === "in_progress" ? "In Progress" : "Pending";
+  const remarkMissing = Boolean(task.requires_remark) && !remark.trim();
+  const description = task.description?.trim();
 
-  const completeWithImage = async (source: PickSource) => {
-    const picked = await pickFile(source, { imagesOnly: true });
+  const pickEvidence = async () => {
+    const picked = await pickFileFromChooser("Upload evidence");
     if (!picked.ok) {
       if (!picked.cancelled) setActionError(picked.message);
-      return;
+      return null;
     }
-    await run(() => uploadAndCompleteTask(profile.tenant_id, task.id ?? "", picked.file));
+    const invalid = taskEvidenceFileError(picked.file);
+    if (invalid) {
+      setActionError(invalid);
+      return null;
+    }
+    return picked.file;
   };
 
-  const attach = async (source: PickSource) => {
-    const picked = await pickFile(source);
-    if (!picked.ok) {
-      if (!picked.cancelled) setActionError(picked.message);
-      return;
-    }
-    await run(() => uploadTaskAttachment(profile.tenant_id, task.id ?? "", picked.file));
+  const uploadEvidence = async (complete: boolean) => {
+    const file = await pickEvidence();
+    if (!file) return;
+    await run(() => complete
+      ? uploadAndCompleteTask(profile.tenant_id, task.id ?? "", file)
+      : uploadTaskAttachment(profile.tenant_id, task.id ?? "", file));
   };
 
   const openFmsStage = async () => {
@@ -154,6 +195,18 @@ export function TaskDetailScreen() {
         const target = await loadFmsTaskStageLink(task.id ?? "");
         navigation.navigate("FmsStage", target);
       }
+    });
+  };
+
+  const submitRevision = () => {
+    if (!revision || !revisionReason.trim()) {
+      setActionError("Enter the revised date and a reason.");
+      return;
+    }
+    void run(async () => {
+      await reviseTask(task.id ?? "", new Date(revision).toISOString(), revisionReason);
+      setRevision("");
+      setRevisionReason("");
     });
   };
 
@@ -180,113 +233,113 @@ export function TaskDetailScreen() {
       {actionError ? <Banner tone="danger">{actionError}</Banner> : null}
 
       <View style={styles.header}>
-        <Text variant="title" weight="semibold">
+        <Text style={completed ? styles.completedTitle : undefined} variant="title" weight="semibold">
           {task.title ?? "Untitled task"}
         </Text>
         <View style={styles.badges}>
           <StatusBadge
-            label={done ? "Completed" : overdue ? "Overdue" : "Pending"}
-            tone={done ? "success" : overdue ? "danger" : "neutral"}
+            label={statusLabel}
+            tone={completed ? "success" : blocked ? "warning" : overdue ? "danger" : "neutral"}
           />
-          {task.priority ? <StatusBadge label={`${task.priority} priority`} /> : null}
           {capability.watcherLabel ? <StatusBadge label={capability.watcherLabel} tone="primary" /> : null}
+          {task.task_type === "fms" ? <StatusBadge label="FMS" tone="primary" /> : null}
+          {task.coverageOriginalAssigneeName ? <StatusBadge label={`Covering for: ${task.coverageOriginalAssigneeName}`} tone="primary" /> : null}
         </View>
       </View>
 
       <Card>
-        <CardRow label="Deadline" value={formatDateTime(deadline, "No deadline")} />
-        {deadline && !done ? (
-          <CardRow label="Time left" value={formatRelativeDeadline(deadline) ?? "—"} />
-        ) : null}
-        <CardRow label="Assigned to" value={task.assigneeName || "Unassigned"} />
-        {task.verifierName ? <CardRow label="Verifier" value={task.verifierName} /> : null}
+        <Text tone={description ? "default" : "muted"} variant="body" style={description ? undefined : styles.italic}>
+          {description ?? "No description provided"}
+        </Text>
+        {detailRows(task, statusLabel).map((row) => <CardRow key={row.label} label={row.label} value={row.value} />)}
+        {task.hasAttachment && task.id ? <TaskAttachmentList refreshKey={attachmentsVersion} taskId={task.id} /> : null}
       </Card>
 
-      {task.description ? (
-        <Card>
-          <Text tone="warm" variant="subtitle" weight="semibold">
-            Details
-          </Text>
-          <Text tone="muted" variant="body">
-            {task.description}
-          </Text>
-        </Card>
+      {blocked ? (
+        <Banner tone="warning">
+          Coverage required. An authorized manager must resolve coverage through a future database-backed workflow; no simulated resolution is available here.
+        </Banner>
       ) : null}
 
-      {task.task_type === "fms" ? <Card>
-        <Text tone="warm" variant="subtitle" weight="semibold">FMS workflow step</Text>
-        <Banner tone="warning">This feed row is read-only. Complete it through the workflow so routing, review, evidence, and audit rules remain intact.</Banner>
-        <Button busy={busy} label={task.form_template_id ? "Open workflow form" : "Open workflow step"} onPress={() => void openFmsStage()} />
-      </Card> : null}
-
-      {task.task_type !== "fms" && checklists.length > 0 ? (
+      {!formOnlyAction && checklists.length > 0 ? (
         <Card>
           <Text tone="warm" variant="subtitle" weight="semibold">
-            Checklist ({checklists.length - remaining}/{checklists.length})
+            {`Checklist (${state.checklistProgress.completedItems}/${state.checklistProgress.totalItems})`}
           </Text>
           {checklists.map((item) => (
             <ToggleField
-              disabled={done || busy}
+              disabled={busy || completed || readOnly || blocked}
               key={item.id}
               label={item.item_text ?? "Checklist item"}
               onChange={(next) =>
                 void run(() => updateTask(task.id ?? "", "checklist", { checklistId: item.id, completed: next }))
               }
-              required={false}
+              required={item.is_required ?? false}
               value={item.is_completed ?? false}
             />
           ))}
         </Card>
       ) : null}
 
-      {task.task_type !== "fms" && needsForm && task.form_template_id ? (
+      {fmsFormAction && !blocked ? (
+        <Button busy={busy} disabled={!task.form_template_id} full label="Complete FMS form" onPress={() => void openFmsStage()} />
+      ) : fmsStageAction && !blocked ? (
+        <Button busy={busy} full label="Open FMS workflow" onPress={() => void openFmsStage()} />
+      ) : formOnlyAction && !readOnly && !blocked ? (
+        <Button
+          disabled={busy || !task.form_template_id}
+          full
+          label="Complete form"
+          onPress={() =>
+            navigation.navigate("TaskForm", {
+              taskId: task.id ?? "",
+              formTemplateId: task.form_template_id ?? "",
+              taskType: task.task_type,
+            })
+          }
+        />
+      ) : null}
+
+      {!formOnlyAction && !readOnly && requiresEvidence && !completed ? (
+        <Button
+          busy={busy}
+          full
+          label={task.hasAttachment ? "Evidence uploaded · add another" : "Upload required evidence"}
+          onPress={() => void uploadEvidence(false)}
+          variant="secondary"
+        />
+      ) : null}
+
+      {!formOnlyAction && !readOnly && task.requires_remark && !completed ? (
+        <TextField label="Completion remark" maxLength={2000} multiline onChangeText={setRemark} value={remark} />
+      ) : null}
+
+      {state.showDirectUpload ? (
+        <Button busy={busy} full label="Upload" onPress={() => void uploadEvidence(true)} />
+      ) : state.showDirectComplete ? (
+        <Button
+          busy={busy}
+          disabled={!state.canComplete || remarkMissing}
+          full
+          label="Complete"
+          onPress={() => void run(() => updateTask(task.id ?? "", "complete", { remark }))}
+        />
+      ) : null}
+
+      {task.task_type === "fms" ? <Banner>FMS work is completed in its protected workflow runner.</Banner> : null}
+
+      {state.showReviseForm ? (
         <Card>
-          <Text tone="warm" variant="subtitle" weight="semibold">
-            Required form
-          </Text>
-          <Banner tone="warning">This task cannot be completed until its form is submitted.</Banner>
-          <Button
-            label="Open the form"
-            onPress={() =>
-              navigation.navigate("TaskForm", {
-                taskId: task.id ?? "",
-                formTemplateId: task.form_template_id ?? "",
-                taskType: task.task_type,
-              })
-            }
-          />
+          <View style={styles.group}>
+            <Text tone="warm" variant="label" weight="medium">Revised date *</Text>
+            <DateField disabled={busy} invalid={false} label="Revised date" mode="datetime" onChange={setRevision} value={revision} />
+          </View>
+          <TextField label="Reason" maxLength={500} onChangeText={setRevisionReason} required value={revisionReason} />
+          <Button busy={busy} label="Revise" onPress={submitRevision} />
         </Card>
       ) : null}
 
-      {!done && task.task_type !== "fms" ? (
-        <Card>
-          <Text tone="warm" variant="subtitle" weight="semibold">
-            Complete this task
-          </Text>
-          <TextField
-            label="Remark"
-            maxLength={2000}
-            multiline
-            onChangeText={setRemark}
-            placeholder="Optional note"
-            value={remark}
-          />
-          <View style={styles.actions}>
-            {cardState.showDirectComplete ? <Button
-              busy={busy}
-              disabled={!cardState.canComplete}
-              label="Mark complete"
-              onPress={() => void run(() => updateTask(task.id ?? "", "complete", remark ? { remark } : {}))}
-            /> : null}
-            {cardState.showDirectUpload ? <Button busy={busy} label="Upload" onPress={() => void chooseSource("Upload evidence", { imagesOnly: true }).then((source) => { if (source) void completeWithImage(source); })} variant="secondary" /> : null}
-          </View>
-          <View style={styles.actions}>
-            <Button busy={busy} label="Attach a photo or file" onPress={() => void chooseSource("Attach a file").then((source) => { if (source) void attach(source); })} variant="ghost" />
-          </View>
-        </Card>
-      ) : done ? (
-        <Banner tone="success">{`Completed ${formatDateTime(task.actual_datetime, "today")}.`}</Banner>
-      ) : null}
+      {completed ? <Banner tone="success">{`Completed ${formatDateTime(task.actual_datetime, "today")}.`}</Banner> : null}
 
       {remarksTaskId ? (
         <TaskRemarksCard comments={remarks.data} error={remarks.error} loading={remarks.loading} viewerId={profile.id} />
@@ -301,5 +354,7 @@ export type TaskDetail = TaskBundle;
 const useStyles = makeStyles((theme) => StyleSheet.create({
   header: { gap: theme.space.xs },
   badges: { flexDirection: "row", flexWrap: "wrap", gap: theme.space.xs },
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: theme.space.sm },
+  group: { gap: theme.space.xs },
+  italic: { fontStyle: "italic" },
+  completedTitle: { textDecorationLine: "line-through", color: theme.colors.textMuted },
 }));

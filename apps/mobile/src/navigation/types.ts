@@ -26,11 +26,12 @@ export type RootStackParamList = {
   FormBuilder: { formTemplateId?: string } | undefined;
   FormSubmission: { submissionId: string };
   FormSubmissions: undefined;
-  ClientDetail: { clientId: string };
+  /** `notice` carries the success message a walk-in or edit leaves behind, as the web page shows it. */
+  ClientDetail: { clientId: string; notice?: string };
   ClientEditor: { clientId?: string } | undefined;
   CrmFollowups: undefined;
   CrmMerge: { survivorId: string };
-  Walkin: { clientId?: string };
+  Walkin: { clientId?: string; mode?: "new" | "returning" };
   Followups: undefined;
   AssigningLeft: undefined;
   PermissionManagement: undefined;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveTaskCardState, taskFormLinkedModule, type TaskCardInput } from "./taskCardState";
+import { deriveTaskCardState, taskEvidenceFileError, taskFormLinkedModule, type TaskCardInput } from "./taskCardState";
 import type { TaskMutationCapability } from "./taskCapabilities";
 
 const NOW = new Date("2026-09-09T10:00:00.000Z");
@@ -89,15 +89,24 @@ describe("deriveTaskCardState", () => {
 
   describe("evidence and forms gate completion", () => {
     it("withholds completion until a required upload exists", () => {
-      const state = derive({ task: task({ requires_upload: true }), hasAttachment: false });
+      const state = derive({ task: task({ requires_upload: true, task_type: "delegation" }), hasAttachment: false });
+      expect(state.requiresEvidence).toBe(true);
       expect(state.canComplete).toBe(false);
       expect(state.showDirectUpload).toBe(true);
     });
 
     it("allows completion once the upload is present", () => {
-      const state = derive({ task: task({ requires_upload: true }), hasAttachment: true });
+      const state = derive({ task: task({ requires_upload: true, task_type: "delegation" }), hasAttachment: true });
       expect(state.canComplete).toBe(true);
       expect(state.showDirectUpload).toBe(false);
+    });
+
+    it("never asks a checklist for evidence, even with a legacy imported upload flag", () => {
+      const state = derive({ task: task({ requires_upload: true, task_type: "checklist" }), hasAttachment: false });
+      expect(state.requiresEvidence).toBe(false);
+      expect(state.canComplete).toBe(true);
+      expect(state.showDirectUpload).toBe(false);
+      expect(state.showDirectComplete).toBe(true);
     });
 
     it("withholds completion until a required form is submitted", () => {
@@ -171,5 +180,19 @@ describe("taskFormLinkedModule", () => {
   it("files every other task's form as a checklist task", () => {
     for (const type of ["checklist", "fms", null, undefined])
       expect(taskFormLinkedModule(type)).toBe("checklist_task");
+  });
+});
+
+describe("taskEvidenceFileError", () => {
+  it("accepts images and PDFs up to 10 MB", () => {
+    expect(taskEvidenceFileError({ size: 1024, type: "image/jpeg" })).toBeNull();
+    expect(taskEvidenceFileError({ size: 10 * 1024 * 1024, type: "application/pdf" })).toBeNull();
+  });
+
+  it("refuses other types, empty files, and files over 10 MB with the web wording", () => {
+    const message = "Upload a JPG, PNG, WebP, or PDF up to 10 MB.";
+    expect(taskEvidenceFileError({ size: 1024, type: "image/heic" })).toBe(message);
+    expect(taskEvidenceFileError({ size: 0, type: "image/png" })).toBe(message);
+    expect(taskEvidenceFileError({ size: 10 * 1024 * 1024 + 1, type: "image/png" })).toBe(message);
   });
 });

@@ -26,6 +26,20 @@ Reference date: 2026-09-23. The web application is the behavioral reference. “
 
 ## Responsive and accessibility contract
 
+### 2026-09-24 full source audit
+
+A section-by-section comparison of every web page against its native screen (visible strings, actions, gating, and data calls) found gaps the earlier matrix rows had marked complete. Closed in this pass:
+
+- **Home** now follows `HomeView`: hero, "Action required", My Tasks / FMS Tasks / CRM Tasks groups with web labels (all open tasks, not five), Priority Tasks Today, CRM Follow-ups Due, Recent Activity, and inbox/tenant realtime refresh.
+- **Tasks**: open counts on My Tasks / Delegated, web status labels, Bulk Import limited to managers (Assigning Left to admins), web empty state, the `canMutate` guard, and PDF evidence up to 10 MB (`taskEvidenceFileError`).
+- **Task detail** loads both task feeds through `features/tasks/taskWorkspace.ts`, so delegated and coverage-blocked tasks open instead of reporting "Task not available". It shows the web detail grid (labels now in core `taskDetails.ts`, consumed by web), uploaded evidence, required-remark enforcement, evidence upload, FMS actions, and the delegation revise form.
+- **Core fix**: `deriveTaskCardState` now applies web's rule that a checklist never owes evidence; native previously asked checklist tasks with a legacy upload flag for an upload.
+- **FMS step**: Request revision, Move backward, Escalate, Reassign, reject confirmation, assignee line, and required/optional linked-form states. **FMS instance**: Hold / Resume / Cancel, lineage, immutable timeline. **FMS list**: opens on active work, with priority filter, Overdue only, and status tiles.
+- **CRM** is the web three-section workspace (walk-in form, not-bought follow-up, client database). The walk-in form is a full port: phone lookup first, branch, visit time, source, client type, product bought, buy status, not-bought reason, follow-up date, potential, companions, CRM/salesperson, product categories, requirement, remark, private attachment. The previous native form sent dropdown values where the RPC casts UUIDs. Directory has server pagination and follow-up badges; client detail, follow-ups and merge use web wording, counts and warnings.
+- **Availability** department overview; **header** unread badge (`unreadBadge` moved to core); **Forms** family grouping, grouped submissions, draft archive, in-place edit of published versions; **Dashboard** realtime refresh; composer voice gaps recomputed with `voiceDraftGaps`.
+
+Evidence: turbo typecheck 5/5, mobile typecheck, core 711, data 83, web 358, mobile 94 tests passed. Device walkthrough still pending.
+
 ### 2026-09-23 focused refresh
 
 - The recent web task changes in `cbc01cd` use shared task-feed visibility and include native task remarks in the same commit. The former-employee filter in `1be4bb7` also changed web and native together. These are source parity findings; authenticated behavior remains unverified.

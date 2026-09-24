@@ -33,6 +33,7 @@ export function ClientActionSheet({ kind, detail, options, defaultAssignee, clos
     {kind === "interaction" ? <><TextField label="Outcome / summary" multiline value={text} onChangeText={setText} /><DateField label="Optional follow-up date" mode="date" value={due} disabled={busy} invalid={false} onChange={setDue} /></> : null}
     {kind === "followup" ? <DateField label="Due date" mode="date" value={due} disabled={busy} invalid={!due} onChange={setDue} /> : null}
     {kind === "followup" || kind === "reassign" ? <OptionPicker label="Assigned CRM" options={people} selected={assigned ? [assigned] : []} onChange={(ids) => setAssigned(ids[0] ?? "")} /> : null}
-    <Button full busy={busy} label="Save" onPress={() => void submit()} />
+    {kind === "reassign" ? <Text tone="muted" variant="small">The client home branch remains unchanged; choose the CRM owner directly.</Text> : null}
+    <Button full busy={busy} label={kind === "interaction" ? "Save interaction" : kind === "followup" ? "Create follow-up" : "Confirm reassignment"} onPress={() => void submit()} />
   </Sheet>;
 }

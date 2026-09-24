@@ -115,7 +115,7 @@ function ShellPage({ children, raiseVoiceAction = false }: { children: ReactNode
   const canUseVoice = hasPermission(shellAccess.access, "tasks.voice_assign") && pageDecision(shellAccess, "checklist_tasks") === "allowed";
   return (
     <View className="flex-1 bg-obsidian">
-      <MobileHeader onNavigate={navigate} onOpenNavigation={() => setDrawerOpen(true)} profileName={profile.employee_name} />
+      <MobileHeader onNavigate={navigate} onOpenNavigation={() => setDrawerOpen(true)} profileId={profile.id} profileName={profile.employee_name} />
       <View className="flex-1">
         {children}
         {canUseVoice ? <GlobalVoiceTaskButton raised={raiseVoiceAction} /> : null}

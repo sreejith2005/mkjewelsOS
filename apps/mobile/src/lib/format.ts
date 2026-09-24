@@ -64,5 +64,5 @@ export function greetingFor(timezone: string = DEFAULT_TIMEZONE): string {
     new Intl.DateTimeFormat("en-IN", { hour: "2-digit", hour12: false, timeZone: timezone }).format(new Date()),
   );
   if (!Number.isFinite(hour)) return "Hello";
-  return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  return hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
 }

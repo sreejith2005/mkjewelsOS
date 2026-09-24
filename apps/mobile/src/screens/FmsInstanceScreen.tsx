@@ -1,24 +1,39 @@
-import { useCallback, useMemo } from "react";
-import { RefreshControl, StyleSheet, View } from "react-native";
+import { useCallback, useMemo, useState } from "react";
+import { Alert, RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { calculateFmsProgress, deriveFmsTransitionCapability } from "@jewelos/core";
-import { loadFmsRuntime } from "@jewelos/data/fms/api";
+import { loadFmsRuntime, setFmsInstanceStatus } from "@jewelos/data/fms/api";
 import { useProfile } from "@/auth/AuthProvider";
 import { useAsyncData } from "@/lib/useAsyncData";
 import { formatDateTime } from "@/lib/format";
+import { errorText } from "@/lib/log";
 import { makeStyles } from "@/theme/makeStyles";
 import { useAppTheme } from "@/theme/ThemeProvider";
+import { Button } from "@/ui/Button";
 import { Card, StatusBadge } from "@/ui/Card";
+import { PromptSheet } from "@/ui/PromptSheet";
 import { Screen } from "@/ui/Screen";
 import { Text } from "@/ui/Text";
-import { EmptyState, ErrorState, LoadingState } from "@/ui/states";
+import { Banner, EmptyState, ErrorState, LoadingState } from "@/ui/states";
 import type { RootStackParamList } from "@/navigation/types";
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, "FmsInstance">;
 
 const ACTIONABLE = new Set(["pending", "in_progress", "in_review", "overdue"]);
+/** The web instance view still grants Hold / Resume / Cancel by role; the RPC re-checks. */
+const MANAGER_ROLES = new Set(["super_admin", "admin", "manager"]);
+type StatusAction = "hold" | "resume" | "cancel";
+
+function confirmAction(title: string, message: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    Alert.alert(title, message, [
+      { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+      { text: "Confirm", onPress: () => resolve(true) },
+    ], { cancelable: true, onDismiss: () => resolve(false) });
+  });
+}
 
 /**
  * One workflow, as the vertical timeline the desktop graph becomes on a phone.
@@ -34,6 +49,9 @@ export function FmsInstanceScreen() {
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<Route>();
   const { data, error, loading, refreshing, reload, refresh } = useAsyncData(loadFmsRuntime, []);
+  const [statusAction, setStatusAction] = useState<StatusAction | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const instance = useMemo(
     () => data?.instances.find((item) => item.id === params.instanceId) ?? null,
@@ -70,6 +88,26 @@ export function FmsInstanceScreen() {
     })),
   );
   const flow = data?.flows.find((item) => item.id === instance.fms_flow_id);
+  const canManage = MANAGER_ROLES.has(profile.user_role);
+  const parent = instance.parent_instance_id ? data?.instances.find((item) => item.id === instance.parent_instance_id) : null;
+  const children = (data?.instances ?? []).filter((item) => item.parent_instance_id === instance.id);
+  const logs = (data?.logs ?? []).filter((log) => stages.some((stage) => stage.id === log.fms_instance_stage_id));
+  const nameOf = (id: string | null) => (id ? data?.users.find((user) => user.id === id)?.employee_name : null) ?? "system";
+
+  const runStatusAction = async (action: StatusAction, reason: string) => {
+    setStatusAction(null);
+    if (!(await confirmAction(`Confirm ${action}`, `Confirm ${action} for ${instance.reference_number}?`))) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await setFmsInstanceStatus(instance.id, action, reason);
+      await refresh();
+    } catch (caught) {
+      setActionError(errorText(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <Screen
@@ -91,8 +129,21 @@ export function FmsInstanceScreen() {
           {instance.title}
         </Text>
         <Text tone="muted" variant="caption">
-          {flow?.name ?? "Historical workflow"} · version {instance.flow_version}
+          {`${flow?.name ?? "Historical flow"} · version ${instance.flow_version} · ${instance.status}`}
         </Text>
+        {canManage ? (
+          <View style={styles.badges}>
+            {instance.status === "on_hold" ? (
+              <Button busy={busy} label="Resume" onPress={() => setStatusAction("resume")} />
+            ) : instance.status === "active" || instance.status === "overdue" ? (
+              <Button busy={busy} label="Hold" onPress={() => setStatusAction("hold")} variant="secondary" />
+            ) : null}
+            {!["completed", "cancelled"].includes(instance.status) ? (
+              <Button busy={busy} label="Cancel" onPress={() => setStatusAction("cancel")} variant="danger" />
+            ) : null}
+          </View>
+        ) : null}
+        {actionError ? <Banner tone="danger">{actionError}</Banner> : null}
         <View
           accessibilityLabel={`${progress.percent} percent complete`}
           accessibilityRole="progressbar"
@@ -101,8 +152,13 @@ export function FmsInstanceScreen() {
           <View style={[styles.fill, { width: `${progress.percent}%` }]} />
         </View>
         <Text tone="muted" variant="caption">
-          {progress.completed}/{progress.total} required steps · {progress.percent}%
+          {progress.completed}/{progress.total} required stages · {progress.percent}%
         </Text>
+        {parent || children.length ? (
+          <Text tone="muted" variant="caption">
+            {`Lineage: ${parent ? `parent ${parent.reference_number}` : "root"}${children.length ? ` · children ${children.map((item) => item.reference_number).join(", ")}` : ""}`}
+          </Text>
+        ) : null}
       </View>
 
       {stages.length === 0 ? (
@@ -182,6 +238,26 @@ export function FmsInstanceScreen() {
           );
         })
       )}
+
+      <Card>
+        <Text variant="subtitle" weight="semibold">Immutable timeline</Text>
+        {logs.length === 0 ? <Text tone="muted" variant="small">No timeline entries yet.</Text> : logs.map((log) => (
+          <View key={log.id} style={styles.logRow}>
+            <Text variant="small" weight="semibold">{log.action.replaceAll("_", " ")}</Text>
+            <Text tone="muted" variant="caption">{`${formatDateTime(log.created_at, "—")} · actor ${nameOf(log.actor_id)}`}</Text>
+            {log.details ? <Text tone="muted" variant="caption">{JSON.stringify(log.details)}</Text> : null}
+          </View>
+        ))}
+      </Card>
+
+      <PromptSheet
+        busy={busy}
+        onCancel={() => setStatusAction(null)}
+        onSubmit={(reason) => { if (statusAction) void runStatusAction(statusAction, reason); }}
+        submitLabel="Continue"
+        title={statusAction ? `${statusAction[0]!.toUpperCase()}${statusAction.slice(1)} reason` : ""}
+        visible={statusAction !== null}
+      />
     </Screen>
   );
 }
@@ -199,4 +275,5 @@ const useStyles = makeStyles((theme) => StyleSheet.create({
   stageHead: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: theme.space.sm },
   stageName: { flex: 1, minWidth: 0 },
   badges: { flexDirection: "row", flexWrap: "wrap", gap: theme.space.xs },
+  logRow: { borderLeftWidth: 2, borderLeftColor: theme.colors.borderStrong, paddingLeft: theme.space.sm, gap: 2 },
 }));

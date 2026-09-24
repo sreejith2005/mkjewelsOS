@@ -7,6 +7,7 @@ import {
   deriveTaskAuthoringCapability,
   hasPermission,
   voiceDraftGapMessage,
+  voiceDraftGaps,
   type ManualTaskMode,
   type ManualTaskPriority,
   type VoiceDraftGap,
@@ -113,17 +114,28 @@ export function TaskComposerScreen() {
     if (draft.title) setTitle(draft.title);
     if (draft.description) setDescription(draft.description);
     setMode(draft.taskType === "checklist" ? "checklist" : "task");
-    if (draft.taskType === "checklist" && draft.checklist.length > 0) setChecklistText(draft.checklist.join("\n"));
+    // Mirrors choosing "Task" by hand, which also discards checklist items.
+    setChecklistText(draft.taskType === "checklist" ? draft.checklist.join("\n") : "");
     if (draft.priority) setPriority(draft.priority);
     if (draft.plannedDatetime) setPlannedDatetime(draft.plannedDatetime);
-    if (draft.assigneeId && eligiblePeople.some((person) => person.id === draft.assigneeId)) {
+    const assigneeApplies = Boolean(draft.assigneeId) && eligiblePeople.some((person) => person.id === draft.assigneeId);
+    if (assigneeApplies && draft.assigneeId) {
       setDoerIds([draft.assigneeId]);
       setWatcherIds((current) => current.filter((id) => id !== draft.assigneeId));
       setAssignmentReason(draft.assignmentReason);
     } else {
       setAssignmentReason(null);
     }
-    setVoiceGaps(interpretation.gaps);
+    // Gaps are judged on what the form will hold, as the web composer does: an
+    // assignee outside this author's selectable users is dropped above and must
+    // surface as "User not selected", and anything already filled by hand is
+    // not a gap.
+    setVoiceGaps(voiceDraftGaps({
+      ...draft,
+      title: draft.title || title.trim(),
+      assigneeId: assigneeApplies ? draft.assigneeId : doerIds[0] ?? null,
+      plannedDatetime: draft.plannedDatetime || plannedDatetime || null,
+    }));
   };
 
   const chooseAttachment = async () => {
@@ -218,7 +230,7 @@ export function TaskComposerScreen() {
       {error ? <Banner tone="danger">{error}</Banner> : null}
       {createdTaskId ? <Banner tone="warning">The task is saved. Only the attachment still needs uploading.</Banner> : null}
       {hasPermission(access, "tasks.voice_assign") && !createdTaskId ? <VoiceCaptureBoundary><VoiceTaskCapture onInterpreted={applyVoiceDraft} /></VoiceCaptureBoundary> : null}
-      {outstandingVoiceGaps.length > 0 ? <Banner tone="warning">{`Finish before assigning: ${outstandingVoiceGaps.map(voiceDraftGapMessage).join(" ")}`}</Banner> : null}
+      {outstandingVoiceGaps.length > 0 ? <Banner tone="danger">{`Still missing: ${outstandingVoiceGaps.map(voiceDraftGapMessage).join(" ")}`}</Banner> : null}
       {assignmentReason ? <Text tone="muted" variant="caption">Assigned from your voice note · {assignmentReason}</Text> : null}
       <TextField editable={!createdTaskId} label="Task title" maxLength={200} onChangeText={setTitle} required value={title} />
       <TextField editable={!createdTaskId} label="Description" multiline onChangeText={setDescription} value={description} />
@@ -276,6 +288,7 @@ export function TaskComposerScreen() {
           options={[{ value: "", label: "No form required" }, ...data.forms.map((form) => ({ value: form.id, label: form.name }))]}
           selected={[formTemplateId]}
         />
+        <Text tone="muted" variant="caption">The selected form must be completed before this task can be finished.</Text>
       </View>
       <View style={styles.fieldGroup}>
         <Text tone="warm" variant="label" weight="medium">In Loop · read only</Text>

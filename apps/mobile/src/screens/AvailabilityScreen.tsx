@@ -19,6 +19,7 @@ import { makeStyles } from "@/theme/makeStyles";
 import { useAppTheme } from "@/theme/ThemeProvider";
 import { Button } from "@/ui/Button";
 import { Card, StatusBadge } from "@/ui/Card";
+import { Pressable } from "@/ui/Pressable";
 import { OptionPicker } from "@/ui/OptionPicker";
 import { Screen } from "@/ui/Screen";
 import { SearchField } from "@/ui/SearchField";
@@ -80,6 +81,22 @@ export function AvailabilityScreen() {
       && (mode === "all" || (mode === "exceptions" ? status !== "present" : status === "absent"));
   }), [departmentId, entryByUser, mode, search, users]);
   const absentCount = users.filter((user) => (entryByUser.get(user.id)?.status ?? "present") === "absent").length;
+  const departmentOverview = useMemo(() => {
+    const names = new Map((data?.departments ?? []).map((department) => [department.id, department.name]));
+    const rows = new Map<string, { id: string; name: string; total: number; present: number; absent: number; halfDay: number; remote: number }>();
+    for (const user of users) {
+      const id = user.department_id || "unassigned";
+      const current = rows.get(id) ?? { id, name: names.get(id) ?? "Unassigned department", total: 0, present: 0, absent: 0, halfDay: 0, remote: 0 };
+      const status = entryByUser.get(user.id)?.status ?? "present";
+      current.total += 1;
+      if (status === "absent") current.absent += 1;
+      else if (status === "half_day") current.halfDay += 1;
+      else if (status === "remote") current.remote += 1;
+      else current.present += 1;
+      rows.set(id, current);
+    }
+    return [...rows.values()].sort((left, right) => left.name.localeCompare(right.name));
+  }, [data?.departments, entryByUser, users]);
 
   const setAvailability = async (user: TaskUser, status: Enums<"availability_status">) => {
     setSavingId(user.id);
@@ -106,11 +123,40 @@ export function AvailabilityScreen() {
     >
       <View style={styles.titleRow}>
         <CalendarCheck color={theme.colors.primary} size={24} />
-        <View style={styles.titleCopy}><Text variant="heading" weight="bold">Availability</Text><Text tone="muted" variant="small">An authorized absence immediately checks work due today or tomorrow.</Text></View>
+        <View style={styles.titleCopy}><Text variant="heading" weight="bold">Availability</Text><Text tone="muted" variant="small">{`${startDate} - an authorized absence immediately checks work due today or tomorrow.`}</Text></View>
       </View>
       <View style={styles.summary}><StatusBadge label={`${users.length - absentCount} present`} tone="success" /><StatusBadge label={`${absentCount} absent`} tone={absentCount ? "danger" : "neutral"} /></View>
       {actionError ? <Banner tone="danger">{actionError}</Banner> : null}
       {coverage ? <Banner tone={coverage.coverage_required ? "danger" : coverage.manager_review ? "info" : "success"}>{`Coverage result: ${coverage.primary_buddy} primary, ${coverage.secondary_buddy} secondary, ${coverage.reporting_manager} manager, ${coverage.manager_review} review, ${coverage.coverage_required} unassigned.`}</Banner> : null}
+      <View style={styles.overviewHead}>
+        <View style={styles.titleCopy}>
+          <Text variant="small" weight="semibold">Department overview</Text>
+          <Text tone="muted" variant="caption">Select a department to focus the team list below.</Text>
+        </View>
+        {departmentId ? <Button label="All departments" onPress={() => setDepartmentId("")} variant="secondary" /> : null}
+      </View>
+      <View style={styles.overviewGrid}>
+        {departmentOverview.map((department) => (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: departmentId === department.id }}
+            key={department.id}
+            onPress={() => setDepartmentId(department.id)}
+            style={({ pressed }) => [styles.overviewCard, departmentId === department.id && styles.overviewSelected, pressed && styles.pressed]}
+          >
+            <View style={styles.overviewTitle}>
+              <Text numberOfLines={1} style={styles.titleCopy} variant="small" weight="semibold">{department.name}</Text>
+              <StatusBadge label={String(department.total)} />
+            </View>
+            <View style={styles.overviewCounts}>
+              <Text tone="success" variant="caption">{`${department.present} present`}</Text>
+              <Text tone="danger" variant="caption">{`${department.absent} absent`}</Text>
+              {department.halfDay ? <Text tone="primary" variant="caption">{`${department.halfDay} half day`}</Text> : null}
+              {department.remote ? <Text tone="primary" variant="caption">{`${department.remote} remote`}</Text> : null}
+            </View>
+          </Pressable>
+        ))}
+      </View>
       <SearchField accessibilityLabel="Search team" onChangeText={setSearch} placeholder="Find a team member" value={search} />
       {canLogOthers ? <OptionPicker label="Department" onChange={(selected) => setDepartmentId(selected[0] ?? "")} options={[{ value: "", label: "All departments" }, ...(data?.departments ?? []).map((department) => ({ value: department.id, label: department.name }))]} selected={[departmentId]} /> : null}
       <SegmentedControl accessibilityLabel="Availability filter" onChange={setMode} options={[{ value: "all", label: "All" }, { value: "exceptions", label: "Exceptions" }, { value: "absent", label: "Absent" }]} value={mode} />
@@ -145,4 +191,20 @@ const useStyles = makeStyles((theme) => StyleSheet.create({
   personCopy: { flex: 1, minWidth: 0 },
   actions: { flexDirection: "row", alignItems: "center", gap: theme.space.sm },
   statusPicker: { flex: 1, minWidth: 0 },
+  overviewHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: theme.space.sm },
+  overviewGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.space.sm },
+  overviewCard: {
+    flexGrow: 1,
+    flexBasis: "46%",
+    gap: theme.space.xs,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    padding: theme.space.md,
+  },
+  overviewSelected: { borderColor: theme.colors.brand, backgroundColor: theme.colors.brandSoft },
+  overviewTitle: { flexDirection: "row", alignItems: "center", gap: theme.space.xs },
+  overviewCounts: { flexDirection: "row", flexWrap: "wrap", columnGap: theme.space.sm },
+  pressed: { opacity: 0.8 },
 }));

@@ -38,6 +38,11 @@ export type TaskCardState = Readonly<{
   showDirectComplete: boolean;
   /** Offer upload-and-complete instead, because evidence is still owed. */
   showDirectUpload: boolean;
+  /**
+   * Evidence is owed before completion. A checklist never owes evidence, even
+   * when an older import copied the sheet's upload flag onto it.
+   */
+  requiresEvidence: boolean;
   /** Elevated viewers may re-date a delegation task. */
   showReviseForm: boolean;
   checklistProgress: TaskChecklistProgress;
@@ -77,9 +82,13 @@ export function deriveTaskCardState(input: {
   const blocked = task.status === "blocked";
   const readOnly = !capability.canMutate || task.task_type === "fms";
   const formOnlyAction = Boolean(task.requires_form) && !completed;
+  // Checklists are a click-to-complete task type. Older imports copied the
+  // sheet's evidence flag onto checklist records (repaired by migration 0148),
+  // so the rule is normalised here rather than trusted from the row.
+  const requiresEvidence = task.task_type !== "checklist" && Boolean(task.requires_upload);
 
   const canComplete =
-    (!task.requires_upload || hasAttachment) && (!task.requires_form || hasFormSubmission);
+    (!requiresEvidence || hasAttachment) && (!task.requires_form || hasFormSubmission);
 
   const showDirectComplete = !formOnlyAction && !readOnly && !completed && !blocked;
 
@@ -92,7 +101,8 @@ export function deriveTaskCardState(input: {
     formOnlyAction,
     canComplete,
     showDirectComplete,
-    showDirectUpload: showDirectComplete && Boolean(task.requires_upload) && !hasAttachment,
+    showDirectUpload: showDirectComplete && requiresEvidence && !hasAttachment,
+    requiresEvidence,
     showReviseForm:
       !formOnlyAction &&
       capability.canUseElevatedActions &&
@@ -113,4 +123,19 @@ export function deriveTaskCardState(input: {
  */
 export function taskFormLinkedModule(taskType: string | null | undefined): "checklist_task" | "delegation_task" {
   return taskType === "delegation" ? "delegation_task" : "checklist_task";
+}
+
+/** The file types a task accepts as evidence, the same list the web file input offers. */
+export const TASK_EVIDENCE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"] as const;
+export const TASK_EVIDENCE_MAX_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Why a picked file cannot be used as task evidence, or `null` when it can.
+ * Both clients check before uploading so a person sees the rule instead of a
+ * storage error; the bucket policy remains the authority.
+ */
+export function taskEvidenceFileError(file: Readonly<{ size: number; type: string }>): string | null {
+  const acceptedType = (TASK_EVIDENCE_MIME_TYPES as readonly string[]).includes(file.type);
+  if (file.size < 1 || file.size > TASK_EVIDENCE_MAX_BYTES || !acceptedType) return "Upload a JPG, PNG, WebP, or PDF up to 10 MB.";
+  return null;
 }

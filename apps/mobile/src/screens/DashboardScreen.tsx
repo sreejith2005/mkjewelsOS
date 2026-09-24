@@ -15,6 +15,7 @@ import {
   type ReportingOptions,
 } from "@jewelos/data/analytics/api";
 import type { DashboardPayload } from "@jewelos/data/analytics/types";
+import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
 import { useAuth, useProfile } from "@/auth/AuthProvider";
 import { DateField } from "@/forms/DateField";
 import { titleCase } from "@/lib/format";
@@ -95,6 +96,11 @@ export function DashboardScreen() {
   const { data, error, loading, refreshing, refresh, reload } = useAsyncData(
     () => fetchDashboardMetrics(context),
     [branchId, customFrom, customTo, departmentId, range],
+  );
+  // The web dashboard refreshes itself on the same tenant topics.
+  useEffect(
+    () => subscribeToTenantRealtime(profile.tenant_id, ["tasks", "fms", "crm", "organization", "settings"], () => void refresh()),
+    [profile.tenant_id, refresh],
   );
   const definitions = useMemo(() => METRIC_CATALOG.filter((item) =>
     item.roles.includes(profile.user_role) && data && Object.hasOwn(data.metrics, item.key)), [data, profile.user_role]);

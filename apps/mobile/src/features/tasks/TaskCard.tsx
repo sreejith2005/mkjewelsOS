@@ -189,6 +189,11 @@ export function TaskCard({
                   <Text className="text-[10px] font-semibold text-task-text">{capability.watcherLabel}</Text>
                 </View>
               ) : null}
+              {task.task_type === "fms" ? (
+                <View className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5">
+                  <Text className="text-[10px] font-semibold text-gold">FMS</Text>
+                </View>
+              ) : null}
               {task.coverageOriginalAssigneeName ? (
                 <View className="rounded-full border border-task-accent/40 bg-task-accent-soft px-2 py-0.5">
                   <Text className="text-[10px] font-semibold text-task-text">

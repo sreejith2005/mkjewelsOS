@@ -115,6 +115,7 @@ export * from "./identity";
 export * from "./taskImport";
 export * from "./taskImport/index";
 export * from "./taskCardState";
+export * from "./taskDetails";
 export * from "./availability";
 export * from "./recurringTodo";
 export * from "./dropdownMaster.ts";
