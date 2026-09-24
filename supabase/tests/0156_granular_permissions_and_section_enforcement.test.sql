@@ -33,7 +33,7 @@ from (values
 
 -- Catalog and privilege contract.
 select has_table('public', 'permission_catalog', 'permission catalog exists');
-select is((select count(*)::integer from permission_catalog), 29, 'catalog defines 29 permissions');
+select is((select count(*)::integer from permission_catalog), 31, 'catalog defines 31 permissions through migration 0171');
 select ok(not has_function_privilege('authenticated', 'permission_effective_for(uuid,text)', 'EXECUTE'), 'resolving another profile''s permissions stays owner-only');
 select throws_ok(
   $$insert into role_permissions(tenant_id, user_role, permission_key, is_allowed) values ('15610000-0000-4000-8000-000000000001', 'staff', 'permissions.manage', true)$$,

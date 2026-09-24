@@ -66,7 +66,7 @@ describe("permission catalog", () => {
     expect(isConfigurablePermission("users.manage")).toBe(true);
     expect(isConfigurablePermission("tasks.view_all")).toBe(false);
     expect(isConfigurablePermission("permissions.manage")).toBe(false);
-    expect(PERMISSION_CATALOG.filter((item) => item.kind === "protected").map((item) => item.key).sort()).toEqual(["developer_mode.manage", "permissions.manage"]);
+    expect(PERMISSION_CATALOG.filter((item) => item.kind === "protected").map((item) => item.key).sort()).toEqual(["developer_mode.manage", "organization.manage", "permissions.manage"]);
   });
 });
 
@@ -139,6 +139,13 @@ describe("permission resolution", () => {
     expect(explainPermission(subject, "permissions.manage").effective).toBe(false);
     expect(explainPermission({ role: "super_admin", dashboardAuthority: null, userOverrides: { "developer_mode.manage": "deny" } }, "developer_mode.manage").effective).toBe(true);
     expect(explainPermission({ role: "staff", dashboardAuthority: "super_admin" }, "permissions.manage").effective).toBe(true);
+  });
+
+  it("effective Super Admin keeps every implemented capability despite configured denies", () => {
+    const denied = Object.fromEntries(PERMISSION_CATALOG.map(({ key }) => [key, "deny"])) as AccessSubject["userOverrides"];
+    const subject: AccessSubject = { role: "staff", dashboardAuthority: "super_admin", userOverrides: denied };
+    for (const item of PERMISSION_CATALOG) expect(explainPermission(subject, item.key).effective, item.key).toBe(true);
+    expect(explainPermission({ role: "admin", dashboardAuthority: null, userOverrides: { "users.manage": "deny" } }, "users.manage").effective).toBe(false);
   });
 
   it("authority permissions ignore overrides", () => {

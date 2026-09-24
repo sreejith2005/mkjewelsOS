@@ -109,7 +109,7 @@ function RolePermissionsTab({ context, onSaved }: { context: PermissionAdminCont
       <SegmentedControl accessibilityLabel="Role" onChange={setRole} options={context.roles.map((item) => ({ value: item, label: titleCase(item) }))} value={role} />
       <FeedbackBanner feedback={feedback} />
       <Text tone="muted" variant="small">
-        These are the defaults for everyone whose effective role is {titleCase(role)} (their role, or their dashboard authority when one is set). Designation and user overrides still apply on top.
+        {role === "super_admin" ? "Super Admin has every implemented capability. Configured denies do not reduce this authority." : `These are the defaults for everyone whose effective role is ${titleCase(role)} (their role, or their dashboard authority when one is set). Designation and user overrides still apply on top.`}
       </Text>
       {GROUPS.map((group) => (
         <Card key={group.category}>
@@ -120,7 +120,7 @@ function RolePermissionsTab({ context, onSaved }: { context: PermissionAdminCont
                 <Text weight="medium">{item.label}</Text>
                 <Text tone="muted" variant="caption">{item.description}</Text>
               </View>
-              {isConfigurablePermission(item.key) ? (
+              {isConfigurablePermission(item.key) && role !== "super_admin" ? (
                 <View style={styles.controlColumn}>
                   <View style={styles.inline}>
                     <Text tone="muted" variant="caption">{isCustomised(item.key) ? "Customised" : "Default"}</Text>
@@ -140,7 +140,7 @@ function RolePermissionsTab({ context, onSaved }: { context: PermissionAdminCont
                 </View>
               ) : (
                 <View style={styles.controlColumn}>
-                  <View style={styles.inline}><Lock color={theme.colors.textMuted} size={12} /><Text tone="muted" variant="caption">{lockedReason(item)}</Text></View>
+                  <View style={styles.inline}><Lock color={theme.colors.textMuted} size={12} /><Text tone="muted" variant="caption">{role === "super_admin" ? "Super Admin authority" : lockedReason(item)}</Text></View>
                   <Allowed value={explainPermission({ role, dashboardAuthority: null }, item.key).effective} />
                 </View>
               )}
@@ -313,7 +313,7 @@ function UserPermissionsTab({ context, onSaved, selfId }: { context: PermissionA
                 <Text tone="muted" variant="caption">
                   {`Role: ${explanation.roleDefault ? "Allowed" : "Denied"} (${explanation.decidedBy === "protected" || explanation.decidedBy === "authority" ? lockedReason(item) : `${titleCase(explanation.effectiveRole)}${explanation.roleConfigured ? " · customised" : ""}`}) · Designation: ${explanation.designation ? titleCase(explanation.designation) : "—"}`}
                 </Text>
-                {isConfigurablePermission(item.key) ? (
+                {isConfigurablePermission(item.key) && explanation.effectiveRole !== "super_admin" ? (
                   <EffectControl disabled={isSelf} label={`${item.label} override for ${breakdown.employeeName}`} onChange={(value) => setDraft((current) => ({ ...current, [item.key]: value }))} value={explanation.user} />
                 ) : (
                   <View style={styles.inline}><Lock color={theme.colors.textMuted} size={12} /><Text tone="muted" variant="caption">Locked</Text></View>

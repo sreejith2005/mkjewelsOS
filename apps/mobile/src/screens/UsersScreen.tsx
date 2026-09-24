@@ -22,6 +22,7 @@ import {
 import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
 import { useAccess, useProfile } from "@/auth/AuthProvider";
 import { OrganizationTree } from "@/features/users/OrganizationTree";
+import { OrganizationManager } from "@/features/users/OrganizationManager";
 import { titleCase } from "@/lib/format";
 import { errorText } from "@/lib/log";
 import { useAsyncData } from "@/lib/useAsyncData";
@@ -68,6 +69,7 @@ export function UsersScreen() {
   const [view, setView] = useState<"list" | "organization">("list");
   const [editing, setEditing] = useState<UserDirectoryProfile | null>(null);
   const [inviting, setInviting] = useState(false);
+  const [managingOrganization, setManagingOrganization] = useState(false);
   const state = useAsyncData(loadUserDirectory, []);
   useEffect(() => profile.tenant_id ? subscribeToTenantRealtime(profile.tenant_id, ["organization", "settings"], () => void state.refresh()) : undefined, [profile.tenant_id, state.refresh]);
   const canManage = hasPermission(access, "users.manage");
@@ -135,6 +137,7 @@ export function UsersScreen() {
             {formerCount > 0 && statusFilter !== "left" ? <Text tone="muted" variant="small">{formerCount} former employees hidden - choose Left in Filter status to see them.</Text> : null}
           </View>
           {canManage ? <Button label="Add user" onPress={() => setInviting(true)} /> : null}
+          {hasPermission(access, "organization.manage") ? <Button label="Manage organization" onPress={() => setManagingOrganization(true)} variant="secondary" /> : null}
           <SegmentedControl accessibilityLabel="Employee directory view" options={[{ value: "list", label: "List" }, { value: "organization", label: "Organization" }]} value={view} onChange={setView} />
           {state.error ? <Banner tone="danger">{state.error}</Banner> : null}
           <SearchField
@@ -187,6 +190,7 @@ export function UsersScreen() {
           role={profile.user_role}
         />
       ) : null}
+      {managingOrganization ? <OrganizationManager onChanged={state.refresh} onClose={() => setManagingOrganization(false)} /> : null}
     </>
   );
 }

@@ -26,6 +26,7 @@ import { supabase } from "@jewelos/api-client";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Field, Modal, Notice } from "@/components/ui";
 import { refreshSessionForSensitiveAction } from "@/lib/edgeSession";
+import { OrganizationManager } from "@/features/users/OrganizationManager";
 import { edgeFunctionErrorMessage, initials, PHONE_PATTERN, titleCase } from "@/lib/format";
 import type { Branch, Department, DropdownMaster, UserProfile } from "@/types";
 
@@ -833,6 +834,8 @@ export function UserManagementPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [branchFilter, setBranchFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("");
   const [view, setView] = useState<"list" | "organization">("list");
   const [editing, setEditing] = useState<UserProfile | null>(null);
   const [inviting, setInviting] = useState(false);
@@ -871,9 +874,11 @@ export function UserManagementPage() {
             `${user.employee_name} ${user.employee_code} ${user.email}`
               .toLowerCase()
               .includes(search.toLowerCase())) &&
-          (!status || user.account_status === status),
+          (!status || user.account_status === status) &&
+          (!branchFilter || user.branch_id === branchFilter) &&
+          (!departmentFilter || user.department_id === departmentFilter),
       ),
-    [data.profiles, search, status],
+    [data.profiles, search, status, branchFilter, departmentFilter],
   );
   if (!caller) return null;
   const canEdit = hasPermission(access, "users.manage");
@@ -902,7 +907,8 @@ export function UserManagementPage() {
         ) : null}
       </header>
       {error ? <Notice tone="danger">{error}</Notice> : null}
-      <div className="glass-card mb-4 grid gap-3 rounded-xl p-4 sm:grid-cols-2 lg:grid-cols-[1fr_180px_auto]">
+      {hasPermission(access, "organization.manage") ? <OrganizationManager data={{ branches: data.branches, departments: data.departments, people: data.profiles }} onChanged={load} /> : null}
+      <div className="glass-card mb-4 grid gap-3 rounded-xl p-4 sm:grid-cols-2 lg:grid-cols-[1fr_160px_160px_160px_auto]">
         <label className="relative">
           <Search className="absolute left-3 top-3 h-4 w-4 text-soft-grey" />
           <input
@@ -913,6 +919,8 @@ export function UserManagementPage() {
             onChange={(event) => setSearch(event.target.value)}
           />
         </label>
+        <select aria-label="Filter branch" className="field" onChange={(event) => { setBranchFilter(event.target.value); setDepartmentFilter(""); }} value={branchFilter}><option value="">All branches</option>{data.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
+        <select aria-label="Filter department" className="field" onChange={(event) => setDepartmentFilter(event.target.value)} value={departmentFilter}><option value="">All departments</option>{data.departments.filter((department) => !branchFilter || !department.branch_id || department.branch_id === branchFilter).map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select>
         <select
           className="field"
           aria-label="Account status"
@@ -975,6 +983,8 @@ export function UserManagementPage() {
                 {[
                   ["Mobile", user.personal_mobile ?? "—"],
                   ["Email", user.email],
+                  ["Branch", data.branches.find((item) => item.id === user.branch_id)?.name ?? "—"],
+                  ["Department", data.departments.find((item) => item.id === user.department_id)?.name ?? "—"],
                   ["Reports to", data.profiles.find((item) => item.id === user.reports_to_user_id)?.employee_name ?? "—"],
                 ].map(([label, value]) => (
                   <div className="flex justify-between gap-3" key={label}>
@@ -988,12 +998,14 @@ export function UserManagementPage() {
           {users.length === 0 ? <p className="rounded-xl border border-gold/15 p-10 text-center text-soft-grey">No users match this view.</p> : null}
         </div>
         <div className="hidden overflow-x-auto rounded-xl border border-gold/15 lg:block">
-          <table className="w-full min-w-[920px] text-left text-sm">
+          <table className="w-full min-w-[1120px] text-left text-sm">
             <thead className="border-b border-gold/15 bg-charcoal text-xs uppercase text-soft-grey">
               <tr>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Mobile</th>
                 <th className="px-4 py-3">Email</th>
+                <th className="px-4 py-3">Branch</th>
+                <th className="px-4 py-3">Department</th>
                 <th className="px-4 py-3">Reports to</th>
                 <th className="px-4 py-3">Role</th>
                 <th className="px-4 py-3">Status</th>
@@ -1025,6 +1037,8 @@ export function UserManagementPage() {
                     {user.personal_mobile ?? "—"}
                   </td>
                   <td className="px-4 py-3 text-soft-grey">{user.email}</td>
+                  <td className="px-4 py-3 text-soft-grey">{data.branches.find((item) => item.id === user.branch_id)?.name ?? "—"}</td>
+                  <td className="px-4 py-3 text-soft-grey">{data.departments.find((item) => item.id === user.department_id)?.name ?? "—"}</td>
                   <td className="px-4 py-3 text-soft-grey">
                     {data.profiles.find(
                       (item) => item.id === user.reports_to_user_id,

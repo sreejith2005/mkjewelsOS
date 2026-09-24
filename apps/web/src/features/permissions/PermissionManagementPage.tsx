@@ -90,14 +90,14 @@ function RolePermissionsTab({ context, onSaved }: { context: PermissionAdminCont
   return <div className="flex flex-col gap-4">
     <div className="scroll-x no-scrollbar flex gap-2 pb-1" role="group" aria-label="Role">{context.roles.map((item) => <Pill active={item === role} key={item} onClick={() => setRole(item)}>{titleCase(item)}</Pill>)}</div>
     <FeedbackNotice feedback={feedback} />
-    <p className="text-sm text-task-text-muted">These are the defaults for everyone whose effective role is <strong>{titleCase(role)}</strong> (their role, or their dashboard authority when one is set). Designation and user overrides still apply on top.</p>
+    <p className="text-sm text-task-text-muted">{role === "super_admin" ? "Super Admin has every implemented capability. Configured denies do not reduce this authority." : <>These are the defaults for everyone whose effective role is <strong>{titleCase(role)}</strong> (their role, or their dashboard authority when one is set). Designation and user overrides still apply on top.</>}</p>
     {GROUPS.map((group) => <Panel key={group.category} title={group.category}><ul className="-mx-4 -my-3 divide-y divide-task-border">{group.items.map((item) => <li className="flex items-start justify-between gap-3 px-4 py-3" key={item.key}>
       <div className="min-w-0"><p className="text-sm font-medium">{item.label}</p><p className="text-xs text-task-text-muted">{item.description}</p></div>
-      {isConfigurablePermission(item.key) ? <div className="flex shrink-0 items-center gap-2">
+      {isConfigurablePermission(item.key) && role !== "super_admin" ? <div className="flex shrink-0 items-center gap-2">
         <span className="text-[11px] text-task-text-muted">{isCustomised(item.key) ? "Customised" : "Default"}</span>
         {isCustomised(item.key) ? <button aria-label={`Reset ${item.label} to default`} className="rounded p-1 text-task-text-muted hover:bg-task-muted" onClick={() => setDraft((current) => ({ ...current, [item.key]: null }))} type="button"><RotateCcw className="size-3.5" /></button> : null}
         <input aria-label={`${item.label} for ${titleCase(role)}`} checked={valueFor(item.key)} className="size-4 accent-gold" onChange={(event) => setDraft((current) => ({ ...current, [item.key]: event.target.checked }))} type="checkbox" />
-      </div> : <span className="flex shrink-0 items-center gap-1.5 text-xs text-task-text-muted"><Lock className="size-3.5" />{lockedReason(item)} · <Allowed value={explainPermission({ role, dashboardAuthority: null }, item.key).effective} /></span>}
+      </div> : <span className="flex shrink-0 items-center gap-1.5 text-xs text-task-text-muted"><Lock className="size-3.5" />{role === "super_admin" ? "Super Admin authority" : lockedReason(item)} · <Allowed value={explainPermission({ role, dashboardAuthority: null }, item.key).effective} /></span>}
     </li>)}</ul></Panel>)}
     <div className="flex justify-end"><Button disabled={saving || changes.length === 0} onClick={() => void save()}><Save />{saving ? "Saving…" : `Save ${changes.length || ""} change${changes.length === 1 ? "" : "s"}`}</Button></div>
   </div>;
@@ -215,7 +215,7 @@ function UserPermissionsTab({ context, onSaved, selfId }: { context: PermissionA
                   <td className="px-4 py-2"><span className="font-medium">{item.label}</span></td>
                   <td className="px-3 py-2"><Allowed value={explanation.roleDefault} /><span className="block text-[11px] text-task-text-muted">{explanation.decidedBy === "protected" || explanation.decidedBy === "authority" ? lockedReason(item) : `${titleCase(explanation.effectiveRole)}${explanation.roleConfigured ? " · customised" : ""}`}</span></td>
                   <td className="px-3 py-2 text-xs">{explanation.designation ? titleCase(explanation.designation) : <span className="text-task-text-muted">—</span>}</td>
-                  <td className="px-3 py-2">{isConfigurablePermission(item.key) ? <EffectSelect disabled={isSelf} label={`${item.label} override for ${breakdown.employeeName}`} onChange={(value) => setDraft((current) => ({ ...current, [item.key]: value }))} value={explanation.user} /> : <Lock aria-label="Locked" className="size-3.5 text-task-text-muted" />}</td>
+                  <td className="px-3 py-2">{isConfigurablePermission(item.key) && explanation.effectiveRole !== "super_admin" ? <EffectSelect disabled={isSelf} label={`${item.label} override for ${breakdown.employeeName}`} onChange={(value) => setDraft((current) => ({ ...current, [item.key]: value }))} value={explanation.user} /> : <Lock aria-label="Locked" className="size-3.5 text-task-text-muted" />}</td>
                   <td className="px-3 py-2"><Allowed value={explanation.effective} />{pending ? <span className="block text-[11px] text-task-text-muted">unsaved</span> : null}</td>
                 </tr>;
               }),

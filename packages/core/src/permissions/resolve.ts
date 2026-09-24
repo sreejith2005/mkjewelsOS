@@ -53,8 +53,11 @@ export function explainPermission(subject: AccessSubject, key: PermissionKey): P
   if (!definition) throw new Error(`Unknown permission: ${key}`);
   const effectiveRole = effectiveRoleFor(subject);
   const builtin = definition.defaultRoles.includes(effectiveRole);
+  if (effectiveRole === "super_admin") {
+    return { key, effectiveRole, roleDefault: true, roleConfigured: false, designation: null, user: null, effective: true, decidedBy: definition.kind === "protected" ? "protected" : "authority" };
+  }
   if (definition.kind === "protected" || definition.kind === "authority") {
-    const effective = definition.kind === "protected" ? effectiveRole === "super_admin" : builtin;
+    const effective = definition.kind === "protected" ? false : builtin;
     return { key, effectiveRole, roleDefault: effective, roleConfigured: false, designation: null, user: null, effective, decidedBy: definition.kind };
   }
   const configured = subject.rolePermissions?.[effectiveRole]?.[key];

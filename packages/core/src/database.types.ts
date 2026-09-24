@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -2340,6 +2340,69 @@ export type Database = {
           },
           {
             foreignKeyName: "designation_daily_checklists_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      designation_permission_overrides: {
+        Row: {
+          designation_id: string
+          effect: string
+          permission_key: string
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          designation_id: string
+          effect: string
+          permission_key: string
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          designation_id?: string
+          effect?: string
+          permission_key?: string
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "designation_permission_overrides_designation_id_fkey"
+            columns: ["designation_id"]
+            isOneToOne: false
+            referencedRelation: "dropdown_masters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "designation_permission_overrides_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "permission_catalog"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "designation_permission_overrides_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "designation_permission_overrides_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "designation_permission_overrides_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "v_task_users"
@@ -5021,6 +5084,30 @@ export type Database = {
           },
         ]
       }
+      permission_catalog: {
+        Row: {
+          default_roles: Database["public"]["Enums"]["user_role"][]
+          key: string
+          kind: string
+          page_id: string | null
+          sort_order: number
+        }
+        Insert: {
+          default_roles: Database["public"]["Enums"]["user_role"][]
+          key: string
+          kind: string
+          page_id?: string | null
+          sort_order: number
+        }
+        Update: {
+          default_roles?: Database["public"]["Enums"]["user_role"][]
+          key?: string
+          kind?: string
+          page_id?: string | null
+          sort_order?: number
+        }
+        Relationships: []
+      }
       production_demo_data_retirements: {
         Row: {
           actor_profile_id: string
@@ -5214,6 +5301,62 @@ export type Database = {
           {
             foreignKeyName: "resignations_user_profile_id_fkey"
             columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      role_permissions: {
+        Row: {
+          is_allowed: boolean
+          permission_key: string
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+          user_role: Database["public"]["Enums"]["user_role"]
+        }
+        Insert: {
+          is_allowed: boolean
+          permission_key: string
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+          user_role: Database["public"]["Enums"]["user_role"]
+        }
+        Update: {
+          is_allowed?: boolean
+          permission_key?: string
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_role?: Database["public"]["Enums"]["user_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "permission_catalog"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "role_permissions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_permissions_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_permissions_updated_by_fkey"
+            columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "v_task_users"
             referencedColumns: ["id"]
@@ -6457,6 +6600,66 @@ export type Database = {
         }
         Relationships: []
       }
+      user_access_profiles: {
+        Row: {
+          dashboard_authority: Database["public"]["Enums"]["user_role"]
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+          user_profile_id: string
+        }
+        Insert: {
+          dashboard_authority: Database["public"]["Enums"]["user_role"]
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+          user_profile_id: string
+        }
+        Update: {
+          dashboard_authority?: Database["public"]["Enums"]["user_role"]
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_access_profiles_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_access_profiles_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_access_profiles_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_access_profiles_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: true
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_access_profiles_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: true
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_availability: {
         Row: {
           created_at: string | null
@@ -6682,6 +6885,76 @@ export type Database = {
           },
           {
             foreignKeyName: "user_organization_history_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_permission_overrides: {
+        Row: {
+          effect: string
+          permission_key: string
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+          user_profile_id: string
+        }
+        Insert: {
+          effect: string
+          permission_key: string
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+          user_profile_id: string
+        }
+        Update: {
+          effect?: string
+          permission_key?: string
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_permission_overrides_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "permission_catalog"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "user_permission_overrides_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_permission_overrides_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_permission_overrides_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_permission_overrides_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_permission_overrides_user_profile_id_fkey"
             columns: ["user_profile_id"]
             isOneToOne: false
             referencedRelation: "v_task_users"
@@ -7260,9 +7533,9 @@ export type Database = {
           buddy_assignment_allowed: boolean | null
           category_id: string | null
           checklist_completion_pct: number | null
+          core_task_label: string | null
           coverage_original_assignee_id: string | null
           coverage_status: string | null
-          core_task_label: string | null
           created_by: string | null
           delay_minutes: number | null
           department_id: string | null
@@ -7597,6 +7870,8 @@ export type Database = {
         Args: { p_allowed: string[]; p_label: string; p_value: Json }
         Returns: undefined
       }
+      assert_module_access: { Args: { p_page: string }; Returns: undefined }
+      assert_module_enabled: { Args: { p_page: string }; Returns: undefined }
       assert_notification_admin: {
         Args: never
         Returns: {
@@ -7965,6 +8240,10 @@ export type Database = {
         Args: { p_batch_id: string; p_rows: Json }
         Returns: Json
       }
+      commit_task_bulk_import_chunk_v0132: {
+        Args: { p_batch_id: string; p_rows: Json }
+        Returns: Json
+      }
       complete_crm_followup: {
         Args: {
           p_expected_version: number
@@ -7986,6 +8265,10 @@ export type Database = {
       }
       complete_recurring_task_with_image_with_audit: {
         Args: { p_file_url: string; p_task_id: string }
+        Returns: undefined
+      }
+      complete_task_checklist_items: {
+        Args: { p_actor_id: string; p_task_id: string }
         Returns: undefined
       }
       complete_uploaded_task_with_audit: {
@@ -8345,6 +8628,10 @@ export type Database = {
         }
         Returns: string
       }
+      fms_route_expected_values: {
+        Args: { p_operator: string; p_value: string }
+        Returns: Json
+      }
       fms_rule_matches: {
         Args: { p_actual: Json; p_expected: string; p_operator: string }
         Returns: boolean
@@ -8364,6 +8651,18 @@ export type Database = {
           p_stage_id: string
         }
         Returns: boolean
+      }
+      fms_stage_matched_route: {
+        Args: {
+          p_instance_id: string
+          p_instance_stage_id: string
+          p_outcome: string
+          p_stage_id: string
+        }
+        Returns: {
+          next_stage_id: string
+          rule_id: string
+        }[]
       }
       fms_stage_route_target: {
         Args: {
@@ -8426,6 +8725,7 @@ export type Database = {
       get_employee_task_progress: { Args: { p_context?: Json }; Returns: Json }
       get_form_upload_path: { Args: { p_file_id: string }; Returns: string }
       get_home_summary: { Args: { p_context?: Json }; Returns: Json }
+      get_my_access_context: { Args: never; Returns: Json }
       get_my_daily_checklist_status: { Args: never; Returns: Json }
       get_my_fms_starter_assignments: {
         Args: never
@@ -8447,6 +8747,7 @@ export type Database = {
           status_reason: string
         }[]
       }
+      get_permission_admin_context: { Args: never; Returns: Json }
       get_recurring_todo_workspace: { Args: { p_filter?: Json }; Returns: Json }
       get_report_data: {
         Args: { p_filters?: Json; p_report_key: string }
@@ -8461,35 +8762,6 @@ export type Database = {
         Returns: Json
       }
       get_section_availability: { Args: never; Returns: Json }
-      assert_module_access: { Args: { p_page: string }; Returns: undefined }
-      assert_module_enabled: { Args: { p_page: string }; Returns: undefined }
-      get_my_access_context: { Args: never; Returns: Json }
-      get_permission_admin_context: { Args: never; Returns: Json }
-      get_user_access_breakdown: { Args: { p_profile_id: string }; Returns: Json }
-      has_permission: { Args: { p_key: string }; Returns: boolean }
-      module_accessible: {
-        Args: { p_page: string; p_require_permission?: boolean }
-        Returns: boolean
-      }
-      save_designation_permissions_with_audit: {
-        Args: { p_designation_id: string; p_overrides: Json }
-        Returns: Json
-      }
-      save_role_permissions_with_audit: {
-        Args: {
-          p_permissions: Json
-          p_role: Database["public"]["Enums"]["user_role"]
-        }
-        Returns: Json
-      }
-      save_user_access_with_audit: {
-        Args: {
-          p_dashboard_authority?: string
-          p_overrides: Json
-          p_profile_id: string
-        }
-        Returns: Json
-      }
       get_task_attachment_path: {
         Args: { p_attachment_id: string }
         Returns: string
@@ -8500,6 +8772,11 @@ export type Database = {
         Returns: Json
       }
       get_task_template_directory: { Args: { p_filter?: Json }; Returns: Json }
+      get_user_access_breakdown: {
+        Args: { p_profile_id: string }
+        Returns: Json
+      }
+      has_permission: { Args: { p_key: string }; Returns: boolean }
       hold_fms_instance_with_audit: {
         Args: { p_instance_id: string; p_reason: string }
         Returns: undefined
@@ -8633,16 +8910,6 @@ export type Database = {
       }
       list_assigning_left_tasks: { Args: never; Returns: Json }
       list_crm_followups: { Args: { p_filter?: Json }; Returns: Json[] }
-      list_task_comments: {
-        Args: { p_task_id: string }
-        Returns: {
-          author_id: string
-          author_name: string
-          comment: string
-          created_at: string
-          id: string
-        }[]
-      }
       list_designation_daily_checklists: { Args: never; Returns: Json }
       list_notification_delivery_logs: {
         Args: {
@@ -8667,6 +8934,16 @@ export type Database = {
           recipient_label: string
           scheduled_at: string
           state: string
+        }[]
+      }
+      list_task_comments: {
+        Args: { p_task_id: string }
+        Returns: {
+          author_id: string
+          author_name: string
+          comment: string
+          created_at: string
+          id: string
         }[]
       }
       list_task_import_identity_candidates: {
@@ -8710,6 +8987,11 @@ export type Database = {
         }
         Returns: string
       }
+      module_accessible: {
+        Args: { p_page: string; p_require_permission?: boolean }
+        Returns: boolean
+      }
+      module_enabled: { Args: { p_page: string }; Returns: boolean }
       move_fms_stage_backward_with_audit: {
         Args: {
           p_assignee_id?: string
@@ -8752,6 +9034,10 @@ export type Database = {
       notification_link_is_safe: { Args: { p_link: string }; Returns: boolean }
       notification_rule_matches: {
         Args: { p_conditions: Json; p_payload: Json }
+        Returns: boolean
+      }
+      permission_effective_for: {
+        Args: { p_key: string; p_profile_id: string }
         Returns: boolean
       }
       prepare_unused_user_deletion: {
@@ -8873,6 +9159,10 @@ export type Database = {
         Args: never
         Returns: undefined
       }
+      reconcile_employee_roster_with_audit: {
+        Args: { p_retire: Json; p_roster: Json }
+        Returns: Json
+      }
       reconcile_production_login_emails: {
         Args: { p_changes: Json; p_retire_ids?: string[] }
         Returns: number
@@ -8954,6 +9244,7 @@ export type Database = {
         Args: { p_payload: Json; p_template: string }
         Returns: string
       }
+      repair_known_task_mojibake: { Args: { p_value: string }; Returns: string }
       repair_production_super_admin_identity: {
         Args: never
         Returns: undefined
@@ -9067,6 +9358,10 @@ export type Database = {
           original_assignee_id: string
           resolution: string
         }[]
+      }
+      restore_fms_flow_with_audit: {
+        Args: { p_flow_id: string; p_reason?: string }
+        Returns: undefined
       }
       resume_fms_instance_with_audit: {
         Args: { p_instance_id: string; p_reason: string }
@@ -9208,6 +9503,104 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      save_branch_with_audit: {
+        Args: { p_branch_id: string | null; p_payload: Json }
+        Returns: {
+          address: string | null
+          city: string | null
+          code: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          manager_id: string | null
+          name: string
+          pincode: string | null
+          settings: Json
+          settings_version: number
+          state: string | null
+          tenant_id: string
+          updated_at: string | null
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "branches"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      save_branch_with_audit_impl: {
+        Args: { p_branch_id: string | null; p_payload: Json }
+        Returns: {
+          address: string | null
+          city: string | null
+          code: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          manager_id: string | null
+          name: string
+          pincode: string | null
+          settings: Json
+          settings_version: number
+          state: string | null
+          tenant_id: string
+          updated_at: string | null
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "branches"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      save_department_with_audit: {
+        Args: { p_department_id: string | null; p_payload: Json }
+        Returns: {
+          branch_id: string | null
+          code: string
+          created_at: string | null
+          created_by: string | null
+          head_id: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          tenant_id: string
+          updated_at: string | null
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "departments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      save_department_with_audit_impl: {
+        Args: { p_department_id: string | null; p_payload: Json }
+        Returns: {
+          branch_id: string | null
+          code: string
+          created_at: string | null
+          created_by: string | null
+          head_id: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          tenant_id: string
+          updated_at: string | null
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "departments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       save_designation_daily_checklist_with_audit: {
         Args: {
           p_checklist_id: string
@@ -9219,6 +9612,10 @@ export type Database = {
           p_items: Json
           p_title: string
         }
+        Returns: Json
+      }
+      save_designation_permissions_with_audit: {
+        Args: { p_designation_id: string; p_overrides: Json }
         Returns: Json
       }
       save_fms_context_assignee_default_with_audit: {
@@ -9271,6 +9668,13 @@ export type Database = {
         Args: { p_payload: Json; p_template_id: string }
         Returns: string
       }
+      save_role_permissions_with_audit: {
+        Args: {
+          p_permissions: Json
+          p_role: Database["public"]["Enums"]["user_role"]
+        }
+        Returns: Json
+      }
       save_section_availability_with_audit: {
         Args: {
           p_developer_mode_enabled: boolean
@@ -9316,6 +9720,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      save_user_access_with_audit: {
+        Args: {
+          p_dashboard_authority?: string
+          p_overrides: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
       save_user_preferences_with_audit: {
         Args: { p_preferences: Json }
         Returns: {
@@ -9342,6 +9754,10 @@ export type Database = {
       }
       send_recurring_followup_with_audit: {
         Args: { p_message: string; p_task_id: string }
+        Returns: undefined
+      }
+      set_fms_flow_active_with_audit: {
+        Args: { p_active: boolean; p_flow_id: string; p_reason?: string }
         Returns: undefined
       }
       set_fms_flow_context_with_audit: {
@@ -9541,6 +9957,10 @@ export type Database = {
         Args: { p_value: string }
         Returns: string
       }
+      task_import_repair_checklist_evidence: {
+        Args: { p_actor_user_id: string; p_registry_id: string }
+        Returns: number
+      }
       task_import_repair_checklist_headline: {
         Args: {
           p_actor_user_id: string
@@ -9650,6 +10070,10 @@ export type Database = {
       use_task_template_with_audit: {
         Args: { p_planned_datetime: string; p_template_id: string }
         Returns: string
+      }
+      user_profile_has_linked_records: {
+        Args: { p_profile_id: string }
+        Returns: boolean
       }
       user_role_hierarchy_rank: {
         Args: { p_role: Database["public"]["Enums"]["user_role"] }

@@ -87,6 +87,7 @@ export const PERMISSION_CATALOG = [
   { key: "daily_checklists.manage", kind: "action", category: "Settings", label: "Manage daily checklists", description: "Designation daily checklist content.", defaultRoles: ["super_admin", "hr"], pageId: null },
   { key: "permissions.manage", kind: "protected", category: "Administration", label: "Manage permissions", description: "Role, designation, and user permissions and dashboard authority. Super Admin authority only.", defaultRoles: ["super_admin"], pageId: null },
   { key: "developer_mode.manage", kind: "protected", category: "Administration", label: "Manage Developer Mode", description: "Enable or disable sections and use disabled sections. Super Admin authority only.", defaultRoles: ["super_admin"], pageId: null },
+  { key: "organization.manage", kind: "protected", category: "Administration", label: "Manage organization structure", description: "Create and edit branches and departments. Super Admin authority only.", defaultRoles: ["super_admin"], pageId: null },
 ] as const satisfies readonly PermissionDefinition[];
 
 export type PermissionKey = (typeof PERMISSION_CATALOG)[number]["key"];
