@@ -10,6 +10,7 @@ import {
   voiceDraftGaps,
   type ManualTaskMode,
   type ManualTaskPriority,
+  type VoiceDeadline,
   type VoiceDraftGap,
 } from "@jewelos/core";
 import {
@@ -80,6 +81,7 @@ export function TaskComposerScreen() {
   const [error, setError] = useState<string | null>(null);
   const [voiceGaps, setVoiceGaps] = useState<readonly VoiceDraftGap[]>([]);
   const [assignmentReason, setAssignmentReason] = useState<string | null>(null);
+  const [deadlineNote, setDeadlineNote] = useState<Readonly<{ text: string; resolved: boolean }> | null>(null);
 
   const data = reference.data;
   const authoringScope = data ? deriveTaskAuthoringCapability({
@@ -117,7 +119,14 @@ export function TaskComposerScreen() {
     // Mirrors choosing "Task" by hand, which also discards checklist items.
     setChecklistText(draft.taskType === "checklist" ? draft.checklist.join("\n") : "");
     if (draft.priority) setPriority(draft.priority);
+    // Absent when an older function deployment answered.
+    const deadline: VoiceDeadline | undefined = draft.deadline;
+    // A note that named a deadline which could not be pinned to one day
+    // replaces an earlier date, so a stale one is never assigned unseen.
+    const spokeUnresolvedDeadline = !draft.plannedDatetime && Boolean(deadline?.dateExpression || deadline?.timeExpression);
     if (draft.plannedDatetime) setPlannedDatetime(draft.plannedDatetime);
+    else if (spokeUnresolvedDeadline) setPlannedDatetime("");
+    setDeadlineNote(deadline?.note ? { text: deadline.note, resolved: deadline.status === "resolved" } : null);
     const assigneeApplies = Boolean(draft.assigneeId) && eligiblePeople.some((person) => person.id === draft.assigneeId);
     if (assigneeApplies && draft.assigneeId) {
       setDoerIds([draft.assigneeId]);
@@ -134,7 +143,7 @@ export function TaskComposerScreen() {
       ...draft,
       title: draft.title || title.trim(),
       assigneeId: assigneeApplies ? draft.assigneeId : doerIds[0] ?? null,
-      plannedDatetime: draft.plannedDatetime || plannedDatetime || null,
+      plannedDatetime: draft.plannedDatetime || (spokeUnresolvedDeadline ? "" : plannedDatetime) || null,
     }));
   };
 
@@ -232,6 +241,7 @@ export function TaskComposerScreen() {
       {hasPermission(access, "tasks.voice_assign") && !createdTaskId ? <VoiceCaptureBoundary><VoiceTaskCapture onInterpreted={applyVoiceDraft} /></VoiceCaptureBoundary> : null}
       {outstandingVoiceGaps.length > 0 ? <Banner tone="danger">{`Still missing: ${outstandingVoiceGaps.map(voiceDraftGapMessage).join(" ")}`}</Banner> : null}
       {assignmentReason ? <Text tone="muted" variant="caption">Assigned from your voice note · {assignmentReason}</Text> : null}
+      {deadlineNote ? <Text tone={deadlineNote.resolved ? "muted" : "danger"} variant="caption">Deadline from your voice note · {deadlineNote.text}</Text> : null}
       <TextField editable={!createdTaskId} label="Task title" maxLength={200} onChangeText={setTitle} required value={title} />
       <TextField editable={!createdTaskId} label="Description" multiline onChangeText={setDescription} value={description} />
       <View style={styles.fieldGroup}>
@@ -270,7 +280,7 @@ export function TaskComposerScreen() {
       </View>
       <View style={styles.fieldGroup}>
         <Text tone="warm" variant="label" weight="medium">Due date and time *</Text>
-        <DateField disabled={Boolean(createdTaskId)} invalid={false} label="Due date and time" mode="datetime" onChange={setPlannedDatetime} value={plannedDatetime} />
+        <DateField disabled={Boolean(createdTaskId)} invalid={false} label="Due date and time" mode="datetime" onChange={(value) => { setPlannedDatetime(value); setDeadlineNote(null); }} value={plannedDatetime} />
       </View>
       <View style={styles.fieldGroup}>
         <Text tone="warm" variant="label" weight="medium">Priority</Text>

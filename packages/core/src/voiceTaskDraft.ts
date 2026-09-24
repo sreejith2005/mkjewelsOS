@@ -1,4 +1,5 @@
 import { matchPersonByLabel, normalizePersonLabel, type PersonMatchCandidate } from "./personMatching.ts";
+import type { VoiceDeadline } from "./voiceDeadline.ts";
 
 /**
  * Turning an interpreted voice note into a Task composer draft.
@@ -22,8 +23,13 @@ export type VoiceTaskHints = Readonly<{
   description: string;
   assignee_hint: string | null;
   department_hint: string | null;
-  /** ISO-8601 instant, already resolved against Asia/Kolkata "now" by the extractor. */
-  due_datetime: string | null;
+  /**
+   * The deadline day as spoken ("next Monday", "30 September"). Never a
+   * computed date: `resolveVoiceDeadline` turns it into one.
+   */
+  date_expression: string | null;
+  /** The time of day as spoken ("3 pm", "10:30 in the morning"). */
+  time_expression: string | null;
   priority: VoiceTaskPriority | null;
   task_type: VoiceTaskMode;
   checklist_items: readonly string[];
@@ -61,7 +67,10 @@ export type VoiceTaskDraft = Readonly<{
   description: string;
   assigneeId: string | null;
   assignmentReason: string | null;
+  /** Set only when `deadline.status` is "resolved". */
   plannedDatetime: string | null;
+  /** How the spoken deadline was read, shown to the author before Assign. */
+  deadline: VoiceDeadline;
   priority: VoiceTaskPriority | null;
   taskType: VoiceTaskMode;
   checklist: readonly string[];
@@ -232,7 +241,7 @@ export function resolveVoiceAssignment(
   return { assigneeId: null, reason: null };
 }
 
-export function buildVoiceTaskDraft(hints: VoiceTaskHints, context: VoiceResolutionContext): VoiceTaskDraft {
+export function buildVoiceTaskDraft(hints: VoiceTaskHints, context: VoiceResolutionContext, deadline: VoiceDeadline): VoiceTaskDraft {
   const assignment = resolveVoiceAssignment(hints, context);
   const checklist = hints.task_type === "checklist"
     ? hints.checklist_items.map((item) => item.trim()).filter(Boolean)
@@ -242,7 +251,8 @@ export function buildVoiceTaskDraft(hints: VoiceTaskHints, context: VoiceResolut
     description: hints.description.trim(),
     assigneeId: assignment.assigneeId,
     assignmentReason: assignment.reason,
-    plannedDatetime: hints.due_datetime,
+    plannedDatetime: deadline.status === "resolved" ? deadline.plannedDatetime : null,
+    deadline,
     priority: hints.priority,
     taskType: hints.task_type,
     checklist,

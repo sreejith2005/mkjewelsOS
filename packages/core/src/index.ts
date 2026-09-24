@@ -71,6 +71,15 @@ export type {
   VoiceTaskMode,
   VoiceTaskPriority,
 } from "./voiceTaskDraft.ts";
+export {
+  isValidTimeZone,
+  resolveVoiceDeadline,
+  VOICE_DEADLINE_DEFAULT_TIME,
+  VOICE_DEADLINE_DEFAULT_TIME_ZONE,
+  zonedDateKey,
+  zonedWallTimeToInstant,
+} from "./voiceDeadline.ts";
+export type { VoiceDeadline, VoiceDeadlineInput, VoiceDeadlineStatus } from "./voiceDeadline.ts";
 export { matchPersonByLabel, normalizePersonLabel, personNameKey } from "./personMatching";
 export type { PersonMatchCandidate } from "./personMatching";
 export { normalizeTaskParticipants } from "./taskParticipants";

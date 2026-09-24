@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { VoiceDeadline } from "@jewelos/core";
 import type { UserProfile } from "@/types";
 import type { TaskReferenceData } from "./api";
 import type { VoiceTaskInterpretation } from "./voiceApi";
@@ -50,6 +51,25 @@ const profile = {
 
 const tomorrow = new Date(Date.now() + 86_400_000).toISOString();
 
+const resolvedDeadline: VoiceDeadline = {
+  status: "resolved",
+  dateExpression: "tomorrow",
+  timeExpression: null,
+  hasExplicitDate: true,
+  hasExplicitTime: false,
+  date: tomorrow.slice(0, 10),
+  time: "19:00",
+  timeSource: "default",
+  range: null,
+  plannedDatetime: tomorrow,
+  timeZone: "Asia/Kolkata",
+  note: "“tomorrow” → tomorrow, 7:00 PM (no time said, default 7:00 PM)",
+};
+
+const unresolvedDeadline = (overrides: Partial<VoiceDeadline>): VoiceDeadline => ({
+  ...resolvedDeadline, date: null, time: null, timeSource: null, plannedDatetime: null, note: null, ...overrides,
+});
+
 const interpretation = (overrides: Partial<VoiceTaskInterpretation["draft"]> = {}, gaps: VoiceTaskInterpretation["gaps"] = []): VoiceTaskInterpretation => ({
   transcript: "Ask Teammate to count the stock by tomorrow",
   gaps,
@@ -59,6 +79,7 @@ const interpretation = (overrides: Partial<VoiceTaskInterpretation["draft"]> = {
     assigneeId: "doer-1",
     assignmentReason: 'Matched "Teammate"',
     plannedDatetime: tomorrow,
+    deadline: resolvedDeadline,
     priority: "low",
     taskType: "delegation",
     checklist: [],
@@ -170,12 +191,51 @@ describe("TaskComposer voice capture", () => {
   });
 
   it("keeps a missing deadline out of the form rather than guessing one", () => {
-    interpretationRef.current = interpretation({ plannedDatetime: null }, ["due"]);
+    interpretationRef.current = interpretation({ plannedDatetime: null, deadline: unresolvedDeadline({ status: "missing", dateExpression: null, hasExplicitDate: false }) }, ["due"]);
     renderComposer();
 
     fireEvent.click(screen.getByRole("button", { name: "Apply voice note" }));
 
     expect(screen.getByTestId("voice-gap-alert").textContent).toContain("Due date and time not set.");
     expect(screen.getByRole("button", { name: /Due Date/i }).textContent).not.toMatch(/\d/);
+  });
+
+  it("shows how the spoken deadline was read before Assign", () => {
+    interpretationRef.current = interpretation();
+    renderComposer();
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply voice note" }));
+
+    const note = screen.getByTestId("voice-deadline-note");
+    expect(note.textContent).toContain("“tomorrow”");
+    expect(note.className).not.toContain("text-danger");
+  });
+
+  it("replaces an earlier voice deadline when the next note names a deadline that needs a choice", async () => {
+    interpretationRef.current = interpretation();
+    const { onSave } = renderComposer();
+    fireEvent.click(screen.getByRole("button", { name: "Apply voice note" }));
+    expect(screen.getByTestId("task-selector-due").textContent).toMatch(/\d/);
+
+    interpretationRef.current = interpretation({
+      plannedDatetime: null,
+      deadline: unresolvedDeadline({
+        status: "ambiguous",
+        dateExpression: "next week",
+        range: { start: "2026-09-28", end: "2026-10-04" },
+        note: "“next week” covers Mon 28 Sep 2026 – Sun 4 Oct 2026. Choose the exact day.",
+      }),
+    }, ["due"]);
+    fireEvent.click(screen.getByRole("button", { name: "Apply voice note" }));
+
+    expect(screen.getByTestId("voice-gap-alert").textContent).toContain("Due date and time not set.");
+    expect(screen.getByTestId("task-selector-due").textContent).not.toMatch(/\d/);
+    const note = screen.getByTestId("voice-deadline-note");
+    expect(note.textContent).toContain("Choose the exact day.");
+    expect(note.className).toContain("text-danger");
+
+    fireEvent.click(screen.getByRole("button", { name: /Assign Task/i }));
+    await waitFor(() => expect(screen.getByText("Choose a due date and time.")).toBeTruthy());
+    expect(onSave).not.toHaveBeenCalled();
   });
 });

@@ -7,6 +7,7 @@ import {
   type VoiceTaskMode,
   type VoiceTaskPriority,
 } from "../../../packages/core/src/voiceTaskDraft.ts";
+import { resolveVoiceDeadline, type VoiceDeadline } from "../../../packages/core/src/voiceDeadline.ts";
 
 /**
  * Interpretation of a task voice note. This worker transcribes, extracts
@@ -54,8 +55,13 @@ export function assertVoiceUpload(upload: VoiceAudioUpload): void {
 }
 
 export type VoiceExtractionContext = Readonly<{
-  /** Current Asia/Kolkata wall clock, so "tomorrow 5pm" resolves. */
+  /**
+   * The one reference instant for this request. Relative deadlines resolve
+   * against it in `timeZone`; the extraction model is never shown it.
+   */
   nowIso: string;
+  /** The tenant's IANA timezone. */
+  timeZone: string;
   departmentLabels: readonly string[];
   peopleNames: readonly string[];
 }>;
@@ -80,13 +86,14 @@ export type VoiceInterpretationGateway = Readonly<{
 export const VOICE_HINTS_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["title", "description", "assignee_hint", "department_hint", "due_datetime", "priority", "task_type", "checklist_items"],
+  required: ["title", "description", "assignee_hint", "department_hint", "date_expression", "time_expression", "priority", "task_type", "checklist_items"],
   properties: {
     title: { type: "string", description: "Short imperative task title drawn from the note." },
     description: { type: "string", description: "Any extra detail from the note. Empty string when there is none." },
     assignee_hint: { type: ["string", "null"], description: "The person's name exactly as spoken, or null when no person was named." },
     department_hint: { type: ["string", "null"], description: "The department name or code as spoken, or null." },
-    due_datetime: { type: ["string", "null"], description: "ISO-8601 instant with offset, or null when the note gave no deadline." },
+    date_expression: { type: ["string", "null"], description: "The deadline day in the speaker's own words, e.g. \"next Monday\" or \"30 September\". Never a computed date. Null when no day was said." },
+    time_expression: { type: ["string", "null"], description: "The deadline time of day in the speaker's own words, e.g. \"3 pm\". Null when no time was said." },
     priority: { type: ["string", "null"], enum: ["high", "medium", "low", null] },
     task_type: { type: "string", enum: ["delegation", "checklist"] },
     checklist_items: { type: "array", items: { type: "string" } },
@@ -97,7 +104,7 @@ export function buildExtractionInstructions(context: VoiceExtractionContext): st
   return [
     "You convert a spoken task instruction into structured fields for a task assignment form at MK Jewels, a jewellery retailer in India.",
     "The transcript is machine speech-to-text of Indian English that may mix in Hindi or Malayalam words, so names can be misspelt.",
-    `The current date and time in Asia/Kolkata is ${context.nowIso}. Resolve relative deadlines such as "tomorrow", "by Friday", "tonight", or "in two hours" against it and answer with an ISO-8601 instant including the +05:30 offset. A day without a time means 18:00 that day.`,
+    'Report the deadline exactly as it was said; the application works out the calendar date. date_expression is only the words naming the day, such as "tomorrow", "next Monday", "Monday of next week", "second week of next month", "last Friday of this month", "in 3 days", "tonight", or "30 September". time_expression is only the words naming the time of day, such as "3 pm", "10:30 in the morning", or "evening". Copy the words as spoken (translate a Hindi or Malayalam deadline word-for-word into English, e.g. "parson" -> "day after tomorrow"). Never convert them into a date, weekday, or number the speaker did not say, never add a year, and never fill in a deadline that was not spoken.',
     'title is a short imperative summary of the work in English, for example "Count the display stock". Never copy the whole transcript into the title.',
     "Return assignee_hint as the person's name. When the spoken name clearly refers to one of the listed people, return that person's name exactly as listed; otherwise return it as spoken. Never invent a name that was not said, and never return an identifier.",
     "Return department_hint when a team or department was named, using the department's name or code exactly as listed when it clearly refers to one of them.",
@@ -152,7 +159,7 @@ export function assertTranscriptWasSpoken(transcription: VoiceTranscription): vo
 
 /** True when the note carried nothing a task could be built from. */
 export function hintsCarryNoTask(hints: VoiceTaskHints): boolean {
-  return !hints.title && !hints.assignee_hint && !hints.department_hint && !hints.due_datetime && hints.checklist_items.length === 0;
+  return !hints.title && !hints.assignee_hint && !hints.department_hint && !hints.date_expression && !hints.time_expression && hints.checklist_items.length === 0;
 }
 
 function asString(value: unknown): string {
@@ -171,19 +178,8 @@ function asMode(value: unknown): VoiceTaskMode {
   return value === "checklist" ? "checklist" : "delegation";
 }
 
-/**
- * A deadline the model placed in the past is dropped rather than trusted, so it
- * surfaces as a "due" gap the author fills instead of a silently wrong date.
- */
-function asFutureIso(value: unknown, nowMs: number): string | null {
-  const raw = asNullableString(value);
-  if (!raw) return null;
-  const parsed = Date.parse(raw);
-  return Number.isNaN(parsed) || parsed <= nowMs ? null : new Date(parsed).toISOString();
-}
-
 /** Model output is untrusted input, so every field is narrowed before use. */
-export function parseExtractionHints(value: unknown, nowMs: number): VoiceTaskHints {
+export function parseExtractionHints(value: unknown): VoiceTaskHints {
   if (typeof value !== "object" || value === null) throw new VoiceInterpretationError(502, "The voice note could not be interpreted");
   const record = value as Record<string, unknown>;
   const items = Array.isArray(record.checklist_items) ? record.checklist_items : [];
@@ -192,7 +188,8 @@ export function parseExtractionHints(value: unknown, nowMs: number): VoiceTaskHi
     description: asString(record.description).trim().slice(0, 2_000),
     assignee_hint: asNullableString(record.assignee_hint),
     department_hint: asNullableString(record.department_hint),
-    due_datetime: asFutureIso(record.due_datetime, nowMs),
+    date_expression: asNullableString(record.date_expression)?.slice(0, 120) ?? null,
+    time_expression: asNullableString(record.time_expression)?.slice(0, 80) ?? null,
     priority: asPriority(record.priority),
     task_type: asMode(record.task_type),
     checklist_items: items.flatMap((item) => typeof item === "string" && item.trim() ? [item.trim().slice(0, 200)] : []).slice(0, 50),
@@ -206,14 +203,15 @@ export type VoiceInterpretation = Readonly<{
 }>;
 
 /**
- * `loadResolution` runs after extraction because the roster snapshot depends on
- * the deadline the note turned out to carry - availability and open load are
- * both per-day facts.
+ * `loadResolution` runs after the deadline is resolved because the roster
+ * snapshot depends on it - availability and open load are both per-day facts.
+ * The model reports what was said; `resolveVoiceDeadline` alone decides which
+ * day that is, against the request's single reference instant.
  */
 export async function interpretVoiceTask(
   gateway: VoiceInterpretationGateway,
   upload: VoiceAudioUpload,
-  loadResolution: (hints: VoiceTaskHints) => Promise<VoiceResolutionContext>,
+  loadResolution: (hints: VoiceTaskHints, deadline: VoiceDeadline) => Promise<VoiceResolutionContext>,
   extraction: VoiceExtractionContext,
 ): Promise<VoiceInterpretation> {
   assertVoiceUpload(upload);
@@ -221,8 +219,14 @@ export async function interpretVoiceTask(
   const transcript = transcription.text.trim();
   if (!transcript) throw new VoiceInterpretationError(422, "Nothing was said in the recording");
   assertTranscriptWasSpoken(transcription);
-  const hints = parseExtractionHints(await gateway.extract(transcript, extraction), Date.parse(extraction.nowIso));
+  const hints = parseExtractionHints(await gateway.extract(transcript, extraction));
   if (hintsCarryNoTask(hints)) throw new VoiceInterpretationError(422, "No task was heard in that recording. Check your microphone, speak clearly, and try again.");
-  const draft = buildVoiceTaskDraft(hints, await loadResolution(hints));
+  const deadline = resolveVoiceDeadline({
+    dateExpression: hints.date_expression,
+    timeExpression: hints.time_expression,
+    now: extraction.nowIso,
+    timeZone: extraction.timeZone,
+  });
+  const draft = buildVoiceTaskDraft(hints, await loadResolution(hints, deadline), deadline);
   return { transcript, draft, gaps: voiceDraftGaps(draft) };
 }

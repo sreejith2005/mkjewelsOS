@@ -10,7 +10,14 @@ import {
   type VoiceExtractionContext,
 } from "./worker.ts";
 import { deriveTaskAuthoringCapability } from "../../../packages/core/src/taskAuthoringCapabilities.ts";
-import type { VoiceAssignmentCandidate, VoiceTaskHints } from "../../../packages/core/src/voiceTaskDraft.ts";
+import type { VoiceAssignmentCandidate } from "../../../packages/core/src/voiceTaskDraft.ts";
+import {
+  VOICE_DEADLINE_DEFAULT_TIME_ZONE,
+  isValidTimeZone,
+  zonedDateKey,
+  zonedWallTimeToInstant,
+  type VoiceDeadline,
+} from "../../../packages/core/src/voiceDeadline.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
@@ -29,19 +36,6 @@ const OPEN_TASK_STATUSES = ["pending", "in_progress", "in_review", "blocked", "o
 
 function response(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), { headers: corsHeaders, status });
-}
-
-function kolkataParts(date: Date) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    day: "2-digit", hour: "2-digit", hour12: false, minute: "2-digit",
-    month: "2-digit", second: "2-digit", timeZone: "Asia/Kolkata", year: "numeric",
-  }).formatToParts(date);
-  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
-  return { date: `${value("year")}-${value("month")}-${value("day")}`, time: `${value("hour")}:${value("minute")}:${value("second")}` };
-}
-
-function kolkataDateKey(iso: string): string {
-  return kolkataParts(new Date(iso)).date;
 }
 
 async function callOpenAi(path: string, apiKey: string, init: RequestInit): Promise<unknown> {
@@ -115,10 +109,11 @@ Deno.serve(async (request: Request) => {
       filename: audio.name || "voice-note.webm",
     };
 
+    // The single reference instant: every relative deadline in this note
+    // ("tomorrow", "next Monday") is resolved against it, never the model's.
     const now = new Date();
-    const { date: todayKey, time: nowTime } = kolkataParts(now);
 
-    const [departmentsResult, peopleResult, designationResult] = await Promise.all([
+    const [departmentsResult, peopleResult, designationResult, tenantResult] = await Promise.all([
       admin.from("departments").select("id,name,code,head_id").eq("tenant_id", profile.tenant_id).eq("is_active", true),
       admin.from("user_profiles")
         .select("id,employee_name,first_name,last_name,branch_id,department_id,account_status,working_status")
@@ -128,6 +123,7 @@ Deno.serve(async (request: Request) => {
       profile.designation_id
         ? admin.from("dropdown_masters").select("value").eq("id", profile.designation_id).maybeSingle()
         : Promise.resolve({ data: null, error: null }),
+      admin.from("tenants").select("timezone").eq("id", profile.tenant_id).maybeSingle(),
     ]);
     if (departmentsResult.error || peopleResult.error) return response(503, { error: "Roster is unavailable right now" });
 
@@ -145,21 +141,28 @@ Deno.serve(async (request: Request) => {
     }));
     const departments = departmentsResult.data.filter((department) => people.some((person) => person.department_id === department.id));
 
+    const tenantTimeZone = tenantResult.data?.timezone;
+    const timeZone = isValidTimeZone(tenantTimeZone) ? tenantTimeZone : VOICE_DEADLINE_DEFAULT_TIME_ZONE;
+    const todayKey = zonedDateKey(now, timeZone);
+
     const extraction: VoiceExtractionContext = {
-      nowIso: `${todayKey}T${nowTime}+05:30`,
+      nowIso: now.toISOString(),
+      timeZone,
       departmentLabels: departments.map((department) => department.code ? `${department.name} (${department.code})` : department.name),
       peopleNames: people.map((person) => person.employee_name).filter(Boolean),
     };
 
-    const loadResolution = async (hints: VoiceTaskHints) => {
-      const dueKey = hints.due_datetime ? kolkataDateKey(hints.due_datetime) : todayKey;
+    const loadResolution = async (_hints: unknown, deadline: VoiceDeadline) => {
+      const dueKey = deadline.date ?? todayKey;
+      const dayStart = zonedWallTimeToInstant(dueKey, "00:00", timeZone) ?? `${dueKey}T00:00:00Z`;
+      const dayEnd = new Date(Date.parse(zonedWallTimeToInstant(dueKey, "23:59", timeZone) ?? `${dueKey}T23:59:00Z`) + 59_999).toISOString();
       const [availabilityResult, loadResult] = await Promise.all([
         admin.from("user_availability").select("user_profile_id,status").eq("date", dueKey),
         admin.from("v_all_tasks").select("assignee_id")
           .eq("tenant_id", profile.tenant_id)
           .in("status", OPEN_TASK_STATUSES)
-          .gte("planned_datetime", `${dueKey}T00:00:00+05:30`)
-          .lte("planned_datetime", `${dueKey}T23:59:59.999+05:30`),
+          .gte("planned_datetime", dayStart)
+          .lte("planned_datetime", dayEnd),
       ]);
       const openCounts = new Map<string, number>();
       for (const row of loadResult.data ?? []) {
@@ -250,7 +253,7 @@ Deno.serve(async (request: Request) => {
       action: "task_voice_interpreted",
       module: "tasks",
       record_id: null,
-      new_value: { audio_bytes: upload.bytes.byteLength, gaps: interpretation.gaps, resolved_assignee: interpretation.draft.assigneeId !== null },
+      new_value: { audio_bytes: upload.bytes.byteLength, gaps: interpretation.gaps, resolved_assignee: interpretation.draft.assigneeId !== null, deadline_status: interpretation.draft.deadline.status },
     });
 
     return response(200, { ...interpretation });

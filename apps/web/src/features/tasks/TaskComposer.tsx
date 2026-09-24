@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { AlertTriangle, CalendarDays, Check, ChevronDown, FileText, Flag, Paperclip, Plus, Rocket, Users, UserRoundCheck, X } from "lucide-react";
-import { buildManualTaskCreateRequest, deriveTaskAuthoringCapability, voiceDraftGapMessage, voiceDraftGaps, type Enums, type Json, type VoiceDraftGap } from "@jewelos/core";
+import { buildManualTaskCreateRequest, deriveTaskAuthoringCapability, voiceDraftGapMessage, voiceDraftGaps, type Enums, type Json, type VoiceDeadline, type VoiceDraftGap } from "@jewelos/core";
 import type { UserProfile } from "@/types";
 import { Button, Modal, Notice } from "@/components/ui";
 import { toast } from "sonner";
@@ -69,6 +69,7 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
   const [voiceGaps, setVoiceGaps] = useState<readonly VoiceDraftGap[]>([]);
   const [gapAlertOpen, setGapAlertOpen] = useState(false);
   const [assignmentReason, setAssignmentReason] = useState<string | null>(null);
+  const [deadlineNote, setDeadlineNote] = useState<Readonly<{ text: string; resolved: boolean }> | null>(null);
 
   const branchNames = useMemo(() => new Map(data.branches.map((branch) => [branch.id, branch.name])), [data.branches]);
   const departmentNames = useMemo(() => new Map(data.departments.map((department) => [department.id, department.name])), [data.departments]);
@@ -122,7 +123,14 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
     }
     if (draft.priority) setPriority(draft.priority);
     const nextPlanned = draft.plannedDatetime ? toDateTimeLocal(draft.plannedDatetime) : "";
+    // Absent when an older function deployment answered.
+    const deadline: VoiceDeadline | undefined = draft.deadline;
+    // A note that named a deadline which could not be pinned to one day
+    // replaces an earlier date, so a stale one is never assigned unseen.
+    const spokeUnresolvedDeadline = !nextPlanned && Boolean(deadline?.dateExpression || deadline?.timeExpression);
     if (nextPlanned) setPlanned(nextPlanned);
+    else if (spokeUnresolvedDeadline) setPlanned("");
+    setDeadlineNote(deadline?.note ? { text: deadline.note, resolved: deadline.status === "resolved" } : null);
     const assigneeApplies = Boolean(draft.assigneeId) && eligiblePeople.some((person) => person.id === draft.assigneeId);
     if (assigneeApplies && draft.assigneeId) {
       setDoers([draft.assigneeId]);
@@ -139,7 +147,7 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
       ...draft,
       title: draft.title || title.trim(),
       assigneeId: assigneeApplies ? draft.assigneeId : doers[0] ?? null,
-      plannedDatetime: nextPlanned || planned || null,
+      plannedDatetime: nextPlanned || (spokeUnresolvedDeadline ? "" : planned) || null,
     });
     setVoiceGaps(gaps);
     setGapAlertOpen(gaps.length > 0);
@@ -186,7 +194,7 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
         : checklist.length === 0), [checklist.length, doers.length, planned, title, voiceGaps]);
 
   const usersPanel = <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} label="Assign user" multiple={false} onChange={updateDoers} people={eligiblePeople.flatMap((person) => person.id ? [{ ...person, id: person.id }] : [])} selectedIds={doers} />;
-  const duePanel = <label><span className="mb-1 block text-xs font-semibold text-task-text">Due date and time</span><input className="task-field" min={new Date().toISOString().slice(0, 16)} onChange={(event) => { setPlanned(event.target.value); setPanel(null); }} type="datetime-local" value={planned} /></label>;
+  const duePanel = <label><span className="mb-1 block text-xs font-semibold text-task-text">Due date and time</span><input className="task-field" min={new Date().toISOString().slice(0, 16)} onChange={(event) => { setPlanned(event.target.value); setDeadlineNote(null); setPanel(null); }} type="datetime-local" value={planned} /></label>;
   const priorityPanel = <fieldset className="grid grid-cols-3 gap-2"><legend className="sr-only">Priority</legend>{priorityOptions.map((option) => <button className={cn("min-h-11 rounded-lg border text-sm", priority === option.value ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border text-task-text-muted")} key={option.id} onClick={() => { setPriority(option.value); setPanel(null); }} type="button">{priority === option.value ? <Check className="mr-1 inline size-4" /> : null}{option.label}</button>)}</fieldset>;
   const formPanel = <div><label><span className="mb-1 block text-xs font-semibold text-task-text">Required form</span><select className="task-field" onChange={(event) => { setFormTemplateId(event.target.value); setPanel(null); }} value={formTemplateId}><option value="">No form required</option>{data.forms.map((form) => <option key={form.id} value={form.id}>{form.name}</option>)}</select></label><p className="mt-2 text-xs text-task-text-muted">The selected form must be completed before this task can be finished.</p></div>;
   const watchersPanel = <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} disabledIds={doers} label="In Loop · read only" multiple onChange={setWatchers} people={eligiblePeople.flatMap((person) => person.id ? [{ ...person, id: person.id }] : [])} selectedIds={watchers} />;
@@ -211,6 +219,7 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
       {!gapAlertOpen && outstandingVoiceGaps.length > 0 ? <div className="mb-4" data-testid="voice-gap-notice"><Notice tone="danger">Still missing: {outstandingVoiceGaps.map(voiceDraftGapMessage).join(" ")}</Notice></div> : null}
 
       {assignmentReason ? <p className="mb-3 text-xs text-task-text-muted" data-testid="voice-assignment-reason">Assigned from your voice note · {assignmentReason}</p> : null}
+      {deadlineNote ? <p className={cn("mb-3 text-xs", deadlineNote.resolved ? "text-task-text-muted" : "text-danger")} data-testid="voice-deadline-note">Deadline from your voice note · {deadlineNote.text}</p> : null}
 
       <form className="flex flex-col" onSubmit={(event) => void submitManual(event)}>
           <label className="border-b border-task-border px-1 pb-3">

@@ -145,6 +145,7 @@ Android phone-sized device.
 
 - [ ] Create a manual task and checklist on Android, including one doer, watchers, deadline, priority, required form, and attachment; retry an attachment failure without creating a duplicate task.
 - [ ] Record and review a voice task, deny then grant microphone permission, hit the 60-second limit, and verify temporary audio is removed.
+- [ ] On web and native, say "next Monday", "tomorrow at 3 pm", "second week of next month", and a note with no deadline: the first two prefill the same due date on both surfaces (7:00 PM when no time is said) with a "Deadline from your voice note" line; the last two leave the due date empty and block Assign until one is chosen.
 - [ ] Import current CSV and canonical XLSX through the Android file picker; map an ambiguous identity, share a correction report, resume a partial batch, and finish Assigning Left.
 - [ ] Exercise CRM create/edit, duplicate-phone refusal, interaction, walk-in, follow-up transitions, reassignment, merge confirmation, and private document upload/view/remove for allowed and denied roles.
 - [ ] Exercise Forms create/edit/publish/revise/archive/duplicate/publish-as-new/delete-impact, fill, immutable deleted-form submission, signed file answer, and approve/reject for reviewer and read-only roles.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   autoAssignFromDepartment,
-  buildVoiceTaskDraft,
+  buildVoiceTaskDraft as buildDraft,
   matchDepartmentByLabel,
   resolveVoiceAssignment,
   VOICE_TASK_SPEAKING_GUIDE,
@@ -13,6 +13,7 @@ import {
   type VoiceResolutionContext,
   type VoiceTaskHints,
 } from "./voiceTaskDraft.ts";
+import { resolveVoiceDeadline, type VoiceDeadline } from "./voiceDeadline.ts";
 
 const crm: VoiceDepartment = { id: "dept-crm", name: "Customer Relations", code: "CRM", head_id: "priya" };
 const mdo: VoiceDepartment = { id: "dept-mdo", name: "Market Development", code: "MDO", head_id: null };
@@ -42,7 +43,8 @@ const hints = (overrides: Partial<VoiceTaskHints> = {}): VoiceTaskHints => ({
   description: "",
   assignee_hint: null,
   department_hint: null,
-  due_datetime: "2026-09-17T11:30:00.000Z",
+  date_expression: "tomorrow",
+  time_expression: "5 pm",
   priority: "high",
   task_type: "delegation",
   checklist_items: [],
@@ -180,7 +182,35 @@ describe("resolveVoiceAssignment", () => {
   });
 });
 
+const deadlineFor = (value: VoiceTaskHints): VoiceDeadline => resolveVoiceDeadline({
+  dateExpression: value.date_expression,
+  timeExpression: value.time_expression,
+  now: "2026-09-16T10:00:00+05:30",
+  timeZone: "Asia/Kolkata",
+});
+
+/** The draft the worker builds: hints plus the deadline resolved from them. */
+function buildVoiceTaskDraft(value: VoiceTaskHints, resolution: VoiceResolutionContext) {
+  return buildDraft(value, resolution, deadlineFor(value));
+}
+
 describe("buildVoiceTaskDraft", () => {
+  it("fills the due date only from a resolved deadline", () => {
+    const draft = buildVoiceTaskDraft(hints(), context);
+    expect(draft.plannedDatetime).toBe("2026-09-17T11:30:00.000Z");
+    expect(draft.deadline).toMatchObject({ status: "resolved", dateExpression: "tomorrow", timeExpression: "5 pm" });
+  });
+
+  it("leaves the due date empty for an ambiguous or missing deadline", () => {
+    const ranged = buildVoiceTaskDraft(hints({ date_expression: "next week", time_expression: null }), context);
+    expect(ranged.plannedDatetime).toBeNull();
+    expect(ranged.deadline.status).toBe("ambiguous");
+    expect(voiceDraftGaps(ranged)).toContain("due");
+    const missing = buildVoiceTaskDraft(hints({ date_expression: null, time_expression: null }), context);
+    expect(missing.plannedDatetime).toBeNull();
+    expect(missing.deadline.status).toBe("missing");
+  });
+
   it("trims text and drops checklist items on a delegation task", () => {
     const draft = buildVoiceTaskDraft(hints({ title: "  Call back  ", description: " today ", checklist_items: ["ignored"] }), context);
     expect(draft.title).toBe("Call back");
@@ -206,7 +236,7 @@ describe("voiceDraftGaps", () => {
   });
 
   it("reports a missing title, due date, and empty checklist", () => {
-    const draft = buildVoiceTaskDraft(hints({ title: "   ", due_datetime: null, task_type: "checklist", checklist_items: [] }), context);
+    const draft = buildVoiceTaskDraft(hints({ title: "   ", date_expression: null, time_expression: null, task_type: "checklist", checklist_items: [] }), context);
     expect(voiceDraftGaps(draft)).toEqual(["title", "assignee", "due", "checklist"]);
   });
 });
