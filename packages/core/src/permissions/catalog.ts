@@ -77,6 +77,7 @@ export const PERMISSION_CATALOG = [
   { key: "users.delete", kind: "action", category: "People", label: "Delete unused users", description: "Permanently delete invited or disabled accounts that were never used.", defaultRoles: ["super_admin"], pageId: null },
   modulePermission("availability.view", "availability", "People", "Open Availability", "Record and view working availability."),
   { key: "availability.manage_others", kind: "action", category: "People", label: "Record availability for others", description: "Mark other employees absent or present.", defaultRoles: ["super_admin", "admin", "manager", "hr"], pageId: null },
+  { key: "availability.review_leave", kind: "action", category: "People", label: "Review leave requests", description: "Approve or reject leave applications. Approval also requires availability management.", defaultRoles: ["super_admin", "admin", "hr"], pageId: null },
   modulePermission("reports.view", "reports", "Reports", "Open Reports", "Preview the reports available to the user's level."),
   { key: "reports.export", kind: "action", category: "Reports", label: "Export reports", description: "Request private CSV exports of the reports the user can view.", defaultRoles: ALL_ROLES, pageId: null },
   modulePermission("dropdowns.view", "dropdown_master", "Master data", "Open Dropdown Master", "Master dropdown values."),

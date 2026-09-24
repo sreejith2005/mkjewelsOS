@@ -39,14 +39,14 @@ select is((
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
-), 323, 'exactly 323 postgres-owned public application functions exist in the current migration set');
+), 375, 'exactly 375 postgres-owned public application functions exist in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres' and p.prosecdef
-), 271, 'exactly 271 public application functions are SECURITY DEFINER in the current migration set');
+), 313, 'exactly 313 public application functions are SECURITY DEFINER in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -62,7 +62,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 167, 'authenticated can execute exactly 167 reviewed public application functions');
+), 187, 'authenticated can execute exactly 187 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -70,7 +70,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('service_role', p.oid, 'EXECUTE')
-), 44, 'service_role can execute exactly 44 reviewed public application functions');
+), 49, 'service_role can execute exactly 49 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -78,7 +78,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('postgres', p.oid, 'EXECUTE')
-), 323, 'postgres retains owner execution on every public application function');
+), 375, 'postgres retains owner execution on every public application function');
 
 -- Exact authenticated allowlist: baseline, Forms, and reviewed FMS entry points.
 select ok(has_function_privilege('authenticated', 'current_profile()', 'EXECUTE'), 'authenticated executes current_profile');
@@ -200,7 +200,7 @@ select is((
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
     and p.oid::regprocedure::text not in (select identity from expected)
-), 45, 'authenticated has exactly 45 reviewed post-dashboard grant additions');
+), 65, 'authenticated has exactly 65 reviewed post-dashboard grant additions');
 
 -- Exact service-role allowlist and preservation of recurrence table reads.
 select ok(has_function_privilege('service_role', 'invite_profile_with_audit(uuid,uuid,text,text,uuid,uuid,uuid,text,text,text[],user_role,text,uuid)', 'EXECUTE'), 'service_role executes invite_profile_with_audit');
@@ -239,7 +239,7 @@ select is((
       ,'mark_report_export_cleaned(uuid)'
       ,'is_user_week_off_on_date(uuid,date)'
     )
-), 30, 'service_role has exactly 30 reviewed post-dashboard grant additions');
+), 35, 'service_role has exactly 35 reviewed post-dashboard grant additions');
 select ok(has_table_privilege('service_role', 'task_templates', 'SELECT'), 'service_role retains task_templates SELECT');
 select ok(has_table_privilege('service_role', 'user_profiles', 'SELECT'), 'service_role retains user_profiles SELECT');
 select ok(has_table_privilege('service_role', 'user_availability', 'SELECT'), 'service_role retains user_availability SELECT');

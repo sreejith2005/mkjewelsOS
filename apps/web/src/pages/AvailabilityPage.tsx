@@ -9,6 +9,7 @@ import { normalizeAvailabilityRange } from "@/features/availability/dateRange";
 import { initials, titleCase } from "@/lib/format";
 import { loadAvailabilityForDate, loadAvailabilityUsers, recordAvailabilityRange, type AvailabilityEntry, type TaskUser } from "@/features/tasks/api";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
+import { LeaveApplications } from "@/features/availability/LeaveApplications";
 
 function today(): string { return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); }
 const statusLabels: Record<Enums<"availability_status">, string> = { present: "Present", absent: "Absent", half_day: "Half day", remote: "Remote" };
@@ -107,5 +108,6 @@ export function AvailabilityPage() {
         .map((id) => users.find((candidate) => candidate.id === id)?.employee_name).filter(Boolean);
       return <article className="rounded-xl border border-gold/15 bg-charcoal p-4" key={user.id}><div className="mb-3 flex min-w-0 items-center gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gold font-semibold text-obsidian">{initials(user.employee_name)}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-white">{user.employee_name}</p><p className="truncate text-xs text-soft-grey">{user.employee_code} - {titleCase(user.user_role)}</p></div><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${status === "absent" ? "bg-danger/15 text-danger" : "bg-success/15 text-success"}`}>{statusLabels[status]}</span></div>{coverageNames.length ? <p className="mb-3 truncate text-xs text-soft-grey">Coverage: {coverageNames.join(" → ")}</p> : <p className="mb-3 text-xs text-warning">No coverage chain configured</p>}{canLogOthers ? <div className="flex flex-wrap gap-2"><Button className="min-w-32 flex-1" disabled={saving || status === "absent"} onClick={() => void setAvailability(user, "absent")} variant={status === "absent" ? "secondary" : "danger"}>{saving ? "Saving..." : "Mark absent"}</Button><select aria-label={`Availability for ${user.employee_name}`} className="field w-auto min-w-28 md:text-xs" disabled={saving} onChange={(event) => void setAvailability(user, event.target.value as Enums<"availability_status">)} value={status}><option value="present">Present</option><option value="half_day">Half day</option><option value="remote">Remote</option><option value="absent">Absent</option></select></div> : null}</article>;
     })}</div>}
+    <LeaveApplications />
   </section>;
 }

@@ -27,6 +27,7 @@ import { SegmentedControl } from "@/ui/SegmentedControl";
 import { Banner, ErrorState, LoadingState } from "@/ui/states";
 import { Text } from "@/ui/Text";
 import { TextField } from "@/ui/TextField";
+import { LeaveApplications } from "@/features/availability/LeaveApplications";
 
 type Board = Readonly<{
   users: TaskUser[];
@@ -174,6 +175,7 @@ export function AvailabilityScreen() {
           {canLogOthers ? <View style={styles.actions}><Button busy={savingId === user.id} disabled={status === "absent"} label="Mark absent" onPress={() => void setAvailability(user, "absent")} variant="danger" /><View style={styles.statusPicker}><OptionPicker disabled={savingId === user.id} label={`Availability for ${user.employee_name}`} onChange={(selected) => void setAvailability(user, selected[0] as Enums<"availability_status">)} options={STATUS_OPTIONS} selected={[status]} /></View></View> : null}
         </Card>;
       })}
+      <LeaveApplications />
     </Screen>
   );
 }

@@ -4370,6 +4370,141 @@ export type Database = {
           },
         ]
       }
+      leave_requests: {
+        Row: {
+          applicant_id: string
+          branch_id: string
+          duration: string
+          handed_over_at: string | null
+          handover_approval_path: string | null
+          handover_to: string | null
+          hr_remark: string | null
+          id: string
+          inform_status: string
+          leave_end: string
+          leave_start: string
+          leave_type: string
+          reason: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          submitted_at: string
+          tenant_id: string
+          tl_approval_path: string
+          total_leave_count: number
+          updated_at: string
+          work_start_date: string
+          work_start_in: string
+        }
+        Insert: {
+          applicant_id: string
+          branch_id: string
+          duration: string
+          handed_over_at?: string | null
+          handover_approval_path?: string | null
+          handover_to?: string | null
+          hr_remark?: string | null
+          id?: string
+          inform_status: string
+          leave_end: string
+          leave_start: string
+          leave_type: string
+          reason: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submitted_at?: string
+          tenant_id: string
+          tl_approval_path: string
+          total_leave_count: number
+          updated_at?: string
+          work_start_date: string
+          work_start_in: string
+        }
+        Update: {
+          applicant_id?: string
+          branch_id?: string
+          duration?: string
+          handed_over_at?: string | null
+          handover_approval_path?: string | null
+          handover_to?: string | null
+          hr_remark?: string | null
+          id?: string
+          inform_status?: string
+          leave_end?: string
+          leave_start?: string
+          leave_type?: string
+          reason?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submitted_at?: string
+          tenant_id?: string
+          tl_approval_path?: string
+          total_leave_count?: number
+          updated_at?: string
+          work_start_date?: string
+          work_start_in?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_requests_applicant_id_fkey"
+            columns: ["applicant_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_requests_applicant_id_fkey"
+            columns: ["applicant_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_requests_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_requests_handover_to_fkey"
+            columns: ["handover_to"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_requests_handover_to_fkey"
+            columns: ["handover_to"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_requests_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_deliveries: {
         Row: {
           attempt_count: number
@@ -7870,6 +8005,14 @@ export type Database = {
         Args: { p_allowed: string[]; p_label: string; p_value: Json }
         Returns: undefined
       }
+      assert_leave_image: {
+        Args: {
+          p_actor: Database["public"]["Tables"]["user_profiles"]["Row"]
+          p_kind: string
+          p_path: string
+        }
+        Returns: undefined
+      }
       assert_module_access: { Args: { p_page: string }; Returns: undefined }
       assert_module_enabled: { Args: { p_page: string }; Returns: undefined }
       assert_notification_admin: {
@@ -8548,6 +8691,16 @@ export type Database = {
         Args: { p_name?: string; p_source_template_id: string }
         Returns: string
       }
+      edit_pending_leave: {
+        Args: {
+          p_id: string
+          p_leave_end: string
+          p_leave_start: string
+          p_work_start_date: string
+          p_work_start_in: string
+        }
+        Returns: undefined
+      }
       emit_tenant_realtime_event: {
         Args: { p_tenant_id: string; p_topic: string }
         Returns: undefined
@@ -8899,6 +9052,22 @@ export type Database = {
       is_valid_fms_timing_rule: { Args: { p_rule: Json }; Returns: boolean }
       is_valid_form_date: { Args: { p_value: string }; Returns: boolean }
       is_valid_form_datetime: { Args: { p_value: string }; Returns: boolean }
+      leave_day_count: {
+        Args: {
+          p_duration: string
+          p_end: string
+          p_start: string
+          p_work: string
+          p_work_half: string
+        }
+        Returns: number
+      }
+      leave_file_readable: { Args: { p_path: string }; Returns: boolean }
+      leave_file_writable: { Args: { p_path: string }; Returns: boolean }
+      leave_inform_status: {
+        Args: { p_end: string; p_start: string; p_submitted: string }
+        Returns: string
+      }
       link_crm_record: {
         Args: {
           p_client_id: string
@@ -9426,6 +9595,10 @@ export type Database = {
         }
         Returns: string
       }
+      review_leave_request: {
+        Args: { p_approve: boolean; p_id: string; p_remark: string }
+        Returns: undefined
+      }
       review_resignation_with_audit: {
         Args: { p_decision: string; p_resignation_id: string }
         Returns: {
@@ -9848,6 +10021,23 @@ export type Database = {
           p_form_template_id: string
           p_linked_module?: string
           p_linked_record_id?: string
+        }
+        Returns: string
+      }
+      submit_leave_handover: {
+        Args: { p_approval_path: string; p_handover_to: string; p_id: string }
+        Returns: undefined
+      }
+      submit_leave_request: {
+        Args: {
+          p_duration: string
+          p_leave_end: string
+          p_leave_start: string
+          p_leave_type: string
+          p_reason: string
+          p_tl_approval_path: string
+          p_work_start_date: string
+          p_work_start_in: string
         }
         Returns: string
       }
