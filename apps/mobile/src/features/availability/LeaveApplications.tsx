@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, View } from "react-native";
 import { countLeaveDays, hasPermission, leaveInformStatus, type LeaveHalf, type ReturnHalf } from "@jewelos/core";
-import { editPendingLeave, leaveTypes, listLeaveRequests, reviewLeave, signedLeaveImage, submitHandover, submitLeave, type LeaveDraft, type LeaveRequest } from "@jewelos/data/leave/api";
+import { canSubmitLeave, editPendingLeave, leaveTypes, listLeaveRequests, reviewLeave, signedLeaveImage, submitHandover, submitLeave, type LeaveDraft, type LeaveRequest } from "@jewelos/data/leave/api";
 import type { UploadableFile } from "@jewelos/data/runtime";
 import { loadAvailabilityUsers, type TaskUser } from "@jewelos/data/tasks/api";
 import { useAccess, useProfile } from "@/auth/AuthProvider";
@@ -23,6 +23,7 @@ export function LeaveApplications() {
   const profile = useProfile();
   const access = useAccess();
   const canReview = hasPermission(access, "availability.review_leave") && hasPermission(access, "availability.manage_others");
+  const [canApply, setCanApply] = useState<boolean | null>(null);
   const [tab, setTab] = useState<"apply" | "history" | "review">("apply");
   const [rows, setRows] = useState<LeaveRequest[]>([]);
   const [types, setTypes] = useState<Array<{ value: string; label: string }>>([]);
@@ -42,12 +43,14 @@ export function LeaveApplications() {
 
   const load = useCallback(async () => {
     try {
-      const [ownRows, reviewRows, nextTypes, nextPeople] = await Promise.all([
+      const [ownRows, reviewRows, nextTypes, nextPeople, applicantEligible] = await Promise.all([
         listLeaveRequests(profile.id), canReview ? listLeaveRequests(undefined, "pending") : Promise.resolve([]),
-        leaveTypes(), loadAvailabilityUsers(),
+        leaveTypes(), loadAvailabilityUsers(), canSubmitLeave(),
       ]);
       setRows([...ownRows, ...reviewRows.filter((row) => row.applicant_id !== profile.id)]);
       setTypes(nextTypes); setPeople(nextPeople);
+      setCanApply(applicantEligible);
+      if (!applicantEligible) setTab((current) => current === "apply" ? (canReview ? "review" : "history") : current);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not load leave requests"); }
   }, [canReview, profile.id]);
   useEffect(() => { void load(); }, [load]);
@@ -84,10 +87,10 @@ export function LeaveApplications() {
   return <View style={{ gap: 12, marginTop: 20 }}>
     <Text variant="heading" weight="bold">Leave applications</Text>
     <Text tone="muted" variant="small">Apply, complete handover, and follow HR's decision.</Text>
-    <SegmentedControl accessibilityLabel="Leave section" onChange={setTab} options={[{ value: "apply", label: "Apply" }, { value: "history", label: "My summary" }, ...(canReview ? [{ value: "review" as const, label: "Review" }] : [])]} value={tab} />
+    {canApply !== null ? <SegmentedControl accessibilityLabel="Leave section" onChange={setTab} options={[...(canApply ? [{ value: "apply" as const, label: "Apply" }] : []), { value: "history" as const, label: "My summary" }, ...(canReview ? [{ value: "review" as const, label: "Review" }] : [])]} value={tab} /> : null}
     {error ? <Banner tone="danger">{error}</Banner> : null}
     {message ? <Banner tone="success">{message}</Banner> : null}
-    {tab === "apply" ? <Card>
+    {tab === "apply" && canApply ? <Card>
       <Text tone="muted" variant="small">{profile.employee_name} · Your signed in identity and branch are used.</Text>
       <OptionPicker label="Type of leave" options={types} selected={draft.leaveType ? [draft.leaveType] : []} onChange={(value) => setDraft({ ...draft, leaveType: value[0] ?? "" })} />
       <OptionPicker label="Leave duration" options={durationOptions} selected={[draft.duration]} onChange={(value) => setDraft({ ...draft, duration: value[0] as LeaveHalf })} />

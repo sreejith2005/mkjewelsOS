@@ -28,6 +28,12 @@ export async function leaveTypes(): Promise<Array<{ value: string; label: string
   return data ?? [];
 }
 
+export async function canSubmitLeave(): Promise<boolean> {
+  const { data, error } = await db().rpc("leave_applicant_eligible");
+  fail(error, "Check leave access");
+  return data === true;
+}
+
 export async function listLeaveRequests(applicantId?: string, status?: "pending"): Promise<LeaveRequest[]> {
   const rows: LeaveRequest[] = [];
   for (let offset = 0; ; offset += 200) {

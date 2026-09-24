@@ -4,9 +4,11 @@ The Availability section contains Apply leave, My leave summary, and an HR revie
 
 ## Setup
 
-Add the company's actual leave types in Dropdown Master with master type `leave_type`. The Apps Script references a `FORM DATA` sheet but the supplied source files do not include its values, so no leave types are invented or seeded. The form explains when none are configured.
+The `leave_type` Dropdown Master category contains Casual Leave, Sick Leave, and Earned Leave for existing tenants. The source Apps Script reads the `FORM DATA` sheet, whose values were not supplied; these three types are the current app defaults and can be managed in Dropdown Master.
 
 `availability.review_leave` defaults to Super Admin, Admin, and HR. Approving a request also requires `availability.manage_others`, because it records absence through the existing audited Availability contract. A reviewer cannot decide their own request. Other employees see only their own applications. An active employee can submit a request with a TL approval screenshot, edit dates while pending, and submit handover with an active colleague and second screenshot. Rejected leave cannot receive handover.
+
+Leave applications appear before the employee roster on web and Android. Super Admins and employees designated Director, Managing Director, or Owner see their summary and any review access, without an application form. The database applies the same restriction to direct submissions. HR remains eligible to apply.
 
 ## Calculation and attendance
 
@@ -14,6 +16,6 @@ The app and database mirror `tempcode.gs`: advance notice thresholds use the sub
 
 ## Data and release
 
-Migrations `0174` and `0175` add the tenant-scoped requests, protected RPCs, retained data classification, and private `leave-approvals` Storage bucket. Images are limited to JPEG, PNG, or WebP up to 5 MB. The browser and native clients use short-lived signed URLs. A failed request registration attempts to remove its unlinked upload; an upload abandoned when the app closes can remain and needs operational cleanup. Existing Google Sheet rows are not imported; the source files do not include the spreadsheet data. Any historical import requires a separate mapping and authorization review.
+Migrations `0174` through `0176` add the tenant-scoped requests, protected RPCs, retained data classification, private `leave-approvals` Storage bucket, default leave types, and applicant eligibility. Images are limited to JPEG, PNG, or WebP up to 5 MB. The browser and native clients use short-lived signed URLs. A failed request registration attempts to remove its unlinked upload; an upload abandoned when the app closes can remain and needs operational cleanup. Existing Google Sheet rows are not imported; the source files do not include the spreadsheet data. Any historical import requires a separate mapping and authorization review.
 
-Apply and verify the migrations on staging before publishing either client; the current production link must not be used as a feature-test database. Run `supabase.cmd db reset --local`, `supabase.cmd test db`, core/web/native tests, typechecks, and builds first. Validate the signed-in Availability route on desktop and phone width and test the upload/review workflow against staging with synthetic accounts.
+Run `supabase.cmd db reset --local`, `supabase.cmd test db`, core/web/native tests, typechecks, and builds before applying the forward migration to the existing linked JewelOS project. Validate the signed-in Availability route on desktop and phone width and the upload/review workflow with controlled accounts.

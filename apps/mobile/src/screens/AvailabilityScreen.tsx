@@ -127,6 +127,7 @@ export function AvailabilityScreen() {
         <View style={styles.titleCopy}><Text variant="heading" weight="bold">Availability</Text><Text tone="muted" variant="small">{`${startDate} - an authorized absence immediately checks work due today or tomorrow.`}</Text></View>
       </View>
       <View style={styles.summary}><StatusBadge label={`${users.length - absentCount} present`} tone="success" /><StatusBadge label={`${absentCount} absent`} tone={absentCount ? "danger" : "neutral"} /></View>
+      <LeaveApplications />
       {actionError ? <Banner tone="danger">{actionError}</Banner> : null}
       {coverage ? <Banner tone={coverage.coverage_required ? "danger" : coverage.manager_review ? "info" : "success"}>{`Coverage result: ${coverage.primary_buddy} primary, ${coverage.secondary_buddy} secondary, ${coverage.reporting_manager} manager, ${coverage.manager_review} review, ${coverage.coverage_required} unassigned.`}</Banner> : null}
       <View style={styles.overviewHead}>
@@ -175,7 +176,6 @@ export function AvailabilityScreen() {
           {canLogOthers ? <View style={styles.actions}><Button busy={savingId === user.id} disabled={status === "absent"} label="Mark absent" onPress={() => void setAvailability(user, "absent")} variant="danger" /><View style={styles.statusPicker}><OptionPicker disabled={savingId === user.id} label={`Availability for ${user.employee_name}`} onChange={(selected) => void setAvailability(user, selected[0] as Enums<"availability_status">)} options={STATUS_OPTIONS} selected={[status]} /></View></View> : null}
         </Card>;
       })}
-      <LeaveApplications />
     </Screen>
   );
 }

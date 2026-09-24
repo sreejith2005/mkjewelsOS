@@ -9062,6 +9062,7 @@ export type Database = {
         }
         Returns: number
       }
+      leave_applicant_eligible: { Args: never; Returns: boolean }
       leave_file_readable: { Args: { p_path: string }; Returns: boolean }
       leave_file_writable: { Args: { p_path: string }; Returns: boolean }
       leave_inform_status: {

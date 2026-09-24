@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { countLeaveDays, hasPermission, leaveInformStatus, type LeaveHalf, type ReturnHalf } from "@jewelos/core";
-import { editPendingLeave, leaveTypes, listLeaveRequests, reviewLeave, signedLeaveImage, submitHandover, submitLeave, type LeaveDraft, type LeaveRequest } from "@jewelos/data/leave/api";
+import { canSubmitLeave, editPendingLeave, leaveTypes, listLeaveRequests, reviewLeave, signedLeaveImage, submitHandover, submitLeave, type LeaveDraft, type LeaveRequest } from "@jewelos/data/leave/api";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
 import { loadAvailabilityUsers, type TaskUser } from "@/features/tasks/api";
@@ -12,6 +12,7 @@ const emptyDraft: LeaveDraft = { leaveType: "", duration: "FULL DAY", reason: ""
 export function LeaveApplications() {
   const { access, profile } = useAuth();
   const canReview = hasPermission(access, "availability.review_leave") && hasPermission(access, "availability.manage_others");
+  const [canApply, setCanApply] = useState<boolean | null>(null);
   const [tab, setTab] = useState<"apply" | "history" | "review">("apply");
   const [types, setTypes] = useState<Array<{ value: string; label: string }>>([]);
   const [people, setPeople] = useState<TaskUser[]>([]);
@@ -32,12 +33,14 @@ export function LeaveApplications() {
   const load = useCallback(async () => {
     if (!profile) return;
     try {
-      const [ownRows, reviewRows, nextTypes, nextPeople] = await Promise.all([
+      const [ownRows, reviewRows, nextTypes, nextPeople, applicantEligible] = await Promise.all([
         listLeaveRequests(profile.id), canReview ? listLeaveRequests(undefined, "pending") : Promise.resolve([]),
-        leaveTypes(), loadAvailabilityUsers(),
+        leaveTypes(), loadAvailabilityUsers(), canSubmitLeave(),
       ]);
       setRows([...ownRows, ...reviewRows.filter((row) => row.applicant_id !== profile.id)]);
       setTypes(nextTypes); setPeople(nextPeople);
+      setCanApply(applicantEligible);
+      if (!applicantEligible) setTab((current) => current === "apply" ? (canReview ? "review" : "history") : current);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to load leave requests"); }
   }, [canReview, profile]);
   useEffect(() => { void load(); }, [load]);
@@ -69,14 +72,14 @@ export function LeaveApplications() {
   };
 
   if (!profile) return null;
-  return <section className="mt-8 space-y-4 border-t border-gold/15 pt-6">
+  return <section className="mb-6 space-y-4 rounded-xl border border-gold/25 bg-charcoal p-4 sm:p-5">
     <div><h2 className="font-display text-xl text-gold">Leave applications</h2><p className="text-sm text-soft-grey">Apply, complete your handover, and follow HR's decision.</p></div>
-    <div className="flex flex-wrap gap-2" role="tablist" aria-label="Leave applications">
-      {(["apply", "history", ...(canReview ? ["review"] : [])] as Array<typeof tab>).map((item) => <Button key={item} onClick={() => setTab(item)} variant={tab === item ? "primary" : "secondary"}>{item === "apply" ? "Apply leave" : item === "history" ? "My leave summary" : "Review requests"}</Button>)}
-    </div>
+    {canApply !== null ? <div className="flex flex-wrap gap-2" role="tablist" aria-label="Leave applications">
+      {([...(canApply ? ["apply"] : []), "history", ...(canReview ? ["review"] : [])] as Array<typeof tab>).map((item) => <Button key={item} onClick={() => setTab(item)} variant={tab === item ? "primary" : "secondary"}>{item === "apply" ? "Apply leave" : item === "history" ? "My leave summary" : "Review requests"}</Button>)}
+    </div> : null}
     {error ? <Notice tone="danger">{error}</Notice> : null}
     {message ? <Notice tone="success">{message}</Notice> : null}
-    {tab === "apply" ? <form className="grid gap-4 rounded-xl border border-gold/15 p-4 sm:grid-cols-2" onSubmit={(event) => {
+    {tab === "apply" && canApply ? <form className="grid gap-4 rounded-xl border border-gold/15 p-4 sm:grid-cols-2" onSubmit={(event) => {
       event.preventDefault();
       if (!tlImage) { setError("Attach the TL approval screenshot"); return; }
       void run(async () => { await submitLeave(draft, profile.tenant_id, profile.id, tlImage); setDraft(emptyDraft); setTlImage(null); setTab("history"); }, "Leave submitted. Complete handover from your summary.");
