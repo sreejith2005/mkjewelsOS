@@ -1,3 +1,5 @@
+> Superseded for the CRM application/data layer by 2026-09-25-crm-native-integration-design.md.
+
 # JewelOS embedded CRM with single sign-on
 
 ## Status

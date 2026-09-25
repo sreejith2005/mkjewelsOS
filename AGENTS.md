@@ -113,6 +113,22 @@ Important current contracts include:
   user administration, controlled roster reconciliation, and section
   maintenance controls.
 
+### CRM (2026-09-25 owner decision)
+
+The CRM in `packages/crm-ui` (rendered by the web app at `/crm`; Phase 3) and
+database schema `crm` (migrations 0179-0184) is a port of the original MK Jewels
+CRM (`sreejith-crm/web-app`). Parity with the original - screens, fields, order,
+labels, vocabularies, flows, validation, calculations and styling - is the
+acceptance criterion; do not improve, rename, re-order, or merge it with the old
+JewelOS CRM (`public.clients`, `public.client_timeline`, ...), which stays untouched
+until the approved cutover. Approved exception to rule 7: the CRM UI keeps the
+original palette, fonts and CSS, scoped to the CRM surface only. `sreejith-crm/` is
+a read-only reference, not a dependency: never import from it or build it, and never
+copy its `.env*`, `*.xlsx`, `migration-backups`, `migration-reports`, or Android
+build outputs. JewelOS login is the only CRM login; CRM identity resolves through
+the audited bridge in 0180 (`crm.current_crm_user_id()`). Design and phases:
+`docs/superpowers/specs/2026-09-25-crm-native-integration-design.md`.
+
 Read the relevant source, migration, and pgTAP test before changing one of
 these areas. Preserve historical task/form/FMS data when evolving a contract.
 For authoritative roster work, preserve personal contact information and use

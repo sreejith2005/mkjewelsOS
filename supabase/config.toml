@@ -1,5 +1,13 @@
 project_id = "jewelos"
 
+# The original CRM is ported into schema crm (0179-0184) and is queried as
+# supabase.schema("crm"). crm is deliberately not on extra_search_path: its table
+# names (clients, client_timeline, ...) overlap public ones. crm_private is internal
+# and must never be exposed. The hosted project needs the same "Exposed schemas".
+[api]
+schemas = ["public", "graphql_public", "crm"]
+extra_search_path = ["public", "extensions"]
+
 # Platform JWT verification is disabled only because this handler verifies the
 # deployment secret from x-cron-secret before parsing input or accessing data.
 [functions.generate-recurring-tasks]
