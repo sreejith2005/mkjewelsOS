@@ -193,14 +193,81 @@ select is((
       'save_designation_permissions_with_audit(uuid,jsonb)', 'save_user_access_with_audit(uuid,jsonb,text)'
     ]::text[])
   )
-  select count(*)::integer
+  select array_agg(p.oid::regprocedure::text order by p.oid::regprocedure::text)
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
     and p.oid::regprocedure::text not in (select identity from expected)
-), 66, 'authenticated has exactly 66 reviewed post-dashboard grant additions');
+), array[
+  'acknowledge_daily_checklist_with_audit(uuid,integer,uuid[])',
+  'add_task_comment_with_audit(uuid,text)',
+  'assert_crm_branch_user(uuid,uuid,uuid,text)',
+  'assert_fms_flow_publishable(uuid)',
+  'assign_imported_task_with_audit(text,uuid,uuid)',
+  'begin_task_bulk_import(text,text,integer)',
+  'cancel_task_bulk_import(uuid)',
+  'change_dropdown_category_with_audit(text,uuid,text,text,text,integer,boolean)',
+  'commit_task_bulk_import_chunk(uuid,jsonb)',
+  'complete_recurring_task_with_image_with_audit(uuid,text)',
+  'complete_uploaded_task_with_audit(uuid,text)',
+  'create_crm_field_definition(text,text,text,text,jsonb,boolean,jsonb)',
+  'create_dropdown_list_with_audit(text,jsonb)',
+  'create_manual_task_with_mode_with_audit(jsonb,uuid[],uuid[],jsonb)',
+  'delete_fms_flow_with_audit(uuid,text)',
+  'delete_form_draft_with_audit(uuid)',
+  'delete_form_with_audit(uuid)',
+  'delete_recurring_todo_template_with_audit(uuid)',
+  'duplicate_form_with_audit(uuid,text)',
+  'edit_pending_leave(uuid,date,date,date,text)',
+  'form_deletion_impact(uuid)',
+  'get_employee_task_progress(jsonb)',
+  'get_my_daily_checklist_status()',
+  'get_my_fms_starter_assignments()',
+  'get_recurring_todo_workspace(jsonb)',
+  'get_section_availability()',
+  'get_task_attachment_path(uuid)',
+  'get_task_evidence_workspace(jsonb)',
+  'get_task_import_batch_status(uuid)',
+  'import_delegation_tasks_with_audit(jsonb,text)',
+  'import_task_bulk_with_audit(jsonb,text,text)',
+  'is_reporting_descendant(uuid,uuid)',
+  'leave_applicant_eligible()',
+  'leave_file_readable(text)',
+  'leave_file_writable(text)',
+  'list_assigning_left_tasks()',
+  'list_designation_daily_checklists()',
+  'list_task_comments(uuid)',
+  'list_task_import_identity_candidates()',
+  'prepare_unused_user_deletion(uuid)',
+  'reconcile_task_import_assignments(jsonb)',
+  'record_availability_range_with_audit(uuid,date,date,availability_status,text)',
+  'resolve_fms_stage_assignees(uuid,uuid,uuid)',
+  'restore_fms_flow_with_audit(uuid,text)',
+  'review_leave_request(uuid,boolean,text)',
+  'run_recurring_todo_template_now_with_audit(uuid,date)',
+  'save_branch_with_audit(uuid,jsonb)',
+  'save_department_with_audit(uuid,jsonb)',
+  'save_designation_daily_checklist_with_audit(uuid,uuid,text,text,jsonb,text,boolean,integer)',
+  'save_published_form_with_audit(uuid,jsonb,jsonb)',
+  'save_recurring_todo_template_with_audit(uuid,jsonb)',
+  'save_section_availability_with_audit(boolean,jsonb,integer,uuid)',
+  'save_task_import_identity_alias_with_audit(text,uuid)',
+  'send_recurring_followup_with_audit(uuid,text)',
+  'set_fms_flow_active_with_audit(uuid,boolean,text)',
+  'set_recurring_todo_template_active_with_audit(uuid,boolean)',
+  'start_fms_from_form_submission_with_audit(uuid)',
+  'submit_fms_form_and_progress_with_audit(uuid,jsonb,text,uuid,uuid,text,text,jsonb,uuid)',
+  'submit_leave_handover(uuid,uuid,text)',
+  'submit_leave_request(text,text,text,date,date,date,text,text)',
+  'task_attachment_display_name(text)',
+  'task_effective_due_datetime(task_instances)',
+  'upsert_crm_branch_mapping(text,text,uuid,jsonb)',
+  'upsert_crm_staff_mapping(text,text,uuid,jsonb)',
+  'validate_task_bulk_import(jsonb,text)',
+  'verify_recurring_task_with_audit(uuid,text,text)'
+]::text[], 'authenticated additional EXECUTE grants match the reviewed function identities');
 
 -- Exact service-role allowlist and preservation of recurrence table reads.
 select ok(has_function_privilege('service_role', 'invite_profile_with_audit(uuid,uuid,text,text,uuid,uuid,uuid,text,text,text[],user_role,text,uuid)', 'EXECUTE'), 'service_role executes invite_profile_with_audit');
@@ -217,7 +284,7 @@ select ok(has_function_privilege('service_role', 'finish_report_export(uuid,uuid
 select ok(has_function_privilege('service_role', 'claim_report_export_cleanup(integer)', 'EXECUTE'), 'service_role claims expired export cleanup');
 select ok(has_function_privilege('service_role', 'mark_report_export_cleaned(uuid)', 'EXECUTE'), 'service_role records export cleanup');
 select is((
-  select count(*)::integer
+  select array_agg(p.oid::regprocedure::text order by p.oid::regprocedure::text)
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
@@ -239,7 +306,43 @@ select is((
       ,'mark_report_export_cleaned(uuid)'
       ,'is_user_week_off_on_date(uuid,date)'
     )
-), 35, 'service_role has exactly 35 reviewed post-dashboard grant additions');
+), array[
+  'apply_authoritative_admin_roles(uuid[])',
+  'apply_authoritative_production_roster(jsonb,uuid[])',
+  'apply_complete_authoritative_roster(jsonb)',
+  'apply_work_identity_with_audit(jsonb)',
+  'audit_super_admin_password_reset(uuid,uuid)',
+  'authorize_super_admin_password_reset(uuid,uuid)',
+  'begin_crm_sync_run(text,text,uuid,jsonb)',
+  'bootstrap_initial_production_super_admin(uuid)',
+  'configure_invited_profile_coverage_with_audit(uuid,uuid,uuid,uuid)',
+  'consume_username_login_rate_limit(text)',
+  'consume_voice_interpretation_quota(uuid)',
+  'create_recurring_todo_instance(uuid,date,uuid[])',
+  'create_user_profile_with_coverage_and_audit(uuid,uuid,text,text,text,text,uuid,uuid,uuid,text,text,text[],user_role,uuid,uuid,uuid)',
+  'demo_data_purge_counts(uuid)',
+  'enrich_legacy_crm_timeline_visit_form(text,text,jsonb,text)',
+  'execute_production_demo_data_retirement(uuid,uuid,text,text)',
+  'fail_crm_sync_run(uuid,text,uuid,jsonb)',
+  'finalize_crm_sync_run(uuid,jsonb,uuid,jsonb)',
+  'get_crm_sync_checkpoint(text,text,jsonb)',
+  'import_legacy_crm_client(text,text,jsonb,text,uuid)',
+  'import_legacy_crm_timeline(text,text,text,jsonb,text,uuid)',
+  'ingest_crm_source_batch(uuid,text,text,jsonb,uuid,jsonb)',
+  'invite_profile_with_audit_v2(uuid,uuid,text,text,uuid,uuid,uuid,text,text,text[],user_role,uuid)',
+  'invite_profile_with_audit_v3(uuid,uuid,text,text,text,text,uuid,uuid,uuid,text,text,text[],user_role,uuid)',
+  'preserve_legacy_crm_timeline_visit_form(text,text,jsonb,text)',
+  'preview_production_demo_data_retirement(uuid,text,boolean)',
+  'purge_demo_data(uuid,text[],text)',
+  'reconcile_duplicate_production_identity_profiles()',
+  'reconcile_employee_roster_with_audit(jsonb,jsonb)',
+  'reconcile_production_login_emails(jsonb,uuid[])',
+  'repair_production_super_admin_identity()',
+  'resolve_task_coverage(uuid,date)',
+  'set_new_user_work_identity_with_audit(uuid,text,text)',
+  'task_effective_due_datetime(task_instances)',
+  'user_profile_has_linked_records(uuid)'
+]::text[], 'service_role additional EXECUTE grants match the reviewed function identities');
 select ok(has_table_privilege('service_role', 'task_templates', 'SELECT'), 'service_role retains task_templates SELECT');
 select ok(has_table_privilege('service_role', 'user_profiles', 'SELECT'), 'service_role retains user_profiles SELECT');
 select ok(has_table_privilege('service_role', 'user_availability', 'SELECT'), 'service_role retains user_availability SELECT');

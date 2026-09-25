@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(18);
+select plan(20);
 
 select has_table('public', 'production_demo_data_retirements', 'retirement operation ledger exists');
 select has_column('public', 'production_demo_data_retirements', 'tenant_id', 'operations are tenant scoped');
@@ -22,6 +22,8 @@ insert into public.branches(id, tenant_id, name, code) values ('10620000-0000-40
 insert into public.departments(id, tenant_id, branch_id, name, code) values ('10630000-0000-4000-8000-000000000001', '10610000-0000-4000-8000-000000000001', '10620000-0000-4000-8000-000000000001', 'Retirement Department', 'RTD');
 insert into public.user_profiles(id, auth_user_id, tenant_id, branch_id, department_id, employee_name, personal_mobile, email, employee_code, user_role, working_status, account_status, is_login_enabled)
 values ('10640000-0000-4000-8000-000000000001', '10600000-0000-4000-8000-000000000001', '10610000-0000-4000-8000-000000000001', '10620000-0000-4000-8000-000000000001', '10630000-0000-4000-8000-000000000001', 'Retirement Super Admin', '0000000106', 'retirement-admin@example.invalid', 'RET-1', 'super_admin', 'active', 'active', true);
+insert into public.task_import_identity_aliases(tenant_id, normalized_label, source_label, user_profile_id, created_by, updated_by)
+values ('10610000-0000-4000-8000-000000000001', 'retirement super admin', 'Retirement Super Admin', '10640000-0000-4000-8000-000000000001', '10640000-0000-4000-8000-000000000001', '10640000-0000-4000-8000-000000000001');
 insert into public.user_availability(tenant_id, user_profile_id, date, status, logged_by)
 values ('10610000-0000-4000-8000-000000000001', '10640000-0000-4000-8000-000000000001', current_date, 'present', '10640000-0000-4000-8000-000000000001');
 insert into public.clients(tenant_id, branch_id, phone, first_name)
@@ -49,6 +51,7 @@ select set_config('request.jwt.claim.role', 'service_role', true);
 create temporary table retirement_preview as
 select public.preview_production_demo_data_retirement('10600000-0000-4000-8000-000000000001', 'local-backup-reference', true) as response;
 select is(((select response from retirement_preview)->'removal_counts'->>'task_instances')::integer, 1, 'preview counts the demo task without mutating it');
+select is(((select response from retirement_preview)->'retained_counts'->>'task_import_identity_aliases')::integer, 1, 'preview classifies identity aliases as retained operational data');
 select is((select count(*)::integer from public.task_instances where tenant_id='10610000-0000-4000-8000-000000000001'), 1, 'preview is read only');
 select lives_ok($$select public.execute_production_demo_data_retirement('10600000-0000-4000-8000-000000000001', ((select response from retirement_preview)->>'operation_id')::uuid, (select response->>'manifest_hash' from retirement_preview), 'RETIRE DEMO DATA')$$, 'approved service execution retires the demo manifest');
 select is((select count(*)::integer from public.task_instances where tenant_id='10610000-0000-4000-8000-000000000001'), 0, 'demo tasks are removed');
@@ -57,6 +60,7 @@ select is((select count(*)::integer from public.fms_flows where tenant_id='10610
 select is((select count(*)::integer from public.notifications where tenant_id='10610000-0000-4000-8000-000000000001'), 0, 'demo notifications are removed');
 select is((select count(*)::integer from public.clients where tenant_id='10610000-0000-4000-8000-000000000001'), 1, 'CRM remains intact');
 select is((select count(*)::integer from public.user_availability where tenant_id='10610000-0000-4000-8000-000000000001'), 1, 'Availability remains intact');
+select is((select count(*)::integer from public.task_import_identity_aliases where tenant_id='10610000-0000-4000-8000-000000000001'), 1, 'identity aliases remain intact');
 
 select * from finish();
 rollback;
