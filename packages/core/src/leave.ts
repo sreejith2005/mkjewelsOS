@@ -46,3 +46,29 @@ export function countLeaveDays(duration: LeaveHalf, start: string, end: string, 
   if (duration === "2ND HALF" && workHalf === "2ND HALF" && returnDay - first >= 5) total += 0.5;
   return total;
 }
+
+const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"] as const;
+
+/** The source sheet's DD-MON-YYYY display, e.g. 25-SEP-2026. Unparseable input is returned unchanged. */
+export function formatLeaveDate(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const month = match ? MONTHS[Number(match[2]) - 1] : undefined;
+  return match && month ? `${match[3]}-${month}-${match[1]}` : value;
+}
+
+/** A leave awaits handover until it is handed over; rejected leave never needs one. */
+export function leaveNeedsHandover(row: Readonly<{ handed_over_at: string | null; status: string }>): boolean {
+  return !row.handed_over_at && row.status !== "rejected";
+}
+
+export type LeaveSummaryTotals = { total: number; approved: number; pending: number; rejected: number };
+
+/** Summary cards sum counted leave days by status, as the source summary does. */
+export function leaveSummaryTotals(rows: ReadonlyArray<Readonly<{ status: string; total_leave_count: number }>>): LeaveSummaryTotals {
+  return rows.reduce<LeaveSummaryTotals>((totals, row) => {
+    const days = Number(row.total_leave_count) || 0;
+    totals.total += days;
+    if (row.status === "approved" || row.status === "pending" || row.status === "rejected") totals[row.status] += days;
+    return totals;
+  }, { total: 0, approved: 0, pending: 0, rejected: 0 });
+}

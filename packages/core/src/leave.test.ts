@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countLeaveDays, leaveInformStatus, validateLeaveDates } from "./leave";
+import { countLeaveDays, formatLeaveDate, leaveInformStatus, leaveNeedsHandover, leaveSummaryTotals, validateLeaveDates } from "./leave";
 
 describe("Apps Script leave rules", () => {
   it("counts same-day and Sunday exclusions", () => {
@@ -19,5 +19,22 @@ describe("Apps Script leave rules", () => {
     expect(() => validateLeaveDates("2026-02-30", "2026-03-02", "2026-03-03")).toThrow();
     expect(() => validateLeaveDates("2026-09-25", "2026-09-24", "2026-09-26")).toThrow();
     expect(() => validateLeaveDates("2026-09-24", "2026-09-26", "2026-09-25")).toThrow();
+  });
+  it("formats dates the way the source sheet displays them", () => {
+    expect(formatLeaveDate("2026-09-05")).toBe("05-SEP-2026");
+    expect(formatLeaveDate("not a date")).toBe("not a date");
+  });
+  it("lists handover as pending until done, except for rejected leave", () => {
+    expect(leaveNeedsHandover({ handed_over_at: null, status: "pending" })).toBe(true);
+    expect(leaveNeedsHandover({ handed_over_at: null, status: "approved" })).toBe(true);
+    expect(leaveNeedsHandover({ handed_over_at: null, status: "rejected" })).toBe(false);
+    expect(leaveNeedsHandover({ handed_over_at: "2026-09-25T10:00:00Z", status: "pending" })).toBe(false);
+  });
+  it("sums counted days by status for the summary cards", () => {
+    expect(leaveSummaryTotals([
+      { status: "approved", total_leave_count: 2 },
+      { status: "pending", total_leave_count: 0.5 },
+      { status: "rejected", total_leave_count: 1 },
+    ])).toEqual({ total: 3.5, approved: 2, pending: 0.5, rejected: 1 });
   });
 });

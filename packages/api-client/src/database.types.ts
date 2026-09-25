@@ -4412,6 +4412,7 @@ export type Database = {
           leave_start: string
           leave_type: string
           reason: string
+          reference_code: string
           reviewed_at: string | null
           reviewed_by: string | null
           status: string
@@ -4437,6 +4438,7 @@ export type Database = {
           leave_start: string
           leave_type: string
           reason: string
+          reference_code?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: string
@@ -4462,6 +4464,7 @@ export type Database = {
           leave_start?: string
           leave_type?: string
           reason?: string
+          reference_code?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: string
