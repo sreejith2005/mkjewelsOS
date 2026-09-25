@@ -129,16 +129,16 @@ export function LeaveApplications() {
         <Text tone="muted" variant="caption">{row.reference_code}</Text>
         <StatusBadge label={row.status} tone={statusTone(row.status)} />
         <Text variant="small">{formatLeaveDate(row.leave_start)} to {formatLeaveDate(row.leave_end)}</Text>
-        <Button label={row.id === handoverId ? "Selected for handover" : "Fill handover"} onPress={() => fillHandover(row.id)} variant={row.id === handoverId ? "primary" : "secondary"} />
+        {row.id === handoverId ? <View style={{ gap: 10 }}>
+          <Text weight="semibold">Handover form</Text>
+          <Text variant="small">Selected leave: {row.reference_code}</Text>
+          <OptionPicker label="Handover done?" options={handoverDoneOptions} selected={handoverDone ? [handoverDone] : []} onChange={(value) => setHandoverDone(value[0] ?? "")} />
+          <OptionPicker label="Handover given to" options={people.filter((person) => person.id !== profile.id).map((person) => ({ value: person.id, label: person.employee_name }))} selected={handoverTo ? [handoverTo] : []} onChange={(value) => setHandoverTo(value[0] ?? "")} />
+          <Button label={handoverImage ? `Handover proof: ${handoverImage.name}` : "Attach handover approval screenshot"} onPress={() => void choose("handover")} variant="secondary" />
+          <Button busy={busy} disabled={handoverDone !== "YES" || !handoverTo || !handoverImage} label="Submit handover" onPress={() => void run(async () => { if (!handoverImage) throw new Error("Handover image required"); await submitHandover(row.id, profile.tenant_id, profile.id, handoverTo, handoverImage); setHandoverId(null); setHandoverDone(""); setHandoverTo(""); setHandoverImage(null); setTab("history"); }, "Handover submitted.")} />
+        </View> : <Button label="Fill handover" onPress={() => fillHandover(row.id)} variant="secondary" />}
       </Card>)}
-      {selectedHandover ? <Card>
-        <Text weight="semibold">Handover form</Text>
-        <Text variant="small">Selected leave: {selectedHandover.reference_code}</Text>
-        <OptionPicker label="Handover done?" options={handoverDoneOptions} selected={handoverDone ? [handoverDone] : []} onChange={(value) => setHandoverDone(value[0] ?? "")} />
-        <OptionPicker label="Handover given to" options={people.filter((person) => person.id !== profile.id).map((person) => ({ value: person.id, label: person.employee_name }))} selected={handoverTo ? [handoverTo] : []} onChange={(value) => setHandoverTo(value[0] ?? "")} />
-        <Button label={handoverImage ? `Handover proof: ${handoverImage.name}` : "Attach handover approval screenshot"} onPress={() => void choose("handover")} variant="secondary" />
-        <Button busy={busy} disabled={handoverDone !== "YES" || !handoverTo || !handoverImage} label="Submit handover" onPress={() => void run(async () => { if (!handoverImage) throw new Error("Handover image required"); await submitHandover(selectedHandover.id, profile.tenant_id, profile.id, handoverTo, handoverImage); setHandoverId(null); setHandoverDone(""); setHandoverTo(""); setHandoverImage(null); setTab("history"); }, "Handover submitted.")} />
-      </Card> : handoverRows.length ? <Card><Text tone="muted" variant="small">Choose Fill handover on a leave to open the handover form.</Text></Card> : null}
+      {handoverRows.length > 0 && !selectedHandover ? <Card><Text tone="muted" variant="small">Choose Fill handover on a leave to open its handover form.</Text></Card> : null}
     </View> : null}
 
     {tab === "history" ? <View style={{ gap: 10 }}>

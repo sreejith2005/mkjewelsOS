@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { countLeaveDays, formatLeaveDate, hasPermission, leaveInformStatus, leaveNeedsHandover, leaveSummaryTotals, type LeaveHalf, type ReturnHalf } from "@jewelos/core";
 import { canSubmitLeave, editPendingLeave, leaveHandoverCandidates, leaveTypes, listLeaveRequests, reviewLeave, signedLeaveImage, submitHandover, submitLeave, type LeaveDraft, type LeaveRequest } from "@jewelos/data/leave/api";
 import { useAuth } from "@/auth/AuthContext";
@@ -34,6 +34,9 @@ export function LeaveApplications() {
   const [handoverDone, setHandoverDone] = useState("");
   const [handoverTo, setHandoverTo] = useState("");
   const [handoverImage, setHandoverImage] = useState<File | null>(null);
+  const [handoverFocus, setHandoverFocus] = useState(0);
+  const handoverFormRef = useRef<HTMLFormElement>(null);
+  const handoverDoneRef = useRef<HTMLSelectElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDates, setEditDates] = useState({ leaveStart: "", leaveEnd: "", workStartDate: "", workStartIn: "1ST HALF" as ReturnHalf });
   const [remark, setRemark] = useState("");
@@ -56,6 +59,15 @@ export function LeaveApplications() {
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to load leave requests"); }
   }, [canReview, profile]);
   useEffect(() => { void load(); }, [load]);
+  // Fill handover must visibly open the form, which sits below the pending list.
+  useEffect(() => {
+    if (!handoverFocus) return;
+    const frame = window.requestAnimationFrame(() => {
+      handoverFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      handoverDoneRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [handoverFocus]);
   useEffect(() => {
     const refresh = () => { void load(); };
     window.addEventListener("focus", refresh);
@@ -88,7 +100,7 @@ export function LeaveApplications() {
     catch (caught) { setError(caught instanceof Error ? caught.message : "Image unavailable"); }
   };
   const switchTab = (next: Tab) => { setTab(next); setError(""); setMessage(""); if (next !== "apply") void load(); };
-  const fillHandover = (id: string) => { setHandoverId(id); setHandoverDone(""); setHandoverTo(""); setHandoverImage(null); setFileInputKey((key) => key + 1); setTab("handover"); };
+  const fillHandover = (id: string) => { setHandoverId(id); setHandoverDone(""); setHandoverTo(""); setHandoverImage(null); setFileInputKey((key) => key + 1); setTab("handover"); setHandoverFocus((tick) => tick + 1); };
 
   if (!profile) return null;
   return <section className="mb-6 space-y-4 rounded-xl border border-gold/25 bg-charcoal p-4 sm:p-5">
@@ -135,11 +147,11 @@ export function LeaveApplications() {
             <td className="p-3">{formatLeaveDate(row.leave_start)}</td>
             <td className="p-3">{formatLeaveDate(row.leave_end)}</td>
             <td className="p-3"><StatusPill status={row.status} /></td>
-            <td className="p-3"><Button onClick={() => fillHandover(row.id)} variant={row.id === handoverId ? "primary" : "secondary"}>Fill handover</Button></td>
+            <td className="p-3"><Button onClick={() => fillHandover(row.id)} variant={row.id === handoverId ? "primary" : "secondary"}>{row.id === handoverId ? "Selected" : "Fill handover"}</Button></td>
           </tr>)}</tbody>
         </table>
       </div>}
-      {handoverRows.length ? <form className="grid gap-3 rounded-xl border border-gold/15 p-4 sm:grid-cols-2" onSubmit={(e) => {
+      {handoverRows.length ? <form className={`grid scroll-mt-4 gap-3 rounded-xl border p-4 sm:grid-cols-2 ${selectedHandover ? "border-gold/60" : "border-gold/15"}`} ref={handoverFormRef} onSubmit={(e) => {
         e.preventDefault();
         if (!selectedHandover) { setError("Choose Fill handover for a leave first"); return; }
         if (handoverDone !== "YES") { setError("Confirm that the handover is done"); return; }
@@ -152,7 +164,7 @@ export function LeaveApplications() {
       }}>
         <h3 className="font-semibold text-champagne sm:col-span-2">Handover form</h3>
         <label className="text-sm sm:col-span-2">Selected leave (Unique ID)<input className="task-field mt-1 w-full" disabled placeholder="Choose Fill handover above" value={selectedHandover?.reference_code ?? ""} /></label>
-        <label className="text-sm">Handover done?<select className="task-field mt-1 w-full" required value={handoverDone} onChange={(e) => setHandoverDone(e.target.value)}><option value="">Select</option><option value="YES">YES</option></select></label>
+        <label className="text-sm">Handover done?<select className="task-field mt-1 w-full" ref={handoverDoneRef} required value={handoverDone} onChange={(e) => setHandoverDone(e.target.value)}><option value="">Select</option><option value="YES">YES</option></select></label>
         <label className="text-sm">Handover given to<select className="task-field mt-1 w-full" required value={handoverTo} onChange={(e) => setHandoverTo(e.target.value)}><option value="">Select employee</option>{people.filter((person) => person.id !== profile.id).map((person) => <option key={person.id} value={person.id}>{person.employee_name}</option>)}</select></label>
         <label className="text-sm sm:col-span-2">Handover approval screenshot<input accept="image/jpeg,image/png,image/webp" className="task-field mt-1 w-full" key={fileInputKey} required type="file" onChange={(e) => setHandoverImage(e.target.files?.[0] ?? null)} /></label>
         <Button disabled={busy || !selectedHandover} type="submit">{busy ? "Submitting…" : "Submit handover"}</Button>
