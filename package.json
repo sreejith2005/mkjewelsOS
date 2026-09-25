@@ -16,13 +16,18 @@
     "mobile:typecheck": "npm --prefix apps/mobile run typecheck",
     "seed": "tsx supabase/seed.ts",
     "seed:local": "powershell -NoProfile -ExecutionPolicy Bypass -File supabase/seed-local.ps1",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "crm:parity": "node scripts/crm-parity/run.mjs"
   },
   "devDependencies": {
+    "@supabase/ssr": "0.12.4",
     "@supabase/supabase-js": "^2.112.1",
     "@types/node": "^24.13.3",
-    "turbo": "^2.10.8",
+    "pixelmatch": "^7.1.0",
+    "playwright": "1.63.0",
+    "pngjs": "^7.0.0",
     "tsx": "^4.20.6",
+    "turbo": "^2.10.8",
     "typescript": "^5.9.3"
   }
 }

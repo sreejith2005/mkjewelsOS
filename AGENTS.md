@@ -116,7 +116,7 @@ Important current contracts include:
 ### CRM (2026-09-25 owner decision)
 
 The CRM in `packages/crm-ui` (rendered by the web app at `/crm`; Phase 3) and
-database schema `crm` (migrations 0179-0184) is a port of the original MK Jewels
+database schema `crm` (migrations 0179-0185) is a port of the original MK Jewels
 CRM (`sreejith-crm/web-app`). Parity with the original - screens, fields, order,
 labels, vocabularies, flows, validation, calculations and styling - is the
 acceptance criterion; do not improve, rename, re-order, or merge it with the old

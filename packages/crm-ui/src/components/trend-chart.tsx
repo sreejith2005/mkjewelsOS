@@ -1,0 +1,7 @@
+type Point = { day: string; total: number; bought: number; notBought: number };
+export function TrendChart({ points }: { points: Point[] }) {
+  if (!points.length) return <p className="p-5 text-sm text-stone-600">No visits in this date range.</p>;
+  const width = 720, height = 240, pad = 30, max = Math.max(1, ...points.flatMap((point) => [point.total, point.bought, point.notBought]));
+  const line = (field: keyof Omit<Point, "day">) => points.map((point, index) => `${pad + index * ((width - pad * 2) / Math.max(1, points.length - 1))},${height - pad - (point[field] / max) * (height - pad * 2)}`).join(" ");
+  return <div className="p-4"><div className="mb-3 flex gap-4 text-xs"><span className="text-stone-700">● Total</span><span className="text-amber-700">● Bought</span><span className="text-red-700">● Not bought</span></div><svg className="h-60 w-full" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Visits per day: total, bought, and not bought"><line x1={pad} y1={height - pad} x2={width - pad} y2={height - pad} stroke="#d6d3d1" /><polyline points={line("total")} fill="none" stroke="#44403c" strokeWidth="3" /><polyline points={line("bought")} fill="none" stroke="#b45309" strokeWidth="3" /><polyline points={line("notBought")} fill="none" stroke="#b91c1c" strokeWidth="3" /></svg><div className="flex justify-between gap-2 text-xs text-stone-500"><span>{points[0]?.day}</span><span>{points.at(-1)?.day}</span></div></div>;
+}

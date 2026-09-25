@@ -31,6 +31,20 @@ the production playbook.
 
 ## Phase 3 - Web UI port (`packages/crm-ui`)
 
+Status (2026-09-25, branch `feat/crm-native`, local only): implemented. Record:
+`packages/crm-ui/PORTING.md` (every `crm-port:` edit, styling/isolation) and
+`scripts/crm-parity/README.md` (harness). As built, it differs from the plan below in these ways:
+
+- `/crm/*` renders `CrmApp` full-screen (its own original shell) behind the existing
+  JewelOS gates. The old `CRMPage` is unrouted; rollback is reverting the App.tsx change.
+  The `/crm/*` path mapping lives in `apps/web` (`packages/core` is shared with mobile and
+  is unchanged).
+- The original server pages run unchanged as client loaders
+  (`src/crm-port/app-router.tsx`). The original `app/` tree keeps its layout.
+- The stylesheet uses id-tier scoping (`.crm-root#crm-root…`), not class prefixing alone,
+  because Tailwind 4's cascade layers would otherwise lose to JewelOS's unlayered CSS.
+- Audit addendum: `0185_crm_direct_write_audit.sql` (design open question 6).
+
 Stack facts: original = Next 16 / React 19 / Tailwind 4 with async server-component
 pages and `next/navigation`, `next/link`, one `next/image`, one server action
 (`signOut`). JewelOS web = Vite / React 18.3 / Tailwind 3 with its own pathname

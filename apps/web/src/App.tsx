@@ -52,7 +52,9 @@ const DropdownMasterPage = lazyPage("dropdown-master", () => import("@/pages/Dro
 const FormsPage = lazyPage("forms", () => import("@/pages/FormsPage").then((module) => ({ default: module.FormsPage })));
 const FMSBuilderPage = lazyPage("fms", () => import("@/pages/FMSBuilderPage").then((module) => ({ default: module.FMSBuilderPage })));
 const NotificationsPage = lazyPage("notifications", () => import("@/pages/NotificationsPage").then((module) => ({ default: module.NotificationsPage })));
-const CRMPage = lazyPage("crm", () => import("@/pages/CRMPage").then((module) => ({ default: module.CRMPage })));
+// /crm is the ported original CRM (@jewelos/crm-ui, 2026-09-25 owner decision). The old
+// JewelOS CRMPage stays in the tree, unrouted, until its Phase 7 retirement.
+const CrmApp = lazyPage("crm", () => import("@jewelos/crm-ui").then((module) => ({ default: module.CrmApp })));
 const TasksPage = lazyPage("tasks", () => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
 const FmsAssignedWorkPage = lazyPage("fms-assigned-work", () => import("@/pages/FmsAssignedWorkPage").then((module) => ({ default: module.FmsAssignedWorkPage })));
 const RecurringTodoPage = lazyPage("recurring-todo", () => import("@/pages/RecurringTodoPage").then((module) => ({ default: module.RecurringTodoPage })));
@@ -289,7 +291,8 @@ function AppShell() {
       setSavingSectionControls(false);
     }
   };
-  const requestedPage = getPageForPath(path) ?? "home";
+  // Every /crm/* path belongs to the CRM section (web only; the shared path map is unchanged).
+  const requestedPage = path === "/crm" || path.startsWith("/crm/") ? "crm" : getPageForPath(path) ?? "home";
   // Permission management sits under Settings but depends only on the
   // protected permission, so a Super Admin can never be locked out of it.
   const showPermissionManagement = path === "/settings/permissions" && hasPermission(effectiveAccess, "permissions.manage");
@@ -310,7 +313,6 @@ function AppShell() {
     : currentPage === "reports" ? <ReportsPage />
     : currentPage === "settings" ? <><SettingsPage /><div className="mx-auto w-full max-w-7xl px-4 pb-8"><DailyChecklistManager /></div></>
     : currentPage === "users" ? <TeamDirectoryPage />
-    : currentPage === "crm" ? <CRMPage />
     : currentPage === "dropdown_master" ? <DropdownMasterPage />
       : currentPage === "checklist_tasks" ? path === "/tasks/import" ? <TaskBulkImportPage onBack={() => navigate("/tasks")} /> : path === "/tasks/assigning-left" ? <AssigningLeftPage /> : path === "/tasks/fms" ? <FmsAssignedWorkPage key={search} onNavigate={navigate} /> : <TasksPage />
       : currentPage === "recurring_todo" ? <RecurringTodoPage />
@@ -320,6 +322,21 @@ function AppShell() {
               : currentPage === "fms_builder" ? <FMSBuilderPage />
                 : currentPage === "notifications" ? <NotificationsPage onNavigate={navigate} />
             : <DashboardPage />;
+
+  // The CRM renders full-screen with its own original shell once the JewelOS gates allow the
+  // section; a disabled section keeps the JewelOS maintenance notice inside the shell below.
+  if (currentPage === "crm" && pageAccess === "allowed" && !showPermissionManagement) {
+    return (
+      <>
+        <LazyPageErrorBoundary onNavigate={navigate} resetKey={path}>
+          <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-gold">Loading…</div>}>
+            <CrmApp jewelosHomePath="/" navigate={navigate} onSignOut={logout} path={path} search={search} supabase={supabase} />
+          </Suspense>
+        </LazyPageErrorBoundary>
+        <DailyChecklistGate profileId={profile.id} />
+      </>
+    );
+  }
 
   return (
     <>

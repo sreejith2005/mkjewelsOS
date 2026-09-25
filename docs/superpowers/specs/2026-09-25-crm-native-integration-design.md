@@ -240,6 +240,11 @@ The implementation plan with files, tests and gates is
 6. Direct table writes in the original UI (clients, availability, leads, lead
    call history, campaign tags, lookups) are RLS-authorized but not audited in
    `public.audit_logs`. Accept as original behaviour, or add audit triggers?
+   Resolved in Phase 3 by `0185_crm_direct_write_audit.sql`, which audits direct
+   (non-RPC) writes to clients, crm_daily_availability, leads, lead_call_history and
+   the lookup tables. It records entity, operation and changed column names, never
+   values. Other RLS-writable tables (campaign tags, documents, entry_queue, ...)
+   have no UI direct write and are not yet audited.
 7. Does the Google Sheets worker from the 2026-08-21 design stop, or later feed
    `crm` instead of `public`?
 8. After cutover, are Home "CRM Tasks", dashboard CRM metrics and CRM reports

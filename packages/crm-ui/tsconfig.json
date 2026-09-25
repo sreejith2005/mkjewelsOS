@@ -1,0 +1,28 @@
+{
+  // The original CRM source is ported verbatim, so it is checked with the original
+  // compiler options (sreejith-crm/web-app/tsconfig.json: strict, bundler resolution,
+  // "@/*" path alias) rather than the stricter repository base. The web app reads only
+  // src/public-api.d.ts, never these sources, so its own settings are unaffected.
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  // tests/ are the original vitest files, run type-stripped by vitest as in the original.
+  // Two verbatim lines spy on crypto.randomUUID with a plain string, which the JewelOS typing
+  // environment rejects (type-only); the assertions are kept unchanged instead.
+  "include": ["src", "vitest.config.ts"]
+}

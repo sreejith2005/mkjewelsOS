@@ -13,6 +13,7 @@
   "dependencies": {
     "@jewelos/api-client": "workspace:*",
     "@jewelos/core": "workspace:*",
+    "@jewelos/crm-ui": "workspace:*",
     "@jewelos/data": "workspace:*",
     "@jewelos/ui-tokens": "workspace:*",
     "@radix-ui/react-slot": "^1.2.4",
