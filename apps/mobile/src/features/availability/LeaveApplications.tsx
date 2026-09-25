@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Linking, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { countLeaveDays, hasPermission, leaveInformStatus, type LeaveHalf, type ReturnHalf } from "@jewelos/core";
-import { canSubmitLeave, editPendingLeave, leaveTypes, listLeaveRequests, reviewLeave, signedLeaveImage, submitHandover, submitLeave, type LeaveDraft, type LeaveRequest } from "@jewelos/data/leave/api";
+import { canSubmitLeave, editPendingLeave, leaveHandoverCandidates, leaveTypes, listLeaveRequests, reviewLeave, signedLeaveImage, submitHandover, submitLeave, type LeaveDraft, type LeaveRequest } from "@jewelos/data/leave/api";
 import type { UploadableFile } from "@jewelos/data/runtime";
-import { loadAvailabilityUsers, type TaskUser } from "@jewelos/data/tasks/api";
 import { useAccess, useProfile } from "@/auth/AuthProvider";
 import { DateField } from "@/forms/DateField";
 import { pickFileFromChooser } from "@/lib/pickFile";
@@ -27,7 +27,7 @@ export function LeaveApplications() {
   const [tab, setTab] = useState<"apply" | "history" | "review">("apply");
   const [rows, setRows] = useState<LeaveRequest[]>([]);
   const [types, setTypes] = useState<Array<{ value: string; label: string }>>([]);
-  const [people, setPeople] = useState<TaskUser[]>([]);
+  const [people, setPeople] = useState<Array<{ id: string; employee_name: string }>>([]);
   const [draft, setDraft] = useState<LeaveDraft>(emptyDraft);
   const [tlImage, setTlImage] = useState<UploadableFile | null>(null);
   const [handoverId, setHandoverId] = useState<string | null>(null);
@@ -45,7 +45,7 @@ export function LeaveApplications() {
     try {
       const [ownRows, reviewRows, nextTypes, nextPeople, applicantEligible] = await Promise.all([
         listLeaveRequests(profile.id), canReview ? listLeaveRequests(undefined, "pending") : Promise.resolve([]),
-        leaveTypes(), loadAvailabilityUsers(), canSubmitLeave(),
+        leaveTypes(), leaveHandoverCandidates(), canSubmitLeave(),
       ]);
       setRows([...ownRows, ...reviewRows.filter((row) => row.applicant_id !== profile.id)]);
       setTypes(nextTypes); setPeople(nextPeople);
@@ -53,7 +53,7 @@ export function LeaveApplications() {
       if (!applicantEligible) setTab((current) => current === "apply" ? (canReview ? "review" : "history") : current);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not load leave requests"); }
   }, [canReview, profile.id]);
-  useEffect(() => { void load(); }, [load]);
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const mine = useMemo(() => rows.filter((row) => row.applicant_id === profile.id), [profile.id, rows]);
   const totals = useMemo(() => mine.reduce((total, row) => {

@@ -3185,6 +3185,8 @@ export type Database = {
           form_submission_id: string | null
           id: string
           last_escalated_at: string | null
+          leave_coverage_buddy_id: string | null
+          leave_coverage_buddy_preexisting: boolean | null
           next_doer_ids: string[] | null
           outcome: string | null
           planned_datetime: string | null
@@ -3213,6 +3215,8 @@ export type Database = {
           form_submission_id?: string | null
           id?: string
           last_escalated_at?: string | null
+          leave_coverage_buddy_id?: string | null
+          leave_coverage_buddy_preexisting?: boolean | null
           next_doer_ids?: string[] | null
           outcome?: string | null
           planned_datetime?: string | null
@@ -3241,6 +3245,8 @@ export type Database = {
           form_submission_id?: string | null
           id?: string
           last_escalated_at?: string | null
+          leave_coverage_buddy_id?: string | null
+          leave_coverage_buddy_preexisting?: boolean | null
           next_doer_ids?: string[] | null
           outcome?: string | null
           planned_datetime?: string | null
@@ -3306,6 +3312,27 @@ export type Database = {
             columns: ["form_submission_id"]
             isOneToOne: false
             referencedRelation: "form_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_instance_stages_leave_coverage_buddy_id_fkey"
+            columns: ["leave_coverage_buddy_id"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_instance_stages_leave_coverage_buddy_id_fkey"
+            columns: ["leave_coverage_buddy_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_instance_stages_leave_coverage_buddy_id_fkey"
+            columns: ["leave_coverage_buddy_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
             referencedColumns: ["id"]
           },
           {
@@ -7658,6 +7685,12 @@ export type Database = {
       }
     }
     Views: {
+      leave_handover_candidates: {
+        Row: { id: string | null; employee_name: string | null }
+        Insert: { id?: string | null; employee_name?: string | null }
+        Update: { id?: string | null; employee_name?: string | null }
+        Relationships: []
+      }
       v_all_tasks: {
         Row: {
           actual_datetime: string | null
@@ -9065,6 +9098,10 @@ export type Database = {
       leave_applicant_eligible: { Args: never; Returns: boolean }
       leave_file_readable: { Args: { p_path: string }; Returns: boolean }
       leave_file_writable: { Args: { p_path: string }; Returns: boolean }
+      leave_half_day_absent_at: {
+        Args: { p_at: string; p_user: string }
+        Returns: boolean
+      }
       leave_inform_status: {
         Args: { p_end: string; p_start: string; p_submitted: string }
         Returns: string
@@ -9528,6 +9565,10 @@ export type Database = {
           original_assignee_id: string
           resolution: string
         }[]
+      }
+      resolve_task_coverage_at: {
+        Args: { p_at: string; p_original_assignee_id: string; p_target_date: string }
+        Returns: { effective_assignee_id: string; original_assignee_id: string; resolution: string }[]
       }
       restore_fms_flow_with_audit: {
         Args: { p_flow_id: string; p_reason?: string }
@@ -10083,6 +10124,7 @@ export type Database = {
         Args: { p_actor: string; p_client_id: string }
         Returns: undefined
       }
+      sync_leave_half_day_tasks: { Args: { p_at: string }; Returns: undefined }
       task_attachment_display_name: {
         Args: { p_storage_path: string }
         Returns: string

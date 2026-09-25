@@ -28,6 +28,13 @@ export async function leaveTypes(): Promise<Array<{ value: string; label: string
   return data ?? [];
 }
 
+export async function leaveHandoverCandidates(): Promise<Array<{ id: string; employee_name: string }>> {
+  const { data, error } = await db().from("leave_handover_candidates").select("id,employee_name");
+  fail(error, "Load handover employees");
+  return (data ?? []).filter((person): person is { id: string; employee_name: string } =>
+    Boolean(person.id && person.employee_name));
+}
+
 export async function canSubmitLeave(): Promise<boolean> {
   const { data, error } = await db().rpc("leave_applicant_eligible");
   fail(error, "Check leave access");

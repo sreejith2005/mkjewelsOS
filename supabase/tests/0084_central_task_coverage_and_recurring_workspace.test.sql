@@ -27,7 +27,7 @@ select has_function('public', 'configure_invited_profile_coverage_with_audit', a
 select ok(position('secondary_buddy_id' in pg_get_functiondef('public.configure_invited_profile_coverage_with_audit(uuid,uuid,uuid,uuid)'::regprocedure)) > 0, 'new-user coverage configuration persists the secondary buddy');
 
 select ok(
-  position('secondary_buddy_id' in pg_get_functiondef('public.resolve_task_coverage(uuid,date)'::regprocedure)) > 0,
+  position('secondary_buddy_id' in pg_get_functiondef('public.resolve_task_coverage_at(uuid,date,timestamp with time zone)'::regprocedure)) > 0,
   'resolver evaluates the secondary buddy'
 );
 select ok(

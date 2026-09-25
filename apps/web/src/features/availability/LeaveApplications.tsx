@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { countLeaveDays, hasPermission, leaveInformStatus, type LeaveHalf, type ReturnHalf } from "@jewelos/core";
-import { canSubmitLeave, editPendingLeave, leaveTypes, listLeaveRequests, reviewLeave, signedLeaveImage, submitHandover, submitLeave, type LeaveDraft, type LeaveRequest } from "@jewelos/data/leave/api";
+import { canSubmitLeave, editPendingLeave, leaveHandoverCandidates, leaveTypes, listLeaveRequests, reviewLeave, signedLeaveImage, submitHandover, submitLeave, type LeaveDraft, type LeaveRequest } from "@jewelos/data/leave/api";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
-import { loadAvailabilityUsers, type TaskUser } from "@/features/tasks/api";
 
 const durations: LeaveHalf[] = ["FULL DAY", "1ST HALF", "2ND HALF"];
 const halves: ReturnHalf[] = ["1ST HALF", "2ND HALF"];
@@ -15,7 +14,7 @@ export function LeaveApplications() {
   const [canApply, setCanApply] = useState<boolean | null>(null);
   const [tab, setTab] = useState<"apply" | "history" | "review">("apply");
   const [types, setTypes] = useState<Array<{ value: string; label: string }>>([]);
-  const [people, setPeople] = useState<TaskUser[]>([]);
+  const [people, setPeople] = useState<Array<{ id: string; employee_name: string }>>([]);
   const [rows, setRows] = useState<LeaveRequest[]>([]);
   const [draft, setDraft] = useState<LeaveDraft>(emptyDraft);
   const [tlImage, setTlImage] = useState<File | null>(null);
@@ -35,7 +34,7 @@ export function LeaveApplications() {
     try {
       const [ownRows, reviewRows, nextTypes, nextPeople, applicantEligible] = await Promise.all([
         listLeaveRequests(profile.id), canReview ? listLeaveRequests(undefined, "pending") : Promise.resolve([]),
-        leaveTypes(), loadAvailabilityUsers(), canSubmitLeave(),
+        leaveTypes(), leaveHandoverCandidates(), canSubmitLeave(),
       ]);
       setRows([...ownRows, ...reviewRows.filter((row) => row.applicant_id !== profile.id)]);
       setTypes(nextTypes); setPeople(nextPeople);
@@ -44,6 +43,11 @@ export function LeaveApplications() {
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to load leave requests"); }
   }, [canReview, profile]);
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const refresh = () => { void load(); };
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, [load]);
 
   const myRows = useMemo(() => rows.filter((row) => row.applicant_id === profile?.id), [rows, profile?.id]);
   const totals = useMemo(() => myRows.reduce((result, row) => {
