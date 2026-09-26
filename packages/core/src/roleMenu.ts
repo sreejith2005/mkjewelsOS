@@ -88,6 +88,7 @@ const APP_DESCRIPTIONS: Partial<Readonly<Record<PageId, string>>> = {
   crm: "Manage clients, walk-ins, interactions, follow-ups, and documents.",
   fms_tasks: "Run assigned stages and authorized workflows.",
   fms_builder: "Run live workflows and design versioned process flows.",
+  forms_library: "Browse, fill, and manage authorized forms and submissions.",
   users: "Browse employees by department and manage authorized accounts.",
   availability: "Record real working availability.",
   recurring_todo: "Manage recurring schedules, personal work, verification, follow-ups, and coverage.",

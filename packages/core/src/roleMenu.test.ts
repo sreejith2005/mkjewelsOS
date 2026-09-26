@@ -34,6 +34,7 @@ describe("task workspace navigation", () => {
       "home",
       "dashboard",
       "fms_builder",
+      "forms_library",
       "availability",
       "reports",
       "settings",
