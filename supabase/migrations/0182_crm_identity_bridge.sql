@@ -365,7 +365,7 @@ end
 $$;
 
 -- ---------------------------------------------------------------------------
--- 5. Privileges (0182 re-applies the crm grants after its clean-slate revoke)
+-- 5. Privileges (0184 re-applies the crm grants after its clean-slate revoke)
 -- ---------------------------------------------------------------------------
 
 revoke all on all functions in schema crm_private from public, anon, authenticated, service_role;

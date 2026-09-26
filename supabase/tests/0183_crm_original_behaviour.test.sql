@@ -16,9 +16,9 @@ create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 select no_plan();
 
-insert into tenants(id, name, slug) values ('01811000-0000-4000-8000-000000000001', 'CRM original behaviour', 'crm-0181');
-insert into branches(id, tenant_id, name, code) values ('01812000-0000-4000-8000-000000000001', '01811000-0000-4000-8000-000000000001', 'CRM 0181 HQ', 'C181HQ');
-insert into departments(id, tenant_id, branch_id, name, code) values ('01813000-0000-4000-8000-000000000001', '01811000-0000-4000-8000-000000000001', '01812000-0000-4000-8000-000000000001', 'HQ', 'C181HQ');
+insert into tenants(id, name, slug) values ('01831000-0000-4000-8000-000000000001', 'CRM original behaviour', 'crm-0183');
+insert into branches(id, tenant_id, name, code) values ('01832000-0000-4000-8000-000000000001', '01831000-0000-4000-8000-000000000001', 'CRM 0183 HQ', 'C181HQ');
+insert into departments(id, tenant_id, branch_id, name, code) values ('01833000-0000-4000-8000-000000000001', '01831000-0000-4000-8000-000000000001', '01832000-0000-4000-8000-000000000001', 'HQ', 'C181HQ');
 
 -- port: replaces "INSERT INTO users (id,name,email,role,branch_id)". Creates the CRM user
 -- and a linked, active JewelOS profile (super_admin / manager / crm) in a JewelOS branch
@@ -26,11 +26,11 @@ insert into departments(id, tenant_id, branch_id, name, code) values ('01813000-
 create function pg_temp.crm_user(p_id uuid, p_name text, p_email text, p_role crm.user_role, p_branch uuid)
 returns void language plpgsql as $$
 declare
-  v_tenant constant uuid := '01811000-0000-4000-8000-000000000001';
+  v_tenant constant uuid := '01831000-0000-4000-8000-000000000001';
   v_auth uuid := ('a' || substr(p_id::text, 2))::uuid;
   v_profile uuid := ('c' || substr(p_id::text, 2))::uuid;
-  v_jewelos_branch uuid := '01812000-0000-4000-8000-000000000001';
-  v_department uuid := '01813000-0000-4000-8000-000000000001';
+  v_jewelos_branch uuid := '01832000-0000-4000-8000-000000000001';
+  v_department uuid := '01833000-0000-4000-8000-000000000001';
 begin
   if p_branch is not null then
     select jewelos_branch_id into v_jewelos_branch from crm.branches where id = p_branch;

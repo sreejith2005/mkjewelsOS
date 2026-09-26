@@ -17,6 +17,7 @@ describe("task workspace navigation", () => {
     expect(getPageForPath("/tasks")).toBe("checklist_tasks");
     expect(getPageForPath("/tasks/checklist")).toBe("checklist_tasks");
     expect(getPageForPath("/tasks/delegation")).toBe("checklist_tasks");
+    expect(getPageForPath("/tasks/in-loop")).toBe("checklist_tasks");
     expect(getPageForPath("/tasks/import")).toBe("checklist_tasks");
     expect(getPageForPath("/tasks/assigning-left")).toBe("checklist_tasks");
     // Assigned FMS work is a Tasks surface. It must not require builder access

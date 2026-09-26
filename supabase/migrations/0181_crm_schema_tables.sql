@@ -7,7 +7,7 @@
 -- replayed into schema crm and captured with pg_dump. Table, column, enum,
 -- constraint, index and sequence names are unchanged so the original queries port
 -- 1:1 as supabase.schema("crm"). The SSO migration 20260820110000 is excluded.
--- Functions/triggers: 0181. RLS/grants: 0182. Identity bridge: 0180.
+-- Functions/triggers: 0183. RLS/grants: 0184. Identity bridge: 0182.
 -- Existing public.clients / public.client_timeline (old JewelOS CRM) are untouched.
 
 create schema crm;

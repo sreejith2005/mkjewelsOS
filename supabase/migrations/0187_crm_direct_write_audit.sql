@@ -4,7 +4,7 @@
 -- through an RPC: clients (profile edit), crm_daily_availability (roster availability),
 -- leads (lead capture; the Runo push updates it), lead_call_history (post-call inbox).
 -- The lookup tables are writable directly by a CRM super admin. Mutating CRM RPCs already
--- write their own crm.<function> row through crm_private.write_audit_log (0180); these
+-- write their own crm.<function> row through crm_private.write_audit_log (0182); these
 -- writes did not. RLS and the UI contract are unchanged.
 --
 -- Audited: a row-level INSERT/UPDATE/DELETE executed as role authenticated by the statement

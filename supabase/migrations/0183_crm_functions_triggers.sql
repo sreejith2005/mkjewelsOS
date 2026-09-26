@@ -1,14 +1,14 @@
--- Original CRM functions and triggers in schema crm (see 0179 header for provenance).
+-- Original CRM functions and triggers in schema crm (see 0181 header for provenance).
 -- Function names, signatures, return shapes, security modes and search_path = ''
 -- are unchanged from the final original state. The only edits are:
 --   1. Identity bridge: every "auth"."uid"() that meant "the acting CRM user" now reads
---      "crm"."current_crm_user_id"() (0180), because the JWT subject is now a JewelOS
+--      "crm"."current_crm_user_id"() (0182), because the JWT subject is now a JewelOS
 --      Auth user and CRM user ids (FK targets) are preserved.
 --   2. Each mutating RPC writes a public.audit_logs row in the same transaction through
 --      crm_private.write_audit_log immediately before its successful return. The original
 --      client_edit_log / history triggers are unchanged.
 -- The identity helpers current_user_role(), current_user_branch_id() and
--- get_my_profile() are defined by 0180.
+-- get_my_profile() are defined by 0182.
 
 CREATE FUNCTION crm.assign_client_code() RETURNS trigger
     LANGUAGE plpgsql

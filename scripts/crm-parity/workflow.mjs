@@ -1,7 +1,7 @@
 // End-to-end workflow parity: the same salesperson flow in both apps (queue -> walk-in with a
 // proof upload -> not-bought follow-up -> referral follow-up -> profile edit), then the rows
 // each app wrote are compared, with generated ids and timestamps normalised. On JewelOS the
-// audit rows are checked too (mutating RPC rows, the 0185 direct-write row, no values).
+// audit rows are checked too (mutating RPC rows, the 0187 direct-write row, no values).
 import { PNG } from "pngjs";
 
 import { ORIGINAL_DB_CONTAINER } from "./original-stack.mjs";

@@ -344,7 +344,7 @@ to authenticated;
 grant select, insert on crm.referral_calling_history to authenticated;
 grant select, insert, update on crm.lead_call_history to authenticated;
 grant select on crm.legacy_walkin_ingest_attempts to authenticated;
--- Identity-bridge columns (0180) are writable only through the audited link RPCs.
+-- Identity-bridge columns (0182) are writable only through the audited link RPCs.
 grant select, delete on crm.users, crm.branches to authenticated;
 grant insert (id, name, phone, email, role, branch_id, active, created_at),
       update (id, name, phone, email, role, branch_id, active, created_at) on crm.users to authenticated;

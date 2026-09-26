@@ -82,7 +82,7 @@ from parity_users
 on conflict (id) do update set user_role = excluded.user_role, branch_id = excluded.branch_id, account_status = 'active', is_login_enabled = true, working_status = 'active';
 commit;
 `);
-  // The identity bridge links (0180). Owner-side here because this is a local synthetic
+  // The identity bridge links (0182). Owner-side here because this is a local synthetic
   // fixture; production links go through crm.link_jewelos_profile / link_jewelos_branch.
   psql(JEWELOS_DB_CONTAINER, `
 update crm.branches set jewelos_branch_id = case id

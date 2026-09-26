@@ -1,4 +1,4 @@
--- Original CRM Storage bucket and object policies (see 0179 header for provenance).
+-- Original CRM Storage bucket and object policies (see 0181 header for provenance).
 --
 -- The original bucket id 'crm-documents' is already used by the old JewelOS CRM
 -- (0012 onwards), so the original CRM files live in the distinct private bucket
@@ -7,7 +7,7 @@
 --   lead-calls/<uuid>/<uuid>_<file name>                          (call recordings)
 -- The four original policies are ported to the new bucket id with bucket-prefixed names.
 -- Storage owner_id is the JewelOS Auth user (JWT subject), so the owner checks keep
--- auth.uid(); CRM role checks read the identity bridge (0180).
+-- auth.uid(); CRM role checks read the identity bridge (0182).
 -- file_size_limit mirrors the original client-side 10 MB cap (walk-in-form.tsx
 -- MAX_UPLOAD_BYTES). MIME types stay unrestricted like the original bucket; see the
 -- design's open questions.

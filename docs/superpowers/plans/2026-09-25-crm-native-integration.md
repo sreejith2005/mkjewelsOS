@@ -11,10 +11,10 @@ phase is handed over; hosted steps additionally need owner approval.
 
 Files:
 
-- `supabase/migrations/0179_crm_schema_tables.sql` .. `0184_crm_storage_bucket.sql`
-- `supabase/tests/0180_crm_identity_bridge.test.sql` (privileges, bridge,
+- `supabase/migrations/0181_crm_schema_tables.sql` .. `0186_crm_storage_bucket.sql`
+- `supabase/tests/0182_crm_identity_bridge.test.sql` (privileges, bridge,
   fail-closed cases, branch scoping, link RPCs, ingest path, old CRM untouched)
-- `supabase/tests/0181_crm_original_behaviour.test.sql` (port of
+- `supabase/tests/0183_crm_original_behaviour.test.sql` (port of
   `sreejith-crm/web-app/tests/database-foundation.test.ts`)
 - `supabase/config.toml` (`[api] schemas` adds `crm`)
 - `packages/api-client/src/database.types.ts`, `packages/core/src/database.types.ts`
@@ -26,7 +26,7 @@ Gate (met locally): `supabase.cmd db reset`, `supabase.cmd test db`,
 `git diff --check`; catalog, function-body and seed diffs against a replay of the
 original migrations show only the documented differences.
 
-Hosted (owner action, later): add `crm` to Exposed schemas; apply 0179-0184 with
+Hosted (owner action, later): add `crm` to Exposed schemas; apply 0181-0186 with
 the production playbook.
 
 ## Phase 3 - Web UI port (`packages/crm-ui`)
@@ -43,7 +43,7 @@ Status (2026-09-25, branch `feat/crm-native`, local only): implemented. Record:
   (`src/crm-port/app-router.tsx`). The original `app/` tree keeps its layout.
 - The stylesheet uses id-tier scoping (`.crm-root#crm-root…`), not class prefixing alone,
   because Tailwind 4's cascade layers would otherwise lose to JewelOS's unlayered CSS.
-- Audit addendum: `0185_crm_direct_write_audit.sql` (design open question 6).
+- Audit addendum: `0187_crm_direct_write_audit.sql` (design open question 6).
 
 Stack facts: original = Next 16 / React 19 / Tailwind 4 with async server-component
 pages and `next/navigation`, `next/link`, one `next/image`, one server action
@@ -114,7 +114,7 @@ Files:
 - `supabase/functions/crm-runo-push/` - port of `app/api/leads/[leadId]/runo/route.ts`;
   caller JWT verified, owner/super-admin check through the bridge, Runo
   credentials server-side only.
-- `supabase/migrations/0185_crm_ingest_service_grants.sql` - `service_role`:
+- `supabase/migrations/0188_crm_ingest_service_grants.sql` - `service_role`:
   USAGE on `crm`, EXECUTE on the two ingest RPCs, INSERT/SELECT on the attempts
   ledger, and only what `crm-runo-push` needs.
 - Tests: Deno tests per function (bad secret, malformed body, rate limit,

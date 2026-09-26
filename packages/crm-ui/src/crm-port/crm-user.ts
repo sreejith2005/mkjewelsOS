@@ -1,6 +1,6 @@
 // crm-port: the original used supabase.auth.getUser().id as the acting CRM user id
 // (crm.users lookups, leads.created_by, lead_call_history.entered_by). Through the JewelOS
-// identity bridge (0180) the Auth user is a JewelOS user and the CRM user id is
+// identity bridge (0182) the Auth user is a JewelOS user and the CRM user id is
 // crm.current_crm_user_id(). This keeps the original { data: { user } } shape so each call
 // site changes only the call; user.email stays the signed-in Auth email.
 import type { CrmSupabaseClient } from "./runtime";

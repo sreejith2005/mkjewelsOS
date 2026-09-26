@@ -1,6 +1,6 @@
 project_id = "jewelos"
 
-# The original CRM is ported into schema crm (0179-0184) and is queried as
+# The original CRM is ported into schema crm (0181-0186) and is queried as
 # supabase.schema("crm"). crm is deliberately not on extra_search_path: its table
 # names (clients, client_timeline, ...) overlap public ones. crm_private is internal
 # and must never be exposed. The hosted project needs the same "Exposed schemas".

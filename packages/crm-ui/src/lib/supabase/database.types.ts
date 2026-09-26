@@ -1,5 +1,5 @@
 // crm-port: replaces the original generated sreejith-crm/web-app/lib/supabase/database.types.ts.
-// The original schema now lives in JewelOS schema "crm" (0179-0185) with the same table,
+// The original schema now lives in JewelOS schema "crm" (0181-0187) with the same table,
 // column, enum and function names, so the original "public" types are the generated
 // JewelOS "crm" types. Components keep reading Database["public"] unchanged.
 import type { Database as JewelosDatabase, Json as JewelosJson } from "@jewelos/api-client";

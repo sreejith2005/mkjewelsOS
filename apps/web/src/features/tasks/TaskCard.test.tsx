@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { TaskMutationCapability } from "@jewelos/core";
+import { deriveTaskMutationCapability, type TaskMutationCapability } from "@jewelos/core";
 import type { TaskBundle } from "./api";
 import { TaskCard } from "./TaskCard";
 
@@ -71,6 +71,14 @@ const task = {
 } as TaskBundle;
 
 describe("TaskCard direct completion", () => {
+  it("shows a manager watcher the remark thread without task mutation actions", () => {
+    const watcher = deriveTaskMutationCapability({ assigneeIds: ["doer-1"], isWatcher: true, viewerId: "manager-1", viewerRole: "manager" });
+    render(<TaskCard capability={watcher} categoryLabel="Uncategorized" onAction={vi.fn()} task={{ ...task, isWatchedByViewer: true }} />);
+    expect(screen.queryByRole("button", { name: "Complete task: Direct completion task" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /View details/i }));
+    expect(screen.getByRole("region", { name: "Remarks" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Revise" })).toBeNull();
+  });
   it("marks a linked FMS form action explicitly and delegates its stage identity", async () => {
     const onAction = vi.fn().mockResolvedValue(undefined);
 

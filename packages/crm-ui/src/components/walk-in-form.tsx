@@ -295,7 +295,7 @@ export function WalkInForm({
   async function removeProof(key: string) {
     const proof = proofs[key];
     if (!proof) return;
-    await createClient().storage.from("crm-legacy-documents") /* crm-port: bucket crm-documents -> crm-legacy-documents (0184) */.remove([proof.path]);
+    await createClient().storage.from("crm-legacy-documents") /* crm-port: bucket crm-documents -> crm-legacy-documents (0186) */.remove([proof.path]);
     setProofs((current) => {
       const next = { ...current };
       delete next[key];
@@ -366,7 +366,7 @@ export function WalkInForm({
       },
     }));
     const { error } = await createClient()
-      .storage.from("crm-legacy-documents") /* crm-port: bucket crm-documents -> crm-legacy-documents (0184) */
+      .storage.from("crm-legacy-documents") /* crm-port: bucket crm-documents -> crm-legacy-documents (0186) */
       .upload(path, file, { contentType: file.type, upsert: false });
     if (error) {
       setProofs((current) => ({
