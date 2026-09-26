@@ -301,7 +301,7 @@ export function TaskComposerScreen() {
         <Text tone="muted" variant="caption">The selected form must be completed before this task can be finished.</Text>
       </View>
       <View style={styles.fieldGroup}>
-        <Text tone="warm" variant="label" weight="medium">In Loop · read only</Text>
+        <Text tone="warm" variant="label" weight="medium">In Loop · view and comment</Text>
         <OptionPicker disabled={Boolean(createdTaskId)} label="In Loop" multiple onChange={setWatcherIds} options={watcherOptions} selected={watcherIds} />
       </View>
       <Button

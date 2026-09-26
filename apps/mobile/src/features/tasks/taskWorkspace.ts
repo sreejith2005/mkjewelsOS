@@ -1,4 +1,4 @@
-import { kolkataDateKey, splitAssignedTaskFeed } from "@jewelos/core";
+import { kolkataDateKey, splitAssignedTaskFeed, splitWatchedTaskFeed } from "@jewelos/core";
 import type { UserProfile } from "@jewelos/data/auth/session";
 import { ensureMyRecurringTasks, loadTaskFeed, loadTaskFeedReferenceData, type TaskBundle, type TaskFeedReferenceData } from "@jewelos/data/tasks/api";
 import { log } from "@/lib/log";
@@ -9,6 +9,7 @@ const ADMIN_TASK_VIEW_ROLES = new Set(["super_admin", "admin"]);
 export type TaskWorkspace = Readonly<{
   mine: TaskBundle[];
   delegated: TaskBundle[];
+  inLoop: TaskBundle[];
   categories: TaskFeedReferenceData["categories"];
 }>;
 
@@ -51,16 +52,19 @@ export async function loadTaskWorkspace(viewer: WorkspaceViewer, options: Readon
       : Promise.resolve<TaskBundle[]>([]),
     loadTaskFeedReferenceData().catch(() => ({ categories: [] })),
   ]);
-  const split = splitAssignedTaskFeed(assigned);
+  const assignedByParticipation = splitWatchedTaskFeed(assigned);
+  const authoredByParticipation = splitWatchedTaskFeed(authored);
+  const split = splitAssignedTaskFeed(assignedByParticipation.tasks);
   return {
-    mine: admin ? assigned : split.myTasks,
-    delegated: admin ? authored : split.delegatedTasks,
+    mine: admin ? assignedByParticipation.tasks : split.myTasks,
+    delegated: admin ? authoredByParticipation.tasks : split.delegatedTasks,
+    inLoop: [...assignedByParticipation.inLoop, ...authoredByParticipation.inLoop.filter((task) => !assignedByParticipation.inLoop.some((watched) => watched.id === task.id))],
     categories: references.categories,
   };
 }
 
-/** Finds one task in either feed, preferring the viewer's own copy of the row. */
+/** Finds one task in any feed, preferring the viewer's own copy of the row. */
 export function findWorkspaceTask(workspace: TaskWorkspace | null | undefined, taskId: string): TaskBundle | null {
   if (!workspace) return null;
-  return workspace.mine.find((task) => task.id === taskId) ?? workspace.delegated.find((task) => task.id === taskId) ?? null;
+  return workspace.mine.find((task) => task.id === taskId) ?? workspace.delegated.find((task) => task.id === taskId) ?? workspace.inLoop.find((task) => task.id === taskId) ?? null;
 }

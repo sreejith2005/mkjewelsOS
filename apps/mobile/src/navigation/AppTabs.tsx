@@ -129,7 +129,7 @@ function TopLevelTab({ route, children }: { route: NativeTopLevelRoute; children
 }
 
 function HomeTab() { return <TopLevelTab route="Home"><HomeScreen /></TopLevelTab>; }
-function TasksTab() { return <TopLevelTab route="Tasks"><TasksScreen /></TopLevelTab>; }
+function TasksTab() { const { path } = useShell(); return <TopLevelTab route="Tasks"><TasksScreen path={path} /></TopLevelTab>; }
 function FmsTab() { return <TopLevelTab route="Fms"><FmsScreen /></TopLevelTab>; }
 function CrmTab() { return <TopLevelTab route="Crm"><CrmScreen /></TopLevelTab>; }
 function SectionTab() {

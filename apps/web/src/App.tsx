@@ -312,7 +312,7 @@ function AppShell() {
     : currentPage === "users" ? <TeamDirectoryPage />
     : currentPage === "crm" ? <CRMPage />
     : currentPage === "dropdown_master" ? <DropdownMasterPage />
-      : currentPage === "checklist_tasks" ? path === "/tasks/import" ? <TaskBulkImportPage onBack={() => navigate("/tasks")} /> : path === "/tasks/assigning-left" ? <AssigningLeftPage /> : path === "/tasks/fms" ? <FmsAssignedWorkPage key={search} onNavigate={navigate} /> : <TasksPage />
+      : currentPage === "checklist_tasks" ? path === "/tasks/import" ? <TaskBulkImportPage onBack={() => navigate("/tasks")} /> : path === "/tasks/assigning-left" ? <AssigningLeftPage /> : path === "/tasks/fms" ? <FmsAssignedWorkPage key={search} onNavigate={navigate} /> : <TasksPage path={path} />
       : currentPage === "recurring_todo" ? <RecurringTodoPage />
       : currentPage === "task_templates" ? <TaskTemplatesPage />
       : currentPage === "availability" ? <AvailabilityPage />

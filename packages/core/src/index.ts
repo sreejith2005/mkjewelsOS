@@ -21,6 +21,7 @@ export {
   getPageForPath,
   isImplementedPage,
 } from "./roleMenu";
+export { TASK_IN_LOOP_PATH } from "./roleMenu";
 export type { LauncherMenuItem, MenuItem, PageId, UserRole } from "./roleMenu";
 export {
   isUserAvailableForRecurringTask,
@@ -43,6 +44,7 @@ export {
   isRecurringOrWorkflowTask,
   isTaskFeedItemOverdue,
   splitAssignedTaskFeed,
+  splitWatchedTaskFeed,
   taskFeedCurrentOrOverdueFilter,
   taskMatchesStatus,
 } from "./taskFeed";

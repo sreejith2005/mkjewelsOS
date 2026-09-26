@@ -167,11 +167,13 @@ export function canAccessPage(role: UserRole, page: PageId): boolean {
   return allowedPages(role).includes(page);
 }
 
+export const TASK_IN_LOOP_PATH = "/tasks/in-loop";
+
 export function getPageForPath(path: string): PageId | undefined {
   // Task evidence used to be its own destination; it is now a panel inside Task
   // Control, so old links and bookmarks land on the workspace that absorbed it.
   if (path === "/task-evidence") return "task_templates";
-  if (path === "/tasks/checklist" || path === "/tasks/delegation" || path === "/tasks/import" || path === "/tasks/assigning-left") return "checklist_tasks";
+  if (path === "/tasks/checklist" || path === "/tasks/delegation" || path === TASK_IN_LOOP_PATH || path === "/tasks/import" || path === "/tasks/assigning-left") return "checklist_tasks";
   // Permission management lives inside Settings; the page itself additionally
   // requires the protected permissions.manage permission.
   if (path === "/settings/permissions") return "settings";

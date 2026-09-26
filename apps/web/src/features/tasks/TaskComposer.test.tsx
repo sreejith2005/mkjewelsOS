@@ -89,7 +89,7 @@ describe("TaskComposer selector panels", () => {
     expect(screen.getByTestId("task-selector-due").className).not.toContain("col-span-2");
 
     fireEvent.click(screen.getByRole("button", { name: /In Loop/i }));
-    expect(screen.getByLabelText("Search in loop · read only")).toBeTruthy();
+    expect(screen.getByLabelText("Search in loop · view and comment")).toBeTruthy();
     fireEvent.click(screen.getByLabelText("Teammate"));
     expect(screen.getByTestId("task-panel-watchers")).toBeTruthy();
   });

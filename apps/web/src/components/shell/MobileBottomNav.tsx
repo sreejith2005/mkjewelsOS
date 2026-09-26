@@ -1,4 +1,5 @@
 import { CheckCircle2, Home } from "lucide-react";
+import { TASK_IN_LOOP_PATH } from "@jewelos/core";
 import { cn } from "@/lib/utils";
 
 type MobileBottomNavProps = {
@@ -6,7 +7,7 @@ type MobileBottomNavProps = {
   path: string;
 };
 
-const TASK_PATHS = new Set(["/tasks", "/tasks/checklist", "/tasks/delegation", "/tasks/fms", "/tasks/import", "/tasks/assigning-left"]);
+const TASK_PATHS = new Set(["/tasks", "/tasks/checklist", "/tasks/delegation", TASK_IN_LOOP_PATH, "/tasks/fms", "/tasks/import", "/tasks/assigning-left"]);
 
 export function MobileBottomNav({ onNavigate, path }: MobileBottomNavProps) {
   const destinations = [

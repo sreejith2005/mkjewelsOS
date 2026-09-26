@@ -1,4 +1,5 @@
 import {
+  TASK_IN_LOOP_PATH,
   getAccessibleMenu,
   getLauncherMenuForRole,
   getPageForPath,
@@ -81,6 +82,7 @@ const TASK_PATHS = new Set([
   "/tasks",
   "/tasks/checklist",
   "/tasks/delegation",
+  TASK_IN_LOOP_PATH,
   "/tasks/import",
   "/tasks/assigning-left",
 ]);
