@@ -3,10 +3,12 @@
 // Then adds the JewelOS side of the identity bridge for the synthetic users. Local only: it
 // replaces the rows of the local JewelOS crm schema (synthetic data; `supabase db reset`
 // restores the seeded state).
+import { isolatedJewelos, PORT_DB_CONTAINER } from "./jewelos-stack.mjs";
 import { ORIGINAL_DB_CONTAINER } from "./original-stack.mjs";
 import { copyBetween, psql } from "./util.mjs";
 
-export const JEWELOS_DB_CONTAINER = "supabase_db_jewelos";
+// `--isolated-jewelos` runs against a throwaway port stack instead of the shared local JewelOS stack.
+export const JEWELOS_DB_CONTAINER = isolatedJewelos() ? PORT_DB_CONTAINER : "supabase_db_jewelos";
 
 const EXCLUDED_TABLES = new Set(["_prisma_migrations"]);
 

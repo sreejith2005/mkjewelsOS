@@ -5,6 +5,8 @@
 //   pnpm.cmd crm:parity                       full run (fresh original stack + fixture)
 //   pnpm.cmd crm:parity -- --reuse            reuse the running stack and loaded fixture
 //   pnpm.cmd crm:parity -- --states=dashboard,clients --roles=salesperson --viewports=desktop
+//   pnpm.cmd crm:parity -- --ingest           server routes only: /api/ingest/walkin and the Runo push
+//                                             (original route vs. the Edge Functions), see ingest.mjs
 //
 // Output (outside Git): <workdir>/run-<timestamp>/{original,port,diff}/*.png, *.txt, report.json,
 // report.md. Workdir: CRM_PARITY_WORKDIR or <tmp>/jewelos-crm-parity. Local only; no hosted calls.
@@ -15,6 +17,7 @@ import { chromium } from "playwright";
 
 import { comparePngs, firstDifference, pageControlsDump, pageMaskRects, pageTextDump } from "./compare.mjs";
 import { copyFixtureToJewelos, createJewelosIdentity, fixtureIds, JEWELOS_DB_CONTAINER, PARITY_PASSWORD, PARITY_USERS } from "./load-jewelos.mjs";
+import { isolatedJewelos, prepareJewelosStack, startJewelosStack } from "./jewelos-stack.mjs";
 import { ORIGINAL_DB_CONTAINER, prepareOriginalStack, startOriginalStack } from "./original-stack.mjs";
 import { jewelosSession, localStackKeys, originalSessionCookies } from "./sessions.mjs";
 import { statesFor } from "./states.mjs";
@@ -111,10 +114,16 @@ async function workflowCheck(browser, originalKeys, jewelosKeys) {
 async function main() {
   const base = workdir();
   const stackDir = join(base, "original");
+  const jewelosDir = join(base, "port");
   if (args.reuse !== "true") {
     const migrations = prepareOriginalStack(stackDir);
     console.log(`original stack: ${migrations} original migrations`);
     await startOriginalStack(stackDir, migrations);
+    if (isolatedJewelos()) {
+      prepareJewelosStack(jewelosDir);
+      startJewelosStack(jewelosDir);
+      console.log("JewelOS port stack: isolated throwaway stack (jewelos-crm-parity-port)");
+    }
     psql(ORIGINAL_DB_CONTAINER, (await import("node:fs")).readFileSync(join(REPO_ROOT, "scripts", "crm-parity", "fixture.sql"), "utf8"));
     const copied = await copyFixtureToJewelos();
     createJewelosIdentity();
@@ -128,7 +137,31 @@ async function main() {
   }
   const ids = fixtureIds();
   const originalKeys = localStackKeys(stackDir);
-  const jewelosKeys = localStackKeys();
+  const jewelosKeys = localStackKeys(isolatedJewelos() ? jewelosDir : undefined);
+
+  if (args.ingest === "true") {
+    const { runIngestParity } = await import("./ingest.mjs");
+    let payload = null;
+    const ok = await runIngestParity({ originalKeys, jewelosKeys, base, jewelosWorkdir: isolatedJewelos() ? jewelosDir : undefined, report: (data) => { payload = data; } });
+    const stamp = new Date().toISOString().replaceAll(":", "").replace(/\..+/, "");
+    const runDir = join(base, `ingest-${stamp}`);
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(join(runDir, "report.json"), JSON.stringify(payload, null, 2));
+    const yes = (value) => (value ? "yes" : "NO");
+    const rows = (payload?.results ?? []).map((r) => `| ${r.id} | ${r.status.original} / ${r.status.port} | ${yes(r.status.identical)} | ${yes(r.json.identical)} | ${r.outbound ? yes(r.outbound.identical) : "-"} | ${r.uiMessage ? yes(r.uiMessage.identical) : "-"} | ${yes(r.rows.identical)} |`);
+    const lines = [
+      `# CRM server-route parity ${stamp}`, "",
+      "| Case | Status (original / port) | Status same | JSON same | Runo request same | UI message same | Rows same |",
+      "| --- | --- | --- | --- | --- | --- | --- |",
+      ...rows, "",
+      `JewelOS ingest audit rows free of customer values: ${yes(payload?.auditHasNoCustomerValues)}`, "",
+      `Original without a session: ${JSON.stringify(payload?.originalProxyFinding)}`, "",
+    ];
+    writeFileSync(join(runDir, "report.md"), lines.join("\n"));
+    console.log(`Report: ${join(runDir, "report.md")}`);
+    process.exitCode = ok ? 0 : 1;
+    return;
+  }
 
   const servers = [];
   try {

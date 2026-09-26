@@ -13,6 +13,7 @@ import {
 
 const MAX_REQUEST_BYTES = 1_000_000;
 const RATE_LIMIT_KEY = "legacy-apps-script";
+const DISCARD_LIMIT_BYTES = 16_000_000;
 
 export type IngestAttempt = Readonly<{
   requestId: string;
@@ -68,6 +69,23 @@ export function suppliedKeyMatches(value: string | null, expected: string): bool
   return difference === 0;
 }
 
+/** Reads and drops the request body, stopping (and cancelling) after `limit` bytes. */
+async function discardBody(request: Request, limit: number): Promise<void> {
+  if (request.bodyUsed || !request.body) return;
+  let seen = 0;
+  try {
+    const reader = request.body.getReader();
+    while (seen < limit) {
+      const { done, value } = await reader.read();
+      if (done) return;
+      seen += value.byteLength;
+    }
+    await reader.cancel();
+  } catch {
+    // The connection may already be gone; the response below is still the right answer.
+  }
+}
+
 function clientAddress(request: Request): string | null {
   return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
 }
@@ -111,6 +129,9 @@ export async function handleWalkinIngest(request: Request, deps: IngestDeps): Pr
   }
 
   const tooLarge = async () => {
+    // Drain (discard) a bounded amount of the body before answering: the platform gateway waits
+    // for an unread request body and would answer 504 instead of this response.
+    await discardBody(request, DISCARD_LIMIT_BYTES);
     await safelyLogAttempt({ payload: {}, payloadHash: null, outcome: "payload_too_large", result: { code: "PAYLOAD_TOO_LARGE" } });
     return response({ ok: false, requestId, code: "PAYLOAD_TOO_LARGE", message: "Payload exceeds the 1 MB limit." }, 413);
   };

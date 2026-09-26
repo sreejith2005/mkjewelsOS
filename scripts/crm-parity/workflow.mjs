@@ -145,7 +145,7 @@ const TIMESTAMP = /(\d{4}-\d{2}-\d{2})[T ]\d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}(:?
 const FIXED_USER_IDS = new Set(["c0000000-0000-4000-8000-000000000001", "c0000000-0000-4000-8000-000000000002", "c0000000-0000-4000-8000-000000000003", "c0000000-0000-4000-8000-000000000004", "a0000000-0000-4000-8000-00000000000a", "a0000000-0000-4000-8000-00000000000b"]);
 
 /** Generated ids and queue tokens are masked (fixture user/branch ids stay), timestamps keep the day. */
-function normalise(text) {
+export function normalise(text) {
   return text.replace(QUEUE_TOKEN, "<token>").replace(UUID, (id) => (FIXED_USER_IDS.has(id.toLowerCase()) ? id : "<uuid>")).replace(TIMESTAMP, "$1");
 }
 
