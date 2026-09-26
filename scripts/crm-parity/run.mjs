@@ -111,12 +111,19 @@ async function main() {
   const base = workdir();
   const stackDir = join(base, "original");
   if (args.reuse !== "true") {
-    console.log(`original stack: ${prepareOriginalStack(stackDir)} original migrations`);
-    startOriginalStack(stackDir);
+    const migrations = prepareOriginalStack(stackDir);
+    console.log(`original stack: ${migrations} original migrations`);
+    await startOriginalStack(stackDir, migrations);
     psql(ORIGINAL_DB_CONTAINER, (await import("node:fs")).readFileSync(join(REPO_ROOT, "scripts", "crm-parity", "fixture.sql"), "utf8"));
     const copied = await copyFixtureToJewelos();
     createJewelosIdentity();
     console.log(`fixture copied to JewelOS crm (${copied.tables} tables): ${copied.counts}`);
+  } else if (args["reload-jewelos"] === "true") {
+    // The original stack keeps its fixture; only the local JewelOS copy is rebuilt (for example
+    // after another `supabase db reset` of the shared local JewelOS database).
+    const copied = await copyFixtureToJewelos();
+    createJewelosIdentity();
+    console.log(`fixture re-copied to JewelOS crm (${copied.tables} tables)`);
   }
   const ids = fixtureIds();
   const originalKeys = localStackKeys(stackDir);

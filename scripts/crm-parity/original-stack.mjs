@@ -4,7 +4,7 @@
 import { copyFileSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { REPO_ROOT, run } from "./util.mjs";
+import { psql, REPO_ROOT, run } from "./util.mjs";
 
 export const ORIGINAL_PROJECT_ID = "jewelos-crm-parity-original";
 export const ORIGINAL_API_URL = "http://127.0.0.1:56321";
@@ -81,10 +81,21 @@ export function prepareOriginalStack(workdir) {
   return folders.length;
 }
 
-export function startOriginalStack(workdir) {
+export async function startOriginalStack(workdir, expectedMigrations) {
   run("supabase.cmd", ["start", "--workdir", workdir], { timeoutMs: 900_000 });
   // A clean database for every run: all original migrations, then the synthetic fixture.
-  run("supabase.cmd", ["db", "reset", "--workdir", workdir], { timeoutMs: 900_000 });
+  // The CLI can report failure only because the restarted storage container misses its health
+  // deadline; the reset itself is judged by the recorded migrations and a live storage API.
+  const reset = run("supabase.cmd", ["db", "reset", "--workdir", workdir], { timeoutMs: 900_000, allowFailure: true });
+  const applied = Number(psql(ORIGINAL_DB_CONTAINER, "select count(*) from supabase_migrations.schema_migrations;"));
+  if (applied !== expectedMigrations) {
+    throw new Error(`original stack reset applied ${applied}/${expectedMigrations} migrations\n${`${reset.stdout}\n${reset.stderr}`.split("\n").slice(-20).join("\n")}`);
+  }
+  for (let attempt = 0; attempt < 60; attempt++) {
+    try { if ((await fetch(`${ORIGINAL_API_URL}/storage/v1/status`)).ok) return; } catch { /* restarting */ }
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+  }
+  throw new Error("original stack storage API did not come up after the reset");
 }
 
 export function stopOriginalStack(workdir) {
