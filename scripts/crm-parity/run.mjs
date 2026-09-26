@@ -121,7 +121,7 @@ async function main() {
     await startOriginalStack(stackDir, migrations);
     if (isolatedJewelos()) {
       prepareJewelosStack(jewelosDir);
-      startJewelosStack(jewelosDir);
+      await startJewelosStack(jewelosDir);
       console.log("JewelOS port stack: isolated throwaway stack (jewelos-crm-parity-port)");
     }
     psql(ORIGINAL_DB_CONTAINER, (await import("node:fs")).readFileSync(join(REPO_ROOT, "scripts", "crm-parity", "fixture.sql"), "utf8"));

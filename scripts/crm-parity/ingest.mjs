@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { JEWELOS_DB_CONTAINER, PARITY_PASSWORD, PARITY_USERS } from "./load-jewelos.mjs";
 import { ORIGINAL_DB_CONTAINER } from "./original-stack.mjs";
 import { jewelosSession, originalSessionCookies } from "./sessions.mjs";
-import { psql, REPO_ROOT, startServer, stopServer, waitForUrl } from "./util.mjs";
+import { psql, REPO_ROOT, run, startServer, stopServer, waitForUrl } from "./util.mjs";
 import { normalise } from "./workflow.mjs";
 
 export const ORIGINAL_ORIGIN = "http://localhost:3300";
@@ -274,6 +274,16 @@ export async function runIngestParity({ originalKeys, jewelosKeys, base, jewelos
     const auditText = psql(JEWELOS_DB_CONTAINER, "select coalesce(string_agg(new_value::text, ' '), '') from public.audit_logs where module = 'crm' and action like 'crm.legacy_walkin_ingest_%';");
     const auditClean = !/Ingest Parity|Ingest Companion|9100090|Pune|Synthetic|Andheri/.test(auditText);
     const failed = results.filter((result) => !(result.status.identical && result.json.identical && result.rows.identical && (result.outbound?.identical ?? true) && (result.uiMessage?.identical ?? true)));
+    if (failed.length) {
+      // Keep the function runtime's own log next to the report: it explains platform-level answers (5xx from the gateway).
+      const container = jewelosWorkdir ? "supabase_edge_runtime_jewelos-crm-parity-port" : "supabase_edge_runtime_jewelos";
+      const logs = run("docker", ["logs", "--tail", "300", container], { allowFailure: true });
+      writeFileSync(join(base, "ingest-functions-runtime.log"), `${logs.stdout}
+${logs.stderr}
+--- functions serve ---
+${servers[1]?.logTail?.() ?? ""}`);
+      console.log(`function runtime log: ${join(base, "ingest-functions-runtime.log")}`);
+    }
     report({ results, auditHasNoCustomerValues: auditClean, originalProxyFinding: proxyFinding });
     console.log(`\ningest parity: ${results.length} cases, ${failed.length} differing; JewelOS ingest audit rows free of customer values: ${auditClean ? "yes" : "NO"}`);
     return failed.length === 0 && auditClean;

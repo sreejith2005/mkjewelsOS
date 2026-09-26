@@ -64,7 +64,7 @@ export function prepareJewelosStack(workdir) {
   }
 }
 
-export function startJewelosStack(workdir) {
+export async function startJewelosStack(workdir) {
   run("supabase.cmd", ["start", "--workdir", workdir], { timeoutMs: 900_000 });
   const reset = run("supabase.cmd", ["db", "reset", "--workdir", workdir], { timeoutMs: 900_000, allowFailure: true });
   const applied = Number(psql(PORT_DB_CONTAINER, "select count(*) from supabase_migrations.schema_migrations;"));
@@ -72,7 +72,18 @@ export function startJewelosStack(workdir) {
   if (applied !== expected) {
     throw new Error(`JewelOS port stack reset applied ${applied}/${expected} migrations\n${`${reset.stdout}\n${reset.stderr}`.split("\n").slice(-20).join("\n")}`);
   }
-  run("docker", ["restart", `supabase_kong_${PORT_PROJECT_ID}`], { timeoutMs: 120_000, allowFailure: true });
+  // The reset recreates auth/storage; the gateway can keep their old addresses (or be down),
+  // so restart it and wait until auth answers through it.
+  const kong = `supabase_kong_${PORT_PROJECT_ID}`;
+  for (let attempt = 0; attempt < 60; attempt++) {
+    if (attempt % 12 === 0) run("docker", ["restart", kong], { timeoutMs: 120_000, allowFailure: true });
+    try {
+      const auth = await fetch("http://127.0.0.1:57321/auth/v1/health");
+      if (auth.status < 500) return;
+    } catch { /* restarting */ }
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+  }
+  throw new Error("JewelOS port stack auth API did not come up after the reset");
 }
 
 export function stopJewelosStack(workdir) {

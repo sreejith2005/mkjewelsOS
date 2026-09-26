@@ -7,9 +7,16 @@ import { run } from "./util.mjs";
 
 export function localStackKeys(workdir) {
   const args = ["status", "-o", "json", ...(workdir ? ["--workdir", workdir] : [])];
-  const output = run("supabase.cmd", args, { timeoutMs: 120_000 }).stdout;
-  const status = JSON.parse(output.slice(output.indexOf("{")));
-  return { url: status.API_URL, anonKey: status.ANON_KEY };
+  // `status` can omit the API address while the gateway is restarting; ask again.
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const output = run("supabase.cmd", args, { timeoutMs: 120_000, allowFailure: true }).stdout ?? "";
+    try {
+      const status = JSON.parse(output.slice(output.indexOf("{")));
+      if (status.API_URL && status.ANON_KEY) return { url: status.API_URL, anonKey: status.ANON_KEY };
+    } catch { /* not ready */ }
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5000);
+  }
+  throw new Error("supabase status did not report the API address and anon key");
 }
 
 /** Auth restarts after a `db reset`; retry while it answers with an upstream error. */
