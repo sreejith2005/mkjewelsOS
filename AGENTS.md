@@ -116,7 +116,7 @@ Important current contracts include:
 ### CRM (2026-09-25 owner decision)
 
 The CRM in `packages/crm-ui` (rendered by the web app at `/crm`; Phase 3) and
-database schema `crm` (migrations 0181-0187) is a port of the original MK Jewels
+database schema `crm` (migrations 0181-0188) is a port of the original MK Jewels
 CRM (`sreejith-crm/web-app`). Parity with the original - screens, fields, order,
 labels, vocabularies, flows, validation, calculations and styling - is the
 acceptance criterion; do not improve, rename, re-order, or merge it with the old
@@ -126,7 +126,10 @@ original palette, fonts and CSS, scoped to the CRM surface only. `sreejith-crm/`
 a read-only reference, not a dependency: never import from it or build it, and never
 copy its `.env*`, `*.xlsx`, `migration-backups`, `migration-reports`, or Android
 build outputs. JewelOS login is the only CRM login; CRM identity resolves through
-the audited bridge in 0182 (`crm.current_crm_user_id()`). Design and phases:
+the audited bridge in 0182 (`crm.current_crm_user_id()`). The original's two server
+routes are the Edge Functions `crm-walkin-ingest` (Apps Script, key header, service_role
+RPCs of 0188 only) and `crm-runo-push` (caller JWT, RLS); owner cutover steps are in
+`docs/CRM_SHEETS_INGEST_CUTOVER.md`. Design and phases:
 `docs/superpowers/specs/2026-09-25-crm-native-integration-design.md`.
 
 Read the relevant source, migration, and pgTAP test before changing one of

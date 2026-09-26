@@ -123,6 +123,18 @@ Files:
 Gate: function tests; pgTAP; local end-to-end call with a synthetic payload.
 Hosted: deploy functions, set secrets, repoint Apps Script (owner).
 
+Delivered (local only): `crm-walkin-ingest`, `crm-runo-push`, migration
+`0188_crm_ingest_service_grants.sql` (service_role: USAGE on `crm` and EXECUTE on three RPCs, no
+table privilege; the ingest RPC does branch lookup + visit + ledger + audit in one transaction),
+pgTAP 0188, Deno tests, `crm:parity -- --ingest`, `docs/CRM_SHEETS_INGEST_CUTOVER.md`.
+Intentional differences from the originals: the Runo lead id is sent in the JSON body, not the URL;
+"the creator" is the caller's CRM user id from the identity bridge; a non-POST is a bare 405; a
+rate-limit database outage is a JSON 500 (the original threw); a body over 1 MB without a
+Content-Length is also refused; ledger `source_ip` is cut to its 64-character column; the ingest
+writes `crm.legacy_walkin_ingest_attempt` audit rows (request id, outcome, code only); an optional
+`CRM_RUNO_API_URL` secret exists for local stubs only. The original's `proxy.ts` redirects a
+session-less request (including Apps Script) to the login page; the Edge Function does not.
+
 ## Phase 5 - Data migration from the CRM Supabase
 
 Files:
