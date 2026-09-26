@@ -10,6 +10,7 @@ import {
   taskEvidenceFileError,
   taskMatchesStatus,
   type TaskFeedStatusFilter,
+  TASK_IN_LOOP_PATH,
 } from "@jewelos/core";
 import { reviseTask, updateTask, uploadAndCompleteTask, type TaskBundle } from "@jewelos/data/tasks/api";
 import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
@@ -30,7 +31,7 @@ import { TASKS_PRIMARY_ACTION } from "@/navigation/shellModel";
 import { fmsAssignedWorkRouteForTask, navigateFmsAssignedWork } from "@/features/fms/assignedWorkNavigation";
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
-type Workspace = "mine" | "delegated";
+type Workspace = "mine" | "delegated" | "inLoop";
 
 /**
  * My Tasks and Delegated Tasks, as one scannable list rather than the web's
@@ -38,14 +39,15 @@ type Workspace = "mine" | "delegated";
  * and the split between them is `splitAssignedTaskFeed` from the shared core,
  * so the two clients never disagree about which work lands where.
  */
-export function TasksScreen() {
+export function TasksScreen({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const theme = useAppTheme();
   const styles = useStyles();
   const profile = useProfile();
   const navigation = useNavigation<Navigation>();
   const insets = useSafeAreaInsets();
-  const [workspace, setWorkspace] = useState<Workspace>("mine");
+  const [workspace, setWorkspace] = useState<Workspace>(path === TASK_IN_LOOP_PATH ? "inLoop" : "mine");
   const [status, setStatus] = useState<TaskFeedStatusFilter>("pending");
+  useEffect(() => { if (path === TASK_IN_LOOP_PATH) setWorkspace("inLoop"); }, [path]);
 
   // The web Tasks page offers Bulk Import to managers and Assigning Left to
   // administrators only; the server re-checks both.
@@ -71,6 +73,7 @@ export function TasksScreen() {
   const openCounts = useMemo(() => ({
     mine: countTaskFeedStatuses(data?.mine ?? []).open,
     delegated: countTaskFeedStatuses(data?.delegated ?? []).open,
+    inLoop: countTaskFeedStatuses(data?.inLoop ?? []).open,
   }), [data]);
   const categoryNames = useMemo(() => new Map((data?.categories ?? []).map((item) => [item.id, item.label])), [data?.categories]);
 
@@ -123,6 +126,7 @@ export function TasksScreen() {
           options={[
             { value: "mine", label: `My Tasks (${openCounts.mine})` },
             { value: "delegated", label: `Delegated (${openCounts.delegated})` },
+            { value: "inLoop", label: `In Loop (${openCounts.inLoop})` },
           ]}
           value={workspace}
         />

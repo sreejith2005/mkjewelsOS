@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countTaskFeedStatuses, effectiveTaskDeadline, groupTaskFeedRows, isTaskFeedItemInCurrentDayOrOverdue, splitAssignedTaskFeed, taskFeedCurrentOrOverdueFilter, taskMatchesStatus } from "./taskFeed";
+import { countTaskFeedStatuses, effectiveTaskDeadline, groupTaskFeedRows, isTaskFeedItemInCurrentDayOrOverdue, splitAssignedTaskFeed, splitWatchedTaskFeed, taskFeedCurrentOrOverdueFilter, taskMatchesStatus } from "./taskFeed";
 
 const now = "2026-08-07T12:00:00.000Z";
 
@@ -71,6 +71,15 @@ describe("task feed presentation", () => {
       { ...task("one-time-delegation", "viewer"), task_type: "delegation", task_template_id: null },
     ];
     expect(splitAssignedTaskFeed(assigned)).toEqual({ myTasks: assigned.slice(0, 3), delegatedTasks: assigned.slice(3) });
+  });
+
+  it("separates watched tasks before ordinary task grouping", () => {
+    const tasks = [
+      { id: "assigned", isWatchedByViewer: false },
+      { id: "watched", isWatchedByViewer: true },
+      { id: "another", isWatchedByViewer: false },
+    ];
+    expect(splitWatchedTaskFeed(tasks)).toEqual({ tasks: [tasks[0], tasks[2]], inLoop: [tasks[1]] });
   });
 
   it("uses revised, then independent due, then planned datetime", () => {

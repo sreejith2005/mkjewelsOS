@@ -89,6 +89,7 @@ describe("resolveNativeDestination", () => {
     ["/tasks", "Tasks"],
     ["/tasks/checklist", "Tasks"],
     ["/tasks/delegation", "Tasks"],
+    ["/tasks/in-loop", "Tasks"],
     ["/tasks/import", "Tasks"],
     ["/tasks/assigning-left", "Tasks"],
     ["/fms", "Fms"],

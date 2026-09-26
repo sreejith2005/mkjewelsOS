@@ -9,7 +9,7 @@ describe("task mutation capability", () => {
       viewerId: "viewer",
       viewerRole: "staff",
     })).toEqual({
-      access: "read_only",
+      access: "watcher",
       canMutate: false,
       canUseElevatedActions: false,
       watcherLabel: "In Loop",
@@ -25,18 +25,24 @@ describe("task mutation capability", () => {
     })).toMatchObject({ access: "doer", canMutate: true, canUseElevatedActions: false });
   });
 
-  it("permits elevated actions when an elevated viewer is also a watcher", () => {
+  it("keeps an elevated viewer read-only when they are only a watcher", () => {
     expect(deriveTaskMutationCapability({
       assigneeIds: ["someone-else"],
       isWatcher: true,
       viewerId: "viewer",
       viewerRole: "manager",
     })).toEqual({
-      access: "elevated",
-      canMutate: true,
-      canUseElevatedActions: true,
-      watcherLabel: "In Loop · manager access",
+      access: "watcher",
+      canMutate: false,
+      canUseElevatedActions: false,
+      watcherLabel: "In Loop",
     });
+  });
+
+  it("retains doer access when a doer also has a watcher row", () => {
+    expect(deriveTaskMutationCapability({
+      assigneeIds: ["viewer"], isWatcher: true, viewerId: "viewer", viewerRole: "manager",
+    })).toMatchObject({ access: "elevated", canMutate: true, canUseElevatedActions: true });
   });
 
   it("never grants mutation access from watcher status alone", () => {

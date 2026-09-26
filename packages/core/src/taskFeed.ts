@@ -79,6 +79,14 @@ export function splitAssignedTaskFeed<T extends SplittableAssignedTask>(tasks: r
   }, { delegatedTasks: [], myTasks: [] });
 }
 
+/** Keeps a viewer's looped-in work out of their actionable task lists. */
+export function splitWatchedTaskFeed<T extends Readonly<{ isWatchedByViewer: boolean }>>(items: readonly T[]) {
+  return items.reduce<{ tasks: T[]; inLoop: T[] }>((result, item) => {
+    (item.isWatchedByViewer ? result.inLoop : result.tasks).push(item);
+    return result;
+  }, { tasks: [], inLoop: [] });
+}
+
 export function isTaskFeedItemOverdue(task: TaskFeedLike, now: Date | string = new Date()): boolean {
   const deadline = effectiveTaskDeadline(task);
   if (!deadline || task.status === "completed") return false;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Plus, RefreshCw, Upload, UserRoundPlus } from "lucide-react";
-import { countTaskFeedStatuses, deriveTaskMutationCapability, hasPermission, kolkataDateKey, splitAssignedTaskFeed, taskFormLinkedModule, taskMatchesStatus, type TaskFeedStatusFilter } from "@jewelos/core";
+import { TASK_IN_LOOP_PATH, countTaskFeedStatuses, deriveTaskMutationCapability, hasPermission, kolkataDateKey, splitAssignedTaskFeed, splitWatchedTaskFeed, taskFormLinkedModule, taskMatchesStatus, type TaskFeedStatusFilter } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Modal, Notice } from "@/components/ui";
 import {
@@ -27,15 +27,16 @@ import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeR
 import { fmsAssignedWorkPath } from "@jewelos/core";
 import { loadFmsTaskDeepLink } from "@/features/tasks/api";
 
-type TaskWorkspaceView = "mine" | "delegated";
+type TaskWorkspaceView = "mine" | "delegated" | "inLoop";
 const TASK_TOPICS = ["tasks", "forms", "organization"] as const;
 
-export function TasksPage() {
+export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const { access, profile } = useAuth();
   const [statusFilter, setStatusFilter] = useState<TaskFeedStatusFilter>("pending");
   const [myTasks, setMyTasks] = useState<TaskBundle[]>([]);
   const [delegatedTasks, setDelegatedTasks] = useState<TaskBundle[]>([]);
-  const [workspaceView, setWorkspaceView] = useState<TaskWorkspaceView>("mine");
+  const [inLoopTasks, setInLoopTasks] = useState<TaskBundle[]>([]);
+  const [workspaceView, setWorkspaceView] = useState<TaskWorkspaceView>(path === TASK_IN_LOOP_PATH ? "inLoop" : "mine");
   const [categories, setCategories] = useState<TaskReferenceData["categories"]>([]);
   const [references, setReferences] = useState<TaskReferenceData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,10 +71,13 @@ export function TasksPage() {
         [assignedTasks, authoredTasks, nextCategories]: Awaited<ReturnType<typeof loadWorkspace>>,
         workspaceGeneration: number,
       ) => {
-        const assignedSplit = splitAssignedTaskFeed(assignedTasks);
-        const nextMyTasks = hasAdminTaskView ? assignedTasks : assignedSplit.myTasks;
-        const nextDelegatedTasks = hasAdminTaskView ? authoredTasks : assignedSplit.delegatedTasks;
-        const nextTasks = [...nextMyTasks, ...nextDelegatedTasks.filter((task) => !nextMyTasks.some((myTask) => myTask.id === task.id))];
+        const assignedByParticipation = splitWatchedTaskFeed(assignedTasks);
+        const authoredByParticipation = splitWatchedTaskFeed(authoredTasks);
+        const assignedSplit = splitAssignedTaskFeed(assignedByParticipation.tasks);
+        const nextMyTasks = hasAdminTaskView ? assignedByParticipation.tasks : assignedSplit.myTasks;
+        const nextDelegatedTasks = hasAdminTaskView ? authoredByParticipation.tasks : assignedSplit.delegatedTasks;
+        const nextInLoopTasks = [...assignedByParticipation.inLoop, ...authoredByParticipation.inLoop.filter((task) => !assignedByParticipation.inLoop.some((watched) => watched.id === task.id))];
+        const nextTasks = [...nextMyTasks, ...nextDelegatedTasks.filter((task) => !nextMyTasks.some((myTask) => myTask.id === task.id)), ...nextInLoopTasks];
         const [forms, dynamicOptions] = await Promise.all([
           loadTaskForms([...new Set(nextTasks.flatMap((task) => task.requires_form && task.form_template_id ? [task.form_template_id] : []))], nextTasks.flatMap((task) => task.id ? [task.id] : [])),
           loadFormDynamicOptions(),
@@ -81,6 +85,7 @@ export function TasksPage() {
         if (workspaceGeneration !== refreshGeneration.current) return;
         setMyTasks(nextMyTasks);
         setDelegatedTasks(nextDelegatedTasks);
+        setInLoopTasks(nextInLoopTasks);
         setCategories(nextCategories.categories);
         setFormBundles(forms.bundles);
         setFormDynamicOptions(dynamicOptions);
@@ -102,6 +107,7 @@ export function TasksPage() {
   }, [canManage, hasAdminTaskView, profile]);
 
   useEffect(() => { hasCompletedInitialLoad.current = false; }, [profile?.id]);
+  useEffect(() => { if (path === TASK_IN_LOOP_PATH) setWorkspaceView("inLoop"); }, [path]);
   useEffect(() => { void refresh(); }, [refresh]);
   useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: TASK_TOPICS, refresh });
 
@@ -111,7 +117,7 @@ export function TasksPage() {
   }, []);
 
   const categoryNames = useMemo(() => new Map(categories.map((category) => [category.id, category.label])), [categories]);
-  const tasks = workspaceView === "mine" ? myTasks : delegatedTasks;
+  const tasks = workspaceView === "mine" ? myTasks : workspaceView === "delegated" ? delegatedTasks : inLoopTasks;
   const counts = useMemo(() => countTaskFeedStatuses(tasks), [tasks]);
   const scopedTasks = useMemo(() => {
     return tasks.filter((task) => taskMatchesStatus(task, statusFilter));
@@ -170,6 +176,7 @@ export function TasksPage() {
         {([
           ["mine", "My Tasks", countTaskFeedStatuses(myTasks).open],
           ["delegated", "Delegated", countTaskFeedStatuses(delegatedTasks).open],
+          ["inLoop", "In Loop", countTaskFeedStatuses(inLoopTasks).open],
         ] as const).map(([view, label, count]) => <button
           aria-pressed={workspaceView === view}
           className={`relative min-h-11 shrink-0 px-3 pb-3 text-sm font-semibold ${workspaceView === view ? "text-task-text after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-task-accent" : "text-task-text-muted"}`}

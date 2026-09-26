@@ -9,12 +9,6 @@ export type TaskMutationCapability = Readonly<{
 
 const ELEVATED_TASK_ROLES = new Set<UserRole>(["super_admin", "admin", "manager"]);
 
-const ELEVATED_ACCESS_LABELS: Readonly<Partial<Record<UserRole, string>>> = {
-  super_admin: "super admin",
-  admin: "admin",
-  manager: "manager",
-};
-
 export function deriveTaskMutationCapability({
   assigneeIds,
   isWatcher,
@@ -26,18 +20,15 @@ export function deriveTaskMutationCapability({
   viewerId: string;
   viewerRole: UserRole;
 }>): TaskMutationCapability {
-  const canUseElevatedActions = ELEVATED_TASK_ROLES.has(viewerRole);
   const isActiveDoer = assigneeIds.includes(viewerId);
-  const access = canUseElevatedActions ? "elevated" : isActiveDoer ? "doer" : "read_only";
+  const watcherOnly = isWatcher && !isActiveDoer;
+  const canUseElevatedActions = ELEVATED_TASK_ROLES.has(viewerRole) && !watcherOnly;
+  const access = watcherOnly ? "watcher" : canUseElevatedActions ? "elevated" : isActiveDoer ? "doer" : "read_only";
 
   return {
     access,
     canMutate: access === "doer" || access === "elevated",
     canUseElevatedActions,
-    watcherLabel: !isWatcher
-      ? null
-      : canUseElevatedActions
-        ? `In Loop · ${ELEVATED_ACCESS_LABELS[viewerRole]} access`
-        : "In Loop",
+    watcherLabel: isWatcher ? "In Loop" : null,
   };
 }
