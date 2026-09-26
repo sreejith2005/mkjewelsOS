@@ -84,6 +84,7 @@ async function workflowCheck(browser, originalKeys, jewelosKeys) {
     + Number(psql(JEWELOS_DB_CONTAINER, `select count(*) from crm.clients where primary_phone = '${WORKFLOW_PHONE}';`));
   if (existing) return { error: "the workflow client already exists; run the workflow on a fresh fixture (without --reuse)" };
   const user = PARITY_USERS.find((candidate) => candidate.key === "salesperson");
+  const startedAt = new Date().toISOString();
   const outcome = {};
   for (const app of ["original", "port"]) {
     const context = await browser.newContext({ viewport: VIEWPORTS.desktop, deviceScaleFactor: 1, bypassCSP: app === "original" });
@@ -104,7 +105,7 @@ async function workflowCheck(browser, originalKeys, jewelosKeys) {
     await context.close();
   }
   if (outcome.original !== "completed" || outcome.port !== "completed") return { error: "workflow did not complete in both apps", outcome };
-  return { outcome, ...compareWorkflowRows() };
+  return { outcome, ...compareWorkflowRows(startedAt) };
 }
 
 async function main() {
@@ -210,7 +211,9 @@ async function main() {
     writeFileSync(join(runDir, "report.json"), JSON.stringify({ captures: results, workflow }, null, 2));
     const rows = results.map((r) => `| ${r.viewport} | ${r.role} | ${r.state} | ${r.error ? "ERROR" : r.textMatch && r.controlsMatch ? "yes" : "NO"} | ${r.error ? "-" : r.diffPercent} | ${r.error ? r.error : [r.pathMatch ? "" : `path ${r.finalPath.original} vs ${r.finalPath.port}`, r.textDifference ? `text L${r.textDifference.line}` : "", r.controlsDifference ? `controls L${r.controlsDifference.line}` : "", r.pixelPass ? "" : `pixels > ${PIXEL_LIMIT}%`].filter(Boolean).join("; ")} |`);
     const failed = results.filter((r) => r.error || !r.textMatch || !r.controlsMatch || !r.pixelPass || !r.pathMatch);
-    const workflowFailed = Boolean(workflow && (workflow.error || Object.values(workflow.tables ?? {}).some((table) => !table.match) || !workflow.auditHasNoCustomerValues));
+    const workflowFailed = Boolean(workflow && (workflow.error || Object.values(workflow.tables ?? {}).some((table) => !table.match)
+      || !workflow.auditHasNoCustomerValues || !workflow.directWriteAudited || !workflow.rpcWriteNotDoubleAudited
+      || !workflow.storageObjects?.original || !workflow.storageObjects?.port));
     const workflowSection = workflow ? `\n## Workflow check\n\n${"```"}json\n${JSON.stringify(workflow, null, 2)}\n${"```"}\n` : "";
     writeFileSync(join(runDir, "report.md"), `# CRM parity run ${stamp}\n\nStates: ${results.length}; failing: ${failed.length}. Pixel limit ${PIXEL_LIMIT}% after masking the JewelOS link and the live visit time.\n\n| Viewport | Role | State | Text + controls match | Pixel diff % | Notes |\n| --- | --- | --- | --- | --- | --- |\n${rows.join("\n")}\n${workflowSection}`);
     console.log(`\n${results.length} captures, ${failed.length} failing. Report: ${join(runDir, "report.md")}`);

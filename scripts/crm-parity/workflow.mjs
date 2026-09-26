@@ -43,8 +43,19 @@ export async function runWorkflow(page, origin) {
   await page.waitForURL(/\/crm\/visits\/new\?queue=/, { timeout: 60_000 });
   await idle();
   await page.getByLabel("Visit date and time").waitFor();
+  // The form looks the queued client up by phone after a debounce and overwrites the profile
+  // fields with the stored (still empty) values, so fill only after that auto-fill has run.
+  // (An existing client starts with some fields marked; only the lookup marks Country.)
+  await page.locator("label", { has: page.getByLabel("Country") }).getByText("Auto-filled from client history — editable").waitFor({ timeout: 30_000 });
+  await idle();
 
+  // The form's default "Walk-in" matches no (upper-cased) lookup option, so the required
+  // select starts empty in both apps and has to be chosen, as staff do.
+  const source = page.getByLabel("Source of lead");
+  await source.selectOption(await source.evaluate((select) => [...select.options].find((option) => /^walk-in$/i.test(option.value))?.value ?? ""));
+  await page.getByLabel("CRM / salesperson").selectOption({ index: 1 });
   await page.getByLabel("Salesperson attending the client").selectOption({ index: 1 });
+  await page.getByLabel("Country").fill("India");
   await page.getByLabel("Gender").selectOption("FEMALE");
   await page.getByLabel("Same as mobile number").check();
   await page.getByLabel("State").fill("Maharashtra");
@@ -103,7 +114,9 @@ export async function runWorkflow(page, origin) {
   await page.getByRole("button", { name: "EDIT PROFILE" }).click();
   await page.locator("label", { hasText: /^city$/i }).locator("input").fill("Pune");
   await page.getByRole("button", { name: "Save profile" }).click();
-  await page.getByText("Saved", { exact: true }).waitFor({ timeout: 30_000 });
+  // A successful save leaves edit mode (the "Saved" message belongs to the edit view).
+  await page.getByRole("button", { name: "EDIT PROFILE" }).waitFor({ timeout: 30_000 });
+  await idle();
 }
 
 const ROWS_SQL = (schema) => `
@@ -127,15 +140,16 @@ select json_build_object(
 );`;
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+const QUEUE_TOKEN = /\b\d{4}-[0-9A-F]{5}\b/g;
 const TIMESTAMP = /(\d{4}-\d{2}-\d{2})[T ]\d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}(:?\d{2})?|Z)?/g;
 const FIXED_USER_IDS = new Set(["c0000000-0000-4000-8000-000000000001", "c0000000-0000-4000-8000-000000000002", "c0000000-0000-4000-8000-000000000003", "c0000000-0000-4000-8000-000000000004", "a0000000-0000-4000-8000-00000000000a", "a0000000-0000-4000-8000-00000000000b"]);
 
-/** Generated ids become <uuid> (fixture user/branch ids stay), timestamps keep only the day. */
+/** Generated ids and queue tokens are masked (fixture user/branch ids stay), timestamps keep the day. */
 function normalise(text) {
-  return text.replace(UUID, (id) => (FIXED_USER_IDS.has(id.toLowerCase()) ? id : "<uuid>")).replace(TIMESTAMP, "$1");
+  return text.replace(QUEUE_TOKEN, "<token>").replace(UUID, (id) => (FIXED_USER_IDS.has(id.toLowerCase()) ? id : "<uuid>")).replace(TIMESTAMP, "$1");
 }
 
-export function compareWorkflowRows() {
+export function compareWorkflowRows(startedAt) {
   const original = JSON.parse(psql(ORIGINAL_DB_CONTAINER, ROWS_SQL("public")));
   const port = JSON.parse(psql(JEWELOS_DB_CONTAINER, ROWS_SQL("crm")));
   const tables = {};
@@ -144,19 +158,23 @@ export function compareWorkflowRows() {
     const b = normalise(JSON.stringify(port[table]));
     tables[table] = { rows: Array.isArray(original[table]) ? original[table].length : 0, match: a === b, ...(a === b ? {} : { original: a.slice(0, 600), port: b.slice(0, 600) }) };
   }
+  // The proof file each app's documents row points at exists in that app's bucket.
+  const documentObject = (container, schema, bucket) => psql(container, `select count(*) from ${schema}.documents d join ${schema}.clients c on c.client_id = d.client_id join storage.objects o on o.bucket_id = '${bucket}' and o.name = d.storage_path where c.primary_phone = '${WORKFLOW_PHONE}';`) === "1";
   const objects = {
-    original: Number(psql(ORIGINAL_DB_CONTAINER, "select count(*) from storage.objects where bucket_id = 'crm-documents' and name like '%parity-proof.png';")),
-    port: Number(psql(JEWELOS_DB_CONTAINER, "select count(*) from storage.objects where bucket_id = 'crm-legacy-documents' and name like '%parity-proof.png';")),
+    original: documentObject(ORIGINAL_DB_CONTAINER, "public", "crm-documents"),
+    port: documentObject(JEWELOS_DB_CONTAINER, "crm", "crm-legacy-documents"),
   };
   const audit = psql(JEWELOS_DB_CONTAINER, `
 select coalesce(json_agg(json_build_object('action', action, 'changed_columns', new_value -> 'changed_columns') order by action), '[]')
 from public.audit_logs where module = 'crm' and actor_user_id = '0d000000-0000-4000-8000-000000000003'
-  and created_at > now() - interval '30 minutes';`);
-  const auditText = psql(JEWELOS_DB_CONTAINER, "select coalesce(string_agg(new_value::text, ' '), '') from public.audit_logs where module = 'crm' and created_at > now() - interval '30 minutes';");
+  and created_at >= '${startedAt}';`);
+  const auditText = psql(JEWELOS_DB_CONTAINER, `select coalesce(string_agg(new_value::text, ' '), '') from public.audit_logs where module = 'crm' and created_at >= '${startedAt}';`);
   return {
     tables,
     storageObjects: objects,
     jewelosAudit: JSON.parse(audit),
+    directWriteAudited: JSON.parse(audit).some((row) => row.action === "crm.clients_update" && (row.changed_columns ?? []).includes("city")),
+    rpcWriteNotDoubleAudited: !JSON.parse(audit).some((row) => row.action === "crm.clients_insert"),
     auditHasNoCustomerValues: !/Parity Workflow|9100000777|Pune|Parity workflow/.test(auditText),
   };
 }

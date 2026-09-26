@@ -91,11 +91,16 @@ export async function startOriginalStack(workdir, expectedMigrations) {
   if (applied !== expectedMigrations) {
     throw new Error(`original stack reset applied ${applied}/${expectedMigrations} migrations\n${`${reset.stdout}\n${reset.stderr}`.split("\n").slice(-20).join("\n")}`);
   }
+  // The reset recreates the auth/storage containers; the gateway can keep their old addresses.
+  run("docker", ["restart", `supabase_kong_${ORIGINAL_PROJECT_ID}`], { timeoutMs: 120_000 });
   for (let attempt = 0; attempt < 60; attempt++) {
-    try { if ((await fetch(`${ORIGINAL_API_URL}/storage/v1/status`)).ok) return; } catch { /* restarting */ }
+    try {
+      const [storage, auth] = await Promise.all([fetch(`${ORIGINAL_API_URL}/storage/v1/status`), fetch(`${ORIGINAL_API_URL}/auth/v1/health`)]);
+      if (storage.ok && auth.status !== 502) return;
+    } catch { /* restarting */ }
     await new Promise((resolve) => setTimeout(resolve, 5000));
   }
-  throw new Error("original stack storage API did not come up after the reset");
+  throw new Error("original stack storage/auth APIs did not come up after the reset");
 }
 
 export function stopOriginalStack(workdir) {

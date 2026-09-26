@@ -93,7 +93,7 @@ export function statesFor(ids) {
     { id: "clients-empty", roles: ["salesperson"], path: "/clients?search=zz-no-match" },
     { id: "clients-walkin-branch-choice", roles: ["super_admin"], path: "/clients", act: async (page) => { await page.getByRole("button", { name: "Make Walk-in Entry" }).first().click(); } },
     { id: "topbar-search-results", roles: ["salesperson"], path: "/clients", act: async (page) => { await page.getByLabel("Search client", { exact: true }).fill("Parity"); await page.getByText("Parity Asha Mehta").first().waitFor(); } },
-    { id: "topbar-search-none", roles: ["salesperson"], path: "/clients", act: async (page) => { await page.getByLabel("Search client", { exact: true }).fill("zz-none"); await page.getByText("No client found").waitFor(); } },
+    { id: "topbar-search-none", roles: ["salesperson"], path: "/clients", act: async (page) => { await page.getByLabel("Search client", { exact: true }).fill("zz-none"); await page.waitForTimeout(400); await page.getByText("Searching…").waitFor({ state: "detached", timeout: 30_000 }).catch(() => undefined); await page.getByText("No client found").waitFor(); } },
 
     { id: "client-new", roles: ALL, path: "/clients/new?phone=9100000999" },
     { id: "client-new-error", roles: ["salesperson"], path: "/clients/new", act: async (page) => { await page.getByRole("button", { name: "Create client" }).click(); } },
