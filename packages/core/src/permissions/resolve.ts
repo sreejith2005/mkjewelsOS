@@ -45,7 +45,8 @@ export function effectiveRoleFor(subject: Pick<AccessSubject, "role" | "dashboar
 }
 
 /**
- * Mirrors `permission_effective_for()` in migration 0156. The database is the
+ * Mirrors `permission_effective_for()` as evolved through migrations 0156, 0171,
+ * and 0181. The database is the
  * authority; this copy exists for live previews and must stay in parity.
  */
 export function explainPermission(subject: AccessSubject, key: PermissionKey): PermissionExplanation {
@@ -53,6 +54,10 @@ export function explainPermission(subject: AccessSubject, key: PermissionKey): P
   if (!definition) throw new Error(`Unknown permission: ${key}`);
   const effectiveRole = effectiveRoleFor(subject);
   const builtin = definition.defaultRoles.includes(effectiveRole);
+  if (key === "availability.apply_leave_exception") {
+    const user = subject.userOverrides?.[key] ?? null;
+    return { key, effectiveRole, roleDefault: false, roleConfigured: false, designation: null, user, effective: user === "grant", decidedBy: user ? "user" : "role" };
+  }
   if (effectiveRole === "super_admin") {
     return { key, effectiveRole, roleDefault: true, roleConfigured: false, designation: null, user: null, effective: true, decidedBy: definition.kind === "protected" ? "protected" : "authority" };
   }

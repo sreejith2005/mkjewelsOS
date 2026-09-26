@@ -32,6 +32,12 @@ const withSection = (page: keyof SectionControls["section_availability"], enable
 });
 
 describe("permission catalog", () => {
+  it("requires an explicit user grant for the leadership leave application exception", () => {
+    const base = { role: "super_admin" as const, dashboardAuthority: null };
+    expect(explainPermission(base, "availability.apply_leave_exception").effective).toBe(false);
+    expect(explainPermission({ ...base, userOverrides: { "availability.apply_leave_exception": "grant" } }, "availability.apply_leave_exception").effective).toBe(true);
+  });
+
   it("has unique keys", () => {
     expect(new Set(PERMISSION_KEYS).size).toBe(PERMISSION_KEYS.length);
   });
@@ -141,10 +147,10 @@ describe("permission resolution", () => {
     expect(explainPermission({ role: "staff", dashboardAuthority: "super_admin" }, "permissions.manage").effective).toBe(true);
   });
 
-  it("effective Super Admin keeps every implemented capability despite configured denies", () => {
+  it("effective Super Admin keeps capabilities while leave application still requires an explicit grant", () => {
     const denied = Object.fromEntries(PERMISSION_CATALOG.map(({ key }) => [key, "deny"])) as AccessSubject["userOverrides"];
     const subject: AccessSubject = { role: "staff", dashboardAuthority: "super_admin", userOverrides: denied };
-    for (const item of PERMISSION_CATALOG) expect(explainPermission(subject, item.key).effective, item.key).toBe(true);
+    for (const item of PERMISSION_CATALOG) expect(explainPermission(subject, item.key).effective, item.key).toBe(item.key !== "availability.apply_leave_exception");
     expect(explainPermission({ role: "admin", dashboardAuthority: null, userOverrides: { "users.manage": "deny" } }, "users.manage").effective).toBe(false);
   });
 
