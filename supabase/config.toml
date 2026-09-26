@@ -26,3 +26,14 @@ verify_jwt = false
 # salted rate-limit key, and returns generic credential failures.
 [functions.username-password-login]
 verify_jwt = false
+
+# Google Apps Script cannot send a JWT. This function checks the x-mk-legacy-api-key header
+# against the CRM_LEGACY_WALKIN_INGEST_API_KEY function secret (constant-time) before it
+# rate-limits, parses the body or touches the database.
+[functions.crm-walkin-ingest]
+verify_jwt = false
+
+# Signed-in CRM staff only: the caller's JewelOS JWT is verified by the platform and the
+# function reads and writes as that caller under crm RLS. RUNO_API_KEY is a function secret.
+[functions.crm-runo-push]
+verify_jwt = true

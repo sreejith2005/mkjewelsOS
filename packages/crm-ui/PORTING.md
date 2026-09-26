@@ -32,14 +32,14 @@ To compare a file with the original: `git diff --no-index sreejith-crm/web-app/<
 | c. Storage bucket | `components/walk-in-form.tsx` (2 calls) | `crm-documents` becomes `crm-legacy-documents` (0186). |
 | d. Sign-out | `app/actions.ts`; `components/crm-shell.tsx` form | The server action signs out of JewelOS. The `<form action={signOut}>` (a React 19 function action) becomes an `onSubmit` handler. |
 | d. Login | `app/(crm)/layout.tsx` | `redirect("/login")`: no session goes to the JewelOS login; no CRM profile shows "No CRM access" (`crm-port/access.tsx`). The original `/login` and `/auth/jewelos*` routes are not ported. A signed-in visitor to `/crm/login` is sent to `/`, as the original `proxy.ts` did. |
-| e. Phase 4 routes | `components/lead-form.tsx` | `fetch("/api/leads/<id>/runo")` becomes `pushLeadToRuno()` (`crm-port/phase4.ts`, `TODO(phase4)`). It reports "not pushed", and the form shows its own original message: "Lead saved locally. Runo sync not yet configured." `/api/ingest/walkin` has no UI caller. |
+| e. Server routes | `components/lead-form.tsx` | `fetch("/api/leads/<id>/runo")` becomes `pushLeadToRuno()` (`crm-port/phase4.ts`), which invokes the `crm-runo-push` Edge Function with the caller's JewelOS JWT and the lead id in the body. `ok` is still the route's HTTP ok, so the form shows its own original messages ("Lead saved and pushed to Runo." / "Lead saved locally. Runo sync not yet configured."). `/api/ingest/walkin` has no UI caller; it is the `crm-walkin-ingest` Edge Function. |
 | Addition | `components/crm-shell.tsx` | The one JewelOS addition: a "← JewelOS" entry in the menu (`crm-port/jewelos-home-link.tsx`, `data-crm-port`). |
 | Types only | `lib/supabase/database.types.ts`, `lib/supabase/client.ts` | `Database["public"]` is the generated JewelOS `crm` schema type. `manage_crm_roster` keeps the original nullable optional args. `createClient()` returns the JewelOS client for schema `crm`: `from`/`rpc` go to schema `crm`, `storage`/`auth` stay on the JewelOS session. |
 | Tests | `tests/*.test.tsx` | `vi.mock("next/navigation" / "next/link")` becomes the shim module. Assertions are unchanged. |
 
 Not ported: `app/login`, `app/auth/jewelos`, `app/api/ingest/walkin` and
-`app/api/leads/[leadId]/runo` (both Phase 4), `lib/prisma.ts`, `lib/sso/*`,
-`lib/legacy-walkin-ingest.ts` (Phase 4), `lib/supabase/{env,proxy}.ts` and `proxy.ts`.
+`app/api/leads/[leadId]/runo` (both are Edge Functions: `crm-walkin-ingest`, `crm-runo-push`), `lib/prisma.ts`, `lib/sso/*`,
+`lib/legacy-walkin-ingest.ts` (copied into `supabase/functions/crm-walkin-ingest`), `lib/supabase/{env,proxy}.ts` and `proxy.ts`.
 Declared in the original `package.json` but not used by its source, so not added:
 `react-hook-form`, `@hookform/resolvers`.
 
