@@ -76,7 +76,11 @@ export function ApplicationShell({
   const sidebarNavigation = getSidebarNavigation(nav);
 
   return (
-    <div className="min-h-screen bg-obsidian">
+    // `overflow-x-clip` on a normal element is a real clip: unlike the body
+    // rule it cannot be bypassed by mobile Chrome zooming out to fit, or by
+    // panning, when a page still has something wider than the screen. It does
+    // not create a scroll container, so the sticky header keeps working.
+    <div className="min-h-screen overflow-x-clip bg-obsidian">
       <header className={cn("sticky top-0 z-30 flex items-center border-b border-task-border bg-task-bg px-3 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] md:fixed md:inset-x-0 md:border-gold/20 md:bg-charcoal/95 md:px-5 md:backdrop-blur", developerModeActive ? "min-h-[calc(3.5rem_+_env(safe-area-inset-top))] flex-wrap pb-2 pt-[calc(0.5rem_+_env(safe-area-inset-top))] md:min-h-16 md:py-2" : "h-[calc(3.5rem_+_env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] md:h-16 md:pt-0")}>
         <div className="flex w-full items-center">
         <Button aria-label="Toggle sidebar" className="mr-3 hidden size-10 p-0 md:inline-flex" onClick={() => setSidebarOpen(!sidebarOpen)} variant="ghost">

@@ -20,4 +20,11 @@ describe("mobile document and shell contract", () => {
     expect(shellSource).toContain("env(safe-area-inset-top)");
     expect(globalCss).toContain("env(safe-area-inset-bottom)");
   });
+
+  it("keeps wide content from dragging the page sideways on a phone", () => {
+    // Without this, a table inside `overflow-x-auto` in a single-column grid
+    // widens the grid track and the whole page pans or zooms out.
+    expect(globalCss).toMatch(/\.grid > \*\s*\{\s*min-width: 0;/);
+    expect(shellSource).toContain('"min-h-screen overflow-x-clip bg-obsidian"');
+  });
 });

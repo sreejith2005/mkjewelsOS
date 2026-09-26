@@ -34,7 +34,7 @@ export function TaskRemarksCard({ comments, error, loading, viewerId }: Readonly
       {comments?.map((item) => (
         <View key={item.id} style={[styles.remark, item.authorId === viewerId ? styles.ownRemark : null]}>
           <View style={styles.meta}>
-            <Text variant="small" weight="semibold">{item.authorId === viewerId ? "You" : item.authorName}</Text>
+            <Text style={styles.author} variant="small" weight="semibold">{item.authorId === viewerId ? "You" : item.authorName}</Text>
             <Text tone="muted" variant="caption">{formatDateTime(item.createdAt, "")}</Text>
           </View>
           <Text variant="body">{item.comment}</Text>
@@ -109,6 +109,7 @@ const useStyles = makeStyles((theme) => StyleSheet.create({
   },
   ownRemark: { backgroundColor: theme.colors.primarySoft },
   meta: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: theme.space.sm },
+  author: { flexShrink: 1 },
   composerGroup: { gap: theme.space.sm },
   composer: { flexDirection: "row", alignItems: "flex-end", gap: theme.space.sm },
   input: {
