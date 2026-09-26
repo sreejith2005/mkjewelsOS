@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { countLeaveDays, formatLeaveDate, hasPermission, leaveInformStatus, leaveNeedsHandover, leaveSummaryTotals, type LeaveHalf, type ReturnHalf } from "@jewelos/core";
-import { canSubmitLeave, editPendingLeave, leaveHandoverCandidates, leaveTypes, listLeaveRequests, reviewLeave, signedLeaveImage, submitHandover, submitLeave, type LeaveDraft, type LeaveRequest } from "@jewelos/data/leave/api";
+import { canSubmitLeave, editPendingLeave, leaveHandoverCandidates, leaveSummaryApplicants, leaveTypes, listLeaveRequests, reviewLeave, signedLeaveImage, submitHandover, submitLeave, type LeaveDraft, type LeaveRequest } from "@jewelos/data/leave/api";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
 
@@ -13,7 +13,7 @@ const statusPill: Record<string, string> = {
   pending: "border-warning/40 bg-warning/10 text-warning",
 };
 type Tab = "apply" | "handover" | "history" | "review";
-const tabLabels: Record<Tab, string> = { apply: "Apply leave", handover: "Handover", history: "My leave summary", review: "Review requests" };
+const tabLabels: Record<Tab, string> = { apply: "Apply leave", handover: "Handover", history: "Leave summary", review: "Review requests" };
 
 function StatusPill({ status }: { status: string }) {
   return <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold uppercase ${statusPill[status] ?? statusPill.pending}`}>{status}</span>;
@@ -22,9 +22,11 @@ function StatusPill({ status }: { status: string }) {
 export function LeaveApplications() {
   const { access, branch, profile } = useAuth();
   const canReview = hasPermission(access, "availability.review_leave") && hasPermission(access, "availability.manage_others");
+  const canViewOffice = hasPermission(access, "availability.view_leave_summary");
   const [canApply, setCanApply] = useState<boolean | null>(null);
   const [tab, setTab] = useState<Tab>("apply");
   const [types, setTypes] = useState<Array<{ value: string; label: string }>>([]);
+  const [applicants, setApplicants] = useState<Array<{ id: string; employee_name: string }>>([]);
   const [people, setPeople] = useState<Array<{ id: string; employee_name: string }>>([]);
   const [rows, setRows] = useState<LeaveRequest[]>([]);
   const [draft, setDraft] = useState<LeaveDraft>(emptyDraft);
@@ -48,16 +50,16 @@ export function LeaveApplications() {
   const load = useCallback(async () => {
     if (!profile) return;
     try {
-      const [ownRows, reviewRows, nextTypes, nextPeople, applicantEligible] = await Promise.all([
-        listLeaveRequests(profile.id), canReview ? listLeaveRequests(undefined, "pending") : Promise.resolve([]),
-        leaveTypes(), leaveHandoverCandidates(), canSubmitLeave(),
+      const [summaryRows, reviewRows, nextTypes, nextPeople, applicantEligible, nextApplicants] = await Promise.all([
+        listLeaveRequests(canViewOffice ? undefined : profile.id), canReview && !canViewOffice ? listLeaveRequests(undefined, "pending") : Promise.resolve([]),
+        leaveTypes(), leaveHandoverCandidates(), canSubmitLeave(), canViewOffice ? leaveSummaryApplicants() : Promise.resolve([]),
       ]);
-      setRows([...ownRows, ...reviewRows.filter((row) => row.applicant_id !== profile.id)]);
-      setTypes(nextTypes); setPeople(nextPeople);
+      setRows([...summaryRows, ...reviewRows.filter((row) => !summaryRows.some((summary) => summary.id === row.id))]);
+      setTypes(nextTypes); setPeople(nextPeople); setApplicants(nextApplicants);
       setCanApply(applicantEligible);
-      if (!applicantEligible) setTab((current) => current === "apply" ? (canReview ? "review" : "history") : current);
+      if (!applicantEligible) setTab((current) => current === "apply" ? (canViewOffice ? "history" : canReview ? "review" : "history") : current);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to load leave requests"); }
-  }, [canReview, profile]);
+  }, [canReview, canViewOffice, profile]);
   useEffect(() => { void load(); }, [load]);
   // Fill handover must visibly open the form, which sits below the pending list.
   useEffect(() => {
@@ -76,8 +78,10 @@ export function LeaveApplications() {
 
   const myRows = useMemo(() => rows.filter((row) => row.applicant_id === profile?.id), [rows, profile?.id]);
   const handoverRows = useMemo(() => myRows.filter(leaveNeedsHandover), [myRows]);
-  const totals = useMemo(() => leaveSummaryTotals(myRows), [myRows]);
+  const summaryRows = canViewOffice ? rows : myRows;
+  const totals = useMemo(() => leaveSummaryTotals(summaryRows), [summaryRows]);
   const peopleById = useMemo(() => new Map(people.map((person) => [person.id, person])), [people]);
+  const applicantNames = useMemo(() => new Map(applicants.map((person) => [person.id, person.employee_name])), [applicants]);
   const selectedHandover = handoverRows.find((row) => row.id === handoverId) ?? null;
   const preview = useMemo(() => {
     try {
@@ -173,18 +177,19 @@ export function LeaveApplications() {
 
     {tab === "history" ? <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {([["Total leaves", totals.total], ["Approved", totals.approved], ["Pending", totals.pending], ["Rejected", totals.rejected]] as const).map(([label, value]) => <div className="rounded-xl border border-gold/15 p-3" key={label}>
+        {([[(canViewOffice ? "Office days requested" : "Total leaves"), totals.total], ["Approved", totals.approved], ["Pending", totals.pending], ["Rejected", totals.rejected]] as const).map(([label, value]) => <div className="rounded-xl border border-gold/15 p-3" key={label}>
           <p className="text-xs uppercase text-soft-grey">{label}</p><p className="mt-1 text-2xl font-semibold text-champagne">{value}</p><p className="text-xs text-soft-grey">days</p>
         </div>)}
       </div>
-      <h3 className="font-semibold text-champagne">My leave history</h3>
-      {myRows.length === 0 ? <Notice tone="task">No leave applications yet.</Notice> : myRows.map((row) => <article className="space-y-2 rounded-xl border border-gold/15 p-4 text-sm" key={row.id}>
-        <div className="flex flex-wrap items-start justify-between gap-2"><div><strong>{row.leave_type} · {row.duration}</strong><p className="font-mono text-xs text-soft-grey">{row.reference_code}</p></div><StatusPill status={row.status} /></div>
+      <h3 className="font-semibold text-champagne">{canViewOffice ? "Office leave history" : "My leave history"}</h3>
+      {summaryRows.length === 0 ? <Notice tone="task">No leave applications yet.</Notice> : summaryRows.map((row) => <article className="space-y-2 rounded-xl border border-gold/15 p-4 text-sm" key={row.id}>
+        <div className="flex flex-wrap items-start justify-between gap-2"><div><strong>{canViewOffice ? `${applicantNames.get(row.applicant_id) ?? (row.applicant_id === profile.id ? profile.employee_name : row.applicant_id)} · ` : ""}{row.leave_type} · {row.duration}</strong><p className="font-mono text-xs text-soft-grey">{row.reference_code}</p></div><StatusPill status={row.status} /></div>
         <p>{formatLeaveDate(row.leave_start)} to {formatLeaveDate(row.leave_end)} · {row.total_leave_count} days · {row.inform_status}</p>
+        {canViewOffice ? <p>Reason: {row.reason}</p> : null}
         <p>Return {formatLeaveDate(row.work_start_date)} {row.work_start_in} · Handover {row.handed_over_at ? `done${row.handover_to ? ` to ${peopleById.get(row.handover_to)?.employee_name ?? "colleague"}` : ""}` : row.status === "rejected" ? "not required" : "pending"}</p>
         <p>HR remark: {row.hr_remark ?? "—"}</p>
-        <div className="flex flex-wrap gap-2"><Button onClick={() => void openImage(row.tl_approval_path)} variant="secondary">TL approval</Button>{row.handover_approval_path ? <Button onClick={() => void openImage(row.handover_approval_path!)} variant="secondary">Handover proof</Button> : null}{row.status === "pending" ? <Button onClick={() => { setEditingId(row.id); setEditDates({ leaveStart: row.leave_start, leaveEnd: row.leave_end, workStartDate: row.work_start_date, workStartIn: row.work_start_in as ReturnHalf }); }} variant="secondary">Edit</Button> : null}{leaveNeedsHandover(row) ? <Button onClick={() => fillHandover(row.id)} variant="secondary">Handover</Button> : null}</div>
-        {editingId === row.id && row.status === "pending" ? <form className="grid gap-3 rounded-xl border border-gold/15 p-4 sm:grid-cols-2" onSubmit={(e) => {
+        <div className="flex flex-wrap gap-2"><Button onClick={() => void openImage(row.tl_approval_path)} variant="secondary">TL approval</Button>{row.handover_approval_path ? <Button onClick={() => void openImage(row.handover_approval_path!)} variant="secondary">Handover proof</Button> : null}{row.applicant_id === profile.id && row.status === "pending" ? <Button onClick={() => { setEditingId(row.id); setEditDates({ leaveStart: row.leave_start, leaveEnd: row.leave_end, workStartDate: row.work_start_date, workStartIn: row.work_start_in as ReturnHalf }); }} variant="secondary">Edit</Button> : null}{row.applicant_id === profile.id && leaveNeedsHandover(row) ? <Button onClick={() => fillHandover(row.id)} variant="secondary">Handover</Button> : null}</div>
+        {editingId === row.id && row.applicant_id === profile.id && row.status === "pending" ? <form className="grid gap-3 rounded-xl border border-gold/15 p-4 sm:grid-cols-2" onSubmit={(e) => {
           e.preventDefault();
           if (editDates.leaveEnd < editDates.leaveStart) { setError("Leave end date cannot be before leave start date"); return; }
           void run(async () => { await editPendingLeave(row.id, editDates); setEditingId(null); }, "Leave updated. Leave count and inform status recalculated.");
