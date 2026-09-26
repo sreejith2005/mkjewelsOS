@@ -62,6 +62,18 @@ describe("navigatePath", () => {
     expect(calls).toEqual([]);
   });
 
+  it("opens Forms Library only for an account with forms access", () => {
+    const allowed = recorder();
+    expect(navigatePath("/forms", shellFor("staff"), allowed.handlers)).toBe(true);
+    expect(allowed.calls).toEqual(["path:/forms", "section:forms_library"]);
+
+    const base = accessFor("staff");
+    const deniedAccess: AccessContext = { ...base, permissions: { ...base.permissions, "forms.view": false } };
+    const denied = recorder();
+    expect(navigatePath("/forms", { access: deniedAccess, controls: DEFAULT_SECTION_CONTROLS }, denied.handlers)).toBe(false);
+    expect(denied.calls).toEqual([]);
+  });
+
   it("follows a granted permission rather than the base role", () => {
     const base = accessFor("housekeeping");
     const granted: AccessContext = { ...base, permissions: { ...base.permissions, "crm.view": true } };
@@ -121,6 +133,7 @@ describe("buildLauncherItems", () => {
       "home",
       "dashboard",
       "fms_builder",
+      "forms_library",
       "availability",
       "reports",
       "settings",
