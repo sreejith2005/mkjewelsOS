@@ -43,25 +43,23 @@ enabled = true
 inspector_port = 57383
 `;
 
-/** Writes the repository's supabase config (project id and ports replaced) and copies the tracked migrations, functions and tests. */
+/** Writes the repository's supabase config (project id and ports replaced) and extracts the migrations, functions and tests as committed at HEAD. */
 export function prepareJewelosStack(workdir) {
   const supabaseDir = join(workdir, "supabase");
   rmSync(supabaseDir, { recursive: true, force: true });
   mkdirSync(supabaseDir, { recursive: true });
-  const repoConfig = readFileSync(join(REPO_ROOT, "supabase", "config.toml"), "utf8")
+  // HEAD, not the working tree: a run reflects committed work, never another session's unfinished files.
+  const repoConfig = run("git", ["show", "HEAD:supabase/config.toml"]).stdout
     .replace(/^project_id = ".*"$/m, `project_id = "${PORT_PROJECT_ID}"`);
   // The repository config keeps every other setting at its default, so its [api] block is the
   // only one; the port is added to it and the remaining sections are appended.
-  const config = repoConfig.replace(/^\[api\]$/m, "[api]\nport = 57321");
+  const config = repoConfig.replace(/^\[api\]\r?$/m, "[api]\nport = 57321");
   writeFileSync(join(supabaseDir, "config.toml"), `${config}\n${PORTS}`);
-  // Only files Git tracks: a run reflects committed work, never another session's unfinished files.
-  // packages/core/src is copied because several functions import it relatively (../../../packages/core).
-  const tracked = run("git", ["ls-files", "-z", "--", "supabase/migrations", "supabase/functions", "supabase/tests", "packages/core/src"]).stdout.split("\0").filter(Boolean);
-  for (const file of tracked) {
-    const target = join(workdir, file);
-    mkdirSync(dirname(target), { recursive: true });
-    copyFileSync(join(REPO_ROOT, file), target);
-  }
+  // packages/core/src is extracted because several functions import it relatively (../../../packages/core).
+  const archive = join(workdir, "committed.tar");
+  run("git", ["archive", "--format=tar", "-o", archive, "HEAD", "supabase/migrations", "supabase/functions", "supabase/tests", "packages/core/src"]);
+  run("tar", ["-xf", "committed.tar"], { cwd: workdir });
+  rmSync(archive, { force: true });
 }
 
 export async function startJewelosStack(workdir) {
