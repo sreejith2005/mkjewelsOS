@@ -140,7 +140,7 @@ Releases page. Every APK is also archived locally in
 | `packages/core`, `packages/data`, `packages/ui-tokens` | Mobile release **and** web deploy; both apps bundle them |
 | `apps/web/**` only | Web deploy only (Vercel), no APK |
 | Supabase migration / RPC / RLS / Edge Function | `PRODUCTION_SWITCH_PLAYBOOK.md`. No APK unless the app code changed too. **Keep it backward-compatible with the app versions still installed.** If it breaks older apps, release a mobile build that works with it and publish that release with `-Mandatory`. |
-| `apps/mobile/.env` (Supabase URL/key) | Mobile release. Values are baked in at build time. |
+| `apps/mobile/.env` (Supabase URL/key, CRM web origin) | Mobile release. Values are baked in at build time. |
 | `app.json` plugins/permissions, native deps (`npx expo install …`) | Mobile release. Covered automatically: every release is a full native build. |
 
 There are **no over-the-air JS updates** (no `expo-updates` / EAS Update).
@@ -179,11 +179,33 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\release-mobile.ps1 -
 | `-SkipChecks` | Skip mobile typecheck/tests. Only if you just ran them. |
 | `-NoPublish` | Build and verify only, for testing. No commit/tag/release; `app.json` restored. Don't hand this APK to employees. |
 
+### The CRM web origin (required)
+
+The CRM tab shows the web app's `/crm` route in a WebView, so every release must carry the
+JewelOS web origin, baked in at build time:
+
+```text
+# apps/mobile/.env
+EXPO_PUBLIC_JEWELOS_WEB_ORIGIN=https://<jewelos-web-origin>
+```
+
+- The owner fills in the real value (the production web host, e.g. the Vercel production
+  domain). `apps/mobile/.env.example` carries only the placeholder, which the script rejects.
+- A variable set in the PowerShell session (`$env:EXPO_PUBLIC_JEWELOS_WEB_ORIGIN = ...`) wins
+  over `.env`, exactly as in Expo's own loading.
+- The script refuses to build (also with `-NoPublish`) when the value is missing, not an absolute
+  URL, not `https`, has a path/query/fragment/credentials, or points at this computer. It prints
+  the value and its source, e.g. `CRM web origin (EXPO_PUBLIC_JEWELOS_WEB_ORIGIN, from
+  apps/mobile/.env): https://...`, again at the end of the run. Check it before you walk away.
+- Changing the origin (new domain) needs a new release: installed apps keep the origin they were
+  built with.
+
 ### What the script does
 
 1. **Preflight**: `main`; clean source; `gh auth status`; keystore descriptor
    exists and has no BOM; `.env` points at `yimafxhuwgfhvzczqqdd.supabase.co`;
-   build-tools present; disk space.
+   `EXPO_PUBLIC_JEWELOS_WEB_ORIGIN` is a valid https origin (printed as
+   `CRM web origin (...): https://...`; see below); build-tools present; disk space.
 2. **Version**: reads `app.json` and the published `latest.json`, takes the
    higher, bumps it. Refuses if the tag/release already exists.
 3. **Checks**: `npm --prefix apps/mobile run typecheck` and `run test`.
@@ -239,7 +261,7 @@ reasons in `apps/mobile/README.md` and `docs/MOBILE_HANDOFF.md` §4.4.
 | Mobile deps | `apps/mobile` installs with **npm** (`npm install`), not pnpm |
 | Workspace deps | root `pnpm.cmd install` (for `packages/*`) |
 | Signing | `%USERPROFILE%\.gradle\gradle.properties` → `JEWELOS_KEYSTORE_PROPERTIES` |
-| Secrets file | `apps/mobile/.env` (untracked): `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` only |
+| Build config file | `apps/mobile/.env` (untracked): `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_JEWELOS_WEB_ORIGIN` only |
 
 Never put a service-role key or any other secret in `apps/mobile/.env`. It is
 compiled into an APK that anyone can download.
@@ -332,6 +354,7 @@ over USB during development) must uninstall it first ("App not installed" /
 |---|---|
 | `uncommitted changes would be built into the APK` | Commit, or `git stash -u -- <paths>`. If another person/session is mid-work in this checkout, wait for them to commit. |
 | `GitHub CLI is not logged in` | `gh auth login` |
+| `EXPO_PUBLIC_JEWELOS_WEB_ORIGIN is not set` / `is not an absolute URL` / `is not https` / `must be an origin only` / `points at this computer` | Put the production web origin (`https://host`, no path) in `apps/mobile/.env` (§4 "The CRM web origin"). |
 | `does not point at yimafxhuwgfhvzczqqdd.supabase.co` | Fix `apps/mobile/.env`. If production genuinely moved, update `$ExpectedSupabaseHost` in the script **and** §1 of this guide. |
 | `signed with the DEBUG key` / BOM | §6 |
 | `Filename longer than 260 characters` / `build.ninja still dirty` | Checkout path too long (§5), or `apps/mobile` installed with pnpm. Use npm. |

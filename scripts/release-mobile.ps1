@@ -7,7 +7,8 @@
   Full procedure and troubleshooting: docs/MOBILE_RELEASE_GUIDE.md
 
   1. Preflight: main branch, committed mobile/shared source, GitHub login,
-     upload keystore, production Supabase URL in apps/mobile/.env.
+     upload keystore, production Supabase URL in apps/mobile/.env, and an
+     https EXPO_PUBLIC_JEWELOS_WEB_ORIGIN (printed) for the CRM tab.
   2. Next version: one above the higher of app.json and the published release.
   3. Mobile typecheck and tests (skip with -SkipChecks).
   4. Signed release APK built from the working tree, which step 1 proved
@@ -123,6 +124,35 @@ if ($envText -notmatch "EXPO_PUBLIC_SUPABASE_URL=https://$([regex]::Escape($Expe
   Stop-Release "$envFile does not point at $ExpectedSupabaseHost. Employees would get a build talking to the wrong database."
 }
 if ($envText -notmatch 'EXPO_PUBLIC_SUPABASE_ANON_KEY=\S+') { Stop-Release "$envFile has no EXPO_PUBLIC_SUPABASE_ANON_KEY." }
+
+# The JewelOS web origin whose /crm route the CRM tab shows. Expo inlines it at build time, and a
+# variable already set in this session wins over apps/mobile/.env, as in Expo's own loading.
+# Without a valid https origin every phone would get a CRM tab that says "CRM not configured".
+$webOriginSource = $envFile
+$webOriginValue = $env:EXPO_PUBLIC_JEWELOS_WEB_ORIGIN
+if ($webOriginValue) { $webOriginSource = 'the EXPO_PUBLIC_JEWELOS_WEB_ORIGIN session variable' }
+else {
+  $webOriginMatch = [regex]::Match($envText, '(?m)^[ \t]*EXPO_PUBLIC_JEWELOS_WEB_ORIGIN[ \t]*=[ \t]*(.*?)[ \t]*\r?$')
+  if ($webOriginMatch.Success) { $webOriginValue = $webOriginMatch.Groups[1].Value.Trim('"', "'") }
+}
+if (-not $webOriginValue) {
+  Stop-Release "EXPO_PUBLIC_JEWELOS_WEB_ORIGIN is not set in $envFile. Add the https origin of the JewelOS web app (for example EXPO_PUBLIC_JEWELOS_WEB_ORIGIN=https://<web host>)."
+}
+$webOriginUri = $null
+if (-not [Uri]::TryCreate($webOriginValue, [UriKind]::Absolute, [ref]$webOriginUri)) {
+  Stop-Release "EXPO_PUBLIC_JEWELOS_WEB_ORIGIN ('$webOriginValue', from $webOriginSource) is not an absolute URL. Replace the placeholder with the real https origin."
+}
+if ($webOriginUri.Scheme -ne 'https') {
+  Stop-Release "EXPO_PUBLIC_JEWELOS_WEB_ORIGIN ('$webOriginValue', from $webOriginSource) is not https. A release APK accepts only an https origin."
+}
+if ($webOriginUri.UserInfo -or $webOriginUri.AbsolutePath -ne '/' -or $webOriginUri.Query -or $webOriginUri.Fragment) {
+  Stop-Release "EXPO_PUBLIC_JEWELOS_WEB_ORIGIN ('$webOriginValue', from $webOriginSource) must be an origin only (https://host), without a path, query, fragment or credentials."
+}
+if ($webOriginUri.IsLoopback) {
+  Stop-Release "EXPO_PUBLIC_JEWELOS_WEB_ORIGIN ('$webOriginValue', from $webOriginSource) points at this computer, which no phone can reach."
+}
+$webOrigin = $webOriginUri.GetLeftPart([UriPartial]::Authority)
+Write-Host "CRM web origin (EXPO_PUBLIC_JEWELOS_WEB_ORIGIN, from $webOriginSource): $webOrigin"
 
 foreach ($tool in @("$BuildTools\apksigner.bat", "$BuildTools\aapt2.exe")) {
   if (-not (Test-Path $tool)) { Stop-Release "$tool is missing. Install Android build-tools 36.0.0." }
@@ -243,7 +273,7 @@ Write-Host "Archived: $outDir ($([math]::Round($apkItem.Length / 1MB, 1)) MB)"
 
 if ($NoPublish) {
   Write-Utf8NoBom $appJsonPath $appJson
-  Write-Step "Built and verified only (-NoPublish). app.json restored. APK: $releasedApk"
+  Write-Step "Built and verified only (-NoPublish). app.json restored. APK: $releasedApk (CRM web origin $webOrigin)"
   exit 0
 }
 
@@ -283,5 +313,6 @@ Write-Host ''
 Write-Host "JewelOS $newName is live." -ForegroundColor Green
 Write-Host "  Download link (always the newest): https://github.com/$Repo/releases/latest/download/$AssetName"
 Write-Host "  Release page:                      https://github.com/$Repo/releases/tag/$tag"
+Write-Host "  CRM web origin built in:           $webOrigin"
 Write-Host "  Installed apps will prompt on their next launch or return to the foreground."
 Write-Host "  Remember to push main when you are ready: git push origin main"
