@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
-import { CheckCircle2, FileText, Redo2, Save, Send, TestTube2, Undo2, UserRoundPlus } from "lucide-react-native";
+import { CheckCircle2, ChevronDown, ChevronUp, FileText, Plus, Redo2, Save, Send, Undo2, UserRoundPlus } from "lucide-react-native";
 import { normalizeFmsDefinition, validateFmsDefinition, type FmsFlowDefinition, type FmsStageDefinition } from "@jewelos/core";
 import { loadFmsBuilderData, publishFmsFlow, saveFmsContextAssigneeDefault, saveFmsDraft, type FmsData, type FmsFlowRow } from "@jewelos/data/fms/api";
 import { flowToDefinition, newFmsStage, removeFmsStage } from "@jewelos/data/fms/definition";
@@ -9,7 +9,7 @@ import { fmsDepartmentLabel } from "@jewelos/data/fms/departments";
 import { newRequestKey } from "@jewelos/data/runtime";
 import { FmsGraphCanvas } from "@/features/fms/FmsGraphCanvas";
 import { FmsStageEditor } from "@/features/fms/FmsStageEditor";
-import { builderCanvasHeight } from "@/features/fms/builderLayout";
+import { FmsStepList } from "@/features/fms/FmsStepList";
 import { errorText } from "@/lib/log";
 import { useAsyncData } from "@/lib/useAsyncData";
 import type { RootStackParamList } from "@/navigation/types";
@@ -59,7 +59,6 @@ export function FmsBuilderScreen() {
 function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: FmsFlowRow | null; data: FmsData; duplicate: boolean; onClose: () => void; onSaved: () => Promise<void> }) {
   const theme = useAppTheme();
   const styles = useStyles();
-  const { height: windowHeight } = useWindowDimensions();
   const navigation = useNavigation();
   const initial = useMemo(() => { const value = flowToDefinition(flow, data); return duplicate ? { ...value, id: undefined, familyId: undefined, version: 1, lifecycle: "draft" as const, name: `${value.name} (Copy)` } : value; }, [data, duplicate, flow]);
   const [definition, setDefinition] = useState<FmsFlowDefinition>(initial);
@@ -73,7 +72,9 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [assigning, setAssigning] = useState(false);
-  const [canvasExpanded, setCanvasExpanded] = useState(false);
+  /** Steps is a tap-only list and the default; Map is the draggable canvas. */
+  const [view, setView] = useState<"steps" | "map">("steps");
+  const [issuesOpen, setIssuesOpen] = useState(false);
 
   const normalized = useMemo(() => normalizeFmsDefinition(definition), [definition]);
   const issues = useMemo(() => validateFmsDefinition(normalized, { formFields: data.formFields, availableFormIds: data.forms.map((form) => form.id) }), [data.formFields, data.forms, normalized]);
@@ -175,7 +176,7 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
     if (stage.type === "parallel_start") return { ...stage, parallelTargetStageKeys: stage.parallelTargetStageKeys.filter((key) => key !== to) };
     return stage.defaultNextStageKey === to ? { ...stage, defaultNextStageKey: undefined } : stage;
   }) }));
-  const ensureFirstForm = () => { if (normalized.stages.length) return; const first = { ...newFmsStage("form", 0), key: "start_form", name: "Start form", assigneeRules: contextDefaultAssigneeId ? [{ type: "specific_user" as const, userProfileId: contextDefaultAssigneeId }] : [] }; commit({ ...definition, stages: [first] }); setSelectedKey(first.key); };
+  const ensureFirstForm = () => { if (normalized.stages.length) return; const first = { ...newFmsStage("form", 0), key: "start_form", name: "Start form", assigneeRules: contextDefaultAssigneeId ? [{ type: "specific_user" as const, userProfileId: contextDefaultAssigneeId }] : [] }; commit({ ...definition, stages: [first] }); };
   const persist = async () => { const id = await saveFmsDraft(persistedId, normalized); setPersistedId(id); setSavedSnapshot(JSON.stringify(normalized)); await onSaved(); return id; };
   const save = async () => { setBusy("save"); setError(null); setSuccess(null); try { await persist(); setSuccess("Draft saved"); } catch (caught) { setError(errorText(caught)); } finally { setBusy(null); } };
   const publish = async () => {
@@ -202,91 +203,117 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
     );
   }
 
+  const checkWorkflow = () => { setSuccess(issues.length ? null : "Workflow check passed"); setError(issues.length ? "Workflow check found issues. Review Publish readiness." : null); };
+  const readiness = (
+    <View>
+      <Pressable
+        accessibilityLabel={`Publish readiness. ${issues.length ? `${issues.length} issue${issues.length === 1 ? "" : "s"} to resolve` : "Ready to publish"}`}
+        accessibilityRole="button"
+        {...(issues.length ? { accessibilityState: { expanded: issuesOpen } } : {})}
+        onPress={() => { if (issues.length) setIssuesOpen((open) => !open); else checkWorkflow(); }}
+        style={({ pressed }) => [styles.header, styles.readiness, pressed && styles.pressed]}
+      >
+        <View style={styles.flex}>
+          <Text weight="semibold">Publish readiness</Text>
+          <Text tone="muted" variant="caption">{issues.length ? `${issues.length} issue${issues.length === 1 ? "" : "s"} to resolve · tap to ${issuesOpen ? "hide" : "review"}` : "Ready to publish"}</Text>
+        </View>
+        {issues.length ? (issuesOpen ? <ChevronDown color={theme.colors.textMuted} size={20} /> : <ChevronUp color={theme.colors.textMuted} size={20} />) : <CheckCircle2 color={theme.colors.success} size={20} />}
+      </Pressable>
+      {issuesOpen && issues.length ? (
+        <ScrollView contentContainerStyle={styles.issues} style={styles.issueScroll}>
+          {issues.map((issue, index) => (
+            <Pressable accessibilityRole="button" key={`${issue.code}-${issue.stageKey ?? index}`} onPress={() => { if (issue.stageKey) { setSelectedKey(issue.stageKey); setIssuesOpen(false); } }} style={({ pressed }) => [styles.issue, pressed && styles.pressed]}>
+              <Text tone="danger" variant="caption">{issue.message}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : null}
+    </View>
+  );
+
   return (
-    // The canvas owns its own pan and pinch, so this screen must not scroll:
-    // a parent ScrollView steals the vertical drag before the canvas sees it.
-    // The canvas is pinned above a separately scrolling editor region instead.
-    <Screen>
+    // Steps is a plain scrolling list. Map owns its own pan and pinch, so it is
+    // never inside a ScrollView (a parent ScrollView steals the vertical drag);
+    // it fills the space between the header and the readiness footer instead.
+    <Screen footer={readiness}>
       <View style={styles.header}>
         <View style={styles.flex}>
           <Text numberOfLines={1} variant="subtitle" weight="semibold">{normalized.name}</Text>
           <Text tone="muted" variant="caption">{dirty ? "Unsaved changes" : "Draft saved"}</Text>
         </View>
-      </View>
-      <ScrollView contentContainerStyle={styles.toolbar} horizontal showsHorizontalScrollIndicator={false} style={styles.toolbarScroll}>
-        <Button label={canvasExpanded ? "Smaller canvas" : "Expand canvas"} onPress={() => setCanvasExpanded((current) => !current)} variant="ghost" />
-        <Button disabled={!past.length} icon={<Undo2 color={theme.colors.primary} size={16} />} label="Undo" onPress={undo} variant="ghost" />
-        <Button disabled={!future.length} icon={<Redo2 color={theme.colors.primary} size={16} />} label="Redo" onPress={redo} variant="ghost" />
-        <Button icon={<TestTube2 color={theme.colors.primary} size={16} />} label="Check workflow" onPress={() => { setSuccess(issues.length ? null : "Workflow check passed"); setError(issues.length ? "Workflow check found issues. Review Publish readiness." : null); }} variant="secondary" />
-        <Button busy={busy === "save"} disabled={!!busy} icon={<Save color={theme.colors.primary} size={16} />} label={busy === "save" ? "Saving..." : "Save draft"} onPress={() => void save()} variant="secondary" />
+        <Pressable accessibilityLabel={busy === "save" ? "Saving..." : "Save draft"} accessibilityRole="button" accessibilityState={{ disabled: !!busy, busy: busy === "save" }} disabled={!!busy} onPress={() => void save()} style={({ pressed }) => [styles.iconButton, styles.iconButtonOutlined, (pressed || !!busy) && styles.pressed]}>
+          <Save color={theme.colors.primary} size={18} />
+        </Pressable>
         <Button busy={busy === "publish"} disabled={!!busy || issues.length > 0} icon={<Send color={theme.colors.onPrimary} size={16} />} label={busy === "publish" ? "Publishing..." : "Publish"} onPress={() => void publish()} />
-      </ScrollView>
+      </View>
+      <View style={[styles.header, styles.viewRow]}>
+        <View accessibilityLabel="Builder view" accessibilityRole="tablist" style={styles.viewSwitch}>
+          {(["steps", "map"] as const).map((value) => {
+            const active = view === value;
+            return (
+              <Pressable accessibilityLabel={value === "steps" ? "Steps" : "Map"} accessibilityRole="tab" accessibilityState={{ selected: active }} key={value} onPress={() => setView(value)} style={[styles.viewOption, active && styles.viewOptionActive]}>
+                <Text tone={active ? "inverse" : "warm"} variant="small" weight="semibold">{value === "steps" ? "Steps" : "Map"}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Pressable accessibilityLabel="Undo" accessibilityRole="button" accessibilityState={{ disabled: !past.length }} disabled={!past.length} onPress={undo} style={[styles.iconButton, !past.length && styles.disabled]}><Undo2 color={theme.colors.primary} size={20} /></Pressable>
+        <Pressable accessibilityLabel="Redo" accessibilityRole="button" accessibilityState={{ disabled: !future.length }} disabled={!future.length} onPress={redo} style={[styles.iconButton, !future.length && styles.disabled]}><Redo2 color={theme.colors.primary} size={20} /></Pressable>
+      </View>
       {error ? <Banner tone="danger">{error}</Banner> : null}
       {success ? <Banner tone="success">{success}</Banner> : null}
 
-      <View style={[styles.canvasRegion, { height: builderCanvasHeight(windowHeight, canvasExpanded) }]}>
-        <FmsGraphCanvas
-          definition={normalized}
-          formFields={data.formFields}
-          invalidKeys={invalidKeys}
-          onAddAfter={(key) => add("task", key)}
-          onConnect={connect}
-          onDelete={(key) => void remove(key)}
-          onDisconnect={disconnect}
-          onDuplicate={duplicateStage}
-          onMove={moveStages}
-          onReconnect={reconnect}
-          onSelect={setSelectedKey}
-          selectedKey={selected?.key ?? null}
-          showGestureHint={canvasExpanded}
-        />
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.details}
-        keyboardShouldPersistTaps="handled"
-        style={styles.flex}
-      >
-        <Text tone="muted" variant="caption">The initial Form starts the workflow. The final unconnected step completes it.</Text>
-        <Text tone="muted" variant="caption">Tap a canvas card to configure it. Expand the canvas to move and connect steps.</Text>
-        <Text tone="warm" variant="caption" weight="semibold">BUILDING BLOCKS</Text>
-      <Pressable accessibilityRole="button" onPress={() => add("task")} style={({ pressed }) => [styles.block, styles.blockPrimary, pressed && styles.pressed]}>
-        <UserRoundPlus color={theme.colors.brand} size={18} />
-        <View style={styles.flex}><Text weight="semibold" variant="small">Add Step</Text><Text tone="warm" variant="caption">Create the next general workflow step</Text></View>
-      </Pressable>
-      <View style={styles.blockRow}>
-        <Pressable accessibilityRole="button" onPress={() => normalized.stages[0] && setSelectedKey(normalized.stages[0].key)} style={({ pressed }) => [styles.block, styles.half, pressed && styles.pressed]}>
-          <FileText color={theme.colors.textWarm} size={16} />
-          <View style={styles.flex}>
-            <Text numberOfLines={1} variant="small" weight="semibold">{normalized.stages[0]?.formTemplateId ? data.forms.find((form) => form.id === normalized.stages[0]?.formTemplateId)?.name ?? "Form attached" : "None attached"}</Text>
-            <Text tone="muted" variant="caption">Process form</Text>
+      {view === "steps" ? (
+        <ScrollView contentContainerStyle={styles.details} keyboardShouldPersistTaps="handled" style={styles.flex}>
+          <View style={styles.blockRow}>
+            <Pressable accessibilityRole="button" onPress={() => normalized.stages[0] && setSelectedKey(normalized.stages[0].key)} style={({ pressed }) => [styles.block, styles.half, pressed && styles.pressed]}>
+              <FileText color={theme.colors.textWarm} size={16} />
+              <View style={styles.flex}>
+                <Text numberOfLines={1} variant="small" weight="semibold">{normalized.stages[0]?.formTemplateId ? data.forms.find((form) => form.id === normalized.stages[0]?.formTemplateId)?.name ?? "Form attached" : "None attached"}</Text>
+                <Text tone="muted" variant="caption">Process form</Text>
+              </View>
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={() => setAssigning(true)} style={({ pressed }) => [styles.block, styles.half, pressed && styles.pressed]}>
+              <UserRoundPlus color={theme.colors.textWarm} size={16} />
+              <View style={styles.flex}>
+                <Text numberOfLines={1} variant="small" weight="semibold">{assignableStages.length ? `${assignedStages.length}/${assignableStages.length} assigned` : "No steps yet"}</Text>
+                <Text tone="muted" variant="caption">Default assignees</Text>
+              </View>
+            </Pressable>
           </View>
-        </Pressable>
-        <Pressable accessibilityRole="button" onPress={() => setAssigning(true)} style={({ pressed }) => [styles.block, styles.half, pressed && styles.pressed]}>
-          <UserRoundPlus color={theme.colors.textWarm} size={16} />
-          <View style={styles.flex}>
-            <Text numberOfLines={1} variant="small" weight="semibold">{assignableStages.length ? `${assignedStages.length}/${assignableStages.length} assigned` : "No steps yet"}</Text>
-            <Text tone="muted" variant="caption">Default assignees</Text>
+          <Text tone="muted" variant="caption">Tap a step to edit it and choose where it continues. The final unconnected step completes the workflow.</Text>
+          <FmsStepList
+            definition={normalized}
+            formFields={data.formFields}
+            invalidKeys={invalidKeys}
+            onAddAfter={(key) => add("task", key)}
+            onDelete={(key) => void remove(key)}
+            onDuplicate={duplicateStage}
+            onSelect={setSelectedKey}
+            selectedKey={selected?.key ?? null}
+          />
+        </ScrollView>
+      ) : (
+        <View style={styles.flex}>
+          <FmsGraphCanvas
+            definition={normalized}
+            formFields={data.formFields}
+            invalidKeys={invalidKeys}
+            onAddAfter={(key) => add("task", key)}
+            onConnect={connect}
+            onDelete={(key) => void remove(key)}
+            onDisconnect={disconnect}
+            onDuplicate={duplicateStage}
+            onMove={moveStages}
+            onReconnect={reconnect}
+            onSelect={setSelectedKey}
+            selectedKey={selected?.key ?? null}
+          />
+          <View style={styles.mapAdd}>
+            <Button icon={<Plus color={theme.colors.onPrimary} size={16} />} label="Add Step" onPress={() => add("task")} />
           </View>
-        </Pressable>
-      </View>
-
-
-      <Card accent={issues.length ? "danger" : "success"}>
-        <View style={styles.header}>
-          <View style={styles.flex}>
-            <Text weight="semibold">Publish readiness</Text>
-            <Text tone="muted" variant="caption">{issues.length ? `${issues.length} issue${issues.length === 1 ? "" : "s"} to resolve` : "Ready to publish"}</Text>
-          </View>
-          {issues.length ? null : <CheckCircle2 color={theme.colors.success} size={20} />}
         </View>
-        {issues.map((issue, index) => (
-          <Pressable accessibilityRole="button" key={`${issue.code}-${issue.stageKey ?? index}`} onPress={() => issue.stageKey && setSelectedKey(issue.stageKey)} style={({ pressed }) => [styles.issue, pressed && styles.pressed]}>
-            <Text tone="danger" variant="caption">{issue.message}</Text>
-          </Pressable>
-        ))}
-      </Card>
-      </ScrollView>
+      )}
 
       {selected ? (
         <Sheet scrollable={false} onClose={() => setSelectedKey(null)} tall title={`${selected.type.replaceAll("_", " ")} · ${selected.name}`} visible>
@@ -381,12 +408,19 @@ function DefaultAssigneesSheet({ data, definition, onChange, onClose }: { data: 
 const useStyles = makeStyles((theme) => StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", gap: theme.space.sm },
   flex: { flex: 1, minWidth: 0 },
-  canvasRegion: { flexShrink: 0 },
-  details: { gap: theme.space.md, paddingBottom: theme.space.lg },
-  toolbarScroll: { flexGrow: 0, maxHeight: theme.touchTarget + theme.space.sm },
-  toolbar: { alignItems: "center", gap: theme.space.xs, paddingRight: theme.space.md },
+  details: { gap: theme.space.md, paddingTop: theme.space.sm, paddingBottom: theme.space.lg },
+  viewRow: { marginTop: theme.space.sm, marginBottom: theme.space.sm },
+  viewSwitch: { flex: 1, flexDirection: "row", borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, backgroundColor: theme.colors.surface, padding: 3 },
+  viewOption: { flex: 1, minHeight: 40, alignItems: "center", justifyContent: "center", borderRadius: theme.radius.sm },
+  viewOptionActive: { backgroundColor: theme.colors.primary },
+  iconButton: { width: theme.touchTarget, height: theme.touchTarget, alignItems: "center", justifyContent: "center", borderRadius: theme.radius.md },
+  iconButtonOutlined: { borderWidth: 1, borderColor: theme.colors.borderStrong, backgroundColor: theme.colors.surface },
+  disabled: { opacity: 0.4 },
+  mapAdd: { position: "absolute", left: theme.space.sm, bottom: theme.space.sm },
+  readiness: { minHeight: theme.touchTarget },
+  issueScroll: { maxHeight: 220 },
+  issues: { gap: theme.space.xs, paddingTop: theme.space.xs },
   block: { flexDirection: "row", alignItems: "center", gap: theme.space.sm, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.lg, backgroundColor: theme.colors.surface, padding: theme.space.sm },
-  blockPrimary: { borderColor: theme.colors.borderStrong, backgroundColor: theme.colors.brandSoft },
   blockRow: { flexDirection: "row", gap: theme.space.sm },
   half: { flex: 1, minWidth: 0 },
   pressed: { opacity: 0.75 },

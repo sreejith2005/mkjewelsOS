@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { PanResponder, StyleSheet, View, type GestureResponderEvent, type NativeTouchEvent } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, type SharedValue } from "react-native-reanimated";
 import Svg, { G, Path, Polygon, Rect, Text as SvgText } from "react-native-svg";
-import { CheckSquare, Copy, FileText, Flag, GitBranch, Layers, Maximize, Merge, Minus, Plus, RotateCcw, ShieldCheck, Trash2, X, Zap } from "lucide-react-native";
+import { CheckSquare, CircleHelp, Copy, FileText, Flag, GitBranch, Layers, Maximize, Merge, Minus, Plus, RotateCcw, ShieldCheck, Trash2, X, Zap } from "lucide-react-native";
 import { FMS_MAX_ZOOM, FMS_MIN_ZOOM, fmsOutgoingStageKeys, hasFmsStageRouting, type FmsFlowDefinition, type FmsFormFieldRef, type FmsStageDefinition } from "@jewelos/core";
 import { fmsGraphEdges, fmsStageSummary, fmsTimingSummary, layoutFmsDefinition, type FmsGraphEdge, type FmsGraphPosition } from "@jewelos/data/fms/graph";
 import { makeStyles } from "@/theme/makeStyles";
@@ -72,7 +72,6 @@ export type FmsGraphCanvasProps = Readonly<{
   onDisconnect: (from: string, to: string, ruleId?: string) => void;
   onReconnect: (from: string, previousTo: string, nextTo: string, ruleId?: string) => void;
   onMove: (positions: Readonly<Record<string, FmsGraphPosition>>) => void;
-  showGestureHint?: boolean;
 }>;
 
 export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
@@ -92,6 +91,8 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
   const [connecting, setConnecting] = useState<Readonly<{ from: string; x: number; y: number }> | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [activeEdge, setActiveEdge] = useState<string | null>(null);
+  /** The gesture help is a toggle, so it never sits on top of the cards. */
+  const [hintOpen, setHintOpen] = useState(false);
   // Transient viewport and node movement stays off React's render loop. React
   // receives one durable position update when a gesture ends.
   const panX = useSharedValue(0);
@@ -438,10 +439,11 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
         <Pressable accessibilityLabel="Zoom in" onPress={() => zoomBy(ZOOM_STEP)} style={styles.control}><Plus color={theme.colors.brand} size={16} /></Pressable>
         <Pressable accessibilityLabel="Fit workflow to view" onPress={fitView} style={styles.control}><Maximize color={theme.colors.brand} size={16} /></Pressable>
         <Pressable accessibilityLabel="Reset workflow view" onPress={resetView} style={styles.control}><RotateCcw color={theme.colors.brand} size={16} /></Pressable>
+        <Pressable accessibilityLabel="How to use the map" accessibilityState={{ expanded: hintOpen }} onPress={() => setHintOpen((open) => !open)} style={[styles.control, hintOpen && { backgroundColor: theme.colors.brandSoft }]}><CircleHelp color={theme.colors.brand} size={16} /></Pressable>
       </View>
-      {props.showGestureHint ? <View pointerEvents="none" style={styles.hint}>
+      {connecting || hintOpen ? <View pointerEvents="none" style={[styles.hint, connecting ? styles.hintBottom : styles.hintTop]}>
         <Text tone="muted" variant="caption">
-          {connecting ? "Drop on a step to connect · release on empty space to cancel" : "Drag a card to move it · drag empty space to pan · pinch to zoom · drag a card’s right dot onto another card to connect · tap a connection to remove it or drag its arrow end to move it"}
+          {connecting ? "Drop on a step to connect · release on empty space to cancel" : "Tap a card to edit it · drag a card to move it · drag empty space to pan · pinch to zoom · drag a card’s right dot onto another card to connect · tap a connection to remove it or drag its arrow end to move it"}
         </Text>
       </View> : null}
     </View>
@@ -509,9 +511,12 @@ const useStyles = makeStyles((theme) => StyleSheet.create({
   },
   edgeRemove: { position: "absolute", width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, alignItems: "center", justifyContent: "center", backgroundColor: theme.colors.surface },
   controls: { position: "absolute", right: 8, top: 8, flexDirection: "row", alignItems: "center", gap: 2, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, backgroundColor: theme.colors.surface, padding: 2 },
-  control: { minWidth: 36, minHeight: 36, alignItems: "center", justifyContent: "center", borderRadius: theme.radius.sm },
+  control: { minWidth: 40, minHeight: 40, alignItems: "center", justifyContent: "center", borderRadius: theme.radius.sm },
+  hintTop: { top: 60 },
+  // Above the builder's floating Add Step button.
+  hintBottom: { bottom: 64 },
   zoomLabel: { minWidth: 40, textAlign: "center" },
-  hint: { position: "absolute", left: 8, right: 8, bottom: 8, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, backgroundColor: theme.colors.surface, paddingHorizontal: 8, paddingVertical: 4, opacity: 0.95 },
+  hint: { position: "absolute", left: 8, right: 8, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, backgroundColor: theme.colors.surface, paddingHorizontal: 8, paddingVertical: 4, opacity: 0.95 },
 }));
 
 export type { GestureResponderEvent };
