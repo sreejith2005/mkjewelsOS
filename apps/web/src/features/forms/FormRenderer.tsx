@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type FormEvent } from "react";
-import { normalizeFormAnswers, resolveFormOptions, validateCompleteForm, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition } from "@jewelos/core";
+import { isWorkUploadForm, nextFormStepKey, normalizeFormAnswers, previousFormStepKey, resolveFormOptions, updateVisibleFormAnswers, validateCompleteForm, validateFormStep, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition } from "@jewelos/core";
 import { Button, Notice } from "@/components/ui";
 import { signedFormFileUrl, uploadFormFile } from "./api";
 import { RatingField } from "./RatingField";
@@ -54,16 +54,38 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [stepKey, setStepKey] = useState<string | null>(null);
   const fieldRefs = useRef(new Map<string, HTMLElement>());
   // Dropdown Master questions store only a reference; resolve it for rendering
   // and validation so every option field behaves identically here.
   const resolved = useMemo(() => resolveFormOptions(definition, dynamicOptions.masters), [definition, dynamicOptions.masters]);
   const normalized = useMemo(() => normalizeFormAnswers(resolved, answers), [answers, resolved]);
   const sections = useMemo(() => visibleFormSections(resolved, answers), [answers, resolved]);
+  const stepped = isWorkUploadForm(resolved) && !readOnly;
+  const activeStep = stepped ? sections.find(({ section }) => section.key === stepKey) ?? sections[0] : undefined;
+  const currentStepKey = activeStep?.section.key;
+  const nextStepKey = currentStepKey ? nextFormStepKey(resolved, answers, currentStepKey) : undefined;
+  const previousStepKey = currentStepKey ? previousFormStepKey(resolved, answers, currentStepKey) : undefined;
+  const renderedSections = stepped ? activeStep ? [activeStep] : [] : sections;
   const showSectionTitles = (resolved.sections?.length ?? 0) > 1;
   const branchFieldKey = useMemo(() => resolved.fields.find((field) => field.type === "branch_dropdown")?.key, [resolved]);
   const optionsFor = (type: string) => type === "user_dropdown" ? dynamicOptions.users : type === "branch_dropdown" ? dynamicOptions.branches : type === "department_dropdown" ? dynamicOptions.departments.filter((item) => !branchFieldKey || !answers[branchFieldKey] || item.branchId === answers[branchFieldKey]) : [];
-  const set = (key: string, value: FormAnswer) => setAnswers((current) => ({ ...current, [key]: value }));
+  const set = (key: string, value: FormAnswer) => {
+    setAnswers((current) => stepped ? updateVisibleFormAnswers(resolved, current, key, value, initialAnswers) : { ...current, [key]: value });
+    setError(null);
+  };
+  const advance = () => {
+    if (!currentStepKey || !nextStepKey) return;
+    const result = validateFormStep(resolved, answers, currentStepKey);
+    if (!result.valid) {
+      const issue = result.issues[0];
+      setError(issue?.message ?? "Check this step");
+      requestAnimationFrame(() => { if (issue?.fieldKey) fieldRefs.current.get(issue.fieldKey)?.focus(); });
+      return;
+    }
+    setError(null);
+    setStepKey(nextStepKey);
+  };
   const register = (key: string) => (node: HTMLElement | null) => { if (node) fieldRefs.current.set(key, node); else fieldRefs.current.delete(key); };
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -112,10 +134,15 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
     {error ? <div aria-live="assertive" role="alert"><Notice tone="danger">{error}</Notice></div> : null}
     {success ? <Notice tone="success">Form submitted successfully.</Notice> : null}
     {resolved.fields.length === 0 ? <Notice tone="danger">This form version has no saved questions. Close it and edit the draft before publishing.</Notice> : null}
-    {sections.map(({ section, fields }) => <section aria-label={section.title} className={showSectionTitles ? "rounded-xl border border-gold/15 p-4" : ""} key={section.key}>
+    {stepped && activeStep ? <p className="text-sm text-soft-grey" role="status">Step {sections.findIndex(({ section }) => section.key === activeStep.section.key) + 1} of {sections.length}</p> : null}
+    {renderedSections.map(({ section, fields }) => <section aria-label={section.title} className={showSectionTitles ? "rounded-xl border border-gold/15 p-4" : ""} key={section.key}>
       {showSectionTitles ? <header className="mb-3"><h3 className="text-base font-semibold text-gold">{section.title}</h3>{section.description ? <p className="text-xs text-soft-grey">{section.description}</p> : null}</header> : null}
       <div className="flex flex-col gap-4">{fields.map(renderField)}</div>
     </section>)}
-    {!readOnly && resolved.fields.length > 0 ? <div className="sticky bottom-0 -mx-1 mt-2 border-t border-gold/15 bg-task-bg/95 px-1 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none"><Button className="min-h-12 w-full sm:w-auto" disabled={busy || preview || success} type="submit">{busy ? "Submitting..." : "Submit form"}</Button></div> : null}
+    {!readOnly && resolved.fields.length > 0 ? <div className="sticky bottom-0 -mx-1 mt-2 flex flex-wrap gap-2 border-t border-gold/15 bg-task-bg/95 px-1 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+      {stepped && previousStepKey ? <Button className="min-h-12" disabled={busy || success} onClick={() => { setError(null); setStepKey(previousStepKey); }} type="button" variant="secondary">Back</Button> : null}
+      {stepped && nextStepKey ? <Button className="min-h-12 w-full sm:w-auto" disabled={busy || success} onClick={advance} type="button">Next</Button>
+        : <Button className="min-h-12 w-full sm:w-auto" disabled={busy || preview || success} type="submit">{busy ? "Submitting..." : "Submit form"}</Button>}
+    </div> : null}
   </form>;
 }
