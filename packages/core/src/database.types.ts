@@ -9920,6 +9920,12 @@ export type Database = {
       }
     }
     Views: {
+      leave_summary_applicants: {
+        Row: { id: string | null; employee_name: string | null }
+        Insert: { id?: string | null; employee_name?: string | null }
+        Update: { id?: string | null; employee_name?: string | null }
+        Relationships: []
+      }
       leave_handover_candidates: {
         Row: { id: string | null; employee_name: string | null }
         Insert: { id?: string | null; employee_name?: string | null }

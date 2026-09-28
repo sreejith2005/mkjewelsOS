@@ -120,7 +120,7 @@ export function DashboardScreen() {
         <View style={styles.headingCopy}>
           <View style={styles.titleRow}>
             <BarChart3 color={theme.colors.brand} size={22} />
-            <Text variant="heading" weight="semibold">{dashboardHeadingForRole(profile.user_role)}</Text>
+            <Text style={styles.titleText} variant="heading" weight="semibold">{dashboardHeadingForRole(profile.user_role)}</Text>
           </View>
           <Text tone="muted" variant="caption">{profile.employee_name} · {titleCase(profile.user_role)} · {branch?.name ?? "Branch unavailable"}</Text>
           <Text tone="muted" variant="caption">{data.context.local_start.slice(0, 10)} → {data.context.local_end_exclusive.slice(0, 10)}</Text>
@@ -177,6 +177,9 @@ const useStyles = makeStyles((theme) => StyleSheet.create({
   headingRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: theme.space.sm },
   headingCopy: { flex: 1, minWidth: 0, gap: 3 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: theme.space.sm },
+  // A row child does not shrink by default, so a long role heading beside the
+  // Refresh button would run off the screen instead of wrapping.
+  titleText: { flexShrink: 1 },
   filters: { gap: theme.space.sm },
   field: { gap: 4 },
   metricGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.space.sm },

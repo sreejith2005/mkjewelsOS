@@ -85,6 +85,34 @@ export function reachableFmsStageKeys(definition: FmsFlowDefinition): ReadonlySe
   return reached;
 }
 
+/**
+ * Stages in the order a person reads the workflow as a list: the trigger
+ * first, then each step before the steps it leads to (a step two paths share
+ * comes after both paths), then any step nothing reaches yet, in saved order.
+ * It is a reverse-postorder walk, so a draft that still contains a loop is
+ * listed rather than rejected.
+ */
+export function fmsStagesInFlowOrder(stages: readonly FmsStageDefinition[]): readonly FmsStageDefinition[] {
+  const byKey = new Map(stages.map((stage) => [stage.key, stage]));
+  const visited = new Set<string>();
+  const ordered: FmsStageDefinition[] = [];
+  const walk = (root: string) => {
+    const postorder: FmsStageDefinition[] = [];
+    const visit = (key: string) => {
+      const stage = byKey.get(key);
+      if (!stage || visited.has(key)) return;
+      visited.add(key);
+      // Children are visited last-first so the reversed result keeps their listed order.
+      for (const next of [...fmsOutgoingStageKeys(stage)].reverse()) visit(next);
+      postorder.push(stage);
+    };
+    visit(root);
+    ordered.push(...postorder.reverse());
+  };
+  for (const stage of stages) walk(stage.key);
+  return ordered;
+}
+
 function hasUnsupportedCycle(definition: FmsFlowDefinition): boolean {
   const byKey = new Map(definition.stages.map((stage) => [stage.key, stage])); const visiting = new Set<string>(); const visited = new Set<string>();
   const visit = (key: string): boolean => { if (visiting.has(key)) return true; if (visited.has(key)) return false; visiting.add(key); for (const next of fmsOutgoingStageKeys(byKey.get(key)!)) if (byKey.has(next) && visit(next)) return true; visiting.delete(key); visited.add(key); return false; };

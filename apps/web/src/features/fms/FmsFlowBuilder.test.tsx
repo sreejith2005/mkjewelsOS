@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FmsFlowDefinition } from "@jewelos/core";
 import type { FmsData } from "./api";
 import { FmsFlowBuilder } from "./FmsFlowBuilder";
@@ -200,5 +200,65 @@ describe("FMS builder graph wiring", () => {
       expect(bar).toBeTruthy();
       expect(bar!.querySelector(".flex-wrap")).toBeTruthy();
     });
+  });
+});
+
+/**
+ * Phone layout. `useIsMobile` reads `(max-width: 767px)`, so matching every
+ * media query puts the builder in its phone layout.
+ */
+describe("FMS builder on a phone", () => {
+  beforeEach(() => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: true, media: query, addEventListener: () => undefined, removeEventListener: () => undefined }));
+  });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  async function openPhoneBuilder() {
+    const user = userEvent.setup();
+    render(<FmsFlowBuilder data={data} flow={null} onClose={() => undefined} onSaved={async () => undefined} />);
+    await user.type(screen.getByLabelText("Workflow name *"), "Qualification");
+    await user.type(screen.getByLabelText("Purpose *"), "Route by customer type");
+    await user.click(screen.getByRole("button", { name: /Open builder/ }));
+    return user;
+  }
+
+  it("opens on the step list with the editor closed and every header action reachable", async () => {
+    await openPhoneBuilder();
+    expect(screen.getByRole("list", { name: "Workflow steps" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Steps" }).getAttribute("aria-selected")).toBe("true");
+    for (const name of ["Back", "Save draft", "Undo", "Redo"]) expect(screen.getByRole("button", { name })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Publish$/ })).toBeTruthy();
+    // No palette, no canvas, and no editor sheet covering the list.
+    expect(screen.queryByText("Building blocks")).toBeNull();
+    expect(screen.queryByRole("button", { name: "connect a" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Close inspector" })).toBeNull();
+  });
+
+  it("adds a step after a chosen step without any dragging", async () => {
+    const user = await openPhoneBuilder();
+    await user.click(screen.getByRole("button", { name: "Add next step after Start form" }));
+    await user.click(screen.getByRole("button", { name: "Close inspector" }));
+    await user.click(screen.getByRole("button", { name: "Add next step after Start form" }));
+    await user.click(screen.getByRole("button", { name: "Close inspector" }));
+    const items = within(screen.getByRole("list", { name: "Workflow steps" })).getAllByRole("listitem");
+    expect(items).toHaveLength(3);
+    expect(items[1]!.textContent).toContain("Step");
+  });
+
+  it("opens the editor when a step is tapped", async () => {
+    const user = await openPhoneBuilder();
+    await user.click(screen.getByRole("button", { name: "Edit Start form" }));
+    expect(screen.getByRole("button", { name: "Close inspector" })).toBeTruthy();
+  });
+
+  it("switches to the map and lists readiness issues on demand", async () => {
+    const user = await openPhoneBuilder();
+    await user.click(screen.getByRole("tab", { name: "Map" }));
+    expect(screen.getByRole("button", { name: "connect a" })).toBeTruthy();
+    const readiness = screen.getByRole("button", { name: /Publish readiness/ });
+    expect(readiness.getAttribute("aria-expanded")).toBe("false");
+    await user.click(readiness);
+    expect(readiness.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getAllByRole("listitem").length).toBeGreaterThan(0);
   });
 });

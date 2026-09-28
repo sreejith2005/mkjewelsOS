@@ -57,7 +57,7 @@ select lives_ok($$select submit_leave_handover((select id from leave_requests li
 select throws_ok($$select review_leave_request((select id from leave_requests limit 1),true,'')$$,'42501','Leave review denied','ordinary employee cannot review');
 
 select set_config('request.jwt.claim.sub','17400000-0000-4000-8000-000000000003',true);
-select ok(not leave_file_readable('17410000-0000-4000-8000-000000000001/17440000-0000-4000-8000-000000000001/tl/17460000-0000-4000-8000-000000000001.png'),'manager cannot read private leave image');
+select ok(leave_file_readable('17410000-0000-4000-8000-000000000001/17440000-0000-4000-8000-000000000001/tl/17460000-0000-4000-8000-000000000001.png'),'manager with office summary access can read leave image');
 select throws_ok($$select review_leave_request((select id from leave_requests limit 1),true,'')$$,'42501','Leave review denied','manager cannot use HR decision');
 select set_config('request.jwt.claim.sub','17400000-0000-4000-8000-000000000005',true);
 select throws_ok($$select submit_leave_request('annual','FULL DAY','Reason','2026-09-24','2026-09-26','2026-09-28','1ST HALF','bad')$$,'42501','Active employee required','inactive employee cannot submit');
