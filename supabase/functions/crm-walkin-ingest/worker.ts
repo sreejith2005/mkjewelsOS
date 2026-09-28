@@ -1,7 +1,7 @@
 // Port of sreejith-crm/web-app/app/api/ingest/walkin/route.ts (POST /api/ingest/walkin).
 // Same header, credential check, limits, rate limit, attempt ledger, validation, status
 // codes, error codes and messages. The database work that Prisma did (raw SQL, findFirst,
-// create) is done by the crm RPCs of migration 0188, granted to service_role only.
+// create) is done by the crm RPCs of migration 0189, granted to service_role only.
 //
 // Never logged: payloads, phones, names, keys. Console output carries the request id and
 // a coarse error class only.

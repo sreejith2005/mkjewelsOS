@@ -29,6 +29,19 @@ Decision:
 
 `sreejith-crm/` in this checkout is a read-only reference, never a dependency.
 
+Working location (owner decision, 2026-09-28): all CRM work happens only in the
+dedicated Git worktree `C:\crm` on branch `feat/crm-native`. The main checkout
+`C:\Users\MIS\Downloads\MKJewelOS` belongs to other sessions and is not used for
+CRM work. The original CRM stays at
+`C:\Users\MIS\Downloads\MKJewelOS\sreejith-crm\web-app` (git-ignored, not copied
+into `C:\crm`); tooling reads it from `CRM_ORIGINAL_DIR`, which defaults to that
+path.
+
+Migration numbers (2026-09-28): the CRM migrations are `0182`-`0189`, after
+main's `0181_office_leave_summary`. They have never been applied to a hosted
+database, so they may be renumbered again (by `git mv`, keeping order) until
+Phase 7 applies them.
+
 This document authorizes the local database port (Phase 2). Every later phase
 needs its own reviewed change; hosted actions (schema exposure, migration apply,
 data import, deploy, APK release) each need their own approval.
@@ -51,7 +64,7 @@ Browser (JewelOS web)                 Android app
      v                                     as Phase 6 defines)
 JewelOS Supabase (one project)
   schema public       JewelOS (users, tasks, old CRM tables ... unchanged)
-  schema crm          original CRM tables, enums, RPCs, triggers, RLS (0181-0186)
+  schema crm          original CRM tables, enums, RPCs, triggers, RLS (0182-0187)
   schema crm_private  internal helpers (identity resolver, audit writer); never exposed
   Storage bucket      crm-legacy-documents (original CRM files)
   Edge Functions      crm-walkin-ingest, crm-runo-push (Phase 4)
@@ -73,18 +86,18 @@ Principles:
 
 | Migration | Content |
 | --- | --- |
-| `0181_crm_schema_tables.sql` | schema `crm`, 8 enums, 38 tables, 2 sequences, constraints, indexes |
-| `0182_crm_identity_bridge.sql` | link columns, `crm_private`, identity resolver, re-implemented identity helpers, audit writer, link RPCs |
-| `0183_crm_functions_triggers.sql` | 49 original functions and 27 triggers |
-| `0184_crm_rls_grants.sql` | RLS on every table, 107 original policies, section gate, grants |
-| `0185_crm_lookup_seed.sql` | the original lookup and lead-form seed statements |
-| `0186_crm_storage_bucket.sql` | bucket `crm-legacy-documents` and the 4 original object policies |
+| `0182_crm_schema_tables.sql` | schema `crm`, 8 enums, 38 tables, 2 sequences, constraints, indexes |
+| `0183_crm_identity_bridge.sql` | link columns, `crm_private`, identity resolver, re-implemented identity helpers, audit writer, link RPCs |
+| `0184_crm_functions_triggers.sql` | 49 original functions and 27 triggers |
+| `0185_crm_rls_grants.sql` | RLS on every table, 107 original policies, section gate, grants |
+| `0186_crm_lookup_seed.sql` | the original lookup and lead-form seed statements |
+| `0187_crm_storage_bucket.sql` | bucket `crm-legacy-documents` and the 4 original object policies |
 
 Method. All original Prisma migrations `20260723000000` .. `20260803010000`
 (including the uncommitted `20260803010000_lead_calling_foundation`) were replayed
 in timestamp order into schema `crm` of a throwaway local database, with only
 `"public".` rewritten to `"crm".`. The resulting final state was captured with
-`pg_dump` and split into 0181/0183/0184; seed statements were copied verbatim.
+`pg_dump` and split into 0182/0184/0185; seed statements were copied verbatim.
 A catalog diff (columns, defaults, constraints, indexes, enums, sequences,
 function signatures/security/volatility/config, triggers, RLS, policies), a
 function-body diff and a seed-data diff against the replayed original show only
@@ -184,7 +197,7 @@ For every original route (`/`, `/dashboard`, `/queue`, `/visits/new`,
 ## Phases
 
 1. Decision and design (this document) - done.
-2. **Database port** - 0181-0186, pgTAP 0182/0183, `[api] schemas` includes
+2. **Database port** - 0182-0187, pgTAP 0183/0184, `[api] schemas` includes
    `crm`, DB types include `crm`. Local only.
 3. **Web UI port** - `packages/crm-ui`, rendered by `apps/web` at `/crm/*`
    (lazy route replacing `CRMPage` behind one reviewed switch), original CSS
@@ -240,7 +253,7 @@ The implementation plan with files, tests and gates is
 6. Direct table writes in the original UI (clients, availability, leads, lead
    call history, campaign tags, lookups) are RLS-authorized but not audited in
    `public.audit_logs`. Accept as original behaviour, or add audit triggers?
-   Resolved in Phase 3 by `0187_crm_direct_write_audit.sql`, which audits direct
+   Resolved in Phase 3 by `0188_crm_direct_write_audit.sql`, which audits direct
    (non-RPC) writes to clients, crm_daily_availability, leads, lead_call_history and
    the lookup tables. It records entity, operation and changed column names, never
    values. Other RLS-writable tables (campaign tags, documents, entry_queue, ...)

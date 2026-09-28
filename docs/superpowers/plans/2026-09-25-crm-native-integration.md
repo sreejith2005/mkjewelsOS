@@ -4,6 +4,15 @@ Design: `docs/superpowers/specs/2026-09-25-crm-native-integration-design.md`.
 Reference source (read-only): `sreejith-crm/web-app`. Parity with it is the
 acceptance criterion for every phase.
 
+Worktree (2026-09-28): all CRM work is done in `C:\crm` (`git worktree` of this
+repository, branch `feat/crm-native`); the main checkout is not used for CRM work.
+The parity harness reads the original from `CRM_ORIGINAL_DIR` (default
+`C:\Users\MIS\Downloads\MKJewelOS\sreejith-crm\web-app`). On 2026-09-28 the branch
+merged `origin/main` (`ce4ff1c`, which added `0181_office_leave_summary`) and the CRM
+migrations and tests were renumbered +1 to `0182`-`0189` with `git mv`. They have
+never been applied to a hosted database; repeat the renumber if main adds more
+migrations before Phase 7.
+
 Each phase is a separate reviewed change. "Gate" lists what must pass before the
 phase is handed over; hosted steps additionally need owner approval.
 
@@ -11,10 +20,10 @@ phase is handed over; hosted steps additionally need owner approval.
 
 Files:
 
-- `supabase/migrations/0181_crm_schema_tables.sql` .. `0186_crm_storage_bucket.sql`
-- `supabase/tests/0182_crm_identity_bridge.test.sql` (privileges, bridge,
+- `supabase/migrations/0182_crm_schema_tables.sql` .. `0187_crm_storage_bucket.sql`
+- `supabase/tests/0183_crm_identity_bridge.test.sql` (privileges, bridge,
   fail-closed cases, branch scoping, link RPCs, ingest path, old CRM untouched)
-- `supabase/tests/0183_crm_original_behaviour.test.sql` (port of
+- `supabase/tests/0184_crm_original_behaviour.test.sql` (port of
   `sreejith-crm/web-app/tests/database-foundation.test.ts`)
 - `supabase/config.toml` (`[api] schemas` adds `crm`)
 - `packages/api-client/src/database.types.ts`, `packages/core/src/database.types.ts`
@@ -26,7 +35,7 @@ Gate (met locally): `supabase.cmd db reset`, `supabase.cmd test db`,
 `git diff --check`; catalog, function-body and seed diffs against a replay of the
 original migrations show only the documented differences.
 
-Hosted (owner action, later): add `crm` to Exposed schemas; apply 0181-0186 with
+Hosted (owner action, later): add `crm` to Exposed schemas; apply 0182-0187 with
 the production playbook.
 
 ## Phase 3 - Web UI port (`packages/crm-ui`)
@@ -43,7 +52,7 @@ Status (2026-09-25, branch `feat/crm-native`, local only): implemented. Record:
   (`src/crm-port/app-router.tsx`). The original `app/` tree keeps its layout.
 - The stylesheet uses id-tier scoping (`.crm-root#crm-root…`), not class prefixing alone,
   because Tailwind 4's cascade layers would otherwise lose to JewelOS's unlayered CSS.
-- Audit addendum: `0187_crm_direct_write_audit.sql` (design open question 6).
+- Audit addendum: `0188_crm_direct_write_audit.sql` (design open question 6).
 
 Stack facts: original = Next 16 / React 19 / Tailwind 4 with async server-component
 pages and `next/navigation`, `next/link`, one `next/image`, one server action
@@ -114,7 +123,7 @@ Files:
 - `supabase/functions/crm-runo-push/` - port of `app/api/leads/[leadId]/runo/route.ts`;
   caller JWT verified, owner/super-admin check through the bridge, Runo
   credentials server-side only.
-- `supabase/migrations/0188_crm_ingest_service_grants.sql` - `service_role`:
+- `supabase/migrations/0189_crm_ingest_service_grants.sql` - `service_role`:
   USAGE on `crm`, EXECUTE on the two ingest RPCs, INSERT/SELECT on the attempts
   ledger, and only what `crm-runo-push` needs.
 - Tests: Deno tests per function (bad secret, malformed body, rate limit,
@@ -124,9 +133,9 @@ Gate: function tests; pgTAP; local end-to-end call with a synthetic payload.
 Hosted: deploy functions, set secrets, repoint Apps Script (owner).
 
 Delivered (local only): `crm-walkin-ingest`, `crm-runo-push`, migration
-`0188_crm_ingest_service_grants.sql` (service_role: USAGE on `crm` and EXECUTE on three RPCs, no
+`0189_crm_ingest_service_grants.sql` (service_role: USAGE on `crm` and EXECUTE on three RPCs, no
 table privilege; the ingest RPC does branch lookup + visit + ledger + audit in one transaction),
-pgTAP 0188, Deno tests, `crm:parity -- --ingest`, `docs/CRM_SHEETS_INGEST_CUTOVER.md`.
+pgTAP 0189, Deno tests, `crm:parity -- --ingest`, `docs/CRM_SHEETS_INGEST_CUTOVER.md`.
 Intentional differences from the originals: the Runo lead id is sent in the JSON body, not the URL;
 "the creator" is the caller's CRM user id from the identity bridge; a non-POST is a bare 405; a
 rate-limit database outage is a JSON 500 (the original threw); a body over 1 MB without a

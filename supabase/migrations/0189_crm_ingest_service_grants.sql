@@ -4,7 +4,7 @@
 -- connection. The Edge Function instead calls only the RPCs below with the service key;
 -- service_role receives no table privilege in schema crm.
 --
---   crm.consume_legacy_walkin_ingest_rate_limit(text)   existing (0183), now granted
+--   crm.consume_legacy_walkin_ingest_rate_limit(text)   existing (0184), now granted
 --   crm.legacy_walkin_ingest_log_attempt(...)            ledger row for outcomes decided
 --                                                        before the database write
 --   crm.legacy_walkin_ingest_submit(...)                 branch lookup + visit + ledger row

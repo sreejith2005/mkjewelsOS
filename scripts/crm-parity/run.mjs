@@ -21,7 +21,7 @@ import { isolatedJewelos, prepareJewelosStack, startJewelosStack } from "./jewel
 import { ORIGINAL_DB_CONTAINER, prepareOriginalStack, startOriginalStack } from "./original-stack.mjs";
 import { jewelosSession, localStackKeys, originalSessionCookies } from "./sessions.mjs";
 import { statesFor } from "./states.mjs";
-import { psql, REPO_ROOT, startServer, stopServer, waitForUrl, workdir } from "./util.mjs";
+import { ORIGINAL_DIR, psql, REPO_ROOT, startServer, stopServer, waitForUrl, workdir } from "./util.mjs";
 import { compareWorkflowRows, runWorkflow, WORKFLOW_PHONE } from "./workflow.mjs";
 
 const args = Object.fromEntries(process.argv.slice(2).filter((arg) => arg.startsWith("--")).map((arg) => {
@@ -167,7 +167,7 @@ async function main() {
   try {
     if (args["no-servers"] !== "true") {
       servers.push(startServer("node", ["node_modules/next/dist/bin/next", "dev", "--port", "3300"], {
-        cwd: join(REPO_ROOT, "sreejith-crm", "web-app"),
+        cwd: ORIGINAL_DIR,
         env: { NEXT_PUBLIC_SUPABASE_URL: originalKeys.url, NEXT_PUBLIC_SUPABASE_ANON_KEY: originalKeys.anonKey, NEXT_TELEMETRY_DISABLED: "1" },
       }));
       servers.push(startServer("pnpm.cmd", ["--filter", "web", "exec", "vite", "--port", "5180", "--strictPort", "--host", "localhost"], {

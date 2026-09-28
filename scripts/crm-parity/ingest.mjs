@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { JEWELOS_DB_CONTAINER, PARITY_PASSWORD, PARITY_USERS } from "./load-jewelos.mjs";
 import { ORIGINAL_DB_CONTAINER } from "./original-stack.mjs";
 import { jewelosSession, originalSessionCookies } from "./sessions.mjs";
-import { psql, REPO_ROOT, run, startServer, stopServer, waitForUrl } from "./util.mjs";
+import { ORIGINAL_DIR, psql, REPO_ROOT, run, startServer, stopServer, waitForUrl } from "./util.mjs";
 import { normalise } from "./workflow.mjs";
 
 export const ORIGINAL_ORIGIN = "http://localhost:3300";
@@ -236,7 +236,7 @@ export async function runIngestParity({ originalKeys, jewelosKeys, base, jewelos
   const servers = [];
   try {
     servers.push(startServer("node", ["node_modules/next/dist/bin/next", "dev", "--port", "3300"], {
-      cwd: join(REPO_ROOT, "sreejith-crm", "web-app"),
+      cwd: ORIGINAL_DIR,
       env: {
         NEXT_PUBLIC_SUPABASE_URL: originalKeys.url, NEXT_PUBLIC_SUPABASE_ANON_KEY: originalKeys.anonKey, NEXT_TELEMETRY_DISABLED: "1",
         // Explicit local values: they override the app's git-ignored .env, which may name hosted databases.

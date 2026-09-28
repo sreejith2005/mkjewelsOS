@@ -126,7 +126,7 @@ the hosted project.**
 
 ## Order of the hosted cutover (owner; each step needs your explicit go)
 
-1. Follow `PRODUCTION_SWITCH_PLAYBOOK.md`; apply migrations `0181`-`0188` to the hosted project
+1. Follow `PRODUCTION_SWITCH_PLAYBOOK.md`; apply migrations `0182`-`0189` to the hosted project
    and add `crm` to its Exposed schemas.
 2. Run the Phase 5 data migration so the CRM branches and clients exist in `crm`.
 3. `supabase functions deploy crm-walkin-ingest` and `crm-runo-push` (`config.toml` carries

@@ -44,6 +44,11 @@ What a run does:
    proof upload), follow-up, profile edit. The harness compares the resulting rows in both
    databases (ids and timestamps normalised) and checks the JewelOS audit rows.
 
+The original app is read from `CRM_ORIGINAL_DIR` (default
+`C:\Users\MIS\Downloads\MKJewelOS\sreejith-crm\web-app`, the git-ignored copy in the main
+checkout; the CRM worktree `C:\crm` has none). Its Prisma migrations and `next dev` both come
+from there.
+
 Output goes to `CRM_PARITY_WORKDIR` (default `%TEMP%\jewelos-crm-parity`), outside Git:
 `run-<timestamp>/{original,port,diff}/*.png|txt`, `report.json`, `report.md`. To stop the
 throwaway stack: `supabase.cmd stop --workdir <workdir>\original --no-backup`.

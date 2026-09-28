@@ -4,13 +4,13 @@
 import { copyFileSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { psql, REPO_ROOT, run } from "./util.mjs";
+import { ORIGINAL_DIR, psql, REPO_ROOT, run } from "./util.mjs";
 
 export const ORIGINAL_PROJECT_ID = "jewelos-crm-parity-original";
 export const ORIGINAL_API_URL = "http://127.0.0.1:56321";
 export const ORIGINAL_DB_CONTAINER = `supabase_db_${ORIGINAL_PROJECT_ID}`;
 
-const ORIGINAL_MIGRATIONS = join(REPO_ROOT, "sreejith-crm", "web-app", "prisma", "migrations");
+const ORIGINAL_MIGRATIONS = join(ORIGINAL_DIR, "prisma", "migrations");
 // The same replay range as the Phase 2 port (20260723000000 .. 20260803010000). The SSO
 // migration is excluded there too (its artefacts are replaced by the identity bridge), and it
 // does not apply on PostgreSQL 17 ("grant" is used as a table alias). Without it the original

@@ -6,6 +6,13 @@ import { fileURLToPath } from "node:url";
 
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
+/**
+ * The original CRM app (read-only reference, git-ignored, never copied). The CRM worktree
+ * (C:\crm) has no copy of it, so the location comes from CRM_ORIGINAL_DIR, defaulting to
+ * the one kept in the main checkout.
+ */
+export const ORIGINAL_DIR = resolve(process.env.CRM_ORIGINAL_DIR ?? "C:\\Users\\MIS\\Downloads\\MKJewelOS\\sreejith-crm\\web-app");
+
 /** Everything the harness writes (stack workdir, screenshots, reports) lives outside Git. */
 export function workdir() {
   const dir = process.env.CRM_PARITY_WORKDIR ?? join(tmpdir(), "jewelos-crm-parity");
