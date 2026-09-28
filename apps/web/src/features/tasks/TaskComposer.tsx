@@ -87,6 +87,7 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
     return user.department_id === profile.department_id;
   }), [authoringScope, data.users, profile.branch_id, profile.department_id, profile.tenant_id]);
   const priorityLabel = priorityOptions.find((option) => option.value === priority)?.label ?? priority;
+  const selectedDoerName = eligiblePeople.find((person) => person.id === doers[0])?.employee_name;
   const attachedForm = data.forms.find((form) => form.id === formTemplateId);
 
   useEffect(() => {
@@ -237,7 +238,7 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
           </section> : null}
 
           <div className="grid grid-cols-2 gap-2 border-b border-task-border py-3">
-            <TaskSelector id="users" open={panel === "users"} panel={usersPanel}><ChipSelector active={panel === "users"} Icon={Users} label="Users" onClick={() => togglePanel("users")} summary={doers.length ? `${doers.length} user${doers.length === 1 ? "" : "s"}` : undefined} /></TaskSelector>
+            <TaskSelector id="users" open={panel === "users"} panel={usersPanel}><ChipSelector active={panel === "users"} Icon={Users} label="Users" onClick={() => togglePanel("users")} summary={selectedDoerName || undefined} /></TaskSelector>
             <TaskSelector id="due" open={panel === "due"} panel={duePanel}><ChipSelector active={panel === "due"} Icon={CalendarDays} label="Due Date" onClick={() => togglePanel("due")} summary={planned ? new Date(planned).toLocaleString("en-IN", { day: "numeric", hour: "numeric", minute: "2-digit", month: "short" }) : undefined} /></TaskSelector>
             <TaskSelector id="priority" open={panel === "priority"} panel={priorityPanel}><ChipSelector active={panel === "priority"} Icon={Flag} label="Priority" onClick={() => togglePanel("priority")} summary={priorityLabel} /></TaskSelector>
             <TaskSelector id="form" open={panel === "form"} panel={formPanel}><ChipSelector active={panel === "form"} Icon={FileText} label="Attach Form" onClick={() => togglePanel("form")} summary={attachedForm?.name} /></TaskSelector>
