@@ -147,13 +147,23 @@ export async function applySqlEditsToOriginal(query, schema = "public") {
   const byFn = new Map();
   for (const edit of SQL_EDITS) byFn.set(edit.fn, [...(byFn.get(edit.fn) ?? []), edit]);
   for (const [fn, edits] of byFn) {
+    // Every overload is read (browse_clients has a 3-argument wrapper); each `find` must occur
+    // the listed number of times across them, and only the definitions containing it change.
     const { rows } = await query(
-      "select pg_get_functiondef(p.oid) as def from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = $1 and p.proname = $2",
+      "select pg_get_functiondef(p.oid) as def from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = $1 and p.proname = $2 order by p.oid",
       [schema, fn],
     );
-    if (rows.length !== 1) throw new Error(`original function ${schema}.${fn}: expected 1 definition, found ${rows.length}`);
-    if (rows[0].def.includes(MARK)) continue;
-    await query(applyEdits(rows[0].def, edits, `${schema}.${fn}`));
+    if (rows.length === 0) throw new Error(`original function ${schema}.${fn} not found`);
+    if (rows.some((row) => row.def.includes(MARK))) continue;
+    for (const edit of edits) {
+      const total = rows.reduce((sum, row) => sum + occurrences(row.def, edit.find), 0);
+      if (total !== edit.count) throw new Error(`${schema}.${fn}: expected ${edit.count} x ${JSON.stringify(edit.find)}, found ${total}`);
+    }
+    for (const row of rows) {
+      const own = edits.filter((edit) => occurrences(row.def, edit.find) > 0).map((edit) => ({ ...edit, count: occurrences(row.def, edit.find) }));
+      if (own.length === 0) continue;
+      await query(applyEdits(row.def, own, `${schema}.${fn}`));
+    }
     applied.push(fn);
   }
   return applied;

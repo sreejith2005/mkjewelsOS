@@ -3,10 +3,12 @@
 // The port breaks ORDER BY ties with the primary key (deterministic-order.mjs). For a fair
 // comparison the parity harnesses run the original with the SAME tie-breakers, applied at run
 // time to a copy in the harness workdir; the original under sreejith-crm/ is never edited.
-// Only the app sources are copied; node_modules is linked (a directory junction), and the
-// original's secrets and data (.env*, *.xlsx, migration-backups, migration-reports, reports,
-// android, build output) are never copied.
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+// Only the app sources are copied. node_modules is mirrored as real directories whose files are
+// hard links to the original's (same volume: no extra disk space; Turbopack rejects a junction
+// that points outside the project root); nothing writes into it. The original's secrets and data
+// (.env*, *.xlsx, migration-backups, migration-reports, reports, android, build output) are never
+// copied.
+import { copyFileSync, cpSync, existsSync, linkSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 
 import { applyEdits, applySqlEditsToOriginal, uiEditsByFile } from "./deterministic-order.mjs";
@@ -27,6 +29,26 @@ function copied(source) {
   return true;
 }
 
+/** Mirrors `source` at `target`: directories are created, files hard-linked (copied across volumes). */
+function linkTree(source, target) {
+  mkdirSync(target, { recursive: true });
+  for (const entry of readdirSync(source, { withFileTypes: true })) {
+    const from = join(source, entry.name);
+    const to = join(target, entry.name);
+    if (entry.isSymbolicLink()) {
+      const stat = lstatSync(from);
+      symlinkSync(readlinkSync(from), to, stat.isDirectory() ? "junction" : "file");
+    } else if (entry.isDirectory()) {
+      linkTree(from, to);
+    } else {
+      try { linkSync(from, to); } catch (error) {
+        if (error?.code !== "EXDEV") throw error;
+        copyFileSync(from, to);
+      }
+    }
+  }
+}
+
 /** Creates (or refreshes) `<workdir>/original-app` and returns its path. */
 export function preparePatchedOriginal(workdir) {
   const target = join(workdir, "original-app");
@@ -37,7 +59,12 @@ export function preparePatchedOriginal(workdir) {
   mkdirSync(target, { recursive: true });
   cpSync(ORIGINAL_DIR, target, { recursive: true, filter: copied, force: true });
   const modules = join(target, "node_modules");
-  if (!existsSync(modules)) symlinkSync(join(ORIGINAL_DIR, "node_modules"), modules, "junction");
+  const marker = join(target, ".node_modules-linked");
+  if (!existsSync(marker)) {
+    rmSync(modules, { recursive: true, force: true });
+    linkTree(join(ORIGINAL_DIR, "node_modules"), modules);
+    writeFileSync(marker, "node_modules mirrored with hard links");
+  }
   for (const [file, edits] of uiEditsByFile()) {
     const path = join(target, file);
     writeFileSync(path, applyEdits(readFileSync(path, "utf8"), edits, `original ${file}`));

@@ -17,11 +17,11 @@ import { MobileNavigationDrawer, type MobileNavigationDrawerItem } from "@/compo
 import { GlobalVoiceTaskButton } from "@/features/tasks/GlobalVoiceTaskButton";
 import { titleCase } from "@/lib/format";
 import {
-  buildLauncherItems, navigatePath, pageDecision, pageForTopLevelRoute, pathForTopLevelRoute,
+  buildLauncherItems, crmTabFullScreen, navigatePath, pageDecision, pageForTopLevelRoute, pathForTopLevelRoute,
   type NativeTopLevelRoute, type ShellAccess,
 } from "@/navigation/shellModel";
 import type { TabParamList } from "@/navigation/types";
-import { CrmScreen } from "@/screens/CrmScreen";
+import { CrmWebViewScreen } from "@/features/crm/CrmWebViewScreen";
 import { FmsScreen } from "@/screens/FmsScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
 import { SectionScreen } from "@/screens/SectionScreen";
@@ -131,7 +131,17 @@ function TopLevelTab({ route, children }: { route: NativeTopLevelRoute; children
 function HomeTab() { return <TopLevelTab route="Home"><HomeScreen /></TopLevelTab>; }
 function TasksTab() { const { path } = useShell(); return <TopLevelTab route="Tasks"><TasksScreen path={path} /></TopLevelTab>; }
 function FmsTab() { return <TopLevelTab route="Fms"><FmsScreen /></TopLevelTab>; }
-function CrmTab() { return <TopLevelTab route="Crm"><CrmScreen /></TopLevelTab>; }
+/**
+ * The CRM tab shows the web CRM (the ported original, CRM Phase 6) full-screen with its own
+ * original shell, exactly as the web renders /crm once its section gate allows it; a disabled
+ * or denied section keeps the notice inside the native shell. The old native CRM screens
+ * (CrmScreen and its stack screens) stay in the tree, unrouted, until the Phase 7 retirement.
+ */
+function CrmTab() {
+  const { shellAccess } = useShell();
+  if (crmTabFullScreen(shellAccess)) return <CrmWebViewScreen />;
+  return <TopLevelTab route="Crm"><CrmWebViewScreen /></TopLevelTab>;
+}
 function SectionTab() {
   const { params } = useRoute<RouteProp<TabParamList, "Section">>();
   const navigate = usePathNavigation();
@@ -157,6 +167,9 @@ function ParityTabBar({ navigation, state }: BottomTabBarProps) {
   const launcherItems = useMemo<MobileNavigationDrawerItem[]>(() =>
     buildLauncherItems(shell.shellAccess).map((item) => ({ ...item, Icon: PAGE_ICONS[item.id] })),
   [shell.shellAccess]);
+
+  // The full-screen CRM has no JewelOS dock, as on web; its own menu and "← JewelOS" lead back.
+  if (current?.name === "Crm" && crmTabFullScreen(shell.shellAccess)) return null;
 
   return (
     <>

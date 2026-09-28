@@ -6,6 +6,20 @@ Design: `docs/superpowers/specs/2026-09-25-crm-native-integration-design.md`. To
 `scripts/crm-import/` (see its README). The Phase 5 rehearsal (2026-09-28) ran this procedure end to
 end against local stacks; its private record is in `C:\crm-private\work` and is never committed.
 
+Owner decisions (2026-09-28, recorded in the design as D1-D8): copy ALL source Storage objects
+(D1); first-use provisioning by `crm.ensure_my_crm_user` with the historical-user link list run
+BEFORE go-live (D2, step 9); JewelOS decides CRM roles (D3); CRM "Zaveri Bazaar" -> JewelOS
+"ZAVERI BAZAR", JewelOS "EXHIBITION" without a CRM branch (D4); deterministic ORDER BY in the
+port (D5, migration 0190); `lead_call_history` kept empty (D6); SSO rows/tables not imported
+(D7); stored source rollups kept, including the one client whose stored `last_branch_id` differs
+from a recomputation (D8).
+
+Order at a glance: freeze -> backup -> dry run -> import -> Storage copy -> reconciliation ->
+identity and branch links -> only then open `/crm` (web) and ship the APK. Nobody may open the
+production `/crm` between the migration apply and step 9: `crm.ensure_my_crm_user` would
+provision a NEW CRM user for an eligible historical person who is not linked yet (it never
+matches by email; an email already in `crm.users` only blocks provisioning).
+
 Every step here is an owner-approved production action. Follow `PRODUCTION_SWITCH_PLAYBOOK.md` for
 the approvals. Nothing in this runbook stores a URL, key or password: the owner types them into the
 PowerShell session at run time, and the session is closed at the end.
@@ -21,7 +35,7 @@ PowerShell session at run time, and the session is closed at the end.
 ## 1. Pre-checks (owner and operator, before the freeze)
 
 1. JewelOS production has the CRM migrations applied through the production playbook. Their numbers
-   must follow main's highest migration at that time (they are `0182`-`0189` today; renumber first if
+   must follow main's highest migration at that time (they are `0182`-`0191` today; renumber first if
    main moved). `crm` is in the API's exposed schemas and bucket `crm-legacy-documents` exists.
 2. The target `crm` schema holds only the rows seeded by `0186_crm_lookup_seed.sql`. In the SQL editor:
 
@@ -126,7 +140,8 @@ node scripts/crm-import/storage-copy.mjs --source-env=C:\crm-private\source.env 
 
 Path rule: the object path is unchanged; only the bucket changes (`crm-documents` ->
 `crm-legacy-documents`, migration 0187), so the imported `crm.documents.storage_path` values need no
-change. Every object in the source bucket is copied, including objects no document row references.
+change. Every object in the source bucket is copied, including objects no document row references
+(D1: all 22 at the rehearsal, of which 9 are referenced).
 Each download is checked against the source size and eTag (MD5), each upload is read back and compared
 by size and SHA-256. It can be re-run: files already downloaded are reused and objects already in the
 target are verified, never overwritten. Accept only `failed 0` and `verified` = source objects.
@@ -151,7 +166,7 @@ Accept only when the verdict is `ACCEPTED`, i.e.:
 4. Storage: every `crm.documents` path exists in `crm-legacy-documents`, and the manifest verified 100%;
 5. exactly one `crm.legacy_data_import` audit row, whose checksum equals the dry run's.
 
-## 9. Identity and branch links (after owner approval)
+## 9. Identity and branch links (after owner approval, BEFORE go-live)
 
 Run the approved link file (generated in the rehearsal as `C:\crm-private\work\crm-link-proposal.sql`;
 regenerate it against production ids if JewelOS profiles changed) as an active JewelOS super_admin or admin:
@@ -162,7 +177,14 @@ psql $env:CRM_IMPORT_TARGET_URL -v admin_auth_user_id=<auth.users id of that adm
 
 It links branches first, then users, through `crm.link_jewelos_branch` / `crm.link_jewelos_profile`
 (audited). Only exact normalized email matches (users) and exact name matches (branches) are
-proposed; flagged rows are commented out until the owner decides. Check with
+proposed; flagged rows are commented out until the owner decides. Owner decisions already in the
+file: D4 links CRM "Zaveri Bazaar" to JewelOS "ZAVERI BAZAR" (EXHIBITION stays unlinked); D3
+activates the exact-email user whose roles differed (JewelOS decides the role).
+
+This step must complete before anyone opens `/crm` in production (D2). Afterwards, any other
+eligible JewelOS user (crm.view, mapped role, linked branch) gets a CRM user on first open,
+audited as `crm.ensure_my_crm_user`; check with
+`select count(*) from public.audit_logs where action = 'crm.ensure_my_crm_user';` after go-live. Check with
 `select * from crm.list_identity_links();`, then have each linked person open `/crm`.
 
 ## 10. Rollback

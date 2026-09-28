@@ -20,11 +20,6 @@ import { FormFillScreen } from "@/screens/FormFillScreen";
 import { FormBuilderScreen } from "@/screens/FormBuilderScreen";
 import { FormSubmissionsScreen } from "@/screens/FormSubmissionsScreen";
 import { FormSubmissionScreen } from "@/screens/FormSubmissionScreen";
-import { ClientDetailScreen } from "@/screens/ClientDetailScreen";
-import { ClientEditorScreen } from "@/screens/ClientEditorScreen";
-import { CrmFollowupsScreen } from "@/screens/CrmFollowupsScreen";
-import { CrmMergeScreen } from "@/screens/CrmMergeScreen";
-import { WalkinScreen } from "@/screens/WalkinScreen";
 import { ProfileScreen } from "@/screens/ProfileScreen";
 import { AssigningLeftScreen } from "@/screens/AssigningLeftScreen";
 import { PermissionManagementScreen } from "@/screens/PermissionManagementScreen";
@@ -88,11 +83,9 @@ export function RootNavigator() {
           <Stack.Screen component={FormBuilderScreen} name="FormBuilder" options={{ title: "Form builder" }} />
           <Stack.Screen component={FormSubmissionsScreen} name="FormSubmissions" options={{ title: "Form submissions" }} />
           <Stack.Screen component={FormSubmissionScreen} name="FormSubmission" options={{ title: "Submission" }} />
-          <Stack.Screen component={ClientDetailScreen} name="ClientDetail" options={{ title: "Client" }} />
-          <Stack.Screen component={ClientEditorScreen} name="ClientEditor" options={{ title: "Client editor" }} />
-          <Stack.Screen component={CrmFollowupsScreen} name="CrmFollowups" options={{ title: "Follow-ups" }} />
-          <Stack.Screen component={CrmMergeScreen} name="CrmMerge" options={{ title: "Merge clients" }} />
-          <Stack.Screen component={WalkinScreen} name="Walkin" options={{ title: "New walk-in" }} />
+          {/* CRM Phase 6: the CRM tab is the web CRM; the old native CRM stack screens
+              (ClientDetail, ClientEditor, CrmFollowups, CrmMerge, Walkin) stay in the tree,
+              unrouted, until the Phase 7 retirement. */}
           <Stack.Screen component={ProfileScreen} name="Profile" options={{ title: "Profile" }} />
           <Stack.Screen component={AssigningLeftScreen} name="AssigningLeft" options={{ title: "Assigning Left" }} />
           <Stack.Screen component={PermissionManagementScreen} name="PermissionManagement" options={{ title: "Permission management" }} />

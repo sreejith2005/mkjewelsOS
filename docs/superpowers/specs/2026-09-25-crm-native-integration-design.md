@@ -37,10 +37,11 @@ CRM work. The original CRM stays at
 into `C:\crm`); tooling reads it from `CRM_ORIGINAL_DIR`, which defaults to that
 path.
 
-Migration numbers (2026-09-28): the CRM migrations are `0182`-`0189`, after
-main's `0181_office_leave_summary`. They have never been applied to a hosted
-database, so they may be renumbered again (by `git mv`, keeping order) until
-Phase 7 applies them.
+Migration numbers (2026-09-28): the CRM migrations are `0182`-`0191`, after
+main's `0181_office_leave_summary` (`0190` deterministic order and `0191`
+provisioning come from the Phase 5 decisions below). They have never been
+applied to a hosted database, so they may be renumbered again (by `git mv`,
+keeping order) until Phase 7 applies them.
 
 This document authorizes the local database port (Phase 2). Every later phase
 needs its own reviewed change; hosted actions (schema exposure, migration apply,
@@ -92,6 +93,10 @@ Principles:
 | `0185_crm_rls_grants.sql` | RLS on every table, 107 original policies, section gate, grants |
 | `0186_crm_lookup_seed.sql` | the original lookup and lead-form seed statements |
 | `0187_crm_storage_bucket.sql` | bucket `crm-legacy-documents` and the 4 original object policies |
+| `0188_crm_direct_write_audit.sql` | audit rows for direct (non-RPC) writes (Phase 3) |
+| `0189_crm_ingest_service_grants.sql` | service-role ingest RPCs (Phase 4) |
+| `0190_crm_deterministic_order.sql` | D5 tie-breakers in `browse_clients`, `search_clients` and the follow-up trigger |
+| `0191_crm_ensure_my_crm_user.sql` | D2 first-use provisioning RPC |
 
 Method. All original Prisma migrations `20260723000000` .. `20260803010000`
 (including the uncommitted `20260803010000_lead_calling_foundation`) were replayed
@@ -172,6 +177,100 @@ Behaviour that differs from the original (all forced by the bridge or hosting):
    owner-only until Phase 4, argument-free identity calls in policies wrapped in
    `(select ...)` so they run once per statement.
 
+## Owner decisions on the Phase 5 questions (2026-09-28)
+
+| # | Decision |
+| --- | --- |
+| D1 | Storage: copy ALL source objects of `crm-documents` (22, not only the 9 that `crm.documents` references) to `crm-legacy-documents` at the same paths. Copied objects have no Storage owner; accepted (a CRM super_admin can still delete them). |
+| D2 | Provisioning: `crm.ensure_my_crm_user()` (0191, below). Historical users are linked only through the owner-approved link list, which Phase 7 runs BEFORE go-live. |
+| D3 | JewelOS decides roles. No special-casing for the CRM super_admin who is JewelOS staff; the owner changes that JewelOS role if needed. |
+| D4 | Branches: CRM "Zaveri Bazaar" -> JewelOS "ZAVERI BAZAR". JewelOS "EXHIBITION" gets no CRM branch. |
+| D5 | Deterministic order: a unique tie-breaker (the table's primary key, same direction) on every ORDER BY in the port that can tie (below). |
+| D6 | `lead_call_history` is kept (empty). |
+| D7 | The original SSO rows and tables are not imported. |
+| D8 | The source rollup value is kept (the one client whose stored `last_branch_id` differs from a recomputation stays as stored). |
+
+### Provisioning (D2)
+
+`crm.ensure_my_crm_user()` is an audited `SECURITY DEFINER` RPC that the CRM root loader
+(`crm-port/app-router.tsx`, `crm-port/provisioning.ts`) calls once per mount, before the layout
+and page queries. When the caller has an active JewelOS profile, holds `crm.view`, the `crm`
+section is available (the same checks and Developer Mode rule as `current_crm_identity`), the
+JewelOS role maps to a CRM role, and (non-super roles) the JewelOS branch is linked to a CRM
+branch, AND no `crm.users` row is linked to the profile yet, it creates one `crm.users` row
+(name and email from the profile, the derived role, the mapped branch, active), links it, and
+writes one `public.audit_logs` row (`crm.ensure_my_crm_user`), in one transaction under a
+per-profile advisory lock. It returns `created`, `already_linked`, `not_eligible` or
+`email_in_use`; the UI ignores the result.
+
+It never matches or links existing CRM users: when a `crm.users` row already has the profile's
+email (case-insensitive), nothing is created (`email_in_use`), so a historical user is never
+duplicated or taken over. Every other case creates nothing. Access is decided only by the 0183
+identity functions, which are unchanged and stay `STABLE`. An already-linked but inactive CRM
+user is not re-activated. Tests: `supabase/tests/0191_crm_ensure_my_crm_user.test.sql`.
+
+### Deterministic order (D5)
+
+The original sorts by non-unique keys (`created_at`, `event_date`, `display_order`, ...), so
+tied rows could come back in any order, and the dashboard's 1000-row paging
+(`.range(offset, offset + 999)`) could skip or repeat a row between pages. The port adds the
+table's primary key, in the direction of the last sort key, to every such ORDER BY: 11 UI
+edits in 8 pages (marked `crm-port: deterministic order`) and 3 functions in 0190. Sorts that
+cannot tie (unique lookup labels, `branches.name`, `crm_allocation.crm_name` within one
+branch) are unchanged. The single list of edits is `scripts/crm-parity/deterministic-order.mjs`;
+the parity harnesses apply the same edits to the ORIGINAL at run time only (a patched copy
+of its sources in the harness workdir, and its local database), never to `sreejith-crm`.
+
+## Mobile WebView (Phase 6)
+
+The Android app's CRM tab shows the web `/crm` route (this port) in a
+`react-native-webview`, full-screen with the CRM's own shell, already signed in. This is the
+approved exception to the mobile playbook's "no WebView" rule; everything else stays native.
+The old native CRM screens stay in the tree, unrouted, until Phase 7 retires them.
+
+Configuration: `EXPO_PUBLIC_JEWELOS_WEB_ORIGIN` (build time; https in a release, http only
+for a local debug stack). Without it the tab shows "CRM not configured".
+
+Session handoff (the app remains the only session holder and refresher):
+
+1. The WebView loads `<origin>/crm` with `JewelOSCrmEmbed/1` appended to its user agent. The
+   page enters embedded mode only when that token AND the `window.ReactNativeWebView` bridge
+   exist on a `/crm` path (`apps/web/src/embedded`). It never loads the JewelOS web shell,
+   login or session-holding client.
+2. The page's Supabase client uses supabase-js's `accessToken` option
+   (`createJewelosAccessTokenClient`); supabase-js then builds no auth client at all, so the
+   page cannot refresh, persist or hold a refresh token. `supabase.auth.getUser()` for the
+   ported code is a GoTrue `/auth/v1/user` call with the current token (`CrmAuth` host override).
+3. The page posts `ready`; the app answers with `{accessToken, expiresAt}` (never the refresh
+   token) through `WebView.postMessage`, and pushes each token it refreshes itself
+   (`TOKEN_REFRESHED`). A token within 60 s of expiry makes the page ask again (`expired`); a
+   401 makes it ask with `unauthorized`, the app then refreshes its own session and answers,
+   and the request is retried once. Without a token a request runs as anon and is denied.
+4. Protocol, validation and the navigation allowlist are one module shared by both sides:
+   `packages/core/src/crmEmbed.ts`.
+
+Threats and mitigations:
+
+| Threat | Mitigation |
+| --- | --- |
+| Token leaks through a URL, history, referrer, logs, storage or cookies | The token travels only through the bridge and is held in page memory; it is never written to storage or put in a URL or cookie; the app logs no payloads; the page has `persistSession: false` and no auth client. |
+| Refresh-token theft through XSS in the CRM | The page never receives it. An XSS can at most use the current access token (short-lived, the signed-in user's own RLS-bound power) while the page is open. |
+| A foreign page in the WebView obtains a token | Navigation is limited to `<origin>/crm` and below; everything else goes to the system browser or dialer, or is blocked (`javascript:`, `data:`, `file:`, `blob:`, `intent:`); `setSupportMultipleWindows={false}`. The app sends a token only while the loaded page is on the origin, and accepts messages only from frames on the origin (Android's WebMessageListener reports the sender's real origin). |
+| Another window or frame feeds the page a forged token or `clear` | The page listens on `document` only and accepts only the synthetic, sourceless, originless event the native bridge dispatches; a cross-window `postMessage` goes to `window`, is trusted and carries its origin. Messages are schema-checked (version, size, JWT shape). A forged token is still verified by the server. |
+| The page asks the app to do something dangerous | Page-to-app messages are limited to `ready`, `token-request`, `home`, `sign-out` and `cleared`; the app takes no URL or data from them. |
+| The session survives sign-out or an account switch | On `SIGNED_OUT` or a different user the app tells the page to clear (it forgets the token, refuses new ones, wipes local/session storage and the Cache API, and confirms), clears the WebView cache, history and form data, and unmounts it (the WebView is keyed by user). Every new WebView is `incognito` (cookies removed, no HTTP cache), and the page wipes its storage again at boot. |
+| A stale token after background/resume | The page checks expiry before use and retries on 401; the app refreshes on resume as before and pushes the new token. |
+| A tampered build or a spoofed user agent in a browser | The user-agent token only selects the mode; without the native bridge there is no embedded mode, and without a token no access. Authorization stays in the database (RLS, `crm.view`, section gate, identity bridge). |
+| Mixed content or downgrade | A release build accepts only an https origin; `mixedContentMode="never"`. |
+
+Other behaviour: `tel:` links (the call button's non-Capacitor fallback) open the dialer; the
+walk-in proof file input uses the WebView's file chooser (camera and gallery; `CAMERA` and
+`READ_MEDIA_IMAGES` are already declared); the original has no signed-URL document viewer,
+and any signed Storage URL is on the Supabase origin, so it opens in the system browser. The
+Android back button walks WebView history, then leaves the tab. "← JewelOS" posts `home` and
+the app switches to its Home tab. A load or 5xx failure shows a native "CRM unavailable"
+screen with Retry. `textZoom=100` keeps the layout identical to the web at phone width.
+
 ## Parity verification method
 
 For every original route (`/`, `/dashboard`, `/queue`, `/visits/new`,
@@ -210,7 +309,9 @@ For every original route (`/`, `/dashboard`, `/queue`, `/visits/new`,
    import into `crm`, Storage copy to `crm-legacy-documents`, sequence reset,
    reconciliation report, owner-approved link preflight and links.
 6. **Mobile** - CRM tab shows `/crm` in a WebView with a reviewed session
-   handoff; APK release through `scripts/release-mobile.ps1`.
+   handoff ("Mobile WebView" above); the APK is released with the Phase 7 go-live
+   through `scripts/release-mobile.ps1`, because it depends on the web `/crm` route and
+   the `crm` schema being live.
 7. **Cutover and retirement** - menu/Home/notification links point to the port,
    the old JewelOS CRM UI retires in a separate change; old tables stay until a
    separately approved data-retirement plan.

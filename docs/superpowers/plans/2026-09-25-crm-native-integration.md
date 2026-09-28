@@ -189,6 +189,14 @@ Planned files (superseded as above):
 Gate: dry run into a local copy; reconciliation clean; owner-approved link list
 applied through `crm.link_jewelos_profile` / `crm.link_jewelos_branch` (audited).
 
+Status (2026-09-28, Phase 5 complete locally): owner decisions D1-D8 are recorded in the design
+and the runbook. The rehearsal was repeated on a fresh isolated target built from HEAD (with
+0190/0191): all 22 Storage objects copied and verified (size, eTag, SHA-256), import committed,
+reconciliation ACCEPTED (38 tables equal in rows and hashes, 0 FK orphans, rollups identical,
+Storage 9/9 documents and 22/22 objects, one audit row with the dry run's checksum), and the
+read-only real-data parity with D5 applied to both apps. Evidence is private
+(`C:\crm-private\work`).
+
 ## Phase 6 - Mobile WebView and APK
 
 Files: `apps/mobile/src/features/crm/CrmWebViewScreen.tsx`,
@@ -199,6 +207,14 @@ that never puts tokens in URLs, navigation allow-list limited to `/crm/*`,
 Gate: mobile typecheck/tests, device check at phone width for every CRM route,
 sign-out clears WebView storage; release only via `scripts/release-mobile.ps1`
 per `docs/MOBILE_RELEASE_GUIDE.md` (no `-Mandatory` without owner approval).
+
+Status (2026-09-28, implemented on `feat/crm-native`, not released): as built,
+`apps/mobile/src/features/crm/{CrmWebViewScreen.tsx,crmWebViewBridge.ts}`, the shared protocol
+`packages/core/src/crmEmbed.ts`, the web embedded mode `apps/web/src/embedded/` and
+`createJewelosAccessTokenClient` in `@jewelos/api-client`. The web origin is the build-time
+`EXPO_PUBLIC_JEWELOS_WEB_ORIGIN`. The owner decided (2026-09-28) that the APK ships with the
+Phase 7 go-live, because the tab depends on the web `/crm` route and the `crm` schema being live.
+Design and threat model: the design's "Mobile WebView (Phase 6)".
 
 ## Phase 7 - Cutover and retirement
 

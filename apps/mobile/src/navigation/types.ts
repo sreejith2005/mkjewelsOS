@@ -26,7 +26,12 @@ export type RootStackParamList = {
   FormBuilder: { formTemplateId?: string } | undefined;
   FormSubmission: { submissionId: string };
   FormSubmissions: undefined;
-  /** `notice` carries the success message a walk-in or edit leaves behind, as the web page shows it. */
+  /**
+   * The old native CRM screens below are unrouted since CRM Phase 6 (the CRM tab is the web CRM);
+   * their types stay so the retained screens compile until the Phase 7 retirement. Nothing may
+   * navigate to them.
+   * `notice` carries the success message a walk-in or edit leaves behind, as the web page shows it.
+   */
   ClientDetail: { clientId: string; notice?: string };
   ClientEditor: { clientId?: string } | undefined;
   CrmFollowups: undefined;

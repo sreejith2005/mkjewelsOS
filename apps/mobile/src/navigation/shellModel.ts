@@ -25,7 +25,8 @@ export const NATIVE_WORK_ROUTES = {
   fmsStage: "FmsStage",
   fmsStageForm: "FmsStageForm",
   formSubmission: "FormSubmission",
-  crmClient: "ClientDetail",
+  /** The CRM tab (the web CRM in a WebView); the old native ClientDetail screen is unrouted. */
+  crmClient: "Crm",
   notificationInbox: "Section",
 } as const;
 
@@ -117,6 +118,14 @@ export function resolveNativeDestination(path: string): NativeDestination | null
  */
 export function pageDecision(shell: ShellAccess, page: PageId): PageAccessDecision {
   return resolvePageAccess(shell.access, shell.controls, page);
+}
+
+/**
+ * The CRM tab is the web CRM, full-screen without the native header and dock, whenever the
+ * CRM section is open to this user - the same rule the web shell applies to /crm.
+ */
+export function crmTabFullScreen(shell: ShellAccess): boolean {
+  return pageDecision(shell, "crm") === "allowed";
 }
 
 /** Execute a web-path navigation request against the native tab shell. */

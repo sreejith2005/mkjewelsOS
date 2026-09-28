@@ -202,7 +202,7 @@ export function HomeScreen() {
               description={`Due ${followup.due_date}`}
               key={followup.id}
               label={followup.overdue ? "Overdue — open now" : "Open follow-up"}
-              onOpen={() => navigation.navigate("ClientDetail", { clientId: followup.client_id })}
+              onOpen={() => navigation.navigate("Crm")}
               overdue={followup.overdue}
               title={followup.subject ?? "Follow-up"}
             />

@@ -47,6 +47,31 @@ export function createJewelosClient(config: JewelosClientConfig): JewelosClient 
   return createClient<Database>(config.url, config.anonKey, options);
 }
 
+export type JewelosAccessTokenClientConfig = Readonly<{
+  url: string;
+  anonKey: string;
+  /** Returns the current access token (or null), issued and refreshed elsewhere. */
+  accessToken: () => Promise<string | null>;
+  fetch?: typeof fetch | undefined;
+}>;
+
+/**
+ * A client that never manages a session: every request carries the token `accessToken`
+ * returns. supabase-js builds no auth client for it, so it cannot refresh, persist or hold a
+ * refresh token (`client.auth` throws). Used by the CRM page inside the JewelOS Android app's
+ * WebView, where the native app is the only session holder.
+ */
+export function createJewelosAccessTokenClient(config: JewelosAccessTokenClientConfig): JewelosClient {
+  if (!config.url || !config.anonKey) {
+    throw new Error("A JewelOS Supabase client needs both a project URL and an anon key");
+  }
+  return createClient<Database>(config.url, config.anonKey, {
+    accessToken: config.accessToken,
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    ...(config.fetch ? { global: { fetch: config.fetch } } : {}),
+  });
+}
+
 let registered: JewelosClient | null = null;
 
 /**

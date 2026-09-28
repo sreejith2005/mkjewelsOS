@@ -44,6 +44,16 @@ What a run does:
    proof upload), follow-up, profile edit. The harness compares the resulting rows in both
    databases (ids and timestamps normalised) and checks the JewelOS audit rows.
 
+Deterministic order (D5): the port breaks ORDER BY ties with the primary key. Before the apps
+start, the harness applies the SAME edits (`deterministic-order.mjs`) to the original at run time
+only: `patchOriginalDatabase()` replaces the three affected functions in the throwaway original
+database, and `preparePatchedOriginal()` copies the original's sources to
+`<workdir>/original-app` (no `.env*`, `*.xlsx`, backups, reports or build output), mirrors its
+`node_modules` with hard links (Turbopack refuses a junction that points outside the project), and
+patches the 8 pages. `next dev` runs from that copy. `sreejith-crm` itself is never edited.
+`node --test scripts/crm-parity/deterministic-order.test.mjs` checks that the port carries exactly
+the listed edits and that they apply to the original.
+
 The original app is read from `CRM_ORIGINAL_DIR` (default
 `C:\Users\MIS\Downloads\MKJewelOS\sreejith-crm\web-app`, the git-ignored copy in the main
 checkout; the CRM worktree `C:\crm` has none). Its Prisma migrations and `next dev` both come
