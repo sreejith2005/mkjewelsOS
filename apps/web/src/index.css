@@ -23,6 +23,15 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* A grid item defaults to `min-width: auto`, so a wide table or chip strip
+     inside it (even one wrapped in `overflow-x-auto`) widens the whole grid
+     track past the phone screen. Let grid items shrink so the inner scroll
+     container scrolls instead of the page. Any explicit `min-w-*` utility on a
+     grid item still wins because utilities load after this base layer. */
+  .grid > * {
+    min-width: 0;
+  }
+
   /* Removes the 300ms double-tap-to-zoom delay on controls without taking away
      pinch-to-zoom, which stays available for accessibility. */
   a,

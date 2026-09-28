@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateFmsDelay, fmsFieldOptions, fmsOutgoingStageKeys, hasFmsStageFallback, hasFmsStageRouting, calculateFmsProgress, deriveFmsTransitionCapability, evaluateFmsBranchRule, fmsStatusLabel, isFmsCompletionSatisfied, isFmsJoinReady, normalizeFmsDefinition, reachableFmsStageKeys, resolveFmsBranch, validateFmsAssignmentCandidate, validateFmsDefinition, type FmsFlowDefinition, type FmsStageDefinition } from ".";
+import { calculateFmsDelay, fmsFieldOptions, fmsOutgoingStageKeys, fmsStagesInFlowOrder, hasFmsStageFallback, hasFmsStageRouting, calculateFmsProgress, deriveFmsTransitionCapability, evaluateFmsBranchRule, fmsStatusLabel, isFmsCompletionSatisfied, isFmsJoinReady, normalizeFmsDefinition, reachableFmsStageKeys, resolveFmsBranch, validateFmsAssignmentCandidate, validateFmsDefinition, type FmsFlowDefinition, type FmsStageDefinition } from ".";
 
 const stage = (patch: Partial<FmsStageDefinition> & Pick<FmsStageDefinition, "key" | "name" | "type" | "order">): FmsStageDefinition => ({ required: true, completionRule: patch.type === "approval" ? "manager_approval" : "any_doer", allowMultipleDoers: false, requiresUpload: false, requiresRemark: false, checklist: [], assigneeRules: ["branch", "parallel_start", "parallel_join", "notification", "end"].includes(patch.type) ? [] : [{ type: "reporter" }], requiresNextDoerHandoff: false, canMoveBackward: false, canReject: false, canRequestRevision: false, canEscalate: false, branchRules: [], parallelTargetStageKeys: [], joinRequiredStageKeys: [], sla: { dueDate: "2099-12-31" }, ...patch });
 const flow = (stages: FmsStageDefinition[]): FmsFlowDefinition => ({ name: "Order flow", description: "test", scope: "tenant", manualTrigger: true, stages });
@@ -82,4 +82,28 @@ describe("FMS runtime helpers", () => {
   it("calculates required-stage progress", () => expect(calculateFmsProgress([{ required: true, status: "completed" }, { required: true, status: "in_progress" }, { required: false, status: "pending" }])).toEqual({ completed: 1, total: 2, percent: 50 }));
   it("calculates non-negative delay", () => { expect(calculateFmsDelay("2026-01-01T01:00:00Z", "2026-01-01T01:30:00Z")).toEqual({ delayMinutes: 30, overdue: true }); expect(calculateFmsDelay("2026-01-01T01:00:00Z", "2026-01-01T00:30:00Z")).toEqual({ delayMinutes: 0, overdue: false }); });
   it("formats safe labels", () => expect(fmsStatusLabel("in_progress")).toBe("In Progress"));
+});
+
+describe("fmsStagesInFlowOrder", () => {
+  const keys = (stages: readonly FmsStageDefinition[]) => fmsStagesInFlowOrder(stages).map((item) => item.key);
+  it("lists a linear flow from the trigger regardless of saved order", () => {
+    expect(keys([stage({ key: "c", name: "C", type: "task", order: 2 }), stage({ key: "a", name: "A", type: "form", order: 0, defaultNextStageKey: "b" }), stage({ key: "b", name: "B", type: "task", order: 1, defaultNextStageKey: "c" })].sort((x, y) => x.order - y.order))).toEqual(["a", "b", "c"]);
+  });
+  it("keeps each path together and lists a shared step after both paths", () => {
+    expect(keys([
+      stage({ key: "form", name: "Form", type: "form", order: 0, defaultNextStageKey: "decide" }),
+      stage({ key: "decide", name: "Decide", type: "branch", order: 1, branchRules: [{ id: "yes", source: "outcome", operator: "equals", value: "yes", nextStageKey: "yes_1", order: 0 }, { id: "no", source: "outcome", operator: "default", nextStageKey: "no_1", order: 1 }] }),
+      stage({ key: "merge", name: "Merge", type: "task", order: 2 }),
+      stage({ key: "no_1", name: "No", type: "task", order: 3, defaultNextStageKey: "merge" }),
+      stage({ key: "yes_1", name: "Yes", type: "task", order: 4, defaultNextStageKey: "yes_2" }),
+      stage({ key: "yes_2", name: "Yes 2", type: "task", order: 5, defaultNextStageKey: "merge" }),
+    ])).toEqual(["form", "decide", "yes_1", "yes_2", "no_1", "merge"]);
+  });
+  it("appends unconnected steps and tolerates a loop in a draft", () => {
+    expect(keys([
+      stage({ key: "a", name: "A", type: "form", order: 0, defaultNextStageKey: "b" }),
+      stage({ key: "b", name: "B", type: "task", order: 1, defaultNextStageKey: "a" }),
+      stage({ key: "island", name: "Island", type: "task", order: 2 }),
+    ])).toEqual(["a", "b", "island"]);
+  });
 });
