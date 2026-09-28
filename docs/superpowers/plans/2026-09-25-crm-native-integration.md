@@ -146,7 +146,27 @@ session-less request (including Apps Script) to the login page; the Edge Functio
 
 ## Phase 5 - Data migration from the CRM Supabase
 
-Files:
+Status (2026-09-28, local rehearsal done): tooling in `scripts/crm-import/` (README there), production
+procedure in `docs/CRM_DATA_MIGRATION_RUNBOOK.md`. The rehearsal restored the owner's export of the
+original into an isolated local stack, imported it into an isolated JewelOS stack built from HEAD,
+and reconciled it; its reports, the identity/branch proposal and the link SQL are private
+(`C:\crm-private\work`). As built, it differs from the list below:
+
+- `scripts/crm-import/{import,storage-copy,reconcile}.mjs` replace `scripts/crm-migration/*`. The
+  source is a database URL (restored copy or the original, read-only transaction); no export script.
+- Every trigger is off for the load (`session_replication_role = replica`), not a subset, so every
+  stored value (rollups, codes, edit log, phone index, audit fields) is copied as-is and no per-row
+  audit is written; one `crm.legacy_data_import` summary row is.
+- Seeded lookups and lead-form rows are replaced by the source rows (matched by `label` /
+  `field_key` / field key + option value), so every row keeps its source id; the seed id -> source
+  id remap is recorded in the report. Sequences move to the greater of the source position and the
+  highest value in use.
+- Storage keeps object paths (bucket id only changes). `owner_id` is not rewritten: the Storage
+  API sets no owner on a copied object; CRM super_admin keeps delete rights.
+- The link preflight is the owner-reviewed proposal (exact normalized email for users, exact name
+  for branches; names shown, never matched) plus a commented link SQL file, both private.
+
+Planned files (superseded as above):
 
 - `scripts/crm-migration/export.ts` - read-only export from the CRM Supabase with
   an owner-provided read-only connection (never committed, never printed).
