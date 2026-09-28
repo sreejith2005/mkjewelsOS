@@ -120,6 +120,30 @@ export function matchPersonBySpokenName<T extends PersonMatchCandidate>(
   return byNearSpelling.length === 1 ? byNearSpelling[0] : undefined;
 }
 
+/** Recover an explicit assignee from a transcript when extraction missed it.
+ * A full name must uniquely match the roster and follow an assignment verb.
+ */
+export function matchPersonMentionInTranscript<T extends PersonMatchCandidate>(
+  transcript: string,
+  candidates: readonly T[],
+): T | undefined {
+  const words = spokenNameTokens(transcript);
+  const assignmentVerbs = new Set(["assign", "ask", "tell", "give", "delegate", "have"]);
+  const mentions = candidates.flatMap((candidate) => {
+    const name = spokenNameTokens(candidate.employee_name);
+    if (name.length < 2 || name[0]!.length < 4 || name.at(-1)!.length < 4) return [];
+    const index = words.findIndex((word, position) => position + 1 < words.length
+      && word.length >= 4 && words[position + 1]!.length >= 4
+      && withinOneEdit(word, name[0]!)
+      && withinOneEdit(words[position + 1]!, name.at(-1)!));
+    return index < 0 ? [] : [{ candidate, index }];
+  });
+  const mention = mentions.length === 1 ? mentions[0] : undefined;
+  return mention && [1, 2, 3].some((offset) => assignmentVerbs.has(words[mention.index - offset] ?? ""))
+    ? mention.candidate
+    : undefined;
+}
+
 /** Forms of address a spoken instruction wraps around a name ("Anil sir", "Priya ji"). */
 const SPOKEN_HONORIFICS = new Set(["mr", "mrs", "ms", "miss", "dr", "sir", "madam", "maam", "mam", "ji", "bhai", "chechi", "chetta", "chettan", "anna"]);
 

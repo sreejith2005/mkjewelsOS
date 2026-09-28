@@ -137,7 +137,7 @@ Deno.serve(async (request: Request) => {
       return person.department_id === profile.department_id;
     }).map((person) => ({
       ...person,
-      employee_name: [person.first_name, person.last_name].filter((part) => Boolean(part?.trim())).join(" ") || person.employee_name || "",
+      employee_name: person.employee_name || [person.first_name, person.last_name].filter((part) => Boolean(part?.trim())).join(" "),
     }));
     const departments = departmentsResult.data.filter((department) => people.some((person) => person.department_id === department.id));
 

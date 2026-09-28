@@ -3,6 +3,7 @@ import {
   autoAssignFromDepartment,
   buildVoiceTaskDraft as buildDraft,
   matchDepartmentByLabel,
+  matchPersonMentionInTranscript,
   resolveVoiceAssignment,
   VOICE_TASK_SPEAKING_GUIDE,
   voiceDraftGapMessage,
@@ -37,6 +38,23 @@ const people: VoiceAssignmentCandidate[] = [
 ];
 
 const context: VoiceResolutionContext = { people, departments: [crm, mdo], availability: [] };
+
+describe("matchPersonMentionInTranscript", () => {
+  const roster = [
+    person({ id: "ayush", employee_name: "Ayush Shelavale" }),
+    person({ id: "ayush-other", employee_name: "Ayush Shervale" }),
+  ];
+
+  it("finds a unique near-spelled full name in an assignment instruction", () => {
+    expect(matchPersonMentionInTranscript("Assign Ayush Shelavle to complete the IMS meeting", roster)?.id).toBe("ayush");
+  });
+
+  it("leaves ambiguous and incidental mentions unresolved", () => {
+    expect(matchPersonMentionInTranscript("Ask Ayush to complete the IMS meeting", roster)).toBeUndefined();
+    expect(matchPersonMentionInTranscript("Ask Ayush Shervale and Ayush Shelavale", roster)).toBeUndefined();
+    expect(matchPersonMentionInTranscript("Prepare a report about Ayush Shelavale", roster)).toBeUndefined();
+  });
+});
 
 const hints = (overrides: Partial<VoiceTaskHints> = {}): VoiceTaskHints => ({
   title: "Call back the Kochi walk-in",
@@ -120,6 +138,10 @@ describe("autoAssignFromDepartment", () => {
 });
 
 describe("resolveVoiceAssignment", () => {
+  it("recognizes a one-letter misspelling of a full employee name", () => {
+    const roster = { ...context, people: [person({ id: "ayush", employee_name: "Ayush Shelavale" })] };
+    expect(resolveVoiceAssignment(hints({ assignee_hint: "Ayush Shelavle" }), roster).assigneeId).toBe("ayush");
+  });
   it("resolves a spoken first name to a unique roster member", () => {
     expect(resolveVoiceAssignment(hints({ assignee_hint: "Reshma" }), context)).toEqual({ assigneeId: "reshma", reason: 'Matched "Reshma"' });
   });
