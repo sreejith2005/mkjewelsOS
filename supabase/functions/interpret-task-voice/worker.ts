@@ -1,5 +1,7 @@
 import {
   buildVoiceTaskDraft,
+  matchPersonBySpokenName,
+  matchPersonMentionInTranscript,
   voiceDraftGaps,
   type VoiceResolutionContext,
   type VoiceTaskDraft,
@@ -227,6 +229,11 @@ export async function interpretVoiceTask(
     now: extraction.nowIso,
     timeZone: extraction.timeZone,
   });
-  const draft = buildVoiceTaskDraft(hints, await loadResolution(hints, deadline), deadline);
+  const resolution = await loadResolution(hints, deadline);
+  const mentioned = matchPersonBySpokenName(hints.assignee_hint, resolution.people)
+    ? undefined
+    : matchPersonMentionInTranscript(transcript, resolution.people);
+  const resolvedHints = mentioned ? { ...hints, assignee_hint: mentioned.employee_name } : hints;
+  const draft = buildVoiceTaskDraft(resolvedHints, resolution, deadline);
   return { transcript, draft, gaps: voiceDraftGaps(draft) };
 }

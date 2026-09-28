@@ -123,6 +123,19 @@ Deno.test("interpretVoiceTask resolves a named person and reports no gaps", asyn
   assertEquals(interpretation.gaps, []);
 });
 
+Deno.test("interpretVoiceTask recovers a unique near-spelled full name when extraction misses it", async () => {
+  const ayush = { ...resolution.people[0]!, id: "ayush", employee_name: "Ayush Shelavale" };
+  const interpretation = await interpretVoiceTask({
+    transcribe: () => Promise.resolve("Assign Ayush Shelavle to complete the IMS meeting by tomorrow"),
+    extract: () => Promise.resolve({
+      title: "Complete IMS meeting", description: "", assignee_hint: null, department_hint: null,
+      date_expression: "tomorrow", time_expression: null, priority: null, task_type: "delegation", checklist_items: [],
+    }),
+  }, upload(), () => Promise.resolve({ ...resolution, people: [ayush] }), extraction);
+  assertEquals(interpretation.draft.assigneeId, "ayush");
+  assertEquals(interpretation.gaps, []);
+});
+
 Deno.test("interpretVoiceTask resolves a relative deadline itself and loads the roster for that day", async () => {
   let rosterDay: string | null = null;
   const interpretation = await interpretVoiceTask({

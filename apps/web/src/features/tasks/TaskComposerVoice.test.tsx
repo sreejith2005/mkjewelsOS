@@ -116,7 +116,7 @@ describe("TaskComposer voice capture", () => {
 
     expect((screen.getByPlaceholderText("Add Title") as HTMLInputElement).value).toBe("Count the stock");
     expect((screen.getByPlaceholderText("Add Description") as HTMLTextAreaElement).value).toBe("Front display only");
-    expect(screen.getByTestId("task-selector-users").textContent).toContain("1 user");
+    expect(screen.getByTestId("task-selector-users").textContent).toContain("Teammate");
     expect(screen.getByTestId("voice-assignment-reason").textContent).toContain('Matched "Teammate"');
     expect(screen.queryByTestId("voice-gap-alert")).toBeNull();
 
@@ -187,7 +187,7 @@ describe("TaskComposer voice capture", () => {
     fireEvent.click(screen.getByRole("button", { name: "Apply voice note" }));
 
     expect(screen.queryByTestId("voice-gap-alert")).toBeNull();
-    expect(screen.getByTestId("task-selector-users").textContent).toContain("1 user");
+    expect(screen.getByTestId("task-selector-users").textContent).toContain("Teammate");
   });
 
   it("keeps a missing deadline out of the form rather than guessing one", () => {

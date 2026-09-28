@@ -51,6 +51,13 @@ function renderComposer(overrides: Partial<Parameters<typeof TaskComposer>[0]> =
 }
 
 describe("TaskComposer selector panels", () => {
+  it("shows the selected assignee name while the picker is closed", () => {
+    renderComposer();
+    fireEvent.click(screen.getByRole("button", { name: /Users/i }));
+    fireEvent.click(screen.getByLabelText("Teammate"));
+    expect(screen.getByTestId("task-selector-users").textContent).toContain("Teammate");
+    expect(screen.queryByTestId("task-panel-users")).toBeNull();
+  });
   it("limits normal staff to themselves and colleagues in their department", () => {
     renderComposer({ profile: { ...profile, user_role: "staff" } });
 
