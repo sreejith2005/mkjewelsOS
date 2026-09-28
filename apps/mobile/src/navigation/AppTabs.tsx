@@ -134,8 +134,8 @@ function FmsTab() { return <TopLevelTab route="Fms"><FmsScreen /></TopLevelTab>;
 /**
  * The CRM tab shows the web CRM (the ported original, CRM Phase 6) full-screen with its own
  * original shell, exactly as the web renders /crm once its section gate allows it; a disabled
- * or denied section keeps the notice inside the native shell. The old native CRM screens
- * (CrmScreen and its stack screens) stay in the tree, unrouted, until the Phase 7 retirement.
+ * or denied section keeps the notice inside the native shell. The old native CRM screens were
+ * retired at the CRM cutover.
  */
 function CrmTab() {
   const { shellAccess } = useShell();

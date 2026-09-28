@@ -26,17 +26,6 @@ export type RootStackParamList = {
   FormBuilder: { formTemplateId?: string } | undefined;
   FormSubmission: { submissionId: string };
   FormSubmissions: undefined;
-  /**
-   * The old native CRM screens below are unrouted since CRM Phase 6 (the CRM tab is the web CRM);
-   * their types stay so the retained screens compile until the Phase 7 retirement. Nothing may
-   * navigate to them.
-   * `notice` carries the success message a walk-in or edit leaves behind, as the web page shows it.
-   */
-  ClientDetail: { clientId: string; notice?: string };
-  ClientEditor: { clientId?: string } | undefined;
-  CrmFollowups: undefined;
-  CrmMerge: { survivorId: string };
-  Walkin: { clientId?: string; mode?: "new" | "returning" };
   Followups: undefined;
   AssigningLeft: undefined;
   PermissionManagement: undefined;

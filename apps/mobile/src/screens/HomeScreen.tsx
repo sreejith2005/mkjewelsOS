@@ -144,7 +144,7 @@ export function HomeScreen() {
         <View style={styles.sectionHead}>
           <View style={styles.sectionCopy}>
             <Text variant="subtitle" weight="semibold">Action required</Text>
-            <Text tone="muted" variant="small">Your assigned tasks, FMS steps, and CRM follow-ups are shown below.</Text>
+            <Text tone="muted" variant="small">Your assigned tasks and FMS steps are shown below.</Text>
           </View>
           <AlarmClock color={theme.colors.primary} size={20} />
         </View>
@@ -196,19 +196,6 @@ export function HomeScreen() {
           ) : <EmptyMessage>No FMS steps waiting.</EmptyMessage>}
         </ActionGroup>
 
-        <ActionGroup title="CRM Tasks">
-          {data.crm_followups.length ? data.crm_followups.slice(0, 4).map((followup) => (
-            <ActionItem
-              description={`Due ${followup.due_date}`}
-              key={followup.id}
-              label={followup.overdue ? "Overdue — open now" : "Open follow-up"}
-              onOpen={() => navigation.navigate("Crm")}
-              overdue={followup.overdue}
-              title={followup.subject ?? "Follow-up"}
-            />
-          )) : <EmptyMessage>No CRM follow-ups due.</EmptyMessage>}
-        </ActionGroup>
-
         <View style={styles.sectionGap}>
           <View style={styles.rowBetween}>
             <Text variant="subtitle" weight="semibold">Priority Tasks Today</Text>
@@ -230,18 +217,6 @@ export function HomeScreen() {
             </Pressable>
           )) : <EmptyMessage>No high-priority work is waiting.</EmptyMessage>}
         </View>
-
-        <Panel description="Visible only within your authorized CRM scope." title="CRM Follow-ups Due">
-          {data.crm_followups.length ? data.crm_followups.map((followup) => (
-            <View key={followup.id} style={styles.listRow}>
-              <StatusDot tone={followup.overdue ? "danger" : "warning"} />
-              <View style={styles.flex}>
-                <Text variant="small" weight="medium">{followup.subject ?? "Follow-up"}</Text>
-                <Text tone="muted" variant="caption">{`Due ${followup.due_date}${followup.overdue ? " · Overdue" : ""}`}</Text>
-              </View>
-            </View>
-          )) : <EmptyMessage>No CRM follow-ups are due.</EmptyMessage>}
-        </Panel>
 
         <Panel description="Bounded and authorized audit activity." title="Recent Activity">
           {data.recent_activity.length ? data.recent_activity.map((activity) => (

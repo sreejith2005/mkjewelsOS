@@ -34,8 +34,7 @@ describe("HomeView collapsible work groups", () => {
 
     const tasks = screen.getByRole("button", { name: "My Tasks" });
     const fms = screen.getByRole("button", { name: "FMS Tasks" });
-    const crm = screen.getByRole("button", { name: "CRM Tasks" });
-    for (const toggle of [tasks, fms, crm]) expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    for (const toggle of [tasks, fms]) expect(toggle.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByRole("button", { name: /Polish display tray/ })).toBeTruthy();
 
     fireEvent.click(tasks);
@@ -43,12 +42,19 @@ describe("HomeView collapsible work groups", () => {
     expect(tasks.getAttribute("aria-expanded")).toBe("false");
     expect(screen.queryByRole("button", { name: /Polish display tray/ })).toBeNull();
     expect(screen.getByText("Polish display tray", { selector: "span" })).toBeTruthy();
-    expect(crm.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByRole("button", { name: /Call about bangles/ })).toBeTruthy();
+    expect(fms.getAttribute("aria-expanded")).toBe("true");
 
     fireEvent.click(tasks);
 
     expect(tasks.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByRole("button", { name: /Polish display tray/ })).toBeTruthy();
+  });
+
+  it("hides the old CRM follow-ups since the CRM cutover", () => {
+    render(<HomeView onNavigate={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: "CRM Tasks" })).toBeNull();
+    expect(screen.queryByText("CRM Follow-ups Due")).toBeNull();
+    expect(screen.queryByText(/Call about bangles/)).toBeNull();
   });
 });

@@ -25,7 +25,7 @@ export const NATIVE_WORK_ROUTES = {
   fmsStage: "FmsStage",
   fmsStageForm: "FmsStageForm",
   formSubmission: "FormSubmission",
-  /** The CRM tab (the web CRM in a WebView); the old native ClientDetail screen is unrouted. */
+  /** The CRM tab (the web CRM in a WebView); the old native CRM screens were retired at the CRM cutover. */
   crmClient: "Crm",
   notificationInbox: "Section",
 } as const;

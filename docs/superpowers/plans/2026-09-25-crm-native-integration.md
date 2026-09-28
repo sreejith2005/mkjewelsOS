@@ -218,6 +218,18 @@ Design and threat model: the design's "Mobile WebView (Phase 6)".
 
 ## Phase 7 - Cutover and retirement
 
+Status (2026-09-28, prepared on `feat/crm-native`, nothing hosted changed): merged `origin/main`
+(`1b1b5d0`, no new migrations, so the CRM series stays `0182`-`0191`). Owner decisions: Home "CRM
+Tasks" / "CRM Follow-ups Due", the four old CRM reports and the six old CRM dashboard metrics are
+hidden on web and mobile (they read the archived `public` CRM tables, which stay untouched); the old
+native CRM UI is deleted (web `features/crm` + `CRMPage`; mobile `Crm*`/`ClientDetail`/`ClientEditor`/
+`Walkin` screens and `features/crm` except the WebView files; `packages/data/src/crm`;
+`packages/core` CRM helpers except `crm/{phone,preflight,legacyImport}`, which the legacy import
+scripts still use). `crm.view` keeps its defaults; staff are granted one by one. The release script
+requires an https `EXPO_PUBLIC_JEWELOS_WEB_ORIGIN`. The production procedure, with the read-only
+preflight findings, is `docs/CRM_CUTOVER_CHECKLIST.md`.
+
+
 - Switch `/crm` to `CrmApp` for all CRM-permitted roles; Home "CRM Tasks",
   notifications and dashboard CRM entries decided per the design's open questions.
 - Smoke test each mapped role, an unlinked user, a deactivated user, a disabled

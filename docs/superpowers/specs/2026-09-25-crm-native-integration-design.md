@@ -324,10 +324,11 @@ The implementation plan with files, tests and gates is
 - Phase 2: the schema is additive and unused until Phase 3. Rolling back the
   code is enough; a forward migration can revoke `crm` grants if needed. Never
   drop `crm` after Phase 5 data exists.
-- Phases 3/6: the `/crm` switch returns to the old JewelOS `CRMPage`; the mobile
-  tab returns to the native CRM screens in a new APK (no `-Mandatory` without
-  approval). The `crm` section maintenance switch blocks CRM data server-side
-  immediately.
+- Phases 3/6: the `crm` section maintenance switch blocks CRM data server-side
+  immediately. The old JewelOS `CRMPage` and native CRM screens were deleted in the
+  Phase 7 preparation; bringing them back means reverting the cutover merge on
+  `main` (web) and a new APK (no `-Mandatory` without approval). See
+  `docs/CRM_CUTOVER_CHECKLIST.md`.
 - Phase 4: point Apps Script back at the original deployment while it still
   exists.
 - Phase 5: the original CRM Supabase remains the source of truth and stays

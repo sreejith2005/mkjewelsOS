@@ -53,7 +53,7 @@ const FormsPage = lazyPage("forms", () => import("@/pages/FormsPage").then((modu
 const FMSBuilderPage = lazyPage("fms", () => import("@/pages/FMSBuilderPage").then((module) => ({ default: module.FMSBuilderPage })));
 const NotificationsPage = lazyPage("notifications", () => import("@/pages/NotificationsPage").then((module) => ({ default: module.NotificationsPage })));
 // /crm is the ported original CRM (@jewelos/crm-ui, 2026-09-25 owner decision). The old
-// JewelOS CRMPage stays in the tree, unrouted, until its Phase 7 retirement.
+// JewelOS CRMPage was retired at the CRM cutover (the old public CRM tables stay as an archive).
 const CrmApp = lazyPage("crm", () => import("@jewelos/crm-ui").then((module) => ({ default: module.CrmApp })));
 const TasksPage = lazyPage("tasks", () => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
 const FmsAssignedWorkPage = lazyPage("fms-assigned-work", () => import("@/pages/FmsAssignedWorkPage").then((module) => ({ default: module.FmsAssignedWorkPage })));

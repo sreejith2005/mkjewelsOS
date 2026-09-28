@@ -83,9 +83,6 @@ export function RootNavigator() {
           <Stack.Screen component={FormBuilderScreen} name="FormBuilder" options={{ title: "Form builder" }} />
           <Stack.Screen component={FormSubmissionsScreen} name="FormSubmissions" options={{ title: "Form submissions" }} />
           <Stack.Screen component={FormSubmissionScreen} name="FormSubmission" options={{ title: "Submission" }} />
-          {/* CRM Phase 6: the CRM tab is the web CRM; the old native CRM stack screens
-              (ClientDetail, ClientEditor, CrmFollowups, CrmMerge, Walkin) stay in the tree,
-              unrouted, until the Phase 7 retirement. */}
           <Stack.Screen component={ProfileScreen} name="Profile" options={{ title: "Profile" }} />
           <Stack.Screen component={AssigningLeftScreen} name="AssigningLeft" options={{ title: "Assigning Left" }} />
           <Stack.Screen component={PermissionManagementScreen} name="PermissionManagement" options={{ title: "Permission management" }} />

@@ -21,6 +21,9 @@ describe("metric catalog and formatting", () => {
     expect(METRIC_CATALOG.every((item)=>item.definition && item.dateWindow && item.scope)).toBe(true);
     expect(METRIC_CATALOG.some((item)=>/revenue|sales conversion|target|product mix|loyalty|vip|ranking/i.test(`${item.key} ${item.displayName}`))).toBe(false);
   });
+  it("shows no old CRM metric since the CRM cutover", () => {
+    expect(METRIC_CATALOG.some((item)=>item.sourceModule==="crm"||item.key.startsWith("crm_"))).toBe(false);
+  });
   it("uses null for zero denominators", () => { expect(safeRate(0,0)).toBeNull(); expect(safeRate(3,4)).toBe(75); });
   it("formats counts, percentages, duration, no-data, and not-applicable", () => {
     const rate=METRIC_CATALOG.find((item)=>item.key==="people_availability_rate")!;

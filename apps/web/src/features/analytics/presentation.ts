@@ -9,14 +9,14 @@ export function asyncPresentation(loading: boolean, error: string | null, rowCou
   return rowCount === 0 ? "empty" : "ready";
 }
 
-export function homeSectionsForRole(role: UserRole): readonly string[] {
-  const sections = ["tasks", "fms", "forms", "notifications", "availability", "activity"];
-  return ["super_admin", "admin", "manager", "crm"].includes(role) ? [...sections, "crm_followups"] : sections;
+// The old JewelOS CRM follow-ups (Home) and CRM metrics (dashboard) read the archived public CRM
+// tables and are hidden for every role since the CRM cutover.
+export function homeSectionsForRole(_role: UserRole): readonly string[] {
+  return ["tasks", "fms", "forms", "notifications", "availability", "activity"];
 }
 
 export function dashboardSectionsForRole(role: UserRole): readonly string[] {
   const sections = ["personal_tasks", "fms", "forms", "notifications"];
-  if (["super_admin", "admin", "manager", "crm"].includes(role)) sections.push("crm");
   if (["super_admin", "admin", "manager", "hr"].includes(role)) sections.push("people");
   if (["super_admin", "admin"].includes(role)) sections.push("delivery_health");
   return sections;

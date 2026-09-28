@@ -4,14 +4,13 @@ import { ErrorPanel, LoadingPanels } from "./components";
 import { asyncPresentation, dashboardSectionsForRole, exportActionsForStatus, homeSectionsForRole, reportSearch, settingsSectionsForRole } from "./presentation";
 
 describe("dashboard and report presentation contracts", () => {
-  it("keeps CRM follow-ups out of HR, staff, doer, and housekeeping Home", () => {
-    for (const role of ["hr", "staff", "doer", "housekeeping"] as const) expect(homeSectionsForRole(role)).not.toContain("crm_followups");
-    expect(homeSectionsForRole("crm")).toContain("crm_followups");
+  it("keeps the old CRM follow-ups off every Home since the CRM cutover", () => {
+    for (const role of ["super_admin", "admin", "manager", "crm", "hr", "staff", "doer", "housekeeping"] as const) expect(homeSectionsForRole(role)).not.toContain("crm_followups");
   });
 
   it("separates role-specific dashboard content", () => {
     expect(dashboardSectionsForRole("hr")).toContain("people");
-    expect(dashboardSectionsForRole("hr")).not.toContain("crm");
+    for (const role of ["super_admin", "admin", "manager", "crm", "hr"] as const) expect(dashboardSectionsForRole(role)).not.toContain("crm");
     expect(dashboardSectionsForRole("housekeeping")).toEqual(["personal_tasks", "fms", "forms", "notifications"]);
     expect(dashboardSectionsForRole("admin")).toContain("delivery_health");
   });
