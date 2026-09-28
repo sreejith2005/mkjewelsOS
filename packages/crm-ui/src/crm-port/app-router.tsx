@@ -31,7 +31,8 @@ import { redirect } from "@/next-shim/navigation";
 
 import { CrmNavigationContext, type CrmAppRouter as AppRouter, type CrmNavigationState } from "./navigation-context";
 import { NextNotFound } from "./not-found";
-import { crmAppPath, crmHost, CrmLeave, CrmNotFound, CrmRedirect, withBasePath } from "./runtime";
+import { ensureMyCrmUser } from "./provisioning";
+import { crmAppPath, crmHost, crmSupabase, CrmLeave, CrmNotFound, CrmRedirect, withBasePath } from "./runtime";
 
 type SearchParamsRecord = Record<string, string | string[]>;
 type PageProps = { params: Promise<Record<string, string>>; searchParams: Promise<SearchParamsRecord> };
@@ -159,6 +160,8 @@ export function CrmAppRouter({ browserPath, browserSearch }: { browserPath: stri
   const [view, setView] = useState<PageView | null>(null);
   const [failure, setFailure] = useState<{ error: unknown } | null>(null);
   const layoutRef = useRef<{ node: ReactNode; refreshToken: number } | null>(null);
+  // crm-port: D2 provisioning runs once per mount, before the first layout/page loader.
+  const provisioningRef = useRef<Promise<void> | null>(null);
   const requestRef = useRef(0);
   const navigationKind = useRef<"history" | "navigate" | "refresh">("history");
 
@@ -182,6 +185,9 @@ export function CrmAppRouter({ browserPath, browserSearch }: { browserPath: stri
     const layout = layoutRef.current;
     const needsLayout = Boolean(match?.route.inCrmLayout) && (!layout || layout.refreshToken !== refreshToken);
     void (async () => {
+      provisioningRef.current ??= ensureMyCrmUser(crmSupabase());
+      await provisioningRef.current;
+      if (requestId !== requestRef.current) return;
       const [layoutResult, pageResult] = await Promise.all([
         needsLayout ? settle(() => CrmLayout({ children: <CrmPageSlot /> })) : Promise.resolve(null),
         match ? settle(() => match.route.load(props)) : Promise.resolve<Settled>({ ok: false, error: new CrmNotFound() }),

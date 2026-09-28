@@ -14,8 +14,19 @@ export const CRM_BASE_PATH = "/crm";
 
 export type CrmSupabaseClient = SupabaseClient<Database>;
 
+/**
+ * The part of supabase.auth the original uses: getUser() (layout, followups, referrals,
+ * getCrmUser). The JewelOS Android app's WebView (embedded mode) has no Supabase auth client
+ * of its own (the native app is the only session holder), so it supplies this instead.
+ */
+export type CrmAuth = {
+  getUser: () => Promise<{ data: { user: { id: string; email?: string | undefined } | null }; error: unknown }>;
+};
+
 export type CrmHost = {
   supabase: JewelosClient;
+  /** Replaces supabase.auth for the ported code (embedded mode only). */
+  auth?: CrmAuth | undefined;
   /** JewelOS client-side navigation (history push) to an absolute JewelOS path. */
   navigate: (href: string) => void;
   onSignOut: () => Promise<void> | void;
@@ -23,7 +34,7 @@ export type CrmHost = {
 };
 
 let host: CrmHost | null = null;
-let facade: { base: JewelosClient; client: CrmSupabaseClient } | null = null;
+let facade: { base: JewelosClient; auth: CrmAuth | undefined; client: CrmSupabaseClient } | null = null;
 
 export function configureCrmHost(next: CrmHost): void {
   host = next;
@@ -36,22 +47,23 @@ export function crmHost(): CrmHost {
 
 /** The single client every ported query reads through: the JewelOS session, schema crm. */
 export function crmSupabase(): CrmSupabaseClient {
-  const { supabase } = crmHost();
-  if (!facade || facade.base !== supabase) facade = { base: supabase, client: crmFacade(supabase) };
+  const { supabase, auth } = crmHost();
+  if (!facade || facade.base !== supabase || facade.auth !== auth) facade = { base: supabase, auth, client: crmFacade(supabase, auth) };
   return facade.client;
 }
 
-function crmFacade(base: JewelosClient): CrmSupabaseClient {
+function crmFacade(base: JewelosClient, auth: CrmAuth | undefined): CrmSupabaseClient {
   const crm = base.schema("crm");
   // The original code uses only from(), rpc(), storage and auth on its client. from/rpc
   // go to PostgREST schema crm; storage and auth stay on the JewelOS session. The cast is
   // narrow and safe for that surface: the crm schema types are exactly Database["public"].
+  // In embedded mode `base.auth` is unusable by design and `auth` stands in for getUser().
   return {
     from: crm.from.bind(crm),
     rpc: crm.rpc.bind(crm),
     schema: base.schema.bind(base),
     storage: base.storage,
-    auth: base.auth,
+    auth: auth ?? base.auth,
   } as unknown as CrmSupabaseClient;
 }
 

@@ -15,7 +15,7 @@ export default async function ReferralsPage() {
   const clientIds = [...new Set(rows.flatMap((row: any) => [row.referrals.given_by_client_id, row.converted_client_id]).filter(Boolean))];
   const [{ data: clients }, { data: history }, { data: users }] = await Promise.all([
     clientIds.length ? db.from("clients").select("client_id,primary_name").in("client_id", clientIds) : Promise.resolve({ data: [] }),
-    rows.length ? db.from("referral_calling_history").select("referral_calling_id,remark,entered_by,created_at").in("referral_calling_id", rows.map((row: any) => row.id)).order("created_at", { ascending: false }) : Promise.resolve({ data: [] }),
+    rows.length ? db.from("referral_calling_history").select("referral_calling_id,remark,entered_by,created_at").in("referral_calling_id", rows.map((row: any) => row.id)).order("created_at", { ascending: false }).order("id", { ascending: false }) /* crm-port: deterministic order */ : Promise.resolve({ data: [] }),
     db.from("users").select("id,name"),
   ]);
   const clientById = new Map<string, any>((clients ?? []).map((client: any) => [client.client_id, client]));

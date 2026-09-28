@@ -16,7 +16,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const visits = [];
   // No branch predicate: dashboard viewing remains global for every active role.
   for (let offset = 0; ; offset += 1000) {
-    let visitsQuery = supabase.from("client_timeline").select("id,event_date,created_at,event_type,buy_status,branch_id,crm_name,remark,reference_number,client_id,branch:branches(name),client:clients(primary_name),salesperson:users(name)").order("event_date", { ascending: false }).range(offset, offset + 999);
+    let visitsQuery = supabase.from("client_timeline").select("id,event_date,created_at,event_type,buy_status,branch_id,crm_name,remark,reference_number,client_id,branch:branches(name),client:clients(primary_name),salesperson:users(name)").order("event_date", { ascending: false }).order("id", { ascending: false }) /* crm-port: deterministic order */.range(offset, offset + 999);
     if (from && until) visitsQuery = visitsQuery.gte("event_date", from).lt("event_date", until);
     const response = await visitsQuery;
     const page = response.data ?? [];

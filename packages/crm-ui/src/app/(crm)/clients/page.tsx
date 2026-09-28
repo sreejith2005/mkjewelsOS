@@ -15,7 +15,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
     supabase.rpc("get_my_profile"),
     getCrmUser(supabase) /* crm-port: auth.getUser().id is used as the CRM user id -> crm.current_crm_user_id() */,
     supabase.from("branches").select("id,name").eq("active", true).order("name"),
-    supabase.from("leads").select("id,phone_number,name,field_values,created_at").order("created_at", { ascending: false }).limit(1000),
+    supabase.from("leads").select("id,phone_number,name,field_values,created_at").order("created_at", { ascending: false }).order("id", { ascending: false }) /* crm-port: deterministic order */.limit(1000),
   ]);
   const profile = profileRows?.[0];
   const { data: user } = auth.user

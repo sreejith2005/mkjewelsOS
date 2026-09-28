@@ -4,7 +4,7 @@ import type { JewelosClient } from "@jewelos/api-client";
 import RootLayout from "@/app/layout";
 
 import { CrmAppRouter } from "./app-router";
-import { configureCrmHost } from "./runtime";
+import { configureCrmHost, type CrmAuth } from "./runtime";
 
 export type CrmAppProps = {
   /** The signed-in JewelOS browser client; CRM queries use its schema("crm"). */
@@ -19,9 +19,14 @@ export type CrmAppProps = {
   onSignOut: () => Promise<void> | void;
   /** Where "← JewelOS" returns to. */
   jewelosHomePath: string;
+  /**
+   * Embedded mode only (the JewelOS Android app's WebView): stands in for supabase.auth, which
+   * a client fed by the native access token does not have.
+   */
+  auth?: CrmAuth | undefined;
 };
 
-export function CrmApp({ supabase, path, search, navigate, onSignOut, jewelosHomePath }: CrmAppProps) {
-  configureCrmHost({ supabase, navigate, onSignOut, jewelosHomePath });
+export function CrmApp({ supabase, path, search, navigate, onSignOut, jewelosHomePath, auth }: CrmAppProps) {
+  configureCrmHost({ supabase, navigate, onSignOut, jewelosHomePath, auth });
   return <RootLayout><CrmAppRouter browserPath={path} browserSearch={search} /></RootLayout>;
 }

@@ -226,7 +226,7 @@ async function runoCases({ stub, originalKeys, jewelosKeys, runoKey, tables }) {
 }
 
 // ---------------------------------------------------------------------------------------------
-export async function runIngestParity({ originalKeys, jewelosKeys, base, jewelosWorkdir, report }) {
+export async function runIngestParity({ originalKeys, jewelosKeys, base, originalApp = ORIGINAL_DIR, jewelosWorkdir, report }) {
   const key = randomBytes(24).toString("hex");
   const runoKey = randomBytes(16).toString("hex");
   const stub = await startRunoStub();
@@ -236,7 +236,7 @@ export async function runIngestParity({ originalKeys, jewelosKeys, base, jewelos
   const servers = [];
   try {
     servers.push(startServer("node", ["node_modules/next/dist/bin/next", "dev", "--port", "3300"], {
-      cwd: ORIGINAL_DIR,
+      cwd: originalApp,
       env: {
         NEXT_PUBLIC_SUPABASE_URL: originalKeys.url, NEXT_PUBLIC_SUPABASE_ANON_KEY: originalKeys.anonKey, NEXT_TELEMETRY_DISABLED: "1",
         // Explicit local values: they override the app's git-ignored .env, which may name hosted databases.

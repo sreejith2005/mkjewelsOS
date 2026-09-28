@@ -1907,6 +1907,7 @@ export type Database = {
         Returns: Database["crm"]["Enums"]["user_role"]
       }
       dedupe_category_array: { Args: { p_values: string[] }; Returns: string[] }
+      ensure_my_crm_user: { Args: never; Returns: string }
       get_my_profile: {
         Args: never
         Returns: {

@@ -22,8 +22,8 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
     giftsResult,
   ] = await Promise.all([
     supabase.from("clients").select("*").eq("client_id", clientId).single(),
-    supabase.from("client_timeline").select("id,created_at,event_date,event_type,buy_status,crm_name,remark,branch_id,salesperson_id,seen_categories,bought_categories,order_categories,product_requirement,reference_number").eq("client_id", clientId).order("created_at", { ascending: false }).order("event_date", { ascending: false }),
-    supabase.from("client_edit_log").select("id,field_name,old_value,new_value,created_at,edited_by").eq("client_id", clientId).order("created_at", { ascending: false }),
+    supabase.from("client_timeline").select("id,created_at,event_date,event_type,buy_status,crm_name,remark,branch_id,salesperson_id,seen_categories,bought_categories,order_categories,product_requirement,reference_number").eq("client_id", clientId).order("created_at", { ascending: false }).order("event_date", { ascending: false }).order("id", { ascending: false }) /* crm-port: deterministic order */,
+    supabase.from("client_edit_log").select("id,field_name,old_value,new_value,created_at,edited_by").eq("client_id", clientId).order("created_at", { ascending: false }).order("id", { ascending: false }) /* crm-port: deterministic order */,
     supabase.rpc("get_my_profile"),
     getCrmUser(supabase) /* crm-port: auth.getUser().id is used as the CRM user id -> crm.current_crm_user_id() */,
     supabase.from("branches").select("id,name").eq("active", true).order("name"),

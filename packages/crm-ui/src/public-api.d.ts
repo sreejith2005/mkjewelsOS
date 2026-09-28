@@ -17,6 +17,16 @@ export type CrmAppProps = {
   onSignOut: () => Promise<void> | void;
   /** Where "← JewelOS" returns to. */
   jewelosHomePath: string;
+  /**
+   * Embedded mode only (the JewelOS Android app's WebView): stands in for supabase.auth, which
+   * a client fed by the native access token does not have.
+   */
+  auth?: CrmAuth | undefined;
+};
+
+/** The part of supabase.auth the ported CRM uses. */
+export type CrmAuth = {
+  getUser: () => Promise<{ data: { user: { id: string; email?: string | undefined } | null }; error: unknown }>;
 };
 
 export declare function CrmApp(props: CrmAppProps): ReactElement;
