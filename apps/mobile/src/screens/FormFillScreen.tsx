@@ -4,6 +4,8 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { loadFormDynamicOptions, loadTaskForms, startFmsFromFormSubmission, submitFmsStarterAssignment, submitForm } from "@jewelos/data/forms/api";
 import { useAsyncData } from "@/lib/useAsyncData";
 import { useUnsavedGuard } from "@/lib/useUnsavedGuard";
+import { useProfile } from "@/auth/AuthProvider";
+import { isWorkUploadForm } from "@jewelos/core";
 import { Screen } from "@/ui/Screen";
 import { EmptyState, ErrorState, LoadingState } from "@/ui/states";
 import { FormRenderer } from "@/forms/FormRenderer";
@@ -22,6 +24,7 @@ type Route = RouteProp<RootStackParamList, "FormFill">;
  */
 export function FormFillScreen() {
   const navigation = useNavigation<Navigation>();
+  const profile = useProfile();
   const { params } = useRoute<Route>();
   const [dirty, setDirty] = useState(false);
 
@@ -52,16 +55,18 @@ export function FormFillScreen() {
   }
 
   const { bundle, options } = data;
+  const definition = {
+    name: bundle.name,
+    ...(bundle.description === null ? {} : { description: bundle.description }),
+    sections: bundle.sections,
+    fields: bundle.fields,
+  };
 
   return (
     <FormRenderer
-      definition={{
-        name: bundle.name,
-        ...(bundle.description === null ? {} : { description: bundle.description }),
-        sections: bundle.sections,
-        fields: bundle.fields,
-      }}
+      definition={definition}
       dynamicOptions={options}
+      initialAnswers={isWorkUploadForm(definition) && options.users.some((user) => user.id === profile.id) ? { crm_follow_up: profile.id } : {}}
       onDirtyChange={setDirty}
       onSubmit={async (answers) => {
         if (params.starterAssignmentId) {
