@@ -1,9 +1,14 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { ScrollView, StyleSheet, View, findNodeHandle, type NativeScrollEvent } from "react-native";
 import {
+  isWorkUploadForm,
+  nextFormStepKey,
   normalizeFormAnswers,
+  previousFormStepKey,
   resolveFormOptions,
+  updateVisibleFormAnswers,
   validateCompleteForm,
+  validateFormStep,
   visibleFormSections,
   type FormAnswer,
   type FormAnswers,
@@ -69,6 +74,7 @@ export function FormRenderer({
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [stepKey, setStepKey] = useState<string | null>(null);
 
   const scrollRef = useRef<ScrollView>(null);
   const positions = useRef(new Map<string, number>());
@@ -77,6 +83,12 @@ export function FormRenderer({
   // every option field is validated and rendered through one path.
   const resolved = useMemo(() => resolveFormOptions(definition, [...dynamicOptions.masters]), [definition, dynamicOptions.masters]);
   const sections = useMemo(() => visibleFormSections(resolved, answers), [answers, resolved]);
+  const stepped = isWorkUploadForm(resolved) && !readOnly;
+  const activeStep = stepped ? sections.find(({ section }) => section.key === stepKey) ?? sections[0] : undefined;
+  const currentStepKey = activeStep?.section.key;
+  const nextStepKey = currentStepKey ? nextFormStepKey(resolved, answers, currentStepKey) : undefined;
+  const previousStepKey = currentStepKey ? previousFormStepKey(resolved, answers, currentStepKey) : undefined;
+  const renderedSections = stepped ? activeStep ? [activeStep] : [] : sections;
   const showSectionTitles = (resolved.sections?.length ?? 0) > 1;
 
   // A department question narrows to the branch already chosen on this form,
@@ -103,12 +115,29 @@ export function FormRenderer({
 
   const set = useCallback(
     (key: string, value: FormAnswer) => {
-      setAnswers((current) => ({ ...current, [key]: value }));
+      setAnswers((current) => stepped ? updateVisibleFormAnswers(resolved, current, key, value, initialAnswers) : { ...current, [key]: value });
       setFieldError(null);
+      setError(null);
       onDirtyChange?.(true);
     },
-    [onDirtyChange],
+    [initialAnswers, onDirtyChange, resolved, stepped],
   );
+
+  const advance = () => {
+    if (!currentStepKey || !nextStepKey) return;
+    const result = validateFormStep(resolved, answers, currentStepKey);
+    if (!result.valid) {
+      const issue = result.issues[0];
+      setError(issue?.message ?? "Check this step before continuing.");
+      setFieldError(issue?.fieldKey ?? null);
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+      return;
+    }
+    setError(null);
+    setFieldError(null);
+    setStepKey(nextStepKey);
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
 
   const submit = async () => {
     const result = validateCompleteForm(resolved, answers);
@@ -152,7 +181,8 @@ export function FormRenderer({
           </Banner>
         ) : null}
 
-        {sections.map(({ section, fields }) => (
+        {stepped && activeStep ? <Text tone="muted" variant="caption">Step {sections.findIndex(({ section }) => section.key === activeStep.section.key) + 1} of {sections.length}</Text> : null}
+        {renderedSections.map(({ section, fields }) => (
           <View key={section.key} style={showSectionTitles ? styles.section : undefined}>
             {showSectionTitles ? (
               <View style={styles.sectionHeader}>
@@ -190,14 +220,9 @@ export function FormRenderer({
 
       {!readOnly && resolved.fields.length > 0 ? (
         <View style={styles.footer}>
-          <Button
-            busy={busy}
-            disabled={submitted}
-            full
-            label={submitted ? "Submitted" : submitLabel}
-            onPress={() => void submit()}
-            size="large"
-          />
+          {stepped && previousStepKey ? <Button disabled={busy || submitted} full label="Back" onPress={() => { setError(null); setFieldError(null); setStepKey(previousStepKey); scrollRef.current?.scrollTo({ y: 0, animated: true }); }} variant="secondary" /> : null}
+          {stepped && nextStepKey ? <Button disabled={busy || submitted} full label="Next" onPress={advance} size="large" />
+            : <Button busy={busy} disabled={submitted} full label={submitted ? "Submitted" : submitLabel} onPress={() => void submit()} size="large" />}
         </View>
       ) : null}
     </View>
@@ -225,5 +250,6 @@ const useStyles = makeStyles((theme) => StyleSheet.create({
     borderTopColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
     padding: theme.space.md,
+    gap: theme.space.sm,
   },
 }));
