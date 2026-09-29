@@ -64,7 +64,7 @@ describe("Deleting a form that is in use", () => {
     expect(screen.getByText(/This form is part of a workflow/)).toBeTruthy();
     expect(screen.getByText(/Order intake v3/)).toBeTruthy();
     expect(screen.getByText(/Goes off the air and waits as a draft/)).toBeTruthy();
-    expect(screen.getByText(/2 runs already under way keep going/)).toBeTruthy();
+    expect(screen.getByText(/2 runs retain their stage IDs.*explicit replacement/)).toBeTruthy();
     expect(mocks.deleteForm).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: "Keep it" }));
@@ -127,6 +127,20 @@ describe("Opening the Forms workspace", () => {
 
     expect(mocks.reviseForm).not.toHaveBeenCalled();
     expect(await screen.findByText("Builder enquiry")).toBeTruthy();
+  });
+
+  it("creates a version in the same family and opens its draft", async () => {
+    const revision = { ...bundle, id: "enquiry-v3", version: 3, lifecycle: "draft" } as FormBundle;
+    mocks.loadForms.mockResolvedValueOnce({ bundles: [bundle], submissions: [] })
+      .mockResolvedValue({ bundles: [bundle, revision], submissions: [] });
+    mocks.reviseForm.mockResolvedValue("enquiry-v3");
+    const user = userEvent.setup();
+    render(<FormsPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Create new version" }));
+
+    expect(mocks.reviseForm).toHaveBeenCalledWith("enquiry");
+    expect(await screen.findByText("Builder enquiry-v3")).toBeTruthy();
   });
 });
 

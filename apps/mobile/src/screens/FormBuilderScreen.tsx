@@ -8,6 +8,7 @@ import {
   addFormSection,
   createFormField,
   convertFormFieldType,
+  describePublishedFormEdit,
   duplicateFormField,
   formRuleHasIncompletePredicate,
   insertFormField,
@@ -26,7 +27,7 @@ import {
   type FormTemplateDefinition,
   type UserRole,
 } from "@jewelos/core";
-import { loadFormDynamicOptions, loadForms, publishForm, type FormBundle } from "@jewelos/data/forms/api";
+import { formUsageImpact, loadFormDynamicOptions, loadForms, publishForm, type FormBundle } from "@jewelos/data/forms/api";
 import { formBuilderDefinition, saveFormBuilder } from "@/features/forms/formBuilderController";
 import { FormRenderer } from "@/forms/FormRenderer";
 import { useAsyncData } from "@/lib/useAsyncData";
@@ -97,6 +98,15 @@ function FormBuilderWorkspace({ bundle, dynamicOptions, onRefresh }: Readonly<{ 
     if (issues.length) { setMessage(issues[0]?.message ?? "Fix the form before saving."); return; }
     setBusy(publish ? "publish" : "save"); setMessage(null);
     try {
+      if (template?.lifecycle === "published") {
+        const impact = await formUsageImpact(template.id);
+        const confirmed = await new Promise<boolean>((resolve) => Alert.alert(
+          "Edit published form?", describePublishedFormEdit(impact), [
+            { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+            { text: "Edit this form", onPress: () => resolve(true) },
+          ], { cancelable: true, onDismiss: () => resolve(false) }));
+        if (!confirmed) return;
+      }
       const id = await saveFormBuilder(template, normalized);
       if (publish) await publishForm(id);
       const nextTemplate = { id, lifecycle: publish ? "published" as const : template?.lifecycle ?? "draft" as const };

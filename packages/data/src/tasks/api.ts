@@ -32,7 +32,7 @@ export type TaskReferenceData = {
   priorities: Array<Pick<Tables<"dropdown_masters">, "id" | "label" | "value">>;
   departments: Array<Pick<Tables<"departments">, "id" | "name" | "branch_id">>;
   designations: Array<Pick<Tables<"dropdown_masters">, "id" | "value">>;
-  forms: Array<Pick<Tables<"form_templates">, "id" | "name">>;
+  forms: Array<Pick<Tables<"form_templates">, "id" | "name" | "version" | "family_id" | "lifecycle">>;
   templates: TaskTemplate[];
   users: TaskUser[];
 };
@@ -116,7 +116,7 @@ export async function loadTaskAuthoringReferenceData(): Promise<TaskReferenceDat
     loadMasterOptions(["task_priority"]),
     loadMasterOptions(["designation"]),
     db().from("task_templates").select("*").eq("task_type", "checklist").order("created_at", { ascending: false }),
-    db().from("form_templates").select("id,name").eq("is_active", true).order("name"),
+    db().from("form_templates").select("id,name,version,family_id,lifecycle").in("lifecycle", ["published", "archived"]).order("name"),
   ]);
   fail("Load branches", branchesResult.error);
   fail("Load departments", departmentsResult.error);

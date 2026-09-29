@@ -353,10 +353,9 @@ function LinkedForm({ data, firstStage, stage, update }: { data: FmsData; firstS
     <>
       <OptionPicker label={firstStage ? "Initial details form" : "Linked form"} onChange={(values) => update({ formTemplateId: values[0] || undefined })} options={options} selected={[stage.formTemplateId ?? ""]} />
       {missing ? <View style={styles.warn}><Text tone="danger" variant="caption">This Form is no longer an available published version. Choose another before publishing.</Text></View> : null}
-      {/* Revisions copy every question key, so re-pinning keeps the configured routes valid. */}
       {newer ? (
         <View style={styles.note}>
-          <Text tone="warm" variant="caption">{`Version ${newer.version} of this Form is published. Use it to pick up its current questions and answers. Routes keep matching because question and answer identities do not change between versions.`}</Text>
+          <Text tone="warm" variant="caption">{`Version ${newer.version} of this Form is published. Use it for future work on this flow. Review answer routes before publishing: changed question keys or choices may no longer match.`}</Text>
           <Button label={`Use v${newer.version}`} onPress={() => update({ formTemplateId: newer.id })} variant="ghost" />
         </View>
       ) : null}

@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(30);
+select plan(48);
 
 -- Synthetic fixtures only. No production rows or personal information.
 insert into auth.users(id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
@@ -55,13 +55,49 @@ values ('61170000-0000-0000-0000-000000000002','11170000-0000-0000-0000-00000000
 insert into fms_stages(id,fms_flow_id,stage_key,name,step_type,sort_order)
 values ('71170000-0000-0000-0000-000000000002','61170000-0000-0000-0000-000000000002','stage_p117b','P117 Other Stage','task',0);
 update fms_flows set status='published' where id in ('61170000-0000-0000-0000-000000000001','61170000-0000-0000-0000-000000000002');
+insert into fms_instances(tenant_id,fms_flow_id,flow_family_id,flow_version,reference_number,title,status,branch_id,started_by,context)
+select f.tenant_id,f.id,f.family_id,f.version,'P117-RUN','P117 existing run','active','21170000-0000-0000-0000-000000000001','41170000-0000-0000-0000-000000000001','{}'::jsonb
+from fms_flows f where f.id='61170000-0000-0000-0000-000000000001';
+insert into fms_instance_stages(fms_instance_id,fms_stage_id,status,assigned_to)
+values ((select id from fms_instances where reference_number='P117-RUN'),'71170000-0000-0000-0000-000000000001','in_progress',array['41170000-0000-0000-0000-000000000002'::uuid]);
+insert into fms_starter_assignments(id,tenant_id,fms_flow_id,fms_stage_id,form_template_id,user_profile_id,status)
+values ('91170000-0000-0000-0000-000000000001','11170000-0000-0000-0000-000000000001','61170000-0000-0000-0000-000000000001','71170000-0000-0000-0000-000000000001',
+  (select id from form_templates where name='P117 Enquiry'),'41170000-0000-0000-0000-000000000002','pending');
 
 set local role authenticated;
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','a1170000-0000-0000-0000-000000000001',true);
 
 -- The warning shown before the author confirms ------------------------------
-select is(form_deletion_impact((select id from form_templates where name='P117 Enquiry'))->>'submissions', '1',
+select create_form_revision_with_audit((select id from form_templates where name='P117 Enquiry'),'{"name":"P117 Enquiry v2"}'::jsonb);
+select lives_ok($$select publish_form_with_audit((select id from form_templates where name='P117 Enquiry v2'))$$,
+  'a new form version publishes while the old version remains pinned by an active FMS stage');
+select set_config('request.jwt.claim.sub','a1170000-0000-0000-0000-000000000002',true);
+select is(can_access_form_template((select id from form_templates where name='P117 Enquiry')),true,
+  'the assigned doer can still load the exact archived form version');
+select throws_ok($$select submit_form_with_audit((select id from form_templates where name='P117 Enquiry'),'{"metal":"gold"}'::jsonb)$$,
+  '42501',null,'an archived pinned version is not offered as a standalone form');
+select lives_ok($$select submit_fms_form_and_progress_with_audit(
+  (select id from form_templates where name='P117 Enquiry'),'{"metal":"gold"}'::jsonb,'fms_entry',
+  '91170000-0000-0000-0000-000000000001','a1170000-0000-0000-0000-000000000101'::uuid)$$,
+  'the assigned starter can submit its archived exact form version');
+select lives_ok($$select submit_form_with_audit((select id from form_templates where name='P117 Enquiry'),
+  '{"metal":"gold"}'::jsonb,'fms_stage',
+  (select id from fms_instance_stages where fms_instance_id=(select id from fms_instances where reference_number='P117-RUN')))$$,
+  'the assigned doer can submit the archived version pinned to the active stage');
+reset role;
+update fms_instance_stages set form_submission_id=null where fms_instance_id=(select id from fms_instances where reference_number='P117-RUN');
+delete from form_submissions where linked_module='fms_stage' and linked_record_id=(select id from fms_instance_stages where fms_instance_id=(select id from fms_instances where reference_number='P117-RUN'));
+set local role authenticated;
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','a1170000-0000-0000-0000-000000000001',true);
+select lives_ok($$select form_usage_impact((select id from form_templates where name='P117 Enquiry'))$$,
+  'a form author can inspect named connections before editing a published form');
+select is(form_usage_impact((select id from form_templates where name='P117 Enquiry'))->'flows'->0->>'name','P117 Flow',
+  'the edit warning names the connected FMS flow');
+select is(form_usage_impact((select id from form_templates where name='P117 Enquiry'))->'tasks'->0->>'title','P117 Task',
+  'the edit warning names connected open tasks');
+select is(form_deletion_impact((select id from form_templates where name='P117 Enquiry'))->>'submissions', '2',
   'the warning counts the submissions that would be kept');
 select is(form_deletion_impact((select id from form_templates where name='P117 Enquiry'))->>'tasks', '1',
   'the warning counts the tasks that would stop asking for the form');
@@ -75,8 +111,32 @@ select is(form_deletion_impact((select id from form_templates where name='P117 E
 -- Deleting it -----------------------------------------------------------------
 select lives_ok($$select delete_form_with_audit((select id from form_templates where name='P117 Enquiry'))$$,
   'a form with submissions, a task and a published workflow stage can still be deleted');
+select lives_ok($$select save_fms_flow_draft_with_audit('61170000-0000-0000-0000-000000000001',
+  '{"name":"P117 Flow","scope_type":"tenant","trigger_type":"manual"}'::jsonb,
+  '[{"key":"stage_p117","name":"P117 Stage","type":"form","order":0,"formTemplateId":null,"assigneeRules":[],"branchRules":[],"checklist":[]}]'::jsonb)$$,
+  'saving the detached draft retains a stage referenced by an existing run');
+select is((select fms_stage_id from fms_instance_stages where fms_instance_id=(select id from fms_instances where reference_number='P117-RUN')),
+  '71170000-0000-0000-0000-000000000001'::uuid,
+  'an existing run still points at its original stage ID');
+select is(save_fms_flow_draft_with_audit('61170000-0000-0000-0000-000000000001',
+  '{"name":"P117 Flow","scope_type":"tenant","trigger_type":"manual"}'::jsonb,
+  jsonb_build_array(jsonb_build_object('key','stage_p117','name','P117 Stage','type','form','order',0,
+    'formTemplateId',(select id from form_templates where name='P117 Enquiry v2'),
+    'assigneeRules','[]'::jsonb,'branchRules','[]'::jsonb,'checklist','[]'::jsonb))),
+  '61170000-0000-0000-0000-000000000001'::uuid,
+  'the author can save an explicit replacement published form on the retained stage');
+select is((select form_template_id from fms_stages where id='71170000-0000-0000-0000-000000000001'),
+  (select id from form_templates where name='P117 Enquiry v2'),
+  'the existing run now reaches the replacement form through its original stage');
+select throws_ok($$select save_fms_flow_draft_with_audit('61170000-0000-0000-0000-000000000001',
+  '{"name":"P117 Flow","scope_type":"tenant","trigger_type":"manual"}'::jsonb,
+  '[{"key":"stage_p117","name":"Changed live stage","type":"form","order":0,"formTemplateId":null,"assigneeRules":[],"branchRules":[],"checklist":[]}]'::jsonb)$$,
+  '23514',null,'a live stage cannot be redefined in place');
+select throws_ok($$select save_fms_flow_draft_with_audit('61170000-0000-0000-0000-000000000001',
+  '{"name":"P117 Flow","scope_type":"tenant","trigger_type":"manual"}'::jsonb,'[]'::jsonb)$$,
+  '23514',null,'a live stage cannot be removed from its existing run');
 select is((select count(*)::integer from form_templates where name='P117 Enquiry'), 0, 'the form is gone');
-select is((select count(*)::integer from form_submissions), 1, 'the submission it collected is not');
+select is((select count(*)::integer from form_submissions), 2, 'the submissions it collected are not');
 select ok((select form_template_id is null from form_submissions limit 1), 'the submission no longer points at a form');
 select is((select template_snapshot->'template'->>'name' from form_submissions limit 1), 'P117 Enquiry',
   'the submission remembers which form it answered');
@@ -86,16 +146,16 @@ select is((select jsonb_array_length(template_snapshot->'fields') from form_subm
 reset role;
 select is((select requires_form from task_instances where id='51170000-0000-0000-0000-000000000001'), false,
   'a task stops demanding a form nobody can fill');
-select ok((select form_template_id is null from fms_stages where id='71170000-0000-0000-0000-000000000001'),
-  'a published workflow stage releases the form');
-select is((select new_value->'impact'->>'submissions' from audit_logs where action='form_deleted' order by created_at desc limit 1), '1',
+select ok((select form_template_id=(select id from form_templates where name='P117 Enquiry v2') from fms_stages where id='71170000-0000-0000-0000-000000000001'),
+  'the published workflow stage keeps the explicit replacement');
+select is((select new_value->'impact'->>'submissions' from audit_logs where action='form_deleted' order by created_at desc limit 1), '2',
   'the audit records what the deletion detached');
 select is((select status::text from fms_flows where id='61170000-0000-0000-0000-000000000001'), 'draft',
   'the workflow comes off the air and waits as a draft');
 select ok((select published_by is null from fms_flows where id='61170000-0000-0000-0000-000000000001'),
   'the workflow no longer claims to be published');
 select throws_ok($$select assert_fms_flow_publishable('61170000-0000-0000-0000-000000000001')$$,
-  '23514', null, 'the workflow cannot go live again until the stage gets a form');
+  '23514', null, 'the synthetic workflow still needs its separate timing rule before publish');
 
 -- The published-stage exemption is exactly one column wide ------------------
 select is((select status::text from fms_flows where id='61170000-0000-0000-0000-000000000002'), 'published',
@@ -114,12 +174,28 @@ select throws_ok($$select delete_form_with_audit('81170000-0000-0000-0000-000000
   '42501', null, 'staff still cannot delete a form');
 select throws_ok($$select form_deletion_impact('81170000-0000-0000-0000-000000000001')$$,
   '42501', null, 'staff cannot even ask what deleting a form would cost');
+select throws_ok($$select form_usage_impact('81170000-0000-0000-0000-000000000001')$$,
+  '42501', null, 'staff cannot inspect form edit usage');
 select ok(has_function_privilege('authenticated','form_deletion_impact(uuid)','EXECUTE'),
   'a form author can read the warning');
 select ok(not has_function_privilege('anon','form_deletion_impact(uuid)','EXECUTE'),
   'anonymous callers cannot');
 select function_owner_is('public','delete_form_with_audit',array['uuid'],'postgres',
   'the deletion RPC is still owned by postgres');
+
+reset role;
+insert into tenants(id,name,slug) values ('11170000-0000-0000-0000-000000000002','Other test tenant','phase117-other');
+insert into form_templates(id,tenant_id,name,lifecycle,created_by)
+values ('81170000-0000-0000-0000-000000000002','11170000-0000-0000-0000-000000000002','Other tenant form','draft','41170000-0000-0000-0000-000000000001');
+set local role authenticated;
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','a1170000-0000-0000-0000-000000000001',true);
+select throws_ok($$select form_usage_impact('81170000-0000-0000-0000-000000000002')$$,
+  '42501', null, 'an author cannot inspect another tenant form');
+select ok(not has_function_privilege('anon','form_usage_impact(uuid)','EXECUTE'),
+  'anonymous callers cannot request the form usage report');
+select ok(not has_function_privilege('service_role','form_usage_impact(uuid)','EXECUTE'),
+  'the form usage report is not a broad service-role entry point');
 
 select * from finish();
 rollback;

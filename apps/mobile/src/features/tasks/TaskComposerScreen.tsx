@@ -295,7 +295,7 @@ export function TaskComposerScreen() {
           disabled={Boolean(createdTaskId)}
           label="Required form"
           onChange={(selected) => setFormTemplateId(selected[0] ?? "")}
-          options={[{ value: "", label: "No form required" }, ...data.forms.map((form) => ({ value: form.id, label: form.name }))]}
+          options={[{ value: "", label: "No form required" }, ...data.forms.filter((form) => form.lifecycle === "published").map((form) => ({ value: form.id, label: `${form.name} v${form.version}` }))]}
           selected={[formTemplateId]}
         />
         <Text tone="muted" variant="caption">The selected form must be completed before this task can be finished.</Text>

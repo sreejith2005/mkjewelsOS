@@ -1,5 +1,5 @@
 import { supabase } from "@jewelos/api-client";
-import type { Json, Tables } from "@jewelos/core";
+import type { FormUsageImpact, Json, Tables } from "@jewelos/core";
 import { normalizeFormDefinition, parseFormOptions, type FormBranch, type FormFieldDefinition, type FormRule, type FormSectionDefinition, type FormTemplateDefinition } from "@jewelos/core";
 import { loadMasterOptions, toFormMasterOptions } from "@/features/dropdowns/api";
 
@@ -118,6 +118,7 @@ export async function loadFormDynamicOptions() {
 }
 export const saveDraft = async (id: string | null, payload: Json, fields: Json): Promise<string> => { const { data, error } = await supabase.rpc("save_form_draft_with_audit", { p_template_id: id as string, p_payload: payload, p_fields: fields }); fail("Save form draft", error); if (!data) throw new Error("Save form draft: the server did not return the draft id"); return data; };
 export const savePublishedForm = async (id: string, payload: Json, fields: Json) => { const { error } = await supabase.rpc("save_published_form_with_audit", { p_template_id: id, p_payload: payload, p_fields: fields }); fail("Save published form", error); };
+export const formUsageImpact = async (id: string): Promise<FormUsageImpact> => { const { data, error } = await supabase.rpc("form_usage_impact", { p_template_id: id }); fail("Check form usage", error); if (!data) throw new Error("Check form usage returned no result"); return data as unknown as FormUsageImpact; };
 export const reviseForm = async (id: string) => { const { data, error } = await supabase.rpc("create_form_revision_with_audit", { p_source_template_id: id, p_payload: {} }); fail("Create form revision", error); if (!data) throw new Error("Create form revision: the server did not return the new draft"); return data as string; };
 export const publishForm = async (id: string) => { const { error } = await supabase.rpc("publish_form_with_audit", { p_template_id: id }); fail("Publish form", error); };
 export const archiveForm = async (id: string) => { const { error } = await supabase.rpc("archive_form_with_audit", { p_template_id: id }); fail("Archive form", error); };

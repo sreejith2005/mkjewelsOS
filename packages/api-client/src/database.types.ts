@@ -8882,6 +8882,7 @@ export type Database = {
         Returns: boolean
       }
       form_deletion_impact: { Args: { p_template_id: string }; Returns: Json }
+      form_usage_impact: { Args: { p_template_id: string }; Returns: Json }
       form_field_option_values: {
         Args: { p_master_type: string; p_options: Json; p_tenant_id: string }
         Returns: Json

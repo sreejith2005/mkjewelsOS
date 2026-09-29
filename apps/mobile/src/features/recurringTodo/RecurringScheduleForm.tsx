@@ -53,11 +53,12 @@ export function RecurringScheduleForm({ data, template, onCancel, onSave }: Recu
     template?.task_type === "delegation" ? "task" : "checklist",
   );
   const [buddy, setBuddy] = useState(template?.buddy_assignment_allowed ?? true);
+  const [formTemplateId, setFormTemplateId] = useState(template?.form_template_id ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const assignee = useMemo(() => data.users.find((candidate) => candidate.id === user), [data.users, user]);
-  const draft = { title, description, frequency, start, startTime, dueTime, mode, buddy };
+  const draft = { title, description, frequency, start, startTime, dueTime, mode, buddy, formTemplateId };
 
   const submit = async () => {
     const invalid = validateRecurringTemplateDraft(draft, assignee ?? null);
@@ -154,6 +155,16 @@ export function RecurringScheduleForm({ data, template, onCancel, onSave }: Recu
         />
       </View>
 
+      <OptionPicker
+        label="Required form version"
+        onChange={(selected) => setFormTemplateId(selected[0] ?? "")}
+        options={[
+          { value: "", label: "No form required" },
+          ...(formTemplateId && !data.forms.some((form) => form.id === formTemplateId) ? [{ value: formTemplateId, label: "Current pinned form (unavailable for new work)" }] : []),
+          ...data.forms.filter((form) => form.lifecycle === "published" || form.id === formTemplateId).map((form) => ({ value: form.id, label: `${form.name} v${form.version}${form.lifecycle === "archived" ? " (current pinned version)" : " (published)"}` })),
+        ]}
+        selected={[formTemplateId]}
+      />
       <View style={styles.actions}>
         <Button label="Cancel" onPress={onCancel} variant="secondary" />
         <Button

@@ -20,13 +20,14 @@ export function TaskTemplateForm({ data, template, onCancel, onSave }: { data: T
   const [dueTime, setDueTime] = useState(template?.due_time?.slice(0, 5) ?? template?.planned_time?.slice(0, 5) ?? "");
   const [mode, setMode] = useState<"task" | "checklist">(template?.task_type === "delegation" ? "task" : "checklist");
   const [buddy, setBuddy] = useState(template?.buddy_assignment_allowed ?? true);
+  const [formTemplateId, setFormTemplateId] = useState(template?.form_template_id ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const assignee = useMemo(() => data.users.find((candidate) => candidate.id === user), [data.users, user]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    const draft = { title, description, frequency, start, startTime, dueTime, mode, buddy };
+    const draft = { title, description, frequency, start, startTime, dueTime, mode, buddy, formTemplateId };
     const invalid = validateRecurringTemplateDraft(draft, assignee ?? null);
     if (invalid || !assignee) { setError(invalid); return; }
     setSaving(true);
@@ -44,6 +45,7 @@ export function TaskTemplateForm({ data, template, onCancel, onSave }: { data: T
       <Field label="Frequency *"><select className="field" value={frequency} onChange={(event) => setFrequency(event.target.value)}>{FREQUENCIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field><Field label="Task Start Date *"><input className="field" required type="date" value={start} onChange={(event) => setStart(event.target.value)} /></Field><Field label="Scheduled Start Time"><input className="field" required type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} /></Field><Field label="Due Time"><input className="field" required type="time" value={dueTime} onChange={(event) => setDueTime(event.target.value)} /></Field>
     </div>{!start ? <Notice tone="task">Select a start date.</Notice> : null}</section>
     <section className="rounded-2xl border border-task-border bg-task-bg p-4"><p className="mb-4 text-xs font-semibold uppercase tracking-wider">3 · Task Controls</p><div className="grid gap-4 sm:grid-cols-2"><Field label="Task Type *"><select className="field" value={mode} onChange={(event) => setMode(event.target.value as "task" | "checklist")}><option value="checklist">CHECKBOX — Tap to complete</option><option value="task">TASK — Upload image to complete</option></select></Field><Field label="Buddy Assignment Allowed"><select className="field" value={buddy ? "yes" : "no"} onChange={(event) => setBuddy(event.target.value === "yes")}><option value="yes">Yes</option><option value="no">No</option></select></Field></div></section>
+    <Field label="Required form version"><select className="field" value={formTemplateId} onChange={(event) => setFormTemplateId(event.target.value)}><option value="">No form required</option>{formTemplateId && !data.forms.some((form) => form.id === formTemplateId) ? <option value={formTemplateId}>Current pinned form (unavailable for new work)</option> : null}{data.forms.filter((form) => form.lifecycle === "published" || form.id === formTemplateId).map((form) => <option key={form.id} value={form.id}>{form.name} v{form.version}{form.lifecycle === "archived" ? " (current pinned version)" : " (published)"}</option>)}</select></Field>
     <div className="flex justify-end"><Button disabled={saving} type="submit">{saving ? "Saving…" : template ? "Update Task" : "Save Task"}</Button></div>
   </form>;
 }

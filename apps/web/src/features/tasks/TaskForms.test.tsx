@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TaskReferenceData } from "./api";
 import { TaskTemplateForm } from "./TaskForms";
@@ -56,6 +56,27 @@ describe("recurring schedule form", () => {
       department_id: "department-1",
       default_assignee_user_id: "user-1",
     });
+  });
+
+  it("offers the latest published form version for an existing pinned template", async () => {
+    cleanup();
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const forms = [
+      { id: "form-v1", name: "Check", family_id: "family", version: 1, lifecycle: "archived" },
+      { id: "form-v2", name: "Check", family_id: "family", version: 2, lifecycle: "published" },
+    ] as TaskReferenceData["forms"];
+    render(<TaskTemplateForm data={{ ...referenceData, forms }} template={{ id: "template-1", form_template_id: "form-v1" } as never} onCancel={vi.fn()} onSave={onSave} />);
+    const picker = screen.getByLabelText("Required form version") as HTMLSelectElement;
+    expect(picker.value).toBe("form-v1");
+    expect(screen.getByRole("option", { name: "Check v2 (published)" })).toBeTruthy();
+    fireEvent.change(picker, { target: { value: "form-v2" } });
+    fireEvent.change(screen.getByLabelText("Assign To User *"), { target: { value: "user-1" } });
+    fireEvent.change(screen.getByLabelText("Core Task *"), { target: { value: "Open showroom" } });
+    fireEvent.change(screen.getByLabelText("Scheduled Start Time"), { target: { value: "09:00" } });
+    fireEvent.change(screen.getByLabelText("Due Time"), { target: { value: "18:00" } });
+    fireEvent.submit(screen.getByRole("button", { name: "Update Task" }).closest("form") as HTMLFormElement);
+    await vi.waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0]?.[1]).toMatchObject({ form_template_id: "form-v2", requires_form: true });
   });
 
 });
