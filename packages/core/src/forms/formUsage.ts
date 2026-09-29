@@ -8,6 +8,10 @@ export type FormUsageImpact = {
 };
 
 export function describePublishedFormEdit(impact: FormUsageImpact): string {
+  const starterFlows = new Map<string, number>();
+  for (const assignment of impact.starterAssignments) {
+    starterFlows.set(assignment.flowName, (starterFlows.get(assignment.flowName) ?? 0) + 1);
+  }
   const lines = [
     `Edit ${impact.form.name} v${impact.form.version} under the same form ID?`,
     "Connected FMS stages:",
@@ -17,7 +21,8 @@ export function describePublishedFormEdit(impact: FormUsageImpact): string {
     ...impact.taskTemplates.map((task) => `• ${task.title}${task.active ? "" : " (inactive)"}`),
     "Open tasks:",
     ...impact.tasks.map((task) => `• ${task.title} (${task.status})`),
-    `${impact.starterAssignments.length} pending FMS starter assignment${impact.starterAssignments.length === 1 ? "" : "s"} use this form.`,
+    "Pending FMS starter assignments:",
+    ...[...starterFlows].map(([flowName, count]) => `• ${flowName}: ${count} pending starter assignment${count === 1 ? "" : "s"}`),
     `${impact.submissions} completed submissions retain their original questions.`,
     "Saving here changes the questions shown to future submissions and open work that uses this ID. Changing question keys or answer choices can break FMS answer routes or answers already in progress.",
     "Create a new version to keep old work on its current form, then select the new version in connected tasks and FMS stages.",

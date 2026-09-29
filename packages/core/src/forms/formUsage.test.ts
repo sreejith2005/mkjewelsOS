@@ -15,7 +15,7 @@ describe("describePublishedFormEdit", () => {
     expect(message).toContain("Sales FMS v2 / Start (3 active runs)");
     expect(message).toContain("Call customer");
     expect(message).toContain("Customer A");
-    expect(message).toContain("1 pending FMS starter assignment");
+    expect(message).toContain("Sales FMS: 1 pending starter assignment");
     expect(message).toContain("4 completed submissions retain their original questions");
     expect(message).toContain("Create a new version");
     expect(message).toContain("question keys or answer choices");
