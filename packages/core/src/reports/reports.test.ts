@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { canExportReport, csvCell, encodeCsv, escapeSpreadsheetFormula, filtersToSearchParams, parseReportFilters, REPORT_CATALOG, reportFor, reportsForRole, safeExportFilename } from "./index";
 
 describe("fixed report catalog",()=>{
-  it("contains the required unique fixed reports",()=>{expect(REPORT_CATALOG).toHaveLength(13);expect(new Set(REPORT_CATALOG.map((item)=>item.key)).size).toBe(13);});
-  it("keeps HR out of CRM and housekeeping in own operational reports",()=>{expect(reportsForRole("hr").some((item)=>item.key.startsWith("crm_"))).toBe(false);expect(reportsForRole("housekeeping").map((item)=>item.key)).toContain("task_operations");});
-  it("allows exports only when report and role allow it",()=>{expect(canExportReport("crm","crm_followups")).toBe(true);expect(canExportReport("hr","crm_followups")).toBe(false);expect(canExportReport("admin","export_history")).toBe(false);});
+  it("contains the required unique fixed reports",()=>{expect(REPORT_CATALOG).toHaveLength(9);expect(new Set(REPORT_CATALOG.map((item)=>item.key)).size).toBe(9);});
+  it("hides the old CRM reports from every role since the CRM cutover and keeps housekeeping in own operational reports",()=>{for(const role of ["super_admin","admin","manager","crm","hr"] as const)expect(reportsForRole(role).some((item)=>item.key.startsWith("crm_"))).toBe(false);expect(reportFor("crm_walkins")).toBeUndefined();expect(reportsForRole("crm").length).toBeGreaterThan(0);expect(reportsForRole("housekeeping").map((item)=>item.key)).toContain("task_operations");});
+  it("allows exports only when report and role allow it",()=>{expect(canExportReport("crm","task_operations")).toBe(true);expect(canExportReport("crm","crm_followups")).toBe(false);expect(canExportReport("hr","task_operations")).toBe(false);expect(canExportReport("admin","export_history")).toBe(false);});
   it("contains no sensitive CRM contacts, form answers, or paths",()=>expect(REPORT_CATALOG.flatMap((item)=>item.columns).some((column)=>/phone|email|answer|document|path/i.test(column.key))).toBe(false));
 });
 

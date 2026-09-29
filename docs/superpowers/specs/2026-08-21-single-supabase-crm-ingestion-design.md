@@ -1,3 +1,5 @@
+> Superseded for the CRM application/data layer by 2026-09-25-crm-native-integration-design.md.
+
 # Single-Supabase CRM and Google Sheets Ingestion Design
 
 ## Status and decision

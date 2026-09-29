@@ -6,6 +6,7 @@ import {
   NATIVE_WORK_ROUTES,
   accessibleMenu,
   buildLauncherItems,
+  crmTabFullScreen,
   isTaskPath,
   navigatePath,
   pageDecision,
@@ -161,10 +162,37 @@ it("uses the approved web paths for visible native tabs", () => {
 it("resolves every implemented web menu destination and every exact work-item target", () => {
   const implemented = new Set(IMPLEMENTED_PAGE_IDS);
   expect(ALL_MENU_ITEMS.filter((item) => implemented.has(item.id)).every((item) => resolveNativeDestination(item.path) !== null)).toBe(true);
-  expect(NATIVE_WORK_ROUTES).toEqual({ task: "TaskDetail", fmsInstance: "FmsInstance", fmsStage: "FmsStage", fmsStageForm: "FmsStageForm", formSubmission: "FormSubmission", crmClient: "ClientDetail", notificationInbox: "Section" });
+  expect(NATIVE_WORK_ROUTES).toEqual({ task: "TaskDetail", fmsInstance: "FmsInstance", fmsStage: "FmsStage", fmsStageForm: "FmsStageForm", formSubmission: "FormSubmission", crmClient: "Crm", notificationInbox: "Section" });
 });
 
 it("describes the theme the toggle will activate", () => {
   expect(themeToggleLabel("light")).toBe("Switch to dark mode");
   expect(themeToggleLabel("dark")).toBe("Switch to light mode");
+});
+
+describe("CRM tab (CRM Phase 6: the web CRM in a WebView)", () => {
+  it("is full-screen, without the native header and dock, when the CRM section is open to the user", () => {
+    expect(crmTabFullScreen(shellFor("crm"))).toBe(true);
+    expect(crmTabFullScreen(shellFor("manager"))).toBe(true);
+  });
+
+  it("keeps the native shell (and its notice) when the section is disabled or the user lacks crm.view", () => {
+    expect(pageDecision(shellFor("crm", withSectionOff("crm")), "crm")).toBe("disabled");
+    expect(crmTabFullScreen(shellFor("crm", withSectionOff("crm")))).toBe(false);
+    expect(pageDecision(shellFor("housekeeping"), "crm")).toBe("denied");
+    expect(crmTabFullScreen(shellFor("housekeeping"))).toBe(false);
+  });
+
+  it("lists the CRM in the drawer only for users with crm.view and an enabled section", () => {
+    expect(buildLauncherItems(shellFor("crm")).some((item) => item.id === "crm")).toBe(true);
+    expect(buildLauncherItems(shellFor("housekeeping")).some((item) => item.id === "crm")).toBe(false);
+    expect(buildLauncherItems(shellFor("crm", withSectionOff("crm"))).some((item) => item.id === "crm")).toBe(false);
+  });
+
+  it("opens /crm links, including Home's CRM follow-ups, on the CRM tab", () => {
+    const { calls, handlers } = recorder();
+    expect(navigatePath("/crm", shellFor("crm"), handlers)).toBe(true);
+    expect(calls).toEqual(["path:/crm", "tab:Crm"]);
+    expect(NATIVE_WORK_ROUTES.crmClient).toBe("Crm");
+  });
 });

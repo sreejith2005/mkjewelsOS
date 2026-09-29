@@ -113,6 +113,29 @@ Important current contracts include:
   user administration, controlled roster reconciliation, and section
   maintenance controls.
 
+### CRM (2026-09-25 owner decision)
+
+The CRM in `packages/crm-ui` (rendered by the web app at `/crm`; Phase 3) and
+database schema `crm` (migrations 0183-0192) is a port of the original MK Jewels
+CRM (`sreejith-crm/web-app`). Parity with the original - screens, fields, order,
+labels, vocabularies, flows, validation, calculations and styling - is the
+acceptance criterion; do not improve, rename, re-order, or merge it with the old
+JewelOS CRM (`public.clients`, `public.client_timeline`, ...), which stays untouched
+until the approved cutover. Approved exception to rule 7: the CRM UI keeps the
+original palette, fonts and CSS, scoped to the CRM surface only. `sreejith-crm/` is
+a read-only reference, not a dependency: never import from it or build it, and never
+copy its `.env*`, `*.xlsx`, `migration-backups`, `migration-reports`, or Android
+build outputs. JewelOS login is the only CRM login; CRM identity resolves through
+the audited bridge in 0183 (`crm.current_crm_user_id()`). The original's two server
+routes are the Edge Functions `crm-walkin-ingest` (Apps Script, key header, service_role
+RPCs of 0189 only) and `crm-runo-push` (caller JWT, RLS); owner cutover steps are in
+`docs/CRM_SHEETS_INGEST_CUTOVER.md`. CRM work is done only in the worktree `C:\crm`
+(branch `feat/crm-native`); tooling reads the original from `CRM_ORIGINAL_DIR`
+(default `C:\Users\MIS\Downloads\MKJewelOS\sreejith-crm\web-app`). Design and phases:
+`docs/superpowers/specs/2026-09-25-crm-native-integration-design.md`. crm read
+access is company-wide for active CRM users by owner decision; writes follow
+the original branch rules; the database enforces both.
+
 Read the relevant source, migration, and pgTAP test before changing one of
 these areas. Preserve historical task/form/FMS data when evolving a contract.
 For authoritative roster work, preserve personal contact information and use

@@ -39,6 +39,13 @@ EXPO_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon key>
 ```
 
+The CRM tab (CRM Phase 6) also reads
+`EXPO_PUBLIC_JEWELOS_WEB_ORIGIN=https://<jewelos web host>`: the JewelOS web origin whose `/crm`
+route the tab shows in a WebView. It is **required for a release**: `scripts/release-mobile.ps1`
+refuses to build without a valid https origin and prints the value it uses
+(`docs/MOBILE_RELEASE_GUIDE.md`). A debug build may leave it out (the tab then says "CRM not
+configured") or use a local `http://10.0.2.2:<port>` (emulator) or LAN address.
+
 Only the `EXPO_PUBLIC_` prefix is inlined by Expo's Babel transform, and it is
 inlined **at build time**. Changing either value requires a rebuild — a Metro
 reload will not pick it up. The anon key is safe to ship for the same reason it

@@ -22,7 +22,9 @@ Repository: `C:\Users\MIS\Downloads\MKJewelOS`. `C:\jos` is a stale clone. Ignor
    from mobile.
 4. The database is the authority. Hiding a control is presentation. RLS, RPCs,
    and Edge Functions enforce access.
-5. No Capacitor, no WebView, no mobile-only business rules, no mock data.
+5. No Capacitor, no WebView, no mobile-only business rules, no mock data. One approved
+   exception (owner decision 2026-09-25): the CRM tab shows the web `/crm` route (the ported
+   original CRM) in a WebView; see the CRM design's "Mobile WebView (Phase 6)".
 6. Same wording as web. Copy user-facing strings verbatim.
 7. A failed write stays visible and retryable. Never fake success.
 
@@ -251,7 +253,7 @@ Status as of 2026-09-21. Source parity is tracked in `MOBILE_PARITY_MATRIX.md`; 
 | Assigning Left | `AssigningLeftScreen` | |
 | Uploads | `lib/pickFile.ts` | Camera, gallery, files |
 | Task creation and import | `TaskComposerScreen`, `TaskImportScreen`, `VoiceTaskCapture` | Manual, voice-assisted, CSV/XLSX, correction/resume, Assigning Left |
-| CRM | `CrmScreen`, `ClientEditorScreen`, `ClientDetailScreen`, `CrmFollowupsScreen`, `CrmMergeScreen`, `WalkinScreen` | Directory filters, client mutations, visits, follow-ups, merge, documents, links |
+| CRM | `features/crm/CrmWebViewScreen` (CRM Phase 6, web `/crm` in a WebView); the old `CrmScreen`, `ClientEditorScreen`, `ClientDetailScreen`, `CrmFollowupsScreen`, `CrmMergeScreen`, `WalkinScreen` stay unrouted until the Phase 7 retirement | Identical to the web CRM by construction (same route) |
 | Forms library and review | `FormsLibraryScreen`, `FormBuilderScreen`, `FormSubmissionsScreen`, `FormSubmissionScreen` | Lifecycle, authoring, fill, immutable snapshots, file access, approve/reject, delete impact |
 | Dropdown Master | `DropdownMasterScreen` | Status/search/category filters, counts, create/edit, safe deactivate/reactivate |
 | User organization | `UsersScreen`, `features/users/OrganizationTree` | List and hierarchy, status/branch/department/search filters, cycle-safe reporting tree |

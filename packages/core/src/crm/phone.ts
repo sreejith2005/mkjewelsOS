@@ -1,4 +1,5 @@
-import type { NormalizedPhone } from "./types";
+// Used by the legacy import preparation (legacyImport.ts) of the old JewelOS CRM tables.
+export type NormalizedPhone = { display: string; normalized: string };
 
 const MOBILE = /^[6-9][0-9]{9}$/;
 
@@ -11,12 +12,4 @@ export function normalizeIndianPhone(value: string): NormalizedPhone | null {
   else if (digits.startsWith("0") && digits.length === 11) digits = digits.slice(1);
   if (!MOBILE.test(digits)) return null;
   return { display, normalized: `+91${digits}` };
-}
-
-export function isValidEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()) && value.trim().length <= 254;
-}
-
-export function isValidIndianPincode(value: string): boolean {
-  return /^[1-9][0-9]{5}$/.test(value.trim());
 }
