@@ -1,5 +1,5 @@
 // Copies the original CRM's Storage objects (bucket crm-documents) into JewelOS bucket
-// crm-legacy-documents at the same object path (0187: only the bucket id changes, so the imported
+// crm-legacy-documents at the same object path (0188: only the bucket id changes, so the imported
 // crm.documents.storage_path values stay valid). Verifies size and eTag on download and SHA-256
 // after upload, and writes a manifest. Keys come from the environment at run time only:
 //

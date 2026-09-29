@@ -20,7 +20,9 @@ phase is handed over; hosted steps additionally need owner approval.
 
 Files:
 
-- `supabase/migrations/0182_crm_schema_tables.sql` .. `0187_crm_storage_bucket.sql`
+- `supabase/migrations/0183_crm_schema_tables.sql` .. `0188_crm_storage_bucket.sql` (renumbered
+  again 2026-09-29 from `0182`-`0187`: `main` took `0182_form_dependencies_fms_draft_safety.sql`
+  first, caught by the cutover checklist's gate-2 precondition before any hosted action)
 - `supabase/tests/0183_crm_identity_bridge.test.sql` (privileges, bridge,
   fail-closed cases, branch scoping, link RPCs, ingest path, old CRM untouched)
 - `supabase/tests/0184_crm_original_behaviour.test.sql` (port of
@@ -35,7 +37,7 @@ Gate (met locally): `supabase.cmd db reset`, `supabase.cmd test db`,
 `git diff --check`; catalog, function-body and seed diffs against a replay of the
 original migrations show only the documented differences.
 
-Hosted (owner action, later): add `crm` to Exposed schemas; apply 0182-0187 with
+Hosted (owner action, later): add `crm` to Exposed schemas; apply 0183-0188 with
 the production playbook.
 
 ## Phase 3 - Web UI port (`packages/crm-ui`)
@@ -52,7 +54,7 @@ Status (2026-09-25, branch `feat/crm-native`, local only): implemented. Record:
   (`src/crm-port/app-router.tsx`). The original `app/` tree keeps its layout.
 - The stylesheet uses id-tier scoping (`.crm-root#crm-root…`), not class prefixing alone,
   because Tailwind 4's cascade layers would otherwise lose to JewelOS's unlayered CSS.
-- Audit addendum: `0188_crm_direct_write_audit.sql` (design open question 6).
+- Audit addendum: `0189_crm_direct_write_audit.sql` (design open question 6).
 
 Stack facts: original = Next 16 / React 19 / Tailwind 4 with async server-component
 pages and `next/navigation`, `next/link`, one `next/image`, one server action
@@ -123,7 +125,7 @@ Files:
 - `supabase/functions/crm-runo-push/` - port of `app/api/leads/[leadId]/runo/route.ts`;
   caller JWT verified, owner/super-admin check through the bridge, Runo
   credentials server-side only.
-- `supabase/migrations/0189_crm_ingest_service_grants.sql` - `service_role`:
+- `supabase/migrations/0190_crm_ingest_service_grants.sql` - `service_role`:
   USAGE on `crm`, EXECUTE on the two ingest RPCs, INSERT/SELECT on the attempts
   ledger, and only what `crm-runo-push` needs.
 - Tests: Deno tests per function (bad secret, malformed body, rate limit,
@@ -133,7 +135,7 @@ Gate: function tests; pgTAP; local end-to-end call with a synthetic payload.
 Hosted: deploy functions, set secrets, repoint Apps Script (owner).
 
 Delivered (local only): `crm-walkin-ingest`, `crm-runo-push`, migration
-`0189_crm_ingest_service_grants.sql` (service_role: USAGE on `crm` and EXECUTE on three RPCs, no
+`0190_crm_ingest_service_grants.sql` (service_role: USAGE on `crm` and EXECUTE on three RPCs, no
 table privilege; the ingest RPC does branch lookup + visit + ledger + audit in one transaction),
 pgTAP 0189, Deno tests, `crm:parity -- --ingest`, `docs/CRM_SHEETS_INGEST_CUTOVER.md`.
 Intentional differences from the originals: the Runo lead id is sent in the JSON body, not the URL;
@@ -191,7 +193,7 @@ applied through `crm.link_jewelos_profile` / `crm.link_jewelos_branch` (audited)
 
 Status (2026-09-28, Phase 5 complete locally): owner decisions D1-D8 are recorded in the design
 and the runbook. The rehearsal was repeated on a fresh isolated target built from HEAD (with
-0190/0191): all 22 Storage objects copied and verified (size, eTag, SHA-256), import committed,
+0191/0192, renumbered 2026-09-29): all 22 Storage objects copied and verified (size, eTag, SHA-256), import committed,
 reconciliation ACCEPTED (38 tables equal in rows and hashes, 0 FK orphans, rollups identical,
 Storage 9/9 documents and 22/22 objects, one audit row with the dry run's checksum), and the
 read-only real-data parity with D5 applied to both apps. Evidence is private
@@ -219,7 +221,9 @@ Design and threat model: the design's "Mobile WebView (Phase 6)".
 ## Phase 7 - Cutover and retirement
 
 Status (2026-09-28, prepared on `feat/crm-native`, nothing hosted changed): merged `origin/main`
-(`1b1b5d0`, no new migrations, so the CRM series stays `0182`-`0191`). Owner decisions: Home "CRM
+(`1b1b5d0`, no new migrations, so the CRM series stayed `0182`-`0191` at that point; renumbered
+again 2026-09-29 to `0183`-`0192` when `main` took `0182_form_dependencies_fms_draft_safety.sql`).
+Owner decisions: Home "CRM
 Tasks" / "CRM Follow-ups Due", the four old CRM reports and the six old CRM dashboard metrics are
 hidden on web and mobile (they read the archived `public` CRM tables, which stay untouched); the old
 native CRM UI is deleted (web `features/crm` + `CRMPage`; mobile `Crm*`/`ClientDetail`/`ClientEditor`/

@@ -87,16 +87,20 @@ Principles:
 
 | Migration | Content |
 | --- | --- |
-| `0182_crm_schema_tables.sql` | schema `crm`, 8 enums, 38 tables, 2 sequences, constraints, indexes |
-| `0183_crm_identity_bridge.sql` | link columns, `crm_private`, identity resolver, re-implemented identity helpers, audit writer, link RPCs |
-| `0184_crm_functions_triggers.sql` | 49 original functions and 27 triggers |
-| `0185_crm_rls_grants.sql` | RLS on every table, 107 original policies, section gate, grants |
-| `0186_crm_lookup_seed.sql` | the original lookup and lead-form seed statements |
-| `0187_crm_storage_bucket.sql` | bucket `crm-legacy-documents` and the 4 original object policies |
-| `0188_crm_direct_write_audit.sql` | audit rows for direct (non-RPC) writes (Phase 3) |
-| `0189_crm_ingest_service_grants.sql` | service-role ingest RPCs (Phase 4) |
-| `0190_crm_deterministic_order.sql` | D5 tie-breakers in `browse_clients`, `search_clients` and the follow-up trigger |
-| `0191_crm_ensure_my_crm_user.sql` | D2 first-use provisioning RPC |
+| `0183_crm_schema_tables.sql` | schema `crm`, 8 enums, 38 tables, 2 sequences, constraints, indexes |
+| `0184_crm_identity_bridge.sql` | link columns, `crm_private`, identity resolver, re-implemented identity helpers, audit writer, link RPCs |
+| `0185_crm_functions_triggers.sql` | 49 original functions and 27 triggers |
+| `0186_crm_rls_grants.sql` | RLS on every table, 107 original policies, section gate, grants |
+| `0187_crm_lookup_seed.sql` | the original lookup and lead-form seed statements |
+| `0188_crm_storage_bucket.sql` | bucket `crm-legacy-documents` and the 4 original object policies |
+| `0189_crm_direct_write_audit.sql` | audit rows for direct (non-RPC) writes (Phase 3) |
+| `0190_crm_ingest_service_grants.sql` | service-role ingest RPCs (Phase 4) |
+| `0191_crm_deterministic_order.sql` | D5 tie-breakers in `browse_clients`, `search_clients` and the follow-up trigger |
+| `0192_crm_ensure_my_crm_user.sql` | D2 first-use provisioning RPC |
+
+(Renumbered 2026-09-29: `main` took `0182_form_dependencies_fms_draft_safety.sql` before gate 0,
+so this series shifted from `0182`-`0191` to `0183`-`0192`. Test file names below that mirror a
+migration's OLD number are unchanged — see the note where each is cited.)
 
 Method. All original Prisma migrations `20260723000000` .. `20260803010000`
 (including the uncommitted `20260803010000_lead_calling_foundation`) were replayed
@@ -212,7 +216,7 @@ Nothing in the port is broader than the original — every read/write pair
 below matches `sreejith-crm/web-app/prisma/migrations/**` unless a "New"
 scope note says otherwise (the new note is always narrower, never broader).
 
-Every table in schema `crm`, classified from `0185_crm_rls_grants.sql`
+Every table in schema `crm`, classified from `0186_crm_rls_grants.sql`
 (policy names in backticks are the permissive policy that decides it; every
 table also carries the restrictive `<table>_section_available` gate, omitted
 below since it applies uniformly):
@@ -252,17 +256,20 @@ below since it applies uniformly):
 | `legacy_walkin_ingest_rate_limits` | **No direct access**; written only by the service-role ingest path | Same |
 
 `anon` and `PUBLIC` have zero privileges on schema `crm` (revoked in
-`0185_crm_rls_grants.sql`); every policy is `TO authenticated`. A JewelOS user
+`0186_crm_rls_grants.sql`); every policy is `TO authenticated`. A JewelOS user
 without `crm.view`, not linked to an active `crm.users` row, inactive, or
 whose branch has no linked CRM branch (non-`super_admin` only) resolves
 `crm.current_user_role()` to `NULL` and every `active_staff_*`/`branch_staff_*`
 policy denies them — see `crm_private.current_crm_identity()` in
-`0183_crm_identity_bridge.sql`. This is unchanged by this decision; it governs
+`0184_crm_identity_bridge.sql`. This is unchanged by this decision; it governs
 whether someone is a CRM user at all, not what a CRM user may read.
 
-`supabase/tests/0183_crm_identity_bridge.test.sql` already asserted company-wide
-client reads (`'salesperson reads clients of every branch'`) before this
-decision; `0192_crm_authorization_model.test.sql` (Phase 7) enumerates the
+`supabase/tests/0183_crm_identity_bridge.test.sql` (test filename unchanged: it mirrored the
+migration's number for reading convenience before the 2026-09-29 renumbering; renaming it to
+`0184` would collide with the existing `0184_crm_original_behaviour.test.sql`, so its filename
+stays `0183` even though the migration it covers is now `0184_crm_identity_bridge.sql`) already
+asserted company-wide client reads (`'salesperson reads clients of every branch'`) before this
+decision; `0193_crm_authorization_model.test.sql` (Phase 7) enumerates the
 full table above.
 
 ## Owner decisions on the Phase 5 questions (2026-09-28)
@@ -293,9 +300,11 @@ per-profile advisory lock. It returns `created`, `already_linked`, `not_eligible
 
 It never matches or links existing CRM users: when a `crm.users` row already has the profile's
 email (case-insensitive), nothing is created (`email_in_use`), so a historical user is never
-duplicated or taken over. Every other case creates nothing. Access is decided only by the 0183
+duplicated or taken over. Every other case creates nothing. Access is decided only by the 0184
 identity functions, which are unchanged and stay `STABLE`. An already-linked but inactive CRM
-user is not re-activated. Tests: `supabase/tests/0191_crm_ensure_my_crm_user.test.sql`.
+user is not re-activated. Tests: `supabase/tests/0191_crm_ensure_my_crm_user.test.sql` (test
+filename unchanged, same reason as the identity-bridge test above: it mirrored `0191` before the
+renumbering; the migration it covers is now `0192_crm_ensure_my_crm_user.sql`).
 
 ### Deterministic order (D5)
 
@@ -443,7 +452,7 @@ The implementation plan with files, tests and gates is
 6. Direct table writes in the original UI (clients, availability, leads, lead
    call history, campaign tags, lookups) are RLS-authorized but not audited in
    `public.audit_logs`. Accept as original behaviour, or add audit triggers?
-   Resolved in Phase 3 by `0188_crm_direct_write_audit.sql`, which audits direct
+   Resolved in Phase 3 by `0189_crm_direct_write_audit.sql`, which audits direct
    (non-RPC) writes to clients, crm_daily_availability, leads, lead_call_history and
    the lookup tables. It records entity, operation and changed column names, never
    values. Other RLS-writable tables (campaign tags, documents, entry_queue, ...)

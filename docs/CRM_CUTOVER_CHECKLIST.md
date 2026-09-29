@@ -26,6 +26,13 @@ command below must target exactly that ref.
 - The old JewelOS CRM tables (`public.clients`, `public.client_timeline`, ...) and their
   migrations/RPCs are never touched. They stay as an archive.
 - `mkjewels-sync` is unchanged by this cutover. Upload MIME rules are unchanged.
+- Gates 2 through 7 run in **one sitting**. Between gate 2 (migrations become permanent in
+  production) and gate 7 (merge to `main`), no other session may `db push` or merge migrations to
+  `main` — a migration landing on `main` in that window collides with the CRM series' numbers,
+  since Postgres/Supabase would silently skip a later migration that reuses an already-applied
+  number. The owner confirms this with any other active session before gate 2's `go`. See gate 2's
+  hard precondition for the fresh re-check right before it. After gate 7, `main`'s next free
+  migration number is `0193`.
 
 ## Findings from the read-only preflight (2026-09-28)
 
@@ -33,7 +40,7 @@ command below must target exactly that ref.
 | --- | --- |
 | Linked ref | `yimafxhuwgfhvzczqqdd` (`jewelos-prod`), confirmed in `supabase projects list` |
 | Applied migrations | `0001`-`0181`, identical to `main` (0121, 0122, 0136 do not exist on either side) |
-| Migrations the cutover applies | exactly `0182_crm_schema_tables` ... `0191_crm_ensure_my_crm_user` (10 files). Nothing else from `main` is pending. |
+| Migrations the cutover applies | exactly `0183_crm_schema_tables` ... `0192_crm_ensure_my_crm_user` (10 files, renumbered 2026-09-29: `main` took `0182_form_dependencies_fms_draft_safety.sql` first). Nothing else from `main` is pending. |
 | Schema `crm` / `crm_private` | do not exist (correct) |
 | Bucket `crm-legacy-documents` | does not exist (correct). `crm-documents` exists: it is the OLD JewelOS CRM bucket, not touched. |
 | Exposed schemas (Data API) | `public,graphql_public`; max rows 1000 |
@@ -56,7 +63,7 @@ command below must target exactly that ref.
    git status --short --branch            # clean, "## feat/crm-native...origin/feat/crm-native"
    git rev-parse HEAD origin/feat/crm-native   # identical; record the SHA
    git log --oneline HEAD..origin/main    # must be empty; if main moved, STOP (merge main, and
-                                          # renumber 0182+ if main added a migration; re-run the gates)
+                                          # renumber 0183+ if main added a migration; re-run the gates)
    ```
 
 2. Production still matches the preflight (read-only; run in the main checkout, which is linked):
@@ -119,6 +126,34 @@ The preflight found the section already OFF. Keep it OFF until step 8.
 
 **GATE 2: owner types `go`.**
 
+**Hard precondition, checked fresh right here (not just at P1/gate 0 — the migrations become
+permanent in production at this gate, so a stale check is not good enough):**
+
+```powershell
+cd C:\Users\MIS\Downloads\MKJewelOS
+git fetch origin
+git log --oneline origin/main | head -1              # must still be topped by a migration <= 0182
+git ls-tree -r --name-only origin/main -- supabase/migrations | tail -1   # must be 0182_*
+cd C:\Users\MIS\Downloads\MKJewelOS
+supabase.cmd migration list --linked                 # remote applied must still end at 0182
+```
+
+If `origin/main` or production has picked up ANY `0183+` migration since the last renumbering (from
+another session's work landing on `main`), **STOP**: do not push. Renumber the whole CRM series
+(`C:\crm\supabase\migrations\0183_*.sql`..`0192_*.sql`) to start after the new highest number,
+update every in-repo reference to the old numbers (docs, this checklist, `0193_crm_authorization_model.test.sql`
+if its number is now taken), re-run the isolated pgTAP suite, commit, push `feat/crm-native`, and
+re-present gate 2 with the corrected numbers before continuing. (This exact collision already
+happened once, 2026-09-29: `main` took `0182_form_dependencies_fms_draft_safety.sql` before gate 0,
+caught by this precondition, and the CRM series was renumbered from `0182-0191` to `0183-0192`
+accordingly — this note documents that it is not hypothetical.)
+
+**From this gate through gate 7, no other session may run `db push` or merge migrations to `main`.**
+The owner is responsible for that coordination (say so to any other active session before typing
+`go` here). Gates 2-7 should run in one sitting for this reason — a migration landing on `main`
+mid-window reopens this exact precondition. After gate 7 merges `feat/crm-native`, `main`'s next
+free migration number is **0193**.
+
 Only `C:\crm` contains the CRM migrations, so it is linked to production for this step
 (`supabase/.temp` is git-ignored and never committed):
 
@@ -127,15 +162,15 @@ cd C:\crm
 git status --short                                   # empty
 supabase.cmd link --project-ref yimafxhuwgfhvzczqqdd # enter the database password when asked
 Get-Content supabase\.temp\project-ref               # yimafxhuwgfhvzczqqdd; anything else: STOP
-supabase.cmd migration list --linked                 # remote 0001-0181; local-only 0182-0191
+supabase.cmd migration list --linked                 # remote 0001-0182; local-only 0183-0192
 supabase.cmd db push --linked --dry-run              # must list exactly the 10 files below, nothing else
 ```
 
-Expected dry-run list: `0182_crm_schema_tables.sql`, `0183_crm_identity_bridge.sql`,
-`0184_crm_functions_triggers.sql`, `0185_crm_rls_grants.sql`, `0186_crm_lookup_seed.sql`,
-`0187_crm_storage_bucket.sql`, `0188_crm_direct_write_audit.sql`,
-`0189_crm_ingest_service_grants.sql`, `0190_crm_deterministic_order.sql`,
-`0191_crm_ensure_my_crm_user.sql`.
+Expected dry-run list: `0183_crm_schema_tables.sql`, `0184_crm_identity_bridge.sql`,
+`0185_crm_functions_triggers.sql`, `0186_crm_rls_grants.sql`, `0187_crm_lookup_seed.sql`,
+`0188_crm_storage_bucket.sql`, `0189_crm_direct_write_audit.sql`,
+`0190_crm_ingest_service_grants.sql`, `0191_crm_deterministic_order.sql`,
+`0192_crm_ensure_my_crm_user.sql`.
 
 **GATE 2b: owner compares the dry run with that list and types `go`.** Then, once:
 
@@ -144,7 +179,7 @@ supabase.cmd db push --linked
 ```
 
 **Verify**
-- [ ] `supabase.cmd migration list --linked` shows `0182`-`0191` on both sides.
+- [ ] `supabase.cmd migration list --linked` shows `0183`-`0192` on both sides.
 - [ ] `supabase.cmd db query --linked "select string_agg(nspname, ',' order by nspname) from pg_namespace where nspname in ('crm','crm_private')"` returns `crm,crm_private`.
 - [ ] `supabase.cmd db query --linked "select id, public, file_size_limit from storage.buckets where id = 'crm-legacy-documents'"` returns one row, `public = false`, `file_size_limit = 10485760`.
 - [ ] `supabase.cmd db query --linked "select count(*) from crm.users"` returns `0`, and `select relname from pg_stat_user_tables where schemaname = 'crm' and n_live_tup > 0` lists only `lookup_*`, `lead_form_fields`, `lead_form_field_options`.
@@ -232,7 +267,7 @@ PowerShell window in `C:\crm`:
 
 **Rollback** (before go-live only): runbook section 10. Truncate the `crm` tables in one transaction
 with `session_replication_role = replica`, re-run the seed statements of
-`supabase/migrations/0186_crm_lookup_seed.sql`, delete the copied objects from
+`supabase/migrations/0187_crm_lookup_seed.sql`, delete the copied objects from
 `crm-legacy-documents`, add an audit note. `public.*` is never touched. Re-enable the original CRM
 (Apps Script trigger, staff back on the old app). The import can then be repeated.
 
@@ -330,7 +365,7 @@ Vercel deploys `main` to production (`vercel.json`: `pnpm --filter web build`, `
 - [ ] Vercel dashboard -> the JewelOS project -> Deployments: the production deployment for the merge SHA is **Ready**.
 - [ ] On the production web origin (hard refresh): sign-in works; Home has no "CRM Tasks" group and no "CRM Follow-ups Due" panel; Reports lists no CRM report; Dashboard shows no CRM metric.
 - [ ] As an admin, `/crm` still shows the maintenance notice (section OFF).
-- [ ] The merge did not change any migration: `git diff --stat <previous main>..HEAD -- supabase/migrations` lists only `0182`-`0191`.
+- [ ] The merge did not change any migration: `git diff --stat <previous main>..HEAD -- supabase/migrations` lists only `0183`-`0192`.
 
 **Rollback:** `git revert -m 1 <merge SHA>`, push `main`, confirm Vercel redeploys (or promote the
 previous production deployment in Vercel -> Deployments -> ... -> Promote to Production), and keep the

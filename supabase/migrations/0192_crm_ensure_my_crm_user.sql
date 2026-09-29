@@ -17,7 +17,7 @@
 -- already carries the profile's email, nothing is created (email_in_use): that historical user
 -- is linked only through the owner-approved link list (crm.link_jewelos_profile), which Phase 7
 -- runs BEFORE go-live. Every other case creates nothing and changes nothing (fail closed); access
--- is still decided only by the unchanged, STABLE identity functions of 0183.
+-- is still decided only by the unchanged, STABLE identity functions of 0184.
 --
 -- Result (for the caller's information only; the UI does not branch on it):
 --   'created' | 'already_linked' | 'not_eligible' | 'email_in_use'

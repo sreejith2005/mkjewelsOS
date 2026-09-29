@@ -13,7 +13,7 @@ export const EXCLUDED_TABLES = new Set([
 ]);
 
 /**
- * Tables that migration 0186_crm_lookup_seed fills in the target before any import, and the
+ * Tables that migration 0187_crm_lookup_seed fills in the target before any import, and the
  * natural key each is matched on. They are the only crm tables allowed to be non-empty.
  */
 export const SEEDED_TABLES = new Map([

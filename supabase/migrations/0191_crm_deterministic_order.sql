@@ -1,7 +1,7 @@
 -- D5 (owner decision 2026-09-28): deterministic order in the ported CRM functions.
 -- A unique tie-breaker (the table's primary key, same direction as the last sort key) is added
 -- to every ORDER BY that can tie, so results are deterministic. Each edit is marked
--- `crm-port: deterministic order`. The bodies are otherwise the 0184 definitions, unchanged; CREATE OR REPLACE
+-- `crm-port: deterministic order`. The bodies are otherwise the 0185 definitions, unchanged; CREATE OR REPLACE
 -- keeps owners, privileges and the trigger that uses create_not_bought_followup_from_visit_form.
 -- The edit list is scripts/crm-parity/deterministic-order.mjs (SQL_EDITS); the parity harness
 -- applies the same edits to the original database at run time only.

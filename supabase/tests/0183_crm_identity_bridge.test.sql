@@ -1,4 +1,6 @@
--- Original CRM port (0182-0187): privileges, identity bridge, fail-closed access,
+-- Original CRM port (0183-0188, renumbered 2026-09-29 from 0182-0187 when `main` took
+-- 0182_form_dependencies_fms_draft_safety.sql; this test file's own number is unchanged):
+-- privileges, identity bridge, fail-closed access,
 -- branch scoping, admin-only audited link RPCs, the service-role ingest path, and that
 -- the old JewelOS CRM tables are untouched.
 begin;

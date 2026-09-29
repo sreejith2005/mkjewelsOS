@@ -1,9 +1,9 @@
--- Original CRM seed data, ported as-is (see 0182 header for provenance).
+-- Original CRM seed data, ported as-is (see 0183 header for provenance).
 -- Statements are copied verbatim from the original migrations, schema-qualified to crm:
 --   20260727020000_legacy_form_lookup_options  (lookup options)
 --   20260731010000_lead_capture                (lead form fields and options)
 --   20260731020000_lead_status_first           (lead form display order)
--- The crm.normalize_lookup_label triggers (0184) upper-case labels on insert, which
+-- The crm.normalize_lookup_label triggers (0185) upper-case labels on insert, which
 -- yields the same final labels as the original 20260727040000 normalization.
 -- Not ported: the 20260727020000 crm_allocation roster insert. It joins crm.branches by
 -- name and is a no-op on the empty crm schema; roster rows arrive with the Phase 5

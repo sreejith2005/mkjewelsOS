@@ -35,15 +35,16 @@ PowerShell session at run time, and the session is closed at the end.
 ## 1. Pre-checks (owner and operator, before the freeze)
 
 1. JewelOS production has the CRM migrations applied through the production playbook. Their numbers
-   must follow main's highest migration at that time (they are `0182`-`0191` today; renumber first if
-   main moved). `crm` is in the API's exposed schemas and bucket `crm-legacy-documents` exists.
-2. The target `crm` schema holds only the rows seeded by `0186_crm_lookup_seed.sql`. In the SQL editor:
+   must follow main's highest migration at that time (they are `0183`-`0192` today, renumbered
+   2026-09-29 when `main` took `0182_form_dependencies_fms_draft_safety.sql`; renumber again first if
+   main moved further). `crm` is in the API's exposed schemas and bucket `crm-legacy-documents` exists.
+2. The target `crm` schema holds only the rows seeded by `0187_crm_lookup_seed.sql`. In the SQL editor:
 
    ```sql
    select relname, n_live_tup from pg_stat_user_tables where schemaname = 'crm' and n_live_tup > 0 order by 1;
    ```
 
-   Only the nine `lookup_*` tables seeded by 0186, `lead_form_fields` and `lead_form_field_options` may be listed
+   Only the nine `lookup_*` tables seeded by 0187, `lead_form_fields` and `lead_form_field_options` may be listed
    (the importer re-checks with exact counts and refuses otherwise).
 3. Identity/branch mapping has been reviewed: the owner has approved (or corrected)
    `C:\crm-private\work\identity-mapping-proposal.csv` and `branch-mapping-proposal.csv`, and every
@@ -139,7 +140,7 @@ node scripts/crm-import/storage-copy.mjs --source-env=C:\crm-private\source.env 
 ```
 
 Path rule: the object path is unchanged; only the bucket changes (`crm-documents` ->
-`crm-legacy-documents`, migration 0187), so the imported `crm.documents.storage_path` values need no
+`crm-legacy-documents`, migration 0188), so the imported `crm.documents.storage_path` values need no
 change. Every object in the source bucket is copied, including objects no document row references
 (D1: all 22 at the rehearsal, of which 9 are referenced).
 Each download is checked against the source size and eTag (MD5), each upload is read back and compared
@@ -207,7 +208,7 @@ truncate crm.branches, crm.campaigns, crm.client_campaign_tags, crm.client_edit_
 commit;
 ```
 
-Then re-run the seed statements of `supabase/migrations/0186_crm_lookup_seed.sql` (idempotent
+Then re-run the seed statements of `supabase/migrations/0187_crm_lookup_seed.sql` (idempotent
 upserts) to restore the seeded lookups, delete the copied objects from `crm-legacy-documents`
 (Storage API or dashboard), and add an audit note of the rollback. The import's audit row stays as
 history. `public.*` (users, tasks, the old JewelOS CRM tables) is never touched by the import or by

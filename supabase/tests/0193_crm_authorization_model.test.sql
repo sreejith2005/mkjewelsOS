@@ -1,5 +1,5 @@
 -- Phase 7 (2026-09-29 owner decision): enumerates the read/write scope of every table in
--- schema crm from 0185_crm_rls_grants.sql, so a future policy change that silently
+-- schema crm from 0186_crm_rls_grants.sql, so a future policy change that silently
 -- broadens or narrows access fails this test instead of shipping unnoticed. See
 -- docs/superpowers/specs/2026-09-25-crm-native-integration-design.md "Authorization model"
 -- for the narrative and the same table in prose. Structural (catalog-introspection), not

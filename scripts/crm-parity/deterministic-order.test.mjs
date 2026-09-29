@@ -22,8 +22,8 @@ test("every UI tie-breaker is in the port, marked, the listed number of times", 
   }
 });
 
-test("migration 0190 carries every SQL tie-breaker", () => {
-  const sql = readFileSync(join(REPO_ROOT, "supabase", "migrations", "0190_crm_deterministic_order.sql"), "utf8");
+test("migration 0191 carries every SQL tie-breaker", () => {
+  const sql = readFileSync(join(REPO_ROOT, "supabase", "migrations", "0191_crm_deterministic_order.sql"), "utf8");
   for (const edit of SQL_EDITS) assert.equal(count(sql, edit.replace), edit.count, `${edit.fn}: ${edit.replace}`);
 });
 
