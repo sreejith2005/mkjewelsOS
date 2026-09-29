@@ -132,7 +132,9 @@ RPCs of 0189 only) and `crm-runo-push` (caller JWT, RLS); owner cutover steps ar
 `docs/CRM_SHEETS_INGEST_CUTOVER.md`. CRM work is done only in the worktree `C:\crm`
 (branch `feat/crm-native`); tooling reads the original from `CRM_ORIGINAL_DIR`
 (default `C:\Users\MIS\Downloads\MKJewelOS\sreejith-crm\web-app`). Design and phases:
-`docs/superpowers/specs/2026-09-25-crm-native-integration-design.md`.
+`docs/superpowers/specs/2026-09-25-crm-native-integration-design.md`. crm read
+access is company-wide for active CRM users by owner decision; writes follow
+the original branch rules; the database enforces both.
 
 Read the relevant source, migration, and pgTAP test before changing one of
 these areas. Preserve historical task/form/FMS data when evolving a contract.

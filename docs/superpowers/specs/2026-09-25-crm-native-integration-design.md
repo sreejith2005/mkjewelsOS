@@ -177,6 +177,94 @@ Behaviour that differs from the original (all forced by the bridge or hosting):
    owner-only until Phase 4, argument-free identity calls in policies wrapped in
    `(select ...)` so they run once per statement.
 
+## Authorization model (owner decision, 2026-09-29)
+
+Client reads are company-wide by original design, not a porting gap. The
+original CRM's own foundation migration says so explicitly
+(`sreejith-crm/web-app/prisma/migrations/20260723000000_phase_0_foundation/migration.sql`,
+just above `active_staff_read_clients`):
+
+> Clients and their complete history are globally readable by all active CRM
+> staff. `last_branch_id` remains informational and is never used as an
+> ownership boundary.
+
+The Phase 7 dress rehearsal (P3, 2026-09-29) initially treated a salesperson
+reading another branch's clients/timeline as a database-authorization defect
+(`current_user_role() IS NOT NULL` with no branch predicate, seemingly
+contradicting `AGENTS.md`'s "database is the authorization boundary" rule) and
+stopped the rehearsal. **Owner decision, 2026-09-29: this is not a defect. The
+port keeps the original's company-wide read exactly as designed and approved.**
+It is required for cross-branch lookup of a returning client. CRM access now
+also extends to the Sales and CRM departments (see the cutover checklist), so
+more staff gain this company-wide read than under the original's narrower
+roster, and the owner approved that with this decision.
+
+**The contract, stated once:** for every `crm` table, **read** is either
+company-wide for any active, correctly-provisioned CRM user (`crm.view`,
+linked, active, section enabled — see the identity bridge above) regardless of
+branch, or restricted further (branch-scoped or `super_admin`-only) exactly
+where the original restricted it; **write** (insert/update/delete) follows the
+original's branch/ownership rules unchanged — a salesperson or branch manager
+writes only their own branch's or their own records, `super_admin` writes
+anything. The database enforces both halves; the web app's own branch filter
+on the client list is a usability convenience on top, never the boundary.
+Nothing in the port is broader than the original — every read/write pair
+below matches `sreejith-crm/web-app/prisma/migrations/**` unless a "New"
+scope note says otherwise (the new note is always narrower, never broader).
+
+Every table in schema `crm`, classified from `0185_crm_rls_grants.sql`
+(policy names in backticks are the permissive policy that decides it; every
+table also carries the restrictive `<table>_section_available` gate, omitted
+below since it applies uniformly):
+
+| Table | Read | Write |
+| --- | --- | --- |
+| `clients` | Company-wide (`active_staff_read_clients`) | Insert/update company-wide (`active_staff_insert_clients`, `active_staff_update_clients`); delete `super_admin` only |
+| `client_timeline` | Company-wide (`active_staff_read_timeline`) | Branch-scoped (`branch_staff_insert/update/delete_own_timeline`) |
+| `visit_forms` | Company-wide (`active_staff_read_visit_forms`) | Branch-scoped via the parent timeline row's branch |
+| `client_phone_index` | Company-wide (`active_staff_read_phone_index`) | Company-wide insert/update/delete (`active_staff_insert/update/delete_phone_index`) |
+| `client_edit_log` | Company-wide (`active_staff_read_client_edit_log`) | Trigger-owned only; no staff write policy |
+| `client_campaign_tags` | Company-wide (`active_staff_read_campaign_tags`) | Insert by any active staff (`tagged_by` = self); update/delete by the tagger only, or `super_admin` |
+| `documents` | Company-wide (`active_staff_read_documents`) | Insert by any active staff (`uploaded_by` = self, not branch-scoped, matches the original); update/delete by the uploader only, or `super_admin` |
+| `referrals` | Company-wide (`active_staff_read_referrals`) | Branch-scoped (`branch_staff_insert/update/delete_origin_referrals`) |
+| `referral_calling` | Company-wide (`active_staff_read_referral_calling`) | Branch-scoped via the parent referral's branch |
+| `referral_calling_history` | Company-wide (`active_staff_read_referral_calling_history`) | Insert-only, branch-scoped via referral; immutable (no update/delete policy for staff) |
+| `leads` | Company-wide (`active_staff_read_leads`) | Insert by any active staff (`created_by` = self, not branch-scoped, matches the original: leads aren't branch property); update by the creator or `super_admin`; delete `super_admin` only |
+| `lead_call_history` | Company-wide (`active_staff_read_lead_call_history`) | Insert by any active staff (`entered_by` = self); update by the enterer or `super_admin` |
+| `lead_stage_history` | Company-wide (`active_staff_read_lead_stage_history`) | Insert-only (`changed_by` = self); immutable, not even `super_admin` may update/delete |
+| `not_bought_followups` | Company-wide (`active_staff_read_followups`) | Branch-scoped (`branch_staff_insert/update/delete_origin_followups`) |
+| `not_bought_history` | Company-wide (`active_staff_read_followup_history`) | Insert-only, branch-scoped via the parent followup; no staff update/delete (immutable) |
+| `campaigns` | Company-wide (`active_staff_read_campaigns`) | `super_admin` only |
+| `branches` | Company-wide (`active_staff_read_branches`) | Branch manager limited to own branch (`branch_manager_own_branch`); `super_admin` full |
+| `users` (CRM roster) | Company-wide (`active_staff_read_users`) | Branch manager limited to own branch (`branch_manager_own_users`); `super_admin` full; no salesperson write |
+| `entry_queue` | Branch-scoped (`branch_staff_entry_queue`, salesperson and manager) | Same policy, `FOR ALL`: branch-scoped |
+| `crm_allocation` | **Branch-scoped** (`branch_staff_read_own_allocations`) — narrower than the client tables above | Branch manager only, own branch (`branch_manager_write/update_own_allocations`); no staff delete; `super_admin` full |
+| `crm_daily_availability` | **Branch-scoped** (`branch_staff_read_own_availability`) | Branch manager only, own branch, including delete (`branch_manager_write/update/delete_own_availability`); `super_admin` full |
+| `lead_form_fields` | Company-wide (`active_staff_read_lead_fields`) | `super_admin` only (`super_admin_manage_lead_fields`) |
+| `lead_form_field_options` | Company-wide (`active_staff_read_lead_field_options`) | `super_admin` only |
+| `lookup_relations` | Company-wide | `super_admin` only (`super_admin_manage_lookup_relations`) |
+| `lookup_source_of_leads` | Company-wide | `super_admin` only |
+| `lookup_sugar_options` | Company-wide | `super_admin` only |
+| `lookup_beverages`, `lookup_cities`, `lookup_communities`, `lookup_gifts`, `lookup_not_bought_reasons`, `lookup_pincodes`, `lookup_product_categories`, `lookup_snacks` | Company-wide | `super_admin` only (`super_admin_all`) |
+| `legacy_walkin_ingest_attempts` | **`super_admin` only** (`super_admin_read_legacy_walkin_ingest_attempts`) | None for staff; written only by the service-role ingest path |
+| `crm_queue_round_robin` | **No direct access** for any authenticated role (no policy, no grant); state is read/written only by `SECURITY DEFINER` functions (e.g. `assign_next_available_crm`) | Same: no direct access |
+| `legacy_import_keys` | **No direct access**; import ledger, owner/service-role only (New hardening beyond the original, which had no RLS at all here — narrower, not broader) | Same |
+| `legacy_walkin_ingest_rate_limits` | **No direct access**; written only by the service-role ingest path | Same |
+
+`anon` and `PUBLIC` have zero privileges on schema `crm` (revoked in
+`0185_crm_rls_grants.sql`); every policy is `TO authenticated`. A JewelOS user
+without `crm.view`, not linked to an active `crm.users` row, inactive, or
+whose branch has no linked CRM branch (non-`super_admin` only) resolves
+`crm.current_user_role()` to `NULL` and every `active_staff_*`/`branch_staff_*`
+policy denies them — see `crm_private.current_crm_identity()` in
+`0183_crm_identity_bridge.sql`. This is unchanged by this decision; it governs
+whether someone is a CRM user at all, not what a CRM user may read.
+
+`supabase/tests/0183_crm_identity_bridge.test.sql` already asserted company-wide
+client reads (`'salesperson reads clients of every branch'`) before this
+decision; `0192_crm_authorization_model.test.sql` (Phase 7) enumerates the
+full table above.
+
 ## Owner decisions on the Phase 5 questions (2026-09-28)
 
 | # | Decision |

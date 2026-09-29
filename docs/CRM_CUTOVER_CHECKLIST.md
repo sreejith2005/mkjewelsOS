@@ -389,7 +389,11 @@ B. Switch the section **ON**: Developer Mode strip in the header -> **CRM** enab
 
 C. As a **salesperson-type account** (an active staff member with the `crm.view` grant from step 5
    and a branch linked in step 5), on a phone-width browser:
-- [ ] `/crm` opens; only that branch's data is visible. A person not linked in step 5 gets a new
+- [ ] `/crm` opens. Client search, client profiles and their history are visible **company-wide**
+      (owner decision 2026-09-29, `docs/superpowers/specs/2026-09-25-crm-native-integration-design.md`
+      "Authorization model": this matches the original CRM's own design, not a JewelOS narrowing).
+      Writes (a new visit, follow-up, referral, allocation) stay limited to the salesperson's own
+      linked branch, enforced by RLS. A person not linked in step 5 gets a new
       CRM user on the first open (one `crm.ensure_my_crm_user` audit row). A person whose email
       already belongs to a historical CRM user but who was not linked (the 2 flagged rows) gets
       no access until the owner decides and links them; this is by design (D2).
