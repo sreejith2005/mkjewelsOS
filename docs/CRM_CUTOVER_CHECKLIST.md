@@ -460,7 +460,7 @@ server-side for everyone but the super_admins). For a code problem, step 7's rol
 1. The owner fills in the production web origin (the Vercel production domain from step 7), in
    the main checkout's untracked `apps/mobile/.env`:
    ```text
-   EXPO_PUBLIC_JEWELOS_WEB_ORIGIN=https://<jewelos-web-origin>
+   EXPO_PUBLIC_JEWELOS_WEB_ORIGIN=https://mkjewels-os.vercel.app
    ```
    Origin only (no `/crm`, no trailing path). The value is not a secret but lives only in `.env`.
 2. Build a signed test APK without publishing (main checkout, on `main`, source committed):

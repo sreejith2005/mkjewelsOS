@@ -186,11 +186,12 @@ JewelOS web origin, baked in at build time:
 
 ```text
 # apps/mobile/.env
-EXPO_PUBLIC_JEWELOS_WEB_ORIGIN=https://<jewelos-web-origin>
+EXPO_PUBLIC_JEWELOS_WEB_ORIGIN=https://mkjewels-os.vercel.app
 ```
 
-- The owner fills in the real value (the production web host, e.g. the Vercel production
-  domain). `apps/mobile/.env.example` carries only the placeholder, which the script rejects.
+- `https://mkjewels-os.vercel.app` is the production value (owner decision 2026-09-29; it is not
+  a secret). `apps/mobile/.env.example` carries it too: copy that line into `apps/mobile/.env` in
+  any checkout that releases.
 - A variable set in the PowerShell session (`$env:EXPO_PUBLIC_JEWELOS_WEB_ORIGIN = ...`) wins
   over `.env`, exactly as in Expo's own loading.
 - The script refuses to build (also with `-NoPublish`) when the value is missing, not an absolute
