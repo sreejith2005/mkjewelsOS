@@ -417,6 +417,13 @@ describe("schedule authoring", () => {
       requires_upload: true,
     });
   });
+
+  it("pins the chosen form version on future recurring tasks", () => {
+    expect(buildRecurringTemplatePayload({ ...draft, formTemplateId: "form-v2" }, assignee)).toMatchObject({
+      requires_form: true,
+      form_template_id: "form-v2",
+    });
+  });
 });
 
 describe("schedule actions", () => {

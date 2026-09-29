@@ -19,7 +19,7 @@ const data = {
   priorities: [{ id: "priority-high", label: "High", value: "high" }],
   departments: [{ branch_id: "branch-1", id: "department-1", name: "Sales" }],
   designations: [],
-  forms: [{ id: "form-1", name: "Stock count" }],
+  forms: [{ id: "form-1", name: "Stock count", version: 1, family_id: "form-family", lifecycle: "published" }],
   templates: [],
   users: [
     { branch_id: "branch-1", buddy_id: null, secondary_buddy_id: null, reports_to_user_id: null, department_id: "department-1", employee_code: "E-1", employee_name: "Ashwini", first_name: "Ashwini", id: "user-1", last_name: null, tenant_id: "tenant-1", user_role: "staff", working_status: "active" },

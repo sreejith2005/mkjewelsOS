@@ -326,6 +326,7 @@ export type RecurringTemplateDraft = Readonly<{
   dueTime: string;
   mode: "task" | "checklist";
   buddy: boolean;
+  formTemplateId?: string;
 }>;
 
 export type RecurringTemplateAssignee = Readonly<{
@@ -372,8 +373,8 @@ export function buildRecurringTemplatePayload(
     checklist_items: [],
     requires_upload: draft.mode === "task",
     requires_remark: false,
-    requires_form: false,
-    form_template_id: "",
+    requires_form: Boolean(draft.formTemplateId),
+    form_template_id: draft.formTemplateId ?? "",
     is_active: true,
     verification_required: false,
     verifier_user_profile_id: "",

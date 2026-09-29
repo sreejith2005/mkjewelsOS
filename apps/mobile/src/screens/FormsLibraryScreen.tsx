@@ -3,7 +3,7 @@ import { Alert, RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { FileText } from "lucide-react-native";
-import { archiveForm, duplicateForm, loadForms, publishAsNewForm, publishForm, type FormBundle } from "@jewelos/data/forms/api";
+import { archiveForm, duplicateForm, loadForms, publishAsNewForm, publishForm, reviseForm, type FormBundle } from "@jewelos/data/forms/api";
 import { hasPermission } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthProvider";
 import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
@@ -78,6 +78,15 @@ export function FormsLibraryScreen() {
     catch (caught) { setActionError(caught instanceof Error ? caught.message : failure); }
     finally { setBusyId(null); }
   };
+  const createVersion = async (form: FormBundle) => {
+    setBusyId(form.id); setActionError(null);
+    try {
+      const draftId = await reviseForm(form.id);
+      await refresh();
+      navigation.navigate("FormBuilder", { formTemplateId: draftId });
+    } catch (caught) { setActionError(caught instanceof Error ? caught.message : "Create form version failed"); }
+    finally { setBusyId(null); }
+  };
 
   if (loading) return <LoadingState label="Loading forms..." />;
   if (error && !data) return <ErrorState message={error} onRetry={() => void reload()} title="Unable to load Forms" />;
@@ -86,7 +95,7 @@ export function FormsLibraryScreen() {
     <View style={styles.titleRow}><FileText color={theme.colors.primary} size={24} /><View style={styles.titleCopy}><Text variant="heading" weight="bold">Forms Library</Text><Text tone="muted" variant="small">Choose a form, fill it in, and submit. Workflow forms continue automatically in the background.</Text></View></View>
     {canAuthor ? <Button full label="New form" onPress={() => navigation.navigate("FormBuilder", undefined)} /> : null}
     <SegmentedControl accessibilityLabel="Forms view" onChange={setTab} options={[{ value: "templates", label: "Forms to fill" }, { value: "submissions", label: "My submissions" }]} value={tab} />
-    {actionError ? <Banner tone="danger">{actionError === PINNED_BY_FMS ? "This version is in an active FMS stage. Use Publish as new to preserve in-progress work and publish your edited copy." : actionError}</Banner> : null}
+    {actionError ? <Banner tone="danger">{actionError === PINNED_BY_FMS ? "This version is in an active FMS stage. Use Publish as separate form to preserve in-progress work and publish your edited copy." : actionError}</Banner> : null}
     {tab === "templates" ? <>
       <SearchField accessibilityLabel="Search forms" onChangeText={setQuery} placeholder="Find a form to fill" value={query} />
       <OptionPicker label="Lifecycle filter" onChange={(selected) => setLifecycle(selected[0] ?? "active")} options={[{ value: "active", label: "Current and drafts" }, { value: "published", label: "Published" }, { value: "draft", label: "Drafts" }, { value: "archived", label: "Archived history" }, { value: "all", label: "All lifecycle" }]} selected={[lifecycle]} />
@@ -107,9 +116,10 @@ export function FormsLibraryScreen() {
               // A published version is edited in place, as on the web; the
               // builder saves it through save_published_form_with_audit.
               onEditPublished={() => navigation.navigate("FormBuilder", { formTemplateId: form.id })}
+              onCreateVersion={() => void createVersion(form)}
               onFill={() => navigation.navigate("FormFill", { formTemplateId: form.id })}
               onPublish={() => void act(form, () => publishForm(form.id), "Publish failed")}
-              onPublishAsNew={() => void confirm("Publish as new", "Publish this edited version as a separate form? Active FMS stages will keep using the current version.", "Publish as new").then((ok) => { if (ok) void act(form, () => publishAsNewForm(form.id), "Publish as new form failed"); })}
+              onPublishAsNew={() => void confirm("Publish as separate form", "Publish this edited version as a separate form? Active FMS stages will keep using the current version.", "Publish as separate form").then((ok) => { if (ok) void act(form, () => publishAsNewForm(form.id), "Publish as separate form failed"); })}
             />
           ))}
         </Card>
@@ -129,9 +139,9 @@ export function FormsLibraryScreen() {
   </Screen>;
 }
 
-function VersionRow({ form, canAuthor, busy, onFill, onEdit, onPublish, onPublishAsNew, onEditPublished, onArchive, onDelete, onDuplicate }: {
+function VersionRow({ form, canAuthor, busy, onFill, onEdit, onPublish, onPublishAsNew, onEditPublished, onCreateVersion, onArchive, onDelete, onDuplicate }: {
   form: FormBundle; canAuthor: boolean; busy: boolean; onFill: () => void; onEdit: () => void; onPublish: () => void; onPublishAsNew: () => void;
-  onEditPublished: () => void; onArchive: () => void; onDelete: () => void; onDuplicate: () => void;
+  onEditPublished: () => void; onCreateVersion: () => void; onArchive: () => void; onDelete: () => void; onDuplicate: () => void;
 }) {
   const styles = useStyles();
   const roles = Array.isArray((form.permissions as { roles?: unknown })?.roles) ? ((form.permissions as { roles: string[] }).roles.join(", ") || "none") : "none";
@@ -144,9 +154,9 @@ function VersionRow({ form, canAuthor, busy, onFill, onEdit, onPublish, onPublis
         {canAuthor && form.lifecycle === "draft" ? <>
           <Button busy={busy} label="Edit" onPress={onEdit} variant="secondary" />
           <Button busy={busy} label="Publish" onPress={onPublish} />
-          <Button busy={busy} label="Publish as new" onPress={onPublishAsNew} variant="secondary" />
+          <Button busy={busy} label="Publish as separate form" onPress={onPublishAsNew} variant="secondary" />
         </> : null}
-        {canAuthor && form.lifecycle === "published" ? <Button busy={busy} label="Edit" onPress={onEditPublished} variant="secondary" /> : null}
+        {canAuthor && form.lifecycle === "published" ? <><Button busy={busy} label="Edit" onPress={onEditPublished} variant="secondary" /><Button busy={busy} label="Create new version" onPress={onCreateVersion} variant="secondary" /></> : null}
         {canAuthor ? <Button busy={busy} label="Duplicate" onPress={onDuplicate} variant="ghost" /> : null}
         {canAuthor ? <Button busy={busy} label="Delete" onPress={onDelete} variant="danger" /> : null}
         {canAuthor && form.lifecycle !== "archived" ? <Button busy={busy} label="Archive" onPress={onArchive} variant="danger" /> : null}
