@@ -148,6 +148,12 @@ happened once, 2026-09-29: `main` took `0182_form_dependencies_fms_draft_safety.
 caught by this precondition, and the CRM series was renumbered from `0182-0191` to `0183-0192`
 accordingly — this note documents that it is not hypothetical.)
 
+Also: if `main` moved at all (any commit, migration or not), merge `origin/main` into
+`feat/crm-native` (`git merge --no-ff origin/main`, never a rebase), re-run the isolated pgTAP
+suite and push BEFORE the dry run. `db push` refuses while production holds a migration version
+that `C:\crm\supabase\migrations` lacks. Never "fix" that with `supabase migration repair --status
+reverted`: it would mark main's applied migration as not applied in production.
+
 **From this gate through gate 7, no other session may run `db push` or merge migrations to `main`.**
 The owner is responsible for that coordination (say so to any other active session before typing
 `go` here). Gates 2-7 should run in one sitting for this reason — a migration landing on `main`
