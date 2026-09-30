@@ -91,8 +91,7 @@ insert into fms_flows(id,tenant_id,branch_id,name,status,is_active,created_by,fa
 values('5a100000-0000-0000-0000-000000000060','1a100000-0000-0000-0000-000000000001','2a100000-0000-0000-0000-000000000001','Reusable branch start','draft',true,'4a100000-0000-0000-0000-000000000001','5f100000-0000-0000-0000-000000000060','branch');
 insert into fms_stages(id,fms_flow_id,stage_key,name,step_type,sort_order,form_template_id,planned_time_rule)
 values('6a100000-0000-0000-0000-000000000060','5a100000-0000-0000-0000-000000000060','start_form','Reusable start form','form',0,'7a100000-0000-0000-0000-000000000001','{"dueDate":"2099-12-31"}');
-insert into fms_stage_assignees(fms_stage_id,assignee_type,user_profile_id)
-values('6a100000-0000-0000-0000-000000000060','specific_user','4a100000-0000-0000-0000-000000000003');
+-- This step deliberately has no named assignee: the explicit starting selection owns it.
 update fms_flows set status='published',published_by='4a100000-0000-0000-0000-000000000001' where id='5a100000-0000-0000-0000-000000000060';
 set local role authenticated; select set_config('request.jwt.claim.role','authenticated',true); select set_config('request.jwt.claim.sub','aa100000-0000-0000-0000-000000000001',true);
 select lives_ok($$select start_fms_instance_with_audit('5a100000-0000-0000-0000-000000000060','Selected scope run','medium','{}','2a100000-0000-0000-0000-000000000003','3a100000-0000-0000-0000-000000000003','4a100000-0000-0000-0000-000000000010')$$,'admin starts an old branch-scoped flow in the explicitly selected branch');

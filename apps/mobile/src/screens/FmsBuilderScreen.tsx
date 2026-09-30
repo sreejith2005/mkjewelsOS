@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import { CheckCircle2, ChevronDown, ChevronUp, FileText, Plus, Redo2, Save, Send, Undo2, UserRoundPlus } from "lucide-react-native";
-import { normalizeFmsDefinition, validateFmsDefinition, type FmsFlowDefinition, type FmsStageDefinition } from "@jewelos/core";
+import { copyFirstFmsAssigneeToHumanStages, normalizeFmsDefinition, validateFmsDefinition, type FmsFlowDefinition, type FmsStageDefinition } from "@jewelos/core";
 import { loadFmsBuilderData, publishFmsFlow, saveFmsContextAssigneeDefault, saveFmsDraft, type FmsData, type FmsFlowRow } from "@jewelos/data/fms/api";
 import { flowToDefinition, newFmsStage, removeFmsStage } from "@jewelos/data/fms/definition";
 import { fmsDepartmentLabel } from "@jewelos/data/fms/departments";
@@ -83,6 +83,10 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
   const dirty = JSON.stringify(normalized) !== savedSnapshot;
   const assignableStages = normalized.stages.filter((stage) => ["form", "task", "approval"].includes(stage.type));
   const assignedStages = assignableStages.filter((stage) => stage.assigneeRules.some((rule) => rule.type === "specific_user" && rule.userProfileId));
+  const issueLabel = (issue: (typeof issues)[number]) => {
+    const stage = normalized.stages.find((item) => item.key === issue.stageKey);
+    return stage ? `${stage.name || "Untitled step"}: ${issue.message}` : issue.message;
+  };
   /** Scope and workflow context are no longer asked for; existing values are preserved untouched. */
   const scopeSummary = normalized.scope === "branch" ? data.branches.find((branch) => branch.id === normalized.branchId)?.name ?? "one branch"
     : normalized.scope === "department" ? fmsDepartmentLabel(data.departments.find((department) => department.id === normalized.departmentId) ?? { id: "", branch_id: null, name: "one department" }, data.branches)
@@ -180,7 +184,6 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
   const persist = async () => { const id = await saveFmsDraft(persistedId, normalized); setPersistedId(id); setSavedSnapshot(JSON.stringify(normalized)); await onSaved(); return id; };
   const save = async () => { setBusy("save"); setError(null); setSuccess(null); try { await persist(); setSuccess("Draft saved"); } catch (caught) { setError(errorText(caught)); } finally { setBusy(null); } };
   const publish = async () => {
-    if (assignedStages.length !== assignableStages.length) { setAssigning(true); setError("Assign an owner to every step before publishing."); return; }
     if (issues.length) { setError("Resolve the publish-readiness issues below before publishing."); return; }
     setBusy("publish"); setError(null);
     try { const id = await persist(); await publishFmsFlow(id); await onSaved(); setSuccess("Workflow published and ready to run"); leavingRef.current = true; onClose(); }
@@ -222,8 +225,8 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
       {issuesOpen && issues.length ? (
         <ScrollView contentContainerStyle={styles.issues} style={styles.issueScroll}>
           {issues.map((issue, index) => (
-            <Pressable accessibilityRole="button" key={`${issue.code}-${issue.stageKey ?? index}`} onPress={() => { if (issue.stageKey) { setSelectedKey(issue.stageKey); setIssuesOpen(false); } }} style={({ pressed }) => [styles.issue, pressed && styles.pressed]}>
-              <Text tone="danger" variant="caption">{issue.message}</Text>
+            <Pressable accessibilityRole="button" key={`${issue.code}-${issue.stageKey ?? index}`} onPress={() => { if (issue.stageKey) { setSelectedKey(issue.stageKey); setIssuesOpen(false); } else if (issue.code === "invalid_name" || issue.code === "invalid_scope") setScreen("details"); else setView("map"); }} style={({ pressed }) => [styles.issue, pressed && styles.pressed]}>
+              <Text tone="danger" variant="caption">{issueLabel(issue)}</Text>
             </Pressable>
           ))}
         </ScrollView>
@@ -318,6 +321,7 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
       {selected ? (
         <Sheet scrollable={false} onClose={() => setSelectedKey(null)} tall title={`${selected.type.replaceAll("_", " ")} · ${selected.name}`} visible>
           <ScrollView keyboardShouldPersistTaps="handled">
+            {issues.filter((issue) => issue.stageKey === selected.key).map((issue, index) => <Banner key={`${issue.code}-${index}`} tone="danger">{issue.message}</Banner>)}
             <FmsStageEditor data={data} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); }} onDelete={() => void remove(selected.key)} stage={selected} stages={normalized.stages} />
           </ScrollView>
         </Sheet>
@@ -362,8 +366,11 @@ function DefaultAssigneesSheet({ data, definition, onChange, onClose }: { data: 
   const styles = useStyles();
   const steps = definition.stages.filter((stage) => ["form", "task", "approval"].includes(stage.type));
   const [mappingError, setMappingError] = useState<string | null>(null);
+  const [sameForAll, setSameForAll] = useState(false);
   const setAssignee = async (key: string, userProfileId: string) => {
-    onChange(definition.stages.map((stage) => stage.key !== key ? stage : { ...stage, assigneeRules: userProfileId ? [{ type: "specific_user", userProfileId }] : [] }));
+    const changed = definition.stages.map((stage) => stage.key !== key ? stage : { ...stage, assigneeRules: userProfileId ? [{ type: "specific_user" as const, userProfileId }] : [] });
+    onChange(sameForAll && key === steps[0]?.key && userProfileId ? copyFirstFmsAssigneeToHumanStages(changed) : changed);
+    if (key !== steps[0]?.key || !userProfileId) setSameForAll(false);
     if (!definition.moduleContext || !userProfileId) return;
     try {
       await saveFmsContextAssigneeDefault(definition.moduleContext, userProfileId);
@@ -375,10 +382,18 @@ function DefaultAssigneesSheet({ data, definition, onChange, onClose }: { data: 
   const people = data.users.filter((user) => user.working_status === "active" && user.account_status !== "inactive" && user.account_status !== "suspended" && user.is_login_enabled);
   const branchNames = new Map(data.branches.map((branch) => [branch.id, branch.name]));
   const departmentNames = new Map(data.departments.map((department) => [department.id, department.name]));
+  const toggleSameForAll = () => {
+    if (sameForAll) { setSameForAll(false); return; }
+    if (!steps[0]?.assigneeRules.some((rule) => rule.type === "specific_user" && rule.userProfileId)) { setMappingError("Select a person for the first step before using them for all steps."); return; }
+    onChange(copyFirstFmsAssigneeToHumanStages(definition.stages));
+    setMappingError(null);
+    setSameForAll(true);
+  };
   return (
     <Sheet scrollable={false} onClose={onClose} tall title="Default assignees" visible>
       <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
-        <Text tone="muted" variant="small">{`Pre-assign a named person to each workflow step. Workflow scope remains independent from the selected person.${definition.moduleContext ? " Selecting a person also saves that context's default from the existing Users directory; individual stages remain editable." : ""}`}</Text>
+        <Text tone="muted" variant="small">{`Choose an optional person for each workflow step. A step-specific person overrides a user selected in a linked form.${definition.moduleContext ? " Selecting a person also saves that context's default from the existing Users directory; individual stages remain editable." : ""}`}</Text>
+        <Pressable accessibilityRole="switch" accessibilityState={{ checked: sameForAll }} onPress={toggleSameForAll} style={styles.header}><Text weight="semibold">{sameForAll ? "☑" : "☐"} Use the first step's person for all steps</Text></Pressable>
         {mappingError ? <Banner tone="danger">{mappingError}</Banner> : null}
         {steps.map((stage, index) => (
           <Card key={stage.key}>

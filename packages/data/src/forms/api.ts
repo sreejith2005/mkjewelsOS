@@ -109,13 +109,21 @@ export async function loadTaskForms(templateIds: string[], taskIds: string[]): P
 }
 export async function loadFormDynamicOptions() {
   const [users, branches, departments, masters] = await Promise.all([
-    db().from("v_task_users").select("id,employee_name").eq("working_status", "active").order("employee_name").limit(500),
+    (async () => {
+      const rows: Array<{ id: string | null; employee_name: string | null }> = [];
+      for (let offset = 0; ; offset += 500) {
+        const { data, error } = await db().from("v_task_users").select("id,employee_name").eq("working_status", "active").order("employee_name").order("id").range(offset, offset + 499);
+        fail("Load form users", error);
+        rows.push(...(data ?? []));
+        if ((data?.length ?? 0) < 500) return rows;
+      }
+    })(),
     db().from("branches").select("id,name").eq("is_active", true).order("name").limit(100),
     db().from("departments").select("id,name,branch_id").eq("is_active", true).order("name").limit(500),
     loadMasterOptions([], true).catch(() => []),
   ]);
-  fail("Load form users", users.error); fail("Load form branches", branches.error); fail("Load form departments", departments.error);
-  return { users: (users.data ?? []).flatMap((row) => row.id && row.employee_name ? [{ id: row.id, label: row.employee_name }] : []), branches: (branches.data ?? []).map((row) => ({ id: row.id, label: row.name })), departments: (departments.data ?? []).map((row) => ({ id: row.id, branchId: row.branch_id, label: row.name })), masters: toFormMasterOptions(masters) };
+  fail("Load form branches", branches.error); fail("Load form departments", departments.error);
+  return { users: users.flatMap((row) => row.id && row.employee_name ? [{ id: row.id, label: row.employee_name }] : []), branches: (branches.data ?? []).map((row) => ({ id: row.id, label: row.name })), departments: (departments.data ?? []).map((row) => ({ id: row.id, branchId: row.branch_id, label: row.name })), masters: toFormMasterOptions(masters) };
 }
 export const saveDraft = async (id: string | null, payload: Json, fields: Json) => { const { data, error } = await db().rpc("save_form_draft_with_audit", { p_template_id: id as string, p_payload: payload, p_fields: fields }); fail("Save form draft", error); if (!data) throw new Error("Save form draft: the server did not return the draft id"); return data as string; };
 export const savePublishedForm = async (id: string, payload: Json, fields: Json) => { const { error } = await db().rpc("save_published_form_with_audit", { p_template_id: id, p_payload: payload, p_fields: fields }); fail("Save published form", error); };
@@ -170,6 +178,13 @@ export async function startFmsFromFormSubmission(submissionId: string): Promise<
   fail("Start linked FMS", error);
   const row = Array.isArray(data) ? data[0] : data;
   return row ? { instanceId: row.instance_id as string, referenceNumber: row.reference_number as string } : null;
+}
+/** Submit a Forms Library form and start its linked workflow in one transaction. */
+export async function submitStandaloneFormAndStartFms(formTemplateId: string, answers: object): Promise<FmsStarterResult> {
+  const { data, error } = await db().rpc("submit_form_and_start_fms_with_audit" as never,
+    { p_form_template_id: formTemplateId, p_answers: answers as Json } as never);
+  fail("Submit form and start linked FMS", error);
+  return readFmsStarterResult(data);
 }
 /** Submits the exact Home-selected starter assignment so workflows sharing a form cannot be confused. */
 /**

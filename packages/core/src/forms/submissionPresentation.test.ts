@@ -5,6 +5,12 @@ const current = { id: "form-1", familyId: "family-1", name: "Visit", version: 2,
 const base = { id: "submission-1", formTemplateId: "form-1", status: "submitted", submittedAt: "2026-09-21T10:00:00Z", submittedBy: "user-1", linkedModule: null, linkedRecordId: null, reviewedBy: null, reviewedAt: null, reviewNotes: null, answers: { source: "ref" } };
 
 describe("form submission presentation", () => {
+  it("shows the current Users directory name for a saved User answer", () => {
+    const form = { ...current, fields: [{ key: "assigned_to", label: "Assigned to", type: "user_dropdown" as const }] };
+    const submission = { ...base, answers: { assigned_to: "person-1" } };
+    expect(presentFormSubmission(submission, form, null, [], [{ id: "person-1", label: "Updated Name" }]).answers[0]?.display).toBe("Updated Name");
+  });
+
   it("uses the exact current version and resolves stored option values", () => {
     const result = presentFormSubmission(base, current, null, []);
     expect(result.title).toBe("Visit · v2");

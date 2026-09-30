@@ -12,8 +12,9 @@ const fileAnswer = (value: unknown): { id: string; name: string } | null => {
   return typeof record.id === "string" && typeof record.name === "string" ? { id: record.id, name: record.name } : null;
 };
 
-export function presentFormSubmission(submission: SubmissionRecord, current: SubmissionTemplate | null, deletedSnapshot: SubmissionTemplate | null, masters: readonly FormMasterOption[]): PresentedSubmission {
+export function presentFormSubmission(submission: SubmissionRecord, current: SubmissionTemplate | null, deletedSnapshot: SubmissionTemplate | null, masters: readonly FormMasterOption[], users: readonly Readonly<{ id: string; label: string }>[] = []): PresentedSubmission {
   const template = deletedSnapshot ?? current;
+  const userNames = new Map(users.map((user) => [user.id, user.label]));
   return {
     ...submission,
     title: template ? `${template.name} · v${template.version}${deletedSnapshot ? " (deleted form)" : ""}` : "Historical form",
@@ -23,7 +24,7 @@ export function presentFormSubmission(submission: SubmissionRecord, current: Sub
     answers: template ? template.fields.filter((field) => field.type !== "section_header" && field.type !== "divider").map((field) => {
       const raw = submission.answers[field.key];
       const file = fileAnswer(raw);
-      return { key: field.key, label: field.label, display: file?.name ?? formatFormAnswer({ ...field, options: resolveFieldOptions(field, masters) }, raw as FormAnswer | null | undefined), fileId: file?.id ?? null };
+      return { key: field.key, label: field.label, display: file?.name ?? (field.type === "user_dropdown" && typeof raw === "string" ? userNames.get(raw) ?? raw : formatFormAnswer({ ...field, options: resolveFieldOptions(field, masters) }, raw as FormAnswer | null | undefined)), fileId: file?.id ?? null };
     }) : [],
   };
 }

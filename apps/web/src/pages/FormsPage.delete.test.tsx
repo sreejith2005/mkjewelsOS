@@ -27,7 +27,7 @@ vi.mock("@/features/forms/api", () => ({
   loadFormDynamicOptions: async () => ({ users: [], branches: [], departments: [], masters: [] }),
   deletedFormBundle: () => null,
   archiveForm: vi.fn(), publishForm: vi.fn(), publishAsNewForm: vi.fn(), reviewSubmission: vi.fn(),
-  startFmsFromFormSubmission: vi.fn(), submitForm: vi.fn(), reviseForm: mocks.reviseForm,
+  startFmsFromFormSubmission: vi.fn(), submitStandaloneFormAndStartFms: vi.fn(), submitForm: vi.fn(), reviseForm: mocks.reviseForm,
 }));
 
 const bundle = {

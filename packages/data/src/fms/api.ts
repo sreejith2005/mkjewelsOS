@@ -70,7 +70,7 @@ async function withPinnedFormVersions(published: readonly FormRef[], stages: rea
   return [...published, ...(data ?? [])];
 }
 
-type FormFieldRow = { form_template_id: string; field_key: string; field_name: string; field_type: string; options: Json | null; option_source: string | null; dropdown_master_type: string | null };
+type FormFieldRow = { form_template_id: string; field_key: string; field_name: string; field_type: string; is_required: boolean; is_shown: boolean; conditional_logic: Json | null; rule_definition: Json | null; options: Json | null; option_source: string | null; dropdown_master_type: string | null };
 
 /**
  * Indexes the published Forms' questions by template so FMS route configuration
@@ -79,7 +79,7 @@ type FormFieldRow = { form_template_id: string; field_key: string; field_name: s
  */
 async function formFieldIndex(templateIds: readonly string[]): Promise<Record<string, readonly FmsFormFieldRef[]>> {
   if (!templateIds.length) return {};
-  const { data, error } = await db().from("form_fields").select("form_template_id,field_key,field_name,field_type,options,option_source,dropdown_master_type").in("form_template_id", [...templateIds]).order("sort_order").limit(5000);
+  const { data, error } = await db().from("form_fields").select("form_template_id,field_key,field_name,field_type,is_required,is_shown,conditional_logic,rule_definition,options,option_source,dropdown_master_type").in("form_template_id", [...templateIds]).order("sort_order").limit(5000);
   fail("Load FMS form questions", error);
   const rows = (data ?? []) as FormFieldRow[];
   const masterTypes = [...new Set(rows.flatMap((row) => row.option_source === "dropdown_master" && row.dropdown_master_type ? [row.dropdown_master_type] : []))];
@@ -90,7 +90,7 @@ async function formFieldIndex(templateIds: readonly string[]): Promise<Record<st
     const options: FmsFormFieldOption[] = row.option_source === "dropdown_master" && row.dropdown_master_type
       ? masters.filter((option) => option.master_type === row.dropdown_master_type).map((option) => ({ value: option.value, label: option.label || option.value }))
       : (parseFormOptions(row.options) ?? []).map((option) => ({ value: option.value, label: option.label || option.value }));
-    (index[row.form_template_id] ??= []).push({ key: row.field_key, label: row.field_name || row.field_key, ...(options.length ? { options, optionValues: options.map((option) => option.value) } : {}) });
+    (index[row.form_template_id] ??= []).push({ key: row.field_key, label: row.field_name || row.field_key, type: row.field_type, required: row.is_required, shown: row.is_shown, hasCondition: row.conditional_logic !== null || row.rule_definition !== null, ...(options.length ? { options, optionValues: options.map((option) => option.value) } : {}) });
   }
   return index;
 }

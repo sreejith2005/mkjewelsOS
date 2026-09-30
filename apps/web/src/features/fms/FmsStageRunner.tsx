@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { deriveFmsTransitionCapability, type FmsStageDefinition, type Json } from "@jewelos/core";
+import { deriveFmsTransitionCapability, hasFmsFormAssignmentSource, type FmsStageDefinition, type Json } from "@jewelos/core";
 import { Button, Field, Modal, Notice } from "@/components/ui";
 import { AssigneePicker } from "@/components/assignees/AssigneePicker";
 import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer";
@@ -60,7 +60,7 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
   onRefresh: () => Promise<void>;
   requestedFormTemplateId?: string;
 }) {
-  const requiresLinkedForm = isInitialFmsDefinition(definitions, definition);
+  const requiresLinkedForm = isInitialFmsDefinition(definitions, definition) || hasFmsFormAssignmentSource(definition.planned_time_rule);
   const shouldOpenInitialForm = shouldOpenFmsForm(definitions, definition, stage, requestedFormTemplateId);
   const [remark, setRemark] = useState("");
   const [outcome, setOutcome] = useState("");
@@ -132,7 +132,7 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
       <div className="grid gap-2 sm:grid-cols-2">{isDecision ? <Field label="Decision *"><div className="grid gap-2">{decisionOptions.map((option) => <button className={`min-h-12 rounded-lg border px-3 py-2 text-left ${outcome === option.key ? "border-gold bg-gold/10 text-white" : "border-gold/20 text-soft-grey"}`} key={option.key} onClick={() => setOutcome(option.key)} type="button">{option.label}</button>)}</div></Field> : <Field label="Outcome"><input className="field" maxLength={500} onChange={(event) => setOutcome(event.target.value)} value={outcome} /></Field>}<Field label={definition.requires_remark ? "Remark *" : "Remark"}><textarea className="field" maxLength={4000} onChange={(event) => setRemark(event.target.value)} value={remark} /></Field></div>
       {definition.requires_next_doer_handoff ? <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} label="Next-stage assignee" multiple={false} onChange={(ids) => setNextAssignee(ids[0] ?? "")} people={pickerPeople} selectedIds={nextAssignee ? [nextAssignee] : []}/> : null}
       <div className="flex flex-wrap gap-2">
-        {capability.canComplete ? <Button disabled={busy || (isDecision && !outcome)} onClick={() => void work(() => completeFmsStage(stage.id, outcome, remark, checklistPayload, nextAssignee || null))}>{isDecision ? "Submit decision" : "Complete stage"}</Button> : null}
+        {capability.canComplete ? <Button disabled={busy || (isDecision && !outcome) || (requiresLinkedForm && !stage.form_submission_id)} onClick={() => void work(() => completeFmsStage(stage.id, outcome, remark, checklistPayload, nextAssignee || null))}>{isDecision ? "Submit decision" : "Complete stage"}</Button> : null}
         {capability.canApprove ? <Button disabled={busy} onClick={() => void work(() => reviewFmsStage(stage.id, "approved", remark, nextAssignee || null))}>Approve</Button> : null}
         {capability.canReject ? <Button disabled={busy} onClick={() => window.confirm("Reject this stage?") && void work(() => reviewFmsStage(stage.id, "rejected", remark, nextAssignee || null))} variant="danger">Reject</Button> : null}
         {capability.canRequestRevision && priorStages.length ? <Button disabled={busy} onClick={() => openManagedAction("revision")} variant="secondary">Request revision</Button> : null}

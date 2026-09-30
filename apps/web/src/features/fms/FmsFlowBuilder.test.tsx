@@ -15,15 +15,18 @@ vi.mock("./api", () => ({ saveFmsDraft: mocks.saveFmsDraft, publishFmsFlow: mock
  * capture and hit testing in jsdom.
  */
 let latest: FmsFlowDefinition | null = null;
+let latestFocusRequest: { key: string; id: number } | null = null;
 vi.mock("./FmsGraphCanvas", () => ({
-  FmsGraphCanvas: ({ definition, onConnect, onDisconnect, onReconnect, onMove }: {
+  FmsGraphCanvas: ({ definition, focusRequest, onConnect, onDisconnect, onReconnect, onMove }: {
     definition: FmsFlowDefinition;
+    focusRequest?: { key: string; id: number } | null;
     onConnect: (from: string, to: string) => void;
     onDisconnect: (from: string, to: string, ruleId?: string) => void;
     onReconnect: (from: string, previousTo: string, nextTo: string, ruleId?: string) => void;
     onMove: (positions: Record<string, { x: number; y: number }>) => void;
   }) => {
     latest = definition;
+    latestFocusRequest = focusRequest ?? null;
     const start = definition.stages[0];
     const a = definition.stages[1]?.key ?? "";
     const b = definition.stages[2]?.key ?? "";
@@ -49,9 +52,9 @@ const data = {
 
 const stage = (key: string) => latest!.stages.find((item) => item.key === key)!;
 
-async function openBuilder() {
+async function openBuilder(builderData: FmsData = data) {
   const user = userEvent.setup();
-  render(<FmsFlowBuilder data={data} flow={null} onClose={() => undefined} onSaved={async () => undefined} />);
+  render(<FmsFlowBuilder data={builderData} flow={null} onClose={() => undefined} onSaved={async () => undefined} />);
   await user.type(screen.getByLabelText("Workflow name *"), "Qualification");
   await user.type(screen.getByLabelText("Purpose *"), "Route by customer type");
   await user.click(screen.getByRole("button", { name: /Open builder/ }));
@@ -62,7 +65,7 @@ async function openBuilder() {
   return { user, start, a, b };
 }
 
-afterEach(() => { cleanup(); vi.clearAllMocks(); latest = null; });
+afterEach(() => { cleanup(); vi.clearAllMocks(); latest = null; latestFocusRequest = null; });
 
 describe("FMS builder graph wiring", () => {
   it("no longer asks for workflow context or CRM scope when creating a workflow", () => {
@@ -152,6 +155,28 @@ describe("FMS builder graph wiring", () => {
     expect(screen.getByText("Publish readiness")).toBeTruthy();
     expect(screen.getByText(/issues? to resolve/)).toBeTruthy();
     expect(mocks.publishFmsFlow).not.toHaveBeenCalled();
+  });
+
+  it("opens the affected step when a publish issue is clicked", async () => {
+    const { user, start } = await openBuilder();
+    await user.click(screen.getByRole("button", { name: "Close inspector" }));
+    await user.click(screen.getByRole("button", { name: /Start form: The initial Form requires/ }));
+    expect(latestFocusRequest?.key).toBe(start);
+    expect(screen.getByRole("button", { name: "Close inspector" })).toBeTruthy();
+    expect(screen.getByText("The initial Form requires an exact published template version")).toBeTruthy();
+  });
+
+  it("copies the first assignee to every step and permits a later override", async () => {
+    const personId = "00000000-0000-4000-8000-000000000023";
+    const builderData = { ...data, users: [{ id: personId, employee_name: "Asha", employee_code: "A1", account_status: "active", user_role: "staff", branch_id: "", department_id: "", working_status: "active", is_login_enabled: true }] } as FmsData;
+    const { user } = await openBuilder(builderData);
+    await user.click(screen.getByRole("button", { name: /Pre-assign users after building the flow/ }));
+    await user.click(screen.getAllByRole("radio", { name: "Asha" })[0]!);
+    await user.click(screen.getByRole("checkbox", { name: "Use the first step's person for all steps" }));
+    expect(latest!.stages.filter((item) => ["form", "task", "approval"].includes(item.type)).every((item) => item.assigneeRules[0]?.userProfileId === personId)).toBe(true);
+    await user.click(screen.getAllByRole("button", { name: "Clear assignee" })[1]!);
+    expect(latest!.stages[1]?.assigneeRules).toEqual([]);
+    expect((screen.getByRole("checkbox", { name: "Use the first step's person for all steps" }) as HTMLInputElement).checked).toBe(false);
   });
 
   /**
