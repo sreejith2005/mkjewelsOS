@@ -1,4 +1,6 @@
 import Link from "@/next-shim/link"; // crm-port: next/link -> local shim (same hrefs, /crm base path added)
+import { useRouter } from "@/next-shim/navigation";
+import { withBasePath } from "@/crm-port/runtime";
 
 import { ExistingClientWalkinAction } from "@/components/existing-client-walkin-action";
 import { CallButton } from "@/components/call-button";
@@ -22,6 +24,7 @@ export function ClientDatabase({ clients, search, walkinContext }: {
   search: string;
   walkinContext: { role: string; branchId: string | null; branches: { id: string; name: string }[] };
 }) {
+  const router = useRouter();
   return (
     <main className="mx-auto max-w-7xl px-5 py-7">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -31,7 +34,12 @@ export function ClientDatabase({ clients, search, walkinContext }: {
         </div>
         <Link className="rounded bg-amber-800 px-4 py-2 font-medium text-white" href="/queue">Register Client</Link>
       </div>
-      <form className="mt-5 flex flex-wrap gap-2" action="/clients">
+      {/* crm-port fix (owner 2026-09-30): the original's plain action="/clients" left the /crm base path (404 in the original, JewelOS Home here). */}
+      <form className="mt-5 flex flex-wrap gap-2" action={withBasePath("/clients")} onSubmit={(event) => {
+        event.preventDefault();
+        const value = String(new FormData(event.currentTarget).get("search") ?? "").trim();
+        router.push(value ? `/clients?search=${encodeURIComponent(value)}` : "/clients");
+      }}>
         <label className="sr-only" htmlFor="client-database-search">Search clients</label>
         <input id="client-database-search" className="w-full max-w-xl rounded border p-2" name="search" defaultValue={search} placeholder="Search by client ID, phone, or name" />
         <button className="rounded bg-stone-800 px-4 py-2 text-white" type="submit">SEARCH</button>
