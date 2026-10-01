@@ -32,6 +32,11 @@ assignee overrides the default for that step only; it does not clear the
 default. A manual next assignee handoff, when configured, retains its existing
 one step precedence.
 
+A standalone Forms Library form submission and the linked FMS start use one
+audited database RPC. If the selected user is invalid or the workflow cannot
+start, the form submission rolls back with it. Existing starter assignments
+still use their assignment-specific submission path.
+
 If a human step has neither a named assignee nor a valid current form selected
 user, activation must stop with an actionable assignment error. Publication
 must reject a path that can reach such a step before any required assignment
@@ -60,5 +65,6 @@ Cover core path validation and assignment precedence, database publication
 and runtime allowed and denied cases, first form submission, later form
 submission, stale/inactive/cross tenant answers, and both web and native
 builder and submission surfaces. Apply a forward migration. The source key is
-stored in existing stage JSON, so generated database types do not change.
+stored in existing stage JSON; generated database types gain the new standalone
+submission RPC signature.
 Keep local, hosted, and device evidence separate.

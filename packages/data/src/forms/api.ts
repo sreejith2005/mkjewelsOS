@@ -181,8 +181,8 @@ export async function startFmsFromFormSubmission(submissionId: string): Promise<
 }
 /** Submit a Forms Library form and start its linked workflow in one transaction. */
 export async function submitStandaloneFormAndStartFms(formTemplateId: string, answers: object): Promise<FmsStarterResult> {
-  const { data, error } = await db().rpc("submit_form_and_start_fms_with_audit" as never,
-    { p_form_template_id: formTemplateId, p_answers: answers as Json } as never);
+  const { data, error } = await db().rpc("submit_form_and_start_fms_with_audit",
+    { p_form_template_id: formTemplateId, p_answers: answers as Json });
   fail("Submit form and start linked FMS", error);
   return readFmsStarterResult(data);
 }

@@ -14,8 +14,9 @@
    chosen profile ID in the instance's durable context. Validate it against
    Users and coverage at the server boundary. Keep explicit stage assignees
    and manual handoff precedence.
-5. Keep generated database types unchanged because the source key uses the
-   existing JSON timing rule. Test core, web, native, and pgTAP allowed and
-   denied cases. Check phone width and native navigation. Run the relevant
+5. Add a single audited RPC for a standalone Forms Library submission and its
+   linked FMS start, so a rejected start rolls back the form submission. Update
+   generated database types for the new RPC. Test core, web, native, and pgTAP
+   allowed and denied cases. Check phone width and native navigation. Run the relevant
    local gates, then the linked migration dry run. Publish only after the
    required gates and production playbook checks pass.

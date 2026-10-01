@@ -261,6 +261,7 @@ select is((
   'set_recurring_todo_template_active_with_audit(uuid,boolean)',
   'start_fms_from_form_submission_with_audit(uuid)',
   'submit_fms_form_and_progress_with_audit(uuid,jsonb,text,uuid,uuid,text,text,jsonb,uuid)',
+  'submit_form_and_start_fms_with_audit(uuid,jsonb)',
   'submit_leave_handover(uuid,uuid,text)',
   'submit_leave_request(text,text,text,date,date,date,text,text)',
   'task_attachment_display_name(text)',

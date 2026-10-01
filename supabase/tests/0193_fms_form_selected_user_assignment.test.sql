@@ -11,6 +11,7 @@ select function_owner_is('public','submit_form_and_start_fms_with_audit',array['
 select ok(not has_function_privilege('anon','submit_form_and_start_fms_with_audit(uuid,jsonb)','EXECUTE'),'anonymous callers cannot submit and start a workflow');
 
 create temporary table fms_assignment_fixture(name text primary key,id uuid) on commit drop;
+grant select on fms_assignment_fixture to authenticated;
 do $$
 declare v_tenant uuid; v_branch uuid; v_department uuid; v_auth uuid; v_starter uuid; v_selected uuid;
   v_form uuid; v_flow uuid; v_first uuid; v_next uuid; v_submission uuid; v_instance uuid;
@@ -115,9 +116,9 @@ select ok((select count(*) from fms_stage_assignees where fms_stage_id=(select i
 update fms_stages set planned_time_rule='{"deadlineEnabled":false,"assignmentFieldKey":"assigned_to"}'::jsonb
 where id=(select id from fms_assignment_fixture where name='first');
 update fms_flows set status='published' where id=(select id from fms_assignment_fixture where name='flow');
-set local role authenticated;
-select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub',(select auth_user_id::text from user_profiles where id=(select id from fms_assignment_fixture where name='starter')),true);
+select set_config('request.jwt.claim.role','authenticated',true);
+set local role authenticated;
 select lives_ok($$select submit_form_and_start_fms_with_audit(
   (select id from fms_assignment_fixture where name='form'),
   jsonb_build_object('assigned_to',(select id from fms_assignment_fixture where name='selected')))$$,
@@ -125,9 +126,9 @@ select lives_ok($$select submit_form_and_start_fms_with_audit(
 reset role;
 create temporary table fms_submission_count_before_failure on commit drop as select count(*)::integer as n from form_submissions;
 update user_profiles set is_login_enabled=false where id=(select id from fms_assignment_fixture where name='selected');
-set local role authenticated;
-select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub',(select auth_user_id::text from user_profiles where id=(select id from fms_assignment_fixture where name='starter')),true);
+select set_config('request.jwt.claim.role','authenticated',true);
+set local role authenticated;
 select throws_ok($$select submit_form_and_start_fms_with_audit(
   (select id from fms_assignment_fixture where name='form'),
   jsonb_build_object('assigned_to',(select id from fms_assignment_fixture where name='selected')))$$,
