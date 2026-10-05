@@ -77,6 +77,16 @@ const sectionBundle = {
 } as unknown as FormBundle;
 
 describe("Filling a branching form", () => {
+  it("submits the Users profile ID while showing its current directory name", async () => {
+    const user = userEvent.setup();
+    const submitted: unknown[] = [];
+    render(<FormRenderer definition={{ name: "Assignment", fields: [{ key: "assigned_to", label: "Assigned to", type: "user_dropdown", required: true, sortOrder: 0 }] }} dynamicOptions={{ ...options, users: [{ id: "person-1", label: "Updated Name" }] }} onSubmit={async (answers) => { submitted.push(answers); }} />);
+    await user.selectOptions(screen.getByRole("combobox", { name: /Assigned to/ }), "person-1");
+    expect(screen.getByRole("option", { name: "Updated Name" })).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: /Submit form/ }));
+    expect(submitted).toEqual([{ assigned_to: "person-1" }]);
+  });
+
   it("shows only the section the controlling answer leads to, and switches branches live", async () => {
     const user = userEvent.setup();
     render(<FormRenderer definition={onboarding} dynamicOptions={options} />);
@@ -216,6 +226,14 @@ describe("Entering dropdown options", () => {
 });
 
 describe("Form builder internal keys", () => {
+  it("offers a Users question backed by the live Users directory", async () => {
+    const user = userEvent.setup();
+    render(<FormBuilder dynamicOptions={{ users: [{ id: "person-1", label: "Asha" }], branches: [], departments: [], masters: [] }} onClose={() => {}} onSaved={async () => {}} />);
+    await user.click(screen.getByRole("button", { name: "Add question to Section 1" }));
+    await user.click(screen.getByRole("button", { name: "Users" }));
+    expect(screen.getByLabelText("Edit Users")).toBeTruthy();
+  });
+
   it("allocates an unused key after a field was removed", () => {
     expect(nextFormFieldKey([
       { key: "field_1" },

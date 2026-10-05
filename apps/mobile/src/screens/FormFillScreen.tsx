@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { loadFormDynamicOptions, loadTaskForms, startFmsFromFormSubmission, submitFmsStarterAssignment, submitForm } from "@jewelos/data/forms/api";
+import { loadFormDynamicOptions, loadTaskForms, submitFmsStarterAssignment, submitStandaloneFormAndStartFms } from "@jewelos/data/forms/api";
 import { useAsyncData } from "@/lib/useAsyncData";
 import { useUnsavedGuard } from "@/lib/useUnsavedGuard";
 import { useProfile } from "@/auth/AuthProvider";
@@ -9,7 +9,6 @@ import { isWorkUploadForm } from "@jewelos/core";
 import { Screen } from "@/ui/Screen";
 import { EmptyState, ErrorState, LoadingState } from "@/ui/states";
 import { FormRenderer } from "@/forms/FormRenderer";
-import { log } from "@/lib/log";
 import type { RootStackParamList } from "@/navigation/types";
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
@@ -79,15 +78,9 @@ export function FormFillScreen() {
           else navigation.goBack();
           return;
         }
-        const submissionId = await submitForm(bundle.id, answers);
+        const started = await submitStandaloneFormAndStartFms(bundle.id, answers);
         setDirty(false);
-        const started = await startFmsFromFormSubmission(submissionId).catch((caught: unknown) => {
-          // The answers are saved either way; a workflow that could not start
-          // is a separate problem and must not read as a lost submission.
-          log.error("fms", "linked workflow did not start from this submission", caught);
-          return null;
-        });
-        if (started) {
+        if (started.instanceId) {
           navigation.replace("FmsInstance", { instanceId: started.instanceId });
           return;
         }

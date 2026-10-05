@@ -12282,6 +12282,10 @@ export type Database = {
         }
         Returns: Json
       }
+      submit_form_and_start_fms_with_audit: {
+        Args: { p_answers: Json; p_form_template_id: string }
+        Returns: Json
+      }
       submit_form_base_with_audit: {
         Args: {
           p_answers: Json

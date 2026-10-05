@@ -30,6 +30,8 @@ export type FmsDecisionOption = Readonly<{ key: string; label: string }>;
 /** A conditional step activates only for one configured option of an earlier Decision Step. */
 export type FmsConditionalRule = Readonly<{ decisionStageKey: string; outcome: string } | { decisionStageKey: string; decisionOptionKey: string }>;
 export type FmsSlaRule = Readonly<{
+  /** User question on this stage's linked Form that sets the default for later steps. */
+  assignmentFieldKey?: string | undefined;
   timingMethod?: FmsTimingMethod | undefined;
   deadlineEnabled?: boolean | undefined;
   dueDate: string;
@@ -114,7 +116,7 @@ export type FmsFormFieldOption = Readonly<{ value: string; label: string }>;
  * need. `optionValues` stays the matched identity; `options` adds the labels the
  * builder and the canvas display, so a renamed option never changes a route.
  */
-export type FmsFormFieldRef = Readonly<{ key: string; label: string; optionValues?: readonly string[] | undefined; options?: readonly FmsFormFieldOption[] | undefined }>;
+export type FmsFormFieldRef = Readonly<{ key: string; label: string; type?: string | undefined; required?: boolean | undefined; shown?: boolean | undefined; hasCondition?: boolean | undefined; optionValues?: readonly string[] | undefined; options?: readonly FmsFormFieldOption[] | undefined }>;
 /** Optional Forms knowledge so route validation can catch a removed form, question, or option. */
 export type FmsValidationContext = Readonly<{
   formFields?: Readonly<Record<string, readonly FmsFormFieldRef[]>> | undefined;

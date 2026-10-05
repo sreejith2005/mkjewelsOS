@@ -20,7 +20,7 @@ import type { RootStackParamList } from "@/navigation/types";
 type Route = RouteProp<RootStackParamList, "FormSubmission">;
 export function FormSubmissionScreen() {
   const { params } = useRoute<Route>(); const access = useAccess(); const theme = useAppTheme(); const [decision, setDecision] = useState<"approved" | "rejected" | null>(null); const [notes, setNotes] = useState(""); const [busy, setBusy] = useState(false); const [actionError, setActionError] = useState<string | null>(null);
-  const load = useCallback(async () => { const [forms, options] = await Promise.all([loadForms(), loadFormDynamicOptions()]); const row = forms.submissions.find((item) => item.id === params.submissionId); return row ? { row, presented: presentSubmission(row, forms.bundles, options.masters) } : null; }, [params.submissionId]);
+  const load = useCallback(async () => { const [forms, options] = await Promise.all([loadForms(), loadFormDynamicOptions()]); const row = forms.submissions.find((item) => item.id === params.submissionId); return row ? { row, presented: presentSubmission(row, forms.bundles, options.masters, options.users) } : null; }, [params.submissionId]);
   const { data, error, loading, refreshing, reload, refresh } = useAsyncData(load, [load]);
   if (loading && !data) return <Screen><LoadingState label="Loading submission…" /></Screen>;
   if (error && !data) return <Screen><ErrorState message={error} onRetry={() => void reload()} /></Screen>;

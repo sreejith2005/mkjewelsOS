@@ -3,7 +3,7 @@ import { isFormFieldVisible } from "@jewelos/core";
 
 vi.mock("@jewelos/api-client", () => ({ supabase: {} }));
 
-import { deletedFormBundle, deleteForm, publishAsNewForm, savePublishedForm, startFmsFromFormSubmission, toDefinition, type FormField, type FormSubmission, type FormTemplate } from "./api";
+import { deletedFormBundle, deleteForm, publishAsNewForm, savePublishedForm, startFmsFromFormSubmission, submitStandaloneFormAndStartFms, toDefinition, type FormField, type FormSubmission, type FormTemplate } from "./api";
 
 describe("toDefinition", () => {
   it("does not turn a NULL database condition into a conditional field", () => {
@@ -95,5 +95,16 @@ describe("startFmsFromFormSubmission", () => {
 
     await expect(startFmsFromFormSubmission("submission-1")).resolves.toEqual({ instanceId: "instance-1", referenceNumber: "FMS-1" });
     expect(rpc).toHaveBeenCalledWith("start_fms_from_form_submission_with_audit", { p_submission_id: "submission-1" });
+  });
+});
+
+describe("submitStandaloneFormAndStartFms", () => {
+  it("uses one server transaction to submit the form and start its workflow", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { submission_id: "submission-1", instance_id: "instance-1", reference_number: "FMS-1" }, error: null });
+    const { supabase } = await import("@jewelos/api-client");
+    Object.assign(supabase, { rpc });
+    await expect(submitStandaloneFormAndStartFms("form-1", { assigned_to: "user-1" })).resolves.toEqual({ instanceId: "instance-1", referenceNumber: "FMS-1" });
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("submit_form_and_start_fms_with_audit", { p_form_template_id: "form-1", p_answers: { assigned_to: "user-1" } });
   });
 });

@@ -40,11 +40,12 @@ type Drag =
 const overlaps = (point: FmsGraphPosition, box: Readonly<{ x: number; y: number; width: number; height: number }>) =>
   point.x < box.x + box.width && point.x + NODE_WIDTH > box.x && point.y < box.y + box.height && point.y + NODE_HEIGHT > box.y;
 
-export function FmsGraphCanvas({ definition, formFields, selectedKey, invalidKeys, onSelect, onDelete, onDuplicate, onAddAfter, onConnect, onDisconnect, onReconnect, onMove }: {
+export function FmsGraphCanvas({ definition, formFields, selectedKey, focusRequest, invalidKeys, onSelect, onDelete, onDuplicate, onAddAfter, onConnect, onDisconnect, onReconnect, onMove }: {
   definition: FmsFlowDefinition;
   /** The linked Forms' questions, so a route edge reads as its question and answer labels. */
   formFields: Readonly<Record<string, readonly FmsFormFieldRef[]>>;
   selectedKey: string | null;
+  focusRequest?: Readonly<{ key: string; id: number }> | null;
   invalidKeys: ReadonlySet<string>;
   onSelect: (key: string) => void;
   onDelete: (key: string) => void;
@@ -72,6 +73,7 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, invalidKey
   /** On a phone the gesture help is a toggle, so it never sits on top of the cards. */
   const isPhone = useIsMobile();
   const [hintOpen, setHintOpen] = useState(false);
+  const lastFocusedIssueId = useRef<number | null>(null);
   /** Live touch points, so two fingers become a pinch instead of two competing drags. */
   const pointersRef = useRef(new Map<number, FmsGraphPosition>());
   const pinchRef = useRef<Readonly<{ distance: number; zoom: number; worldX: number; worldY: number }> | null>(null);
@@ -109,6 +111,15 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, invalidKey
   }, [definition.stages, position]);
 
   useLayoutEffect(() => { if (!hasCenteredRef.current && definition.stages.length) { fitView(); hasCenteredRef.current = true; } }, [definition.stages.length, fitView]);
+
+  useEffect(() => {
+    if (!focusRequest || lastFocusedIssueId.current === focusRequest.id || !definition.stages.some((stage) => stage.key === focusRequest.key)) return;
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const point = position(focusRequest.key);
+    setPan({ x: viewport.clientWidth / 2 - (point.x + NODE_WIDTH / 2) * zoom, y: viewport.clientHeight / 2 - (point.y + NODE_HEIGHT / 2) * zoom });
+    lastFocusedIssueId.current = focusRequest.id;
+  }, [focusRequest, definition.stages, position, zoom]);
 
   /** Zooms around a viewport point so the content under the pointer stays put. */
   const zoomAt = useCallback((factor: number, clientX?: number, clientY?: number) => {

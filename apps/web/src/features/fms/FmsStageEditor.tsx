@@ -54,6 +54,7 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { st
   const canChooseNext = !["branch", "parallel_start", "end"].includes(stage.type);
   const decision = stage.sla.decisionMode === "decision" || stage.sla.decisionMode === "yes_no";
   const formFields = stage.formTemplateId ? data.formFields[stage.formTemplateId] ?? [] : [];
+  const assignmentFields = formFields.filter((field) => field.type === "user_dropdown" && field.required && field.shown !== false && !field.hasCondition);
   const [showConditional, setShowConditional] = useState(!!stage.sla.conditional && "decisionStageKey" in stage.sla.conditional);
   const decisionCondition = stage.sla.conditional && "decisionStageKey" in stage.sla.conditional ? stage.sla.conditional : undefined;
 
@@ -87,6 +88,8 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { st
     {human ? <section className="space-y-3 border-t border-gold/15 pt-4">
       <div><h4 className="text-xs font-semibold uppercase tracking-[0.15em] text-gold">Linked form</h4><p className="mt-1 text-xs text-soft-grey">{firstStage ? "The first step uses this form to collect the workflow’s initial details." : "Attach a Form the doer fills in when completing this step. Its answers can also drive the routing below."}</p></div>
       <LinkedForm data={data} firstStage={firstStage} stage={stage} update={update} />
+      {stage.formTemplateId ? <Field label="User question that assigns later steps"><select className="field" onChange={(event) => updateSla({ assignmentFieldKey: event.target.value || undefined })} value={stage.sla.assignmentFieldKey ?? ""}><option value="">None</option>{assignmentFields.map((field) => <option key={field.key} value={field.key}>{field.label}</option>)}{stage.sla.assignmentFieldKey && !assignmentFields.some((field) => field.key === stage.sla.assignmentFieldKey) ? <option value={stage.sla.assignmentFieldKey}>{stage.sla.assignmentFieldKey} (unavailable)</option> : null}</select></Field> : null}
+      <p className="text-xs text-soft-grey">The selected person becomes the default for following steps. A step's named assignee takes priority.</p>
     </section> : null}
 
     {canChooseNext ? <StageRouting decision={decision} fields={formFields} others={others} stage={stage} changeRule={changeBranchRule} moveRule={moveBranchRule} update={update} /> : null}

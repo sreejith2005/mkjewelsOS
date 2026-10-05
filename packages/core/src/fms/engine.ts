@@ -13,6 +13,20 @@ const TIMING_METHODS = new Set<FmsTimingMethod>(["completion_date", "tat_hours",
 const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
 const legacyDecisionOptions: readonly FmsDecisionOption[] = [{ key: "yes", label: "Yes" }, { key: "no", label: "No" }];
 
+export function hasFmsFormAssignmentSource(rule: unknown): boolean {
+  if (!rule || typeof rule !== "object" || Array.isArray(rule)) return false;
+  const key = (rule as Record<string, unknown>).assignmentFieldKey;
+  return typeof key === "string" && !!key.trim();
+}
+
+/** Copy the first human step's named assignee without changing structural steps. */
+export function copyFirstFmsAssigneeToHumanStages(stages: readonly FmsStageDefinition[]): readonly FmsStageDefinition[] {
+  const first = stages.find((stage) => !AUTO.has(stage.type));
+  const userProfileId = first?.assigneeRules.find((rule) => rule.type === "specific_user")?.userProfileId;
+  if (!userProfileId) return stages;
+  return stages.map((stage) => AUTO.has(stage.type) ? stage : { ...stage, assigneeRules: [{ type: "specific_user" as const, userProfileId }] });
+}
+
 export function normalizeFmsDefinition(input: FmsFlowDefinition): FmsFlowDefinition {
   const stages = [...input.stages].sort((a, b) => a.order - b.order || a.key.localeCompare(b.key)).map((stage, order) => ({
     ...stage,
@@ -30,6 +44,7 @@ export function normalizeFmsDefinition(input: FmsFlowDefinition): FmsFlowDefinit
     splitToFlowId: text(stage.splitToFlowId) || undefined,
     position: Number.isFinite(stage.position?.x) && Number.isFinite(stage.position?.y) ? { x: Math.max(0, Math.round(stage.position!.x)), y: Math.max(0, Math.round(stage.position!.y)) } : undefined,
     sla: {
+      ...(text(stage.sla?.assignmentFieldKey) ? { assignmentFieldKey: text(stage.sla.assignmentFieldKey).toLowerCase() } : {}),
       timingMethod: TIMING_METHODS.has(stage.sla?.timingMethod as FmsTimingMethod) ? stage.sla.timingMethod as FmsTimingMethod : "completion_date",
       dueDate: text(stage.sla?.dueDate), deadlineEnabled: stage.sla?.deadlineEnabled !== false,
       decisionMode: stage.sla?.decisionMode === "yes_no" || stage.sla?.decisionMode === "decision" ? "yes_no" as const : "normal" as const,
@@ -179,7 +194,10 @@ export function validateFmsDefinition(raw: FmsFlowDefinition, context: FmsValida
     if (stageIndex === 0 && !stage.formTemplateId) add("missing_form", "The initial Form requires an exact published template version");
     if (stage.formTemplateId && !UUID.test(stage.formTemplateId)) add("invalid_form", "Linked form ID is invalid");
     if (stage.formTemplateId && UUID.test(stage.formTemplateId) && context.availableFormIds && !context.availableFormIds.includes(stage.formTemplateId)) add("missing_linked_form", "The linked Form is no longer an available published version");
-    if (!AUTO.has(stage.type) && !stage.assigneeRules.length) add("missing_assignee", "Executable stages require an assignee rule");
+    if (stage.sla.assignmentFieldKey) {
+      const field = stage.formTemplateId ? context.formFields?.[stage.formTemplateId]?.find((item) => item.key === stage.sla.assignmentFieldKey) : undefined;
+      if (AUTO.has(stage.type) || !field || field.type !== "user_dropdown" || !field.required || field.shown === false || field.hasCondition) add("invalid_assignment_field", "Choose a required, always visible User question in this step's linked Form");
+    }
     if (stage.assigneeRules.some((rule) => !FMS_ASSIGNEE_TYPES.includes(rule.type) || rule.type === "specific_user" && (!UUID.test(rule.userProfileId ?? "") || rule.fallbackUserProfileId !== undefined && !UUID.test(rule.fallbackUserProfileId)) || rule.type !== "specific_user" && rule.fallbackUserProfileId !== undefined || rule.type === "role" && !rule.role)) add("invalid_assignee", "Assignee rule is incomplete");
     if (!stage.allowMultipleDoers && stage.completionRule === "all_doers") add("incompatible_completion_rule", "all_doers requires multiple doers");
     if (stage.type === "approval" && stage.completionRule !== "manager_approval") add("incompatible_completion_rule", "Approval stages require manager_approval");
@@ -189,6 +207,25 @@ export function validateFmsDefinition(raw: FmsFlowDefinition, context: FmsValida
     if (stage.type === "parallel_start" && !stage.parallelTargetStageKeys.length) add("invalid_parallel", "Parallel start requires targets");
     if (stage.type === "parallel_join" && (!stage.joinRule || stage.joinRule === "specific" && !stage.joinRequiredStageKeys.length)) add("invalid_join", "Parallel join configuration is incomplete");
     if (stage.type === "end" && fmsOutgoingStageKeys(stage).length) add("invalid_end", "End stages cannot have outgoing paths");
+  }
+  const first = definition.stages[0];
+  if (first) {
+    const visited = new Set<string>();
+    const queue: Array<{ key: string; hasFormUser: boolean }> = [{ key: first.key, hasFormUser: false }];
+    while (queue.length) {
+      const item = queue.shift()!;
+      const token = `${item.key}:${item.hasFormUser}`;
+      if (visited.has(token)) continue;
+      visited.add(token);
+      const stage = byKey.get(item.key);
+      if (!stage) continue;
+      const hasRule = stage.assigneeRules.length > 0;
+      if (stage.key !== first.key && !AUTO.has(stage.type) && !hasRule && !item.hasFormUser && !issues.some((issue) => issue.code === "missing_assignment_source" && issue.stageKey === stage.key)) {
+        issues.push({ code: "missing_assignment_source", message: "This step needs an assignee or a required User question in an earlier Form", stageKey: stage.key });
+      }
+      const hasFormUser = item.hasFormUser || !!stage.sla.assignmentFieldKey;
+      for (const next of fmsOutgoingStageKeys(stage)) queue.push({ key: next, hasFormUser });
+    }
   }
   const reached = reachableFmsStageKeys(definition); for (const stage of definition.stages) if (!reached.has(stage.key)) issues.push({ code: "unreachable_stage", message: `Stage ${stage.key} is unreachable`, stageKey: stage.key });
   if (![...reached].some((key) => { const stage = byKey.get(key); return stage ? fmsOutgoingStageKeys(stage).length === 0 : false; })) issues.push({ code: "missing_completion_path", message: "At least one reachable path must finish at a step with no outgoing connection" });

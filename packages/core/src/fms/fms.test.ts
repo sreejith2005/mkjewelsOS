@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateFmsDelay, fmsFieldOptions, fmsOutgoingStageKeys, fmsStagesInFlowOrder, hasFmsStageFallback, hasFmsStageRouting, calculateFmsProgress, deriveFmsTransitionCapability, evaluateFmsBranchRule, fmsStatusLabel, isFmsCompletionSatisfied, isFmsJoinReady, normalizeFmsDefinition, reachableFmsStageKeys, resolveFmsBranch, validateFmsAssignmentCandidate, validateFmsDefinition, type FmsFlowDefinition, type FmsStageDefinition } from ".";
+import { calculateFmsDelay, copyFirstFmsAssigneeToHumanStages, fmsFieldOptions, fmsOutgoingStageKeys, fmsStagesInFlowOrder, hasFmsStageFallback, hasFmsStageRouting, calculateFmsProgress, deriveFmsTransitionCapability, evaluateFmsBranchRule, fmsStatusLabel, isFmsCompletionSatisfied, isFmsJoinReady, normalizeFmsDefinition, reachableFmsStageKeys, resolveFmsBranch, validateFmsAssignmentCandidate, validateFmsDefinition, type FmsFlowDefinition, type FmsStageDefinition } from ".";
 
 const stage = (patch: Partial<FmsStageDefinition> & Pick<FmsStageDefinition, "key" | "name" | "type" | "order">): FmsStageDefinition => ({ required: true, completionRule: patch.type === "approval" ? "manager_approval" : "any_doer", allowMultipleDoers: false, requiresUpload: false, requiresRemark: false, checklist: [], assigneeRules: ["branch", "parallel_start", "parallel_join", "notification", "end"].includes(patch.type) ? [] : [{ type: "reporter" }], requiresNextDoerHandoff: false, canMoveBackward: false, canReject: false, canRequestRevision: false, canEscalate: false, branchRules: [], parallelTargetStageKeys: [], joinRequiredStageKeys: [], sla: { dueDate: "2099-12-31" }, ...patch });
 const flow = (stages: FmsStageDefinition[]): FmsFlowDefinition => ({ name: "Order flow", description: "test", scope: "tenant", manualTrigger: true, stages });
@@ -7,6 +7,24 @@ const formId = "00000000-0000-4000-8000-000000000001";
 const good = () => flow([stage({ key: "start_form", name: "Start form", type: "form", order: 0, formTemplateId: formId, defaultNextStageKey: "done" }), stage({ key: "done", name: "Done", type: "task", order: 1 })]);
 
 describe("FMS definitions", () => {
+  it("copies the first named person only to human steps", () => {
+    const stages = [stage({ key: "first", name: "First", type: "form", order: 0, assigneeRules: [{ type: "specific_user", userProfileId: formId }] }), stage({ key: "join", name: "Join", type: "parallel_join", order: 1 }), stage({ key: "next", name: "Next", type: "task", order: 2, assigneeRules: [] })];
+    const copied = copyFirstFmsAssigneeToHumanStages(stages);
+    expect(copied[1]?.assigneeRules).toEqual([]);
+    expect(copied[2]?.assigneeRules).toEqual([{ type: "specific_user", userProfileId: formId }]);
+  });
+  it("allows an unnamed later step after a required User question", () => {
+    const stages = good().stages.map((item) => item.key === "start_form" ? { ...item, sla: { ...item.sla, assignmentFieldKey: "assigned_to" }, assigneeRules: [] } : { ...item, assigneeRules: [] });
+    expect(validateFmsDefinition(flow(stages), { formFields: { [formId]: [{ key: "assigned_to", label: "Assigned to", type: "user_dropdown", required: true, shown: true }] } })).toEqual([]);
+  });
+  it("identifies an unnamed step without an earlier User answer", () => {
+    const stages = good().stages.map((item) => ({ ...item, assigneeRules: [] }));
+    expect(validateFmsDefinition(flow(stages)).some((issue) => issue.code === "missing_assignment_source" && issue.stageKey === "done")).toBe(true);
+  });
+  it("rejects a conditional User question as an assignment source", () => {
+    const stages = good().stages.map((item) => item.key === "start_form" ? { ...item, sla: { ...item.sla, assignmentFieldKey: "assigned_to" } } : item);
+    expect(validateFmsDefinition(flow(stages), { formFields: { [formId]: [{ key: "assigned_to", label: "Assigned to", type: "user_dropdown", required: true, shown: true, hasCondition: true }] } }).some((issue) => issue.code === "invalid_assignment_field")).toBe(true);
+  });
   it("normalizes deterministic stage order and text", () => { const value = normalizeFmsDefinition(flow([stage({ key: " DONE ", name: " Done ", type: "task", order: 9 }), stage({ key: " START_FORM ", name: " Start ", type: "form", formTemplateId: formId, order: 2, defaultNextStageKey: " DONE " })])); expect(value.stages.map((item) => [item.key, item.order])).toEqual([["start_form", 0], ["done", 1]]); expect(value.stages[0]?.defaultNextStageKey).toBe("done"); });
   it("strips retired per-stage fallback users from newly normalized revisions", () => { const value = normalizeFmsDefinition(flow([stage({ key: "form", name: "Form", type: "form", formTemplateId: formId, order: 0, assigneeRules: [{ type: "specific_user", userProfileId: formId, fallbackUserProfileId: "00000000-0000-4000-8000-000000000002" }] })])); expect(value.stages[0]?.assigneeRules[0]?.fallbackUserProfileId).toBeUndefined(); });
   it("accepts a valid linear graph", () => expect(validateFmsDefinition(good())).toEqual([]));

@@ -35,12 +35,12 @@ select ok(
   'recurring generation delegates availability and buddy order to the canonical resolver'
 );
 select ok(
-  position('resolve_task_coverage' in pg_get_functiondef('public.resolve_fms_stage_assignees(uuid,uuid,uuid)'::regprocedure)) > 0
-  and position('fallback_user_profile_id' in pg_get_functiondef('public.resolve_fms_stage_assignees(uuid,uuid,uuid)'::regprocedure)) = 0,
+  position('resolve_task_coverage' in pg_get_functiondef('public.resolve_fms_stage_assignees_before_form_user(uuid,uuid,uuid)'::regprocedure)) > 0
+  and position('fallback_user_profile_id' in pg_get_functiondef('public.resolve_fms_stage_assignees_before_form_user(uuid,uuid,uuid)'::regprocedure)) = 0,
   'FMS activation uses profile coverage and ignores the retired per-stage fallback'
 );
 select ok(
-  position('fms_stage_deadline_for_instance' in pg_get_functiondef('public.resolve_fms_stage_assignees(uuid,uuid,uuid)'::regprocedure)) > 0,
+  position('fms_stage_deadline_for_instance' in pg_get_functiondef('public.resolve_fms_stage_assignees_before_form_user(uuid,uuid,uuid)'::regprocedure)) > 0,
   'FMS coverage uses the effective stage deadline'
 );
 select ok(

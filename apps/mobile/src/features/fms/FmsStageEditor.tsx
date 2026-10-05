@@ -118,6 +118,7 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { st
   const canChooseNext = !["branch", "parallel_start", "end"].includes(stage.type);
   const decision = stage.sla.decisionMode === "decision" || stage.sla.decisionMode === "yes_no";
   const formFields = stage.formTemplateId ? data.formFields[stage.formTemplateId] ?? [] : [];
+  const assignmentFields = formFields.filter((field) => field.type === "user_dropdown" && field.required && field.shown !== false && !field.hasCondition);
   const [showConditional, setShowConditional] = useState(!!stage.sla.conditional && "decisionStageKey" in stage.sla.conditional);
   const decisionCondition = stage.sla.conditional && "decisionStageKey" in stage.sla.conditional ? stage.sla.conditional : undefined;
 
@@ -151,6 +152,8 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { st
       {human ? (
         <Section help={firstStage ? "The first step uses this form to collect the workflow’s initial details." : "Attach a Form the doer fills in when completing this step. Its answers can also drive the routing below."} title="Linked form">
           <LinkedForm data={data} firstStage={firstStage} stage={stage} update={update} />
+          {stage.formTemplateId ? <OptionPicker label="User question that assigns later steps" onChange={(values) => updateSla({ assignmentFieldKey: values[0] || undefined })} options={[{ value: "", label: "None" }, ...assignmentFields.map((field) => ({ value: field.key, label: field.label })), ...(stage.sla.assignmentFieldKey && !assignmentFields.some((field) => field.key === stage.sla.assignmentFieldKey) ? [{ value: stage.sla.assignmentFieldKey, label: `${stage.sla.assignmentFieldKey} (unavailable)` }] : [])]} selected={[stage.sla.assignmentFieldKey ?? ""]} /> : null}
+          <Text tone="muted" variant="caption">The selected person becomes the default for following steps. A step's named assignee takes priority.</Text>
         </Section>
       ) : null}
 

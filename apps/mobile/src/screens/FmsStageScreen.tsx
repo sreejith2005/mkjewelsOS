@@ -3,7 +3,7 @@ import { Alert, RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as WebBrowser from "expo-web-browser";
-import { deriveFmsTransitionCapability } from "@jewelos/core";
+import { deriveFmsTransitionCapability, hasFmsFormAssignmentSource } from "@jewelos/core";
 import {
   claimFmsStage,
   completeFmsStage,
@@ -171,7 +171,7 @@ export function FmsStageScreen() {
       : {};
   const decisions = runtimeDecisionOptions(plannedRule);
   const isDecision = decisions.length > 0;
-  const requiresLinkedForm = isInitialFmsDefinition(data.runtime.definitions, definition);
+  const requiresLinkedForm = isInitialFmsDefinition(data.runtime.definitions, definition) || hasFmsFormAssignmentSource(definition.planned_time_rule);
   const linkedForm = data.forms.find((form) => form.id === definition.form_template_id) ?? null;
   const checklistPayload = Object.fromEntries(checklist.map((item) => [item.item_key, item.is_completed]));
   const canClaim =
@@ -355,7 +355,7 @@ export function FmsStageScreen() {
             {capability.canComplete ? (
               <Button
                 busy={busy}
-                disabled={isDecision && !outcome}
+                disabled={(isDecision && !outcome) || (requiresLinkedForm && !stage.form_submission_id)}
                 label={isDecision ? "Submit decision" : "Complete stage"}
                 onPress={() => void run(() => completeFmsStage(stage.id, outcome, remark, checklistPayload, nextAssignee || null))}
               />
