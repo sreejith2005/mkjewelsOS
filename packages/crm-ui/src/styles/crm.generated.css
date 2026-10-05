@@ -887,6 +887,10 @@
     padding-bottom: calc(var(--spacing) * 2);
   }
 
+.crm-root#crm-root#crm-root#crm-root .pb-7 {
+    padding-bottom: calc(var(--spacing) * 7);
+  }
+
 .crm-root#crm-root#crm-root#crm-root .text-center {
     text-align: center;
   }
@@ -1131,6 +1135,10 @@
 
     .crm-root#crm-root#crm-root#crm-root .md\:grid-cols-\[220px_160px_1fr\] {
       grid-template-columns: 220px 160px 1fr;
+    }
+
+    .crm-root#crm-root#crm-root#crm-root .md\:grid-cols-\[320px_1fr\] {
+      grid-template-columns: 320px 1fr;
     }
 
     .crm-root#crm-root#crm-root#crm-root .md\:grid-cols-\[minmax\(0\,1fr\)_minmax\(0\,1fr\)_auto\] {
