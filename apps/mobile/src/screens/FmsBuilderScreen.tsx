@@ -87,7 +87,7 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
   const scrollToIssue = (event: LayoutChangeEvent) => {
     const { y, height } = event.nativeEvent.layout;
     const destinationAtEnd = focusedIssueCode === "unsupported_cycle" && /^(Otherwise|Continue to) destination/.test(focusedIssue?.message ?? "");
-    editorScrollRef.current?.scrollTo({ y: Math.max(0, y + (destinationAtEnd ? height - 500 : -20)), animated: true });
+    editorScrollRef.current?.scrollTo({ y: Math.max(0, y + (destinationAtEnd ? height - 80 : -20)), animated: true });
   };
   const dirty = JSON.stringify(normalized) !== savedSnapshot;
   const assignableStages = normalized.stages.filter((stage) => ["form", "task", "approval"].includes(stage.type));
