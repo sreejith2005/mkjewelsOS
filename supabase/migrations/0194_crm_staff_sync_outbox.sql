@@ -177,7 +177,7 @@ for each row execute function crm_sync.crm_view_rule_changed();
 create function crm_sync.staff_snapshot(p_profile_id uuid)
 returns jsonb
 language plpgsql
-stable
+volatile
 security definer
 set search_path = public
 as $$
@@ -300,7 +300,7 @@ $$;
 create function public.crm_sync_staff_roster()
 returns jsonb
 language plpgsql
-stable
+volatile
 security definer
 set search_path = public
 as $$

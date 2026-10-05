@@ -62,7 +62,7 @@ FOR EACH ROW EXECUTE FUNCTION crm_private.enqueue_walkin_event();
 CREATE FUNCTION crm_private.walkin_snapshot(p_queue_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
-STABLE
+VOLATILE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
