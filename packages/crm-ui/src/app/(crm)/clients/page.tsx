@@ -15,7 +15,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
     supabase.rpc("get_my_profile"),
     getCrmUser(supabase) /* crm-port: auth.getUser().id is used as the CRM user id -> crm.current_crm_user_id() */,
     supabase.from("branches").select("id,name").eq("active", true).order("name"),
-    supabase.from("leads").select("id,phone_number,name,field_values,created_at").order("created_at", { ascending: false }).order("id", { ascending: false }) /* crm-port: deterministic order */.limit(1000),
+    supabase.from("leads").select("id,phone_number,name,field_values,created_at,client_id,clients!leads_client_id_fkey(client_code,total_visits)").order("created_at", { ascending: false }).order("id", { ascending: false }) /* crm-port: deterministic order */.limit(1000),
   ]);
   const profile = profileRows?.[0];
   const { data: user } = auth.user
@@ -23,10 +23,13 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
     : { data: null };
   const rows = Array.isArray(data) ? data as ClientDatabaseRow[] : [];
   const normalizedSearch = search.toLowerCase();
+  // Approved identity extension: a lead has an MKC client from first contact. It is listed once,
+  // as a LEAD with that MKC, until the person visits.
+  const leadClientIds = new Set((leads ?? []).filter((lead) => lead.client_id && (lead.clients?.total_visits ?? 0) === 0).map((lead) => lead.client_id));
   const leadRows: ClientDatabaseRow[] = (leads ?? []).filter((lead) => !search || `${lead.name ?? ""} ${lead.phone_number}`.toLowerCase().includes(normalizedSearch)).map((lead) => {
     const values = lead.field_values as Record<string, unknown>;
-    return { client_id: lead.id, client_code: "LEAD", primary_name: lead.name ?? "Unnamed lead", primary_phone: lead.phone_number, city: typeof values.city === "string" ? values.city : null, state: typeof values.state === "string" ? values.state : null, total_visits: 0, last_visit_date: lead.created_at, last_buy_status: null, record_type: "lead" };
+    return { client_id: lead.id, client_code: lead.clients?.client_code ?? "LEAD", primary_name: lead.name ?? "Unnamed lead", primary_phone: lead.phone_number, city: typeof values.city === "string" ? values.city : null, state: typeof values.state === "string" ? values.state : null, total_visits: 0, last_visit_date: lead.created_at, last_buy_status: null, record_type: "lead" };
   });
 
-  return <ClientDatabase clients={[...leadRows, ...rows.map((row) => ({ ...row, record_type: "client" as const }))]} search={search} walkinContext={{ role: profile?.role ?? "", branchId: user?.branch_id ?? null, branches: branches ?? [] }} />;
+  return <ClientDatabase clients={[...leadRows, ...rows.filter((row) => !leadClientIds.has(row.client_id)).map((row) => ({ ...row, record_type: "client" as const }))]} search={search} walkinContext={{ role: profile?.role ?? "", branchId: user?.branch_id ?? null, branches: branches ?? [] }} />;
 }

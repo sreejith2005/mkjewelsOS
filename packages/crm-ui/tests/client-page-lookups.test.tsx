@@ -15,6 +15,7 @@ function responseFor(table: string) {
     : table === "client_timeline" || table === "client_edit_log" ? []
       : table === "branches" ? []
         : table === "users" ? { branch_id: null }
+          : table === "client_identity" ? { referral_code: "MKREF-1", household_id: null }
       : lookups[table as keyof typeof lookups] ?? [];
   const result = Promise.resolve({ data, error: null });
   const query = {
@@ -23,6 +24,8 @@ function responseFor(table: string) {
     order: () => query,
     in: () => query,
     single: () => result,
+    maybeSingle: () => result,
+    neq: () => query,
     then: result.then.bind(result),
   };
   return query;

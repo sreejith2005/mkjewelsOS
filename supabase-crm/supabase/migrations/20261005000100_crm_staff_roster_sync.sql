@@ -450,8 +450,8 @@ DECLARE
   v_snapshot jsonb;
   v_result jsonb;
   v_counts jsonb := '{}'::jsonb;
-  v_ids uuid[] := '{}';
-  v_ineligible uuid[] := '{}';
+  v_ids uuid[] := '{}'::uuid[];
+  v_ineligible uuid[] := '{}'::uuid[];
   v_grant public.crm_sso_access_grants;
   v_absent integer := 0;
   v_key text;

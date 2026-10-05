@@ -140,6 +140,13 @@ export type Database = {
             foreignKeyName: "client_campaign_tags_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "client_identity"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_campaign_tags_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["client_id"]
           },
@@ -188,6 +195,13 @@ export type Database = {
             foreignKeyName: "client_edit_log_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "client_identity"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_edit_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["client_id"]
           },
@@ -214,6 +228,13 @@ export type Database = {
           phone?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_phone_index_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_identity"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_phone_index_client_id_fkey"
             columns: ["client_id"]
@@ -287,6 +308,13 @@ export type Database = {
             foreignKeyName: "client_timeline_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "client_identity"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_timeline_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["client_id"]
           },
@@ -319,6 +347,7 @@ export type Database = {
           gift_history: Json | null
           google_review_status: string | null
           high_potential_reason: string | null
+          household_id: string | null
           instagram_status: string | null
           last_bought_categories: string[] | null
           last_branch_id: string | null
@@ -330,15 +359,19 @@ export type Database = {
           last_salesperson_id: string | null
           last_seen_categories: string[] | null
           last_visit_date: string | null
+          lifecycle_stage: string
           next_visit_date: string | null
           other_known_phones: string[] | null
           other_names: string[] | null
           pincode: string | null
           primary_name: string
-          primary_phone: string
+          primary_phone: string | null
           profile_updated_at: string
           profile_updated_by: string | null
+          referral_code: string
+          referral_relation: string | null
           referral_status: string | null
+          referred_by_client_id: string | null
           secondary_phone: string | null
           snack: string | null
           state: string | null
@@ -369,6 +402,7 @@ export type Database = {
           gift_history?: Json | null
           google_review_status?: string | null
           high_potential_reason?: string | null
+          household_id?: string | null
           instagram_status?: string | null
           last_bought_categories?: string[] | null
           last_branch_id?: string | null
@@ -380,15 +414,19 @@ export type Database = {
           last_salesperson_id?: string | null
           last_seen_categories?: string[] | null
           last_visit_date?: string | null
+          lifecycle_stage?: string
           next_visit_date?: string | null
           other_known_phones?: string[] | null
           other_names?: string[] | null
           pincode?: string | null
           primary_name: string
-          primary_phone: string
+          primary_phone?: string | null
           profile_updated_at?: string
           profile_updated_by?: string | null
+          referral_code: string
+          referral_relation?: string | null
           referral_status?: string | null
+          referred_by_client_id?: string | null
           secondary_phone?: string | null
           snack?: string | null
           state?: string | null
@@ -419,6 +457,7 @@ export type Database = {
           gift_history?: Json | null
           google_review_status?: string | null
           high_potential_reason?: string | null
+          household_id?: string | null
           instagram_status?: string | null
           last_bought_categories?: string[] | null
           last_branch_id?: string | null
@@ -430,15 +469,19 @@ export type Database = {
           last_salesperson_id?: string | null
           last_seen_categories?: string[] | null
           last_visit_date?: string | null
+          lifecycle_stage?: string
           next_visit_date?: string | null
           other_known_phones?: string[] | null
           other_names?: string[] | null
           pincode?: string | null
           primary_name?: string
-          primary_phone?: string
+          primary_phone?: string | null
           profile_updated_at?: string
           profile_updated_by?: string | null
+          referral_code?: string
+          referral_relation?: string | null
           referral_status?: string | null
+          referred_by_client_id?: string | null
           secondary_phone?: string | null
           snack?: string | null
           state?: string | null
@@ -451,6 +494,13 @@ export type Database = {
           total_visits?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "clients_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "clients_last_branch_id_fkey"
             columns: ["last_branch_id"]
@@ -471,6 +521,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_referred_by_client_id_fkey"
+            columns: ["referred_by_client_id"]
+            isOneToOne: false
+            referencedRelation: "client_identity"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "clients_referred_by_client_id_fkey"
+            columns: ["referred_by_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -689,6 +753,13 @@ export type Database = {
             foreignKeyName: "documents_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "client_identity"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "documents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["client_id"]
           },
@@ -763,8 +834,44 @@ export type Database = {
             foreignKeyName: "entry_queue_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "client_identity"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "entry_queue_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      households: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          household_code: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          household_code?: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          household_code?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "households_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -965,6 +1072,7 @@ export type Database = {
       leads: {
         Row: {
           branch_id: string | null
+          client_id: string | null
           converted_to_client_id: string | null
           created_at: string
           created_by: string
@@ -981,6 +1089,7 @@ export type Database = {
         }
         Insert: {
           branch_id?: string | null
+          client_id?: string | null
           converted_to_client_id?: string | null
           created_at?: string
           created_by: string
@@ -997,6 +1106,7 @@ export type Database = {
         }
         Update: {
           branch_id?: string | null
+          client_id?: string | null
           converted_to_client_id?: string | null
           created_at?: string
           created_by?: string
@@ -1018,6 +1128,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "branches"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_identity"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "leads_converted_to_client_id_fkey"
+            columns: ["converted_to_client_id"]
+            isOneToOne: false
+            referencedRelation: "client_identity"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "leads_converted_to_client_id_fkey"
@@ -1375,6 +1506,13 @@ export type Database = {
             foreignKeyName: "not_bought_followups_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "client_identity"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "not_bought_followups_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["client_id"]
           },
@@ -1491,6 +1629,13 @@ export type Database = {
             foreignKeyName: "referral_calling_converted_client_id_fkey"
             columns: ["converted_client_id"]
             isOneToOne: false
+            referencedRelation: "client_identity"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "referral_calling_converted_client_id_fkey"
+            columns: ["converted_client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["client_id"]
           },
@@ -1577,6 +1722,7 @@ export type Database = {
           id: string
           referral_name: string
           referral_number: string
+          referred_client_id: string | null
           relationship: string | null
           salesperson_id: string
           source_timeline_id: string | null
@@ -1592,6 +1738,7 @@ export type Database = {
           id?: string
           referral_name: string
           referral_number: string
+          referred_client_id?: string | null
           relationship?: string | null
           salesperson_id: string
           source_timeline_id?: string | null
@@ -1607,6 +1754,7 @@ export type Database = {
           id?: string
           referral_name?: string
           referral_number?: string
+          referred_client_id?: string | null
           relationship?: string | null
           salesperson_id?: string
           source_timeline_id?: string | null
@@ -1623,6 +1771,27 @@ export type Database = {
           {
             foreignKeyName: "referrals_given_by_client_id_fkey"
             columns: ["given_by_client_id"]
+            isOneToOne: false
+            referencedRelation: "client_identity"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "referrals_given_by_client_id_fkey"
+            columns: ["given_by_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "referrals_referred_client_id_fkey"
+            columns: ["referred_client_id"]
+            isOneToOne: false
+            referencedRelation: "client_identity"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "referrals_referred_client_id_fkey"
+            columns: ["referred_client_id"]
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["client_id"]
@@ -1833,9 +2002,51 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      client_identity: {
+        Row: {
+          client_code: string | null
+          client_id: string | null
+          household_code: string | null
+          household_id: string | null
+          lifecycle_stage: string | null
+          referral_code: string | null
+          referral_id: string | null
+          referral_person_id: string | null
+          referred_by_client_code: string | null
+          referred_by_client_id: string | null
+          referred_by_name: string | null
+          relation: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_referred_by_client_id_fkey"
+            columns: ["referred_by_client_id"]
+            isOneToOne: false
+            referencedRelation: "client_identity"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "clients_referred_by_client_id_fkey"
+            columns: ["referred_by_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
     }
     Functions: {
+      add_client_to_family: {
+        Args: { p_client_id: string; p_member_client_id: string }
+        Returns: string
+      }
       assign_next_available_crm: {
         Args: { p_branch_id: string }
         Returns: string
@@ -1931,6 +2142,7 @@ export type Database = {
               id: string
               referral_name: string
               referral_number: string
+              referred_client_id: string | null
               relationship: string | null
               salesperson_id: string
               source_timeline_id: string | null
@@ -1963,6 +2175,7 @@ export type Database = {
               id: string
               referral_name: string
               referral_number: string
+              referred_client_id: string | null
               relationship: string | null
               salesperson_id: string
               source_timeline_id: string | null
@@ -1988,6 +2201,7 @@ export type Database = {
         }
         Returns: {
           branch_id: string | null
+          client_id: string | null
           converted_to_client_id: string | null
           created_at: string
           created_by: string
@@ -2062,6 +2276,28 @@ export type Database = {
         Returns: string
       }
       legacy_status_is_done: { Args: { p_status: string }; Returns: boolean }
+      legacy_walkin_ingest_log_attempt: {
+        Args: {
+          p_outcome: string
+          p_payload: Json
+          p_payload_hash: string
+          p_request_id: string
+          p_result: Json
+          p_source_ip: string
+        }
+        Returns: undefined
+      }
+      legacy_walkin_ingest_submit: {
+        Args: {
+          p_audit_payload: Json
+          p_branch_name: string
+          p_payload: Json
+          p_payload_hash: string
+          p_request_id: string
+          p_source_ip: string
+        }
+        Returns: Json
+      }
       lookup_client_by_phone: {
         Args: { p_phone: string }
         Returns: {
@@ -2103,6 +2339,10 @@ export type Database = {
         Returns: boolean
       }
       reconcile_referral_calling_conversions: { Args: never; Returns: number }
+      remove_client_from_family: {
+        Args: { p_client_id: string }
+        Returns: undefined
+      }
       save_not_bought_followup: {
         Args: {
           p_call_response: string
@@ -2195,13 +2435,16 @@ export type Database = {
       search_clients: {
         Args: { result_limit?: number; search_text: string }
         Returns: {
+          client_code: string
           client_id: string
+          household_code: string
           last_branch_name: string
           last_buy_status: string
           last_visit_date: string
           matched_phone: string
           primary_name: string
           primary_phone: string
+          referral_code: string
           total_visits: number
         }[]
       }

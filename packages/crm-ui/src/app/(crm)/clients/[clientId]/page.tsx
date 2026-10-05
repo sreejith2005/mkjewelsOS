@@ -7,7 +7,6 @@ import { createClient } from "@/lib/supabase/server";
 export default async function ClientPage({ params }: { params: Promise<{ clientId: string }> }) {
   const { clientId } = await params;
   const supabase = await createClient();
-  const db = supabase as unknown as { from: (table: string) => ReturnType<typeof supabase.from> };
   const [
     clientResult,
     timelineResult,
@@ -29,7 +28,7 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
     supabase.from("branches").select("id,name").eq("active", true).order("name"),
     supabase.from("lookup_beverages").select("label").eq("active", true).order("label"),
     supabase.from("lookup_snacks").select("label").eq("active", true).order("label"),
-    db.from("lookup_sugar_options").select("label").eq("active", true).order("label"),
+    supabase.from("lookup_sugar_options").select("label").eq("active", true).order("label"),
     supabase.from("lookup_communities").select("label").eq("active", true).order("label"),
     supabase.from("lookup_gifts").select("label").eq("active", true).order("label"),
   ]);
@@ -47,6 +46,11 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
     branchIds.length ? supabase.from("branches").select("id,name").in("id", branchIds) : Promise.resolve({ data: [] }),
     [...editorIds, ...salespersonIds].length ? supabase.from("users").select("id,name").in("id", [...new Set([...editorIds, ...salespersonIds])]) : Promise.resolve({ data: [] }),
   ]);
+  // Approved identity extension: codes, referrer and family (company-wide read, as clients).
+  const { data: identity } = await supabase.from("client_identity").select("referral_code,household_code,household_id,referral_id,referral_person_id,relation,referred_by_client_id,referred_by_client_code,referred_by_name,lifecycle_stage").eq("client_id", clientId).maybeSingle();
+  const { data: family } = identity?.household_id
+    ? await supabase.from("clients").select("client_id,client_code,primary_name").eq("household_id", identity.household_id).neq("client_id", clientId).order("client_code")
+    : { data: [] };
   const branchNames = new Map((branches ?? []).map((item) => [item.id, item.name]));
   const userNames = new Map((users ?? []).map((item) => [item.id, item.name]));
 
@@ -55,6 +59,8 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
     timeline={(timelineResult.data ?? []).map((item) => ({ ...item, seen_categories: item.seen_categories ?? [], bought_categories: item.bought_categories ?? [], order_categories: item.order_categories ?? [], branch: branchNames.get(item.branch_id) ?? null, salesperson: item.salesperson_id ? userNames.get(item.salesperson_id) ?? null : null }))}
     audit={(auditResult.data ?? []).map((item) => ({ ...item, editor: item.edited_by ? userNames.get(item.edited_by) ?? null : null }))}
     lastBranchName={clientResult.data.last_branch_id ? branchNames.get(clientResult.data.last_branch_id) ?? null : null}
+    identity={identity}
+    family={family ?? []}
     lastSalespersonName={clientResult.data.last_salesperson_id ? userNames.get(clientResult.data.last_salesperson_id) ?? null : null}
     walkinContext={{ role: profileResult.data?.[0]?.role ?? "", branchId: currentUser?.branch_id ?? null, branches: branchesResult.data ?? [] }}
     lookups={{

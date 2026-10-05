@@ -2,6 +2,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { z } from "zod";
+import Link from "@/next-shim/link"; // crm-port: next/link -> local shim (same hrefs, /crm base path added)
 import { createClient } from "@/lib/supabase/client";
 import { ExistingClientWalkinAction } from "@/components/existing-client-walkin-action";
 import { displayDate, nullable, phoneDigits, stringArray } from "@/lib/clients";
@@ -10,10 +11,11 @@ import type { Json } from "@/lib/supabase/database.types";
 import type { Client } from "@/lib/supabase/app-types";
 const schema = z.object({
   primary_name: z.string().trim().min(1).max(160),
+  // Approved extension (2026-10-01): a client may have no phone; an entered phone has 10 digits.
   primary_phone: z
     .string()
     .refine(
-      (value) => phoneDigits(value).length === 10,
+      (value) => value.trim() === "" || phoneDigits(value).length === 10,
       "Enter a 10-digit phone",
     ),
   secondary_phone: z.string(),
@@ -109,7 +111,7 @@ const fieldGroups: { title: string; fields: (keyof Form)[] }[] = [
 function initial(client: Client): Form {
   return {
     primary_name: client.primary_name,
-    primary_phone: client.primary_phone,
+    primary_phone: client.primary_phone ?? "",
     other_names: (client.other_names ?? []).join(", "),
     secondary_phone: client.secondary_phone ?? "",
     billing_phone: client.billing_phone ?? "",
@@ -146,6 +148,20 @@ function label(field: string) {
 function LegacyProfileCard({ title, rows }: { title: string; rows: Array<[string, ReactNode]> }) {
   return <section className="legacy-client-card"><h2>{title}</h2><div className="legacy-client-rows">{rows.map(([name, value]) => <div className="legacy-client-row" key={name}><span>{name}</span><b>{value || "NA"}</b></div>)}</div></section>;
 }
+// Approved identity extension (2026-10-01): MKC / MKF / MKREF codes, family and referrer.
+export type ClientIdentity = {
+  referral_code: string | null;
+  household_code: string | null;
+  referral_id: string | null;
+  referral_person_id: string | null;
+  relation: string | null;
+  referred_by_client_id: string | null;
+  referred_by_client_code: string | null;
+  referred_by_name: string | null;
+  lifecycle_stage: string | null;
+};
+export type FamilyMember = { client_id: string; client_code: string; primary_name: string };
+
 export function ClientProfile({
   client,
   timeline,
@@ -154,6 +170,8 @@ export function ClientProfile({
   walkinContext,
   lastBranchName,
   lastSalespersonName,
+  identity = null,
+  family = [],
 }: {
   client: Client;
   timeline: Array<{
@@ -184,6 +202,8 @@ export function ClientProfile({
   walkinContext: { role: string; branchId: string | null; branches: { id: string; name: string }[] };
   lastBranchName?: string | null;
   lastSalespersonName?: string | null;
+  identity?: ClientIdentity | null;
+  family?: FamilyMember[];
 }) {
   const [values, setValues] = useState(() => initial(client));
   const [tab, setTab] = useState<"profile" | "timeline" | "audit">("profile");
@@ -222,7 +242,7 @@ export function ClientProfile({
                 : nullable(value),
             ]),
         ),
-        primary_phone: phoneDigits(parsed.primary_phone),
+        primary_phone: phoneDigits(parsed.primary_phone) || null,
         other_names: stringArray(parsed.other_names),
         other_known_phones: stringArray(parsed.other_known_phones).map(
           phoneDigits,
@@ -254,8 +274,17 @@ export function ClientProfile({
     return <main className="legacy-client-profile mx-auto max-w-7xl px-5 py-7">
       <div className="legacy-profile-grid">
         <aside className="legacy-profile-left">
-          <section className="legacy-client-hero"><h1>{client.primary_name}</h1><div className="legacy-client-badges"><span>{client.client_code}</span><span>{client.last_buy_status ?? "NA"}</span><span>{client.city ?? "NA"}</span></div><div className="legacy-client-hero-actions"><ExistingClientWalkinAction clientId={client.client_id} primaryName={client.primary_name} primaryPhone={client.primary_phone} role={walkinContext.role} branchId={walkinContext.branchId} branches={walkinContext.branches} /><button type="button" onClick={() => setEditing(true)}>EDIT PROFILE</button></div></section>
-          <LegacyProfileCard title="CONTACT" rows={[["PRIMARY PHONE", client.primary_phone], ["SECONDARY PHONE", client.secondary_phone ?? ""], ["BILLING PHONE", client.billing_phone ?? ""], ["OTHER KNOWN PHONES", client.other_known_phones?.join(", ") ?? ""]]} />
+          <section className="legacy-client-hero"><h1>{client.primary_name}</h1><div className="legacy-client-badges"><span>{client.client_code}</span>{identity?.referral_code ? <span>{identity.referral_code}</span> : null}{identity?.household_code ? <span>{identity.household_code}</span> : null}<span>{client.last_buy_status ?? "NA"}</span><span>{client.city ?? "NA"}</span></div><div className="legacy-client-hero-actions"><ExistingClientWalkinAction clientId={client.client_id} primaryName={client.primary_name} primaryPhone={client.primary_phone ?? ""} role={walkinContext.role} branchId={walkinContext.branchId} branches={walkinContext.branches} /><button type="button" onClick={() => setEditing(true)}>EDIT PROFILE</button></div></section>
+          <LegacyProfileCard title="CONTACT" rows={[["PRIMARY PHONE", client.primary_phone ?? ""], ["SECONDARY PHONE", client.secondary_phone ?? ""], ["BILLING PHONE", client.billing_phone ?? ""], ["OTHER KNOWN PHONES", client.other_known_phones?.join(", ") ?? ""]]} />
+          <LegacyProfileCard title="FAMILY & REFERRAL" rows={[
+            ["REFERRAL ID", identity?.referral_id ?? ""],
+            ["REFERRAL PERSON ID", identity?.referral_person_id ?? ""],
+            ["RELATION", identity?.relation ?? ""],
+            ["REFERRED BY", identity?.referred_by_client_id ? <Link className="underline" href={`/clients/${identity.referred_by_client_id}`}>{identity.referred_by_name} ({identity.referred_by_client_code})</Link> : ""],
+            ["FAMILY ID", identity?.household_code ?? ""],
+            ["FAMILY MEMBERS", family.length ? <span>{family.map((member, index) => <span key={member.client_id}>{index ? ", " : ""}<Link className="underline" href={`/clients/${member.client_id}`}>{member.primary_name} ({member.client_code})</Link></span>)}</span> : ""],
+            ["STAGE", identity?.lifecycle_stage ? identity.lifecycle_stage.toUpperCase() : ""],
+          ]} />
           <LegacyProfileCard title="PREFERENCES" rows={[["BEVERAGE", client.beverage ?? ""], ["SUGAR", client.sugar ?? ""], ["SNACK", client.snack ?? ""], ["GIFT HISTORY", client.gift_history ? JSON.stringify(client.gift_history) : ""]]} />
           <LegacyProfileCard title="CRM ACTIONS" rows={[["INSTAGRAM STATUS", client.instagram_status ?? ""], ["GOOGLE REVIEW STATUS", client.google_review_status ?? ""], ["TESTIMONIAL STATUS", client.testimonial_status ?? ""], ["REFERRAL STATUS", client.referral_status ?? ""], ["NEXT VISIT DATE", displayDate(client.next_visit_date)]]} />
         </aside>
@@ -280,7 +309,7 @@ export function ClientProfile({
         <div>
           <h1 className="text-3xl font-semibold">{client.primary_name}</h1>
           <p className="mt-1 text-stone-600">
-            {client.primary_phone} <button type="button" aria-label="Copy primary phone" className="ml-1 rounded border px-1 text-xs" onClick={() => void navigator.clipboard.writeText(client.primary_phone)}>Copy</button> · {client.gender ?? "Gender not set"}
+            {client.primary_phone ? <>{client.primary_phone} <button type="button" aria-label="Copy primary phone" className="ml-1 rounded border px-1 text-xs" onClick={() => void navigator.clipboard.writeText(client.primary_phone ?? "")}>Copy</button></> : "No phone"} · {client.gender ?? "Gender not set"}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -361,7 +390,7 @@ export function ClientProfile({
                     >
                       <span className="mb-1 block text-xs font-medium capitalize text-stone-600">
                         {label(field)}
-                        {field === "primary_name" || field === "primary_phone"
+                        {field === "primary_name"
                           ? " *"
                           : ""}
                       </span>

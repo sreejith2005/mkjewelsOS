@@ -235,7 +235,7 @@ export function WalkInForm({
   const [saving, setSaving] = useState(false);
   const submitWasExplicit = useRef(false);
   const [billingMatchesPrimary, setBillingMatchesPrimary] = useState(
-    () => Boolean(client?.billing_phone && phoneDigits(client.billing_phone) === phoneDigits(client.primary_phone)),
+    () => Boolean(client?.billing_phone && phoneDigits(client.billing_phone) === phoneDigits(client.primary_phone ?? "")),
   );
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(
     () => new Set(client ? ["primary_name", "gender", "dob", "community", "address", "pincode"] : []),

@@ -484,10 +484,6 @@
     display: inline-flex;
   }
 
-.crm-root#crm-root#crm-root#crm-root .table {
-    display: table;
-  }
-
 .crm-root#crm-root#crm-root#crm-root .h-3 {
     height: calc(var(--spacing) * 3);
   }
