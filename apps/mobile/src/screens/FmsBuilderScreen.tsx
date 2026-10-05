@@ -78,12 +78,17 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
   const [focusedIssueCode, setFocusedIssueCode] = useState<string | undefined>();
   const selectStage = (key: string | null) => { setFocusedIssueCode(undefined); setSelectedKey(key); };
   const editorScrollRef = useRef<ScrollView>(null);
-  const scrollToIssue = (event: LayoutChangeEvent) => editorScrollRef.current?.scrollTo({ y: Math.max(0, event.nativeEvent.layout.y - 20), animated: true });
 
   const normalized = useMemo(() => normalizeFmsDefinition(definition), [definition]);
   const issues = useMemo(() => validateFmsDefinition(normalized, { formFields: data.formFields, availableFormIds: data.forms.map((form) => form.id) }), [data.formFields, data.forms, normalized]);
   const invalidKeys = useMemo(() => new Set(issues.flatMap((issue) => issue.stageKey ? [issue.stageKey] : [])), [issues]);
   const selected = normalized.stages.find((stage) => stage.key === selectedKey) ?? null;
+  const focusedIssue = issues.find((issue) => issue.stageKey === selected?.key && issue.code === focusedIssueCode);
+  const scrollToIssue = (event: LayoutChangeEvent) => {
+    const { y, height } = event.nativeEvent.layout;
+    const destinationAtEnd = focusedIssueCode === "unsupported_cycle" && /^(Otherwise|Continue to) destination/.test(focusedIssue?.message ?? "");
+    editorScrollRef.current?.scrollTo({ y: Math.max(0, y + (destinationAtEnd ? height - 500 : -20)), animated: true });
+  };
   const dirty = JSON.stringify(normalized) !== savedSnapshot;
   const assignableStages = normalized.stages.filter((stage) => ["form", "task", "approval"].includes(stage.type));
   const assignedStages = assignableStages.filter((stage) => stage.assigneeRules.some((rule) => rule.type === "specific_user" && rule.userProfileId));
@@ -326,7 +331,7 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
         <Sheet scrollable={false} onClose={() => setSelectedKey(null)} tall title={`${selected.type.replaceAll("_", " ")} · ${selected.name}`} visible>
           <ScrollView keyboardShouldPersistTaps="handled" ref={editorScrollRef}>
             {issues.filter((issue) => issue.stageKey === selected.key).map((issue, index) => <Banner key={`${issue.code}-${index}`} tone="danger">{issue.message}</Banner>)}
-            <FmsStageEditor data={data} issueCode={focusedIssueCode} issueMessage={issues.find((issue) => issue.stageKey === selected.key && issue.code === focusedIssueCode)?.message} onIssueLayout={scrollToIssue} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); }} onDelete={() => void remove(selected.key)} stage={selected} stages={normalized.stages} />
+            <FmsStageEditor data={data} issueCode={focusedIssueCode} issueMessage={focusedIssue?.message} onIssueLayout={scrollToIssue} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); }} onDelete={() => void remove(selected.key)} stage={selected} stages={normalized.stages} />
           </ScrollView>
         </Sheet>
       ) : null}
