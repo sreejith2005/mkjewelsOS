@@ -435,3 +435,8 @@ verify_jwt = false
 # (constant-time) before it rate-limits, parses the body or touches the database.
 [functions.crm-walkin-ingest]
 verify_jwt = false
+
+# Delivers CRM sync events (walk-in queue changes) to JewelOS. pg_cron only: x-cron-secret
+# (CRM_SYNC_CRON_SECRET, constant-time) is checked before anything else.
+[functions.sync-deliver]
+verify_jwt = false

@@ -2248,6 +2248,19 @@ export type Database = {
           role: Database["public"]["Enums"]["user_role"]
         }[]
       }
+      crm_sync_claim_events: {
+        Args: { p_limit?: number }
+        Returns: {
+          aggregate_id: string
+          event_id: number
+          event_type: string
+          snapshot: Json
+        }[]
+      }
+      crm_sync_finish_event: {
+        Args: { p_error?: string; p_event_id: number; p_ok: boolean }
+        Returns: string
+      }
       crm_sync_health: { Args: never; Returns: Json }
       current_crm_user_id: { Args: never; Returns: string }
       current_user_branch_id: { Args: never; Returns: string }

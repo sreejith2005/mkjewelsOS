@@ -10805,6 +10805,10 @@ export type Database = {
         }
         Returns: string
       }
+      crm_sync_apply_walkin: {
+        Args: { p_event_id: string; p_snapshot: Json }
+        Returns: Json
+      }
       crm_sync_claim_staff_events: {
         Args: { p_limit?: number }
         Returns: {
@@ -10824,8 +10828,10 @@ export type Database = {
           dead_events: number
           failing_events: number
           last_delivered_at: string
+          last_walkin_event_at: string
           oldest_open_at: string
           open_events: number
+          walkin_events_7d: Json
         }[]
       }
       crm_sync_record_operation: {

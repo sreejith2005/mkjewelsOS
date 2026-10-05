@@ -42,3 +42,8 @@ verify_jwt = true
 # constant-time) before parsing the body or touching the database.
 [functions.crm-staff-sync]
 verify_jwt = false
+
+# Sync events from the CRM project (walk-in queue -> tasks), server to server. x-crm-sync-secret
+# is checked against CRM_SYNC_INBOUND_SECRET (constant-time) before the body is read.
+[functions.crm-sync-receive]
+verify_jwt = false
