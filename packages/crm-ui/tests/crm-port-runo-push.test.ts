@@ -1,10 +1,10 @@
 // crm-port addition (no original counterpart): the original POSTed to /api/leads/<id>/runo;
-// the port invokes the crm-runo-push Edge Function. `ok` must stay the route's ok, because the
+// the port invokes the crm-runo-push Edge Function of the CRM project (2026-10-01). `ok` must stay the route's ok, because the
 // original lead form chooses its message from it.
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const invoke = vi.fn();
-vi.mock("@/crm-port/runtime", () => ({ crmHost: () => ({ supabase: { functions: { invoke } } }) }));
+vi.mock("@/crm-port/runtime", () => ({ crmProjectClient: () => ({ functions: { invoke } }) }));
 import { pushLeadToRuno } from "@/crm-port/phase4";
 
 afterEach(() => vi.resetAllMocks());

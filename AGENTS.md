@@ -51,8 +51,10 @@ scripts               Controlled operational helpers
 ```
 
 The web app is a client of hosted/local Supabase. The Vite client may contain
-only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`; the anon key is safe to
-ship only because the database enforces RLS. Service-role keys, cron secrets,
+only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (JewelOS project) and
+`VITE_CRM_SUPABASE_URL` and `VITE_CRM_SUPABASE_ANON_KEY` (CRM project, 2026-10-01
+two-project decision). An anon key is safe to ship only because that project's
+database enforces RLS and grants anon nothing it should not have. Service-role keys, cron secrets,
 provider credentials, Auth admin credentials, production exports, and customer
 data are never client configuration, source, Git content, terminal output, or
 chat content.
@@ -135,6 +137,29 @@ RPCs of 0189 only) and `crm-runo-push` (caller JWT, RLS); owner cutover steps ar
 `docs/superpowers/specs/2026-09-25-crm-native-integration-design.md`. crm read
 access is company-wide for active CRM users by owner decision; writes follow
 the original branch rules; the database enforces both.
+
+### CRM two-project decision (2026-10-01 owner decision; transition in progress)
+
+The paragraph above describes what is deployed today. The owner has decided the
+target architecture is different. The design is
+`docs/superpowers/specs/2026-10-01-crm-two-project-client-database-design.md`.
+
+- **Two Supabase projects, never merged.** The **CRM project** is the client database.
+  The **JewelOS project** holds users and every internal record (roster, tasks, FMS,
+  forms, leave, notifications, reports).
+- **One home project per record.** The other project never edits that record. It
+  receives events through the audited outbox/inbox sync described in the design.
+- **Target state:** the `/crm` screens read and write the CRM project through a login
+  bridge, and the JewelOS `crm` schema is retired.
+  - Do not add new features to the JewelOS `crm` schema.
+  - New CRM-project schema work goes in `supabase-crm/` (forward-only, pgTAP-tested),
+    once its baseline exists.
+- **Approved extensions** to the parity rule: client `MKC-`, family `MKF-` and referral
+  `MKREF-` identifiers and search; optional client phone; walk-in → JewelOS task; channel
+  and FMS contributions to the client record. Everything else stays at parity.
+- **Hosted actions.** Every hosted action on either project (migration, data move, secret,
+  deploy) follows `PRODUCTION_SWITCH_PLAYBOOK.md` and is run by, or in front of, the
+  owner.
 
 Read the relevant source, migration, and pgTAP test before changing one of
 these areas. Preserve historical task/form/FMS data when evolving a contract.

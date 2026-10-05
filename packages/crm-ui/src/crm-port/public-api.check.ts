@@ -10,3 +10,4 @@ export const crmAppMatches: typeof Declared.CrmApp = Implemented.CrmApp;
 export const basePathMatches: typeof Declared.CRM_BASE_PATH = Implemented.CRM_BASE_PATH;
 export const propsMatch: Same<Declared.CrmAppProps, Implemented.CrmAppProps> = true;
 export const authMatches: Same<Declared.CrmAuth, Implemented.CrmAuth> = true;
+export const crmProjectMatches: Same<Declared.CrmProjectConfig, Implemented.CrmProjectConfig> = true;

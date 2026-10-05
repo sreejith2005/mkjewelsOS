@@ -6,6 +6,8 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { isCrmEmbedPath, type CrmEmbedPageMessage } from "@jewelos/core";
 
+import { crmProjectConfig } from "@/lib/crmProject";
+
 import { createEmbeddedCrmClient, embeddedCrmAuth } from "./embeddedCrmClient";
 import { NativeTokenBroker, postToNative, type ReactNativeWebViewBridge } from "./nativeCrmBridge";
 
@@ -30,6 +32,8 @@ export function EmbeddedCrmRoot({ bridge, supabaseUrl, supabaseAnonKey }: Embedd
   const post = useCallback((message: CrmEmbedPageMessage) => postToNative(bridge, message), [bridge]);
   const broker = useMemo(() => new NativeTokenBroker({ post, clearStorage: clearPageStorage }), [post]);
   const supabase = useMemo(() => createEmbeddedCrmClient({ url: supabaseUrl, anonKey: supabaseAnonKey, broker }), [broker, supabaseAnonKey, supabaseUrl]);
+  // The login bridge exchanges the native app's JewelOS token for the CRM-project token.
+  const jewelosAccessToken = useCallback(() => broker.getToken(), [broker]);
   const auth = useMemo(() => embeddedCrmAuth({ url: supabaseUrl, anonKey: supabaseAnonKey, broker }), [broker, supabaseAnonKey, supabaseUrl]);
   const [href, setHref] = useState(window.location.href);
 
@@ -69,6 +73,6 @@ export function EmbeddedCrmRoot({ bridge, supabaseUrl, supabaseAnonKey }: Embedd
 
   const url = new URL(href);
   return <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-gold">Loading…</div>}>
-    <CrmApp auth={auth} jewelosHomePath="/" navigate={navigate} onSignOut={onSignOut} path={url.pathname} search={url.search} supabase={supabase} />
+    <CrmApp auth={auth} crmProject={crmProjectConfig} jewelosAccessToken={jewelosAccessToken} jewelosHomePath="/" navigate={navigate} onSignOut={onSignOut} path={url.pathname} search={url.search} supabase={supabase} />
   </Suspense>;
 }

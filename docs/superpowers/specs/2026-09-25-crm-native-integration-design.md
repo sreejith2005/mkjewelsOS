@@ -1,3 +1,8 @@
+> Partly superseded on 2026-10-01 by `2026-10-01-crm-two-project-client-database-design.md`.
+> CRM data moves to the separate CRM Supabase project, and the JewelOS `crm` schema is
+> retired. The ported UI, parity rules and authorization model in this document still
+> apply.
+
 # Original CRM as a native part of JewelOS
 
 ## Status and decision

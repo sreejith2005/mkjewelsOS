@@ -2,4 +2,5 @@
 // Its type surface is src/public-api.d.ts (kept in step by crm-port/public-api.check.ts), so the
 // web app never type-checks the ported sources under its own compiler settings.
 export { CrmApp, type CrmAppProps } from "./crm-port/crm-app";
+export type { CrmProjectConfig } from "./crm-port/crm-project";
 export { CRM_BASE_PATH, type CrmAuth } from "./crm-port/runtime";

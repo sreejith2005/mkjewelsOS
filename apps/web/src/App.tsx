@@ -30,6 +30,7 @@ import { supabase } from "@jewelos/api-client";
 import { Button, Notice } from "@/components/ui";
 import { ApplicationShell } from "@/components/shell/ApplicationShell";
 import { LazyPageErrorBoundary } from "@/components/LazyPageErrorBoundary";
+import { crmProjectConfig } from "@/lib/crmProject";
 import { lazyPage } from "@/lib/lazyPage";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { DailyChecklistManager } from "@/features/daily-checklists/DailyChecklistManager";
@@ -330,7 +331,7 @@ function AppShell() {
       <>
         <LazyPageErrorBoundary onNavigate={navigate} resetKey={path}>
           <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-gold">Loading…</div>}>
-            <CrmApp jewelosHomePath="/" navigate={navigate} onSignOut={logout} path={path} search={search} supabase={supabase} />
+            <CrmApp crmProject={crmProjectConfig} jewelosHomePath="/" navigate={navigate} onSignOut={logout} path={path} search={search} supabase={supabase} />
           </Suspense>
         </LazyPageErrorBoundary>
         <DailyChecklistGate profileId={profile.id} />
