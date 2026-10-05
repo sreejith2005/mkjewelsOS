@@ -238,8 +238,7 @@ Verification:
   - a user without `crm.view` gets no profile, and no JewelOS session gets no data.
 
 Not yet proven:
-- **Rendered screens in a browser** (the parity harness against two stacks). This needs a
-  JewelOS stack with its API gateway; the shared one was partly stopped by another session.
+- ~~Rendered screens in a browser~~. Done 2026-10-05, see "Browser QA" below.
 - ~~Document upload and view~~. Done 2026-10-05:
   - The owner's read of the hosted storage policies shows three, identical to the port's
     0188 apart from the bucket id.
@@ -255,6 +254,65 @@ Not yet proven:
   - The hosted bucket's own settings (size limit, MIME list) were not read; the owner's
     query output showed only the policies.
 - **Hosted CORS header** (see step 2).
+
+**Steps 4-7 (2026-10-05): built and verified locally.** Plan:
+`docs/superpowers/plans/2026-10-05-crm-two-project-completion.md`. Production steps:
+`docs/CRM_TWO_PROJECT_PRODUCTION_RUNBOOK.md`.
+
+- **Roster sync (JewelOS -> CRM).** JewelOS `0194` (outbox filled by triggers on every
+  access-relevant change, snapshot at claim time, coalescing, backoff, audited dead events,
+  admin-only `crm_sync_health()`), Edge Function `crm-staff-sync` (cron; `deliver` and daily
+  `reconcile`). CRM `20261005000100` (Edge Function `sync-receive`; idempotent, ordered,
+  fail-closed `crm_apply_staff_snapshot`; `crm_reconcile_staff_roster`; owner-approved branch map
+  `branches.jewelos_branch_id` and link list `crm_private.staff_links`; roster rows picked from
+  synced users via `crm_allocation.crm_user_id`; users no longer writable from the CRM API).
+  The allocation CRM NAME is a picker of synced users.
+- **Live data.** CRM `20261005000200` and Edge Function `crm-walkin-ingest` in the CRM project,
+  idempotent by the Sheet's REFERENCE NUMBER (also against the original import);
+  `supabase-crm/apps-script/crm-walkin-push.gs` (live push and resumable backfill since
+  2026-08-17). Owner guide: `docs/CRM_SHEETS_INGEST_CUTOVER.md`.
+- **Identity.** CRM `20261005000300`: `MKF-` families (walk-in companions join the main
+  client's family), `MKREF-` codes with the derived owner columns (`client_identity`), optional
+  phone, leads and referrals get an `MKC` client at first contact (lifecycle stage `lead`;
+  referral conversion and queue registration treat lead clients correctly), code search in
+  `search_clients`. Decision on open question 3: leads link to a `clients` row (`leads.client_id`).
+- **Walk-in -> JewelOS task.** CRM `20261005000400` (outbox on `entry_queue`, Edge Function
+  `sync-deliver`), JewelOS `0195` (Edge Function `crm-sync-receive`, `crm_sync_apply_walkin`):
+  registration creates "Complete walk-in form - {name} ({MKC})" for the salesperson (else the
+  branch manager, flagged); completing the queue entry closes it. A registration completed
+  before the next delivery creates no task (nothing left to do).
+- **Sync health.** Both `crm_sync_health()` RPCs; a CRM SYNC HEALTH panel for CRM super admins
+  on `/crm/allocation`.
+
+Verification (local only):
+- pgTAP: CRM project 207/207 (`supabase-crm/supabase/tests`); JewelOS full suite on an
+  isolated stack, 2,584 tests across 107 files, all passing after the reviewed-function
+  inventory (0006) was updated; db lint clean for the new code.
+- Deno: `crm-staff-sync` 11, `crm-sync-receive` 3, `sync-receive` 6, `sync-deliver` 4,
+  `crm-walkin-ingest` (CRM) 21.
+- Two-stack end to end (isolated JewelOS stack `jewelos-crm-qa` + `mkcrm`, real functions):
+  provisioning, rename, deactivation, reconciliation (closes grants JewelOS no longer lists),
+  walk-in ingest 201/200/401, queue registration -> task with the usual assignment alert ->
+  closed on completion, wrong secrets refused.
+- The real `FORM CODE.GS` helpers and the Apps Script backfill ran in a Node VM against a
+  synthetic sheet and the local ingest (repeatable: the second run saved nothing).
+- `@jewelos/crm-ui` 87/87, `web` 376/376 (one Forms test is timing-sensitive under full load and
+  passes alone), `turbo typecheck` clean.
+
+**Browser QA (2026-10-05).** Playwright against the isolated stacks with synthetic data, at
+1366 and 390 px, as super admin, salesperson and a user without CRM access. Every `/crm` screen
+renders through the login bridge with no failed request, console error or horizontal overflow.
+Flows exercised: queue registration, the full walk-in form with two companions (one without a
+phone) -> visit saved, family created, profile FAMILY & REFERRAL card, `mkf` search; lead
+capture -> listed once as LEAD with its MKC; referrals pending; allocation delete + add through
+the picker; editing a client without a phone; sync health panel. Defects fixed (owner-approved
+even where the original had them): Referrals title rendered twice; queue TYPE always EXISTING;
+MKREF badge took the buy-status styling; engagement selects had no accessible name; companion
+phones from the `/crm` form were dropped by the family trigger.
+
+Still open (hosted or owner input): everything in the runbook; the hosted CORS header; the
+owner's branch map and staff link list; confirmation that the live Apps Script still matches
+`FORM CODE.GS`.
 
 The local CRM-project stack is in `supabase-crm/supabase/` (project id `mkcrm`, ports
 5542x).
