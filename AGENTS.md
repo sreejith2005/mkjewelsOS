@@ -161,7 +161,7 @@ target architecture is different. The design is
   CRM `sync-receive`), walk-in -> JewelOS task (CRM `sync-deliver`, `0195`, `crm-sync-receive`),
   the Apps Script walk-in feed (CRM `crm-walkin-ingest`). The ordered owner steps are in
   `docs/CRM_TWO_PROJECT_PRODUCTION_RUNBOOK.md`; `feat/crm-native` is merged into `main` only at
-  its step b2.
+  its step f.
 - **Hosted actions.** Every hosted action on either project (migration, data move, secret,
   deploy) follows `PRODUCTION_SWITCH_PLAYBOOK.md` and is run by, or in front of, the
   owner.

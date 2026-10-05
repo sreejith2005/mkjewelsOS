@@ -132,21 +132,22 @@ unchanged except that every client now has an MKREF code
 Effect on day one: nothing user-visible yet. The old CRM web app's sign-in no longer opens
 data (the identity gate needs a JewelOS grant), which is intended.
 
-### b2. JewelOS project
+### b2. JewelOS project (from `C:\crm`, without merging)
 
-Merge and push first (this is the point of no return for `/crm` on the web, see f):
+Do **not** push `main` yet: a push to `main` starts the Vercel production build, and `/crm`
+must not switch to the CRM project before steps c to e are done (that happens in step f).
+The JewelOS migrations are applied from the worktree, which has them.
 
 ```powershell
-Set-Location C:\Users\MIS\Downloads\MKJewelOS
-git fetch; git status --short --branch        # main must be clean apart from known untracked files
-git merge --no-ff feat/crm-native
-git push origin main
+Set-Location C:\crm
+supabase.cmd link --project-ref <jewelos-ref>
 supabase.cmd migration list --linked
 supabase.cmd db push --linked --dry-run         # expected: 0193 (if pending), 0194_crm_staff_sync_outbox, 0195_crm_walkin_tasks
 supabase.cmd db push --linked
 ```
 
-0194 queues one event per existing JewelOS profile. Nothing is sent until c4.
+0194 queues one event per existing JewelOS profile. Nothing is sent until c4. Both migrations
+are additive: the current production web keeps working unchanged.
 
 ## c. Functions, secrets and schedules
 
@@ -180,7 +181,7 @@ Do not set `CRM_RUNO_API_URL` (local tests only).
 ### c2. JewelOS project functions
 
 ```powershell
-Set-Location C:\Users\MIS\Downloads\MKJewelOS
+Set-Location C:\crm
 supabase.cmd functions deploy crm-staff-sync --use-api
 supabase.cmd functions deploy crm-sync-receive --use-api
 ```
@@ -294,11 +295,20 @@ staging values if a staging CRM exists):
 
 `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` stay as they are (JewelOS).
 
-## f. Deploy the web app
+## f. Merge and deploy the web app
 
-The push in b2 triggers the Vercel production build; if the variables of step e were added
-after it started, redeploy that commit. From this deployment on, `/crm` reads and writes the CRM
-project.
+Only after steps b to e (CRM functions answer, secrets set, Vercel variables saved, staff
+provisioned):
+
+```powershell
+Set-Location C:\Users\MIS\Downloads\MKJewelOS
+git fetch; git status --short --branch        # main must be clean apart from known untracked files
+git merge --no-ff feat/crm-native
+git push origin main
+```
+
+The push starts the Vercel production build. From this deployment on, `/crm` reads and writes
+the CRM project.
 
 ## g. Smoke test (controlled accounts)
 
