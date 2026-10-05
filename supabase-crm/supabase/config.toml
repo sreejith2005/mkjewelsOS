@@ -429,3 +429,9 @@ verify_jwt = false
 # CRM_SYNC_INBOUND_SECRET (constant-time) before the body is read; no JWT is involved.
 [functions.sync-receive]
 verify_jwt = false
+
+# Google Apps Script walk-in form (moved from JewelOS, 2026-10-05). Apps Script cannot send a
+# JWT: the x-mk-legacy-api-key header is checked against CRM_LEGACY_WALKIN_INGEST_API_KEY
+# (constant-time) before it rate-limits, parses the body or touches the database.
+[functions.crm-walkin-ingest]
+verify_jwt = false

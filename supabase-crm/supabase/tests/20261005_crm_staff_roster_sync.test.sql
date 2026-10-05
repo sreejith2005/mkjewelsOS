@@ -246,7 +246,7 @@ select ok(not (pg_temp.grant_of('05')).active, 'the person absent from the run l
 select ok((select count(*) from crm_private.audit_logs where action = 'crm.staff_sync_apply') >= 10, 'each applied snapshot is audited');
 select ok(not exists (select 1 from crm_private.audit_logs where action like 'crm.staff_sync_%'
   and (details::text ilike '%@example.invalid%' or details::text ilike '%Asha%')), 'sync audit rows carry no names or emails');
-select is((select count(*)::int from crm_private.audit_logs where action = 'crm.staff_sync_reconcile'), 1, 'the reconciliation is audited');
+select is((select count(*)::int from crm_private.audit_logs where action = 'crm.staff_sync_reconcile' and details ->> 'run_id' = 'run-1'), 1, 'the reconciliation is audited');
 
 set local role authenticated;
 select pg_temp.act_as((pg_temp.user_of('01')).id);

@@ -1,170 +1,115 @@
-# CRM Google Sheets walk-in ingest: cutover to Supabase (owner handoff)
+# CRM walk-in form (Google Sheets) -> CRM project: live push and backfill (owner guide)
 
-Status (2026-09-26): built and verified **locally only**. Nothing is deployed, no hosted
-secret is set, and Apps Script still points at whatever it pointed at before. This document
-is the exact change to make later, by the owner.
+Status (2026-10-05): built and verified **locally only** (see "How this was verified").
+Nothing is deployed, no hosted secret is set, and the Apps Script is unchanged. Every step
+below is run by the owner, in the order of `docs/CRM_TWO_PROJECT_PRODUCTION_RUNBOOK.md`.
 
-## What replaces what
+Since the 2026-10-01 two-project decision, walk-ins go to the **CRM project** (the client
+database), not to JewelOS. The function is `crm-walkin-ingest` in `supabase-crm/`. The
+JewelOS copy in `supabase/functions/crm-walkin-ingest` targets the retired JewelOS `crm`
+schema and must not be connected.
 
-| Original CRM | JewelOS |
+## What the owner gets
+
+| | |
 | --- | --- |
-| `POST https://<original-host>/crm/api/ingest/walkin` (Next route) | `POST https://<project-ref>.supabase.co/functions/v1/crm-walkin-ingest` (Edge Function `crm-walkin-ingest`) |
-| header `x-mk-legacy-api-key` | header `x-mk-legacy-api-key` (unchanged) |
-| Vercel env `LEGACY_WALKIN_INGEST_API_KEY` | Supabase function secret `CRM_LEGACY_WALKIN_INGEST_API_KEY` |
-| Apps Script Script Property `MK_CRM_INGEST_API_KEY` | same property name, new value (the new key) |
+| Endpoint | `POST https://<crm-project-ref>.supabase.co/functions/v1/crm-walkin-ingest` |
+| Key header | `x-mk-legacy-api-key` (checked in constant time before anything else) |
+| Function secret | `CRM_LEGACY_WALKIN_INGEST_API_KEY` (CRM project) |
+| Apps Script properties | `MK_CRM_INGEST_URL`, `MK_CRM_INGEST_API_KEY` (same value as the secret) |
+| Apps Script code | `supabase-crm/apps-script/crm-walkin-push.gs` (paste as a new file in the form's project) |
 
-The request body, the response codes and messages, the 30-requests-per-minute limit, the
-1 MB limit and the attempts ledger are the same as the original (verified case by case, see
-"How this was verified"). The function needs **no JWT** (`verify_jwt = false`): the key is
-the only gate, checked in constant time before anything else happens.
+Responses: `201 INGESTED` (saved), `200 ALREADY_INGESTED` (this REFERENCE NUMBER is already
+in the CRM: nothing saved), `422 INVALID_BRANCH`, `422 INGEST_FAILED`, `429 RATE_LIMITED`,
+`401 UNAUTHORIZED`, `413`, `400`. Same limits as the original: 1 MB, 8 files (refused), 30
+requests per minute (the backfill has its own 30 per minute).
 
-## Read this first: two facts about the original
+**No duplicates.** The form stamps every entry with its REFERENCE NUMBER before it writes the
+Sheet row. The CRM saves a reference number once, and it also recognises the reference numbers
+of the original import. So the live push can be retried safely and the backfill can run any
+number of times.
 
-1. **The Apps Script that calls the endpoint is not in the repository.** `FORM CODE.GS`
-   (`sreejith-crm/web-app`) has `submitForm(formDataObj, filesPayload)`, the same shape as the
-   endpoint's body, but no `UrlFetchApp` call. The original `.env.example` says the key lives in
-   the Apps Script Script Property `MK_CRM_INGEST_API_KEY`, so a caller exists somewhere: open
-   the walk-in form script (spreadsheet "01 WALKIN DATA") and search for `MK_CRM_INGEST_API_KEY`
-   or `ingest/walkin`. If nothing matches, the call was never added and step 2 below is an
-   addition, not an edit.
-2. **The original endpoint answers a cookie-less caller with a redirect to the login page.**
-   `sreejith-crm/web-app/proxy.ts` sends every request without a signed-in session to
-   `/crm/login`, and its matcher excludes only static files, so `/crm/api/ingest/walkin` is
-   covered. Apps Script sends no session cookie. On the parity stack a key-only POST gets
-   `HTTP 307 -> /crm/login`. Whether production behaves the same depends on its deployment;
-   check the ledger table `legacy_walkin_ingest_attempts` in the original database: if it has no
-   `success` rows, Sheets never ingested through this endpoint. The Edge Function does not have
-   this problem: it is served without a session by design.
+Known limitation: an entry **edited in the Sheet form** after it reached the CRM is not
+updated in the CRM (the edit is recognised as the same reference and ignored). Correct such a
+visit in `/crm`. This goes away when staff record walk-ins in `/crm` (phase 6).
+
+## Before you start: confirm three things (owner)
+
+1. The live form script is still `FORM CODE.GS` with the WALKIN DATASET headers of
+   `getExpectedHeaders_()` (REFERENCE NUMBER at column 129) and the helpers
+   `getWalkinHeadersForEdit_` and `convertWalkinRowToFormData_`. If the live script differs,
+   send me its header row (names only, no data) before going further.
+2. The Sheet's `BRANCH` values equal the names of **active** CRM branches (case-insensitive).
+   Any other value is answered `INVALID_BRANCH` and counted in the backfill log.
+3. Rows since 2026-08-17 carry a REFERENCE NUMBER. Rows without one are skipped and counted.
 
 ## The Apps Script change
 
-Script: the walk-in form script (`FORM CODE.GS`, spreadsheet "01 WALKIN DATA").
-Function to edit: `submitForm(formDataObj, filesPayload)` (line ~1113). Add the call **after**
-the sheet row has been written, and never let it break the form:
+1. Open the walk-in form script (spreadsheet "01 WALKIN DATA"). Add a script file
+   `crm-walkin-push` and paste `supabase-crm/apps-script/crm-walkin-push.gs`.
+2. Project settings > Script properties: add `MK_CRM_INGEST_URL` and `MK_CRM_INGEST_API_KEY`.
+3. In `submitForm(formDataObj, filesPayload)`, in the **new entry** path, directly after
+   `sh.appendRow(row);` (around line 1224) add:
 
-```javascript
-// Script Properties (File > Project settings > Script properties):
-//   MK_CRM_INGEST_URL     = https://<project-ref>.supabase.co/functions/v1/crm-walkin-ingest
-//   MK_CRM_INGEST_API_KEY = <the new key; the same value as the function secret>
-function pushWalkinToCrm_(formDataObj) {
-  const props = PropertiesService.getScriptProperties();
-  const url = props.getProperty('MK_CRM_INGEST_URL');
-  const key = props.getProperty('MK_CRM_INGEST_API_KEY');
-  if (!url || !key) return { skipped: true };
-  const response = UrlFetchApp.fetch(url, {
-    method: 'post',
-    contentType: 'application/json',
-    headers: { 'x-mk-legacy-api-key': key },
-    // Proof uploads are saved to Drive by saveUploads_. The endpoint rejects a request that
-    // carries files (422, "no visit was saved"), exactly like the original, so send none.
-    payload: JSON.stringify({ formDataObj: formDataObj, filesPayload: [] }),
-    muteHttpExceptions: true,
-  });
-  return { status: response.getResponseCode(), body: response.getContentText() };
-}
-```
+   ```javascript
+   pushWalkinToCrm_(formDataObj);
+   ```
 
-and, inside `submitForm`, after the sheet write succeeds:
+   Do not add it to the edit path (the branch that ends with
+   `sh.getRange(targetRowNumber, ...).setValues([row])`). `pushWalkinToCrm_` never throws, so
+   the Sheet keeps working if the CRM is unreachable; failures go to the script's execution
+   log as an HTTP status and a code only.
 
-```javascript
-try {
-  const crm = pushWalkinToCrm_(formDataObj);
-  if (crm.status && crm.status !== 201) console.error('CRM ingest HTTP ' + crm.status + ' ' + crm.body);
-} catch (error) {
-  console.error('CRM ingest failed: ' + error);
-}
-```
+## Backfill (history since 2026-08-17)
 
-Notes:
+Run `backfillWalkinsToCrm` from the Apps Script editor.
 
-- `formDataObj` must contain `branch` equal (case-insensitive, trimmed) to the name of an
-  **active** CRM branch, otherwise the response is `422 INVALID_BRANCH`.
-- A `201` body is `{"ok":true,"requestId":"...","code":"INGESTED","clientId":"...","timelineId":"...","referenceNumber":"..."}`.
-- The endpoint does not de-duplicate: sending the same submission twice records two visits
-  (the original does the same). Do not retry a `201`. A `422 INGEST_FAILED` may be retried once.
-- Limits: 30 requests per minute for the key, 1 MB per request, 8 files (which are refused).
+- It sends every WALKIN DATASET row submitted on or after `MK_CRM_BACKFILL_SINCE` (Script
+  property, optional; default `2026-08-17T00:00:00+05:30`) through the same endpoint.
+- Each run stops itself after about 5 minutes and remembers where it stopped; run it again
+  (or add a 10-minute time trigger) until the log says `done`. Then remove the trigger.
+- The log shows counts only, for example
+  `{"ingested":412,"already_ingested":37,"skipped_no_reference":2,"failed_422_invalid_branch":1}`.
+  Paste only that line if you want me to check it.
+- Running it again later is safe: everything already sent comes back `already_ingested`.
+  `resetCrmBackfill()` starts from the first row again.
 
-## Test with one synthetic row (local, then hosted)
+Customer data never leaves Google and Supabase: nothing is exported to a file.
 
-Local (safe, nothing hosted): `supabase.cmd start`, then serve with an untracked env file
-(never commit it; `supabase/functions/.env` is already ignored):
+## Test with one synthetic row (hosted, after deploying)
 
 ```powershell
-# supabase/functions/.env  (untracked)  ->  CRM_LEGACY_WALKIN_INGEST_API_KEY=<any local value>
-supabase.cmd functions serve --env-file supabase/functions/.env
-curl.exe -i -X POST http://127.0.0.1:54321/functions/v1/crm-walkin-ingest `
-  -H "x-mk-legacy-api-key: <local value>" -H "content-type: application/json" `
-  --data-binary "@synthetic-walkin.json"
+$s = Read-Host "Ingest key" -AsSecureString; $k = [System.Net.NetworkCredential]::new('', $s).Password
+$body = '{"formDataObj":{"branch":"<an active CRM branch name>","client_name":"Synthetic Ingest Test","client_phone":"9100099999","visit_date":"2026-10-05","client_bought":"NO","remark":"synthetic cutover test","reference_number":"SYNTHETIC-CUTOVER-0001"},"filesPayload":[]}'
+curl.exe -s -X POST "https://<crm-project-ref>.supabase.co/functions/v1/crm-walkin-ingest" -H "x-mk-legacy-api-key: $k" -H "content-type: application/json" --data-raw $body
 ```
 
-`synthetic-walkin.json` (invented person and phone, no customer data):
-
-```json
-{"formDataObj":{"branch":"<an active crm.branches name>","client_name":"Synthetic Ingest Test","client_phone":"9100099999","visit_date":"2026-09-26","buy_status":"NO","remark":"synthetic cutover test"},"filesPayload":[]}
-```
-
-Expected: `HTTP 201` with `"code":"INGESTED"`. Then, as a JewelOS super admin, confirm the visit
-in `/crm` (client "Synthetic Ingest Test"), and in SQL: `select outcome, result from
-crm.legacy_walkin_ingest_attempts order by created_at desc limit 3;` shows `success`, and
-`select action, new_value from public.audit_logs where action like 'crm.legacy_walkin_ingest_%'
-order by created_at desc limit 3;` shows only the request id, outcome and code (no name or phone).
-After the hosted cutover, repeat the same with the hosted URL and key, then delete nothing:
-mark the synthetic client in the CRM as a test client instead.
-
-## Secrets to set later (names only; never write values into Git, chat or logs)
-
-| Where | Name | Purpose |
-| --- | --- | --- |
-| Supabase function secret | `CRM_LEGACY_WALKIN_INGEST_API_KEY` | key Apps Script must send in `x-mk-legacy-api-key` (generate a new random value; do not reuse the original's) |
-| Supabase function secret | `RUNO_API_KEY` | Runo `Auth-Key` for `crm-runo-push` (the same Runo key the original used) |
-| Apps Script Script Property | `MK_CRM_INGEST_API_KEY` | same value as `CRM_LEGACY_WALKIN_INGEST_API_KEY` |
-| Apps Script Script Property | `MK_CRM_INGEST_URL` | the function URL above |
-
-`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_ANON_KEY` are provided by the Edge
-runtime. `CRM_RUNO_API_URL` exists only so local tests can point at a stub: **do not set it in
-the hosted project.**
-
-## Order of the hosted cutover (owner; each step needs your explicit go)
-
-1. Follow `PRODUCTION_SWITCH_PLAYBOOK.md`; apply migrations `0182`-`0189` to the hosted project
-   and add `crm` to its Exposed schemas.
-2. Run the Phase 5 data migration so the CRM branches and clients exist in `crm`.
-3. `supabase functions deploy crm-walkin-ingest` and `crm-runo-push` (`config.toml` carries
-   `verify_jwt = false` / `true`), then set the two function secrets.
-4. Send one synthetic row (above) directly to the hosted function.
-5. Set `MK_CRM_INGEST_URL` / `MK_CRM_INGEST_API_KEY` in Apps Script and submit one synthetic
-   row through the real form. Check the ledger and `/crm`.
+Check that the project ref is the **CRM project's** (JewelOS's starts with `yima`). Expected:
+`"code":"INGESTED"`; sending it again: `"code":"ALREADY_INGESTED"`. Then mark the synthetic
+client in `/crm` as a test client; delete nothing.
 
 ## Rollback
 
-- Point `MK_CRM_INGEST_URL` back at the previous address (or clear the property: the helper
-  above then skips the call and the Sheet keeps working on its own). No redeploy needed.
-- To stop the function accepting anything without deleting it: remove the
-  `CRM_LEGACY_WALKIN_INGEST_API_KEY` secret. Every call then returns `503 SERVER_MISCONFIGURED`.
-- If the key leaked: set a new `CRM_LEGACY_WALKIN_INGEST_API_KEY` and the same value in
-  `MK_CRM_INGEST_API_KEY`.
-- Visits already written stay in `crm` (they are audited and appear in
-  `crm.legacy_walkin_ingest_attempts`). Do not replay them.
+- Clear `MK_CRM_INGEST_URL` in Script properties: `pushWalkinToCrm_` then skips the call and
+  the Sheet works on its own. No redeploy needed.
+- To make the function refuse everything without deleting it: remove the
+  `CRM_LEGACY_WALKIN_INGEST_API_KEY` secret (every call answers `503`).
+- If the key leaked: set a new secret value and the same value in `MK_CRM_INGEST_API_KEY`.
+- Visits already saved stay in the CRM (audited, listed in `legacy_walkin_ingest_attempts`).
 
-## How this was verified (local)
+## How this was verified (local, 2026-10-05)
 
-`pnpm.cmd crm:parity -- --ingest` posts the same synthetic payloads to the original route
-(`next dev`, original schema) and to the local Edge Function, and compares the HTTP status,
-the response JSON (request ids masked), every table's rows in both databases, and, for the
-Runo push, the outbound request each one sends to a local Runo stub. Result and the exact
-cases are in the phase report. It also records the redirect described above.
+- pgTAP (`supabase-crm/supabase/tests/20261005_crm_walkin_ingest.test.sql`): grants
+  (service_role only), INVALID_BRANCH, ALREADY_INGESTED against an original-import reference,
+  no second visit, no key after a failed save, ledger outcomes, audit rows without customer
+  values, and the identity gate's ingest branch (service_role + ingest system user only).
+- Deno: 21/21 for the function (including ALREADY_INGESTED = 200 and the backfill budget).
+- End to end on the local CRM stack (`mkcrm`): a synthetic walk-in answered 201, the same
+  entry again 200, one visit saved with an MKC code; a wrong key 401.
+- The real `FORM CODE.GS` helpers and `crm-walkin-push.gs` ran in a Node VM against a
+  synthetic sheet (mocked Sheets/Properties, real HTTP to the local function): the first
+  backfill run ingested the new row, recognised the already-sent one, skipped the row without
+  a reference and counted the unknown branch; the second run saved nothing new.
 
-## Other writers of Sheets data into the ORIGINAL CRM
-
-Searched this repository, the original codebase (`sreejith-crm`) and the sibling
-`mkjewels-sync` project. Findings, report only (nothing was changed):
-
-- **Only this endpoint** ingests a live Sheets walk-in into the original CRM database.
-- `sreejith-crm/web-app/scripts/migration-*.ts` and `prisma/seed.ts` are one-off imports from
-  exported `.xlsx` files (owner-run), not a live sync.
-- `mkjewels-sync` (a separate project, `../mkjewels-sync`) reads the Google Sheets tabs and
-  writes to its **own** Supabase project (a different project ref from the original CRM's; its
-  older scripts use `SUPABASE_URL`) and, through `jewelos-ingestion-sync.js`, to JewelOS's CRM
-  sync-ingestion RPCs (`JEWELOS_SUPABASE_URL`). It does not write to the original CRM database. It keeps running until the owner retires it; it is unaffected by this cutover.
-- `scripts/import-legacy-crm-*.ts` in this repository read the original CRM and write into
-  JewelOS's OLD CRM tables (`public.clients`, ...); they never write to the original CRM.
+Not verified: the hosted function, the live Apps Script project, and the real Sheet headers
+(owner checks above).
