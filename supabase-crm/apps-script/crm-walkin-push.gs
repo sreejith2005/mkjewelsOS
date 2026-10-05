@@ -26,6 +26,8 @@ function pushWalkinToCrm_(formDataObj) {
     const url = props.getProperty('MK_CRM_INGEST_URL');
     const key = props.getProperty('MK_CRM_INGEST_API_KEY');
     if (!url || !key) return { skipped: true };
+    // Drafts are not visits (the Sheets CRM skips VISIT FINAL STATUS = DRAFT too).
+    if (String(formDataObj.visit_final_status || formDataObj.visitFinalStatus || '').trim().toUpperCase() === 'DRAFT') return { skipped: true };
     const response = UrlFetchApp.fetch(url, {
       method: 'post',
       contentType: 'application/json',
@@ -72,9 +74,15 @@ function backfillWalkinsToCrm() {
   const tsIdx = headers.indexOf('TIMESTAMP');
   if (refIdx < 0 || tsIdx < 0) throw new Error('WALKIN DATASET headers changed: REFERENCE NUMBER or TIMESTAMP not found.');
 
-  // The two key columns are read once; full rows only for rows that are sent.
+  // The key columns are read once; full rows only for rows that are sent.
   const timestamps = sh.getRange(1, tsIdx + 1, lastRow, 1).getValues();
   const references = sh.getRange(1, refIdx + 1, lastRow, 1).getValues();
+  // Draft rows live in WALKIN DATASET with VISIT FINAL STATUS = DRAFT: never send them.
+  // The column is found on the sheet's real header row (it is not in the form's expected headers).
+  const realHeaders = sh.getRange(1, 1, 1, lastCol).getValues()[0]
+    .map(function (h) { return String(h || '').trim().replace(/\s+/g, ' ').toUpperCase(); });
+  const statusIdx = realHeaders.indexOf('VISIT FINAL STATUS');
+  const statuses = statusIdx >= 0 ? sh.getRange(1, statusIdx + 1, lastRow, 1).getValues() : null;
 
   const counts = JSON.parse(props.getProperty('MK_CRM_BACKFILL_COUNTS') || '{}');
   const bump = function (name) { counts[name] = (counts[name] || 0) + 1; };
@@ -93,6 +101,7 @@ function backfillWalkinsToCrm() {
     const reference = String(references[row - 1][0] || '').trim();
     if (isNaN(submitted.getTime()) || submitted < since) { bump('before_since_or_header'); row += 1; continue; }
     if (!reference || reference.toUpperCase() === 'REFERENCE NUMBER') { bump('skipped_no_reference'); row += 1; continue; }
+    if (statuses && String(statuses[row - 1][0] || '').trim().toUpperCase() === 'DRAFT') { bump('skipped_draft'); row += 1; continue; }
     const values = sh.getRange(row, 1, 1, lastCol).getValues()[0];
 
     const response = UrlFetchApp.fetch(url, {
