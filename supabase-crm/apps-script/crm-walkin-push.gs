@@ -35,6 +35,17 @@ var SBCRM_FAILED_PROP = 'SBCRM_FAILED_RECENT';
 var SBCRM_LIVE_DAYS = 3;
 var SBCRM_MAX_ATTEMPTS = 3;
 
+/**
+ * Sheet BRANCH value -> CRM branch name, where the two are spelled differently (checked against
+ * the CRM project's active branches on 2026-10-06). Values not listed are sent as they are;
+ * the CRM matches branch names case-insensitively.
+ */
+var SBCRM_BRANCH_ALIASES = {
+  'ZAVERI BAZAR': 'Zaveri Bazaar',
+  'ZAVARI BAZAR': 'Zaveri Bazaar',
+  'ZAVERI BAZAAR': 'Zaveri Bazaar'
+};
+
 /* ------------------------------------------------------------------ */
 /* Reading the sheet                                                   */
 /* ------------------------------------------------------------------ */
@@ -209,6 +220,10 @@ function sbcrmFormData_(row, index, reference) {
     if (name) out['companion_name_' + n] = name;
     if (phone) out['companion_phone_' + n] = phone;
     if (relation) out['companion_relation_' + n] = relation;
+  }
+  if (out.branch) {
+    var alias = SBCRM_BRANCH_ALIASES[sbcrmClean_(out.branch)];
+    if (alias) out.branch = alias;
   }
   out.reference_number = reference;
   return out;
