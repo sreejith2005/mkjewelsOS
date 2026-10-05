@@ -37,3 +37,8 @@ verify_jwt = false
 # function reads and writes as that caller under crm RLS. RUNO_API_KEY is a function secret.
 [functions.crm-runo-push]
 verify_jwt = true
+
+# CRM roster sync worker (pg_cron only). It verifies x-cron-secret (CRM_STAFF_SYNC_CRON_SECRET,
+# constant-time) before parsing the body or touching the database.
+[functions.crm-staff-sync]
+verify_jwt = false

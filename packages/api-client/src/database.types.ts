@@ -10805,6 +10805,29 @@ export type Database = {
         }
         Returns: string
       }
+      crm_sync_claim_staff_events: {
+        Args: { p_limit?: number }
+        Returns: {
+          aggregate_id: string
+          event_id: number
+          event_type: string
+          snapshot: Json
+        }[]
+      }
+      crm_sync_finish_staff_event: {
+        Args: { p_error?: string; p_event_id: number; p_ok: boolean }
+        Returns: string
+      }
+      crm_sync_health: {
+        Args: never
+        Returns: {
+          dead_events: number
+          failing_events: number
+          last_delivered_at: string
+          oldest_open_at: string
+          open_events: number
+        }[]
+      }
       crm_sync_record_operation: {
         Args: {
           p_assertion_id: string
@@ -10832,6 +10855,7 @@ export type Database = {
         Args: { p_operation: string; p_payload: Json }
         Returns: string
       }
+      crm_sync_staff_roster: { Args: never; Returns: Json }
       current_branch_id: { Args: never; Returns: string }
       current_profile: {
         Args: never

@@ -424,3 +424,8 @@ enabled = true
 # JEWELOS_SUPABASE_ANON_KEY, CRM_BRIDGE_ALLOWED_ORIGINS.
 [functions.crm-session-exchange]
 verify_jwt = false
+
+# Sync events from JewelOS (server to server). The x-crm-sync-secret header is checked against
+# CRM_SYNC_INBOUND_SECRET (constant-time) before the body is read; no JWT is involved.
+[functions.sync-receive]
+verify_jwt = false

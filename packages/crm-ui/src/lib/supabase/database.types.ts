@@ -1,15 +1,15 @@
 // crm-port: replaces the original generated sreejith-crm/web-app/lib/supabase/database.types.ts.
-// The original schema now lives in JewelOS schema "crm" (0182-0188) with the same table,
-// column, enum and function names, so the original "public" types are the generated
-// JewelOS "crm" types. Components keep reading Database["public"] unchanged.
-import type { Database as JewelosDatabase, Json as JewelosJson } from "@jewelos/api-client";
+// Since the 2026-10-01 two-project decision, /crm reads and writes the CRM project (schema
+// "public", as the original did), so these are the CRM project's generated types
+// (crm-project.types.ts). Components keep reading Database["public"] unchanged.
+import type { Database as CrmProjectDatabase, Json as CrmProjectJson } from "./crm-project.types";
 
-export type Json = JewelosJson;
+export type Json = CrmProjectJson;
 
-type CrmSchema = JewelosDatabase["crm"];
+type CrmSchema = CrmProjectDatabase["public"];
 
 // The original generated types declared these optional RPC arguments as nullable (the SQL
-// parameters default to NULL and the original UI passes null); the JewelOS generator omits
+// parameters default to NULL and the original UI passes null); the generator omits
 // "| null". Type-only; the RPC contract is unchanged.
 type NullableArgs<T> = { [K in keyof T]: undefined extends T[K] ? T[K] | null : T[K] };
 type CrmFunctions = Omit<CrmSchema["Functions"], "manage_crm_roster"> & {
