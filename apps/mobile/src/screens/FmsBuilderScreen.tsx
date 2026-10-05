@@ -326,7 +326,7 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
         <Sheet scrollable={false} onClose={() => setSelectedKey(null)} tall title={`${selected.type.replaceAll("_", " ")} · ${selected.name}`} visible>
           <ScrollView keyboardShouldPersistTaps="handled" ref={editorScrollRef}>
             {issues.filter((issue) => issue.stageKey === selected.key).map((issue, index) => <Banner key={`${issue.code}-${index}`} tone="danger">{issue.message}</Banner>)}
-            <FmsStageEditor data={data} issueCode={focusedIssueCode} onIssueLayout={scrollToIssue} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); }} onDelete={() => void remove(selected.key)} stage={selected} stages={normalized.stages} />
+            <FmsStageEditor data={data} issueCode={focusedIssueCode} issueMessage={issues.find((issue) => issue.stageKey === selected.key && issue.code === focusedIssueCode)?.message} onIssueLayout={scrollToIssue} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); }} onDelete={() => void remove(selected.key)} stage={selected} stages={normalized.stages} />
           </ScrollView>
         </Sheet>
       ) : null}

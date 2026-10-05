@@ -17,6 +17,12 @@ function issueControlSelector(code: string, message: string): string {
   if (["missing_form", "invalid_form", "missing_linked_form", "route_without_form", "invalid_assignment_field"].includes(code)) return '[data-fms-focus="form"]';
   if (["invalid_decision", "route_without_decision"].includes(code)) return '[data-fms-focus="decision"]';
   const routeNumber = /^"?Route (\d+)/.exec(message)?.[1];
+  if (code === "unsupported_cycle") {
+    if (routeNumber) return `[aria-label="Route ${routeNumber} then go to"]`;
+    if (message.startsWith("Otherwise")) return '[aria-label="Otherwise (fallback) go to"]';
+    if (message.startsWith("Parallel")) return '[data-fms-focus="parallel"] input';
+    return '[aria-label="Continue to"]';
+  }
   if (routeNumber) {
     if (code === "invalid_route_source") return `[aria-label="Route ${routeNumber} field key"], [aria-label="Route ${routeNumber} question"]`;
     const part = ["route_without_destination", "invalid_route_target"].includes(code) ? "then go to"
@@ -31,6 +37,7 @@ function issueControlSelector(code: string, message: string): string {
   if (["invalid_conditional"].includes(code)) return '[data-fms-focus="condition"] input, [data-fms-focus="condition"] select';
   if (["invalid_parallel", "invalid_join"].includes(code)) return '[data-fms-focus="parallel"] input, [data-fms-focus="parallel"] select';
   if (["invalid_branch"].includes(code)) return '[data-fms-focus="branch"] input, [data-fms-focus="branch"] select';
+  if (code === "missing_completion_path") return '[data-fms-focus="routing"] select, [data-fms-focus="branch"] select, [data-fms-focus="parallel"] input';
   if (["route_without_fallback", "conflicting_fallback_route"].includes(code)) return '[aria-label="Otherwise (fallback) go to"]';
   if (code === "invalid_assignee") return '[data-fms-focus="name"]';
   return '[data-fms-focus="routing"] input, [data-fms-focus="routing"] select, [data-fms-focus="routing"] button';
