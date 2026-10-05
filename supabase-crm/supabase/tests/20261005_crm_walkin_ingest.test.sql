@@ -16,7 +16,7 @@ select ok(not has_table_privilege('service_role', 'crm_private.walkin_ingest_key
 
 insert into branches(id, name) values ('20261006-0000-4000-8000-00000000000a', 'Ingest Test Branch');
 insert into clients(client_id, primary_name, primary_phone, last_branch_id)
-values ('20261006-0000-4000-8000-0000000000c1', 'Synthetic Imported Client', '9100000101', '20261006-0000-4000-8000-00000000000a');
+values ('20261006-0000-4000-8000-0000000000c1', 'Synthetic Imported Client', '9199000101', '20261006-0000-4000-8000-00000000000a');
 insert into client_timeline(id, client_id, event_date, branch_id, reference_number)
 values ('20261006-0000-4000-8000-0000000000e1', '20261006-0000-4000-8000-0000000000c1', '2026-08-17 06:00+05:30', '20261006-0000-4000-8000-00000000000a', 'SHEET-REF-0001');
 

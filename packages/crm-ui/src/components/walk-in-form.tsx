@@ -908,6 +908,7 @@ export function WalkInForm({
                 >
                   <b className="text-sm">{label}</b>
                   <select
+                    aria-label={label}
                     className="rounded border p-2 text-sm"
                     value={item.asked.toLowerCase()}
                     onChange={(event) => {
@@ -924,6 +925,7 @@ export function WalkInForm({
                   </select>
                   {item.asked === "NO" ? (
                     <input
+                      aria-label={`${label} - no reason`}
                       className="rounded border p-2 text-sm"
                       placeholder="Reason"
                       value={item.no_reason}

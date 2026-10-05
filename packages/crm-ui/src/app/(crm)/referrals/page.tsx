@@ -32,5 +32,5 @@ export default async function ReferralsPage() {
       history_count: entries.length, history: entries.map((entry: any) => [entry.entered_by, entry.remark].filter(Boolean).join(": ")).filter(Boolean).join("\n"),
     };
   });
-  return <main className="mx-auto max-w-[1500px] px-5 py-7"><h1 className="text-3xl font-semibold">REFERRALS CALLING</h1><p className="mt-1 text-sm text-stone-600">CALL REFERRALS GIVEN BY CLIENTS. CRM CAN SEE WHO GAVE THE REFERRAL, SAVE FOLLOW-UP HISTORY, AND TRACK CONVERTED REFERRALS.</p><ReferralQueue role={profile.role} branchId={null} enteredByName={profile.name} items={items} /></main>;
+  return <main className="mx-auto max-w-[1500px] px-5 py-7">{/* crm-port fix (owner 2026-10-05): the title and subtitle were rendered twice (here and in ReferralQueue); ReferralQueue's copy, next to its buttons, is kept. */}<ReferralQueue role={profile.role} branchId={null} enteredByName={profile.name} items={items} /></main>;
 }

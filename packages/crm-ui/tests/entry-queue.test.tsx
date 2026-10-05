@@ -46,4 +46,12 @@ describe("consolidated client walk-in queue", () => {
     fireEvent.click(screen.getByRole("button", { name: "LOAD QUEUE" }));
     expect(push).toHaveBeenCalledWith(`/queue?branch=${branchId}&crm=Test+CRM`);
   });
+  it("types a registered new client as NEW although registration already created the client (QA fix 2026-10-05)", () => {
+    render(<EntryQueue profile={{ role: "salesperson", branchId }} selectedBranchId={branchId} selectedCrm="" branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queueCrms={["Test CRM"]} initialItems={[
+      { id: "queue-new", token: "1005-NEW01", client_name: "Brand New", mobile: "9012345611", assigned_crm_name: "Test CRM", status: "pending", created_at: "2026-10-05T09:00:00Z", client_id: "client-new", client_is_new: true },
+      { id: "queue-old", token: "1005-OLD01", client_name: "Returning", mobile: "9012345612", assigned_crm_name: "Test CRM", status: "pending", created_at: "2026-10-05T09:05:00Z", client_id: "client-old", client_is_new: false },
+    ]} />);
+    expect(screen.getByRole("row", { name: /Brand New/ }).textContent).toContain("NEW");
+    expect(screen.getByRole("row", { name: /Returning/ }).textContent).toContain("EXISTING");
+  });
 });

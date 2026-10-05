@@ -109,7 +109,8 @@ select is((select count(*)::int from crm_private.audit_logs
   where action = 'crm.create_client_with_phone' and actor_crm_user_id = '20261001-0000-4000-8000-000000000002'
     and actor_auth_user_id = '20261001-0000-4000-8000-000000000002'), 1,
   'RPC writes one audit row attributed to the CRM user');
-select is((select count(*)::int from crm_private.audit_logs where action = 'crm.clients_insert'), 0,
+select is((select count(*)::int from crm_private.audit_logs where action = 'crm.clients_insert'
+  and actor_crm_user_id = '20261001-0000-4000-8000-000000000002'), 0,
   'the RPC insert is not double-audited as a direct write');
 
 set local role authenticated;

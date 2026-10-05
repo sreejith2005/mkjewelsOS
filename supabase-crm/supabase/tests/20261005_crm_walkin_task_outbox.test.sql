@@ -18,11 +18,11 @@ insert into crm_sso_access_grants(jewelos_user_id, work_email, legacy_crm_user_i
 ('20261009-2222-4000-8000-000000000001', 'outbox-1@example.invalid', '20261009-1111-4000-8000-000000000001', true),
 ('20261009-2222-4000-8000-000000000002', 'outbox-2@example.invalid', '20261009-1111-4000-8000-000000000002', true);
 insert into crm_allocation(branch_id, crm_name, active, crm_user_id) values ('20261009-0000-4000-8000-00000000000a', 'OUTBOX SALES', true, '20261009-1111-4000-8000-000000000001');
-insert into clients(client_id, primary_name, primary_phone, last_branch_id) values ('20261009-3333-4000-8000-000000000001', 'Synthetic Outbox Client', '9100000301', '20261009-0000-4000-8000-00000000000a');
+insert into clients(client_id, primary_name, primary_phone, last_branch_id) values ('20261009-3333-4000-8000-000000000001', 'Synthetic Outbox Client', '9199000301', '20261009-0000-4000-8000-00000000000a');
 
 insert into entry_queue(id, token, client_name, mobile, branch_id, assigned_crm_name, status, client_id) values
-('20261009-4444-4000-8000-000000000001', 'OUTBOX-1', 'Synthetic Outbox Client', '9100000301', '20261009-0000-4000-8000-00000000000a', 'Outbox  sales', 'pending', '20261009-3333-4000-8000-000000000001'),
-('20261009-4444-4000-8000-000000000002', 'OUTBOX-2', 'Synthetic Unknown', '9100000302', '20261009-0000-4000-8000-00000000000a', 'NOT ON ROSTER', 'pending', null);
+('20261009-4444-4000-8000-000000000001', 'OUTBOX-1', 'Synthetic Outbox Client', '9199000301', '20261009-0000-4000-8000-00000000000a', 'Outbox  sales', 'pending', '20261009-3333-4000-8000-000000000001'),
+('20261009-4444-4000-8000-000000000002', 'OUTBOX-2', 'Synthetic Unknown', '9199000302', '20261009-0000-4000-8000-00000000000a', 'NOT ON ROSTER', 'pending', null);
 update entry_queue set remark = 'only a remark' where id = '20261009-4444-4000-8000-000000000001';
 update entry_queue set assigned_crm_name = 'OUTBOX SALES' where id = '20261009-4444-4000-8000-000000000001';
 
@@ -48,7 +48,7 @@ select is((select snapshot ->> 'assignee_jewelos_user_id' from claimed where agg
   'a name not on the roster does not resolve');
 select is((select snapshot -> 'manager_jewelos_user_ids' from claimed where aggregate_id = '20261009-4444-4000-8000-000000000002'),
   '["20261009-2222-4000-8000-000000000002"]'::jsonb, 'the branch managers are offered instead');
-select ok(not exists (select 1 from claimed where snapshot::text ~ '91000003'), 'snapshots carry no phone');
+select ok(not exists (select 1 from claimed where snapshot::text ~ '91990003'), 'snapshots carry no phone');
 
 update entry_queue set status = 'complete' where id = '20261009-4444-4000-8000-000000000001';
 set local role service_role;

@@ -302,7 +302,8 @@ BEGIN
   FOR v_companion IN SELECT value FROM jsonb_array_elements(NEW.companions) LOOP
     IF jsonb_typeof(v_companion) <> 'object' THEN CONTINUE; END IF;
     v_name := left(btrim(COALESCE(v_companion ->> 'name', '')), 160);
-    v_phone := right(regexp_replace(COALESCE(v_companion ->> 'phone', ''), '[^0-9]', '', 'g'), 10);
+    -- The /crm form stores 'mobile'; the Sheet ingest stores 'phone'.
+    v_phone := right(regexp_replace(COALESCE(NULLIF(v_companion ->> 'phone', ''), v_companion ->> 'mobile', ''), '[^0-9]', '', 'g'), 10);
     IF v_name = '' AND length(v_phone) <> 10 THEN CONTINUE; END IF;
     v_member := NULL;
     IF length(v_phone) <> 10 THEN

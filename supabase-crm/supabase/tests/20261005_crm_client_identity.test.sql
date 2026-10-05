@@ -23,8 +23,8 @@ insert into crm_allocation(branch_id, crm_name, active, crm_user_id)
 values ('20261007-0000-4000-8000-00000000000a', 'IDENTITY SALES A', true, '20261007-1111-4000-8000-000000000002');
 
 insert into clients(client_id, primary_name, primary_phone, last_branch_id) values
-('20261007-2222-4000-8000-0000000000c1', 'Synthetic Main Client', '9100000201', '20261007-0000-4000-8000-00000000000a'),
-('20261007-2222-4000-8000-0000000000c2', 'Synthetic Other Family', '9100000202', '20261007-0000-4000-8000-00000000000b');
+('20261007-2222-4000-8000-0000000000c1', 'Synthetic Main Client', '9199000201', '20261007-0000-4000-8000-00000000000a'),
+('20261007-2222-4000-8000-0000000000c2', 'Synthetic Other Family', '9199000202', '20261007-0000-4000-8000-00000000000b');
 
 create function pg_temp.act_as(p_user text) returns void language sql as $$
   select set_config('request.jwt.claim.role', 'authenticated', true),
@@ -54,7 +54,7 @@ select pg_temp.act_as('2');
 select lives_ok($$update clients set city = 'Synthetic City' where client_id = '20261007-2222-4000-8000-0000000000c1'$$, 'staff still edit ordinary client fields');
 select throws_ok($$update clients set referral_code = 'MKREF-999999' where client_id = '20261007-2222-4000-8000-0000000000c1'$$, '42501', null, 'staff cannot change an MKREF code');
 select throws_ok($$update clients set lifecycle_stage = 'lead' where client_id = '20261007-2222-4000-8000-0000000000c1'$$, '42501', null, 'staff cannot change the lifecycle stage');
-select throws_ok($$insert into clients(primary_name, primary_phone, referral_code) values ('X', '9100000299', 'MKREF-1')$$, '42501', null, 'staff cannot choose an MKREF code');
+select throws_ok($$insert into clients(primary_name, primary_phone, referral_code) values ('X', '9199000299', 'MKREF-1')$$, '42501', null, 'staff cannot choose an MKREF code');
 select throws_ok($$insert into households default values$$, '42501', null, 'staff cannot create a family directly');
 reset role;
 
@@ -63,16 +63,16 @@ reset role;
 -- ---------------------------------------------------------------------------
 insert into referrals(id, salesperson_id, given_by_client_id, referral_name, referral_number, branch_id, relationship)
 values ('20261007-3333-4000-8000-000000000001', '20261007-1111-4000-8000-000000000002', '20261007-2222-4000-8000-0000000000c1',
-  'Synthetic Referred Friend', '9100000203', '20261007-0000-4000-8000-00000000000a', null);
+  'Synthetic Referred Friend', '9199000203', '20261007-0000-4000-8000-00000000000a', null);
 select ok((select referred_client_id from referrals where id = '20261007-3333-4000-8000-000000000001') is not null, 'a referral gets a client');
-select is((pg_temp.by_phone('9100000203')).lifecycle_stage, 'lead', 'the referred person is a lead');
-select is((pg_temp.by_phone('9100000203')).referred_by_client_id, '20261007-2222-4000-8000-0000000000c1'::uuid, 'the referrer is stored');
-select is((pg_temp.by_phone('9100000203')).referral_relation::text, 'Referral', 'the relation defaults to Referral');
-select ok((pg_temp.by_phone('9100000203')).client_code ~ '^MKC-[0-9]+$', 'the referred person has an MKC code');
+select is((pg_temp.by_phone('9199000203')).lifecycle_stage, 'lead', 'the referred person is a lead');
+select is((pg_temp.by_phone('9199000203')).referred_by_client_id, '20261007-2222-4000-8000-0000000000c1'::uuid, 'the referrer is stored');
+select is((pg_temp.by_phone('9199000203')).referral_relation::text, 'Referral', 'the relation defaults to Referral');
+select ok((pg_temp.by_phone('9199000203')).client_code ~ '^MKC-[0-9]+$', 'the referred person has an MKC code');
 
 insert into referrals(id, salesperson_id, given_by_client_id, referral_name, referral_number, branch_id)
 values ('20261007-3333-4000-8000-000000000002', '20261007-1111-4000-8000-000000000002', '20261007-2222-4000-8000-0000000000c1',
-  'Synthetic Already Client', '9100000202', '20261007-0000-4000-8000-00000000000a');
+  'Synthetic Already Client', '9199000202', '20261007-0000-4000-8000-00000000000a');
 select is((select referred_client_id from referrals where id = '20261007-3333-4000-8000-000000000002'), '20261007-2222-4000-8000-0000000000c2'::uuid,
   'a referral with a known phone links to that client');
 select is((pg_temp.client('c2')).referred_by_client_id, null, 'an existing client is not re-parented');
@@ -88,11 +88,11 @@ select is((select status::text from referral_calling where referral_id = '202610
 -- The referred person registers in the queue: a new client, engaged.
 set local role authenticated;
 select pg_temp.act_as('2');
-select is((select client_type from create_entry_queue('Synthetic Referred Friend', '9100000203', null, 'IDENTITY SALES A', null)), 'new',
+select is((select client_type from create_entry_queue('Synthetic Referred Friend', '9199000203', null, 'IDENTITY SALES A', null)), 'new',
   'a lead client registers as a new client');
 reset role;
-select is((pg_temp.by_phone('9100000203')).lifecycle_stage, 'engaged', 'registration engages the lead');
-select ok((select client_is_new from entry_queue where mobile = '9100000203'), 'the queue row is flagged new');
+select is((pg_temp.by_phone('9199000203')).lifecycle_stage, 'engaged', 'registration engages the lead');
+select ok((select client_is_new from entry_queue where mobile = '9199000203'), 'the queue row is flagged new');
 set local role authenticated;
 select pg_temp.act_as('2');
 select is(reconcile_referral_calling_conversions(), 1, 'once engaged, the referral converts');
@@ -102,8 +102,8 @@ reset role;
 -- Leads get an MKC client at first contact
 -- ---------------------------------------------------------------------------
 insert into leads(id, phone_number, name, created_by, branch_id) values
-('20261007-4444-4000-8000-000000000001', '9100000204', 'Synthetic Instagram Lead', '20261007-1111-4000-8000-000000000002', '20261007-0000-4000-8000-00000000000a'),
-('20261007-4444-4000-8000-000000000002', '9100000201', null, '20261007-1111-4000-8000-000000000002', '20261007-0000-4000-8000-00000000000a');
+('20261007-4444-4000-8000-000000000001', '9199000204', 'Synthetic Instagram Lead', '20261007-1111-4000-8000-000000000002', '20261007-0000-4000-8000-00000000000a'),
+('20261007-4444-4000-8000-000000000002', '9199000201', null, '20261007-1111-4000-8000-000000000002', '20261007-0000-4000-8000-00000000000a');
 select is((select c.lifecycle_stage from leads l join clients c on c.client_id = l.client_id where l.id = '20261007-4444-4000-8000-000000000001'), 'lead',
   'a new lead gets a lead client');
 select is((select client_id from leads where id = '20261007-4444-4000-8000-000000000002'), '20261007-2222-4000-8000-0000000000c1'::uuid,
@@ -115,9 +115,10 @@ select is((select client_id from leads where id = '20261007-4444-4000-8000-00000
 insert into client_timeline(id, client_id, event_date, branch_id, salesperson_id)
 values ('20261007-5555-4000-8000-000000000001', '20261007-2222-4000-8000-0000000000c1', now(), '20261007-0000-4000-8000-00000000000a', '20261007-1111-4000-8000-000000000002');
 insert into visit_forms(client_timeline_id, companions) values ('20261007-5555-4000-8000-000000000001',
-  '[{"name":"Synthetic Spouse","phone":"9100000205","relation":"SPOUSE"},{"name":"Synthetic Child","phone":"","relation":"SON"},{"name":"Synthetic Other Family","phone":"9100000202","relation":"FRIEND"}]');
+  '[{"name":"Synthetic Spouse","mobile":"9199000205","relation":"SPOUSE"},{"name":"Synthetic Child","phone":"","relation":"SON"},{"name":"Synthetic Other Family","phone":"9199000202","relation":"FRIEND"}]');
 select ok((pg_temp.client('c1')).household_id is not null, 'the main client now has a family');
 select is((select h.household_code ~ '^MKF-[0-9]+$' from households h where h.id = (pg_temp.client('c1')).household_id), true, 'the family has an MKF code');
+select is((pg_temp.by_phone('9199000205')).primary_name::text, 'Synthetic Spouse', 'a companion phone sent as mobile (the /crm form) is kept');
 select is((select count(*)::int from clients where household_id = (pg_temp.client('c1')).household_id), 4,
   'spouse, child (no phone) and the companion already a client joined the family');
 select is((select primary_phone from clients where primary_name = 'Synthetic Child'), null, 'a companion without a phone is a client without a phone');
@@ -130,11 +131,11 @@ select is((select count(*)::int from clients where primary_name ilike 'synthetic
 
 -- A companion who belongs to another family is not moved.
 insert into clients(client_id, primary_name, primary_phone, last_branch_id) values
-('20261007-2222-4000-8000-0000000000c3', 'Synthetic Second Main', '9100000206', '20261007-0000-4000-8000-00000000000a');
+('20261007-2222-4000-8000-0000000000c3', 'Synthetic Second Main', '9199000206', '20261007-0000-4000-8000-00000000000a');
 insert into client_timeline(id, client_id, event_date, branch_id, salesperson_id)
 values ('20261007-5555-4000-8000-000000000003', '20261007-2222-4000-8000-0000000000c3', now(), '20261007-0000-4000-8000-00000000000a', '20261007-1111-4000-8000-000000000002');
-insert into visit_forms(client_timeline_id, companions) values ('20261007-5555-4000-8000-000000000003', '[{"name":"Synthetic Spouse","phone":"9100000205"}]');
-select is((pg_temp.by_phone('9100000205')).household_id, (pg_temp.client('c1')).household_id, 'a person stays in their one family');
+insert into visit_forms(client_timeline_id, companions) values ('20261007-5555-4000-8000-000000000003', '[{"name":"Synthetic Spouse","phone":"9199000205"}]');
+select is((pg_temp.by_phone('9199000205')).household_id, (pg_temp.client('c1')).household_id, 'a person stays in their one family');
 select is((pg_temp.client('c3')).household_id, (pg_temp.client('c1')).household_id, 'the new main client joins the companion''s family instead');
 
 -- ---------------------------------------------------------------------------
@@ -168,16 +169,16 @@ select is((select array_agg(client_id) from search_clients((pg_temp.client('c2')
   'an MKREF code finds its client');
 select is((select count(*)::int from search_clients('MKC-' || substring((pg_temp.client('c1')).client_code from 5) || '0000')), 0,
   'a code-shaped query is never a phone or name search');
-select ok(exists (select 1 from search_clients('9100000201') where client_id = '20261007-2222-4000-8000-0000000000c1'), 'phone search still works');
+select ok(exists (select 1 from search_clients('9199000201') where client_id = '20261007-2222-4000-8000-0000000000c1'), 'phone search still works');
 select ok(exists (select 1 from search_clients('Synthetic Main') where client_id = '20261007-2222-4000-8000-0000000000c1'), 'name search still works');
 
 select is((select relation from client_identity where client_id = '20261007-2222-4000-8000-0000000000c1'), 'Main client', 'a main client''s relation');
 select is((select referral_id from client_identity where client_id = '20261007-2222-4000-8000-0000000000c1'), (pg_temp.client('c1')).referral_code,
   'a main client''s Referral ID is their own MKREF');
 select is((select referral_person_id from client_identity where client_id = '20261007-2222-4000-8000-0000000000c1'), null, 'a main client has no Referral person ID');
-select is((select referral_id from client_identity where client_id = (pg_temp.by_phone('9100000203')).client_id), (pg_temp.client('c1')).referral_code,
+select is((select referral_id from client_identity where client_id = (pg_temp.by_phone('9199000203')).client_id), (pg_temp.client('c1')).referral_code,
   'a referred person''s Referral ID is the referrer''s MKREF');
-select is((select referral_person_id from client_identity where client_id = (pg_temp.by_phone('9100000203')).client_id), (pg_temp.by_phone('9100000203')).referral_code,
+select is((select referral_person_id from client_identity where client_id = (pg_temp.by_phone('9199000203')).client_id), (pg_temp.by_phone('9199000203')).referral_code,
   'a referred person''s Referral person ID is their own MKREF');
 select is((select lifecycle_stage from client_identity where client_id = '20261007-2222-4000-8000-0000000000c1'), 'visited', 'the derived stage follows the visits');
 reset role;
