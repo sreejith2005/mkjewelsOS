@@ -39,14 +39,14 @@ select is((
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
-), 389, 'exactly 389 postgres-owned public application functions exist in the current migration set');
+), 394, 'exactly 394 postgres-owned public application functions exist in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres' and p.prosecdef
-), 326, 'exactly 326 public application functions are SECURITY DEFINER in the current migration set');
+), 331, 'exactly 331 public application functions are SECURITY DEFINER in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -62,7 +62,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 190, 'authenticated can execute exactly 190 reviewed public application functions');
+), 191, 'authenticated can execute exactly 191 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -70,7 +70,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('service_role', p.oid, 'EXECUTE')
-), 49, 'service_role can execute exactly 49 reviewed public application functions');
+), 53, 'service_role can execute exactly 53 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -78,7 +78,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('postgres', p.oid, 'EXECUTE')
-), 389, 'postgres retains owner execution on every public application function');
+), 394, 'postgres retains owner execution on every public application function');
 select ok(not has_function_privilege('authenticated', 'reject_watcher_task_mutation()', 'EXECUTE'), 'watcher guard trigger cannot be called directly');
 
 -- Exact authenticated allowlist: baseline, Forms, and reviewed FMS entry points.
@@ -216,6 +216,8 @@ select is((
   'create_crm_field_definition(text,text,text,text,jsonb,boolean,jsonb)',
   'create_dropdown_list_with_audit(text,jsonb)',
   'create_manual_task_with_mode_with_audit(jsonb,uuid[],uuid[],jsonb)',
+  -- 0195: admin-only CRM sync health (counts only).
+  'crm_sync_health()',
   'delete_fms_flow_with_audit(uuid,text)',
   'delete_form_draft_with_audit(uuid)',
   'delete_form_with_audit(uuid)',
@@ -323,6 +325,11 @@ select is((
   'consume_voice_interpretation_quota(uuid)',
   'create_recurring_todo_instance(uuid,date,uuid[])',
   'create_user_profile_with_coverage_and_audit(uuid,uuid,text,text,text,text,uuid,uuid,uuid,text,text,text[],user_role,uuid,uuid,uuid)',
+  -- 0194/0195: CRM sync workers (crm-staff-sync, crm-sync-receive).
+  'crm_sync_apply_walkin(text,jsonb)',
+  'crm_sync_claim_staff_events(integer)',
+  'crm_sync_finish_staff_event(bigint,boolean,text)',
+  'crm_sync_staff_roster()',
   'demo_data_purge_counts(uuid)',
   'enrich_legacy_crm_timeline_visit_form(text,text,jsonb,text)',
   'execute_production_demo_data_retirement(uuid,uuid,text,text)',
