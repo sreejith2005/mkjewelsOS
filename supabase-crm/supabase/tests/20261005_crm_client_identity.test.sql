@@ -45,6 +45,7 @@ grant execute on function pg_temp.client(text), pg_temp.by_phone(text) to authen
 -- Codes and protected columns
 -- ---------------------------------------------------------------------------
 select ok((pg_temp.client('c1')).referral_code ~ '^MKREF-[0-9]+$', 'a new client gets an MKREF code');
+select ok(substring((pg_temp.client('c1')).client_code from 5)::bigint > 200000, 'new MKC codes start above MKC-200000 (apart from the Sheets CRM numbers)');
 select isnt((pg_temp.client('c1')).referral_code, (pg_temp.client('c2')).referral_code, 'MKREF codes are unique');
 select is((select count(*)::int from clients where referral_code is null), 0, 'every client has an MKREF code');
 select is((pg_temp.client('c1')).lifecycle_stage, 'visited', 'clients created by staff start as visited');

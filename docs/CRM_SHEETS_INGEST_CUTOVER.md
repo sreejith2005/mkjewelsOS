@@ -1,6 +1,6 @@
 # CRM walk-in form (Google Sheets) -> CRM project: live push and backfill (owner guide)
 
-Status (2026-10-05): built and verified **locally only** (see "How this was verified").
+Status (2026-10-06): built and verified **locally only** (see "How this was verified").
 Nothing is deployed, no hosted secret is set, and the Apps Script is unchanged. Every step
 below is run by the owner, in the order of `docs/CRM_TWO_PROJECT_PRODUCTION_RUNBOOK.md`.
 
@@ -17,62 +17,56 @@ schema and must not be connected.
 | Key header | `x-mk-legacy-api-key` (checked in constant time before anything else) |
 | Function secret | `CRM_LEGACY_WALKIN_INGEST_API_KEY` (CRM project) |
 | Apps Script properties | `MK_CRM_INGEST_URL`, `MK_CRM_INGEST_API_KEY` (same value as the secret) |
-| Apps Script code | `supabase-crm/apps-script/crm-walkin-push.gs` (paste as a new file in the form's project) |
+| Apps Script code | `supabase-crm/apps-script/crm-walkin-push.gs`, pasted as a new file into the **MK JEWELS CRM SYSTEM** Apps Script project |
 
 Responses: `201 INGESTED` (saved), `200 ALREADY_INGESTED` (this REFERENCE NUMBER is already
 in the CRM: nothing saved), `422 INVALID_BRANCH`, `422 INGEST_FAILED`, `429 RATE_LIMITED`,
 `401 UNAUTHORIZED`, `413`, `400`. Same limits as the original: 1 MB, 8 files (refused), 30
 requests per minute (the backfill has its own 30 per minute).
 
-**No duplicates.** The form stamps every entry with its REFERENCE NUMBER before it writes the
-Sheet row. The CRM saves a reference number once, and it also recognises the reference numbers
-of the original import. So the live push can be retried safely and the backfill can run any
-number of times.
+**How it works (2026-10-06).** The walk-in form is not changed. The script reads WALKIN
+DATASET by its header names (the live 137-column layout, REFERENCE NUMBER in column 129) and
+sends each final walk-in to the CRM:
 
-Known limitation: an entry **edited in the Sheet form** after it reached the CRM is not
-updated in the CRM (the edit is recognised as the same reference and ignored). Correct such a
-visit in `/crm`. This goes away when staff record walk-ins in `/crm` (phase 6).
+- `sbcrmLiveSync` runs every 5 minutes and sends the walk-ins of the last 3 days that were not
+  sent yet. A new walk-in reaches the CRM within about 5 minutes.
+- `sbcrmBackfill` sends the history since 2026-08-17 once, with the same rules.
 
-## Before you start: confirm three things (owner)
+**No duplicates.** The CRM saves a REFERENCE NUMBER once and also knows the numbers of the
+original import, so both functions can run any number of times. A REFERENCE NUMBER that appears
+on more than one row: the first row keeps it, later rows go as `<number>-R<row>`, so two real
+visits are never merged. A row without a number goes as `AUTO-WALKIN-ROW-<row>`. Drafts
+(`VISIT FINAL STATUS = DRAFT`) are never sent; they are sent once they become final.
 
-1. The live form script is still `FORM CODE.GS` with the WALKIN DATASET headers of
-   `getExpectedHeaders_()` (REFERENCE NUMBER at column 129) and the helpers
-   `getWalkinHeadersForEdit_` and `convertWalkinRowToFormData_`. If the live script differs,
-   send me its header row (names only, no data) before going further.
-2. The Sheet's `BRANCH` values equal the names of **active** CRM branches (case-insensitive).
-   Any other value is answered `INVALID_BRANCH` and counted in the backfill log.
-3. Rows since 2026-08-17 carry a REFERENCE NUMBER. Rows without one are skipped and counted.
+**Status.** The full status (ORDER_PLACED, REPAIR_PICKUP, ...) is kept on the visit, so orders
+and repairs never open a Not-Bought follow-up. The Sheet's own CRM CLIENT ID is not sent: the
+CRM matches clients by phone and keeps its own MKC codes (new ones start at MKC-200001, apart
+from the Sheet's numbers).
 
-## The Apps Script change
+Known limitation: a walk-in **edited** in the form after it reached the CRM is not updated in
+the CRM (same reference number). Correct such a visit in `/crm`.
 
-1. Open the walk-in form script (spreadsheet "01 WALKIN DATA"). Add a script file
-   `crm-walkin-push` and paste `supabase-crm/apps-script/crm-walkin-push.gs`.
+## Before you start (owner)
+
+1. The Sheet's `BRANCH` values must equal the names of **active** CRM branches
+   (case-insensitive). Others are answered `INVALID_BRANCH`, counted in the log and retried at
+   most 3 times. Check with `select name from public.branches where active;` (CRM project).
+2. The Apps Script project must be able to open the "01 WALKIN DATA" spreadsheet (the MK JEWELS
+   CRM SYSTEM project already does).
+
+## Setting it up
+
+1. Open the **MK JEWELS CRM SYSTEM** Apps Script project. File > New > Script file, name it
+   `crm-walkin-push`, and paste `supabase-crm/apps-script/crm-walkin-push.gs`. Save.
 2. Project settings > Script properties: add `MK_CRM_INGEST_URL` and `MK_CRM_INGEST_API_KEY`.
-3. In `submitForm(formDataObj, filesPayload)`, in the **new entry** path, directly after
-   `sh.appendRow(row);` (around line 1224) add:
-
-   ```javascript
-   pushWalkinToCrm_(formDataObj);
-   ```
-
-   Do not add it to the edit path (the branch that ends with
-   `sh.getRange(targetRowNumber, ...).setValues([row])`). `pushWalkinToCrm_` never throws, so
-   the Sheet keeps working if the CRM is unreachable; failures go to the script's execution
-   log as an HTTP status and a code only.
-
-## Backfill (history since 2026-08-17)
-
-Run `backfillWalkinsToCrm` from the Apps Script editor.
-
-- It sends every WALKIN DATASET row submitted on or after `MK_CRM_BACKFILL_SINCE` (Script
-  property, optional; default `2026-08-17T00:00:00+05:30`) through the same endpoint.
-- Each run stops itself after about 5 minutes and remembers where it stopped; run it again
-  (or add a 10-minute time trigger) until the log says `done`. Then remove the trigger.
-- The log shows counts only, for example
-  `{"ingested":412,"already_ingested":37,"skipped_no_reference":2,"failed_422_invalid_branch":1}`.
-  Paste only that line if you want me to check it.
-- Running it again later is safe: everything already sent comes back `already_ingested`.
-  `resetCrmBackfill()` starts from the first row again.
+3. Backfill: choose `sbcrmBackfill` in the function list and click Run (allow the permissions
+   it asks for). Each run stops after about 5 minutes and remembers where it stopped: run it
+   again until the execution log says `done`. The log shows counts only, for example
+   `{"ingested":412,"already_ingested":37,"duplicate_reference_rows":2,"skipped_draft":3,"failed_422_invalid_branch":1}`.
+   Paste only that line if you want me to check it. `sbcrmResetBackfill` starts again from the
+   first row (safe: everything comes back `already_ingested`).
+4. Live: run `sbcrmInstallLiveSync` once. It adds a 5-minute trigger for `sbcrmLiveSync`.
+   `sbcrmRemoveLiveSync` removes it.
 
 Customer data never leaves Google and Supabase: nothing is exported to a file.
 
@@ -90,8 +84,8 @@ client in `/crm` as a test client; delete nothing.
 
 ## Rollback
 
-- Clear `MK_CRM_INGEST_URL` in Script properties: `pushWalkinToCrm_` then skips the call and
-  the Sheet works on its own. No redeploy needed.
+- Run `sbcrmRemoveLiveSync` (or clear `MK_CRM_INGEST_URL`): nothing more is sent. The Sheet and
+  the walk-in form are unaffected either way.
 - To make the function refuse everything without deleting it: remove the
   `CRM_LEGACY_WALKIN_INGEST_API_KEY` secret (every call answers `503`).
 - If the key leaked: set a new secret value and the same value in `MK_CRM_INGEST_API_KEY`.
@@ -106,10 +100,12 @@ client in `/crm` as a test client; delete nothing.
 - Deno: 21/21 for the function (including ALREADY_INGESTED = 200 and the backfill budget).
 - End to end on the local CRM stack (`mkcrm`): a synthetic walk-in answered 201, the same
   entry again 200, one visit saved with an MKC code; a wrong key 401.
-- The real `FORM CODE.GS` helpers and `crm-walkin-push.gs` ran in a Node VM against a
-  synthetic sheet (mocked Sheets/Properties, real HTTP to the local function): the first
-  backfill run ingested the new row, recognised the already-sent one, skipped the row without
-  a reference and counted the unknown branch; the second run saved nothing new.
+- `crm-walkin-push.gs` ran in a Node VM against a synthetic WALKIN DATASET with the live
+  137-column header row (mocked Sheets/Properties, real HTTP to the local function): the first
+  backfill saved the 4 final visits (an ORDER_PLACED visit, two rows sharing one reference, a row
+  without a reference), skipped the old row and the draft, and reported the unknown branch; the
+  second backfill and the live sync saved nothing again. The ORDER_PLACED visit kept its status
+  and opened no Not-Bought follow-up; the companion joined the client's family.
 
 Not verified: the hosted function, the live Apps Script project, and the real Sheet headers
 (owner checks above).

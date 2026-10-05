@@ -1,5 +1,9 @@
-// Verbatim port of sreejith-crm/web-app/lib/legacy-walkin-ingest.ts (zod 4.3.6, the original version),
-// so validation messages match the original endpoint. Only this comment is added.
+// Port of sreejith-crm/web-app/lib/legacy-walkin-ingest.ts (zod 4.3.6, the original version),
+// so validation messages match the original endpoint.
+// Fix (2026-10-05, owner-approved defect fixes): the original mapped the Sheet's buy status to a
+// yes/no flag only, so ORDER / REPAIR / EXCHANGE visits arrived as "not bought" and opened a
+// Not-Bought follow-up. The full status now travels as additional_fields.visit_status (as the
+// /crm walk-in form sends it), and the purchase statuses of the Sheets CRM count as bought.
 import { z } from "zod";
 
 const MAX_TEXT_LENGTH = 2_000;
@@ -44,6 +48,18 @@ function list(value: unknown): string[] {
 
 function yes(value: unknown): boolean {
   return text(value).toUpperCase() === "YES";
+}
+
+/** The Sheet's buy status as one token: "YES AND ORDER_PLACED" -> "YES_AND_ORDER_PLACED". */
+function visitStatus(value: unknown): string | null {
+  const status = text(value).toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  return status || null;
+}
+
+/** Purchase statuses, as the Sheets CRM counts them (ready product, and buying alongside an order or repair). */
+function bought(value: unknown): boolean {
+  const status = visitStatus(value);
+  return status === "YES" || status === "YES_AND_ORDER_PLACED" || (status ?? "").endsWith("_AND_BUYING_NEW_PRODUCT");
 }
 
 function dateAtMidnight(value: unknown): string | null {
@@ -106,7 +122,7 @@ export function toCanonicalWalkinPayload(form: Record<string, unknown>, branchId
     product_requirement: nullable(form.product_requirement),
     crm_name: nullable(form.crm_name),
     event_date: dateAtMidnight(form.visit_date),
-    did_buy: yes(form.buy_status),
+    did_buy: bought(form.buy_status),
     companions,
     seen_categories: list(form.seen_categories),
     bought_categories: list(form.bought_categories),
@@ -150,6 +166,7 @@ export function toCanonicalWalkinPayload(form: Record<string, unknown>, branchId
       referrals: { asked: yes(form.referrals_asked), no_reason: nullable(form.referrals_no_reason) },
     },
     additional_fields: {
+      visit_status: visitStatus(form.buy_status),
       legacy_reference_number: nullable(form.reference_number),
       legacy_form_mode: nullable(form.form_mode),
       legacy_edit_reference_number: nullable(form.edit_reference_number),

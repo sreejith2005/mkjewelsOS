@@ -31,6 +31,12 @@
 -- Structure
 -- ---------------------------------------------------------------------------
 
+-- MKC numbering (2026-10-06). The CRM project's codes are one block (MKC-102726 to MKC-104293 on
+-- 2026-10-05), from its own counter. The Sheets CRM numbers its own clients from MKC-100001 and
+-- renumbers them on every rebuild, so the two ranges can meet. New CRM codes start at MKC-200001:
+-- a new CRM code is never also a Sheet number. Existing codes do not change.
+SELECT setval('public.client_code_sequence', greatest((SELECT last_value FROM public.client_code_sequence), 200000), true);
+
 ALTER TABLE public.clients ALTER COLUMN primary_phone DROP NOT NULL;
 
 CREATE SEQUENCE public.household_code_sequence;

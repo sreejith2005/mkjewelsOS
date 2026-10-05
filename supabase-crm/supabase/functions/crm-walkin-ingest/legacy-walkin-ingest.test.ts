@@ -47,3 +47,20 @@ Deno.test("records file metadata but never base64 content in troubleshooting pay
     filesPayload: [{ fieldName: "instagram_follow_proof", fileName: "proof.jpg", mimeType: "image/jpeg" }],
   });
 });
+
+Deno.test("keeps the Sheet's full buy status: orders and repairs are not 'not bought'", () => {
+  const cases: Array<[string, boolean, string]> = [
+    ["YES", true, "YES"],
+    ["NO", false, "NO"],
+    ["ORDER_PLACED", false, "ORDER_PLACED"],
+    ["REPAIR PICKUP", false, "REPAIR_PICKUP"],
+    ["YES AND ORDER_PLACED", true, "YES_AND_ORDER_PLACED"],
+    ["ORDER_PICKUP_AND_BUYING_NEW_PRODUCT", true, "ORDER_PICKUP_AND_BUYING_NEW_PRODUCT"],
+  ];
+  for (const [status, didBuy, visit] of cases) {
+    const payload = toCanonicalWalkinPayload({ client_name: "Asha", client_phone: "9876543210", buy_status: status }, "b");
+    assertEquals(payload.did_buy, didBuy, status);
+    assertEquals((payload.additional_fields as Record<string, unknown>).visit_status, visit, status);
+  }
+  assertEquals((toCanonicalWalkinPayload({ client_name: "Asha" }, "b").additional_fields as Record<string, unknown>).visit_status, null);
+});
