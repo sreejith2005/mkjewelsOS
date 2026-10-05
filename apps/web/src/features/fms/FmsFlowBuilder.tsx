@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, CheckCircle2, ChevronDown, FileText, Plus, Redo2, Save, Send, TestTube2, Undo2, UserRoundPlus, X } from "lucide-react";
 import { copyFirstFmsAssigneeToHumanStages, normalizeFmsDefinition, validateFmsDefinition, type FmsFlowDefinition, type FmsStageDefinition } from "@jewelos/core";
 import { Button, Field, Modal, Notice } from "@/components/ui";
@@ -13,6 +13,36 @@ import { FmsStepList } from "./FmsStepList";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 
+function issueControlSelector(code: string, message: string): string {
+  if (["missing_form", "invalid_form", "missing_linked_form", "route_without_form", "invalid_assignment_field"].includes(code)) return '[data-fms-focus="form"]';
+  if (["invalid_decision", "route_without_decision"].includes(code)) return '[data-fms-focus="decision"]';
+  const routeNumber = /^"?Route (\d+)/.exec(message)?.[1];
+  if (code === "unsupported_cycle") {
+    if (routeNumber) return `[aria-label="Route ${routeNumber} then go to"]`;
+    if (message.startsWith("Otherwise")) return '[aria-label="Otherwise (fallback) go to"]';
+    if (message.startsWith("Parallel")) return '[data-fms-focus="parallel"] input';
+    return '[aria-label="Continue to"]';
+  }
+  if (routeNumber) {
+    if (code === "invalid_route_source") return `[aria-label="Route ${routeNumber} field key"], [aria-label="Route ${routeNumber} question"]`;
+    const part = ["route_without_destination", "invalid_route_target"].includes(code) ? "then go to"
+      : ["route_field_missing"].includes(code) ? "question"
+      : ["invalid_route_value", "route_value_missing"].includes(code) ? "answer"
+      : ["invalid_route_operator"].includes(code) ? "condition" : "source";
+    return `[aria-label="Route ${routeNumber} ${part}"]`;
+  }
+  if (code === "invalid_deadline") return '[data-fms-focus="deadline"] input';
+  if (code === "invalid_deadline_trigger") return '[data-fms-focus="trigger"]';
+  if (["invalid_stage", "invalid_stage_key"].includes(code)) return '[data-fms-focus="name"]';
+  if (["invalid_conditional"].includes(code)) return '[data-fms-focus="condition"] input, [data-fms-focus="condition"] select';
+  if (["invalid_parallel", "invalid_join"].includes(code)) return '[data-fms-focus="parallel"] input, [data-fms-focus="parallel"] select';
+  if (["invalid_branch"].includes(code)) return '[data-fms-focus="branch"] input, [data-fms-focus="branch"] select';
+  if (code === "missing_completion_path") return '[data-fms-focus="routing"] select, [data-fms-focus="branch"] select, [data-fms-focus="parallel"] input';
+  if (["route_without_fallback", "conflicting_fallback_route"].includes(code)) return '[aria-label="Otherwise (fallback) go to"]';
+  if (code === "invalid_assignee") return '[data-fms-focus="name"]';
+  return '[data-fms-focus="routing"] input, [data-fms-focus="routing"] select, [data-fms-focus="routing"] button';
+}
+
 export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: FmsFlowRow | null; data: FmsData; duplicate?: boolean; onClose: () => void; onSaved: () => Promise<void> }) {
   const initial = useMemo(() => { const value = flowToDefinition(flow, data); return duplicate ? { ...value, id: undefined, familyId: undefined, version: 1, lifecycle: "draft" as const, name: `${value.name} (Copy)` } : value; }, [data, duplicate, flow]);
   const [definition, setDefinition] = useState<FmsFlowDefinition>(initial);
@@ -25,6 +55,8 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { fl
   const [phoneView, setPhoneView] = useState<"steps" | "map">("steps");
   const [issuesOpen, setIssuesOpen] = useState(false);
   const [focusRequest, setFocusRequest] = useState<{ key: string; id: number } | null>(null);
+  const [focusedIssue, setFocusedIssue] = useState<{ code: string; message: string; id: number } | null>(null);
+  const inspectorRef = useRef<HTMLElement>(null);
   const [persistedId, setPersistedId] = useState(flow?.id ?? null);
   const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(normalizeFmsDefinition(initial)));
   const [busy, setBusy] = useState<"save" | "publish" | null>(null);
@@ -39,6 +71,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { fl
   const dirty = JSON.stringify(normalized) !== savedSnapshot;
   const assignableStages = normalized.stages.filter((stage) => ["form", "task", "approval"].includes(stage.type));
   const assignedStages = assignableStages.filter((stage) => stage.assigneeRules.some((rule) => rule.type === "specific_user" && rule.userProfileId));
+  const selectStage = (key: string | null) => { setFocusedIssue(null); setSelectedKey(key); };
   const openIssue = (issue: (typeof issues)[number]) => {
     const stageKey = issue.stageKey;
     if (!stageKey) {
@@ -49,6 +82,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { fl
     }
     setSelectedKey(stageKey);
     setFocusRequest((current) => ({ key: stageKey, id: (current?.id ?? 0) + 1 }));
+    setFocusedIssue((current) => ({ code: issue.code, message: issue.message, id: (current?.id ?? 0) + 1 }));
     setIssuesOpen(false);
   };
   const issueLabel = (issue: (typeof issues)[number]) => {
@@ -62,6 +96,16 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { fl
   const contextDefaultAssigneeId = normalized.moduleContext ? data.contextDefaults?.find((item) => item.module_context === normalized.moduleContext)?.user_profile_id : undefined;
 
   useEffect(() => { const warn = (event: BeforeUnloadEvent) => { if (dirty) { event.preventDefault(); event.returnValue = ""; } }; window.addEventListener("beforeunload", warn); return () => window.removeEventListener("beforeunload", warn); }, [dirty]);
+  useEffect(() => {
+    if (!focusedIssue || !selected) return;
+    const selector = issueControlSelector(focusedIssue.code, focusedIssue.message);
+    const control = inspectorRef.current?.querySelector<HTMLElement>(selector) ?? inspectorRef.current?.querySelector<HTMLElement>("[data-fms-editor] input, [data-fms-editor] select, [data-fms-editor] button");
+    if (!control) return;
+    control.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    control.focus({ preventScroll: true });
+    control.classList.add("ring-2", "ring-danger", "ring-offset-2", "ring-offset-obsidian");
+    return () => control.classList.remove("ring-2", "ring-danger", "ring-offset-2", "ring-offset-obsidian");
+  }, [focusedIssue, selected?.key]);
 
   const commit = (next: FmsFlowDefinition | ((current: FmsFlowDefinition) => FmsFlowDefinition)) => {
     setDefinition((current) => { const value = typeof next === "function" ? next(current) : next; setPast((items) => [...items.slice(-49), current]); setFuture([]); return value; });
@@ -148,7 +192,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { fl
   const assigneeSummary = assignableStages.length ? `${assignedStages.length}/${assignableStages.length} assigned` : "No steps yet";
   const inspector = selected ? <>
     <div aria-hidden="true" className="fixed inset-0 z-40 bg-obsidian/60 md:hidden" onClick={() => setSelectedKey(null)} />
-    <aside className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 max-h-[80dvh] overflow-y-auto overscroll-contain rounded-t-2xl border border-gold/30 bg-obsidian px-4 pb-4 shadow-2xl md:bottom-0 md:left-auto md:top-16 md:max-h-none md:w-[min(32rem,45vw)] md:rounded-none md:border-y-0 md:border-r-0 md:pt-4">
+    <aside ref={inspectorRef} className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 max-h-[80dvh] overflow-y-auto overscroll-contain rounded-t-2xl border border-gold/30 bg-obsidian px-4 pb-4 shadow-2xl md:bottom-0 md:left-auto md:top-16 md:max-h-none md:w-[min(32rem,45vw)] md:rounded-none md:border-y-0 md:border-r-0 md:pt-4">
       <div className="sticky top-0 z-10 -mx-4 mb-4 flex items-center justify-between gap-2 border-b border-gold/15 bg-obsidian px-4 pb-3 pt-2 md:static md:mx-0 md:border-0 md:p-0">
         <div className="min-w-0"><p className="text-xs text-gold">{selected.type.replaceAll("_", " ")}</p><h3 className="truncate text-lg font-semibold text-white">{selected.name}</h3></div>
         <Button aria-label="Close inspector" className="shrink-0" onClick={() => setSelectedKey(null)} variant="ghost"><X className="size-5" /></Button>
@@ -182,13 +226,13 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { fl
     {error ? <Notice tone="danger">{error}</Notice> : null}{success ? <Notice>{success}</Notice> : null}
     {phoneView === "steps" ? <div className="space-y-3 pb-4">
       <div className="grid grid-cols-2 gap-2">
-        <button className="flex min-h-14 min-w-0 items-center gap-2 rounded-xl border border-gold/20 bg-charcoal p-3 text-left" onClick={() => normalized.stages[0] && setSelectedKey(normalized.stages[0].key)} type="button"><FileText className="size-4 shrink-0 text-champagne" /><span className="min-w-0"><b className="block truncate text-sm text-white">{processFormName}</b><span className="text-[11px] text-soft-grey">Process form</span></span></button>
+        <button className="flex min-h-14 min-w-0 items-center gap-2 rounded-xl border border-gold/20 bg-charcoal p-3 text-left" onClick={() => normalized.stages[0] && selectStage(normalized.stages[0].key)} type="button"><FileText className="size-4 shrink-0 text-champagne" /><span className="min-w-0"><b className="block truncate text-sm text-white">{processFormName}</b><span className="text-[11px] text-soft-grey">Process form</span></span></button>
         <button className="flex min-h-14 min-w-0 items-center gap-2 rounded-xl border border-gold/20 bg-charcoal p-3 text-left" onClick={() => setAssigning(true)} type="button"><UserRoundPlus className="size-4 shrink-0 text-champagne" /><span className="min-w-0"><b className="block truncate text-sm text-white">{assigneeSummary}</b><span className="text-[11px] text-soft-grey">Default assignees</span></span></button>
       </div>
       <p className="text-xs text-soft-grey">Tap a step to edit it and choose where it continues. The final unconnected step completes the workflow.</p>
-      <FmsStepList definition={normalized} formFields={data.formFields} invalidKeys={invalidKeys} onAddAfter={(key) => add("task", key)} onDelete={remove} onDuplicate={duplicateStage} onSelect={setSelectedKey} selectedKey={selected?.key ?? null} />
+      <FmsStepList definition={normalized} formFields={data.formFields} invalidKeys={invalidKeys} onAddAfter={(key) => add("task", key)} onDelete={remove} onDuplicate={duplicateStage} onSelect={selectStage} selectedKey={selected?.key ?? null} />
     </div> : <div className="relative">
-      <FmsGraphCanvas definition={normalized} formFields={data.formFields} focusRequest={focusRequest} invalidKeys={invalidKeys} onAddAfter={(key) => add("task", key)} onConnect={connect} onDelete={remove} onDisconnect={disconnect} onDuplicate={duplicateStage} onMove={moveStages} onReconnect={reconnect} onSelect={setSelectedKey} selectedKey={selected?.key ?? null} />
+      <FmsGraphCanvas definition={normalized} formFields={data.formFields} focusRequest={focusRequest} invalidKeys={invalidKeys} onAddAfter={(key) => add("task", key)} onConnect={connect} onDelete={remove} onDisconnect={disconnect} onDuplicate={duplicateStage} onMove={moveStages} onReconnect={reconnect} onSelect={selectStage} selectedKey={selected?.key ?? null} />
       <Button className="absolute bottom-3 left-3 z-30 shadow-lg" onClick={() => add("task")} type="button"><Plus className="size-4" />Add Step</Button>
     </div>}
     <section className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 -mx-2 mt-auto rounded-t-2xl border border-b-0 border-gold/30 bg-charcoal/95 backdrop-blur">
@@ -204,7 +248,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { fl
 
   return <div className={`relative flex min-h-[calc(100dvh-8rem)] flex-col transition-[padding] ${selected ? "md:pr-[min(32rem,45vw)]" : ""}`}><header className="scroll-x no-scrollbar sticky top-0 z-40 -mx-2 mb-3 flex items-center gap-2 border-b border-gold/20 bg-obsidian/95 px-2 py-3 backdrop-blur md:flex-wrap md:overflow-visible"><Button className="shrink-0" onClick={onClose} type="button" variant="ghost"><ArrowLeft className="size-4" /><span className="hidden sm:inline">Back</span></Button><div className="mr-auto min-w-0 max-w-[45vw] md:max-w-none"><h2 className="truncate text-base font-semibold text-white sm:text-lg">{normalized.name}</h2><p className="truncate text-xs text-soft-grey">{dirty ? "Unsaved changes" : "Draft saved"}</p></div><Button aria-label="Undo" className="shrink-0" disabled={!past.length} onClick={undo} variant="ghost"><Undo2 className="size-4" /></Button><Button aria-label="Redo" className="shrink-0" disabled={!future.length} onClick={redo} variant="ghost"><Redo2 className="size-4" /></Button><Button aria-label="Check workflow" className="shrink-0" onClick={checkWorkflow} variant="secondary"><TestTube2 className="size-4" /><span className="hidden lg:inline">Check workflow</span></Button><Button className="shrink-0" disabled={!!busy} onClick={() => void save()} variant="secondary"><Save className="size-4" /><span className="hidden lg:inline">{busy === "save" ? "Saving..." : "Save draft"}</span></Button><Button className="shrink-0" disabled={!!busy || issues.length > 0} onClick={() => void publish()}><Send className="size-4" />{busy === "publish" ? "Publishing..." : "Publish"}</Button></header>
     {error ? <Notice tone="danger">{error}</Notice> : null}{success ? <Notice>{success}</Notice> : null}
-    <div className="grid gap-3 xl:grid-cols-[16rem_minmax(0,1fr)]"><aside className="max-h-64 overflow-y-auto rounded-xl border border-gold/20 bg-charcoal p-3 xl:max-h-[calc(100dvh-13rem)]"><p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Building blocks</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-left text-gold hover:bg-gold/20" onClick={() => add("task")} type="button"><span className="grid size-8 place-items-center rounded-lg bg-gold text-obsidian"><UserRoundPlus className="size-4" /></span><span><b className="block text-sm">Add Step</b><span className="text-[11px] text-champagne">Create the next general workflow step</span></span></button><section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Process form</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/15 p-3 text-left hover:border-gold" onClick={() => normalized.stages[0] && setSelectedKey(normalized.stages[0].key)} type="button"><span className="grid size-8 place-items-center rounded-lg bg-champagne/20 text-champagne"><FileText className="size-4" /></span><span><b className="block text-sm text-white">{normalized.stages[0]?.formTemplateId ? data.forms.find((form) => form.id === normalized.stages[0]?.formTemplateId)?.name ?? "Form attached" : "None attached"}</b><span className="text-[11px] text-soft-grey">Configure the initial details form</span></span></button></section><section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Default assignees</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/15 p-3 text-left hover:border-gold" onClick={() => setAssigning(true)} type="button"><span className="grid size-8 place-items-center rounded-lg bg-champagne/20 text-champagne"><UserRoundPlus className="size-4" /></span><span><b className="block text-sm text-white">{assignableStages.length ? `${assignedStages.length}/${assignableStages.length} assigned` : "No steps yet"}</b><span className="text-[11px] text-soft-grey">Pre-assign users after building the flow</span></span></button></section><p className="mt-5 border-t border-gold/15 pt-3 text-[11px] text-soft-grey">The initial Form starts the workflow. The final unconnected step completes it.</p></aside><FmsGraphCanvas definition={normalized} formFields={data.formFields} focusRequest={focusRequest} invalidKeys={invalidKeys} onAddAfter={(key) => add("task", key)} onConnect={connect} onDelete={remove} onDisconnect={disconnect} onDuplicate={duplicateStage} onMove={moveStages} onReconnect={reconnect} onSelect={setSelectedKey} selectedKey={selected?.key ?? null} /></div>
+    <div className="grid gap-3 xl:grid-cols-[16rem_minmax(0,1fr)]"><aside className="max-h-64 overflow-y-auto rounded-xl border border-gold/20 bg-charcoal p-3 xl:max-h-[calc(100dvh-13rem)]"><p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Building blocks</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-left text-gold hover:bg-gold/20" onClick={() => add("task")} type="button"><span className="grid size-8 place-items-center rounded-lg bg-gold text-obsidian"><UserRoundPlus className="size-4" /></span><span><b className="block text-sm">Add Step</b><span className="text-[11px] text-champagne">Create the next general workflow step</span></span></button><section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Process form</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/15 p-3 text-left hover:border-gold" onClick={() => normalized.stages[0] && selectStage(normalized.stages[0].key)} type="button"><span className="grid size-8 place-items-center rounded-lg bg-champagne/20 text-champagne"><FileText className="size-4" /></span><span><b className="block text-sm text-white">{normalized.stages[0]?.formTemplateId ? data.forms.find((form) => form.id === normalized.stages[0]?.formTemplateId)?.name ?? "Form attached" : "None attached"}</b><span className="text-[11px] text-soft-grey">Configure the initial details form</span></span></button></section><section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Default assignees</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/15 p-3 text-left hover:border-gold" onClick={() => setAssigning(true)} type="button"><span className="grid size-8 place-items-center rounded-lg bg-champagne/20 text-champagne"><UserRoundPlus className="size-4" /></span><span><b className="block text-sm text-white">{assignableStages.length ? `${assignedStages.length}/${assignableStages.length} assigned` : "No steps yet"}</b><span className="text-[11px] text-soft-grey">Pre-assign users after building the flow</span></span></button></section><p className="mt-5 border-t border-gold/15 pt-3 text-[11px] text-soft-grey">The initial Form starts the workflow. The final unconnected step completes it.</p></aside><FmsGraphCanvas definition={normalized} formFields={data.formFields} focusRequest={focusRequest} invalidKeys={invalidKeys} onAddAfter={(key) => add("task", key)} onConnect={connect} onDelete={remove} onDisconnect={disconnect} onDuplicate={duplicateStage} onMove={moveStages} onReconnect={reconnect} onSelect={selectStage} selectedKey={selected?.key ?? null} /></div>
     {inspector}
     <section className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 -mx-2 mt-3 rounded-t-2xl border border-b-0 border-gold/30 bg-charcoal/95 px-4 py-3 backdrop-blur md:bottom-0"><div className="flex flex-wrap items-center gap-3"><div className="mr-auto"><p className="font-semibold text-white">Publish readiness</p><p className="text-xs text-soft-grey">{issues.length ? `${issues.length} issue${issues.length === 1 ? "" : "s"} to resolve` : "Ready to publish"}</p></div>{issues.length ? <div className="hidden max-w-3xl flex-1 gap-2 overflow-x-auto md:flex">{issues.map((issue, index) => <button className="shrink-0 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-left text-xs text-danger" key={`${issue.code}-${issue.stageKey ?? index}`} onClick={() => openIssue(issue)} type="button">{issueLabel(issue)}</button>)}</div> : <CheckCircle2 className="size-5 text-success" />}</div></section>
     {assigning ? <DefaultAssigneesDialog data={data} definition={normalized} onChange={(stages) => commit((current) => ({ ...current, stages }))} onClose={() => setAssigning(false)} /> : null}

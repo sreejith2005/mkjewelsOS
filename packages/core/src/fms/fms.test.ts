@@ -17,9 +17,9 @@ describe("FMS definitions", () => {
     const stages = good().stages.map((item) => item.key === "start_form" ? { ...item, sla: { ...item.sla, assignmentFieldKey: "assigned_to" }, assigneeRules: [] } : { ...item, assigneeRules: [] });
     expect(validateFmsDefinition(flow(stages), { formFields: { [formId]: [{ key: "assigned_to", label: "Assigned to", type: "user_dropdown", required: true, shown: true }] } })).toEqual([]);
   });
-  it("identifies an unnamed step without an earlier User answer", () => {
+  it("allows an unnamed step because the starting form submitter remains the default", () => {
     const stages = good().stages.map((item) => ({ ...item, assigneeRules: [] }));
-    expect(validateFmsDefinition(flow(stages)).some((issue) => issue.code === "missing_assignment_source" && issue.stageKey === "done")).toBe(true);
+    expect(validateFmsDefinition(flow(stages))).toEqual([]);
   });
   it("rejects a conditional User question as an assignment source", () => {
     const stages = good().stages.map((item) => item.key === "start_form" ? { ...item, sla: { ...item.sla, assignmentFieldKey: "assigned_to" } } : item);
@@ -32,7 +32,11 @@ describe("FMS definitions", () => {
   it("rejects duplicate identities", () => expect(validateFmsDefinition(flow([stage({ key: "same", name: "A", type: "form", formTemplateId: formId, order: 0, defaultNextStageKey: "same" }), stage({ key: "same", name: "B", type: "task", order: 1 })])).some((item) => item.code === "invalid_stage_key")).toBe(true));
   it("rejects dangling references", () => expect(validateFmsDefinition(flow([stage({ key: "start_form", name: "A", type: "form", formTemplateId: formId, order: 0, defaultNextStageKey: "missing" })])).some((item) => item.code === "dangling_reference")).toBe(true));
   it("rejects unreachable stages", () => expect(validateFmsDefinition(flow([...good().stages, stage({ key: "island", name: "Island", type: "task", order: 2 })])).some((item) => item.stageKey === "island" && item.code === "unreachable_stage")).toBe(true));
-  it("rejects unsupported cycles", () => expect(validateFmsDefinition(flow([stage({ key: "a", name: "A", type: "form", formTemplateId: formId, order: 0, defaultNextStageKey: "b" }), stage({ key: "b", name: "B", type: "task", order: 1, defaultNextStageKey: "a" })])).some((item) => item.code === "unsupported_cycle")).toBe(true));
+  it("points unsupported cycles to the step whose route closes the loop", () => {
+    const issues = validateFmsDefinition(flow([stage({ key: "a", name: "A", type: "form", formTemplateId: formId, order: 0, defaultNextStageKey: "b" }), stage({ key: "b", name: "B", type: "task", order: 1, defaultNextStageKey: "a" })]));
+    expect(issues.find((item) => item.code === "unsupported_cycle")?.stageKey).toBe("b");
+    expect(issues.find((item) => item.code === "missing_completion_path")?.stageKey).toBe("b");
+  });
   it("accepts a leaf step as implicit completion", () => expect(validateFmsDefinition(flow([stage({ key: "start_form", name: "A", type: "form", formTemplateId: formId, order: 0 })]))).toEqual([]));
   it("rejects legacy explicit end nodes", () => expect(validateFmsDefinition(flow([stage({ key: "start_form", name: "A", type: "form", formTemplateId: formId, order: 0, defaultNextStageKey: "done" }), stage({ key: "done", name: "Done", type: "end", order: 1 })])).some((item) => item.code === "legacy_end_stage")).toBe(true));
   it("requires the first stage to be a form", () => expect(validateFmsDefinition(flow([stage({ key: "task", name: "Task", type: "task", order: 0 })])).some((item) => item.code === "first_stage_must_be_form")).toBe(true));

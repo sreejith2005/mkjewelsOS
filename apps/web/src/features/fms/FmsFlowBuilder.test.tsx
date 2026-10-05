@@ -34,6 +34,7 @@ vi.mock("./FmsGraphCanvas", () => ({
     return <div>
       <button onClick={() => onConnect(start!.key, a)}>connect a</button>
       <button onClick={() => onConnect(start!.key, b)}>connect b</button>
+      <button onClick={() => onConnect(b, start!.key)}>make cycle</button>
       <button onClick={() => onDisconnect(start!.key, start!.defaultNextStageKey ?? "")}>disconnect default</button>
       <button onClick={() => onDisconnect(start!.key, b, routeId)}>disconnect route</button>
       <button onClick={() => onReconnect(start!.key, start!.defaultNextStageKey ?? "", b)}>reconnect default</button>
@@ -164,6 +165,31 @@ describe("FMS builder graph wiring", () => {
     expect(latestFocusRequest?.key).toBe(start);
     expect(screen.getByRole("button", { name: "Close inspector" })).toBeTruthy();
     expect(screen.getByText("The initial Form requires an exact published template version")).toBeTruthy();
+    expect(document.activeElement).toBe(screen.getByLabelText("Initial details form"));
+    expect(screen.getByLabelText("Initial details form").className).toContain("ring-danger");
+  });
+  it("opens the route that closes a cycle", async () => {
+    const { user, b } = await openBuilder();
+    await user.click(screen.getByRole("button", { name: "make cycle" }));
+    await user.click(screen.getByRole("button", { name: /Step: Continue to destination loops back/ }));
+    expect(latestFocusRequest?.key).toBe(b);
+    const destination = screen.getByLabelText("Continue to");
+    expect(document.activeElement).toBe(destination);
+    expect(destination.className).toContain("ring-danger");
+  });
+  it("focuses and highlights the due-date question for a date issue", async () => {
+    const { user } = await openBuilder();
+    await user.click(screen.getAllByRole("button", { name: /Step: Choose a valid completion due date/ })[0]!);
+    const dueDate = screen.getByLabelText("Completion due date");
+    expect(document.activeElement).toBe(dueDate);
+    expect(dueDate.className).toContain("ring-danger");
+  });
+  it("focuses the exact route field for a route issue", async () => {
+    const { user } = await openBuilder();
+    await user.click(screen.getByRole("button", { name: "connect b" }));
+    await user.click(screen.getAllByRole("button", { name: /Route 1.*needs the question or process field/ })[0]!);
+    expect(document.activeElement).toBe(screen.getByLabelText("Route 1 field key"));
+    expect(screen.getByLabelText("Route 1 field key").className).toContain("ring-danger");
   });
 
   it("copies the first assignee to every step and permits a later override", async () => {

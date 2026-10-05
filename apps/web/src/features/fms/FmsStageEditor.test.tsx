@@ -93,6 +93,10 @@ describe("FMS stage editor", () => {
     expect(select.value).toBe("");
     expect(select.textContent).toContain("Initial details");
   });
+  it("uses the existing default assignee picker without adding a per-form assignment selector", () => {
+    render(<RoutingHarness />);
+    expect(screen.queryByLabelText("User question that assigns later steps")).toBeNull();
+  });
 
   it("keeps instructions and completion controls available but secondary", () => {
     render(<Harness />);

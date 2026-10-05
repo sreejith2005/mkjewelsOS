@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, type LayoutChangeEvent } from "react-native";
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react-native";
 import {
   FMS_BRANCH_OPERATORS,
@@ -57,10 +57,10 @@ const optionCheckboxes = [
 const COMPLETE_HERE = "";
 const timingMethod = (sla: FmsSlaRule): FmsTimingMethod => sla.timingMethod ?? "completion_date";
 
-function Section({ title, help, children }: { title: string; help?: string; children: ReactNode }) {
+function Section({ title, help, children, highlight, onLayout }: { title: string; help?: string; children: ReactNode; highlight?: boolean; onLayout?: ((event: LayoutChangeEvent) => void) | undefined }) {
   const styles = useStyles();
   return (
-    <View style={styles.section}>
+    <View onLayout={onLayout} style={[styles.section, highlight && styles.warn]}>
       <Text tone="primary" variant="caption" weight="semibold">{title.toUpperCase()}</Text>
       {help ? <Text tone="muted" variant="caption">{help}</Text> : null}
       {children}
@@ -93,9 +93,10 @@ function IconButton({ label, disabled, onPress, children }: { label: string; dis
   );
 }
 
-function StageSelect({ others, value, label, onChange }: { others: readonly FmsStageDefinition[]; value?: string | undefined; label: string; onChange: (value: string | undefined) => void }) {
+function StageSelect({ others, value, label, onChange, invalid }: { others: readonly FmsStageDefinition[]; value?: string | undefined; label: string; onChange: (value: string | undefined) => void; invalid?: boolean }) {
   return (
     <OptionPicker
+      invalid={invalid ?? false}
       label={label}
       onChange={(values) => onChange(values[0] || undefined)}
       options={[{ value: COMPLETE_HERE, label: "Complete workflow here" }, ...others.map((item) => ({ value: item.key, label: item.name }))]}
@@ -104,7 +105,7 @@ function StageSelect({ others, value, label, onChange }: { others: readonly FmsS
   );
 }
 
-export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; onChange: (value: FmsStageDefinition) => void; onDelete: () => void }) {
+export function FmsStageEditor({ stage, stages, data, onChange, onDelete, issueCode, issueMessage, onIssueLayout }: { stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; onChange: (value: FmsStageDefinition) => void; onDelete: () => void; issueCode?: string | undefined; issueMessage?: string | undefined; onIssueLayout?: ((event: LayoutChangeEvent) => void) | undefined }) {
   const styles = useStyles();
   const theme = useAppTheme();
   const update = (patch: Partial<FmsStageDefinition>) => onChange({ ...stage, ...patch });
@@ -118,7 +119,9 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { st
   const canChooseNext = !["branch", "parallel_start", "end"].includes(stage.type);
   const decision = stage.sla.decisionMode === "decision" || stage.sla.decisionMode === "yes_no";
   const formFields = stage.formTemplateId ? data.formFields[stage.formTemplateId] ?? [] : [];
-  const assignmentFields = formFields.filter((field) => field.type === "user_dropdown" && field.required && field.shown !== false && !field.hasCondition);
+  const formIssue = ["missing_form", "invalid_form", "missing_linked_form", "route_without_form", "invalid_assignment_field"].includes(issueCode ?? "");
+  const deadlineIssue = ["invalid_deadline", "invalid_deadline_trigger"].includes(issueCode ?? "");
+  const mark = (active: boolean) => ({ highlight: active, onLayout: active ? onIssueLayout : undefined });
   const [showConditional, setShowConditional] = useState(!!stage.sla.conditional && "decisionStageKey" in stage.sla.conditional);
   const decisionCondition = stage.sla.conditional && "decisionStageKey" in stage.sla.conditional ? stage.sla.conditional : undefined;
 
@@ -136,12 +139,12 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { st
 
   return (
     <View style={styles.editor}>
-      <Section title="Step details">
+      <Section title="Step details" {...mark(["invalid_stage", "invalid_stage_key"].includes(issueCode ?? ""))}>
         <TextField label="Step name" maxLength={150} onChangeText={(name) => update({ name })} placeholder="e.g. Issue PO to supplier" value={stage.name} />
       </Section>
 
       {human ? (
-        <Section help="A normal step is completed once. A decision step records one configured outcome." title="Step type">
+        <Section help="A normal step is completed once. A decision step records one configured outcome." title="Step type" {...mark(["invalid_decision", "route_without_decision"].includes(issueCode ?? ""))}>
           <Choice help="Complete and continue" onPress={() => updateSla({ decisionMode: "normal", decisionOptions: undefined })} selected={!decision} title="Normal step (Done)" />
           <Choice disabled={firstStage} help="Choose a configured path when completing" onPress={() => updateSla({ decisionMode: "decision", decisionOptions: stage.sla.decisionOptions?.length ? stage.sla.decisionOptions : [{ key: "yes", label: "Yes" }, { key: "no", label: "No" }] })} selected={decision} title="Decision step" />
           {decision ? <DecisionOptions options={stage.sla.decisionOptions ?? [{ key: "yes", label: "Yes" }, { key: "no", label: "No" }]} update={(decisionOptions) => updateSla({ decisionMode: "decision", decisionOptions })} /> : null}
@@ -150,23 +153,21 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { st
       ) : null}
 
       {human ? (
-        <Section help={firstStage ? "The first step uses this form to collect the workflow’s initial details." : "Attach a Form the doer fills in when completing this step. Its answers can also drive the routing below."} title="Linked form">
-          <LinkedForm data={data} firstStage={firstStage} stage={stage} update={update} />
-          {stage.formTemplateId ? <OptionPicker label="User question that assigns later steps" onChange={(values) => updateSla({ assignmentFieldKey: values[0] || undefined })} options={[{ value: "", label: "None" }, ...assignmentFields.map((field) => ({ value: field.key, label: field.label })), ...(stage.sla.assignmentFieldKey && !assignmentFields.some((field) => field.key === stage.sla.assignmentFieldKey) ? [{ value: stage.sla.assignmentFieldKey, label: `${stage.sla.assignmentFieldKey} (unavailable)` }] : [])]} selected={[stage.sla.assignmentFieldKey ?? ""]} /> : null}
-          <Text tone="muted" variant="caption">The selected person becomes the default for following steps. A step's named assignee takes priority.</Text>
+        <Section help={firstStage ? "The first step uses this form to collect the workflow’s initial details." : "Attach a Form the doer fills in when completing this step. Its answers can also drive the routing below."} title="Linked form" {...mark(formIssue)}>
+          <LinkedForm data={data} firstStage={firstStage} invalid={formIssue} stage={stage} update={update} />
         </Section>
       ) : null}
 
-      {canChooseNext ? <StageRouting changeRule={changeBranchRule} decision={decision} fields={formFields} moveRule={moveBranchRule} others={others} stage={stage} update={update} /> : null}
+      {canChooseNext ? <StageRouting changeRule={changeBranchRule} decision={decision} fields={formFields} highlight={!formIssue && !deadlineIssue && /route|reference|completion_path|cycle|unreachable/.test(issueCode ?? "")} issueCode={issueCode} issueMessage={issueMessage} moveRule={moveBranchRule} onIssueLayout={onIssueLayout} others={others} stage={stage} update={update} /> : null}
 
-      <Section help="Choose how this step’s deadline is calculated." title="When">
+      <Section help="Choose how this step’s deadline is calculated." title="When" {...mark(deadlineIssue)}>
         {timingOptions.map((option) => <Choice help={option.help} key={option.value} onPress={() => updateSla({ timingMethod: option.value })} selected={timingMethod(stage.sla) === option.value} title={option.label} />)}
         <ToggleField disabled={false} label={`Set Deadline: ${stage.sla.deadlineEnabled !== false ? "ON" : "OFF"}`} onChange={(value) => updateSla({ deadlineEnabled: value })} required={false} value={stage.sla.deadlineEnabled !== false} />
-        <TimingFields earlierStages={earlierStages} sla={stage.sla} updateSla={updateSla} />
+        <TimingFields earlierStages={earlierStages} invalid={deadlineIssue} sla={stage.sla} updateSla={updateSla} />
       </Section>
 
       {human ? (
-        <Section title="Instructions and controls">
+        <Section title="Instructions and controls" {...mark(["invalid_checklist", "incompatible_completion_rule"].includes(issueCode ?? ""))}>
           <TextField label={`How / instructions${stage.method ? "" : " (optional)"}`} multiline onChangeText={(method) => update({ method })} placeholder="e.g. Get WhatsApp PO confirmation" value={stage.method ?? ""} />
           <Text tone="muted" variant="label">Completion controls</Text>
           {optionCheckboxes.map(({ key, label }) => <ToggleField disabled={false} key={key} label={label} onChange={(value) => update({ [key]: value })} required={false} value={stage[key]} />)}
@@ -175,7 +176,7 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { st
       ) : null}
 
       {!firstStage && human ? (
-        <Section title="Conditional step">
+        <Section title="Conditional step" {...mark(issueCode === "invalid_conditional")}>
           <ToggleField
             disabled={!earlierDecisions.length}
             helperText={earlierDecisions.length ? "Run this step only for a selected outcome from an earlier Decision Step." : "Add an earlier Decision Step to define this condition."}
@@ -192,14 +193,14 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { st
         </Section>
       ) : null}
 
-      {stage.type === "branch" ? <BranchEditor changeRule={changeBranchRule} moveRule={moveBranchRule} others={others} stage={stage} update={update} /> : null}
+      {stage.type === "branch" ? <BranchEditor changeRule={changeBranchRule} highlight={["invalid_branch", "unsupported_cycle", "missing_completion_path"].includes(issueCode ?? "")} issueMessage={issueCode === "unsupported_cycle" ? issueMessage : undefined} moveRule={moveBranchRule} onIssueLayout={onIssueLayout} others={others} stage={stage} update={update} /> : null}
       {stage.type === "parallel_start" ? (
-        <Section title="Parallel paths">
+        <Section title="Parallel paths" {...mark(["invalid_parallel", "unsupported_cycle", "missing_completion_path"].includes(issueCode ?? ""))}>
           {others.map((item) => <ToggleField disabled={false} key={item.key} label={item.name} onChange={(checked) => update({ parallelTargetStageKeys: checked ? [...stage.parallelTargetStageKeys, item.key] : stage.parallelTargetStageKeys.filter((key) => key !== item.key) })} required={false} value={stage.parallelTargetStageKeys.includes(item.key)} />)}
         </Section>
       ) : null}
       {stage.type === "parallel_join" ? (
-        <Section title="Join">
+        <Section title="Join" {...mark(issueCode === "invalid_join")}>
           <OptionPicker label="Join when" onChange={(values) => update({ joinRule: (values[0] ?? "all") as "all" | "any" | "specific" })} options={[{ value: "all", label: "All paths complete" }, { value: "any", label: "Any path completes" }, { value: "specific", label: "Specific paths complete" }]} selected={[stage.joinRule ?? "all"]} />
           {stage.joinRule === "specific" ? others.map((item) => <ToggleField disabled={false} key={item.key} label={item.name} onChange={(checked) => update({ joinRequiredStageKeys: checked ? [...stage.joinRequiredStageKeys, item.key] : stage.joinRequiredStageKeys.filter((key) => key !== item.key) })} required={false} value={stage.joinRequiredStageKeys.includes(item.key)} />) : null}
         </Section>
@@ -218,21 +219,24 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { st
  * historical single successor; adding rules turns it into an ordered switch
  * whose fallback stays `defaultNextStageKey`, so published flows are unaffected.
  */
-function StageRouting({ stage, others, fields, decision, update, changeRule, moveRule }: { stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; fields: readonly FmsFormFieldRef[]; decision: boolean; update: (patch: Partial<FmsStageDefinition>) => void; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void }) {
+function StageRouting({ stage, others, fields, decision, update, changeRule, moveRule, highlight, issueCode, issueMessage, onIssueLayout }: { stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; fields: readonly FmsFormFieldRef[]; decision: boolean; update: (patch: Partial<FmsStageDefinition>) => void; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void; highlight: boolean; issueCode?: string | undefined; issueMessage?: string | undefined; onIssueLayout?: ((event: LayoutChangeEvent) => void) | undefined }) {
   const styles = useStyles();
   const routed = hasFmsStageRouting(stage);
+  const cycle = issueCode === "unsupported_cycle";
+  const cycleRouteNumber = cycle ? /^Route (\d+) destination/.exec(issueMessage ?? "")?.[1] : undefined;
+  const cycleDefault = cycle && !cycleRouteNumber && !issueMessage?.startsWith("Parallel");
   const addRoute = () => {
     const source = stage.formTemplateId && fields.length ? "form_answer" as const : decision ? "outcome" as const : "context" as const;
     const route: FmsBranchRule = { id: newRequestKey(), source, operator: "equals", ...(source === "form_answer" ? { sourceKey: fields[0]?.key } : {}), value: source === "outcome" ? stage.sla.decisionOptions?.[0]?.key ?? "" : "", order: stage.branchRules.length, nextStageKey: undefined };
     update({ branchRules: [...stage.branchRules, route].map((rule, order) => ({ ...rule, order })) });
   };
   return (
-    <Section help={routed ? "Routes are checked top to bottom. The first match wins; anything else takes the fallback." : "This step continues to one next step. Add a condition to send different answers down different paths."} title="On completion">
+    <Section help={routed ? "Routes are checked top to bottom. The first match wins; anything else takes the fallback." : "This step continues to one next step. Add a condition to send different answers down different paths."} highlight={highlight} onLayout={highlight ? onIssueLayout : undefined} title="On completion">
       <Button label="Add route" onPress={addRoute} variant="secondary" />
       {stage.branchRules.map((rule, index) => (
-        <RouteRow changeRule={changeRule} decision={decision} fields={fields} index={index} key={rule.id} moveRule={moveRule} others={others} remove={() => update({ branchRules: stage.branchRules.filter((_, ruleIndex) => ruleIndex !== index).map((item, order) => ({ ...item, order })) })} rule={rule} stage={stage} />
+        <RouteRow changeRule={changeRule} decision={decision} fields={fields} highlightDestination={cycleRouteNumber === String(index + 1)} index={index} key={rule.id} moveRule={moveRule} others={others} remove={() => update({ branchRules: stage.branchRules.filter((_, ruleIndex) => ruleIndex !== index).map((item, order) => ({ ...item, order })) })} rule={rule} stage={stage} />
       ))}
-      <StageSelect label={routed ? "Otherwise (fallback) go to" : "Continue to"} onChange={(value) => update({ defaultNextStageKey: value })} others={others} value={stage.defaultNextStageKey} />
+      <StageSelect invalid={cycleDefault} label={routed ? "Otherwise (fallback) go to" : "Continue to"} onChange={(value) => update({ defaultNextStageKey: value })} others={others} value={stage.defaultNextStageKey} />
       {routed && !hasFmsStageFallback(stage) ? <View style={styles.warn}><Text tone="danger" variant="caption">Choose an Otherwise destination. An answer that matches no route must still have somewhere to go.</Text></View> : null}
       {routed && !stage.formTemplateId && stage.branchRules.some((rule) => rule.source === "form_answer") ? <View style={styles.warn}><Text tone="danger" variant="caption">Link a Form above so these answers exist at run time.</Text></View> : null}
       {stage.formTemplateId && !fields.length ? <View style={styles.note}><Text tone="warm" variant="caption">No branchable fields available in this form.</Text></View> : null}
@@ -240,7 +244,7 @@ function StageRouting({ stage, others, fields, decision, update, changeRule, mov
   );
 }
 
-function RouteRow({ rule, index, stage, others, fields, decision, changeRule, moveRule, remove }: { rule: FmsBranchRule; index: number; stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; fields: readonly FmsFormFieldRef[]; decision: boolean; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void; remove: () => void }) {
+function RouteRow({ rule, index, stage, others, fields, decision, changeRule, moveRule, remove, highlightDestination }: { rule: FmsBranchRule; index: number; stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; fields: readonly FmsFormFieldRef[]; decision: boolean; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void; remove: () => void; highlightDestination: boolean }) {
   const styles = useStyles();
   const theme = useAppTheme();
   const field = rule.source === "form_answer" ? fields.find((item) => item.key === rule.sourceKey) : undefined;
@@ -295,12 +299,12 @@ function RouteRow({ rule, index, stage, others, fields, decision, changeRule, mo
         ) : (
           <TextField label="Answer" onChangeText={(value) => changeRule(index, { value: rule.operator === "in" ? value.split(",").map((item) => item.trim()).filter(Boolean) : value })} placeholder={rule.operator === "in" ? "value_a, value_b" : "Expected value"} value={selected.join(", ")} />
         )}
-      <StageSelect label="Then go to" onChange={(value) => changeRule(index, { nextStageKey: value, nextFlowId: undefined })} others={others} value={rule.nextStageKey} />
+      <StageSelect invalid={highlightDestination} label="Then go to" onChange={(value) => changeRule(index, { nextStageKey: value, nextFlowId: undefined })} others={others} value={rule.nextStageKey} />
     </View>
   );
 }
 
-function TimingFields({ sla, earlierStages, updateSla }: { sla: FmsSlaRule; earlierStages: readonly FmsStageDefinition[]; updateSla: (patch: Partial<FmsSlaRule>) => void }) {
+function TimingFields({ sla, earlierStages, updateSla, invalid }: { sla: FmsSlaRule; earlierStages: readonly FmsStageDefinition[]; updateSla: (patch: Partial<FmsSlaRule>) => void; invalid: boolean }) {
   const styles = useStyles();
   if (sla.deadlineEnabled === false) return <View style={styles.note}><Text tone="muted" variant="caption">No deadline will be created for this step.</Text></View>;
   const method = timingMethod(sla);
@@ -319,7 +323,7 @@ function TimingFields({ sla, earlierStages, updateSla }: { sla: FmsSlaRule; earl
     return (
       <>
         <Text tone="muted" variant="label">Future date</Text>
-        <DateField disabled={false} invalid={false} label="Future date" mode="date" onChange={(futureDate) => updateSla({ futureDate })} value={sla.futureDate ?? ""} />
+        <DateField disabled={false} invalid={invalid} label="Future date" mode="date" onChange={(futureDate) => updateSla({ futureDate })} value={sla.futureDate ?? ""} />
         <TextField keyboardType="number-pad" label="Days before" onChangeText={(text) => updateSla({ daysBefore: text ? Number(text) : undefined })} value={sla.daysBefore === undefined ? "" : String(sla.daysBefore)} />
       </>
     );
@@ -328,7 +332,7 @@ function TimingFields({ sla, earlierStages, updateSla }: { sla: FmsSlaRule; earl
     return (
       <>
         <Text tone="muted" variant="label">Date</Text>
-        <DateField disabled={false} invalid={false} label="Date" mode="date" onChange={(dueDate) => updateSla({ dueDate })} value={sla.dueDate ?? ""} />
+        <DateField disabled={false} invalid={invalid} label="Date" mode="date" onChange={(dueDate) => updateSla({ dueDate })} value={sla.dueDate ?? ""} />
         <Text tone="muted" variant="label">Clock time</Text>
         <DateField disabled={false} invalid={false} label="Clock time" mode="time" onChange={(clockTime) => updateSla({ clockTime })} value={sla.clockTime ?? ""} />
       </>
@@ -337,12 +341,12 @@ function TimingFields({ sla, earlierStages, updateSla }: { sla: FmsSlaRule; earl
   return (
     <>
       <Text tone="muted" variant="label">Completion due date</Text>
-      <DateField disabled={false} invalid={false} label="Completion due date" mode="date" onChange={(dueDate) => updateSla({ dueDate })} value={sla.dueDate ?? ""} />
+      <DateField disabled={false} invalid={invalid} label="Completion due date" mode="date" onChange={(dueDate) => updateSla({ dueDate })} value={sla.dueDate ?? ""} />
     </>
   );
 }
 
-function LinkedForm({ data, firstStage, stage, update }: { data: FmsData; firstStage: boolean; stage: FmsStageDefinition; update: (patch: Partial<FmsStageDefinition>) => void }) {
+function LinkedForm({ data, firstStage, stage, update, invalid }: { data: FmsData; firstStage: boolean; stage: FmsStageDefinition; update: (patch: Partial<FmsStageDefinition>) => void; invalid: boolean }) {
   const styles = useStyles();
   const pinned = data.forms.find((form) => form.id === stage.formTemplateId);
   const missing = !!stage.formTemplateId && !pinned;
@@ -354,7 +358,7 @@ function LinkedForm({ data, firstStage, stage, update }: { data: FmsData; firstS
   ];
   return (
     <>
-      <OptionPicker label={firstStage ? "Initial details form" : "Linked form"} onChange={(values) => update({ formTemplateId: values[0] || undefined })} options={options} selected={[stage.formTemplateId ?? ""]} />
+      <OptionPicker invalid={invalid} label={firstStage ? "Initial details form" : "Linked form"} onChange={(values) => update({ formTemplateId: values[0] || undefined })} options={options} selected={[stage.formTemplateId ?? ""]} />
       {missing ? <View style={styles.warn}><Text tone="danger" variant="caption">This Form is no longer an available published version. Choose another before publishing.</Text></View> : null}
       {newer ? (
         <View style={styles.note}>
@@ -366,11 +370,11 @@ function LinkedForm({ data, firstStage, stage, update }: { data: FmsData; firstS
   );
 }
 
-function BranchEditor({ stage, others, update, changeRule, moveRule }: { stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; update: (patch: Partial<FmsStageDefinition>) => void; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void }) {
+function BranchEditor({ stage, others, update, changeRule, moveRule, highlight, issueMessage, onIssueLayout }: { stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; update: (patch: Partial<FmsStageDefinition>) => void; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void; highlight: boolean; issueMessage?: string | undefined; onIssueLayout?: ((event: LayoutChangeEvent) => void) | undefined }) {
   const styles = useStyles();
   const theme = useAppTheme();
   return (
-    <Section help="Advanced routes run top to bottom. Keep one fallback route last." title="Ordered decision routes">
+    <Section help="Advanced routes run top to bottom. Keep one fallback route last." highlight={highlight} onLayout={highlight ? onIssueLayout : undefined} title="Ordered decision routes">
       {stage.branchRules.map((rule, index) => (
         <View key={rule.id} style={styles.card}>
           <View style={styles.row}>
@@ -383,7 +387,7 @@ function BranchEditor({ stage, others, update, changeRule, moveRule }: { stage: 
           <TextField autoCapitalize="none" editable={rule.source !== "outcome"} label="Stable field key" onChangeText={(sourceKey) => changeRule(index, { sourceKey })} value={rule.sourceKey ?? ""} />
           <OptionPicker label="Operator" onChange={(values) => changeRule(index, { operator: (values[0] ?? rule.operator) as FmsBranchRule["operator"] })} options={FMS_BRANCH_OPERATORS.map((operator) => ({ value: operator, label: operator === "default" ? "Fallback" : operator.replaceAll("_", " ") }))} selected={[rule.operator]} />
           <TextField editable={!["default", "not_empty"].includes(rule.operator)} label="Expected value" onChangeText={(value) => changeRule(index, { value })} value={String(rule.value ?? "")} />
-          <StageSelect label="Then go to" onChange={(value) => changeRule(index, { nextStageKey: value, nextFlowId: undefined })} others={others} value={rule.nextStageKey} />
+          <StageSelect invalid={issueMessage?.startsWith(`Route ${index + 1} destination`) ?? false} label="Then go to" onChange={(value) => changeRule(index, { nextStageKey: value, nextFlowId: undefined })} others={others} value={rule.nextStageKey} />
         </View>
       ))}
       <Button
