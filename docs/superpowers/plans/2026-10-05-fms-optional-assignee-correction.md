@@ -1,0 +1,6 @@
+# FMS optional assignees and issue navigation correction
+
+1. Keep the existing Default assignees dialog as the sole FMS authoring control for named users. Remove the per-stage User-question selector from web and native editors. Preserve stored assignment question keys on existing flow versions and their runtime behavior.
+2. Let every active user authorized to submit a published initial Form start its workflow. Use that submitter as the fallback for unnamed later human stages. Explicit stage assignees and existing configured form-selected defaults keep their precedence. A required, always visible User field named `Assigned to` is detected automatically; unrelated User fields are ignored. Change the shared validation and a forward database migration together.
+3. Make each publish-readiness issue select and center its stage, open the inspector, scroll to the relevant question, and highlight and focus its control. Keep equivalent issue navigation and visual emphasis on native phone screens.
+4. Test the unassigned publish and runtime paths, named override, invalid selected user, and linked Form rollback in pgTAP. Test the web editor, issue navigation, core validator, and native typecheck. Validate local database, web/native builds, and phone width before production release.

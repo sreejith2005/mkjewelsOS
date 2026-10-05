@@ -208,25 +208,6 @@ export function validateFmsDefinition(raw: FmsFlowDefinition, context: FmsValida
     if (stage.type === "parallel_join" && (!stage.joinRule || stage.joinRule === "specific" && !stage.joinRequiredStageKeys.length)) add("invalid_join", "Parallel join configuration is incomplete");
     if (stage.type === "end" && fmsOutgoingStageKeys(stage).length) add("invalid_end", "End stages cannot have outgoing paths");
   }
-  const first = definition.stages[0];
-  if (first) {
-    const visited = new Set<string>();
-    const queue: Array<{ key: string; hasFormUser: boolean }> = [{ key: first.key, hasFormUser: false }];
-    while (queue.length) {
-      const item = queue.shift()!;
-      const token = `${item.key}:${item.hasFormUser}`;
-      if (visited.has(token)) continue;
-      visited.add(token);
-      const stage = byKey.get(item.key);
-      if (!stage) continue;
-      const hasRule = stage.assigneeRules.length > 0;
-      if (stage.key !== first.key && !AUTO.has(stage.type) && !hasRule && !item.hasFormUser && !issues.some((issue) => issue.code === "missing_assignment_source" && issue.stageKey === stage.key)) {
-        issues.push({ code: "missing_assignment_source", message: "This step needs an assignee or a required User question in an earlier Form", stageKey: stage.key });
-      }
-      const hasFormUser = item.hasFormUser || !!stage.sla.assignmentFieldKey;
-      for (const next of fmsOutgoingStageKeys(stage)) queue.push({ key: next, hasFormUser });
-    }
-  }
   const reached = reachableFmsStageKeys(definition); for (const stage of definition.stages) if (!reached.has(stage.key)) issues.push({ code: "unreachable_stage", message: `Stage ${stage.key} is unreachable`, stageKey: stage.key });
   if (![...reached].some((key) => { const stage = byKey.get(key); return stage ? fmsOutgoingStageKeys(stage).length === 0 : false; })) issues.push({ code: "missing_completion_path", message: "At least one reachable path must finish at a step with no outgoing connection" });
   if (hasUnsupportedCycle(definition)) issues.push({ code: "unsupported_cycle", message: "Flow contains an unsupported cycle" });

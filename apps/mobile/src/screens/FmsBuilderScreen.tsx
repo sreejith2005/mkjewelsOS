@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, View, type LayoutChangeEvent } from "react-native";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import { CheckCircle2, ChevronDown, ChevronUp, FileText, Plus, Redo2, Save, Send, Undo2, UserRoundPlus } from "lucide-react-native";
 import { copyFirstFmsAssigneeToHumanStages, normalizeFmsDefinition, validateFmsDefinition, type FmsFlowDefinition, type FmsStageDefinition } from "@jewelos/core";
@@ -75,6 +75,10 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
   /** Steps is a tap-only list and the default; Map is the draggable canvas. */
   const [view, setView] = useState<"steps" | "map">("steps");
   const [issuesOpen, setIssuesOpen] = useState(false);
+  const [focusedIssueCode, setFocusedIssueCode] = useState<string | undefined>();
+  const selectStage = (key: string | null) => { setFocusedIssueCode(undefined); setSelectedKey(key); };
+  const editorScrollRef = useRef<ScrollView>(null);
+  const scrollToIssue = (event: LayoutChangeEvent) => editorScrollRef.current?.scrollTo({ y: Math.max(0, event.nativeEvent.layout.y - 20), animated: true });
 
   const normalized = useMemo(() => normalizeFmsDefinition(definition), [definition]);
   const issues = useMemo(() => validateFmsDefinition(normalized, { formFields: data.formFields, availableFormIds: data.forms.map((form) => form.id) }), [data.formFields, data.forms, normalized]);
@@ -225,7 +229,7 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
       {issuesOpen && issues.length ? (
         <ScrollView contentContainerStyle={styles.issues} style={styles.issueScroll}>
           {issues.map((issue, index) => (
-            <Pressable accessibilityRole="button" key={`${issue.code}-${issue.stageKey ?? index}`} onPress={() => { if (issue.stageKey) { setSelectedKey(issue.stageKey); setIssuesOpen(false); } else if (issue.code === "invalid_name" || issue.code === "invalid_scope") setScreen("details"); else setView("map"); }} style={({ pressed }) => [styles.issue, pressed && styles.pressed]}>
+            <Pressable accessibilityRole="button" key={`${issue.code}-${issue.stageKey ?? index}`} onPress={() => { if (issue.stageKey) { setSelectedKey(issue.stageKey); setFocusedIssueCode(issue.code); setIssuesOpen(false); } else if (issue.code === "invalid_name" || issue.code === "invalid_scope") setScreen("details"); else setView("map"); }} style={({ pressed }) => [styles.issue, pressed && styles.pressed]}>
               <Text tone="danger" variant="caption">{issueLabel(issue)}</Text>
             </Pressable>
           ))}
@@ -269,7 +273,7 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
       {view === "steps" ? (
         <ScrollView contentContainerStyle={styles.details} keyboardShouldPersistTaps="handled" style={styles.flex}>
           <View style={styles.blockRow}>
-            <Pressable accessibilityRole="button" onPress={() => normalized.stages[0] && setSelectedKey(normalized.stages[0].key)} style={({ pressed }) => [styles.block, styles.half, pressed && styles.pressed]}>
+            <Pressable accessibilityRole="button" onPress={() => normalized.stages[0] && selectStage(normalized.stages[0].key)} style={({ pressed }) => [styles.block, styles.half, pressed && styles.pressed]}>
               <FileText color={theme.colors.textWarm} size={16} />
               <View style={styles.flex}>
                 <Text numberOfLines={1} variant="small" weight="semibold">{normalized.stages[0]?.formTemplateId ? data.forms.find((form) => form.id === normalized.stages[0]?.formTemplateId)?.name ?? "Form attached" : "None attached"}</Text>
@@ -292,7 +296,7 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
             onAddAfter={(key) => add("task", key)}
             onDelete={(key) => void remove(key)}
             onDuplicate={duplicateStage}
-            onSelect={setSelectedKey}
+            onSelect={selectStage}
             selectedKey={selected?.key ?? null}
           />
         </ScrollView>
@@ -309,7 +313,7 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
             onDuplicate={duplicateStage}
             onMove={moveStages}
             onReconnect={reconnect}
-            onSelect={setSelectedKey}
+            onSelect={selectStage}
             selectedKey={selected?.key ?? null}
           />
           <View style={styles.mapAdd}>
@@ -320,9 +324,9 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
 
       {selected ? (
         <Sheet scrollable={false} onClose={() => setSelectedKey(null)} tall title={`${selected.type.replaceAll("_", " ")} · ${selected.name}`} visible>
-          <ScrollView keyboardShouldPersistTaps="handled">
+          <ScrollView keyboardShouldPersistTaps="handled" ref={editorScrollRef}>
             {issues.filter((issue) => issue.stageKey === selected.key).map((issue, index) => <Banner key={`${issue.code}-${index}`} tone="danger">{issue.message}</Banner>)}
-            <FmsStageEditor data={data} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); }} onDelete={() => void remove(selected.key)} stage={selected} stages={normalized.stages} />
+            <FmsStageEditor data={data} issueCode={focusedIssueCode} onIssueLayout={scrollToIssue} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); }} onDelete={() => void remove(selected.key)} stage={selected} stages={normalized.stages} />
           </ScrollView>
         </Sheet>
       ) : null}

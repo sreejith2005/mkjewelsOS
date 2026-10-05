@@ -164,6 +164,22 @@ describe("FMS builder graph wiring", () => {
     expect(latestFocusRequest?.key).toBe(start);
     expect(screen.getByRole("button", { name: "Close inspector" })).toBeTruthy();
     expect(screen.getByText("The initial Form requires an exact published template version")).toBeTruthy();
+    expect(document.activeElement).toBe(screen.getByLabelText("Initial details form"));
+    expect(screen.getByLabelText("Initial details form").className).toContain("ring-danger");
+  });
+  it("focuses and highlights the due-date question for a date issue", async () => {
+    const { user } = await openBuilder();
+    await user.click(screen.getAllByRole("button", { name: /Step: Choose a valid completion due date/ })[0]!);
+    const dueDate = screen.getByLabelText("Completion due date");
+    expect(document.activeElement).toBe(dueDate);
+    expect(dueDate.className).toContain("ring-danger");
+  });
+  it("focuses the exact route field for a route issue", async () => {
+    const { user } = await openBuilder();
+    await user.click(screen.getByRole("button", { name: "connect b" }));
+    await user.click(screen.getAllByRole("button", { name: /Route 1.*needs the question or process field/ })[0]!);
+    expect(document.activeElement).toBe(screen.getByLabelText("Route 1 field key"));
+    expect(screen.getByLabelText("Route 1 field key").className).toContain("ring-danger");
   });
 
   it("copies the first assignee to every step and permits a later override", async () => {

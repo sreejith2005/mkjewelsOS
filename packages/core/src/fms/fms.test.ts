@@ -17,9 +17,9 @@ describe("FMS definitions", () => {
     const stages = good().stages.map((item) => item.key === "start_form" ? { ...item, sla: { ...item.sla, assignmentFieldKey: "assigned_to" }, assigneeRules: [] } : { ...item, assigneeRules: [] });
     expect(validateFmsDefinition(flow(stages), { formFields: { [formId]: [{ key: "assigned_to", label: "Assigned to", type: "user_dropdown", required: true, shown: true }] } })).toEqual([]);
   });
-  it("identifies an unnamed step without an earlier User answer", () => {
+  it("allows an unnamed step because the starting form submitter remains the default", () => {
     const stages = good().stages.map((item) => ({ ...item, assigneeRules: [] }));
-    expect(validateFmsDefinition(flow(stages)).some((issue) => issue.code === "missing_assignment_source" && issue.stageKey === "done")).toBe(true);
+    expect(validateFmsDefinition(flow(stages))).toEqual([]);
   });
   it("rejects a conditional User question as an assignment source", () => {
     const stages = good().stages.map((item) => item.key === "start_form" ? { ...item, sla: { ...item.sla, assignmentFieldKey: "assigned_to" } } : item);

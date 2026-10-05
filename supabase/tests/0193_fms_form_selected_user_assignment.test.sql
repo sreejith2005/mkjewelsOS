@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions;
-select plan(22);
+select plan(25);
 
 select function_owner_is('public','resolve_fms_stage_assignees',array['uuid','uuid','uuid'],'postgres','assignment resolver is server owned');
 select ok(not has_function_privilege('anon','resolve_fms_stage_assignees(uuid,uuid,uuid)','EXECUTE'),'anonymous callers cannot resolve assignment');
@@ -110,8 +110,36 @@ update fms_stages set step_type='task' where id=(select id from fms_assignment_f
 select lives_ok($$select assert_fms_flow_publishable((select id from fms_assignment_fixture where name='flow'))$$,
   'a task step may use its linked Form User question for later assignment');
 update fms_stages set planned_time_rule='{"deadlineEnabled":false}'::jsonb where id=(select id from fms_assignment_fixture where name='first');
-select throws_ok($$select assert_fms_flow_publishable((select id from fms_assignment_fixture where name='flow'))$$,'23514','FMS step Next step needs an assignee or a required User question in an earlier Form','missing assignment source identifies the blocked step');
+select lives_ok($$select assert_fms_flow_publishable((select id from fms_assignment_fixture where name='flow'))$$,'unnamed steps publish because the starting form submitter remains the default');
 select ok((select count(*) from fms_stage_assignees where fms_stage_id=(select id from fms_assignment_fixture where name='next'))=0,'validation does not synthesize a named stage assignee');
+update fms_instances set context=context-'_fms_assignment_user_id' where id=(select id from fms_assignment_fixture where name='instance');
+select is((resolve_fms_stage_assignees((select id from fms_assignment_fixture where name='next'),(select id from fms_assignment_fixture where name='instance'),null))[1],(select id from fms_assignment_fixture where name='starter'),'an unassigned later step stays with the starting form submitter');
+update form_submissions set data=jsonb_build_object('assigned_to',(select id from fms_assignment_fixture where name='selected'))
+where id=(select (context->>'form_submission_id')::uuid from fms_instances where id=(select id from fms_assignment_fixture where name='instance'));
+select is(fms_assignment_user_from_submission((select id from fms_assignment_fixture where name='first'),
+  (select (context->>'form_submission_id')::uuid from fms_instances where id=(select id from fms_assignment_fixture where name='instance'))),
+  (select id from fms_assignment_fixture where name='selected'),'the linked Form User answer works without a second FMS selector');
+do $$
+declare v_form uuid; v_submission uuid; v_starter user_profiles;
+begin
+  select * into v_starter from user_profiles where id=(select id from fms_assignment_fixture where name='starter');
+  insert into form_templates(tenant_id,name,version,lifecycle,is_active,created_by,updated_by)
+    values(v_starter.tenant_id,'Reviewer only',1,'draft',true,v_starter.id,v_starter.id) returning id into v_form;
+  insert into form_fields(form_template_id,field_key,field_name,field_type,sort_order,is_required,is_shown)
+    values(v_form,'reviewer','Reviewer','user_dropdown',0,true,true);
+  update form_templates set lifecycle='published' where id=v_form;
+  insert into form_submissions(tenant_id,branch_id,department_id,form_template_id,data,submitted_by,status)
+    values(v_starter.tenant_id,v_starter.branch_id,v_starter.department_id,v_form,
+      jsonb_build_object('reviewer',(select id from fms_assignment_fixture where name='selected')),v_starter.id,'submitted') returning id into v_submission;
+  insert into fms_assignment_fixture(name,id) values('reviewer_form',v_form),('reviewer_submission',v_submission);
+end $$;
+update fms_stages set form_template_id=(select id from fms_assignment_fixture where name='reviewer_form')
+where id=(select id from fms_assignment_fixture where name='first');
+select is(fms_assignment_user_from_submission((select id from fms_assignment_fixture where name='first'),
+  (select id from fms_assignment_fixture where name='reviewer_submission')),
+  null::uuid,'an unrelated User question does not silently assign workflow work');
+update fms_stages set form_template_id=(select id from fms_assignment_fixture where name='form')
+where id=(select id from fms_assignment_fixture where name='first');
 
 update fms_stages set planned_time_rule='{"deadlineEnabled":false,"assignmentFieldKey":"assigned_to"}'::jsonb
 where id=(select id from fms_assignment_fixture where name='first');
