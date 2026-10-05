@@ -157,8 +157,8 @@ target architecture is different. The design is
 - **Approved extensions** to the parity rule: client `MKC-`, family `MKF-` and referral
   `MKREF-` identifiers and search; optional client phone; walk-in → JewelOS task; channel
   and FMS contributions to the client record. Everything else stays at parity.
-- **Sync and live data** (2026-10-05): roster sync JewelOS -> CRM (`0194`, `crm-staff-sync`,
-  CRM `sync-receive`), walk-in -> JewelOS task (CRM `sync-deliver`, `0195`, `crm-sync-receive`),
+- **Sync and live data** (2026-10-05): roster sync JewelOS -> CRM (`0195`, `crm-staff-sync`,
+  CRM `sync-receive`), walk-in -> JewelOS task (CRM `sync-deliver`, `0196`, `crm-sync-receive`),
   the Apps Script walk-in feed (CRM `crm-walkin-ingest`). The ordered owner steps are in
   `docs/CRM_TWO_PROJECT_PRODUCTION_RUNBOOK.md`; `feat/crm-native` is merged into `main` only at
   its step f.

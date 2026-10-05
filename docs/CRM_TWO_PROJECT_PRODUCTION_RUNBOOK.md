@@ -142,11 +142,11 @@ The JewelOS migrations are applied from the worktree, which has them.
 Set-Location C:\crm
 supabase.cmd link --project-ref <jewelos-ref>
 supabase.cmd migration list --linked
-supabase.cmd db push --linked --dry-run         # expected: 0193 (if pending), 0194_crm_staff_sync_outbox, 0195_crm_walkin_tasks
+supabase.cmd db push --linked --dry-run         # expected: 0195_crm_staff_sync_outbox, 0196_crm_walkin_tasks
 supabase.cmd db push --linked
 ```
 
-0194 queues one event per existing JewelOS profile. Nothing is sent until c4. Both migrations
+0195 queues one event per existing JewelOS profile. Nothing is sent until c4. Both migrations
 are additive: the current production web keeps working unchanged.
 
 ## c. Functions, secrets and schedules

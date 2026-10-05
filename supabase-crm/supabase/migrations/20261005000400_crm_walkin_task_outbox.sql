@@ -7,7 +7,7 @@
 -- entry (status 'complete') closes it. Completion therefore comes from durable CRM state,
 -- whichever screen the form was submitted on.
 --
--- Outbox, as in JewelOS 0194: a trigger enqueues one event per queue entry in the same
+-- Outbox, as in JewelOS 0195: a trigger enqueues one event per queue entry in the same
 -- transaction as the change (one open event per entry; later changes coalesce); the delivery
 -- worker (Edge Function sync-deliver, service_role) receives a snapshot computed at claim time.
 -- The snapshot carries the queue id, the client's MKC and display name, the JewelOS branch,

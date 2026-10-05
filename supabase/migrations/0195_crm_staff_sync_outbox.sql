@@ -35,7 +35,7 @@ create table crm_sync.outbox (
   last_error text check (char_length(last_error) <= 200)
 );
 comment on table crm_sync.outbox is
-  'CRM roster sync outbox (0194). One open event per person; delivered as a snapshot computed at claim time.';
+  'CRM roster sync outbox (0195). One open event per person; delivered as a snapshot computed at claim time.';
 
 create unique index crm_sync_outbox_one_open on crm_sync.outbox (event_type, aggregate_id)
   where delivered_at is null and dead_at is null;

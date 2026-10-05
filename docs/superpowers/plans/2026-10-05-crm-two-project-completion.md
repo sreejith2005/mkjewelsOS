@@ -7,13 +7,13 @@ is run by the owner.
 
 Starting point: steps 1-3 (CRM-project baseline and upgrade migrations, login bridge,
 `/crm` repointed) are committed (`2d2ea05`). `main` (FMS `0193`) is merged in, so the next
-JewelOS migration is `0194`.
+JewelOS migration was `0194`; main then took `0194` (FMS), so the CRM ones are `0195` and `0196`.
 
 ## 1. Roster sync (JewelOS -> CRM)
 
 JewelOS Users is the only source of truth for who can use the CRM.
 
-### JewelOS project (`supabase/migrations/0194_crm_staff_sync_outbox.sql`)
+### JewelOS project (`supabase/migrations/0195_crm_staff_sync_outbox.sql`)
 
 - Private schema `crm_sync`, no API grants.
 - `crm_sync.outbox(id, event_type, aggregate_id, created_at, changed_at, claimed_at,

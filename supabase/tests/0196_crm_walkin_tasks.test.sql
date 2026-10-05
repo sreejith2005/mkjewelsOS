@@ -1,4 +1,4 @@
--- 0195: CRM walk-in -> JewelOS task. Service-role only; registered creates one task for the
+-- 0196: CRM walk-in -> JewelOS task. Service-role only; registered creates one task for the
 -- resolved salesperson (else a manager, flagged; else none); completed closes it; idempotent
 -- and ordered; assignment alert and audit; no client phone in the task. Synthetic fixtures.
 begin;

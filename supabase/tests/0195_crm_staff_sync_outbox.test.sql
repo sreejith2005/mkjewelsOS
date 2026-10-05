@@ -1,4 +1,4 @@
--- 0194: CRM roster sync outbox (JewelOS -> CRM project).
+-- 0195: CRM roster sync outbox (JewelOS -> CRM project).
 -- Every access-relevant change enqueues one coalesced event in the same transaction; the
 -- worker receives a snapshot computed at claim time; delivery, requeue, backoff and dead
 -- events; service-role-only worker contract; admin-only health. Synthetic fixtures only.

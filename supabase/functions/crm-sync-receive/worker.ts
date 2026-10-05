@@ -1,6 +1,6 @@
 // JewelOS Edge Function: receives sync events from the CRM project.
 // Design: docs/superpowers/specs/2026-10-01-crm-two-project-client-database-design.md
-// ("Sync mechanism", "Event catalog"); database contract: migration 0195.
+// ("Sync mechanism", "Event catalog"); database contract: migration 0196.
 //
 // Server-to-server only. The caller (CRM sync-deliver) proves itself with x-crm-sync-secret
 // (CRM_SYNC_INBOUND_SECRET, the secret of the CRM -> JewelOS direction), checked in constant

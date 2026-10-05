@@ -1,6 +1,6 @@
 // JewelOS Edge Function: delivers CRM roster sync events to the CRM project.
 // Design: docs/superpowers/specs/2026-10-01-crm-two-project-client-database-design.md
-// ("Roster sync", "Sync mechanism"); database contract: migration 0194.
+// ("Roster sync", "Sync mechanism"); database contract: migration 0195.
 //
 // Called by pg_cron (x-cron-secret), never by a browser:
 //   {"mode":"deliver"}   (default) claim due staff.access_changed events, send their

@@ -259,7 +259,7 @@ Not yet proven:
 `docs/superpowers/plans/2026-10-05-crm-two-project-completion.md`. Production steps:
 `docs/CRM_TWO_PROJECT_PRODUCTION_RUNBOOK.md`.
 
-- **Roster sync (JewelOS -> CRM).** JewelOS `0194` (outbox filled by triggers on every
+- **Roster sync (JewelOS -> CRM).** JewelOS `0195` (outbox filled by triggers on every
   access-relevant change, snapshot at claim time, coalescing, backoff, audited dead events,
   admin-only `crm_sync_health()`), Edge Function `crm-staff-sync` (cron; `deliver` and daily
   `reconcile`). CRM `20261005000100` (Edge Function `sync-receive`; idempotent, ordered,
@@ -277,7 +277,7 @@ Not yet proven:
   referral conversion and queue registration treat lead clients correctly), code search in
   `search_clients`. Decision on open question 3: leads link to a `clients` row (`leads.client_id`).
 - **Walk-in -> JewelOS task.** CRM `20261005000400` (outbox on `entry_queue`, Edge Function
-  `sync-deliver`), JewelOS `0195` (Edge Function `crm-sync-receive`, `crm_sync_apply_walkin`):
+  `sync-deliver`), JewelOS `0196` (Edge Function `crm-sync-receive`, `crm_sync_apply_walkin`):
   registration creates "Complete walk-in form - {name} ({MKC})" for the salesperson (else the
   branch manager, flagged); completing the queue entry closes it. A registration completed
   before the next delivery creates no task (nothing left to do).

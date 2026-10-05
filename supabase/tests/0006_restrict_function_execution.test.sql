@@ -216,7 +216,7 @@ select is((
   'create_crm_field_definition(text,text,text,text,jsonb,boolean,jsonb)',
   'create_dropdown_list_with_audit(text,jsonb)',
   'create_manual_task_with_mode_with_audit(jsonb,uuid[],uuid[],jsonb)',
-  -- 0195: admin-only CRM sync health (counts only).
+  -- 0196: admin-only CRM sync health (counts only).
   'crm_sync_health()',
   'delete_fms_flow_with_audit(uuid,text)',
   'delete_form_draft_with_audit(uuid)',
@@ -325,7 +325,7 @@ select is((
   'consume_voice_interpretation_quota(uuid)',
   'create_recurring_todo_instance(uuid,date,uuid[])',
   'create_user_profile_with_coverage_and_audit(uuid,uuid,text,text,text,text,uuid,uuid,uuid,text,text,text[],user_role,uuid,uuid,uuid)',
-  -- 0194/0195: CRM sync workers (crm-staff-sync, crm-sync-receive).
+  -- 0195/0196: CRM sync workers (crm-staff-sync, crm-sync-receive).
   'crm_sync_apply_walkin(text,jsonb)',
   'crm_sync_claim_staff_events(integer)',
   'crm_sync_finish_staff_event(bigint,boolean,text)',
