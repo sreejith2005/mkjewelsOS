@@ -21,7 +21,7 @@ Full feature parity and production readiness are **not yet established**. This r
 
 `0197_mobile_parity_refresh_signals.sql` adds seven payload-free triggers for leave requests, starter assignments, exports, notification templates/rules and daily checklist definitions/acknowledgements. It reuses the existing tenant signal emitter. No RLS, grants, public RPC signatures, Storage policies or generated types change. Existing audited RPCs continue to authorize mutations and record their audit entries.
 
-The new migration was exercised transactionally against the local database and rolled back. Local history remains through 0194; unrelated pending 0195/0196 and hosted history were not advanced. There was no hosted migration/function/web deployment, Git publish or Android release.
+Before release, the new migration was exercised transactionally against the local database and rolled back. Local history remained through 0194. Hosted execution results are recorded below.
 
 `0198_permission_role_metadata_scope.sql` changes only the permission-administration role metadata expression to the schema-qualified JewelOS enum. A reproduced collision with another schema's `user_role` previously produced duplicates and foreign role labels. The RPC's authorization, tenant scope, signature, grants and other response fields are retained; no generated-type update is needed. It was tested inside a rolled-back local transaction, without advancing migration history.
 
@@ -65,8 +65,8 @@ Scratch screenshots/logs/scripts stay under ignored `.superpowers/sdd/2026-10-06
 - No connected Android device or configured emulator. Native cold/warm/signed-out links, WebView bridge/back navigation, keyboard, large text, TalkBack, touch canvas, files/voice and upload failure interactions are unverified.
 - The action inventory remains open. Every section needs its success/denial/direct-entry scenarios across the three surfaces; the page-width pass cannot substitute for these.
 - CRM catch-up source and failure/draft tests are now integrated on the 9edf6f0 main baseline, preserving committed client paging. The independent Sheet-sync branch is excluded. Original-screen phone/embed actions, two-project sync and hosted cutover need the maintained owner-run runbook.
-- Migrations 0197 and 0198 are not hosted. Neither the new signals nor the corrected permission metadata can be claimed live in production.
-- Integrate reviewed scoped changes on main without publishing the concurrent CRM transition branch wholesale. Then run all required release gates and the official `scripts/release-mobile.ps1`; verify public `latest.json`, APK identity and signature. No mandatory update is authorized.
+- Migrations 0197 and 0198 are now applied to jewelos-prod. Hosted history and the schema dump confirm all seven triggers and the qualified role enum. Authenticated hosted workflow acceptance remains pending.
+- Reviewed scoped changes are pushed to main; the independent CRM Sheet-sync commit is excluded. The signed APK was successfully prepared with the official `scripts/release-mobile.ps1 -NoPublish`. Employee publication remains gated on the required phone validation. No mandatory update is authorized.
 
 No section is certified production-ready by these local checks alone.
 
@@ -81,3 +81,11 @@ Recovery: these compatible migrations add payload-free signals and qualify exist
 Hosted application, Git publication, web deployment and signed APK results must be recorded after execution. Full action-level parity and phone acceptance remain open; release does not certify all remaining scenarios.
 
 Final integrated web suite: 82 files / 399 tests passed. Independent release review found no blockers. Staged whitespace and credential-pattern checks passed.
+
+
+Hosted result: source commit 844dfdea58f602ed4a0c26f3f78558f2f0e6b7f6 was pushed to origin/main. Migrations 0197 and 0198 applied successfully to jewelos-prod, with no seeds or role changes. The hosted schema confirms all seven signal triggers and the qualified enum expression. No Edge Functions or CRM-project migrations were changed by this release.
+
+Both Production Vercel projects (mkjewels-os and jewelos) report successful deployments for that exact source commit. Public https://mkjewels-os.vercel.app/login returned HTTP 200 at 320/360/390/430/1440 widths with no page errors or document overflow; the 320px screenshot was visually inspected. This public smoke does not prove authenticated production workflows.
+
+
+Android build: the official script completed all checks and the signed release build (705 Gradle tasks; 12 minutes). Candidate 1.0.15 / versionCode 16 uses com.jewelos.mobile and the MK Jewels signing certificate. Local archive: C:/Users/MIS/JewelOS-releases/mobile-v1.0.15/JewelOS.apk. SHA-256: ffa05235e46f8f7fe0c1e2e7705ef15c99be39af9a41a973523a7e1f9f7f9238; matches the locally generated manifest. The script restored app.json. No tag, GitHub release or employee manifest was published. The public latest manifest remains 1.0.14 / versionCode 15. No Android device was connected; the release guide section 4 phone check remains the publication blocker.
