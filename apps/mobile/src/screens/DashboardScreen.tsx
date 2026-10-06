@@ -1,3 +1,4 @@
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
 import { useEffect, useMemo, useState } from "react";
 import { RefreshControl, StyleSheet, View, useWindowDimensions } from "react-native";
 import { BarChart3, RefreshCw } from "lucide-react-native";
@@ -15,7 +16,6 @@ import {
   type ReportingOptions,
 } from "@jewelos/data/analytics/api";
 import type { DashboardPayload } from "@jewelos/data/analytics/types";
-import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
 import { useAuth, useProfile } from "@/auth/AuthProvider";
 import { DateField } from "@/forms/DateField";
 import { titleCase } from "@/lib/format";
@@ -98,10 +98,7 @@ export function DashboardScreen() {
     [branchId, customFrom, customTo, departmentId, range],
   );
   // The web dashboard refreshes itself on the same tenant topics.
-  useEffect(
-    () => subscribeToTenantRealtime(profile.tenant_id, ["tasks", "fms", "crm", "organization", "settings"], () => void refresh()),
-    [profile.tenant_id, refresh],
-  );
+  useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["tasks", "fms", "crm", "forms", "organization", "settings"], refresh: refresh });
   const definitions = useMemo(() => METRIC_CATALOG.filter((item) =>
     item.roles.includes(profile.user_role) && data && Object.hasOwn(data.metrics, item.key)), [data, profile.user_role]);
   const departments = options.departments.filter((item) => !branchId || item.branch_id === null || item.branch_id === branchId);

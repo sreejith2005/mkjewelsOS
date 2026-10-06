@@ -1,3 +1,4 @@
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
 import { useCallback, useMemo, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
@@ -52,6 +53,7 @@ export function FmsTasksScreen({ flowIds, heading, onBack }: FmsTasksScreenProps
 
   const canManage = MANAGER_ROLES.has(profile.user_role);
   const { data, error, loading, refreshing, reload, refresh } = useAsyncData(loadFmsRuntime, []);
+  useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["fms", "forms", "organization"], refresh: refresh });
 
   const scopedInstances = useMemo(
     () => (data?.instances ?? []).filter((instance) => !flowIds || flowIds.includes(instance.fms_flow_id)),

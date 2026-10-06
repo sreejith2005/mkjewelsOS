@@ -22,6 +22,18 @@ afterEach(() => {
 });
 
 describe("subscribeToInbox", () => {
+  it("observes durable read-state updates and catches up after reconnect", () => {
+    vi.useFakeTimers();
+    const refresh = vi.fn();
+    const stop = subscribeToInbox("read-state-profile", refresh);
+    const filter = realtimeMocks.channel.on.mock.calls[0]?.[1] as { event: string };
+    const status = realtimeMocks.channel.subscribe.mock.calls[0]?.[0] as ((status: string) => void) | undefined;
+    expect(filter.event).toBe("*");
+    status?.("SUBSCRIBED");
+    expect(refresh).toHaveBeenCalledTimes(1);
+    stop(); vi.runAllTimers();
+  });
+
   it("reuses a configured channel across a Strict Mode effect remount", () => {
     vi.useFakeTimers();
     const firstRefresh = vi.fn();

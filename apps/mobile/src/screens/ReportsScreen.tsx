@@ -10,6 +10,7 @@ import { DateField } from "@/forms/DateField";
 import { formatDateTime, titleCase } from "@/lib/format";
 import { errorText } from "@/lib/log";
 import { useAsyncData } from "@/lib/useAsyncData";
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
 import { makeStyles } from "@/theme/makeStyles";
 import { useAppTheme } from "@/theme/ThemeProvider";
 import { Button } from "@/ui/Button";
@@ -52,12 +53,13 @@ export function ReportsScreen() {
     ]);
     return { preview, history, options };
   }, [definition.key, elevated, filters]);
+  const requestRefresh = useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["tasks", "fms", "forms", "organization", "settings"], refresh });
 
   useEffect(() => {
     if (!data?.history.rows.some((row) => row.status === "queued" || row.status === "processing")) return undefined;
-    const timer = setInterval(() => { void refresh(); }, 5000);
+    const timer = setInterval(requestRefresh, 5000);
     return () => clearInterval(timer);
-  }, [data?.history.rows, refresh]);
+  }, [data?.history.rows, requestRefresh]);
 
   const changeFilter = (key: keyof ReportFilters, value: string | number | undefined) => setFilters((current) => ({ ...current, [key]: value || undefined, page: key === "page" ? Number(value) : 1 }));
   const changeReport = (key: string) => {

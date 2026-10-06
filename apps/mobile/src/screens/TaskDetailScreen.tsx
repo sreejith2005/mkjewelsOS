@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
+import { useCallback, useMemo, useState } from "react";
 import { RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -25,7 +26,6 @@ import {
   type TaskBundle,
 } from "@jewelos/data/tasks/api";
 import { addTaskComment, loadTaskComments } from "@jewelos/data/tasks/comments";
-import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
 import { useProfile } from "@/auth/AuthProvider";
 import { useAsyncData } from "@/lib/useAsyncData";
 import { formatDateTime } from "@/lib/format";
@@ -107,10 +107,7 @@ export function TaskDetailScreen() {
   const loadRemarks = useCallback(async () => (remarksTaskId ? loadTaskComments(remarksTaskId) : []), [remarksTaskId]);
   const remarks = useAsyncData(loadRemarks, [loadRemarks]);
   const refreshRemarks = remarks.refresh;
-  useEffect(() => subscribeToTenantRealtime(profile.tenant_id, ["tasks"], () => {
-    void refresh();
-    void refreshRemarks();
-  }), [profile.tenant_id, refresh, refreshRemarks]);
+  useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["tasks", "forms", "fms", "organization"], refresh: async () => { await Promise.all([refresh(), refreshRemarks()]); setAttachmentsVersion((value) => value + 1); } });
 
   const run = async (action: () => Promise<unknown>) => {
     if (busy) return;

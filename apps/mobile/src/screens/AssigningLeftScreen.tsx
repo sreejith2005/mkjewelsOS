@@ -1,3 +1,4 @@
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
 import { useMemo, useState } from "react";
 import { RefreshControl, StyleSheet, View } from "react-native";
 import {
@@ -33,6 +34,7 @@ export function AssigningLeftScreen() {
   const styles = useStyles();
   const authorized = profile.user_role === "super_admin" || profile.user_role === "admin";
   const state = useAsyncData(() => (authorized ? loadAll() : Promise.resolve(null)), [authorized]);
+  useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["tasks", "organization"], refresh: state.refresh });
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 

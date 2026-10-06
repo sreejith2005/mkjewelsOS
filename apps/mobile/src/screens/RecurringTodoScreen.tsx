@@ -1,3 +1,4 @@
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
 import { useCallback, useMemo, useState } from "react";
 import { Alert, RefreshControl, StyleSheet, View, type ListRenderItem } from "react-native";
 import { useNavigation } from "@react-navigation/native";
@@ -137,6 +138,7 @@ export function RecurringTodoScreen() {
     statusFilter,
   ]);
 
+  useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["tasks", "forms", "organization"], refresh: async () => { await Promise.all([refresh(), referenceState.refresh()]); } });
   const stats = workspace?.stats ?? EMPTY_RECURRING_STATS;
   const templates = useMemo(() => workspace?.templates ?? [], [workspace]);
   const instances = useMemo(() => workspace?.instances ?? [], [workspace]);

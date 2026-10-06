@@ -3,6 +3,10 @@ create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 select no_plan();
 
+-- Another project/schema may define an enum with the same unqualified name.
+create schema permission_metadata_fixture;
+create type permission_metadata_fixture.user_role as enum ('staff', 'super_admin', 'crm_only');
+
 -- Fixture: one tenant, one designation, and an account per authorization shape.
 insert into auth.users(id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 select ('15600000-0000-4000-8000-00000000000' || n)::uuid, 'authenticated', 'authenticated', 'perm-' || n || '@example.invalid',
@@ -62,6 +66,8 @@ select throws_ok($$select save_user_access_with_audit('15640000-0000-4000-8000-0
 
 -- Dashboard authority: a Staff user acting as Manager.
 select set_config('request.jwt.claim.sub', '15600000-0000-4000-8000-000000000001', true);
+select is(get_permission_admin_context() -> 'roles', to_jsonb(enum_range(null::public.user_role)),
+  'permission role choices contain only the ordered JewelOS enum without duplicates');
 select lives_ok($$select save_user_access_with_audit('15640000-0000-4000-8000-000000000005', '{}'::jsonb, 'manager')$$, 'Super Admin assigns Manager authority');
 select set_config('request.jwt.claim.sub', '15600000-0000-4000-8000-000000000005', true);
 select is(current_role_level(), 'manager'::user_role, 'Staff + Manager authority acts as Manager');

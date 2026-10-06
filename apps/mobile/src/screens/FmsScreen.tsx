@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
+import { useCallback, useMemo, useState } from "react";
 import { Alert, RefreshControl, StyleSheet, View } from "react-native";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { GitBranch } from "lucide-react-native";
 import { hasPermission } from "@jewelos/core";
@@ -79,6 +80,7 @@ export function FmsScreen() {
   const navigation = useNavigation<Navigation>();
   const canManage = hasPermission(access, "fms.manage");
   const state = useAsyncData(loadConsole, []);
+  useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["fms", "forms", "organization"], refresh: state.refresh });
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [tasksFor, setTasksFor] = useState<FlowFamily | null>(null);
@@ -86,13 +88,6 @@ export function FmsScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const data = state.data?.builder;
-  // Coming back from the builder must show what was just saved or published.
-  const firstFocus = useRef(true);
-  useFocusEffect(useCallback(() => {
-    if (firstFocus.current) { firstFocus.current = false; return; }
-    void state.refresh();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []));
   const runtime = state.data?.runtime;
 
   const families = useMemo<FlowFamily[]>(() => {

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui";
 import { Panel } from "@/features/analytics/components";
 import { hasPermission, type DailyChecklistItem } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthContext";
+import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { loadDailyChecklistManagement, saveDailyChecklist, type DailyChecklistRecord } from "./api";
 
 const emptyItems = (): DailyChecklistItem[] => [{ id: crypto.randomUUID(), text: "" }];
@@ -18,7 +19,7 @@ function errorMessage(cause: unknown, fallback: string): string {
 }
 
 export function DailyChecklistManager() {
-  const { access } = useAuth();
+  const { access, profile } = useAuth();
   const canManage = hasPermission(access, "daily_checklists.manage");
   const [records, setRecords] = useState<readonly DailyChecklistRecord[]>([]);
   const [designations, setDesignations] = useState<readonly { id: string; label: string }[]>([]);
@@ -47,6 +48,7 @@ export function DailyChecklistManager() {
       setLoaded(true);
     }
   };
+  useTenantRealtimeRefresh({ tenantId: canManage ? profile?.tenant_id : null, topics: ["settings", "organization"], refresh: load });
 
   useEffect(() => {
     if (canManage) void load();
@@ -108,6 +110,7 @@ export function DailyChecklistManager() {
 
   return <Panel title="Daily checklists" description="Create one shared daily routine checklist for each designation. Every save is audited.">
     <div className="flex flex-col gap-3">
+      {selected && (selectedRecord?.revision ?? 0) !== revision ? <div className="rounded-lg border border-task-border p-3"><p className="text-sm text-task-text-muted">This checklist changed elsewhere. Your edits are preserved with the original version.</p><Button onClick={() => choose(selected)} variant="secondary">Discard edits and reload checklist</Button></div> : null}
       <label><span className="mb-1 block text-xs text-task-text-muted">Designation</span><select className="task-field" value={selected} onChange={(event) => choose(event.target.value)}><option value="">Select designation</option>{designations.map((designation) => <option key={designation.id} value={designation.id}>{designation.label}</option>)}</select></label>
       {loaded && designations.length === 0 ? <p className="text-sm text-task-text-muted">Add an active designation in Dropdown Master first.</p> : null}
       <label><span className="mb-1 block text-xs text-task-text-muted">Title</span><input className="task-field" maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} /></label>

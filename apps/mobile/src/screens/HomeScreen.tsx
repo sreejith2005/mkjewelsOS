@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { RefreshControl, StyleSheet, View } from "react-native";
-import { useFocusEffect, useNavigation, type CompositeNavigationProp } from "@react-navigation/native";
+import { useNavigation, type CompositeNavigationProp } from "@react-navigation/native";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AlarmClock, ArrowRight, ChevronDown, Gem } from "lucide-react-native";
 import { fetchHomeSummary } from "@jewelos/data/analytics/api";
 import type { HomeFms, HomeFmsStarter, HomeSummary } from "@jewelos/data/analytics/types";
 import { subscribeToInbox } from "@jewelos/data/notifications/api";
-import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
 import { useAuth, useProfile } from "@/auth/AuthProvider";
 import { useAsyncData } from "@/lib/useAsyncData";
 import { formatDateTime, greetingFor, titleCase } from "@/lib/format";
@@ -53,16 +53,8 @@ export function HomeScreen() {
 
   // The web Home refreshes on inbox events and on the tenant topics that can
   // change what is waiting; returning to the tab refreshes it too.
-  useEffect(() => subscribeToInbox(profile.id, () => void refresh()), [profile.id, refresh]);
-  useEffect(
-    () => subscribeToTenantRealtime(profile.tenant_id, ["tasks", "fms", "crm", "organization", "settings"], () => void refresh()),
-    [profile.tenant_id, refresh],
-  );
-  const firstFocus = useRef(true);
-  useFocusEffect(useCallback(() => {
-    if (firstFocus.current) { firstFocus.current = false; return; }
-    void refresh();
-  }, [refresh]));
+  const requestRefresh = useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["tasks", "fms", "crm", "forms", "organization", "settings"], refresh });
+  useEffect(() => subscribeToInbox(profile.id, requestRefresh), [profile.id, requestRefresh]);
 
   const openStage = useCallback((stage: HomeFms) => {
     navigateFmsAssignedWork(navigation, fmsAssignedWorkRoute(

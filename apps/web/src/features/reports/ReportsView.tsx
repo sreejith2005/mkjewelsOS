@@ -1,4 +1,4 @@
-import {useCallback,useEffect,useMemo,useState} from "react";
+import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import { hasPermission,REPORT_CATALOG,parseReportFilters,reportsForRole,type ReportDefinition,type ReportFilters} from "@jewelos/core";
 import {Download,RefreshCw,RotateCcw,Square,Upload} from "lucide-react";
 import {useAuth} from "@/auth/AuthContext";
@@ -7,6 +7,7 @@ import {ErrorPanel,LoadingPanels,PageHeading,PageSurface,Panel,StatusDot} from "
 import {fetchReportingOptions,type ReportingOptions} from "@/features/analytics/api";
 import {cancelExport,fetchReport,requestExport,retryExport,signedExportUrl,type ReportPayload} from "./api";
 import {titleCase} from "@/lib/format";
+import {useTenantRealtimeRefresh} from "@/features/realtime/useTenantRealtimeRefresh";
 
 const iso=(date:Date)=>date.toISOString().slice(0,10);const today=new Date();const monthAgo=new Date(Date.now()-29*86_400_000);
 function initialParams(definition:ReportDefinition){const params=new URLSearchParams(window.location.search);if(!params.get("from"))params.set("from",iso(monthAgo));if(!params.get("to"))params.set("to",iso(today));if(!params.get("page"))params.set("page","1");if(!params.get("page_size"))params.set("page_size","25");try{return parseReportFilters(params,definition);}catch{return parseReportFilters({from:iso(monthAgo),to:iso(today),page:"1",page_size:"25"},definition);}}
@@ -22,12 +23,15 @@ export function ReportsView(){
   const [data,setData]=useState<ReportPayload|null>(null);const [history,setHistory]=useState<ReportPayload|null>(null);
   const [loading,setLoading]=useState(true);const [error,setError]=useState<string|null>(null);const [message,setMessage]=useState<string|null>(null);const [exporting,setExporting]=useState(false);
   const [options,setOptions]=useState<ReportingOptions>({branches:[],departments:[]});
+  const generation=useRef(0);
+  useEffect(()=>()=>{generation.current+=1;},[]);
   const elevated=["super_admin","admin","manager","hr"].includes(profile!.user_role);
   const canSelectBranch=["super_admin","admin"].includes(profile!.user_role);
   useEffect(()=>{if(elevated)void fetchReportingOptions().then(setOptions);},[elevated]);
-  const load=useCallback(async()=>{setLoading(true);setError(null);try{const [preview,exports]=await Promise.all([fetchReport(definition.key,filters),fetchReport("export_history",{...filters,page:1,page_size:25})]);setData(preview);setHistory(exports);}catch(error){setError(error instanceof Error?error.message:"Report request failed");}finally{setLoading(false);}},[definition,filters]);
+  const load=useCallback(async(showLoading=true)=>{const request=++generation.current;if(showLoading)setLoading(true);setError(null);try{const [preview,exports]=await Promise.all([fetchReport(definition.key,filters),fetchReport("export_history",{...filters,page:1,page_size:25})]);if(request!==generation.current)return;setData(preview);setHistory(exports);}catch(error){if(request===generation.current)setError(error instanceof Error?error.message:"Report request failed");}finally{if(request===generation.current)setLoading(false);}},[definition,filters]);
+  const requestRefresh=useTenantRealtimeRefresh({tenantId:profile?.tenant_id,topics:["tasks","fms","forms","organization","settings"],refresh:()=>load(false)});
   useEffect(()=>{writeUrl(definition.key,filters);void load();},[definition,filters,load]);
-  useEffect(()=>{if(!history?.rows.some((row)=>row.status==="queued"||row.status==="processing"))return;const timer=window.setInterval(()=>void load(),5000);return()=>window.clearInterval(timer);},[history,load]);
+  useEffect(()=>{if(!history?.rows.some((row)=>row.status==="queued"||row.status==="processing"))return;const timer=window.setInterval(requestRefresh,5000);return()=>window.clearInterval(timer);},[history,requestRefresh]);
   const changeReport=(key:string)=>{const next=REPORT_CATALOG.find((item)=>item.key===key);if(!next)return;setDefinition(next);setFilters(initialParams(next));};
   const changeFilter=(key:keyof ReportFilters,value:string|number|undefined)=>setFilters((current)=>({...current,[key]:value||undefined,page:key==="page"?Number(value):1}));
   const doExport=async()=>{setExporting(true);setMessage(null);try{await requestExport(definition.key,filters);setMessage("CSV export queued. Progress appears in export history.");await load();}catch(error){setError(error instanceof Error?error.message:"Export request failed");}finally{setExporting(false);}};

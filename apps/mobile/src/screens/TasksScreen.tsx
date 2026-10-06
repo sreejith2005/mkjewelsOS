@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Plus } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -13,7 +14,6 @@ import {
   TASK_IN_LOOP_PATH,
 } from "@jewelos/core";
 import { reviseTask, updateTask, uploadAndCompleteTask, type TaskBundle } from "@jewelos/data/tasks/api";
-import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
 import { useProfile } from "@/auth/AuthProvider";
 import { TaskCard as ParityTaskCard, type TaskCardAction } from "@/features/tasks/TaskCard";
 import { canManageTaskWorkspace, hasAdminTaskView, loadTaskWorkspace } from "@/features/tasks/taskWorkspace";
@@ -57,12 +57,7 @@ export function TasksScreen({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const load = useCallback(() => loadTaskWorkspace(profile, { prepareRecurring: true }), [profile]);
 
   const { data, error, loading, refreshing, reload, refresh } = useAsyncData(load, [load]);
-  const firstFocus = useRef(true);
-  useFocusEffect(useCallback(() => {
-    if (firstFocus.current) { firstFocus.current = false; return; }
-    void refresh();
-  }, [refresh]));
-  useEffect(() => subscribeToTenantRealtime(profile.tenant_id, ["tasks", "forms", "organization"], () => void refresh()), [profile.tenant_id, refresh]);
+  useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["tasks", "forms", "fms", "organization"], refresh: refresh });
 
   const tasks = useMemo(() => {
     const source = data ? data[workspace] : [];

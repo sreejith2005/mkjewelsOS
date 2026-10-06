@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { UserProfile } from "@/types";
 import type { TaskReferenceData } from "./api";
@@ -51,6 +51,29 @@ function renderComposer(overrides: Partial<Parameters<typeof TaskComposer>[0]> =
 }
 
 describe("TaskComposer selector panels", () => {
+  it("retries a failed attachment against the saved task without creating another task", async () => {
+    const onSave = vi.fn().mockResolvedValue("saved-task");
+    const onCreated = vi.fn();
+    const onUploadAttachment = vi.fn().mockRejectedValueOnce(new Error("Upload interrupted")).mockResolvedValue(undefined);
+    renderComposer({ onSave, onCreated, onUploadAttachment });
+    fireEvent.change(screen.getByLabelText("Task title"), { target: { value: "Counter review" } });
+    fireEvent.click(screen.getByRole("button", { name: /Users/i }));
+    fireEvent.click(screen.getByLabelText("Teammate"));
+    fireEvent.click(screen.getByRole("button", { name: /Due Date/i }));
+    fireEvent.change(screen.getByLabelText("Due date and time"), { target: { value: "2030-10-06T18:00" } });
+    const attachment = new File(["synthetic attachment"], "counter.pdf", { type: "application/pdf" });
+    fireEvent.change(screen.getByLabelText("Attach image or document"), { target: { files: [attachment] } });
+    fireEvent.click(screen.getByRole("button", { name: "Assign Task" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Retry attachment" })).toBeTruthy());
+    expect(onCreated).not.toHaveBeenCalled();
+    const replacement = new File(["replacement synthetic attachment"], "replacement.pdf", { type: "application/pdf" });
+    fireEvent.change(screen.getByLabelText("Attach image or document"), { target: { files: [replacement] } });
+    fireEvent.click(screen.getByRole("button", { name: "Retry attachment" }));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledOnce());
+    expect(onSave).toHaveBeenCalledOnce();
+    expect(onUploadAttachment).toHaveBeenNthCalledWith(1, "saved-task", attachment);
+    expect(onUploadAttachment).toHaveBeenNthCalledWith(2, "saved-task", replacement);
+  });
   it("shows the selected assignee name while the picker is closed", () => {
     renderComposer();
     fireEvent.click(screen.getByRole("button", { name: /Users/i }));

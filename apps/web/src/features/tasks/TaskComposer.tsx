@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { AlertTriangle, CalendarDays, Check, ChevronDown, FileText, Flag, Paperclip, Plus, Rocket, Users, UserRoundCheck, X } from "lucide-react";
 import { buildManualTaskCreateRequest, deriveTaskAuthoringCapability, voiceDraftGapMessage, voiceDraftGaps, type Enums, type Json, type VoiceDeadline, type VoiceDraftGap } from "@jewelos/core";
 import type { UserProfile } from "@/types";
@@ -66,6 +66,8 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
   const [checklist, setChecklist] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const submitting = useRef(false);
+  const [createdTask, setCreatedTask] = useState<{ id: string; doerCount: number; attachment: File | null } | null>(null);
   const [voiceGaps, setVoiceGaps] = useState<readonly VoiceDraftGap[]>([]);
   const [gapAlertOpen, setGapAlertOpen] = useState(false);
   const [assignmentReason, setAssignmentReason] = useState<string | null>(null);
@@ -169,18 +171,31 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
 
   const submitManual = async (event: FormEvent) => {
     event.preventDefault();
+    if (submitting.current) return;
     setError(null);
+    if (createdTask) {
+      submitting.current = true; setSaving(true);
+      try {
+        if (createdTask.attachment) await onUploadAttachment(createdTask.id, createdTask.attachment);
+        toast.success("Task assigned", { description: `Sent to ${createdTask.doerCount} user${createdTask.doerCount === 1 ? "" : "s"}.` });
+        onCreated();
+      } catch (caught) { setError(caught instanceof Error ? caught.message : "The attachment could not be uploaded. Try again."); }
+      finally { submitting.current = false; setSaving(false); }
+      return;
+    }
     const request = buildManualTaskCreateRequest({ title, description, plannedDatetime: planned, priority, mode: taskMode, selectedDoerIds: doers, selectedWatcherIds: watchers, formTemplateId, checklistItems: checklist, eligiblePeople: eligiblePeople.flatMap((person) => person.id ? [{ id: person.id, branchId: person.branch_id, departmentId: person.department_id, eligible: true }] : []) });
     if ("error" in request) return setError(request.error.message);
-    setSaving(true);
+    submitting.current = true; setSaving(true);
     try {
       const taskId = await onSave(request.payload, [...request.doerIds], [...request.watcherIds], [...request.checklist]);
+      setCreatedTask({ id: taskId, doerCount: request.doerIds.length, attachment });
       if (attachment) await onUploadAttachment(taskId, attachment);
       toast.success("Task assigned", { description: `Sent to ${request.doerIds.length} user${request.doerIds.length === 1 ? "" : "s"}.` });
       onCreated();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to create task");
     } finally {
+      submitting.current = false;
       setSaving(false);
     }
   };
@@ -201,10 +216,11 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
   const watchersPanel = <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} disabledIds={doers} label="In Loop · view and comment" multiple onChange={setWatchers} people={eligiblePeople.flatMap((person) => person.id ? [{ ...person, id: person.id }] : [])} selectedIds={watchers} />;
 
   return (
-    <Modal onClose={onClose} title="Assign New Task" tone="light" wide>
+    <Modal onClose={createdTask ? onCreated : onClose} title="Assign New Task" tone="light" wide>
       {error ? <div className="mb-4"><Notice tone="danger">{error}</Notice></div> : null}
+      {createdTask ? <div className="mb-4"><Notice>The task is saved. Retry uploads against this task; its assignment details are already committed.</Notice></div> : null}
 
-      {canUseVoice ? <VoiceTaskCapture onInterpreted={applyVoiceDraft} /> : null}
+      {canUseVoice && !createdTask ? <VoiceTaskCapture onInterpreted={applyVoiceDraft} /> : null}
 
       {gapAlertOpen ? <div className="mb-4 rounded-xl border border-danger/40 bg-danger/10 p-4" data-testid="voice-gap-alert" role="alertdialog" aria-labelledby="voice-gap-alert-title">
         <div className="flex items-start gap-3">
@@ -223,6 +239,7 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
       {deadlineNote ? <p className={cn("mb-3 text-xs", deadlineNote.resolved ? "text-task-text-muted" : "text-danger")} data-testid="voice-deadline-note">Deadline from your voice note · {deadlineNote.text}</p> : null}
 
       <form className="flex flex-col" onSubmit={(event) => void submitManual(event)}>
+        <fieldset className="min-w-0" disabled={saving || createdTask !== null}>
           <label className="border-b border-task-border px-1 pb-3">
             <span className="sr-only">Task title</span>
             <input autoFocus className="w-full bg-transparent text-base font-medium text-task-text placeholder:text-task-text-muted/80 focus-visible:ring-0" data-autofocus maxLength={200} onChange={(event) => setTitle(event.target.value)} placeholder="Add Title" value={title} />
@@ -246,9 +263,11 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
           </div>
 
 
+        </fieldset>
           <div className="sticky -bottom-5 -mx-5 mt-4 flex items-center gap-3 border-t border-task-border bg-task-bg px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-            <label className="flex size-11 cursor-pointer items-center justify-center rounded-lg text-task-text-muted hover:bg-task-muted"><Paperclip className="size-5" /><span className="sr-only">Attach image or document</span><input accept="image/jpeg,image/png,image/webp,application/pdf" className="sr-only" onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} type="file" /></label>
-            <Button className="ml-auto bg-task-accent text-task-text hover:bg-task-accent/90" disabled={saving} type="submit"><Rocket />{saving ? "Assigning…" : "Assign Task"}</Button>
+            <label className="flex size-11 cursor-pointer items-center justify-center rounded-lg text-task-text-muted hover:bg-task-muted"><Paperclip className="size-5" /><span className="sr-only">Attach image or document</span><input accept="image/jpeg,image/png,image/webp,application/pdf" className="sr-only" disabled={saving} onChange={(event) => { const file = event.target.files?.[0] ?? null; setAttachment(file); setCreatedTask((current) => current ? { ...current, attachment: file } : current); }} type="file" /></label>
+            {attachment ? <Button aria-label="Remove attachment" className="size-11 shrink-0 p-0" disabled={saving} onClick={() => { setAttachment(null); setCreatedTask((current) => current ? { ...current, attachment: null } : current); }} type="button" variant="ghost"><X /></Button> : null}
+            <Button className="ml-auto bg-task-accent text-task-text hover:bg-task-accent/90" disabled={saving} type="submit"><Rocket />{saving ? createdTask ? "Uploading…" : "Assigning…" : createdTask ? createdTask.attachment ? "Retry attachment" : "Finish without attachment" : "Assign Task"}</Button>
           </div>
       </form>
     </Modal>

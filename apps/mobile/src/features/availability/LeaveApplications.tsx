@@ -1,10 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, View } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
 import { countLeaveDays, formatLeaveDate, hasPermission, leaveInformStatus, leaveNeedsHandover, leaveSummaryTotals, type LeaveHalf, type ReturnHalf } from "@jewelos/core";
 import { canSubmitLeave, editPendingLeave, leaveHandoverCandidates, leaveSummaryApplicants, leaveTypes, listLeaveRequests, reviewLeave, signedLeaveImage, submitHandover, submitLeave, type LeaveDraft, type LeaveRequest } from "@jewelos/data/leave/api";
 import type { UploadableFile } from "@jewelos/data/runtime";
 import { useAccess, useAuth, useProfile } from "@/auth/AuthProvider";
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
 import { DateField } from "@/forms/DateField";
 import { pickFileFromChooser } from "@/lib/pickFile";
 import { Button } from "@/ui/Button";
@@ -60,7 +60,8 @@ export function LeaveApplications() {
       if (!applicantEligible) setTab((current) => current === "apply" ? (canViewOffice ? "history" : canReview ? "review" : "history") : current);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not load leave requests"); }
   }, [canReview, canViewOffice, profile.id]);
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
+  useEffect(() => { void load(); }, [load]);
+  useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["organization", "tasks"], refresh: load });
 
   const mine = useMemo(() => rows.filter((row) => row.applicant_id === profile.id), [profile.id, rows]);
   const handoverRows = useMemo(() => mine.filter(leaveNeedsHandover), [mine]);

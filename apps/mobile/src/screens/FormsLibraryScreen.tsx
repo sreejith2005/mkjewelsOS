@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
+import { useMemo, useState } from "react";
 import { Alert, RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { FileText } from "lucide-react-native";
 import { archiveForm, duplicateForm, loadForms, publishAsNewForm, publishForm, reviseForm, type FormBundle } from "@jewelos/data/forms/api";
-import { hasPermission } from "@jewelos/core";
+import { hasPermission, formMatchesLifecycle, WORK_UPLOAD_FORM_NAME } from "@jewelos/core";
+import { installWorkUploadForm } from "@jewelos/data/forms/installWorkUploadForm";
 import { useAuth } from "@/auth/AuthProvider";
-import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
 import { FormLifecycleActions } from "@/features/forms/FormLifecycleActions";
 import { groupSubmissions } from "@/features/forms/submissionModel";
 import { formatDateTime, titleCase } from "@/lib/format";
@@ -55,7 +56,7 @@ export function FormsLibraryScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<FormBundle | null>(null);
   const { data, error, loading, refreshing, refresh, reload } = useAsyncData(loadForms, []);
-  useEffect(() => profile?.tenant_id ? subscribeToTenantRealtime(profile.tenant_id, ["forms", "tasks", "fms", "organization"], () => void refresh()) : undefined, [profile?.tenant_id, refresh]);
+  useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["forms", "tasks", "fms", "organization"], refresh: refresh });
 
   // One card per form family, newest version first, as the web library lists them.
   const families = useMemo(() => {
@@ -65,7 +66,7 @@ export function FormsLibraryScreen() {
     return [...groups.values()]
       .map((items) => [...items].sort((a, b) => b.version - a.version))
       .filter((items) => items.some((item) => `${item.name} ${item.description ?? ""}`.toLowerCase().includes(needle)
-        && (lifecycle === "all" || lifecycle === "active" ? item.lifecycle !== "archived" : item.lifecycle === lifecycle)))
+        && formMatchesLifecycle(item.lifecycle, lifecycle)))
       .sort((a, b) => a[0]!.name.localeCompare(b[0]!.name));
   }, [data?.bundles, lifecycle, query]);
   const submissionGroups = useMemo(() => groupSubmissions(data?.submissions ?? [], data?.bundles ?? [], []), [data?.bundles, data?.submissions]);
@@ -87,6 +88,12 @@ export function FormsLibraryScreen() {
     } catch (caught) { setActionError(caught instanceof Error ? caught.message : "Create form version failed"); }
     finally { setBusyId(null); }
   };
+  const installWorkUpload = async () => {
+    setBusyId("work-upload"); setActionError(null);
+    try { await installWorkUploadForm(); await refresh(); setQuery(""); setLifecycle("active"); setTab("templates"); }
+    catch (caught) { await refresh(); setActionError(caught instanceof Error ? caught.message : "Unable to add the work and upload form."); }
+    finally { setBusyId(null); }
+  };
 
   if (loading) return <LoadingState label="Loading forms..." />;
   if (error && !data) return <ErrorState message={error} onRetry={() => void reload()} title="Unable to load Forms" />;
@@ -94,6 +101,7 @@ export function FormsLibraryScreen() {
   return <Screen refreshControl={<RefreshControl colors={[theme.colors.primary]} onRefresh={() => void refresh()} refreshing={refreshing} tintColor={theme.colors.primary} />} scroll>
     <View style={styles.titleRow}><FileText color={theme.colors.primary} size={24} /><View style={styles.titleCopy}><Text variant="heading" weight="bold">Forms Library</Text><Text tone="muted" variant="small">Choose a form, fill it in, and submit. Workflow forms continue automatically in the background.</Text></View></View>
     {canAuthor ? <Button full label="New form" onPress={() => navigation.navigate("FormBuilder", undefined)} /> : null}
+    {canAuthor && !data?.bundles.some((item) => item.name === WORK_UPLOAD_FORM_NAME && item.lifecycle !== "archived") ? <Button busy={busyId === "work-upload"} disabled={busyId !== null} full label="Add work and upload form" onPress={() => void installWorkUpload()} variant="secondary" /> : null}
     <SegmentedControl accessibilityLabel="Forms view" onChange={setTab} options={[{ value: "templates", label: "Forms to fill" }, { value: "submissions", label: "My submissions" }]} value={tab} />
     {actionError ? <Banner tone="danger">{actionError === PINNED_BY_FMS ? "This version is in an active FMS stage. Use Publish as separate form to preserve in-progress work and publish your edited copy." : actionError}</Banner> : null}
     {tab === "templates" ? <>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Banknote, CalendarDays, CheckSquare, ChevronDown, ChevronUp, CircleDot, Copy, Eye, FileUp, Filter, GitBranch, Hash, ListChecks, Mail, Minus, Pencil, Phone, Plus, Split, Star, Trash2, Type, UserRound, X } from "lucide-react";
-import { createFormField, describeFormRule, describePublishedFormEdit, FORM_LIST_OPERATORS, formRuleHasIncompletePredicate, FORM_OPERATOR_LABELS, FORM_SUBMIT_TARGET, FORM_VALUELESS_OPERATORS, nextFormFieldKey as sharedNextFormFieldKey, normalizeFormDefinition, operatorsForFieldType, pruneFormRules, renameFormRuleField, validateFormDefinition, type FormAnswer, type FormBranch, type FormFieldDefinition, type FormOption, type FormRule, type FormRuleOperator, type FormRulePredicate, type FormSectionDefinition, type FormTemplateDefinition, type Json, type UserRole } from "@jewelos/core";
+import { createFormField, formAnswerOptions, setQuestionAnswerCondition, describeFormRule, describePublishedFormEdit, FORM_LIST_OPERATORS, formRuleHasIncompletePredicate, FORM_OPERATOR_LABELS, FORM_SUBMIT_TARGET, FORM_VALUELESS_OPERATORS, nextFormFieldKey as sharedNextFormFieldKey, normalizeFormDefinition, operatorsForFieldType, pruneFormRules, renameFormRuleField, validateFormDefinition, type FormAnswer, type FormBranch, type FormFieldDefinition, type FormOption, type FormRule, type FormRuleOperator, type FormRulePredicate, type FormSectionDefinition, type FormTemplateDefinition, type Json, type UserRole } from "@jewelos/core";
 import { Button, Field, Notice } from "@/components/ui";
 import { loadMasterOptions, toFormMasterOptions, type MasterOption } from "@/features/dropdowns/api";
 import { formUsageImpact, saveDraft, savePublishedForm, type FormBundle } from "./api";
@@ -153,13 +153,7 @@ export function FormBuilder({ bundle, dynamicOptions, onClose, onSaved }: { bund
     fields: settle(setAnswerRoute(current.fields, sourceKey, optionValue, route)),
   }));
   const setQuestionCondition = (targetKey: string, sourceKey: string | undefined, optionValue: FormAnswer | undefined) => setForm((current) => {
-    const target = current.fields.find((field) => field.key === targetKey);
-    const existing = target ? readGuidedConditionLinks(target) : null;
-    if (existing === null) return current;
-    let fields = current.fields;
-    for (const link of existing) fields = setAnswerRoute(fields, link.sourceKey, link.optionValue, { kind: "continue" });
-    if (sourceKey && optionValue !== undefined) fields = setAnswerRoute(fields, sourceKey, optionValue, { kind: "question", questionKey: targetKey });
-    return { ...current, fields: settle(fields) };
+    return { ...current, fields: settle(setQuestionAnswerCondition(current.fields, targetKey, sourceKey, optionValue)) };
   });
 
   const patchSection = (key: string, patch: Partial<FormSectionDefinition>) => setForm((current) => ({ ...current, sections: (current.sections ?? []).map((section) => section.key === key ? { ...section, ...patch } : section) }));
@@ -366,13 +360,7 @@ function toEditableGroup(rule: FormRule | undefined): EditableGroup | null {
 
 /** The answers a question can offer, or null when it is answered freely. */
 function answerOptions(source: FormFieldDefinition, masterOptions: MasterOption[], dynamicOptions: DynamicOptions): readonly FormOption[] | null {
-  if (source.optionSource) return masterOptions.filter((option) => option.master_type === source.optionSource?.masterType).map((option) => ({ value: option.value, label: option.label }));
-  if (source.options?.length) return source.options;
-  if (source.type === "checkbox") return [{ value: "true", label: "Checked" }, { value: "false", label: "Not checked" }];
-  if (source.type === "user_dropdown") return dynamicOptions.users.map((user) => ({ value: user.id, label: user.label }));
-  if (source.type === "branch_dropdown") return dynamicOptions.branches.map((branch) => ({ value: branch.id, label: branch.label }));
-  if (source.type === "department_dropdown") return dynamicOptions.departments.map((department) => ({ value: department.id, label: department.label }));
-  return null;
+  return formAnswerOptions(source, { ...dynamicOptions, masters: toFormMasterOptions(masterOptions) });
 }
 
 function defaultPredicate(source: FormFieldDefinition, options: readonly FormOption[] | null): FormRulePredicate {

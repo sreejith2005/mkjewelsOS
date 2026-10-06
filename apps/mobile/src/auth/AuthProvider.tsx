@@ -1,5 +1,4 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { AppState } from "react-native";
 import type { Session } from "@supabase/supabase-js";
 import { DEFAULT_USER_PREFERENCES, builtinAccessContext, type AccessContext, type UserPreferences } from "@jewelos/core";
 import {
@@ -12,8 +11,11 @@ import {
   type UserProfile,
 } from "@jewelos/data/auth/session";
 import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
+import { invalidateMasterOptions } from "@jewelos/data/dropdowns/api";
 import { supabase } from "@/lib/supabase";
 import { errorText, log } from "@/lib/log";
+import { createRefreshLifecycle } from "@/lib/refreshLifecycle";
+import { subscribeAppAvailability } from "@/lib/useTenantRealtimeRefresh";
 
 /**
  * `restoring` covers the moment before the stored session has been read out of
@@ -55,16 +57,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [branch, setBranch] = useState<Branch | null>(null);
   const [preferences, setPreferences] = useState<UserPreferences>(DEFAULT_USER_PREFERENCES);
   const forcedSignOut = useRef(false);
+  const identityGeneration = useRef(0);
 
   const refreshPreferences = useCallback(async () => {
-    setPreferences(await loadUserPreferences());
+    const generation = identityGeneration.current;
+    const next = await loadUserPreferences();
+    if (generation === identityGeneration.current) setPreferences(next);
   }, []);
 
   const clearIdentity = useCallback(() => {
+    invalidateMasterOptions();
+    identityGeneration.current += 1;
     setSession(null);
     setProfile(null);
     setAccess(null);
     setBranch(null);
+    setPreferences(DEFAULT_USER_PREFERENCES);
   }, []);
 
   /**
@@ -76,16 +84,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * for identical data is wasted work on a phone.
    */
   const applyProfile = useCallback(async (nextProfile: UserProfile) => {
+    const generation = identityGeneration.current;
     const nextAccess = await loadAccessContext(nextProfile);
+    if (generation !== identityGeneration.current) return;
     const effective = { ...nextProfile, user_role: nextAccess.effectiveRole };
     setAccess((current) => (current && JSON.stringify(current) === JSON.stringify(nextAccess) ? current : nextAccess));
     setProfile((current) => (current && JSON.stringify(current) === JSON.stringify(effective) ? current : effective));
   }, []);
 
   const applySession = useCallback(async (next: Session) => {
+    invalidateMasterOptions();
+    const generation = ++identityGeneration.current;
     setSession(next);
     try {
       const gate = await loadProfileGate(next);
+      if (generation !== identityGeneration.current) return;
       if (gate.status === "incomplete") {
         setProfile(null);
         setAccess(null);
@@ -104,11 +117,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       await applyProfile(gate.profile);
+      if (generation !== identityGeneration.current) return;
       setBranch(gate.branch);
       setPreferences(gate.preferences);
       setStatusMessage(null);
       setStatus("authenticated");
     } catch (error) {
+      if (generation !== identityGeneration.current) return;
       // A phone loses its network mid-request routinely. That is not a reason
       // to sign someone out — the stored session is still valid, so the screen
       // says so and offers a retry instead of dumping them at the login form.
@@ -125,9 +140,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const refreshAccess = useCallback(async () => {
     if (!session) return;
+    const generation = identityGeneration.current;
     try {
       const nextProfile = await loadSignedInProfile(session);
-      if (nextProfile) await applyProfile(nextProfile);
+      if (nextProfile && generation === identityGeneration.current) await applyProfile(nextProfile);
     } catch (error) {
       log.error("auth", "could not refresh access", error);
     }
@@ -138,18 +154,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const tenantId = status === "authenticated" ? profile?.tenant_id : null;
     if (!tenantId) return;
-    return subscribeToTenantRealtime(tenantId, ["settings", "organization"], () => void refreshAccess());
-  }, [profile?.tenant_id, refreshAccess, status]);
-
-  // The phone equivalent of the web's `visibilitychange` refresh: coming back
-  // to the app picks up any access change made while it was in the background.
-  useEffect(() => {
-    if (status !== "authenticated") return;
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") void refreshAccess();
-    });
-    return () => subscription.remove();
-  }, [refreshAccess, status]);
+    const lifecycle = createRefreshLifecycle(async () => {
+      await Promise.all([refreshAccess(), refreshPreferences()]);
+    }, false);
+    const stopAvailability = subscribeAppAvailability(lifecycle.setActive);
+    const stopRealtime = subscribeToTenantRealtime(tenantId, ["settings", "organization"], lifecycle.request);
+    return () => { lifecycle.dispose(); stopRealtime(); stopAvailability(); };
+  }, [profile?.tenant_id, refreshAccess, refreshPreferences, status]);
 
   useEffect(() => {
     let active = true;

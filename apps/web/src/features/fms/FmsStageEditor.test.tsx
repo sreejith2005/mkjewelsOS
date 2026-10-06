@@ -54,6 +54,16 @@ function DecisionHarness() {
   return <><button onClick={() => setSelected(1)}>Edit decision</button><button onClick={() => setSelected(2)}>Edit follow up</button><FmsStageEditor data={data} onChange={(value) => setStages((current) => current.map((item, index) => index === selected ? value : item))} onDelete={() => undefined} stage={stages[selected]!} stages={stages} /></>;
 }
 
+function AssignmentHarness({ invalid = false }: { invalid?: boolean }) {
+  const formId = data.forms[0]!.id;
+  const linkedData: FmsData = { ...data, formFields: { [formId]: [
+    { key: "assigned_to", label: "Assigned to", type: "user_dropdown", required: true, shown: true },
+    { key: "optional_user", label: "Optional user", type: "user_dropdown", required: false },
+  ] } };
+  const [stage, setStage] = useState<FmsStageDefinition>(() => ({ ...newFmsStage("form", 0), key: "start_form", formTemplateId: formId, sla: { ...newFmsStage("form", 0).sla, ...(invalid ? { assignmentFieldKey: "removed_question" } : {}) } }));
+  return <><output aria-label="Selected assignment">{stage.sla.assignmentFieldKey ?? "default"}</output><FmsStageEditor data={linkedData} onChange={setStage} onDelete={() => undefined} stage={stage} stages={[stage]} /></>;
+}
+
 describe("FMS stage editor", () => {
   it("defaults the initial Form deadline to off while later steps remain on", () => {
     expect(newFmsStage("form", 0).sla.deadlineEnabled).toBe(false);
@@ -93,9 +103,26 @@ describe("FMS stage editor", () => {
     expect(select.value).toBe("");
     expect(select.textContent).toContain("Initial details");
   });
-  it("uses the existing default assignee picker without adding a per-form assignment selector", () => {
+  it("offers a linked-form assignment question while retaining named defaults", () => {
     render(<RoutingHarness />);
-    expect(screen.queryByLabelText("User question that assigns later steps")).toBeNull();
+    expect(screen.getByLabelText("User question that assigns later steps")).toBeTruthy();
+  });
+
+  it("saves an eligible question and can explicitly restore workflow defaults", async () => {
+    const user = userEvent.setup();
+    render(<AssignmentHarness />);
+    const select = screen.getByLabelText("User question that assigns later steps");
+    expect(select.textContent).not.toContain("Optional user");
+    await user.selectOptions(select, "assigned_to");
+    expect(screen.getByLabelText("Selected assignment").textContent).toBe("assigned_to");
+    await user.selectOptions(select, "");
+    expect(screen.getByLabelText("Selected assignment").textContent).toBe("default");
+  });
+
+  it("keeps an unavailable assignment visible for correction instead of clearing it", () => {
+    render(<AssignmentHarness invalid />);
+    expect(screen.getByLabelText("Selected assignment").textContent).toBe("removed_question");
+    expect(screen.getByLabelText("User question that assigns later steps").getAttribute("aria-invalid")).toBe("true");
   });
 
   it("keeps instructions and completion controls available but secondary", () => {

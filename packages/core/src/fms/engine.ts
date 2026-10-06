@@ -13,6 +13,10 @@ const TIMING_METHODS = new Set<FmsTimingMethod>(["completion_date", "tat_hours",
 const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
 const legacyDecisionOptions: readonly FmsDecisionOption[] = [{ key: "yes", label: "Yes" }, { key: "no", label: "No" }];
 
+export function fmsAssignmentFields(fields: readonly FmsFormFieldRef[]): readonly FmsFormFieldRef[] {
+  return fields.filter((field) => field.type === "user_dropdown" && field.required === true && field.shown !== false && !field.hasCondition);
+}
+
 export function hasFmsFormAssignmentSource(rule: unknown): boolean {
   if (!rule || typeof rule !== "object" || Array.isArray(rule)) return false;
   const key = (rule as Record<string, unknown>).assignmentFieldKey;
@@ -210,7 +214,7 @@ export function validateFmsDefinition(raw: FmsFlowDefinition, context: FmsValida
     if (stage.formTemplateId && UUID.test(stage.formTemplateId) && context.availableFormIds && !context.availableFormIds.includes(stage.formTemplateId)) add("missing_linked_form", "The linked Form is no longer an available published version");
     if (stage.sla.assignmentFieldKey) {
       const field = stage.formTemplateId ? context.formFields?.[stage.formTemplateId]?.find((item) => item.key === stage.sla.assignmentFieldKey) : undefined;
-      if (AUTO.has(stage.type) || !field || field.type !== "user_dropdown" || !field.required || field.shown === false || field.hasCondition) add("invalid_assignment_field", "Choose a required, always visible User question in this step's linked Form");
+      if (AUTO.has(stage.type) || !field || !fmsAssignmentFields([field]).length) add("invalid_assignment_field", "Choose a required, always visible User question in this step's linked Form");
     }
     if (stage.assigneeRules.some((rule) => !FMS_ASSIGNEE_TYPES.includes(rule.type) || rule.type === "specific_user" && (!UUID.test(rule.userProfileId ?? "") || rule.fallbackUserProfileId !== undefined && !UUID.test(rule.fallbackUserProfileId)) || rule.type !== "specific_user" && rule.fallbackUserProfileId !== undefined || rule.type === "role" && !rule.role)) add("invalid_assignee", "Assignee rule is incomplete");
     if (!stage.allowMultipleDoers && stage.completionRule === "all_doers") add("incompatible_completion_rule", "all_doers requires multiple doers");

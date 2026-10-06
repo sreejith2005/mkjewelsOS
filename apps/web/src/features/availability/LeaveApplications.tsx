@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { countLeaveDays, formatLeaveDate, hasPermission, leaveInformStatus, leaveNeedsHandover, leaveSummaryTotals, type LeaveHalf, type ReturnHalf } from "@jewelos/core";
 import { canSubmitLeave, editPendingLeave, leaveHandoverCandidates, leaveSummaryApplicants, leaveTypes, listLeaveRequests, reviewLeave, signedLeaveImage, submitHandover, submitLeave, type LeaveDraft, type LeaveRequest } from "@jewelos/data/leave/api";
 import { useAuth } from "@/auth/AuthContext";
+import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { Button, Notice } from "@/components/ui";
 
 const durations: LeaveHalf[] = ["FULL DAY", "1ST HALF", "2ND HALF"];
@@ -61,6 +62,7 @@ export function LeaveApplications() {
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to load leave requests"); }
   }, [canReview, canViewOffice, profile]);
   useEffect(() => { void load(); }, [load]);
+  useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["organization", "tasks"], refresh: load });
   // Fill handover must visibly open the form, which sits below the pending list.
   useEffect(() => {
     if (!handoverFocus) return;

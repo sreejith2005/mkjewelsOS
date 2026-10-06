@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Archive, Copy, Pencil, Plus, Search, Send, Trash2 } from "lucide-react";
-import { groupFormSubmissions, hasPermission, presentFormSubmission, WORK_UPLOAD_FORM_NAME, type FormMasterOption, type SubmissionRecord, type SubmissionTemplate } from "@jewelos/core";
+import { groupFormSubmissions, formMatchesLifecycle, hasPermission, presentFormSubmission, WORK_UPLOAD_FORM_NAME, type FormMasterOption, type SubmissionRecord, type SubmissionTemplate } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Modal, Notice } from "@/components/ui";
 import { archiveForm, deletedFormBundle, deleteForm, formDeletionImpact, loadFormDynamicOptions, loadForms, publishAsNewForm, publishForm, reviseForm, reviewSubmission, submitFmsStarterAssignment, submitStandaloneFormAndStartFms, type FormBundle, type FormDeletionImpact, type FormSubmission } from "@/features/forms/api";
@@ -19,7 +19,7 @@ export function FormsPage() {
   const refresh = useCallback(async () => { try { setError(null); const [forms, dynamic] = await Promise.all([loadForms(), loadFormDynamicOptions()]); setData(forms); setOptions(dynamic); } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to load Forms"); } }, []); useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => { if (!starter || !data) return; const pinned = data.bundles.find((bundle) => bundle.id === starter.formTemplateId); if (pinned) setFill(pinned); }, [data, starter]);
   useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["forms", "tasks", "fms", "organization"], refresh });
-  const author = hasPermission(access, "forms.manage"); const families = useMemo(() => { const groups = new Map<string, FormBundle[]>(); for (const item of data?.bundles ?? []) groups.set(item.family_id, [...(groups.get(item.family_id) ?? []), item]); return [...groups.values()].map((items) => items.sort((a, b) => b.version - a.version)).filter((items) => items.some((item) => `${item.name} ${item.description ?? ""}`.toLowerCase().includes(query.toLowerCase()) && (life === "all" || life === "active" ? item.lifecycle !== "archived" : item.lifecycle === life))).sort((a, b) => a[0]!.name.localeCompare(b[0]!.name)); }, [data, life, query]);
+  const author = hasPermission(access, "forms.manage"); const families = useMemo(() => { const groups = new Map<string, FormBundle[]>(); for (const item of data?.bundles ?? []) groups.set(item.family_id, [...(groups.get(item.family_id) ?? []), item]); return [...groups.values()].map((items) => items.sort((a, b) => b.version - a.version)).filter((items) => items.some((item) => `${item.name} ${item.description ?? ""}`.toLowerCase().includes(query.toLowerCase()) && formMatchesLifecycle(item.lifecycle, life))).sort((a, b) => a[0]!.name.localeCompare(b[0]!.name)); }, [data, life, query]);
   if (!profile) return null;
   const runPublish = (id: string) => void publishForm(id).then(refresh).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Publish failed"));
   const runPublishAsNew = (id: string) => void publishAsNewForm(id).then(refresh).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Publish as separate form failed"));

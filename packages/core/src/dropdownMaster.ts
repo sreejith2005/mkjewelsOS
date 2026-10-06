@@ -15,6 +15,11 @@ export type DropdownMasterItemLike = Readonly<{
 
 export type DropdownMasterStatusFilter = "all" | "active" | "inactive";
 
+/** Stable list key used when a form author publishes answer choices. */
+export const dropdownMasterKey = (name: string): string => name.trim().toLowerCase()
+  .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "")
+  .replace(/^([^a-z])/, "list_$1").slice(0, 60);
+
 /**
  * An item counts as active unless it is explicitly inactive. A null
  * `is_active` — a row written before the column existed — is treated as

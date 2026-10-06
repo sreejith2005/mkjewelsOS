@@ -23,6 +23,7 @@ import { DeliveryLogs, ProviderStatus, RuleManager, TemplateManager } from "@/fe
 import { formatDateTime, titleCase } from "@/lib/format";
 import { errorText } from "@/lib/log";
 import { useAsyncData } from "@/lib/useAsyncData";
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
 import { makeStyles } from "@/theme/makeStyles";
 import { useAppTheme } from "@/theme/ThemeProvider";
 import { Button } from "@/ui/Button";
@@ -81,8 +82,9 @@ export function NotificationsScreen({ onNavigate }: { onNavigate: (path: string)
       setAdminError(errorText(caught));
     }
   }, [isAdmin]);
+  const requestRefresh = useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["tasks", "fms", "forms", "organization", "settings"], refresh: async () => { await Promise.all([refresh(), refreshAdmin()]); } });
 
-  useEffect(() => subscribeToInbox(profile.id, () => { void refresh(); }), [profile.id, refresh]);
+  useEffect(() => subscribeToInbox(profile.id, requestRefresh), [profile.id, requestRefresh]);
   // Providers show in the header for administrators on every tab, as on web.
   useEffect(() => { if (isAdmin) void refreshAdmin(); }, [isAdmin, refreshAdmin, tab]);
 
