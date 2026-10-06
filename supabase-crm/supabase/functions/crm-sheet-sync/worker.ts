@@ -6,6 +6,7 @@
 // One request = one action of public.crm_sheet_sync (migration 20261006000400):
 //   {action: "run_start", mode}                       start a run (live | dry_run | import)
 //   {action: "push", run_id, tab, dry_run, rows}      Sheet rows -> CRM (<= 200 rows)
+//   {action: "hashes", tab}                           fingerprints the CRM holds (one-way script)
 //   {action: "pull", limit}                           web-app changes waiting for the Sheet
 //   {action: "ack", results}                          what the script wrote
 //   {action: "run_finish", run_id, status, pull_counts}
@@ -45,6 +46,7 @@ const requestSchema = z.discriminatedUnion("action", [
     dry_run: z.boolean().default(false),
     rows: z.array(sheetRow).max(200),
   }).strict(),
+  z.object({ action: z.literal("hashes"), tab: z.enum(TABS) }).strict(),
   z.object({ action: z.literal("pull"), limit: z.number().int().min(1).max(200).default(100) }).strict(),
   z.object({
     action: z.literal("ack"),

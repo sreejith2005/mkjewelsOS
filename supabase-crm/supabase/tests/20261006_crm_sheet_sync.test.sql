@@ -19,6 +19,8 @@ values ('20261009-0000-4000-8000-00000000000a', 'SYNC SALES', true, '20261009-11
 insert into clients(client_id, client_code, primary_name, primary_phone, last_branch_id) values
 ('20261009-2222-4000-8000-0000000000b1', 'MKC-200901', 'Synthetic Crm Person', '9187700001', '20261009-0000-4000-8000-00000000000a');
 
+-- This file tests two-way behaviour; one-way (the default) is in 20261006_crm_sheet_sync_one_way.
+update crm_private.sheet_sync_settings set two_way = true;
 -- Fixture writes are web-app-style writes; start the outbox empty.
 delete from crm_private.sheet_sync_outbox;
 

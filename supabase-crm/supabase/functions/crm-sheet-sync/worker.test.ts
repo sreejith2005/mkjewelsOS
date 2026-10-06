@@ -91,6 +91,14 @@ Deno.test("pull, ack and runs pass straight through", async () => {
   assertEquals((await handleSheetSync(post({ action: "ack", results: [{ id: 3, outcome: "applied", reason: "Bad Reason!" }] }), { apiKey: KEY, gateway })).status, 400);
 });
 
+Deno.test("hashes asks the CRM for one tab's fingerprints", async () => {
+  const { gateway, calls } = fake({ result: { hashes: { "MKC-1": "h" } } });
+  const res = await handleSheetSync(post({ action: "hashes", tab: "WALKIN DATASET" }), { apiKey: KEY, gateway });
+  assertEquals((await res.json()).hashes, { "MKC-1": "h" });
+  assertEquals(calls[0], { action: "hashes", payload: { tab: "WALKIN DATASET" } });
+  assertEquals((await handleSheetSync(post({ action: "hashes", tab: "NOPE" }), { apiKey: KEY, gateway })).status, 400);
+});
+
 Deno.test("a database failure answers a generic 500 without details", async () => {
   const { gateway } = fake({ throws: true });
   const res = await handleSheetSync(post({ action: "pull" }), { apiKey: KEY, gateway });

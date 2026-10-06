@@ -31,5 +31,6 @@
     "tsx": "^4.20.6",
     "turbo": "^2.10.8",
     "typescript": "^5.9.3"
-  }
+  },
+  "workspaces": ["apps/web", "packages/*"]
 }
