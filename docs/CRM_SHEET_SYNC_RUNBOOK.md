@@ -2,7 +2,8 @@
 
 For the owner. Design: "CRM Sheet Sync Design" (https://claude.ai/artifact/MBHPPoH1pRbPJF9jExCL2D),
 plan: `docs/superpowers/plans/2026-10-06-crm-sheet-sync.md`. Every hosted step below is run by you,
-from `C:\Users\MIS\Downloads\MKJewelOS` in PowerShell, on the **CRM project** (ref starts `fsyd`,
+from `C:\crm-sync` in PowerShell (a separate checkout of `feat/crm-sheet-sync`, so the
+main folder's other work is not disturbed), on the **CRM project** (ref starts `fsyd`,
 never `yima`). Never paste keys or terminal output that contains them into chat.
 
 ## What ships
@@ -37,7 +38,8 @@ Order matters: database first, then the function, then the web app, then the App
    supabase.cmd secrets set "CRM_SHEET_SYNC_KEY=$k" --workdir supabase-crm --project-ref fsydcsyqnddacjfoutfe
    Set-Clipboard $k; Remove-Variable k, b
    ```
-   Expect: `Finished supabase secrets set.` Keep the clipboard for step 4.2.
+   Expect: `Finished supabase secrets set.` Paste the clipboard into the Apps Script property
+   `MK_CRM_SHEET_SYNC_KEY` right away (step 4.2), before copying anything else.
 2. Deploy: `supabase.cmd functions deploy crm-sheet-sync --workdir supabase-crm --project-ref fsydcsyqnddacjfoutfe --no-verify-jwt`
    Expect: `Deployed Functions on project fsydcsyqnddacjfoutfe: crm-sheet-sync`.
 
