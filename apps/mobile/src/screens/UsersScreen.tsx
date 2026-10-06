@@ -1,4 +1,5 @@
-import { memo, useEffect, useMemo, useState } from "react";
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
+import { memo, useMemo, useState } from "react";
 import { Alert, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import {
   ADMIN_SET_PASSWORD_LENGTH,
@@ -19,7 +20,6 @@ import {
   type UserDirectoryData,
   type UserDirectoryProfile,
 } from "@jewelos/data/users/api";
-import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
 import { useAccess, useProfile } from "@/auth/AuthProvider";
 import { OrganizationTree } from "@/features/users/OrganizationTree";
 import { OrganizationManager } from "@/features/users/OrganizationManager";
@@ -71,7 +71,7 @@ export function UsersScreen() {
   const [inviting, setInviting] = useState(false);
   const [managingOrganization, setManagingOrganization] = useState(false);
   const state = useAsyncData(loadUserDirectory, []);
-  useEffect(() => profile.tenant_id ? subscribeToTenantRealtime(profile.tenant_id, ["organization", "settings"], () => void state.refresh()) : undefined, [profile.tenant_id, state.refresh]);
+  useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["organization", "settings"], refresh: state.refresh });
   const canManage = hasPermission(access, "users.manage");
   const superAdmin = profile.user_role === "super_admin";
   const data = state.data;

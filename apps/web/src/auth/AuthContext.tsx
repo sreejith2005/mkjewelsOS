@@ -5,6 +5,7 @@ import type { Branch, UserProfile } from "@/types";
 import { DEFAULT_USER_PREFERENCES, builtinAccessContext, validateAccessContext, type AccessContext, type UserPreferences } from "@jewelos/core";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { usernameLoginFunctionError } from "./functionError";
+import { invalidateMasterOptions } from "@/features/dropdowns/api";
 
 type AuthStatus = "loading" | "signed_out" | "authenticated" | "incomplete" | "blocked";
 
@@ -51,25 +52,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const forcedSignOut = useRef(false);
+  const identityGeneration = useRef(0);
 
   const refreshPreferences = useCallback(async () => {
+    const generation = identityGeneration.current;
     const { data } = await supabase.from("user_preferences").select("preferences").maybeSingle();
+    if (generation !== identityGeneration.current) return;
     setPreferences((data?.preferences as UserPreferences | undefined) ?? DEFAULT_USER_PREFERENCES);
   }, []);
 
   const applyProfile = useCallback(async (nextProfile: UserProfile) => {
+    const generation = identityGeneration.current;
     const nextAccess = await fetchAccessContext(nextProfile);
+    if (generation !== identityGeneration.current) return;
     setAccess(nextAccess);
     setProfile({ ...nextProfile, user_role: nextAccess.effectiveRole });
   }, []);
 
   const loadProfile = useCallback(async (nextSession: Session) => {
+    invalidateMasterOptions();
+    const generation = ++identityGeneration.current;
     setSession(nextSession);
     const { data: nextProfile, error } = await supabase
       .from("user_profiles")
       .select("*")
       .eq("auth_user_id", nextSession.user.id)
       .maybeSingle();
+    if (generation !== identityGeneration.current) return;
     if (error) {
       setStatus("blocked");
       setStatusMessage("We could not load your account profile. Please try again or contact your admin.");
@@ -104,13 +113,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     await applyProfile(nextProfile);
+    if (generation !== identityGeneration.current) return;
     const { data: nextBranch } = await supabase
       .from("branches")
       .select("*")
       .eq("id", nextProfile.branch_id)
       .maybeSingle();
+    if (generation !== identityGeneration.current) return;
     setBranch(nextBranch);
     await refreshPreferences();
+    if (generation !== identityGeneration.current) return;
     setStatusMessage(null);
     setStatus("authenticated");
   }, [applyProfile, refreshPreferences]);
@@ -122,23 +134,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const refreshAccess = useCallback(async () => {
     if (!session) return;
+    const generation = identityGeneration.current;
     const { data: nextProfile, error } = await supabase
       .from("user_profiles")
       .select("*")
       .eq("auth_user_id", session.user.id)
       .maybeSingle();
-    if (error || !nextProfile) return;
+    if (generation !== identityGeneration.current || error || !nextProfile) return;
     await applyProfile(nextProfile);
   }, [applyProfile, session]);
 
-  useTenantRealtimeRefresh({ tenantId: status === "authenticated" ? profile?.tenant_id : null, topics: ["settings", "organization"], refresh: refreshAccess });
-
-  useEffect(() => {
-    if (status !== "authenticated") return;
-    const onVisible = () => { if (document.visibilityState === "visible") void refreshAccess(); };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [refreshAccess, status]);
+  useTenantRealtimeRefresh({ tenantId: status === "authenticated" ? profile?.tenant_id : null, topics: ["settings", "organization"], refresh: async () => { await Promise.all([refreshAccess(), refreshPreferences()]); } });
 
   useEffect(() => {
     let active = true;
@@ -153,6 +159,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (refreshError || !refreshed.session) {
         await supabase.auth.signOut({ scope: "local" });
         if (!active) return;
+        identityGeneration.current += 1;
+        invalidateMasterOptions();
+        setPreferences(DEFAULT_USER_PREFERENCES);
         setSession(null);
         setProfile(null);
         setAccess(null);
@@ -170,6 +179,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else if (event === "SIGNED_OUT" && forcedSignOut.current) {
         forcedSignOut.current = false;
       } else {
+        identityGeneration.current += 1;
+        invalidateMasterOptions();
+        setPreferences(DEFAULT_USER_PREFERENCES);
         setSession(null);
         setProfile(null);
         setAccess(null);

@@ -1,9 +1,9 @@
-import { memo, useEffect, useMemo, useState } from "react";
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
+import { memo, useMemo, useState } from "react";
 import { Alert, RefreshControl, StyleSheet, View } from "react-native";
 import { changeMasterOption, loadAllMasterOptions, type MasterOption } from "@jewelos/data/dropdowns/api";
 import { dropdownMasterCounts, filterDropdownMasterItems, hasPermission } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthProvider";
-import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
 import { useAsyncData } from "@/lib/useAsyncData";
 import { makeStyles } from "@/theme/makeStyles";
 import { useAppTheme } from "@/theme/ThemeProvider";
@@ -30,7 +30,7 @@ export function DropdownMasterScreen() {
   const [status, setStatus] = useState<"all" | "active" | "inactive">("all");
   const [editing, setEditing] = useState<MasterOption | null | undefined>(undefined);
   const state = useAsyncData(loadAllMasterOptions, []);
-  useEffect(() => profile?.tenant_id ? subscribeToTenantRealtime(profile.tenant_id, ["organization", "settings"], () => void state.refresh()) : undefined, [profile?.tenant_id, state.refresh]);
+  useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["organization", "settings"], refresh: state.refresh });
   const items = useMemo(() => state.data ?? [], [state.data]);
   const categories = useMemo(() => [...new Set([...REQUIRED, ...items.map((item) => item.master_type)])].sort(), [items]);
   // The same two decisions the web page makes, from the same core functions,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { FormFieldDefinition, FormSectionDefinition } from "../index";
-import { readAnswerRoutes, readGuidedConditionLinks, setAnswerRoute, setGuidedFollowUp } from "./guidedConditions";
+import { readAnswerRoutes, readGuidedConditionLinks, setAnswerRoute, setGuidedFollowUp, setQuestionAnswerCondition } from "./guidedConditions";
 
 const fields: readonly FormFieldDefinition[] = [
   { key: "metal", label: "Metal", type: "select", sortOrder: 0, options: [{ value: "gold", label: "Gold" }, { value: "silver", label: "Silver" }] },
@@ -61,5 +61,22 @@ describe("guided answer follow-ups", () => {
 
     expect(sectionRouted[0]?.branches).toEqual([{ operator: "equals", value: "gold", targetSectionKey: "silver_details" }]);
     expect(continued[0]?.branches).toBeUndefined();
+  });
+  it("removes a previous section jump when the same answer is changed to a question", () => {
+    const sectionRouted = setAnswerRoute(fields, "metal", "gold", { kind: "section", sectionKey: "silver_details" });
+    const questionRouted = setAnswerRoute(sectionRouted, "metal", "gold", { kind: "question", questionKey: "karat" });
+    expect(questionRouted[0]?.branches).toBeUndefined();
+    expect(readAnswerRoutes(questionRouted, sections, "metal").get("gold")).toEqual({ kind: "question", questionKey: "karat" });
+  });
+  it("replaces a question's existing incoming answers and clears them when set to always show", () => {
+    const both = setGuidedFollowUp(setGuidedFollowUp(fields, "metal", "gold", "karat"), "metal", "silver", "karat");
+    const replaced = setQuestionAnswerCondition(both, "karat", "metal", "silver");
+    expect(readGuidedConditionLinks(replaced[1]!)).toEqual([{ sourceKey: "metal", optionValue: "silver" }]);
+    expect(readAnswerRoutes(replaced, sections, "metal").has("gold")).toBe(false);
+    expect(setQuestionAnswerCondition(replaced, "karat", undefined, undefined)[1]?.rule).toBeUndefined();
+  });
+  it("preserves complex rules when using simple question mappings", () => {
+    const complex = fields.map((field) => field.key === "karat" ? { ...field, rule: { kind: "predicate" as const, fieldKey: "metal", operator: "not_equals" as const, value: "silver" } } : field);
+    expect(setQuestionAnswerCondition(complex, "karat", "metal", "gold")).toBe(complex);
   });
 });

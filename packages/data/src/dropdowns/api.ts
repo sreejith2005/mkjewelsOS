@@ -9,7 +9,8 @@ export function loadMasterOptions(types: readonly string[], activeOnly = true): 
   const key = `${activeOnly ? "active" : "all"}:${[...types].sort().join(",")}`;
   const existing = cached.get(key); if (existing) return existing;
   const query = db().from("dropdown_masters").select("id,master_type,label,value,sort_order,is_active").eq("is_active", activeOnly).order("master_type").order("sort_order");
-  const request = Promise.resolve(types.length ? query.in("master_type", [...types]) : query).then(({ data, error }) => { if (error) throw new Error(error.message); return data ?? []; });
+  const request = Promise.resolve(types.length ? query.in("master_type", [...types]) : query).then(({ data, error }) => { if (error) throw new Error(error.message); return data ?? []; })
+    .finally(() => { if (cached.get(key) === request) cached.delete(key); });
   cached.set(key, request); return request;
 }
 export function invalidateMasterOptions() { cached.clear(); }

@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Linking } from "react-native";
 import { NavigationContainer, DefaultTheme, type Theme as NavTheme } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "@/auth/AuthProvider";
@@ -25,6 +26,8 @@ import { AssigningLeftScreen } from "@/screens/AssigningLeftScreen";
 import { PermissionManagementScreen } from "@/screens/PermissionManagementScreen";
 import { FmsBuilderScreen } from "@/screens/FmsBuilderScreen";
 import type { RootStackParamList } from "@/navigation/types";
+import { incomingNativePath } from "@/navigation/incomingPath";
+import { env } from "@/config/env";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -38,6 +41,23 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
  */
 export function RootNavigator() {
   const { status, statusMessage, logout, profile } = useAuth();
+  const [incomingPath, setIncomingPath] = useState<string | null>(null);
+  const previousStatus = useRef(status);
+  const consumePath = useCallback(() => setIncomingPath(null), []);
+  useEffect(() => {
+    let active = true;
+    const receive = (url: string) => {
+      const path = incomingNativePath(url, env.jewelosWebOrigin);
+      if (active && path) setIncomingPath(path);
+    };
+    const subscription = Linking.addEventListener("url", ({ url }) => receive(url));
+    void Linking.getInitialURL().then((url) => { if (url) receive(url); }).catch(() => {});
+    return () => { active = false; subscription.remove(); };
+  }, []);
+  useEffect(() => {
+    if (previousStatus.current === "authenticated" && status !== "authenticated") setIncomingPath(null);
+    previousStatus.current = status;
+  }, [status]);
   const { name, theme } = useTheme();
   const navigationTheme = useMemo<NavTheme>(() => ({
     ...DefaultTheme,
@@ -71,7 +91,9 @@ export function RootNavigator() {
             animation: "default",
           }}
         >
-          <Stack.Screen component={AppTabs} name="Tabs" options={{ headerShown: false }} />
+          <Stack.Screen name="Tabs" options={{ headerShown: false }}>
+            {() => <AppTabs incomingPath={incomingPath} onPathConsumed={consumePath} />}
+          </Stack.Screen>
           <Stack.Screen component={TaskComposerScreen} name="TaskComposer" options={{ title: "Create Task" }} />
           <Stack.Screen component={TaskImportScreen} name="TaskImport" options={{ title: "Task Bulk Import" }} />
           <Stack.Screen component={TaskDetailScreen} name="TaskDetail" options={{ title: "Task" }} />

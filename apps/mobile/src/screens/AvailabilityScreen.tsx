@@ -1,3 +1,4 @@
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
 import { useMemo, useState } from "react";
 import { RefreshControl, StyleSheet, View } from "react-native";
 import { CalendarCheck, Users } from "lucide-react-native";
@@ -70,6 +71,7 @@ export function AvailabilityScreen() {
     return { users: canLogOthers ? allUsers : allUsers.filter((user) => user.id === profile.id), entries, departments };
   }, [canLogOthers, profile.id, startDate]);
 
+  useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["organization", "tasks"], refresh: refresh });
   const users = data?.users ?? [];
   const entries = data?.entries ?? [];
   const entryByUser = useMemo(() => new Map(entries.map((entry) => [entry.user_profile_id, entry])), [entries]);

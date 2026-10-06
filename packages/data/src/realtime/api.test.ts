@@ -22,6 +22,22 @@ afterEach(() => {
 });
 
 describe("subscribeToTenantRealtime", () => {
+  it("catches up on subscription recovery and excludes removed observers", () => {
+    vi.useFakeTimers();
+    const active = vi.fn();
+    const removed = vi.fn();
+    const stop = subscribeToTenantRealtime("recovery-tenant", ["fms"], active);
+    const stopRemoved = subscribeToTenantRealtime("recovery-tenant", ["tasks"], removed);
+    stopRemoved();
+    const status = realtimeMocks.channel.subscribe.mock.calls[0]?.[0] as ((status: string) => void) | undefined;
+    status?.("SUBSCRIBED");
+    status?.("CHANNEL_ERROR");
+    status?.("SUBSCRIBED");
+    expect(active).toHaveBeenCalledTimes(2);
+    expect(removed).not.toHaveBeenCalled();
+    stop(); vi.runAllTimers();
+  });
+
   it("shares one tenant channel and notifies only matching topics", () => {
     vi.useFakeTimers();
     const tasksListener = vi.fn();

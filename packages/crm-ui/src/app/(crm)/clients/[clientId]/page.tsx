@@ -1,3 +1,4 @@
+import { assertCrmRead, readCrmResults } from "@/crm-port/read-results";
 import { getCrmUser } from "@/crm-port/crm-user"; // crm-port: see getCrmUser
 import { notFound } from "@/next-shim/navigation"; // crm-port: next/navigation -> local shim (same paths, /crm base path added)
 
@@ -19,7 +20,7 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
     sugarsResult,
     communitiesResult,
     giftsResult,
-  ] = await Promise.all([
+  ] = await readCrmResults([
     supabase.from("clients").select("*").eq("client_id", clientId).single(),
     supabase.from("client_timeline").select("id,created_at,event_date,event_type,buy_status,crm_name,remark,branch_id,salesperson_id,seen_categories,bought_categories,order_categories,product_requirement,reference_number").eq("client_id", clientId).order("created_at", { ascending: false }).order("event_date", { ascending: false }).order("id", { ascending: false }) /* crm-port: deterministic order */,
     supabase.from("client_edit_log").select("id,field_name,old_value,new_value,created_at,edited_by").eq("client_id", clientId).order("created_at", { ascending: false }).order("id", { ascending: false }) /* crm-port: deterministic order */,
@@ -36,20 +37,20 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
   if (clientResult.error || !clientResult.data) notFound();
 
   const { data: currentUser } = authResult.data.user
-    ? await supabase.from("users").select("branch_id").eq("id", authResult.data.user.id).single()
+    ? assertCrmRead(await supabase.from("users").select("branch_id").eq("id", authResult.data.user.id).single())
     : { data: null };
 
   const branchIds = [...new Set([clientResult.data.last_branch_id, ...(timelineResult.data ?? []).map((item) => item.branch_id)].filter(Boolean))] as string[];
   const editorIds = [...new Set((auditResult.data ?? []).map((item) => item.edited_by).filter(Boolean))] as string[];
   const salespersonIds = [...new Set([clientResult.data.last_salesperson_id, ...(timelineResult.data ?? []).map((item) => item.salesperson_id)].filter(Boolean))] as string[];
-  const [{ data: branches }, { data: users }] = await Promise.all([
+  const [{ data: branches }, { data: users }] = await readCrmResults([
     branchIds.length ? supabase.from("branches").select("id,name").in("id", branchIds) : Promise.resolve({ data: [] }),
     [...editorIds, ...salespersonIds].length ? supabase.from("users").select("id,name").in("id", [...new Set([...editorIds, ...salespersonIds])]) : Promise.resolve({ data: [] }),
   ]);
   // Approved identity extension: codes, referrer and family (company-wide read, as clients).
-  const { data: identity } = await supabase.from("client_identity").select("referral_code,household_code,household_id,referral_id,referral_person_id,relation,referred_by_client_id,referred_by_client_code,referred_by_name,lifecycle_stage").eq("client_id", clientId).maybeSingle();
+  const { data: identity } = assertCrmRead(await supabase.from("client_identity").select("referral_code,household_code,household_id,referral_id,referral_person_id,relation,referred_by_client_id,referred_by_client_code,referred_by_name,lifecycle_stage").eq("client_id", clientId).maybeSingle());
   const { data: family } = identity?.household_id
-    ? await supabase.from("clients").select("client_id,client_code,primary_name").eq("household_id", identity.household_id).neq("client_id", clientId).order("client_code")
+    ? assertCrmRead(await supabase.from("clients").select("client_id,client_code,primary_name").eq("household_id", identity.household_id).neq("client_id", clientId).order("client_code"))
     : { data: [] };
   const branchNames = new Map((branches ?? []).map((item) => [item.id, item.name]));
   const userNames = new Map((users ?? []).map((item) => [item.id, item.name]));

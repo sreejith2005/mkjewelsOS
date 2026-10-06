@@ -26,7 +26,11 @@ function createSubscription(tenantId: string): TenantRealtimeSubscription {
       if (!isTenantRealtimeTopic(topic)) return;
       listeners.forEach(({ listener, topics }) => { if (topics.has(topic)) listener(); });
     },
-  ).subscribe();
+  ).subscribe((status) => {
+    // Postgres events are not replayed after disconnect. Reload authorized data
+    // on channel readiness, including first connection and subsequent recovery.
+    if (status === "SUBSCRIBED") listeners.forEach(({ listener }) => listener());
+  });
   return { channel, listeners, removalTimer: null };
 }
 

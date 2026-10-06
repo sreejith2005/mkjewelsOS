@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, RefreshControl, StyleSheet, Switch, View } from "react-native";
 import { LogOut, Settings, Shield, UserRound } from "lucide-react-native";
 import {
@@ -25,6 +25,8 @@ import { DataPurgeCard } from "@/features/settings/DataPurgeCard";
 import { titleCase } from "@/lib/format";
 import { errorText } from "@/lib/log";
 import { useAsyncData } from "@/lib/useAsyncData";
+import { useSyncedDraft } from "@/lib/useSyncedDraft";
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
 import { makeStyles } from "@/theme/makeStyles";
 import { useAppTheme } from "@/theme/ThemeProvider";
 import { Button } from "@/ui/Button";
@@ -44,32 +46,40 @@ export function SettingsScreen() {
   const { branch, logout, refreshPreferences } = useAuth();
   const theme = useAppTheme();
   const styles = useStyles();
-  const [preferences, setPreferences] = useState<UserPreferences>(DEFAULT_USER_PREFERENCES);
-  const [tenant, setTenant] = useState<TenantSettings | null>(null);
-  const [branchSettings, setBranchSettings] = useState<BranchSettings>({ report_default_department_id: null, export_max_rows: null });
-  const [controls, setControls] = useState<SectionControls>(DEFAULT_SECTION_CONTROLS);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const { data, error, loading, refreshing, refresh, reload } = useAsyncData<SettingsData>(fetchSettings, []);
+  useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["settings", "organization"], refresh });
   const canTenant = hasPermission(access, "settings.manage_organization");
   const canBranch = hasPermission(access, "settings.manage_branch");
   const canDeveloper = hasPermission(access, "developer_mode.manage");
   const canManagePermissions = hasPermission(access, "permissions.manage");
   const currentBranch = data?.branches.find((item) => item.id === profile.branch_id);
 
-  useEffect(() => {
-    if (!data) return;
-    setPreferences(data.preferences?.preferences ?? DEFAULT_USER_PREFERENCES);
-    setControls(data.sectionControls);
-    setTenant({ name: data.tenant.name, currency: data.tenant.currency ?? "INR", timezone: data.tenant.timezone ?? "Asia/Kolkata", export_retention_days: data.tenant.export_retention_days, export_max_rows: data.tenant.export_max_rows });
-    const assigned = data.branches.find((item) => item.id === profile.branch_id);
-    setBranchSettings({ report_default_department_id: typeof assigned?.settings.report_default_department_id === "string" ? assigned.settings.report_default_department_id : null, export_max_rows: typeof assigned?.settings.export_max_rows === "number" ? assigned.settings.export_max_rows : null });
-  }, [data, profile.branch_id]);
+  const incomingTenant = useMemo(() => data ? { settings: { name: data.tenant.name, currency: data.tenant.currency ?? "INR", timezone: data.tenant.timezone ?? "Asia/Kolkata", export_retention_days: data.tenant.export_retention_days, export_max_rows: data.tenant.export_max_rows } satisfies TenantSettings, version: data.tenant.settings_version } : null, [data]);
+  const incomingBranch = useMemo(() => ({ settings: { report_default_department_id: typeof currentBranch?.settings.report_default_department_id === "string" ? currentBranch.settings.report_default_department_id : null, export_max_rows: typeof currentBranch?.settings.export_max_rows === "number" ? currentBranch.settings.export_max_rows : null } satisfies BranchSettings, version: currentBranch?.settings_version ?? 0, id: currentBranch?.id ?? null }), [currentBranch]);
+  const preferencesDraft = useSyncedDraft<UserPreferences>(data?.preferences?.preferences ?? DEFAULT_USER_PREFERENCES);
+  const controlsDraft = useSyncedDraft<SectionControls>(data?.sectionControls ?? DEFAULT_SECTION_CONTROLS);
+  const tenantDraft = useSyncedDraft(incomingTenant);
+  const branchDraft = useSyncedDraft(incomingBranch, profile?.branch_id ?? 'unassigned');
+  const preferences = preferencesDraft.value;
+  const controls = controlsDraft.value;
+  const tenant = tenantDraft.value?.settings ?? null;
+  const branchSettings = branchDraft.value.settings;
+  const setPreferences = preferencesDraft.setValue;
+  const setControls = controlsDraft.setValue;
+  const setTenant = (settings: TenantSettings) => { if (tenantDraft.value) tenantDraft.setValue({ ...tenantDraft.value, settings }); };
+  const setBranchSettings = (settings: BranchSettings) => branchDraft.setValue({ ...branchDraft.value, settings });
+  const staleDrafts = [preferencesDraft, controlsDraft, tenantDraft, branchDraft].filter((draft) => draft.changedRemotely);
 
   const mutate = async (key: string, action: () => Promise<unknown>, success: string) => {
     setBusy(key); setMessage(null); setActionError(null);
-    try { await action(); setMessage(success); await refresh(); }
+    try {
+      await action();
+      if (key === "preferences") preferencesDraft.saved(preferences);
+      setMessage(success); await refresh();
+    }
     catch (caught) { setActionError(errorText(caught)); } finally { setBusy(null); }
   };
 
@@ -80,6 +90,7 @@ export function SettingsScreen() {
   return <Screen refreshControl={<RefreshControl colors={[theme.colors.primary]} onRefresh={() => void refresh()} refreshing={refreshing} tintColor={theme.colors.primary} />} scroll>
     <View style={styles.titleRow}><Settings color={theme.colors.primary} size={24} /><View style={styles.titleCopy}><Text variant="heading" weight="bold">Settings</Text><Text tone="muted" variant="small">Account identity, preferences, and authorized organization defaults.</Text></View></View>
     {message ? <Banner tone="success">{message}</Banner> : null}{actionError || error ? <Banner tone="danger">{actionError ?? error ?? "Settings request failed"}</Banner> : null}
+    {staleDrafts.length ? <Card><Banner tone="warning">Settings changed elsewhere. Your unfinished edits are preserved. Organization and branch saves still check the version you started editing.</Banner><Button label="Discard edits and use latest settings" onPress={() => { preferencesDraft.discard(); controlsDraft.discard(); tenantDraft.discard(); branchDraft.discard(); }} variant="secondary" /></Card> : null}
     <View style={styles.sectionHeading}><UserRound color={theme.colors.primary} size={18} /><Text variant="title" weight="semibold">Account & identity</Text></View>
     <Card><CardRow label="Full name" value={profile.employee_name} /><CardRow label="Email" value={profile.email} /><CardRow label="Employee code" value={profile.employee_code} /><CardRow label="Role" value={titleCase(access.baseRole)} /><CardRow label="Dashboard authority" value={access.dashboardAuthority ? titleCase(access.dashboardAuthority) : "Inherited from role"} /><CardRow label="Working status" value={titleCase(profile.working_status)} /><CardRow label="Assigned branch" value={branch?.name ?? "Not assigned"} /></Card>
     <View style={styles.sectionTitleBlock}><Text variant="title" weight="semibold">My preferences</Text><Text tone="muted" variant="small">Presentation choices never change authorization.</Text></View>
@@ -92,14 +103,14 @@ export function SettingsScreen() {
     </Card>
     {canTenant && tenant ? <>
       <View style={styles.sectionHeading}><Shield color={theme.colors.primary} size={18} /><Text variant="title" weight="semibold">Organization settings</Text><StatusBadge label={`Version ${data.tenant.settings_version}`} /></View>
-      <Card><TextField label="Tenant name" onChangeText={(name) => setTenant({ ...tenant, name })} value={tenant.name} /><View style={styles.fields}><View style={styles.field}><TextField autoCapitalize="characters" label="Currency" maxLength={3} onChangeText={(currency) => setTenant({ ...tenant, currency: currency.toUpperCase() })} value={tenant.currency} /></View><View style={styles.field}><TextField label="Timezone" onChangeText={(timezone) => setTenant({ ...tenant, timezone })} value={tenant.timezone} /></View></View><View style={styles.fields}><View style={styles.field}><TextField keyboardType="number-pad" label="Export retention days" onChangeText={(value) => setTenant({ ...tenant, export_retention_days: Number(value) })} value={String(tenant.export_retention_days)} /></View><View style={styles.field}><TextField keyboardType="number-pad" label="Export max rows" onChangeText={(value) => setTenant({ ...tenant, export_max_rows: Number(value) })} value={String(tenant.export_max_rows)} /></View></View><Button busy={busy === "tenant"} label="Save organization settings" onPress={() => void mutate("tenant", () => saveTenant(validateTenantSettings(tenant), data.tenant.settings_version), "Organization settings saved.")} /></Card>
+      <Card><TextField label="Tenant name" onChangeText={(name) => setTenant({ ...tenant, name })} value={tenant.name} /><View style={styles.fields}><View style={styles.field}><TextField autoCapitalize="characters" label="Currency" maxLength={3} onChangeText={(currency) => setTenant({ ...tenant, currency: currency.toUpperCase() })} value={tenant.currency} /></View><View style={styles.field}><TextField label="Timezone" onChangeText={(timezone) => setTenant({ ...tenant, timezone })} value={tenant.timezone} /></View></View><View style={styles.fields}><View style={styles.field}><TextField keyboardType="number-pad" label="Export retention days" onChangeText={(value) => setTenant({ ...tenant, export_retention_days: Number(value) })} value={String(tenant.export_retention_days)} /></View><View style={styles.field}><TextField keyboardType="number-pad" label="Export max rows" onChangeText={(value) => setTenant({ ...tenant, export_max_rows: Number(value) })} value={String(tenant.export_max_rows)} /></View></View><Button busy={busy === "tenant"} label="Save organization settings" onPress={() => void mutate("tenant", async () => { const submitted = tenantDraft.value; if (!submitted) return; const settings = validateTenantSettings(tenant); const version = await saveTenant(settings, submitted.version); tenantDraft.saved(submitted, { settings, version }, (value) => value ? { ...value, version } : value); }, "Organization settings saved.")} /></Card>
     </> : null}
     {canManagePermissions ? <><View style={styles.sectionHeading}><Shield color={theme.colors.primary} size={18} /><Text variant="title" weight="semibold">Permission management</Text></View><Card><Text tone="muted" variant="small">Role defaults, designation and user overrides, and dashboard authority. Every change is audited.</Text><Button label="Open permission management" onPress={() => navigation.navigate("PermissionManagement")} /></Card></> : null}
     {canDeveloper ? <>
 <View style={styles.sectionHeading}><Text variant="title" weight="semibold">Developer mode</Text><Switch accessibilityLabel="Show section controls in the header" onValueChange={(value) => setControls({ ...controls, developer_mode_enabled: value })} thumbColor={theme.colors.surface} trackColor={{ false: theme.colors.border, true: theme.colors.primary }} value={controls.developer_mode_enabled} /></View>
-      <Card><Text tone="muted" variant="small">Disable sections for everyone except Super Admins. Enforced in the app and on the server. The switch above shows the section controls in the web header; disabled sections stay disabled either way. Each save is audited.</Text><Text tone="muted" variant="caption">Clear a section to disable it for everyone except Super Admins.</Text>{CONTROLLED_PAGES.map((page) => <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: controls.section_availability[page] }} key={page} onPress={() => setControls({ ...controls, section_availability: { ...controls.section_availability, [page]: !controls.section_availability[page] } })} style={styles.controlRow}><Text>{titleCase(page)}</Text><StatusBadge label={controls.section_availability[page] ? "Available" : "Maintenance"} tone={controls.section_availability[page] ? "success" : "warning"} /></Pressable>)}<Button busy={busy === "controls"} label="Save developer controls" onPress={() => void mutate("controls", () => saveSectionControls(controls), "Developer controls saved.")} /></Card>
+      <Card><Text tone="muted" variant="small">Disable sections for everyone except Super Admins. Enforced in the app and on the server. The switch above shows the section controls in the web header; disabled sections stay disabled either way. Each save is audited.</Text><Text tone="muted" variant="caption">Clear a section to disable it for everyone except Super Admins.</Text>{CONTROLLED_PAGES.map((page) => <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: controls.section_availability[page] }} key={page} onPress={() => setControls({ ...controls, section_availability: { ...controls.section_availability, [page]: !controls.section_availability[page] } })} style={styles.controlRow}><Text>{titleCase(page)}</Text><StatusBadge label={controls.section_availability[page] ? "Available" : "Maintenance"} tone={controls.section_availability[page] ? "success" : "warning"} /></Pressable>)}<Button busy={busy === "controls"} label="Save developer controls" onPress={() => void mutate("controls", async () => { const confirmed = await saveSectionControls(controls); controlsDraft.saved(controls, confirmed, (value) => ({ ...value, settings_version: confirmed.settings_version })); }, "Developer controls saved.")} /></Card>
     </> : null}
-    {canBranch && currentBranch ? <><View style={styles.sectionHeading}><Text variant="title" weight="semibold">Branch report defaults</Text><StatusBadge label={currentBranch.name} /></View><Card><OptionPicker label="Default department context" onChange={(selected) => setBranchSettings({ ...branchSettings, report_default_department_id: selected[0] || null })} options={[{ value: "", label: "No default" }, ...data.departments.filter((item) => item.branch_id === null || item.branch_id === currentBranch.id).map((item) => ({ value: item.id, label: item.name }))]} selected={[branchSettings.report_default_department_id ?? ""]} /><TextField keyboardType="number-pad" label="Branch export max rows" onChangeText={(value) => setBranchSettings({ ...branchSettings, export_max_rows: value ? Number(value) : null })} placeholder="Use organization limit" value={branchSettings.export_max_rows === null ? "" : String(branchSettings.export_max_rows)} /><Button busy={busy === "branch"} label="Save branch defaults" onPress={() => void mutate("branch", () => saveBranch(currentBranch.id, validateBranchSettings(branchSettings), currentBranch.settings_version), "Branch defaults saved.")} /></Card></> : !canTenant && !canBranch ? <Card><Text tone="muted">Organization security and configuration are managed by authorized administrators.</Text></Card> : null}
+    {canBranch && currentBranch ? <><View style={styles.sectionHeading}><Text variant="title" weight="semibold">Branch report defaults</Text><StatusBadge label={currentBranch.name} /></View><Card><OptionPicker label="Default department context" onChange={(selected) => setBranchSettings({ ...branchSettings, report_default_department_id: selected[0] || null })} options={[{ value: "", label: "No default" }, ...data.departments.filter((item) => item.branch_id === null || item.branch_id === currentBranch.id).map((item) => ({ value: item.id, label: item.name }))]} selected={[branchSettings.report_default_department_id ?? ""]} /><TextField keyboardType="number-pad" label="Branch export max rows" onChangeText={(value) => setBranchSettings({ ...branchSettings, export_max_rows: value ? Number(value) : null })} placeholder="Use organization limit" value={branchSettings.export_max_rows === null ? "" : String(branchSettings.export_max_rows)} /><Button busy={busy === "branch"} label="Save branch defaults" onPress={() => void mutate("branch", async () => { const submitted = branchDraft.value; const settings = validateBranchSettings(branchSettings); const version = await saveBranch(submitted.id ?? currentBranch.id, settings, submitted.version); branchDraft.saved(submitted, { ...submitted, settings, version }, (value) => ({ ...value, version })); }, "Branch defaults saved.")} /></Card></> : !canTenant && !canBranch ? <Card><Text tone="muted">Organization security and configuration are managed by authorized administrators.</Text></Card> : null}
     {profile.user_role === "super_admin" ? <DataPurgeCard /> : null}
     <DailyChecklistManager />
     <Button icon={<LogOut color={theme.colors.danger} size={18} />} label="Sign out" onPress={() => void logout()} variant="danger" />

@@ -1,14 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BackHandler, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Check } from "lucide-react-native";
-import { calculateDailyChecklistProgress, type DailyChecklistStatus } from "@jewelos/core";
+import { calculateDailyChecklistProgress, dailyChecklistStatusKey, type DailyChecklistStatus } from "@jewelos/core";
 import { acknowledgeDailyChecklist, loadMyDailyChecklistStatus } from "@jewelos/data/dailyChecklists/api";
 import { errorText } from "@/lib/log";
 import { makeStyles } from "@/theme/makeStyles";
 import { useAppTheme } from "@/theme/ThemeProvider";
 import { Button } from "@/ui/Button";
 import { Text } from "@/ui/Text";
+import { useProfile } from "@/auth/AuthProvider";
+import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
+import { createRefreshLifecycle } from "@/lib/refreshLifecycle";
+import { subscribeAppAvailability } from "@/lib/useTenantRealtimeRefresh";
 
 /**
  * The signed-in employee's daily routine checklist, matching the web gate.
@@ -21,6 +25,7 @@ import { Text } from "@/ui/Text";
  * The same 1.5s delay as the web keeps it from covering the first paint.
  */
 export function DailyChecklistGate({ profileId }: { profileId: string }) {
+  const profile = useProfile();
   const theme = useAppTheme();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
@@ -31,31 +36,56 @@ export function DailyChecklistGate({ profileId }: { profileId: string }) {
   const [saving, setSaving] = useState(false);
   /** Bumped by Retry, so a failed load re-runs the effect below. */
   const [reloadToken, setReloadToken] = useState(0);
+  const generation = useRef(0);
+  const identity = useRef(0);
+  const statusRef = useRef(status);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    identity.current += 1;
     let active = true;
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    let previousKey: string | null = null;
     setStatus(null);
+    statusRef.current = null;
+    setSaving(false);
     setCheckedIds(new Set());
     setError(null);
     setVisible(false);
-    void (async () => {
+    const refresh = async () => {
+      const request = ++generation.current;
       try {
         const next = await loadMyDailyChecklistStatus();
-        if (!active) return;
+        if (!active || request !== generation.current) return;
+        const nextKey = dailyChecklistStatusKey(next);
+        if (nextKey !== previousKey) setCheckedIds(new Set());
+        previousKey = nextKey;
+        statusRef.current = next;
         setStatus(next);
-        if (next.required) timer = setTimeout(() => setVisible(true), 1500);
+        setError(null);
+        if (!next.required) {
+          if (timer.current) clearTimeout(timer.current);
+          timer.current = null; setVisible(false);
+        } else if (!timer.current) timer.current = setTimeout(() => { timer.current = null; if (active) setVisible(true); }, 1500);
       } catch (caught) {
-        if (!active) return;
+        if (!active || request !== generation.current) return;
         setError(errorText(caught));
         setVisible(true);
       }
-    })();
+    };
+    const lifecycle = createRefreshLifecycle(refresh, false);
+    const stopAvailability = subscribeAppAvailability(lifecycle.setActive);
+    const stopRealtime = subscribeToTenantRealtime(profile.tenant_id, ["settings", "organization"], lifecycle.request);
+    // Initial validation must also attempt a load offline and expose a retry error.
+    void refresh();
     return () => {
       active = false;
-      if (timer) clearTimeout(timer);
+      identity.current += 1;
+      generation.current += 1;
+      lifecycle.dispose(); stopAvailability(); stopRealtime();
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = null;
     };
-  }, [profileId, reloadToken]);
+  }, [profileId, profile.tenant_id, reloadToken]);
 
   const checklist = status?.checklist ?? null;
   const progress = useMemo(
@@ -75,16 +105,25 @@ export function DailyChecklistGate({ profileId }: { profileId: string }) {
 
   const acknowledge = async () => {
     if (!checklist || !progress?.canAcknowledge) return;
+    const actor = identity.current;
+    const date = status?.date;
+    const current = () => actor === identity.current && statusRef.current?.date === date;
     setSaving(true);
     setError(null);
     try {
       await acknowledgeDailyChecklist(checklist.id, checklist.revision, [...checkedIds]);
-      setStatus({ required: false, date: status?.date ?? "", checklist: null });
+      if (!current()) return;
+      generation.current += 1;
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = null;
+      const completed = { required: false, date: date ?? "", checklist: null };
+      statusRef.current = completed; setStatus(completed);
       setVisible(false);
     } catch (caught) {
+      if (!current()) return;
       setError(errorText(caught));
     } finally {
-      setSaving(false);
+      if (actor === identity.current) setSaving(false);
     }
   };
 

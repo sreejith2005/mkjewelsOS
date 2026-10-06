@@ -17,6 +17,24 @@ afterEach(() => {
 });
 
 describe("useTenantRealtimeRefresh", () => {
+  it("catches up on browser focus, visibility and online recovery", async () => {
+    vi.useFakeTimers();
+    subscription.subscribe.mockReturnValue(vi.fn());
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    const view = render(<Probe refresh={refresh} />);
+    for (const event of [new Event("focus"), new Event("online")]) {
+      act(() => window.dispatchEvent(event));
+      await act(async () => { await vi.advanceTimersByTimeAsync(5); });
+    }
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    await act(async () => { await vi.advanceTimersByTimeAsync(5); });
+    expect(refresh).toHaveBeenCalledTimes(3);
+    view.unmount();
+    act(() => window.dispatchEvent(new Event("online")));
+    await act(async () => { await vi.advanceTimersByTimeAsync(5); });
+    expect(refresh).toHaveBeenCalledTimes(3);
+  });
+
   it("coalesces matching signals into one refresh and cancels its timer on unmount", async () => {
     vi.useFakeTimers();
     const refresh = vi.fn().mockResolvedValue(undefined);

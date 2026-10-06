@@ -6,6 +6,24 @@ export const FORM_OPTION_TYPES: ReadonlySet<string> = new Set(["select", "multis
 /** A Dropdown Master row, reduced to what the forms engine needs. */
 export type FormMasterOption = Readonly<{ masterType: string; value: string; label: string }>;
 
+export type FormChoiceSources = Readonly<{
+  masters: readonly FormMasterOption[];
+  users: readonly Readonly<{ id: string; label: string }>[];
+  branches: readonly Readonly<{ id: string; label: string }>[];
+  departments: readonly Readonly<{ id: string; label: string }>[];
+}>;
+
+/** Actual answers available to the authoring controls on every client. */
+export function formAnswerOptions(field: FormFieldDefinition, sources: FormChoiceSources): readonly FormOption[] | null {
+  if (field.optionSource) return resolveFieldOptions(field, sources.masters);
+  if (field.options?.length) return field.options;
+  if (field.type === "checkbox") return [{ value: "true", label: "Checked" }, { value: "false", label: "Not checked" }];
+  const options = field.type === "user_dropdown" ? sources.users
+    : field.type === "branch_dropdown" ? sources.branches
+    : field.type === "department_dropdown" ? sources.departments : null;
+  return options?.map(({ id, label }) => ({ value: id, label })) ?? null;
+}
+
 export function slugifyOptionValue(label: string): string {
   return label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 100);
 }

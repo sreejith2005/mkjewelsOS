@@ -14,7 +14,8 @@ import { useIsMobile } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 
 function issueControlSelector(code: string, message: string): string {
-  if (["missing_form", "invalid_form", "missing_linked_form", "route_without_form", "invalid_assignment_field"].includes(code)) return '[data-fms-focus="form"]';
+  if (code === "invalid_assignment_field") return '[data-fms-focus="assignment"]';
+  if (["missing_form", "invalid_form", "missing_linked_form", "route_without_form"].includes(code)) return '[data-fms-focus="form"]';
   if (["invalid_decision", "route_without_decision"].includes(code)) return '[data-fms-focus="decision"]';
   const routeNumber = /^"?Route (\d+)/.exec(message)?.[1];
   if (code === "unsupported_cycle") {

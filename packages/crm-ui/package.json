@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@capacitor/core": "^8.5.0",
+    "@jewelos/core": "workspace:*",
     "@tanstack/react-query": "^5.90.20",
     "zod": "^4.3.6"
   },

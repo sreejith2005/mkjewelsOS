@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, GitBranch, Plus, Trash2 } from "lucide-react";
 import {
   FMS_BRANCH_OPERATORS,
   fmsFieldOptions,
+  fmsAssignmentFields,
   hasFmsStageFallback,
   hasFmsStageRouting,
   type FmsBranchOperator,
@@ -54,6 +55,8 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { st
   const canChooseNext = !["branch", "parallel_start", "end"].includes(stage.type);
   const decision = stage.sla.decisionMode === "decision" || stage.sla.decisionMode === "yes_no";
   const formFields = stage.formTemplateId ? data.formFields[stage.formTemplateId] ?? [] : [];
+  const assignmentFields = fmsAssignmentFields(formFields);
+  const invalidAssignment = !!stage.sla.assignmentFieldKey && !assignmentFields.some((field) => field.key === stage.sla.assignmentFieldKey);
   const [showConditional, setShowConditional] = useState(!!stage.sla.conditional && "decisionStageKey" in stage.sla.conditional);
   const decisionCondition = stage.sla.conditional && "decisionStageKey" in stage.sla.conditional ? stage.sla.conditional : undefined;
 
@@ -87,6 +90,12 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { st
     {human ? <section className="space-y-3 border-t border-gold/15 pt-4">
       <div><h4 className="text-xs font-semibold uppercase tracking-[0.15em] text-gold">Linked form</h4><p className="mt-1 text-xs text-soft-grey">{firstStage ? "The first step uses this form to collect the workflow’s initial details." : "Attach a Form the doer fills in when completing this step. Its answers can also drive the routing below."}</p></div>
       <LinkedForm data={data} firstStage={firstStage} stage={stage} update={update} />
+      <Field label="User question that assigns later steps"><select aria-invalid={invalidAssignment} className="field" data-fms-focus="assignment" onChange={(event) => updateSla({ assignmentFieldKey: event.target.value || undefined })} value={stage.sla.assignmentFieldKey ?? ""}>
+        <option value="">Use workflow default assignees</option>
+        {invalidAssignment ? <option disabled value={stage.sla.assignmentFieldKey}>Unavailable question: {stage.sla.assignmentFieldKey}</option> : null}
+        {assignmentFields.map((field) => <option key={field.key} value={field.key}>{field.label}</option>)}
+      </select></Field>
+      <p className="text-xs text-soft-grey">Choose a required, always visible User question in the linked form. Its answer sets the default for later steps; explicit step assignments take priority.</p>
     </section> : null}
 
     {canChooseNext ? <StageRouting decision={decision} fields={formFields} others={others} stage={stage} changeRule={changeBranchRule} moveRule={moveBranchRule} update={update} /> : null}

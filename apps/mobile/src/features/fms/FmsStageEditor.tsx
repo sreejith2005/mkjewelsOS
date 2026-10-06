@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, Trash2 } from "lucide-react-native";
 import {
   FMS_BRANCH_OPERATORS,
   fmsFieldOptions,
+  fmsAssignmentFields,
   hasFmsStageFallback,
   hasFmsStageRouting,
   type FmsBranchOperator,
@@ -119,6 +120,8 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete, issueC
   const canChooseNext = !["branch", "parallel_start", "end"].includes(stage.type);
   const decision = stage.sla.decisionMode === "decision" || stage.sla.decisionMode === "yes_no";
   const formFields = stage.formTemplateId ? data.formFields[stage.formTemplateId] ?? [] : [];
+  const assignmentFields = fmsAssignmentFields(formFields);
+  const invalidAssignment = !!stage.sla.assignmentFieldKey && !assignmentFields.some((field) => field.key === stage.sla.assignmentFieldKey);
   const formIssue = ["missing_form", "invalid_form", "missing_linked_form", "route_without_form", "invalid_assignment_field"].includes(issueCode ?? "");
   const deadlineIssue = ["invalid_deadline", "invalid_deadline_trigger"].includes(issueCode ?? "");
   const mark = (active: boolean) => ({ highlight: active, onLayout: active ? onIssueLayout : undefined });
@@ -155,6 +158,9 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete, issueC
       {human ? (
         <Section help={firstStage ? "The first step uses this form to collect the workflow’s initial details." : "Attach a Form the doer fills in when completing this step. Its answers can also drive the routing below."} title="Linked form" {...mark(formIssue)}>
           <LinkedForm data={data} firstStage={firstStage} invalid={formIssue} stage={stage} update={update} />
+          <OptionPicker label="User question that assigns later steps" invalid={invalidAssignment} options={[{ value: "", label: "Use workflow default assignees" }, ...assignmentFields.map((field) => ({ value: field.key, label: field.label }))]} selected={[stage.sla.assignmentFieldKey ?? ""]} onChange={(values) => updateSla({ assignmentFieldKey: values[0] || undefined })} />
+          {invalidAssignment ? <Text tone="danger" variant="small">{`The assignment question ${stage.sla.assignmentFieldKey} is unavailable. Choose an eligible User question or use workflow defaults.`}</Text> : null}
+          <Text tone="muted" variant="caption">A required, always visible User answer sets the default for later steps. Explicit step assignments take priority.</Text>
         </Section>
       ) : null}
 

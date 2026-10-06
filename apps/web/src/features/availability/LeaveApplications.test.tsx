@@ -17,6 +17,7 @@ const api = vi.hoisted(() => ({
 }));
 const actor = vi.hoisted(() => ({ role: "staff" as "staff" | "super_admin" }));
 vi.mock("@jewelos/data/leave/api", () => api);
+vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealtimeRefresh: vi.fn() }));
 vi.mock("@/auth/AuthContext", async () => {
   const { builtinAccessContext } = await vi.importActual<typeof import("@jewelos/core")>("@jewelos/core");
   const staffProfile = { id: "me", tenant_id: "t", employee_name: "Richelle", user_role: "staff" as const };

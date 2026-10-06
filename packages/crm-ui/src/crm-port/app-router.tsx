@@ -14,6 +14,7 @@
 // - after push/replace the page's first element is scrolled into view the way Next's
 //   layout-router does; refresh and history traversal do not scroll.
 import { createContext, Fragment, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import CrmLayout from "@/app/(crm)/layout";
 import AllocationPage from "@/app/(crm)/allocation/page";
@@ -32,6 +33,7 @@ import { redirect } from "@/next-shim/navigation";
 import { CrmNavigationContext, type CrmAppRouter as AppRouter, type CrmNavigationState } from "./navigation-context";
 import { NextNotFound } from "./not-found";
 import { crmAppPath, crmHost, CrmLeave, CrmNotFound, CrmRedirect, withBasePath } from "./runtime";
+import { useCrmRefresh } from "./use-crm-refresh";
 
 type SearchParamsRecord = Record<string, string | string[]>;
 type PageProps = { params: Promise<Record<string, string>>; searchParams: Promise<SearchParamsRecord> };
@@ -158,6 +160,11 @@ export function CrmAppRouter({ browserPath, browserSearch }: { browserPath: stri
   const [refreshToken, setRefreshToken] = useState(0);
   const [view, setView] = useState<PageView | null>(null);
   const [failure, setFailure] = useState<{ error: unknown } | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const refreshCompletions = useRef(new Set<() => void>());
+  const queryClient = useQueryClient();
   const layoutRef = useRef<{ node: ReactNode; refreshToken: number } | null>(null);
   const requestRef = useRef(0);
   const navigationKind = useRef<"history" | "navigate" | "refresh">("history");
@@ -170,6 +177,17 @@ export function CrmAppRouter({ browserPath, browserSearch }: { browserPath: stri
     forward: () => window.history.forward(),
     prefetch: () => undefined,
   }), []);
+
+  const refreshCurrentPage = () => Promise.all([
+    queryClient.invalidateQueries(),
+    new Promise<void>((resolve) => { refreshCompletions.current.add(resolve); router.refresh(); }),
+  ]).then(() => undefined);
+  useCrmRefresh(refreshCurrentPage);
+  useEffect(() => () => {
+    requestRef.current++;
+    for (const complete of refreshCompletions.current) complete();
+    refreshCompletions.current.clear();
+  }, []);
 
   useEffect(() => {
     if (pathname !== "/" && pathname.endsWith("/")) {
@@ -200,12 +218,26 @@ export function CrmAppRouter({ browserPath, browserSearch }: { browserPath: stri
           setView({ key: `404:${pathname}`, pathname, search: browserSearch, node: <NextNotFound />, inCrmLayout });
           return;
         }
-        setFailure({ error });
+        const current = viewRef.current;
+        const accessDenied = typeof error === "object" && error !== null && (
+          ("code" in error && ["42501", "PGRST301", "PGRST302"].includes(String(error.code)))
+          || ("status" in error && (error.status === 401 || error.status === 403))
+        );
+        if (!accessDenied && navigationKind.current === "refresh" && current?.pathname === pathname && current.search === browserSearch) {
+          setRefreshError("CRM could not refresh. Your current page and unsaved edits have been kept.");
+        } else setFailure({ error });
         return;
       }
+      setRefreshError(null);
       if (layoutResult?.ok) layoutRef.current = { node: layoutResult.value, refreshToken };
       if (pageResult.ok && match) setView({ key: pathname, pathname, search: browserSearch, node: pageResult.value, inCrmLayout: match.route.inCrmLayout });
-    })();
+    })().finally(() => {
+      // A superseding navigation/refresh owns these waiters until its loader
+      // settles. An obsolete request must not release background coordination.
+      if (requestId !== requestRef.current) return;
+      for (const complete of refreshCompletions.current) complete();
+      refreshCompletions.current.clear();
+    });
   }, [pathname, browserSearch, refreshToken]);
 
   useLayoutEffect(() => {
@@ -222,6 +254,7 @@ export function CrmAppRouter({ browserPath, browserSearch }: { browserPath: stri
   if (failure) throw failure.error;
   if (!view || !navigation) return null;
   return <CrmNavigationContext.Provider value={navigation}>
+    {refreshError ? <div role="alert">{refreshError} <button onClick={() => { void refreshCurrentPage(); }} type="button">Retry</button></div> : null}
     {view.inCrmLayout
       ? <PageSlotContext.Provider value={view}>{layoutRef.current?.node}</PageSlotContext.Provider>
       : <Fragment key={view.key}>{view.node}</Fragment>}

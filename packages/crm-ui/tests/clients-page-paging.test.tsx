@@ -3,6 +3,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const TOTAL = 205;
+let countError: { code: string; message: string } | null = null;
 const lead = { id: "lead-1", phone_number: "9100000001", name: "Synthetic Lead", field_values: {}, created_at: "2026-10-01T10:00:00Z", client_id: "lead-client", clients: { client_code: "MKC-200001", total_visits: 0 } };
 
 function clientRows(offset: number, limit: number) {
@@ -13,6 +14,7 @@ function clientRows(offset: number, limit: number) {
 }
 
 const rpc = vi.fn(async (name: string, args: Record<string, unknown> = {}) => {
+  if (name === "browse_clients_page" && args.result_limit === 1 && countError) return { data: null, error: countError };
   if (name === "browse_clients_page") return { data: clientRows(Number(args.page_offset), Number(args.result_limit)), error: null };
   if (name === "get_my_profile") return { data: [{ role: "salesperson" }], error: null };
   return { data: null, error: null };
@@ -33,13 +35,17 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({ fro
 
 import ClientsPage from "@/app/(crm)/clients/page";
 
-afterEach(() => { cleanup(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); countError = null; });
 
 function browseCalls() {
   return rpc.mock.calls.filter(([name]) => name === "browse_clients_page").map(([, args]) => args);
 }
 
 describe("Client Database paging", () => {
+  it("propagates a failed fallback count instead of showing zero clients", async () => {
+    countError = { code: "", message: "TypeError: Failed to fetch" };
+    await expect(ClientsPage({ searchParams: Promise.resolve({ page: "9" }) })).rejects.toBe(countError);
+  });
   it("shows leads and the first 200 clients on page 1, with the total of every match", async () => {
     render(await ClientsPage({ searchParams: Promise.resolve({}) }));
 

@@ -20,6 +20,18 @@ function renderProfile() {
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("ClientProfile legacy parity", () => {
+  it("opens the latest committed client values and preserves an active edit across refresh", () => {
+    const queryClient = new QueryClient();
+    const node = (current: Client) => <QueryClientProvider client={queryClient}><ClientProfile client={current} timeline={[]} audit={[]} lookups={{ beverages: ["Tea"], snacks: ["Biscuits"] }} walkinContext={context} /></QueryClientProvider>;
+    const view = render(node(client));
+    view.rerender(node({ ...client, primary_name: "Updated Client" }));
+    fireEvent.click(screen.getByRole("button", { name: "EDIT PROFILE" }));
+    const name = screen.getByLabelText(/^primary name/) as HTMLInputElement;
+    expect(name.value).toBe("Updated Client");
+    fireEvent.change(name, { target: { value: "My draft" } });
+    view.rerender(node({ ...client, primary_name: "New remote change" }));
+    expect((screen.getByLabelText(/^primary name/) as HTMLInputElement).value).toBe("My draft");
+  });
   it("uses the walk-in select controls for gender and preferences in explicit edit mode", () => {
     renderProfile();
     fireEvent.click(screen.getByRole("button", { name: "EDIT PROFILE" }));

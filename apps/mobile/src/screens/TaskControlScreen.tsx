@@ -1,3 +1,4 @@
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
 import { useCallback, useMemo, useState } from "react";
 import { Alert, Linking, RefreshControl, StyleSheet, View, type ListRenderItem } from "react-native";
 import {
@@ -197,6 +198,7 @@ export function TaskControlScreen() {
     await Promise.all([snapshotState.refresh(), templateState.refresh()]);
   }, [snapshotState, templateState]);
 
+  useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["tasks", "forms", "organization"], refresh: async () => { await Promise.all([refresh(), referenceState.refresh()]); } });
   const changeFilters = useCallback((next: TaskControlFilters) => {
     setFilters(next);
     setPage(1);

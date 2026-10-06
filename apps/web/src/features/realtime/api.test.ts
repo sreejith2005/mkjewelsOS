@@ -7,8 +7,8 @@ const realtimeMocks = vi.hoisted(() => {
   return { channel, removeChannel: vi.fn().mockResolvedValue("ok"), supabaseChannel: vi.fn(() => channel) };
 });
 
-vi.mock("@jewelos/api-client", () => ({
-  supabase: { channel: realtimeMocks.supabaseChannel, removeChannel: realtimeMocks.removeChannel },
+vi.mock("@jewelos/api-client/client", () => ({
+  getSupabase: () => ({ channel: realtimeMocks.supabaseChannel, removeChannel: realtimeMocks.removeChannel }),
 }));
 
 import { subscribeToTenantRealtime } from "./api";

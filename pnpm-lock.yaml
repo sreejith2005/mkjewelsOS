@@ -171,6 +171,9 @@ importers:
       '@capacitor/core':
         specifier: ^8.5.0
         version: 8.5.2
+      '@jewelos/core':
+        specifier: workspace:*
+        version: link:../core
       '@tanstack/react-query':
         specifier: ^5.90.20
         version: 5.103.2(react@18.3.1)

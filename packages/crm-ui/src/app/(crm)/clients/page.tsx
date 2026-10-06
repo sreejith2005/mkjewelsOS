@@ -1,3 +1,4 @@
+import { assertCrmRead, readCrmResults } from "@/crm-port/read-results";
 import { getCrmUser } from "@/crm-port/crm-user"; // crm-port: see getCrmUser
 import { CLIENT_PAGE_SIZE, ClientDatabase, type ClientDatabaseRow } from "@/components/client-database";
 import { createClient } from "@/lib/supabase/server";
@@ -17,7 +18,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   const supabase = await createClient();
   const browser = supabase as unknown as ClientBrowser;
   const browseArgs = { search_text: search || null, potential_category: null, exclude_unvisited_leads: true };
-  const [{ data }, { data: profileRows }, { data: auth }, { data: branches }, { data: leads }] = await Promise.all([
+  const [{ data }, { data: profileRows }, { data: auth }, { data: branches }, { data: leads }] = await readCrmResults([
     browser.rpc("browse_clients_page", { ...browseArgs, page_offset: (page - 1) * CLIENT_PAGE_SIZE, result_limit: CLIENT_PAGE_SIZE }),
     supabase.rpc("get_my_profile"),
     getCrmUser(supabase) /* crm-port: auth.getUser().id is used as the CRM user id -> crm.current_crm_user_id() */,
@@ -26,12 +27,12 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   ]);
   const profile = profileRows?.[0];
   const { data: user } = auth.user
-    ? await supabase.from("users").select("branch_id").eq("id", auth.user.id).single()
+    ? assertCrmRead(await supabase.from("users").select("branch_id").eq("id", auth.user.id).single())
     : { data: null };
   const rows = Array.isArray(data) ? data as ClientPageRow[] : [];
   // A page past the last one has no rows to carry the total; ask for it once.
   const { data: totalRows } = rows.length === 0 && page > 1
-    ? await browser.rpc("browse_clients_page", { ...browseArgs, page_offset: 0, result_limit: 1 })
+    ? assertCrmRead(await browser.rpc("browse_clients_page", { ...browseArgs, page_offset: 0, result_limit: 1 }))
     : { data: null };
   const clientTotal = Number((rows[0] ?? (Array.isArray(totalRows) ? totalRows[0] as ClientPageRow | undefined : undefined))?.total_count ?? 0);
   const normalizedSearch = search.toLowerCase();

@@ -4,6 +4,7 @@ import { TrendChart } from "@/components/trend-chart";
 import { StatusDistributionChart } from "@/components/status-distribution-chart";
 import { buildDashboardData, dashboardRange, endExclusive, startInclusive } from "@/lib/dashboard";
 import { createClient } from "@/lib/supabase/server";
+import { assertCrmRead } from "@/crm-port/read-results";
 
 const statLabels = [["walkIns", "TOTAL WALK-INS"], ["notBought", "TOTAL NOT BOUGHT"], ["bought", "TOTAL BOUGHT"], ["orderPlaced", "TOTAL ORDER PLACE"], ["repairPlaced", "TOTAL REPAIR PLACE"], ["orderPickup", "TOTAL ORDER PICK UP"], ["repairPickup", "TOTAL REPAIR PICKUP"], ["upsale", "TOTAL UPSALE"], ["productReturn", "TOTAL PRODUCT RETURN"]] as const;
 
@@ -18,7 +19,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   for (let offset = 0; ; offset += 1000) {
     let visitsQuery = supabase.from("client_timeline").select("id,event_date,created_at,event_type,buy_status,branch_id,crm_name,remark,reference_number,client_id,branch:branches(name),client:clients(primary_name),salesperson:users(name)").order("event_date", { ascending: false }).order("id", { ascending: false }) /* crm-port: deterministic order */.range(offset, offset + 999);
     if (from && until) visitsQuery = visitsQuery.gte("event_date", from).lt("event_date", until);
-    const response = await visitsQuery;
+    const response = assertCrmRead(await visitsQuery);
     const page = response.data ?? [];
     visits.push(...page);
     if (page.length < 1000) break;

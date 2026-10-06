@@ -88,7 +88,10 @@ export function setAnswerRoute(
   fields: readonly FormFieldDefinition[], sourceKey: string, optionValue: FormAnswer, route: AnswerRoute,
 ): readonly FormFieldDefinition[] {
   const withoutQuestionRoute = setGuidedFollowUp(fields, sourceKey, optionValue, undefined);
-  if (route.kind === "question") return setGuidedFollowUp(withoutQuestionRoute, sourceKey, optionValue, route.questionKey);
+  if (route.kind === "question") {
+    const withoutSectionRoute = setAnswerRoute(withoutQuestionRoute, sourceKey, optionValue, { kind: "continue" });
+    return setGuidedFollowUp(withoutSectionRoute, sourceKey, optionValue, route.questionKey);
+  }
   return withoutQuestionRoute.map((field) => {
     if (field.key !== sourceKey) return field;
     const remaining = (field.branches ?? []).filter((branch) => !((branch.operator === "equals" || branch.operator === "contains") && sameLink({ sourceKey, optionValue }, { sourceKey, optionValue: branch.value ?? "" })));
@@ -97,4 +100,17 @@ export function setAnswerRoute(
     const operator = field.type === "checkbox" || field.type === "multiselect" ? "contains" as const : "equals" as const;
     return { ...field, branches: [...remaining, { operator, value: optionValue, targetSectionKey }] };
   });
+}
+
+/** Replaces the simple incoming answer mappings for a question, preserving complex rules. */
+export function setQuestionAnswerCondition(
+  fields: readonly FormFieldDefinition[], targetKey: string, sourceKey: string | undefined, optionValue: FormAnswer | undefined,
+): readonly FormFieldDefinition[] {
+  const target = fields.find((field) => field.key === targetKey);
+  const existing = target ? readGuidedConditionLinks(target) : null;
+  if (existing === null) return fields;
+  let next = fields;
+  for (const link of existing) next = setAnswerRoute(next, link.sourceKey, link.optionValue, { kind: "continue" });
+  return sourceKey && optionValue !== undefined
+    ? setAnswerRoute(next, sourceKey, optionValue, { kind: "question", questionKey: targetKey }) : next;
 }

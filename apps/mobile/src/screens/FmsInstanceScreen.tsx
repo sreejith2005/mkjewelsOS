@@ -1,3 +1,4 @@
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
 import { useCallback, useMemo, useState } from "react";
 import { Alert, RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
@@ -49,6 +50,7 @@ export function FmsInstanceScreen() {
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<Route>();
   const { data, error, loading, refreshing, reload, refresh } = useAsyncData(loadFmsRuntime, []);
+  useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["fms", "forms", "organization"], refresh: refresh });
   const [statusAction, setStatusAction] = useState<StatusAction | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);

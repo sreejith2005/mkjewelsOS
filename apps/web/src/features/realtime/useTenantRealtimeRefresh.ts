@@ -1,57 +1,37 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { createRefreshCoordinator } from "@jewelos/core";
 import { subscribeToTenantRealtime, type TenantRealtimeTopic } from "./api";
 
-export function useTenantRealtimeRefresh({
-  tenantId,
-  topics,
-  refresh,
-  debounceMs = 350,
-}: {
+export function useTenantRealtimeRefresh({ tenantId, topics, refresh, debounceMs = 350 }: {
   tenantId: string | null | undefined;
   topics: readonly TenantRealtimeTopic[];
   refresh: () => Promise<void> | void;
   debounceMs?: number;
-}): void {
+}): () => void {
+  const requestRef = useRef<() => void>(() => {});
+  const request = useCallback(() => requestRef.current(), []);
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
   const topicKey = topics.join(",");
-
   useEffect(() => {
-    if (!tenantId || topics.length === 0) return;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    let refreshInFlight = false;
-    let refreshQueued = false;
-    let disposed = false;
-    const scheduleRefresh = () => {
-      if (refreshInFlight) {
-        refreshQueued = true;
-        return;
-      }
-      if (timer !== null) clearTimeout(timer);
-      timer = setTimeout(() => { void runRefresh(); }, debounceMs);
+    if (!tenantId || !topicKey) return;
+    const coordinator = createRefreshCoordinator(() => refreshRef.current(), debounceMs);
+    requestRef.current = coordinator.request;
+    const onVisible = () => {
+      if (document.visibilityState === "visible") coordinator.request();
     };
-    const runRefresh = async () => {
-      timer = null;
-      refreshInFlight = true;
-      try {
-        await refreshRef.current();
-      } catch {
-        // Page loaders surface their own errors. A wake-up must not become an
-        // unhandled promise rejection.
-      } finally {
-        refreshInFlight = false;
-        if (disposed || !refreshQueued) return;
-        refreshQueued = false;
-        scheduleRefresh();
-      }
-    };
-    const unsubscribe = subscribeToTenantRealtime(tenantId, topics, () => {
-      scheduleRefresh();
-    });
+    const unsubscribe = subscribeToTenantRealtime(tenantId, topics, coordinator.request);
+    window.addEventListener("focus", onVisible);
+    window.addEventListener("online", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
-      disposed = true;
-      if (timer !== null) clearTimeout(timer);
+      requestRef.current = () => {};
+      coordinator.dispose();
       unsubscribe();
+      window.removeEventListener("focus", onVisible);
+      window.removeEventListener("online", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [debounceMs, tenantId, topicKey]);
+  return request;
 }

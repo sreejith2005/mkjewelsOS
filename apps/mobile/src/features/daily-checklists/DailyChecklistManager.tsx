@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { randomUUID } from "expo-crypto";
 import { hasPermission, type DailyChecklistItem } from "@jewelos/core";
@@ -7,7 +7,8 @@ import {
   saveDailyChecklist,
   type DailyChecklistRecord,
 } from "@jewelos/data/dailyChecklists/api";
-import { useAccess } from "@/auth/AuthProvider";
+import { useAccess, useProfile } from "@/auth/AuthProvider";
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
 import { errorText } from "@/lib/log";
 import { makeStyles } from "@/theme/makeStyles";
 import { Button } from "@/ui/Button";
@@ -33,6 +34,7 @@ function parsePastedChecklistLines(value: string): string[] {
  * document.
  */
 export function DailyChecklistManager() {
+  const profile = useProfile();
   const styles = useStyles();
   const [records, setRecords] = useState<readonly DailyChecklistRecord[]>([]);
   const [designations, setDesignations] = useState<readonly { id: string; label: string }[]>([]);
@@ -49,27 +51,32 @@ export function DailyChecklistManager() {
   const [success, setSuccess] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const allowed = hasPermission(useAccess(), "daily_checklists.manage");
+  const generation = useRef(0);
+  const mounted = useRef(false);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!allowed) return;
-    let active_ = true;
-    void (async () => {
+    const request = ++generation.current;
       try {
         const result = await loadDailyChecklistManagement();
-        if (!active_) return;
+        if (!mounted.current || request !== generation.current) return;
         setRecords(result.checklists);
         setDesignations(result.designations);
         setError(null);
       } catch (caught) {
-        if (active_) setError(errorText(caught));
+        if (mounted.current && request === generation.current) setError(errorText(caught));
       } finally {
-        if (active_) setLoaded(true);
+        if (mounted.current && request === generation.current) setLoaded(true);
       }
-    })();
-    return () => {
-      active_ = false;
-    };
   }, [allowed]);
+  useEffect(() => {
+    mounted.current = true;
+    void load();
+    return () => {
+      mounted.current = false; generation.current += 1;
+    };
+  }, [load]);
+  useTenantRealtimeRefresh({ tenantId: allowed ? profile.tenant_id : null, topics: ["settings", "organization"], refresh: load });
 
   const selectedRecord = useMemo(
     () => records.find((item) => item.designationId === selected) ?? null,
@@ -148,6 +155,7 @@ export function DailyChecklistManager() {
         </Text>
       </View>
       <Card>
+        {selected && (selectedRecord?.revision ?? 0) !== revision ? <><Text tone="muted" variant="small">This checklist changed elsewhere. Your edits are preserved with the original version.</Text><Button label="Discard edits and reload checklist" onPress={() => choose(selected)} variant="secondary" /></> : null}
         <OptionPicker
           label="Designation"
           onChange={(values) => choose(values[0] ?? "")}

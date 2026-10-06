@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Switch, View } from "react-native";
 import { Lock, RotateCcw } from "lucide-react-native";
 import {
@@ -27,8 +27,10 @@ import {
   type RolePermissionChanges,
   type UserAccessBreakdown,
 } from "@jewelos/data/permissions/api";
-import { useAccess, useAuth } from "@/auth/AuthProvider";
+import { useAccess, useAuth, useProfile } from "@/auth/AuthProvider";
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
 import { titleCase } from "@/lib/format";
+import { useSyncedDraft } from "@/lib/useSyncedDraft";
 import { errorText } from "@/lib/log";
 import { makeStyles } from "@/theme/makeStyles";
 import { useAppTheme } from "@/theme/ThemeProvider";
@@ -208,8 +210,17 @@ function UserPermissionsTab({ context, onSaved, selfId }: { context: PermissionA
   const styles = useStyles();
   const theme = useAppTheme();
   const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectionRevision, setSelectionRevision] = useState(0);
+  const selection = useRef(selectedId);
+  selection.current = selectedId;
+  const readEpoch = useRef(0);
+  const saveEpoch = useRef(0);
+  useEffect(() => () => { readEpoch.current++; saveEpoch.current++; }, []);
   const [breakdown, setBreakdown] = useState<UserAccessBreakdown | null>(null);
-  const [authority, setAuthority] = useState<DashboardAuthority | null>(null);
+  const authorityDraft = useSyncedDraft<DashboardAuthority | null>(breakdown?.dashboardAuthority ?? null, selectedId ?? "none");
+  const authority = authorityDraft.value;
+  const setAuthority = authorityDraft.setValue;
   const [draft, setDraft] = useState<Partial<Record<PermissionKey, PermissionEffect | null>>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -218,13 +229,23 @@ function UserPermissionsTab({ context, onSaved, selfId }: { context: PermissionA
     const needle = query.trim().toLowerCase();
     return context.users.filter((user) => !needle || `${user.employeeName} ${user.employeeCode}`.toLowerCase().includes(needle)).slice(0, 60);
   }, [context.users, query]);
-  const select = useCallback(async (id: string) => {
-    setLoading(true); setFeedback(null); setDraft({});
-    try {
-      const next = await fetchUserAccessBreakdown(id);
-      setBreakdown(next); setAuthority(next.dashboardAuthority);
-    } catch (cause) { setBreakdown(null); setFeedback({ tone: "danger", text: errorText(cause) }); } finally { setLoading(false); }
-  }, []);
+  const select = useCallback((id: string) => {
+    if (id === selectedId && (breakdown || loading)) return;
+    readEpoch.current++; saveEpoch.current++; setSaving(false);
+    setSelectionRevision((revision) => revision + 1);
+    setSelectedId(id); setBreakdown(null); setLoading(true); setFeedback(null); setDraft({});
+  }, [selectedId, breakdown, loading]);
+  useEffect(() => {
+    if (!selectedId) return;
+    const epoch = ++readEpoch.current;
+    let cancelled = false;
+    void fetchUserAccessBreakdown(selectedId).then((next) => {
+      if (!cancelled && epoch === readEpoch.current) setBreakdown(next);
+    }).catch((cause: unknown) => {
+      if (!cancelled && epoch === readEpoch.current) setFeedback({ tone: "danger", text: errorText(cause) });
+    }).finally(() => { if (!cancelled && epoch === readEpoch.current) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [context, selectedId, selectionRevision]);
   const savedUser = useMemo(() => Object.fromEntries((breakdown?.rows ?? []).flatMap((row) => (row.user ? [[row.key, row.user]] : []))) as Partial<Record<PermissionKey, PermissionEffect>>, [breakdown]);
   const changes = Object.entries(draft).filter(([key, value]) => (savedUser[key as PermissionKey] ?? null) !== value);
   const authorityChanged = breakdown ? authority !== breakdown.dashboardAuthority : false;
@@ -242,13 +263,19 @@ function UserPermissionsTab({ context, onSaved, selfId }: { context: PermissionA
   } : null;
   const save = async () => {
     if (!breakdown) return;
+    const epoch = ++saveEpoch.current;
+    const submittedDraft = draft;
+    const isCurrent = () => epoch === saveEpoch.current && selection.current === selectedId;
     setSaving(true); setFeedback(null);
     try {
       const next = await saveUserAccess(breakdown.profileId, authority, Object.fromEntries(changes) as OverrideChanges);
-      setBreakdown(next); setAuthority(next.dashboardAuthority); setDraft({});
+      if (!isCurrent()) return;
+      readEpoch.current++;
+      setBreakdown(next); authorityDraft.saved(authority, next.dashboardAuthority);
+      setDraft((current) => Object.fromEntries(Object.entries(current).filter(([key, value]) => value !== submittedDraft[key as PermissionKey])));
       await onSaved();
-      setFeedback({ tone: "success", text: `${next.employeeName}'s access saved. It applies on their next request.` });
-    } catch (cause) { setFeedback({ tone: "danger", text: errorText(cause) }); } finally { setSaving(false); }
+      if (isCurrent()) setFeedback({ tone: "success", text: `${next.employeeName}'s access saved. It applies on their next request.` });
+    } catch (cause) { if (isCurrent()) setFeedback({ tone: "danger", text: errorText(cause) }); } finally { if (isCurrent()) setSaving(false); }
   };
 
   if (loading) return <LoadingState label="Loading access…" />;
@@ -277,7 +304,7 @@ function UserPermissionsTab({ context, onSaved, selfId }: { context: PermissionA
 
   return (
     <>
-      <Button label="Back to users" onPress={() => { setBreakdown(null); setFeedback(null); }} variant="ghost" />
+      <Button label="Back to users" onPress={() => { readEpoch.current++; saveEpoch.current++; setSaving(false); setSelectedId(null); setBreakdown(null); setFeedback(null); }} variant="ghost" />
       <FeedbackBanner feedback={feedback} />
       <Card>
         <Text variant="subtitle" weight="semibold">{breakdown.employeeName}</Text>
@@ -331,6 +358,7 @@ function UserPermissionsTab({ context, onSaved, selfId }: { context: PermissionA
 /** The web `/settings/permissions` page. Super Admin authority only. */
 export function PermissionManagementScreen() {
   const access = useAccess();
+  const profile = useProfile();
   const { refreshAccess } = useAuth();
   const [tab, setTab] = useState<Tab>("roles");
   const [context, setContext] = useState<PermissionAdminContext | null>(null);
@@ -342,6 +370,7 @@ export function PermissionManagementScreen() {
   }, []);
   const afterSave = useCallback(async () => { await Promise.all([load(), refreshAccess()]); }, [load, refreshAccess]);
   useEffect(() => { void load(); }, [load]);
+  useTenantRealtimeRefresh({ tenantId: hasPermission(access, "permissions.manage") ? profile.tenant_id : null, topics: ["settings", "organization"], refresh: load });
 
   if (!hasPermission(access, "permissions.manage")) {
     return <Screen><ErrorState message="Permission management is available to Super Admins only." title="Not available" /></Screen>;

@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Database, Plus } from "lucide-react";
 import type { FormFieldDefinition, FormOption } from "@jewelos/core";
+import { dropdownMasterKey } from "@jewelos/core";
 import { Button, Field, Notice } from "@/components/ui";
 import { createMasterList, type MasterOption } from "@/features/dropdowns/api";
 import { titleCase } from "@/lib/format";
 import { OptionListEditor } from "./OptionListEditor";
 
-const masterKey = (name: string) => name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").replace(/^([^a-z])/, "list_$1").slice(0, 60);
 
 /**
  * A dropdown either owns its options or references a Dropdown Master list.
@@ -25,7 +25,7 @@ export function DropdownSourceEditor({ field, index, masterOptions, onPatch, onM
   const options = field.options ?? [];
 
   const publish = async () => {
-    const key = masterKey(publishName);
+    const key = dropdownMasterKey(publishName);
     if (!key) { setPublishError("Give the new Dropdown Master list a name."); return; }
     if (!options.length) { setPublishError("Add at least one option first."); return; }
     setPublishing(true); setPublishError(null);

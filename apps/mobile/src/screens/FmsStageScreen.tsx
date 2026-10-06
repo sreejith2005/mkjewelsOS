@@ -1,3 +1,4 @@
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
 import { useCallback, useMemo, useState } from "react";
 import { Alert, RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
@@ -97,6 +98,7 @@ export function FmsStageScreen() {
     return { runtime, forms, options };
   }, [params.instanceStageId]);
   const { data, error, loading, refreshing, reload, refresh } = useAsyncData(load, [load]);
+  useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["fms", "forms", "organization"], refresh: refresh });
 
   const stage = useMemo(
     () => data?.runtime.stages.find((item) => item.id === params.instanceStageId) ?? null,

@@ -23,12 +23,14 @@ import {
   validateFormDefinition,
   type FormFieldDefinition,
   type FormFieldType,
-  type FormOption,
   type FormTemplateDefinition,
   type UserRole,
 } from "@jewelos/core";
 import { formUsageImpact, loadFormDynamicOptions, loadForms, publishForm, type FormBundle } from "@jewelos/data/forms/api";
 import { formBuilderDefinition, saveFormBuilder } from "@/features/forms/formBuilderController";
+import { AnswerRoutingEditor, QuestionConditionEditor } from "@/features/forms/FormRoutingEditor";
+import { OptionListEditor } from "@/features/forms/OptionListEditor";
+import { DropdownSourceEditor } from "@/features/forms/DropdownSourceEditor";
 import { FormRenderer } from "@/forms/FormRenderer";
 import { useAsyncData } from "@/lib/useAsyncData";
 import { useUnsavedGuard } from "@/lib/useUnsavedGuard";
@@ -67,8 +69,8 @@ export function FormBuilderScreen() {
   const route = useRoute<Route>();
   const state = useAsyncData(() => loadBuilder(route.params?.formTemplateId), [route.params?.formTemplateId]);
   if (state.loading) return <LoadingState label="Loading form builder..." />;
-  if (state.error || !state.data) return <ErrorState message={state.error ?? "Form builder could not be loaded."} onRetry={() => void state.reload()} />;
-  return <FormBuilderWorkspace bundle={state.data.bundle} dynamicOptions={state.data.dynamicOptions} onRefresh={state.refresh} />;
+  if (!state.data) return <ErrorState message={state.error ?? "Form builder could not be loaded."} onRetry={() => void state.reload()} />;
+  return <>{state.error ? <Banner tone="danger">{state.error}</Banner> : null}<FormBuilderWorkspace bundle={state.data.bundle} dynamicOptions={state.data.dynamicOptions} onRefresh={state.refresh} /></>;
 }
 
 function FormBuilderWorkspace({ bundle, dynamicOptions, onRefresh }: Readonly<{ bundle: FormBundle | undefined; dynamicOptions: Awaited<ReturnType<typeof loadFormDynamicOptions>>; onRefresh: () => Promise<void> }>) {
@@ -80,6 +82,8 @@ function FormBuilderWorkspace({ bundle, dynamicOptions, onRefresh }: Readonly<{ 
   const [template, setTemplate] = useState<Pick<FormBundle, "id" | "lifecycle"> | undefined>(bundle);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [addAfterKey, setAddAfterKey] = useState<string | null>(null);
+  const [previewVersion, setPreviewVersion] = useState(0);
   const [busy, setBusy] = useState<"save" | "publish" | null>(null);
   const [mode, setMode] = useState<BuilderMode>("edit");
   const [message, setMessage] = useState<string | null>(null);
@@ -95,7 +99,7 @@ function FormBuilderWorkspace({ bundle, dynamicOptions, onRefresh }: Readonly<{ 
 
   const mutate = (next: FormTemplateDefinition) => { setDefinition(next); setMessage(null); };
   const save = async (publish: boolean) => {
-    if (issues.length) { setMessage(issues[0]?.message ?? "Fix the form before saving."); return; }
+    if (issues.length) { setMessage(issues[0]?.message ?? "Fix the form before saving."); if (issues[0]?.fieldKey) setSelectedKey(issues[0].fieldKey); return; }
     setBusy(publish ? "publish" : "save"); setMessage(null);
     try {
       if (template?.lifecycle === "published") {
@@ -117,9 +121,9 @@ function FormBuilderWorkspace({ bundle, dynamicOptions, onRefresh }: Readonly<{ 
     finally { setBusy(null); }
   };
 
-  if (mode === "preview") return <View style={styles.fill}><View style={styles.header}><Button label="Back to builder" onPress={() => setMode("edit")} variant="ghost" /><Text style={styles.headerTitle} numberOfLines={1} weight="semibold">Preview: {normalized.name || "Untitled form"}</Text></View><FormRenderer definition={normalized} dynamicOptions={dynamicOptions} onSubmit={async () => setMessage("Preview completed. Nothing was submitted.")} submitLabel="Complete preview" />{message ? <Banner tone="success">{message}</Banner> : null}</View>;
+  if (mode === "preview") return <View style={styles.fill}><View style={styles.header}><Button label="Back to builder" onPress={() => setMode("edit")} variant="ghost" /><Text style={styles.headerTitle} numberOfLines={1} weight="semibold">Preview: {normalized.name || "Untitled form"}</Text></View><Button label="Start preview again" onPress={() => setPreviewVersion((current) => current + 1)} variant="secondary" /><FormRenderer key={previewVersion} definition={normalized} dynamicOptions={dynamicOptions} onSubmit={async () => setMessage("Preview completed. Nothing was submitted.")} submitLabel="Complete preview" />{message ? <Banner tone="success">{message}</Banner> : null}</View>;
 
-  if (mode === "routes") return <View style={styles.fill}><View style={styles.header}><Button label="Back to builder" onPress={() => setMode("edit")} variant="ghost" /><Text style={styles.headerTitle} numberOfLines={1} weight="semibold">Answer routes</Text></View><FlatList contentContainerStyle={styles.list} data={routingDefinition.fields.filter((field) => OPTION_FIELD_TYPES.has(field.type))} keyExtractor={(field) => field.key} ListEmptyComponent={<Banner>No choice questions have routes yet.</Banner>} renderItem={({ item }) => <RouteCard definition={definition} field={item} onChange={mutate} />} /></View>;
+  if (mode === "routes") return <View style={styles.fill}><View style={styles.header}><Button label="Back to builder" onPress={() => setMode("edit")} variant="ghost" /><Text style={styles.headerTitle} numberOfLines={1} weight="semibold">Answer routes</Text></View><FlatList contentContainerStyle={styles.list} data={routingDefinition.fields.filter((field) => OPTION_FIELD_TYPES.has(field.type))} keyExtractor={(field) => field.key} ListEmptyComponent={<Banner>No choice questions have routes yet.</Banner>} renderItem={({ item }) => <RouteCard definition={definition} field={item} onChange={mutate} sources={dynamicOptions} />} /></View>;
 
   return <View style={styles.fill}>
     <View style={styles.header}><Button label="Close" onPress={() => navigation.goBack()} variant="ghost" /><View style={styles.headerTitle}><Text numberOfLines={1} weight="semibold">{normalized.name || "New form"}</Text><Text tone="muted" variant="caption">{dirty ? "Unsaved changes" : "All changes saved"}</Text></View><StatusBadge label={`${normalized.fields.length} fields`} /></View>
@@ -131,25 +135,21 @@ function FormBuilderWorkspace({ bundle, dynamicOptions, onRefresh }: Readonly<{ 
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={<View style={styles.top}><TextField label="Form name" onChangeText={(name) => mutate({ ...definition, name })} placeholder="e.g. Customer onboarding" value={definition.name} /><TextField label="Description" multiline onChangeText={(description) => mutate({ ...definition, description })} value={definition.description ?? ""} />{message ? <Banner tone={message.includes("saved") || message.includes("published") ? "success" : "danger"}>{message}</Banner> : null}{issues.length ? <Banner tone="warning">{`${issues.length} setting${issues.length === 1 ? "" : "s"} need attention before save.`}</Banner> : null}<SectionEditor definition={definition} onChange={mutate} /><Button label="Add section" onPress={() => mutate(addFormSection(definition))} variant="secondary" /><OptionPicker label="Who can use this form" multiple onChange={(roles) => mutate({ ...definition, permissions: { roles: roles as UserRole[] } })} options={ROLES.map((role) => ({ value: role, label: role.replaceAll("_", " ") }))} selected={definition.permissions?.roles ?? []} /></View>}
       ListEmptyComponent={<Card><Text style={styles.center} tone="muted">No questions yet. Add the first field below.</Text></Card>}
-      renderItem={({ item, index }) => <Card accessibilityLabel={`Edit ${item.label}`} onPress={() => setSelectedKey(item.key)}><View style={styles.row}><View style={styles.grow}><Text weight="semibold">{item.label || "Untitled field"}</Text><Text tone="muted" variant="caption">{FIELD_TYPES.find((type) => type.value === item.type)?.label ?? item.type} · {item.required ? "Required" : "Optional"}</Text></View><StatusBadge label={`${index + 1}`} /></View><View style={styles.actions}><Button label="Move up" onPress={() => mutate(moveFormField(definition, item.key, -1))} variant="ghost" /><Button label="Move down" onPress={() => mutate(moveFormField(definition, item.key, 1))} variant="ghost" /><Button label="Duplicate" onPress={() => mutate(duplicateFormField(definition, item.key))} variant="ghost" /><Button label="Delete" onPress={() => Alert.alert("Delete question?", `Delete ${item.label || "this question"}? Referencing conditions will be cleaned safely.`, [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => mutate(removeFormField(definition, item.key)) }])} variant="danger" /></View></Card>}
-      ListFooterComponent={<View style={styles.footer}><Button full label="Add question" onPress={() => setAdding(true)} size="large" /></View>}
+      renderItem={({ item, index }) => <Card accessibilityLabel={`Edit ${item.label}`} onPress={() => setSelectedKey(item.key)}><View style={styles.row}><View style={styles.grow}><Text weight="semibold">{item.label || "Untitled field"}</Text><Text tone="muted" variant="caption">{FIELD_TYPES.find((type) => type.value === item.type)?.label ?? item.type} · {item.required ? "Required" : "Optional"}</Text></View><StatusBadge label={`${index + 1}`} /></View><View style={styles.actions}><Button label="Move up" onPress={() => mutate(moveFormField(definition, item.key, -1))} variant="ghost" /><Button label="Move down" onPress={() => mutate(moveFormField(definition, item.key, 1))} variant="ghost" /><Button label="Add question here" onPress={() => { setAddAfterKey(item.key); setAdding(true); }} variant="secondary" /><Button label="Duplicate" onPress={() => mutate(duplicateFormField(definition, item.key))} variant="ghost" /><Button label="Delete" onPress={() => Alert.alert("Delete question?", `Delete ${item.label || "this question"}? Referencing conditions will be cleaned safely.`, [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => mutate(removeFormField(definition, item.key)) }])} variant="danger" /></View></Card>}
+      ListFooterComponent={<View style={styles.footer}><Button full label="Add question" onPress={() => { setAddAfterKey(null); setAdding(true); }} size="large" /></View>}
     />
-    <Sheet onClose={() => setAdding(false)} title="Add question" visible={adding}>{FIELD_TYPES.map((type) => <Button key={type.value} label={type.label} onPress={() => { const section = normalized.fields.at(-1)?.sectionKey ?? normalized.sections?.[0]?.key ?? "section_1"; const field = createFormField(type.value, normalized.fields, section); mutate(insertFormField(normalized, field, normalized.fields.at(-1)?.key)); setAdding(false); setSelectedKey(field.key); }} variant="secondary" />)}</Sheet>
-    <FieldEditor definition={definition} dynamicOptions={dynamicOptions} field={selected} onChange={mutate} onClose={() => setSelectedKey(null)} />
+    <Sheet onClose={() => setAdding(false)} title="Add question" visible={adding}>{FIELD_TYPES.map((type) => <Button key={type.value} label={type.label} onPress={() => { const after = normalized.fields.find((item) => item.key === addAfterKey) ?? normalized.fields.at(-1); const section = after?.sectionKey ?? normalized.sections?.[0]?.key ?? "section_1"; const field = createFormField(type.value, normalized.fields, section); mutate(insertFormField(normalized, field, after?.key)); setAdding(false); setSelectedKey(field.key); }} variant="secondary" />)}</Sheet>
+    <FieldEditor definition={definition} dynamicOptions={dynamicOptions} field={selected} key={selectedKey ?? "none"} onChange={mutate} onClose={() => setSelectedKey(null)} onMasterCreated={onRefresh} onPatchField={(key, patch) => { setDefinition((current) => updateFormField(current, key, patch)); setMessage(null); }} />
   </View>;
 }
 
 function SectionEditor({ definition, onChange }: Readonly<{ definition: FormTemplateDefinition; onChange: (value: FormTemplateDefinition) => void }>) {
-  return <View>{(definition.sections ?? []).map((section, index) => <View key={section.key}><TextField label={`Section ${index + 1} title`} onChangeText={(title) => onChange(updateFormSection(definition, section.key, { title }))} value={section.title} /><TextField label="Section description" onChangeText={(description) => onChange(updateFormSection(definition, section.key, { description }))} value={section.description ?? ""} /><View style={{ flexDirection: "row", flexWrap: "wrap" }}><Button label="Section up" onPress={() => onChange(moveFormSection(definition, section.key, -1))} variant="ghost" /><Button label="Section down" onPress={() => onChange(moveFormSection(definition, section.key, 1))} variant="ghost" />{(definition.sections?.length ?? 0) > 1 ? <Button label="Remove section" onPress={() => Alert.alert("Remove section?", "Questions in this section and routes to it will be removed.", [{ text: "Cancel", style: "cancel" }, { text: "Remove", style: "destructive", onPress: () => onChange(removeFormSection(definition, section.key)) }])} variant="danger" /> : null}</View></View>)}</View>;
+  return <View>{(definition.sections ?? []).map((section, index) => <View key={section.key}><TextField label={`Section ${index + 1} title`} onChangeText={(title) => onChange(updateFormSection(definition, section.key, { title }))} value={section.title} /><OptionPicker label="After this section" options={[{ value: "", label: "Next section" }, ...(definition.sections ?? []).slice(index + 1).map((item) => ({ value: item.key, label: item.title })), { value: FORM_SUBMIT_TARGET, label: "Submit the form" }]} selected={[section.next ?? ""]} onChange={(selected) => onChange(updateFormSection(definition, section.key, { next: selected[0] || undefined }))} /><TextField label="Section description" onChangeText={(description) => onChange(updateFormSection(definition, section.key, { description }))} value={section.description ?? ""} /><View style={{ flexDirection: "row", flexWrap: "wrap" }}><Button label="Section up" onPress={() => onChange(moveFormSection(definition, section.key, -1))} variant="ghost" /><Button label="Section down" onPress={() => onChange(moveFormSection(definition, section.key, 1))} variant="ghost" />{(definition.sections?.length ?? 0) > 1 ? <Button label="Remove section" onPress={() => Alert.alert("Remove section?", "Questions in this section and routes to it will be removed.", [{ text: "Cancel", style: "cancel" }, { text: "Remove", style: "destructive", onPress: () => onChange(removeFormSection(definition, section.key)) }])} variant="danger" /> : null}</View></View>)}</View>;
 }
 
-function FieldEditor({ definition, dynamicOptions, field, onChange, onClose }: Readonly<{ definition: FormTemplateDefinition; dynamicOptions: Awaited<ReturnType<typeof loadFormDynamicOptions>>; field: FormFieldDefinition | undefined; onChange: (value: FormTemplateDefinition) => void; onClose: () => void }>) {
-  const earlier = field ? definition.fields.slice(0, definition.fields.findIndex((item) => item.key === field.key)).filter((item) => !LAYOUT_FIELD_TYPES.has(item.type)) : [];
+function FieldEditor({ definition, dynamicOptions, field, onChange, onClose, onMasterCreated, onPatchField }: Readonly<{ definition: FormTemplateDefinition; dynamicOptions: Awaited<ReturnType<typeof loadFormDynamicOptions>>; field: FormFieldDefinition | undefined; onChange: (value: FormTemplateDefinition) => void; onClose: () => void; onMasterCreated: () => Promise<void>; onPatchField: (key: string, patch: Partial<FormFieldDefinition>) => void }>) {
   if (!field) return null;
-  const patch = (value: Partial<FormFieldDefinition>) => onChange(updateFormField(definition, field.key, value));
-  const staticOptions = field.options ?? [];
-  const optionText = staticOptions.map((option) => option.label).join("\n");
-  const condition = field.rule?.kind === "predicate" ? field.rule : undefined;
+  const patch = (value: Partial<FormFieldDefinition>) => onPatchField(field.key, value);
   return <Sheet onClose={onClose} tall title={`Edit ${field.label || "question"}`} visible>
     <TextField label="Question label" onChangeText={(label) => patch({ label })} value={field.label} />
     <OptionPicker label="Field type" onChange={(value) => { const type = value[0] as FormFieldType; onChange({ ...definition, fields: convertFormFieldType(definition.fields, definition.fields.findIndex((item) => item.key === field.key), type).fields }); }} options={FIELD_TYPES} selected={[field.type]} />
@@ -157,31 +157,21 @@ function FieldEditor({ definition, dynamicOptions, field, onChange, onClose }: R
     <TextField label="Helper text" onChangeText={(helperText) => patch({ helperText })} value={field.helperText ?? ""} />
     <TextField label="Placeholder" onChangeText={(placeholder) => patch({ placeholder })} value={field.placeholder ?? ""} />
     <Button label={field.required ? "Required: yes" : "Required: no"} onPress={() => patch({ required: !field.required })} variant="secondary" />
-    {["text", "textarea"].includes(field.type) ? <><TextField keyboardType="number-pad" label="Minimum length" onChangeText={(value) => patch({ validation: { ...field.validation, minLength: numberOrUndefined(value) } })} value={field.validation?.minLength?.toString() ?? ""} /><TextField keyboardType="number-pad" label="Maximum length" onChangeText={(value) => patch({ validation: { ...field.validation, maxLength: numberOrUndefined(value) } })} value={field.validation?.maxLength?.toString() ?? ""} /></> : null}
+    {["text", "textarea", "email", "phone"].includes(field.type) ? <><TextField keyboardType="number-pad" label="Minimum length" onChangeText={(value) => patch({ validation: { ...field.validation, minLength: numberOrUndefined(value) } })} value={field.validation?.minLength?.toString() ?? ""} /><TextField keyboardType="number-pad" label="Maximum length" onChangeText={(value) => patch({ validation: { ...field.validation, maxLength: numberOrUndefined(value) } })} value={field.validation?.maxLength?.toString() ?? ""} /></> : null}
     {["number", "currency", "rating"].includes(field.type) ? <><TextField keyboardType="numeric" label="Minimum value" onChangeText={(value) => patch({ validation: { ...field.validation, min: numberOrUndefined(value) } })} value={field.validation?.min?.toString() ?? ""} /><TextField keyboardType="numeric" label="Maximum value" onChangeText={(value) => patch({ validation: { ...field.validation, max: numberOrUndefined(value) } })} value={field.validation?.max?.toString() ?? ""} /></> : null}
-    {OPTION_FIELD_TYPES.has(field.type) && !field.optionSource ? <TextField helperText="One option per line" label="Choice options" multiline onChangeText={(value) => patch({ options: optionLines(value) })} value={optionText} /> : null}
-    {field.type === "select" ? <OptionPicker label="Choice source" onChange={(value) => value[0] === "static" ? patch({ optionSource: undefined, options: field.options?.length ? field.options : [{ value: "option_1", label: "Option 1" }] }) : patch({ optionSource: { kind: "master", masterType: value[0]!.slice(7) }, options: undefined })} options={[{ value: "static", label: "Static choices" }, ...uniqueMasterTypes(dynamicOptions.masters).map((type) => ({ value: `master:${type}`, label: `Dropdown master: ${type}` }))]} selected={[field.optionSource?.kind === "master" ? `master:${field.optionSource.masterType}` : "static"]} /> : null}
-    <OptionPicker label="Show this question when" onChange={(value) => patch({ rule: value[0] ? { kind: "predicate", fieldKey: value[0]!, operator: "equals", value: "" } : undefined })} options={[{ value: "", label: "Always show" }, ...earlier.map((item) => ({ value: item.key, label: item.label }))]} selected={condition ? [condition.fieldKey] : [""]} />
-    {condition ? <TextField label="Required answer" onChangeText={(value) => patch({ rule: { ...condition, value } })} value={typeof condition.value === "string" ? condition.value : ""} /> : null}
+    {OPTION_FIELD_TYPES.has(field.type) && !field.optionSource ? <OptionListEditor options={field.options ?? []} onChange={(options) => patch({ options })} /> : null}
+    {OPTION_FIELD_TYPES.has(field.type) ? <OptionPicker label="Choice source" onChange={(value) => value[0] === "static" ? patch({ optionSource: undefined, options: field.options?.length ? field.options : [{ value: "option_1", label: "Option 1" }] }) : patch({ optionSource: { kind: "master", masterType: value[0]!.slice(7) }, options: undefined })} options={[{ value: "static", label: "Static choices" }, ...uniqueMasterTypes(dynamicOptions.masters).map((type) => ({ value: `master:${type}`, label: `Dropdown master: ${type}` }))]} selected={[field.optionSource?.kind === "master" ? `master:${field.optionSource.masterType}` : "static"]} /> : null}
+    {OPTION_FIELD_TYPES.has(field.type) ? <DropdownSourceEditor field={field} onMasterCreated={onMasterCreated} onPatch={patch} /> : null}
+    {!LAYOUT_FIELD_TYPES.has(field.type) ? <><Button label={field.shown !== false ? "Shown: yes" : "Shown: no"} onPress={() => patch({ shown: field.shown === false })} variant="secondary" /><Button label={field.editable !== false ? "Editable: yes" : "Editable: no"} onPress={() => patch({ editable: field.editable === false })} variant="secondary" /><QuestionConditionEditor definition={definition} field={field} sources={dynamicOptions} onChange={onChange} /></> : null}
     <Button label="Done" onPress={onClose} />
   </Sheet>;
 }
 
 const uniqueMasterTypes = (masters: readonly Readonly<{ masterType: string }>[]) => [...new Set(masters.map((item) => item.masterType))].sort();
-const optionLines = (text: string): readonly FormOption[] => {
-  const used = new Set<string>();
-  return text.split(/\r?\n/).map((label) => label.trim()).filter(Boolean).map((label, index) => {
-    const base = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || `option_${index + 1}`;
-    let value = base; for (let suffix = 2; used.has(value); suffix += 1) value = `${base}_${suffix}`; used.add(value);
-    return { value, label };
-  });
-};
 const numberOrUndefined = (value: string) => value.trim() === "" || !Number.isFinite(Number(value)) ? undefined : Number(value);
 
-function RouteCard({ definition, field, onChange }: Readonly<{ definition: FormTemplateDefinition; field: FormFieldDefinition; onChange: (value: FormTemplateDefinition) => void }>) {
-  const options = field.options ?? [];
-  const targets = [{ value: "continue", label: "Continue normally" }, ...(definition.sections ?? []).filter((section) => section.key !== field.sectionKey).map((section) => ({ value: section.key, label: `Go to ${section.title}` })), { value: FORM_SUBMIT_TARGET, label: "Submit form" }];
-  return <Card><Text weight="semibold">{field.label}</Text>{options.map((option) => { const current = field.branches?.find((branch) => branch.value === option.value)?.targetSectionKey ?? "continue"; return <OptionPicker key={option.value} label={`When answer is ${option.label}`} onChange={(value) => { const target = value[0] ?? "continue"; const branches = [...(field.branches ?? []).filter((branch) => branch.value !== option.value), ...(target === "continue" ? [] : [{ operator: "equals" as const, value: option.value, targetSectionKey: target }])]; onChange(updateFormField(definition, field.key, { branches: branches.length ? branches : undefined })); }} options={targets} selected={[current]} />; })}</Card>;
+function RouteCard({ definition, field, onChange, sources }: Readonly<{ definition: FormTemplateDefinition; field: FormFieldDefinition; onChange: (value: FormTemplateDefinition) => void; sources: Awaited<ReturnType<typeof loadFormDynamicOptions>> }>) {
+  return <Card><Text weight="semibold">{field.label}</Text><AnswerRoutingEditor definition={definition} field={field} onChange={onChange} sources={sources} /></Card>;
 }
 
 const useStyles = makeStyles((theme) => StyleSheet.create({

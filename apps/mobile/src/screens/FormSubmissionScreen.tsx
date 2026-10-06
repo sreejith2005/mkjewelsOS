@@ -1,9 +1,10 @@
+import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
 import { useCallback, useState } from "react";
 import { Alert, Linking, RefreshControl } from "react-native";
 import { useRoute, type RouteProp } from "@react-navigation/native";
 import { hasPermission } from "@jewelos/core";
 import { loadFormDynamicOptions, loadForms, reviewSubmission, signedFormFileUrl } from "@jewelos/data/forms/api";
-import { useAccess } from "@/auth/AuthProvider";
+import { useAccess, useProfile } from "@/auth/AuthProvider";
 import { presentSubmission } from "@/features/forms/submissionModel";
 import { formatDateTime, titleCase } from "@/lib/format";
 import { useAsyncData } from "@/lib/useAsyncData";
@@ -19,9 +20,11 @@ import type { RootStackParamList } from "@/navigation/types";
 
 type Route = RouteProp<RootStackParamList, "FormSubmission">;
 export function FormSubmissionScreen() {
+  const profile = useProfile();
   const { params } = useRoute<Route>(); const access = useAccess(); const theme = useAppTheme(); const [decision, setDecision] = useState<"approved" | "rejected" | null>(null); const [notes, setNotes] = useState(""); const [busy, setBusy] = useState(false); const [actionError, setActionError] = useState<string | null>(null);
   const load = useCallback(async () => { const [forms, options] = await Promise.all([loadForms(), loadFormDynamicOptions()]); const row = forms.submissions.find((item) => item.id === params.submissionId); return row ? { row, presented: presentSubmission(row, forms.bundles, options.masters, options.users) } : null; }, [params.submissionId]);
   const { data, error, loading, refreshing, reload, refresh } = useAsyncData(load, [load]);
+  useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["forms", "organization"], refresh: refresh });
   if (loading && !data) return <Screen><LoadingState label="Loading submission…" /></Screen>;
   if (error && !data) return <Screen><ErrorState message={error} onRetry={() => void reload()} /></Screen>;
   if (!data) return <Screen><EmptyState title="Submission unavailable" message="This submission is outside your authorized scope." /></Screen>;
