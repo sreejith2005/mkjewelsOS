@@ -73,9 +73,10 @@ select ok((pg_temp.by_phone('9199000203')).client_code ~ '^MKC-[0-9]+$', 'the re
 
 insert into referrals(id, salesperson_id, given_by_client_id, referral_name, referral_number, branch_id)
 values ('20261007-3333-4000-8000-000000000002', '20261007-1111-4000-8000-000000000002', '20261007-2222-4000-8000-0000000000c1',
-  'Synthetic Already Client', '9199000202', '20261007-0000-4000-8000-00000000000a');
+  'Synthetic Other Family', '9199000202', '20261007-0000-4000-8000-00000000000a');
+-- Phone + name identity (20261006000200): the known person is the same phone AND name.
 select is((select referred_client_id from referrals where id = '20261007-3333-4000-8000-000000000002'), '20261007-2222-4000-8000-0000000000c2'::uuid,
-  'a referral with a known phone links to that client');
+  'a referral with a known phone and name links to that client');
 select is((pg_temp.client('c2')).referred_by_client_id, null, 'an existing client is not re-parented');
 
 insert into referral_calling(referral_id, status) values

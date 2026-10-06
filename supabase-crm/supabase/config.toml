@@ -436,6 +436,11 @@ verify_jwt = false
 [functions.crm-walkin-ingest]
 verify_jwt = false
 
+# Google Sheet <-> CRM two-way sync (Apps Script crm-sheet-sync.gs). No JWT: the
+# x-mk-sheet-sync-key header (CRM_SHEET_SYNC_KEY, constant-time) is checked before anything else.
+[functions.crm-sheet-sync]
+verify_jwt = false
+
 # Delivers CRM sync events (walk-in queue changes) to JewelOS. pg_cron only: x-cron-secret
 # (CRM_SYNC_CRON_SECRET, constant-time) is checked before anything else.
 [functions.sync-deliver]

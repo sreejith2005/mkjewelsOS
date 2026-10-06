@@ -338,6 +338,7 @@ export type Database = {
           client_code: string
           client_id: string
           client_potential_category: string | null
+          communication_preference: string | null
           community: string | null
           community_other: string | null
           country: string | null
@@ -348,6 +349,7 @@ export type Database = {
           google_review_status: string | null
           high_potential_reason: string | null
           household_id: string | null
+          household_relation: string | null
           instagram_status: string | null
           last_bought_categories: string[] | null
           last_branch_id: string | null
@@ -360,6 +362,7 @@ export type Database = {
           last_seen_categories: string[] | null
           last_visit_date: string | null
           lifecycle_stage: string
+          marketing_message: string | null
           next_visit_date: string | null
           other_known_phones: string[] | null
           other_names: string[] | null
@@ -393,6 +396,7 @@ export type Database = {
           client_code: string
           client_id?: string
           client_potential_category?: string | null
+          communication_preference?: string | null
           community?: string | null
           community_other?: string | null
           country?: string | null
@@ -403,6 +407,7 @@ export type Database = {
           google_review_status?: string | null
           high_potential_reason?: string | null
           household_id?: string | null
+          household_relation?: string | null
           instagram_status?: string | null
           last_bought_categories?: string[] | null
           last_branch_id?: string | null
@@ -415,6 +420,7 @@ export type Database = {
           last_seen_categories?: string[] | null
           last_visit_date?: string | null
           lifecycle_stage?: string
+          marketing_message?: string | null
           next_visit_date?: string | null
           other_known_phones?: string[] | null
           other_names?: string[] | null
@@ -448,6 +454,7 @@ export type Database = {
           client_code?: string
           client_id?: string
           client_potential_category?: string | null
+          communication_preference?: string | null
           community?: string | null
           community_other?: string | null
           country?: string | null
@@ -458,6 +465,7 @@ export type Database = {
           google_review_status?: string | null
           high_potential_reason?: string | null
           household_id?: string | null
+          household_relation?: string | null
           instagram_status?: string | null
           last_bought_categories?: string[] | null
           last_branch_id?: string | null
@@ -470,6 +478,7 @@ export type Database = {
           last_seen_categories?: string[] | null
           last_visit_date?: string | null
           lifecycle_stage?: string
+          marketing_message?: string | null
           next_visit_date?: string | null
           other_known_phones?: string[] | null
           other_names?: string[] | null
@@ -852,18 +861,21 @@ export type Database = {
           created_by: string | null
           household_code: string
           id: string
+          main_client_id: string | null
         }
         Insert: {
           created_at?: string
           created_by?: string | null
           household_code?: string
           id?: string
+          main_client_id?: string | null
         }
         Update: {
           created_at?: string
           created_by?: string | null
           household_code?: string
           id?: string
+          main_client_id?: string | null
         }
         Relationships: [
           {
@@ -872,6 +884,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "households_main_client_id_fkey"
+            columns: ["main_client_id"]
+            isOneToOne: false
+            referencedRelation: "client_identity"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "households_main_client_id_fkey"
+            columns: ["main_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -1718,7 +1744,8 @@ export type Database = {
           branch_id: string | null
           created_at: string
           crm_name: string | null
-          given_by_client_id: string
+          given_by_client_id: string | null
+          given_by_name: string | null
           id: string
           referral_name: string
           referral_number: string
@@ -1734,7 +1761,8 @@ export type Database = {
           branch_id?: string | null
           created_at?: string
           crm_name?: string | null
-          given_by_client_id: string
+          given_by_client_id?: string | null
+          given_by_name?: string | null
           id?: string
           referral_name: string
           referral_number: string
@@ -1750,7 +1778,8 @@ export type Database = {
           branch_id?: string | null
           created_at?: string
           crm_name?: string | null
-          given_by_client_id?: string
+          given_by_client_id?: string | null
+          given_by_name?: string | null
           id?: string
           referral_name?: string
           referral_number?: string
@@ -2160,7 +2189,8 @@ export type Database = {
               branch_id: string | null
               created_at: string
               crm_name: string | null
-              given_by_client_id: string
+              given_by_client_id: string | null
+              given_by_name: string | null
               id: string
               referral_name: string
               referral_number: string
@@ -2193,7 +2223,8 @@ export type Database = {
               branch_id: string | null
               created_at: string
               crm_name: string | null
-              given_by_client_id: string
+              given_by_client_id: string | null
+              given_by_name: string | null
               id: string
               referral_name: string
               referral_number: string
@@ -2269,6 +2300,10 @@ export type Database = {
           name: string
           role: Database["public"]["Enums"]["user_role"]
         }[]
+      }
+      crm_sheet_sync: {
+        Args: { p_action: string; p_payload: Json }
+        Returns: Json
       }
       crm_sync_claim_events: {
         Args: { p_limit?: number }

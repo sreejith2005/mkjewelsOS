@@ -131,8 +131,8 @@ build outputs. JewelOS login is the only CRM login; CRM identity resolves throug
 the audited bridge in 0183 (`crm.current_crm_user_id()`). The original's two server
 routes are the Edge Functions `crm-walkin-ingest` (Apps Script, key header, service_role
 RPCs of 0189 only) and `crm-runo-push` (caller JWT, RLS); owner cutover steps are in
-`docs/CRM_SHEETS_INGEST_CUTOVER.md`. CRM work is done only in the worktree `C:\crm`
-(branch `feat/crm-native`); tooling reads the original from `CRM_ORIGINAL_DIR`
+`docs/CRM_SHEETS_INGEST_CUTOVER.md`. CRM work is done in this repository on a feature branch (the
+`C:\crm` worktree was retired on 2026-10-06 after `feat/crm-native` merged); tooling reads the original from `CRM_ORIGINAL_DIR`
 (default `C:\Users\MIS\Downloads\MKJewelOS\sreejith-crm\web-app`). Design and phases:
 `docs/superpowers/specs/2026-09-25-crm-native-integration-design.md`. crm read
 access is company-wide for active CRM users by owner decision; writes follow
@@ -157,6 +157,10 @@ target architecture is different. The design is
 - **Approved extensions** to the parity rule: client `MKC-`, family `MKF-` and referral
   `MKREF-` identifiers and search; optional client phone; walk-in → JewelOS task; channel
   and FMS contributions to the client record. Everything else stays at parity.
+- **Google Sheet sync** (2026-10-06 owner decision): the Sheets CRM stays the source of truth
+  while both run; client identity is phone + name with the Sheet's MKC; two-way sync through
+  `crm-sheet-sync` (Edge Function) and `supabase-crm/apps-script/crm-sheet-sync.gs`. Owner steps:
+  `docs/CRM_SHEET_SYNC_RUNBOOK.md`.
 - **Sync and live data** (2026-10-05): roster sync JewelOS -> CRM (`0195`, `crm-staff-sync`,
   CRM `sync-receive`), walk-in -> JewelOS task (CRM `sync-deliver`, `0196`, `crm-sync-receive`),
   the Apps Script walk-in feed (CRM `crm-walkin-ingest`). The ordered owner steps are in

@@ -1,4 +1,7 @@
 /**
+ * SUPERSEDED (2026-10-06) by crm-sheet-sync.gs (two-way Sheet <-> CRM sync). Do not install this
+ * file next to it; see docs/CRM_SHEET_SYNC_RUNBOOK.md.
+ *
  * MK Jewels: WALKIN DATASET (Google Sheet "01 WALKIN DATA") -> CRM project (Supabase).
  *
  * Self-contained: paste it as a new script file into the MK JEWELS CRM SYSTEM Apps Script

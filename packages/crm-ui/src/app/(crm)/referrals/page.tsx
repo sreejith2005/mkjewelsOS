@@ -9,7 +9,7 @@ export default async function ReferralsPage() {
   if (!profile || !auth.user) return null;
   const db = supabase as any;
   const [{ data: calling }] = await Promise.all([
-    db.from("referral_calling").select("id,status,remark,next_followup_date,followup_count,converted_client_id,action_point,referrals!inner(crm_name,assigned_doer,salesperson_id,given_by_client_id,referral_name,referral_number)"),
+    db.from("referral_calling").select("id,status,remark,next_followup_date,followup_count,converted_client_id,action_point,referrals!inner(crm_name,assigned_doer,salesperson_id,given_by_client_id,given_by_name,referral_name,referral_number)"),
   ]);
   const rows = calling ?? [];
   const clientIds = [...new Set(rows.flatMap((row: any) => [row.referrals.given_by_client_id, row.converted_client_id]).filter(Boolean))];
@@ -27,7 +27,8 @@ export default async function ReferralsPage() {
     return {
       id: row.id, status: row.status, next_followup_date: row.next_followup_date, remark: row.remark, converted_client_id: row.converted_client_id,
       followup_count: row.followup_count, action_point: row.action_point, crm_name: referral.crm_name ?? "", assigned_doer: referral.assigned_doer,
-      given_by_client_id: referral.given_by_client_id, given_by_name: clientById.get(referral.given_by_client_id)?.primary_name ?? "Client record",
+      // Sheet sync (2026-10-06): a Sheet referral whose referrer is not a known client keeps the name.
+      given_by_client_id: referral.given_by_client_id, given_by_name: clientById.get(referral.given_by_client_id)?.primary_name ?? referral.given_by_name ?? "Client record",
       referral_name: referral.referral_name, referral_number: referral.referral_number, salesperson: userById.get(referral.salesperson_id) ?? "",
       history_count: entries.length, history: entries.map((entry: any) => [entry.entered_by, entry.remark].filter(Boolean).join(": ")).filter(Boolean).join("\n"),
     };
