@@ -2090,6 +2090,28 @@ export type Database = {
               total_visits: number
             }[]
           }
+      browse_clients_page: {
+        Args: {
+          exclude_unvisited_leads?: boolean
+          page_offset: number
+          potential_category: string
+          result_limit: number
+          search_text: string
+        }
+        Returns: {
+          city: string
+          client_code: string
+          client_id: string
+          client_potential_category: string
+          last_buy_status: string
+          last_visit_date: string
+          primary_name: string
+          primary_phone: string
+          state: string
+          total_count: number
+          total_visits: number
+        }[]
+      }
       consume_legacy_walkin_ingest_rate_limit: {
         Args: { p_key_name: string }
         Returns: boolean

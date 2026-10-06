@@ -19,9 +19,38 @@ export type ClientDatabaseRow = {
   record_type?: "lead" | "client";
 };
 
-export function ClientDatabase({ clients, search, walkinContext }: {
+/** browse_clients_page returns at most 200 clients per call (supabase-crm 20261006000100). */
+export const CLIENT_PAGE_SIZE = 200;
+
+export type ClientDatabasePaging = { page: number; clientTotal: number; leadCount: number };
+
+function pageHref(search: string, page: number) {
+  const params = new URLSearchParams();
+  if (search) params.set("search", search);
+  if (page > 1) params.set("page", String(page));
+  const query = params.toString();
+  return query ? `/clients?${query}` : "/clients";
+}
+
+// crm-port fix (owner 2026-10-06): the original listed one call of at most 200 clients.
+function ClientPager({ paging, search }: { paging: ClientDatabasePaging; search: string }) {
+  const pageCount = Math.max(1, Math.ceil(paging.clientTotal / CLIENT_PAGE_SIZE));
+  const first = paging.clientTotal === 0 ? 0 : (paging.page - 1) * CLIENT_PAGE_SIZE + 1;
+  const last = Math.min(paging.page * CLIENT_PAGE_SIZE, paging.clientTotal);
+  return (
+    <nav aria-label="Client pages" className="flex flex-wrap items-center gap-3 p-4 text-xs text-stone-600">
+      <span>{paging.page > pageCount ? "NO CLIENTS ON THIS PAGE." : `SHOWING CLIENTS ${first}-${last} OF ${paging.clientTotal}`}</span>
+      <span>PAGE {paging.page} OF {pageCount}</span>
+      {paging.page > 1 ? <Link className="rounded border px-3 py-1" href={pageHref(search, Math.min(paging.page - 1, pageCount))}>PREVIOUS</Link> : null}
+      {paging.page < pageCount ? <Link className="rounded border px-3 py-1" href={pageHref(search, paging.page + 1)}>NEXT</Link> : null}
+    </nav>
+  );
+}
+
+export function ClientDatabase({ clients, search, paging, walkinContext }: {
   clients: ClientDatabaseRow[];
   search: string;
+  paging?: ClientDatabasePaging;
   walkinContext: { role: string; branchId: string | null; branches: { id: string; name: string }[] };
 }) {
   const router = useRouter();
@@ -46,7 +75,8 @@ export function ClientDatabase({ clients, search, walkinContext }: {
         <Link className="rounded border px-4 py-2" href="/clients">CLEAR</Link>
       </form>
       <section className="mt-6 overflow-hidden rounded border bg-white">
-        <div className="border-b p-4"><h2 className="text-sm font-semibold tracking-wide">SEARCH RESULTS</h2><p className="mt-1 text-xs text-stone-600">{clients.length} RESULT(S) FOUND.</p></div>
+        <div className="border-b p-4"><h2 className="text-sm font-semibold tracking-wide">SEARCH RESULTS</h2><p className="mt-1 text-xs text-stone-600">{paging ? paging.leadCount + paging.clientTotal : clients.length} RESULT(S) FOUND.</p></div>
+        {paging ? <div className="border-b"><ClientPager paging={paging} search={search} /></div> : null}
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead className="border-b bg-stone-50 text-xs uppercase text-stone-600"><tr><th className="p-3">Type</th><th className="p-3">Client ID</th><th className="p-3">Name</th><th className="p-3">Phone</th><th className="p-3">City</th><th className="p-3">State</th><th className="p-3">Total visits</th><th className="p-3">Last visit</th><th className="p-3">Last status</th><th className="p-3">Action</th></tr></thead>
@@ -56,6 +86,7 @@ export function ClientDatabase({ clients, search, walkinContext }: {
             </tbody>
           </table>
         </div>
+        {paging ? <ClientPager paging={paging} search={search} /> : null}
       </section>
     </main>
   );
