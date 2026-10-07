@@ -2059,6 +2059,7 @@ export type Database = {
         Row: {
           client_code: string | null
           client_id: string | null
+          family_relation: string | null
           household_code: string | null
           household_id: string | null
           lifecycle_stage: string | null

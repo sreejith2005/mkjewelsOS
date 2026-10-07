@@ -373,6 +373,32 @@ describe("WalkInForm proof image uploads", () => {
     expect(upload.mock.calls[0][0]).toMatch(new RegExp(`^${existingClientId}/`));
   });
 
+  it("keeps the registered client when another client shares the phone, so a remark photo is not rejected", async () => {
+    // Owner report 2026-10-07: an existing client's walk-in failed with "The mobile number changed
+    // after this proof was uploaded". The phone also belongs to a more recently visited client
+    // (a family member), and the phone lookup switched the form to that client.
+    const registeredId = "20000000-0000-4000-8000-000000000601";
+    const sharedPhoneId = "20000000-0000-4000-8000-000000000602";
+    rpc.mockImplementation((name: string) => name === "lookup_client_by_phone"
+      ? Promise.resolve({ data: [{ client_id: sharedPhoneId, primary_name: "Family Member", primary_phone: "919012345601" }], error: null })
+      : Promise.resolve({ data: [{ client_id: registeredId, timeline_id: "40000000-0000-4000-8000-000000000601", reference_number: "TES-261007-0001" }], error: null }));
+    upload.mockResolvedValueOnce({ error: null });
+    render(<WalkInForm profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]}
+      queue={{ id: "queue-601", client_name: "Registered Buyer", mobile: "919012345601", branch_id: branchId, assigned_crm_name: "Test CRM", client_id: registeredId, client_is_new: false, status: "pending" }}
+      client={{ client_id: registeredId, primary_name: "Registered Buyer", primary_phone: "919012345601" } as unknown as Client} />);
+    completeLegacyRequiredFields();
+    answerRequiredEngagements();
+    fireEvent.click(screen.getByRole("button", { name: "6. Preferences & planning" }));
+    fireEvent.change(screen.getByLabelText("Remark photo 1"), { target: { files: [new File(["photo"], "remark.png", { type: "image/png" })] } });
+    await screen.findByText("remark.png uploaded");
+    expect(upload.mock.calls[0][0]).toMatch(new RegExp(`^${registeredId}/`));
+    fireEvent.click(screen.getByRole("button", { name: "Submit complete visit" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("submit_walkin_visit", expect.objectContaining({
+      p_payload: expect.objectContaining({ client_id: registeredId, primary_name: "Registered Buyer" }),
+    })));
+    expect(screen.queryByText(/The mobile number changed after this proof was uploaded/)).toBeNull();
+  });
+
   it("keeps uploaded proof images when submit_walkin_visit fails", async () => {
     rpc.mockImplementation((name: string) => name === "submit_walkin_visit"
       ? Promise.resolve({ data: null, error: { message: "forced transaction failure" } })

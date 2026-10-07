@@ -234,6 +234,16 @@ export function WalkInForm({
     () => client?.client_id ?? queue?.client_id ?? crypto.randomUUID(),
   );
   const [proposedTimelineId] = useState(() => crypto.randomUUID());
+  // The form is opened for one registered client (the queue's). Several clients may share a
+  // phone (phone + name identity, CRM 20261006000200) and the phone lookup returns only the
+  // most recently visited of them, so while the phone is still that client's own the form keeps
+  // that client instead of switching to another person with the same phone.
+  const anchorClientId = client?.client_id || queue?.client_id || "";
+  const anchorPhone = (() => {
+    const stored = splitPhone(client?.primary_phone ?? queue?.mobile);
+    return anchorClientId ? phoneKey(composePhone(stored.countryCode, stored.number)) : null;
+  })();
+  const keepsAnchorClient = (phone: string) => anchorPhone !== null && phoneKey(phone) === anchorPhone;
   const [message, setMessage] = useState("");
   const activeCrms = crmByBranch?.[values.branch_id] ?? crms;
   const [saving, setSaving] = useState(false);
@@ -258,6 +268,11 @@ export function WalkInForm({
   ] as const;
   useEffect(() => {
     if (phoneError(primaryCountry, values.primary_phone)) return;
+    if (keepsAnchorClient(primaryPhone)) {
+      setValues((current) => ({ ...current, client_id: anchorClientId, client_type: queue?.client_is_new ? "new" : "existing" }));
+      setProposedClientId(anchorClientId);
+      return;
+    }
     const timer = window.setTimeout(() => {
       void lookupClientByPhone(primaryPhone).then((matched) => {
         if (!matched) {
@@ -702,7 +717,7 @@ export function WalkInForm({
               </span>
             </label>
             {field("primary_name", "Client name", "text", true)}
-            <PhoneNumberInput label="Mobile *" countryCode={primaryCountry} number={values.primary_phone} inputClassName={inputClass} onCountryCodeChange={(code) => { setPrimaryCountry(code); setValues((current) => ({ ...current, client_id: client?.client_id || queue?.client_id || "", client_type: client?.client_id || queue?.client_id ? "existing" : "new" })); setAutoFilledFields(new Set()); }} onNumberChange={(value) => { setValues((current) => ({ ...current, primary_phone: value, client_id: client?.client_id || queue?.client_id || "", client_type: client?.client_id || queue?.client_id ? "existing" : "new" })); setAutoFilledFields(new Set()); }} onBlur={() => { if (!phoneError(primaryCountry, values.primary_phone)) void lookupClientByPhone(primaryPhone).then((matched) => { if (matched) { setValues((current) => ({ ...current, client_id: matched.client_id, client_type: queue?.client_is_new && matched.client_id === queue.client_id ? "new" /* crm-port fix (owner 2026-09-30): keep the queue's "new" as the other lookups do */ : "existing", primary_name: matched.primary_name, gender: matched.gender?.toUpperCase() ?? "", dob: matched.dob ?? "", community: matched.community ?? "", address: matched.address ?? "", pincode: matched.pincode ?? "", country: matched.country ?? "", state: matched.state ?? "", city: matched.city ?? "" })); setProposedClientId(matched.client_id); setAutoFilledFields(new Set(["primary_name", "gender", "dob", "community", "address", "pincode", "country", "state", "city"])); } }); }} />
+            <PhoneNumberInput label="Mobile *" countryCode={primaryCountry} number={values.primary_phone} inputClassName={inputClass} onCountryCodeChange={(code) => { setPrimaryCountry(code); setValues((current) => ({ ...current, client_id: client?.client_id || queue?.client_id || "", client_type: client?.client_id || queue?.client_id ? "existing" : "new" })); setAutoFilledFields(new Set()); }} onNumberChange={(value) => { setValues((current) => ({ ...current, primary_phone: value, client_id: client?.client_id || queue?.client_id || "", client_type: client?.client_id || queue?.client_id ? "existing" : "new" })); setAutoFilledFields(new Set()); }} onBlur={() => { if (!phoneError(primaryCountry, values.primary_phone) && !keepsAnchorClient(primaryPhone)) void lookupClientByPhone(primaryPhone).then((matched) => { if (matched) { setValues((current) => ({ ...current, client_id: matched.client_id, client_type: queue?.client_is_new && matched.client_id === queue.client_id ? "new" /* crm-port fix (owner 2026-09-30): keep the queue's "new" as the other lookups do */ : "existing", primary_name: matched.primary_name, gender: matched.gender?.toUpperCase() ?? "", dob: matched.dob ?? "", community: matched.community ?? "", address: matched.address ?? "", pincode: matched.pincode ?? "", country: matched.country ?? "", state: matched.state ?? "", city: matched.city ?? "" })); setProposedClientId(matched.client_id); setAutoFilledFields(new Set(["primary_name", "gender", "dob", "community", "address", "pincode", "country", "state", "city"])); } }); }} />
             {selectField("source_of_lead", "Source of lead", lookups.sourceOfLeads?.length ? lookups.sourceOfLeads : ["Walk-in", "Reference", "Instagram", "Google", "WhatsApp", "Advertisement", "Other"], true)}
             {values.source_of_lead.trim().toUpperCase() === "REFERENCE" ? (
               <>

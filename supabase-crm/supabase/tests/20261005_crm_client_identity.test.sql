@@ -147,7 +147,7 @@ select pg_temp.act_as('3');
 select throws_ok($$select remove_client_from_family('20261007-2222-4000-8000-0000000000c3')$$, '42501', null, 'another branch''s staff cannot change this family');
 select pg_temp.act_as('2');
 select lives_ok($$select remove_client_from_family('20261007-2222-4000-8000-0000000000c3')$$, 'the branch''s staff can take a person out of a family');
-select is((pg_temp.client('c3')).household_id, null, 'removed');
+select isnt((pg_temp.client('c3')).household_id, (pg_temp.client('c1')).household_id, 'removed (into a new family of their own, 20261007001200)');
 select is(add_client_to_family('20261007-2222-4000-8000-0000000000c1', '20261007-2222-4000-8000-0000000000c3'), 'joined', 'and add them back');
 reset role;
 select is((select count(*)::int from crm_private.audit_logs where action in ('crm.add_client_to_family', 'crm.remove_client_from_family')
