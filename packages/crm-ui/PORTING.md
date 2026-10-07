@@ -72,6 +72,32 @@ The fonts are the original `@import` of Google Fonts (Jost, Playfair Display). J
 CSP that blocks it. Both families are overridden by the original's later Calibri rules, so
 neither app renders them.
 
+## Phone layout (owner request 2026-10-07)
+
+The owner asked for the CRM to be fully usable on phones (readable, no sideways dragging, easy
+forms). This is an approved exception to visual parity **at phone width only** (below 768px);
+tablets and desktops render exactly as the original. No original file is edited:
+
+- `crm-port/mobile.css` holds every phone rule, all inside `max-width` media queries (a test
+  enforces this). `CrmDocument` appends it to the same `<style data-crm-ui>` element, with its
+  `#crm-mobile` placeholder replaced by a scope one id stronger than tier 4, so it adjusts the
+  original rules without editing `globals.css`.
+- `crm-port/mobile-tables.ts` copies each column heading of a list with four or more columns into
+  `data-label` on its cells (and marks it `data-crm-cards`), re-run when rows change. On a phone
+  each row is then a labelled card instead of a 900–2200px wide table; the last column (actions
+  and the inline follow-up forms) spans the card.
+- Also at phone width: 16px text in every field (stops the iPhone zoom on focus), larger
+  checkboxes and touch targets, a two-line top bar, a full-height menu drawer that is fully off
+  screen when closed, a swipeable section strip and a pinned submit button on the walk-in visit
+  form, a two-column dashboard summary, and larger profile text.
+
+Because of this, the parity harness's 390×844 text and screenshot comparison now differs from
+the original by design; the 1440×900 comparison is unaffected.
+
+Tailwind scans `src/` for class names, so the bare lower-case element name of a data table,
+written anywhere in `src/` (code or comments), generates an unused utility and makes
+`build-css.mjs --check` fail. `mobile-tables.ts` explains how it avoids that.
+
 ## Runtime notes
 
 - React 18.3: the original uses no React 19-only API except the server-action form (edit d).
