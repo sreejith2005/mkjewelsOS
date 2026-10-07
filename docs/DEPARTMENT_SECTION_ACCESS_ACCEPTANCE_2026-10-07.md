@@ -53,3 +53,15 @@ Next: verify Users and Departments on a phone, then follow the production playbo
 ## Implementation decisions
 
 Owner approval authorized implementation without another approval round. Work stayed on a feature branch in the authoritative checkout rather than a second checkout. The existing resolver, authority-safe audited user write and retirement manifest were extended rather than introducing competing systems. These decisions preserve current contracts and unrelated work.
+
+## Hosted migration deployment and Git publication, 2026-10-07
+
+The owner subsequently explicitly requested deployment of necessary migrations and a push to main. Approved implementation SHA: `ea33c809b77f020eff0c10259d0065444e660541`. This authorization proceeds with database/Git publication separately from the unverified Android device gate. No hosted staging smoke test or backup restoration was performed in this run.
+
+Confirmed target: `jewelos-prod` (`yimafxhuwgfhvzczqqdd`). `supabase.cmd migration list --linked` showed production applied through 0198. `supabase.cmd db push --linked --dry-run` listed exactly 0199 and 0200. `supabase.cmd db push --linked --yes` applied both successfully; the subsequent dry run reported the remote database up to date. Neither a seed nor a reset was run against the hosted database. No CRM-project migration, Edge Function deployment, secret change or Storage change was required.
+
+Read-only hosted catalog checks confirmed department override RLS enabled; both audited RPCs executable by authenticated users; department RPC denied to anonymous callers; direct authenticated table insertion denied; both CRM department event triggers present. This proves deployed schema/privileges, not authenticated end-to-end production UI or CRM sync delivery. Existing grants remain unchanged: live Sales/CRM department setup still requires the audited configuration action.
+
+The reviewed implementation and this deployment record are published to `origin/main` using a fast-forward ref push from the feature branch because main is checked out in other worktrees. Those worktrees are not modified. Git scope/whitespace/credential checks were rerun before publication. A push triggers the configured hosting integration but is not proof that its build or live UI succeeded.
+
+Recovery remains a compatible prior web deployment or a reviewed forward corrective migration; migrations are not rolled back by rewriting history. Android APK publication still awaits the required physical-phone visual test.
