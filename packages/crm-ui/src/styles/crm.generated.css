@@ -396,6 +396,10 @@
     margin-inline: auto;
   }
 
+.crm-root#crm-root#crm-root#crm-root .my-3 {
+    margin-block: calc(var(--spacing) * 3);
+  }
+
 .crm-root#crm-root#crm-root#crm-root .mt-1 {
     margin-top: var(--spacing);
   }
@@ -538,6 +542,10 @@
 
 .crm-root#crm-root#crm-root#crm-root .max-w-\[1800px\] {
     max-width: 1800px;
+  }
+
+.crm-root#crm-root#crm-root#crm-root .max-w-full {
+    max-width: 100%;
   }
 
 .crm-root#crm-root#crm-root#crm-root .max-w-xl {

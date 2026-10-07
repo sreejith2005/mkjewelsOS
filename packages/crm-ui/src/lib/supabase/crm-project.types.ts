@@ -1,5 +1,3 @@
-// Generated from the CRM project (supabase-crm/, schema public). Do not edit by hand.
-// Regenerate: supabase.cmd gen types typescript --local --workdir supabase-crm --schema public
 export type Json =
   | string
   | number
@@ -9,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
   public: {
     Tables: {
       _prisma_migrations: {
@@ -338,6 +341,7 @@ export type Database = {
           client_code: string
           client_id: string
           client_potential_category: string | null
+          communication_preference: string | null
           community: string | null
           community_other: string | null
           country: string | null
@@ -348,6 +352,7 @@ export type Database = {
           google_review_status: string | null
           high_potential_reason: string | null
           household_id: string | null
+          household_relation: string | null
           instagram_status: string | null
           last_bought_categories: string[] | null
           last_branch_id: string | null
@@ -360,6 +365,7 @@ export type Database = {
           last_seen_categories: string[] | null
           last_visit_date: string | null
           lifecycle_stage: string
+          marketing_message: string | null
           next_visit_date: string | null
           other_known_phones: string[] | null
           other_names: string[] | null
@@ -393,6 +399,7 @@ export type Database = {
           client_code: string
           client_id?: string
           client_potential_category?: string | null
+          communication_preference?: string | null
           community?: string | null
           community_other?: string | null
           country?: string | null
@@ -403,6 +410,7 @@ export type Database = {
           google_review_status?: string | null
           high_potential_reason?: string | null
           household_id?: string | null
+          household_relation?: string | null
           instagram_status?: string | null
           last_bought_categories?: string[] | null
           last_branch_id?: string | null
@@ -415,6 +423,7 @@ export type Database = {
           last_seen_categories?: string[] | null
           last_visit_date?: string | null
           lifecycle_stage?: string
+          marketing_message?: string | null
           next_visit_date?: string | null
           other_known_phones?: string[] | null
           other_names?: string[] | null
@@ -448,6 +457,7 @@ export type Database = {
           client_code?: string
           client_id?: string
           client_potential_category?: string | null
+          communication_preference?: string | null
           community?: string | null
           community_other?: string | null
           country?: string | null
@@ -458,6 +468,7 @@ export type Database = {
           google_review_status?: string | null
           high_potential_reason?: string | null
           household_id?: string | null
+          household_relation?: string | null
           instagram_status?: string | null
           last_bought_categories?: string[] | null
           last_branch_id?: string | null
@@ -470,6 +481,7 @@ export type Database = {
           last_seen_categories?: string[] | null
           last_visit_date?: string | null
           lifecycle_stage?: string
+          marketing_message?: string | null
           next_visit_date?: string | null
           other_known_phones?: string[] | null
           other_names?: string[] | null
@@ -852,18 +864,21 @@ export type Database = {
           created_by: string | null
           household_code: string
           id: string
+          main_client_id: string | null
         }
         Insert: {
           created_at?: string
           created_by?: string | null
           household_code?: string
           id?: string
+          main_client_id?: string | null
         }
         Update: {
           created_at?: string
           created_by?: string | null
           household_code?: string
           id?: string
+          main_client_id?: string | null
         }
         Relationships: [
           {
@@ -872,6 +887,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "households_main_client_id_fkey"
+            columns: ["main_client_id"]
+            isOneToOne: false
+            referencedRelation: "client_identity"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "households_main_client_id_fkey"
+            columns: ["main_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -1718,7 +1747,8 @@ export type Database = {
           branch_id: string | null
           created_at: string
           crm_name: string | null
-          given_by_client_id: string
+          given_by_client_id: string | null
+          given_by_name: string | null
           id: string
           referral_name: string
           referral_number: string
@@ -1734,7 +1764,8 @@ export type Database = {
           branch_id?: string | null
           created_at?: string
           crm_name?: string | null
-          given_by_client_id: string
+          given_by_client_id?: string | null
+          given_by_name?: string | null
           id?: string
           referral_name: string
           referral_number: string
@@ -1750,7 +1781,8 @@ export type Database = {
           branch_id?: string | null
           created_at?: string
           crm_name?: string | null
-          given_by_client_id?: string
+          given_by_client_id?: string | null
+          given_by_name?: string | null
           id?: string
           referral_name?: string
           referral_number?: string
@@ -2160,7 +2192,8 @@ export type Database = {
               branch_id: string | null
               created_at: string
               crm_name: string | null
-              given_by_client_id: string
+              given_by_client_id: string | null
+              given_by_name: string | null
               id: string
               referral_name: string
               referral_number: string
@@ -2193,7 +2226,8 @@ export type Database = {
               branch_id: string | null
               created_at: string
               crm_name: string | null
-              given_by_client_id: string
+              given_by_client_id: string | null
+              given_by_name: string | null
               id: string
               referral_name: string
               referral_number: string
@@ -2269,6 +2303,10 @@ export type Database = {
           name: string
           role: Database["public"]["Enums"]["user_role"]
         }[]
+      }
+      crm_sheet_sync: {
+        Args: { p_action: string; p_payload: Json }
+        Returns: Json
       }
       crm_sync_claim_events: {
         Args: { p_limit?: number }
@@ -2625,12 +2663,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2654,11 +2692,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2679,11 +2717,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2704,11 +2742,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2721,11 +2759,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

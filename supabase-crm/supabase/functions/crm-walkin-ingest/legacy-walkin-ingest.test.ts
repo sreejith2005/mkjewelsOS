@@ -4,6 +4,14 @@ import { assertEquals, assertObjectMatch } from "@std/assert";
 
 import { legacyPayloadForAudit, legacyWalkinEnvelopeSchema, toCanonicalWalkinPayload } from "./legacy-walkin-ingest.ts";
 
+Deno.test('preserves every legacy field and exact engagement answers for the data team',()=>{
+  const fields = {client_name:'Synthetic',client_phone:'9100700099',instagram_follow_asked:'CLIENT_ALREADY_FOLLOWING_US',custom_product_tag:'TAG-99',gift:'Flowers',new_things_categories:['Ring']};
+  const payload = toCanonicalWalkinPayload(fields,'branch');
+  const additional = payload.additional_fields as Record<string,unknown>;
+  assertEquals(additional.legacy_submitted_fields,fields);
+  assertObjectMatch(additional,{engagement_answers:{instagram:'CLIENT_ALREADY_FOLLOWING_US'},gift:'Flowers',new_things_categories:['Ring']});
+});
+
 Deno.test("accepts the FORM CODE.GS envelope and maps its field names to the canonical visit payload", () => {
   const envelope = legacyWalkinEnvelopeSchema.parse({
     formDataObj: {

@@ -234,6 +234,7 @@ export function WalkInForm({
   const activeCrms = crmByBranch?.[values.branch_id] ?? crms;
   const [saving, setSaving] = useState(false);
   const submitWasExplicit = useRef(false);
+  const pendingUploadCount = useRef(0);
   const [billingMatchesPrimary, setBillingMatchesPrimary] = useState(
     () => Boolean(client?.billing_phone && phoneDigits(client.billing_phone) === phoneDigits(client.primary_phone ?? "")),
   );
@@ -336,6 +337,9 @@ export function WalkInForm({
       }));
       return;
     }
+    pendingUploadCount.current += 1;
+    setProofs(current=>({...current,[key]:{path:'',clientId:'',fileName:file.name,mimeType:file.type,status:'uploading'}}));
+    try {
     // A phone lookup may still be in flight when the staff member reaches the
     // engagement section. Resolve it here as well, before committing the
     // immutable Storage path, so existing-client proofs use the actual client
@@ -392,6 +396,9 @@ export function WalkInForm({
         status: "ready",
       },
     }));
+    } catch {
+      setProofs(current=>({...current,[key]:{...current[key],path:current[key]?.path ?? '',clientId:current[key]?.clientId ?? '',fileName:file.name,mimeType:file.type,status:'error',error:'Upload failed. Try again.'}}));
+    } finally { pendingUploadCount.current -= 1; }
   }
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -400,6 +407,10 @@ export function WalkInForm({
       return;
     }
     submitWasExplicit.current = false;
+    if (pendingUploadCount.current > 0 || Object.values(proofs).some(proof=>proof.status !== 'ready')) {
+      setMessage('Wait for every photo or video to upload successfully, or remove the failed upload before submitting.');
+      return;
+    }
     if (
       !values.primary_name.trim() ||
       phoneDigits(values.primary_phone).length !== 10 ||
@@ -492,9 +503,11 @@ export function WalkInForm({
       seen_categories: asList(values.seen_categories),
       bought_categories: asList(values.bought_categories),
       order_categories: asList(values.order_categories),
-      documents: Object.values(proofs)
-        .filter((proof) => proof.status === "ready")
-        .map((proof) => ({
+      documents: Object.entries(proofs)
+        .filter(([,proof]) => proof.status === "ready")
+        .map(([purpose,proof]) => ({
+          purpose,
+          original_file_name: proof.fileName,
           storage_path: proof.path,
           // Storage paths have a filename-safe suffix. The documents check
           // intentionally requires that exact suffix, while this display name
@@ -516,6 +529,10 @@ export function WalkInForm({
         seen_other: values.seen_other,
         bought_other: values.bought_other,
         order_other: values.order_other,
+        came_for_categories: asList(values.came_for_categories),
+        came_for_other: values.came_for_other,
+        new_things_categories: asList(values.new_things_categories),
+        new_things_other: values.new_things_other,
         salesperson_handled: values.salesperson_handled,
         new_things_choice: values.new_things_choice,
       },
@@ -559,12 +576,6 @@ export function WalkInForm({
     if (error || !data?.[0]) {
       console.error("submit_walkin_visit failed", {
         code: error?.code,
-        message: error?.message,
-        details: error?.details,
-        hint: error?.hint,
-        uploadedProofPaths: Object.values(proofs)
-          .filter((proof) => proof.status === "ready")
-          .map((proof) => proof.path),
       });
       const safeMessage = walkInSubmitErrorMessage(error);
       const invalidProof = /documents_(storage_path|file_name|mime_type)_check/i.test(error?.message ?? "");
@@ -909,6 +920,7 @@ export function WalkInForm({
                   <b className="text-sm">{label}</b>
                   <select
                     aria-label={label}
+                    disabled={proof?.status === 'uploading'}
                     className="rounded border p-2 text-sm"
                     value={item.asked.toLowerCase()}
                     onChange={(event) => {
@@ -966,6 +978,7 @@ export function WalkInForm({
                               : proof.error}
                           <button
                             type="button"
+                            disabled={proof.status === 'uploading'}
                             className="ml-2 underline"
                             onClick={() => void removeProof(key)}
                           >
@@ -1017,7 +1030,7 @@ export function WalkInForm({
             )}
             {notBoughtReasons.some((reason) => reason.trim().toUpperCase() === "WANT TO SEE MORE DESIGNS") ? multiField("categories_client_wants_more", "Which categories client wants to see more") : null}
             {field("remark", "Remark")}
-            <div className="md:col-span-2"><p className="text-sm">Upload photo (optional) — up to 10. Allowed: {IMAGE_PROOF_DESCRIPTION}.</p><div className="mt-2 grid gap-2 md:grid-cols-2">{Array.from({ length: remarkPhotoSlots }, (_, index) => { const key = `remark_photo_${index + 1}`; const proof = proofs[key]; return <label className="block text-sm" key={key}>Photo {index + 1}<input aria-label={`Remark photo ${index + 1}`} type="file" accept={IMAGE_PROOF_ACCEPT} capture="environment" className="mt-1 block text-sm" onChange={(event) => void uploadProof(key, event.target.files?.[0])} />{proof ? <span className="block text-xs text-stone-600">{proof.status === "ready" ? `${proof.fileName} uploaded` : proof.error ?? "Uploading…"}</span> : null}</label>; })}</div>{remarkPhotoSlots < 10 ? <button type="button" className="mt-2 rounded border px-3 py-1 text-sm" onClick={() => setRemarkPhotoSlots((current) => current + 1)}>Add more photo</button> : null}</div>
+            <div className="md:col-span-2"><p className="text-sm">Upload photo (optional) — up to 10. Allowed: {IMAGE_PROOF_DESCRIPTION}.</p><div className="mt-2 grid gap-2 md:grid-cols-2">{Array.from({ length: remarkPhotoSlots }, (_, index) => { const key = `remark_photo_${index + 1}`; const proof = proofs[key]; return <label className="block text-sm" key={key}>Photo {index + 1}<input aria-label={`Remark photo ${index + 1}`} disabled={proof?.status === "uploading"} type="file" accept={IMAGE_PROOF_ACCEPT} capture="environment" className="mt-1 block text-sm" onChange={(event) => void uploadProof(key, event.target.files?.[0])} />{proof ? <span className="block text-xs text-stone-600">{proof.status === "ready" ? `${proof.fileName} uploaded` : proof.error ?? "Uploading…"}<button type="button" disabled={proof.status === "uploading"} className="ml-2 underline" onClick={() => void removeProof(key)}>Remove photo {index + 1}</button></span> : null}</label>; })}</div>{remarkPhotoSlots < 10 ? <button type="button" className="mt-2 rounded border px-3 py-1 text-sm" onClick={() => setRemarkPhotoSlots((current) => current + 1)}>Add more photo</button> : null}</div>
           </div>
         </section>
       </div>

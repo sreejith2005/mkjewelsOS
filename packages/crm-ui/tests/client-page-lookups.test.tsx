@@ -30,6 +30,7 @@ function responseFor(table: string) {
     single: () => result,
     maybeSingle: () => result,
     neq: () => query,
+    range: () => query,
     then: result.then.bind(result),
   };
   return query;

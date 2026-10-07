@@ -4,6 +4,8 @@ import { notFound } from "@/next-shim/navigation"; // crm-port: next/navigation 
 
 import { ClientProfile } from "@/components/client-profile";
 import { createClient } from "@/lib/supabase/server";
+import type { Json } from '@/lib/supabase/database.types';
+import { readAllCrmRows } from '@/crm-port/read-all-rows';
 
 export default async function ClientPage({ params }: { params: Promise<{ clientId: string }> }) {
   const { clientId } = await params;
@@ -22,7 +24,7 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
     giftsResult,
   ] = await readCrmResults([
     supabase.from("clients").select("*").eq("client_id", clientId).single(),
-    supabase.from("client_timeline").select("id,created_at,event_date,event_type,buy_status,crm_name,remark,branch_id,salesperson_id,seen_categories,bought_categories,order_categories,product_requirement,reference_number").eq("client_id", clientId).order("created_at", { ascending: false }).order("event_date", { ascending: false }).order("id", { ascending: false }) /* crm-port: deterministic order */,
+    readAllCrmRows((from,to)=>supabase.from("client_timeline").select("id,created_at,event_date,event_type,buy_status,crm_name,remark,branch_id,salesperson_id,seen_categories,bought_categories,order_categories,product_requirement,reference_number").eq("client_id", clientId).order("created_at", { ascending: false }).order("event_date", { ascending: false }).order("id", { ascending: false }).range(from,to)),
     supabase.from("client_edit_log").select("id,field_name,old_value,new_value,created_at,edited_by").eq("client_id", clientId).order("created_at", { ascending: false }).order("id", { ascending: false }) /* crm-port: deterministic order */,
     supabase.rpc("get_my_profile"),
     getCrmUser(supabase) /* crm-port: auth.getUser().id is used as the CRM user id -> crm.current_crm_user_id() */,
@@ -54,6 +56,21 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
     : { data: [] };
   const branchNames = new Map((branches ?? []).map((item) => [item.id, item.name]));
   const userNames = new Map((users ?? []).map((item) => [item.id, item.name]));
+  const timelineIds = (timelineResult.data ?? []).map(item=>item.id);
+  const timelineBatches = Array.from({length:Math.ceil(timelineIds.length/100)},(_,index)=>timelineIds.slice(index*100,(index+1)*100));
+  const [{data: forms},{data: documents}] = await readCrmResults([
+    Promise.all(timelineBatches.map(ids=>supabase.from('visit_forms').select('*').in('client_timeline_id',ids).then(assertCrmRead))).then(results=>({data:results.flatMap(result=>result.data ?? [])})),
+    readAllCrmRows((from,to)=>supabase.from('documents').select('id,client_timeline_id,file_name,storage_path,mime_type').eq('client_id',clientId).order('created_at',{ascending:false}).order('id',{ascending:false}).range(from,to)),
+  ]);
+  const formsByTimeline = new Map((forms ?? []).map(form=>[form.client_timeline_id,form]));
+  function mediaPurpose(form: {additional_fields: Json} | undefined, path: string): string | null {
+    const fields = form?.additional_fields;
+    if (!fields || typeof fields !== 'object' || Array.isArray(fields)) return null;
+    const snapshot = fields.submitted_fields;
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot) || !Array.isArray(snapshot.documents)) return null;
+    const found = snapshot.documents.find(item=>item && typeof item === 'object' && !Array.isArray(item) && item.storage_path === path);
+    return found && typeof found === 'object' && !Array.isArray(found) && typeof found.purpose === 'string' ? found.purpose : null;
+  }
 
   return <ClientProfile
     client={clientResult.data}
@@ -62,6 +79,7 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
     lastBranchName={clientResult.data.last_branch_id ? branchNames.get(clientResult.data.last_branch_id) ?? null : null}
     identity={identity}
     family={family ?? []}
+    savedWalkins={(timelineResult.data ?? []).map(item=>({timelineId:item.id,reference:item.reference_number,form:formsByTimeline.get(item.id) ?? null,documents:(documents ?? []).filter(doc=>doc.client_timeline_id===item.id).map(doc=>({...doc,purpose:mediaPurpose(formsByTimeline.get(item.id),doc.storage_path)}))}))}
     lastSalespersonName={clientResult.data.last_salesperson_id ? userNames.get(clientResult.data.last_salesperson_id) ?? null : null}
     walkinContext={{ role: profileResult.data?.[0]?.role ?? "", branchId: currentUser?.branch_id ?? null, branches: branchesResult.data ?? [] }}
     lookups={{

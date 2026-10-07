@@ -94,6 +94,34 @@ beforeEach(() => {
 });
 
 describe("WalkInForm proof image uploads", () => {
+  it("blocks saving while an optional remark photo is still uploading", async () => {
+    rpc.mockResolvedValue({ data: [], error: null });
+    upload.mockImplementation(()=>new Promise(()=>{}));
+    renderPrefilledWalkInForm();
+    completeLegacyRequiredFields();
+    answerRequiredEngagements();
+    fireEvent.click(screen.getByRole('button',{name:'6. Preferences & planning'}));
+    fireEvent.change(screen.getByLabelText('Remark photo 1'),{target:{files:[new File(['photo'],'remark.png',{type:'image/png'})]}});
+    await waitFor(()=>expect(upload).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole('button',{name:'Submit complete visit'}));
+    expect(await screen.findByText(/Wait for every photo or video/)).toBeTruthy();
+    expect(rpc).not.toHaveBeenCalledWith('submit_walkin_visit',expect.anything());
+  });
+  it("blocks saving a failed optional upload instead of silently dropping it", async () => {
+    rpc.mockResolvedValue({data:[],error:null});
+    upload.mockResolvedValue({error:{message:'failed'}});
+    renderPrefilledWalkInForm(); completeLegacyRequiredFields(); answerRequiredEngagements();
+    fireEvent.click(screen.getByRole('button',{name:'6. Preferences & planning'}));
+    fireEvent.change(screen.getByLabelText('Remark photo 1'),{target:{files:[new File(['photo'],'remark.png',{type:'image/png'})]}});
+    await screen.findByText('Upload failed. Try again.');
+    fireEvent.click(screen.getByRole('button',{name:'Submit complete visit'}));
+    expect(await screen.findByText(/Wait for every photo or video/)).toBeTruthy();
+    expect(rpc).not.toHaveBeenCalledWith('submit_walkin_visit',expect.anything());
+    fireEvent.click(screen.getByRole('button',{name:'Remove photo 1'}));
+    await waitFor(()=>expect(screen.queryByText('Upload failed. Try again.')).toBeNull());
+    fireEvent.click(screen.getByRole('button',{name:'Submit complete visit'}));
+    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('submit_walkin_visit',expect.anything()));
+  });
   it("opens with an IST datetime-local value and the walk-in lead source selected", () => {
     renderWalkInForm();
     expect((screen.getByLabelText("Visit date and time") as HTMLInputElement).value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
@@ -309,7 +337,7 @@ describe("WalkInForm proof image uploads", () => {
 
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("submit_walkin_visit", expect.objectContaining({
       p_payload: expect.objectContaining({
-        documents: [{ storage_path: storagePath, file_name: "review_proof__1_.jpg", mime_type: "image/jpeg" }],
+        documents: [{ storage_path: storagePath, file_name: "review_proof__1_.jpg", mime_type: "image/jpeg", purpose: "google_review", original_file_name: "review proof (1).jpg" }],
       }),
     })));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/queue?completed=Uploaded%20Proof%20Client&completedClientId=20000000-0000-4000-8000-000000000501"));
