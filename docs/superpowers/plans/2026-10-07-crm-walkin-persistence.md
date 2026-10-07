@@ -27,3 +27,13 @@ See `docs/CRM_WALKIN_FIELD_MAP.md` for the complete persistence map and exact ev
 Hosted target approved by owner: walk-in_crm / fsydcsyqnddacjfoutfe. Corrective migration: 20261007001000_crm_walkin_persistence.sql. The migration preserves existing records and authorization; private helper/trigger changes only, no new public columns/RPC signature. Current source schema was backed up outside Git before apply. Existing applied schema source restored rather than rewriting the ledger.
 
 Release must be based on current origin/main and named CRM changes only; the older CRM branch and its unrelated pending work must not replace newer released functionality. Retain authenticated desktop/phone/media verification and historical recovery as explicit outstanding items.
+
+Hosted outcome: migration and ingest function applied; scoped commit a3560fd published to main; production Vercel deployment Ready; corrective assets and anonymous denials verified. Historical data left intact. Authenticated media QA, original-evidence reconciliation and legacy upload bridge remain outstanding; do not claim all upload paths are verified.
+
+## Follow-up: misleading wedding error and historical rollups
+
+Owner supplied exact generic wedding error plus MKC-104251 on 2026-10-07. Live read-only findings: all 21 current legacy roster labels lack synced IDs; active CRM-role staff count is zero under the newly deployed Users-driven roster rule. Attendance selection must use active synced branch staff independently of CRM queue allocation; it must never borrow the audit actor's identity. The generic 23514 handler incorrectly names wedding fields for salesperson/media failures.
+
+MKC-104251 has a saved historical visit with four bought categories, null normalized outcome and null did_buy; original outcome is REPAIR_PLACED. Preserve that outcome and derive purchase statistics from the explicitly saved bought-product evidence; do not invent a YES source answer. Audit all saved forms and cached projections with privacy-safe counts. Correct only evidence-backed missing mappings/projections through a service-only audited recovery transaction, preserve source JSON and IDs, and back up before hosted repair. Preserve newer phone/family work already on main.
+
+Steps: regression tests; active-staff attendance read contract and validated selection; accurate validation errors; saved-evidence rollups and historical audit/recovery; local suites and independent review; exact migration preflight, deployed verification and scoped main release. Historical contradictions without evidence remain flagged rather than silently rewritten.

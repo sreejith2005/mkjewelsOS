@@ -1,3 +1,4 @@
+import { savedSalespersonName } from "@/lib/saved-salesperson";
 import { assertCrmRead, readCrmResults } from "@/crm-port/read-results";
 import { getCrmUser } from "@/crm-port/crm-user"; // crm-port: see getCrmUser
 import { notFound } from "@/next-shim/navigation"; // crm-port: next/navigation -> local shim (same paths, /crm base path added)
@@ -74,13 +75,13 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
 
   return <ClientProfile
     client={clientResult.data}
-    timeline={(timelineResult.data ?? []).map((item) => ({ ...item, seen_categories: item.seen_categories ?? [], bought_categories: item.bought_categories ?? [], order_categories: item.order_categories ?? [], branch: branchNames.get(item.branch_id) ?? null, salesperson: item.salesperson_id ? userNames.get(item.salesperson_id) ?? null : null }))}
+    timeline={(timelineResult.data ?? []).map((item) => ({ ...item, seen_categories: item.seen_categories ?? [], bought_categories: item.bought_categories ?? [], order_categories: item.order_categories ?? [], branch: branchNames.get(item.branch_id) ?? null, salesperson: savedSalespersonName(formsByTimeline.get(item.id)?.additional_fields,item.salesperson_id ? userNames.get(item.salesperson_id) ?? null : null) }))}
     audit={(auditResult.data ?? []).map((item) => ({ ...item, editor: item.edited_by ? userNames.get(item.edited_by) ?? null : null }))}
     lastBranchName={clientResult.data.last_branch_id ? branchNames.get(clientResult.data.last_branch_id) ?? null : null}
     identity={identity}
     family={family ?? []}
     savedWalkins={(timelineResult.data ?? []).map(item=>({timelineId:item.id,reference:item.reference_number,form:formsByTimeline.get(item.id) ?? null,documents:(documents ?? []).filter(doc=>doc.client_timeline_id===item.id).map(doc=>({...doc,purpose:mediaPurpose(formsByTimeline.get(item.id),doc.storage_path)}))}))}
-    lastSalespersonName={clientResult.data.last_salesperson_id ? userNames.get(clientResult.data.last_salesperson_id) ?? null : null}
+    lastSalespersonName={savedSalespersonName(formsByTimeline.get([...(timelineResult.data ?? [])].sort((a,b)=>b.event_date.localeCompare(a.event_date)||b.created_at.localeCompare(a.created_at)||b.id.localeCompare(a.id))[0]?.id)?.additional_fields,clientResult.data.last_salesperson_id ? userNames.get(clientResult.data.last_salesperson_id) ?? null : null)}
     walkinContext={{ role: profileResult.data?.[0]?.role ?? "", branchId: currentUser?.branch_id ?? null, branches: branchesResult.data ?? [] }}
     lookups={{
       beverages: (beveragesResult.data ?? []).map((item) => item.label),

@@ -138,6 +138,7 @@ function initialValue(
     order_other: "",
     salesperson_handled: "",
     salesperson: "",
+    salesperson_id: "",
     new_things_choice: "",
     other_order: "",
     came_for_categories: "",
@@ -178,10 +179,16 @@ function walkInSubmitErrorMessage(error: SubmitError | null) {
     if (/wedding_(month|year)_check/i.test(detail)) {
       return "Wedding month or year is invalid. Select the wedding details again before submitting.";
     }
-    if (/client potential category/i.test(detail)) {
+    if (/salesperson/i.test(detail)) {
+      return "Choose an active salesperson from the selected branch before submitting.";
+    }
+    if (/Uploaded proof is missing|documents_mime_type_check/i.test(detail)) {
+      return "A photo or video could not be verified. Remove and upload that file again before submitting.";
+    }
+    if (/client[_ ]potential[_ ]category/i.test(detail)) {
       return "Choose one of the listed client potential categories before submitting.";
     }
-    return "Some form details are invalid. Recheck the wedding details and client potential category, then submit again.";
+    return "Some form details could not be validated. Your entries were kept; contact an administrator if retrying does not help.";
   }
   return "We could not save this visit. Please try again; if it persists, contact an administrator.";
 }
@@ -190,6 +197,7 @@ export function WalkInForm({
   branches,
   crms,
   crmByBranch,
+  salespeopleByBranch,
   queue,
   client,
   lookups = {
@@ -204,6 +212,7 @@ export function WalkInForm({
   branches: { id: string; name: string }[];
   crms: string[];
   crmByBranch?: Record<string, string[]>;
+  salespeopleByBranch?: Record<string, Array<{ id: string; name: string }>>;
   queue: Queue;
   client: Client | null;
   lookups?: {
@@ -246,6 +255,7 @@ export function WalkInForm({
   const keepsAnchorClient = (phone: string) => anchorPhone !== null && phoneKey(phone) === anchorPhone;
   const [message, setMessage] = useState("");
   const activeCrms = crmByBranch?.[values.branch_id] ?? crms;
+  const activeSalespeople = salespeopleByBranch?.[values.branch_id] ?? (salespeopleByBranch ? [] : activeCrms.map(name => ({ id: "", name })));
   const [saving, setSaving] = useState(false);
   const submitWasExplicit = useRef(false);
   const pendingUploadCount = useRef(0);
@@ -737,6 +747,7 @@ export function WalkInForm({
                     branch_id: event.target.value,
                     crm_name: "",
                     salesperson: "",
+                    salesperson_id: "",
                     salesperson_handled: "",
                   }))}
                 >
@@ -765,7 +776,7 @@ export function WalkInForm({
                 ))}
               </select>
             </label>
-            <label className="block text-sm">Salesperson attending the client<select aria-label="Salesperson attending the client" className={inputClass} value={values.salesperson} onChange={(event) => set("salesperson", event.target.value)} disabled={!values.branch_id}><option value="">{values.branch_id ? "Choose" : "Select branch first"}</option>{activeCrms.map((item) => <option value={item} key={item}>{item}</option>)}</select></label>
+            <label className="block text-sm">Salesperson attending the client<select aria-label="Salesperson attending the client" className={inputClass} value={values.salesperson_id || values.salesperson} onChange={(event) => { const person = activeSalespeople.find(item => (item.id || item.name) === event.target.value); setValues(current => ({ ...current, salesperson: person?.name ?? "", salesperson_id: person?.id ?? "" })); }} disabled={!values.branch_id}><option value="">{values.branch_id ? "Choose" : "Select branch first"}</option>{activeSalespeople.map((item) => <option value={item.id || item.name} key={item.id || item.name}>{item.name}</option>)}</select></label>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <h3 className="md:col-span-2 text-sm font-bold tracking-wide">CLIENT PROFILE & CONTACT</h3>
@@ -907,12 +918,12 @@ export function WalkInForm({
                 {countAndTags("camefor_count", "camefor", "Number of products client came for", true)}
                 {asList(values.came_for_categories).some((item) => item.toUpperCase().startsWith("OTHER")) ? field("came_for_other", "Other (came-for category)") : null}
                 {selectField("repair_or_order_approach", "Did CRM approach to show new products?", ["YES", "NO"])}
-                {values.repair_or_order_approach === "YES" ? <>{selectField("new_things_choice", "Is client buying / making order for new things?", ["BUYING_NEW_PRODUCT", "MAKING_NEW_ORDER", "NO"])}{["BUYING_NEW_PRODUCT", "MAKING_NEW_ORDER"].includes(values.new_things_choice) ? <>{selectField("salesperson_handled", "Salesperson attending new buy / order", activeCrms, true)}{multiField("new_things_categories", "New buy / order categories")}{countAndTags("new_things_count", "new_things", "Number of new products")}{asList(values.new_things_categories).some((item) => item.toUpperCase().startsWith("OTHER")) ? field("new_things_other", "Other (new buy / order category)") : null}</> : null}</> : null}
+                {values.repair_or_order_approach === "YES" ? <>{selectField("new_things_choice", "Is client buying / making order for new things?", ["BUYING_NEW_PRODUCT", "MAKING_NEW_ORDER", "NO"])}{["BUYING_NEW_PRODUCT", "MAKING_NEW_ORDER"].includes(values.new_things_choice) ? <>{selectField("salesperson_handled", "Salesperson attending new buy / order", activeSalespeople.map(item => item.name), true)}{multiField("new_things_categories", "New buy / order categories")}{countAndTags("new_things_count", "new_things", "Number of new products")}{asList(values.new_things_categories).some((item) => item.toUpperCase().startsWith("OTHER")) ? field("new_things_other", "Other (new buy / order category)") : null}</> : null}</> : null}
               </> : null}
               {values.visit_status === "PRODUCT_EXCHANGE" ? <>
                 {multiField("came_for_categories", "Product categories client came for")}
                 {countAndTags("camefor_count", "camefor", "Number of products client came for", true)}
-                {selectField("salesperson_handled", "Salesperson attending the client (new buy / order)", activeCrms, true)}
+                {selectField("salesperson_handled", "Salesperson attending the client (new buy / order)", activeSalespeople.map(item => item.name), true)}
                 {multiField("new_things_categories", "New buy / order categories")}
                 {countAndTags("new_things_count", "new_things", "Number of new products")}
                 {asList(values.came_for_categories).some((item) => item.toUpperCase().startsWith("OTHER")) ? field("came_for_other", "Other (came for category)") : null}

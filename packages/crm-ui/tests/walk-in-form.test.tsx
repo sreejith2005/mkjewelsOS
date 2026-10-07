@@ -440,6 +440,46 @@ describe("WalkInForm proof image uploads", () => {
     expect(push).not.toHaveBeenCalled();
   });
 
+  it("submits the selected staff ID independently of CRM queue labels", async () => {
+    rpc.mockResolvedValue({data: [{client_id: "synthetic"}], error: null});
+    const sellerId = "10000000-0000-4000-8000-000000000777";
+    render(<WalkInForm profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} salespeopleByBranch={{ [branchId]: [{ id: sellerId, name: "Active Seller" }] }} queue={null} client={null} />);
+    fireEvent.change(screen.getByLabelText("Client name *"), { target: { value: "Synthetic Attendance" } });
+    fireEvent.change(screen.getByLabelText("Mobile *"), { target: { value: "9012345504" } });
+    completeLegacyRequiredFields(); answerRequiredEngagements();
+    fireEvent.click(screen.getByRole("button", { name: "1. Client & visit" }));
+    expect(within(screen.getByLabelText("Salesperson attending the client")).queryByRole("option", {name: "Test CRM"})).toBeNull();
+    fireEvent.change(screen.getByLabelText("Salesperson attending the client"), { target: { value: sellerId } });
+    fireEvent.click(screen.getByRole("button", { name: "4. Purchase outcome" }));
+    fireEvent.change(screen.getByLabelText("Client bought any product?"), { target: { value: "PRODUCT_EXCHANGE" } });
+    expect(within(screen.getByLabelText("Salesperson attending the client (new buy / order)")).getByRole("option", {name: "Active Seller"})).toBeTruthy();
+    expect(within(screen.getByLabelText("Salesperson attending the client (new buy / order)")).queryByRole("option", {name: "Test CRM"})).toBeNull();
+    fireEvent.change(screen.getByLabelText("Client bought any product?"), { target: { value: "YES" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "6. Preferences & planning" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit complete visit" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("submit_walkin_visit", expect.objectContaining({ p_payload: expect.objectContaining({ salesperson_id: sellerId, salesperson: "Active Seller" }) })));
+  });
+
+  it.each(["NON BRIDAL", "BRIDAL"])("identifies salesperson validation without blaming wedding details (%s)", async (bridal) => {
+    rpc.mockImplementation((name: string) => name === "submit_walkin_visit"
+      ? Promise.resolve({ data: null, error: { code: "23514", message: "Choose one active salesperson from the selected branch roster" } })
+      : Promise.resolve({ data: [], error: null }));
+    renderWalkInForm();
+    fireEvent.change(screen.getByLabelText("Client name *"), { target: { value: "Synthetic Seller Validation" } });
+    fireEvent.change(screen.getByLabelText("Mobile *"), { target: { value: "9012345504" } });
+    completeLegacyRequiredFields(); answerRequiredEngagements();
+    fireEvent.click(screen.getByRole("button", { name: "6. Preferences & planning" }));
+    fireEvent.change(screen.getByLabelText("Bridal / non-bridal"), { target: { value: bridal } });
+    if (bridal === "BRIDAL") {
+      fireEvent.change(screen.getByLabelText("Wedding month"), { target: { value: "OCTOBER" } });
+      fireEvent.change(screen.getByLabelText("Wedding year"), { target: { value: String(new Date().getFullYear()) } });
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Submit complete visit" }));
+    expect(await screen.findByText("Choose an active salesperson from the selected branch before submitting.")).toBeTruthy();
+    expect(screen.queryByText(/Recheck the wedding/)).toBeNull();
+  });
+
   it("does not mislabel an unrelated database validation failure as a proof-link failure", async () => {
     rpc.mockImplementation((name: string) => name === "submit_walkin_visit"
       ? Promise.resolve({ data: null, error: { code: "23514", message: "new row violates check constraint visit_forms_wedding_year_check" } })

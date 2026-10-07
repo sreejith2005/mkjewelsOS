@@ -2317,6 +2317,10 @@ export type Database = {
         Args: { p_event_id: string; p_snapshot: Json }
         Returns: Json
       }
+      crm_reconcile_saved_walkins: {
+        Args: { p_apply?: boolean; p_client_id?: string }
+        Returns: Json
+      }
       crm_reconcile_staff_roster: {
         Args: { p_run_id: string; p_snapshots: Json }
         Returns: Json
@@ -2360,6 +2364,14 @@ export type Database = {
           branch_name: string
           name: string
           role: Database["public"]["Enums"]["user_role"]
+        }[]
+      }
+      get_walkin_salespeople: {
+        Args: never
+        Returns: {
+          branch_id: string
+          salesperson_id: string
+          salesperson_name: string
         }[]
       }
       is_branch_manager: { Args: { row_branch_id: string }; Returns: boolean }
