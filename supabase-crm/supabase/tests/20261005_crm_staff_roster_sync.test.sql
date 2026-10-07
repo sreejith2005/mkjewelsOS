@@ -1,6 +1,6 @@
 -- CRM roster sync (20261005000100): JewelOS staff snapshots applied to users, grants and
 -- the roster; idempotency and ordering; fail-closed cases; owner-approved link list;
--- roster rows picked from synced users; reconciliation; sync health. Synthetic fixtures.
+-- roster rows follow the person (old-format snapshots); reconciliation; sync health. Synthetic fixtures.
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
@@ -108,21 +108,16 @@ select pg_temp.link_session('01'); select pg_temp.link_session('02'); select pg_
 set local role authenticated;
 select pg_temp.act_as((pg_temp.user_of('02')).id);
 select is(current_user_role()::text, 'branch_manager', 'the synced manager signs in through the gate');
-select is((select count(*)::int from crm_roster_candidates('20261005-0000-4000-8000-00000000000a')), 2,
-  'roster candidates are the synced active users of the branch');
-select ok(not exists (select 1 from crm_roster_candidates('20261005-0000-4000-8000-00000000000a') where name = 'Historic Helen'),
-  'an unsynced historical user is not a candidate');
-select is((select crm_name from manage_crm_roster('ADD', null, '20261005-0000-4000-8000-00000000000a', null, null, (pg_temp.user_of('01')).id)),
-  'ASHA SALES', 'ADD stores the picked user''s name');
-select throws_ok(format($$select * from manage_crm_roster('ADD', null, '20261005-0000-4000-8000-00000000000a', 'Typed Name', null, null)$$),
-  '23514', 'PLEASE SELECT A CRM USER.', 'a typed name without a synced user is refused');
-select throws_ok(format($$select * from manage_crm_roster('ADD', null, '20261005-0000-4000-8000-00000000000a', null, null, %L)$$, (pg_temp.user_of('04')).id),
-  '23514', null, 'a user of another branch is refused');
+-- Since 20261007000100 the roster follows JewelOS: staff can no longer edit it.
+select throws_ok(format($$select * from manage_crm_roster('ADD', null, '20261005-0000-4000-8000-00000000000a', null, null, %L)$$, (pg_temp.user_of('01')).id),
+  '42501', null, 'the manual roster RPC is closed');
 select throws_ok($$insert into crm_allocation(branch_id, crm_name) values ('20261005-0000-4000-8000-00000000000a', 'DIRECT NAME')$$,
-  '23514', null, 'a direct roster insert without a synced user is refused');
+  '42501', null, 'a direct roster insert is refused');
 select throws_ok($$insert into users(id, name, email, role, branch_id) values (gen_random_uuid(), 'X', 'x@example.invalid', 'salesperson', '20261005-0000-4000-8000-00000000000a')$$,
   '42501', null, 'staff cannot create a CRM user directly');
 reset role;
+insert into crm_allocation(branch_id, crm_name, active, crm_user_id)
+values ('20261005-0000-4000-8000-00000000000a', 'ASHA SALES', true, (pg_temp.user_of('01')).id);
 
 -- availability exceptions for today and yesterday, under the old name
 insert into crm_daily_availability(branch_id, crm_name, date, is_available) values

@@ -98,7 +98,8 @@ select ok(not (select (snapshot ->> 'eligible')::boolean from claimed where aggr
   'staff without crm.view is not eligible');
 select ok((select snapshot ? 'snapshot_at' from claimed limit 1), 'a snapshot carries its time');
 select ok(not exists (select 1 from claimed c, jsonb_object_keys(c.snapshot) k where k not in
-  ('jewelos_user_id', 'present', 'tenant_id', 'name', 'email', 'jewelos_role', 'crm_role', 'jewelos_branch_id', 'eligible', 'snapshot_at')),
+  ('jewelos_user_id', 'present', 'tenant_id', 'name', 'email', 'jewelos_role', 'crm_role', 'jewelos_branch_id', 'eligible',
+   'crm_roster', 'availability_from', 'availability_to', 'unavailable_dates', 'snapshot_at')),
   'snapshots carry only the documented staff fields');
 
 set local role service_role;

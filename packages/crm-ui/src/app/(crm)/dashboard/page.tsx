@@ -2,6 +2,7 @@ import Link from "@/next-shim/link"; // crm-port: next/link -> local shim (same 
 import { DashboardFilter } from "@/components/dashboard-filter";
 import { TrendChart } from "@/components/trend-chart";
 import { StatusDistributionChart } from "@/components/status-distribution-chart";
+import { SyncHealth } from "@/components/sync-health";
 import { buildDashboardData, dashboardRange, endExclusive, startInclusive } from "@/lib/dashboard";
 import { createClient } from "@/lib/supabase/server";
 import { assertCrmRead } from "@/crm-port/read-results";
@@ -14,6 +15,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const from = startInclusive(range);
   const until = endExclusive(range);
   const supabase = await createClient();
+  // Two-project addition: super admins see CRM sync health here (it was on the removed roster page).
+  const { data: profileRows } = assertCrmRead(await supabase.rpc("get_my_profile"));
+  const isSuperAdmin = profileRows?.[0]?.role === "super_admin";
   const visits = [];
   // No branch predicate: dashboard viewing remains global for every active role.
   for (let offset = 0; ; offset += 1000) {
@@ -33,6 +37,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     <section className="mt-7 grid gap-6 lg:grid-cols-2"><Panel title="WALK-IN TREND"><TrendChart points={data.trend} /></Panel><Panel title="WALK-IN STATUS DISTRIBUTION"><StatusDistributionChart total={data.totals.walkIns} items={data.statusDistribution} /></Panel></section>
     <section className="mt-7 grid gap-6 lg:grid-cols-2"><Breakdown title="BRANCH BREAKDOWN" rows={data.branchBreakdown} /><Breakdown title="CRM BREAKDOWN" rows={data.crmBreakdown} /></section>
     <section className="mt-7 overflow-hidden rounded-xl border bg-white"><div className="border-b p-4"><h2 className="text-lg font-semibold">RECENT VISITS</h2></div><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-sm"><thead className="bg-stone-50 text-xs uppercase text-stone-600"><tr><th className="p-3">DATE</th><th className="p-3">CLIENT ID</th><th className="p-3">TYPE</th><th className="p-3">STATUS</th><th className="p-3">BRANCH</th><th className="p-3">CRM</th><th className="p-3">REMARK</th></tr></thead><tbody>{data.recentVisits.length ? data.recentVisits.map((visit) => <tr className="border-t" key={visit.id}><td className="p-3">{displayKolkataDate(visit.event_date)}</td><td className="p-3"><Link className="font-medium text-amber-800 underline" href={`/clients/${visit.client_id}`}>{visit.client_id}</Link></td><td className="p-3">{visit.event_type.replaceAll("_", " ")}</td><td className="p-3">{visit.buy_status?.replaceAll("_", " ") ?? "-"}</td><td className="p-3">{visit.branch?.name ?? "-"}</td><td className="p-3">{visit.crm_name ?? "-"}</td><td className="max-w-64 truncate p-3" title={visit.remark ?? undefined}>{visit.remark ?? "-"}</td></tr>) : <tr><td className="p-5 text-stone-600" colSpan={7}>NO VISITS FOUND.</td></tr>}</tbody></table></div></section>
+    {isSuperAdmin ? <SyncHealth /> : null}
   </main>;
 }
 

@@ -17,7 +17,6 @@ import { createContext, Fragment, useContext, useEffect, useLayoutEffect, useMem
 import { useQueryClient } from "@tanstack/react-query";
 
 import CrmLayout from "@/app/(crm)/layout";
-import AllocationPage from "@/app/(crm)/allocation/page";
 import ClientPage from "@/app/(crm)/clients/[clientId]/page";
 import NewClientPage from "@/app/(crm)/clients/new/page";
 import ClientsPage from "@/app/(crm)/clients/page";
@@ -64,7 +63,6 @@ const ROUTES: Route[] = [
   { segments: ["clients", "[clientId]"], load: page(ClientPage), inCrmLayout: true },
   { segments: ["followups"], load: page(FollowupsPage), inCrmLayout: true },
   { segments: ["referrals"], load: page(ReferralsPage), inCrmLayout: true },
-  { segments: ["allocation"], load: page(AllocationPage), inCrmLayout: true },
   { segments: ["leads", "new"], load: page(NewLeadPage), inCrmLayout: true },
 ];
 
