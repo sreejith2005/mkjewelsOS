@@ -26,7 +26,7 @@ select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.path','/rpc/submit_walkin_visit',true);
 select lives_ok($$select * from submit_walkin_visit(pg_temp.payload())$$,'complete visit persists');
 reset role;
-select is((select billing_phone from clients where client_id='20261007-0000-4000-8000-000000000004'),'9100700002','new client billing phone persists');
+select is((select billing_phone from clients where client_id='20261007-0000-4000-8000-000000000004'),'919100700002','new client billing phone persists (stored with its country code, 20261007001100)');
 select is((select last_salesperson_id from clients where client_id='20261007-0000-4000-8000-000000000004'),'20261007-0000-4000-8000-000000000003'::uuid,'selected salesperson differs from audit actor');
 select is((select last_buy_status::text from clients where client_id='20261007-0000-4000-8000-000000000004'),'YES_AND_ORDER_PLACED','purchase plus order preserved');
 select is((select total_purchase_visits from clients where client_id='20261007-0000-4000-8000-000000000004'),1,'purchase counted');

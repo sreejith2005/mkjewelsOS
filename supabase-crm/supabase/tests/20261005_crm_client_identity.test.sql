@@ -37,7 +37,7 @@ create function pg_temp.client(p_id text) returns clients language sql security 
   select * from clients where client_id = ('20261007-2222-4000-8000-0000000000' || p_id)::uuid;
 $$;
 create function pg_temp.by_phone(p_phone text) returns clients language sql security definer as $$
-  select c.* from clients c join client_phone_index pi on pi.client_id = c.client_id where pi.phone = p_phone;
+  select c.* from clients c join client_phone_index pi on pi.client_id = c.client_id where pi.phone = crm_private.phone_key(p_phone); -- stored with country code (20261007001000)
 $$;
 grant execute on function pg_temp.client(text), pg_temp.by_phone(text) to authenticated;
 
@@ -93,7 +93,7 @@ select is((select client_type from create_entry_queue('Synthetic Referred Friend
   'a lead client registers as a new client');
 reset role;
 select is((pg_temp.by_phone('9199000203')).lifecycle_stage, 'engaged', 'registration engages the lead');
-select ok((select client_is_new from entry_queue where mobile = '9199000203'), 'the queue row is flagged new');
+select ok((select client_is_new from entry_queue where mobile = '919199000203'), 'the queue row is flagged new');
 set local role authenticated;
 select pg_temp.act_as('2');
 select is(reconcile_referral_calling_conversions(), 1, 'once engaged, the referral converts');

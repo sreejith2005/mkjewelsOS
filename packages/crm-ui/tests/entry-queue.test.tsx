@@ -32,6 +32,33 @@ describe("consolidated client walk-in queue", () => {
     expect(screen.queryByText("Direct walk-in")).toBeNull();
   });
 
+  it("requires a country code (India first) and registers the number with it", async () => {
+    rpc.mockImplementation((name: string) => name === "lookup_client_by_phone" ? Promise.resolve({ data: [], error: null }) : Promise.resolve({ data: [{ token: "0725-NEW02", client_code: "MKC-102728", client_type: "new" }], error: null }));
+    renderQueue();
+    const countryCode = screen.getByLabelText("Country code") as HTMLSelectElement;
+    expect(countryCode.required).toBe(true);
+    expect(countryCode.value).toBe("91");
+    expect(countryCode.options[0]!.textContent).toBe("+91 India");
+    fireEvent.change(screen.getAllByRole("textbox")[0]!, { target: { value: "Gulf Queue Client" } });
+    fireEvent.change(screen.getByLabelText("Mobile Number"), { target: { value: "90123456" } });
+    fireEvent.click(screen.getByRole("button", { name: "REGISTER CLIENT" }));
+    expect(screen.getByRole("status").textContent).toBe("Enter a 10-digit mobile number for India (+91).");
+    expect(rpc).not.toHaveBeenCalledWith("create_entry_queue", expect.anything());
+    fireEvent.change(countryCode, { target: { value: "971" } });
+    fireEvent.change(screen.getByLabelText("Mobile Number"), { target: { value: "50 123 4567" } });
+    fireEvent.click(screen.getByRole("button", { name: "REGISTER CLIENT" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_entry_queue", expect.objectContaining({ p_mobile: "+971501234567" })));
+  });
+
+  it("shows queued numbers with their country code", () => {
+    render(<EntryQueue profile={{ role: "salesperson", branchId }} selectedBranchId={branchId} selectedCrm="" branches={[{ id: branchId, name: "Test Branch" }]} crms={[]} queueCrms={[]} initialItems={[
+      { id: "q-in", token: "T1", client_name: "Indian Client", mobile: "919012345601", assigned_crm_name: null, status: "pending", created_at: "2026-10-07T10:00:00Z", client_id: null },
+      { id: "q-ae", token: "T2", client_name: "Gulf Client", mobile: "971501234567", assigned_crm_name: null, status: "pending", created_at: "2026-10-07T10:00:00Z", client_id: null },
+    ]} />);
+    expect(screen.getByText("+91 9012345601")).toBeTruthy();
+    expect(screen.getByText("+971 501234567")).toBeTruthy();
+  });
+
   it("keeps completed visits out of the active queue but makes them reviewable in Recently submitted", () => {
     renderQueue();
     expect(screen.queryByText("Submitted Client")).toBeNull();

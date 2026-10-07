@@ -7,11 +7,24 @@
 // URL; "the creator" is the caller's CRM user id resolved by the CRM project's gate
 // (current_crm_user_id(), equal to auth.uid() under a login-bridge session) instead of the Auth user id; every database call runs as the
 // caller (RLS applies), never as service_role.
+// Leads store the country code with the number (CRM 20261007001000: 919987323456,
+// 6591234567; the code is also in leads.country_code).
+export function runoPhoneNumber(phone: string): string {
+  return `+${phone.replace(/\D/g, "")}`;
+}
+
+// The Runo "mobile" user field keeps the number without its country code, as before.
+export function runoNationalNumber(phone: string, countryCode: string | null | undefined): string {
+  const digits = phone.replace(/\D/g, "");
+  return countryCode && digits.startsWith(countryCode) ? digits.slice(countryCode.length) : digits;
+}
+
 export const RUNO_ALLOCATION_URL = "https://api.runo.in/v1/crm/allocation";
 
 export type RunoLead = Readonly<{
   id: string;
   phone_number: string;
+  country_code?: string | null;
   name: string | null;
   field_values: Record<string, unknown> | null;
   created_by: string | null;
@@ -79,7 +92,7 @@ export async function handleRunoPush(request: Request, deps: RunoDeps): Promise<
 
   const fieldValues = lead.field_values ?? {};
   const userFields = fields.flatMap((field) => {
-    const value = field.field_key === "mobile_no" ? lead.phone_number : field.field_key === "name" ? lead.name : fieldValues[field.field_key];
+    const value = field.field_key === "mobile_no" ? runoNationalNumber(lead.phone_number, lead.country_code) : field.field_key === "name" ? lead.name : fieldValues[field.field_key];
     return field.runo_field_name && value !== null && value !== undefined && String(value).trim()
       ? [{ name: field.runo_field_name, value: String(value) }]
       : [];
@@ -89,7 +102,7 @@ export async function handleRunoPush(request: Request, deps: RunoDeps): Promise<
     const response = await (deps.fetcher ?? fetch)(deps.runoUrl || RUNO_ALLOCATION_URL, {
       method: "POST",
       headers: { "Auth-Key": key, "Content-Type": "application/json" },
-      body: JSON.stringify({ customer: { name: lead.name ?? "", phoneNumber: `+91${lead.phone_number}` }, userFields }),
+      body: JSON.stringify({ customer: { name: lead.name ?? "", phoneNumber: runoPhoneNumber(lead.phone_number) }, userFields }),
     });
     const payload: unknown = await response.json().catch(() => null);
     if (!response.ok) {

@@ -20,7 +20,7 @@ function callerGateway(request: Request): RunoGateway | null {
       return data.user?.id ?? null;
     },
     async lead(leadId) {
-      const { data } = await db.from("leads").select("id,phone_number,name,field_values,created_by").eq("id", leadId).single();
+      const { data } = await db.from("leads").select("id,phone_number,country_code,name,field_values,created_by").eq("id", leadId).single();
       return (data as RunoLead | null) ?? null;
     },
     async runoFields() {

@@ -41,7 +41,7 @@ function renderWalkInForm() {
 }
 
 function renderPrefilledWalkInForm() {
-  return render(<WalkInForm profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queue={null} client={{ client_id: "20000000-0000-4000-8000-000000000501", primary_name: "Known Client", primary_phone: "9012345678" } as unknown as Client} />);
+  return render(<WalkInForm profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queue={null} client={{ client_id: "20000000-0000-4000-8000-000000000501", primary_name: "Known Client", primary_phone: "919012345678" } as unknown as Client} />);
 }
 function renderQueuedWalkInForm() {
   return render(<WalkInForm profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queue={{ id: "queue-501", client_name: "Queue Client", mobile: "9012345509", branch_id: branchId, assigned_crm_name: "Test CRM", client_id: null, status: "pending" }} client={null} />);
@@ -247,11 +247,17 @@ describe("WalkInForm proof image uploads", () => {
     fireEvent.change(screen.getByLabelText("Mobile *"), { target: { value: "9012345678" } });
     fireEvent.click(screen.getByRole("button", { name: "2. Profile" }));
     fireEvent.click(screen.getByLabelText("Same as mobile number"));
-    expect((screen.getByLabelText("Billing phone") as HTMLInputElement).value).toBe("9012345678");
+    // The billing phone copies the whole number, country code included (CRM 20261007001000).
+    expect((screen.getByLabelText("Billing phone") as HTMLInputElement).value).toBe("+919012345678");
     fireEvent.click(screen.getByRole("button", { name: "1. Client & visit" }));
     fireEvent.change(screen.getByLabelText("Mobile *"), { target: { value: "9012345679" } });
     fireEvent.click(screen.getByRole("button", { name: "2. Profile" }));
-    expect((screen.getByLabelText("Billing phone") as HTMLInputElement).value).toBe("9012345679");
+    expect((screen.getByLabelText("Billing phone") as HTMLInputElement).value).toBe("+919012345679");
+    fireEvent.click(screen.getByRole("button", { name: "1. Client & visit" }));
+    expect((screen.getByLabelText("Country code") as HTMLSelectElement).value).toBe("91");
+    fireEvent.change(screen.getByLabelText("Country code"), { target: { value: "971" } });
+    fireEvent.click(screen.getByRole("button", { name: "2. Profile" }));
+    expect((screen.getByLabelText("Billing phone") as HTMLInputElement).value).toBe("+9719012345679");
     fireEvent.click(screen.getByLabelText("Same as mobile number"));
     expect((screen.getByLabelText("Billing phone") as HTMLInputElement).disabled).toBe(false);
   });

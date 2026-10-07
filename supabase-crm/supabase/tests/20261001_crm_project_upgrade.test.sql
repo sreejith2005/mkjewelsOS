@@ -143,10 +143,10 @@ select set_config('request.path', '', true);
 select is((select count(*)::int from lead_call_history where entered_by = '20261001-0000-4000-8000-000000000002'), 1,
   'the first call record is created with the lead');
 select throws_ok($$insert into lead_call_history(lead_id, call_response, entered_by)
-  select id, 'NOT PICKED', '20261001-0000-4000-8000-000000000003' from leads where phone_number = '9100000004'$$,
+  select id, 'NOT PICKED', '20261001-0000-4000-8000-000000000003' from leads where phone_number = '919100000004'$$,
   '42501', null, 'staff cannot record a call as someone else');
 select lives_ok($$insert into lead_call_history(lead_id, call_response, entered_by)
-  select id, 'NOT PICKED', '20261001-0000-4000-8000-000000000002' from leads where phone_number = '9100000004'$$,
+  select id, 'NOT PICKED', '20261001-0000-4000-8000-000000000002' from leads where phone_number = '919100000004'$$,
   'staff record their own follow-up call');
 select pg_temp.act_as('5');
 select throws_ok($$select create_post_call_lead('9100000005', 'Synthetic Lead 2', '{}'::jsonb, 'CONNECTED')$$,

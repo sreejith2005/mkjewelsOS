@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "@/next-shim/navigation"; // crm-port: next/navigation -> local shim (same paths, /crm base path added)
 
-import { phoneDigits } from "@/lib/clients";
+import { PhoneNumberInput } from "@/components/phone-number-input";
+import { composePhone, phoneError, phoneKey, splitPhone, storedPhone } from "@/lib/phone";
 import { isPotentialCategory, POTENTIAL_CATEGORIES } from "@/lib/client-potential";
 import { createClient } from "@/lib/supabase/client";
 import { lookupClientByPhone } from "@/lib/client-phone-lookup";
@@ -84,7 +85,8 @@ function initialValue(
     branch_id: queue?.branch_id ?? branchId,
     crm_name: queue?.assigned_crm_name ?? crmName,
     primary_name: client?.primary_name ?? queue?.client_name ?? "",
-    primary_phone: client?.primary_phone ?? queue?.mobile ?? "",
+    // The number only; the country code is primaryCountry in the form (stored phones carry it).
+    primary_phone: splitPhone(client?.primary_phone ?? queue?.mobile).number,
     billing_phone: client?.billing_phone ?? "",
     gender: client?.gender?.toUpperCase() ?? "",
     country: client?.country ?? "India",
@@ -217,6 +219,8 @@ export function WalkInForm({
   const [values, setValues] = useState(() =>
     initialValue(client, queue, profile.branchId ?? "", profile.name),
   );
+  const [primaryCountry, setPrimaryCountry] = useState(() => splitPhone(client?.primary_phone ?? queue?.mobile).countryCode);
+  const primaryPhone = composePhone(primaryCountry, values.primary_phone);
   const [companions, setCompanions] = useState<Companion[]>([]);
   const [referrals, setReferrals] = useState<{ name: string; mobile: string }[]>([]);
   const [notBoughtReasons, setNotBoughtReasons] = useState<string[]>([]);
@@ -236,8 +240,9 @@ export function WalkInForm({
   const submitWasExplicit = useRef(false);
   const pendingUploadCount = useRef(0);
   const [billingMatchesPrimary, setBillingMatchesPrimary] = useState(
-    () => Boolean(client?.billing_phone && phoneDigits(client.billing_phone) === phoneDigits(client.primary_phone ?? "")),
+    () => Boolean(client?.billing_phone && storedPhone(client.billing_phone) === storedPhone(client.primary_phone)),
   );
+  const billingPhone = billingMatchesPrimary ? primaryPhone : values.billing_phone;
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(
     () => new Set(client ? ["primary_name", "gender", "dob", "community", "address", "pincode"] : []),
   );
@@ -252,9 +257,9 @@ export function WalkInForm({
     ["referrals", "Referrals", ["YES", "NO", "NOT_INTERESTED"]],
   ] as const;
   useEffect(() => {
-    if (phoneDigits(values.primary_phone).length !== 10) return;
+    if (phoneError(primaryCountry, values.primary_phone)) return;
     const timer = window.setTimeout(() => {
-      void lookupClientByPhone(values.primary_phone).then((matched) => {
+      void lookupClientByPhone(primaryPhone).then((matched) => {
         if (!matched) {
           if (!queue?.client_id && !client?.client_id) {
             setValues((current) => ({ ...current, client_id: "", client_type: "new" }));
@@ -269,7 +274,7 @@ export function WalkInForm({
       });
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [client?.client_id, queue?.client_id, values.primary_phone]);
+  }, [client?.client_id, queue?.client_id, primaryCountry, primaryPhone, values.primary_phone]);
   useEffect(() => {
     const pincode = values.pincode.trim();
     if (!/^\d{6}$/.test(pincode)) return;
@@ -346,7 +351,7 @@ export function WalkInForm({
     // UUID rather than the temporary UUID reserved for a new client.
     let proofClientId = client?.client_id || queue?.client_id || "";
     if (!proofClientId) {
-      const matched = await lookupClientByPhone(values.primary_phone);
+      const matched = await lookupClientByPhone(primaryPhone);
       if (matched) {
         proofClientId = matched.client_id;
         setProposedClientId(matched.client_id);
@@ -413,10 +418,10 @@ export function WalkInForm({
     }
     if (
       !values.primary_name.trim() ||
-      phoneDigits(values.primary_phone).length !== 10 ||
+      phoneError(primaryCountry, values.primary_phone) !== null ||
       !values.branch_id
     ) {
-      setMessage("Name, 10-digit phone, and branch are required.");
+      setMessage(phoneError(primaryCountry, values.primary_phone) ?? "Name and branch are required.");
       setStep(0);
       return;
     }
@@ -436,8 +441,8 @@ export function WalkInForm({
       setStep(4);
       return;
     }
-    if (referrals.some((referral) => referral.name.trim().length === 0 || phoneDigits(referral.mobile).length !== 10)) {
-      setMessage("Every referral needs a name and 10-digit mobile number.");
+    if (referrals.some((referral) => referral.name.trim().length === 0 || !phoneKey(referral.mobile))) {
+      setMessage("Every referral needs a name and a valid mobile number (10 digits for India, or + and the country code).");
       setStep(4);
       return;
     }
@@ -451,7 +456,7 @@ export function WalkInForm({
       return;
     }
     const required = [
-      ["billing_phone", phoneDigits(values.billing_phone).length === 10, "Billing phone"],
+      ["billing_phone", Boolean(phoneKey(billingPhone) || storedPhone(billingPhone)), "Billing phone"],
       ["gender", Boolean(values.gender), "Gender"],
       ["occupation", Boolean(values.occupation), "Occupation"],
       ["bridal_or_non_bridal", Boolean(values.bridal_or_non_bridal), "Bridal / non bridal"],
@@ -490,7 +495,8 @@ export function WalkInForm({
       client_id: values.client_id || client?.client_id || queue?.client_id || "",
       proposed_client_id: proposedClientId,
       proposed_timeline_id: proposedTimelineId,
-      primary_phone: phoneDigits(values.primary_phone),
+      primary_phone: primaryPhone,
+      billing_phone: billingPhone,
       event_date: values.event_date ? `${values.event_date}:00+05:30` : undefined,
       did_buy: values.visit_status === "YES",
       // The legacy control stores month names, while the current schema stores
@@ -696,7 +702,7 @@ export function WalkInForm({
               </span>
             </label>
             {field("primary_name", "Client name", "text", true)}
-            <label className="block text-sm"><span>Mobile *</span><div className="mt-1 flex rounded border border-stone-300 bg-white"><span className="border-r border-stone-300 px-3 py-2 text-stone-600">+91</span><input aria-label="Mobile *" className="min-w-0 flex-1 rounded-r p-2" inputMode="numeric" value={values.primary_phone} onChange={(event) => { setValues((current) => ({ ...current, primary_phone: event.target.value, client_id: client?.client_id || queue?.client_id || "", client_type: client?.client_id || queue?.client_id ? "existing" : "new" })); if (billingMatchesPrimary) set("billing_phone", event.target.value); setAutoFilledFields(new Set()); }} onBlur={() => { if (phoneDigits(values.primary_phone).length === 10) void lookupClientByPhone(values.primary_phone).then((matched) => { if (matched) { setValues((current) => ({ ...current, client_id: matched.client_id, client_type: queue?.client_is_new && matched.client_id === queue.client_id ? "new" /* crm-port fix (owner 2026-09-30): keep the queue's "new" as the other lookups do */ : "existing", primary_name: matched.primary_name, gender: matched.gender?.toUpperCase() ?? "", dob: matched.dob ?? "", community: matched.community ?? "", address: matched.address ?? "", pincode: matched.pincode ?? "", country: matched.country ?? "", state: matched.state ?? "", city: matched.city ?? "" })); setProposedClientId(matched.client_id); setAutoFilledFields(new Set(["primary_name", "gender", "dob", "community", "address", "pincode", "country", "state", "city"])); } }); }} /></div></label>
+            <PhoneNumberInput label="Mobile *" countryCode={primaryCountry} number={values.primary_phone} inputClassName={inputClass} onCountryCodeChange={(code) => { setPrimaryCountry(code); setValues((current) => ({ ...current, client_id: client?.client_id || queue?.client_id || "", client_type: client?.client_id || queue?.client_id ? "existing" : "new" })); setAutoFilledFields(new Set()); }} onNumberChange={(value) => { setValues((current) => ({ ...current, primary_phone: value, client_id: client?.client_id || queue?.client_id || "", client_type: client?.client_id || queue?.client_id ? "existing" : "new" })); setAutoFilledFields(new Set()); }} onBlur={() => { if (!phoneError(primaryCountry, values.primary_phone)) void lookupClientByPhone(primaryPhone).then((matched) => { if (matched) { setValues((current) => ({ ...current, client_id: matched.client_id, client_type: queue?.client_is_new && matched.client_id === queue.client_id ? "new" /* crm-port fix (owner 2026-09-30): keep the queue's "new" as the other lookups do */ : "existing", primary_name: matched.primary_name, gender: matched.gender?.toUpperCase() ?? "", dob: matched.dob ?? "", community: matched.community ?? "", address: matched.address ?? "", pincode: matched.pincode ?? "", country: matched.country ?? "", state: matched.state ?? "", city: matched.city ?? "" })); setProposedClientId(matched.client_id); setAutoFilledFields(new Set(["primary_name", "gender", "dob", "community", "address", "pincode", "country", "state", "city"])); } }); }} />
             {selectField("source_of_lead", "Source of lead", lookups.sourceOfLeads?.length ? lookups.sourceOfLeads : ["Walk-in", "Reference", "Instagram", "Google", "WhatsApp", "Advertisement", "Other"], true)}
             {values.source_of_lead.trim().toUpperCase() === "REFERENCE" ? (
               <>
@@ -749,7 +755,7 @@ export function WalkInForm({
           <div className="grid gap-4 md:grid-cols-2">
             <h3 className="md:col-span-2 text-sm font-bold tracking-wide">CLIENT PROFILE & CONTACT</h3>
             {selectField("gender", "Gender", ["FEMALE", "MALE", "OTHER"], true)}
-            <label className="block text-sm"><span>Billing phone</span><input aria-label="Billing phone" className={inputClass} inputMode="numeric" value={values.billing_phone} disabled={billingMatchesPrimary} onChange={(event) => set("billing_phone", event.target.value)} /><span className="mt-2 flex items-center gap-2"><input aria-label="Same as mobile number" type="checkbox" checked={billingMatchesPrimary} onChange={(event) => { setBillingMatchesPrimary(event.target.checked); if (event.target.checked) set("billing_phone", values.primary_phone); }} />Same as mobile number</span></label>
+            <label className="block text-sm"><span>Billing phone</span><input aria-label="Billing phone" className={inputClass} inputMode="tel" value={billingPhone} disabled={billingMatchesPrimary} onChange={(event) => set("billing_phone", event.target.value)} /><span className="mt-2 flex items-center gap-2"><input aria-label="Same as mobile number" type="checkbox" checked={billingMatchesPrimary} onChange={(event) => { setBillingMatchesPrimary(event.target.checked); set("billing_phone", primaryPhone); }} />Same as mobile number</span></label>
             {field("country", "Country", "text", true)}
             {field("state", "State", "text", true)}
             {field("city", "City", "text", true)}

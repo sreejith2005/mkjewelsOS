@@ -336,6 +336,7 @@ export type Database = {
           anniversary: string | null
           beverage: string | null
           billing_phone: string | null
+          billing_phone_country_code: string | null
           city: string | null
           city_other: string | null
           client_code: string
@@ -372,6 +373,7 @@ export type Database = {
           pincode: string | null
           primary_name: string
           primary_phone: string | null
+          primary_phone_country_code: string | null
           profile_updated_at: string
           profile_updated_by: string | null
           referral_code: string
@@ -379,6 +381,7 @@ export type Database = {
           referral_status: string | null
           referred_by_client_id: string | null
           secondary_phone: string | null
+          secondary_phone_country_code: string | null
           snack: string | null
           state: string | null
           sugar: string | null
@@ -394,6 +397,7 @@ export type Database = {
           anniversary?: string | null
           beverage?: string | null
           billing_phone?: string | null
+          billing_phone_country_code?: string | null
           city?: string | null
           city_other?: string | null
           client_code: string
@@ -430,6 +434,7 @@ export type Database = {
           pincode?: string | null
           primary_name: string
           primary_phone?: string | null
+          primary_phone_country_code?: string | null
           profile_updated_at?: string
           profile_updated_by?: string | null
           referral_code: string
@@ -437,6 +442,7 @@ export type Database = {
           referral_status?: string | null
           referred_by_client_id?: string | null
           secondary_phone?: string | null
+          secondary_phone_country_code?: string | null
           snack?: string | null
           state?: string | null
           sugar?: string | null
@@ -452,6 +458,7 @@ export type Database = {
           anniversary?: string | null
           beverage?: string | null
           billing_phone?: string | null
+          billing_phone_country_code?: string | null
           city?: string | null
           city_other?: string | null
           client_code?: string
@@ -488,6 +495,7 @@ export type Database = {
           pincode?: string | null
           primary_name?: string
           primary_phone?: string | null
+          primary_phone_country_code?: string | null
           profile_updated_at?: string
           profile_updated_by?: string | null
           referral_code?: string
@@ -495,6 +503,7 @@ export type Database = {
           referral_status?: string | null
           referred_by_client_id?: string | null
           secondary_phone?: string | null
+          secondary_phone_country_code?: string | null
           snack?: string | null
           state?: string | null
           sugar?: string | null
@@ -798,6 +807,7 @@ export type Database = {
           client_id: string | null
           client_is_new: boolean
           client_name: string
+          country_code: string | null
           created_at: string
           full_form_timestamp: string | null
           id: string
@@ -812,6 +822,7 @@ export type Database = {
           client_id?: string | null
           client_is_new?: boolean
           client_name: string
+          country_code?: string | null
           created_at?: string
           full_form_timestamp?: string | null
           id?: string
@@ -826,6 +837,7 @@ export type Database = {
           client_id?: string | null
           client_is_new?: boolean
           client_name?: string
+          country_code?: string | null
           created_at?: string
           full_form_timestamp?: string | null
           id?: string
@@ -1103,6 +1115,7 @@ export type Database = {
           branch_id: string | null
           client_id: string | null
           converted_to_client_id: string | null
+          country_code: string | null
           created_at: string
           created_by: string
           created_via: Database["public"]["Enums"]["lead_created_via"]
@@ -1120,6 +1133,7 @@ export type Database = {
           branch_id?: string | null
           client_id?: string | null
           converted_to_client_id?: string | null
+          country_code?: string | null
           created_at?: string
           created_by: string
           created_via?: Database["public"]["Enums"]["lead_created_via"]
@@ -1137,6 +1151,7 @@ export type Database = {
           branch_id?: string | null
           client_id?: string | null
           converted_to_client_id?: string | null
+          country_code?: string | null
           created_at?: string
           created_by?: string
           created_via?: Database["public"]["Enums"]["lead_created_via"]
@@ -1745,6 +1760,7 @@ export type Database = {
           assigned_doer: string | null
           best_time_to_call: string | null
           branch_id: string | null
+          country_code: string | null
           created_at: string
           crm_name: string | null
           given_by_client_id: string | null
@@ -1762,6 +1778,7 @@ export type Database = {
           assigned_doer?: string | null
           best_time_to_call?: string | null
           branch_id?: string | null
+          country_code?: string | null
           created_at?: string
           crm_name?: string | null
           given_by_client_id?: string | null
@@ -1779,6 +1796,7 @@ export type Database = {
           assigned_doer?: string | null
           best_time_to_call?: string | null
           branch_id?: string | null
+          country_code?: string | null
           created_at?: string
           crm_name?: string | null
           given_by_client_id?: string | null
@@ -1920,6 +1938,7 @@ export type Database = {
           occupation_other: string | null
           reference_name: string | null
           reference_phone: string | null
+          reference_phone_country_code: string | null
           referrals_asked: boolean | null
           referrals_no_reason: string | null
           referrals_proof_url: string | null
@@ -1963,6 +1982,7 @@ export type Database = {
           occupation_other?: string | null
           reference_name?: string | null
           reference_phone?: string | null
+          reference_phone_country_code?: string | null
           referrals_asked?: boolean | null
           referrals_no_reason?: string | null
           referrals_proof_url?: string | null
@@ -2006,6 +2026,7 @@ export type Database = {
           occupation_other?: string | null
           reference_name?: string | null
           reference_phone?: string | null
+          reference_phone_country_code?: string | null
           referrals_asked?: boolean | null
           referrals_no_reason?: string | null
           referrals_proof_url?: string | null
@@ -2190,6 +2211,7 @@ export type Database = {
               assigned_doer: string | null
               best_time_to_call: string | null
               branch_id: string | null
+              country_code: string | null
               created_at: string
               crm_name: string | null
               given_by_client_id: string | null
@@ -2224,6 +2246,7 @@ export type Database = {
               assigned_doer: string | null
               best_time_to_call: string | null
               branch_id: string | null
+              country_code: string | null
               created_at: string
               crm_name: string | null
               given_by_client_id: string | null
@@ -2259,6 +2282,7 @@ export type Database = {
           branch_id: string | null
           client_id: string | null
           converted_to_client_id: string | null
+          country_code: string | null
           created_at: string
           created_by: string
           created_via: Database["public"]["Enums"]["lead_created_via"]

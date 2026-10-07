@@ -1,4 +1,4 @@
-import { phoneDigits } from "@/lib/clients";
+import { phoneKey } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/client";
 
 export type PhoneMatchedClient = {
@@ -17,8 +17,9 @@ export type PhoneMatchedClient = {
 };
 
 export async function lookupClientByPhone(value: string) {
-  const phone = phoneDigits(value);
-  if (phone.length !== 10) return null;
+  // value: a stored phone or composePhone(countryCode, number).
+  const phone = phoneKey(value);
+  if (!phone) return null;
   const result = await createClient().rpc("lookup_client_by_phone", {
     p_phone: phone,
   });
