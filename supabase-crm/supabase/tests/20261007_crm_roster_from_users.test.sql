@@ -1,4 +1,4 @@
--- CRM roster from JewelOS Users and Availability (20261007000100): roster rows follow the
+-- CRM roster from JewelOS Users and Availability (20261007000900): roster rows follow the
 -- JewelOS CRM role; absences follow JewelOS Availability; takeover of pre-sync rows; name
 -- conflicts; reconciliation; staff can no longer write the roster. Synthetic fixtures.
 begin;

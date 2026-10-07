@@ -108,7 +108,7 @@ select pg_temp.link_session('01'); select pg_temp.link_session('02'); select pg_
 set local role authenticated;
 select pg_temp.act_as((pg_temp.user_of('02')).id);
 select is(current_user_role()::text, 'branch_manager', 'the synced manager signs in through the gate');
--- Since 20261007000100 the roster follows JewelOS: staff can no longer edit it.
+-- Since 20261007000900 the roster follows JewelOS: staff can no longer edit it.
 select throws_ok(format($$select * from manage_crm_roster('ADD', null, '20261005-0000-4000-8000-00000000000a', null, null, %L)$$, (pg_temp.user_of('01')).id),
   '42501', null, 'the manual roster RPC is closed');
 select throws_ok($$insert into crm_allocation(branch_id, crm_name) values ('20261005-0000-4000-8000-00000000000a', 'DIRECT NAME')$$,

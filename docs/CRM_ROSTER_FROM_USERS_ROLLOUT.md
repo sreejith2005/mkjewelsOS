@@ -14,7 +14,7 @@ come from JewelOS:
   reconciliation re-sends everyone, which also covers the next day.
 
 Migrations: JewelOS `supabase/migrations/0201_crm_roster_from_users.sql`; CRM project
-`supabase-crm/supabase/migrations/20261007000100_crm_roster_from_users.sql`. No Edge Function
+`supabase-crm/supabase/migrations/20261007000900_crm_roster_from_users.sql`. No Edge Function
 changes. Either project may be migrated first: the CRM keeps the old behaviour until snapshots
 carry the roster fields.
 
@@ -49,16 +49,14 @@ in that branch, otherwise it becomes inactive (kept as history, never deleted).
 ## 2. Apply the migrations
 
 ```powershell
-supabase.cmd db push --linked --workdir supabase-crm --dry-run   # CRM project: expect 20261007000100_crm_roster_from_users
+supabase.cmd db push --linked --workdir supabase-crm --dry-run   # CRM project: expect 20261007000900_crm_roster_from_users
 supabase.cmd db push --linked --workdir supabase-crm
 supabase.cmd db push --linked --dry-run                          # JewelOS project: expect 0201_crm_roster_from_users
 supabase.cmd db push --linked
 ```
 
-Confirm the linked project ref before each push (JewelOS ref starts `yima`). If the JewelOS dry
-run also lists 0199/0200 (department section access), they belong to that separate change:
-push only once it is approved too. If 0201 was pushed before 0199/0200, those need
-`--include-all` when they are pushed later.
+Confirm the linked project ref before each push (JewelOS ref starts `yima`, CRM project
+`fsydcsyqnddacjfoutfe`). Each dry run must list only the migration above.
 
 0201 enqueues every person once; the worker delivers them within a few minutes.
 

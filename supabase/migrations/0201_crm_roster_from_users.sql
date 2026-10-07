@@ -17,7 +17,7 @@
 -- left to the migrations that own it. Availability and weekly-off changes enqueue the same
 -- `staff.access_changed` event; the daily reconciliation sends every snapshot again, which
 -- also moves the availability window forward each day. CRM-project side:
--- supabase-crm/supabase/migrations/20261007000100_crm_roster_from_users.sql.
+-- supabase-crm/supabase/migrations/20261007000900_crm_roster_from_users.sql.
 
 set search_path = public, extensions;
 
