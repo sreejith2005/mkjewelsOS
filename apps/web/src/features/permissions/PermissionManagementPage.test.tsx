@@ -4,14 +4,14 @@ import { afterEach, expect, it, vi } from "vitest";
 import type { PermissionAdminContext, UserAccessBreakdown } from "./api";
 import { PermissionManagementPage } from "./PermissionManagementPage";
 
-const mocks = vi.hoisted(() => ({ context: vi.fn(), breakdown: vi.fn(), save: vi.fn(), refresh: undefined as (() => Promise<void>) | undefined }));
-vi.mock("./api", () => ({ fetchPermissionAdminContext: mocks.context, fetchUserAccessBreakdown: mocks.breakdown, saveDesignationPermissions: vi.fn(), saveRolePermissions: vi.fn(), saveUserAccess: mocks.save }));
+const mocks = vi.hoisted(() => ({ context: vi.fn(), departmentSave: vi.fn(), breakdown: vi.fn(), save: vi.fn(), refresh: undefined as (() => Promise<void>) | undefined }));
+vi.mock("./api", () => ({ fetchPermissionAdminContext: mocks.context, fetchUserAccessBreakdown: mocks.breakdown, saveDesignationPermissions: vi.fn(), saveRolePermissions: vi.fn(), saveUserAccess: mocks.save, saveDepartmentPermissions: mocks.departmentSave }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ access: { permissions: { "permissions.manage": true }, profileId: "actor" }, profile: { tenant_id: "tenant" }, refreshAccess: vi.fn() }) }));
 vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealtimeRefresh: ({ refresh }: { refresh: () => Promise<void> }) => { mocks.refresh = refresh; } }));
 afterEach(() => { cleanup(); vi.resetAllMocks(); mocks.refresh = undefined; });
 
-const context: PermissionAdminContext = { roles: ["staff"], rolePermissions: {}, designations: [], designationOverrides: {}, users: [{ id: "target", employeeName: "Synthetic User", employeeCode: "TEST", role: "staff", designationId: null, accountStatus: "active", dashboardAuthority: null, overrideCount: 0 }] };
-const breakdown: UserAccessBreakdown = { profileId: "target", employeeName: "Synthetic User", employeeCode: "TEST", baseRole: "staff", designationId: null, designationLabel: null, dashboardAuthority: null, effectiveRole: "staff", rows: [{ key: "tasks.view", roleDefault: true, roleConfigured: false, designation: null, user: null, effective: true }] };
+const context: PermissionAdminContext = { departments: [], departmentOverrides: {}, roles: ["staff"], rolePermissions: {}, designations: [], designationOverrides: {}, users: [{ id: "target", employeeName: "Synthetic User", employeeCode: "TEST", role: "staff", designationId: null, accountStatus: "active", dashboardAuthority: null, overrideCount: 0 }] };
+const breakdown: UserAccessBreakdown = { profileId: "target", employeeName: "Synthetic User", employeeCode: "TEST", baseRole: "staff", departmentId: null, departmentName: null, designationId: null, designationLabel: null, dashboardAuthority: null, effectiveRole: "staff", rows: [{ key: "tasks.view", roleDefault: true, roleConfigured: false, department: null, designation: null, user: null, effective: true }] };
 
 it("refreshes the selected user's committed access while preserving local authority and override edits", async () => {
   mocks.context.mockResolvedValue(context);
@@ -134,4 +134,19 @@ it("allows retrying the same user after the initial breakdown read fails", async
   fireEvent.click(screen.getByRole("button", { name: /Synthetic User/ }));
   await act(async () => {});
   expect(screen.queryByLabelText("Open Tasks override for Synthetic User")).not.toBeNull();
+});
+
+it("ignores a delayed pre-save department context after the committed refresh", async () => {
+  const before: PermissionAdminContext = { ...context, departments: [{ id: "sales", name: "Sales", branchName: null }] };
+  const after: PermissionAdminContext = { ...before, departmentOverrides: { sales: { "crm.view": "grant" } } };
+  let resolve: ((value: PermissionAdminContext) => void) | undefined;
+  mocks.context.mockResolvedValueOnce(before).mockImplementationOnce(() => new Promise<PermissionAdminContext>(r => { resolve = r; })).mockResolvedValue(after);
+  render(<PermissionManagementPage onBack={() => {}} />); await act(async () => {});
+  fireEvent.click(screen.getByRole("button", { name: "Departments" }));
+  let oldRead: Promise<void> | undefined;
+  act(() => { oldRead = mocks.refresh?.(); });
+  fireEvent.change(screen.getByLabelText("CRM department access"), { target: { value: "grant" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save department access" })); await act(async () => {});
+  await act(async () => { resolve?.(before); await oldRead; });
+  expect((screen.getByLabelText("CRM department access") as HTMLSelectElement).value).toBe("grant");
 });

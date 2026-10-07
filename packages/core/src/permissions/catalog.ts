@@ -4,7 +4,7 @@ import { ROLE_PAGES, USER_ROLES, type PageId, type UserRole } from "../roleMenu"
  * How a permission may be configured.
  *
  * - `module`: access to an application section; configurable per role,
- *   designation and user.
+ *   department, designation and user.
  * - `action`: a capability inside a section that maps to an existing server
  *   check; configurable per role, designation and user.
  * - `authority`: follows the user's dashboard authority and cannot be

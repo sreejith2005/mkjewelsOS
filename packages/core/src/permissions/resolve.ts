@@ -22,17 +22,19 @@ export type AccessSubject = Readonly<{
   role: UserRole;
   dashboardAuthority: DashboardAuthority | null;
   rolePermissions?: RolePermissionMatrix;
+  departmentOverrides?: PermissionOverrides;
   designationOverrides?: PermissionOverrides;
   userOverrides?: PermissionOverrides;
 }>;
 
-export type PermissionDecisionSource = "role" | "designation" | "user" | "authority" | "protected";
+export type PermissionDecisionSource = "role" | "department" | "designation" | "user" | "authority" | "protected";
 
 export type PermissionExplanation = Readonly<{
   key: PermissionKey;
   effectiveRole: UserRole;
   roleDefault: boolean;
   roleConfigured: boolean;
+  department: PermissionEffect | null;
   designation: PermissionEffect | null;
   user: PermissionEffect | null;
   effective: boolean;
@@ -46,7 +48,7 @@ export function effectiveRoleFor(subject: Pick<AccessSubject, "role" | "dashboar
 
 /**
  * Mirrors `permission_effective_for()` as evolved through migrations 0156, 0171,
- * and 0181. The database is the
+ * 0181 and 0199. The database is the
  * authority; this copy exists for live previews and must stay in parity.
  */
 export function explainPermission(subject: AccessSubject, key: PermissionKey): PermissionExplanation {
@@ -56,29 +58,31 @@ export function explainPermission(subject: AccessSubject, key: PermissionKey): P
   const builtin = definition.defaultRoles.includes(effectiveRole);
   if (key === "availability.apply_leave_exception") {
     const user = subject.userOverrides?.[key] ?? null;
-    return { key, effectiveRole, roleDefault: false, roleConfigured: false, designation: null, user, effective: user === "grant", decidedBy: user ? "user" : "role" };
+    return { key, effectiveRole, roleDefault: false, roleConfigured: false, department: null, designation: null, user, effective: user === "grant", decidedBy: user ? "user" : "role" };
   }
   if (effectiveRole === "super_admin") {
-    return { key, effectiveRole, roleDefault: true, roleConfigured: false, designation: null, user: null, effective: true, decidedBy: definition.kind === "protected" ? "protected" : "authority" };
+    return { key, effectiveRole, roleDefault: true, roleConfigured: false, department: null, designation: null, user: null, effective: true, decidedBy: definition.kind === "protected" ? "protected" : "authority" };
   }
   if (definition.kind === "protected" || definition.kind === "authority") {
     const effective = definition.kind === "protected" ? false : builtin;
-    return { key, effectiveRole, roleDefault: effective, roleConfigured: false, designation: null, user: null, effective, decidedBy: definition.kind };
+    return { key, effectiveRole, roleDefault: effective, roleConfigured: false, department: null, designation: null, user: null, effective, decidedBy: definition.kind };
   }
   const configured = subject.rolePermissions?.[effectiveRole]?.[key];
   const roleDefault = configured ?? builtin;
+  const department = definition.kind === "module" ? subject.departmentOverrides?.[key] ?? null : null;
   const designation = subject.designationOverrides?.[key] ?? null;
   const user = subject.userOverrides?.[key] ?? null;
-  const effective = user ? user === "grant" : designation ? designation === "grant" : roleDefault;
+  const effective = user ? user === "grant" : department ? department === "grant" : designation ? designation === "grant" : roleDefault;
   return {
     key,
     effectiveRole,
     roleDefault,
     roleConfigured: configured !== undefined,
+    department,
     designation,
     user,
     effective,
-    decidedBy: user ? "user" : designation ? "designation" : "role",
+    decidedBy: user ? "user" : department ? "department" : designation ? "designation" : "role",
   };
 }
 

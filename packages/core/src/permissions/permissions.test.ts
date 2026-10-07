@@ -227,3 +227,27 @@ describe("server payload parsing", () => {
     expect(parsePermissionOverrides({ "tasks.view": "deny", "crm.view": "maybe", "x.y": "grant" })).toEqual({ "tasks.view": "deny" });
   });
 });
+
+
+describe("department section access", () => {
+  it("grants CRM to staff by department ahead of designation deny", () => {
+    expect(explainPermission({ role: "staff", dashboardAuthority: null, departmentOverrides: { "crm.view": "grant" }, designationOverrides: { "crm.view": "deny" } }, "crm.view")).toMatchObject({ effective: true, decidedBy: "department", department: "grant" });
+  });
+  it("individual deny beats department grant", () => {
+    expect(explainPermission({ role: "staff", dashboardAuthority: null, departmentOverrides: { "crm.view": "grant" }, userOverrides: { "crm.view": "deny" } }, "crm.view").effective).toBe(false);
+  });
+  it("individual grant beats department deny", () => {
+    expect(explainPermission({ role: "staff", dashboardAuthority: null, departmentOverrides: { "crm.view": "deny" }, userOverrides: { "crm.view": "grant" } }, "crm.view").effective).toBe(true);
+  });
+  it("department deny beats manager role defaults", () => {
+    expect(explainPermission({ role: "manager", dashboardAuthority: null, departmentOverrides: { "crm.view": "deny" } }, "crm.view").effective).toBe(false);
+  });
+  it("does not turn a department rule into action or dashboard authority", () => {
+    const subject = { role: "staff" as const, dashboardAuthority: null, departmentOverrides: { "forms.manage": "grant" as const, "tasks.manage_team": "grant" as const } };
+    expect(explainPermission(subject, "forms.manage").effective).toBe(false);
+    expect(explainPermission(subject, "tasks.manage_team").effective).toBe(false);
+  });
+  it("keeps Super Admin section access despite department deny", () => {
+    expect(explainPermission({ role: "super_admin", dashboardAuthority: null, departmentOverrides: { "crm.view": "deny" } }, "crm.view").effective).toBe(true);
+  });
+});

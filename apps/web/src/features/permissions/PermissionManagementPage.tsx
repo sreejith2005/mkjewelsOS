@@ -1,3 +1,4 @@
+import { DepartmentPermissionsTab } from "./DepartmentPermissionsTab";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Lock, RotateCcw, Save, Search } from "lucide-react";
 import {
@@ -39,7 +40,7 @@ const GROUPS = PERMISSION_CATEGORIES
   .map((category) => ({ category, items: CATALOG.filter((item) => item.category === category) }))
   .filter((group) => group.items.length > 0);
 
-type Tab = "roles" | "designations" | "users";
+type Tab = "roles" | "departments" | "designations" | "users";
 type Feedback = { tone: "success" | "danger"; text: string } | null;
 
 const errorText = (cause: unknown) => (cause instanceof Error ? cause.message : typeof cause === "object" && cause && "message" in cause && typeof cause.message === "string" ? cause.message : "The request failed.");
@@ -92,7 +93,7 @@ function RolePermissionsTab({ context, onSaved }: { context: PermissionAdminCont
   return <div className="flex flex-col gap-4">
     <div className="scroll-x no-scrollbar flex gap-2 pb-1" role="group" aria-label="Role">{context.roles.map((item) => <Pill active={item === role} key={item} onClick={() => setRole(item)}>{titleCase(item)}</Pill>)}</div>
     <FeedbackNotice feedback={feedback} />
-    <p className="text-sm text-task-text-muted">{role === "super_admin" ? "Super Admin has every implemented capability. Configured denies do not reduce this authority." : <>These are the defaults for everyone whose effective role is <strong>{titleCase(role)}</strong> (their role, or their dashboard authority when one is set). Designation and user overrides still apply on top.</>}</p>
+    <p className="text-sm text-task-text-muted">{role === "super_admin" ? "Super Admin has every implemented capability. Configured denies do not reduce this authority." : <>These are the defaults for everyone whose effective role is <strong>{titleCase(role)}</strong> (their role, or their dashboard authority when one is set). Department, designation and user overrides still apply on top.</>}</p>
     {GROUPS.map((group) => <Panel key={group.category} title={group.category}><ul className="-mx-4 -my-3 divide-y divide-task-border">{group.items.map((item) => <li className="flex items-start justify-between gap-3 px-4 py-3" key={item.key}>
       <div className="min-w-0"><p className="text-sm font-medium">{item.label}</p><p className="text-xs text-task-text-muted">{item.description}</p></div>
       {isConfigurablePermission(item.key) && role !== "super_admin" ? <div className="flex shrink-0 items-center gap-2">
@@ -186,6 +187,7 @@ function UserPermissionsTab({ context, onSaved, selfId }: { context: PermissionA
     role: breakdown.baseRole,
     dashboardAuthority: authority,
     rolePermissions: context.rolePermissions,
+    departmentOverrides: breakdown.departmentId && context.departments.some(item => item.id === breakdown.departmentId) ? context.departmentOverrides[breakdown.departmentId] ?? {} : {},
     designationOverrides: activeDesignation ? context.designationOverrides[activeDesignation] ?? {} : {},
     userOverrides: Object.fromEntries(CATALOG.flatMap((item) => {
       const value = draft[item.key] !== undefined ? draft[item.key] ?? null : savedUser[item.key] ?? null;
@@ -219,7 +221,7 @@ function UserPermissionsTab({ context, onSaved, selfId }: { context: PermissionA
     <div className="min-w-0">
       <FeedbackNotice feedback={feedback} />
       {loading ? <LoadingPanels count={2} /> : !breakdown || !subject ? <Notice>Select a user to see and change their access.</Notice> : <div className="flex flex-col gap-4">
-        <Panel title={breakdown.employeeName} description={`Role: ${titleCase(breakdown.baseRole)} · Designation: ${breakdown.designationLabel ?? "None"} · Effective role: ${titleCase(authority ?? breakdown.baseRole)}`}>
+        <Panel title={breakdown.employeeName} description={`Role: ${titleCase(breakdown.baseRole)} · Department: ${breakdown.departmentName ?? "None"} · Designation: ${breakdown.designationLabel ?? "None"} · Effective role: ${titleCase(authority ?? breakdown.baseRole)}`}>
           {isSelf ? <div className="mb-3"><Notice>You cannot change your own access. Ask another Super Admin.</Notice></div> : null}
           <fieldset disabled={isSelf}><legend className="mb-2 text-xs font-medium text-task-text-muted">Dashboard authority</legend><div className="flex flex-wrap gap-2">
             {[null, ...DASHBOARD_AUTHORITIES].map((level) => <label className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm ${authority === level ? "border-task-accent bg-task-accent-soft" : "border-task-border"}`} key={level ?? "inherit"}>
@@ -230,9 +232,9 @@ function UserPermissionsTab({ context, onSaved, selfId }: { context: PermissionA
         </Panel>
         <div className="overflow-x-auto rounded-xl border border-task-border bg-task-bg">
           <table className="w-full min-w-[40rem] text-left text-sm">
-            <thead className="border-b border-task-border text-xs text-task-text-muted"><tr><th className="px-4 py-2 font-medium">Permission</th><th className="px-3 py-2 font-medium">Role</th><th className="px-3 py-2 font-medium">Designation</th><th className="px-3 py-2 font-medium">User override</th><th className="px-3 py-2 font-medium">Effective</th></tr></thead>
+            <thead className="border-b border-task-border text-xs text-task-text-muted"><tr><th className="px-4 py-2 font-medium">Permission</th><th className="px-3 py-2 font-medium">Role</th><th className="px-3 py-2 font-medium">Department</th><th className="px-3 py-2 font-medium">Designation</th><th className="px-3 py-2 font-medium">User override</th><th className="px-3 py-2 font-medium">Effective</th></tr></thead>
             <tbody className="divide-y divide-task-border">{GROUPS.flatMap((group) => [
-              <tr className="bg-task-muted" key={group.category}><td className="px-4 py-1.5 text-xs font-semibold" colSpan={5}>{group.category}</td></tr>,
+              <tr className="bg-task-muted" key={group.category}><td className="px-4 py-1.5 text-xs font-semibold" colSpan={6}>{group.category}</td></tr>,
               ...group.items.map((item) => {
                 const explanation = explainPermission(subject, item.key);
                 const serverEffective = breakdown.rows.find((row) => row.key === item.key)?.effective;
@@ -240,6 +242,7 @@ function UserPermissionsTab({ context, onSaved, selfId }: { context: PermissionA
                 return <tr key={item.key}>
                   <td className="px-4 py-2"><span className="font-medium">{item.label}</span></td>
                   <td className="px-3 py-2"><Allowed value={explanation.roleDefault} /><span className="block text-[11px] text-task-text-muted">{explanation.decidedBy === "protected" || explanation.decidedBy === "authority" ? lockedReason(item) : `${titleCase(explanation.effectiveRole)}${explanation.roleConfigured ? " · customised" : ""}`}</span></td>
+                  <td className="px-3 py-2 text-xs">{explanation.department ? titleCase(explanation.department) : "?"}</td>
                   <td className="px-3 py-2 text-xs">{explanation.designation ? titleCase(explanation.designation) : <span className="text-task-text-muted">—</span>}</td>
                   <td className="px-3 py-2">{isConfigurablePermission(item.key) && explanation.effectiveRole !== "super_admin" ? <EffectSelect disabled={isSelf} label={`${item.label} override for ${breakdown.employeeName}`} onChange={(value) => setDraft((current) => ({ ...current, [item.key]: value }))} value={explanation.user} /> : <Lock aria-label="Locked" className="size-3.5 text-task-text-muted" />}</td>
                   <td className="px-3 py-2"><Allowed value={explanation.effective} />{pending ? <span className="block text-[11px] text-task-text-muted">unsaved</span> : null}</td>
@@ -260,23 +263,29 @@ export function PermissionManagementPage({ onBack }: { onBack: () => void }) {
   const [context, setContext] = useState<PermissionAdminContext | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const contextEpoch = useRef(0);
   const load = useCallback(async () => {
+    const request = ++contextEpoch.current;
     setError(null);
-    try { setContext(await fetchPermissionAdminContext()); } catch (cause) { setError(errorText(cause)); } finally { setLoading(false); }
+    try { const next = await fetchPermissionAdminContext(); if (request === contextEpoch.current) setContext(next); }
+    catch (cause) { if (request === contextEpoch.current) setError(errorText(cause)); }
+    finally { if (request === contextEpoch.current) setLoading(false); }
   }, []);
   const afterSave = useCallback(async () => { await Promise.all([load(), refreshAccess()]); }, [load, refreshAccess]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); return () => { contextEpoch.current++; }; }, [load]);
   useTenantRealtimeRefresh({ tenantId: hasPermission(access, "permissions.manage") ? profile?.tenant_id : null, topics: ["settings", "organization"], refresh: load });
   if (!hasPermission(access, "permissions.manage")) return <PageSurface><Notice tone="danger">Permission management is available to Super Admins only.</Notice></PageSurface>;
   return <PageSurface>
-    <PageHeading title="Permission management" description="Role defaults, designation and user overrides, and dashboard authority. Enforced by the database; every change is audited." actions={<Button onClick={onBack} variant="secondary"><ArrowLeft />Settings</Button>} />
+    <PageHeading title="Permission management" description="Role defaults, department, designation and user overrides, and dashboard authority. Enforced by the database; every change is audited." actions={<Button onClick={onBack} variant="secondary"><ArrowLeft />Settings</Button>} />
     <div className="mb-5 flex gap-2" role="tablist" aria-label="Permission scope">
       <Pill active={tab === "roles"} onClick={() => setTab("roles")}>Roles</Pill>
+      <Pill active={tab === "departments"} onClick={() => setTab("departments")}>Departments</Pill>
       <Pill active={tab === "designations"} onClick={() => setTab("designations")}>Designations</Pill>
       <Pill active={tab === "users"} onClick={() => setTab("users")}>Users</Pill>
     </div>
     {loading ? <LoadingPanels count={3} /> : error && !context ? <ErrorPanel message={error} onRetry={() => void load()} /> : context ? (
       tab === "roles" ? <RolePermissionsTab context={context} onSaved={afterSave} />
+        : tab === "departments" ? <DepartmentPermissionsTab context={context} onSaved={afterSave} />
         : tab === "designations" ? <DesignationPermissionsTab context={context} onSaved={afterSave} />
           : <UserPermissionsTab context={context} onSaved={afterSave} selfId={access?.profileId} />
     ) : null}

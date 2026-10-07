@@ -35,9 +35,13 @@ export type PermissionAdminUser = Readonly<{
   overrideCount: number;
 }>;
 
+export type PermissionDepartment = Readonly<{ id: string; name: string; branchName: string | null }>;
+
 export type Designation = Readonly<{ id: string; label: string }>;
 
 export type PermissionAdminContext = Readonly<{
+  departments: readonly PermissionDepartment[];
+  departmentOverrides: Readonly<Record<string, PermissionOverrides>>;
   roles: readonly UserRole[];
   rolePermissions: RolePermissionMatrix;
   designations: readonly Designation[];
@@ -49,6 +53,7 @@ export type UserAccessRow = Readonly<{
   key: PermissionKey;
   roleDefault: boolean;
   roleConfigured: boolean;
+  department: PermissionEffect | null;
   designation: PermissionEffect | null;
   user: PermissionEffect | null;
   effective: boolean;
@@ -61,6 +66,8 @@ export type UserAccessBreakdown = Readonly<{
   baseRole: UserRole;
   designationId: string | null;
   designationLabel: string | null;
+  departmentId: string | null;
+  departmentName: string | null;
   dashboardAuthority: DashboardAuthority | null;
   effectiveRole: UserRole;
   rows: readonly UserAccessRow[];
@@ -88,6 +95,15 @@ export async function fetchPermissionAdminContext(): Promise<PermissionAdminCont
     const label = asString(row.label);
     return id && label ? [{ id, label }] : [];
   });
+  const departmentOverrides: Record<string, Partial<Record<PermissionKey, PermissionEffect>>> = {};
+  for (const row of asArray(value.department_overrides).map(asRecord)) {
+    const id = asString(row.department_id);
+    if (id && isPermissionKey(row.key) && isEffect(row.effect)) (departmentOverrides[id] ??= {})[row.key] = row.effect;
+  }
+  const departments = asArray(value.departments).map(asRecord).flatMap((row): PermissionDepartment[] => {
+    const id = asString(row.id); const name = asString(row.name);
+    return id && name ? [{ id, name, branchName: asString(row.branch_name) }] : [];
+  });
   const users = asArray(value.users).map(asRecord).flatMap((row): PermissionAdminUser[] => {
     const id = asString(row.id);
     const employeeName = asString(row.employee_name);
@@ -103,7 +119,7 @@ export async function fetchPermissionAdminContext(): Promise<PermissionAdminCont
       overrideCount: typeof row.override_count === "number" ? row.override_count : 0,
     }];
   });
-  return { roles: roles.length ? roles : USER_ROLES, rolePermissions, designations, designationOverrides, users };
+  return { departments, departmentOverrides, roles: roles.length ? roles : USER_ROLES, rolePermissions, designations, designationOverrides, users };
 }
 
 function parseBreakdown(data: unknown): UserAccessBreakdown {
@@ -116,6 +132,7 @@ function parseBreakdown(data: unknown): UserAccessBreakdown {
     key: row.key,
     roleDefault: row.role_default === true,
     roleConfigured: row.role_configured === true,
+    department: isEffect(row.department) ? row.department : null,
     designation: isEffect(row.designation) ? row.designation : null,
     user: isEffect(row.user) ? row.user : null,
     effective: row.effective === true,
@@ -127,6 +144,8 @@ function parseBreakdown(data: unknown): UserAccessBreakdown {
     baseRole: profile.base_role,
     designationId: asString(profile.designation_id),
     designationLabel: asString(profile.designation_label),
+    departmentId: asString(profile.department_id),
+    departmentName: asString(profile.department_name),
     dashboardAuthority: isAuthority(value.dashboard_authority) ? value.dashboard_authority : null,
     effectiveRole: value.effective_role,
     rows,
@@ -157,4 +176,16 @@ export async function saveUserAccess(profileId: string, authority: DashboardAuth
   });
   if (error) throw error;
   return parseBreakdown(data);
+}
+
+/** Section-only writes cannot change dashboard authority or action overrides. */
+export async function saveUserSectionAccess(profileId: string, changes: OverrideChanges): Promise<UserAccessBreakdown> {
+  const { data, error } = await db().rpc("save_user_section_access_with_audit", { p_profile_id: profileId, p_overrides: changes });
+  if (error) throw error;
+  return parseBreakdown(data);
+}
+
+export async function saveDepartmentPermissions(departmentId: string, changes: OverrideChanges): Promise<void> {
+  const { error } = await db().rpc("save_department_permissions_with_audit", { p_department_id: departmentId, p_overrides: changes });
+  if (error) throw error;
 }

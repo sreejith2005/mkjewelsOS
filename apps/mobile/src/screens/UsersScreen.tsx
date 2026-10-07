@@ -1,3 +1,4 @@
+import { UserSectionAccess } from "@/features/users/UserSectionAccess";
 import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
 import { memo, useMemo, useState } from "react";
 import { Alert, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
@@ -68,6 +69,8 @@ export function UsersScreen() {
   const [statusFilter, setStatusFilter] = useState("");
   const [view, setView] = useState<"list" | "organization">("list");
   const [editing, setEditing] = useState<UserDirectoryProfile | null>(null);
+  const [sectionProfileId, setSectionProfileId] = useState<string | null>(null);
+  const canManageSections = hasPermission(access, "permissions.manage");
   const [inviting, setInviting] = useState(false);
   const [managingOrganization, setManagingOrganization] = useState(false);
   const state = useAsyncData(loadUserDirectory, []);
@@ -125,6 +128,7 @@ export function UsersScreen() {
             departmentNames={departmentNames}
             designationNames={designationNames}
             onEdit={setEditing}
+            onSectionAccess={canManageSections ? setSectionProfileId : undefined}
             user={item}
           />
         )}
@@ -190,6 +194,7 @@ export function UsersScreen() {
           role={profile.user_role}
         />
       ) : null}
+      {sectionProfileId && canManageSections ? <UserSectionAccess key={sectionProfileId} profileId={sectionProfileId} onClose={() => setSectionProfileId(null)} onSaved={state.refresh} /> : null}
       {managingOrganization ? <OrganizationManager onChanged={state.refresh} onClose={() => setManagingOrganization(false)} /> : null}
     </>
   );
@@ -207,6 +212,7 @@ const UserCard = memo(function UserCard({
   departmentNames,
   designationNames,
   onEdit,
+  onSectionAccess,
 }: {
   user: UserDirectoryProfile;
   canManage: boolean;
@@ -214,6 +220,7 @@ const UserCard = memo(function UserCard({
   departmentNames: ReadonlyMap<string, string>;
   designationNames: ReadonlyMap<string, string>;
   onEdit: (user: UserDirectoryProfile) => void;
+  onSectionAccess?: ((profileId: string) => void) | undefined;
 }) {
   const styles = useStyles();
   return (
@@ -229,6 +236,7 @@ const UserCard = memo(function UserCard({
       <CardRow label="Department" value={departmentNames.get(user.department_id) ?? "Unassigned department"} />
       <CardRow label="Branch" value={branchNames.get(user.branch_id) ?? "Unassigned branch"} />
       <Text tone="primary" variant="caption">{titleCase(user.user_role)}</Text>
+      {onSectionAccess ? <Button label={`Section access for ${user.employee_name}`} onPress={() => onSectionAccess(user.id)} variant="secondary" /> : null}
       {canManage ? <Button label={`Edit ${user.employee_name}`} onPress={() => onEdit(user)} variant="secondary" /> : null}
     </Card>
   );

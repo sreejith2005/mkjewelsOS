@@ -1,7 +1,7 @@
 # Department and individual section access
 
 Date: 2026-10-07 (Asia/Kolkata)
-Status: behavior approved in chat; written specification pending review.
+Status: approved for implementation by the owner on 2026-10-07.
 
 ## Purpose and approved behavior
 

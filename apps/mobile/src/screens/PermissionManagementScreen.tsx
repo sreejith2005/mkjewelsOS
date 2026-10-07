@@ -1,3 +1,4 @@
+import { DepartmentPermissionsTab } from "@/features/settings/DepartmentPermissionsTab";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Switch, View } from "react-native";
 import { Lock, RotateCcw } from "lucide-react-native";
@@ -49,7 +50,7 @@ const GROUPS = PERMISSION_CATEGORIES
   .map((category) => ({ category, items: CATALOG.filter((item) => item.category === category) }))
   .filter((group) => group.items.length > 0);
 
-type Tab = "roles" | "designations" | "users";
+type Tab = "roles" | "departments" | "designations" | "users";
 type Feedback = { tone: "success" | "danger"; text: string } | null;
 type EffectChoice = "inherit" | PermissionEffect;
 
@@ -111,7 +112,7 @@ function RolePermissionsTab({ context, onSaved }: { context: PermissionAdminCont
       <SegmentedControl accessibilityLabel="Role" onChange={setRole} options={context.roles.map((item) => ({ value: item, label: titleCase(item) }))} value={role} />
       <FeedbackBanner feedback={feedback} />
       <Text tone="muted" variant="small">
-        {role === "super_admin" ? "Super Admin has every implemented capability. Configured denies do not reduce this authority." : `These are the defaults for everyone whose effective role is ${titleCase(role)} (their role, or their dashboard authority when one is set). Designation and user overrides still apply on top.`}
+        {role === "super_admin" ? "Super Admin has every implemented capability. Configured denies do not reduce this authority." : `These are the defaults for everyone whose effective role is ${titleCase(role)} (their role, or their dashboard authority when one is set). Department, designation and user overrides still apply on top.`}
       </Text>
       {GROUPS.map((group) => (
         <Card key={group.category}>
@@ -255,6 +256,7 @@ function UserPermissionsTab({ context, onSaved, selfId }: { context: PermissionA
     role: breakdown.baseRole,
     dashboardAuthority: authority,
     rolePermissions: context.rolePermissions,
+    departmentOverrides: breakdown.departmentId && context.departments.some(item => item.id === breakdown.departmentId) ? context.departmentOverrides[breakdown.departmentId] ?? {} : {},
     designationOverrides: activeDesignation ? context.designationOverrides[activeDesignation] ?? {} : {},
     userOverrides: Object.fromEntries(CATALOG.flatMap((item) => {
       const value = draft[item.key] !== undefined ? draft[item.key] ?? null : savedUser[item.key] ?? null;
@@ -309,7 +311,7 @@ function UserPermissionsTab({ context, onSaved, selfId }: { context: PermissionA
       <Card>
         <Text variant="subtitle" weight="semibold">{breakdown.employeeName}</Text>
         <Text tone="muted" variant="caption">
-          {`Role: ${titleCase(breakdown.baseRole)} · Designation: ${breakdown.designationLabel ?? "None"} · Effective role: ${titleCase(authority ?? breakdown.baseRole)}`}
+          {`Role: ${titleCase(breakdown.baseRole)} · Department: ${breakdown.departmentName ?? "None"} · Designation: ${breakdown.designationLabel ?? "None"} · Effective role: ${titleCase(authority ?? breakdown.baseRole)}`}
         </Text>
         {isSelf ? <Banner tone="info">You cannot change your own access. Ask another Super Admin.</Banner> : null}
         <Text tone="muted" variant="label">Dashboard authority</Text>
@@ -338,7 +340,7 @@ function UserPermissionsTab({ context, onSaved, selfId }: { context: PermissionA
                   <View style={styles.inline}><Allowed value={explanation.effective} />{pending ? <Text tone="muted" variant="caption">unsaved</Text> : null}</View>
                 </View>
                 <Text tone="muted" variant="caption">
-                  {`Role: ${explanation.roleDefault ? "Allowed" : "Denied"} (${explanation.decidedBy === "protected" || explanation.decidedBy === "authority" ? lockedReason(item) : `${titleCase(explanation.effectiveRole)}${explanation.roleConfigured ? " · customised" : ""}`}) · Designation: ${explanation.designation ? titleCase(explanation.designation) : "—"}`}
+                  {`Role: ${explanation.roleDefault ? "Allowed" : "Denied"} (${explanation.decidedBy === "protected" || explanation.decidedBy === "authority" ? lockedReason(item) : `${titleCase(explanation.effectiveRole)}${explanation.roleConfigured ? " · customised" : ""}`}) · Department: ${explanation.department ? titleCase(explanation.department) : "Inherit"} · Designation: ${explanation.designation ? titleCase(explanation.designation) : "—"}`}
                 </Text>
                 {isConfigurablePermission(item.key) && explanation.effectiveRole !== "super_admin" ? (
                   <EffectControl disabled={isSelf} label={`${item.label} override for ${breakdown.employeeName}`} onChange={(value) => setDraft((current) => ({ ...current, [item.key]: value }))} value={explanation.user} />
@@ -364,12 +366,16 @@ export function PermissionManagementScreen() {
   const [context, setContext] = useState<PermissionAdminContext | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const contextEpoch = useRef(0);
   const load = useCallback(async () => {
+    const request = ++contextEpoch.current;
     setError(null);
-    try { setContext(await fetchPermissionAdminContext()); } catch (cause) { setError(errorText(cause)); } finally { setLoading(false); }
+    try { const next = await fetchPermissionAdminContext(); if (request === contextEpoch.current) setContext(next); }
+    catch (cause) { if (request === contextEpoch.current) setError(errorText(cause)); }
+    finally { if (request === contextEpoch.current) setLoading(false); }
   }, []);
   const afterSave = useCallback(async () => { await Promise.all([load(), refreshAccess()]); }, [load, refreshAccess]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); return () => { contextEpoch.current++; }; }, [load]);
   useTenantRealtimeRefresh({ tenantId: hasPermission(access, "permissions.manage") ? profile.tenant_id : null, topics: ["settings", "organization"], refresh: load });
 
   if (!hasPermission(access, "permissions.manage")) {
@@ -378,17 +384,18 @@ export function PermissionManagementScreen() {
   return (
     <Screen scroll>
       <Text variant="heading" weight="semibold">Permission management</Text>
-      <Text tone="muted" variant="small">Role defaults, designation and user overrides, and dashboard authority. Enforced by the database; every change is audited.</Text>
+      <Text tone="muted" variant="small">Role defaults, department, designation and user overrides, and dashboard authority. Enforced by the database; every change is audited.</Text>
       <SegmentedControl
         accessibilityLabel="Permission scope"
         onChange={setTab}
-        options={[{ value: "roles", label: "Roles" }, { value: "designations", label: "Designations" }, { value: "users", label: "Users" }]}
+        options={[{ value: "roles", label: "Roles" }, { value: "departments", label: "Departments" }, { value: "designations", label: "Designations" }, { value: "users", label: "Users" }]}
         value={tab}
       />
       {loading ? <LoadingState label="Loading permissions…" />
         : error && !context ? <ErrorState message={error} onRetry={() => void load()} />
           : context ? (
             tab === "roles" ? <RolePermissionsTab context={context} onSaved={afterSave} />
+              : tab === "departments" ? <DepartmentPermissionsTab context={context} onSaved={afterSave} />
               : tab === "designations" ? <DesignationPermissionsTab context={context} onSaved={afterSave} />
                 : <UserPermissionsTab context={context} onSaved={afterSave} selfId={access.profileId} />
           ) : null}
