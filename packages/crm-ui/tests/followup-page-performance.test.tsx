@@ -7,8 +7,8 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({
   rpc: async () => ({ data: [{ role: "salesperson" }] }),
   auth: { getUser: async () => ({ data: { user: { id: "synthetic" } } }) },
   from: (table: string) => {
-    const read = table === "not_bought_followups" ? mocks.followups : mocks.history;
-    const query = { select: () => query, order: () => query, then: (resolve: (value: unknown) => unknown, reject: (error: unknown) => unknown) => read().then(resolve, reject) };
+    const read = table === "not_bought_followups" ? mocks.followups : table === "not_bought_history" ? mocks.history : async () => ({ data: [] });
+    const query = { select: () => query, order: () => query, eq: () => query, range: () => query, then: (resolve: (value: unknown) => unknown, reject: (error: unknown) => unknown) => read().then(resolve, reject) };
     return query;
   },
 }) }));

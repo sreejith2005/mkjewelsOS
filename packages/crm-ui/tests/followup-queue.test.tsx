@@ -34,3 +34,28 @@ describe("FollowupQueue legacy parity", () => {
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("sync_not_bought_followups")); expect(refresh).toHaveBeenCalled(); expect(screen.getByText(/2 follow-up\(s\) added/)).toBeTruthy();
   });
 });
+
+describe("FollowupQueue roster, sorting and finding (owner request 2026-10-08)", () => {
+  const row = (id: string, extra: Partial<FollowupItem>): FollowupItem => ({ ...item, id, ...extra });
+  function renderItems(items: FollowupItem[], crmNames: string[]) { return render(<FollowupQueue role="salesperson" branchId="branch-1" items={items} crmNames={crmNames} enteredByName="Test CRM" />); }
+  it("lists the roster and matches records whatever their saved capitalisation", () => {
+    renderItems([row("a", { client_name: "Current", crm_name: "Riya Shah" }), row("b", { client_name: "Former", crm_name: "Old Crm" })], ["RIYA SHAH"]);
+    expect(Array.from((screen.getByLabelText("CRM name") as HTMLSelectElement).options).map((option) => option.text)).toEqual(["CRM NAME: ALL", "RIYA SHAH", "NOT IN CURRENT ROSTER"]);
+    fireEvent.change(screen.getByLabelText("CRM name"), { target: { value: "RIYA SHAH" } });
+    expect(screen.getByText("Current")).toBeTruthy(); expect(screen.queryByText("Former")).toBeNull();
+    fireEvent.change(screen.getByLabelText("CRM name"), { target: { value: "__off_roster__" } });
+    expect(screen.getByText("Former")).toBeTruthy(); expect(screen.queryByText("Current")).toBeNull();
+  });
+  it("counts each tab and sorts by client name or visit date on request", () => {
+    renderItems([row("a", { client_name: "Zara", visit_date: "2026-10-01" }), row("b", { client_name: "Asha", visit_date: "2026-09-01", status: "ALREADY PURCHASED FROM MK JEWELS" }), row("c", { client_name: "Meera", visit_date: "2026-10-05" })], []);
+    expect(screen.getByRole("button", { name: "TODAY FOLLOW UP" }).textContent).toBe("TODAY FOLLOW UP (2)");
+    expect(screen.getByRole("button", { name: "ALL DONE" }).textContent).toBe("ALL DONE (1)");
+    const names = () => screen.getAllByRole("row").slice(1).map((tr) => tr.querySelectorAll("td")[1]?.querySelector("a")?.textContent);
+    fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "client" } });
+    expect(names()).toEqual(["Meera", "Zara"]);
+    fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "visit_newest" } });
+    expect(names()).toEqual(["Meera", "Zara"]);
+    fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "visit_oldest" } });
+    expect(names()).toEqual(["Zara", "Meera"]);
+  });
+});
