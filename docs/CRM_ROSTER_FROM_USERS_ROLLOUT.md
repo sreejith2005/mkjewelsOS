@@ -4,7 +4,8 @@ Owner decision 2026-10-07. The CRM ROSTER / ALLOCATION page is removed. Who appe
 person in a branch (walk-in form, queue dropdowns, round robin) and who is absent today now
 come from JewelOS:
 
-- **On the roster**: JewelOS Users > Role is **CRM**, the person has CRM access (login enabled,
+- **On the roster**: JewelOS Users > Department is **CRM** (department code `CRM`; since 0202)
+  or Role is **CRM**, the person has CRM access (login enabled,
   active, not resigned, `crm.view`), and their JewelOS branch is mapped to a CRM branch. Staff,
   managers and admins keep their CRM access but are not on the roster.
 - **Absent on a date**: JewelOS Availability says they are not available that day: an absent
