@@ -15,6 +15,9 @@
 /** A listing with fewer columns than this fits a phone as it is. */
 export const MIN_CARD_COLUMNS = 4;
 
+/** A last column with this heading holds the row's buttons and links. */
+const ACTIONS_HEADING = /^actions?$/i;
+
 function setAttribute(element: Element, name: string, value: string): void {
   if (element.getAttribute(name) !== value) element.setAttribute(name, value);
 }
@@ -24,9 +27,13 @@ export function labelTableCells(root: ParentNode): void {
     const headings = Array.from(listing.querySelectorAll(":scope > thead > tr:first-child > th")).map((cell) => cell.textContent?.trim() ?? "");
     if (headings.length < MIN_CARD_COLUMNS) {
       if (listing.hasAttribute("data-crm-cards")) listing.removeAttribute("data-crm-cards");
+      if (listing.hasAttribute("data-crm-actions")) listing.removeAttribute("data-crm-actions");
       continue;
     }
     setAttribute(listing, "data-crm-cards", "");
+    // crm-port/wide.css pins an actions column to the right edge on tablets and desktops.
+    if (ACTIONS_HEADING.test(headings[headings.length - 1] ?? "")) setAttribute(listing, "data-crm-actions", "");
+    else if (listing.hasAttribute("data-crm-actions")) listing.removeAttribute("data-crm-actions");
     for (const row of Array.from(listing.querySelectorAll(":scope > tbody > tr"))) {
       const cells = Array.from(row.children);
       if (cells.length !== headings.length) continue;

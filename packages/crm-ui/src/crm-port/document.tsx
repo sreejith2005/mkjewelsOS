@@ -6,23 +6,26 @@
 // The phone layout (crm-port/mobile.css, owner request 2026-10-07) is appended to the same
 // <style> element. Its "#crm-mobile" placeholder becomes MOBILE_SCOPE: one id more than the
 // strongest tier of crm.generated.css (.crm-root + four #crm-root), so a phone rule wins over
-// the original rule it adjusts while the original file stays verbatim.
+// the original rule it adjusts while the original file stays verbatim. The tablet and desktop
+// layout (crm-port/wide.css, owner request 2026-10-08: full width, listings that scroll inside
+// the window) follows it with the same scope through its "#crm-wide" placeholder.
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 
 import crmCss from "@/styles/crm.generated.css?raw";
 
 import mobileCss from "./mobile.css?raw";
+import wideCss from "./wide.css?raw";
 import { watchTableCells } from "./mobile-tables";
 
 export const CRM_ROOT_ID = "crm-root";
 export const MOBILE_SCOPE = `.crm-root${`#${CRM_ROOT_ID}`.repeat(5)}`;
 
 export function scopeMobileCss(source: string): string {
-  return source.replaceAll("#crm-mobile", MOBILE_SCOPE);
+  return source.replaceAll("#crm-mobile", MOBILE_SCOPE).replaceAll("#crm-wide", MOBILE_SCOPE);
 }
 
 export function crmStylesheet(): string {
-  return `${crmCss}\n${scopeMobileCss(mobileCss)}`;
+  return `${crmCss}\n${scopeMobileCss(mobileCss)}\n${scopeMobileCss(wideCss)}`;
 }
 
 export function CrmDocument({ title, children }: { title: string; children: ReactNode }) {

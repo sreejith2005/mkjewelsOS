@@ -92,7 +92,28 @@ tablets and desktops render exactly as the original. No original file is edited:
   form, a two-column dashboard summary, and larger profile text.
 
 Because of this, the parity harness's 390×844 text and screenshot comparison now differs from
-the original by design; the 1440×900 comparison is unaffected.
+the original by design (see also the tablet and desktop layout below).
+
+## Tablet and desktop layout (owner request 2026-10-08)
+
+The owner reported that the lists used only a 1400px column in the middle of a wide screen, and
+that the end of a row (the OPEN PROFILE / FOLLOW UP FORM / VIEW HISTORY buttons) could only be
+reached by scrolling to the bottom of a long list for its sideways scroll bar. This is an
+approved exception to visual parity **at 768px and wider**; phones keep the card layout above.
+
+- `crm-port/wide.css` holds every rule, all inside `min-width` media queries of at least 768px (a
+  test enforces this). `CrmDocument` appends it after the phone rules with the same scope (its
+  `#crm-wide` placeholder).
+- Pages (and the walk-in form and client profile) use the full window width.
+- A list with four or more columns scrolls inside a box no taller than the window, so its
+  sideways scroll bar is always on screen, and its headings stay in view while scrolling down.
+- Columns size to the available width with a 6rem minimum (10rem for remark columns) instead of
+  the original fixed 640-2200px widths; on a 1920px screen the follow-up list fits without
+  sideways scrolling.
+- When the last heading is "Action", `mobile-tables.ts` marks the list `data-crm-actions` and
+  that column stays pinned to the right edge, with compact buttons.
+
+The parity harness's 1440×900 comparison therefore also differs from the original by design.
 
 Tailwind scans `src/` for class names, so the bare lower-case element name of a data table,
 written anywhere in `src/` (code or comments), generates an unused utility and makes

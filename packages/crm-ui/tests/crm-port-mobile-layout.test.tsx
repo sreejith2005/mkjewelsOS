@@ -10,6 +10,11 @@ import { labelTableCells } from "@/crm-port/mobile-tables";
 
 // Vitest stubs CSS imports (even ?raw) to empty text, so the source is read from disk.
 const mobileSource = readFileSync(join(process.cwd(), "src", "crm-port", "mobile.css"), "utf8");
+const wideSource = readFileSync(join(process.cwd(), "src", "crm-port", "wide.css"), "utf8");
+
+function outsideMediaQueries(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, "").trim();
+}
 
 afterEach(() => { cleanup(); document.head.querySelectorAll("style[data-crm-ui]").forEach((style) => style.remove()); });
 
@@ -41,6 +46,16 @@ describe("phone table cards", () => {
     expect(empty.element.querySelector("td")?.hasAttribute("data-label")).toBe(false);
   });
 
+  it("marks a listing whose last column is its actions", () => {
+    const withActions = table(["CRM Name", "Client Name", "Number", "Action"], [["A", "B", "C", "D"]]);
+    labelTableCells(withActions.host);
+    expect(withActions.element.hasAttribute("data-crm-actions")).toBe(true);
+
+    const withoutActions = table(["DATE", "CLIENT ID", "TYPE", "REMARK"], [["A", "B", "C", "D"]]);
+    labelTableCells(withoutActions.host);
+    expect(withoutActions.element.hasAttribute("data-crm-actions")).toBe(false);
+  });
+
   it("labels rows rendered after the CRM mounts", async () => {
     const { container } = render(<CrmDocument title="MK Jewels CRM"><table><thead><tr><th>A</th><th>B</th><th>C</th><th>D</th></tr></thead><tbody /></table></CrmDocument>);
     const row = document.createElement("tr");
@@ -54,14 +69,23 @@ describe("phone table cards", () => {
 describe("phone stylesheet", () => {
   it("applies only at phone width and is scoped above the original stylesheet", () => {
     // Every rule is inside a max-width media query, so tablets and desktops are unchanged.
-    const outside = mobileSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, "").trim();
-    expect(outside).toBe("");
+    expect(outsideMediaQueries(mobileSource)).toBe("");
     expect([...mobileSource.matchAll(/@media\s*\(([^)]*)\)/g)].every(([, query]) => /^max-width:\s*\d+px$/.test(query!.trim()))).toBe(true);
     // One id more than the original's strongest tier (.crm-root + four #crm-root).
     expect(MOBILE_SCOPE).toBe(".crm-root#crm-root#crm-root#crm-root#crm-root#crm-root");
     const css = scopeMobileCss(mobileSource);
     expect(css).not.toContain("#crm-mobile");
     expect(css).toContain(`${MOBILE_SCOPE} .crm-app table[data-crm-cards]`);
+  });
+
+  it("applies the full-width layout only from tablet width up, where the phone rules stop", () => {
+    expect(outsideMediaQueries(wideSource)).toBe("");
+    const queries = [...wideSource.matchAll(/@media\s*\(([^)]*)\)/g)].map(([, query]) => query!.trim());
+    expect(queries.length).toBeGreaterThan(0);
+    expect(queries.every((query) => /^min-width:\s*(\d+)px$/.test(query) && Number(/\d+/.exec(query)![0]) >= 768)).toBe(true);
+    const css = scopeMobileCss(wideSource);
+    expect(css).not.toContain("#crm-wide");
+    expect(css).toContain(`${MOBILE_SCOPE} .crm-app table[data-crm-actions]`);
   });
 
   it("is attached as the single CRM style element while mounted", () => {
