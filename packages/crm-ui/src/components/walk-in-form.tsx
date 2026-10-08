@@ -7,7 +7,7 @@ import { PhoneNumberInput } from "@/components/phone-number-input";
 import { composePhone, phoneError, phoneKey, splitPhone, storedPhone } from "@/lib/phone";
 import { isPotentialCategory, POTENTIAL_CATEGORIES } from "@/lib/client-potential";
 import { createClient } from "@/lib/supabase/client";
-import { lookupClientByPhone } from "@/lib/client-phone-lookup";
+import { lookupClientByPhone, clientProfileAutofill } from "@/lib/client-phone-lookup";
 import type { Client } from "@/lib/supabase/app-types";
 
 type Queue = {
@@ -61,7 +61,7 @@ const LEGACY_COMMUNICATION_PREFERENCES = [
   "CALL", "WHATSAPP CALLS", "WHATSAPP MESSAGE", "DON'T CONTACT",
 ];
 function legacyWeddingMonthNumber(value: string) {
-  const index = LEGACY_WEDDING_MONTHS.indexOf(value);
+  const index = LEGACY_WEDDING_MONTHS.findIndex(month=>month.toUpperCase()===value.toUpperCase());
   return index === -1 ? value : String(index + 1);
 }
 function istDateTimeLocal(now = new Date()) {
@@ -114,7 +114,7 @@ function initialValue(
     bridal_or_non_bridal: "",
     wedding_month: "",
     wedding_year: "",
-    communication_preference: "",
+    communication_preference: client?.communication_preference ?? "",
     beverage: client?.beverage ?? "",
     sugar: client?.sugar ?? "",
     snack: client?.snack ?? "",
@@ -220,7 +220,7 @@ export function WalkInForm({
     notBoughtReasons: string[];
     beverages: string[];
     snacks: string[];
-    relations?: string[]; sugarOptions?: string[]; sourceOfLeads?: string[]; communities?: string[]; gifts?: string[];
+    relations?: string[]; sugarOptions?: string[]; sourceOfLeads?: string[]; communities?: string[]; gifts?: string[]; masterFields?: Record<string,string[]>;
   };
 }) {
   const router = useRouter();
@@ -230,6 +230,9 @@ export function WalkInForm({
   );
   const [primaryCountry, setPrimaryCountry] = useState(() => splitPhone(client?.primary_phone ?? queue?.mobile).countryCode);
   const primaryPhone = composePhone(primaryCountry, values.primary_phone);
+  const currentLookupPhone = useRef(primaryPhone);
+  currentLookupPhone.current = primaryPhone;
+
   const [companions, setCompanions] = useState<Companion[]>([]);
   const [referrals, setReferrals] = useState<{ name: string; mobile: string }[]>([]);
   const [notBoughtReasons, setNotBoughtReasons] = useState<string[]>([]);
@@ -284,8 +287,11 @@ export function WalkInForm({
       setProposedClientId(anchorClientId);
       return;
     }
+    let cancelled = false;
     const timer = window.setTimeout(() => {
       void lookupClientByPhone(primaryPhone).then((matched) => {
+        if (cancelled || currentLookupPhone.current !== primaryPhone) return;
+
         if (!matched) {
           if (!queue?.client_id && !client?.client_id) {
             setValues((current) => ({ ...current, client_id: "", client_type: "new" }));
@@ -293,13 +299,14 @@ export function WalkInForm({
           setAutoFilledFields(new Set());
           return;
         }
-        const fields = ["primary_name", "gender", "dob", "community", "address", "pincode", "country", "state", "city"];
-        setValues((current) => ({ ...current, client_id: matched.client_id, client_type: queue?.client_is_new && matched.client_id === queue.client_id ? "new" : "existing", primary_name: matched.primary_name, gender: matched.gender?.toUpperCase() ?? "", dob: matched.dob ?? "", community: matched.community ?? "", address: matched.address ?? "", pincode: matched.pincode ?? "", country: matched.country ?? "", state: matched.state ?? "", city: matched.city ?? "" }));
+        const fields = Object.keys(clientProfileAutofill(matched));
+        setValues((current) => ({ ...current, client_id: matched.client_id, client_type: queue?.client_is_new && matched.client_id === queue.client_id ? "new" : "existing", ...clientProfileAutofill(matched) }));
         setProposedClientId(matched.client_id);
         setAutoFilledFields(new Set(fields));
       });
     }, 350);
-    return () => window.clearTimeout(timer);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+
   }, [client?.client_id, queue?.client_id, primaryCountry, primaryPhone, values.primary_phone]);
   useEffect(() => {
     const pincode = values.pincode.trim();
@@ -378,6 +385,8 @@ export function WalkInForm({
     let proofClientId = client?.client_id || queue?.client_id || "";
     if (!proofClientId) {
       const matched = await lookupClientByPhone(primaryPhone);
+      if (currentLookupPhone.current !== primaryPhone) throw new Error("Mobile changed during lookup. Try the upload again.");
+
       if (matched) {
         proofClientId = matched.client_id;
         setProposedClientId(matched.client_id);
@@ -646,6 +655,8 @@ export function WalkInForm({
         onChange={(event) => set(key, event.target.value)}
       >
         <option value="">Choose</option>
+        {values[key] && !options.includes(values[key]) ? <option value={values[key]}>{values[key]} (saved)</option> : null}
+        {!options.length ? <option disabled value="__empty">No active choices. Update JewelOS Dropdown Master.</option> : null}
         {options.map((option) => (
           <option value={option} key={option}>
             {option}
@@ -731,8 +742,9 @@ export function WalkInForm({
               </span>
             </label>
             {field("primary_name", "Client name", "text", true)}
-            <PhoneNumberInput label="Mobile *" countryCode={primaryCountry} number={values.primary_phone} inputClassName={inputClass} onCountryCodeChange={(code) => { setPrimaryCountry(code); setValues((current) => ({ ...current, client_id: client?.client_id || queue?.client_id || "", client_type: client?.client_id || queue?.client_id ? "existing" : "new" })); setAutoFilledFields(new Set()); }} onNumberChange={(value) => { setValues((current) => ({ ...current, primary_phone: value, client_id: client?.client_id || queue?.client_id || "", client_type: client?.client_id || queue?.client_id ? "existing" : "new" })); setAutoFilledFields(new Set()); }} onBlur={() => { if (!phoneError(primaryCountry, values.primary_phone) && !keepsAnchorClient(primaryPhone)) void lookupClientByPhone(primaryPhone).then((matched) => { if (matched) { setValues((current) => ({ ...current, client_id: matched.client_id, client_type: queue?.client_is_new && matched.client_id === queue.client_id ? "new" /* crm-port fix (owner 2026-09-30): keep the queue's "new" as the other lookups do */ : "existing", primary_name: matched.primary_name, gender: matched.gender?.toUpperCase() ?? "", dob: matched.dob ?? "", community: matched.community ?? "", address: matched.address ?? "", pincode: matched.pincode ?? "", country: matched.country ?? "", state: matched.state ?? "", city: matched.city ?? "" })); setProposedClientId(matched.client_id); setAutoFilledFields(new Set(["primary_name", "gender", "dob", "community", "address", "pincode", "country", "state", "city"])); } }); }} />
-            {selectField("source_of_lead", "Source of lead", lookups.sourceOfLeads?.length ? lookups.sourceOfLeads : ["Walk-in", "Reference", "Instagram", "Google", "WhatsApp", "Advertisement", "Other"], true)}
+            <PhoneNumberInput label="Mobile *" countryCode={primaryCountry} number={values.primary_phone} inputClassName={inputClass} onCountryCodeChange={(code) => { setPrimaryCountry(code); setValues((current) => ({ ...current, client_id: client?.client_id || queue?.client_id || "", client_type: client?.client_id || queue?.client_id ? "existing" : "new" })); setAutoFilledFields(new Set()); }} onNumberChange={(value) => { setValues((current) => ({ ...current, primary_phone: value, client_id: client?.client_id || queue?.client_id || "", client_type: client?.client_id || queue?.client_id ? "existing" : "new" })); setAutoFilledFields(new Set()); }} onBlur={() => { if (!phoneError(primaryCountry, values.primary_phone) && !keepsAnchorClient(primaryPhone)) void lookupClientByPhone(primaryPhone).then((matched) => { if (currentLookupPhone.current !== primaryPhone) return; if (matched) { setValues((current) => ({ ...current, client_id: matched.client_id, client_type: queue?.client_is_new && matched.client_id === queue.client_id ? "new" /* crm-port fix (owner 2026-09-30): keep the queue's "new" as the other lookups do */ : "existing", ...clientProfileAutofill(matched) })); setProposedClientId(matched.client_id); setAutoFilledFields(new Set(Object.keys(clientProfileAutofill(matched)))); } }); }} />
+            {selectField("source_of_lead", "Source of lead", lookups.sourceOfLeads ?? [], true)}
+
             {values.source_of_lead.trim().toUpperCase() === "REFERENCE" ? (
               <>
                 {field("reference_name", "Reference name", "text", true)}
@@ -784,7 +796,8 @@ export function WalkInForm({
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <h3 className="md:col-span-2 text-sm font-bold tracking-wide">CLIENT PROFILE & CONTACT</h3>
-            {selectField("gender", "Gender", ["FEMALE", "MALE", "OTHER"], true)}
+            {selectField("gender", "Gender", lookups.masterFields?.gender ?? [], true)}
+
             <label className="block text-sm"><span>Billing phone</span><input aria-label="Billing phone" className={inputClass} inputMode="tel" value={billingPhone} disabled={billingMatchesPrimary} onChange={(event) => set("billing_phone", event.target.value)} /><span className="mt-2 flex items-center gap-2"><input aria-label="Same as mobile number" type="checkbox" checked={billingMatchesPrimary} onChange={(event) => { setBillingMatchesPrimary(event.target.checked); set("billing_phone", primaryPhone); }} />Same as mobile number</span></label>
             {field("country", "Country", "text", true)}
             {field("state", "State", "text", true)}
@@ -792,18 +805,18 @@ export function WalkInForm({
             {values.city.trim().toUpperCase() === "OTHER" ? field("city_other", "City other") : null}
             {field("pincode", "Pincode", "text", true)}
             {field("address", "Address", "text", true)}
-            {selectField("community", "Community / caste", lookups.communities?.length ? lookups.communities : ["OTHER"], true)}
+            {selectField("community", "Community / caste", lookups.communities ?? [], true)}
             {values.community.trim().toUpperCase().startsWith("OTHER") ? field("community_other", "Community other") : null}
             {field("dob", "Date of birth", "date")}
             {field("anniversary", "Anniversary", "date")}
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <h3 className="md:col-span-2 text-sm font-bold tracking-wide">CLIENT PLANNING</h3>
-            {selectField("occupation", "Occupation", ["BUSINESS OWNER", "SELF EMPLOYED", "SERVICE / SALARIED", "HOUSEWIFE / HOMEMAKER", "STUDENT", "DOCTOR", "LAWYER", "CHARTERED ACCOUNTANT / CA", "ENGINEER", "TEACHER / PROFESSOR", "BANKER / FINANCE", "GOVERNMENT EMPLOYEE", "REAL ESTATE", "FASHION / DESIGNER", "RETIRED", "OTHER"], true)}
+            {selectField("occupation", "Occupation", lookups.masterFields?.occupation ?? [], true)}
             {values.occupation.trim().toUpperCase() === "OTHER" ? field("occupation_other", "Occupation other", "text", true) : null}
-            {selectField("bridal_or_non_bridal", "Bridal / non-bridal", ["BRIDAL", "NON BRIDAL"], true)}
-            {values.bridal_or_non_bridal.trim().toUpperCase() === "BRIDAL" ? <>{selectField("wedding_month", "Wedding month", LEGACY_WEDDING_MONTHS, true)}{selectField("wedding_year", "Wedding year", Array.from({ length: 11 }, (_, index) => String(new Date().getFullYear() + index)), true)}</> : null}
-            {selectField("communication_preference", "Communication preference", LEGACY_COMMUNICATION_PREFERENCES, true)}
+            {selectField("bridal_or_non_bridal", "Bridal / non-bridal", lookups.masterFields?.bridal_or_non_bridal ?? [], true)}
+            {values.bridal_or_non_bridal.trim().toUpperCase() === "BRIDAL" ? <>{selectField("wedding_month", "Wedding month", lookups.masterFields?.wedding_month ?? [], true)}{selectField("wedding_year", "Wedding year", Array.from({ length: 11 }, (_, index) => String(new Date().getFullYear() + index)), true)}</> : null}
+            {selectField("communication_preference", "Communication preference", lookups.masterFields?.communication_preference ?? [], true)}
           </div>
         </section>
         <section id="family-friends" className="legacy-walkin-card">
@@ -901,7 +914,7 @@ export function WalkInForm({
                     {reason}
                   </label>
                 ))}
-                {notBoughtReasons.some((reason) => reason.startsWith("Other:")) ? field("not_bought_other", "Other reason") : null}
+                {notBoughtReasons.some((reason) => reason.toUpperCase().startsWith("OTHER")) ? field("not_bought_other", "Other reason") : null}
               </div>
             ) : null}
             {values.visit_status !== "STORE_VISIT" && values.visit_status !== "PRICE_CALCULATION" ? <>
@@ -1041,13 +1054,13 @@ export function WalkInForm({
           <div className="grid gap-4 md:grid-cols-2">
             <h2 className="md:col-span-2 text-lg font-semibold">PREFERENCES</h2>
             {selectField("beverage", "Beverage", lookups.beverages)}
-            {values.beverage === "Other:" ? field("beverage_other", "Other beverage") : null}
+            {values.beverage.toUpperCase().startsWith("OTHER") ? field("beverage_other", "Other beverage") : null}
             {selectField("sugar", "Sugar", lookups.sugarOptions ?? [])}
-            {values.sugar === "Other:" ? field("sugar_other", "Other sugar preference") : null}
+            {values.sugar.toUpperCase().startsWith("OTHER") ? field("sugar_other", "Other sugar preference") : null}
             {selectField("snack", "Snack", lookups.snacks)}
-            {values.snack === "Other:" ? field("snack_other", "Other snack") : null}
+            {values.snack.toUpperCase().startsWith("OTHER") ? field("snack_other", "Other snack") : null}
             {selectField("gift", "Gift given", lookups.gifts ?? [])}
-            {values.gift === "Other:" ? field("gift_other", "Other gift") : null}
+            {values.gift.toUpperCase().startsWith("OTHER") ? field("gift_other", "Other gift") : null}
           </div>
         </section>
         <section id="remark" className="legacy-walkin-card">
@@ -1056,7 +1069,7 @@ export function WalkInForm({
             {field("next_visit_date", "Next visit date", "date", values.visit_status === "NO")}
             {selectField("client_potential_category", "Client potential category", [
               ...(!isPotentialCategory(values.client_potential_category) && values.client_potential_category ? [values.client_potential_category] : []),
-              ...POTENTIAL_CATEGORIES,
+              ...(lookups.masterFields?.client_potential_category ?? []),
             ])}
             {field("high_potential_reason", "Why high potential")}
             {field("product_requirement", "Product requirement")}

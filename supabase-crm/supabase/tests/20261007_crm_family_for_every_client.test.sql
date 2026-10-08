@@ -13,6 +13,7 @@ insert into users(id, name, email, role, branch_id, active) values
 ('20261008-1111-4000-8000-000000000002', 'Family Sales A', 'family-2@example.invalid', 'salesperson', '20261008-0000-4000-8000-00000000000a', true);
 insert into crm_sso_access_grants(jewelos_user_id, work_email, legacy_crm_user_id, crm_auth_user_id, active)
 select gen_random_uuid(), u.email, u.id, u.id, true from users u where u.email like 'family-%@example.invalid';
+\ir fixtures/crm_master_options.sql
 insert into crm_allocation(branch_id, crm_name, active, crm_user_id)
 values ('20261008-0000-4000-8000-00000000000a', 'FAMILY SALES A', true, '20261008-1111-4000-8000-000000000002');
 

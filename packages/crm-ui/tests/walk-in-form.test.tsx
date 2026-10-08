@@ -26,11 +26,13 @@ vi.mock("@/lib/supabase/client", () => ({
 import { WalkInForm } from "@/components/walk-in-form";
 import type { Client } from "@/lib/supabase/app-types";
 
+const masterLookups = {productCategories:[],notBoughtReasons:[],beverages:[],snacks:[],sourceOfLeads:['Walk-in','Reference','Instagram','Google','WhatsApp','Advertisement','Other'],communities:['OTHER'],masterFields:{gender:['FEMALE','MALE','OTHER'],occupation:['BUSINESS OWNER','SELF EMPLOYED','SERVICE / SALARIED','HOUSEWIFE / HOMEMAKER','STUDENT','DOCTOR','LAWYER','CHARTERED ACCOUNTANT / CA','ENGINEER','TEACHER / PROFESSOR','BANKER / FINANCE','GOVERNMENT EMPLOYEE','REAL ESTATE','FASHION / DESIGNER','RETIRED','OTHER'],bridal_or_non_bridal:['BRIDAL','NON BRIDAL'],wedding_month:['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'],communication_preference:['CALL','WHATSAPP CALLS','WHATSAPP MESSAGE',"DON'T CONTACT"],client_potential_category:['A','B','C','D','E']}};
+
 const branchId = "10000000-0000-4000-8000-000000000501";
 
 function renderWalkInForm() {
   return render(
-    <WalkInForm
+    <WalkInForm lookups={masterLookups}
       profile={{ role: "salesperson", branchId, name: "Test CRM" }}
       branches={[{ id: branchId, name: "Test Branch" }]}
       crms={["Test CRM"]}
@@ -41,10 +43,11 @@ function renderWalkInForm() {
 }
 
 function renderPrefilledWalkInForm() {
-  return render(<WalkInForm profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queue={null} client={{ client_id: "20000000-0000-4000-8000-000000000501", primary_name: "Known Client", primary_phone: "919012345678" } as unknown as Client} />);
+  return render(<WalkInForm lookups={masterLookups} profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queue={null} client={{ client_id: "20000000-0000-4000-8000-000000000501", primary_name: "Known Client", primary_phone: "919012345678" } as unknown as Client} />);
+
 }
 function renderQueuedWalkInForm() {
-  return render(<WalkInForm profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queue={{ id: "queue-501", client_name: "Queue Client", mobile: "9012345509", branch_id: branchId, assigned_crm_name: "Test CRM", client_id: null, status: "pending" }} client={null} />);
+  return render(<WalkInForm lookups={masterLookups} profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queue={{ id: "queue-501", client_name: "Queue Client", mobile: "9012345509", branch_id: branchId, assigned_crm_name: "Test CRM", client_id: null, status: "pending" }} client={null} />);
 }
 
 function openEngagementStep() {
@@ -131,7 +134,7 @@ describe("WalkInForm proof image uploads", () => {
 
   it("clears and reloads CRM and salesperson choices when a super-admin selects another branch", () => {
     const otherBranchId = "10000000-0000-4000-8000-000000000502";
-    render(<WalkInForm profile={{ role: "super_admin", branchId: null, name: "Admin" }} branches={[{ id: branchId, name: "Andheri" }, { id: otherBranchId, name: "Bandra" }]} crms={[]} crmByBranch={{ [branchId]: ["Andheri CRM"], [otherBranchId]: ["Bandra CRM"] }} queue={null} client={null} />);
+    render(<WalkInForm lookups={masterLookups} profile={{ role: "super_admin", branchId: null, name: "Admin" }} branches={[{ id: branchId, name: "Andheri" }, { id: otherBranchId, name: "Bandra" }]} crms={[]} crmByBranch={{ [branchId]: ["Andheri CRM"], [otherBranchId]: ["Bandra CRM"] }} queue={null} client={null} />);
     const branch = screen.getByLabelText("Branch") as HTMLSelectElement;
     const crm = screen.getByLabelText("CRM / salesperson") as HTMLSelectElement;
     const salesperson = screen.getByLabelText("Salesperson attending the client") as HTMLSelectElement;
@@ -147,7 +150,7 @@ describe("WalkInForm proof image uploads", () => {
   });
 
   it("uses legacy source, bridal, occupation, and category reveal rules", () => {
-    render(<WalkInForm profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queue={null} client={null} lookups={{ productCategories: ["Ring", "Other"], notBoughtReasons: [], beverages: [], snacks: [] }} />);
+    render(<WalkInForm profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queue={null} client={null} lookups={{ ...masterLookups, productCategories: ["Ring", "Other"], notBoughtReasons: [], beverages: [], snacks: [] }} />);
     fireEvent.change(screen.getByLabelText("Source of lead"), { target: { value: "Reference" } });
     expect(screen.getByLabelText("Reference name")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "6. Preferences & planning" }));
@@ -184,7 +187,7 @@ describe("WalkInForm proof image uploads", () => {
     expect(visitStatus.value).toBe("YES");
   });
   it("auto-fills a matched phone profile and keeps a manually edited value", async () => {
-    rpc.mockImplementation((name: string) => name === "lookup_client_by_phone" ? Promise.resolve({ data: [{ client_id: "20000000-0000-4000-8000-000000000599", primary_name: "Phone Match", primary_phone: "9012345599", gender: "Female", dob: "1990-01-02", community: "Nair", address: "Main Road", pincode: "682001", country: "India", state: "Kerala", city: "Kochi" }], error: null }) : Promise.resolve({ data: [], error: null }));
+    rpc.mockImplementation((name: string) => name === "lookup_client_profile_by_phone" ? Promise.resolve({ data: [{ client_id: "20000000-0000-4000-8000-000000000599", primary_name: "Phone Match", primary_phone: "9012345599", gender: "Female", dob: "1990-01-02", community: "Nair", address: "Main Road", pincode: "682001", country: "India", state: "Kerala", city: "Kochi" }], error: null }) : Promise.resolve({ data: [], error: null }));
     renderWalkInForm();
     fireEvent.change(screen.getByLabelText("Mobile *"), { target: { value: "9012345599" } });
     await waitFor(() => expect(screen.getByDisplayValue("Phone Match")).toBeTruthy());
@@ -207,7 +210,7 @@ describe("WalkInForm proof image uploads", () => {
   });
 
   it("returns to the queue with the completed client confirmation after submission", async () => {
-    rpc.mockImplementation((name: string) => name === "lookup_client_by_phone" ? Promise.resolve({ data: [], error: null }) : Promise.resolve({ data: [{ client_id: "20000000-0000-4000-8000-000000000509", timeline_id: "40000000-0000-4000-8000-000000000509", reference_number: "TES-260725-0001" }], error: null }));
+    rpc.mockImplementation((name: string) => name === "lookup_client_profile_by_phone" ? Promise.resolve({ data: [], error: null }) : Promise.resolve({ data: [{ client_id: "20000000-0000-4000-8000-000000000509", timeline_id: "40000000-0000-4000-8000-000000000509", reference_number: "TES-260725-0001" }], error: null }));
     renderQueuedWalkInForm();
     completeLegacyRequiredFields("STORE_VISIT");
     fireEvent.click(screen.getByRole("button", { name: "6. Preferences & planning" }));
@@ -357,7 +360,7 @@ describe("WalkInForm proof image uploads", () => {
 
   it("uses the resolved existing client UUID for a proof uploaded before the lookup effect finishes", async () => {
     const existingClientId = "20000000-0000-4000-8000-000000000777";
-    rpc.mockImplementation((name: string) => name === "lookup_client_by_phone"
+    rpc.mockImplementation((name: string) => name === "lookup_client_profile_by_phone"
       ? Promise.resolve({ data: [{ client_id: existingClientId, primary_name: "Existing Proof Client", primary_phone: "9012345777" }], error: null })
       : Promise.resolve({ data: [{ client_id: existingClientId, timeline_id: "40000000-0000-4000-8000-000000000777", reference_number: "TES-260729-0001" }], error: null }));
     upload.mockResolvedValueOnce({ error: null });
@@ -384,11 +387,12 @@ describe("WalkInForm proof image uploads", () => {
     // (a family member), and the phone lookup switched the form to that client.
     const registeredId = "20000000-0000-4000-8000-000000000601";
     const sharedPhoneId = "20000000-0000-4000-8000-000000000602";
-    rpc.mockImplementation((name: string) => name === "lookup_client_by_phone"
+    rpc.mockImplementation((name: string) => name === "lookup_client_profile_by_phone"
       ? Promise.resolve({ data: [{ client_id: sharedPhoneId, primary_name: "Family Member", primary_phone: "919012345601" }], error: null })
       : Promise.resolve({ data: [{ client_id: registeredId, timeline_id: "40000000-0000-4000-8000-000000000601", reference_number: "TES-261007-0001" }], error: null }));
     upload.mockResolvedValueOnce({ error: null });
-    render(<WalkInForm profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]}
+    render(<WalkInForm lookups={masterLookups} profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]}
+
       queue={{ id: "queue-601", client_name: "Registered Buyer", mobile: "919012345601", branch_id: branchId, assigned_crm_name: "Test CRM", client_id: registeredId, client_is_new: false, status: "pending" }}
       client={{ client_id: registeredId, primary_name: "Registered Buyer", primary_phone: "919012345601" } as unknown as Client} />);
     completeLegacyRequiredFields();
@@ -448,7 +452,8 @@ describe("WalkInForm proof image uploads", () => {
   it("submits the selected staff ID independently of CRM queue labels", async () => {
     rpc.mockResolvedValue({data: [{client_id: "synthetic"}], error: null});
     const sellerId = "10000000-0000-4000-8000-000000000777";
-    render(<WalkInForm profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} salespeopleByBranch={{ [branchId]: [{ id: sellerId, name: "Active Seller" }] }} queue={null} client={null} />);
+    render(<WalkInForm lookups={masterLookups} profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} salespeopleByBranch={{ [branchId]: [{ id: sellerId, name: "Active Seller" }] }} queue={null} client={null} />);
+
     fireEvent.change(screen.getByLabelText("Client name *"), { target: { value: "Synthetic Attendance" } });
     fireEvent.change(screen.getByLabelText("Mobile *"), { target: { value: "9012345504" } });
     completeLegacyRequiredFields(); answerRequiredEngagements();

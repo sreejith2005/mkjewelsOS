@@ -15,6 +15,7 @@ insert into users(id,name,email,role,branch_id,active) values
 ('20261008-0300-4000-8000-000000000004','Former Roster','followup-former@example.invalid','salesperson','20261008-0300-4000-8000-00000000000a',true);
 insert into crm_sso_access_grants(jewelos_user_id,work_email,legacy_crm_user_id,crm_auth_user_id,active)
 select id,email,id,id,true from users where id::text like '20261008-0300-4000-8000-00000000000_';
+\ir fixtures/crm_master_options.sql
 insert into crm_allocation(branch_id,crm_name,crm_user_id,active) values
 ('20261008-0300-4000-8000-00000000000a','ROSTER CRM','20261008-0300-4000-8000-000000000001',true),
 ('20261008-0300-4000-8000-00000000000b','ROSTER CRM','20261008-0300-4000-8000-000000000001',true),

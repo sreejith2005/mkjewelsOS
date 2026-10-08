@@ -50,6 +50,7 @@ select isnt((pg_temp.client('c1')).referral_code, (pg_temp.client('c2')).referra
 select is((select count(*)::int from clients where referral_code is null), 0, 'every client has an MKREF code');
 select is((pg_temp.client('c1')).lifecycle_stage, 'visited', 'clients created by staff start as visited');
 
+\ir fixtures/crm_master_options.sql
 set local role authenticated;
 select pg_temp.act_as('2');
 select lives_ok($$update clients set city = 'Synthetic City' where client_id = '20261007-2222-4000-8000-0000000000c1'$$, 'staff still edit ordinary client fields');

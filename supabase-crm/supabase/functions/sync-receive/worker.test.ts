@@ -28,6 +28,15 @@ function post(body: unknown, secret: string | null = SECRET) {
 
 const snapshot = { jewelos_user_id: "11111111-1111-4111-8111-111111111111", name: "Synthetic Person", email: "synthetic@example.invalid" };
 
+Deno.test('receives master snapshots separately from staff grants',async()=>{
+ const {gateway,applied}=fake();
+ let masterApplied=false;
+ const response=await handleSyncReceive(post({kind:'master.events',events:[{event_id:'master.1',snapshot:{tenant_id:'tenant',snapshot_at:'2026-10-08Z',options:[]}}]}),{
+  secret:SECRET,gateway:{...gateway,applyMasters:async()=>{masterApplied=true;return {outcome:'applied'};}},
+ });
+ assertEquals(response.status,200);assertEquals(masterApplied,true);assertEquals(applied.length,0);
+});
+
 Deno.test("refuses a missing or wrong secret before reading the body, and an unconfigured function", async () => {
   const { gateway, applied } = fake();
   assertEquals((await handleSyncReceive(post({ kind: "staff.events" }, null), { secret: SECRET, gateway })).status, 401);

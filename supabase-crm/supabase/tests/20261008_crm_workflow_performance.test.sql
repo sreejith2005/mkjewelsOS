@@ -16,6 +16,7 @@ insert into public.users(id,name,email,role,branch_id,active) values
  ('20261008-0000-4000-8000-000000000004','PERF ADMIN','perf-admin@example.test','super_admin',null,true),
  ('20261008-0000-4000-8000-000000000005','PERF INACTIVE','perf-inactive@example.test','salesperson','20261008-0000-4000-8000-000000000001',false);
 insert into public.crm_sso_access_grants(jewelos_user_id,legacy_crm_user_id,crm_auth_user_id,work_email,active) select id,id,id,email,true from public.users where id in ('20261008-0000-4000-8000-000000000003','20261008-0000-4000-8000-000000000004','20261008-0000-4000-8000-000000000005');
+\ir fixtures/crm_master_options.sql
 insert into public.crm_allocation(branch_id,crm_name,crm_user_id,active) values ('20261008-0000-4000-8000-000000000001','PERF STAFF','20261008-0000-4000-8000-000000000003',true);
 create temp table saved as select null::uuid as id,null::text as client_code where false;
 grant all on saved to authenticated;

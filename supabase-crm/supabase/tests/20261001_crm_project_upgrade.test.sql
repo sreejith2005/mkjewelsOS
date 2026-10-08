@@ -68,6 +68,7 @@ reset role;
 -- ---------------------------------------------------------------------------
 -- Identity gate
 -- ---------------------------------------------------------------------------
+\ir fixtures/crm_master_options.sql
 set local role authenticated;
 select pg_temp.act_as('2');
 select is(current_crm_user_id(), '20261001-0000-4000-8000-000000000002'::uuid, 'linked active grant resolves to its CRM user');

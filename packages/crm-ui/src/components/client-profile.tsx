@@ -1,4 +1,6 @@
 "use client";
+import { ClientActivity, type ClientActivityRow } from "@/components/client-activity";
+
 import { WalkinHistory, type SavedWalkin } from '@/components/walkin-history';
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
@@ -177,6 +179,12 @@ export function ClientProfile({
   identity = null,
   family = [],
   savedWalkins = [],
+  activity = [],
+  leadFieldLabels = {},
+  activityActorNames = {},
+  activityBranchNames = {},
+  activitySummary,
+
 }: {
   client: Client;
   timeline: Array<{
@@ -203,13 +211,19 @@ export function ClientProfile({
     created_at: string;
     editor: string | null;
   }>;
-  lookups: { beverages: string[]; snacks: string[]; sugars?: string[]; communities?: string[]; gifts?: string[] };
+  lookups: { beverages: string[]; snacks: string[]; sugars?: string[]; communities?: string[]; gifts?: string[]; masterFields?: Record<string,string[]> };
   walkinContext: { role: string; branchId: string | null; branches: { id: string; name: string }[] };
   lastBranchName?: string | null;
   lastSalespersonName?: string | null;
   identity?: ClientIdentity | null;
   family?: FamilyMember[];
   savedWalkins?: SavedWalkin[];
+  activity?: ClientActivityRow[];
+  leadFieldLabels?: Record<string,string>;
+  activityActorNames?: Record<string,string>;
+  activityBranchNames?: Record<string,string>;
+  activitySummary?: {first_recorded_at:string|null;latest_interaction_at:string|null};
+
 }) {
   const [values, setValues] = useState(() => initial(client));
   const [tab, setTab] = useState<"profile" | "timeline" | "audit">("profile");
@@ -282,6 +296,7 @@ export function ClientProfile({
         <aside className="legacy-profile-left">
           <section className="legacy-client-hero"><h1>{client.primary_name}</h1><div className="legacy-client-badges"><span>{client.client_code}</span><span>{client.last_buy_status ?? "NA"}</span><span>{client.city ?? "NA"}</span>{identity?.referral_code ? <span>{identity.referral_code}</span> : null}{identity?.household_code ? <span>{identity.household_code}</span> : null}</div><div className="legacy-client-hero-actions"><ExistingClientWalkinAction clientId={client.client_id} primaryName={client.primary_name} primaryPhone={client.primary_phone ?? ""} role={walkinContext.role} branchId={walkinContext.branchId} branches={walkinContext.branches} /><button type="button" onClick={() => { setValues(initial(client)); setEditing(true); }}>EDIT PROFILE</button></div></section>
           <LegacyProfileCard title="CONTACT" rows={[["PRIMARY PHONE", formatPhone(client.primary_phone)], ["SECONDARY PHONE", formatPhone(client.secondary_phone)], ["BILLING PHONE", formatPhone(client.billing_phone)], ["OTHER KNOWN PHONES", client.other_known_phones?.map(formatPhone).join(", ") ?? ""]]} />
+
           <LegacyProfileCard title="FAMILY & REFERRAL" rows={[
             ["REFERRAL ID", identity?.referral_id ?? ""],
             ["REFERRAL PERSON ID", identity?.referral_person_id ?? ""],
@@ -304,6 +319,8 @@ export function ClientProfile({
             <LegacyProfileCard title="POTENTIAL" rows={[["CLIENT POTENTIAL CATEGORY", client.client_potential_category ?? ""], ["HIGH POTENTIAL REASON", client.high_potential_reason ?? ""], ["PROFILE LAST UPDATED ON", displayDate(client.profile_updated_at)]]} />
           </div>
           <section className="legacy-timeline-card"><h2>FULL TIMELINE HISTORY</h2><div className="overflow-x-auto"><table><thead><tr>{["TIMESTAMP", "CLIENT VISIT DATE", "EVENT TYPE", "BUY STATUS", "BRANCH", "CRM", "SALESPERSON", "SEEN", "BOUGHT", "ORDER", "PRODUCT REQUIREMENT", "REMARK", "REFERENCE NUMBER"].map((heading) => <th key={heading}>{heading}</th>)}</tr></thead><tbody>{timelineRows.length ? timelineRows : <tr><td colSpan={13}>NO TIMELINE FOUND.</td></tr>}</tbody></table></div></section>
+          <ClientActivity clientId={client.client_id} activity={activity} fieldLabels={leadFieldLabels} actorNames={activityActorNames} branchNames={activityBranchNames} summary={activitySummary} />
+
           <WalkinHistory visits={savedWalkins} />
           <section className="legacy-audit-card"><h2>PROFILE EDIT LOG</h2>{audit.length ? <div className="overflow-x-auto"><table><thead><tr><th>FIELD</th><th>OLD VALUE</th><th>NEW VALUE</th><th>UPDATED BY</th><th>UPDATED ON</th></tr></thead><tbody>{audit.map((item) => <tr key={item.id}><td>{label(item.field_name)}</td><td>{JSON.stringify(item.old_value)}</td><td>{JSON.stringify(item.new_value)}</td><td>{item.editor ?? "SYSTEM"}</td><td>{displayDate(item.created_at)}</td></tr>)}</tbody></table></div> : <p>NO PROFILE EDITS YET.</p>}</section>
         </section>
@@ -344,6 +361,7 @@ export function ClientProfile({
           {client.last_buy_status ?? "—"}
         </p>
       </div>
+      <ClientActivity clientId={client.client_id} activity={activity} fieldLabels={leadFieldLabels} actorNames={activityActorNames} branchNames={activityBranchNames} summary={activitySummary} />
       <div className="mt-6 flex gap-4 border-b">
         <button
           onClick={() => setTab("profile")}
@@ -423,13 +441,13 @@ export function ClientProfile({
                             })
                           }
                         >
-                          {!isPotentialCategory(values.client_potential_category) && values.client_potential_category ? (
+                          {!(lookups.masterFields?.client_potential_category ?? []).includes(values.client_potential_category) && values.client_potential_category ? (
                             <option value={values.client_potential_category} disabled>
                               Legacy value: {values.client_potential_category} (needs review)
                             </option>
                           ) : null}
                           <option value="">Not set</option>
-                          {POTENTIAL_CATEGORIES.map((category) => (
+                          {(lookups.masterFields?.client_potential_category ?? []).map((category) => (
                             <option value={category} key={category}>
                               {category} {potentialStars(category)}
                             </option>
@@ -445,7 +463,8 @@ export function ClientProfile({
                           }
                         >
                           <option value="">Choose</option>
-                          {["FEMALE", "MALE", "OTHER"].map((option) => (
+                          {values.gender && !(lookups.masterFields?.gender ?? []).includes(values.gender)?<option value={values.gender}>{values.gender} (saved)</option>:null}
+                          {(lookups.masterFields?.gender ?? []).map((option) => (
                             <option value={option} key={option}>{option}</option>
                           ))}
                         </select>

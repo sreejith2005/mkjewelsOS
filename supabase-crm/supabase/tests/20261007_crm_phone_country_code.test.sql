@@ -60,6 +60,7 @@ grant execute on function pg_temp.phone_of(uuid), pg_temp.indexed(text), pg_temp
 -- ---------------------------------------------------------------------------
 -- Write paths
 -- ---------------------------------------------------------------------------
+\ir fixtures/crm_master_options.sql
 set local role authenticated;
 select pg_temp.act_as_staff();
 
@@ -94,12 +95,12 @@ select is((select reference_phone::text from visit_forms where client_timeline_i
 select is((select reference_phone_country_code from visit_forms where client_timeline_id = (select timeline_id from walkin)), '91',
   'with its country code');
 
-insert into leads(phone_number, name, created_by) values ('+44 7700 900123', 'Synthetic UK Lead', '20261008-1111-4000-8000-000000000002');
+select create_post_call_lead('+44 7700 900123','Synthetic UK Lead','{}','CONNECTED');
 select is((select phone_number::text from leads where name = 'Synthetic UK Lead'), '447700900123', 'a lead keeps its country code');
 select is((select country_code from leads where name = 'Synthetic UK Lead'), '44', 'the lead country code column is set');
 update leads set country_code = '91' where name = 'Synthetic UK Lead';
 select is((select country_code from leads where name = 'Synthetic UK Lead'), '44', 'the country code cannot be set apart from the number');
-select throws_ok($$insert into leads(phone_number, created_by) values ('123', '20261008-1111-4000-8000-000000000002')$$, '23514', null,
+select throws_ok($$select create_post_call_lead('123','Invalid phone','{}','CONNECTED')$$, '23514', null,
   'a lead needs a valid phone');
 select is((create_post_call_lead('9100000077', 'Synthetic Call Lead', '{}'::jsonb, 'CONNECTED')).phone_number::text, '919100000077',
   'a post-call lead without code is stored as Indian');

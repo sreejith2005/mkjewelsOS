@@ -8,6 +8,7 @@ insert into users(id,name,email,role,branch_id,active) values
 ('20261007-0013-4000-8000-000000000003','Synthetic Branch Staff','seller13@example.invalid','salesperson','20261007-0013-4000-8000-000000000001',true);
 insert into crm_sso_access_grants(jewelos_user_id,work_email,legacy_crm_user_id,crm_auth_user_id,active)
 select id,email,id,id,true from users where id in ('20261007-0013-4000-8000-000000000002','20261007-0013-4000-8000-000000000003');
+\ir fixtures/crm_master_options.sql
 set local role authenticated;
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','20261007-0013-4000-8000-000000000002',true);
