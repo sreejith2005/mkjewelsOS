@@ -1,5 +1,6 @@
 -- 0202: the CRM department (code CRM) is the CRM roster; Role CRM still counts; moving a
--- person or changing a department's code enqueues them. Synthetic fixtures only.
+-- person or changing a department's code enqueues them; 0203: department members are on
+-- every branch roster. Synthetic fixtures only.
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
@@ -41,6 +42,12 @@ create function pg_temp.deliver_all() returns void language sql as $$
 select ok(pg_temp.on_roster('crm_staff'), 'a Staff-role member of the CRM department is on the roster (code matched case-insensitively)');
 select ok(not pg_temp.on_roster('sales_staff'), 'a member of another department is not');
 select ok(pg_temp.on_roster('crm_role'), 'Role CRM still puts a person on the roster');
+select ok((crm_sync.staff_roster_fields(pg_temp.pid('crm_staff')) ->> 'crm_roster_all_branches')::boolean,
+  '0203: a CRM-department member is on every branch roster');
+select ok(not (crm_sync.staff_roster_fields(pg_temp.pid('crm_role')) ->> 'crm_roster_all_branches')::boolean,
+  '0203: a Role-CRM person outside the department stays on their own branch');
+select ok(not (crm_sync.staff_roster_fields(pg_temp.pid('sales_staff')) ->> 'crm_roster_all_branches')::boolean,
+  '0203: nobody else is');
 
 select pg_temp.deliver_all();
 update user_profiles set department_id = pg_temp.pid('crm_dept') where id = pg_temp.pid('sales_staff');
