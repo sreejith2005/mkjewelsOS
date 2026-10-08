@@ -9,9 +9,9 @@
  * as the phone rules (crm-port/document.tsx), one id stronger than the original's strongest tier.
  *
  * - Pages use the full window width instead of the original 1400px (1180px profile) column.
- * - A listing marked data-crm-cards (crm-port/mobile-tables.ts) scrolls inside a box no taller
- *   than the window, so its sideways scroll bar is always on screen and its column headings stay
- *   in view while scrolling down.
+ * - The one listing of a page (marked data-crm-cards by crm-port/mobile-tables.ts) fills the room
+ *   left in the window and is the page's only scroller, so its sideways scroll bar is always on
+ *   screen and its column headings stay in view; there is never a second vertical scroll bar.
  * - Columns size to their content with a readable minimum instead of a fixed 900-2200px width,
  *   so a wide screen shows every column without scrolling.
  * - When the last column is the row's actions (data-crm-actions), it stays pinned to the right
@@ -24,8 +24,10 @@
   #crm-wide .crm-app .legacy-walkin-form,
   #crm-wide .legacy-client-profile { width: 100% !important; max-width: none !important; }
 
-  /* The listing scrolls inside a box that fits the window under the 64px top bar. */
-  #crm-wide .crm-app [class*="overflow-x-auto"]:has(> table[data-crm-cards]) { max-height: calc(100vh - 64px - 1.25rem); max-height: calc(100dvh - 64px - 1.25rem); overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+  /* One scroll bar (owner 2026-10-08): crm-port/mobile-tables.ts sets --crm-fit-height on the one
+     listing of a page to the room left in the window, so only the listing scrolls; otherwise the
+     box grows with its rows and only the page scrolls. */
+  #crm-wide .crm-app [class*="overflow-x-auto"]:has(> table[data-crm-cards]) { max-height: var(--crm-fit-height, none); overflow: auto; overscroll-behavior: contain; }
   #crm-wide .crm-app table[data-crm-cards] { min-width: 100% !important; width: 100%; max-width: none; border-collapse: separate; border-spacing: 0; }
 
   /* Readable columns: a minimum width, long text wraps instead of stretching the row. */

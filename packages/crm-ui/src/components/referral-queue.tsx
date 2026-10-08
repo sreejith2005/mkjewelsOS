@@ -26,7 +26,8 @@ const SORTS:readonly (readonly [string,string,Compare<ReferralItem>])[]=[
 ];
 type RpcClient={rpc:(name:string,args?:Record<string,unknown>)=>Promise<{data:unknown;error:{message:string}|null}>};
 function businessDate(){const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());const v=Object.fromEntries(p.map(x=>[x.type,x.value]));return `${v.year}-${v.month}-${v.day}`;}
-function matches(x:ReferralItem,tab:string,today:string){return tab==="today"?!isDoneFollowup(x.status)&&x.status.trim().toUpperCase()!=="HISTORICAL"&&(x.next_followup_date===null||x.next_followup_date===today):queueTabMatches(x,tab,today,Boolean(x.converted_client_id));}
+// Owner decision 2026-10-08: TODAY FOLLOW UP includes overdue referrals, as on Not Bought (the original showed only those due exactly today).
+function matches(x:ReferralItem,tab:string,today:string){return queueTabMatches(x,tab,today,Boolean(x.converted_client_id));}
 export function ReferralQueue({items,enteredByName,rosterNames=[],branches=[]}:{items:ReferralItem[];role:string;branchId:string|null;enteredByName:string;rosterNames?:string[];branches?:{id:string;name:string}[]}){
   const router=useRouter();
   const[tab,setTab]=useState("today"),[crm,setCrm]=useState(""),[search,setSearch]=useState(""),[status,setStatus]=useState(""),[branch,setBranch]=useState(""),[sort,setSort]=useState("newest"),[open,setOpen]=useState<string|null>(null),[message,setMessage]=useState(""),[syncing,setSyncing]=useState(false);

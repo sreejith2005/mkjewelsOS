@@ -42,19 +42,57 @@ export function labelTableCells(root: ParentNode): void {
   }
 }
 
+/** crm-port/wide.css applies from this width; phones keep the card layout and the page scroll. */
+export const WIDE_QUERY = "(min-width: 768px)";
+/** A fitted listing box is never shorter than this; with less room the page scrolls instead. */
+export const MIN_FIT_HEIGHT = 240;
+export const FIT_HEIGHT_PROPERTY = "--crm-fit-height";
+/** The window size-change event, spelt in two parts so the stylesheet scan (see the wording note above) does not add a utility class. */
+const WINDOW_SIZE_EVENT = ["re", "size"].join("");
+
+/**
+ * One scroll bar (owner request 2026-10-08: "I don't like the two scroll bars"). On a tablet or
+ * desktop, a page with a single wide listing gets that listing's box sized to the room left in
+ * the window under everything above it, so the page itself no longer scrolls: the listing is the
+ * one scroller, its sideways bar and column headings stay on screen. A page with several
+ * listings, or too little room, gets no fitted height; wide.css then lets the box take its full
+ * length and only the page scrolls.
+ */
+export function fitListingHeights(root: ParentNode, view: Window = window): void {
+  const boxes = Array.from(root.querySelectorAll("TABLE[data-crm-cards]"))
+    .map((listing) => listing.parentElement)
+    .filter((box): box is HTMLElement => box instanceof HTMLElement && /(^|\s)overflow-x-auto(\s|$)/.test(box.className));
+  const fitted = boxes.length === 1 && view.matchMedia(WIDE_QUERY).matches ? boxes[0]! : null;
+  for (const box of boxes) if (box !== fitted && box.style.getPropertyValue(FIT_HEIGHT_PROPERTY)) box.style.removeProperty(FIT_HEIGHT_PROPERTY);
+  if (!fitted) return;
+  const boxRect = fitted.getBoundingClientRect();
+  const page = fitted.closest("main") ?? fitted;
+  // Room under the box inside the page (its padding and anything after it), independent of the box height.
+  const below = Math.max(0, page.getBoundingClientRect().bottom - boxRect.bottom);
+  const top = boxRect.top + view.scrollY;
+  const room = Math.floor(view.innerHeight - top - below);
+  const value = room >= MIN_FIT_HEIGHT ? `${room}px` : "";
+  if (fitted.style.getPropertyValue(FIT_HEIGHT_PROPERTY) === value) return;
+  if (value) fitted.style.setProperty(FIT_HEIGHT_PROPERTY, value);
+  else fitted.style.removeProperty(FIT_HEIGHT_PROPERTY);
+}
+
 /** Labels the listings under root now and whenever rows are added or replaced. Returns a stop function. */
 export function watchTableCells(root: HTMLElement): () => void {
   let frame = 0;
+  const update = () => { labelTableCells(root); fitListingHeights(root); };
   const schedule = () => {
     if (frame) return;
-    frame = window.requestAnimationFrame(() => { frame = 0; labelTableCells(root); });
+    frame = window.requestAnimationFrame(() => { frame = 0; update(); });
   };
-  labelTableCells(root);
-  // Attributes are not observed, so the labels this sets never retrigger the observer.
+  update();
+  // Attributes are not observed, so the labels and heights this sets never retrigger the observer.
   const observer = new MutationObserver(schedule);
-  observer.observe(root, { childList: true, subtree: true });
+  observer.observe(root, { childList: true, subtree: true, characterData: true });
+  window.addEventListener(WINDOW_SIZE_EVENT, schedule);
   return () => {
     observer.disconnect();
+    window.removeEventListener(WINDOW_SIZE_EVENT, schedule);
     if (frame) window.cancelAnimationFrame(frame);
   };
 }

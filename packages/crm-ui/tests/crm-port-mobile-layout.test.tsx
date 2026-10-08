@@ -6,7 +6,7 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { CrmDocument, MOBILE_SCOPE, scopeMobileCss } from "@/crm-port/document";
-import { labelTableCells } from "@/crm-port/mobile-tables";
+import { fitListingHeights, labelTableCells } from "@/crm-port/mobile-tables";
 
 // Vitest stubs CSS imports (even ?raw) to empty text, so the source is read from disk.
 const mobileSource = readFileSync(join(process.cwd(), "src", "crm-port", "mobile.css"), "utf8");
@@ -93,5 +93,55 @@ describe("phone stylesheet", () => {
     expect(document.querySelectorAll("style[data-crm-ui]").length).toBe(1);
     view.unmount();
     expect(document.querySelectorAll("style[data-crm-ui]").length).toBe(0);
+  });
+});
+
+describe("one scroll bar on tablets and desktops (owner request 2026-10-08)", () => {
+  function page(listings: number) {
+    const main = document.createElement("main");
+    for (let index = 0; index < listings; index += 1) {
+      const { element } = table(["A", "B", "C", "D"], [["1", "2", "3", "4"]]);
+      const box = document.createElement("div"); box.className = "mt-5 overflow-x-auto rounded border"; box.append(element);
+      main.append(box);
+    }
+    labelTableCells(main);
+    return main;
+  }
+  function fakeWindow(wide: boolean, innerHeight = 900, scrollY = 0) {
+    return { matchMedia: () => ({ matches: wide }), innerHeight, scrollY } as unknown as Window;
+  }
+  function place(element: Element, top: number, bottom: number) {
+    element.getBoundingClientRect = () => ({ top, bottom } as DOMRect);
+  }
+  const box = (main: HTMLElement, index = 0) => main.querySelectorAll<HTMLElement>(".overflow-x-auto")[index]!;
+
+  it("sizes a page's only listing to the room left in the window", () => {
+    const main = page(1); place(box(main), 260, 4000); place(main, 0, 4024);
+    fitListingHeights(main, fakeWindow(true));
+    expect(box(main).style.getPropertyValue("--crm-fit-height")).toBe("616px");
+  });
+  it("measures from the top of the page when the window is scrolled", () => {
+    const main = page(1); place(box(main), 60, 3800); place(main, -200, 3824);
+    fitListingHeights(main, fakeWindow(true, 900, 200));
+    expect(box(main).style.getPropertyValue("--crm-fit-height")).toBe("616px");
+  });
+  it("lets the page scroll instead when there is too little room or several listings", () => {
+    const tall = page(1); place(box(tall), 800, 4000); place(tall, 0, 4024);
+    box(tall).style.setProperty("--crm-fit-height", "500px");
+    fitListingHeights(tall, fakeWindow(true));
+    expect(box(tall).style.getPropertyValue("--crm-fit-height")).toBe("");
+    const several = page(2); place(box(several, 0), 200, 600); place(box(several, 1), 620, 900); place(several, 0, 920);
+    fitListingHeights(several, fakeWindow(true));
+    expect(box(several, 0).style.getPropertyValue("--crm-fit-height")).toBe("");
+    expect(box(several, 1).style.getPropertyValue("--crm-fit-height")).toBe("");
+  });
+  it("leaves phones to the card layout", () => {
+    const main = page(1); place(box(main), 260, 4000); place(main, 0, 4024);
+    fitListingHeights(main, fakeWindow(false));
+    expect(box(main).style.getPropertyValue("--crm-fit-height")).toBe("");
+  });
+  it("has no fixed window-height box left in wide.css", () => {
+    expect(wideSource).not.toMatch(/max-height:\s*calc\(100d?vh/);
+    expect(wideSource).toMatch(/max-height:\s*var\(--crm-fit-height,\s*none\)/);
   });
 });
