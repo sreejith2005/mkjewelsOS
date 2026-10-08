@@ -1,9 +1,10 @@
 // crm-port: phone layout support (owner request 2026-10-07). Not part of the original source.
 //
-// On a phone, crm-port/mobile.css shows each row of a wide TABLE element as a card with one
-// labelled line per column. The labels come from the element's own column headings: this
-// copies each heading into data-label on the cells of that column, and marks the element
-// data-crm-cards. The original components are not edited; React leaves these attributes alone
+// A wide TABLE element (four or more columns) is marked data-crm-cards; crm-port/mobile.css shows
+// it on a phone as a compact listing swiped sideways (owner request 2026-10-08; it was one card
+// per row from 2026-10-07), sized by its column count (--crm-columns), and crm-port/wide.css fits
+// it to the window on tablets and desktops. Each heading is also copied into data-label on the
+// cells of its column. The original components are not edited; React leaves these attributes alone
 // because it never renders them. Narrow listings (fewer than four columns, e.g. the dashboard
 // breakdowns) keep their columns. A row whose cell count does not match the headings (an
 // empty-state row with colSpan) is left unlabelled and is shown as a plain block.
@@ -14,6 +15,9 @@
 
 /** A listing with fewer columns than this fits a phone as it is. */
 export const MIN_CARD_COLUMNS = 4;
+
+/** Characters above which a column counts as long text (crm-port/mobile.css widens it). */
+export const LONG_TEXT = 24;
 
 /** A last column with this heading holds the row's buttons and links. */
 const ACTIONS_HEADING = /^actions?$/i;
@@ -31,13 +35,20 @@ export function labelTableCells(root: ParentNode): void {
       continue;
     }
     setAttribute(listing, "data-crm-cards", "");
+    // crm-port/mobile.css gives each column of a phone listing a share of its width.
+    if (listing instanceof HTMLElement && listing.style.getPropertyValue("--crm-columns") !== String(headings.length)) listing.style.setProperty("--crm-columns", String(headings.length));
     // crm-port/wide.css pins an actions column to the right edge on tablets and desktops.
     if (ACTIONS_HEADING.test(headings[headings.length - 1] ?? "")) setAttribute(listing, "data-crm-actions", "");
     else if (listing.hasAttribute("data-crm-actions")) listing.removeAttribute("data-crm-actions");
-    for (const row of Array.from(listing.querySelectorAll(":scope > tbody > tr"))) {
-      const cells = Array.from(row.children);
-      if (cells.length !== headings.length) continue;
-      cells.forEach((cell, index) => setAttribute(cell, "data-label", headings[index] ?? ""));
+    const rows = Array.from(listing.querySelectorAll(":scope > tbody > tr")).map((row) => Array.from(row.children)).filter((cells) => cells.length === headings.length);
+    // A column holding long text (reasons, remarks) gets more room on a phone; the others stay on one line.
+    const longest = headings.map((_, index) => Math.max(0, ...rows.map((cells) => (cells[index]?.textContent ?? "").trim().length)));
+    for (const cells of rows) {
+      cells.forEach((cell, index) => {
+        setAttribute(cell, "data-label", headings[index] ?? "");
+        if ((longest[index] ?? 0) > LONG_TEXT) setAttribute(cell, "data-crm-long", "");
+        else if (cell.hasAttribute("data-crm-long")) cell.removeAttribute("data-crm-long");
+      });
     }
   }
 }

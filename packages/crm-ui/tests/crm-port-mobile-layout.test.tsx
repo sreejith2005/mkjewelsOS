@@ -34,6 +34,27 @@ describe("phone table cards", () => {
     expect([...element.querySelectorAll("tbody td")].map((cell) => cell.getAttribute("data-label"))).toEqual(["Type", "Client ID", "Name", "Phone"]);
   });
 
+  it("records the column count that sizes a phone listing", () => {
+    const { host, element } = table(["A", "B", "C", "D", "E"], [["1", "2", "3", "4", "5"]]);
+    labelTableCells(host);
+    expect(element.style.getPropertyValue("--crm-columns")).toBe("5");
+  });
+
+  it("marks columns holding long text so phones give them more room", () => {
+    const { host, element } = table(["Name", "Phone", "Reason", "Date"], [["Anita", "+91 90000 00000", "WANT TO SEE MORE DESIGNS, WANT READY PIECE", "8 Oct"], ["Bina", "+91 90000 00001", "TIME TO THINK", "7 Oct"]]);
+    labelTableCells(host);
+    const marked = [...element.querySelectorAll("tbody tr:first-child td")].map((cell) => cell.hasAttribute("data-crm-long"));
+    expect(marked).toEqual([false, false, true, false]);
+    expect(element.querySelector("tbody tr:last-child td:nth-child(3)")?.hasAttribute("data-crm-long")).toBe(true);
+  });
+
+  it("swipes phone listings sideways as compact tables instead of cards", () => {
+    expect(mobileSource).not.toMatch(/thead\s*\{\s*display:\s*none/);
+    expect(mobileSource).not.toMatch(/content:\s*attr\(data-label\)/);
+    expect(mobileSource).toMatch(/\[class\*="overflow-x-auto"\]:has\(> table\[data-crm-cards\]\) \{ overflow-x: auto;/);
+    expect(mobileSource).toMatch(/min-width: calc\(var\(--crm-columns, 8\) \* 5\.6rem\)/);
+  });
+
   it("keeps short tables as tables and leaves empty-state rows unlabelled", () => {
     const short = table(["Name", "Count"], [["Andheri", "4"]]);
     labelTableCells(short.host);
