@@ -3,7 +3,7 @@
 import Link from "@/next-shim/link"; // crm-port: next/link -> local shim (same hrefs, /crm base path added)
 import { useRouter } from "@/next-shim/navigation"; // crm-port: next/navigation -> local shim (same paths, /crm base path added)
 import { useMemo, useState } from "react";
-import { isDoneFollowup, queueTabMatches, sortNotBoughtFollowups } from "@/lib/followup-logic";
+import { followupSaveError, isDoneFollowup, queueTabMatches, sortNotBoughtFollowups } from "@/lib/followup-logic";
 import { createClient } from "@/lib/supabase/client";
 import { displayDate } from "@/lib/clients";
 import { kolkataDateKey } from "@/lib/business-date";
@@ -40,6 +40,9 @@ const SORTS: readonly (readonly [string, string, Compare<FollowupItem> | null])[
   ["crm", "CRM NAME A-Z", byText((item) => item.crm_name)],
   ["followups", "MOST FOLLOW-UPS", byNumberDesc((item) => item.followup_count)],
 ];
+// Fix 2026-10-08: legacy statuses (e.g. "NO" from the April import) are not saveable, so the form
+// starts on PENDING instead of offering a value the save RPC refuses.
+const saveableStatus = (status: string) => FOLLOW_UP_STATUSES.find((choice) => choice === status.trim().toUpperCase()) ?? "PENDING";
 const inTab = (item: FollowupItem, tab: string, today: string) => queueTabMatches({ status: item.status, next_followup_date: item.next_followup_date, followup_count: item.followup_count }, tab, today);
 type FollowupRpcClient = { rpc: (name: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }> };
 
@@ -95,7 +98,7 @@ export function FollowupQueue({ items, crmNames, enteredByName, branches = [] }:
       p_next_followup_date: String(data.get("next_date")) || null,
       p_remark: remark || null,
     });
-    if (error) { setMessage("Could not save this follow-up. Please try again or contact an administrator."); return; }
+    if (error) { setMessage(followupSaveError(error.message, "Could not save this follow-up. Please try again or contact an administrator.")); return; }
     setOpen(null); setMessage("Follow-up saved."); router.refresh();
   }
 
@@ -113,7 +116,7 @@ export function FollowupQueue({ items, crmNames, enteredByName, branches = [] }:
         <td className="p-3">{item.crm_name || "—"}</td><td className="p-3"><Link className="font-semibold text-amber-800 underline" href={`/clients/${item.client_id}`}>{item.client_name}</Link><div className="mt-1 flex gap-1"><span className="rounded bg-stone-100 px-1">{item.status}</span><span className="rounded bg-stone-100 px-1">FU: {item.followup_count}</span><span className="rounded bg-stone-100 px-1">HIST: {item.history_count}</span></div></td><td className="p-3">{formatPhone(item.phone)}</td><td className="p-3">{displayDate(item.visit_date)}</td><td className="p-3">{displayDate(item.next_followup_date)}</td><td className="p-3">{item.reason || "—"}</td><td className="p-3">{item.seen_categories || "—"}</td><td className="p-3">{item.product_requirement || "—"}</td><td className="p-3 max-w-56 whitespace-pre-wrap">{item.product_seen_remark || "—"}</td><td className="p-3 max-w-56 whitespace-pre-wrap">{item.remark || "—"}</td><td className="p-3 max-w-56 whitespace-pre-wrap">{item.action_point || "—"}</td>
         <td className="p-3"><div className="flex flex-col gap-1"><Link className="rounded border px-2 py-1 text-center" href={`/clients/${item.client_id}`}>OPEN PROFILE</Link><button className="rounded border px-2 py-1" onClick={() => setOpen(open === item.id ? null : item.id)}>FOLLOW UP FORM</button><button className="rounded border px-2 py-1" onClick={() => setOpen(open === `${item.id}:history` ? null : `${item.id}:history`)}>VIEW HISTORY</button></div>
           {open === item.id && <form className="mt-2 grid min-w-56 gap-2" onSubmit={(event) => { event.preventDefault(); void save(item, event.currentTarget); }}>
-            <label>Follow Up Status<select aria-label="Follow Up Status" name="status" defaultValue={item.status} required className="mt-1 w-full rounded border p-1">{!FOLLOW_UP_STATUSES.includes(item.status as typeof FOLLOW_UP_STATUSES[number]) && <option>{item.status}</option>}{FOLLOW_UP_STATUSES.map((status) => <option key={status}>{status}</option>)}</select></label>
+            <label>Follow Up Status<select aria-label="Follow Up Status" name="status" defaultValue={saveableStatus(item.status)} required className="mt-1 w-full rounded border p-1">{FOLLOW_UP_STATUSES.map((status) => <option key={status}>{status}</option>)}</select></label>
             <label>Next Follow Up Date<input aria-label="Next Follow Up Date" name="next_date" type="date" defaultValue={item.next_followup_date ?? today} className="mt-1 w-full rounded border p-1" /></label>
             <label>Call Response<select aria-label="Call Response" name="call_response" required className="mt-1 w-full rounded border p-1">{CALL_RESPONSES.map((response) => <option key={response}>{response}</option>)}</select></label>
             <label>Entered By<input aria-label="Entered By" value={enteredByName} readOnly className="mt-1 w-full rounded border bg-stone-50 p-1" /></label>

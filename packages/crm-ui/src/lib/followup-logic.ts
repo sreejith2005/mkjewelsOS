@@ -28,6 +28,20 @@ export function queueTabMatches(record: { status: string; next_followup_date: st
   return !done && (record.next_followup_date === null || record.next_followup_date <= today);
 }
 
+/** The reason a follow-up save was refused, from the RPC's own messages (fix 2026-10-08: the
+ * pages showed one generic message for every refusal). Unknown errors keep the fallback. */
+export function followupSaveError(message: string | undefined, fallback: string): string {
+  const text = (message ?? "").toLowerCase();
+  if (text.includes("from your own branch")) return "You can only save follow-ups for branches where you are on the CRM roster. Ask an administrator to check your department in JewelOS Users.";
+  if (text.includes("invalid follow-up status")) return "Choose a Follow Up Status from the list and save again.";
+  if (text.includes("invalid call response")) return "Choose a Call Response from the list and save again.";
+  if (text.includes("remark is required")) return "Follow Up Remark is required.";
+  if (text.includes("next follow-up date is required")) return "Next Follow Up Date is required.";
+  if (text.includes("active crm profile required")) return "Your CRM access is not active. Ask an administrator.";
+  if (text.includes("not found")) return "This follow-up no longer exists. Press REFRESH.";
+  return fallback;
+}
+
 export function sortNotBoughtFollowups<T extends { next_followup_date: string | null; visit_date: string | null }>(items: T[], tab: string) {
   const dateFor = (item: T) => item.next_followup_date ?? item.visit_date ?? "0000-00-00";
   return [...items].sort((left, right) => tab === "today"

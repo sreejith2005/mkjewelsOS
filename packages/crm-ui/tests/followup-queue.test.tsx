@@ -59,3 +59,23 @@ describe("FollowupQueue roster, sorting and finding (owner request 2026-10-08)",
     expect(names()).toEqual(["Zara", "Meera"]);
   });
 });
+
+describe("FollowupQueue saving legacy rows (fix 2026-10-08)", () => {
+  function renderOne(extra: Partial<FollowupItem>) { return render(<FollowupQueue role="salesperson" branchId="branch-1" items={[{ ...item, ...extra }]} crmNames={[]} enteredByName="Test CRM" />); }
+  it("starts a legacy NO row on PENDING, so the save is not refused for its status", async () => {
+    rpc.mockResolvedValue({ error: null }); renderOne({ status: "NO" });
+    fireEvent.click(screen.getByRole("button", { name: "ALL PENDING FOLLOW UP" }));
+    fireEvent.click(screen.getByRole("button", { name: "FOLLOW UP FORM" }));
+    expect(Array.from((screen.getByLabelText("Follow Up Status") as HTMLSelectElement).options).map((option) => option.text)).not.toContain("NO");
+    fireEvent.change(screen.getByLabelText("Follow Up Remark"), { target: { value: "Called" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("save_not_bought_followup", expect.objectContaining({ p_followup_status: "PENDING" })));
+  });
+  it("says why a save was refused", async () => {
+    rpc.mockResolvedValue({ error: { message: "you may only update follow-ups from your own branch" } }); renderOne({});
+    fireEvent.click(screen.getByRole("button", { name: "FOLLOW UP FORM" }));
+    fireEvent.change(screen.getByLabelText("Follow Up Remark"), { target: { value: "Called" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText(/on the CRM roster/)).toBeTruthy();
+  });
+});
