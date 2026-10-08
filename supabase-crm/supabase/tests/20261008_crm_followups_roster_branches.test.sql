@@ -53,17 +53,16 @@ select lives_ok($$select save_not_bought_followup((select followup_id from ids),
 select lives_ok($$select reconcile_referral_calling_conversions()$$,'a roster member can sync referral conversions');
 select lives_ok($$select sync_not_bought_followups()$$,'a roster member can sync Not Bought data');
 
--- Same branch A, not on branch B's roster: refused, as before.
+-- 20261008000500 (owner decision): any active CRM user saves any follow-up, roster or not.
 select set_config('request.jwt.claim.sub','20261008-0300-4000-8000-000000000003',true);
-select throws_ok($$select save_referral_followup((select calling_id from ids),'CALL CONNECTED','CONNECTED','2026-10-12','x','x',gen_random_uuid())$$,
-  '42501',null,'a person off the branch roster cannot save its referral follow-up');
-select throws_ok($$select save_not_bought_followup((select followup_id from ids),'CALL NOT PICKED','NOT PICKED','2026-10-12','x')$$,
-  '42501',null,'a person off the branch roster cannot save its Not Bought follow-up');
+select lives_ok($$select save_referral_followup((select calling_id from ids),'CALL CONNECTED','CONNECTED','2026-10-12','x','x',gen_random_uuid())$$,
+  'a person off the branch roster saves its referral follow-up');
+select lives_ok($$select save_not_bought_followup((select followup_id from ids),'CALL NOT PICKED','NOT PICKED','2026-10-12','x')$$,
+  'a person off the branch roster saves its Not Bought follow-up');
 
--- An inactive roster row grants nothing.
 select set_config('request.jwt.claim.sub','20261008-0300-4000-8000-000000000004',true);
-select throws_ok($$select save_not_bought_followup((select followup_id from ids),'CALL NOT PICKED','NOT PICKED','2026-10-12','x')$$,
-  '42501',null,'an inactive roster row does not allow saving');
+select lives_ok($$select save_not_bought_followup((select followup_id from ids),'CALL NOT PICKED','NOT PICKED','2026-10-12','x')$$,
+  'a person with only an inactive roster row still saves (active CRM access is what counts)');
 
 -- The branch's own staff keep the original rule.
 select set_config('request.jwt.claim.sub','20261008-0300-4000-8000-000000000002',true);
@@ -79,9 +78,17 @@ select throws_ok($$select save_not_bought_followup((select followup_id from ids)
   '42501',null,'a person without active CRM access cannot save');
 reset role;
 
-select is((select status from referral_calling where id=(select calling_id from ids)),'CALL CONNECTED','the roster member''s referral save persisted');
-select is((select count(*)::int from referral_calling_history where referral_calling_id=(select calling_id from ids)),1,'one referral history row');
-select is((select count(*)::int from crm_private.audit_logs where action='crm.save_not_bought_followup' and record_id=(select followup_id from ids)),2,'both allowed Not Bought saves audited');
+select is((select status from referral_calling where id=(select calling_id from ids)),'CALL CONNECTED','the referral save persisted');
+select is((select count(*)::int from referral_calling_history where referral_calling_id=(select calling_id from ids)),2,'two referral history rows');
+select is((select count(*)::int from crm_private.audit_logs where action='crm.save_not_bought_followup' and record_id=(select followup_id from ids)),4,'every allowed Not Bought save audited');
+
+-- A follow-up without a branch can be saved by any active CRM user too.
+update not_bought_followups set branch_id=null where id=(select followup_id from ids);
+set local role authenticated;
+select set_config('request.jwt.claim.sub','20261008-0300-4000-8000-000000000003',true);
+select lives_ok($$select save_not_bought_followup((select followup_id from ids),'CALL NOT PICKED','NOT PICKED','2026-10-14','again')$$,
+  'a follow-up without a branch is saveable');
+reset role;
 select is((select status from not_bought_followups where id=(select followup_id from ids)),'CALL NOT PICKED','the last allowed Not Bought save persisted');
 select ok(not has_function_privilege('authenticated','crm_private.works_crm_branch(uuid)','execute'),'the branch helper is not callable by clients');
 
