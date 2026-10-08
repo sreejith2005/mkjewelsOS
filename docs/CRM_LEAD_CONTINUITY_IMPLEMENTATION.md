@@ -1,6 +1,6 @@
 # CRM lead continuity implementation — 2026-10-08
 
-Implemented locally in the required `C:/crm` worktree (`feat/crm-native`). No hosted migration, historical customer repair, function deployment, Git publication, web deployment or APK release was performed. The worktree already contained substantial unrelated CRM changes; they were preserved.
+Initially implemented locally in the required `C:/crm` worktree (`feat/crm-native`). The owner subsequently authorized deployment and publication; the integrated release and hosted outcome are recorded in [the release record](CRM_LEAD_CONTINUITY_RELEASE_2026-10-08.md). The original worktree contained substantial unrelated CRM changes; they were preserved. No historical customer repair or APK release was performed.
 
 ## Behavior
 

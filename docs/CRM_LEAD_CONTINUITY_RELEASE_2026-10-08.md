@@ -33,4 +33,13 @@ Migrations remain forward-only. Preserve recorded history and correct failures w
 
 Rendered authenticated browser and physical-phone evidence remains open. Native CRM loads the hosted `/crm` page and no native binary/shared mobile contract is changed. Git publication, database/function deployment and web-host readiness are verified separately; none establishes physical-device behavior.
 
-The deployment outcome and exact remote SHA are recorded after the release actions.
+## Deployment outcome
+
+- Application commit `54374308394a74a9746f5c03a55efabfe874fab2` was pushed to `origin/main` and remote hash equality verified. Only 47 reviewed task paths were committed; staged whitespace and credential checks passed. The original dirty worktree was preserved.
+- CRM migrations `20261008000600` / `20261008000700` and JewelOS `0204` applied successfully. Subsequent linked dry runs on both projects reported **Remote database is up to date**.
+- Both named Edge Functions deployed successfully. Unauthenticated POST requests return **401** for both.
+- The scheduled JewelOS worker delivered the master event successfully: one delivered event, zero dead events. CRM has 220 projected options and 82 active projected members. A scoped authenticated read returns **six Sugar options** and **four communication preferences**; browsing returns the full 1,581-record count and a bounded one-row page. The attempted manual bootstrap was not needed after successful scheduled delivery.
+- Hosted before/after checks preserve **1,581 clients, seven leads, 1,993 visit forms and 13 documents**. The aggregate digest of original lead answers is unchanged. Anonymous execution of the new lead/browse RPCs and authenticated direct contact/lead INSERT privileges are absent. All three private master tables have RLS enabled.
+- Final fresh local candidate: **602 passing assertions across all 17 current CRM pgTAP files**, zero failures/errors; JewelOS master sync **12/12**. The newer company-wide follow-up workflows remain covered. The last focused CRM UI run passed **35 tests**, and CSS/type checks passed after final phone compatibility edits.
+- Vercel production deployment `dpl_9jvv6Fcnh2eiSnTY1BS47i4FeKcP` for the application commit is **READY**, serving `https://mkjewels-os.vercel.app`.
+- No historical lead-profile recovery, customer interaction creation, secret rotation or APK publication was performed. Authenticated rendered/browser/physical-phone behavior remains outside this evidence.
