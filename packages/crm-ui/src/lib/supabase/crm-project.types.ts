@@ -2097,6 +2097,14 @@ export type Database = {
       }
     }
     Functions: {
+      get_walkin_queue_snapshot: {
+        Args: { p_branch_id?: string; p_crm_name?: string; p_completed_client_id?: string }
+        Returns: Json
+      }
+      register_walkin_entry: {
+        Args: { p_client_name: string; p_mobile: string; p_branch_id?: string }
+        Returns: { id: string; token: string; client_id: string; client_code: string; client_type: string; client_name: string; mobile: string; branch_id: string; assigned_crm_name: string | null; status: string; created_at: string; client_is_new: boolean }[]
+      }
       add_client_to_family: {
         Args: { p_client_id: string; p_member_client_id: string }
         Returns: string

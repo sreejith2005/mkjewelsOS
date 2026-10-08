@@ -43,11 +43,11 @@ describe("consolidated client walk-in queue", () => {
     fireEvent.change(screen.getByLabelText("Mobile Number"), { target: { value: "90123456" } });
     fireEvent.click(screen.getByRole("button", { name: "REGISTER CLIENT" }));
     expect(screen.getByRole("status").textContent).toBe("Enter a 10-digit mobile number for India (+91).");
-    expect(rpc).not.toHaveBeenCalledWith("create_entry_queue", expect.anything());
+    expect(rpc).not.toHaveBeenCalledWith("register_walkin_entry", expect.anything());
     fireEvent.change(countryCode, { target: { value: "971" } });
     fireEvent.change(screen.getByLabelText("Mobile Number"), { target: { value: "50 123 4567" } });
     fireEvent.click(screen.getByRole("button", { name: "REGISTER CLIENT" }));
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_entry_queue", expect.objectContaining({ p_mobile: "+971501234567" })));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("register_walkin_entry", expect.objectContaining({ p_mobile: "+971501234567" })));
   });
 
   it("shows queued numbers with their country code", () => {

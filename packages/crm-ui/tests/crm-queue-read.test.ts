@@ -8,7 +8,7 @@ function responseFor(table: string) {
   return query;
 }
 vi.mock("@/crm-port/crm-user", () => ({ getCrmUser: async () => ({ data: { user: { id: "synthetic" } } }) }));
-vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ from: responseFor, rpc: async () => ({ data: [{ role: "salesperson" }], error: null }) }) }));
+vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ from: responseFor, rpc: async (name: string) => name === "get_walkin_queue_snapshot" ? { data: null, error } : { data: [{ role: "salesperson" }], error: null } }) }));
 
 it("propagates a failed queue read instead of hiding pending and recent work", async () => {
   await expect(QueuePage({ searchParams: Promise.resolve({}) })).rejects.toBe(error);

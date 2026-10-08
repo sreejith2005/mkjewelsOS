@@ -212,7 +212,12 @@ describe("WalkInForm proof image uploads", () => {
     completeLegacyRequiredFields("STORE_VISIT");
     fireEvent.click(screen.getByRole("button", { name: "6. Preferences & planning" }));
     fireEvent.click(screen.getByRole("button", { name: "Submit complete visit" }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/queue?completed=Queue%20Client&completedClientId=20000000-0000-4000-8000-000000000509"));
+    await screen.findByRole("status", { name: "" });
+    expect(screen.getByRole("status").textContent).toContain("Walk-in saved");
+    expect((screen.getByRole("button", { name: "Visit saved" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.submit(screen.getByRole("button", { name: "Visit saved" }).closest("form")!);
+    expect(rpc.mock.calls.filter(([name]) => name === "submit_walkin_visit")).toHaveLength(1);
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/queue?branch=10000000-0000-4000-8000-000000000501&completed=Queue%20Client&completedClientId=20000000-0000-4000-8000-000000000509"));
   });
 
   it("never submits from beverage changes or implicit form submits", async () => {
@@ -346,7 +351,7 @@ describe("WalkInForm proof image uploads", () => {
         documents: [{ storage_path: storagePath, file_name: "review_proof__1_.jpg", mime_type: "image/jpeg", purpose: "google_review", original_file_name: "review proof (1).jpg" }],
       }),
     })));
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/queue?completed=Uploaded%20Proof%20Client&completedClientId=20000000-0000-4000-8000-000000000501"));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/queue?branch=10000000-0000-4000-8000-000000000501&completed=Uploaded%20Proof%20Client&completedClientId=20000000-0000-4000-8000-000000000501"));
     expect(remove).not.toHaveBeenCalled();
   });
 

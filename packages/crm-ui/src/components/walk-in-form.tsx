@@ -257,6 +257,7 @@ export function WalkInForm({
   const activeCrms = crmByBranch?.[values.branch_id] ?? crms;
   const activeSalespeople = salespeopleByBranch?.[values.branch_id] ?? (salespeopleByBranch ? [] : activeCrms.map(name => ({ id: "", name })));
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const submitWasExplicit = useRef(false);
   const pendingUploadCount = useRef(0);
   const [billingMatchesPrimary, setBillingMatchesPrimary] = useState(
@@ -432,6 +433,7 @@ export function WalkInForm({
   }
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (saving || saved) return;
     if (!submitWasExplicit.current) {
       setMessage("Use Submit complete visit to save this form.");
       return;
@@ -614,7 +616,9 @@ export function WalkInForm({
       setMessage(`${safeMessage}${hasUploadedProof && !invalidProof ? " Uploaded proof files were kept so you do not need to add them again." : ""}`);
       return;
     }
-    router.push(`/queue?completed=${encodeURIComponent(values.primary_name)}&completedClientId=${encodeURIComponent(data[0].client_id)}`);
+    setSaved(true);
+    setMessage("Walk-in saved. Opening the queue...");
+    router.push(`/queue?branch=${encodeURIComponent(values.branch_id)}&completed=${encodeURIComponent(values.primary_name)}&completedClientId=${encodeURIComponent(data[0].client_id)}`);
   }
   const requiredMark = <span className="text-red-600"> *</span>;
   const field = (key: keyof typeof values, label: string, type = "text", required = false) => (
@@ -1067,11 +1071,11 @@ export function WalkInForm({
         </section>
       </div>
       <div className="mt-4 flex justify-end">
-        <button type="submit" disabled={saving} className="rounded bg-amber-800 px-4 py-2 font-medium text-white disabled:opacity-50" onClick={() => { submitWasExplicit.current = true; }}>
-          {saving ? "Submitting…" : "Submit complete visit"}
+        <button type="submit" disabled={saving || saved} className="rounded bg-amber-800 px-4 py-2 font-medium text-white disabled:opacity-50" onClick={() => { submitWasExplicit.current = true; }}>
+          {saved ? "Visit saved" : saving ? "Submitting..." : "Submit complete visit"}
         </button>
       </div>
-      {message ? <p className="mt-3 text-sm text-red-700">{message}</p> : null}
+      {message ? <p role={saved ? "status" : "alert"} className={`mt-3 text-sm ${saved ? "text-green-800" : "text-red-700"}`}>{message}</p> : null}
     </form>
   );
 }
