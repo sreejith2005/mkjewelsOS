@@ -48,6 +48,17 @@ select ok(exists(select 1 from jsonb_array_elements(get_walkin_queue_snapshot()-
 select throws_ok($$select save_crm_lead('9199000994','Renamed route','{"status":"PROSPECT"}')$$,'22023',null,'renamed conditional question is required at the server');
 select lives_ok($$select save_crm_lead('9199000994','Renamed route','{"status":"PROSPECT","source_of_lead":"Synthetic source"}')$$,'renamed conditional route saves its complete answers');
 reset role;
+update crm_private.master_options set label='LEAD' where master_type='lead_status';
+set local role authenticated;
+select is((select count(*)::integer from get_crm_lead_option_routes() where field_id='20261008-4444-4000-8000-000000000010' and upper(btrim(option_value))='LEAD'),1,'unchanged master and legacy labels return one route');
+select is((select count(*)::integer from jsonb_array_elements(get_walkin_queue_snapshot()->'options') o where o->>'field_id'='20261008-4444-4000-8000-000000000010' and upper(btrim(o->>'option_value'))='LEAD'),1,'opening registration snapshot has one matching choice');
+select is((select triggers_field_key from get_crm_lead_option_routes() where field_id='20261008-4444-4000-8000-000000000010' and option_value='LEAD'),'source_of_lead','deduplication preserves required conditional route');
+select lives_ok($$select save_crm_lead('9199000995','Unchanged route','{"status":"LEAD","source_of_lead":"Synthetic source"}')$$,'unchanged master route saves through audited RPC');
+reset role;
+update crm_private.master_options set label=' lead ' where master_type='lead_status';
+set local role authenticated;
+select is((select count(*)::integer from get_crm_lead_option_routes() where field_id='20261008-4444-4000-8000-000000000010' and upper(btrim(option_value))='LEAD'),1,'case and whitespace variants also return one route');
+reset role;
 update users set active=false where id='20261008-4444-4000-8000-000000000002';
 set local role authenticated;
 select throws_ok($$select get_crm_master_options()$$,'42501',null,'inactive caller cannot read master options');
