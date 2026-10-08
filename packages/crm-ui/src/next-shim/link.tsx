@@ -13,8 +13,9 @@ type LinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & {
   scroll?: boolean;
 };
 
-export default function Link({ href, onClick, children, prefetch: _prefetch, replace = false, scroll: _scroll, ...rest }: LinkProps) {
+export default function Link({ href, onClick, onMouseEnter, onFocus, onTouchStart, children, prefetch = true, replace = false, scroll: _scroll, ...rest }: LinkProps) {
   const { router } = useCrmNavigation();
+  const preload = () => { if (prefetch) router.prefetch(href); };
   function handleClick(event: MouseEvent<HTMLAnchorElement>) {
     onClick?.(event);
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -23,5 +24,8 @@ export default function Link({ href, onClick, children, prefetch: _prefetch, rep
     if (replace) router.replace(href);
     else router.push(href);
   }
-  return <a {...rest} href={withBasePath(href)} onClick={handleClick}>{children}</a>;
+  return <a {...rest} href={withBasePath(href)} onClick={handleClick}
+    onMouseEnter={(event) => { onMouseEnter?.(event); preload(); }}
+    onFocus={(event) => { onFocus?.(event); preload(); }}
+    onTouchStart={(event) => { onTouchStart?.(event); preload(); }}>{children}</a>;
 }
