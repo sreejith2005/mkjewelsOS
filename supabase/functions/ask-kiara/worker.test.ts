@@ -76,6 +76,9 @@ type Call = { fn: string; args: Record<string, unknown> | undefined };
 class FakeActor implements ActorClient {
   readonly calls: Call[] = [];
   constructor(private readonly responses: Record<string, (args?: Record<string, unknown>) => { data: unknown; error: { code?: string; message: string } | null }>) {}
+  select() {
+    return Promise.resolve({ data: null, error: { code: "42501", message: "no select in worker tests" } });
+  }
   rpc(fn: string, args?: Record<string, unknown>) {
     this.calls.push({ fn, args });
     const handler = this.responses[fn];
@@ -127,7 +130,7 @@ function setup(script: ConstructorParameters<typeof FakeAnthropic>[0], options: 
   const actor = options.actor ?? actorWith();
   const logs: Record<string, unknown>[] = [];
   const deps: KiaraTurnDeps = { anthropic, actor, config: { ...DEFAULT_KIARA_CONFIG, ...options.config }, now: () => new Date("2026-10-09T05:00:00Z"), log: (entry) => logs.push(entry) };
-  const input: KiaraTurnInput = { request, started: started(options.history), offered: options.offered ?? staffTools, accessibleSections: staffSections };
+  const input: KiaraTurnInput = { request, started: started(options.history), offered: options.offered ?? staffTools, accessibleSections: staffSections, access: staff };
   const events: KiaraStreamEvent[] = [];
   return { anthropic, actor, logs, deps, input, events, emit: (event: KiaraStreamEvent) => events.push(event) };
 }
@@ -175,7 +178,7 @@ Deno.test("the per-turn context leads the user turn; the system prompt carries n
   assertEquals(params.betas, ["server-side-fallback-2026-07-01"]);
   assertEquals(params.fallbacks, "default");
   assertEquals(params.tool_choice, { type: "auto" });
-  assertEquals((params.tools ?? []).map((tool) => (tool as { name: string }).name), ["get_my_work_summary", "get_app_help"]);
+  assertEquals((params.tools ?? []).map((tool) => (tool as { name: string }).name), staffTools.map((tool) => tool.definition.name));
 });
 
 Deno.test("history is replayed unchanged ahead of the new turn", async () => {

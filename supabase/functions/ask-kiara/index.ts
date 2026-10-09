@@ -4,6 +4,7 @@ import { resolvePageAccess, validateAccessContext, type AccessContext } from "..
 import { validateSectionControls, type SectionControls } from "../../../packages/core/src/settings/sectionAvailability.ts";
 import { accessibleKiaraSections, offeredKiaraTools } from "../../../packages/core/src/assistant/tools.ts";
 import type { KiaraChatResult, KiaraErrorBody } from "../../../packages/core/src/assistant/events.ts";
+import { createActorClient } from "./actor.ts";
 import {
   DEFAULT_KIARA_CONFIG,
   KiaraHttpError,
@@ -11,7 +12,6 @@ import {
   runKiaraTurn,
   startTurn,
   validateChatRequest,
-  type ActorClient,
   type KiaraConfig,
   type KiaraEffort,
   type KiaraTurnDeps,
@@ -68,12 +68,7 @@ Deno.serve(async (request: Request) => {
   });
   const { data: userData, error: userError } = await client.auth.getUser(token);
   if (userError || !userData.user) return json(401, { error: "Authentication required", code: "unauthenticated" });
-  const actor: ActorClient = {
-    rpc: async (fn, args) => {
-      const { data, error } = await client.rpc(fn, args ?? {});
-      return { data, error: error ? { code: error.code, message: error.message } : null };
-    },
-  };
+  const actor = createActorClient(client);
 
   let body: unknown;
   try {
@@ -121,7 +116,7 @@ Deno.serve(async (request: Request) => {
     now: () => new Date(),
     log,
   };
-  const input = { request: chat, started, offered: offeredKiaraTools(access, controls), accessibleSections: accessibleKiaraSections(access, controls) };
+  const input = { request: chat, started, offered: offeredKiaraTools(access, controls), accessibleSections: accessibleKiaraSections(access, controls), access };
 
   const wantsStream = (request.headers.get("Accept") ?? "").includes("text/event-stream");
   if (!wantsStream) {

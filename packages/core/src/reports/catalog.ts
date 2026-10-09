@@ -1,5 +1,5 @@
-import type { ReportColumn, ReportDefinition } from "./types";
-import type { UserRole } from "../roleMenu";
+import type { ReportColumn, ReportDefinition } from "./types.ts";
+import type { UserRole } from "../roleMenu.ts";
 
 const ALL: readonly UserRole[] = ["super_admin","admin","manager","hr","crm","staff","doer","housekeeping"];
 const OPS: readonly UserRole[] = ["super_admin","admin","manager","staff","doer","housekeeping","crm"];

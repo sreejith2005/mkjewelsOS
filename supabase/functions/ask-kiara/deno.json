@@ -5,7 +5,8 @@
     "@supabase/supabase-js": "npm:@supabase/supabase-js@2.112.1"
   },
   "tasks": {
-    "check": "deno check index.ts worker.ts worker.test.ts",
-    "test": "deno test --allow-env worker.test.ts"
+    "check": "deno check index.ts worker.ts worker.test.ts tools/executors.test.ts integration.test.ts",
+    "test": "deno test --allow-env worker.test.ts tools/executors.test.ts",
+    "test:integration": "deno test --allow-env --allow-net --allow-read --allow-run integration.test.ts"
   }
 }
