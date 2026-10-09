@@ -1,4 +1,4 @@
-import type { UserRole } from "../roleMenu";
+import type { UserRole } from "../roleMenu.ts";
 
 export type ReportFilterKey = "from" | "to" | "branch_id" | "department_id" | "status" | "user_profile_id" | "page" | "page_size";
 export type ReportColumn = Readonly<{ key: string; label: string; sensitive?: boolean }>;

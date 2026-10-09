@@ -186,11 +186,12 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     section: "ask_kiara",
     title: "Ask Kiara",
     path: "/ask-kiara",
-    summary: "Ask Kiara answers questions about the user's own work, how to use JewelOS, and company SOPs, within the user's access.",
+    summary: "Ask Kiara answers questions about the user's own work (tasks, FMS, forms, notifications, leave, availability), their Dashboard, Task Control and Reports numbers, colleagues' names and roles, and how to use JewelOS, never showing more than the user's own screens show them.",
     recipes: [
       "Ask a question: type it in the box at the bottom and press Send. English, Hindi, and Hinglish all work.",
       "See how many questions are left today: the counter next to the box shows it and when it resets.",
       "Start fresh: press \"New chat\". Earlier chats stay in the list on the left (or under \"Chats\" on a phone).",
+      "Ask about a team or branch: Kiara answers from the same Dashboard, Task Control, Reports, and leave screens the user can open; if a screen is not open to the user, Kiara says so.",
     ],
   },
 };

@@ -23,8 +23,35 @@ const names = (access: AccessContext, controls: SectionControls = DEFAULT_SECTIO
   offeredKiaraTools(access, controls).map((tool) => tool.definition.name);
 
 describe("tool offering", () => {
-  it.each(["staff", "manager", "super_admin"] as const)("offers %s the Phase 1 tools", (role) => {
-    expect(names(accessFor(role))).toEqual(["get_my_work_summary", "get_app_help"]);
+  const STAFF = ["get_my_work_summary", "get_app_help", "search_my_tasks", "get_fms_work", "get_my_notifications", "search_forms", "get_leave", "get_availability", "get_dashboard_metrics", "list_reports", "run_report", "find_colleague"];
+  const MANAGER = ["get_my_work_summary", "get_app_help", "search_my_tasks", "get_fms_work", "get_my_notifications", "search_forms", "get_leave", "get_availability", "get_dashboard_metrics", "get_team_progress", "list_reports", "run_report", "find_people", "find_colleague"];
+
+  it("offers staff only their own-work tools, the scoped Dashboard and Reports, and the directory", () => {
+    expect(names(accessFor("staff"))).toEqual(STAFF);
+    expect(names(accessFor("staff"))).not.toContain("get_team_progress");
+    expect(names(accessFor("staff"))).not.toContain("find_people");
+  });
+
+  it.each(["manager", "admin", "super_admin"] as const)("offers %s every Phase 2 tool", (role) => {
+    expect(names(accessFor(role))).toEqual(MANAGER);
+  });
+
+  it("offers HR no forms tool (no Forms access by default) and FMS work through Tasks", () => {
+    expect(names(accessFor("hr"))).toContain("get_fms_work");
+    expect(names(accessFor("hr"))).not.toContain("search_forms");
+    expect(names(accessFor("hr"))).toContain("get_team_progress");
+  });
+
+  it("follows individual grants and denies", () => {
+    expect(names(accessFor("staff", { "task_control.view": true }))).toContain("get_team_progress");
+    expect(names(accessFor("manager", { "users.view": false }))).not.toContain("find_people");
+    expect(names(accessFor("staff", { "reports.view": false }))).not.toContain("run_report");
+  });
+
+  it("offers FMS work through either FMS or Tasks access", () => {
+    expect(names(accessFor("staff", { "fms.view": false }))).toContain("get_fms_work");
+    expect(names(accessFor("staff", { "tasks.view": false }))).toContain("get_fms_work");
+    expect(names(accessFor("staff", { "tasks.view": false, "fms.view": false }))).not.toContain("get_fms_work");
   });
 
   it("offers nothing when Ask Kiara is denied to the user", () => {
@@ -33,12 +60,13 @@ describe("tool offering", () => {
 
   it("offers nothing to staff while the section is dark, but everything to Super Admin", () => {
     expect(names(accessFor("staff"), withSectionOff("ask_kiara"))).toEqual([]);
-    expect(names(accessFor("super_admin"), withSectionOff("ask_kiara"))).toEqual(["get_my_work_summary", "get_app_help"]);
+    expect(names(accessFor("super_admin"), withSectionOff("ask_kiara"))).toEqual(MANAGER);
   });
 
   it("withholds the work summary without Home access or while Home is disabled", () => {
-    expect(names(accessFor("staff", { "home.view": false }))).toEqual(["get_app_help"]);
-    expect(names(accessFor("staff"), withSectionOff("home"))).toEqual(["get_app_help"]);
+    expect(names(accessFor("staff", { "home.view": false }))).toEqual(STAFF.filter((name) => name !== "get_my_work_summary"));
+    expect(names(accessFor("staff"), withSectionOff("home"))).toEqual(STAFF.filter((name) => name !== "get_my_work_summary"));
+    expect(names(accessFor("staff"), withSectionOff("reports"))).not.toContain("run_report");
   });
 
   it("keeps catalogue order and identical bytes for one permission shape (prompt caching)", () => {
@@ -88,6 +116,35 @@ describe("tool input validation", () => {
     expect(validateKiaraToolInput("get_app_help", { section: "home", question: "" }).ok).toBe(false);
     const long = validateKiaraToolInput("get_app_help", { section: "home", question: "a".repeat(500) });
     expect(long.ok && long.input.name === "get_app_help" ? long.input.question.length : 0).toBe(200);
+  });
+
+  it("validates Phase 2 inputs: enums, dates, integers, text, required fields", () => {
+    expect(validateKiaraToolInput("search_my_tasks", { status: "overdue", period: "this_week", limit: 50 }))
+      .toEqual({ ok: true, input: { name: "search_my_tasks", status: "overdue", period: "this_week", limit: 20 } });
+    expect(validateKiaraToolInput("search_my_tasks", { status: "late" }).ok).toBe(false);
+    expect(validateKiaraToolInput("search_my_tasks", { from: "9 Oct" }).ok).toBe(false);
+    expect(validateKiaraToolInput("search_my_tasks", { limit: 2.5 }).ok).toBe(false);
+    expect(validateKiaraToolInput("search_my_tasks", { text: "   " })).toEqual({ ok: true, input: { name: "search_my_tasks" } });
+    expect(validateKiaraToolInput("get_leave", {})).toEqual({ ok: false, error: "scope is required." });
+    expect(validateKiaraToolInput("get_leave", { scope: "office", user_id: "x" })).toEqual({ ok: false, error: "Unknown field: user_id" });
+    expect(validateKiaraToolInput("run_report", { report_key: "export_history" }).ok).toBe(false);
+    expect(validateKiaraToolInput("run_report", { report_key: "task_operations", page: 9 })).toEqual({ ok: true, input: { name: "run_report", report_key: "task_operations", page: 5 } });
+    expect(validateKiaraToolInput("find_colleague", { person_name: "x".repeat(200) })).toEqual({ ok: true, input: { name: "find_colleague", person_name: "x".repeat(60) } });
+    expect(validateKiaraToolInput("get_my_notifications", { unread_only: "yes" }).ok).toBe(false);
+  });
+
+  it("never lets a tool input name another user", () => {
+    for (const spec of KIARA_TOOLS) {
+      const keys = Object.keys(spec.definition.input_schema.properties);
+      expect(keys.some((key) => /(_id|user|profile|tenant)$/.test(key))).toBe(false);
+    }
+  });
+
+  it("keeps descriptions short and free of volatile text", () => {
+    for (const spec of KIARA_TOOLS) {
+      expect(spec.definition.description.length).toBeLessThanOrEqual(520);
+      expect(spec.definition.description).not.toMatch(/20\d\d/);
+    }
   });
 
   it("rejects unknown tools", () => {

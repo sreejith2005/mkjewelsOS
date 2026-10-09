@@ -11,6 +11,7 @@ import { detectLanguageStyle } from "../../../packages/core/src/assistant/langua
 import { parseKiaraQuota, type KiaraQuota } from "../../../packages/core/src/assistant/quota.ts";
 import { encodeKiaraEvent, type KiaraErrorCode, type KiaraStreamEvent } from "../../../packages/core/src/assistant/events.ts";
 import type { PageId } from "../../../packages/core/src/roleMenu.ts";
+import type { AccessContext } from "../../../packages/core/src/permissions/resolve.ts";
 import { executeKiaraTool, type ActorClient, type RpcError } from "./tools/index.ts";
 
 type MessageParam = Anthropic.Beta.Messages.BetaMessageParam;
@@ -166,6 +167,7 @@ export type KiaraTurnInput = Readonly<{
   started: StartedTurn;
   offered: readonly KiaraToolSpec[];
   accessibleSections: readonly PageId[];
+  access: AccessContext;
 }>;
 
 export type RequestUsage = Readonly<{
@@ -361,6 +363,8 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
           offered,
           accessibleSections: input.accessibleSections,
           timeZone: started.context.timezone,
+          access: input.access,
+          now: deps.now(),
         });
         if (executed.spec) {
           if (!toolsUsed.includes(executed.spec.definition.name)) toolsUsed.push(executed.spec.definition.name);

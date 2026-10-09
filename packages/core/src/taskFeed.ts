@@ -1,4 +1,4 @@
-import { calculateSla } from "./sla";
+import { calculateSla } from "./sla.ts";
 
 export type TaskFeedStatusFilter = "completed" | "overdue" | "pending";
 
