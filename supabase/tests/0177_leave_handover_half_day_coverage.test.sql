@@ -2,6 +2,9 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions;
 select no_plan();
+-- Fixed past day: the coverage triggers resolve half-day absence against the real
+-- clock (resolve_task_coverage uses now()), so a fixture on "today" made the result
+-- depend on whether the run happened before or after 13:00 IST.
 
 insert into auth.users(id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
 select ('17700000-0000-4000-8000-00000000000'||n)::uuid,'authenticated','authenticated','leave-177-'||n||'@example.invalid',
@@ -47,41 +50,41 @@ reset role;
 update user_profiles set is_login_enabled=true where id='17740000-0000-4000-8000-000000000001';
 
 insert into user_availability(tenant_id,user_profile_id,date,status)
-values('17710000-0000-4000-8000-000000000001','17740000-0000-4000-8000-000000000001',(now() at time zone 'Asia/Kolkata')::date,'half_day');
+values('17710000-0000-4000-8000-000000000001','17740000-0000-4000-8000-000000000001',date '2026-01-06','half_day');
 insert into leave_requests(id,tenant_id,applicant_id,branch_id,leave_type,duration,reason,leave_start,leave_end,work_start_date,work_start_in,inform_status,total_leave_count,tl_approval_path,status)
 values('17750000-0000-4000-8000-000000000001','17710000-0000-4000-8000-000000000001','17740000-0000-4000-8000-000000000001','17720000-0000-4000-8000-000000000001','casual','FULL DAY','Test',
-  (now() at time zone 'Asia/Kolkata')::date,(now() at time zone 'Asia/Kolkata')::date,(now() at time zone 'Asia/Kolkata')::date,'2ND HALF','Inform Adv',0.5,'177/tl/one','approved');
+  date '2026-01-06',date '2026-01-06',date '2026-01-06','2ND HALF','Inform Adv',0.5,'177/tl/one','approved');
 select ok(leave_half_day_absent_at('17740000-0000-4000-8000-000000000001',
-  (((now() at time zone 'Asia/Kolkata')::date::text||' 12:59 Asia/Kolkata')::timestamptz)),'first half absent before cutoff');
+  (timestamptz '2026-01-06 12:59 Asia/Kolkata')),'first half absent before cutoff');
 select ok(not leave_half_day_absent_at('17740000-0000-4000-8000-000000000001',
-  (((now() at time zone 'Asia/Kolkata')::date::text||' 13:00 Asia/Kolkata')::timestamptz)),'first half returns at 13:00');
+  (timestamptz '2026-01-06 13:00 Asia/Kolkata')),'first half returns at 13:00');
 
 insert into task_instances(id,tenant_id,branch_id,department_id,task_type,title,status,planned_datetime,created_by)
 values('17760000-0000-4000-8000-000000000001','17710000-0000-4000-8000-000000000001','17720000-0000-4000-8000-000000000001','17730000-0000-4000-8000-000000000001','delegation','Half-day work','pending',
-  (((now() at time zone 'Asia/Kolkata')::date::text||' 18:00 Asia/Kolkata')::timestamptz),'17740000-0000-4000-8000-000000000003');
+  (timestamptz '2026-01-06 18:00 Asia/Kolkata'),'17740000-0000-4000-8000-000000000003');
 insert into task_assignees(task_instance_id,user_profile_id,role_at_task,is_original,is_active)
 values('17760000-0000-4000-8000-000000000001','17740000-0000-4000-8000-000000000001','doer',true,true);
 update task_assignees set is_active=false where task_instance_id='17760000-0000-4000-8000-000000000001';
 insert into task_assignees(task_instance_id,user_profile_id,role_at_task,is_original,is_active)
 values('17760000-0000-4000-8000-000000000001','17740000-0000-4000-8000-000000000002','doer',false,true);
 update task_instances set coverage_status='covered',coverage_original_assignee_id='17740000-0000-4000-8000-000000000001',
-  coverage_resolution='primary_buddy',coverage_resolved_for_date=(now() at time zone 'Asia/Kolkata')::date
+  coverage_resolution='primary_buddy',coverage_resolved_for_date=date '2026-01-06'
 where id='17760000-0000-4000-8000-000000000001';
 reset role;
-select sync_leave_half_day_tasks((((now() at time zone 'Asia/Kolkata')::date::text||' 13:00 Asia/Kolkata')::timestamptz));
+select sync_leave_half_day_tasks((timestamptz '2026-01-06 13:00 Asia/Kolkata'));
 select ok(exists(select 1 from task_assignees where task_instance_id='17760000-0000-4000-8000-000000000001' and user_profile_id='17740000-0000-4000-8000-000000000001' and is_active),'open task returns to employee at cutoff');
 select ok(not exists(select 1 from task_assignees where task_instance_id='17760000-0000-4000-8000-000000000001' and user_profile_id='17740000-0000-4000-8000-000000000002' and is_active),'buddy loses returned task');
 
 update leave_requests set duration='2ND HALF',work_start_date=work_start_date+1,work_start_in='1ST HALF'
 where id='17750000-0000-4000-8000-000000000001';
 select ok(not leave_half_day_absent_at('17740000-0000-4000-8000-000000000001',
-  (((now() at time zone 'Asia/Kolkata')::date::text||' 12:59 Asia/Kolkata')::timestamptz)),'second half leave keeps employee available before cutoff');
+  (timestamptz '2026-01-06 12:59 Asia/Kolkata')),'second half leave keeps employee available before cutoff');
 select ok(leave_half_day_absent_at('17740000-0000-4000-8000-000000000001',
-  (((now() at time zone 'Asia/Kolkata')::date::text||' 13:00 Asia/Kolkata')::timestamptz)),'second half leave starts at 13:00');
+  (timestamptz '2026-01-06 13:00 Asia/Kolkata')),'second half leave starts at 13:00');
 insert into clients(id,tenant_id,branch_id,phone,first_name,assigned_crm_id)
 values('17770000-0000-4000-8000-000000000001','17710000-0000-4000-8000-000000000001','17720000-0000-4000-8000-000000000001','0000017705','Leave client','17740000-0000-4000-8000-000000000001');
 insert into client_followups(id,client_id,tenant_id,branch_id,assigned_to,due_date,status,subject,created_by)
-values('17780000-0000-4000-8000-000000000001','17770000-0000-4000-8000-000000000001','17710000-0000-4000-8000-000000000001','17720000-0000-4000-8000-000000000001','17740000-0000-4000-8000-000000000001',(now() at time zone 'Asia/Kolkata')::date,'open','Leave follow-up','17740000-0000-4000-8000-000000000003');
+values('17780000-0000-4000-8000-000000000001','17770000-0000-4000-8000-000000000001','17710000-0000-4000-8000-000000000001','17720000-0000-4000-8000-000000000001','17740000-0000-4000-8000-000000000001',date '2026-01-06','open','Leave follow-up','17740000-0000-4000-8000-000000000003');
 insert into fms_flows(id,tenant_id,name,created_by)
 values('17790000-0000-4000-8000-000000000001','17710000-0000-4000-8000-000000000001','Leave flow','17740000-0000-4000-8000-000000000003');
 insert into fms_stages(id,fms_flow_id,name,sort_order)
@@ -94,26 +97,26 @@ from fms_flows where id='17790000-0000-4000-8000-000000000001';
 insert into fms_instance_stages(id,fms_instance_id,fms_stage_id,assigned_to,planned_datetime)
 values
 ('177c0000-0000-4000-8000-000000000001','177b0000-0000-4000-8000-000000000001','177a0000-0000-4000-8000-000000000001',
-  array['17740000-0000-4000-8000-000000000001'::uuid],(((now() at time zone 'Asia/Kolkata')::date::text||' 18:00 Asia/Kolkata')::timestamptz)),
+  array['17740000-0000-4000-8000-000000000001'::uuid],(timestamptz '2026-01-06 18:00 Asia/Kolkata')),
 ('177c0000-0000-4000-8000-000000000002','177b0000-0000-4000-8000-000000000001','177a0000-0000-4000-8000-000000000002',
   array['17740000-0000-4000-8000-000000000001'::uuid,'17740000-0000-4000-8000-000000000003'::uuid],
-  (((now() at time zone 'Asia/Kolkata')::date::text||' 18:00 Asia/Kolkata')::timestamptz));
+  (timestamptz '2026-01-06 18:00 Asia/Kolkata'));
 insert into fms_instance_stage_assignees(tenant_id,fms_instance_stage_id,user_profile_id)
 values
 ('17710000-0000-4000-8000-000000000001','177c0000-0000-4000-8000-000000000001','17740000-0000-4000-8000-000000000001'),
 ('17710000-0000-4000-8000-000000000001','177c0000-0000-4000-8000-000000000002','17740000-0000-4000-8000-000000000001'),
 ('17710000-0000-4000-8000-000000000001','177c0000-0000-4000-8000-000000000002','17740000-0000-4000-8000-000000000003');
-select sync_leave_half_day_tasks((((now() at time zone 'Asia/Kolkata')::date::text||' 13:00 Asia/Kolkata')::timestamptz));
+select sync_leave_half_day_tasks((timestamptz '2026-01-06 13:00 Asia/Kolkata'));
 select ok(exists(select 1 from task_assignees where task_instance_id='17760000-0000-4000-8000-000000000001' and user_profile_id='17740000-0000-4000-8000-000000000002' and is_active),'primary buddy owns task during absent half');
 select ok(not exists(select 1 from task_assignees where task_instance_id='17760000-0000-4000-8000-000000000001' and user_profile_id='17740000-0000-4000-8000-000000000001' and is_active),'absent employee loses task during absent half');
 select is((select coverage_original_assignee_id from task_instances where id='17760000-0000-4000-8000-000000000001'),
   '17740000-0000-4000-8000-000000000001'::uuid,'task retains original assignee tag');
 select is((select effective_assignee_id from resolve_task_coverage_at(
   '17740000-0000-4000-8000-000000000001',
-  (now() at time zone 'Asia/Kolkata')::date,
-  (((now() at time zone 'Asia/Kolkata')::date::text||' 13:00 Asia/Kolkata')::timestamptz))),
+  date '2026-01-06',
+  (timestamptz '2026-01-06 13:00 Asia/Kolkata'))),
   '17740000-0000-4000-8000-000000000002'::uuid,'new assignment resolver targets buddy during absent half');
-select sync_leave_half_day_tasks((((now() at time zone 'Asia/Kolkata')::date::text||' 13:00 Asia/Kolkata')::timestamptz));
+select sync_leave_half_day_tasks((timestamptz '2026-01-06 13:00 Asia/Kolkata'));
 select is((select count(*)::integer from audit_logs where record_id='17760000-0000-4000-8000-000000000001' and action='absence_coverage_assigned'),1,'repeat scheduler run does not duplicate transfer');
 select is((select assigned_to from client_followups where id='17780000-0000-4000-8000-000000000001'),
   '17740000-0000-4000-8000-000000000002'::uuid,'CRM follow-up moves to primary buddy');
@@ -124,7 +127,7 @@ select ok((select assigned_to @> array['17740000-0000-4000-8000-000000000002'::u
   from fms_instance_stages where id='177c0000-0000-4000-8000-000000000002'),'shared FMS stage keeps coworker and transfers absent doer');
 update leave_requests set duration='FULL DAY',work_start_date=leave_start,work_start_in='2ND HALF'
 where id='17750000-0000-4000-8000-000000000001';
-select sync_leave_half_day_tasks((((now() at time zone 'Asia/Kolkata')::date::text||' 13:00 Asia/Kolkata')::timestamptz));
+select sync_leave_half_day_tasks((timestamptz '2026-01-06 13:00 Asia/Kolkata'));
 select is((select assigned_to from client_followups where id='17780000-0000-4000-8000-000000000001'),
   '17740000-0000-4000-8000-000000000001'::uuid,'open CRM follow-up returns at cutoff');
 select is((select assigned_to[1] from fms_instance_stages where id='177c0000-0000-4000-8000-000000000001'),
