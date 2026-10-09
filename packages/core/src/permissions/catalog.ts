@@ -1,4 +1,4 @@
-import { ROLE_PAGES, USER_ROLES, type PageId, type UserRole } from "../roleMenu";
+import { ROLE_PAGES, USER_ROLES, type PageId, type UserRole } from "../roleMenu.ts";
 
 /**
  * How a permission may be configured.
@@ -30,6 +30,7 @@ export const PERMISSION_CATEGORIES = [
   "Master data",
   "Settings",
   "Administration",
+  "Assistant",
 ] as const;
 export type PermissionCategory = (typeof PERMISSION_CATEGORIES)[number];
 
@@ -91,6 +92,12 @@ export const PERMISSION_CATALOG = [
   { key: "permissions.manage", kind: "protected", category: "Administration", label: "Manage permissions", description: "Role, designation, and user permissions and dashboard authority. Super Admin authority only.", defaultRoles: ["super_admin"], pageId: null },
   { key: "developer_mode.manage", kind: "protected", category: "Administration", label: "Manage Developer Mode", description: "Enable or disable sections and use disabled sections. Super Admin authority only.", defaultRoles: ["super_admin"], pageId: null },
   { key: "organization.manage", kind: "protected", category: "Administration", label: "Manage organization structure", description: "Create and edit branches and departments. Super Admin authority only.", defaultRoles: ["super_admin"], pageId: null },
+  modulePermission("assistant.view", "ask_kiara", "Assistant", "Use Ask Kiara", "Ask Kiara about your own work, using JewelOS, and company SOPs. Answers stay within the user's access."),
+  { key: "assistant.voice", kind: "action", category: "Assistant", label: "Ask Kiara by voice", description: "Record a spoken question for Ask Kiara. The transcript is shown for editing before it is sent.", defaultRoles: ["super_admin", "admin", "manager"], pageId: null },
+  { key: "assistant.answer_escalations", kind: "action", category: "Assistant", label: "Answer escalated questions", description: "See and answer questions employees in the user's reporting line escalate from Ask Kiara.", defaultRoles: ["super_admin", "admin", "manager"], pageId: null },
+  { key: "assistant.view_insights", kind: "action", category: "Assistant", label: "View Ask Kiara insights", description: "SOP knowledge estimates for employees in the user's scope. No transcripts.", defaultRoles: ["super_admin", "admin", "manager"], pageId: null },
+  { key: "assistant.manage_knowledge", kind: "action", category: "Assistant", label: "Manage the knowledge base", description: "Upload, replace, edit, deactivate, and delete SOP documents Kiara answers from.", defaultRoles: ["super_admin"], pageId: null },
+  { key: "assistant.manage_limits", kind: "protected", category: "Assistant", label: "Manage Ask Kiara limits", description: "Daily question limits, per-user exceptions, and retention. Super Admin authority only.", defaultRoles: ["super_admin"], pageId: null },
 ] as const satisfies readonly PermissionDefinition[];
 
 export type PermissionKey = (typeof PERMISSION_CATALOG)[number]["key"];

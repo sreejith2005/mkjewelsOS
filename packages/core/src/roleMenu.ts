@@ -32,6 +32,7 @@ export const PAGE_IDS = [
   "reports",
   "dropdown_master",
   "settings",
+  "ask_kiara",
 ] as const;
 
 export type PageId = (typeof PAGE_IDS)[number];
@@ -59,6 +60,7 @@ export const ALL_MENU_ITEMS: readonly MenuItem[] = [
   { id: "availability", label: "Availability", path: "/availability" },
   { id: "reports", label: "Reports", path: "/reports" },
   { id: "dropdown_master", label: "Dropdown Master", path: "/dropdown-master" },
+  { id: "ask_kiara", label: "Ask Kiara", path: "/ask-kiara" },
   { id: "settings", label: "Settings", path: "/settings" },
 ] as const;
 
@@ -78,6 +80,7 @@ export const IMPLEMENTED_PAGE_IDS: readonly PageId[] = [
   "crm",
   "reports",
   "settings",
+  "ask_kiara",
 ] as const;
 
 const IMPLEMENTED_PAGES = new Set<PageId>(IMPLEMENTED_PAGE_IDS);
@@ -96,6 +99,7 @@ const APP_DESCRIPTIONS: Partial<Readonly<Record<PageId, string>>> = {
   dropdown_master: "Maintain active master values.",
   reports: "Preview fixed reports and manage private CSV exports.",
   settings: "Manage account preferences and authorized organization defaults.",
+  ask_kiara: "Ask about your work, using JewelOS, and company SOPs.",
 };
 
 const COMMON_WORK_PAGES: readonly PageId[] = [
@@ -109,6 +113,7 @@ const COMMON_WORK_PAGES: readonly PageId[] = [
   "availability",
   "reports",
   "settings",
+  "ask_kiara",
 ];
 
 export const ROLE_PAGES: Readonly<Record<UserRole, readonly PageId[]>> = {
@@ -125,10 +130,11 @@ export const ROLE_PAGES: Readonly<Record<UserRole, readonly PageId[]>> = {
     "reports",
     "settings",
     "task_templates",
+    "ask_kiara",
   ],
   crm: [...COMMON_WORK_PAGES, "crm", "reports"],
   staff: COMMON_WORK_PAGES,
-  doer: ["home", "dashboard", "checklist_tasks", "fms_builder", "notifications", "availability", "reports", "settings"],
+  doer: ["home", "dashboard", "checklist_tasks", "fms_builder", "notifications", "availability", "reports", "settings", "ask_kiara"],
   housekeeping: [
     "home",
     "dashboard",
@@ -137,6 +143,7 @@ export const ROLE_PAGES: Readonly<Record<UserRole, readonly PageId[]>> = {
     "availability",
     "reports",
     "settings",
+    "ask_kiara",
   ],
 };
 

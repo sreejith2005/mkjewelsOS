@@ -1,5 +1,5 @@
-import { ALL_MENU_ITEMS, USER_ROLES, canAccessPage, isImplementedPage, type MenuItem, type PageId, type UserRole } from "../roleMenu";
-import type { SectionControls } from "../settings/sectionAvailability";
+import { ALL_MENU_ITEMS, USER_ROLES, canAccessPage, isImplementedPage, type MenuItem, type PageId, type UserRole } from "../roleMenu.ts";
+import type { SectionControls } from "../settings/sectionAvailability.ts";
 import {
   DASHBOARD_AUTHORITIES,
   PAGE_VIEW_PERMISSION,
@@ -9,7 +9,7 @@ import {
   isPermissionKey,
   type DashboardAuthority,
   type PermissionKey,
-} from "./catalog";
+} from "./catalog.ts";
 
 export type PermissionEffect = "grant" | "deny";
 

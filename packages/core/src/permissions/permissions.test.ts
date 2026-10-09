@@ -72,7 +72,7 @@ describe("permission catalog", () => {
     expect(isConfigurablePermission("users.manage")).toBe(true);
     expect(isConfigurablePermission("tasks.view_all")).toBe(false);
     expect(isConfigurablePermission("permissions.manage")).toBe(false);
-    expect(PERMISSION_CATALOG.filter((item) => item.kind === "protected").map((item) => item.key).sort()).toEqual(["developer_mode.manage", "organization.manage", "permissions.manage"]);
+    expect(PERMISSION_CATALOG.filter((item) => item.kind === "protected").map((item) => item.key).sort()).toEqual(["assistant.manage_limits", "developer_mode.manage", "organization.manage", "permissions.manage"]);
   });
 });
 

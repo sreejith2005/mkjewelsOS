@@ -5,7 +5,7 @@ import { useNavigation, useRoute, type RouteProp, type CompositeNavigationProp }
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   CalendarCheck, CheckSquare, ClipboardList, FileSpreadsheet, FolderCheck, GitBranch,
-  Home, LayoutDashboard, ListChecks, ListFilter, Settings, Users,
+  Home, LayoutDashboard, ListChecks, ListFilter, Settings, Sparkles, Users,
 } from "lucide-react-native";
 import { DEFAULT_SECTION_CONTROLS, getPageForPath, hasPermission, type PageId, type SectionControls } from "@jewelos/core";
 import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
@@ -54,6 +54,8 @@ const PAGE_ICONS: Record<PageId, MobileNavigationDrawerItem["Icon"]> = {
   reports: FileSpreadsheet,
   dropdown_master: ListFilter,
   settings: Settings,
+  // Hidden natively until Phase 8 (NATIVE_PENDING_PAGES); the map stays exhaustive.
+  ask_kiara: Sparkles,
 };
 
 type ShellState = Readonly<{

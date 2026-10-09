@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  ALL_MENU_ITEMS,
+  USER_ROLES,
   canAccessPage,
+  isImplementedPage,
   getImplementedMenuForRole,
   getLauncherMenuForRole,
   getMenuForRole,
@@ -37,8 +40,17 @@ describe("task workspace navigation", () => {
       "forms_library",
       "availability",
       "reports",
+      "ask_kiara",
       "settings",
     ]);
+  });
+
+  it("gives every role the Ask Kiara section, placed before Settings", () => {
+    for (const role of USER_ROLES) expect(canAccessPage(role, "ask_kiara")).toBe(true);
+    expect(getPageForPath("/ask-kiara")).toBe("ask_kiara");
+    expect(isImplementedPage("ask_kiara")).toBe(true);
+    const ids = ALL_MENU_ITEMS.map((item) => item.id);
+    expect(ids.indexOf("ask_kiara")).toBe(ids.indexOf("settings") - 1);
   });
 
   it("reserves recurring schedule management for admin roles", () => {
