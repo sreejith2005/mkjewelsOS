@@ -82,15 +82,9 @@ export async function findPeople(context: ExecutorContext, args: ToolArgs): Prom
  * staff can find "the HR person in our branch" without seeing profiles.
  */
 export async function findColleague(context: ExecutorContext, args: ToolArgs): Promise<ToolOutcome> {
-  const { data, error } = await context.actor.rpc("kiara_directory_lookup", {
-    p_name: argText(args, "person_name"),
-    p_department: argText(args, "department"),
-    p_designation: argText(args, "designation"),
-    p_branch: argText(args, "branch"),
-    p_limit: 10,
-  });
+  const { data, error } = await context.actor.rpc("kiara_directory_lookup", { p_query: argText(args, "query"), p_limit: 10 });
   if (error) {
-    if (error.code === "22023") return { result: { error: "invalid_input", message: "Give a name, department, designation, or branch." }, isError: true };
+    if (error.code === "22023") return { result: { error: "invalid_input", message: "Give one to six key words: a name, department, designation, or branch." }, isError: true };
     return outcomeForError(error);
   }
   if (!isRecord(data)) return { result: { error: "unavailable", message: "This information could not be loaded right now." }, isError: true };

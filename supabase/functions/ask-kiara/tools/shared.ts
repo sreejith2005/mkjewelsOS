@@ -163,7 +163,7 @@ export const argBool = (args: ToolArgs, key: string): boolean => args[key] === t
 
 /** The tool's date range: the given period or dates, else the tool's default. */
 export function rangeFor(args: ToolArgs, context: ExecutorContext, fallback: (context: ExecutorContext) => KiaraDateRange, maxDays = 366): KiaraDateRange | ToolOutcome {
-  const parsed = kiaraRangeFromInput({ period: args.period, from: args.from, to: args.to }, context.now, context.timeZone, maxDays);
+  const parsed = kiaraRangeFromInput(args.period, context.now, context.timeZone, maxDays);
   if (!parsed.ok) return invalidInput(parsed.error);
   return parsed.range ?? fallback(context);
 }
@@ -175,7 +175,7 @@ export function dayStart(date: string, timeZone: string): string {
 
 /** The given period or dates, or null when the user gave none. */
 export function kiaraRangeOrNull(args: ToolArgs, context: ExecutorContext, maxDays = 366): KiaraDateRange | null | ToolOutcome {
-  const parsed = kiaraRangeFromInput({ period: args.period, from: args.from, to: args.to }, context.now, context.timeZone, maxDays);
+  const parsed = kiaraRangeFromInput(args.period, context.now, context.timeZone, maxDays);
   if (!parsed.ok) return invalidInput(parsed.error);
   return parsed.range;
 }

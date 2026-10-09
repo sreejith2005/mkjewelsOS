@@ -78,7 +78,7 @@ Deno.test("invalid input is an error result and runs nothing", async () => {
   const result = await run(actor, "search_my_tasks", { assignee_id: "someone-else" });
   assert(result.isError);
   assertEquals(result.json.error, "invalid_input");
-  const range = await run(actor, "get_availability", { from: "2026-01-01", to: "2026-03-01" });
+  const range = await run(actor, "get_availability", { period: "2026-01-01..2026-03-01" });
   assert(range.isError);
   assertStringIncludes(String(range.json.message), "31 days");
   assertEquals(actor.rpcs.length + actor.selects.length, 0);
@@ -136,10 +136,16 @@ Deno.test("search_my_tasks: overdue uses the Tasks rule, text and limit filter, 
   assertEquals((overdue.json.tasks as unknown[]).length, 1);
   const text = await run(taskActor(), "search_my_tasks", { text: "polish" });
   assertEquals((text.json.tasks as Array<{ title: { untrusted_text: string } }>).map((task) => task.title.untrusted_text), ["Polish display"]);
-  const limited = await run(taskActor(), "search_my_tasks", { limit: 1 });
-  assertEquals((limited.json.tasks as unknown[]).length, 1);
+  const many = Array.from({ length: 12 }, (_, index) => ({ ...TASK_ROWS[1]!, id: `a0000000-0000-4000-8000-0000000001${String(index).padStart(2, "0")}`, title: `Task ${index}` }));
+  const manyActor = new FakeActor({}, {
+    task_watchers: () => ok([]),
+    v_task_feed_scope: (query) => query.filters?.some((f) => "value" in f && f.column === "assignee_id") ? ok(many.map((task) => ({ id: task.id, assignee_id: ME, created_by: "x" }))) : ok([]),
+    task_instances: () => ok(many),
+  });
+  const limited = await run(manyActor, "search_my_tasks", {});
+  assertEquals((limited.json.tasks as unknown[]).length, 10);
   assertEquals(limited.json.truncated, true);
-  assertEquals(limited.json.total_found, 3);
+  assertEquals(limited.json.total_found, 12);
 });
 
 Deno.test("search_my_tasks resolves a period to Asia/Kolkata day boundaries", async () => {
@@ -250,7 +256,7 @@ Deno.test("run_report: one page, ids dropped, free text wrapped, truncated beyon
 
 Deno.test("run_report: too-long ranges, odd status values, and refusals", async () => {
   const actor = new FakeActor({ get_report_data: denied });
-  const long = await run(actor, "run_report", { report_key: "task_operations", from: "2026-01-01", to: "2026-10-01" });
+  const long = await run(actor, "run_report", { report_key: "task_operations", period: "2026-01-01..2026-10-01" });
   assert(long.isError);
   assertStringIncludes(String(long.json.message), "90 days");
   const status = await run(actor, "run_report", { report_key: "task_operations", status: "x' or 1=1" });
@@ -284,13 +290,13 @@ Deno.test("find_people never selects or returns personal contact fields", async 
 
 Deno.test("find_colleague returns only the four directory fields", async () => {
   const actor = new FakeActor({ kiara_directory_lookup: () => ok({ people: [{ name: "Bina", designation: "HR Executive", department: "HR", branch: "Andheri", personal_mobile: "9812345678", email: "bina@home.example" }], truncated: false }) });
-  const result = await run(actor, "find_colleague", { department: "HR", branch: "Andheri" }, accessFor("staff"));
-  assertEquals(actor.rpcs[0]!.args, { p_name: null, p_department: "HR", p_designation: null, p_branch: "Andheri", p_limit: 10 });
+  const result = await run(actor, "find_colleague", { query: "HR Andheri" }, accessFor("staff"));
+  assertEquals(actor.rpcs[0]!.args, { p_query: "HR Andheri", p_limit: 10 });
   assertEquals(result.json.people, [{ name: "Bina", designation: "HR Executive", department: "HR", branch: "Andheri" }]);
   assertFalse(SENSITIVE.test(result.content));
-  const empty = await run(new FakeActor({ kiara_directory_lookup: () => fail({ code: "22023", message: "Give a name" }) }), "find_colleague", {}, accessFor("staff"));
+  const empty = await run(new FakeActor({ kiara_directory_lookup: () => fail({ code: "22023", message: "Give a name" }) }), "find_colleague", { query: "in our" }, accessFor("staff"));
   assert(empty.isError);
-  const off = await run(new FakeActor({ kiara_directory_lookup: () => fail({ code: "42501", message: "This section is currently unavailable" }) }), "find_colleague", { person_name: "x" }, accessFor("staff"));
+  const off = await run(new FakeActor({ kiara_directory_lookup: () => fail({ code: "42501", message: "This section is currently unavailable" }) }), "find_colleague", { query: "x" }, accessFor("staff"));
   assertEquals(off.json, { access: "denied" });
 });
 

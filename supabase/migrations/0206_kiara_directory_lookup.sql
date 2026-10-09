@@ -11,36 +11,35 @@
 -- audit row (complete_kiara_turn) already records that the directory tool ran.
 set search_path = public, extensions;
 
-create function kiara_directory_lookup(
-  p_name text default null,
-  p_department text default null,
-  p_designation text default null,
-  p_branch text default null,
-  p_limit integer default 10
-)
+create function kiara_directory_lookup(p_query text, p_limit integer default 10)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare
   -- Active profile and the ask_kiara section (permission and availability).
   v_actor user_profiles := kiara_actor();
-  v_name text := nullif(btrim(coalesce(p_name, '')), '');
-  v_department text := nullif(btrim(coalesce(p_department, '')), '');
-  v_designation text := nullif(btrim(coalesce(p_designation, '')), '');
-  v_branch text := nullif(btrim(coalesce(p_branch, '')), '');
+  v_query text := btrim(regexp_replace(coalesce(p_query, ''), '\s+', ' ', 'g'));
+  v_words text[];
   v_limit integer := coalesce(p_limit, 10);
   v_rows jsonb;
   v_count integer;
 begin
-  if v_name is null and v_department is null and v_designation is null and v_branch is null then
+  if v_query = '' then
     raise exception 'Give a name, department, designation, or branch to look up' using errcode = '22023';
   end if;
-  if greatest(length(coalesce(v_name, '')), length(coalesce(v_department, '')), length(coalesce(v_designation, '')), length(coalesce(v_branch, ''))) > 60 then
+  if length(v_query) > 60 then
     raise exception 'Lookup terms must be at most 60 characters' using errcode = '22023';
   end if;
   if v_limit < 1 or v_limit > 20 then
     raise exception 'Limit must be 1 to 20' using errcode = '22023';
   end if;
+  -- Each word is matched as plain text (LIKE wildcards typed by the user are
+  -- literal), and every word must match one of the five work fields.
+  select array_agg('%' || replace(replace(replace(w, '\', '\\'), '%', '\%'), '_', '\_') || '%')
+    into v_words
+  from unnest(string_to_array(v_query, ' ')) w where w <> '';
+  if array_length(v_words, 1) > 6 then
+    raise exception 'Use at most 6 words' using errcode = '22023';
+  end if;
 
-  -- Terms are matched as plain text: LIKE wildcards typed by the user are literal.
   select coalesce(jsonb_agg(jsonb_build_object('name', q.name, 'designation', q.designation, 'department', q.department, 'branch', q.branch)
            order by q.name, q.id) filter (where q.n <= v_limit), '[]'::jsonb),
          count(*)::integer
@@ -57,11 +56,11 @@ begin
       and p.account_status = 'active'
       and p.is_login_enabled
       and p.working_status not in ('inactive', 'resigned')
-      and (v_name is null or p.employee_name ilike '%' || replace(replace(replace(v_name, '\', '\\'), '%', '\%'), '_', '\_') || '%')
-      and (v_department is null or d.name ilike '%' || replace(replace(replace(v_department, '\', '\\'), '%', '\%'), '_', '\_') || '%')
-      and (v_designation is null or dm.label ilike '%' || replace(replace(replace(v_designation, '\', '\\'), '%', '\%'), '_', '\_') || '%')
-      and (v_branch is null or b.name ilike '%' || replace(replace(replace(v_branch, '\', '\\'), '%', '\%'), '_', '\_') || '%'
-        or b.code ilike replace(replace(replace(v_branch, '\', '\\'), '%', '\%'), '_', '\_'))
+      and not exists (
+        select 1 from unnest(v_words) w
+        where not (p.employee_name ilike w or coalesce(dm.label, '') ilike w or coalesce(d.name, '') ilike w
+          or coalesce(b.name, '') ilike w or coalesce(b.code, '') ilike w)
+      )
     order by p.employee_name, p.id
     limit v_limit + 1
   ) q;
@@ -69,8 +68,8 @@ begin
   return jsonb_build_object('people', v_rows, 'truncated', v_count > v_limit);
 end $$;
 
-alter function kiara_directory_lookup(text,text,text,text,integer) owner to postgres;
-revoke all on function kiara_directory_lookup(text,text,text,text,integer) from public, anon, authenticated, service_role;
-grant execute on function kiara_directory_lookup(text,text,text,text,integer) to authenticated;
+alter function kiara_directory_lookup(text,integer) owner to postgres;
+revoke all on function kiara_directory_lookup(text,integer) from public, anon, authenticated, service_role;
+grant execute on function kiara_directory_lookup(text,integer) to authenticated;
 
 notify pgrst, 'reload schema';

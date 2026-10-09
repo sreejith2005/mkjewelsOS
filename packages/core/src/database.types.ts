@@ -12955,13 +12955,7 @@ export type Database = {
       is_valid_form_date: { Args: { p_value: string }; Returns: boolean }
       is_valid_form_datetime: { Args: { p_value: string }; Returns: boolean }
       kiara_directory_lookup: {
-        Args: {
-          p_branch?: string
-          p_department?: string
-          p_designation?: string
-          p_limit?: number
-          p_name?: string
-        }
+        Args: { p_limit?: number; p_query: string }
         Returns: Json
       }
       leave_day_count: {

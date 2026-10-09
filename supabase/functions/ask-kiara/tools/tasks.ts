@@ -121,7 +121,7 @@ export async function searchMyTasks(context: ExecutorContext, args: ToolArgs): P
       total_found: matches.length,
       tasks,
       ...(matches.length > tasks.length || scopeCapped ? { truncated: true } : {}),
-      note: "Only the user's own tasks (assigned, created, or watched). FMS stages are not included.",
+      note: "Only the user's own tasks. your_part says how each task is theirs: for \"my tasks\" questions, tasks assigned to them come first; mention tasks they only created or watch separately. FMS stages are not included.",
     },
     isError: false,
   };

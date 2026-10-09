@@ -86,13 +86,17 @@ Deno.serve(async (request: Request) => {
     actor.rpc("get_section_availability"),
   ]);
   if (accessResult.error?.code === "42501") return json(403, { error: "Active profile required", code: "forbidden" });
-  if (accessResult.error || controlsResult.error) return json(503, { error: "Ask Kiara is unavailable right now. Please try again shortly.", code: "unavailable" });
+  if (accessResult.error || controlsResult.error) {
+    log({ event: "kiara_access_context_failed", access_code: accessResult.error?.code ?? null, controls_code: controlsResult.error?.code ?? null });
+    return json(503, { error: "Ask Kiara is unavailable right now. Please try again shortly.", code: "unavailable" });
+  }
   let access: AccessContext;
   let controls: SectionControls;
   try {
     access = validateAccessContext(accessResult.data);
     controls = validateSectionControls(controlsResult.data);
   } catch {
+    log({ event: "kiara_access_context_invalid" });
     return json(503, { error: "Ask Kiara is unavailable right now. Please try again shortly.", code: "unavailable" });
   }
   const pageAccess = resolvePageAccess(access, controls, "ask_kiara");
