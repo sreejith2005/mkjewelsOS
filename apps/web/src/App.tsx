@@ -308,8 +308,11 @@ function AppShell() {
   const pageAccess = requestedAccess === "denied" && !fallbackPage ? "denied" : requestedAccess === "denied" ? "allowed" : requestedAccess;
   // Voice assignment everywhere, offered on the same terms as inside Tasks:
   // the database-resolved key, and only while the Tasks section is open.
+  // Not on Ask Kiara: the floating button would cover its Send button, and Kiara
+  // has its own voice input (Phase 7) that must not be confused with task voice.
   const canUseGlobalVoice = (access ? hasPermission(access, "tasks.voice_assign") : false)
-    && resolvePageAccess(effectiveAccess, sectionControls, "checklist_tasks") === "allowed";
+    && resolvePageAccess(effectiveAccess, sectionControls, "checklist_tasks") === "allowed"
+    && currentPage !== "ask_kiara";
   const pageContent = showPermissionManagement ? <PermissionManagementPage onBack={() => navigate("/settings")} />
     : pageAccess === "denied" ? <div className="p-4"><Notice tone="danger">No sections are available to your account. Contact your Super Admin.</Notice></div>
     : pageAccess === "disabled" ? <SectionMaintenanceNotice section={currentPage === "checklist_tasks" ? "Tasks" : currentPage === "forms_library" ? "Forms Library" : currentPage === "fms_builder" ? "FMS" : currentPage === "dropdown_master" ? "Dropdown Master" : currentPage === "task_templates" ? "Task Control" : currentPage.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())} /> : currentPage === "home" ? <HomePage onNavigate={navigate} />
