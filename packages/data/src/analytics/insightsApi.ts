@@ -1,0 +1,5 @@
+import {getSupabase} from "@jewelos/api-client/client";
+import {parseInsightsFilter,parseInsightsPayload,parseInsightsDetailPage,parseInsightsOptions,type InsightsFilter,type InsightsDetailFilter} from "@jewelos/core";
+export async function fetchManagementInsights(filter:InsightsFilter){const {data,error}=await getSupabase().rpc("get_management_insights_v1",{p_context:parseInsightsFilter(filter)});if(error)throw error;return parseInsightsPayload(data);}
+export async function fetchManagementInsightRecords(input:InsightsDetailFilter){const {data,error}=await getSupabase().rpc("get_management_insight_records_v1",{p_context:parseInsightsFilter(input.filter),p_metric:input.metricKey,...(input.groupId?{p_group_id:input.groupId}:{}),p_offset:input.offset??0,p_limit:input.limit??25});if(error)throw error;return parseInsightsDetailPage(data);}
+export async function fetchInsightsOptions(filter:InsightsFilter){const {data,error}=await getSupabase().rpc("get_management_insights_options_v1",{p_context:parseInsightsFilter(filter)});if(error)throw error;return parseInsightsOptions(data);}

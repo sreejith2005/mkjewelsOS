@@ -11,6 +11,7 @@ export type RootStackParamList = {
   Tabs: undefined;
   TaskComposer: undefined;
   TaskImport: undefined;
+  Availability: { employeeId: string };
   TaskDetail: { taskId: string };
   /**
    * `taskType` decides the `linked_module` the submission is filed under, which

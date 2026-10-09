@@ -55,11 +55,13 @@ describe("dashboard and report presentation contracts", () => {
     expect(source).toContain("grid gap-3 sm:hidden");
   });
 
-  it("keeps chart essentials available through a labelled SVG trend", async () => {
-    const source = await import("./DashboardView?raw").then((module) => module.default as string);
-    expect(source).toContain("Task Performance Trend");
-    expect(source).toContain('aria-label="Task completion trend with directly labelled daily values"');
-    expect(source).toContain("role=\"img\"");
-    expect(source).toContain("{point.completed}");
+  it("keeps trend values readable without hover", async () => {
+    const {InsightsTrend}=await import("./insights/InsightsCharts");
+    const markup=renderToStaticMarkup(<InsightsTrend points={[{date:"2026-10-09",due:8,completed:3}]} onOpen={()=>{}}/>);
+    expect(markup).toContain('role="img"');
+    expect(markup).toContain('aria-label="Due work compared with completion activity by date"');
+    expect(markup).toContain("Show exact values");
+    expect(markup).toContain("2026-10-09");
+    expect(markup).toContain("8 / 3");
   });
 });

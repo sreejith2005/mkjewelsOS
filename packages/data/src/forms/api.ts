@@ -107,6 +107,15 @@ export async function loadTaskForms(templateIds: string[], taskIds: string[]): P
   const submissionRows = submissionBatches.flatMap((batch) => batch.data ?? []); const counts = countByTemplate(submissionRows);
   return { bundles: (templates.data ?? []).map((item) => ({ ...item, fields: toDefinition(item, fieldsByTemplate.get(item.id) ?? []).fields as FormFieldDefinition[], sections: parseSections(item.sections), submissionCount: counts.get(item.id) ?? 0 })), submissions: submissionRows };
 }
+/** Reads the exact persisted submission through RLS, including older library history. */
+export async function loadFormSubmissionDetail(submissionId: string): Promise<{ submission: FormSubmission; bundle: FormBundle | null } | null> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(submissionId)) throw new Error("Invalid submission identifier");
+  const result = await db().from("form_submissions").select("*").eq("id", submissionId).maybeSingle();
+  fail("Load submission", result.error);
+  if (!result.data) return null;
+  const forms = result.data.form_template_id ? await loadTaskForms([result.data.form_template_id], []) : { bundles: [], submissions: [] };
+  return { submission: result.data, bundle: forms.bundles.find((bundle) => bundle.id === result.data?.form_template_id) ?? null };
+}
 export async function loadFormDynamicOptions() {
   const [users, branches, departments, masters] = await Promise.all([
     (async () => {

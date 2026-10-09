@@ -183,3 +183,5 @@ describe("task feed effective-deadline scope", () => {
     expect(result?.verifierName).toBe("Verifier unavailable");
   });
 });
+
+ it("loads a persisted task identity outside the feed date window for insights",async()=>{taskRows.push({id:"20261009-0000-4000-8000-000000000001",title:"Historical task",task_type:"delegation",status:"completed",planned_datetime:"2020-01-01T00:00:00Z",actual_datetime:"2020-01-01T01:00:00Z",assignee_id:"doer-1"});const rows=await loadTaskFeed("doer-1","2026-10-09T00:00:00Z","2026-10-10T00:00:00Z",{tenantId:"tenant-1",recordId:"20261009-0000-4000-8000-000000000001"});expect(rows.map(r=>r.id)).toEqual(["20261009-0000-4000-8000-000000000001"]);expect(identifierFilters).toContainEqual({table:"v_all_tasks",values:["20261009-0000-4000-8000-000000000001"]});});

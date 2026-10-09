@@ -10,6 +10,7 @@ import { Screen } from "@/ui/Screen";
 import { ErrorState, LoadingState } from "@/ui/states";
 import { AppTabs } from "@/navigation/AppTabs";
 import { LoginScreen } from "@/screens/LoginScreen";
+import { AvailabilityScreen } from "@/screens/AvailabilityScreen";
 import { TaskDetailScreen } from "@/screens/TaskDetailScreen";
 import { TaskComposerScreen } from "@/features/tasks/TaskComposerScreen";
 import { TaskImportScreen } from "@/screens/TaskImportScreen";
@@ -96,6 +97,7 @@ export function RootNavigator() {
           </Stack.Screen>
           <Stack.Screen component={TaskComposerScreen} name="TaskComposer" options={{ title: "Create Task" }} />
           <Stack.Screen component={TaskImportScreen} name="TaskImport" options={{ title: "Task Bulk Import" }} />
+          <Stack.Screen name="Availability" options={{title:"Employee availability"}}>{({route})=><AvailabilityScreen employeeId={route.params.employeeId}/>}</Stack.Screen>
           <Stack.Screen component={TaskDetailScreen} name="TaskDetail" options={{ title: "Task" }} />
           <Stack.Screen component={TaskFormScreen} name="TaskForm" options={{ title: "Task form" }} />
           <Stack.Screen component={FmsInstanceScreen} name="FmsInstance" options={{ title: "Workflow" }} />

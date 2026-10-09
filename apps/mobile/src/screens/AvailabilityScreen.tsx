@@ -49,7 +49,7 @@ function kolkataToday(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 }
 
-export function AvailabilityScreen() {
+export function AvailabilityScreen({employeeId}: {employeeId?:string} = {}) {
   const profile = useProfile();
   const theme = useAppTheme();
   const styles = useStyles();
@@ -79,10 +79,10 @@ export function AvailabilityScreen() {
   const visibleUsers = useMemo(() => users.filter((user) => {
     const status = entryByUser.get(user.id)?.status ?? "present";
     const needle = search.trim().toLowerCase();
-    return (!needle || `${user.employee_name} ${user.employee_code}`.toLowerCase().includes(needle))
+    return (!employeeId || user.id===employeeId) && (!needle || `${user.employee_name} ${user.employee_code}`.toLowerCase().includes(needle))
       && (!departmentId || user.department_id === departmentId)
       && (mode === "all" || (mode === "exceptions" ? status !== "present" : status === "absent"));
-  }), [departmentId, entryByUser, mode, search, users]);
+  }), [departmentId, employeeId, entryByUser, mode, search, users]);
   const absentCount = users.filter((user) => (entryByUser.get(user.id)?.status ?? "present") === "absent").length;
   const departmentOverview = useMemo(() => {
     const names = new Map((data?.departments ?? []).map((department) => [department.id, department.name]));

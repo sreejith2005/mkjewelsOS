@@ -1,0 +1,6 @@
+import type {AttentionFinding,InsightMetric} from "./insightsTypes";
+export function buildAttentionFindings(metrics:readonly InsightMetric[]):AttentionFinding[]{
+  const rules=[{key:"overdue",title:"Review overdue work",severity:"danger" as const},{key:"blocked_stages",title:"Unblock workflow stages",severity:"danger" as const},{key:"uncovered",title:"Arrange work coverage",severity:"danger" as const},{key:"review_forms",title:"Clear the form review queue",severity:"warning" as const},{key:"overdue_followups",title:"Contact overdue follow-ups",severity:"danger" as const},{key:"unknown_outcomes",title:"Check missing visit outcomes",severity:"warning" as const}];
+  return rules.flatMap(rule=>{const m=metrics.find(x=>x.key===rule.key);return m&&m.value!==null&&m.value>0?[{id:rule.key,title:rule.title,description:`${m.value.toLocaleString("en-IN")} ${m.label.toLowerCase()}${m.denominator!==null?` out of ${m.denominator.toLocaleString("en-IN")}`:""}. Open the records to review owners and next steps.`,metricKey:m.key,module:m.module,severity:rule.severity}]:[];}).slice(0,5);
+}
+export function insightValue(m:InsightMetric):string{return m.value===null?"No data":`${m.unit==="percent"?m.value.toFixed(1):m.value.toLocaleString("en-IN")}${m.unit==="percent"?"%":""}`;}

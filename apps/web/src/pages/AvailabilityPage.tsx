@@ -15,6 +15,7 @@ function today(): string { return new Date().toLocaleDateString("en-CA", { timeZ
 const statusLabels: Record<Enums<"availability_status">, string> = { present: "Present", absent: "Absent", half_day: "Half day", remote: "Remote" };
 
 export function AvailabilityPage() {
+  const employeeId=new URLSearchParams(window.location.search).get("employee_id");
   const { access, profile } = useAuth();
   const [users, setUsers] = useState<TaskUser[]>([]);
   const [entries, setEntries] = useState<AvailabilityEntry[]>([]);
@@ -55,8 +56,8 @@ export function AvailabilityPage() {
   const visibleUsers = useMemo(() => users.filter((user) => {
     const status = entryByUser.get(user.id)?.status ?? "present";
     const matchesSearch = !search.trim() || `${user.employee_name} ${user.employee_code}`.toLowerCase().includes(search.trim().toLowerCase());
-    return matchesSearch && (!departmentId || user.department_id === departmentId) && (!onlyExceptions || status !== "present") && (!onlyAbsent || status === "absent");
-  }), [departmentId, entries, entryByUser, onlyAbsent, onlyExceptions, search, users]);
+    return (!employeeId || user.id===employeeId) && matchesSearch && (!departmentId || user.department_id === departmentId) && (!onlyExceptions || status !== "present") && (!onlyAbsent || status === "absent");
+  }), [departmentId, employeeId, entries, entryByUser, onlyAbsent, onlyExceptions, search, users]);
   const absentCount = users.filter((user) => (entryByUser.get(user.id)?.status ?? "present") === "absent").length;
   const presentCount = users.length - absentCount;
   const departmentOverview = useMemo(() => {

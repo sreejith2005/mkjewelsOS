@@ -185,7 +185,7 @@ export async function loadTaskFeed(
   viewerId: string,
   startIso: string,
   endIso: string,
-  options: { tenantId: string; delegated?: boolean; includeBlockedCoverage?: boolean; includeOverdue?: boolean },
+  options: { tenantId: string; delegated?: boolean; includeBlockedCoverage?: boolean; includeOverdue?: boolean; recordId?: string },
 ): Promise<TaskBundle[]> {
   const watcherPromise = supabase.from("task_watchers")
     .select("task_instance_id")
@@ -196,7 +196,12 @@ export async function loadTaskFeed(
   let users: Array<{ employee_name: string | null; id: string | null }> = [];
   const deadlineFilter = options.includeOverdue ? taskFeedCurrentOrOverdueFilter(startIso, endIso) : null;
 
-  if (options.delegated) {
+  if (options.recordId) {
+    if (!/^[0-9a-f-]{36}$/i.test(options.recordId)) throw new Error("Invalid task identifier");
+    const [taskResult,watcherResult,usersResult]=await Promise.all([loadTaskRowsByIds([options.recordId]),watcherPromise,usersPromise]);
+    fail("Load selected task",taskResult.error);fail("Load task watchers",watcherResult.error);fail("Load task users",usersResult.error);
+    rows=taskResult.data;watcherRows=watcherResult.data??[];users=usersResult.data??[];
+  } else if (options.delegated) {
     const [scopeResult, watcherResult, usersResult] = await Promise.all([
       (deadlineFilter
         ? loadTaskScopePages((from, to) => supabase.from("v_task_feed_scope").select("id").or(deadlineFilter)
@@ -274,7 +279,7 @@ export async function loadTaskFeed(
     rows = [...visibleTasksResult.data, ...coverageTasksResult.data];
   }
 
-  const scopedRows = options.includeOverdue
+  const scopedRows = !options.recordId && options.includeOverdue
     ? rows.filter((row) => isTaskFeedItemInCurrentDayOrOverdue(row, startIso, endIso))
     : rows;
   const groupedRows = groupTaskFeedRows(scopedRows);

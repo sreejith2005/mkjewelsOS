@@ -32,6 +32,9 @@ const TASK_TOPICS = ["tasks", "forms", "organization"] as const;
 
 export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const { access, profile } = useAuth();
+  const selectedTaskId=new URLSearchParams(window.location.search).get("task_id");
+  const focusedTaskId=selectedTaskId&&/^[0-9a-f-]{36}$/i.test(selectedTaskId)?selectedTaskId:null;
+  const [focusedTasks,setFocusedTasks]=useState<TaskBundle[]>([]);
   const [statusFilter, setStatusFilter] = useState<TaskFeedStatusFilter>("pending");
   const [myTasks, setMyTasks] = useState<TaskBundle[]>([]);
   const [delegatedTasks, setDelegatedTasks] = useState<TaskBundle[]>([]);
@@ -59,6 +62,21 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
     setLoading(true);
     setError(null);
     try {
+      if (focusedTaskId) {
+        const rows = await loadTaskFeed(profile.id, "", "", { tenantId: profile.tenant_id, recordId: focusedTaskId });
+        const [forms, dynamicOptions, referenceData] = await Promise.all([
+          loadTaskForms([...new Set(rows.flatMap((task) => task.requires_form && task.form_template_id ? [task.form_template_id] : []))], rows.flatMap((task) => task.id ? [task.id] : [])),
+          loadFormDynamicOptions(),
+          loadTaskFeedReferenceData().catch(() => ({ categories: [] })),
+        ]);
+        if (generation === refreshGeneration.current) {
+          setFocusedTasks(rows);
+          setFormBundles(forms.bundles);
+          setFormDynamicOptions(dynamicOptions);
+          setCategories(referenceData.categories);
+        }
+        return;
+      }
       const today = kolkataDateKey(new Date());
       const start = `${today}T00:00:00.000+05:30`;
       const end = `${today}T23:59:59.999+05:30`;
@@ -104,7 +122,7 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
         setLoading(false);
       }
     }
-  }, [canManage, hasAdminTaskView, profile]);
+  }, [canManage, hasAdminTaskView, profile,focusedTaskId]);
 
   useEffect(() => { hasCompletedInitialLoad.current = false; }, [profile?.id]);
   useEffect(() => { if (path === TASK_IN_LOOP_PATH) setWorkspaceView("inLoop"); }, [path]);
@@ -120,8 +138,8 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const tasks = workspaceView === "mine" ? myTasks : workspaceView === "delegated" ? delegatedTasks : inLoopTasks;
   const counts = useMemo(() => countTaskFeedStatuses(tasks), [tasks]);
   const scopedTasks = useMemo(() => {
-    return tasks.filter((task) => taskMatchesStatus(task, statusFilter));
-  }, [statusFilter, tasks]);
+    return focusedTaskId?focusedTasks:tasks.filter((task) => taskMatchesStatus(task, statusFilter));
+  }, [statusFilter, tasks,focusedTaskId,focusedTasks]);
 
   const navigateTo = (path: string) => {
     window.history.pushState({}, "", path);
@@ -192,7 +210,7 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
         </div> : null}
       </div>
 
-      <TaskFilterBar counts={counts} onStatusChange={setStatusFilter} status={statusFilter} />
+      <>{focusedTaskId?<div className="px-4 py-3 text-sm text-task-text-muted">Selected task | <button className="min-h-11 text-task-accent" onClick={()=>navigateTo("/tasks")}>Return to task feed</button></div>:null}</><TaskFilterBar counts={counts} onStatusChange={setStatusFilter} status={statusFilter} />
 
       <div className="w-full p-3 sm:p-5">
         {error ? <div className="flex flex-col gap-3 rounded-xl border border-danger/40 bg-danger/10 p-4"><Notice tone="danger">{error}</Notice><Button className="self-start border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={() => void refresh()} variant="secondary"><RefreshCw />Retry</Button></div> : shouldShowTaskLoading(loading, hasCompletedInitialLoad.current) ? <div aria-label="Loading tasks" className="flex flex-col gap-3">{[0, 1, 2].map((item) => <div className="h-28 animate-pulse rounded-2xl border border-task-border bg-task-muted" key={item} />)}</div> : scopedTasks.length === 0 ? <div className="flex min-h-[48dvh] flex-col items-center justify-center px-5 text-center"><span className="mb-5 flex size-20 items-center justify-center rounded-[1.75rem] bg-task-muted text-task-accent"><CheckCircle2 className="size-10" /></span><h2 className="text-2xl font-semibold text-task-text">No Tasks Here</h2><p className="mt-1 max-w-sm text-sm text-task-text-muted">It seems that you don’t have any tasks in this list.</p></div> : <div className="flex flex-col gap-3">{profile ? scopedTasks.map((task) => <TaskCard capability={deriveTaskMutationCapability({ assigneeIds: task.assignees.map((assignee) => assignee.id), isWatcher: task.isWatchedByViewer, viewerId: profile.id, viewerRole: profile.user_role })} categoryLabel={task.category_id ? categoryNames.get(task.category_id) ?? "Uncategorized" : "Uncategorized"} key={task.id} onAction={(action) => handleAction(task, action)} task={task} />) : null}</div>}

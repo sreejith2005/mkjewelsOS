@@ -2267,6 +2267,75 @@ export type Database = {
   }
   public: {
     Tables: {
+      dashboard_saved_views: {
+        Row: {
+          config: Json
+          created_at: string
+          id: string
+          name: string
+          record_version: number
+          tenant_id: string
+          updated_at: string
+          user_profile_id: string
+        }
+        Insert: {
+          config: Json
+          created_at?: string
+          id?: string
+          name: string
+          record_version?: number
+          tenant_id: string
+          updated_at?: string
+          user_profile_id: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          id?: string
+          name?: string
+          record_version?: number
+          tenant_id?: string
+          updated_at?: string
+          user_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboard_saved_views_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dashboard_saved_views_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dashboard_saved_views_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dashboard_saved_views_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dashboard_saved_views_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       department_permission_overrides: {
         Row: {
           created_at: string
@@ -11229,6 +11298,34 @@ export type Database = {
           p_worker_assertion: Json
         }
         Returns: Json
+      }
+      get_management_insights_v1: { Args: { p_context?: Json }; Returns: Json }
+      get_management_insight_records_v1: {
+        Args: {
+          p_context: Json
+          p_group_id?: string
+          p_limit?: number
+          p_metric: string
+          p_offset?: number
+        }
+        Returns: Json
+      }
+      get_management_insights_options_v1: {
+        Args: { p_context?: Json }
+        Returns: Json
+      }
+      save_dashboard_view_with_audit: {
+        Args: {
+          p_config?: Json
+          p_expected_version?: number
+          p_id?: string
+          p_name?: string
+        }
+        Returns: Json
+      }
+      delete_dashboard_view_with_audit: {
+        Args: { p_expected_version: number; p_id: string }
+        Returns: undefined
       }
       get_dashboard_metrics: { Args: { p_context?: Json }; Returns: Json }
       get_employee_task_progress: { Args: { p_context?: Json }; Returns: Json }

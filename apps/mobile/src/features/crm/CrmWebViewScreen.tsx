@@ -41,7 +41,7 @@ function openOutside(url: string) {
   void Linking.openURL(url).catch((error: unknown) => log.error("navigation", "could not open a CRM link outside the app", error));
 }
 
-function CrmWebView({ origin, userId }: { origin: string; userId: string }) {
+function CrmWebView({ origin, userId, initialPath }: { origin: string; userId: string; initialPath: string }) {
   const navigation = useNavigation<BottomTabNavigationProp<TabParamList>>();
   const { logout } = useAuth();
   const insets = useSafeAreaInsets();
@@ -144,18 +144,18 @@ function CrmWebView({ origin, userId }: { origin: string; userId: string }) {
         originWhitelist={["*"]}
         ref={webView}
         setSupportMultipleWindows={false}
-        source={{ uri: crmStartUrl(origin) }}
+        source={{ uri: crmStartUrl(origin, initialPath) }}
         style={styles.fill}
         textZoom={100}
         webviewDebuggingEnabled={__DEV__}
       />
-      {loadState === "loading" ? <View style={styles.overlay}><LoadingState label="Opening CRM…" /></View> : null}
+      {loadState === "loading" ? <View style={styles.overlay}><LoadingState label="Opening CRM..." /></View> : null}
     </View>
   );
 }
 
 /** The CRM tab. The section gate (crm.view, section switch) is applied by the tab shell. */
-export function CrmWebViewScreen() {
+export function CrmWebViewScreen({initialPath="/crm"}: {initialPath?:string}={}) {
   const { session } = useAuth();
   const origin = env.jewelosWebOrigin;
   if (!origin) {
@@ -169,7 +169,7 @@ export function CrmWebViewScreen() {
     );
   }
   // A new signed-in user gets a new WebView (and a signed-out app has none).
-  return session ? <CrmWebView key={session.user.id} origin={origin} userId={session.user.id} /> : null;
+  return session ? <CrmWebView key={session.user.id} origin={origin} userId={session.user.id} initialPath={initialPath} /> : null;
 }
 
 const styles = StyleSheet.create({

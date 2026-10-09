@@ -101,6 +101,8 @@ export function createNativeCrmBridge(deps: NativeCrmBridgeDeps): NativeCrmBridg
 }
 
 /** The first URL the CRM tab opens. */
-export function crmStartUrl(origin: string): string {
-  return `${origin}/crm`;
+export function crmStartUrl(origin: string, initialPath = "/crm"): string {
+  const url = new URL(initialPath, origin);
+  if (url.origin !== new URL(origin).origin || !(url.pathname === "/crm" || url.pathname.startsWith("/crm/"))) return `${origin}/crm`;
+  return url.href;
 }

@@ -1,0 +1,21 @@
+export const INSIGHTS_TABS = ["overview", "tasks", "workflows", "people", "crm"] as const;
+export const INSIGHTS_GROUPS = ["department", "branch", "designation", "employee", "task_type", "workflow"] as const;
+export type InsightsTab = typeof INSIGHTS_TABS[number];
+export type InsightsModule = "tasks" | "workflows" | "forms" | "people" | "crm";
+export type InsightsFilter = {
+  version: 1; tab: InsightsTab; preset: string; from?: string | undefined; to?: string | undefined;
+  groupBy: typeof INSIGHTS_GROUPS[number]; branch_id?: string | undefined; department_id?: string | undefined;
+  designation_id?: string | undefined; user_profile_id?: string | undefined; task_type?: string | undefined; category_id?: string | undefined;
+  priority?: string | undefined; status?: string | undefined; source?: string | undefined; flow_id?: string | undefined; stage_id?: string | undefined;
+};
+export type InsightMetric = {key:string;label:string;value:number|null;previous:number|null;numerator:number|null;denominator:number|null;basis:"cohort"|"period"|"current";module:InsightsModule;unit?:"percent"};
+export type InsightGroup = {id:string;name:string;total:number;completed:number;open:number;overdue:number;on_time:number};
+export type InsightOption = {id:string;name:string};
+export type InsightsOptions = {branches:InsightOption[];departments:InsightOption[];designations:InsightOption[];employees:InsightOption[];categories:InsightOption[];flows:InsightOption[];stages?:InsightOption[];taskTypes:InsightOption[];sources:InsightOption[]};
+export type InsightsPayload = {version:1;generatedAt:string;timezone:string;from:string;to:string;scopeLabel:string;moduleStates:Record<InsightsModule,boolean>;metrics:InsightMetric[];trend:Array<{date:string;due:number;completed:number}>;groups:InsightGroup[];groupBasis:string;missingDeadline:number};
+export type InsightRecord = {id:string;title:string;status:string;due:string|null;completed:string|null;module:InsightsModule;task_id?:string|undefined;instance_id?:string|undefined;stage_id?:string|undefined;starter_id?:string|undefined;form_id?:string|undefined;client_id?:string|undefined;employee_id?:string|undefined};
+export type InsightsDetailFilter = {filter:InsightsFilter;metricKey:string;groupId?:string|undefined;offset?:number;limit?:number};
+export type InsightsDetailPage = {rows:InsightRecord[];total:number;offset:number;limit:number};
+export type AttentionFinding = {id:string;title:string;description:string;metricKey:string;module:InsightsModule;severity:"danger"|"warning"};
+export type DashboardViewConfig = {version:1;filter:InsightsFilter;sections:string[]};
+export type DashboardSavedView = {id:string;name:string;config:DashboardViewConfig;record_version:number};

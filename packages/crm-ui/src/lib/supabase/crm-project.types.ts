@@ -2043,6 +2043,10 @@ export type Database = {
       }
     }
     Functions: {
+      get_crm_insights_v1: { Args: {p_context?: Json}; Returns: Json }
+      get_crm_insights_options_v1: { Args: {p_context?: Json}; Returns: Json }
+      get_crm_insight_records_v1: { Args: {p_context: Json; p_metric: string; p_group_id?: string; p_offset?: number; p_limit?: number}; Returns: Json }
+
       add_client_to_family: {
         Args: { p_client_id: string; p_member_client_id: string }
         Returns: string

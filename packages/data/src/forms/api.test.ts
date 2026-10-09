@@ -4,7 +4,7 @@ import { isFormFieldVisible } from "@jewelos/core";
 const { client } = vi.hoisted(() => ({ client: {} as Record<string, unknown> }));
 vi.mock("@jewelos/api-client/client", () => ({ getSupabase: () => client }));
 
-import { deletedFormBundle, deleteForm, publishAsNewForm, savePublishedForm, startFmsFromFormSubmission, submitFmsStarterAssignment, toDefinition, type FormField, type FormSubmission, type FormTemplate } from "./api";
+import { loadFormSubmissionDetail, deletedFormBundle, deleteForm, publishAsNewForm, savePublishedForm, startFmsFromFormSubmission, submitFmsStarterAssignment, toDefinition, type FormField, type FormSubmission, type FormTemplate } from "./api";
 
 describe("toDefinition", () => {
   it("does not turn a NULL database condition into a conditional field", () => {
@@ -121,3 +121,5 @@ describe("submitFmsStarterAssignment", () => {
       .resolves.toEqual({ instanceId: "instance-5", referenceNumber: "FMS-9" });
   });
 });
+
+describe("exact submission detail",()=>{it("loads a persisted submission outside the recent library page",async()=>{const row={id:"11111111-1111-4111-8111-111111111111",form_template_id:"22222222-2222-4222-8222-222222222222",submitted_at:"2020-01-01",data:{saved:"Historical answer"}};const from=vi.fn((table:string)=>{const chain={select:vi.fn(()=>chain),eq:vi.fn(()=>chain),in:vi.fn(()=>chain),order:vi.fn(()=>chain),limit:vi.fn(async()=>({data:table==="form_templates"?[{id:row.form_template_id,name:"Historical form",description:null,permissions:{},sections:[]}]:[],error:null})),maybeSingle:vi.fn(async()=>({data:row,error:null}))};return chain;});Object.assign(client,{from});const detail=await loadFormSubmissionDetail(row.id);expect(detail?.submission.data).toEqual({saved:"Historical answer"});expect(detail?.bundle.id).toBe(row.form_template_id);});it("does not invent a row when RLS hides it",async()=>{Object.assign(client,{from:()=>({select:()=>({eq:()=>({maybeSingle:async()=>({data:null,error:null})})})})});expect(await loadFormSubmissionDetail("11111111-1111-4111-8111-111111111111")).toBeNull();});});

@@ -124,3 +124,5 @@ describe("native CRM bridge: navigation allowlist", () => {
     expect(bridge.navigation("intent://scan#Intent;end")).toBe("block");
   });
 });
+
+describe("native CRM dashboard scoped launch",()=>{it("retains scope and rejects paths outside CRM",()=>{expect(crmStartUrl(ORIGIN,"/crm/dashboard?preset=today&jewelos_branch_id=branch")).toBe(`${ORIGIN}/crm/dashboard?preset=today&jewelos_branch_id=branch`);expect(crmStartUrl(ORIGIN,"/tasks")).toBe(`${ORIGIN}/crm`);expect(crmStartUrl(ORIGIN,"https://outside.invalid/crm")).toBe(`${ORIGIN}/crm`);});});
