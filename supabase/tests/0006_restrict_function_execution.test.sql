@@ -249,6 +249,8 @@ select is((
   'import_delegation_tasks_with_audit(jsonb,text)',
   'import_task_bulk_with_audit(jsonb,text,text)',
   'is_reporting_descendant(uuid,uuid)',
+  -- 0206: Ask Kiara colleague directory (name, designation, department, branch only).
+  'kiara_directory_lookup(text,integer)',
   'leave_applicant_eligible()',
   'leave_file_readable(text)',
   'leave_file_writable(text)',
