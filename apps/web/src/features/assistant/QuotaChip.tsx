@@ -15,6 +15,6 @@ export function QuotaChip({ quota }: { quota: KiaraQuota | null }) {
   >
     <MessageCircleQuestion aria-hidden className="size-3.5" />
     {formatQuotaLabel(quota)}
-    {reset ? <span className="font-normal text-task-text-muted">· resets {reset}</span> : null}
+    {reset ? <span className="hidden font-normal text-task-text-muted sm:inline">· resets {reset}</span> : null}
   </span>;
 }
