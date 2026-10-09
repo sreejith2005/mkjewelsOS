@@ -18,6 +18,14 @@ adds its own allowed, denied, language, and injection cases. Phase 9 runs the fu
 Tool calls for a question are recorded in the `assistant_question_answered` audit row
 (`new_value -> 'tools_used'`), so a run can be graded without reading transcripts.
 
+## Phase 2 fixture
+
+Phase 2 cases (`p2-*`) sign in as the users of `supabase/functions/ask-kiara/integration.fixture.sql`
+(tenant "Kiara integration": Andheri and Borivali branches; super admin, admin, Andheri manager, HR,
+two Andheri staff of whom one has manager dashboard authority, Borivali staff and manager). The
+integration test applies it; to apply it by hand on a local stack:
+`docker exec -i supabase_db_<project> psql -U postgres < supabase/functions/ask-kiara/integration.fixture.sql`.
+
 ## Running against a local stack
 
 Never point this at a hosted project. Use an isolated local stack (see the plan's global

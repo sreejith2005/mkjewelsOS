@@ -5,7 +5,6 @@ import {
   type ExecutorContext,
   type ToolArgs,
   type ToolOutcome,
-  argInt,
   argText,
   invalidInput,
   isOutcome,
@@ -65,7 +64,8 @@ export async function runReport(context: ExecutorContext, args: ToolArgs): Promi
   const range = rangeFor(args, context, ({ now, timeZone }) => resolveKiaraPeriod("this_month", now, timeZone));
   if (isOutcome(range)) return range;
   if (kiaraRangeDays(range) > definition.maxDateRangeDays) return invalidInput(`${definition.name} covers at most ${definition.maxDateRangeDays} days. Use a shorter period.`);
-  const page = argInt(args, "page", 1);
+  // Kiara shows the first page; the Reports section has the rest.
+  const page = 1;
   const filters: Record<string, string | number> = { preset: "custom", from: range.from, to: range.to, page, page_size: REPORT_PAGE_SIZE };
   const status = argText(args, "status")?.toLowerCase();
   if (status) {
@@ -85,7 +85,7 @@ export async function runReport(context: ExecutorContext, args: ToolArgs): Promi
       page,
       rows,
       total_rows: total,
-      ...(total > page * REPORT_PAGE_SIZE ? { truncated: true, more: "More rows exist on later pages (page up to 5) or in Reports." } : {}),
+      ...(total > page * REPORT_PAGE_SIZE ? { truncated: true, more: "More rows exist; the full report is in Reports." } : {}),
     },
     isError: false,
   };

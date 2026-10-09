@@ -74,28 +74,25 @@ export function resolveKiaraPeriod(period: KiaraPeriod, now: Date, timeZone: str
   }
 }
 
-export type KiaraRangeInput = Readonly<{ period?: unknown; from?: unknown; to?: unknown }>;
+/**
+ * The one way a tool's `period` text becomes a date range: a period name
+ * ("tomorrow"), one date ("2026-10-10"), or a range ("2026-10-01..2026-10-07").
+ * Nothing given means "not given" (`range: null`); each tool decides its own
+ * default. A single text field keeps the strict tool schemas small.
+ */
 export type KiaraRangeResult = Readonly<{ ok: true; range: KiaraDateRange | null }> | Readonly<{ ok: false; error: string }>;
 
-/**
- * The one way a tool input becomes a date range: a named period, or explicit
- * `from`/`to` dates (either may be given alone for a single day), never both.
- * No period and no dates means "not given" (`range: null`); each tool decides
- * its own default.
- */
-export function kiaraRangeFromInput(input: KiaraRangeInput, now: Date, timeZone: string, maxDays = 366): KiaraRangeResult {
-  const { period, from, to } = input;
-  if (period !== undefined && period !== null) {
-    if (from !== undefined || to !== undefined) return { ok: false, error: "Give either period or from/to dates, not both." };
-    if (typeof period !== "string" || !(KIARA_PERIODS as readonly string[]).includes(period)) return { ok: false, error: "period must be one of the listed periods." };
-    return { ok: true, range: resolveKiaraPeriod(period as KiaraPeriod, now, timeZone) };
-  }
-  if (from === undefined && to === undefined) return { ok: true, range: null };
-  if (from !== undefined && !isIsoDate(from)) return { ok: false, error: "from must be a date (YYYY-MM-DD)." };
-  if (to !== undefined && !isIsoDate(to)) return { ok: false, error: "to must be a date (YYYY-MM-DD)." };
-  const start = (from ?? to) as string;
-  const end = (to ?? from) as string;
-  if (end < start) return { ok: false, error: "to must not be before from." };
+export const KIARA_PERIOD_HINT = `One of ${KIARA_PERIODS.join(", ")}; or a date YYYY-MM-DD; or a range YYYY-MM-DD..YYYY-MM-DD.`;
+
+export function kiaraRangeFromInput(period: unknown, now: Date, timeZone: string, maxDays = 366): KiaraRangeResult {
+  if (period === undefined || period === null) return { ok: true, range: null };
+  if (typeof period !== "string") return { ok: false, error: `period must be text. ${KIARA_PERIOD_HINT}` };
+  const value = period.trim().toLowerCase();
+  if (!value) return { ok: true, range: null };
+  if ((KIARA_PERIODS as readonly string[]).includes(value)) return { ok: true, range: resolveKiaraPeriod(value as KiaraPeriod, now, timeZone) };
+  const [start, end = start, extra] = value.split("..").map((part) => part.trim());
+  if (extra !== undefined || !isIsoDate(start) || !isIsoDate(end)) return { ok: false, error: `period is not understood. ${KIARA_PERIOD_HINT}` };
+  if (end < start) return { ok: false, error: "The range ends before it starts." };
   const days = Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000) + 1;
   if (days > maxDays) return { ok: false, error: `The date range can be at most ${maxDays} days.` };
   return { ok: true, range: { from: start, to: end } };

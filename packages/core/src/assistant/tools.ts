@@ -3,7 +3,7 @@ import type { SectionControls } from "../settings/sectionAvailability.ts";
 import { hasPermission, resolvePageAccess, type AccessContext } from "../permissions/resolve.ts";
 import type { PermissionKey } from "../permissions/catalog.ts";
 import { REPORT_CATALOG } from "../reports/catalog.ts";
-import { KIARA_PERIODS, isIsoDate } from "./period.ts";
+import { KIARA_PERIOD_HINT } from "./period.ts";
 
 /**
  * The Ask Kiara tool catalogue (spec section 8).
@@ -104,18 +104,15 @@ export const KIARA_NAME_MAX = 60;
 type FieldSpec =
   | Readonly<{ kind: "string"; max: number; description: string }>
   | Readonly<{ kind: "enum"; values: readonly string[]; description: string }>
-  | Readonly<{ kind: "date"; description: string }>
-  | Readonly<{ kind: "integer"; min: number; max: number; description: string }>
   | Readonly<{ kind: "boolean"; description: string }>;
 
 type ToolFields = Readonly<{ fields: Readonly<Record<string, FieldSpec>>; required: readonly string[] }>;
 
-const periodFields: Readonly<Record<string, FieldSpec>> = {
-  period: { kind: "enum", values: KIARA_PERIODS, description: "A period relative to today in the turn context. Use instead of from/to when it fits (kal = yesterday or tomorrow by context; is hafte = this_week; is mahine = this_month)." },
-  from: { kind: "date", description: "First day, YYYY-MM-DD. Use with to for any other range." },
-  to: { kind: "date", description: "Last day, YYYY-MM-DD." },
-};
-const limitField = (max: number): FieldSpec => ({ kind: "integer", min: 1, max, description: `How many rows to return, 1 to ${max}.` });
+/**
+ * One optional text field for dates, not period/from/to: strict tool schemas
+ * allow 24 optional parameters in total per request (see the limits test).
+ */
+const periodField: FieldSpec = { kind: "string", max: 30, description: `Dates, worked out from today in the turn context (kal = tomorrow or yesterday by context; is hafte = this_week; is mahine = this_month). ${KIARA_PERIOD_HINT}` };
 const nameField = (description: string): FieldSpec => ({ kind: "string", max: KIARA_NAME_MAX, description: `${description} At most ${KIARA_NAME_MAX} characters.` });
 
 function schemaFor(spec: ToolFields): KiaraInputSchema {
@@ -123,8 +120,6 @@ function schemaFor(spec: ToolFields): KiaraInputSchema {
   for (const [key, field] of Object.entries(spec.fields)) {
     if (field.kind === "string") properties[key] = { type: "string", description: field.description };
     else if (field.kind === "enum") properties[key] = { type: "string", enum: [...field.values], description: field.description };
-    else if (field.kind === "date") properties[key] = { type: "string", format: "date", description: field.description };
-    else if (field.kind === "integer") properties[key] = { type: "integer", description: field.description };
     else properties[key] = { type: "boolean", description: field.description };
   }
   return { type: "object", properties, required: [...spec.required], additionalProperties: false };
@@ -143,29 +138,25 @@ const FIELDS: Readonly<Record<KiaraToolName, ToolFields>> = {
     fields: {
       text: { kind: "string", max: KIARA_TEXT_MAX, description: "Words to find in the task title (English or as the user wrote them). At most 100 characters." },
       status: { kind: "enum", values: ["open", "overdue", "completed", "all"], description: "open (not done), overdue (not done and past due), completed, or all. Default open." },
-      ...periodFields,
-      limit: limitField(20),
+      period: periodField,
     },
     required: [],
   },
   get_fms_work: {
     fields: {
       status: { kind: "enum", values: ["open", "completed", "all"], description: "open (default), completed, or all." },
-      limit: limitField(20),
     },
     required: [],
   },
   get_my_notifications: {
     fields: {
       unread_only: { kind: "boolean", description: "Only unread notifications. Default false." },
-      limit: limitField(20),
     },
     required: [],
   },
   search_forms: {
     fields: {
       text: { kind: "string", max: KIARA_TEXT_MAX, description: "Words to find in the form name. At most 100 characters." },
-      limit: limitField(20),
     },
     required: [],
   },
@@ -173,20 +164,20 @@ const FIELDS: Readonly<Record<KiaraToolName, ToolFields>> = {
     fields: {
       scope: { kind: "enum", values: ["mine", "office"], description: "mine: the user's own leave requests. office: everyone's leave the user may see (managers, HR, admins)." },
       status: { kind: "enum", values: ["pending", "approved", "rejected"], description: "Only requests in this state." },
-      ...periodFields,
+      period: periodField,
     },
     required: ["scope"],
   },
   get_availability: {
     fields: {
-      ...periodFields,
+      period: periodField,
       department: nameField("Only this department (name)."),
     },
     required: [],
   },
   get_dashboard_metrics: {
     fields: {
-      ...periodFields,
+      period: periodField,
       branch: nameField("Only this branch (name). Admins only."),
       department: nameField("Only this department (name)."),
     },
@@ -194,7 +185,7 @@ const FIELDS: Readonly<Record<KiaraToolName, ToolFields>> = {
   },
   get_team_progress: {
     fields: {
-      ...periodFields,
+      period: periodField,
       branch: nameField("Only this branch (name). Admins only."),
       department: nameField("Only this department (name)."),
       employee_name: nameField("Only this employee (name)."),
@@ -205,9 +196,8 @@ const FIELDS: Readonly<Record<KiaraToolName, ToolFields>> = {
   run_report: {
     fields: {
       report_key: { kind: "enum", values: KIARA_REPORT_KEYS, description: "The report to run (see list_reports)." },
-      ...periodFields,
+      period: periodField,
       status: { kind: "string", max: 40, description: "Optional status filter, for example pending, completed, overdue, breached." },
-      page: { kind: "integer", min: 1, max: 5, description: "Page of 25 rows, 1 to 5." },
     },
     required: ["report_key"],
   },
@@ -215,18 +205,14 @@ const FIELDS: Readonly<Record<KiaraToolName, ToolFields>> = {
     fields: {
       person_name: nameField("Part of the employee's name."),
       department: nameField("Part of the department name."),
-      limit: limitField(20),
     },
     required: [],
   },
   find_colleague: {
     fields: {
-      person_name: nameField("Part of the colleague's name."),
-      department: nameField("Part of the department name, for example HR."),
-      designation: nameField("Part of the designation, for example Manager."),
-      branch: nameField("Part of the branch name or its code."),
+      query: nameField("Key words only, for example \"HR Andheri\", \"Asha\", or \"Branch Manager Borivali\". Every word must match the colleague's name, designation, department, branch, or branch code."),
     },
-    required: [],
+    required: ["query"],
   },
 };
 
@@ -293,7 +279,7 @@ export const KIARA_TOOLS: readonly KiaraToolSpec[] = [
   ),
   tool(
     "run_report",
-    "One page (25 rows) of a report from Reports for a date range, within the user's report scope.",
+    "The first 25 rows of a report from Reports for a date range, within the user's report scope.",
     { permissions: ["reports.view"], pages: ["reports"], dataCategory: "reports", statusLabel: "Running the report" },
   ),
   tool(
@@ -357,11 +343,6 @@ function validateField(key: string, field: FieldSpec, value: unknown): Readonly<
       return { error: key === "section" ? "section must be one of the listed JewelOS sections." : `${key} must be one of: ${field.values.join(", ")}.` };
     }
     return { value };
-  }
-  if (field.kind === "date") return isIsoDate(value) ? { value } : { error: `${key} must be a date (YYYY-MM-DD).` };
-  if (field.kind === "integer") {
-    if (typeof value !== "number" || !Number.isInteger(value)) return { error: `${key} must be a whole number.` };
-    return { value: Math.min(field.max, Math.max(field.min, value)) };
   }
   return typeof value === "boolean" ? { value } : { error: `${key} must be true or false.` };
 }

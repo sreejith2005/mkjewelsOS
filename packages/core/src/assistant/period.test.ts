@@ -47,20 +47,23 @@ describe("Kiara periods", () => {
   });
 });
 
-describe("tool input ranges", () => {
-  it("accepts a period, explicit dates, a single date, or nothing", () => {
-    expect(kiaraRangeFromInput({ period: "tomorrow" }, lateFriday, IST)).toEqual({ ok: true, range: { from: "2026-10-10", to: "2026-10-10" } });
-    expect(kiaraRangeFromInput({ from: "2026-10-01", to: "2026-10-05" }, lateFriday, IST)).toEqual({ ok: true, range: { from: "2026-10-01", to: "2026-10-05" } });
-    expect(kiaraRangeFromInput({ from: "2026-10-01" }, lateFriday, IST)).toEqual({ ok: true, range: { from: "2026-10-01", to: "2026-10-01" } });
-    expect(kiaraRangeFromInput({}, lateFriday, IST)).toEqual({ ok: true, range: null });
+describe("tool period text", () => {
+  it("accepts a period name, a date, a range, or nothing", () => {
+    expect(kiaraRangeFromInput("tomorrow", lateFriday, IST)).toEqual({ ok: true, range: { from: "2026-10-10", to: "2026-10-10" } });
+    expect(kiaraRangeFromInput(" This_Week ", lateFriday, IST)).toEqual({ ok: true, range: { from: "2026-10-05", to: "2026-10-11" } });
+    expect(kiaraRangeFromInput("2026-10-01..2026-10-05", lateFriday, IST)).toEqual({ ok: true, range: { from: "2026-10-01", to: "2026-10-05" } });
+    expect(kiaraRangeFromInput("2026-10-01", lateFriday, IST)).toEqual({ ok: true, range: { from: "2026-10-01", to: "2026-10-01" } });
+    expect(kiaraRangeFromInput(undefined, lateFriday, IST)).toEqual({ ok: true, range: null });
+    expect(kiaraRangeFromInput("", lateFriday, IST)).toEqual({ ok: true, range: null });
   });
 
-  it("rejects mixed, malformed, reversed, and over-long ranges", () => {
-    expect(kiaraRangeFromInput({ period: "today", from: "2026-10-01" }, lateFriday, IST).ok).toBe(false);
-    expect(kiaraRangeFromInput({ period: "kal" }, lateFriday, IST).ok).toBe(false);
-    expect(kiaraRangeFromInput({ from: "2026-02-30" }, lateFriday, IST).ok).toBe(false);
-    expect(kiaraRangeFromInput({ from: "2026-10-05", to: "2026-10-01" }, lateFriday, IST).ok).toBe(false);
-    expect(kiaraRangeFromInput({ from: "2026-01-01", to: "2026-12-31" }, lateFriday, IST, 90).ok).toBe(false);
+  it("rejects unknown words, malformed, reversed, and over-long ranges", () => {
+    expect(kiaraRangeFromInput("kal", lateFriday, IST).ok).toBe(false);
+    expect(kiaraRangeFromInput("2026-02-30", lateFriday, IST).ok).toBe(false);
+    expect(kiaraRangeFromInput("2026-10-01..2026-10-02..2026-10-03", lateFriday, IST).ok).toBe(false);
+    expect(kiaraRangeFromInput("2026-10-05..2026-10-01", lateFriday, IST).ok).toBe(false);
+    expect(kiaraRangeFromInput("2026-01-01..2026-12-31", lateFriday, IST, 90).ok).toBe(false);
+    expect(kiaraRangeFromInput(7, lateFriday, IST).ok).toBe(false);
   });
 
   it("validates dates strictly", () => {

@@ -107,7 +107,7 @@ async function expectDenied(session: Session, name: string, input: Record<string
 
 async function checkMyTasks(s: Session) {
   if (!offered(s, "search_my_tasks")) return expectDenied(s, "search_my_tasks", {});
-  const result = await tool(s, "search_my_tasks", { status: "all", limit: 20 });
+  const result = await tool(s, "search_my_tasks", { status: "all" });
   // The Tasks section's feeds: doer, creator (Delegated), and Watching.
   const me = s.access.profileId;
   const [doer, creator, watched] = await Promise.all([
@@ -140,7 +140,7 @@ async function checkFms(s: Session) {
 
 async function checkNotifications(s: Session) {
   if (!offered(s, "get_my_notifications")) return expectDenied(s, "get_my_notifications", {});
-  const result = await tool(s, "get_my_notifications", { limit: 20 });
+  const result = await tool(s, "get_my_notifications", {});
   const section = await s.actor.select("notifications", { columns: "title", filters: [{ op: "eq", column: "user_profile_id", value: s.access.profileId }], order: [{ column: "created_at", ascending: false }], limit: 20 });
   const unread = await s.actor.select("notifications", { columns: "id", filters: [{ op: "eq", column: "user_profile_id", value: s.access.profileId }, { op: "eq", column: "is_read", value: false }], limit: 1, count: true });
   assertEquals(rows(result.notifications).map((row) => untrustedText(row.title)), rows(section.data).map((row) => row.title as string), `${s.who} notifications`);
@@ -150,7 +150,7 @@ async function checkNotifications(s: Session) {
 
 async function checkForms(s: Session) {
   if (!offered(s, "search_forms")) return expectDenied(s, "search_forms", {});
-  const result = await tool(s, "search_forms", { limit: 20 });
+  const result = await tool(s, "search_forms", {});
   const section = await s.actor.select("form_templates", { columns: "name", filters: [{ op: "eq", column: "lifecycle", value: "published" }, { op: "eq", column: "is_active", value: true }], order: [{ column: "name", ascending: true }], limit: 20 });
   assertEquals(rows(result.forms_you_can_fill).map((row) => untrustedText(row.form)), rows(section.data).map((row) => row.name as string), `${s.who} forms`);
   record(s.who, "search_forms", `equal (${rows(result.forms_you_can_fill).length} forms)`);
@@ -256,7 +256,7 @@ async function checkReports(s: Session) {
 
 async function checkPeople(s: Session) {
   if (!offered(s, "find_people")) return expectDenied(s, "find_people", { person_name: "KIT" });
-  const result = await tool(s, "find_people", { person_name: "KIT", limit: 20 });
+  const result = await tool(s, "find_people", { person_name: "KIT" });
   const section = await s.actor.select("user_profiles", { columns: "employee_name", filters: [{ op: "ilike", column: "employee_name", value: "%KIT%" }], order: [{ column: "employee_name", ascending: true }], limit: 20 });
   const got = rows(result.people).map((row) => row.name as string);
   assertEquals(got, rows(section.data).map((row) => row.employee_name as string), `${s.who} find_people`);
@@ -266,9 +266,9 @@ async function checkPeople(s: Session) {
 }
 
 async function checkDirectory(s: Session) {
-  if (!offered(s, "find_colleague")) return expectDenied(s, "find_colleague", { department: "HR" });
-  const result = await tool(s, "find_colleague", { department: "HR", branch: "Andheri" });
-  const rpc = await s.actor.rpc("kiara_directory_lookup", { p_name: null, p_department: "HR", p_designation: null, p_branch: "Andheri", p_limit: 10 });
+  if (!offered(s, "find_colleague")) return expectDenied(s, "find_colleague", { query: "HR" });
+  const result = await tool(s, "find_colleague", { query: "HR Andheri" });
+  const rpc = await s.actor.rpc("kiara_directory_lookup", { p_query: "HR Andheri", p_limit: 10 });
   assert(!rpc.error);
   assertEquals(result.people, (rpc.data as Record<string, unknown>).people, `${s.who} find_colleague`);
   assert(!JSON.stringify(result).match(/9[78]000207|example\.invalid|@home\.example/), "contact data leaked from the directory");

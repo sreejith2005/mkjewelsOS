@@ -56,9 +56,9 @@ grant execute on function pg_temp.as_user(integer) to authenticated, service_rol
 -- ---------------------------------------------------------------------------
 -- Grants
 -- ---------------------------------------------------------------------------
-select ok(has_function_privilege('authenticated', 'kiara_directory_lookup(text,text,text,text,integer)', 'EXECUTE'), 'signed-in users can call the lookup');
-select ok(not has_function_privilege('anon', 'kiara_directory_lookup(text,text,text,text,integer)', 'EXECUTE')
-  and not has_function_privilege('service_role', 'kiara_directory_lookup(text,text,text,text,integer)', 'EXECUTE'), 'anon and the service role cannot call it');
+select ok(has_function_privilege('authenticated', 'kiara_directory_lookup(text,integer)', 'EXECUTE'), 'signed-in users can call the lookup');
+select ok(not has_function_privilege('anon', 'kiara_directory_lookup(text,integer)', 'EXECUTE')
+  and not has_function_privilege('service_role', 'kiara_directory_lookup(text,integer)', 'EXECUTE'), 'anon and the service role cannot call it');
 set local role anon;
 select throws_ok($$select kiara_directory_lookup('Bina')$$, '42501', null, 'anon execution is denied');
 reset role;
@@ -82,41 +82,43 @@ select throws_ok($$select kiara_directory_lookup('Bina')$$, '42501', 'Section ac
 -- ---------------------------------------------------------------------------
 select pg_temp.as_user(1);
 select is(kiara_directory_lookup('Bina') -> 'people', '[{"name":"Dir HR Bina","designation":"HR Executive","department":"Dir HR","branch":"Dir Andheri"}]'::jsonb, 'a name lookup returns name, designation, department, branch');
-select is((select array_agg(distinct k order by k) from jsonb_array_elements(kiara_directory_lookup(null, 'HR') -> 'people') p, jsonb_object_keys(p) k),
+select is((select array_agg(distinct k order by k) from jsonb_array_elements(kiara_directory_lookup('HR') -> 'people') p, jsonb_object_keys(p) k),
   array['branch','department','designation','name'], 'no other field is ever returned');
-select ok(kiara_directory_lookup(null, 'HR')::text !~ '(example\.invalid|0000206|0000306|DIR-[0-9]|2065)', 'no email, mobile, employee code, or id appears anywhere in the result');
+select ok(kiara_directory_lookup('HR')::text !~ '(example\.invalid|0000206|0000306|DIR-[0-9]|2065)', 'no email, mobile, employee code, or id appears anywhere in the result');
 
 -- ---------------------------------------------------------------------------
 -- Matching, tenant isolation, inactive users
 -- ---------------------------------------------------------------------------
-select is((select array_agg(p ->> 'name' order by p ->> 'name') from jsonb_array_elements(kiara_directory_lookup(null, 'HR') -> 'people') p),
+select is((select array_agg(p ->> 'name' order by p ->> 'name') from jsonb_array_elements(kiara_directory_lookup('HR') -> 'people') p),
   array['Dir HR Bina','Dir HR Chitra'], 'department lookup: active colleagues only (on leave is still active); resigned, disabled, invited and other-tenant people excluded');
-select is((select array_agg(p ->> 'name' order by p ->> 'name') from jsonb_array_elements(kiara_directory_lookup(null, null, 'HR Executive', 'Andheri') -> 'people') p),
-  array['Dir HR Bina'], 'designation and branch filters combine');
-select is((select array_agg(p ->> 'name') from jsonb_array_elements(kiara_directory_lookup(null, null, null, 'dir-bor') -> 'people') p),
+select is((select array_agg(p ->> 'name' order by p ->> 'name') from jsonb_array_elements(kiara_directory_lookup('HR Executive Andheri') -> 'people') p),
+  array['Dir HR Bina'], 'every word must match a field: designation words and a branch combine');
+select is((select array_agg(p ->> 'name') from jsonb_array_elements(kiara_directory_lookup('dir-bor') -> 'people') p),
   array['Dir HR Chitra','Dir Staff_Percent'], 'a branch can be matched by its code');
 select is(jsonb_array_length(kiara_directory_lookup('Other Tenant') -> 'people'), 0, 'another tenant''s people are never found');
 select is(jsonb_array_length(kiara_directory_lookup('Resigned') -> 'people'), 0, 'a resigned colleague is not found');
 select is(jsonb_array_length(kiara_directory_lookup('Disabled') -> 'people'), 0, 'a disabled colleague is not found');
 select is(jsonb_array_length(kiara_directory_lookup('Invited') -> 'people'), 0, 'an invited (not yet active) colleague is not found');
 select is((select array_agg(p ->> 'name') from jsonb_array_elements(kiara_directory_lookup('Staff_') -> 'people') p), array['Dir Staff_Percent'], 'an underscore is matched literally, not as a wildcard');
-select is((select array_agg(p ->> 'name') from jsonb_array_elements(kiara_directory_lookup(null, null, '100%') -> 'people') p), array['Dir Denied Dev','Dir Staff Asha'], 'a percent sign is matched literally');
+select is((select array_agg(p ->> 'name') from jsonb_array_elements(kiara_directory_lookup('100%') -> 'people') p), array['Dir Denied Dev','Dir Staff Asha'], 'a percent sign is matched literally');
 
 select pg_temp.as_user(8);
-select is((select array_agg(p ->> 'name') from jsonb_array_elements(kiara_directory_lookup(null, 'HR') -> 'people') p), array['Dir HR Other Tenant'], 'tenant B sees only tenant B');
+select is((select array_agg(p ->> 'name') from jsonb_array_elements(kiara_directory_lookup('HR') -> 'people') p), array['Dir HR Other Tenant'], 'tenant B sees only tenant B');
 
 -- ---------------------------------------------------------------------------
 -- Caps and validation
 -- ---------------------------------------------------------------------------
 select pg_temp.as_user(1);
-select is(kiara_directory_lookup(null, null, null, 'Dir', 2) -> 'truncated', 'true'::jsonb, 'more matches than the limit set truncated');
-select is(jsonb_array_length(kiara_directory_lookup(null, null, null, 'Dir', 2) -> 'people'), 2, 'rows are capped at the limit');
+select is(kiara_directory_lookup('Dir', 2) -> 'truncated', 'true'::jsonb, 'more matches than the limit set truncated');
+select is(jsonb_array_length(kiara_directory_lookup('Dir', 2) -> 'people'), 2, 'rows are capped at the limit');
 select is(kiara_directory_lookup('Bina') -> 'truncated', 'false'::jsonb, 'a complete result is not truncated');
-select throws_ok($$select kiara_directory_lookup()$$, '22023', 'Give a name, department, designation, or branch to look up', 'an empty lookup is rejected (no full directory dump)');
-select throws_ok($$select kiara_directory_lookup('   ', '')$$, '22023', null, 'blank terms count as empty');
+select throws_ok($$select kiara_directory_lookup(null)$$, '22023', 'Give a name, department, designation, or branch to look up', 'an empty lookup is rejected (no full directory dump)');
+select throws_ok($$select kiara_directory_lookup('   ')$$, '22023', null, 'blank terms count as empty');
 select throws_ok(format('select kiara_directory_lookup(%L)', repeat('a', 61)), '22023', 'Lookup terms must be at most 60 characters', 'long terms are rejected');
-select throws_ok($$select kiara_directory_lookup('Bina', null, null, null, 21)$$, '22023', 'Limit must be 1 to 20', 'the limit is capped at 20');
-select throws_ok($$select kiara_directory_lookup('Bina', null, null, null, 0)$$, '22023', 'Limit must be 1 to 20', 'the limit must be positive');
+select throws_ok($$select kiara_directory_lookup('a b c d e f g')$$, '22023', 'Use at most 6 words', 'at most six words');
+select is(jsonb_array_length(kiara_directory_lookup('Bina Borivali') -> 'people'), 0, 'a word that matches nothing excludes the colleague');
+select throws_ok($$select kiara_directory_lookup('Bina', 21)$$, '22023', 'Limit must be 1 to 20', 'the limit is capped at 20');
+select throws_ok($$select kiara_directory_lookup('Bina', 0)$$, '22023', 'Limit must be 1 to 20', 'the limit must be positive');
 
 -- ---------------------------------------------------------------------------
 -- Section switched off (launch dark): staff denied, Super Admin allowed

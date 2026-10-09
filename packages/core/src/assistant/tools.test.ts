@@ -118,19 +118,35 @@ describe("tool input validation", () => {
     expect(long.ok && long.input.name === "get_app_help" ? long.input.question.length : 0).toBe(200);
   });
 
-  it("validates Phase 2 inputs: enums, dates, integers, text, required fields", () => {
-    expect(validateKiaraToolInput("search_my_tasks", { status: "overdue", period: "this_week", limit: 50 }))
-      .toEqual({ ok: true, input: { name: "search_my_tasks", status: "overdue", period: "this_week", limit: 20 } });
+  it("validates Phase 2 inputs: enums, text, booleans, required fields", () => {
+    expect(validateKiaraToolInput("search_my_tasks", { status: "overdue", period: "this_week" }))
+      .toEqual({ ok: true, input: { name: "search_my_tasks", status: "overdue", period: "this_week" } });
     expect(validateKiaraToolInput("search_my_tasks", { status: "late" }).ok).toBe(false);
-    expect(validateKiaraToolInput("search_my_tasks", { from: "9 Oct" }).ok).toBe(false);
-    expect(validateKiaraToolInput("search_my_tasks", { limit: 2.5 }).ok).toBe(false);
+    expect(validateKiaraToolInput("search_my_tasks", { limit: 5 })).toEqual({ ok: false, error: "Unknown field: limit" });
     expect(validateKiaraToolInput("search_my_tasks", { text: "   " })).toEqual({ ok: true, input: { name: "search_my_tasks" } });
     expect(validateKiaraToolInput("get_leave", {})).toEqual({ ok: false, error: "scope is required." });
     expect(validateKiaraToolInput("get_leave", { scope: "office", user_id: "x" })).toEqual({ ok: false, error: "Unknown field: user_id" });
     expect(validateKiaraToolInput("run_report", { report_key: "export_history" }).ok).toBe(false);
-    expect(validateKiaraToolInput("run_report", { report_key: "task_operations", page: 9 })).toEqual({ ok: true, input: { name: "run_report", report_key: "task_operations", page: 5 } });
-    expect(validateKiaraToolInput("find_colleague", { person_name: "x".repeat(200) })).toEqual({ ok: true, input: { name: "find_colleague", person_name: "x".repeat(60) } });
+    expect(validateKiaraToolInput("find_colleague", {})).toEqual({ ok: false, error: "query is required." });
+    expect(validateKiaraToolInput("find_colleague", { query: "x".repeat(200) })).toEqual({ ok: true, input: { name: "find_colleague", query: "x".repeat(60) } });
     expect(validateKiaraToolInput("get_my_notifications", { unread_only: "yes" }).ok).toBe(false);
+  });
+
+  it("stays inside the API's strict-schema limits for the widest permission shape", () => {
+    // Documented per-request limits across all strict tools: 20 tools,
+    // 24 optional parameters, 16 parameters with union types.
+    const strict = offeredKiaraTools(accessFor("super_admin"), DEFAULT_SECTION_CONTROLS).map((spec) => spec.definition);
+    expect(strict).toHaveLength(KIARA_TOOLS.length);
+    expect(strict.length).toBeLessThanOrEqual(20);
+    const optional = strict.reduce((total, tool) => total + Object.keys(tool.input_schema.properties).filter((key) => !tool.input_schema.required.includes(key)).length, 0);
+    expect(optional).toBeLessThanOrEqual(24);
+    const unions = strict.reduce((total, tool) => total + Object.values(tool.input_schema.properties).filter((property) => "anyOf" in property || Array.isArray(property.type)).length, 0);
+    expect(unions).toBeLessThanOrEqual(16);
+    for (const tool of strict) {
+      for (const property of Object.values(tool.input_schema.properties)) {
+        for (const unsupported of ["minimum", "maximum", "minLength", "maxLength", "multipleOf"]) expect(property).not.toHaveProperty(unsupported);
+      }
+    }
   });
 
   it("never lets a tool input name another user", () => {
