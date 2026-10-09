@@ -134,3 +134,4 @@ export * from "./recurringTodo";
 export * from "./dropdownMaster.ts";
 export * from "./taskControlView.ts";
 export { createRefreshCoordinator } from "./realtime/refreshCoordinator";
+export * from "./assistant/index.ts";

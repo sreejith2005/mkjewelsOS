@@ -1,5 +1,5 @@
-import { PAGE_IDS, type PageId, type UserRole } from "../roleMenu";
-import { SECTION_PARENT } from "../permissions/catalog";
+import { PAGE_IDS, type PageId, type UserRole } from "../roleMenu.ts";
+import { SECTION_PARENT } from "../permissions/catalog.ts";
 
 export type SectionAvailability = Readonly<Record<PageId, boolean>>;
 

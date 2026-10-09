@@ -12,6 +12,7 @@ import {
   ListChecks,
   ListFilter,
   Settings,
+  Sparkles,
   Users,
 } from "lucide-react";
 import {
@@ -65,6 +66,7 @@ const AssigningLeftPage = lazyPage("assigning-left", () => import("@/pages/Assig
 const TeamDirectoryPage = lazyPage("team-directory", () => import("@/pages/TeamDirectoryPage").then((module) => ({ default: module.TeamDirectoryPage })));
 const ReportsPage = lazyPage("reports", () => import("@/pages/ReportsPage").then((module) => ({ default: module.ReportsPage })));
 const SettingsPage = lazyPage("settings", () => import("@/pages/SettingsPage").then((module) => ({ default: module.SettingsPage })));
+const AskKiaraPage = lazyPage("ask-kiara", () => import("@/pages/AskKiaraPage").then((module) => ({ default: module.AskKiaraPage })));
 const PermissionManagementPage = lazyPage("permission-management", () => import("@/features/permissions/PermissionManagementPage").then((module) => ({ default: module.PermissionManagementPage })));
 
 const PAGE_ICONS: Record<PageId, typeof Home> = {
@@ -86,6 +88,7 @@ const PAGE_ICONS: Record<PageId, typeof Home> = {
   reports: FileSpreadsheet,
   dropdown_master: ListFilter,
   settings: Settings,
+  ask_kiara: Sparkles,
 };
 
 const FULL_WIDTH_PAGES = new Set<PageId>([
@@ -322,6 +325,7 @@ function AppShell() {
           : currentPage === "forms_library" ? <FormsPage />
               : currentPage === "fms_builder" ? <FMSBuilderPage />
                 : currentPage === "notifications" ? <NotificationsPage onNavigate={navigate} />
+                : currentPage === "ask_kiara" ? <AskKiaraPage onNavigate={navigate} />
             : <DashboardPage />;
 
   // The CRM renders full-screen with its own original shell once the JewelOS gates allow the

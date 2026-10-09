@@ -3,6 +3,7 @@ import { ALL_MENU_ITEMS, DEFAULT_SECTION_CONTROLS, IMPLEMENTED_PAGE_IDS, builtin
 import {
   COMPACT_DOCK_PATHS,
   TASKS_PRIMARY_ACTION,
+  NATIVE_PENDING_PAGES,
   NATIVE_WORK_ROUTES,
   accessibleMenu,
   buildLauncherItems,
@@ -161,7 +162,8 @@ it("uses the approved web paths for visible native tabs", () => {
 
 it("resolves every implemented web menu destination and every exact work-item target", () => {
   const implemented = new Set(IMPLEMENTED_PAGE_IDS);
-  expect(ALL_MENU_ITEMS.filter((item) => implemented.has(item.id)).every((item) => resolveNativeDestination(item.path) !== null)).toBe(true);
+  const pending = new Set(NATIVE_PENDING_PAGES);
+  expect(ALL_MENU_ITEMS.filter((item) => implemented.has(item.id) && !pending.has(item.id)).every((item) => resolveNativeDestination(item.path) !== null)).toBe(true);
   expect(NATIVE_WORK_ROUTES).toEqual({ task: "TaskDetail", fmsInstance: "FmsInstance", fmsStage: "FmsStage", fmsStageForm: "FmsStageForm", formSubmission: "FormSubmission", crmClient: "Crm", notificationInbox: "Section" });
 });
 
@@ -194,5 +196,32 @@ describe("CRM tab (CRM Phase 6: the web CRM in a WebView)", () => {
     expect(navigatePath("/crm", shellFor("crm"), handlers)).toBe(true);
     expect(calls).toEqual(["path:/crm", "tab:Crm"]);
     expect(NATIVE_WORK_ROUTES.crmClient).toBe("Crm");
+  });
+});
+
+describe("native-pending sections (Ask Kiara until its Phase 8)", () => {
+  it("lists only Ask Kiara", () => {
+    expect(NATIVE_PENDING_PAGES).toEqual(["ask_kiara"]);
+  });
+
+  it("keeps Ask Kiara out of the launcher and menu even though the web section is open", () => {
+    for (const role of ["staff", "manager", "super_admin"] as const) {
+      const shell = shellFor(role);
+      expect(pageDecision(shell, "ask_kiara")).toBe("allowed");
+      expect(buildLauncherItems(shell).some((item) => item.id === "ask_kiara")).toBe(false);
+      expect(accessibleMenu(shell).some((item) => item.id === "ask_kiara")).toBe(false);
+    }
+  });
+
+  it("does not route an /ask-kiara link to the unimplemented section fallback", () => {
+    expect(resolveNativeDestination("/ask-kiara")).toBeNull();
+    const calls: string[] = [];
+    const handled = navigatePath("/ask-kiara", shellFor("super_admin"), { navigateSection: () => calls.push("section"), navigateTab: () => calls.push("tab"), setPath: () => calls.push("path") });
+    expect(handled).toBe(false);
+    expect(calls).toEqual([]);
+  });
+
+  it("leaves every other launcher entry unchanged", () => {
+    expect(buildLauncherItems(shellFor("staff")).map((item) => item.id)).toEqual(["home", "dashboard", "fms_builder", "forms_library", "availability", "reports", "settings"]);
   });
 });

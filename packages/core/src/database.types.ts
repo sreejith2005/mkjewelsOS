@@ -7137,6 +7137,471 @@ export type Database = {
           },
         ]
       }
+      kiara_conversations: {
+        Row: {
+          archived_at: string | null
+          client: string
+          created_at: string
+          id: string
+          last_message_at: string
+          tenant_id: string
+          title: string
+          user_profile_id: string
+        }
+        Insert: {
+          archived_at?: string | null
+          client: string
+          created_at?: string
+          id?: string
+          last_message_at?: string
+          tenant_id: string
+          title: string
+          user_profile_id: string
+        }
+        Update: {
+          archived_at?: string | null
+          client?: string
+          created_at?: string
+          id?: string
+          last_message_at?: string
+          tenant_id?: string
+          title?: string
+          user_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kiara_conversations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_conversations_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_conversations_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_conversations_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_conversations_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kiara_daily_usage: {
+        Row: {
+          local_date: string
+          questions: number
+          refunded: number
+          tenant_id: string
+          user_profile_id: string
+        }
+        Insert: {
+          local_date: string
+          questions?: number
+          refunded?: number
+          tenant_id: string
+          user_profile_id: string
+        }
+        Update: {
+          local_date?: string
+          questions?: number
+          refunded?: number
+          tenant_id?: string
+          user_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kiara_daily_usage_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_daily_usage_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_daily_usage_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_daily_usage_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_daily_usage_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kiara_messages: {
+        Row: {
+          api_content: Json | null
+          citations: Json | null
+          conversation_id: string
+          created_at: string
+          data_categories: string[]
+          display_text: string
+          escalation_offer: Json | null
+          id: string
+          language: string | null
+          model: string | null
+          ordinal: number
+          quota_date: string | null
+          refunded_at: string | null
+          reply_to_message_id: string | null
+          request_id: string | null
+          role: string
+          stop_reason: string | null
+          tenant_id: string
+          tools_used: string[]
+          usage: Json | null
+        }
+        Insert: {
+          api_content?: Json | null
+          citations?: Json | null
+          conversation_id: string
+          created_at?: string
+          data_categories?: string[]
+          display_text: string
+          escalation_offer?: Json | null
+          id?: string
+          language?: string | null
+          model?: string | null
+          ordinal: number
+          quota_date?: string | null
+          refunded_at?: string | null
+          reply_to_message_id?: string | null
+          request_id?: string | null
+          role: string
+          stop_reason?: string | null
+          tenant_id: string
+          tools_used?: string[]
+          usage?: Json | null
+        }
+        Update: {
+          api_content?: Json | null
+          citations?: Json | null
+          conversation_id?: string
+          created_at?: string
+          data_categories?: string[]
+          display_text?: string
+          escalation_offer?: Json | null
+          id?: string
+          language?: string | null
+          model?: string | null
+          ordinal?: number
+          quota_date?: string | null
+          refunded_at?: string | null
+          reply_to_message_id?: string | null
+          request_id?: string | null
+          role?: string
+          stop_reason?: string | null
+          tenant_id?: string
+          tools_used?: string[]
+          usage?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kiara_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "kiara_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_messages_reply_to_message_id_fkey"
+            columns: ["reply_to_message_id"]
+            isOneToOne: true
+            referencedRelation: "kiara_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_messages_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kiara_question_facts: {
+        Row: {
+          asked_at: string
+          category: string | null
+          data_categories: string[]
+          escalated: boolean
+          id: string
+          kb_hit: boolean
+          labelled_at: string | null
+          local_date: string
+          message_id: string | null
+          sop_level: string | null
+          tenant_id: string
+          topic: string | null
+          user_profile_id: string
+        }
+        Insert: {
+          asked_at?: string
+          category?: string | null
+          data_categories?: string[]
+          escalated?: boolean
+          id?: string
+          kb_hit?: boolean
+          labelled_at?: string | null
+          local_date: string
+          message_id?: string | null
+          sop_level?: string | null
+          tenant_id: string
+          topic?: string | null
+          user_profile_id: string
+        }
+        Update: {
+          asked_at?: string
+          category?: string | null
+          data_categories?: string[]
+          escalated?: boolean
+          id?: string
+          kb_hit?: boolean
+          labelled_at?: string | null
+          local_date?: string
+          message_id?: string | null
+          sop_level?: string | null
+          tenant_id?: string
+          topic?: string | null
+          user_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kiara_question_facts_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "kiara_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_question_facts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_question_facts_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_question_facts_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_question_facts_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_question_facts_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kiara_settings: {
+        Row: {
+          conversation_retention_days: number
+          daily_question_limit: number
+          settings_version: number
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          conversation_retention_days?: number
+          daily_question_limit?: number
+          settings_version?: number
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          conversation_retention_days?: number
+          daily_question_limit?: number
+          settings_version?: number
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kiara_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kiara_user_limits: {
+        Row: {
+          daily_question_limit: number | null
+          reason: string | null
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+          user_profile_id: string
+        }
+        Insert: {
+          daily_question_limit?: number | null
+          reason?: string | null
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+          user_profile_id: string
+        }
+        Update: {
+          daily_question_limit?: number | null
+          reason?: string | null
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kiara_user_limits_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_user_limits_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_user_limits_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_user_limits_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_user_limits_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_user_limits_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: true
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_user_limits_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: true
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_user_limits_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: true
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_user_limits_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: true
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leave_requests: {
         Row: {
           applicant_id: string
@@ -11231,6 +11696,10 @@ export type Database = {
         Args: { p_template_id: string }
         Returns: string
       }
+      archive_my_kiara_conversation: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
       archive_notification_rule: {
         Args: { p_rule_id: string }
         Returns: undefined
@@ -11791,6 +12260,23 @@ export type Database = {
         }
         Returns: undefined
       }
+      complete_kiara_turn: {
+        Args: {
+          p_api_content: Json
+          p_citations: Json
+          p_data_categories: string[]
+          p_display_text: string
+          p_escalation_offer: Json
+          p_kb_hit: boolean
+          p_language: string
+          p_model: string
+          p_request_id: string
+          p_stop_reason: string
+          p_tools_used: string[]
+          p_usage: Json
+        }
+        Returns: string
+      }
       complete_recurring_task_with_image_with_audit: {
         Args: { p_file_url: string; p_task_id: string }
         Returns: undefined
@@ -12305,6 +12791,8 @@ export type Database = {
           stage_name: string
         }[]
       }
+      get_my_kiara_conversation: { Args: { p_id: string }; Returns: Json }
+      get_my_kiara_quota: { Args: never; Returns: Json }
       get_notification_provider_availability: {
         Args: never
         Returns: {
@@ -12499,6 +12987,7 @@ export type Database = {
       list_assigning_left_tasks: { Args: never; Returns: Json }
       list_crm_followups: { Args: { p_filter?: Json }; Returns: Json[] }
       list_designation_daily_checklists: { Args: never; Returns: Json }
+      list_my_kiara_conversations: { Args: { p_limit?: number }; Returns: Json }
       list_notification_delivery_logs: {
         Args: {
           p_channel?: string
@@ -12788,6 +13277,10 @@ export type Database = {
       }
       refresh_crm_client_rollups: {
         Args: { p_client_id: string }
+        Returns: undefined
+      }
+      refund_kiara_question: {
+        Args: { p_request_id: string }
         Returns: undefined
       }
       register_crm_document: {
@@ -13413,6 +13906,15 @@ export type Database = {
           instance_id: string
           reference_number: string
         }[]
+      }
+      start_kiara_turn: {
+        Args: {
+          p_client: string
+          p_conversation_id: string
+          p_message: string
+          p_request_id: string
+        }
+        Returns: Json
       }
       submit_fms_form_and_progress_with_audit: {
         Args: {
