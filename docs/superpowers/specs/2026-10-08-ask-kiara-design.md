@@ -1,7 +1,7 @@
 # Ask Kiara: organization assistant design
 
 Date: 2026-10-08 (Asia/Kolkata)
-Status: draft for owner review. Product decisions in section 2 were approved by the owner on 2026-10-08; everything else is a proposal.
+Status: approved. Product decisions in section 2 and the open questions in section 19 were decided by the owner on 2026-10-08 (item 14, data-retention terms, is pending before Phase 9).
 Base: `origin/main` at `fac01b6` (includes `feat/department-section-access`, migrations 0199-0204).
 Plan: `docs/superpowers/plans/2026-10-08-ask-kiara-plan.md`.
 
@@ -513,10 +513,10 @@ Payload sizes (approximate, after trimming): work summary 1.5-3k tokens; dashboa
 1-4k (capped); report page 2-4k; people 0.5-2k; availability/leave 0.5-2k; FMS 1-3k; forms 0.5-2k;
 notifications 0.5-1.5k; KB search 2-5k (5 chunks); CRM 1-3k.
 
-Gaps (no scoped contract today; not built until the owner decides, see open questions):
+Gaps (no scoped contract today; owner decisions in section 19):
 - A colleague directory for staff ("who handles HR in Andheri?"): `up_select` shows staff only
-  themselves. Would need a narrow `kiara_directory_lookup` returning name, designation, department,
-  branch of active colleagues, no contact data.
+  themselves. Approved (section 19 item 8): a narrow `kiara_directory_lookup` returning name,
+  designation, department, branch of active colleagues, no contact data, built in Phase 2.
 - Branch-scoped availability for a manager without the PEOPLE report roles: only raw RLS (tenant-wide)
   exists. Kiara uses the report path and does not fall back to the raw table.
 - CRM aggregates (counts and conversion by salesperson or period): no CRM-project read RPC; would be
@@ -656,7 +656,7 @@ Structure that enforces rule 7:
 - Retention: conversations and messages 180 days (tenant-configurable 30-730) by
   `purge_kiara_conversations`; `kiara_question_facts` (no text) 365 days; escalations and KB
   documents kept until deleted; `audit_logs` per existing practice. Provider-side retention follows
-  the organization's Anthropic and OpenAI API terms (open question 14).
+  the organization's Anthropic and OpenAI API terms (section 19 item 14, pending owner confirmation before Phase 9).
 - The Edge Function logs shape only (counts, durations, tool names), never question text or data, as
   `interpret-task-voice` does (index.ts:220-221).
 
@@ -772,30 +772,36 @@ Monthly upper bound, 100 employees × 10 questions × 30 days = 30,000 questions
 The Edge Function logs token usage per question in the audit row, so Phase 9 replaces these estimates
 with measured numbers.
 
-## 19. Open questions for the owner (each with a recommended answer)
+## 19. Owner decisions on the open questions (Decided 2026-10-08)
 
-1. Escalation recipients rule in 5.6 (reports-to chain, department head, branch manager; admins see
-   all). Recommended: approve as written.
-2. Should HR answer escalations by default? Recommended: no; grant per role if wanted.
-3. Insights scope for managers: reports-to tree (like Users) rather than branch (like Dashboard).
-   Recommended: reports-to tree.
-4. Conversation retention 180 days, facts 365 days. Recommended: approve.
-5. Any transcript access for Super Admin? Recommended: none in the app.
-6. Employees downloading original SOP files. Recommended: not in v1; excerpts with citations only.
-7. KB entries saved from escalations start as "suggested" until Super Admin approves. Recommended: yes.
-8. Staff colleague directory (gap in 8). Recommended: add the narrow name/designation/department/
-   branch lookup in Phase 2, no contact data.
-9. Fresher/Experienced/Veteran without a joining-date field. Recommended: activity-based v1 as in 13.
-10. `assistant.voice` excludes HR while `tasks.voice_assign` includes it. Recommended: keep the owner
-    default; grant HR in Settings if wanted.
-11. Launch dark (section off for non-Super Admin until switched on). Recommended: yes.
-12. Quota counting rules in 9. Recommended: approve.
-13. Insights labelling through the Batches API. Recommended: yes.
-14. Confirm the organization's Anthropic and OpenAI API data-retention terms are acceptable for
-    employee questions and business data before Phase 9.
-15. Transcription auto-detects language (no `language` parameter) with the transcript shown for
-    editing before sending. Recommended: yes.
-16. Merge and release cadence. Kiara changes shared code the Android app consumes, so every merge to
-    `main` triggers the standing APK release. Recommended: keep phases 1-7 on `feat/ask-kiara`, owner
-    tests from a preview/local build, merge dark before Phase 8, and ship the first Kiara APK in
-    Phase 8 (the native launcher hides the page until then via a native-pending list).
+All recommendations were approved by the owner on 2026-10-08, except item 14, which is pending and
+does not block Phases 1-8.
+
+1. Escalation recipients (5.6): reports-to ancestors, department head, branch manager; admins and
+   super admins see all. **Approved.**
+2. HR does not answer escalations by default; `assistant.answer_escalations` is grantable per role.
+   **Approved.**
+3. Manager insights scope is the reports-to tree (like Users), not the branch. **Approved.**
+4. Conversations and messages are kept 180 days (tenant-configurable 30-730); text-free
+   `kiara_question_facts` are kept 365 days. **Approved.**
+5. No in-app transcript access for anyone, including Super Admin. **Approved.**
+6. No SOP file downloads in v1; employees see cited excerpts only. **Approved.**
+7. Answers saved to the KB from escalations start as `suggested` until Super Admin approves.
+   **Approved.**
+8. Narrow colleague lookup (`kiara_directory_lookup`: name, designation, department, branch; no
+   contact information) is built in Phase 2. **Approved.**
+9. Fresher / Experienced / Veteran is activity-based for v1 (section 13). **Approved.**
+10. `assistant.voice` defaults to super_admin, admin, manager (no HR); HR can be granted in Settings.
+    **Approved.**
+11. Launch dark: the section is off for everyone except Super Admin until the owner enables it.
+    **Approved.**
+12. Quota (section 9): a question counts when sent, is refunded on provider failure before any answer
+    text, and escalations and transcription do not count. **Approved.**
+13. Insights labelling uses the Message Batches API. **Approved.**
+14. Organization's Anthropic and OpenAI API data-retention terms for employee questions and business
+    data. **Pending owner confirmation before Phase 9** (hosted deploy). Not blocking earlier phases.
+15. Voice transcription auto-detects the language; the transcript is editable before sending.
+    **Approved.**
+16. Merge and release cadence: phases 1-7 stay on `feat/ask-kiara`, rebased on `origin/main` at every
+    phase; the first APK containing Kiara ships in Phase 8 (the native launcher hides the page until
+    then via a native-pending list). **Approved.**
