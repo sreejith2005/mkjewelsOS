@@ -96,9 +96,10 @@ Files to modify:
 - `apps/mobile/src/navigation/AppTabs.tsx` icon map entry (line 54) so the type stays exhaustive.
 
 Android release note: these are mobile-consumed changes, so AGENTS.md's standing release instruction
-applies when they reach `main`. Proposed (owner to confirm): keep phases 1-7 on `feat/ask-kiara`
-(or merge them to `main` dark) and cut the first APK containing Kiara in Phase 8. If any phase merges
-to `main` earlier, that merge is followed by the routine release per `docs/MOBILE_RELEASE_GUIDE.md`.
+applies when they reach `main`. Decided 2026-10-08 (spec 19 item 16): phases 1-7 stay on
+`feat/ask-kiara`, rebased on `origin/main` at every phase, and the first APK containing Kiara ships in
+Phase 8. If any phase merges to `main` earlier, that merge is followed by the routine release per
+`docs/MOBILE_RELEASE_GUIDE.md`.
 
 Tests:
 - pgTAP: catalog rows and defaults; section key accepted by `validated_section_availability`; launch
@@ -149,9 +150,9 @@ Exit criteria:
 
 **Scope:** `search_my_tasks`, `get_dashboard_metrics`, `get_team_progress`, `list_reports`/
 `run_report`, `find_people`, `get_availability`, `get_leave`, `get_fms_work`, `search_forms`,
-`get_my_notifications` (spec 8). Decide open question 8 (colleague directory) before starting.
+`get_my_notifications` (spec 8), and `kiara_directory_lookup` (spec 19 item 8, approved 2026-10-08).
 
-Migrations: none expected. If open question 8 is approved, `02xx_kiara_directory_lookup.sql` with
+Migration (approved, spec 19 item 8): `02xx_kiara_directory_lookup.sql` with
 `kiara_directory_lookup(p_name text, p_limit int)` (active colleagues in tenant; name, designation,
 department, branch; no contact data; `assert_module_access('ask_kiara')`; pgTAP).
 
