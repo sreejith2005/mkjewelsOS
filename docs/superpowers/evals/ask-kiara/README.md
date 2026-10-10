@@ -35,7 +35,7 @@ constraints), not the shared `jewelos` stack.
    or its steps against your own stack's database container). Add a synthetic manager
    (`kiara-manager@mkjewels.local`) in the seed tenant and branch.
 2. Switch the section on for the seed tenant (Developer Mode, or it is already on for tenants created
-   after migration 0205).
+   after migration 0206).
 3. Put `ANTHROPIC_API_KEY` in the git-ignored `supabase/functions/.env.local` (never print it), then:
    `supabase.cmd functions serve ask-kiara --env-file supabase/functions/.env.local`.
 4. For each case, sign in as `user` (`POST /auth/v1/token?grant_type=password`), then call
@@ -46,3 +46,14 @@ constraints), not the shared `jewelos` stack.
 
 Each question costs real money (Sonnet 5.5, about 2 cents). The daily limit (10, Super Admin
 unlimited) applies to eval accounts too; use a per-user exception or Super Admin for long runs.
+
+## Phase 3 knowledge base
+
+Phase 3 cases (`p3-*`) use only synthetic articles, typed in the Knowledge base screen (Ask Kiara >
+Knowledge base, Super Admin) as their `setup` describes. A citation is valid only when its marker
+names a chunk returned by `search_knowledge_base` in the same turn; the server drops any other
+marker, so grade citations from `kiara_messages.citations`, not from the model's raw text.
+
+The owner's real SOPs are never added to this file. Questions written from them, and their results,
+live in the git-ignored `docs/superpowers/evals/ask-kiara/private/` folder on the machine that ran
+them.

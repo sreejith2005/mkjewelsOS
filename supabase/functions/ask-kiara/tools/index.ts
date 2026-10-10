@@ -1,4 +1,5 @@
 import { getKiaraTool, validateKiaraToolInput, type KiaraToolSpec } from "../../../../packages/core/src/assistant/tools.ts";
+import type { KiaraCitationSource } from "../../../../packages/core/src/assistant/citations.ts";
 import type { PageId } from "../../../../packages/core/src/roleMenu.ts";
 import { hasPermission, type AccessContext } from "../../../../packages/core/src/permissions/resolve.ts";
 import { getAppHelpOutcome } from "./appHelp.ts";
@@ -6,6 +7,7 @@ import { getAvailability } from "./availability.ts";
 import { getDashboardMetrics } from "./dashboard.ts";
 import { getFmsWork } from "./fms.ts";
 import { searchForms } from "./forms.ts";
+import { searchKnowledge } from "./knowledge.ts";
 import { getLeave } from "./leave.ts";
 import { getMyNotifications } from "./notifications.ts";
 import { findColleague, findPeople } from "./people.ts";
@@ -31,6 +33,8 @@ export type ExecutedTool = Readonly<{
   spec: KiaraToolSpec | null;
   content: string;
   isError: boolean;
+  /** Knowledge-base chunks returned by this call: the only ones the turn may cite. */
+  citationSources?: readonly KiaraCitationSource[] | undefined;
 }>;
 
 /**
@@ -59,6 +63,7 @@ export async function executeKiaraTool(name: string, input: unknown, context: To
     hasPermission: (key) => hasPermission(context.access, key),
   };
   let outcome: ToolOutcome;
+  let citationSources: readonly KiaraCitationSource[] = [];
   try {
     switch (args.name) {
       case "get_my_work_summary":
@@ -67,6 +72,12 @@ export async function executeKiaraTool(name: string, input: unknown, context: To
       case "get_app_help":
         outcome = getAppHelpOutcome(args.section as PageId, context.accessibleSections);
         break;
+      case "search_knowledge_base": {
+        const search = await searchKnowledge(executor, args);
+        outcome = search.outcome;
+        citationSources = search.sources;
+        break;
+      }
       case "search_my_tasks":
         outcome = await searchMyTasks(executor, args);
         break;
@@ -107,5 +118,10 @@ export async function executeKiaraTool(name: string, input: unknown, context: To
   } catch {
     outcome = UNAVAILABLE;
   }
-  return { spec, content: serializeToolResult(outcome.result), isError: outcome.isError };
+  return {
+    spec,
+    content: serializeToolResult(outcome.result, outcome.maxChars),
+    isError: outcome.isError,
+    ...(citationSources.length ? { citationSources } : {}),
+  };
 }

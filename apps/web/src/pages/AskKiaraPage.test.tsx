@@ -71,9 +71,9 @@ describe("AskKiaraPage", () => {
     const bubbles = bubblesFor({
       id: "c1", title: "t", created_at: "x", last_message_at: "x", question_count: 2,
       messages: [
-        { id: "m1", ordinal: 1, role: "user", display_text: "Q1", reply_to_message_id: null, refunded: true, stop_reason: null, created_at: "x" },
-        { id: "m2", ordinal: 2, role: "user", display_text: "Q2", reply_to_message_id: null, refunded: false, stop_reason: null, created_at: "x" },
-        { id: "m3", ordinal: 3, role: "assistant", display_text: "A2", reply_to_message_id: "m2", refunded: false, stop_reason: "end_turn", created_at: "x" },
+        { id: "m1", ordinal: 1, role: "user", display_text: "Q1", reply_to_message_id: null, refunded: true, stop_reason: null, created_at: "x", citations: [] },
+        { id: "m2", ordinal: 2, role: "user", display_text: "Q2", reply_to_message_id: null, refunded: false, stop_reason: null, created_at: "x", citations: [] },
+        { id: "m3", ordinal: 3, role: "assistant", display_text: "A2", reply_to_message_id: "m2", refunded: false, stop_reason: "end_turn", created_at: "x", citations: [] },
       ],
     });
     expect(bubbles.map((bubble) => bubble.note ?? bubble.text)).toEqual(["Q1", "Kiara could not answer this one, so it was not counted.", "Q2", "A2"]);

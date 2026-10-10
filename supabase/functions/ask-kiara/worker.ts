@@ -6,7 +6,7 @@ import {
   buildTurnContext,
 } from "../../../packages/core/src/assistant/systemPrompt.ts";
 import type { KiaraToolSpec } from "../../../packages/core/src/assistant/tools.ts";
-import { applyCitations } from "../../../packages/core/src/assistant/citations.ts";
+import { applyCitations, type KiaraCitation, type KiaraCitationSource } from "../../../packages/core/src/assistant/citations.ts";
 import { detectLanguageStyle } from "../../../packages/core/src/assistant/language.ts";
 import { parseKiaraQuota, type KiaraQuota } from "../../../packages/core/src/assistant/quota.ts";
 import { encodeKiaraEvent, type KiaraErrorCode, type KiaraStreamEvent } from "../../../packages/core/src/assistant/events.ts";
@@ -182,7 +182,7 @@ export type RequestUsage = Readonly<{
 export type KiaraUsage = RequestUsage & Readonly<{ requests: number; per_request: readonly RequestUsage[] }>;
 
 export type KiaraTurnResult =
-  | Readonly<{ ok: true; assistantMessageId: string; displayText: string; stopReason: string; quota: KiaraQuota; usage: KiaraUsage; toolsUsed: readonly string[] }>
+  | Readonly<{ ok: true; assistantMessageId: string; displayText: string; stopReason: string; quota: KiaraQuota; usage: KiaraUsage; toolsUsed: readonly string[]; citations: readonly KiaraCitation[] }>
   | Readonly<{ ok: false; code: KiaraErrorCode; message: string }>;
 
 class ProviderFailure extends Error {}
@@ -288,6 +288,8 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
   const perRequest: RequestUsage[] = [];
   const toolsUsed: string[] = [];
   const dataCategories: string[] = [];
+  // Chunks returned by knowledge searches in this turn: the only citable sources (spec 7.5).
+  const citationSources = new Map<string, KiaraCitationSource>();
   let displayText = "";
   let textEmitted = false;
   let toolCalls = 0;
@@ -366,6 +368,7 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
           access: input.access,
           now: deps.now(),
         });
+        for (const source of executed.citationSources ?? []) citationSources.set(source.chunk_id, source);
         if (executed.spec) {
           if (!toolsUsed.includes(executed.spec.definition.name)) toolsUsed.push(executed.spec.definition.name);
           if (!dataCategories.includes(executed.spec.dataCategory)) dataCategories.push(executed.spec.dataCategory);
@@ -398,10 +401,14 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
     }
   }
 
-  const cited = applyCitations(displayText.trim(), new Map());
+  const cited = applyCitations(displayText.trim(), citationSources);
   const finalText = cited.text || "Sorry, I could not find an answer to that. Please try asking in a different way.";
   if (cited.removedMarkers > 0) deps.log({ event: "kiara_citation_removed", count: cited.removedMarkers });
   const usage = totalUsage(perRequest);
+  const kbHit = cited.citations.length > 0;
+  // Phase 4 hook: a knowledge search that ended without a valid citation is the
+  // "not in the SOPs" case where the escalation offer will be made.
+  const kbNoMatch = toolsUsed.includes("search_knowledge_base") && !kbHit;
 
   const completed = await actor.rpc("complete_kiara_turn", {
     p_request_id: request.request_id,
@@ -412,17 +419,20 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
     p_escalation_offer: null,
     p_tools_used: toolsUsed,
     p_data_categories: dataCategories,
-    p_kb_hit: false,
+    p_kb_hit: kbHit,
     p_model: model,
     p_stop_reason: stopReason,
     p_usage: usage,
   });
   // Shape only: never question text, answers, or tool data.
-  deps.log({ event: "kiara_turn", ok: !completed.error, model, stop_reason: stopReason, tools: toolsUsed, tool_calls: toolCalls, ms: Date.now() - startedAt, usage });
+  deps.log({ event: "kiara_turn", ok: !completed.error, model, stop_reason: stopReason, tools: toolsUsed, tool_calls: toolCalls, citations: cited.citations.length, kb_no_match: kbNoMatch, ms: Date.now() - startedAt, usage });
   if (completed.error || typeof completed.data !== "string") {
     return { ok: false, code: "unavailable", message: "Kiara answered, but the answer could not be saved. Please try again." };
   }
-  return { ok: true, assistantMessageId: completed.data, displayText: finalText, stopReason, quota: started.quota, usage, toolsUsed };
+  for (const citation of cited.citations) {
+    emit({ event: "citation", data: { marker: citation.marker, chunk_id: citation.chunk_id, document_id: citation.document_id, title: citation.title, heading_path: citation.heading_path } });
+  }
+  return { ok: true, assistantMessageId: completed.data, displayText: finalText, stopReason, quota: started.quota, usage, toolsUsed, citations: cited.citations };
 }
 
 /**

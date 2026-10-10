@@ -23,8 +23,8 @@ const names = (access: AccessContext, controls: SectionControls = DEFAULT_SECTIO
   offeredKiaraTools(access, controls).map((tool) => tool.definition.name);
 
 describe("tool offering", () => {
-  const STAFF = ["get_my_work_summary", "get_app_help", "search_my_tasks", "get_fms_work", "get_my_notifications", "search_forms", "get_leave", "get_availability", "get_dashboard_metrics", "list_reports", "run_report", "find_colleague"];
-  const MANAGER = ["get_my_work_summary", "get_app_help", "search_my_tasks", "get_fms_work", "get_my_notifications", "search_forms", "get_leave", "get_availability", "get_dashboard_metrics", "get_team_progress", "list_reports", "run_report", "find_people", "find_colleague"];
+  const STAFF = ["get_my_work_summary", "get_app_help", "search_knowledge_base", "search_my_tasks", "get_fms_work", "get_my_notifications", "search_forms", "get_leave", "get_availability", "get_dashboard_metrics", "list_reports", "run_report", "find_colleague"];
+  const MANAGER = ["get_my_work_summary", "get_app_help", "search_knowledge_base", "search_my_tasks", "get_fms_work", "get_my_notifications", "search_forms", "get_leave", "get_availability", "get_dashboard_metrics", "get_team_progress", "list_reports", "run_report", "find_people", "find_colleague"];
 
   it("offers staff only their own-work tools, the scoped Dashboard and Reports, and the directory", () => {
     expect(names(accessFor("staff"))).toEqual(STAFF);
@@ -32,7 +32,7 @@ describe("tool offering", () => {
     expect(names(accessFor("staff"))).not.toContain("find_people");
   });
 
-  it.each(["manager", "admin", "super_admin"] as const)("offers %s every Phase 2 tool", (role) => {
+  it.each(["manager", "admin", "super_admin"] as const)("offers %s every data and knowledge tool", (role) => {
     expect(names(accessFor(role))).toEqual(MANAGER);
   });
 
@@ -52,6 +52,12 @@ describe("tool offering", () => {
     expect(names(accessFor("staff", { "fms.view": false }))).toContain("get_fms_work");
     expect(names(accessFor("staff", { "tasks.view": false }))).toContain("get_fms_work");
     expect(names(accessFor("staff", { "tasks.view": false, "fms.view": false }))).not.toContain("get_fms_work");
+  });
+
+  it("offers the knowledge base to every Ask Kiara user (audience is enforced by the database)", () => {
+    for (const role of ["staff", "doer", "housekeeping", "hr", "crm", "manager", "admin", "super_admin"] as const) {
+      expect(names(accessFor(role))).toContain("search_knowledge_base");
+    }
   });
 
   it("offers nothing when Ask Kiara is denied to the user", () => {
@@ -130,6 +136,9 @@ describe("tool input validation", () => {
     expect(validateKiaraToolInput("find_colleague", {})).toEqual({ ok: false, error: "query is required." });
     expect(validateKiaraToolInput("find_colleague", { query: "x".repeat(200) })).toEqual({ ok: true, input: { name: "find_colleague", query: "x".repeat(60) } });
     expect(validateKiaraToolInput("get_my_notifications", { unread_only: "yes" }).ok).toBe(false);
+    expect(validateKiaraToolInput("search_knowledge_base", { original_terms: "chhutti" })).toEqual({ ok: false, error: "english_query is required." });
+    expect(validateKiaraToolInput("search_knowledge_base", { english_query: " leave  policy ", original_terms: "" }))
+      .toEqual({ ok: true, input: { name: "search_knowledge_base", english_query: "leave policy" } });
   });
 
   it("stays inside the API's strict-schema limits for the widest permission shape", () => {

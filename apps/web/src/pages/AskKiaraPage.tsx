@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MessagesSquare, Sparkles } from "lucide-react";
-import { formatQuotaReset, isQuotaExhausted, type KiaraQuota } from "@jewelos/core";
+import { BookOpen, MessagesSquare, Sparkles } from "lucide-react";
+import { formatQuotaReset, hasPermission, isQuotaExhausted, type KiaraQuota } from "@jewelos/core";
 import {
   KIARA_CONVERSATION_QUESTION_LIMIT,
   KIARA_QUESTION_MAX_LENGTH,
@@ -17,6 +17,10 @@ import { Notice } from "@/components/ui";
 import { ChatView, type ChatBubble } from "@/features/assistant/ChatView";
 import { ConversationList } from "@/features/assistant/ConversationList";
 import { QuotaChip } from "@/features/assistant/QuotaChip";
+import { KnowledgeBaseView } from "@/features/assistant/knowledge/KnowledgeBaseView";
+
+type KiaraTab = "chat" | "knowledge";
+const initialTab = (): KiaraTab => new URLSearchParams(window.location.search).get("tab") === "knowledge" ? "knowledge" : "chat";
 
 /** Display bubbles for a stored conversation. A question without an answer says why. */
 export function bubblesFor(conversation: KiaraConversation): ChatBubble[] {
@@ -27,14 +31,24 @@ export function bubblesFor(conversation: KiaraConversation): ChatBubble[] {
       if (answered.has(message.id)) return [bubble];
       return [bubble, { id: `${message.id}:missing`, role: "assistant", text: "", note: message.refunded ? "Kiara could not answer this one, so it was not counted." : "No answer was saved for this question." }];
     }
-    return [{ id: message.id, role: "assistant", text: message.display_text }];
+    return [{ id: message.id, role: "assistant", text: message.display_text, citations: message.citations }];
   });
 }
 
 const errorText = (caught: unknown, fallback: string) => caught instanceof Error && caught.message ? caught.message : fallback;
 
 export function AskKiaraPage({ onNavigate }: { onNavigate: (path: string) => void }) {
-  const { profile } = useAuth();
+  const { access, profile } = useAuth();
+  // A screen aid only: every knowledge RPC re-checks assistant.manage_knowledge.
+  const canManageKnowledge = access ? hasPermission(access, "assistant.manage_knowledge") : false;
+  const [tab, setTab] = useState<KiaraTab>(initialTab);
+  const showTab = (next: KiaraTab) => {
+    setTab(next);
+    const url = new URL(window.location.href);
+    if (next === "chat") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", next);
+    window.history.replaceState(window.history.state, "", url);
+  };
   const [conversations, setConversations] = useState<KiaraConversationSummary[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -138,6 +152,8 @@ export function AskKiaraPage({ onNavigate }: { onNavigate: (path: string) => voi
           setStatus(event.data.label);
         } else if (event.event === "delta") {
           updateAnswer((bubble) => ({ ...bubble, text: bubble.text + event.data.text }));
+        } else if (event.event === "citation") {
+          updateAnswer((bubble) => ({ ...bubble, citations: [...(bubble.citations ?? []), event.data] }));
         } else if (event.event === "done") {
           updateAnswer((bubble) => ({ ...bubble, text: event.data.display_text, pending: false }));
           applyQuota(event.data.quota);
@@ -147,7 +163,7 @@ export function AskKiaraPage({ onNavigate }: { onNavigate: (path: string) => voi
     setStatus(null);
     setSending(false);
     if (outcome.ok) {
-      updateAnswer((bubble) => ({ ...bubble, text: outcome.result.display_text, pending: false }));
+      updateAnswer((bubble) => ({ ...bubble, text: outcome.result.display_text, pending: false, citations: outcome.result.citations }));
       void refreshList();
       return;
     }
@@ -170,6 +186,29 @@ export function AskKiaraPage({ onNavigate }: { onNavigate: (path: string) => voi
     : conversationFull ? "This chat is full. Press \"New chat\" to keep asking." : null;
   const firstName = (profile?.employee_name ?? "").trim().split(/\s+/)[0] ?? "";
 
+  const tabs = canManageKnowledge ? <nav aria-label="Ask Kiara" className="flex gap-1 rounded-xl border border-task-border bg-task-bg p-1">
+    {([["chat", "Chat", MessagesSquare], ["knowledge", "Knowledge base", BookOpen]] as const).map(([id, label, Icon]) =>
+      <button aria-current={tab === id ? "page" : undefined} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold ${tab === id ? "bg-task-accent text-white" : "text-task-text hover:bg-task-muted"}`} key={id} onClick={() => showTab(id)} type="button">
+        <Icon aria-hidden className="size-4" />{label}
+      </button>)}
+  </nav> : null;
+
+  if (canManageKnowledge && tab === "knowledge") {
+    return <div className="flex flex-col gap-4">
+      <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-task-border bg-task-bg px-4 py-3 sm:px-5">
+        <div className="flex items-center gap-2">
+          <BookOpen aria-hidden className="size-6 text-task-accent" />
+          <div>
+            <h1 className="text-xl font-bold text-task-text">Knowledge base</h1>
+            <p className="text-xs text-task-text-muted">The SOPs and articles Kiara answers from. Employees see cited sections only, never files.</p>
+          </div>
+        </div>
+        {tabs}
+      </header>
+      <section className="rounded-2xl border border-task-border bg-task-bg p-3 sm:p-4"><KnowledgeBaseView /></section>
+    </div>;
+  }
+
   return <div className="flex h-[calc(100dvh-9rem)] min-h-[32rem] flex-col gap-4 md:h-[calc(100dvh-7rem)]">
     <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-task-border bg-task-bg px-4 py-3 sm:px-5">
       <div className="flex items-center gap-2">
@@ -179,7 +218,8 @@ export function AskKiaraPage({ onNavigate }: { onNavigate: (path: string) => voi
           <p className="text-xs text-task-text-muted">Answers use only what you can already see in JewelOS.</p>
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {tabs}
         <QuotaChip quota={quota} />
         <button aria-expanded={showList} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-task-border px-3 text-sm font-semibold text-task-text md:hidden" onClick={() => setShowList((open) => !open)} type="button">
           <MessagesSquare aria-hidden className="size-4" /> Chats

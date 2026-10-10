@@ -1,7 +1,7 @@
 import { getSupabase as db } from "@jewelos/api-client/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
-export const TENANT_REALTIME_TOPICS = ["tasks", "fms", "crm", "forms", "organization", "settings"] as const;
+export const TENANT_REALTIME_TOPICS = ["tasks", "fms", "crm", "forms", "organization", "settings", "assistant"] as const;
 export type TenantRealtimeTopic = typeof TENANT_REALTIME_TOPICS[number];
 
 type TenantRealtimeSubscription = {
