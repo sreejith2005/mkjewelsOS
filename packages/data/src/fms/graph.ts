@@ -2,7 +2,7 @@ import { fmsFieldOptions, fmsOutgoingStageKeys, hasFmsStageRouting, type FmsBran
 
 /**
  * How the FMS builder draws a workflow, shared by both clients. This is the
- * web `features/fms/graph.ts` verbatim.
+ * single source re-exported by web `features/fms/graph.ts`.
  */
 
 /** Resolves a route's question/answer identifiers to the Form's current display labels. */
@@ -24,8 +24,8 @@ export function fmsRouteLabel(rule: FmsBranchRule, naming: FmsRouteNaming = {}):
   return `${question} ${verb}${rule.operator === "not_empty" ? "" : ` ${value}`}`.trim();
 }
 
-const COLUMN_WIDTH = 264;
-const ROW_HEIGHT = 144;
+const COLUMN_WIDTH = 360;
+const ROW_HEIGHT = 184;
 
 /** A deterministic editor-only layout. Runtime routing never reads these coordinates. */
 export function layoutFmsDefinition(definition: FmsFlowDefinition): ReadonlyMap<string, FmsGraphPosition> {
@@ -49,7 +49,7 @@ export function layoutFmsDefinition(definition: FmsFlowDefinition): ReadonlyMap<
     const column = depth.get(stage.key) ?? 0;
     const lane = lanes.get(column) ?? 0;
     lanes.set(column, lane + 1);
-    return [stage.key, { x: 28 + column * COLUMN_WIDTH, y: 28 + lane * ROW_HEIGHT }];
+    return [stage.key, { x: 60 + column * COLUMN_WIDTH, y: 100 + lane * ROW_HEIGHT }];
   }));
 }
 

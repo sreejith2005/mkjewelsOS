@@ -33,6 +33,7 @@ select ok(not has_function_privilege('authenticated', 'rls_auto_enable()', 'EXEC
 select ok(not has_function_privilege('service_role', 'rls_auto_enable()', 'EXECUTE'), 'future public functions do not default-grant service_role');
 
 -- Current application-function matrix, including the linked-only helper above.
+-- 0212 adds three owner-only functions and makes the activation dispatcher a definer.
 -- 0206/0207 add 10 functions (8 definers), 5 authenticated entry points.
 -- 0208/0210 add 11 private/public definers, only 3 authenticated entry points.
 select is((
@@ -41,14 +42,14 @@ select is((
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
-), 418, 'exactly 418 postgres-owned public application functions exist in the current migration set');
+), 421, 'exactly 421 postgres-owned public application functions exist in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres' and p.prosecdef
-), 352, 'exactly 352 public application functions are SECURITY DEFINER in the current migration set');
+), 356, 'exactly 356 public application functions are SECURITY DEFINER in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -80,7 +81,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('postgres', p.oid, 'EXECUTE')
-), 418, 'postgres retains owner execution on every public application function');
+), 421, 'postgres retains owner execution on every public application function');
 select ok(not has_function_privilege('authenticated', 'reject_watcher_task_mutation()', 'EXECUTE'), 'watcher guard trigger cannot be called directly');
 
 -- Exact authenticated allowlist: baseline, Forms, and reviewed FMS entry points.

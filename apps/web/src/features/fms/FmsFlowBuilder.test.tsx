@@ -168,10 +168,10 @@ describe("FMS builder graph wiring", () => {
     expect(document.activeElement).toBe(screen.getByLabelText("Initial details form"));
     expect(screen.getByLabelText("Initial details form").className).toContain("ring-danger");
   });
-  it("opens the route that closes a cycle", async () => {
+  it("opens a closed loop that needs an exit", async () => {
     const { user, b } = await openBuilder();
     await user.click(screen.getByRole("button", { name: "make cycle" }));
-    await user.click(screen.getByRole("button", { name: /Step: Continue to destination loops back/ }));
+    await user.click(screen.getAllByRole("button", { name: /Step: This step has no path to a completion step/ })[0]!);
     expect(latestFocusRequest?.key).toBe(b);
     const destination = screen.getByLabelText("Continue to");
     expect(document.activeElement).toBe(destination);

@@ -87,7 +87,7 @@ export function FmsStageScreen() {
   const [actionReason, setActionReason] = useState("");
 
   const load = useCallback(async () => {
-    const [runtime, options] = await Promise.all([loadFmsRuntime(), loadFormDynamicOptions()]);
+    const [runtime, options] = await Promise.all([loadFmsRuntime(params.instanceId), loadFormDynamicOptions()]);
     // Which form this step links to is only known once the runtime has loaded,
     // so the form is fetched afterwards — one template rather than the whole
     // library, which `loadForms()` would have pulled.
@@ -96,7 +96,7 @@ export function FmsStageScreen() {
     )?.form_template_id;
     const forms = linkedId ? (await loadTaskForms([linkedId], [])).bundles : [];
     return { runtime, forms, options };
-  }, [params.instanceStageId]);
+  }, [params.instanceId, params.instanceStageId]);
   const { data, error, loading, refreshing, reload, refresh } = useAsyncData(load, [load]);
   useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["fms", "forms", "organization"], refresh: refresh });
 
@@ -240,7 +240,7 @@ export function FmsStageScreen() {
 
       <View style={styles.header}>
         <View style={styles.titleRow}>
-          <Text style={styles.flex} variant="title" weight="semibold">{definition.name}</Text>
+          <Text style={styles.flex} variant="title" weight="semibold">{definition.name}{stage.visit_number && stage.visit_number > 1 ? ` (visit ${stage.visit_number})` : ""}</Text>
           <StatusBadge
             label={stage.status.replaceAll("_", " ")}
             tone={stage.status === "completed" ? "success" : stage.status === "overdue" ? "danger" : "primary"}

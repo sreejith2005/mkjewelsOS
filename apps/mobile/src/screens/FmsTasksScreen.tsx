@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { calculateFmsProgress } from "@jewelos/core";
+import { latestFmsStageVisits, calculateFmsProgress } from "@jewelos/core";
 import { loadFmsRuntime, type FmsInstance } from "@jewelos/data/fms/api";
 import { filterFmsInstances } from "@jewelos/data/fms/runtimeView";
 import { useProfile } from "@/auth/AuthProvider";
@@ -82,7 +82,7 @@ export function FmsTasksScreen({ flowIds, heading, onBack }: FmsTasksScreenProps
     (instance: FmsInstance) => {
       const stages = (data?.stages ?? []).filter((stage) => stage.fms_instance_id === instance.id);
       const progress = calculateFmsProgress(
-        stages.map((stage) => ({
+        latestFmsStageVisits(stages).map((stage) => ({
           required: data?.definitions.find((item) => item.id === stage.fms_stage_id)?.is_required ?? true,
           status: stage.status as never,
         })),

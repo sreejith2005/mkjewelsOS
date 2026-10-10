@@ -50,7 +50,7 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { st
   const firstStage = stageIndex === 0;
   const earlierStages = stages.slice(0, Math.max(0, stageIndex));
   const earlierDecisions = earlierStages.filter((item) => item.sla.decisionMode === "decision" || item.sla.decisionMode === "yes_no");
-  const others = stages.filter((item) => item.key !== stage.key);
+  const others = stages;
   const human = humanTypes.includes(stage.type);
   const canChooseNext = !["branch", "parallel_start", "end"].includes(stage.type);
   const decision = stage.sla.decisionMode === "decision" || stage.sla.decisionMode === "yes_no";

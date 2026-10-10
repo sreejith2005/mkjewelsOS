@@ -148,7 +148,6 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { fl
   const duplicateStage = (key: string) => { const source = normalized.stages.find((stage) => stage.key === key); if (!source || normalized.stages[0]?.key === key) return; const stage = { ...source, key: nextKey(), name: `${source.name} copy`, order: normalized.stages.length, defaultNextStageKey: undefined, branchRules: source.type === "branch" ? [{ id: crypto.randomUUID(), source: "outcome" as const, operator: "default" as const, order: 0 }] : [], parallelTargetStageKeys: [], joinRequiredStageKeys: [] }; commit({ ...definition, stages: [...normalized.stages, stage] }); setSelectedKey(stage.key); };
   /** A first connection becomes the plain next step; each extra one becomes an ordered route. */
   const connect = (from: string, to: string) => {
-    if (from === to) return;
     commit((current) => ({ ...current, stages: current.stages.map((stage) => {
       if (stage.key !== from) return stage;
       if (stage.type === "branch") return { ...stage, branchRules: stage.branchRules.map((rule, index) => rule.operator === "default" || index === stage.branchRules.length - 1 ? { ...rule, nextStageKey: to, nextFlowId: undefined } : rule) };

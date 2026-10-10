@@ -92,7 +92,7 @@ export function fmsOutgoingStageKeys(stage: FmsStageDefinition): readonly string
   if (stage.type === "branch") return stage.branchRules.flatMap((rule) => rule.nextStageKey ? [rule.nextStageKey] : []);
   if (stage.type === "parallel_start") return stage.parallelTargetStageKeys;
   const routed = stage.branchRules.flatMap((rule) => rule.nextStageKey ? [rule.nextStageKey] : []);
-  return [...new Set(stage.defaultNextStageKey ? [...routed, stage.defaultNextStageKey] : routed)];
+  return [...new Set(stage.defaultNextStageKey && !stage.branchRules.some((rule) => rule.operator === "default") ? [...routed, stage.defaultNextStageKey] : routed)];
 }
 
 export function reachableFmsStageKeys(definition: FmsFlowDefinition): ReadonlySet<string> {
@@ -150,6 +150,27 @@ function unsupportedCycleRoute(definition: FmsFlowDefinition): { sourceKey: stri
     if (route) return route;
   }
   return undefined;
+}
+
+/** Cycles are executable when every reachable region has an exit and a human stop. */
+export function validateFmsRoutingGraph(stages: readonly FmsStageDefinition[]): readonly FmsValidationIssue[] {
+  const definition: FmsFlowDefinition = { name: "Graph", scope: "tenant", manualTrigger: true, stages };
+  const reached = reachableFmsStageKeys(definition);
+  const canFinish = new Set(stages.filter((stage) => !fmsOutgoingStageKeys(stage).length).map((stage) => stage.key));
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const stage of stages) if (!canFinish.has(stage.key) && fmsOutgoingStageKeys(stage).some((next) => canFinish.has(next))) { canFinish.add(stage.key); changed = true; }
+  }
+  const closed = stages.filter((stage) => reached.has(stage.key) && !canFinish.has(stage.key));
+  const closing = unsupportedCycleRoute(definition);
+  const issues: FmsValidationIssue[] = closed.map((stage) => ({ code: "missing_completion_path", message: "This step has no path to a completion step. Add an exit from the loop", stageKey: stage.key }));
+  // Put the closing route first, so issue navigation opens the useful inspector.
+  if (closing) issues.sort((a, b) => Number(b.stageKey === closing.sourceKey) - Number(a.stageKey === closing.sourceKey));
+  const automatic = stages.filter((stage) => AUTO.has(stage.type));
+  const automaticCycle = unsupportedCycleRoute({ ...definition, stages: automatic });
+  if (automaticCycle) issues.push({ code: "automatic_cycle", message: "An automatic-only loop can run forever. Route through a human step before repeating", stageKey: automaticCycle.sourceKey });
+  return issues;
 }
 
 const ROUTE_VALUE_FREE = new Set<string>(["default", "not_empty"]);
@@ -227,14 +248,7 @@ export function validateFmsDefinition(raw: FmsFlowDefinition, context: FmsValida
     if (stage.type === "end" && fmsOutgoingStageKeys(stage).length) add("invalid_end", "End stages cannot have outgoing paths");
   }
   const reached = reachableFmsStageKeys(definition); for (const stage of definition.stages) if (!reached.has(stage.key)) issues.push({ code: "unreachable_stage", message: `Stage ${stage.key} is unreachable`, stageKey: stage.key });
-  const cycleRoute = unsupportedCycleRoute(definition);
-  if (![...reached].some((key) => { const stage = byKey.get(key); return stage ? fmsOutgoingStageKeys(stage).length === 0 : false; })) issues.push({ code: "missing_completion_path", message: "At least one reachable path must finish at a step with no outgoing connection", stageKey: cycleRoute?.sourceKey ?? [...reached].at(-1) });
-  if (cycleRoute) {
-    const source = byKey.get(cycleRoute.sourceKey)!;
-    const routeIndex = source.branchRules.findIndex((rule) => rule.nextStageKey === cycleRoute.targetKey);
-    const field = routeIndex >= 0 ? `Route ${routeIndex + 1} destination` : source.type === "parallel_start" ? "Parallel path" : source.branchRules.length ? "Otherwise destination" : "Continue to destination";
-    issues.push({ code: "unsupported_cycle", message: `${field} loops back to an earlier step`, stageKey: cycleRoute.sourceKey });
-  }
+  issues.push(...validateFmsRoutingGraph(definition.stages));
   return issues;
 }
 

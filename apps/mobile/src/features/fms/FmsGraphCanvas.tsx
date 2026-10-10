@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { PanResponder, StyleSheet, View, type GestureResponderEvent, type NativeTouchEvent } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, type SharedValue } from "react-native-reanimated";
 import Svg, { G, Path, Polygon, Rect, Text as SvgText } from "react-native-svg";
-import { CheckSquare, CircleHelp, Copy, FileText, Flag, GitBranch, Layers, Maximize, Merge, Minus, Plus, RotateCcw, ShieldCheck, Trash2, X, Zap } from "lucide-react-native";
-import { FMS_MAX_ZOOM, FMS_MIN_ZOOM, fmsOutgoingStageKeys, hasFmsStageRouting, type FmsFlowDefinition, type FmsFormFieldRef, type FmsStageDefinition } from "@jewelos/core";
+import { CheckSquare, CircleHelp, Copy, FileText, Flag, GitBranch, Layers, Maximize, Merge, Minus, Plus, RotateCcw, ShieldCheck, Trash2, X, Zap, LayoutGrid } from "lucide-react-native";
+import { fmsCanvasHandleRadius, routeFmsGraphEdges, FMS_MAX_ZOOM, FMS_MIN_ZOOM, fmsOutgoingStageKeys, hasFmsStageRouting, type FmsFlowDefinition, type FmsFormFieldRef, type FmsStageDefinition } from "@jewelos/core";
 import { fmsGraphEdges, fmsStageSummary, fmsTimingSummary, layoutFmsDefinition, type FmsGraphEdge, type FmsGraphPosition } from "@jewelos/data/fms/graph";
 import { makeStyles } from "@/theme/makeStyles";
 import { useAppTheme } from "@/theme/ThemeProvider";
@@ -111,17 +111,22 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
   /** A stage keeps its saved coordinates; without them it falls back to the computed layout. */
   const position = (key: string): FmsGraphPosition => {
     const base = saved.get(key) ?? layout.get(key) ?? { x: 60, y: 60 };
-    return { x: clamp(base.x, 0, WORLD_SIZE - NODE_WIDTH), y: clamp(base.y, 0, WORLD_SIZE - NODE_HEIGHT) };
+    return { x: Math.max(0, base.x), y: Math.max(0, base.y) };
   };
+
+  const routedEdges = useMemo(() => routeFmsGraphEdges(edges.map((edge) => ({ ...edge, id: edgeId(edge) })), new Map(definition.stages.map((stage) => [stage.key, position(stage.key)])), { width: NODE_WIDTH, height: NODE_HEIGHT }), [edges, definition.stages, saved, layout]);
+  const routeById = useMemo(() => new Map(routedEdges.map((route) => [route.id, route])), [routedEdges]);
+  const edgeDetails = edges.find((edge) => edgeId(edge) === activeEdge);
+  const nameOf = (key: string) => definition.stages.find((stage) => stage.key === key)?.name || key;
 
   const fitView = () => {
     const { width, height } = viewport.current;
     if (!width || !definition.stages.length) return;
     const points = definition.stages.map((stage) => position(stage.key));
-    const left = Math.min(...points.map((point) => point.x));
-    const right = Math.max(...points.map((point) => point.x + NODE_WIDTH));
-    const top = Math.min(...points.map((point) => point.y));
-    const bottom = Math.max(...points.map((point) => point.y + NODE_HEIGHT));
+    const left = Math.min(...points.map((point) => point.x), ...routedEdges.map((edge) => edge.bounds.left));
+    const right = Math.max(...points.map((point) => point.x + NODE_WIDTH), ...routedEdges.map((edge) => edge.bounds.right));
+    const top = Math.min(...points.map((point) => point.y), ...routedEdges.map((edge) => edge.bounds.top));
+    const bottom = Math.max(...points.map((point) => point.y + NODE_HEIGHT), ...routedEdges.map((edge) => edge.bounds.bottom));
     const next = clamp(Math.min((width - FIT_PADDING) / Math.max(1, right - left), (height - FIT_PADDING) / Math.max(1, bottom - top)), FMS_MIN_ZOOM, 1);
     const nextPan = { x: width / 2 - ((left + right) / 2) * next, y: height / 2 - ((top + bottom) / 2) * next };
     viewportLive.current = { pan: nextPan, zoom: next };
@@ -167,7 +172,7 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
     return current.stages.find((stage) => {
       if (stage.type === "end") return false;
       const point = at(stage.key);
-      return Math.hypot(world.x - (point.x + NODE_WIDTH), world.y - (point.y + NODE_HEIGHT / 2)) <= HANDLE_REACH / currentZoom;
+      return Math.hypot(world.x - (point.x + NODE_WIDTH), world.y - (point.y + NODE_HEIGHT / 2)) <= fmsCanvasHandleRadius(currentZoom, NODE_HEIGHT, HANDLE_REACH);
     })?.key ?? null;
   };
 
@@ -202,8 +207,8 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
       if (current.activeEdge) {
         const edge = current.edges.find((item) => edgeId(item) === current.activeEdge);
         if (edge) {
-          const to = current.position(edge.to);
-          if (Math.hypot(world.x - (to.x - 10), world.y - (to.y + NODE_HEIGHT / 2)) <= HANDLE_REACH / current.zoom) {
+          const route = routeFmsGraphEdges(current.edges.map((item) => ({ ...item, id: edgeId(item) })), new Map(current.props.definition.stages.map((stage) => [stage.key, current.position(stage.key)])), { width: NODE_WIDTH, height: NODE_HEIGHT }).find((item) => item.id === edgeId(edge));
+          if (route && Math.hypot(world.x - (route.end.x - 10), world.y - route.end.y) <= fmsCanvasHandleRadius(current.zoom, NODE_HEIGHT, HANDLE_REACH)) {
             dragRef.current = { kind: "reconnect", from: edge.from, to: edge.to, ruleId: edge.ruleId };
             setConnecting({ from: edge.from, x: world.x, y: world.y });
             return;
@@ -281,7 +286,7 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
       const { props: current } = live.current;
       if (drag?.kind === "connect" || drag?.kind === "reconnect") {
         const target = nodeAt(toWorld(gesture.moveX || gesture.x0, gesture.moveY || gesture.y0));
-        if (target && target !== drag.from) {
+        if (target) {
           if (drag.kind === "connect") current.onConnect(drag.from, target);
           else if (target !== drag.to) current.onReconnect(drag.from, drag.to, target, drag.ruleId);
         }
@@ -322,38 +327,35 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
   const edgeColor = (edge: FmsGraphEdge) => edge.kind === "branch" ? theme.colors.danger : edge.kind === "parallel" ? theme.colors.textWarm : theme.colors.brand;
 
   const points = definition.stages.map((stage) => position(stage.key));
-  const svgWidth = Math.min(WORLD_SIZE, Math.max(400, ...points.map((point) => point.x + NODE_WIDTH + 120), (connecting?.x ?? 0) + 60));
-  const svgHeight = Math.min(WORLD_SIZE, Math.max(400, ...points.map((point) => point.y + NODE_HEIGHT + 120), (connecting?.y ?? 0) + 60));
+  const svgLeft = Math.min(0, ...routedEdges.map((edge) => edge.bounds.left - 40));
+  const svgTop = Math.min(0, ...routedEdges.map((edge) => edge.bounds.top - 40));
+  const svgWidth = Math.max(400, ...points.map((point) => point.x + NODE_WIDTH + 120), ...routedEdges.map((edge) => edge.bounds.right + 80), (connecting?.x ?? 0) + 60);
+  const svgHeight = Math.max(400, ...points.map((point) => point.y + NODE_HEIGHT + 120), ...routedEdges.map((edge) => edge.bounds.bottom + 80), (connecting?.y ?? 0) + 60);
   const clearSelection = () => { setSelection(null); setActiveEdge(null); };
 
   return (
     <View ref={viewRef} onLayout={onLayout} style={styles.viewport} {...responder.panHandlers}>
       <Pressable accessibilityLabel="Workflow canvas" onPress={clearSelection} style={StyleSheet.absoluteFill}>
-        <Animated.View style={[styles.world, worldStyle]}>
-          <Svg height={svgHeight} style={styles.svg} width={svgWidth}>
+        <Animated.View style={[styles.world, { width: Math.max(WORLD_SIZE, svgWidth), height: Math.max(WORLD_SIZE, svgHeight) }, worldStyle]}>
+          <Svg height={svgHeight - svgTop} style={[styles.svg, { left: svgLeft, top: svgTop }]} width={svgWidth - svgLeft} viewBox={`${svgLeft} ${svgTop} ${svgWidth - svgLeft} ${svgHeight - svgTop}`}>
             {edges.map((edge) => {
-              const from = position(edge.from);
-              const to = position(edge.to);
-              const startX = from.x + NODE_WIDTH;
-              const startY = from.y + NODE_HEIGHT / 2;
-              const endX = to.x;
-              const endY = to.y + NODE_HEIGHT / 2;
-              const id = edgeId(edge);
+              const id = edgeId(edge); const route = routeById.get(id);
+              if (!route) return null;
+              const endX = route.end.x; const endY = route.end.y;
               const active = activeEdge === id;
-              const midX = (startX + endX) / 2;
-              const midY = (startY + endY) / 2;
-              const path = curve(startX, startY, endX, endY);
-              const color = edgeColor(edge);
-              const labelWidth = edge.label ? Math.min(200, edge.label.length * 6.4 + 18) : 0;
+              const connected = edge.from === selectedKey || edge.to === selectedKey;
+              const midX = route.label.x; const midY = route.label.y;
+              const path = route.path; const color = edgeColor(edge); const labelWidth = route.labelWidth;
+              const label = `${route.isReturn ? "Return: " : ""}${edge.label ?? (route.isReturn ? nameOf(edge.to) : "")}`;
               return (
                 <G key={id}>
                   <Path d={path} fill="none" onPress={() => setActiveEdge(active ? null : id)} stroke="transparent" strokeWidth={24} />
-                  <Path d={path} fill="none" stroke={color} {...(edge.kind === "parallel" ? { strokeDasharray: [4, 4] } : {})} strokeOpacity={active ? 1 : 0.85} strokeWidth={active ? 3 : 2} />
+                  <Path d={path} fill="none" stroke={color} {...(edge.kind === "parallel" ? { strokeDasharray: [4, 4] } : {})} strokeOpacity={active || connected ? 1 : selectedKey ? 0.25 : 0.8} strokeWidth={active || connected ? 3 : 2} />
                   <Polygon fill={color} points={`${endX},${endY} ${endX - 7},${endY - 3.5} ${endX - 7},${endY + 3.5}`} />
-                  {edge.label ? (
+                  {label ? (
                     <>
-                      <Rect fill={theme.colors.surface} height={18} rx={9} stroke={color} strokeOpacity={0.45} width={labelWidth} x={midX - labelWidth / 2} y={midY - 27} />
-                      <SvgText fill={color} fontSize={11} textAnchor="middle" x={midX} y={midY - 14}>{edge.label.length > 29 ? `${edge.label.slice(0, 28)}…` : edge.label}</SvgText>
+                      <Rect fill={theme.colors.surface} height={24} rx={6} stroke={color} strokeOpacity={0.45} width={labelWidth} x={midX - labelWidth / 2} y={midY - 12} />
+                      <SvgText fill={color} fontSize={11} textAnchor="middle" x={midX} y={midY + 4}>{label.length > 34 ? `${label.slice(0, 33)}…` : label}</SvgText>
                     </>
                   ) : null}
                   {active ? <Rect fill={theme.colors.surface} height={14} rx={7} stroke={color} strokeWidth={2} width={14} x={endX - 17} y={endY - 7} /> : null}
@@ -366,10 +368,8 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
           </Svg>
 
           {edges.filter((edge) => edgeId(edge) === activeEdge).map((edge) => {
-            const from = position(edge.from);
-            const to = position(edge.to);
-            const midX = (from.x + NODE_WIDTH + to.x) / 2;
-            const midY = (from.y + to.y + NODE_HEIGHT) / 2;
+            const route = routeById.get(edgeId(edge)); if (!route) return null;
+            const midX = route.label.x; const midY = route.label.y + 28;
             return (
               <Pressable
                 accessibilityLabel={`Remove the connection to ${edge.to}`}
@@ -387,7 +387,7 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
             const point = position(stage.key);
             const item = appearance[stage.type];
             const tone = toneColor(item.tone);
-            const active = selection === stage.key || stage.key === selectedKey;
+            const active = selection === stage.key || stage.key === selectedKey || edgeDetails?.from === stage.key || edgeDetails?.to === stage.key;
             const invalid = invalidKeys.has(stage.key);
             const canOutput = stage.type !== "end";
             const canAppend = !["end", "branch", "parallel_start"].includes(stage.type);
@@ -438,10 +438,12 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
         <Text style={styles.zoomLabel} tone="warm" variant="caption">{`${Math.round(zoom * 100)}%`}</Text>
         <Pressable accessibilityLabel="Zoom in" onPress={() => zoomBy(ZOOM_STEP)} style={styles.control}><Plus color={theme.colors.brand} size={16} /></Pressable>
         <Pressable accessibilityLabel="Fit workflow to view" onPress={fitView} style={styles.control}><Maximize color={theme.colors.brand} size={16} /></Pressable>
+        <Pressable accessibilityLabel="Auto-arrange workflow" onPress={() => props.onMove(Object.fromEntries(layout))} style={styles.control}><LayoutGrid color={theme.colors.brand} size={16} /></Pressable>
         <Pressable accessibilityLabel="Reset workflow view" onPress={resetView} style={styles.control}><RotateCcw color={theme.colors.brand} size={16} /></Pressable>
         <Pressable accessibilityLabel="How to use the map" accessibilityState={{ expanded: hintOpen }} onPress={() => setHintOpen((open) => !open)} style={[styles.control, hintOpen && { backgroundColor: theme.colors.brandSoft }]}><CircleHelp color={theme.colors.brand} size={16} /></Pressable>
       </View>
-      {connecting || hintOpen ? <View pointerEvents="none" style={[styles.hint, connecting ? styles.hintBottom : styles.hintTop]}>
+      {edgeDetails ? <View style={[styles.hint, styles.hintBottom]}><Text weight="semibold" variant="small">{`${nameOf(edgeDetails.from)} to ${nameOf(edgeDetails.to)}`}</Text><Text variant="caption">{edgeDetails.label || "Continue to next step"}</Text><Pressable accessibilityLabel="Remove selected connection" onPress={() => { onDisconnect(edgeDetails.from, edgeDetails.to, edgeDetails.ruleId); setActiveEdge(null); }}><Text tone="danger" variant="small">Remove connection</Text></Pressable></View> : null}
+      {(connecting || hintOpen) && !edgeDetails ? <View pointerEvents="none" style={[styles.hint, connecting ? styles.hintBottom : styles.hintTop]}>
         <Text tone="muted" variant="caption">
           {connecting ? "Drop on a step to connect · release on empty space to cancel" : "Tap a card to edit it · drag a card to move it · drag empty space to pan · pinch to zoom · drag a card’s right dot onto another card to connect · tap a connection to remove it or drag its arrow end to move it"}
         </Text>

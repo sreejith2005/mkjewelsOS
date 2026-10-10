@@ -1,3 +1,4 @@
+import { loadFmsVisitHistory, readAllFmsRows } from "@jewelos/data/fms/visitHistory";
 import { supabase } from "@jewelos/api-client";
 import type { FmsFlowDefinition, FmsFormFieldOption, FmsFormFieldRef, Json } from "@jewelos/core";
 import { parseFormOptions } from "@jewelos/core";
@@ -17,8 +18,8 @@ export type FmsStageRow = {
   can_move_backward: boolean | null; can_reject: boolean | null; can_request_revision: boolean | null; can_escalate: boolean | null; default_next_stage_id: string | null;
   parallel_target_stage_ids: string[]; join_rule: "all" | "any" | "specific" | null; join_required_stage_ids: string[] | null; split_to_flow_id: string | null; canvas_position?: { x: number; y: number } | null;
 };
-export type FmsInstance = { id: string; fms_flow_id: string; reference_number: string; title: string; status: "active" | "completed" | "cancelled" | "on_hold" | "overdue"; priority: "high" | "medium" | "low" | null; context: Json; branch_id: string | null; department_id: string | null; started_by: string; started_at: string | null; completed_at: string | null; parent_instance_id: string | null; flow_version: number };
-export type FmsInstanceStage = { id: string; fms_instance_id: string; fms_stage_id: string; status: string; assigned_to: string[] | null; planned_datetime: string | null; actual_datetime: string | null; delay_minutes: number | null; sla_breached: boolean | null; form_submission_id: string | null; remark: string | null; outcome: string | null; completed_by: string | null; escalation_count: number };
+export type FmsInstance = { id: string; fms_flow_id: string; reference_number: string; title: string; status: "active" | "completed" | "cancelled" | "on_hold" | "overdue"; priority: "high" | "medium" | "low" | null; context: Json; branch_id: string | null; department_id: string | null; started_by: string; started_at: string | null; completed_at: string | null; parent_instance_id: string | null; flow_version: number; execution_version?: number };
+export type FmsInstanceStage = { id: string; fms_instance_id: string; fms_stage_id: string; status: string; assigned_to: string[] | null; planned_datetime: string | null; actual_datetime: string | null; delay_minutes: number | null; sla_breached: boolean | null; form_submission_id: string | null; remark: string | null; outcome: string | null; completed_by: string | null; escalation_count: number; visit_number?: number; execution_scope_id?: string | null };
 export type FmsChecklistItem = { id: string; fms_instance_stage_id: string; item_key: string; label: string; is_required: boolean; is_completed: boolean; sort_order: number };
 export type FmsEvidence = { id: string; fms_instance_stage_id: string; storage_path: string; original_filename: string; mime_type: string; size_bytes: number; uploaded_by: string; created_at: string };
 export type FmsLog = { id: string; fms_instance_stage_id: string; actor_id: string | null; action: string; details: Json | null; created_at: string | null };
@@ -109,9 +110,13 @@ export const setFmsFlowActive = async (id: string, active: boolean, reason?: str
 export const restoreFmsFlow = async (id: string, reason?: string) => { const { error } = await supabase.rpc("restore_fms_flow_with_audit" as any, { p_flow_id: id, ...(reason ? { p_reason: reason } : {}) }); fail("Restore FMS flow", error); };
 export const deleteFmsFlow = async (id: string) => { const { error } = await supabase.rpc("delete_fms_flow_with_audit" as any, { p_flow_id: id }); fail("Delete FMS flow", error); };
 
-export async function loadFmsRuntime(): Promise<{ instances: FmsInstance[]; stages: FmsInstanceStage[]; definitions: FmsStageRow[]; flows: FmsFlowRow[]; checklist: FmsChecklistItem[]; evidence: FmsEvidence[]; logs: FmsLog[]; users: FmsData["users"] }> {
+export async function loadFmsRuntime(instanceId?: string): Promise<{ instances: FmsInstance[]; stages: FmsInstanceStage[]; definitions: FmsStageRow[]; flows: FmsFlowRow[]; checklist: FmsChecklistItem[]; evidence: FmsEvidence[]; logs: FmsLog[]; users: FmsData["users"] }> {
+  if (instanceId) {
+    const history = await loadFmsVisitHistory(supabase, instanceId);
+    return history ?? { instances: [], stages: [], definitions: [], flows: [], checklist: [], evidence: [], logs: [], users: [] };
+  }
   const [instances, stages, definitions, flows, checklist, evidence, logs, users] = await Promise.all([
-    supabase.from("fms_instances").select("*").order("started_at", { ascending: false }).limit(200), supabase.from("fms_instance_stages").select("*").order("created_at").limit(1500),
+    readAllFmsRows((from, to) => supabase.from("fms_instances").select("*").order("started_at", { ascending: false }).order("id").range(from, to)).then((data) => ({ data, error: null })), readAllFmsRows((from, to) => supabase.from("fms_instance_stages").select("*").order("created_at").order("id").range(from, to)).then((data) => ({ data, error: null })),
     supabase.from("fms_stages").select("*").order("sort_order").limit(1000), supabase.from("fms_flows").select("*").limit(300), supabase.from("fms_instance_checklist_items").select("*").order("sort_order").limit(2000),
     supabase.from("fms_evidence").select("*").is("removed_at", null).order("created_at").limit(1000), supabase.from("fms_stage_logs").select("*").order("created_at").limit(3000),
     supabase.from("user_profiles").select("id,employee_name,user_role,branch_id,department_id,working_status,is_login_enabled").order("employee_name").limit(500),

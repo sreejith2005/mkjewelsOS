@@ -7,11 +7,12 @@ import {
   zoomFmsViewport,
   FMS_MAX_ZOOM,
   FMS_MIN_ZOOM,
+  fmsCanvasHandleRadius,
 } from "./canvas";
 
 describe("clampFmsZoom", () => {
   it("holds zoom inside the usable range", () => {
-    expect(clampFmsZoom(0.2)).toBe(0.5);
+    expect(clampFmsZoom(0.02)).toBe(FMS_MIN_ZOOM);
     expect(clampFmsZoom(2.8)).toBe(2);
     expect(clampFmsZoom(1.25)).toBe(1.25);
     expect(clampFmsZoom(FMS_MIN_ZOOM)).toBe(FMS_MIN_ZOOM);
@@ -135,5 +136,13 @@ describe("fitFmsViewport", () => {
   it("resets rather than dividing by a zero-sized viewport", () => {
     expect(fitFmsViewport({ left: 0, top: 0, right: 10, bottom: 10 }, { width: 0, height: 0 }, 0))
       .toEqual({ x: 0, y: 0, zoom: 1 });
+  });
+});
+
+describe("overview port hit areas", () => {
+  it("preserves normal touch reach without swallowing node drags when zoomed out", () => {
+    expect(fmsCanvasHandleRadius(1, 104)).toBe(28);
+    expect(fmsCanvasHandleRadius(0.1, 104)).toBeLessThan(104 / 2);
+    expect(fmsCanvasHandleRadius(0, 104)).toBe(0);
   });
 });

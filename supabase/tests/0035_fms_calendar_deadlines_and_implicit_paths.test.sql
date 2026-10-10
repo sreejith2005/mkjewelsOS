@@ -10,7 +10,7 @@ select ok((select pg_get_functiondef('assert_fms_flow_publishable(uuid)'::regpro
 select ok((select pg_get_functiondef('assert_fms_flow_publishable(uuid)'::regprocedure) like '%completion step with no outgoing connection%'),'a reachable leaf is an implicit completion path');
 select ok((select pg_get_functiondef('assert_fms_flow_publishable(uuid)'::regprocedure) like '%valid timing rule%'),'publish validates calendar deadlines');
 select is(fms_stage_deadline('{"dueDate":"2099-12-31"}'::jsonb,(select id from tenants order by created_at limit 1)),('2099-12-31 23:59:59.999999'::timestamp at time zone coalesce((select timezone from tenants order by created_at limit 1),'Asia/Kolkata')),'calendar date resolves to tenant-local end of day');
-select ok((select pg_get_functiondef('activate_fms_stage_internal(uuid,uuid,uuid,uuid,integer)'::regprocedure) like '%fms_stage_deadline_for_instance(v_stage.planned_time_rule,v_instance.tenant_id,p_instance_id)%'),'runtime uses the calendar deadline');
+select ok((select pg_get_functiondef('activate_fms_stage_v2_internal(uuid,uuid,uuid,uuid,integer,uuid,uuid,uuid[],uuid)'::regprocedure) like '%fms_stage_deadline_for_instance(v_stage.planned_time_rule,v_instance.tenant_id,p_instance_id)%'),'runtime uses the calendar deadline');
 
 select * from finish();
 rollback;

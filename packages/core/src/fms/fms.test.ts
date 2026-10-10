@@ -32,10 +32,27 @@ describe("FMS definitions", () => {
   it("rejects duplicate identities", () => expect(validateFmsDefinition(flow([stage({ key: "same", name: "A", type: "form", formTemplateId: formId, order: 0, defaultNextStageKey: "same" }), stage({ key: "same", name: "B", type: "task", order: 1 })])).some((item) => item.code === "invalid_stage_key")).toBe(true));
   it("rejects dangling references", () => expect(validateFmsDefinition(flow([stage({ key: "start_form", name: "A", type: "form", formTemplateId: formId, order: 0, defaultNextStageKey: "missing" })])).some((item) => item.code === "dangling_reference")).toBe(true));
   it("rejects unreachable stages", () => expect(validateFmsDefinition(flow([...good().stages, stage({ key: "island", name: "Island", type: "task", order: 2 })])).some((item) => item.stageKey === "island" && item.code === "unreachable_stage")).toBe(true));
-  it("points unsupported cycles to the step whose route closes the loop", () => {
+  it("points a closed loop to the step whose route closes it", () => {
     const issues = validateFmsDefinition(flow([stage({ key: "a", name: "A", type: "form", formTemplateId: formId, order: 0, defaultNextStageKey: "b" }), stage({ key: "b", name: "B", type: "task", order: 1, defaultNextStageKey: "a" })]));
-    expect(issues.find((item) => item.code === "unsupported_cycle")?.stageKey).toBe("b");
     expect(issues.find((item) => item.code === "missing_completion_path")?.stageKey).toBe("b");
+  });
+  it("accepts a backward route with an exit and a fresh visit to the earlier step", () => {
+    const stages = [...good().stages];
+    stages[1] = stage({ key: "done", name: "Follow up 3", type: "task", order: 1, defaultNextStageKey: "finish", branchRules: [{ id: "repeat", source: "context", sourceKey: "repeat", operator: "equals", value: "yes", nextStageKey: "start_form", order: 0 }] });
+    stages.push(stage({ key: "finish", name: "Finish", type: "task", order: 2 }));
+    expect(validateFmsDefinition(flow(stages))).toEqual([]);
+    stages[1] = { ...stages[1]!, branchRules: [{ ...stages[1]!.branchRules[0]!, nextStageKey: "done" }] };
+    expect(validateFmsDefinition(flow(stages))).toEqual([]);
+  });
+  it("rejects a trapped branch even when another branch can finish", () => {
+    const stages = [...good().stages, stage({ key: "trapped", name: "Trapped", type: "task", order: 2, defaultNextStageKey: "trapped" })];
+    stages[0] = { ...stages[0]!, branchRules: [{ id: "trap", source: "context", sourceKey: "trap", operator: "equals", value: "yes", nextStageKey: "trapped", order: 0 }] };
+    expect(validateFmsDefinition(flow(stages)).some((issue) => issue.stageKey === "trapped" && issue.code === "missing_completion_path")).toBe(true);
+  });
+  it("rejects automatic-only cycles even when they have an exit", () => {
+    const stages = [...good().stages, stage({ key: "auto", name: "Automatic", type: "branch", order: 2, branchRules: [{ id: "loop", source: "context", sourceKey: "loop", operator: "equals", value: "yes", nextStageKey: "auto", order: 0 }, { id: "exit", source: "context", operator: "default", nextStageKey: "done", order: 1 }] })];
+    stages[0] = { ...stages[0]!, defaultNextStageKey: "auto" };
+    expect(validateFmsDefinition(flow(stages)).some((issue) => issue.code === "automatic_cycle")).toBe(true);
   });
   it("accepts a leaf step as implicit completion", () => expect(validateFmsDefinition(flow([stage({ key: "start_form", name: "A", type: "form", formTemplateId: formId, order: 0 })]))).toEqual([]));
   it("rejects legacy explicit end nodes", () => expect(validateFmsDefinition(flow([stage({ key: "start_form", name: "A", type: "form", formTemplateId: formId, order: 0, defaultNextStageKey: "done" }), stage({ key: "done", name: "Done", type: "end", order: 1 })])).some((item) => item.code === "legacy_end_stage")).toBe(true));

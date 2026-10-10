@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { newFmsStage } from "./definition";
 import { fmsGraphEdges, layoutFmsDefinition } from "./graph";
+import { routeFmsGraphEdges } from "@jewelos/core";
 
 describe("FMS graph presentation", () => {
+  it("draws backward routes with independent return lanes", () => {
+    const a = { ...newFmsStage("task", 0), key: "a" };
+    const b = { ...newFmsStage("task", 1), key: "b", defaultNextStageKey: "a", branchRules: [{ id: "return", source: "context" as const, sourceKey: "again", operator: "equals" as const, value: "yes", nextStageKey: "a", order: 0 }] };
+    const edges = fmsGraphEdges([a, b]);
+    const routes = routeFmsGraphEdges(edges.map((edge, index) => ({ ...edge, id: String(index) })), new Map([["a", { x: 60, y: 100 }], ["b", { x: 420, y: 100 }]]), { width: 208, height: 104 });
+    expect(routes).toHaveLength(2);
+    expect(routes.every((edge) => edge.isReturn)).toBe(true);
+    expect(routes[0]!.label.y).not.toBe(routes[1]!.label.y);
+  });
   it("lays out explicit routes rather than stage array order", () => {
     const first = { ...newFmsStage("form", 0), key: "first", defaultNextStageKey: "last" };
     const middle = { ...newFmsStage("task", 1), key: "middle" };

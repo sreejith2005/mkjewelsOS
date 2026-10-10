@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Alert, RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { calculateFmsProgress, deriveFmsTransitionCapability } from "@jewelos/core";
+import { latestFmsStageVisits, calculateFmsProgress, deriveFmsTransitionCapability } from "@jewelos/core";
 import { loadFmsRuntime, setFmsInstanceStatus } from "@jewelos/data/fms/api";
 import { useProfile } from "@/auth/AuthProvider";
 import { useAsyncData } from "@/lib/useAsyncData";
@@ -49,7 +49,7 @@ export function FmsInstanceScreen() {
   const profile = useProfile();
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<Route>();
-  const { data, error, loading, refreshing, reload, refresh } = useAsyncData(loadFmsRuntime, []);
+  const { data, error, loading, refreshing, reload, refresh } = useAsyncData(useCallback(() => loadFmsRuntime(params.instanceId), [params.instanceId]), [params.instanceId]);
   useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["fms", "forms", "organization"], refresh: refresh });
   const [statusAction, setStatusAction] = useState<StatusAction | null>(null);
   const [busy, setBusy] = useState(false);
@@ -84,7 +84,7 @@ export function FmsInstanceScreen() {
   }
 
   const progress = calculateFmsProgress(
-    stages.map((stage) => ({
+    latestFmsStageVisits(stages).map((stage) => ({
       required: definitionFor(stage.fms_stage_id)?.is_required ?? true,
       status: stage.status as never,
     })),
@@ -198,7 +198,7 @@ export function FmsInstanceScreen() {
             >
               <View style={styles.stageHead}>
                 <Text style={styles.stageName} variant="body" weight="semibold">
-                  {definition.name}
+                  {definition.name}{stage.visit_number && stage.visit_number > 1 ? ` (visit ${stage.visit_number})` : ""}
                 </Text>
                 <StatusBadge
                   label={stage.status.replaceAll("_", " ")}

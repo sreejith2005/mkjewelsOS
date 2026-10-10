@@ -5270,6 +5270,224 @@ export type Database = {
           },
         ]
       }
+      fms_execution_scopes: {
+        Row: {
+          created_at: string
+          execution_scope_id: string
+          fms_instance_id: string
+          id: string
+          parent_branch_id: string | null
+          parent_scope_id: string | null
+          split_instance_stage_id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          execution_scope_id: string
+          fms_instance_id: string
+          id?: string
+          parent_branch_id?: string | null
+          parent_scope_id?: string | null
+          split_instance_stage_id: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          execution_scope_id?: string
+          fms_instance_id?: string
+          id?: string
+          parent_branch_id?: string | null
+          parent_scope_id?: string | null
+          split_instance_stage_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fms_execution_scopes_fms_instance_id_fkey"
+            columns: ["fms_instance_id"]
+            isOneToOne: false
+            referencedRelation: "fms_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_execution_scopes_parent_branch_id_fkey"
+            columns: ["parent_branch_id"]
+            isOneToOne: false
+            referencedRelation: "fms_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_execution_scopes_parent_scope_id_fkey"
+            columns: ["parent_scope_id"]
+            isOneToOne: false
+            referencedRelation: "fms_execution_scopes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_execution_scopes_split_instance_stage_id_fkey"
+            columns: ["split_instance_stage_id"]
+            isOneToOne: true
+            referencedRelation: "fms_instance_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_execution_scopes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fms_join_arrivals: {
+        Row: {
+          branch_stage_id: string
+          created_at: string
+          execution_path: string[]
+          join_stage_id: string
+          parallel_scope_id: string
+          source_instance_stage_id: string
+        }
+        Insert: {
+          branch_stage_id: string
+          created_at?: string
+          execution_path: string[]
+          join_stage_id: string
+          parallel_scope_id: string
+          source_instance_stage_id: string
+        }
+        Update: {
+          branch_stage_id?: string
+          created_at?: string
+          execution_path?: string[]
+          join_stage_id?: string
+          parallel_scope_id?: string
+          source_instance_stage_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fms_join_arrivals_branch_stage_id_fkey"
+            columns: ["branch_stage_id"]
+            isOneToOne: false
+            referencedRelation: "fms_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_join_arrivals_join_stage_id_fkey"
+            columns: ["join_stage_id"]
+            isOneToOne: false
+            referencedRelation: "fms_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_join_arrivals_parallel_scope_id_fkey"
+            columns: ["parallel_scope_id"]
+            isOneToOne: false
+            referencedRelation: "fms_execution_scopes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_join_arrivals_source_instance_stage_id_fkey"
+            columns: ["source_instance_stage_id"]
+            isOneToOne: false
+            referencedRelation: "fms_instance_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fms_visit_transitions: {
+        Row: {
+          source_instance_stage_id: string
+          target_instance_stage_id: string | null
+          target_stage_id: string
+        }
+        Insert: {
+          source_instance_stage_id: string
+          target_instance_stage_id?: string | null
+          target_stage_id: string
+        }
+        Update: {
+          source_instance_stage_id?: string
+          target_instance_stage_id?: string | null
+          target_stage_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fms_visit_transitions_source_instance_stage_id_fkey"
+            columns: ["source_instance_stage_id"]
+            isOneToOne: false
+            referencedRelation: "fms_instance_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_visit_transitions_target_instance_stage_id_fkey"
+            columns: ["target_instance_stage_id"]
+            isOneToOne: false
+            referencedRelation: "fms_instance_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_visit_transitions_target_stage_id_fkey"
+            columns: ["target_stage_id"]
+            isOneToOne: false
+            referencedRelation: "fms_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fms_visit_inputs: {
+        Row: {
+          branch_stage_id: string
+          execution_path: string[]
+          parallel_scope_id: string
+          source_instance_stage_id: string
+          target_instance_stage_id: string
+        }
+        Insert: {
+          branch_stage_id: string
+          execution_path: string[]
+          parallel_scope_id: string
+          source_instance_stage_id: string
+          target_instance_stage_id: string
+        }
+        Update: {
+          branch_stage_id?: string
+          execution_path?: string[]
+          parallel_scope_id?: string
+          source_instance_stage_id?: string
+          target_instance_stage_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fms_visit_inputs_branch_stage_id_fkey"
+            columns: ["branch_stage_id"]
+            isOneToOne: false
+            referencedRelation: "fms_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_visit_inputs_parallel_scope_id_fkey"
+            columns: ["parallel_scope_id"]
+            isOneToOne: false
+            referencedRelation: "fms_execution_scopes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_visit_inputs_source_instance_stage_id_fkey"
+            columns: ["source_instance_stage_id"]
+            isOneToOne: false
+            referencedRelation: "fms_instance_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_visit_inputs_target_instance_stage_id_fkey"
+            columns: ["target_instance_stage_id"]
+            isOneToOne: false
+            referencedRelation: "fms_instance_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fms_flows: {
         Row: {
           archived_at: string | null
@@ -5279,6 +5497,7 @@ export type Database = {
           created_by: string
           department_id: string | null
           description: string | null
+          execution_version: number
           family_id: string
           id: string
           is_active: boolean | null
@@ -5302,6 +5521,7 @@ export type Database = {
           created_by: string
           department_id?: string | null
           description?: string | null
+          execution_version?: number
           family_id?: string
           id?: string
           is_active?: boolean | null
@@ -5325,6 +5545,7 @@ export type Database = {
           created_by?: string
           department_id?: string | null
           description?: string | null
+          execution_version?: number
           family_id?: string
           id?: string
           is_active?: boolean | null
@@ -5341,6 +5562,20 @@ export type Database = {
           version?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "fms_flows_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_flows_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fms_flows_archived_by_fkey"
             columns: ["archived_by"]
@@ -5374,6 +5609,20 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_flows_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_flows_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
             referencedColumns: ["id"]
           },
           {
@@ -5562,6 +5811,8 @@ export type Database = {
           created_at: string | null
           delay_minutes: number | null
           escalation_count: number
+          execution_path: string[]
+          execution_scope_id: string | null
           fms_instance_id: string
           fms_stage_id: string
           form_submission_id: string | null
@@ -5571,6 +5822,8 @@ export type Database = {
           leave_coverage_buddy_preexisting: boolean | null
           next_doer_ids: string[] | null
           outcome: string | null
+          parallel_branch_id: string | null
+          parallel_scope_id: string | null
           planned_datetime: string | null
           previous_instance_stage_id: string | null
           remark: string | null
@@ -5578,6 +5831,7 @@ export type Database = {
           sla_breached: boolean | null
           status: Database["public"]["Enums"]["task_status"]
           updated_at: string | null
+          visit_number: number
         }
         Insert: {
           activated_at?: string | null
@@ -5592,6 +5846,8 @@ export type Database = {
           created_at?: string | null
           delay_minutes?: number | null
           escalation_count?: number
+          execution_path?: string[]
+          execution_scope_id?: string | null
           fms_instance_id: string
           fms_stage_id: string
           form_submission_id?: string | null
@@ -5601,6 +5857,8 @@ export type Database = {
           leave_coverage_buddy_preexisting?: boolean | null
           next_doer_ids?: string[] | null
           outcome?: string | null
+          parallel_branch_id?: string | null
+          parallel_scope_id?: string | null
           planned_datetime?: string | null
           previous_instance_stage_id?: string | null
           remark?: string | null
@@ -5608,6 +5866,7 @@ export type Database = {
           sla_breached?: boolean | null
           status?: Database["public"]["Enums"]["task_status"]
           updated_at?: string | null
+          visit_number?: number
         }
         Update: {
           activated_at?: string | null
@@ -5622,6 +5881,8 @@ export type Database = {
           created_at?: string | null
           delay_minutes?: number | null
           escalation_count?: number
+          execution_path?: string[]
+          execution_scope_id?: string | null
           fms_instance_id?: string
           fms_stage_id?: string
           form_submission_id?: string | null
@@ -5631,6 +5892,8 @@ export type Database = {
           leave_coverage_buddy_preexisting?: boolean | null
           next_doer_ids?: string[] | null
           outcome?: string | null
+          parallel_branch_id?: string | null
+          parallel_scope_id?: string | null
           planned_datetime?: string | null
           previous_instance_stage_id?: string | null
           remark?: string | null
@@ -5638,6 +5901,7 @@ export type Database = {
           sla_breached?: boolean | null
           status?: Database["public"]["Enums"]["task_status"]
           updated_at?: string | null
+          visit_number?: number
         }
         Relationships: [
           {
@@ -5645,6 +5909,20 @@ export type Database = {
             columns: ["branch_rule_id"]
             isOneToOne: false
             referencedRelation: "fms_branch_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_instance_stages_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_instance_stages_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
             referencedColumns: ["id"]
           },
           {
@@ -5659,6 +5937,20 @@ export type Database = {
             columns: ["completed_by"]
             isOneToOne: false
             referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_instance_stages_coverage_original_assignee_id_fkey"
+            columns: ["coverage_original_assignee_id"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_instance_stages_coverage_original_assignee_id_fkey"
+            columns: ["coverage_original_assignee_id"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
             referencedColumns: ["id"]
           },
           {
@@ -5707,6 +5999,13 @@ export type Database = {
             foreignKeyName: "fms_instance_stages_leave_coverage_buddy_id_fkey"
             columns: ["leave_coverage_buddy_id"]
             isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_instance_stages_leave_coverage_buddy_id_fkey"
+            columns: ["leave_coverage_buddy_id"]
+            isOneToOne: false
             referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
@@ -5715,6 +6014,20 @@ export type Database = {
             columns: ["leave_coverage_buddy_id"]
             isOneToOne: false
             referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_instance_stages_parallel_branch_id_fkey"
+            columns: ["parallel_branch_id"]
+            isOneToOne: false
+            referencedRelation: "fms_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_instance_stages_parallel_scope_id_fkey"
+            columns: ["parallel_scope_id"]
+            isOneToOne: false
+            referencedRelation: "fms_execution_scopes"
             referencedColumns: ["id"]
           },
           {
@@ -5743,6 +6056,7 @@ export type Database = {
           context: Json
           created_at: string | null
           department_id: string | null
+          execution_version: number
           flow_family_id: string
           flow_version: number
           fms_flow_id: string
@@ -5771,6 +6085,7 @@ export type Database = {
           context?: Json
           created_at?: string | null
           department_id?: string | null
+          execution_version?: number
           flow_family_id: string
           flow_version: number
           fms_flow_id: string
@@ -5799,6 +6114,7 @@ export type Database = {
           context?: Json
           created_at?: string | null
           department_id?: string | null
+          execution_version?: number
           flow_family_id?: string
           flow_version?: number
           fms_flow_id?: string
@@ -5824,6 +6140,20 @@ export type Database = {
             columns: ["branch_id"]
             isOneToOne: false
             referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_instances_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_instances_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
             referencedColumns: ["id"]
           },
           {
@@ -5858,6 +6188,20 @@ export type Database = {
             foreignKeyName: "fms_instances_held_by_fkey"
             columns: ["held_by"]
             isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_instances_held_by_fkey"
+            columns: ["held_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_instances_held_by_fkey"
+            columns: ["held_by"]
+            isOneToOne: false
             referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
@@ -5873,6 +6217,20 @@ export type Database = {
             columns: ["parent_instance_id"]
             isOneToOne: false
             referencedRelation: "fms_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_instances_started_by_fkey"
+            columns: ["started_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fms_instances_started_by_fkey"
+            columns: ["started_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
             referencedColumns: ["id"]
           },
           {
@@ -10806,6 +11164,30 @@ export type Database = {
           p_revision: number
         }
         Returns: Json
+      }
+      activate_fms_stage_v1_internal: {
+        Args: {
+          p_guard?: number
+          p_instance_id: string
+          p_previous_instance_stage_id: string
+          p_selected_user?: string
+          p_stage_id: string
+        }
+        Returns: string
+      }
+      activate_fms_stage_v2_internal: {
+        Args: {
+          p_guard: number
+          p_instance_id: string
+          p_previous_instance_stage_id: string
+          p_selected_user: string
+          p_stage_id: string
+          p_token_branch?: string
+          p_token_pass?: string
+          p_token_path?: string[]
+          p_token_scope?: string
+        }
+        Returns: string
       }
       activate_fms_stage_internal: {
         Args: {
