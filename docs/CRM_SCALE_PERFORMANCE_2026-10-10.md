@@ -111,9 +111,19 @@ Real local registration/full-form saves passed in all three presentations:
 | Phone web | 399 ms | 910 ms |
 | Embedded phone | 276 ms | 939 ms |
 
-These write measurements used the small synthetic workflow fixture, separately
-from the large-data read run. Server validation was preserved: the fixture
-needed an existing lead-source option selected explicitly.
+These initial write measurements used the small synthetic workflow fixture.
+The full workflow was then repeated with the 100,000-record fixture present:
+
+| Presentation | Registration | Full save and queue update | Save RPC |
+| --- | ---: | ---: | ---: |
+| Desktop | 4,703 ms | 4,369 ms | 2,705 ms |
+| Phone web | 997 ms | 1,733 ms | 1,080 ms |
+| Embedded phone | 1,758 ms | 3,984 ms | 2,275 ms |
+
+All three completed persisted writes, showed the saved queue entry and had
+zero page errors/overflow. Latency remains variable under the shared-machine
+load. Server validation was preserved: the fixture needed an existing
+lead-source option selected explicitly.
 
 The final 100,000-record retry encountered severe local resource pressure
 (16 GB Windows host, free memory below 300 MB, temporary database connection
