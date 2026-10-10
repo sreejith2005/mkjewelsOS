@@ -531,6 +531,12 @@ capped at 15 user turns ("start a new conversation" after that). Per-turn contex
 user identity) is a text block at the start of each user turn, not in the system prompt, so the
 system prompt is identical for every request.
 
+People's answers to escalated questions (Phase 4 follow-up, migration 0907) follow the same rule:
+`start_kiara_turn` returns the conversation's `human_answers`, and the worker puts each answer that
+the stored history does not yet contain into the NEW user turn as a `<human_answers>` block (after
+`<turn_context>`, before the question; question and answer wrapped as untrusted text). The block is
+stored with that turn, so it is sent once and never spliced into earlier turns.
+
 ### 7.5 Citations
 
 KB search results carry `chunk_id`s. The prompt tells Kiara to cite with `[[cite:<chunk_id>]]`. The

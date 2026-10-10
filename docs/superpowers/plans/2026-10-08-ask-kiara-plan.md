@@ -28,6 +28,8 @@ TypeScript/Vitest, React (web), React Native/Expo (Android).
 
 Rebased 2026-10-10 again on `origin/main` `e214179` (main added 0208, 0210-0212): no rename was needed;
 0906 carries main 0212's manifest additions.
+Rebased 2026-10-10 (Phase 5) on `origin/main` `a6f1c85`: main added only a document, so no shared
+definition changed.
 
 History: the branch first took the next number after `origin/main` (0205), then renumbered twice
 (0206/0207 on 2026-10-09, 0208-0210 on 2026-10-10) as main kept adding migrations, and main then
@@ -45,6 +47,7 @@ Phase 9 merge, immediately before the first hosted apply.
 | `0904_kiara_department_targeting` | new | Phase 3 follow-up (department tags, visibility) |
 | `0905_ask_kiara_escalations` | new | Phase 4 |
 | `0906_kiara_manifest_main_0212` | new | Re-applies main 0212's manifest entries after Kiara's full manifest copy |
+| `0907_kiara_human_answers_in_history` | new | Phase 4 follow-up: `start_kiara_turn` also returns the conversation's human answers |
 
 Each pgTAP file carries the same number as its migration.
 
@@ -341,8 +344,14 @@ with escalation state, manifest). Deviations and additions:
 - Native app: Ask Kiara stays hidden (NATIVE_PENDING_PAGES). A Kiara notification shows "Open on web
   for now" instead of Open, a tapped Ask Kiara link lands on the notification list, and
   `navigatePath` never opens the unimplemented-section fallback for a pending page.
-- Kiara does not yet see human answers in later turns of the same chat (history replays only its
-  own turns); noted as a follow-up.
+- Follow-up done (`0907_kiara_human_answers_in_history`): Kiara sees a person's answer in later turns
+  of the same chat. `start_kiara_turn` returns `human_answers` (escalation id, "Name (Designation)",
+  time, question summary, answer). The worker adds each answer the replayed history does not yet
+  contain (matched by escalation id) as a `<human_answers>` block in the NEW user turn, after
+  `<turn_context>`, with question and answer inside the untrusted-text wrapper (angle brackets
+  escaped). That turn is stored with the block, so earlier turns and thinking blocks stay
+  byte-identical and each answer enters the history once. The system prompt treats the block as
+  information for the conversation, never as instructions or an approved SOP.
 
 ## Phase 5: CRM tools
 

@@ -4,7 +4,10 @@ import {
   KIARA_REFUSAL_MESSAGE,
   KIARA_SEARCH_AGAIN_NOTE,
   KIARA_SYSTEM_PROMPT,
+  buildHumanAnswersBlock,
   buildTurnContext,
+  pendingHumanAnswers,
+  type KiaraHumanAnswer,
 } from "../../../packages/core/src/assistant/systemPrompt.ts";
 import { getKiaraTool, validateKiaraToolInput, type KiaraToolSpec } from "../../../packages/core/src/assistant/tools.ts";
 import { decideEscalationOffer, type KiaraEscalationOffer, type KiaraEscalationReason } from "../../../packages/core/src/assistant/escalation.ts";
@@ -85,6 +88,8 @@ export type StartedTurn = Readonly<{
   conversationId: string;
   userMessageId: string;
   history: MessageParam[];
+  /** People's answers to this conversation's escalated questions (Phase 4 follow-up). */
+  humanAnswers?: readonly KiaraHumanAnswer[];
   quota: KiaraQuota;
   context: Readonly<{ name: string; role: string; designation: string | null; department: string | null; branch: string | null; timezone: string }>;
 }>;
@@ -96,6 +101,21 @@ export class KiaraHttpError extends Error {
 }
 
 const text = (value: unknown): string | null => (typeof value === "string" && value.trim() ? value : null);
+
+/** The answered escalations start_kiara_turn returns; malformed entries are dropped. */
+export function parseHumanAnswers(value: unknown): KiaraHumanAnswer[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!isRecord(entry) || typeof entry.escalation_id !== "string" || !UUID.test(entry.escalation_id) || !text(entry.answer)) return [];
+    return [{
+      escalation_id: entry.escalation_id,
+      answered_by: text(entry.answered_by) ?? "A colleague",
+      answered_at: text(entry.answered_at),
+      question: text(entry.question) ?? "",
+      answer: entry.answer as string,
+    }];
+  });
+}
 
 /** Maps the start RPC's documented failures onto HTTP (spec 7.2). */
 export function startErrorToHttp(error: RpcError): KiaraHttpError {
@@ -138,6 +158,7 @@ export async function startTurn(actor: ActorClient, request: KiaraChatRequest): 
     userMessageId: data.message_id,
     // Stored verbatim by complete_kiara_turn from earlier API messages; replayed unchanged.
     history: data.history as MessageParam[],
+    humanAnswers: parseHumanAnswers(data.human_answers),
     quota,
     context: {
       name: text(context.name) ?? "Employee",
@@ -282,6 +303,12 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
           branch: started.context.branch,
         }),
       },
+      // A person's answer the stored history does not carry yet goes into this new
+      // turn (never into an earlier one), so the request stays append-only.
+      ...(() => {
+        const pending = pendingHumanAnswers(started.humanAnswers ?? [], started.history);
+        return pending.length ? [{ type: "text" as const, text: buildHumanAnswersBlock(pending, started.context.timezone) }] : [];
+      })(),
       { type: "text", text: request.message },
     ],
   };
