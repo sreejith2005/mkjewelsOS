@@ -1,7 +1,8 @@
 # Task scale and management validation - 10 October 2026
 
-Owner approved implementation in chat. Changes are local source and local
-Postgres validation; no hosted migration, web deployment or Android publication.
+Owner approved implementation and explicitly requested migration deployment and
+publication to main in chat. Production migrations are applied as recorded below;
+local checks and hosted verification are reported separately. No Android publication.
 
 ## Changed behavior and files
 
@@ -85,10 +86,32 @@ call them; existing client calls remain supported. No Edge Function change/secre
 The Browser execution tool is unavailable, so real browser desktop/phone-width QA
 and authenticated E2E were not performed. Component interaction tests passed.
 `adb devices -l` returned no devices. MOBILE_RELEASE_GUIDE requires running visual
-changes on a phone and being on main; this checkout is feat/department-section-access.
+changes on a phone and being on main. No connected phone was available.
 The signed release script must not publish until those gates pass.
 
-Staging migration preflight/application, hosted role/Storage/import/recurrence
-verification, main integration, Android device proof, release-mobile.ps1, public
-manifest/APK verification and production smoke tests remain. No hosted credentials,
-records, migrations or public release were changed. A source commit is not deployment.
+Separate staging validation, hosted role/Storage/import/recurrence smoke tests,
+Android device proof, release-mobile.ps1 and public manifest/APK verification remain.
+The owner explicitly requested the production migration deployment and main push.
+No exploratory production imports, test records, seeds, resets, secrets or Edge
+Function changes were performed. A source push does not prove rendered web behavior.
+
+## Hosted deployment and publication - 10 October 2026
+
+- Implementation commit: 434d98f; publication target: origin/main.
+- Confirmed via supabase.cmd projects list: jewelos-prod, reference
+  yimafxhuwgfhvzczqqdd, ACTIVE_HEALTHY and linked. CRM projects were untouched.
+- supabase.cmd migration list --linked: only task migrations 0208, 0210 and
+  0211 were missing; 0209 was already applied.
+- supabase.cmd db push --linked --dry-run --include-all: listed exactly
+  0208_task_scale_and_management.sql, 0210_task_deleted_read_paths.sql and
+  0211_task_deleted_background_paths.sql. include-all inserts the approved
+  missing 0208 before the already-applied 0209; it does not rerun 0209.
+- supabase.cmd db push --linked --include-all --yes: all three applied, exit 0.
+- Post-apply supabase.cmd db push --linked --dry-run --include-all: remote
+  database up to date, no pending migrations.
+- All source changes were directly ahead of origin/main and whitespace checked.
+  Main publication uses a normal fast-forward push; no force push or rewriting
+  of the main branch checked out in another worktree.
+- Recovery is a reviewed forward migration, preserving history and tombstones.
+  Hosted backup restore readiness and authenticated application smoke tests were
+  not independently verified in this run.
