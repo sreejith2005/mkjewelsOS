@@ -15,7 +15,7 @@ export type ClaimedEvent = Readonly<{
   event_id: number;
   event_type: string;
   aggregate_id: string;
-  snapshot: StaffSnapshot;
+  snapshot: Readonly<Record<string, unknown> & { snapshot_at: string }>;
 }>;
 
 export type FinishState = "delivered" | "requeued" | "retry" | "dead" | "ignored";
@@ -65,7 +65,8 @@ export function secretMatches(supplied: string | null, expected: string): boolea
 /** The CRM inbox key: one per delivered snapshot, so an exact replay is applied once. */
 export function crmEventId(event: ClaimedEvent): string {
   const at = Date.parse(event.snapshot.snapshot_at);
-  return `jewelos.staff.${event.event_id}.${Number.isFinite(at) ? at : 0}`;
+  const kind=event.event_type==='master.options_changed' ? 'master' : 'staff';
+  return `jewelos.${kind}.${event.event_id}.${Number.isFinite(at) ? at : 0}`;
 }
 
 function resultsById(body: unknown): Map<string, CrmEventResult> {
@@ -85,25 +86,25 @@ async function deliver(jewelos: JewelosSyncGateway, crm: CrmReceiver) {
     const events = await jewelos.claim(BATCH_SIZE);
     if (events.length === 0) break;
     counts.claimed += events.length;
-    let results = new Map<string, CrmEventResult>();
-    let failure: string | null = null;
-    try {
-      const response = await crm.post({
-        kind: "staff.events",
-        events: events.map((event) => ({ event_id: crmEventId(event), snapshot: event.snapshot })),
-      });
-      if (response.status === 200) results = resultsById(response.body);
-      else failure = `http_${response.status}`;
-    } catch {
-      failure = "network";
+    let failed=false;
+    for(const [eventType,kind] of [['staff.access_changed','staff.events'],['master.options_changed','master.events']] as const) {
+      const group=events.filter(event=>event.event_type===eventType);
+      if(!group.length)continue;
+      let results=new Map<string,CrmEventResult>();let failure:string|null=null;
+      try {
+        const response=await crm.post({kind,events:group.map(event=>({event_id:crmEventId(event),snapshot:event.snapshot}))});
+        if(response.status===200)results=resultsById(response.body);else failure=`http_${response.status}`;
+      }catch{failure='network';}
+      for(const event of group) {
+        const result=results.get(crmEventId(event));const ok=failure===null && result?.ok===true;
+        counts[await jewelos.finish(event.event_id,ok,ok?null:failure ?? result?.error ?? 'no_result')] += 1;
+      }
+      failed ||= failure!==null;
     }
-    for (const event of events) {
-      const result = results.get(crmEventId(event));
-      const ok = failure === null && result?.ok === true;
-      const error = ok ? null : failure ?? (typeof result?.error === "string" ? result.error : "no_result");
-      counts[await jewelos.finish(event.event_id, ok, error)] += 1;
+    for(const event of events.filter(event=>!['staff.access_changed','master.options_changed'].includes(event.event_type))) {
+      counts[await jewelos.finish(event.event_id,false,'unsupported_type')] += 1;
     }
-    if (failure !== null || events.length < BATCH_SIZE) break;
+    if (failed || events.length < BATCH_SIZE) break;
   }
   return counts;
 }

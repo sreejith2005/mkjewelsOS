@@ -30,6 +30,7 @@ function responseFor(table: string) {
     single: () => result,
     maybeSingle: () => result,
     neq: () => query,
+    range: () => query,
     then: result.then.bind(result),
   };
   return query;
@@ -38,7 +39,7 @@ function responseFor(table: string) {
 vi.mock("@/next-shim/navigation", () => ({ notFound: vi.fn() })); // crm-port: next/navigation -> local shim module
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({
   from: responseFor,
-  rpc: vi.fn(async () => ({ data: [{ role: "salesperson" }], error: null })),
+  rpc: vi.fn(async (name: string) => ({ data: name === "get_crm_master_options" ? Object.fromEntries(Object.entries(lookups).map(([key,rows])=>[key,rows.map(row=>row.label)])) : [{ role: "salesperson" }], error: null })),
   auth: { getUser: vi.fn(async () => ({ data: { user: null }, error: null })) },
 })) }));
 vi.mock("@/components/client-profile", () => ({

@@ -9,7 +9,7 @@ const push = vi.fn();
 const single = vi.fn();
 const insert = vi.fn(() => ({ select: () => ({ single }) }));
 vi.mock("@/next-shim/navigation", () => ({ useRouter: () => ({ refresh, push: vi.fn() }) })); // crm-port: next/navigation -> local shim module
-vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({ from: () => ({ insert }) }) }));
+vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({ rpc: single }) }));
 vi.mock("@/crm-port/phase4", () => ({ pushLeadToRuno: (leadId: string) => push(leadId) }));
 import { LeadForm } from "@/components/lead-form";
 
@@ -24,6 +24,23 @@ async function saveLead() {
 }
 
 describe("LeadForm Runo push message", () => {
+  it("renders one choice per normalized master label", () => {
+    render(<LeadForm fields={[...fields,{...fields[0],id:'status',field_key:'status',label:'Status',field_type:'dropdown'}]} options={[]} lookupOptions={{status:['LEAD','LEAD',' lead ','CALLING','Calling']}} actorId="crm-user-1" />);
+    expect(Array.from((screen.getByLabelText('Status') as HTMLSelectElement).options).map(option=>option.text)).toEqual(['Select Status','LEAD','CALLING']);
+  });
+
+  it("explains blocked saves and retains entered answers", async () => {
+    single.mockResolvedValue({data:null,error:{code:'42501'}});
+    expect((await saveLead()).textContent).toBe('Your CRM session cannot save this lead. Reload CRM and sign in again if needed. Your answers are still here.');
+    expect((screen.getByLabelText('Mobile no') as HTMLInputElement).value).toBe('9100000601');
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("explains a master choice validation failure", async () => {
+    single.mockResolvedValue({data:null,error:{code:'22023'}});
+    expect((await saveLead()).textContent).toBe('Check the required fields and select active dropdown choices. If choices changed, reload CRM before trying again.');
+  });
+
   it("says the lead was pushed when the push is ok", async () => {
     single.mockResolvedValue({ data: { id: "lead-1" }, error: null });
     push.mockResolvedValue({ ok: true });

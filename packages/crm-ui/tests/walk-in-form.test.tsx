@@ -26,11 +26,13 @@ vi.mock("@/lib/supabase/client", () => ({
 import { WalkInForm } from "@/components/walk-in-form";
 import type { Client } from "@/lib/supabase/app-types";
 
+const masterLookups = {productCategories:[],notBoughtReasons:[],beverages:[],snacks:[],sourceOfLeads:['Walk-in','Reference','Instagram','Google','WhatsApp','Advertisement','Other'],communities:['OTHER'],masterFields:{gender:['FEMALE','MALE','OTHER'],occupation:['BUSINESS OWNER','SELF EMPLOYED','SERVICE / SALARIED','HOUSEWIFE / HOMEMAKER','STUDENT','DOCTOR','LAWYER','CHARTERED ACCOUNTANT / CA','ENGINEER','TEACHER / PROFESSOR','BANKER / FINANCE','GOVERNMENT EMPLOYEE','REAL ESTATE','FASHION / DESIGNER','RETIRED','OTHER'],bridal_or_non_bridal:['BRIDAL','NON BRIDAL'],wedding_month:['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'],communication_preference:['CALL','WHATSAPP CALLS','WHATSAPP MESSAGE',"DON'T CONTACT"],client_potential_category:['A','B','C','D','E']}};
+
 const branchId = "10000000-0000-4000-8000-000000000501";
 
 function renderWalkInForm() {
   return render(
-    <WalkInForm
+    <WalkInForm lookups={masterLookups}
       profile={{ role: "salesperson", branchId, name: "Test CRM" }}
       branches={[{ id: branchId, name: "Test Branch" }]}
       crms={["Test CRM"]}
@@ -41,10 +43,11 @@ function renderWalkInForm() {
 }
 
 function renderPrefilledWalkInForm() {
-  return render(<WalkInForm profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queue={null} client={{ client_id: "20000000-0000-4000-8000-000000000501", primary_name: "Known Client", primary_phone: "9012345678" } as unknown as Client} />);
+  return render(<WalkInForm lookups={masterLookups} profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queue={null} client={{ client_id: "20000000-0000-4000-8000-000000000501", primary_name: "Known Client", primary_phone: "919012345678" } as unknown as Client} />);
+
 }
 function renderQueuedWalkInForm() {
-  return render(<WalkInForm profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queue={{ id: "queue-501", client_name: "Queue Client", mobile: "9012345509", branch_id: branchId, assigned_crm_name: "Test CRM", client_id: null, status: "pending" }} client={null} />);
+  return render(<WalkInForm lookups={masterLookups} profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queue={{ id: "queue-501", client_name: "Queue Client", mobile: "9012345509", branch_id: branchId, assigned_crm_name: "Test CRM", client_id: null, status: "pending" }} client={null} />);
 }
 
 function openEngagementStep() {
@@ -94,6 +97,34 @@ beforeEach(() => {
 });
 
 describe("WalkInForm proof image uploads", () => {
+  it("blocks saving while an optional remark photo is still uploading", async () => {
+    rpc.mockResolvedValue({ data: [], error: null });
+    upload.mockImplementation(()=>new Promise(()=>{}));
+    renderPrefilledWalkInForm();
+    completeLegacyRequiredFields();
+    answerRequiredEngagements();
+    fireEvent.click(screen.getByRole('button',{name:'6. Preferences & planning'}));
+    fireEvent.change(screen.getByLabelText('Remark photo 1'),{target:{files:[new File(['photo'],'remark.png',{type:'image/png'})]}});
+    await waitFor(()=>expect(upload).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole('button',{name:'Submit complete visit'}));
+    expect(await screen.findByText(/Wait for every photo or video/)).toBeTruthy();
+    expect(rpc).not.toHaveBeenCalledWith('submit_walkin_visit',expect.anything());
+  });
+  it("blocks saving a failed optional upload instead of silently dropping it", async () => {
+    rpc.mockResolvedValue({data:[],error:null});
+    upload.mockResolvedValue({error:{message:'failed'}});
+    renderPrefilledWalkInForm(); completeLegacyRequiredFields(); answerRequiredEngagements();
+    fireEvent.click(screen.getByRole('button',{name:'6. Preferences & planning'}));
+    fireEvent.change(screen.getByLabelText('Remark photo 1'),{target:{files:[new File(['photo'],'remark.png',{type:'image/png'})]}});
+    await screen.findByText('Upload failed. Try again.');
+    fireEvent.click(screen.getByRole('button',{name:'Submit complete visit'}));
+    expect(await screen.findByText(/Wait for every photo or video/)).toBeTruthy();
+    expect(rpc).not.toHaveBeenCalledWith('submit_walkin_visit',expect.anything());
+    fireEvent.click(screen.getByRole('button',{name:'Remove photo 1'}));
+    await waitFor(()=>expect(screen.queryByText('Upload failed. Try again.')).toBeNull());
+    fireEvent.click(screen.getByRole('button',{name:'Submit complete visit'}));
+    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('submit_walkin_visit',expect.anything()));
+  });
   it("opens with an IST datetime-local value and the walk-in lead source selected", () => {
     renderWalkInForm();
     expect((screen.getByLabelText("Visit date and time") as HTMLInputElement).value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
@@ -103,7 +134,7 @@ describe("WalkInForm proof image uploads", () => {
 
   it("clears and reloads CRM and salesperson choices when a super-admin selects another branch", () => {
     const otherBranchId = "10000000-0000-4000-8000-000000000502";
-    render(<WalkInForm profile={{ role: "super_admin", branchId: null, name: "Admin" }} branches={[{ id: branchId, name: "Andheri" }, { id: otherBranchId, name: "Bandra" }]} crms={[]} crmByBranch={{ [branchId]: ["Andheri CRM"], [otherBranchId]: ["Bandra CRM"] }} queue={null} client={null} />);
+    render(<WalkInForm lookups={masterLookups} profile={{ role: "super_admin", branchId: null, name: "Admin" }} branches={[{ id: branchId, name: "Andheri" }, { id: otherBranchId, name: "Bandra" }]} crms={[]} crmByBranch={{ [branchId]: ["Andheri CRM"], [otherBranchId]: ["Bandra CRM"] }} queue={null} client={null} />);
     const branch = screen.getByLabelText("Branch") as HTMLSelectElement;
     const crm = screen.getByLabelText("CRM / salesperson") as HTMLSelectElement;
     const salesperson = screen.getByLabelText("Salesperson attending the client") as HTMLSelectElement;
@@ -119,7 +150,7 @@ describe("WalkInForm proof image uploads", () => {
   });
 
   it("uses legacy source, bridal, occupation, and category reveal rules", () => {
-    render(<WalkInForm profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queue={null} client={null} lookups={{ productCategories: ["Ring", "Other"], notBoughtReasons: [], beverages: [], snacks: [] }} />);
+    render(<WalkInForm profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queue={null} client={null} lookups={{ ...masterLookups, productCategories: ["Ring", "Other"], notBoughtReasons: [], beverages: [], snacks: [] }} />);
     fireEvent.change(screen.getByLabelText("Source of lead"), { target: { value: "Reference" } });
     expect(screen.getByLabelText("Reference name")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "6. Preferences & planning" }));
@@ -156,7 +187,7 @@ describe("WalkInForm proof image uploads", () => {
     expect(visitStatus.value).toBe("YES");
   });
   it("auto-fills a matched phone profile and keeps a manually edited value", async () => {
-    rpc.mockImplementation((name: string) => name === "lookup_client_by_phone" ? Promise.resolve({ data: [{ client_id: "20000000-0000-4000-8000-000000000599", primary_name: "Phone Match", primary_phone: "9012345599", gender: "Female", dob: "1990-01-02", community: "Nair", address: "Main Road", pincode: "682001", country: "India", state: "Kerala", city: "Kochi" }], error: null }) : Promise.resolve({ data: [], error: null }));
+    rpc.mockImplementation((name: string) => name === "lookup_client_profile_by_phone" ? Promise.resolve({ data: [{ client_id: "20000000-0000-4000-8000-000000000599", primary_name: "Phone Match", primary_phone: "9012345599", gender: "Female", dob: "1990-01-02", community: "Nair", address: "Main Road", pincode: "682001", country: "India", state: "Kerala", city: "Kochi" }], error: null }) : Promise.resolve({ data: [], error: null }));
     renderWalkInForm();
     fireEvent.change(screen.getByLabelText("Mobile *"), { target: { value: "9012345599" } });
     await waitFor(() => expect(screen.getByDisplayValue("Phone Match")).toBeTruthy());
@@ -179,12 +210,17 @@ describe("WalkInForm proof image uploads", () => {
   });
 
   it("returns to the queue with the completed client confirmation after submission", async () => {
-    rpc.mockImplementation((name: string) => name === "lookup_client_by_phone" ? Promise.resolve({ data: [], error: null }) : Promise.resolve({ data: [{ client_id: "20000000-0000-4000-8000-000000000509", timeline_id: "40000000-0000-4000-8000-000000000509", reference_number: "TES-260725-0001" }], error: null }));
+    rpc.mockImplementation((name: string) => name === "lookup_client_profile_by_phone" ? Promise.resolve({ data: [], error: null }) : Promise.resolve({ data: [{ client_id: "20000000-0000-4000-8000-000000000509", timeline_id: "40000000-0000-4000-8000-000000000509", reference_number: "TES-260725-0001" }], error: null }));
     renderQueuedWalkInForm();
     completeLegacyRequiredFields("STORE_VISIT");
     fireEvent.click(screen.getByRole("button", { name: "6. Preferences & planning" }));
     fireEvent.click(screen.getByRole("button", { name: "Submit complete visit" }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/queue?completed=Queue%20Client&completedClientId=20000000-0000-4000-8000-000000000509"));
+    await screen.findByRole("status", { name: "" });
+    expect(screen.getByRole("status").textContent).toContain("Walk-in saved");
+    expect((screen.getByRole("button", { name: "Visit saved" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.submit(screen.getByRole("button", { name: "Visit saved" }).closest("form")!);
+    expect(rpc.mock.calls.filter(([name]) => name === "submit_walkin_visit")).toHaveLength(1);
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/queue?branch=10000000-0000-4000-8000-000000000501&completed=Queue%20Client&completedClientId=20000000-0000-4000-8000-000000000509"));
   });
 
   it("never submits from beverage changes or implicit form submits", async () => {
@@ -219,11 +255,17 @@ describe("WalkInForm proof image uploads", () => {
     fireEvent.change(screen.getByLabelText("Mobile *"), { target: { value: "9012345678" } });
     fireEvent.click(screen.getByRole("button", { name: "2. Profile" }));
     fireEvent.click(screen.getByLabelText("Same as mobile number"));
-    expect((screen.getByLabelText("Billing phone") as HTMLInputElement).value).toBe("9012345678");
+    // The billing phone copies the whole number, country code included (CRM 20261007001000).
+    expect((screen.getByLabelText("Billing phone") as HTMLInputElement).value).toBe("+919012345678");
     fireEvent.click(screen.getByRole("button", { name: "1. Client & visit" }));
     fireEvent.change(screen.getByLabelText("Mobile *"), { target: { value: "9012345679" } });
     fireEvent.click(screen.getByRole("button", { name: "2. Profile" }));
-    expect((screen.getByLabelText("Billing phone") as HTMLInputElement).value).toBe("9012345679");
+    expect((screen.getByLabelText("Billing phone") as HTMLInputElement).value).toBe("+919012345679");
+    fireEvent.click(screen.getByRole("button", { name: "1. Client & visit" }));
+    expect((screen.getByLabelText("Country code") as HTMLSelectElement).value).toBe("91");
+    fireEvent.change(screen.getByLabelText("Country code"), { target: { value: "971" } });
+    fireEvent.click(screen.getByRole("button", { name: "2. Profile" }));
+    expect((screen.getByLabelText("Billing phone") as HTMLInputElement).value).toBe("+9719012345679");
     fireEvent.click(screen.getByLabelText("Same as mobile number"));
     expect((screen.getByLabelText("Billing phone") as HTMLInputElement).disabled).toBe(false);
   });
@@ -309,16 +351,16 @@ describe("WalkInForm proof image uploads", () => {
 
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("submit_walkin_visit", expect.objectContaining({
       p_payload: expect.objectContaining({
-        documents: [{ storage_path: storagePath, file_name: "review_proof__1_.jpg", mime_type: "image/jpeg" }],
+        documents: [{ storage_path: storagePath, file_name: "review_proof__1_.jpg", mime_type: "image/jpeg", purpose: "google_review", original_file_name: "review proof (1).jpg" }],
       }),
     })));
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/queue?completed=Uploaded%20Proof%20Client&completedClientId=20000000-0000-4000-8000-000000000501"));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/queue?branch=10000000-0000-4000-8000-000000000501&completed=Uploaded%20Proof%20Client&completedClientId=20000000-0000-4000-8000-000000000501"));
     expect(remove).not.toHaveBeenCalled();
   });
 
   it("uses the resolved existing client UUID for a proof uploaded before the lookup effect finishes", async () => {
     const existingClientId = "20000000-0000-4000-8000-000000000777";
-    rpc.mockImplementation((name: string) => name === "lookup_client_by_phone"
+    rpc.mockImplementation((name: string) => name === "lookup_client_profile_by_phone"
       ? Promise.resolve({ data: [{ client_id: existingClientId, primary_name: "Existing Proof Client", primary_phone: "9012345777" }], error: null })
       : Promise.resolve({ data: [{ client_id: existingClientId, timeline_id: "40000000-0000-4000-8000-000000000777", reference_number: "TES-260729-0001" }], error: null }));
     upload.mockResolvedValueOnce({ error: null });
@@ -337,6 +379,33 @@ describe("WalkInForm proof image uploads", () => {
 
     await waitFor(() => expect(upload).toHaveBeenCalledOnce());
     expect(upload.mock.calls[0][0]).toMatch(new RegExp(`^${existingClientId}/`));
+  });
+
+  it("keeps the registered client when another client shares the phone, so a remark photo is not rejected", async () => {
+    // Owner report 2026-10-07: an existing client's walk-in failed with "The mobile number changed
+    // after this proof was uploaded". The phone also belongs to a more recently visited client
+    // (a family member), and the phone lookup switched the form to that client.
+    const registeredId = "20000000-0000-4000-8000-000000000601";
+    const sharedPhoneId = "20000000-0000-4000-8000-000000000602";
+    rpc.mockImplementation((name: string) => name === "lookup_client_profile_by_phone"
+      ? Promise.resolve({ data: [{ client_id: sharedPhoneId, primary_name: "Family Member", primary_phone: "919012345601" }], error: null })
+      : Promise.resolve({ data: [{ client_id: registeredId, timeline_id: "40000000-0000-4000-8000-000000000601", reference_number: "TES-261007-0001" }], error: null }));
+    upload.mockResolvedValueOnce({ error: null });
+    render(<WalkInForm lookups={masterLookups} profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]}
+
+      queue={{ id: "queue-601", client_name: "Registered Buyer", mobile: "919012345601", branch_id: branchId, assigned_crm_name: "Test CRM", client_id: registeredId, client_is_new: false, status: "pending" }}
+      client={{ client_id: registeredId, primary_name: "Registered Buyer", primary_phone: "919012345601" } as unknown as Client} />);
+    completeLegacyRequiredFields();
+    answerRequiredEngagements();
+    fireEvent.click(screen.getByRole("button", { name: "6. Preferences & planning" }));
+    fireEvent.change(screen.getByLabelText("Remark photo 1"), { target: { files: [new File(["photo"], "remark.png", { type: "image/png" })] } });
+    await screen.findByText("remark.png uploaded");
+    expect(upload.mock.calls[0][0]).toMatch(new RegExp(`^${registeredId}/`));
+    fireEvent.click(screen.getByRole("button", { name: "Submit complete visit" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("submit_walkin_visit", expect.objectContaining({
+      p_payload: expect.objectContaining({ client_id: registeredId, primary_name: "Registered Buyer" }),
+    })));
+    expect(screen.queryByText(/The mobile number changed after this proof was uploaded/)).toBeNull();
   });
 
   it("keeps uploaded proof images when submit_walkin_visit fails", async () => {
@@ -378,6 +447,47 @@ describe("WalkInForm proof image uploads", () => {
     expect(remove).not.toHaveBeenCalled();
     expect(await screen.findByText("We could not save this visit. Please try again; if it persists, contact an administrator. Uploaded proof files were kept so you do not need to add them again.")).toBeTruthy();
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it("submits the selected staff ID independently of CRM queue labels", async () => {
+    rpc.mockResolvedValue({data: [{client_id: "synthetic"}], error: null});
+    const sellerId = "10000000-0000-4000-8000-000000000777";
+    render(<WalkInForm lookups={masterLookups} profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} salespeopleByBranch={{ [branchId]: [{ id: sellerId, name: "Active Seller" }] }} queue={null} client={null} />);
+
+    fireEvent.change(screen.getByLabelText("Client name *"), { target: { value: "Synthetic Attendance" } });
+    fireEvent.change(screen.getByLabelText("Mobile *"), { target: { value: "9012345504" } });
+    completeLegacyRequiredFields(); answerRequiredEngagements();
+    fireEvent.click(screen.getByRole("button", { name: "1. Client & visit" }));
+    expect(within(screen.getByLabelText("Salesperson attending the client")).queryByRole("option", {name: "Test CRM"})).toBeNull();
+    fireEvent.change(screen.getByLabelText("Salesperson attending the client"), { target: { value: sellerId } });
+    fireEvent.click(screen.getByRole("button", { name: "4. Purchase outcome" }));
+    fireEvent.change(screen.getByLabelText("Client bought any product?"), { target: { value: "PRODUCT_EXCHANGE" } });
+    expect(within(screen.getByLabelText("Salesperson attending the client (new buy / order)")).getByRole("option", {name: "Active Seller"})).toBeTruthy();
+    expect(within(screen.getByLabelText("Salesperson attending the client (new buy / order)")).queryByRole("option", {name: "Test CRM"})).toBeNull();
+    fireEvent.change(screen.getByLabelText("Client bought any product?"), { target: { value: "YES" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "6. Preferences & planning" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit complete visit" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("submit_walkin_visit", expect.objectContaining({ p_payload: expect.objectContaining({ salesperson_id: sellerId, salesperson: "Active Seller" }) })));
+  });
+
+  it.each(["NON BRIDAL", "BRIDAL"])("identifies salesperson validation without blaming wedding details (%s)", async (bridal) => {
+    rpc.mockImplementation((name: string) => name === "submit_walkin_visit"
+      ? Promise.resolve({ data: null, error: { code: "23514", message: "Choose one active salesperson from the selected branch roster" } })
+      : Promise.resolve({ data: [], error: null }));
+    renderWalkInForm();
+    fireEvent.change(screen.getByLabelText("Client name *"), { target: { value: "Synthetic Seller Validation" } });
+    fireEvent.change(screen.getByLabelText("Mobile *"), { target: { value: "9012345504" } });
+    completeLegacyRequiredFields(); answerRequiredEngagements();
+    fireEvent.click(screen.getByRole("button", { name: "6. Preferences & planning" }));
+    fireEvent.change(screen.getByLabelText("Bridal / non-bridal"), { target: { value: bridal } });
+    if (bridal === "BRIDAL") {
+      fireEvent.change(screen.getByLabelText("Wedding month"), { target: { value: "OCTOBER" } });
+      fireEvent.change(screen.getByLabelText("Wedding year"), { target: { value: String(new Date().getFullYear()) } });
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Submit complete visit" }));
+    expect(await screen.findByText("Choose an active salesperson from the selected branch before submitting.")).toBeTruthy();
+    expect(screen.queryByText(/Recheck the wedding/)).toBeNull();
   });
 
   it("does not mislabel an unrelated database validation failure as a proof-link failure", async () => {

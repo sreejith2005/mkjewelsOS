@@ -15,6 +15,7 @@ export type ApplyResult = Readonly<{ outcome?: string; reason?: string | null; d
 export type CrmSyncGateway = Readonly<{
   applyStaff: (eventId: string, snapshot: Record<string, unknown>) => Promise<ApplyResult>;
   reconcileStaff: (runId: string, snapshots: ReadonlyArray<Record<string, unknown>>) => Promise<Record<string, unknown>>;
+  applyMasters?: (eventId:string,snapshot:Record<string,unknown>)=>Promise<ApplyResult>;
 }>;
 
 export type ReceiveDeps = Readonly<{ secret: string | undefined; gateway: CrmSyncGateway | null }>;
@@ -63,7 +64,9 @@ export async function handleSyncReceive(request: Request, deps: ReceiveDeps): Pr
   if (!isObject(body)) return json(400, { error: "Invalid sync request" });
 
   const gateway = deps.gateway;
-  if (body.kind === "staff.events") {
+  if (body.kind === "staff.events" || body.kind === 'master.events') {
+    const apply=body.kind==='master.events' ? gateway.applyMasters : gateway.applyStaff;
+    if(!apply)return json(503,{error:'Master sync is not configured'});
     const events = body.events;
     if (!Array.isArray(events) || events.length === 0 || events.length > MAX_EVENTS) return json(400, { error: "Invalid events" });
     for (const item of events) {
@@ -74,7 +77,7 @@ export async function handleSyncReceive(request: Request, deps: ReceiveDeps): Pr
     const results = [];
     for (const item of events as Array<{ event_id: string; snapshot: Record<string, unknown> }>) {
       try {
-        const result = await gateway.applyStaff(item.event_id, item.snapshot);
+        const result = await apply(item.event_id, item.snapshot);
         results.push({ event_id: item.event_id, ok: true, outcome: result.outcome ?? "unknown", duplicate: result.duplicate === true });
       } catch (error) {
         console.error("sync-receive apply failed:", error instanceof Error ? error.message : "unknown");

@@ -122,10 +122,6 @@ export function statesFor(ids) {
     { id: "referrals-form-error", roles: ["salesperson"], path: "/referrals", act: async (page) => { await page.getByRole("button", { name: "ALL PENDING", exact: true }).click(); await page.getByRole("button", { name: "FOLLOW UP FORM" }).first().click(); await page.getByRole("button", { name: "SAVE FOLLOW UP" }).click(); } },
     { id: "referrals-history", roles: ["salesperson"], path: "/referrals", act: async (page) => { await page.getByRole("button", { name: "ALL PENDING", exact: true }).click(); await page.getByRole("button", { name: "VIEW HISTORY" }).first().click(); } },
 
-    { id: "allocation", roles: STAFF, path: "/allocation" },
-    { id: "allocation-admin", roles: ["super_admin"], path: `/allocation?branch=${A}` },
-    { id: "allocation-edit", roles: ["branch_manager", "super_admin"], path: `/allocation?branch=${A}`, act: async (page) => { await page.getByRole("button", { name: "EDIT" }).first().click(); } },
-    { id: "allocation-add-error", roles: ["branch_manager"], path: "/allocation", act: async (page) => { await page.getByRole("button", { name: "ADD", exact: true }).click(); } },
 
     { id: "leads-new", roles: ["salesperson"], path: "/leads/new" },
     { id: "drawer-open", roles: ALL, path: "/dashboard", act: async (page) => { await page.getByRole("button", { name: "Open navigation menu" }).click(); await page.waitForTimeout(400); } },

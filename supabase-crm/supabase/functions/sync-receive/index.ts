@@ -12,6 +12,11 @@ function gateway(): CrmSyncGateway | null {
   if (!url || !key) return null;
   const admin = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
   return {
+    async applyMasters(eventId,snapshot) {
+      const {data,error}=await admin.rpc('crm_apply_master_snapshot',{p_event_id:eventId,p_snapshot:snapshot});
+      if(error)throw new Error(`rpc_${error.code ?? 'unknown'}`);
+      return (data ?? {}) as Awaited<ReturnType<NonNullable<CrmSyncGateway['applyMasters']>>>;
+    },
     async applyStaff(eventId, snapshot) {
       const { data, error } = await admin.rpc("crm_apply_staff_snapshot", { p_event_id: eventId, p_snapshot: snapshot });
       // Only the SQLSTATE is reported: a database message could quote input values.

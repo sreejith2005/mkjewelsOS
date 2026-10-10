@@ -56,6 +56,16 @@ function post(body?: unknown, secret: string | null = SECRET) {
   return new Request("http://local/crm-staff-sync", { method: "POST", headers, body: body === undefined ? undefined : JSON.stringify(body) });
 }
 
+Deno.test('routes master events to master transport while preserving staff delivery',async()=>{
+ const master={event_id:2,event_type:'master.options_changed',aggregate_id:'tenant',snapshot:{snapshot_at:'2026-10-08T10:00:00Z',tenant_id:'tenant',options:[]}};
+ const {gateway,finished}=jewelos([[event(1),master]]);
+ const {receiver,sent}=crm(okFor);
+ const response=await handleStaffSync(post(),{cronSecret:SECRET,jewelos:gateway,crm:receiver});
+ assertEquals(response.status,200);
+ assertEquals(sent.map(body=>body.kind),['staff.events','master.events']);
+ assertEquals(finished.map(item=>item.ok),[true,true]);
+});
+
 Deno.test("refuses a missing or wrong cron secret, and an unconfigured function", async () => {
   const { gateway } = jewelos([]);
   const { receiver } = crm(okFor);

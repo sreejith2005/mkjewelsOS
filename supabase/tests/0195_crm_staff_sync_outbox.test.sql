@@ -79,7 +79,11 @@ select pg_temp.as_service();
 create temporary table claimed on commit drop as select * from public.crm_sync_claim_staff_events(200);
 reset role;
 
-select is((select count(*)::integer from claimed where aggregate_id in (select id from sync_fixture)), 4, 'each fixture person is claimed once');
+-- Since 0204 the claim also carries master.options_changed events (keyed by tenant);
+-- the fixture tenant has one, so the staff assertions scope to staff events.
+select is((select count(*)::integer from claimed where event_type = 'staff.access_changed' and aggregate_id in (select id from sync_fixture)), 4, 'each fixture person is claimed once');
+select is((select count(*)::integer from claimed where event_type = 'master.options_changed' and aggregate_id = (select id from sync_fixture where name = 'tenant')), 1,
+  'the fixture tenant master event shares the claim');
 select is((select snapshot ->> 'name' from claimed where aggregate_id = (select id from sync_fixture where name = 'crm_user')),
   'Sync crm renamed', 'the snapshot carries the current name');
 select is((select snapshot ->> 'email' from claimed where aggregate_id = (select id from sync_fixture where name = 'crm_user')),
@@ -97,8 +101,9 @@ select ok((select (snapshot ->> 'eligible')::boolean from claimed where aggregat
 select ok(not (select (snapshot ->> 'eligible')::boolean from claimed where aggregate_id = (select id from sync_fixture where name = 'staff')),
   'staff without crm.view is not eligible');
 select ok((select snapshot ? 'snapshot_at' from claimed limit 1), 'a snapshot carries its time');
-select ok(not exists (select 1 from claimed c, jsonb_object_keys(c.snapshot) k where k not in
-  ('jewelos_user_id', 'present', 'tenant_id', 'name', 'email', 'jewelos_role', 'crm_role', 'jewelos_branch_id', 'eligible', 'snapshot_at')),
+select ok(not exists (select 1 from claimed c, jsonb_object_keys(c.snapshot) k where c.event_type = 'staff.access_changed' and k not in
+  ('jewelos_user_id', 'present', 'tenant_id', 'name', 'email', 'jewelos_role', 'crm_role', 'jewelos_branch_id', 'eligible',
+   'crm_roster', 'crm_roster_all_branches', 'availability_from', 'availability_to', 'unavailable_dates', 'snapshot_at')),
   'snapshots carry only the documented staff fields');
 
 set local role service_role;

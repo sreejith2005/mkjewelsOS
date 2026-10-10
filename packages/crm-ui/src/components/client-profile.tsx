@@ -1,23 +1,25 @@
 "use client";
+import { ClientActivity, type ClientActivityRow } from "@/components/client-activity";
+
+import { WalkinHistory, type SavedWalkin } from '@/components/walkin-history';
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { z } from "zod";
 import Link from "@/next-shim/link"; // crm-port: next/link -> local shim (same hrefs, /crm base path added)
 import { createClient } from "@/lib/supabase/client";
 import { ExistingClientWalkinAction } from "@/components/existing-client-walkin-action";
-import { displayDate, nullable, phoneDigits, stringArray } from "@/lib/clients";
+import { displayDate, nullable, stringArray } from "@/lib/clients";
+import { PhoneNumberInput } from "@/components/phone-number-input";
+import { composePhone, formatPhone, phoneError, splitPhone } from "@/lib/phone";
 import { isPotentialCategory, POTENTIAL_CATEGORIES, potentialStars } from "@/lib/client-potential";
 import type { Json } from "@/lib/supabase/database.types";
 import type { Client } from "@/lib/supabase/app-types";
 const schema = z.object({
   primary_name: z.string().trim().min(1).max(160),
-  // Approved extension (2026-10-01): a client may have no phone; an entered phone has 10 digits.
-  primary_phone: z
-    .string()
-    .refine(
-      (value) => value.trim() === "" || phoneDigits(value).length === 10,
-      "Enter a 10-digit phone",
-    ),
+  // Approved extension (2026-10-01): a client may have no phone. An entered phone is checked
+  // with its country code below (stored with the code since CRM 20261007001000).
+  primary_phone: z.string(),
+  primary_phone_country: z.string(),
   secondary_phone: z.string(),
   billing_phone: z.string(),
   other_names: z.string(),
@@ -46,6 +48,9 @@ const schema = z.object({
   testimonial_status: z.string(),
   referral_status: z.string(),
   next_visit_date: z.string(),
+}).superRefine((form, context) => {
+  const problem = form.primary_phone.trim() ? phoneError(form.primary_phone_country, form.primary_phone) : null;
+  if (problem) context.addIssue({ code: "custom", path: ["primary_phone"], message: problem });
 });
 type Form = z.infer<typeof schema>;
 const fieldGroups: { title: string; fields: (keyof Form)[] }[] = [
@@ -111,7 +116,8 @@ const fieldGroups: { title: string; fields: (keyof Form)[] }[] = [
 function initial(client: Client): Form {
   return {
     primary_name: client.primary_name,
-    primary_phone: client.primary_phone ?? "",
+    primary_phone: splitPhone(client.primary_phone).number,
+    primary_phone_country: splitPhone(client.primary_phone).countryCode,
     other_names: (client.other_names ?? []).join(", "),
     secondary_phone: client.secondary_phone ?? "",
     billing_phone: client.billing_phone ?? "",
@@ -172,6 +178,13 @@ export function ClientProfile({
   lastSalespersonName,
   identity = null,
   family = [],
+  savedWalkins = [],
+  activity = [],
+  leadFieldLabels = {},
+  activityActorNames = {},
+  activityBranchNames = {},
+  activitySummary,
+
 }: {
   client: Client;
   timeline: Array<{
@@ -198,12 +211,19 @@ export function ClientProfile({
     created_at: string;
     editor: string | null;
   }>;
-  lookups: { beverages: string[]; snacks: string[]; sugars?: string[]; communities?: string[]; gifts?: string[] };
+  lookups: { beverages: string[]; snacks: string[]; sugars?: string[]; communities?: string[]; gifts?: string[]; masterFields?: Record<string,string[]> };
   walkinContext: { role: string; branchId: string | null; branches: { id: string; name: string }[] };
   lastBranchName?: string | null;
   lastSalespersonName?: string | null;
   identity?: ClientIdentity | null;
   family?: FamilyMember[];
+  savedWalkins?: SavedWalkin[];
+  activity?: ClientActivityRow[];
+  leadFieldLabels?: Record<string,string>;
+  activityActorNames?: Record<string,string>;
+  activityBranchNames?: Record<string,string>;
+  activitySummary?: {first_recorded_at:string|null;latest_interaction_at:string|null};
+
 }) {
   const [values, setValues] = useState(() => initial(client));
   const [tab, setTab] = useState<"profile" | "timeline" | "audit">("profile");
@@ -231,6 +251,7 @@ export function ClientProfile({
                   "other_known_phones",
                   "gift_history",
                   "primary_phone",
+                  "primary_phone_country",
                 ].includes(key),
             )
             .map(([key, value]) => [
@@ -242,11 +263,10 @@ export function ClientProfile({
                 : nullable(value),
             ]),
         ),
-        primary_phone: phoneDigits(parsed.primary_phone) || null,
+        primary_phone: parsed.primary_phone.trim() ? composePhone(parsed.primary_phone_country, parsed.primary_phone) : null,
         other_names: stringArray(parsed.other_names),
-        other_known_phones: stringArray(parsed.other_known_phones).map(
-          phoneDigits,
-        ),
+        // Sent as typed: the database stores numbers added to the list and keeps the rest.
+        other_known_phones: stringArray(parsed.other_known_phones),
         gift_history: gift,
       };
       const { data, error } = await createClient()
@@ -267,7 +287,7 @@ export function ClientProfile({
       setValues(initial(updated));
       setEditing(false);
     },
-    onError: () => setMessage("Could not save the profile. Check the entered values and try again."),
+    onError: (error) => setMessage(error instanceof z.ZodError && error.issues[0]?.path[0] === "primary_phone" ? error.issues[0].message : "Could not save the profile. Check the entered values and try again."),
   });
   if (!editing) {
     const timelineRows = timeline.map((item) => <tr key={item.id}><td>{displayDate(item.created_at)}</td><td>{displayDate(item.event_date)}</td><td>{item.event_type}</td><td>{item.buy_status ?? "NA"}</td><td>{item.branch ?? "NA"}</td><td>{item.crm_name ?? "NA"}</td><td>{item.salesperson ?? "NA"}</td><td>{item.seen_categories.join(", ") || "NA"}</td><td>{item.bought_categories.join(", ") || "NA"}</td><td>{item.order_categories.join(", ") || "NA"}</td><td>{item.product_requirement ?? "NA"}</td><td>{item.remark ?? "NA"}</td><td>{item.reference_number ?? "NO REF"}</td></tr>);
@@ -275,7 +295,8 @@ export function ClientProfile({
       <div className="legacy-profile-grid">
         <aside className="legacy-profile-left">
           <section className="legacy-client-hero"><h1>{client.primary_name}</h1><div className="legacy-client-badges"><span>{client.client_code}</span><span>{client.last_buy_status ?? "NA"}</span><span>{client.city ?? "NA"}</span>{identity?.referral_code ? <span>{identity.referral_code}</span> : null}{identity?.household_code ? <span>{identity.household_code}</span> : null}</div><div className="legacy-client-hero-actions"><ExistingClientWalkinAction clientId={client.client_id} primaryName={client.primary_name} primaryPhone={client.primary_phone ?? ""} role={walkinContext.role} branchId={walkinContext.branchId} branches={walkinContext.branches} /><button type="button" onClick={() => { setValues(initial(client)); setEditing(true); }}>EDIT PROFILE</button></div></section>
-          <LegacyProfileCard title="CONTACT" rows={[["PRIMARY PHONE", client.primary_phone ?? ""], ["SECONDARY PHONE", client.secondary_phone ?? ""], ["BILLING PHONE", client.billing_phone ?? ""], ["OTHER KNOWN PHONES", client.other_known_phones?.join(", ") ?? ""]]} />
+          <LegacyProfileCard title="CONTACT" rows={[["PRIMARY PHONE", formatPhone(client.primary_phone)], ["SECONDARY PHONE", formatPhone(client.secondary_phone)], ["BILLING PHONE", formatPhone(client.billing_phone)], ["OTHER KNOWN PHONES", client.other_known_phones?.map(formatPhone).join(", ") ?? ""]]} />
+
           <LegacyProfileCard title="FAMILY & REFERRAL" rows={[
             ["REFERRAL ID", identity?.referral_id ?? ""],
             ["REFERRAL PERSON ID", identity?.referral_person_id ?? ""],
@@ -298,6 +319,9 @@ export function ClientProfile({
             <LegacyProfileCard title="POTENTIAL" rows={[["CLIENT POTENTIAL CATEGORY", client.client_potential_category ?? ""], ["HIGH POTENTIAL REASON", client.high_potential_reason ?? ""], ["PROFILE LAST UPDATED ON", displayDate(client.profile_updated_at)]]} />
           </div>
           <section className="legacy-timeline-card"><h2>FULL TIMELINE HISTORY</h2><div className="overflow-x-auto"><table><thead><tr>{["TIMESTAMP", "CLIENT VISIT DATE", "EVENT TYPE", "BUY STATUS", "BRANCH", "CRM", "SALESPERSON", "SEEN", "BOUGHT", "ORDER", "PRODUCT REQUIREMENT", "REMARK", "REFERENCE NUMBER"].map((heading) => <th key={heading}>{heading}</th>)}</tr></thead><tbody>{timelineRows.length ? timelineRows : <tr><td colSpan={13}>NO TIMELINE FOUND.</td></tr>}</tbody></table></div></section>
+          <ClientActivity clientId={client.client_id} activity={activity} fieldLabels={leadFieldLabels} actorNames={activityActorNames} branchNames={activityBranchNames} summary={activitySummary} />
+
+          <WalkinHistory visits={savedWalkins} />
           <section className="legacy-audit-card"><h2>PROFILE EDIT LOG</h2>{audit.length ? <div className="overflow-x-auto"><table><thead><tr><th>FIELD</th><th>OLD VALUE</th><th>NEW VALUE</th><th>UPDATED BY</th><th>UPDATED ON</th></tr></thead><tbody>{audit.map((item) => <tr key={item.id}><td>{label(item.field_name)}</td><td>{JSON.stringify(item.old_value)}</td><td>{JSON.stringify(item.new_value)}</td><td>{item.editor ?? "SYSTEM"}</td><td>{displayDate(item.created_at)}</td></tr>)}</tbody></table></div> : <p>NO PROFILE EDITS YET.</p>}</section>
         </section>
       </div>
@@ -309,7 +333,7 @@ export function ClientProfile({
         <div>
           <h1 className="text-3xl font-semibold">{client.primary_name}</h1>
           <p className="mt-1 text-stone-600">
-            {client.primary_phone ? <>{client.primary_phone} <button type="button" aria-label="Copy primary phone" className="ml-1 rounded border px-1 text-xs" onClick={() => void navigator.clipboard.writeText(client.primary_phone ?? "")}>Copy</button></> : "No phone"} · {client.gender ?? "Gender not set"}
+            {client.primary_phone ? <>{formatPhone(client.primary_phone)} <button type="button" aria-label="Copy primary phone" className="ml-1 rounded border px-1 text-xs" onClick={() => void navigator.clipboard.writeText(client.primary_phone ?? "")}>Copy</button></> : "No phone"} · {client.gender ?? "Gender not set"}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -337,6 +361,7 @@ export function ClientProfile({
           {client.last_buy_status ?? "—"}
         </p>
       </div>
+      <ClientActivity clientId={client.client_id} activity={activity} fieldLabels={leadFieldLabels} actorNames={activityActorNames} branchNames={activityBranchNames} summary={activitySummary} />
       <div className="mt-6 flex gap-4 border-b">
         <button
           onClick={() => setTab("profile")}
@@ -379,7 +404,18 @@ export function ClientProfile({
               >
                 <h2 className="font-semibold">{group.title}</h2>
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  {group.fields.map((field) => (
+                  {group.fields.map((field) => field === "primary_phone" ? (
+                    <div key={field}>
+                      <PhoneNumberInput
+                        label="Primary phone"
+                        countryCode={values.primary_phone_country}
+                        number={values.primary_phone}
+                        onCountryCodeChange={(code) => setValues({ ...values, primary_phone_country: code })}
+                        onNumberChange={(number) => setValues({ ...values, primary_phone: number })}
+                        inputClassName="w-full rounded border p-2"
+                      />
+                    </div>
+                  ) : (
                     <label
                       className={
                         field === "address" || field === "gift_history"
@@ -405,13 +441,13 @@ export function ClientProfile({
                             })
                           }
                         >
-                          {!isPotentialCategory(values.client_potential_category) && values.client_potential_category ? (
+                          {!(lookups.masterFields?.client_potential_category ?? []).includes(values.client_potential_category) && values.client_potential_category ? (
                             <option value={values.client_potential_category} disabled>
                               Legacy value: {values.client_potential_category} (needs review)
                             </option>
                           ) : null}
                           <option value="">Not set</option>
-                          {POTENTIAL_CATEGORIES.map((category) => (
+                          {(lookups.masterFields?.client_potential_category ?? []).map((category) => (
                             <option value={category} key={category}>
                               {category} {potentialStars(category)}
                             </option>
@@ -427,7 +463,8 @@ export function ClientProfile({
                           }
                         >
                           <option value="">Choose</option>
-                          {["FEMALE", "MALE", "OTHER"].map((option) => (
+                          {values.gender && !(lookups.masterFields?.gender ?? []).includes(values.gender)?<option value={values.gender}>{values.gender} (saved)</option>:null}
+                          {(lookups.masterFields?.gender ?? []).map((option) => (
                             <option value={option} key={option}>{option}</option>
                           ))}
                         </select>
@@ -470,7 +507,7 @@ export function ClientProfile({
                               ? "date"
                               : "text"
                           }
-                          inputMode={field === "primary_phone" || field === "secondary_phone" || field === "billing_phone" ? "numeric" : undefined}
+                          inputMode={field === "secondary_phone" || field === "billing_phone" ? "tel" : undefined}
                           value={values[field]}
                           onChange={(event) =>
                             setValues({

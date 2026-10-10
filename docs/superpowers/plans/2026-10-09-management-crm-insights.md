@@ -37,12 +37,12 @@
 
 - `packages/core/src/analytics/insightsTypes.ts`, `insightsFilters.ts`, `insights.ts`, `insightsCatalog.ts`: versioned contracts, filter codecs, deterministic findings, module descriptors.
 - `packages/core/src/analytics/crmInsights.ts`: pure CRM status classification and rate definitions shared with CRM UI.
-- `supabase/migrations/0202_management_insights.sql`: internal scope/filter helpers, aggregates, drilldowns.
-- `supabase/migrations/0203_dashboard_saved_views.sql`: personal configuration persistence and audited writes.
+- `supabase/migrations/0206_management_insights.sql`: internal scope/filter helpers, aggregates, drilldowns.
+- `supabase/migrations/0207_dashboard_saved_views.sql`: personal configuration persistence and audited writes.
 - `packages/data/src/analytics/insightsApi.ts`: typed internal RPC I/O shared by web/native.
 - `apps/web/src/features/analytics/insights/`: responsive views and interactions; existing DashboardView becomes the entry adapter.
 - `apps/mobile/src/features/analytics/`: native views consuming the same contracts; existing DashboardScreen remains the entry.
-- CRM worktree `supabase-crm/supabase/migrations/20261009000100_crm_insights.sql`: CRM-only aggregate/detail contracts.
+- CRM worktree `supabase-crm/supabase/migrations/20261010000100_crm_insights.sql`: CRM-only aggregate/detail contracts.
 - CRM worktree `packages/crm-ui/src/components/dashboard-insights/`: CRM-only rendered views.
 - `docs/MANAGEMENT_INSIGHTS_PARITY.md`: action-level parity and verification evidence.
 
@@ -69,7 +69,7 @@
 
 ## Task 2: Authorized internal aggregates and matching detail predicates
 
-**Files:** Create `supabase/migrations/0202_management_insights.sql`, `supabase/tests/0202_management_insights.test.sql`; update `packages/api-client/src/database.types.ts` using the repository generation workflow.
+**Files:** Create `supabase/migrations/0206_management_insights.sql`, `supabase/tests/0206_management_insights.test.sql`; update `packages/api-client/src/database.types.ts` using the repository generation workflow.
 
 **Interfaces:** `get_management_insights_v1(p_context jsonb) returns jsonb`; `get_management_insight_records_v1(p_context jsonb,p_metric text,p_group_id text default null,p_offset integer default 0,p_limit integer default 25) returns jsonb`; `get_management_insights_options_v1(p_context jsonb) returns jsonb`.
 
@@ -96,7 +96,7 @@
 
 ## Task 4: Personal saved dashboard views
 
-**Files:** Create `supabase/migrations/0203_dashboard_saved_views.sql`, `supabase/tests/0203_dashboard_saved_views.test.sql`, `packages/data/src/analytics/savedViews.ts`, `savedViews.test.ts`; update generated types and analytics exports.
+**Files:** Create `supabase/migrations/0207_dashboard_saved_views.sql`, `supabase/tests/0207_dashboard_saved_views.test.sql`, `packages/data/src/analytics/savedViews.ts`, `savedViews.test.ts`; update generated types and analytics exports.
 
 **Interfaces:** `dashboard_saved_views` stores id, tenant_id, user_profile_id, name, config jsonb, record_version and timestamps. `save_dashboard_view_with_audit(p_id uuid,p_name text,p_config jsonb,p_expected_version integer) returns jsonb`; `delete_dashboard_view_with_audit(p_id uuid,p_expected_version integer) returns void`. Config: version 1, validated filter, ordered visible section keys, no metrics/records/tokens. Name trimmed 1..80 chars, at most 20 personal views, unique per-user case-insensitive name.
 
@@ -133,7 +133,7 @@
 
 ## Task 7: CRM aggregate/detail contracts and CRM-only view
 
-**Files in `C:\crm`:** Create `supabase-crm/supabase/migrations/20261009000100_crm_insights.sql`, `supabase-crm/supabase/tests/20261009_crm_insights.test.sql`, `packages/crm-ui/src/lib/crm-insights-api.ts`, `packages/crm-ui/src/components/dashboard-insights/CrmInsightsDashboard.tsx`, `CrmInsightsFilters.tsx`, `CrmInsightsCharts.tsx`, `CrmInsightsRecords.tsx`, `packages/crm-ui/tests/crm-insights.test.tsx`; modify existing dashboard page and CRM-project generated types. Integrate the reviewed core classifier from Task 1 without replacing dirty core changes.
+**Files in `C:\crm`:** Create `supabase-crm/supabase/migrations/20261010000100_crm_insights.sql`, `supabase-crm/supabase/tests/20261010_crm_insights.test.sql`, `packages/crm-ui/src/lib/crm-insights-api.ts`, `packages/crm-ui/src/components/dashboard-insights/CrmInsightsDashboard.tsx`, `CrmInsightsFilters.tsx`, `CrmInsightsCharts.tsx`, `CrmInsightsRecords.tsx`, `packages/crm-ui/tests/crm-insights.test.tsx`; modify existing dashboard page and CRM-project generated types. Integrate the reviewed core classifier from Task 1 without replacing dirty core changes.
 
 **Interfaces:** `get_crm_insights_v1(p_context jsonb) returns jsonb`; `get_crm_insight_records_v1(p_context jsonb,p_metric text,p_group_id text default null,p_offset integer default 0,p_limit integer default 25) returns jsonb`; `get_crm_insights_options_v1(p_context jsonb) returns jsonb`. `CrmInsightsFilter`: period plus branch, saved CRM attribution, salesperson, lead source, visit type/outcome, tab (`visits|followups|clients|staff`). `CrmInsightsPayload` follows shared metrics/trend/groups/missingness structure but contains CRM-only measures.
 

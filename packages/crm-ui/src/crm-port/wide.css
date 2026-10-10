@@ -1,0 +1,56 @@
+/*
+ * crm-port: tablet and desktop layout for the ported CRM (owner request 2026-10-08: "the entire
+ * width of the screen is not being used" and "to view the end of the rows I have to go to the
+ * bottom of the page and use the horizontal scroll bar"). Not part of the original globals.css,
+ * which stays verbatim.
+ *
+ * Every rule sits inside a min-width media query at or above 768px, where crm-port/mobile.css
+ * stops, so phones keep the card layout. "#crm-wide" is replaced at load time by the same scope
+ * as the phone rules (crm-port/document.tsx), one id stronger than the original's strongest tier.
+ *
+ * - Pages use the full window width instead of the original 1400px (1180px profile) column.
+ * - The one listing of a page (marked data-crm-cards by crm-port/mobile-tables.ts) fills the room
+ *   left in the window and is the page's only scroller, so its sideways scroll bar is always on
+ *   screen and its column headings stay in view; there is never a second vertical scroll bar.
+ * - Columns size to their content with a readable minimum instead of a fixed 900-2200px width,
+ *   so a wide screen shows every column without scrolling.
+ * - When the last column is the row's actions (data-crm-actions), it stays pinned to the right
+ *   edge, so OPEN PROFILE / FOLLOW UP FORM / VIEW HISTORY are always reachable.
+ */
+
+@media (min-width: 768px) {
+  /* Full width pages. */
+  #crm-wide .crm-app main,
+  #crm-wide .crm-app .legacy-walkin-form,
+  #crm-wide .legacy-client-profile { width: 100% !important; max-width: none !important; }
+
+  /* One scroll bar (owner 2026-10-08): crm-port/mobile-tables.ts sets --crm-fit-height on the one
+     listing of a page to the room left in the window, so only the listing scrolls; otherwise the
+     box grows with its rows and only the page scrolls. */
+  #crm-wide .crm-app [class*="overflow-x-auto"]:has(> table[data-crm-cards]) { max-height: var(--crm-fit-height, none); overflow: auto; overscroll-behavior: contain; }
+  #crm-wide .crm-app table[data-crm-cards] { min-width: 100% !important; width: 100%; max-width: none; border-collapse: separate; border-spacing: 0; }
+
+  /* Readable columns: a minimum width, long text wraps instead of stretching the row. */
+  #crm-wide .crm-app table[data-crm-cards] > thead > tr > th,
+  #crm-wide .crm-app table[data-crm-cards] > tbody > tr > td[data-label] { min-width: 6rem; max-width: 22rem; }
+  #crm-wide .crm-app table[data-crm-cards] > tbody > tr > td[data-label][class*="max-w-"] { min-width: 10rem; }
+  #crm-wide .crm-app table[data-crm-cards] > tbody > tr > td { overflow-wrap: break-word; }
+  #crm-wide .crm-app table[data-crm-cards] > tbody > tr > td.whitespace-nowrap { max-width: none; overflow-wrap: normal; }
+  #crm-wide .crm-app table[data-crm-cards] > tbody > tr > td .flex.gap-1 { flex-wrap: wrap; }
+  #crm-wide .crm-app table[data-crm-cards] > tbody > tr > td .flex.gap-1 > span { white-space: nowrap; }
+
+  /* Column headings stay at the top of the box while scrolling down. */
+  #crm-wide .crm-app table[data-crm-cards] > thead > tr > th { position: sticky; top: 0; z-index: 2; background: #fafafa; box-shadow: inset 0 -1px 0 var(--crm-line); white-space: nowrap; }
+  /* Separate borders (needed for the sticky cells): a row's line is drawn by its cells. */
+  #crm-wide .crm-app table[data-crm-cards] > tbody > tr.border-t > td { border-top: 1px solid var(--crm-line); }
+  #crm-wide .crm-app table[data-crm-cards] > tbody > tr.border-b > td { border-bottom: 1px solid var(--crm-line); }
+
+  /* The actions column stays pinned to the right edge. */
+  #crm-wide .crm-app table[data-crm-actions] > thead > tr > th:last-child,
+  #crm-wide .crm-app table[data-crm-actions] > tbody > tr > td[data-label]:last-child { position: sticky; right: 0; box-shadow: -8px 0 10px -8px rgba(0, 0, 0, .18), inset 1px 0 0 var(--crm-line); }
+  #crm-wide .crm-app table[data-crm-actions] > thead > tr > th:last-child { z-index: 3; box-shadow: -8px 0 10px -8px rgba(0, 0, 0, .18), inset 1px 0 0 var(--crm-line), inset 0 -1px 0 var(--crm-line); }
+  #crm-wide .crm-app table[data-crm-actions] > tbody > tr > td[data-label]:last-child { z-index: 1; min-width: 9.5rem; background: var(--crm-card); }
+  #crm-wide .crm-app table[data-crm-actions] > tbody > tr:hover > td[data-label]:last-child { background: #fff8e9; }
+  /* Compact row buttons, so three stacked actions do not make every row 150px tall. */
+  #crm-wide .crm-app table[data-crm-actions] > tbody > tr > td:last-child .flex-col > * { display: flex; min-height: 2rem; align-items: center; justify-content: center; padding-block: .3rem; line-height: 1.15; text-align: center; }
+}

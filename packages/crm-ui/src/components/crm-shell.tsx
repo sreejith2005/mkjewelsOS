@@ -19,7 +19,7 @@ function BrandLink() {
 }
 
 export function CrmShell({ profile, children }: { profile: { name: string; role: string; branch_name: string | null }; children: React.ReactNode }) {
-  const navigation = [["DASHBOARD", "/dashboard"], ["CLIENT WALK-IN FORM", "/queue"], ["NOT BOUGHT FOLLOW UP", "/followups"], ["REFERRALS CALLING", "/referrals"], ["CLIENT DATABASE", "/clients"], ["ROSTER / ALLOCATION", "/allocation"]] as const;
+  const navigation = [["DASHBOARD", "/dashboard"], ["CLIENT WALK-IN FORM", "/queue"], ["NOT BOUGHT FOLLOW UP", "/followups"], ["REFERRALS CALLING", "/referrals"], ["CLIENT DATABASE", "/clients"]] as const; // crm-port: ROSTER / ALLOCATION removed; the roster follows JewelOS Users and Availability
   const [drawerOpen, setDrawerOpen] = useState(false);
   const pathname = usePathname();
 

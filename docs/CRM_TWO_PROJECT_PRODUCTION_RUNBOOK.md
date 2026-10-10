@@ -314,8 +314,9 @@ the CRM project.
 
 1. Sign in to JewelOS as a super admin, open `/crm`: dashboard and client database load; the
    header search finds a client by phone, by name and by its `MKC-` code.
-2. A salesperson (granted in d): `/crm` opens, scoped writes work, the allocation screen's CRM
-   NAME offers only synced users. A JewelOS user without CRM access cannot open `/crm`.
+2. A salesperson (granted in d): `/crm` opens, scoped writes work, the walk-in CRM dropdown
+   lists only JewelOS CRM-role people of the branch (since 2026-10-07, see
+   `docs/CRM_ROSTER_FROM_USERS_ROLLOUT.md`). A JewelOS user without CRM access cannot open `/crm`.
 3. **Hosted CORS header** (local could not prove it):
 
    ```powershell
@@ -327,12 +328,12 @@ the CRM project.
    foreign origins itself); the second prints `403`.
 4. Walk-in ingest: the synthetic test of `docs/CRM_SHEETS_INGEST_CUTOVER.md` (201, then 200).
 5. Roster: in JewelOS Users rename a test account that has CRM access; within two minutes the
-   CRM allocation picker shows the new name. Deactivate it: `/crm` refuses it within one token
+   CRM walk-in dropdown shows the new name. Deactivate it: `/crm` refuses it within one token
    lifetime (1 hour) and immediately after the next sync.
 6. Walk-in task: register a synthetic walk-in in `/crm` queue; within two minutes the salesperson
    has the task "Complete walk-in form - ..." in JewelOS; submit the walk-in form; the task
    closes.
-7. CRM super admin: `/crm/allocation` shows CRM SYNC HEALTH with no failing or dead events.
+7. CRM super admin: the `/crm` dashboard shows CRM SYNC HEALTH with no failing or dead events.
 8. Android app: open the CRM tab on a phone; it loads `/crm` (no APK is needed: the app was
    not changed).
 

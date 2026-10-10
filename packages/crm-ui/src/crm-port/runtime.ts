@@ -79,14 +79,15 @@ function currentFacade(): Facade {
     !facade || facade.base !== supabase || facade.auth !== auth || facade.url !== crmProject.url
     || facade.anonKey !== crmProject.anonKey || facade.jewelosAccessToken !== jewelosAccessToken
   ) {
+    const currentAccessToken = jewelosAccessToken ?? (async () => (await supabase.auth.getSession()).data.session?.access_token ?? null);
     const source = crmTokenSource({
       config: crmProject,
-      jewelosAccessToken: jewelosAccessToken ?? (async () => (await supabase.auth.getSession()).data.session?.access_token ?? null),
+      jewelosAccessToken: currentAccessToken,
     });
     const project = createCrmProjectClient({ config: crmProject, source }) as unknown as CrmSupabaseClient;
     facade = {
       base: supabase, auth, url: crmProject.url, anonKey: crmProject.anonKey, jewelosAccessToken, source, project,
-      client: crmFacade(project, auth ?? supabase.auth),
+      client: crmFacade(project, sharedPendingAuth(auth ?? supabase.auth, currentAccessToken)),
     };
   }
   return facade;
@@ -105,6 +106,25 @@ export function crmProjectClient(): CrmSupabaseClient {
 /** Forget the cached CRM token (sign-out). */
 export function forgetCrmSession(): void {
   facade?.source.invalidate();
+  facade = null;
+}
+
+/** Share only overlapping verifications for the exact same session. Completed
+ * results are discarded, including denials and errors, so later loads verify
+ * with Auth again. CRM data access continues to be enforced by its RLS/RPCs. */
+function sharedPendingAuth(auth: CrmAuth, currentAccessToken: () => Promise<string | null>): CrmAuth {
+  const pending = new Map<string, ReturnType<CrmAuth["getUser"]>>();
+  return {
+    async getUser() {
+      const token = await currentAccessToken();
+      if (!token) return auth.getUser();
+      const existing = pending.get(token);
+      if (existing) return existing;
+      const verification = auth.getUser().finally(() => { pending.delete(token); });
+      pending.set(token, verification);
+      return verification;
+    },
+  };
 }
 
 function crmFacade(project: CrmSupabaseClient, auth: CrmAuth | CrmSupabaseClient["auth"]): CrmSupabaseClient {

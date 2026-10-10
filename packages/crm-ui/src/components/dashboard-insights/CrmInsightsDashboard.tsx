@@ -2,6 +2,7 @@
 import {useEffect,useRef,useState} from "react";
 import {INSIGHTS_RANGES,buildAttentionFindings,insightValue,type InsightsDetailPage,type InsightOption,classifyCrmVisitOutcome} from "@jewelos/core";
 import Link from "@/next-shim/link";
+import {useCrmRefresh} from "@/crm-port/use-crm-refresh";
 import {fetchCrmInsights,fetchCrmInsightsOptions,fetchCrmInsightRecords,readCrmInsightsFilter,type CrmInsightsFilter,type CrmInsightsPayload,type CrmInsightsOptions} from "@/lib/crm-insights-api";
 const tabs={visits:"Visits & Outcomes",followups:"Follow-ups",clients:"Clients & Leads",staff:"Staff & Branches"};
 export function CrmInsightsDashboard(){
@@ -10,6 +11,7 @@ export function CrmInsightsDashboard(){
  const requestedBranch=new URLSearchParams(window.location.search).get("jewelos_branch_id");const [mappedBranch,setMappedBranch]=useState("");const mappingPending=!!requestedBranch&&mappedBranch!==requestedBranch;const [mappingError,setMappingError]=useState("");
  useEffect(()=>{if(!requestedBranch)return;let active=true;void fetchCrmInsightsOptions(filter).then(o=>{if(!active)return;const branch=o.branches.find(b=>b.jewelos_branch_id===requestedBranch);if(!branch){setMappingError("This JewelOS branch has no CRM mapping. Open CRM directly to select its own branch.");return;}setFilter(f=>({...f,branch_id:branch.id}));setOptions(o);setMappedBranch(requestedBranch);}).catch(()=>{if(active)setMappingError("CRM branch mapping could not load. Refresh to retry.");});return()=>{active=false;};},[requestedBranch]);
  const refresh=async()=>{const seq=++generation.current;setLoading(true);setError("");try{const result=await fetchCrmInsights(filter);if(seq===generation.current){setData(result);setLoadedKey(key);}}catch{if(seq===generation.current)setError("CRM analytics could not load. Check connection and access, then retry.");}finally{if(seq===generation.current)setLoading(false);}};
+ useCrmRefresh(async()=>{if(!mappingPending)await refresh();});
  useEffect(()=>{if(mappingPending)return;void refresh();let active=true;void fetchCrmInsightsOptions(filter).then(o=>{if(active)setOptions(o);}).catch(()=>{if(active)setOptions(null);});return()=>{active=false;generation.current++;};},[key,mappingPending]);
  useEffect(()=>{const restore=()=>{setFilter(readCrmInsightsFilter(window.location.search));setSelection(null);};window.addEventListener("popstate",restore);return()=>window.removeEventListener("popstate",restore);},[]);
  useEffect(()=>{if(mappingPending)return;const seq=++detailGeneration.current;setPage(null);setDetailError("");if(!selection)return;setDetailLoading(true);void fetchCrmInsightRecords(filter,selection.metric,selection.group,selection.offset).then(p=>{if(seq===detailGeneration.current)setPage(p);}).catch(()=>{if(seq===detailGeneration.current)setDetailError("Could not load matching records. Close and retry.");}).finally(()=>{if(seq===detailGeneration.current)setDetailLoading(false);});return()=>{detailGeneration.current++;};},[selection,key,mappingPending]);

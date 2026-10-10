@@ -1,12 +1,12 @@
 import { assert, assertEquals, assertFalse } from "@std/assert";
 
-import { handleRunoPush, RUNO_ALLOCATION_URL, type RunoGateway, type RunoLead, type RunoLeadUpdate } from "./worker.ts";
+import { handleRunoPush, RUNO_ALLOCATION_URL, runoNationalNumber, runoPhoneNumber, type RunoGateway, type RunoLead, type RunoLeadUpdate } from "./worker.ts";
 
 const LEAD_ID = "6a000000-0000-4000-8000-000000000001";
 const CREATOR = "30000000-0000-4000-8000-000000000001";
 const OTHER = "30000000-0000-4000-8000-000000000002";
 
-const lead: RunoLead = { id: LEAD_ID, phone_number: "9100000001", name: "Parity Lead", field_values: { city: "Pune", budget: "  ", note: 5 }, created_by: CREATOR };
+const lead: RunoLead = { id: LEAD_ID, phone_number: "919100000001", country_code: "91", name: "Parity Lead", field_values: { city: "Pune", budget: "  ", note: 5 }, created_by: CREATOR };
 const fields = [
   { field_key: "mobile_no", runo_field_name: "Mobile" },
   { field_key: "name", runo_field_name: "Customer" },
@@ -140,4 +140,13 @@ Deno.test("only POST is served; the key never appears in a response", async () =
   const response = await handleRunoPush(post(), { runoKey: "runo-secret", gateway, fetcher: runoStub(500).fetcher });
   assertFalse((await response.text()).includes("runo-secret"));
   assert(response.status === 502);
+});
+
+Deno.test("Runo receives the number with its own country code", () => {
+  assertEquals(runoPhoneNumber("919987323456"), "+919987323456");
+  assertEquals(runoPhoneNumber("971501234567"), "+971501234567");
+  assertEquals(runoPhoneNumber("6591234567"), "+6591234567");
+  assertEquals(runoNationalNumber("919987323456", "91"), "9987323456");
+  assertEquals(runoNationalNumber("6591234567", "65"), "91234567");
+  assertEquals(runoNationalNumber("919987323456", null), "919987323456");
 });
