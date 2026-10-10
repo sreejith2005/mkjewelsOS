@@ -43,3 +43,11 @@ Rendered authenticated browser and physical-phone evidence remains open. Native 
 - Final fresh local candidate: **602 passing assertions across all 17 current CRM pgTAP files**, zero failures/errors; JewelOS master sync **12/12**. The newer company-wide follow-up workflows remain covered. The last focused CRM UI run passed **35 tests**, and CSS/type checks passed after final phone compatibility edits.
 - Vercel production deployment `dpl_9jvv6Fcnh2eiSnTY1BS47i4FeKcP` for the application commit is **READY**, serving `https://mkjewels-os.vercel.app`.
 - No historical lead-profile recovery, customer interaction creation, secret rotation or APK publication was performed. Authenticated rendered/browser/physical-phone behavior remains outside this evidence.
+
+## Hosted hotfix: global dropdown sync, 2026-10-09
+
+`0204` enqueued a CRM master sync for every `dropdown_masters` write, including global rows (`tenant_id` null). The outbox aggregate is not null, so any insert, update or delete of a global dropdown failed. Forward migration `0205_crm_master_sync_ignore_global_dropdowns.sql` replaces only the `crm_sync.master_changed()` trigger function so that null tenants are skipped; a row moved between global and a tenant still enqueues the tenant side. No applied migration was edited.
+
+The fix and its pgTAP coverage were merged to `main` in merge commit `4b3b7b6` (PR #2, `fix/pgtap-crm-sync-0204`). Migration `0205` was then applied to the JewelOS project (`yimafxhuwgfhvzczqqdd`). No CRM-project migration, Edge Function deployment, secret change or web change was part of this hotfix.
+
+Hosted verification: the deployed `crm_sync.master_changed()` contains the null-tenant guard, and its privileges are unchanged (the migration re-applies the existing owner-only revoke). This proves the deployed function definition and privileges, not a live global-dropdown edit or CRM sync delivery in production.
