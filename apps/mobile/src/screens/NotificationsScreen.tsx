@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Bell, CheckCheck } from "lucide-react-native";
-import { filterNotificationInbox, hasPermission, notificationDestination } from "@jewelos/core";
+import { filterNotificationInbox, hasPermission } from "@jewelos/core";
+import { nativeNotificationAction } from "@/navigation/shellModel";
 import {
   loadActiveRecipientProfiles,
   loadInbox,
@@ -174,12 +175,12 @@ export function NotificationsScreen({ onNavigate }: { onNavigate: (path: string)
       }
       refreshControl={<RefreshControl colors={[theme.colors.primary]} onRefresh={() => void refresh()} refreshing={refreshing} tintColor={theme.colors.primary} />}
       renderItem={({ item }) => {
-        const destination = notificationDestination(item.link_url);
+        const action = nativeNotificationAction(item.link_url);
         return (
           <Card accent={item.is_read ? "none" : "primary"}>
             <View style={styles.itemHeading}><Text style={styles.itemTitle} variant="subtitle" weight={item.is_read ? "medium" : "semibold"}>{item.title || "Notification"}</Text><Text tone="muted" variant="caption">{formatDateTime(item.created_at, "")}</Text></View>
             <Text tone="muted" variant="small">{item.message}</Text>
-            <View style={styles.actions}><StatusBadge label={titleCase(item.event_type || "system")} tone="neutral" /><StatusBadge label={titleCase(item.priority || "medium")} tone={item.priority === "high" ? "danger" : item.priority === "medium" ? "warning" : "neutral"} /><View style={styles.spacer} />{destination ? <Button label="Open" onPress={() => { if (!item.is_read) void toggleRead(item); onNavigate(destination); }} variant="ghost" /> : null}<Button busy={busyId === item.id} label={item.is_read ? "Mark unread" : "Mark read"} onPress={() => void toggleRead(item)} variant="ghost" /></View>
+            <View style={styles.actions}><StatusBadge label={titleCase(item.event_type || "system")} tone="neutral" /><StatusBadge label={titleCase(item.priority || "medium")} tone={item.priority === "high" ? "danger" : item.priority === "medium" ? "warning" : "neutral"} /><View style={styles.spacer} />{action?.kind === "open" ? <Button label="Open" onPress={() => { if (!item.is_read) void toggleRead(item); onNavigate(action.path); }} variant="ghost" /> : null}{action?.kind === "web_only" ? <Text tone="muted" variant="caption">Open on web for now</Text> : null}<Button busy={busyId === item.id} label={item.is_read ? "Mark unread" : "Mark read"} onPress={() => void toggleRead(item)} variant="ghost" /></View>
           </Card>
         );
       }}

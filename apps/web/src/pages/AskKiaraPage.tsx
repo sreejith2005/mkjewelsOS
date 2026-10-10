@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BookOpen, MessagesSquare, Sparkles } from "lucide-react";
+import { BookOpen, MessageCircleQuestion, MessagesSquare, Sparkles } from "lucide-react";
 import { formatQuotaReset, hasPermission, isQuotaExhausted, type KiaraQuota } from "@jewelos/core";
 import {
   KIARA_CONVERSATION_QUESTION_LIMIT,
@@ -12,15 +12,28 @@ import {
   type KiaraConversation,
   type KiaraConversationSummary,
 } from "@jewelos/data/assistant/api";
+import { createKiaraEscalation, withdrawMyKiaraEscalation } from "@jewelos/data/assistant/escalations";
 import { useAuth } from "@/auth/AuthContext";
 import { Notice } from "@/components/ui";
 import { ChatView, type ChatBubble } from "@/features/assistant/ChatView";
+import { QuestionsForYou } from "@/features/assistant/QuestionsForYou";
+import { useKiaraEscalationBadge } from "@/features/assistant/useKiaraEscalationBadge";
+import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { ConversationList } from "@/features/assistant/ConversationList";
 import { QuotaChip } from "@/features/assistant/QuotaChip";
 import { KnowledgeBaseView } from "@/features/assistant/knowledge/KnowledgeBaseView";
 
-type KiaraTab = "chat" | "knowledge";
-const initialTab = (): KiaraTab => new URLSearchParams(window.location.search).get("tab") === "knowledge" ? "knowledge" : "chat";
+type KiaraTab = "chat" | "questions" | "knowledge";
+/** The tab and item a URL opens (notification links use these). */
+export function kiaraLocation(search: string): Readonly<{ tab: KiaraTab; escalationId: string | null; conversationId: string | null }> {
+  const params = new URLSearchParams(search);
+  const tab = params.get("tab");
+  return {
+    tab: tab === "knowledge" || tab === "questions" ? tab : "chat",
+    escalationId: params.get("escalation"),
+    conversationId: params.get("conversation"),
+  };
+}
 
 /** Display bubbles for a stored conversation. A question without an answer says why. */
 export function bubblesFor(conversation: KiaraConversation): ChatBubble[] {
@@ -31,17 +44,30 @@ export function bubblesFor(conversation: KiaraConversation): ChatBubble[] {
       if (answered.has(message.id)) return [bubble];
       return [bubble, { id: `${message.id}:missing`, role: "assistant", text: "", note: message.refunded ? "Kiara could not answer this one, so it was not counted." : "No answer was saved for this question." }];
     }
-    return [{ id: message.id, role: "assistant", text: message.display_text, citations: message.citations }];
+    if (message.role === "human_answer") {
+      return [{ id: message.id, role: "human", text: message.display_text, answeredBy: message.answered_by ?? undefined, createdAt: message.created_at }];
+    }
+    return [{
+      id: message.id,
+      role: "assistant",
+      text: message.display_text,
+      citations: message.citations,
+      ...(message.escalation_offer ? { offer: { messageId: message.id, summary: message.escalation_offer.summary_en } } : {}),
+      ...(message.escalation ? { escalation: { id: message.escalation.id, status: message.escalation.status, answeredBy: message.escalation.answered_by } } : {}),
+    }];
   });
 }
 
 const errorText = (caught: unknown, fallback: string) => caught instanceof Error && caught.message ? caught.message : fallback;
 
-export function AskKiaraPage({ onNavigate }: { onNavigate: (path: string) => void }) {
+export function AskKiaraPage({ onNavigate, search = window.location.search }: { onNavigate: (path: string) => void; search?: string }) {
   const { access, profile } = useAuth();
-  // A screen aid only: every knowledge RPC re-checks assistant.manage_knowledge.
+  // Screen aids only: every knowledge and escalation RPC re-checks its permission.
   const canManageKnowledge = access ? hasPermission(access, "assistant.manage_knowledge") : false;
-  const [tab, setTab] = useState<KiaraTab>(initialTab);
+  const canAnswer = access ? hasPermission(access, "assistant.answer_escalations") : false;
+  const waitingQuestions = useKiaraEscalationBadge(profile?.tenant_id, canAnswer);
+  const location = kiaraLocation(search);
+  const [tab, setTab] = useState<KiaraTab>(location.tab);
   const showTab = (next: KiaraTab) => {
     setTab(next);
     const url = new URL(window.location.href);
@@ -60,6 +86,7 @@ export function AskKiaraPage({ onNavigate }: { onNavigate: (path: string) => voi
   const [status, setStatus] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [showList, setShowList] = useState(false);
+  const [escalationBusy, setEscalationBusy] = useState(false);
   const activeRef = useRef<string | null>(null);
   activeRef.current = activeId;
   // A quota read that started before a newer quota arrived (from a send) is stale.
@@ -105,6 +132,55 @@ export function AskKiaraPage({ onNavigate }: { onNavigate: (path: string) => voi
       setNotice(errorText(caught, "This chat could not be loaded."));
     }
   }, []);
+
+  // A notification link (?conversation=, ?tab=questions&escalation=) opens its place.
+  useEffect(() => {
+    setTab(location.tab);
+    if (location.conversationId) void openConversation(location.conversationId);
+  }, [location.conversationId, location.tab, openConversation]);
+
+  // A person's answer arrives through the assistant realtime topic.
+  const sendingRef = useRef(false);
+  sendingRef.current = sending;
+  const refreshActive = useCallback(async () => {
+    const id = activeRef.current;
+    if (!id || sendingRef.current) return;
+    try {
+      const conversation = await getMyKiaraConversation(id);
+      if (activeRef.current === id && !sendingRef.current) setBubbles(bubblesFor(conversation));
+    } catch {
+      // The next open reloads it.
+    }
+  }, []);
+  useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["assistant"], refresh: refreshActive });
+
+  const updateBubbleEscalation = (messageId: string, escalation: NonNullable<ChatBubble["escalation"]>) =>
+    setBubbles((current) => current.map((bubble) => bubble.offer?.messageId === messageId ? { ...bubble, escalation } : bubble));
+  const askPerson = async (messageId: string) => {
+    setEscalationBusy(true);
+    setNotice(null);
+    try {
+      const { escalationId } = await createKiaraEscalation(messageId);
+      updateBubbleEscalation(messageId, { id: escalationId, status: "open", answeredBy: null });
+    } catch (caught) {
+      setNotice(errorText(caught, "Your question could not be sent. Please try again."));
+    } finally {
+      setEscalationBusy(false);
+    }
+  };
+  const withdraw = async (escalationId: string) => {
+    setEscalationBusy(true);
+    setNotice(null);
+    try {
+      await withdrawMyKiaraEscalation(escalationId);
+      setBubbles((current) => current.map((bubble) => bubble.escalation?.id === escalationId ? { ...bubble, escalation: { ...bubble.escalation, status: "withdrawn" } } : bubble));
+    } catch (caught) {
+      setNotice(errorText(caught, "The question could not be withdrawn."));
+      void refreshActive();
+    } finally {
+      setEscalationBusy(false);
+    }
+  };
 
   const newChat = () => {
     setShowList(false);
@@ -154,6 +230,9 @@ export function AskKiaraPage({ onNavigate }: { onNavigate: (path: string) => voi
           updateAnswer((bubble) => ({ ...bubble, text: bubble.text + event.data.text }));
         } else if (event.event === "citation") {
           updateAnswer((bubble) => ({ ...bubble, citations: [...(bubble.citations ?? []), event.data] }));
+        } else if (event.event === "escalation_offer") {
+          const offer = { messageId: event.data.message_id, summary: event.data.summary };
+          updateAnswer((bubble) => ({ ...bubble, offer }));
         } else if (event.event === "done") {
           updateAnswer((bubble) => ({ ...bubble, text: event.data.display_text, pending: false }));
           applyQuota(event.data.quota);
@@ -163,7 +242,14 @@ export function AskKiaraPage({ onNavigate }: { onNavigate: (path: string) => voi
     setStatus(null);
     setSending(false);
     if (outcome.ok) {
-      updateAnswer((bubble) => ({ ...bubble, text: outcome.result.display_text, pending: false, citations: outcome.result.citations }));
+      const offer = outcome.result.escalation_offer;
+      updateAnswer((bubble) => ({
+        ...bubble,
+        text: outcome.result.display_text,
+        pending: false,
+        citations: outcome.result.citations,
+        ...(offer ? { offer: { messageId: offer.message_id, summary: offer.summary } } : {}),
+      }));
       void refreshList();
       return;
     }
@@ -186,12 +272,34 @@ export function AskKiaraPage({ onNavigate }: { onNavigate: (path: string) => voi
     : conversationFull ? "This chat is full. Press \"New chat\" to keep asking." : null;
   const firstName = (profile?.employee_name ?? "").trim().split(/\s+/)[0] ?? "";
 
-  const tabs = canManageKnowledge ? <nav aria-label="Ask Kiara" className="flex gap-1 rounded-xl border border-task-border bg-task-bg p-1">
-    {([["chat", "Chat", MessagesSquare], ["knowledge", "Knowledge base", BookOpen]] as const).map(([id, label, Icon]) =>
+  const tabList = ([
+    ["chat", "Chat", MessagesSquare, true],
+    ["questions", "Questions for you", MessageCircleQuestion, canAnswer],
+    ["knowledge", "Knowledge base", BookOpen, canManageKnowledge],
+  ] as const).filter(([, , , shown]) => shown);
+  const tabs = tabList.length > 1 ? <nav aria-label="Ask Kiara" className="flex flex-wrap gap-1 rounded-xl border border-task-border bg-task-bg p-1">
+    {tabList.map(([id, label, Icon]) =>
       <button aria-current={tab === id ? "page" : undefined} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold ${tab === id ? "bg-task-accent text-white" : "text-task-text hover:bg-task-muted"}`} key={id} onClick={() => showTab(id)} type="button">
         <Icon aria-hidden className="size-4" />{label}
+        {id === "questions" && waitingQuestions > 0 ? <span aria-label={`${waitingQuestions} waiting`} className={`rounded-full px-1.5 text-xs ${tab === id ? "bg-white text-task-accent" : "bg-task-accent text-white"}`}>{waitingQuestions}</span> : null}
       </button>)}
   </nav> : null;
+
+  if (canAnswer && tab === "questions") {
+    return <div className="flex flex-col gap-4">
+      <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-task-border bg-task-bg px-4 py-3 sm:px-5">
+        <div className="flex items-center gap-2">
+          <MessageCircleQuestion aria-hidden className="size-6 text-task-accent" />
+          <div>
+            <h1 className="text-xl font-bold text-task-text">Questions for you</h1>
+            <p className="text-xs text-task-text-muted">Questions Kiara could not answer. The first answer goes to the employee.</p>
+          </div>
+        </div>
+        {tabs}
+      </header>
+      <section className="rounded-2xl border border-task-border bg-task-bg p-3 sm:p-4"><QuestionsForYou focusId={location.escalationId} /></section>
+    </div>;
+  }
 
   if (canManageKnowledge && tab === "knowledge") {
     return <div className="flex flex-col gap-4">
@@ -235,6 +343,9 @@ export function AskKiaraPage({ onNavigate }: { onNavigate: (path: string) => voi
         <ChatView
           bubbles={bubbles}
           disabledReason={disabledReason}
+          escalationBusy={escalationBusy}
+          onAskPerson={(messageId) => void askPerson(messageId)}
+          onWithdraw={(escalationId) => void withdraw(escalationId)}
           draft={draft}
           firstName={firstName}
           maxLength={KIARA_QUESTION_MAX_LENGTH}

@@ -27,6 +27,8 @@ export type ToolContext = Readonly<{
   /** The caller's verified access context (identity and effective permissions). */
   access: AccessContext;
   now: Date;
+  /** Knowledge searches already run in this turn (the retry returns more excerpts). */
+  knowledgeSearches?: number | undefined;
 }>;
 
 export type ExecutedTool = Readonly<{
@@ -73,7 +75,7 @@ export async function executeKiaraTool(name: string, input: unknown, context: To
         outcome = getAppHelpOutcome(args.section as PageId, context.accessibleSections);
         break;
       case "search_knowledge_base": {
-        const search = await searchKnowledge(executor, args);
+        const search = await searchKnowledge(executor, args, context.knowledgeSearches ?? 0);
         outcome = search.outcome;
         citationSources = search.sources;
         break;
@@ -113,6 +115,10 @@ export async function executeKiaraTool(name: string, input: unknown, context: To
         break;
       case "find_colleague":
         outcome = await findColleague(executor, args);
+        break;
+      case "offer_escalation":
+        // Decided by the worker from the turn's state (runKiaraTurn); never executed here.
+        outcome = { result: { offered: false, message: "Offers are decided by the conversation." }, isError: true };
         break;
     }
   } catch {

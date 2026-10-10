@@ -4,6 +4,7 @@ import { hasPermission, resolvePageAccess, type AccessContext } from "../permiss
 import type { PermissionKey } from "../permissions/catalog.ts";
 import { REPORT_CATALOG } from "../reports/catalog.ts";
 import { KIARA_PERIOD_HINT } from "./period.ts";
+import { KIARA_ESCALATION_REASONS, KIARA_ESCALATION_SUMMARY_MAX } from "./escalation.ts";
 
 /**
  * The Ask Kiara tool catalogue (spec section 8).
@@ -31,7 +32,8 @@ export type KiaraDataCategory =
   | "fms"
   | "forms"
   | "notifications"
-  | "knowledge";
+  | "knowledge"
+  | "escalation";
 
 /** A JSON-Schema object the Messages API accepts with `strict: true`. */
 export type KiaraInputSchema = Readonly<{
@@ -81,6 +83,7 @@ export const KIARA_TOOL_NAMES = [
   "run_report",
   "find_people",
   "find_colleague",
+  "offer_escalation",
 ] as const;
 export type KiaraToolName = (typeof KIARA_TOOL_NAMES)[number];
 
@@ -218,6 +221,13 @@ const FIELDS: Readonly<Record<KiaraToolName, ToolFields>> = {
     },
     required: [],
   },
+  offer_escalation: {
+    fields: {
+      reason: { kind: "enum", values: KIARA_ESCALATION_REASONS, description: "no_kb_match: the knowledge base had no answer after two searches. conflicting_policy: the SOPs found disagree. needs_judgment: the SOPs leave it to a manager's decision." },
+      summary_en: { kind: "string", max: KIARA_ESCALATION_SUMMARY_MAX, description: "The question in one short English sentence for the person who will answer, at most 300 characters. No personal details beyond what the user wrote." },
+    },
+    required: ["reason", "summary_en"],
+  },
   find_colleague: {
     fields: {
       query: nameField("Key words only, for example \"HR Andheri\", \"Asha\", or \"Branch Manager Borivali\". Every word must match the colleague's name, designation, department, branch, or branch code."),
@@ -306,6 +316,11 @@ export const KIARA_TOOLS: readonly KiaraToolSpec[] = [
     "find_colleague",
     "Find active colleagues by name, department, designation, or branch: returns only name, designation, department, and branch (no contact details). Use for \"who is the HR person in our branch\".",
     { permissions: ["assistant.view"], pages: ["ask_kiara"], dataCategory: "directory", statusLabel: "Looking up colleagues" },
+  ),
+  tool(
+    "offer_escalation",
+    "Offer to send the user's question to a person above them when you could not answer a valid MK Jewels procedure or policy question confidently after searching the knowledge base. Nothing is sent unless the user confirms. Never use it when the user lacks access to information, when they ask you to do something, or for a question you answered.",
+    { permissions: ["assistant.view"], pages: ["ask_kiara"], dataCategory: "escalation", statusLabel: "Preparing to ask a person" },
   ),
 ];
 

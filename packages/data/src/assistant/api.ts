@@ -1,7 +1,10 @@
 import { getSupabase as db } from "@jewelos/api-client/client";
 import {
   createKiaraEventParser,
+  parseKiaraEscalationOffer,
   parseKiaraQuota,
+  type KiaraEscalationOffer,
+  type KiaraEscalationOfferData,
   type KiaraChatResult,
   type KiaraCitationData,
   type KiaraErrorCode,
@@ -32,6 +35,12 @@ export type KiaraMessage = Readonly<{
   created_at: string;
   /** Validated knowledge-base sources for the answer's [n] markers. */
   citations: readonly KiaraCitationData[];
+  /** Kiara's offer to pass the question to a person (assistant answers only). */
+  escalation_offer: KiaraEscalationOffer | null;
+  /** The escalation created from that offer, once the asker confirmed it. */
+  escalation: Readonly<{ id: string; status: "open" | "answered" | "withdrawn"; answered_by: string | null; answered_at: string | null }> | null;
+  /** Human answers: "Name (Designation)" of the person who answered. */
+  answered_by: string | null;
 }>;
 
 export type KiaraConversation = Readonly<{
@@ -84,7 +93,24 @@ function asMessage(value: unknown): KiaraMessage | null {
     stop_reason: str(value.stop_reason) ? value.stop_reason : null,
     created_at: value.created_at,
     citations: parseKiaraCitations(value.citations),
+    escalation_offer: parseKiaraEscalationOffer(value.escalation_offer),
+    escalation: isRecord(value.escalation) && str(value.escalation.id)
+      ? {
+        id: value.escalation.id,
+        status: value.escalation.status === "answered" || value.escalation.status === "withdrawn" ? value.escalation.status : "open",
+        answered_by: str(value.escalation.answered_by) ? value.escalation.answered_by : null,
+        answered_at: str(value.escalation.answered_at) ? value.escalation.answered_at : null,
+      }
+      : null,
+    answered_by: str(value.answered_by) ? value.answered_by : null,
   };
+}
+
+/** A JSON-mode or stored offer as the client shows it. */
+function parseOfferData(value: unknown): KiaraEscalationOfferData | null {
+  if (!isRecord(value) || !str(value.message_id) || !str(value.offer_id) || !str(value.summary)) return null;
+  const offer = parseKiaraEscalationOffer({ offer_id: value.offer_id, reason: value.reason, summary_en: value.summary });
+  return offer ? { message_id: value.message_id, offer_id: offer.offer_id, reason: offer.reason, summary: offer.summary_en } : null;
 }
 
 export async function listMyKiaraConversations(limit = 30): Promise<KiaraConversationSummary[]> {
@@ -210,7 +236,7 @@ export async function askKiara(options: AskKiaraOptions): Promise<AskKiaraOutcom
     if (isRecord(data) && str(data.conversation_id) && str(data.user_message_id) && str(data.assistant_message_id) && str(data.display_text) && str(data.stop_reason)) {
       const quota = parseKiaraQuota(data.quota);
       if (quota) {
-        return { ok: true, requestId, result: { conversation_id: data.conversation_id, user_message_id: data.user_message_id, assistant_message_id: data.assistant_message_id, stop_reason: data.stop_reason, display_text: data.display_text, quota, citations: parseKiaraCitations(data.citations) } };
+        return { ok: true, requestId, result: { conversation_id: data.conversation_id, user_message_id: data.user_message_id, assistant_message_id: data.assistant_message_id, stop_reason: data.stop_reason, display_text: data.display_text, quota, citations: parseKiaraCitations(data.citations), escalation_offer: parseOfferData(data.escalation_offer) } };
       }
     }
     return { ok: false, requestId, conversationId: options.conversationId, code: "unavailable", message: GENERIC_FAILURE };
@@ -219,17 +245,19 @@ export async function askKiara(options: AskKiaraOptions): Promise<AskKiaraOutcom
   let meta: Extract<KiaraStreamEvent, { event: "meta" }>["data"] | null = null;
   let outcome: AskKiaraOutcome | null = null;
   const citations: KiaraCitationData[] = [];
+  let offer: KiaraEscalationOfferData | null = null;
   try {
     await readEvents(data, (event) => {
       if (outcome) return;
       options.onEvent?.(event);
       if (event.event === "meta") meta = event.data;
       if (event.event === "citation") citations.push(event.data);
+      if (event.event === "escalation_offer") offer = event.data;
       if (event.event === "done" && meta) {
         outcome = {
           ok: true,
           requestId,
-          result: { conversation_id: meta.conversation_id, user_message_id: meta.user_message_id, assistant_message_id: event.data.assistant_message_id, stop_reason: event.data.stop_reason, display_text: event.data.display_text, quota: event.data.quota, citations: [...citations] },
+          result: { conversation_id: meta.conversation_id, user_message_id: meta.user_message_id, assistant_message_id: event.data.assistant_message_id, stop_reason: event.data.stop_reason, display_text: event.data.display_text, quota: event.data.quota, citations: [...citations], escalation_offer: offer },
         };
       }
       if (event.event === "error") {

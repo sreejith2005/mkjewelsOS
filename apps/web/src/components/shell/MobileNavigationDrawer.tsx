@@ -11,7 +11,14 @@ export type MobileNavigationDrawerItem = Readonly<{
   path: string;
 }>;
 
+/** A count chip on a navigation item (Ask Kiara: open questions for you). */
+export function NavCountBadge({ count, label }: { count: number | undefined; label: string }) {
+  if (!count) return null;
+  return <span aria-label={`${count} ${label}`} className="ml-auto min-w-5 rounded-full bg-task-accent px-1.5 text-center text-xs font-bold leading-5 text-white" role="status">{count > 99 ? "99+" : count}</span>;
+}
+
 export function MobileNavigationDrawer({
+  badges,
   branchName,
   currentPath,
   items,
@@ -21,6 +28,8 @@ export function MobileNavigationDrawer({
   profileName,
   roleLabel,
 }: {
+  /** Counts shown next to items, by item id. */
+  badges?: Readonly<Record<string, number>> | undefined;
   branchName: string;
   currentPath: string;
   items: readonly MobileNavigationDrawerItem[];
@@ -111,6 +120,7 @@ export function MobileNavigationDrawer({
                     <span className="block truncate text-sm font-semibold">{label}</span>
                     <span className="block truncate text-xs text-task-text-muted">{description}</span>
                   </span>
+                  <NavCountBadge count={badges?.[id]} label="open questions for you" />
                 </button>
               );
             })}

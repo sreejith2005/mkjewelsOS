@@ -45,4 +45,10 @@ describe("Kiara SSE events", () => {
       .toEqual({ event: "meta", data: { conversation_id: "c", user_message_id: "u", quota: { used: 4, limit: null, resets_at: quota.resets_at, timezone: undefined } } });
     expect(parseKiaraEvent("error", { code: "provider_error", message: "Try again" })).toEqual({ event: "error", data: { code: "provider_error", message: "Try again" } });
   });
+
+  it("parses an escalation offer and refuses an unknown reason", () => {
+    const data = { message_id: "m", offer_id: "o", reason: "no_kb_match", summary: "Synthetic summary" };
+    expect(parseKiaraEvent("escalation_offer", data)).toEqual({ event: "escalation_offer", data });
+    expect(parseKiaraEvent("escalation_offer", { ...data, reason: "needs_approval" })).toBeNull();
+  });
 });

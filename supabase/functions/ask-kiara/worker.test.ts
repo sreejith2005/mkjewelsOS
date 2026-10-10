@@ -436,7 +436,7 @@ Deno.test("search again: a reply after one empty search is held back and Kiara s
   ], { actor });
   const result = await runKiaraTurn(t.deps, t.input, t.emit);
   assert(result.ok);
-  assertEquals(actor.called("search_kiara_knowledge").length, 2);
+  assertEquals(actor.called("search_kiara_knowledge").map((call) => call.args!.p_limit), [5, 8]);
   // Only the reply after the second search reaches the user.
   assertEquals(result.displayText, "I searched twice and could not find this in the company SOPs. Please ask your manager.");
   assertEquals(t.events.filter((event) => event.event === "delta").map((event) => (event.data as { text: string }).text).join(""), result.displayText);
@@ -503,4 +503,82 @@ Deno.test("search again: no second search when the request budget is nearly used
   assert(result.ok);
   assertEquals(result.displayText, "I could not find this in the company SOPs.");
   assertEquals(t.anthropic.calls.length, 2);
+});
+
+// ---------------------------------------------------------------------------
+// Escalation offers (Phase 4)
+// ---------------------------------------------------------------------------
+
+const emptyKb = () => actorWith({ search_kiara_knowledge: () => ({ data: { results: [] }, error: null }) });
+const offerInput = { reason: "no_kb_match", summary_en: "Synthetic: may staff bring pets?" };
+
+Deno.test("escalation: an offer after two empty searches is stored with the answer and streamed", async () => {
+  const actor = emptyKb();
+  const t = setup([
+    message([toolUse("tu_a", "search_knowledge_base", { english_query: "pet policy" }), toolUse("tu_b", "search_knowledge_base", { english_query: "animals in store" })], "tool_use"),
+    message([toolUse("tu_offer", "offer_escalation", offerInput)], "tool_use"),
+    message([text("I could not answer this confidently. You can send it to your manager with the button below.")], "end_turn"),
+  ], { actor });
+  const result = await runKiaraTurn(t.deps, t.input, t.emit);
+  assert(result.ok);
+  const stored = actor.called("complete_kiara_turn")[0]!.args!.p_escalation_offer as Record<string, string>;
+  assertMatch(stored.offer_id!, /^[0-9a-f-]{36}$/);
+  assertEquals([stored.reason, stored.summary_en], ["no_kb_match", "Synthetic: may staff bring pets?"]);
+  assertEquals(result.escalationOffer?.offer_id, stored.offer_id);
+  const sent = JSON.parse(String(toolResults(t.anthropic.calls[2]!).at(-1)!.content));
+  assertEquals(sent.offered, true);
+  const offerEvent = t.events.find((event) => event.event === "escalation_offer");
+  assertEquals(offerEvent?.data, { message_id: "answer-id", offer_id: stored.offer_id, reason: "no_kb_match", summary: "Synthetic: may staff bring pets?" });
+  assertEquals(actor.called("complete_kiara_turn")[0]!.args!.p_data_categories, ["knowledge", "escalation"]);
+});
+
+Deno.test("escalation: never offered after an access denial", async () => {
+  const actor = actorWith({
+    search_kiara_knowledge: () => ({ data: { results: [] }, error: null }),
+    get_dashboard_metrics: () => ({ data: null, error: { code: "42501", message: "denied" } }),
+  });
+  const t = setup([
+    message([toolUse("tu_dash", "get_dashboard_metrics", {}), toolUse("tu_a", "search_knowledge_base", { english_query: "branch sales" }), toolUse("tu_b", "search_knowledge_base", { english_query: "branch revenue" })], "tool_use"),
+    message([toolUse("tu_offer", "offer_escalation", { reason: "needs_judgment", summary_en: "Branch numbers" })], "tool_use"),
+    message([text("You do not have access to branch numbers in JewelOS.")], "end_turn"),
+  ], { actor });
+  const result = await runKiaraTurn(t.deps, t.input, t.emit);
+  assert(result.ok);
+  const refusal = JSON.parse(String(toolResults(t.anthropic.calls[2]!).at(-1)!.content));
+  assertEquals([refusal.offered, refusal.code], [false, "access_denied"]);
+  assertEquals(actor.called("complete_kiara_turn")[0]!.args!.p_escalation_offer, null);
+  assertEquals(result.escalationOffer, null);
+  assertEquals(t.events.filter((event) => event.event === "escalation_offer").length, 0);
+  assertEquals(t.logs.find((entry) => entry.event === "kiara_offer_refused")?.code, "access_denied");
+});
+
+Deno.test("escalation: refused without a knowledge search, and before the second search", async () => {
+  const noSearch = setup([
+    message([toolUse("tu_offer", "offer_escalation", { reason: "needs_judgment", summary_en: "Please approve my leave" })], "tool_use"),
+    message([text("I can only answer questions; I cannot approve leave.")], "end_turn"),
+  ]);
+  await runKiaraTurn(noSearch.deps, noSearch.input, noSearch.emit);
+  assertEquals(JSON.parse(String(toolResults(noSearch.anthropic.calls[1]!).at(-1)!.content)).code, "not_a_procedure_question");
+  assertEquals(noSearch.actor.called("complete_kiara_turn")[0]!.args!.p_escalation_offer, null);
+
+  const oneSearch = setup([
+    message([toolUse("tu_a", "search_knowledge_base", { english_query: "pet policy" }), toolUse("tu_offer", "offer_escalation", offerInput)], "tool_use"),
+    message([toolUse("tu_b", "search_knowledge_base", { english_query: "animals in store" })], "tool_use"),
+    message([text("Still nothing in the SOPs.")], "end_turn"),
+  ], { actor: emptyKb() });
+  await runKiaraTurn(oneSearch.deps, oneSearch.input, oneSearch.emit);
+  assertEquals(JSON.parse(String(toolResults(oneSearch.anthropic.calls[1]!).at(-1)!.content)).code, "search_again");
+});
+
+Deno.test("escalation: one offer per question", async () => {
+  const actor = emptyKb();
+  const t = setup([
+    message([toolUse("tu_a", "search_knowledge_base", { english_query: "pet policy" }), toolUse("tu_b", "search_knowledge_base", { english_query: "animals" })], "tool_use"),
+    message([toolUse("tu_o1", "offer_escalation", offerInput), toolUse("tu_o2", "offer_escalation", offerInput)], "tool_use"),
+    message([text("You can send it to your manager.")], "end_turn"),
+  ], { actor });
+  await runKiaraTurn(t.deps, t.input, t.emit);
+  const results = toolResults(t.anthropic.calls[2]!).slice(-2).map((block) => JSON.parse(String(block.content)));
+  assertEquals(results.map((entry) => entry.offered), [true, false]);
+  assertEquals(results[1].code, "already_offered");
 });

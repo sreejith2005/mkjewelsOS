@@ -10,6 +10,7 @@ import {
   crmTabFullScreen,
   isTaskPath,
   navigatePath,
+  nativeNotificationAction,
   pageDecision,
   pathForTopLevelRoute,
   resolveNativeDestination,
@@ -219,6 +220,17 @@ describe("native-pending sections (Ask Kiara until its Phase 8)", () => {
     const handled = navigatePath("/ask-kiara", shellFor("super_admin"), { navigateSection: () => calls.push("section"), navigateTab: () => calls.push("tab"), setPath: () => calls.push("path") });
     expect(handled).toBe(false);
     expect(calls).toEqual([]);
+  });
+
+  it("Ask Kiara notifications say \"Open on web for now\" instead of opening a screen", () => {
+    expect(nativeNotificationAction("/ask-kiara?tab=questions&escalation=e1")).toEqual({ kind: "web_only" });
+    expect(nativeNotificationAction("/ask-kiara?conversation=c1")).toEqual({ kind: "web_only" });
+    const calls: string[] = [];
+    expect(navigatePath("/ask-kiara?conversation=c1", shellFor("staff"), { navigateSection: () => calls.push("section"), navigateTab: () => calls.push("tab"), setPath: () => calls.push("path") })).toBe(false);
+    expect(calls).toEqual([]);
+    expect(nativeNotificationAction("/tasks")).toEqual({ kind: "open", path: "/tasks" });
+    expect(nativeNotificationAction("https://evil.example/x")).toBeNull();
+    expect(nativeNotificationAction(null)).toBeNull();
   });
 
   it("leaves every other launcher entry unchanged", () => {

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui";
 import { initials, titleCase } from "@/lib/format";
 import type { Branch, UserProfile } from "@/types";
 import { cn } from "@/lib/utils";
-import { MobileNavigationDrawer, type MobileNavigationDrawerItem } from "./MobileNavigationDrawer";
+import { MobileNavigationDrawer, NavCountBadge, type MobileNavigationDrawerItem } from "./MobileNavigationDrawer";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
 import { ThemeToggle, type Theme } from "@/components/ThemeToggle";
@@ -29,6 +29,7 @@ export function getSidebarNavigation(nav: readonly ShellNavItem[]): Readonly<{ p
 }
 
 export function ApplicationShell({
+  badges,
   branch,
   children,
   currentPage,
@@ -51,6 +52,8 @@ export function ApplicationShell({
   onThemeChange,
   fullBleed = false,
 }: {
+  /** Counts shown next to navigation items, by page id. */
+  badges?: Readonly<Record<string, number>> | undefined;
   branch: Branch | null;
   children: ReactNode;
   currentPage: PageId;
@@ -118,6 +121,7 @@ export function ApplicationShell({
               type="button"
             >
               <Icon className="size-4 shrink-0" />{item.label}
+              <NavCountBadge count={badges?.[item.id]} label="open questions for you" />
             </button>
           ))}
         </nav>
@@ -140,7 +144,7 @@ export function ApplicationShell({
       </main>
 
       <MobileBottomNav onNavigate={navigate} path={path} />
-      {drawerOpen ? <MobileNavigationDrawer branchName={branch?.name ?? "Branch unavailable"} currentPath={path} items={launcherItems} onClose={() => onDrawerOpenChange(false)} onLogout={onLogout} onNavigate={navigate} profileName={profile.employee_name} roleLabel={titleCase(profile.user_role)} /> : null}
+      {drawerOpen ? <MobileNavigationDrawer badges={badges} branchName={branch?.name ?? "Branch unavailable"} currentPath={path} items={launcherItems} onClose={() => onDrawerOpenChange(false)} onLogout={onLogout} onNavigate={navigate} profileName={profile.employee_name} roleLabel={titleCase(profile.user_role)} /> : null}
     </div>
   );
 }
