@@ -1,0 +1,12 @@
+{
+  "imports": {
+    "@std/assert": "jsr:@std/assert@1",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.112.1",
+    "jszip": "npm:jszip@3.10.1",
+    "mammoth": "npm:mammoth@1.8.0"
+  },
+  "tasks": {
+    "check": "deno check index.ts worker.ts worker.test.ts",
+    "test": "deno test --allow-env worker.test.ts"
+  }
+}

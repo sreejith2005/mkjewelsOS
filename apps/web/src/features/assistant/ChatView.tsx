@@ -1,5 +1,7 @@
 import { useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
 import { Loader2, SendHorizontal, Sparkles } from "lucide-react";
+import type { KiaraCitationData } from "@jewelos/core";
+import { CitationChips } from "./CitationChips";
 import { KiaraMarkdown } from "./KiaraMarkdown";
 
 export type ChatBubble = Readonly<{
@@ -10,6 +12,8 @@ export type ChatBubble = Readonly<{
   pending?: boolean | undefined;
   /** A note shown instead of an answer (failure, refund, interruption). */
   note?: string | undefined;
+  /** Knowledge-base sources for the answer's [n] markers. */
+  citations?: readonly KiaraCitationData[] | undefined;
 }>;
 
 export const KIARA_SUGGESTIONS = [
@@ -90,6 +94,7 @@ export function ChatView({
             {bubble.pending && !bubble.text ? <span className="inline-flex items-center gap-2 text-task-text-muted"><Loader2 aria-hidden className="size-4 animate-spin" />{status ?? "Thinking"}…</span> : null}
             {bubble.pending && bubble.text && status ? <span className="mt-2 flex items-center gap-2 text-xs text-task-text-muted"><Loader2 aria-hidden className="size-3 animate-spin" />{status}…</span> : null}
             {bubble.note ? <p className="mt-1 text-xs text-task-text-muted">{bubble.note}</p> : null}
+            {!bubble.pending && bubble.citations?.length ? <CitationChips citations={bubble.citations} /> : null}
           </div>
         </div>)}
       <div ref={endRef} />

@@ -32,6 +32,13 @@ describe("system prompt", () => {
     expect(KIARA_SYSTEM_PROMPT).toMatch(/never give phone numbers or email addresses for a colleague/);
   });
 
+  it("answers SOP questions only from cited knowledge-base excerpts, never by guessing", () => {
+    expect(KIARA_SYSTEM_PROMPT).toContain("call search_knowledge_base before answering");
+    expect(KIARA_SYSTEM_PROMPT).toContain("[[cite:<chunk_id>]], using only chunk_ids returned to you in this turn");
+    expect(KIARA_SYSTEM_PROMPT).toContain("you could not find this in the company SOPs");
+    expect(KIARA_SYSTEM_PROMPT).toMatch(/translating Hindi, Hinglish, or Hindi in English letters first/);
+  });
+
   it("resolves relative dates from the turn context, never from the cached prompt", () => {
     expect(KIARA_SYSTEM_PROMPT).toMatch(/Work out dates from the date in the turn context/);
     expect(KIARA_SYSTEM_PROMPT).not.toMatch(/(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/);

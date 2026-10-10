@@ -65,7 +65,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 201, 'authenticated can execute exactly 201 reviewed public application functions');
+), 217, 'authenticated can execute exactly 217 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -206,6 +206,8 @@ select is((
     and p.oid::regprocedure::text not in (select identity from expected)
 ), array[
   'acknowledge_daily_checklist_with_audit(uuid,integer,uuid[])',
+  -- 0208: Ask Kiara knowledge base (manager RPCs audited; search read-only; storage path checks).
+  'add_kiara_document_version_with_audit(uuid,text,integer,text)',
   'add_task_comment_with_audit(uuid,text)',
   'admin_delete_task_with_audit(uuid,boolean,text)',
   'admin_edit_task_with_audit(uuid,jsonb)',
@@ -221,6 +223,7 @@ select is((
   'complete_uploaded_task_with_audit(uuid,text)',
   'create_crm_field_definition(text,text,text,text,jsonb,boolean,jsonb)',
   'create_dropdown_list_with_audit(text,jsonb)',
+  'create_kiara_document_with_audit(text,text,text,text,integer,text)',
   'create_manual_task_with_mode_with_audit(jsonb,uuid[],uuid[],jsonb)',
   -- 0196: admin-only CRM sync health (counts only).
   'crm_sync_health()',
@@ -228,9 +231,11 @@ select is((
   'delete_fms_flow_with_audit(uuid,text)',
   'delete_form_draft_with_audit(uuid)',
   'delete_form_with_audit(uuid)',
+  'delete_kiara_document_with_audit(uuid)',
   'delete_recurring_todo_template_with_audit(uuid)',
   'duplicate_form_with_audit(uuid,text)',
   'edit_pending_leave(uuid,date,date,date,text)',
+  'fail_kiara_extraction_with_audit(uuid,text)',
   'form_deletion_impact(uuid)',
   'form_usage_impact(uuid)',
   'get_employee_task_progress(jsonb)',
@@ -249,13 +254,17 @@ select is((
   'import_delegation_tasks_with_audit(jsonb,text)',
   'import_task_bulk_with_audit(jsonb,text,text)',
   'is_reporting_descendant(uuid,uuid)',
-  -- 0206: Ask Kiara colleague directory (name, designation, department, branch only).
+  -- 0207: Ask Kiara colleague directory (name, designation, department, branch only).
   'kiara_directory_lookup(text,integer)',
+  'kiara_knowledge_object_readable(text)',
+  'kiara_knowledge_object_removable(text)',
+  'kiara_knowledge_object_writable(text)',
   'leave_applicant_eligible()',
   'leave_file_readable(text)',
   'leave_file_writable(text)',
   'list_assigning_left_tasks()',
   'list_designation_daily_checklists()',
+  'list_kiara_documents(text,text)',
   'list_my_kiara_conversations(integer)',
   'list_task_comments(uuid)',
   'list_task_import_identity_candidates()',
@@ -272,16 +281,20 @@ select is((
   'save_department_permissions_with_audit(uuid,jsonb)',
   'save_department_with_audit(uuid,jsonb)',
   'save_designation_daily_checklist_with_audit(uuid,uuid,text,text,jsonb,text,boolean,integer)',
+  'save_kiara_document_text_with_audit(uuid,text,text,text,text,jsonb)',
   'save_published_form_with_audit(uuid,jsonb,jsonb)',
   'save_recurring_todo_template_with_audit(uuid,jsonb)',
   'save_section_availability_with_audit(boolean,jsonb,integer,uuid)',
   'save_task_import_identity_alias_with_audit(text,uuid)',
   'save_user_section_access_with_audit(uuid,jsonb)',
+  'search_kiara_knowledge(text,text,integer)',
   'send_recurring_followup_with_audit(uuid,text)',
   'set_fms_flow_active_with_audit(uuid,boolean,text)',
+  'set_kiara_document_status_with_audit(uuid,text)',
   'set_recurring_todo_template_active_with_audit(uuid,boolean)',
   'start_fms_from_form_submission_with_audit(uuid)',
   'start_kiara_turn(uuid,uuid,text,text)',
+  'store_kiara_extraction_with_audit(uuid,text,jsonb,integer,integer)',
   'submit_fms_form_and_progress_with_audit(uuid,jsonb,text,uuid,uuid,text,text,jsonb,uuid)',
   'submit_form_and_start_fms_with_audit(uuid,jsonb)',
   'submit_leave_handover(uuid,uuid,text)',

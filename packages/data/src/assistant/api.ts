@@ -3,6 +3,7 @@ import {
   createKiaraEventParser,
   parseKiaraQuota,
   type KiaraChatResult,
+  type KiaraCitationData,
   type KiaraErrorCode,
   type KiaraQuota,
   type KiaraStreamEvent,
@@ -29,6 +30,8 @@ export type KiaraMessage = Readonly<{
   refunded: boolean;
   stop_reason: string | null;
   created_at: string;
+  /** Validated knowledge-base sources for the answer's [n] markers. */
+  citations: readonly KiaraCitationData[];
 }>;
 
 export type KiaraConversation = Readonly<{
@@ -60,6 +63,14 @@ function asSummary(value: unknown): KiaraConversationSummary | null {
   };
 }
 
+/** Stored citations and streamed citation events share this shape. */
+export function parseKiaraCitations(value: unknown): KiaraCitationData[] {
+  return (Array.isArray(value) ? value : []).flatMap((item): KiaraCitationData[] => {
+    if (!isRecord(item) || typeof item.marker !== "number" || !str(item.chunk_id) || !str(item.document_id) || !str(item.title)) return [];
+    return [{ marker: item.marker, chunk_id: item.chunk_id, document_id: item.document_id, title: item.title, heading_path: str(item.heading_path) ? item.heading_path : "" }];
+  });
+}
+
 function asMessage(value: unknown): KiaraMessage | null {
   if (!isRecord(value) || !str(value.id) || typeof value.ordinal !== "number" || !str(value.display_text) || !str(value.created_at)) return null;
   if (value.role !== "user" && value.role !== "assistant" && value.role !== "human_answer") return null;
@@ -72,6 +83,7 @@ function asMessage(value: unknown): KiaraMessage | null {
     refunded: value.refunded === true,
     stop_reason: str(value.stop_reason) ? value.stop_reason : null,
     created_at: value.created_at,
+    citations: parseKiaraCitations(value.citations),
   };
 }
 
@@ -107,6 +119,20 @@ export async function getMyKiaraQuota(): Promise<KiaraQuota> {
   const quota = parseKiaraQuota(data);
   if (!quota) throw new Error("Your question allowance could not be loaded.");
   return quota;
+}
+
+export type KiaraExcerpt =
+  | Readonly<{ available: true; title: string; heading_path: string; content: string }>
+  | Readonly<{ available: false }>;
+
+/** The excerpt behind a citation chip; unavailable once the document is removed, inactive, or replaced. */
+export async function getKiaraKnowledgeExcerpt(chunkId: string): Promise<KiaraExcerpt> {
+  const { data, error } = await db().rpc("get_kiara_knowledge_excerpt", { p_chunk_id: chunkId });
+  if (error) throw error;
+  if (isRecord(data) && data.available === true && str(data.title) && str(data.content)) {
+    return { available: true, title: data.title, heading_path: str(data.heading_path) ? data.heading_path : "", content: data.content };
+  }
+  return { available: false };
 }
 
 export type AskKiaraOptions = Readonly<{
@@ -184,7 +210,7 @@ export async function askKiara(options: AskKiaraOptions): Promise<AskKiaraOutcom
     if (isRecord(data) && str(data.conversation_id) && str(data.user_message_id) && str(data.assistant_message_id) && str(data.display_text) && str(data.stop_reason)) {
       const quota = parseKiaraQuota(data.quota);
       if (quota) {
-        return { ok: true, requestId, result: { conversation_id: data.conversation_id, user_message_id: data.user_message_id, assistant_message_id: data.assistant_message_id, stop_reason: data.stop_reason, display_text: data.display_text, quota } };
+        return { ok: true, requestId, result: { conversation_id: data.conversation_id, user_message_id: data.user_message_id, assistant_message_id: data.assistant_message_id, stop_reason: data.stop_reason, display_text: data.display_text, quota, citations: parseKiaraCitations(data.citations) } };
       }
     }
     return { ok: false, requestId, conversationId: options.conversationId, code: "unavailable", message: GENERIC_FAILURE };
@@ -192,16 +218,18 @@ export async function askKiara(options: AskKiaraOptions): Promise<AskKiaraOutcom
 
   let meta: Extract<KiaraStreamEvent, { event: "meta" }>["data"] | null = null;
   let outcome: AskKiaraOutcome | null = null;
+  const citations: KiaraCitationData[] = [];
   try {
     await readEvents(data, (event) => {
       if (outcome) return;
       options.onEvent?.(event);
       if (event.event === "meta") meta = event.data;
+      if (event.event === "citation") citations.push(event.data);
       if (event.event === "done" && meta) {
         outcome = {
           ok: true,
           requestId,
-          result: { conversation_id: meta.conversation_id, user_message_id: meta.user_message_id, assistant_message_id: event.data.assistant_message_id, stop_reason: event.data.stop_reason, display_text: event.data.display_text, quota: event.data.quota },
+          result: { conversation_id: meta.conversation_id, user_message_id: meta.user_message_id, assistant_message_id: event.data.assistant_message_id, stop_reason: event.data.stop_reason, display_text: event.data.display_text, quota: event.data.quota, citations: [...citations] },
         };
       }
       if (event.event === "error") {

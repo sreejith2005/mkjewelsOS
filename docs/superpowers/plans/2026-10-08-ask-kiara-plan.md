@@ -26,7 +26,9 @@ TypeScript/Vitest, React (web), React Native/Expo (Android).
 
 ## Migration numbering
 
-The next free number on `origin/main` is **0205**. Other branches also add migrations (for example
+The next free number on `origin/main` was **0205** when this plan was written. Renumbered 2026-10-09:
+main gained `0205_crm_master_sync_ignore_global_dropdowns` (PR #2), so this branch's unapplied
+migrations became `0206_ask_kiara_foundation` and `0207_kiara_directory_lookup`; Phase 3 is `0208`. Other branches also add migrations (for example
 `C:\crm` carries a `0201` that differs from main's). Rule for this branch:
 1. Before writing a migration, `git fetch origin` and take the next number after `origin/main`.
 2. Before every push and before merge, rebase on `origin/main`. If main gained the same number,
@@ -52,7 +54,7 @@ The owner's nine phases are kept, with three adjustments:
 **Scope:** permissions and page, conversations/messages, quota, `ask-kiara` with two tools
 (`get_my_work_summary`, `get_app_help`), streaming web chat, local tests.
 
-Migration `0205_ask_kiara_foundation.sql`:
+Migration `0206_ask_kiara_foundation.sql` (originally 0205):
 - Permission catalog rows (`-- permission-catalog:begin/end`): all six `assistant.*` keys (spec 15)
   so later phases need no catalog change. Sort 310-315.
 - `default_section_availability()` / `validated_section_availability()` with `ask_kiara`; launch-dark
@@ -78,7 +80,7 @@ Files to create:
   client (`fetch` + `ReadableStream`, JSON fallback).
 - `apps/web/src/pages/AskKiaraPage.tsx`, `apps/web/src/features/assistant/` (chat view, message
   renderer with the restricted markdown subset, quota chip, conversation list, tests).
-- `supabase/tests/0205_ask_kiara_foundation.test.sql`.
+- `supabase/tests/0206_ask_kiara_foundation.test.sql`.
 - `docs/superpowers/evals/ask-kiara/` with `cases.json` (role, question, expected tools allowed,
   forbidden tools, must-refuse flag) and `README.md` (how to run against a local stack).
 
@@ -152,7 +154,7 @@ Exit criteria:
 `run_report`, `find_people`, `get_availability`, `get_leave`, `get_fms_work`, `search_forms`,
 `get_my_notifications` (spec 8), and `kiara_directory_lookup` (spec 19 item 8, approved 2026-10-08).
 
-Migration (approved, spec 19 item 8): `02xx_kiara_directory_lookup.sql` with
+Migration (approved, spec 19 item 8): `0207_kiara_directory_lookup.sql` with
 `kiara_directory_lookup(p_name text, p_limit int)` (active colleagues in tenant; name, designation,
 department, branch; no contact data; `assert_module_access('ask_kiara')`; pgTAP).
 
@@ -185,7 +187,7 @@ First task (gate): run `npm:mammoth@1.8.0` inside `supabase.cmd functions serve`
 real SOP, measure CPU/memory/time. If it exceeds edge-runtime limits, stop and bring options to the
 owner (smaller files, split documents, or browser-side extraction re-validated server-side).
 
-Migration `02xx_ask_kiara_knowledge.sql`: documents, versions, chunks (generated `tsvector`, GIN),
+Migration `0208_ask_kiara_knowledge.sql`: documents, versions, chunks (generated `tsvector`, GIN),
 bucket `kiara-knowledge` with MIME/size limits and path policies, all KB RPCs, `search_kiara_knowledge`,
 `assistant` realtime topic (constraint + `emit_tenant_realtime_event` replace), manifest
 classification.
@@ -210,6 +212,24 @@ Tests:
 
 Exit criteria: owner uploads two real SOPs locally, asks 10 questions in four language styles, every
 policy answer has a valid citation, an unknown policy is not invented.
+
+**Phase 3 status (2026-10-10, local only).** Gate passed on the local edge runtime (the limits mirror
+hosted: 256 MB, 1 s CPU soft / 2 s hard): no hard-limit hit; the most text-heavy SOP sometimes passes
+the soft limit (the worker is recycled after answering). Built as planned, with these owner decisions
+and deviations:
+- Per-document `audience` (`everyone` | `managers_and_above` = effective role manager, admin, or super
+  admin) enforced in `search_kiara_knowledge` and `get_kiara_knowledge_excerpt`.
+- One splitter (`packages/core/src/assistant/chunking.ts`) for uploads, edits, and typed articles,
+  instead of a second SQL splitter; the RPCs verify every chunk is a verbatim slice of the stored text.
+  Small sections under one top-level heading are packed (up to 1,200 characters); documents without
+  heading styles use bold lines, then inferred title lines, then fixed size.
+- `search_kiara_knowledge(p_query, p_original_terms, p_limit)`: OR-ranked English query plus a
+  `simple` query over the original words (Devanagari); document titles weigh in ranking.
+- Extra RPCs: `get_kiara_version_for_ingest`, `update_kiara_document_details_with_audit`,
+  `get_kiara_knowledge_excerpt` (citation drawer); `save_kiara_document_text_with_audit` also creates
+  typed articles (`p_document_id` null).
+- Duplicate uploads are refused by SHA-256 (`kiara_duplicate_document`); mammoth skips images.
+- Real-SOP evaluation questions are kept in the git-ignored `docs/superpowers/evals/ask-kiara/private/`.
 
 ## Phase 4: human step-in
 

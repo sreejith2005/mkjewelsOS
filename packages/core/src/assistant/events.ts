@@ -11,7 +11,9 @@ import { parseKiaraQuota, type KiaraQuota } from "./quota.ts";
 export type KiaraMetaEvent = Readonly<{ event: "meta"; data: Readonly<{ conversation_id: string; user_message_id: string; quota: KiaraQuota }> }>;
 export type KiaraStatusEvent = Readonly<{ event: "status"; data: Readonly<{ phase: "thinking" | "tool"; label: string }> }>;
 export type KiaraDeltaEvent = Readonly<{ event: "delta"; data: Readonly<{ text: string }> }>;
-export type KiaraCitationEvent = Readonly<{ event: "citation"; data: Readonly<{ marker: number; document_id: string; title: string; heading_path: string }> }>;
+/** A validated citation for the answer's "[n]" marker (spec 7.5); sent before `done`. */
+export type KiaraCitationData = Readonly<{ marker: number; chunk_id: string; document_id: string; title: string; heading_path: string }>;
+export type KiaraCitationEvent = Readonly<{ event: "citation"; data: KiaraCitationData }>;
 export type KiaraDoneEvent = Readonly<{
   event: "done";
   data: Readonly<{
@@ -51,6 +53,7 @@ export type KiaraChatResult = Readonly<{
   stop_reason: string;
   display_text: string;
   quota: KiaraQuota;
+  citations: readonly KiaraCitationData[];
 }>;
 
 /** The body of every non-2xx response, streaming or not. */
@@ -78,8 +81,8 @@ export function parseKiaraEvent(name: string, data: unknown): KiaraStreamEvent |
     case "delta":
       return str(data.text) ? { event: "delta", data: { text: data.text } } : null;
     case "citation":
-      return typeof data.marker === "number" && str(data.document_id) && str(data.title) && str(data.heading_path)
-        ? { event: "citation", data: { marker: data.marker, document_id: data.document_id, title: data.title, heading_path: data.heading_path } } : null;
+      return typeof data.marker === "number" && str(data.chunk_id) && str(data.document_id) && str(data.title) && str(data.heading_path)
+        ? { event: "citation", data: { marker: data.marker, chunk_id: data.chunk_id, document_id: data.document_id, title: data.title, heading_path: data.heading_path } } : null;
     case "done": {
       const quota = parseKiaraQuota(data.quota);
       return str(data.assistant_message_id) && str(data.stop_reason) && str(data.display_text) && quota

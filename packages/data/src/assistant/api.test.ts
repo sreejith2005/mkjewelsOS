@@ -35,13 +35,15 @@ describe("askKiara", () => {
       { event: "status", data: { phase: "tool", label: "Checking your work" } },
       { event: "delta", data: { text: "Aapke 2 " } },
       { event: "delta", data: { text: "task pending hain." } },
+      { event: "citation", data: { marker: 1, chunk_id: "k1", document_id: "d1", title: "Synthetic SOP", heading_path: "Opening" } },
       { event: "done", data: { assistant_message_id: "a1", stop_reason: "end_turn", quota, display_text: "Aapke 2 task pending hain." } },
     ];
     api.invoke.mockResolvedValue({ data: sse(events), error: null });
     const seen: string[] = [];
     const outcome = await askKiara({ conversationId: null, message: "aaj mera kya pending hai?", client: "web", requestId, onEvent: (event) => seen.push(event.event) });
-    expect(seen).toEqual(["meta", "status", "delta", "delta", "done"]);
-    expect(outcome).toEqual({ ok: true, requestId, result: { conversation_id: "c1", user_message_id: "u1", assistant_message_id: "a1", stop_reason: "end_turn", display_text: "Aapke 2 task pending hain.", quota } });
+    expect(seen).toEqual(["meta", "status", "delta", "delta", "citation", "done"]);
+    expect(outcome).toEqual({ ok: true, requestId, result: { conversation_id: "c1", user_message_id: "u1", assistant_message_id: "a1", stop_reason: "end_turn", display_text: "Aapke 2 task pending hain.", quota,
+      citations: [{ marker: 1, chunk_id: "k1", document_id: "d1", title: "Synthetic SOP", heading_path: "Opening" }] } });
     expect(api.invoke).toHaveBeenCalledWith("ask-kiara/chat", expect.objectContaining({
       method: "POST",
       headers: { Accept: "text/event-stream" },
@@ -108,13 +110,15 @@ describe("conversation reads", () => {
         id: "c1", title: "Pending work", created_at: "2026-10-09T05:00:00Z", last_message_at: "2026-10-09T05:01:00Z", question_count: 1,
         messages: [
           { id: "m1", ordinal: 1, role: "user", display_text: "What is pending?", refunded: false, created_at: "2026-10-09T05:00:00Z" },
-          { id: "m2", ordinal: 2, role: "assistant", display_text: "Two tasks.", reply_to_message_id: "m1", stop_reason: "end_turn", created_at: "2026-10-09T05:00:05Z", api_content: [{ secret: true }] },
+          { id: "m2", ordinal: 2, role: "assistant", display_text: "Two tasks [1].", reply_to_message_id: "m1", stop_reason: "end_turn", created_at: "2026-10-09T05:00:05Z", api_content: [{ secret: true }],
+            citations: [{ marker: 1, chunk_id: "k1", document_id: "d1", version_id: "v1", title: "Synthetic SOP", heading_path: "Opening" }, { marker: "x" }] },
         ],
       },
       error: null,
     });
     const conversation = await getMyKiaraConversation("c1");
-    expect(conversation.messages.map((message) => [message.role, message.display_text])).toEqual([["user", "What is pending?"], ["assistant", "Two tasks."]]);
+    expect(conversation.messages.map((message) => [message.role, message.display_text])).toEqual([["user", "What is pending?"], ["assistant", "Two tasks [1]."]]);
+    expect(conversation.messages[1]!.citations).toEqual([{ marker: 1, chunk_id: "k1", document_id: "d1", title: "Synthetic SOP", heading_path: "Opening" }]);
     expect(JSON.stringify(conversation)).not.toContain("secret");
   });
 

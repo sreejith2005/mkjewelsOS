@@ -96,7 +96,12 @@ export function untrusted(value: unknown, max = 300): UntrustedText | null {
   return text ? { untrusted_text: text.slice(0, max) } : null;
 }
 
-export type ToolOutcome = Readonly<{ result: Record<string, unknown>; isError: boolean }>;
+export type ToolOutcome = Readonly<{
+  result: Record<string, unknown>;
+  isError: boolean;
+  /** A larger result cap for a tool that returns document excerpts (default TOOL_RESULT_MAX_CHARS). */
+  maxChars?: number | undefined;
+}>;
 
 export const ACCESS_DENIED: ToolOutcome = { result: { access: "denied" }, isError: false };
 export const UNAVAILABLE: ToolOutcome = { result: { error: "unavailable", message: "This information could not be loaded right now." }, isError: true };

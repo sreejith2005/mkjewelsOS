@@ -406,3 +406,43 @@ Deno.test("a read failure that is not a denial is an error result, never data", 
   assert(result.isError);
   assertEquals(result.json.error, "unavailable");
 });
+
+// ---------------------------------------------------------------------------
+// search_knowledge_base (Phase 3)
+// ---------------------------------------------------------------------------
+
+const chunk = (n: number, content: string) => ({
+  chunk_id: `cccccccc-0000-4000-8000-00000000000${n}`, document_id: "dddddddd-0000-4000-8000-000000000001", version_id: "eeeeeeee-0000-4000-8000-000000000001",
+  title: "Synthetic SOP", heading_path: n === 1 ? "Billing" : "", content, internal_rank: 0.9,
+});
+
+Deno.test("knowledge search runs as the caller and returns excerpts as untrusted text with their sources", async () => {
+  const actor = new FakeActor({ search_kiara_knowledge: () => ok({ results: [chunk(1, "Check the bill twice."), chunk(2, "Second excerpt.")] }) });
+  const result = await run(actor, "search_knowledge_base", { english_query: "billing check", original_terms: "bill" }, accessFor("staff"));
+  assertEquals(actor.rpcs[0], { fn: "search_kiara_knowledge", args: { p_query: "billing check", p_original_terms: "bill", p_limit: 5 } });
+  assertEquals(result.json.found, 2);
+  assertEquals((result.json.results as Record<string, unknown>[])[0], { chunk_id: chunk(1, "").chunk_id, title: "Synthetic SOP", section: "Billing", excerpt: { untrusted_text: "Check the bill twice." } });
+  assertFalse(result.content.includes("internal_rank"));
+  assertFalse(result.content.includes("document_id"));
+  assertEquals(result.citationSources?.map((source) => source.chunk_id), [chunk(1, "").chunk_id, chunk(2, "").chunk_id]);
+});
+
+Deno.test("knowledge results over the size cap are dropped whole and are not citable", async () => {
+  const long = "x".repeat(4400);
+  const actor = new FakeActor({ search_kiara_knowledge: () => ok({ results: [1, 2, 3, 4, 5].map((n) => chunk(n, long)) }) });
+  const result = await run(actor, "search_knowledge_base", { english_query: "anything" }, accessFor("staff"));
+  assert(result.content.length <= 16_000);
+  assertEquals(result.json.truncated, true);
+  assertEquals(result.citationSources?.length, (result.json.results as unknown[]).length);
+  assert((result.json.results as unknown[]).length < 5);
+});
+
+Deno.test("knowledge search: no results, denial, and the required English query", async () => {
+  const empty = await run(new FakeActor({ search_kiara_knowledge: () => ok({ results: [] }) }), "search_knowledge_base", { english_query: "pets" }, accessFor("staff"));
+  assertEquals(empty.json, { results: [], found: 0, message: "No matching SOP sections were found." });
+  assertEquals(empty.citationSources, undefined);
+  const deniedResult = await run(new FakeActor({ search_kiara_knowledge: denied }), "search_knowledge_base", { english_query: "pets" }, accessFor("staff"));
+  assertEquals(deniedResult.json, { access: "denied" });
+  const missing = await run(new FakeActor(), "search_knowledge_base", { original_terms: "chhutti" }, accessFor("staff"));
+  assertMatch(String(missing.json.message), /english_query is required/);
+});

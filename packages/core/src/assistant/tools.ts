@@ -30,7 +30,8 @@ export type KiaraDataCategory =
   | "leave"
   | "fms"
   | "forms"
-  | "notifications";
+  | "notifications"
+  | "knowledge";
 
 /** A JSON-Schema object the Messages API accepts with `strict: true`. */
 export type KiaraInputSchema = Readonly<{
@@ -67,6 +68,7 @@ export type KiaraToolSpec = Readonly<{
 export const KIARA_TOOL_NAMES = [
   "get_my_work_summary",
   "get_app_help",
+  "search_knowledge_base",
   "search_my_tasks",
   "get_fms_work",
   "get_my_notifications",
@@ -96,6 +98,7 @@ export const KIARA_REPORT_KEYS: readonly string[] = REPORT_CATALOG.map((report) 
 export const KIARA_HELP_QUESTION_MAX = 200;
 export const KIARA_TEXT_MAX = 100;
 export const KIARA_NAME_MAX = 60;
+export const KIARA_KB_QUERY_MAX = 200;
 
 // ---------------------------------------------------------------------------
 // Input fields: one declaration drives both the schema and the validator
@@ -133,6 +136,13 @@ const FIELDS: Readonly<Record<KiaraToolName, ToolFields>> = {
       question: { kind: "string", max: KIARA_HELP_QUESTION_MAX, description: "The user's how-to question in English, at most 200 characters." },
     },
     required: ["section", "question"],
+  },
+  search_knowledge_base: {
+    fields: {
+      english_query: { kind: "string", max: KIARA_KB_QUERY_MAX, description: "Key words in English (translate Hindi, Hinglish, or Hindi in English letters first)." },
+      original_terms: { kind: "string", max: KIARA_KB_QUERY_MAX, description: "The user's own key words when they did not write in English." },
+    },
+    required: ["english_query"],
   },
   search_my_tasks: {
     fields: {
@@ -231,6 +241,11 @@ export const KIARA_TOOLS: readonly KiaraToolSpec[] = [
     "get_app_help",
     "How to use a JewelOS section: where things are and the steps for common jobs (for example applying for leave, filling a form, or creating a task). Pass the section the question is about and the question in English (at most 200 characters). Help is returned only for sections the user can open; otherwise the result says access is denied.",
     { permissions: ["assistant.view"], pages: ["ask_kiara"], dataCategory: "app_help", statusLabel: "Looking up app help" },
+  ),
+  tool(
+    "search_knowledge_base",
+    "Search MK Jewels' SOPs and policies. Returns the best matching excerpts, each with its chunk_id, document title, and section.",
+    { permissions: ["assistant.view"], pages: ["ask_kiara"], dataCategory: "knowledge", statusLabel: "Searching company SOPs" },
   ),
   tool(
     "search_my_tasks",

@@ -133,6 +133,7 @@ Deno.serve(async (request: Request) => {
       stop_reason: result.stopReason,
       display_text: result.displayText,
       quota: result.quota,
+      citations: result.citations.map(({ marker, chunk_id, document_id, title, heading_path }) => ({ marker, chunk_id, document_id, title, heading_path })),
     });
   }
 
