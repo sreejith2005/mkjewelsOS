@@ -1,9 +1,10 @@
 import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
+  hasPermission,
   deriveTaskCardState,
   deriveTaskMutationCapability,
   formatIndiaDateTime,
@@ -26,7 +27,7 @@ import {
   type TaskBundle,
 } from "@jewelos/data/tasks/api";
 import { addTaskComment, loadTaskComments } from "@jewelos/data/tasks/comments";
-import { useProfile } from "@/auth/AuthProvider";
+import { useAccess, useProfile } from "@/auth/AuthProvider";
 import { useAsyncData } from "@/lib/useAsyncData";
 import { formatDateTime } from "@/lib/format";
 import { errorText, log } from "@/lib/log";
@@ -43,9 +44,10 @@ import { ToggleField } from "@/forms/ToggleField";
 import { Banner, EmptyState, ErrorState, LoadingState } from "@/ui/states";
 import type { RootStackParamList } from "@/navigation/types";
 import { fmsAssignedWorkRouteForTask, navigateFmsAssignedWork } from "@/features/fms/assignedWorkNavigation";
+import { TaskAdminControls } from "@/features/tasks/TaskAdminControls";
 import { TaskAttachmentList } from "@/features/tasks/TaskAttachmentList";
 import { TaskRemarkComposer, TaskRemarksCard } from "@/features/tasks/TaskRemarks";
-import { findWorkspaceTask, loadTaskWorkspace } from "@/features/tasks/taskWorkspace";
+import { loadTaskDetail } from "@/features/tasks/taskWorkspace";
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, "TaskDetail">;
@@ -88,6 +90,7 @@ export function TaskDetailScreen() {
   const theme = useAppTheme();
   const styles = useStyles();
   const profile = useProfile();
+  const access = useAccess();
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<Route>();
   const [remark, setRemark] = useState("");
@@ -99,9 +102,9 @@ export function TaskDetailScreen() {
 
   // The same two feeds the Tasks list shows, so a delegated or coverage-blocked
   // task opened from the list is always found here.
-  const load = useCallback(() => loadTaskWorkspace(profile), [profile]);
+  const load = useCallback(() => loadTaskDetail(profile, params.taskId), [profile, params.taskId]);
   const { data, error, loading, refreshing, reload, refresh } = useAsyncData(load, [load]);
-  const task = useMemo(() => findWorkspaceTask(data, params.taskId), [data, params.taskId]);
+  const task = data;
   // FMS feed rows are workflow stages, not task records, so they carry no remark thread.
   const remarksTaskId = task && task.task_type !== "fms" ? task.id : null;
   const loadRemarks = useCallback(async () => (remarksTaskId ? loadTaskComments(remarksTaskId) : []), [remarksTaskId]);
@@ -249,6 +252,7 @@ export function TaskDetailScreen() {
           {description ?? "No description provided"}
         </Text>
         {detailRows(task, statusLabel).map((row) => <CardRow key={row.label} label={row.label} value={row.value} />)}
+        {task.task_type !== "fms" && hasPermission(access, "tasks.view_all") ? <TaskAdminControls task={task} onChanged={refresh} /> : null}
         {task.hasAttachment && task.id ? <TaskAttachmentList refreshKey={attachmentsVersion} taskId={task.id} /> : null}
       </Card>
 

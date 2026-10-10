@@ -278,7 +278,7 @@ export function TaskImportScreen() {
         <Text tone="primary" variant="heading" weight="semibold">Task Bulk Import</Text>
         <Text tone="muted" variant="small">Upload once. Exact employee matches are assigned automatically; unclear names can be confirmed now or imported safely to Assigning Left.</Text>
       </View>
-      <Banner tone="info">Accepts the one-sheet 20-column format, six-column work list, earlier 18-column CSV, and existing canonical workbook, up to 2 MiB and 2,500 records.</Banner>
+      <Banner tone="info">Accepts the one-sheet 20-column format, six-column work list, earlier 18-column CSV, and existing canonical workbook, up to 2 MiB and 2,500 records. Every Task requires an uploaded file; Checklists are click-to-complete.</Banner>
       {session.error ? <Banner tone="danger">{session.error}</Banner> : null}
       {session.result ? <Banner tone="success">{session.result}</Banner> : null}
       <Card>

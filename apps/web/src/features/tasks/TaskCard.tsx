@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent } from "react";
+import { useState, type ReactNode, type ChangeEvent } from "react";
 import { AlertTriangle, Check, CheckCircle2, ChevronDown, Clock, Eye, FileUp, PauseCircle, Users } from "lucide-react";
 import { calculateTaskChecklistProgress, effectiveTaskDeadline, isTaskFeedItemOverdue, type Enums, type TaskMutationCapability } from "@jewelos/core";
 import { Button, Field, Notice } from "@/components/ui";
@@ -23,7 +23,8 @@ const PRIORITY_CLASS: Record<Enums<"task_priority">, string> = {
   low: "border-task-border bg-task-muted text-task-text-muted",
 };
 
-export function TaskCard({ capability, categoryLabel, onAction, task: taskInput }: {
+export function TaskCard({ management, capability, categoryLabel, onAction, task: taskInput }: {
+  management?: ReactNode;
   capability: TaskMutationCapability;
   categoryLabel: string;
   onAction: (action: TaskCardAction) => Promise<void>;
@@ -117,6 +118,7 @@ export function TaskCard({ capability, categoryLabel, onAction, task: taskInput 
     </div>
     {expanded ? <section aria-label={detailsLabel} className="flex flex-col gap-4 border-t border-task-border bg-task-muted p-4" id={detailsId}>
       {error ? <Notice tone="danger">{error}</Notice> : null}
+      {management}
       <TaskDetails statusLabel={statusLabel} task={taskInput} />
       {blocked ? <Notice tone="task">Coverage required. An authorized manager must resolve coverage through a future database-backed workflow; no simulated resolution is available here.</Notice> : null}
       {!formOnlyAction ? task.checklists.map((item) => <div className="flex items-start gap-3 text-sm text-task-text" key={item.id}><button aria-label={item.is_completed ? "Mark incomplete" : "Mark complete"} className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded border", item.is_completed ? "border-task-accent bg-task-accent text-task-text" : "border-task-border bg-task-bg")} disabled={busy || completed || readOnly || blocked} onClick={() => void act({ kind: "checklist", checklistId: item.id, completed: !item.is_completed })} type="button">{item.is_completed ? <Check className="size-3" /> : null}</button><span className={cn(item.is_completed && "line-through text-task-text-muted")}>{item.item_text}{item.is_required ? <span className="ml-1 text-task-overdue">*</span> : null}</span></div>) : null}

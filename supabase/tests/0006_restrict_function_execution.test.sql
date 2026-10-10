@@ -33,20 +33,22 @@ select ok(not has_function_privilege('authenticated', 'rls_auto_enable()', 'EXEC
 select ok(not has_function_privilege('service_role', 'rls_auto_enable()', 'EXECUTE'), 'future public functions do not default-grant service_role');
 
 -- Current application-function matrix, including the linked-only helper above.
+-- 0206/0207 add 10 functions (8 definers), 5 authenticated entry points.
+-- 0208/0210 add 11 private/public definers, only 3 authenticated entry points.
 select is((
   select count(*)::integer
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
-), 397, 'exactly 397 postgres-owned public application functions exist in the current migration set');
+), 418, 'exactly 418 postgres-owned public application functions exist in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres' and p.prosecdef
-), 333, 'exactly 333 public application functions are SECURITY DEFINER in the current migration set');
+), 352, 'exactly 352 public application functions are SECURITY DEFINER in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -62,7 +64,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 193, 'authenticated can execute exactly 193 reviewed public application functions');
+), 201, 'authenticated can execute exactly 201 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -78,7 +80,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('postgres', p.oid, 'EXECUTE')
-), 397, 'postgres retains owner execution on every public application function');
+), 418, 'postgres retains owner execution on every public application function');
 select ok(not has_function_privilege('authenticated', 'reject_watcher_task_mutation()', 'EXECUTE'), 'watcher guard trigger cannot be called directly');
 
 -- Exact authenticated allowlist: baseline, Forms, and reviewed FMS entry points.
@@ -204,6 +206,8 @@ select is((
 ), array[
   'acknowledge_daily_checklist_with_audit(uuid,integer,uuid[])',
   'add_task_comment_with_audit(uuid,text)',
+  'admin_delete_task_with_audit(uuid,boolean,text)',
+  'admin_edit_task_with_audit(uuid,jsonb)',
   'assert_crm_branch_user(uuid,uuid,uuid,text)',
   'assert_fms_flow_publishable(uuid)',
   'assign_imported_task_with_audit(text,uuid,uuid)',
@@ -218,6 +222,7 @@ select is((
   'create_manual_task_with_mode_with_audit(jsonb,uuid[],uuid[],jsonb)',
   -- 0196: admin-only CRM sync health (counts only).
   'crm_sync_health()',
+  'delete_dashboard_view_with_audit(uuid,integer)',
   'delete_fms_flow_with_audit(uuid,text)',
   'delete_form_draft_with_audit(uuid)',
   'delete_form_with_audit(uuid)',
@@ -227,6 +232,9 @@ select is((
   'form_deletion_impact(uuid)',
   'form_usage_impact(uuid)',
   'get_employee_task_progress(jsonb)',
+  'get_management_insight_records_v1(jsonb,text,text,integer,integer)',
+  'get_management_insights_options_v1(jsonb)',
+  'get_management_insights_v1(jsonb)',
   'get_my_daily_checklist_status()',
   'get_my_fms_starter_assignments()',
   'get_recurring_todo_workspace(jsonb)',
@@ -252,6 +260,7 @@ select is((
   'review_leave_request(uuid,boolean,text)',
   'run_recurring_todo_template_now_with_audit(uuid,date)',
   'save_branch_with_audit(uuid,jsonb)',
+  'save_dashboard_view_with_audit(uuid,text,jsonb,integer)',
   'save_department_permissions_with_audit(uuid,jsonb)',
   'save_department_with_audit(uuid,jsonb)',
   'save_designation_daily_checklist_with_audit(uuid,uuid,text,text,jsonb,text,boolean,integer)',
@@ -270,6 +279,7 @@ select is((
   'submit_leave_request(text,text,text,date,date,date,text,text)',
   'task_attachment_display_name(text)',
   'task_effective_due_datetime(task_instances)',
+  'task_feed_page(text,text,integer,integer)',
   'upsert_crm_branch_mapping(text,text,uuid,jsonb)',
   'upsert_crm_staff_mapping(text,text,uuid,jsonb)',
   'validate_task_bulk_import(jsonb,text)',
@@ -414,5 +424,10 @@ select throws_ok(
 );
 reset role;
 
+select ok(not has_function_privilege('authenticated','delete_task_lifecycle_with_audit(uuid,boolean,text)','EXECUTE'),'task lifecycle implementation stays private');
+select ok(not has_function_privilege('authenticated','admin_delete_task_series_with_audit(uuid,text)','EXECUTE'),'series implementation stays private');
+select ok(not has_function_privilege('authenticated','enforce_imported_task_proof(uuid)','EXECUTE'),'proof repair implementation stays private');
+select ok(not has_function_privilege('authenticated','commit_task_bulk_import_chunk_v0208(uuid,jsonb)','EXECUTE'),'old import implementation stays private');
+select ok(not has_function_privilege('authenticated','delete_recurring_todo_template_v0210(uuid)','EXECUTE'),'old schedule deletion implementation stays private');
 select * from finish();
 rollback;

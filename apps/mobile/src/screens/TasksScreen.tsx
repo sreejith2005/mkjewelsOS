@@ -6,17 +6,18 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Plus } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  countTaskFeedStatuses,
+  TASK_PAGE_SIZE,
+  hasPermission,
+  type TaskWorkspaceView,
   deriveTaskMutationCapability,
   taskEvidenceFileError,
-  taskMatchesStatus,
   type TaskFeedStatusFilter,
   TASK_IN_LOOP_PATH,
 } from "@jewelos/core";
-import { reviseTask, updateTask, uploadAndCompleteTask, type TaskBundle } from "@jewelos/data/tasks/api";
-import { useProfile } from "@/auth/AuthProvider";
+import { ensureMyRecurringTasks, reviseTask, updateTask, uploadAndCompleteTask, type TaskBundle } from "@jewelos/data/tasks/api";
+import { useAccess, useProfile } from "@/auth/AuthProvider";
 import { TaskCard as ParityTaskCard, type TaskCardAction } from "@/features/tasks/TaskCard";
-import { canManageTaskWorkspace, hasAdminTaskView, loadTaskWorkspace } from "@/features/tasks/taskWorkspace";
+import { loadTaskWorkspacePage } from "@/features/tasks/taskWorkspace";
 import { useAsyncData } from "@/lib/useAsyncData";
 import { pickFileFromChooser } from "@/lib/pickFile";
 import { makeStyles } from "@/theme/makeStyles";
@@ -31,14 +32,9 @@ import { TASKS_PRIMARY_ACTION } from "@/navigation/shellModel";
 import { fmsAssignedWorkRouteForTask, navigateFmsAssignedWork } from "@/features/fms/assignedWorkNavigation";
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
-type Workspace = "mine" | "delegated" | "inLoop";
+type Workspace = TaskWorkspaceView;
 
-/**
- * My Tasks and Delegated Tasks, as one scannable list rather than the web's
- * table. The feeds come from `loadTaskWorkspace`, which Task detail also reads,
- * and the split between them is `splitAssignedTaskFeed` from the shared core,
- * so the two clients never disagree about which work lands where.
- */
+/** Loads only the selected server page; details use their persisted task identity. */
 export function TasksScreen({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const theme = useAppTheme();
   const styles = useStyles();
@@ -46,30 +42,35 @@ export function TasksScreen({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const navigation = useNavigation<Navigation>();
   const insets = useSafeAreaInsets();
   const [workspace, setWorkspace] = useState<Workspace>(path === TASK_IN_LOOP_PATH ? "inLoop" : "mine");
+  const [offset, setOffset] = useState(0);
   const [status, setStatus] = useState<TaskFeedStatusFilter>("pending");
   useEffect(() => { if (path === TASK_IN_LOOP_PATH) setWorkspace("inLoop"); }, [path]);
 
   // The web Tasks page offers Bulk Import to managers and Assigning Left to
   // administrators only; the server re-checks both.
-  const canManage = canManageTaskWorkspace(profile);
-  const hasAdminView = hasAdminTaskView(profile);
+  const access = useAccess();
+  const canManage = hasPermission(access, "tasks.manage_team");
+  const hasAdminView = hasPermission(access, "tasks.view_all");
 
-  const load = useCallback(() => loadTaskWorkspace(profile, { prepareRecurring: true }), [profile]);
+  const identity = `${profile.id}|${workspace}|${status}|${offset}`;
+  const load = useCallback(() => loadTaskWorkspacePage(profile, workspace, status, offset), [profile, workspace, status, offset]);
 
   const { data, error, loading, refreshing, reload, refresh } = useAsyncData(load, [load]);
+  useEffect(() => {
+    if (data?.identity === identity && offset > 0 && offset >= data.total) setOffset(Math.max(0, Math.floor((data.total - 1) / TASK_PAGE_SIZE) * TASK_PAGE_SIZE));
+  }, [data, identity, offset]);
   useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["tasks", "forms", "fms", "organization"], refresh: refresh });
 
-  const tasks = useMemo(() => {
-    const source = data ? data[workspace] : [];
-    return source.filter((task) => taskMatchesStatus(task, status));
-  }, [data, status, workspace]);
-
-  const counts = useMemo(() => countTaskFeedStatuses(data ? data[workspace] : []), [data, workspace]);
-  const openCounts = useMemo(() => ({
-    mine: countTaskFeedStatuses(data?.mine ?? []).open,
-    delegated: countTaskFeedStatuses(data?.delegated ?? []).open,
-    inLoop: countTaskFeedStatuses(data?.inLoop ?? []).open,
-  }), [data]);
+  useEffect(() => {
+    let active = true;
+    void ensureMyRecurringTasks().then((result) => { if (active && result.created) void refresh(); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [profile.id, refresh]);
+  const current = data?.identity === identity;
+  const tasks = current ? data.tasks : [];
+  const counts = current ? data.counts : { pending: 0, overdue: 0, completed: 0, open: 0 };
+  const changeWorkspace = (value: Workspace) => { setWorkspace(value); setOffset(0); };
+  const changeStatus = (value: TaskFeedStatusFilter) => { setStatus(value); setOffset(0); };
   const categoryNames = useMemo(() => new Map((data?.categories ?? []).map((item) => [item.id, item.label])), [data?.categories]);
 
   const handleAction = async (task: TaskBundle, action: TaskCardAction) => {
@@ -109,7 +110,7 @@ export function TasksScreen({ path = "/tasks" }: Readonly<{ path?: string }>) {
     await refresh();
   };
 
-  if (loading) return <Screen><LoadingState label="Loading your tasks…" /></Screen>;
+  if (loading || (!current && !error)) return <Screen><LoadingState label="Loading your tasks…" /></Screen>;
   if (error && !data) return <Screen><ErrorState message={error} onRetry={() => void reload()} /></Screen>;
 
   return (
@@ -117,17 +118,18 @@ export function TasksScreen({ path = "/tasks" }: Readonly<{ path?: string }>) {
       <View style={styles.controls}>
         <SegmentedControl
           accessibilityLabel="Task workspace"
-          onChange={setWorkspace}
+          onChange={changeWorkspace}
           options={[
-            { value: "mine", label: `My Tasks (${openCounts.mine})` },
-            { value: "delegated", label: `Delegated (${openCounts.delegated})` },
-            { value: "inLoop", label: `In Loop (${openCounts.inLoop})` },
+            { value: "mine", label: "My Tasks" },
+            { value: "delegated", label: "Delegated" },
+            { value: "inLoop", label: "In Loop" },
+            ...(hasAdminView ? [{ value: "all" as const, label: "All Tasks" }] : []),
           ]}
           value={workspace}
         />
         <SegmentedControl
           accessibilityLabel="Task filters"
-          onChange={setStatus}
+          onChange={changeStatus}
           options={[
             { value: "pending", label: `Pending (${counts.pending})` },
             { value: "overdue", label: `Overdue (${counts.overdue})` },
@@ -154,6 +156,11 @@ export function TasksScreen({ path = "/tasks" }: Readonly<{ path?: string }>) {
         // Tasks are keyed by their instance id; the feed view can repeat a row
         // per assignee, and the id is what makes a card one task.
         keyExtractor={(task) => task.id ?? String(task.task_template_id)}
+        ListFooterComponent={current ? <View style={styles.adminActions}>
+          <Button label="Previous" disabled={refreshing || offset === 0} variant="secondary" onPress={() => setOffset(Math.max(0, offset - TASK_PAGE_SIZE))} />
+          <Text variant="caption">{data.total === 0 ? "0 tasks" : `${offset + 1} - ${Math.min(offset + TASK_PAGE_SIZE, data.total)} of ${data.total}`}</Text>
+          <Button label="Next" disabled={refreshing || offset + TASK_PAGE_SIZE >= data.total} variant="secondary" onPress={() => setOffset(offset + TASK_PAGE_SIZE)} />
+        </View> : null}
         ListEmptyComponent={<EmptyState message="It seems that you don’t have any tasks in this list." title="No Tasks Here" />}
         refreshControl={
           <RefreshControl

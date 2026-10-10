@@ -1,3 +1,4 @@
+import { decodeTaskPage, TASK_PAGE_SIZE, taskAdminEditPayload, type TaskAdminEdit, type TaskPageScope, type TaskFeedStatusFilter, type TaskWorkspaceView } from "@jewelos/core";
 import { getSupabase as db } from "@jewelos/api-client/client";
 import { groupTaskFeedRows, isTaskFeedItemInCurrentDayOrOverdue, taskFeedCurrentOrOverdueFilter as coreTaskFeedCurrentOrOverdueFilter, type Database, type Enums, type Json, type Tables } from "@jewelos/core";
 import { loadMasterOptions } from "../dropdowns/api";
@@ -202,18 +203,28 @@ export async function loadTaskFeed(
   viewerId: string,
   startIso: string,
   endIso: string,
-  options: { tenantId: string; delegated?: boolean; includeBlockedCoverage?: boolean; includeOverdue?: boolean },
+  options: { tenantId: string; delegated?: boolean; includeBlockedCoverage?: boolean; includeOverdue?: boolean; recordId?: string; recordIds?: readonly string[] },
 ): Promise<TaskBundle[]> {
-  const watcherPromise = db().from("task_watchers")
+  if (options.recordIds?.length === 0) return [];
+  if (options.recordIds && (options.recordIds.length > TASK_PAGE_SIZE || options.recordIds.some((id) => !/^[0-9a-f-]{36}$/i.test(id)))) throw new Error("Invalid task page identifiers");
+  const detailIds = options.recordIds ?? (options.recordId ? [options.recordId] : undefined);
+  const watcherQuery = db().from("task_watchers")
     .select("task_instance_id")
     .eq("user_profile_id", viewerId);
+  const watcherPromise = detailIds ? watcherQuery.in("task_instance_id", [...detailIds]) : watcherQuery;
   const usersPromise = db().from("v_task_users").select("id,employee_name");
   let rows: TaskFeedRow[] = [];
   let watcherRows: Array<{ task_instance_id: string }> = [];
   let users: Array<{ employee_name: string | null; id: string | null }> = [];
   const deadlineFilter = options.includeOverdue ? taskFeedCurrentOrOverdueFilter(startIso, endIso) : null;
 
-  if (options.delegated) {
+  if (options.recordIds || options.recordId) {
+    const ids = detailIds ?? [];
+    if (ids.some((id) => !/^[0-9a-f-]{36}$/i.test(id))) throw new Error("Invalid task identifier");
+    const [taskResult, watcherResult, usersResult] = await Promise.all([loadTaskRowsByIds(ids), watcherPromise, usersPromise]);
+    fail("Load selected tasks", taskResult.error); fail("Load task watchers", watcherResult.error); fail("Load task users", usersResult.error);
+    rows = taskResult.data; watcherRows = watcherResult.data ?? []; users = usersResult.data ?? [];
+  } else if (options.delegated) {
     const [scopeResult, watcherResult, usersResult] = await Promise.all([
       (deadlineFilter
         ? loadTaskScopePages((from, to) => db().from("v_task_feed_scope").select("id").or(deadlineFilter)
@@ -510,4 +521,26 @@ export async function recordAvailabilityRange(
     ? data.coverage_summary : {};
   const count = (key: string) => typeof summary[key] === "number" ? summary[key] : 0;
   return { primary_buddy: count("primary_buddy"), secondary_buddy: count("secondary_buddy"), reporting_manager: count("reporting_manager"), coverage_required: count("coverage_required"), manager_review: count("manager_review") };
+}
+
+
+export type TaskPage = Omit<TaskPageScope, "ids"> & Readonly<{ tasks: TaskBundle[] }>;
+
+export async function loadTaskPage(viewerId: string, tenantId: string, view: TaskWorkspaceView, status: TaskFeedStatusFilter, offset = 0): Promise<TaskPage> {
+  const { data, error } = await db().rpc("task_feed_page", { p_view: view, p_status: status, p_offset: offset, p_limit: TASK_PAGE_SIZE });
+  fail("Load task page", error);
+  const scope = decodeTaskPage(data);
+  const rows = await loadTaskFeed(viewerId, "", "", { tenantId, recordIds: scope.ids });
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return { counts: scope.counts, total: scope.total, tasks: scope.ids.flatMap((id) => { const row = byId.get(id); return row ? [row] : []; }) };
+}
+
+export async function adminEditTask(taskId: string, edit: TaskAdminEdit): Promise<void> {
+  const { error } = await db().rpc("admin_edit_task_with_audit", { p_task_id: taskId, p_payload: taskAdminEditPayload(edit) });
+  fail("Edit task", error);
+}
+
+export async function adminDeleteTask(taskId: string, entireSeries: boolean, reason: string): Promise<void> {
+  const { error } = await db().rpc("admin_delete_task_with_audit", { p_task_id: taskId, p_entire_series: entireSeries, p_reason: reason });
+  fail("Delete task", error);
 }

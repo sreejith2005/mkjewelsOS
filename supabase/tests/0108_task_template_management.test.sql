@@ -156,9 +156,9 @@ select is(
 reset role;
 
 select is(
-  (select count(*) from public.task_instances where task_template_id='10850000-0000-4000-8000-000000000001'),
+  (select count(*) from public.task_instances where task_template_id='10850000-0000-4000-8000-000000000001' and deleted_at is null),
   1::bigint,
-  'only the completed occurrence survives the delete'
+  'only the completed occurrence remains visible after deletion; tombstones retain audit history'
 );
 
 select * from finish();
