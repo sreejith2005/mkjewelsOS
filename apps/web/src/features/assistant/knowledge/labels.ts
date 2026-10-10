@@ -1,5 +1,5 @@
 import { isLittleText } from "@jewelos/core";
-import type { KiaraAudience, KiaraDocumentStatus, KiaraUploadStage } from "@jewelos/data/assistant/knowledge";
+import type { KiaraDocumentStatus, KiaraUploadStage, KiaraVisibility } from "@jewelos/data/assistant/knowledge";
 
 export const STATUS_LABELS: Readonly<Record<KiaraDocumentStatus, string>> = {
   processing: "Processing",
@@ -19,10 +19,22 @@ export const STATUS_TONES: Readonly<Record<KiaraDocumentStatus, string>> = {
   deleted: "border-task-border bg-task-muted text-task-text-muted",
 };
 
-export const AUDIENCE_LABELS: Readonly<Record<KiaraAudience, string>> = {
+export const VISIBILITY_LABELS: Readonly<Record<KiaraVisibility, string>> = {
   everyone: "Everyone",
+  departments: "Only these departments",
   managers_and_above: "Managers and above",
 };
+
+export const VISIBILITY_HELP: Readonly<Record<KiaraVisibility, string>> = {
+  everyone: "Every employee can get answers from it. People in the tagged departments see it first.",
+  departments: "Only people in the tagged departments (in every branch), plus Admins and Super Admin.",
+  managers_and_above: "Managers, Admins, and Super Admin only. HR is not included.",
+};
+
+/** Department tags as a short line ("Sales, Drivers" or "All departments"). */
+export function departmentsText(tags: readonly string[]): string {
+  return tags.length ? tags.join(", ") : "No department";
+}
 
 export const STAGE_LABELS: Readonly<Record<KiaraUploadStage | "queued", string>> = {
   queued: "Waiting",

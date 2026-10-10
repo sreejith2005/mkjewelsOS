@@ -1,3 +1,3 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`system prompt > is pinned: a change here is a deliberate cache reset 1`] = `"dacaabece30a7744e05dcf806653317b88ef9683b5e10d368ab6db0b049f28f7"`;
+exports[`system prompt > is pinned: a change here is a deliberate cache reset 1`] = `"89f661eefca307959a1c6c03a5d3f4d5e3a4d05559acdb6162a874bba081f95f"`;

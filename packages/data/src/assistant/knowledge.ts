@@ -14,14 +14,21 @@ import {
  */
 
 export type KiaraDocumentStatus = "processing" | "active" | "inactive" | "suggested" | "failed" | "deleted";
-export type KiaraAudience = "everyone" | "managers_and_above";
-export const KIARA_AUDIENCES: readonly KiaraAudience[] = ["everyone", "managers_and_above"];
+/**
+ * Who may get answers from a document (owner decision 2026-10-10): everyone;
+ * only the tagged departments (plus Admin, Super Admin, and knowledge
+ * managers); or managers and above. Enforced by the database.
+ */
+export type KiaraVisibility = "everyone" | "departments" | "managers_and_above";
+export const KIARA_VISIBILITIES: readonly KiaraVisibility[] = ["everyone", "departments", "managers_and_above"];
 
 export type KiaraDocumentSummary = Readonly<{
   id: string;
   title: string;
   category: string | null;
-  audience: KiaraAudience;
+  visibility: KiaraVisibility;
+  /** Department names (one tag covers that name in every branch). */
+  department_tags: readonly string[];
   source_kind: "upload" | "escalation_answer" | "manual";
   status: KiaraDocumentStatus;
   updated_at: string;
@@ -52,7 +59,8 @@ export type KiaraDocumentDetail = Readonly<{
   id: string;
   title: string;
   category: string | null;
-  audience: KiaraAudience;
+  visibility: KiaraVisibility;
+  department_tags: readonly string[];
   source_kind: KiaraDocumentSummary["source_kind"];
   status: KiaraDocumentStatus;
   updated_at: string;
@@ -66,6 +74,9 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 const str = (value: unknown): string | null => (typeof value === "string" ? value : null);
 const num = (value: unknown): number | null => (typeof value === "number" ? value : null);
+const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []);
+const visibilityOf = (value: unknown): KiaraVisibility =>
+  value === "departments" || value === "managers_and_above" ? value : "everyone";
 
 function rpcError(error: { code?: string; message: string; details?: string | null } | null): Error | null {
   if (!error) return null;
@@ -89,7 +100,8 @@ function asSummary(value: unknown): KiaraDocumentSummary | null {
     id: value.id as string,
     title: value.title as string,
     category: str(value.category),
-    audience: value.audience === "managers_and_above" ? "managers_and_above" : "everyone",
+    visibility: visibilityOf(value.visibility),
+    department_tags: strings(value.department_tags),
     source_kind: value.source_kind === "manual" || value.source_kind === "escalation_answer" ? value.source_kind : "upload",
     status: value.status as KiaraDocumentStatus,
     updated_at: value.updated_at as string,
@@ -107,8 +119,13 @@ function asSummary(value: unknown): KiaraDocumentSummary | null {
   };
 }
 
-export async function listKiaraDocuments(search?: string, status?: KiaraDocumentStatus): Promise<KiaraDocumentSummary[]> {
-  const data = unwrap(await db().rpc("list_kiara_documents", { ...(search?.trim() ? { p_search: search.trim() } : {}), ...(status ? { p_status: status } : {}) }));
+/** Documents by title/category text, status, and department name ("-" = untagged). */
+export async function listKiaraDocuments(search?: string, status?: KiaraDocumentStatus, department?: string): Promise<KiaraDocumentSummary[]> {
+  const data = unwrap(await db().rpc("list_kiara_documents", {
+    ...(search?.trim() ? { p_search: search.trim() } : {}),
+    ...(status ? { p_status: status } : {}),
+    ...(department?.trim() ? { p_department: department.trim() } : {}),
+  }));
   return (Array.isArray(data) ? data : []).flatMap((row) => {
     const summary = asSummary(row);
     return summary ? [summary] : [];
@@ -123,7 +140,8 @@ export async function getKiaraDocument(id: string): Promise<KiaraDocumentDetail>
     id: summary.id,
     title: summary.title,
     category: summary.category,
-    audience: summary.audience,
+    visibility: summary.visibility,
+    department_tags: summary.department_tags,
     source_kind: summary.source_kind,
     status: summary.status,
     updated_at: summary.updated_at,
@@ -217,7 +235,8 @@ export type UploadKnowledgeInput = Readonly<{
   file: File;
   title: string;
   category: string | null;
-  audience: KiaraAudience;
+  visibility: KiaraVisibility;
+  departmentTags: readonly string[];
   /** Replace: the document receiving a new version. */
   replaceDocumentId?: string | undefined;
 }>;
@@ -249,7 +268,7 @@ export async function uploadKnowledgeDocx(
       set({ ...state, stage: "registering" });
       const registration = asRegistration(state.documentId
         ? unwrap(await db().rpc("add_kiara_document_version_with_audit", { p_document_id: state.documentId, p_filename: input.file.name, p_byte_size: input.file.size, p_sha256: hash }))
-        : unwrap(await db().rpc("create_kiara_document_with_audit", { p_title: input.title, p_category: input.category as string, p_audience: input.audience, p_filename: input.file.name, p_byte_size: input.file.size, p_sha256: hash })));
+        : unwrap(await db().rpc("create_kiara_document_with_audit", { p_title: input.title, p_category: input.category as string, p_visibility: input.visibility, p_department_tags: [...input.departmentTags], p_filename: input.file.name, p_byte_size: input.file.size, p_sha256: hash })));
       set({ ...state, documentId: registration.document_id, versionId: registration.version_id, storagePath: registration.storage_path, uploaded: false, versionFailed: false });
     }
     if (!state.uploaded) {
@@ -277,7 +296,7 @@ export async function uploadKnowledgeDocx(
  * come from the same splitter the .docx ingest uses, so what is saved is what
  * Kiara reads; the database checks each section is a slice of the text.
  */
-export async function saveKiaraDocumentText(input: Readonly<{ documentId: string | null; title: string; category: string | null; audience: KiaraAudience; text: string }>): Promise<string> {
+export async function saveKiaraDocumentText(input: Readonly<{ documentId: string | null; title: string; category: string | null; visibility: KiaraVisibility; departmentTags: readonly string[]; text: string }>): Promise<string> {
   const text = normalizeKnowledgeText(input.text);
   const chunked = chunkKnowledgeText(text);
   if (!chunked.ok) throw new Error(chunked.error);
@@ -286,16 +305,65 @@ export async function saveKiaraDocumentText(input: Readonly<{ documentId: string
     p_document_id: input.documentId as string,
     p_title: input.title,
     p_category: input.category as string,
-    p_audience: input.audience,
+    p_visibility: input.visibility,
     p_text: text,
     p_chunks: chunked.chunks as unknown as Json,
+    p_department_tags: [...input.departmentTags],
   }));
   if (!isRecord(data) || !str(data.document_id)) throw new Error("The text could not be saved.");
   return data.document_id as string;
 }
 
-export async function updateKiaraDocumentDetails(documentId: string, details: Readonly<{ title: string; category: string | null; audience: KiaraAudience }>): Promise<void> {
-  unwrap(await db().rpc("update_kiara_document_details_with_audit", { p_document_id: documentId, p_title: details.title, p_category: details.category as string, p_audience: details.audience }));
+export async function updateKiaraDocumentDetails(documentId: string, details: Readonly<{ title: string; category: string | null; visibility: KiaraVisibility; departmentTags: readonly string[] }>): Promise<void> {
+  unwrap(await db().rpc("update_kiara_document_details_with_audit", {
+    p_document_id: documentId, p_title: details.title, p_category: details.category as string, p_visibility: details.visibility,
+    p_department_tags: [...details.departmentTags],
+  }));
+}
+
+export type KiaraTagMode = "replace" | "add" | "remove";
+
+/**
+ * Sets visibility and/or departments on many documents in one audited action.
+ * Leave `visibility` or `departmentTags` undefined to keep each document's own.
+ */
+export async function bulkUpdateKiaraDocumentsAccess(
+  documentIds: readonly string[],
+  change: Readonly<{ visibility?: KiaraVisibility | undefined; departmentTags?: readonly string[] | undefined; mode?: KiaraTagMode | undefined }>,
+): Promise<Readonly<{ selected: number; changed: number }>> {
+  const data = unwrap(await db().rpc("bulk_update_kiara_documents_access_with_audit", {
+    p_document_ids: [...documentIds],
+    // Null keeps each document's value (generated types mark SQL args non-null).
+    p_visibility: (change.visibility ?? null) as string,
+    p_department_tags: (change.departmentTags ? [...change.departmentTags] : null) as string[],
+    p_tag_mode: change.mode ?? "replace",
+  }));
+  return { selected: isRecord(data) ? num(data.selected) ?? 0 : 0, changed: isRecord(data) ? num(data.changed) ?? 0 : 0 };
+}
+
+export type KiaraDepartmentOption = Readonly<{ name: string; key: string; branches: number; documents: number }>;
+export type KiaraKnowledgeFilters = Readonly<{
+  departments: readonly KiaraDepartmentOption[];
+  /** Tags whose department no longer exists under that name. */
+  unmatchedTags: readonly string[];
+  untagged: number;
+  statusCounts: Readonly<Partial<Record<KiaraDocumentStatus, number>>>;
+}>;
+
+/** Department names for pickers and filters, and document counts by status. */
+export async function getKiaraKnowledgeFilters(): Promise<KiaraKnowledgeFilters> {
+  const data = unwrap(await db().rpc("get_kiara_knowledge_filters"));
+  const record = isRecord(data) ? data : {};
+  const counts = isRecord(record.status_counts) ? record.status_counts : {};
+  return {
+    departments: (Array.isArray(record.departments) ? record.departments : []).flatMap((row): KiaraDepartmentOption[] =>
+      isRecord(row) && str(row.name) && str(row.key)
+        ? [{ name: row.name as string, key: row.key as string, branches: num(row.branches) ?? 0, documents: num(row.documents) ?? 0 }]
+        : []),
+    unmatchedTags: strings(record.unmatched_tags),
+    untagged: num(record.untagged) ?? 0,
+    statusCounts: Object.fromEntries(Object.entries(counts).flatMap(([key, value]) => (typeof value === "number" ? [[key, value]] : []))) as Partial<Record<KiaraDocumentStatus, number>>,
+  };
 }
 
 export async function setKiaraDocumentStatus(documentId: string, status: "active" | "inactive"): Promise<void> {
@@ -311,13 +379,13 @@ export async function deleteKiaraDocument(documentId: string): Promise<Readonly<
   return { filesRemoved: !error };
 }
 
-export type KiaraSearchHit = Readonly<{ chunk_id: string; document_id: string; title: string; heading_path: string; content: string }>;
+export type KiaraSearchHit = Readonly<{ chunk_id: string; document_id: string; title: string; heading_path: string; content: string; departments: readonly string[]; own_department: boolean }>;
 
-/** What Kiara would retrieve for these words (the same RPC and audience rules). */
+/** What Kiara would retrieve for these words (the same RPC, visibility, and ranking rules). */
 export async function searchKiaraKnowledge(englishQuery: string, originalTerms?: string): Promise<KiaraSearchHit[]> {
   const data = unwrap(await db().rpc("search_kiara_knowledge", { p_query: englishQuery, ...(originalTerms?.trim() ? { p_original_terms: originalTerms.trim() } : {}), p_limit: 8 }));
   return (isRecord(data) && Array.isArray(data.results) ? data.results : []).flatMap((row): KiaraSearchHit[] =>
     isRecord(row) && str(row.chunk_id) && str(row.document_id) && str(row.title) && str(row.content)
-      ? [{ chunk_id: row.chunk_id as string, document_id: row.document_id as string, title: row.title as string, heading_path: str(row.heading_path) ?? "", content: row.content as string }]
+      ? [{ chunk_id: row.chunk_id as string, document_id: row.document_id as string, title: row.title as string, heading_path: str(row.heading_path) ?? "", content: row.content as string, departments: strings(row.departments), own_department: row.own_department === true }]
       : []);
 }

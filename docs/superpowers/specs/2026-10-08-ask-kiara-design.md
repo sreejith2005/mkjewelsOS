@@ -283,6 +283,60 @@ created by the caller, and the caller has `assistant.manage_knowledge`; select f
 permission; delete only through the delete RPC's cleanup list. `.doc` (old binary Word), PDF, and
 images are rejected in v1.
 
+### 5.3a Department targeting (owner decision 2026-10-10; migration 0904)
+
+SOPs are written for particular departments (salespersons, drivers, karigar designers, cleaning
+staff, accounts...). Each document carries zero or more **department tags** and one **visibility**.
+
+**How departments are modelled today.** `departments` rows belong to a tenant and either one branch
+(`branch_id` set) or the whole tenant (`branch_id` null). Names repeat across branches with
+different codes (code is unique per tenant, 0173), for example a "Sales" row per branch, and the
+roster import creates a new branch-scoped row when a branch has none. A department id therefore
+cannot express "Sales everywhere".
+
+**Storage model chosen: tags are department NAMES.** `kiara_documents.department_tags text[]`
+(at most 20) holds the tenant's spelling of each name; a generated
+`department_keys text[]` holds `kiara_department_key(name)` = lower-cased, trimmed, inner spaces
+collapsed, with a GIN index. The asker matches when the key of their own department's name is in
+`department_keys`. Tagging "Sales" once therefore covers Sales in every branch, a tenant-wide Sales,
+and any branch added later; " sALES " and "Sales" are the same tag. Alternatives rejected: a join
+table of department ids (needs every branch's row, misses branches added later, breaks on
+re-created departments); a separate tag table keyed by name (more joins for a set of at most 20
+short values that is always read and written with the document). When tagging, every name must
+match an active department of the tenant (typos are refused) and is stored with the most common
+spelling (Title Case preferred on a tie). If a department is later renamed, its old tag no longer
+matches; the Knowledge screen lists such "unmatched" tags so Super Admin can fix them.
+
+**Visibility** (replaces the 2-value `audience`; the column is renamed and the two existing values
+keep their meaning, so no data changes):
+
+| Visibility | Search and citation excerpts available to |
+| --- | --- |
+| `everyone` (default) | every Ask Kiara user; the asker's own-department documents rank higher |
+| `departments` | employees whose department name matches a tag, plus Admin and Super Admin authority, plus `assistant.manage_knowledge` holders; requires at least one tag |
+| `managers_and_above` | manager dashboard authority or higher (manager, admin, super admin); HR is not included |
+
+Roles are effective roles from `current_profile()`, so dashboard authority counts. One immutable
+function, `kiara_document_visible(role, asker_key, can_manage, visibility, keys)`, is used by both
+`search_kiara_knowledge` and `get_kiara_knowledge_excerpt`, so a citation chip can never show what
+search would hide. Untagged documents behave as `everyone` with no boost.
+
+**Ranking.** Full-text rank as before. A result from the asker's own department is multiplied by
+1.35, but only when its rank is at least half of the best rank for that query. An own-department
+document that barely matches is never lifted above a clearly relevant one; between comparably
+relevant hits, the asker's department wins (a driver asking a general question that both a driver
+SOP and a sales SOP answer sees the driver SOP first). Results carry `departments` and
+`own_department` so Kiara can prefer the asker's SOP; the per-turn context already names the asker's
+department.
+
+**Knowledge screen.** Department multi-select and visibility selector on each document and in the
+article editor; a Department filter (including "No department") with document counts; a status
+filter with counts for Suggested, Processing, and Failed; row selection with **bulk edit**
+(`bulk_update_kiara_documents_access_with_audit`: set visibility and/or replace, add, or remove
+departments for up to 500 documents in one transaction and one audit row holding every document's
+previous values; a department-only result without departments fails the whole selection); and
+visibility plus departments chosen before a bulk upload.
+
 ### 5.4 Escalations
 
 `kiara_escalations`
@@ -344,7 +398,9 @@ question text, answers, or data payloads, except where stated.
 | `archive_my_kiara_conversation(p_id uuid) returns void` | authenticated, owner | Hides from the list; content is purged on the retention schedule. Audit. |
 | `get_my_kiara_quota() returns jsonb` | authenticated | `{used, limit (null=unlimited), resets_at}`. |
 | `consume_my_voice_quota() returns boolean` | authenticated, `assistant.voice` | Same table and rolling-hour rule as `consume_voice_interpretation_quota` (0162), for the caller resolved by `current_profile()`. No audit (the transcription is logged by shape). |
-| `search_kiara_knowledge(p_query text, p_limit int default 5) returns jsonb` | authenticated, `assistant.view` | `websearch_to_tsquery('english', q)` OR `plainto_tsquery('simple', q)` over chunks of `active` documents' active versions, `ts_rank_cd` ordered, max 8 rows, each `{chunk_id, document_id, version_id, title, heading_path, content}`. Read-only, no audit row (the question's audit lists the KB document ids). |
+| `search_kiara_knowledge(p_query text, p_original_terms text, p_limit int default 5) returns jsonb` | authenticated, `assistant.view` | OR-ranked `english` query plus a `simple` query over the original words, over chunks of `active` documents' active versions the caller may see (5.3a), `ts_rank_cd` ordered with the own-department boost (5.3a), max 8 rows, each `{chunk_id, document_id, version_id, title, heading_path, content, departments, own_department}`. Read-only, no audit row (the question's audit lists the KB document ids). |
+| `bulk_update_kiara_documents_access_with_audit(p_document_ids uuid[], p_visibility text, p_department_tags text[], p_tag_mode text)` | `assistant.manage_knowledge` | 5.3a bulk edit; null keeps the field. One audit row `assistant_kb_bulk_access_updated`. |
+| `get_kiara_knowledge_filters() returns jsonb` | `assistant.manage_knowledge` | Department names (one per name across branches, with branch and document counts), unmatched tags, untagged count, counts by status. |
 | `create_kiara_document_with_audit(p_title text, p_category text, p_filename text, p_byte_size int, p_sha256 text) returns jsonb` | `assistant.manage_knowledge` | Creates document (`processing`) + pending version; returns `{document_id, version_id, storage_path}` for upload. Audit `assistant_kb_document_created`. |
 | `add_kiara_document_version_with_audit(p_document_id uuid, p_filename text, p_byte_size int, p_sha256 text) returns jsonb` | `assistant.manage_knowledge` | Replace: new pending version. Audit. |
 | `store_kiara_extraction_with_audit(p_version_id uuid, p_extracted_text text, p_chunks jsonb) returns void` | `assistant.manage_knowledge` (called by the ingest function as the caller) | Validates chunk shape and sizes, replaces chunks for the version, marks version `succeeded`, switches `active_version_id`, sets document `active` (unless it was `inactive`). Audit with counts only. |
@@ -540,7 +596,8 @@ Gaps (no scoped contract today; owner decisions in section 19):
 
 ## 10. Knowledge base ingestion
 
-1. Super Admin picks a `.docx` (client checks extension, MIME, size <= 10 MB; computes SHA-256).
+1. Super Admin picks a `.docx` (client checks extension, MIME, size <= 10 MB; computes SHA-256),
+   with the visibility and departments chosen for the batch (5.3a).
 2. `create_kiara_document_with_audit` (or `add_kiara_document_version_with_audit`) returns the path.
 3. Client uploads to `kiara-knowledge` at that path (storage policy re-checks).
 4. Client calls `POST /functions/v1/kiara-knowledge-ingest {version_id}` with the caller's JWT.
@@ -595,7 +652,13 @@ native UI, reviewed in the regression checklist when a section's UI changes. A V
    in JewelOS and stop. Never guess, estimate, or infer hidden data, and never suggest escalation as a
    way around access.
 5. **Citations.** Every SOP or policy statement carries `[[cite:<chunk_id>]]` from this turn's search
-   results. No citation, no policy claim.
+   results. No citation, no policy claim. **Search again (2026-10-10):** if the first search finds
+   nothing that answers the question, Kiara searches once more with different wording (synonyms or
+   the plain-language version) before saying it could not find it. The worker enforces this: after
+   a knowledge search it holds answer text until the text carries a valid citation; if the model ends
+   its reply after a single search with nothing citable, the held reply is dropped (never shown) and
+   a fixed server note (`<kiara_check>`) asks for one more search. A not-found reply is allowed only
+   after two searches (or when the request budget leaves no room for another round).
 6. **Escalation.** Call `offer_escalation` when the question is valid and about MK Jewels work but:
    the knowledge base has no relevant result; results conflict; the answer needs a judgment, an
    exception, or an approval; or the user asks for a person. Do not offer it for access denials,
