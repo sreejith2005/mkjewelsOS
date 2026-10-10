@@ -38,7 +38,12 @@ anonymous/inactive/service denials, branch visibility, denied projection writes,
 full counts beyond the REST cap, source refresh and history compatibility.
 The legacy fixture test was rerun after supplying its migration include path;
 the final scale test uses mutable contacts rather than attempting to update
-immutable history.
+immutable history. A rerun on the seeded 100,000-record database initially
+failed five fixture-only assumptions (unfiltered company-wide totals and
+non-unique search names). The fixture now scopes counts to its own synthetic
+branch and uses a unique client name; all 44 assertions passed again with
+the large fixture present. Company-wide reads and cross-branch checks remain
+covered. This required no application or authorization change.
 
 Commands used in the isolated release/local worktrees:
 
@@ -113,6 +118,12 @@ needed an existing lead-source option selected explicitly.
 The final 100,000-record retry encountered severe local resource pressure
 (16 GB Windows host, free memory below 300 MB, temporary database connection
 rejection). Those timings must not be presented as clean production latency.
+Two resource-constrained retries timed out. The final isolated read run
+completed all 12 queries, exit 0, with correct totals and bounded payloads:
+Not Bought first/deep/search 14.4/10.3/4.6 seconds; referrals 5.6 seconds;
+clients first/deep/name/phone/source 2.3/1.7/9.0/1.0/2.1 seconds; dashboard
+2.1 seconds; queue first/deep 0.45/0.44 seconds. This confirms correctness
+and bounded transfer under pressure, not achievement of the latency target.
 
 ## Hosted release
 

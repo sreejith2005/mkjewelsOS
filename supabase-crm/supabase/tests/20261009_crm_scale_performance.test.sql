@@ -13,7 +13,7 @@ insert into users(id,name,email,role,branch_id,active) values
 ('20261009-0001-4000-8000-000000000002','Scale Admin','scale-admin@example.invalid','super_admin',null,true),
 ('20261009-0001-4000-8000-000000000003','Scale Inactive','scale-inactive@example.invalid','salesperson','20261009-0001-4000-8000-00000000000a',false);
 insert into crm_sso_access_grants(jewelos_user_id,work_email,legacy_crm_user_id,crm_auth_user_id,active) select id,email,id,id,true from users where id::text like '20261009-0001-4000-8000-00000000000_';
-insert into clients(client_id,primary_name,primary_phone,last_branch_id) values('20261009-0001-4000-8000-000000000010','Scale Client','919900000010','20261009-0001-4000-8000-00000000000a');
+insert into clients(client_id,primary_name,primary_phone,last_branch_id) values('20261009-0001-4000-8000-000000000010','Scale Contract Client','919900000010','20261009-0001-4000-8000-00000000000a');
 insert into crm_allocation(branch_id,crm_name,crm_user_id,active) values('20261009-0001-4000-8000-00000000000a','Scale Staff','20261009-0001-4000-8000-000000000001',true);
 \ir fixtures/crm_master_options.sql
 -- Bulk queue rows do not add a contact. Avoid recomputing the same client's unchanged
@@ -26,13 +26,13 @@ alter table not_bought_followups enable trigger zz_client_browse_state;
 set local role authenticated;
 select set_config('request.jwt.claim.sub','20261009-0001-4000-8000-000000000001',true);
 select set_config('request.jwt.claim.role','authenticated',true);
-select is((browse_crm_followups('not_bought','{"tab":"pending"}',0,500)->>'total')::integer,801,'all matching work counted beyond REST cap');
-select is(jsonb_array_length(browse_crm_followups('not_bought','{"tab":"pending"}',0,500)->'rows'),50,'server enforces bounded page even with larger requested limit');
-select is((browse_crm_followups('not_bought','{}')->'counts'->>'today')::integer,401,'historical is pending but not due today');
-select is((browse_crm_followups('not_bought','{}')->'counts'->>'done')::integer,400,'done tab keeps UI status semantics');
-select is((browse_crm_followups('not_bought','{"tab":"pending","search":"SCALE-1201"}')->>'total')::integer,1,'search finds records beyond first 1000');
+select is((browse_crm_followups('not_bought','{"tab":"pending","branch":"20261009-0001-4000-8000-00000000000b"}',0,500)->>'total')::integer,801,'all matching work counted beyond REST cap');
+select is(jsonb_array_length(browse_crm_followups('not_bought','{"tab":"pending","branch":"20261009-0001-4000-8000-00000000000b"}',0,500)->'rows'),50,'server enforces bounded page even with larger requested limit');
+select is((browse_crm_followups('not_bought','{"branch":"20261009-0001-4000-8000-00000000000b"}')->'counts'->>'today')::integer,401,'historical is pending but not due today');
+select is((browse_crm_followups('not_bought','{"branch":"20261009-0001-4000-8000-00000000000b"}')->'counts'->>'done')::integer,400,'done tab keeps UI status semantics');
+select is((browse_crm_followups('not_bought','{"tab":"pending","search":"SCALE-1201","branch":"20261009-0001-4000-8000-00000000000b"}')->>'total')::integer,1,'search finds records beyond first 1000');
 select is((browse_crm_followups('not_bought','{"tab":"pending","branch":"20261009-0001-4000-8000-00000000000a"}')->>'total')::integer,0,'branch filter is applied before counting/paging');
-select isnt(browse_crm_followups('not_bought','{"tab":"pending","sort":"newest"}',0,50)->'rows'->0->>'id',browse_crm_followups('not_bought','{"tab":"pending","sort":"newest"}',50,50)->'rows'->0->>'id','next page reaches different records');
+select isnt(browse_crm_followups('not_bought','{"tab":"pending","sort":"newest","branch":"20261009-0001-4000-8000-00000000000b"}',0,50)->'rows'->0->>'id',browse_crm_followups('not_bought','{"tab":"pending","sort":"newest","branch":"20261009-0001-4000-8000-00000000000b"}',50,50)->'rows'->0->>'id','next page reaches different records');
 select throws_ok($$select browse_crm_followups('bad')$$,'22023','invalid queue kind','invalid kind rejected');
 reset role;
 insert into not_bought_history(followup_id,status,remark,created_at,updated_by)
@@ -46,8 +46,8 @@ select ok((select latest_interaction_at is not null from crm_client_activity_sum
 select ok(not exists(
  select 1 from (select client_id,min(occurred_at) as first,max(occurred_at) filter(where is_contact and occurred_at<=statement_timestamp()) as latest from crm_client_activity where client_id='20261009-0001-4000-8000-000000000010' group by client_id) a
  join crm_client_activity_summary s using(client_id) where a.first is distinct from s.first_recorded_at or a.latest is distinct from s.latest_interaction_at),'projected timestamps match visible original evidence');
-select is((browse_crm_records_page('{"search":"Scale Client"}')->>'total')::integer,1,'thin browse applies filters before counting');
-select is(browse_crm_records_page('{"search":"Scale Client"}')->'rows'->0->>'primary_phone','919900000010','thin page hydrates saved listing fields after selecting IDs');
+select is((browse_crm_records_page('{"search":"Scale Contract Client"}')->>'total')::integer,1,'thin browse applies filters before counting');
+select is(browse_crm_records_page('{"search":"Scale Contract Client"}')->'rows'->0->>'primary_phone','919900000010','thin page hydrates saved listing fields after selecting IDs');
 select throws_ok($$update crm_client_browse_state set latest_interaction_at=now()$$,'42501',null,'clients cannot mutate derived projection directly');
 reset role;
 -- Test refreshes on a mutable source; immutable follow-up evidence remains intact.
@@ -68,9 +68,9 @@ delete from crm_contacts where id='20261009-0001-4000-8000-000000000012';
 set local role authenticated;
 select is((select latest_interaction_at from crm_client_activity_summary where client_id='20261009-0001-4000-8000-000000000011'),null::timestamptz,'deleting a mutable source refreshes metadata instead of retaining a stale contact');
 reset role;
-insert into entry_queue(branch_id,token,client_name,mobile,status,client_id,created_at) values('20261009-0001-4000-8000-00000000000b','SCALE-PRIVATE','Scale Client','919900000010','WAITING','20261009-0001-4000-8000-000000000010','2000-01-01');
+insert into entry_queue(branch_id,token,client_name,mobile,status,client_id,created_at) values('20261009-0001-4000-8000-00000000000b','SCALE-PRIVATE','Scale Contract Client','919900000010','WAITING','20261009-0001-4000-8000-000000000010','2000-01-01');
 insert into entry_queue(branch_id,token,client_name,mobile,status,client_id)
-select '20261009-0001-4000-8000-00000000000a','SCALE-PAGE-'||n,'Scale Client','919900000010','pending','20261009-0001-4000-8000-000000000010' from generate_series(1,55)n;
+select '20261009-0001-4000-8000-00000000000a','SCALE-PAGE-'||n,'Scale Contract Client','919900000010','pending','20261009-0001-4000-8000-000000000010' from generate_series(1,55)n;
 set local role authenticated;
 select is((get_walkin_queue_page()->>'total_count')::integer,55,'walk-in queue reports every pending entry');
 select is(jsonb_array_length(get_walkin_queue_page()->'items'),50,'walk-in queue page is bounded');
