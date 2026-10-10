@@ -28,7 +28,10 @@ TypeScript/Vitest, React (web), React Native/Expo (Android).
 
 The next free number on `origin/main` was **0205** when this plan was written. Renumbered 2026-10-09:
 main gained `0205_crm_master_sync_ignore_global_dropdowns` (PR #2), so this branch's unapplied
-migrations became `0206_ask_kiara_foundation` and `0207_kiara_directory_lookup`; Phase 3 is `0208`. Other branches also add migrations (for example
+migrations became `0206_ask_kiara_foundation` and `0207_kiara_directory_lookup`. Renumbered again 2026-10-10:
+main gained `0206_management_insights` and `0207_dashboard_saved_views` (applied on production), so
+the Kiara migrations are `0208_ask_kiara_foundation`, `0209_kiara_directory_lookup`, and
+`0210_ask_kiara_knowledge`; their manifest redefinitions keep main's `dashboard_saved_views`. Other branches also add migrations (for example
 `C:\crm` carries a `0201` that differs from main's). Rule for this branch:
 1. Before writing a migration, `git fetch origin` and take the next number after `origin/main`.
 2. Before every push and before merge, rebase on `origin/main`. If main gained the same number,
@@ -54,7 +57,7 @@ The owner's nine phases are kept, with three adjustments:
 **Scope:** permissions and page, conversations/messages, quota, `ask-kiara` with two tools
 (`get_my_work_summary`, `get_app_help`), streaming web chat, local tests.
 
-Migration `0206_ask_kiara_foundation.sql` (originally 0205):
+Migration `0208_ask_kiara_foundation.sql` (originally 0205, then 0206):
 - Permission catalog rows (`-- permission-catalog:begin/end`): all six `assistant.*` keys (spec 15)
   so later phases need no catalog change. Sort 310-315.
 - `default_section_availability()` / `validated_section_availability()` with `ask_kiara`; launch-dark
@@ -80,7 +83,7 @@ Files to create:
   client (`fetch` + `ReadableStream`, JSON fallback).
 - `apps/web/src/pages/AskKiaraPage.tsx`, `apps/web/src/features/assistant/` (chat view, message
   renderer with the restricted markdown subset, quota chip, conversation list, tests).
-- `supabase/tests/0206_ask_kiara_foundation.test.sql`.
+- `supabase/tests/0208_ask_kiara_foundation.test.sql`.
 - `docs/superpowers/evals/ask-kiara/` with `cases.json` (role, question, expected tools allowed,
   forbidden tools, must-refuse flag) and `README.md` (how to run against a local stack).
 
@@ -154,7 +157,7 @@ Exit criteria:
 `run_report`, `find_people`, `get_availability`, `get_leave`, `get_fms_work`, `search_forms`,
 `get_my_notifications` (spec 8), and `kiara_directory_lookup` (spec 19 item 8, approved 2026-10-08).
 
-Migration (approved, spec 19 item 8): `0207_kiara_directory_lookup.sql` with
+Migration (approved, spec 19 item 8): `0209_kiara_directory_lookup.sql` with
 `kiara_directory_lookup(p_name text, p_limit int)` (active colleagues in tenant; name, designation,
 department, branch; no contact data; `assert_module_access('ask_kiara')`; pgTAP).
 
@@ -187,7 +190,7 @@ First task (gate): run `npm:mammoth@1.8.0` inside `supabase.cmd functions serve`
 real SOP, measure CPU/memory/time. If it exceeds edge-runtime limits, stop and bring options to the
 owner (smaller files, split documents, or browser-side extraction re-validated server-side).
 
-Migration `0208_ask_kiara_knowledge.sql`: documents, versions, chunks (generated `tsvector`, GIN),
+Migration `0210_ask_kiara_knowledge.sql`: documents, versions, chunks (generated `tsvector`, GIN),
 bucket `kiara-knowledge` with MIME/size limits and path policies, all KB RPCs, `search_kiara_knowledge`,
 `assistant` realtime topic (constraint + `emit_tenant_realtime_event` replace), manifest
 classification.

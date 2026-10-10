@@ -815,7 +815,7 @@ declare
     'fms_instance_stage_assignees','fms_instances',
     'fms_context_assignee_defaults','fms_workflow_mutation_keys','form_submission_files',
     'leave_requests','task_import_identity_aliases','designation_permission_overrides',
-    'role_permissions','user_access_profiles','user_permission_overrides','department_permission_overrides',
+    'role_permissions','user_access_profiles','user_permission_overrides','department_permission_overrides','dashboard_saved_views',
     'kiara_settings','kiara_user_limits','kiara_daily_usage','kiara_conversations','kiara_messages','kiara_question_facts',
     'kiara_documents','kiara_document_versions','kiara_document_chunks'
   ];
@@ -878,6 +878,7 @@ begin
       'user_permission_overrides', (select count(*) from public.user_permission_overrides where tenant_id = p_tenant_id),
       'clients', (select count(*) from public.clients where tenant_id = p_tenant_id),
       'crm_documents', (select count(*) from public.crm_documents where tenant_id = p_tenant_id),
+      'dashboard_saved_views', (select count(*) from public.dashboard_saved_views where tenant_id = p_tenant_id),
       'audit_logs', (select count(*) from public.audit_logs where tenant_id = p_tenant_id),
       'kiara_settings', (select count(*) from public.kiara_settings where tenant_id = p_tenant_id),
       'kiara_user_limits', (select count(*) from public.kiara_user_limits where tenant_id = p_tenant_id),

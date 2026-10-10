@@ -2,7 +2,7 @@
  * A coarse label for the language style of a question, stored with the answer
  * for later insights. It never changes what Kiara says: the model follows the
  * user's language on its own (system prompt). Labels match the
- * `kiara_messages.language` check in migration 0206.
+ * `kiara_messages.language` check in migration 0208.
  */
 export type KiaraLanguage = "en" | "hi" | "hinglish" | "hi_latn";
 

@@ -76,7 +76,7 @@ export async function findPeople(context: ExecutorContext, args: ToolArgs): Prom
 }
 
 /**
- * `find_colleague` is the approved narrow directory (migration 0207,
+ * `find_colleague` is the approved narrow directory (migration 0209,
  * `kiara_directory_lookup`): active colleagues in the tenant, only name,
  * designation, department, and branch. It mirrors no section; it exists so
  * staff can find "the HR person in our branch" without seeing profiles.

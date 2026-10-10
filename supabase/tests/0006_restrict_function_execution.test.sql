@@ -65,7 +65,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 217, 'authenticated can execute exactly 217 reviewed public application functions');
+), 222, 'authenticated can execute exactly 222 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -206,7 +206,7 @@ select is((
     and p.oid::regprocedure::text not in (select identity from expected)
 ), array[
   'acknowledge_daily_checklist_with_audit(uuid,integer,uuid[])',
-  -- 0208: Ask Kiara knowledge base (manager RPCs audited; search read-only; storage path checks).
+  -- 0210: Ask Kiara knowledge base (manager RPCs audited; search read-only; storage path checks).
   'add_kiara_document_version_with_audit(uuid,text,integer,text)',
   'add_task_comment_with_audit(uuid,text)',
   'admin_delete_task_with_audit(uuid,boolean,text)',
@@ -254,7 +254,7 @@ select is((
   'import_delegation_tasks_with_audit(jsonb,text)',
   'import_task_bulk_with_audit(jsonb,text,text)',
   'is_reporting_descendant(uuid,uuid)',
-  -- 0207: Ask Kiara colleague directory (name, designation, department, branch only).
+  -- 0209: Ask Kiara colleague directory (name, designation, department, branch only).
   'kiara_directory_lookup(text,integer)',
   'kiara_knowledge_object_readable(text)',
   'kiara_knowledge_object_removable(text)',
