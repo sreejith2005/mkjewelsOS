@@ -72,7 +72,7 @@ select ok(not has_table_privilege('authenticated', 'kiara_documents', 'INSERT') 
   'no direct client writes to documents or versions');
 select ok(not has_table_privilege('service_role', 'kiara_documents', 'SELECT') and not has_table_privilege('anon', 'kiara_documents', 'SELECT'), 'service role and anon cannot read documents');
 select ok(not has_function_privilege('anon', 'search_kiara_knowledge(text,text,integer)', 'EXECUTE')
-  and not has_function_privilege('service_role', 'create_kiara_document_with_audit(text,text,text,text,integer,text)', 'EXECUTE'), 'anon and service role cannot call KB RPCs');
+  and not has_function_privilege('service_role', 'create_kiara_document_with_audit(text,text,text,text,integer,text,text[])', 'EXECUTE'), 'anon and service role cannot call KB RPCs');
 select ok(not has_function_privilege('authenticated', 'kiara_kb_publish_version(kiara_documents,uuid,jsonb)', 'EXECUTE')
   and not has_function_privilege('authenticated', 'kiara_kb_actor()', 'EXECUTE'), 'internal helpers stay owner-only');
 select is((select array[public::text, file_size_limit::text, array_to_string(allowed_mime_types, ',')] from storage.buckets where id = 'kiara-knowledge'),
@@ -108,7 +108,7 @@ select throws_ok(format('select create_kiara_document_with_audit(%L, null, %L, %
 select throws_ok(format('select create_kiara_document_with_audit(%L, null, %L, %L, 100, %L)', 'Pdf', 'everyone', 'scan.pdf', pg_temp.sha(3)), '22023', 'Only .docx Word files can be uploaded', 'PDF is refused');
 select throws_ok(format('select create_kiara_document_with_audit(%L, null, %L, %L, 10485761, %L)', 'Big', 'everyone', 'big.docx', pg_temp.sha(3)), '22023', 'The file must be at most 10 MB', 'over 10 MB is refused');
 select throws_ok(format('select create_kiara_document_with_audit(%L, null, %L, %L, 100, %L)', 'Hash', 'everyone', 'a.docx', 'nothex'), '22023', 'The file hash is invalid', 'a bad hash is refused');
-select throws_ok(format('select create_kiara_document_with_audit(%L, null, %L, %L, 100, %L)', 'Aud', 'staff_only', 'a.docx', pg_temp.sha(3)), '22023', 'Audience must be everyone or managers_and_above', 'an unknown audience is refused');
+select throws_ok(format('select create_kiara_document_with_audit(%L, null, %L, %L, 100, %L)', 'Aud', 'staff_only', 'a.docx', pg_temp.sha(3)), '22023', 'Visibility must be everyone, departments, or managers_and_above', 'an unknown visibility is refused');
 select throws_ok(format('select create_kiara_document_with_audit(%L, null, %L, %L, 100, %L)', '  ', 'everyone', 'a.docx', pg_temp.sha(3)), '22023', 'Title must be 1 to 200 characters', 'a blank title is refused');
 
 -- ---------------------------------------------------------------------------
@@ -156,7 +156,7 @@ select ok((select new_value ->> 'chunk_count' = '2' and new_value::text not like
 select ok(exists (select 1 from tenant_realtime_events where tenant_id = '20810000-0000-4000-8000-000000000001' and topic = 'assistant'), 'document changes emit the assistant realtime topic');
 
 -- ---------------------------------------------------------------------------
--- Reading: search is the only path, and it enforces status and audience
+-- Reading: search is the only path, and it enforces status and visibility
 -- ---------------------------------------------------------------------------
 select pg_temp.as_user(4);
 select is((select count(*)::integer from kiara_documents), 0, 'staff cannot select documents directly');
@@ -201,7 +201,7 @@ select lives_ok(format('select set_kiara_document_status_with_audit(%L, %L)', (s
 select ok(exists (select 1 from audit_logs where action = 'assistant_kb_status_changed' and record_id = (select id from ids where name = 'd1')), 'status changes are audited');
 
 reset role;
-insert into kiara_documents(id, tenant_id, title, audience, source_kind, status) values
+insert into kiara_documents(id, tenant_id, title, visibility, source_kind, status) values
   ('20850000-0000-4000-8000-000000000001', '20810000-0000-4000-8000-000000000001', 'Synthetic Suggested Answer', 'everyone', 'escalation_answer', 'processing');
 insert into kiara_document_versions(id, tenant_id, document_id, version_number, source, extraction_status, extracted_text)
 values ('20850000-0000-4000-8000-000000000002', '20810000-0000-4000-8000-000000000001', '20850000-0000-4000-8000-000000000001', 1, 'escalation_answer', 'succeeded', 'Gift wrapping is free for bridal orders.');
@@ -244,7 +244,7 @@ select is(pg_temp.found('locker'), '{}'::text[], 'old text is no longer retrieve
 select is(pg_temp.found('vault cashier'), array['Synthetic Key Control SOP'], 'new text is retrieved');
 
 -- ---------------------------------------------------------------------------
--- Edit text, details, audience
+-- Edit text, details, visibility
 -- ---------------------------------------------------------------------------
 select pg_temp.as_user(1);
 select lives_ok(format('select save_kiara_document_text_with_audit(%L, %L, %L, %L, %L, %L)', (select id from ids where name = 'd1'), 'Synthetic Key Control SOP', 'Store', 'everyone',
@@ -256,7 +256,7 @@ reset role;
 select is((select distinct document_title from kiara_document_chunks where document_id = (select id from ids where name = 'd1')), 'Synthetic Vault Key SOP', 'a rename reaches the chunks');
 set local role authenticated;
 select pg_temp.as_user(4);
-select is(pg_temp.found('vault cashier'), '{}'::text[], 'changing the audience to managers hides it from staff at once');
+select is(pg_temp.found('vault cashier'), '{}'::text[], 'changing the visibility to managers hides it from staff at once');
 select pg_temp.as_user(3);
 select is(pg_temp.found('vault cashier'), array['Synthetic Vault Key SOP'], 'and managers still find it');
 

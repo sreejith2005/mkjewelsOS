@@ -79,7 +79,7 @@ begin
     insert into audit_logs(tenant_id, actor_user_id, action, module, record_id, old_value, new_value)
     values (t.id, null, 'section_availability_launch_dark', 'developer_controls', t.id,
       case when c.tenant_id is null then null else jsonb_build_object('section_availability', c.section_availability, 'settings_version', c.settings_version) end,
-      jsonb_build_object('ask_kiara', false, 'reason', 'Ask Kiara launches dark until the owner enables it (migration 0208).'));
+      jsonb_build_object('ask_kiara', false, 'reason', 'Ask Kiara launches dark until the owner enables it (migration 0901).'));
   end loop;
 end $launch_dark$;
 

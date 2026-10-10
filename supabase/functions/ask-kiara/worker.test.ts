@@ -2,7 +2,7 @@ import { assert, assertEquals, assertMatch, assertStringIncludes } from "@std/as
 import type Anthropic from "@anthropic-ai/sdk";
 import { builtinAccessContext } from "../../../packages/core/src/permissions/resolve.ts";
 import { DEFAULT_SECTION_CONTROLS } from "../../../packages/core/src/settings/sectionAvailability.ts";
-import { KIARA_REFUSAL_MESSAGE, KIARA_SYSTEM_PROMPT } from "../../../packages/core/src/assistant/systemPrompt.ts";
+import { KIARA_REFUSAL_MESSAGE, KIARA_SEARCH_AGAIN_NOTE, KIARA_SYSTEM_PROMPT } from "../../../packages/core/src/assistant/systemPrompt.ts";
 import { KIARA_TOOLS, accessibleKiaraSections, offeredKiaraTools } from "../../../packages/core/src/assistant/tools.ts";
 import { createKiaraEventParser, type KiaraStreamEvent } from "../../../packages/core/src/assistant/events.ts";
 import { serializeToolResult } from "./tools/shared.ts";
@@ -426,15 +426,81 @@ Deno.test("SOP answers keep only citations of chunks returned in this turn", asy
   assertEquals(t.logs.find((entry) => entry.event === "kiara_citation_removed")?.count, 1);
 });
 
-Deno.test("a search with no usable result is a kb miss (the Phase 4 escalation hook)", async () => {
+Deno.test("search again: a reply after one empty search is held back and Kiara searches once more", async () => {
   const actor = actorWith({ search_kiara_knowledge: () => ({ data: { results: [] }, error: null }) });
   const t = setup([
     message([toolUse("tu_kb", "search_knowledge_base", { english_query: "pet policy" })], "tool_use"),
     message([text("I could not find this in the company SOPs.")], "end_turn"),
+    message([toolUse("tu_kb2", "search_knowledge_base", { english_query: "animals allowed in store" })], "tool_use"),
+    message([text("I searched twice and could not find this in the company SOPs. Please ask your manager.")], "end_turn"),
   ], { actor });
   const result = await runKiaraTurn(t.deps, t.input, t.emit);
   assert(result.ok);
-  assertEquals(actor.called("complete_kiara_turn")[0]!.args!.p_kb_hit, false);
-  assertEquals(t.logs.find((entry) => entry.event === "kiara_turn")?.kb_no_match, true);
-  assertEquals(t.events.filter((event) => event.event === "citation").length, 0);
+  assertEquals(actor.called("search_kiara_knowledge").length, 2);
+  // Only the reply after the second search reaches the user.
+  assertEquals(result.displayText, "I searched twice and could not find this in the company SOPs. Please ask your manager.");
+  assertEquals(t.events.filter((event) => event.event === "delta").map((event) => (event.data as { text: string }).text).join(""), result.displayText);
+  // The server note is a user turn between the first reply and the second search, and it is stored.
+  const third = t.anthropic.calls[2]!.messages;
+  assertEquals(third[third.length - 1], { role: "user", content: [{ type: "text", text: KIARA_SEARCH_AGAIN_NOTE }] });
+  const stored = actor.called("complete_kiara_turn")[0]!.args!;
+  assert(JSON.stringify(stored.p_api_content).includes("kiara_check"));
+  assertEquals(stored.p_kb_hit, false);
+  const log = t.logs.find((entry) => entry.event === "kiara_turn")!;
+  assertEquals([log.kb_no_match, log.kb_searches], [true, 2]);
+  assertEquals(t.logs.filter((entry) => entry.event === "kiara_search_again").length, 1);
+});
+
+Deno.test("search again: results without a usable citation also trigger the second search", async () => {
+  let calls = 0;
+  const actor = actorWith({ search_kiara_knowledge: () => ({ data: { results: [kbRow(calls++ === 0 ? K1 : K2, "Synthetic excerpt.")] }, error: null }) });
+  const t = setup([
+    message([toolUse("tu_kb", "search_knowledge_base", { english_query: "gold rate board" })], "tool_use"),
+    message([text("These sections do not cover it.")], "end_turn"),
+    message([toolUse("tu_kb2", "search_knowledge_base", { english_query: "daily price display" })], "tool_use"),
+    message([text(`Update the board at opening [[cite:${K2}]].`)], "end_turn"),
+  ], { actor });
+  const result = await runKiaraTurn(t.deps, t.input, t.emit);
+  assert(result.ok);
+  assertEquals(result.displayText, "Update the board at opening [1].");
+  assertEquals(result.citations.map((citation) => citation.chunk_id), [K2]);
+  assertEquals(actor.called("complete_kiara_turn")[0]!.args!.p_kb_hit, true);
+});
+
+Deno.test("search again: a cited answer after the first search streams with no second search", async () => {
+  const actor = actorWith({ search_kiara_knowledge: () => ({ data: { results: [kbRow(K1, "Synthetic excerpt.")] }, error: null }) });
+  const t = setup([
+    message([toolUse("tu_kb", "search_knowledge_base", { english_query: "keys" })], "tool_use"),
+    message([text(`Keys go in the safe [[cite:${K1}]]. Then lock the shutter and check the alarm panel.`)], "end_turn"),
+  ], { actor });
+  const result = await runKiaraTurn(t.deps, t.input, t.emit);
+  assert(result.ok);
+  assertEquals(actor.called("search_kiara_knowledge").length, 1);
+  // Held until the citation arrived, then streamed in pieces.
+  assert(t.events.filter((event) => event.event === "delta").length > 2);
+  assertEquals(t.logs.filter((entry) => entry.event === "kiara_search_again").length, 0);
+});
+
+Deno.test("search again: two searches already made allow the not-found reply", async () => {
+  const actor = actorWith({ search_kiara_knowledge: () => ({ data: { results: [] }, error: null }) });
+  const t = setup([
+    message([toolUse("tu_a", "search_knowledge_base", { english_query: "pet policy" }), toolUse("tu_b", "search_knowledge_base", { english_query: "animals in store" })], "tool_use"),
+    message([text("I could not find this in the company SOPs.")], "end_turn"),
+  ], { actor });
+  const result = await runKiaraTurn(t.deps, t.input, t.emit);
+  assert(result.ok);
+  assertEquals(result.displayText, "I could not find this in the company SOPs.");
+  assertEquals(t.anthropic.calls.length, 2);
+});
+
+Deno.test("search again: no second search when the request budget is nearly used", async () => {
+  const actor = actorWith({ search_kiara_knowledge: () => ({ data: { results: [] }, error: null }) });
+  const t = setup([
+    message([toolUse("tu_kb", "search_knowledge_base", { english_query: "pet policy" })], "tool_use"),
+    message([text("I could not find this in the company SOPs.")], "end_turn"),
+  ], { actor, config: { maxRequests: 3 } });
+  const result = await runKiaraTurn(t.deps, t.input, t.emit);
+  assert(result.ok);
+  assertEquals(result.displayText, "I could not find this in the company SOPs.");
+  assertEquals(t.anthropic.calls.length, 2);
 });

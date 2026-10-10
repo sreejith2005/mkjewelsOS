@@ -2,11 +2,12 @@ import type Anthropic from "@anthropic-ai/sdk";
 import {
   KIARA_INTERRUPTED_MESSAGE,
   KIARA_REFUSAL_MESSAGE,
+  KIARA_SEARCH_AGAIN_NOTE,
   KIARA_SYSTEM_PROMPT,
   buildTurnContext,
 } from "../../../packages/core/src/assistant/systemPrompt.ts";
 import type { KiaraToolSpec } from "../../../packages/core/src/assistant/tools.ts";
-import { applyCitations, type KiaraCitation, type KiaraCitationSource } from "../../../packages/core/src/assistant/citations.ts";
+import { CITATION_MARKER_PATTERN, applyCitations, type KiaraCitation, type KiaraCitationSource } from "../../../packages/core/src/assistant/citations.ts";
 import { detectLanguageStyle } from "../../../packages/core/src/assistant/language.ts";
 import { parseKiaraQuota, type KiaraQuota } from "../../../packages/core/src/assistant/quota.ts";
 import { encodeKiaraEvent, type KiaraErrorCode, type KiaraStreamEvent } from "../../../packages/core/src/assistant/events.ts";
@@ -295,12 +296,35 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
   let toolCalls = 0;
   let stopReason = "end_turn";
   let model = config.model;
+  // Search-again rule (enforced here, not only in the prompt): after a knowledge
+  // search, answer text is held back until it carries a valid citation. If the
+  // model finishes after a single search with nothing citable, the held reply
+  // is dropped and Kiara is asked to search once more with other words; a
+  // not-found reply is allowed only after the second search.
+  let kbSearches = 0;
+  let searchNudges = 0;
+  let citationShown = false;
+  let held = "";
 
   const appendText = (delta: string) => {
     if (!delta) return;
     displayText += delta;
     textEmitted = true;
     emit({ event: "delta", data: { text: delta } });
+  };
+  const hasValidCitation = (value: string) => [...value.matchAll(CITATION_MARKER_PATTERN)].some((match) => citationSources.has(match[1]!));
+  const releaseHeld = () => {
+    const pending = held;
+    held = "";
+    appendText(pending);
+  };
+  const handleText = (delta: string) => {
+    if (kbSearches === 0 || citationShown) return appendText(delta);
+    held += delta;
+    if (hasValidCitation(held)) {
+      citationShown = true;
+      releaseHeld();
+    }
   };
 
   try {
@@ -319,10 +343,11 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
               emit({ event: "status", data: { phase: "tool", label: spec?.statusLabel ?? "Checking" } });
             }
           } else if (event.type === "content_block_delta" && event.delta.type === "text_delta" && event.delta.text) {
-            // Separate this text block from text shown earlier in the turn.
-            if (!blockHasText && displayText && !displayText.endsWith("\n")) appendText("\n\n");
+            // Separate this text block from text shown (or held) earlier in the turn.
+            const earlier = displayText + held;
+            if (!blockHasText && earlier && !earlier.endsWith("\n")) handleText("\n\n");
             blockHasText = true;
-            appendText(event.delta.text);
+            handleText(event.delta.text);
           }
         }
         message = await stream.finalMessage();
@@ -348,7 +373,20 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
       stopReason = message.stop_reason ?? "end_turn";
 
       const toolUses = content.filter((block): block is ToolUseBlock => block.type === "tool_use");
-      if (toolUses.length === 0) break;
+      if (toolUses.length === 0) {
+        // A reply after one search that cites nothing: search once more first,
+        // when two more model requests and a tool call are still available.
+        if (kbSearches === 1 && !citationShown && searchNudges === 0 && round + 2 < config.maxRequests && toolCalls < config.maxToolCalls) {
+          held = "";
+          searchNudges += 1;
+          const note: MessageParam = { role: "user", content: [{ type: "text", text: KIARA_SEARCH_AGAIN_NOTE }] };
+          turn.push(note);
+          messages.push(note);
+          deps.log({ event: "kiara_search_again" });
+          continue;
+        }
+        break;
+      }
 
       const results: ToolResultParam[] = [];
       // A tool call cut off at max_tokens is never run; every tool_use still gets
@@ -369,6 +407,7 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
           now: deps.now(),
         });
         for (const source of executed.citationSources ?? []) citationSources.set(source.chunk_id, source);
+        if (toolUse.name === "search_knowledge_base" && executed.spec) kbSearches += 1;
         if (executed.spec) {
           if (!toolsUsed.includes(executed.spec.definition.name)) toolsUsed.push(executed.spec.definition.name);
           if (!dataCategories.includes(executed.spec.dataCategory)) dataCategories.push(executed.spec.dataCategory);
@@ -391,6 +430,10 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
     }
     return { ok: false, code: "interrupted", message: KIARA_INTERRUPTED_MESSAGE };
   }
+
+  // Whatever is still held (no citation, or the loop ran out) is the reply.
+  if (stopReason === "refusal") held = "";
+  else releaseHeld();
 
   // The stored turn must end on a model turn or a complete tool-result turn.
   const last = turn[turn.length - 1];
@@ -425,7 +468,7 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
     p_usage: usage,
   });
   // Shape only: never question text, answers, or tool data.
-  deps.log({ event: "kiara_turn", ok: !completed.error, model, stop_reason: stopReason, tools: toolsUsed, tool_calls: toolCalls, citations: cited.citations.length, kb_no_match: kbNoMatch, ms: Date.now() - startedAt, usage });
+  deps.log({ event: "kiara_turn", ok: !completed.error, model, stop_reason: stopReason, tools: toolsUsed, tool_calls: toolCalls, kb_searches: kbSearches, citations: cited.citations.length, kb_no_match: kbNoMatch, ms: Date.now() - startedAt, usage });
   if (completed.error || typeof completed.data !== "string") {
     return { ok: false, code: "unavailable", message: "Kiara answered, but the answer could not be saved. Please try again." };
   }

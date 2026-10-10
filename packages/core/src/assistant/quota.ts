@@ -48,7 +48,7 @@ export function formatQuotaReset(quota: KiaraQuota, fallbackTimeZone = "Asia/Kol
 
 /**
  * The quota day: the calendar date in the tenant's timezone. Mirrors
- * `kiara_quota_for()` in migration 0208, which is the authority.
+ * `kiara_quota_for()` in migration 0901, which is the authority.
  */
 export function kiaraQuotaDate(now: Date, timeZone: string): string {
   return zonedDateKey(now, timeZone);

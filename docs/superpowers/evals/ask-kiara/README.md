@@ -35,7 +35,7 @@ constraints), not the shared `jewelos` stack.
    or its steps against your own stack's database container). Add a synthetic manager
    (`kiara-manager@mkjewels.local`) in the seed tenant and branch.
 2. Switch the section on for the seed tenant (Developer Mode, or it is already on for tenants created
-   after migration 0208).
+   after migration 0901).
 3. Put `ANTHROPIC_API_KEY` in the git-ignored `supabase/functions/.env.local` (never print it), then:
    `supabase.cmd functions serve ask-kiara --env-file supabase/functions/.env.local`.
 4. For each case, sign in as `user` (`POST /auth/v1/token?grant_type=password`), then call

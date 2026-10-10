@@ -1,18 +1,19 @@
 import { useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { chunkKnowledgeText, normalizeKnowledgeText } from "@jewelos/core";
-import { KIARA_AUDIENCES, saveKiaraDocumentText, type KiaraAudience } from "@jewelos/data/assistant/knowledge";
+import { saveKiaraDocumentText, type KiaraDepartmentOption, type KiaraVisibility } from "@jewelos/data/assistant/knowledge";
 import { Button, Notice } from "@/components/ui";
-import { AUDIENCE_LABELS } from "./labels";
+import { AccessFields, accessProblem } from "./AccessFields";
 
-export type KnowledgeDraft = Readonly<{ title: string; category: string; audience: KiaraAudience; text: string }>;
+export type KnowledgeDraft = Readonly<{ title: string; category: string; visibility: KiaraVisibility; departmentTags: readonly string[]; text: string }>;
 
 /**
  * Edits the text Kiara reads, or writes a new article. Lines starting with
  * "# ", "## ", or "### " are headings; Kiara's sections follow them. Saving
  * makes a new version (audited); the previous one stays in the history.
  */
-export function KnowledgeTextEditor({ documentId, initial, onCancel, onSaved, save = saveKiaraDocumentText }: {
+export function KnowledgeTextEditor({ departments, documentId, initial, onCancel, onSaved, save = saveKiaraDocumentText }: {
+  departments: readonly KiaraDepartmentOption[];
   documentId: string | null;
   initial: KnowledgeDraft;
   onCancel: () => void;
@@ -28,10 +29,12 @@ export function KnowledgeTextEditor({ documentId, initial, onCancel, onSaved, sa
   const submit = async () => {
     if (!draft.title.trim()) return setError("Give the document a title.");
     if (!preview.ok) return setError(preview.error);
+    const problem = accessProblem(draft);
+    if (problem) return setError(problem);
     setSaving(true);
     setError(null);
     try {
-      onSaved(await save({ documentId, title: draft.title.trim(), category: draft.category.trim() || null, audience: draft.audience, text: draft.text }));
+      onSaved(await save({ documentId, title: draft.title.trim(), category: draft.category.trim() || null, visibility: draft.visibility, departmentTags: draft.departmentTags, text: draft.text }));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The text could not be saved.");
     } finally {
@@ -50,12 +53,7 @@ export function KnowledgeTextEditor({ documentId, initial, onCancel, onSaved, sa
         <input className="task-field mt-1 w-full" maxLength={80} onChange={(event) => update({ category: event.target.value })} placeholder="For example Sales SOP" value={draft.category} />
       </label>
     </div>
-    <label className="block">
-      <span className="text-xs font-semibold text-task-text-muted">Who can get answers from it</span>
-      <select className="task-field mt-1 w-full sm:w-72" onChange={(event) => update({ audience: event.target.value as KiaraAudience })} value={draft.audience}>
-        {KIARA_AUDIENCES.map((audience) => <option key={audience} value={audience}>{AUDIENCE_LABELS[audience]}</option>)}
-      </select>
-    </label>
+    <AccessFields departments={departments} idPrefix="kb-editor" onChange={update} value={draft} />
     <label className="block">
       <span className="text-xs font-semibold text-task-text-muted">Text Kiara reads</span>
       <textarea className="task-field mt-1 min-h-[22rem] w-full font-mono text-sm" onChange={(event) => update({ text: event.target.value })} spellCheck value={draft.text} />

@@ -65,7 +65,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 222, 'authenticated can execute exactly 222 reviewed public application functions');
+), 224, 'authenticated can execute exactly 224 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -206,7 +206,7 @@ select is((
     and p.oid::regprocedure::text not in (select identity from expected)
 ), array[
   'acknowledge_daily_checklist_with_audit(uuid,integer,uuid[])',
-  -- 0210: Ask Kiara knowledge base (manager RPCs audited; search read-only; storage path checks).
+  -- 0903: Ask Kiara knowledge base (manager RPCs audited; search read-only; storage path checks).
   'add_kiara_document_version_with_audit(uuid,text,integer,text)',
   'add_task_comment_with_audit(uuid,text)',
   'admin_delete_task_with_audit(uuid,boolean,text)',
@@ -215,6 +215,8 @@ select is((
   'assert_fms_flow_publishable(uuid)',
   'assign_imported_task_with_audit(text,uuid,uuid)',
   'begin_task_bulk_import(text,text,integer)',
+  -- 0904: Ask Kiara department targeting (bulk visibility/tag edit, filter data; audited).
+  'bulk_update_kiara_documents_access_with_audit(uuid[],text,text[],text)',
   'cancel_task_bulk_import(uuid)',
   'change_dropdown_category_with_audit(text,uuid,text,text,text,integer,boolean)',
   'commit_task_bulk_import_chunk(uuid,jsonb)',
@@ -223,7 +225,7 @@ select is((
   'complete_uploaded_task_with_audit(uuid,text)',
   'create_crm_field_definition(text,text,text,text,jsonb,boolean,jsonb)',
   'create_dropdown_list_with_audit(text,jsonb)',
-  'create_kiara_document_with_audit(text,text,text,text,integer,text)',
+  'create_kiara_document_with_audit(text,text,text,text,integer,text,text[])',
   'create_manual_task_with_mode_with_audit(jsonb,uuid[],uuid[],jsonb)',
   -- 0196: admin-only CRM sync health (counts only).
   'crm_sync_health()',
@@ -254,7 +256,7 @@ select is((
   'import_delegation_tasks_with_audit(jsonb,text)',
   'import_task_bulk_with_audit(jsonb,text,text)',
   'is_reporting_descendant(uuid,uuid)',
-  -- 0209: Ask Kiara colleague directory (name, designation, department, branch only).
+  -- 0902: Ask Kiara colleague directory (name, designation, department, branch only).
   'kiara_directory_lookup(text,integer)',
   'kiara_knowledge_object_readable(text)',
   'kiara_knowledge_object_removable(text)',
@@ -264,7 +266,7 @@ select is((
   'leave_file_writable(text)',
   'list_assigning_left_tasks()',
   'list_designation_daily_checklists()',
-  'list_kiara_documents(text,text)',
+  'list_kiara_documents(text,text,text)',
   'list_my_kiara_conversations(integer)',
   'list_task_comments(uuid)',
   'list_task_import_identity_candidates()',
@@ -281,7 +283,7 @@ select is((
   'save_department_permissions_with_audit(uuid,jsonb)',
   'save_department_with_audit(uuid,jsonb)',
   'save_designation_daily_checklist_with_audit(uuid,uuid,text,text,jsonb,text,boolean,integer)',
-  'save_kiara_document_text_with_audit(uuid,text,text,text,text,jsonb)',
+  'save_kiara_document_text_with_audit(uuid,text,text,text,text,jsonb,text[])',
   'save_published_form_with_audit(uuid,jsonb,jsonb)',
   'save_recurring_todo_template_with_audit(uuid,jsonb)',
   'save_section_availability_with_audit(boolean,jsonb,integer,uuid)',

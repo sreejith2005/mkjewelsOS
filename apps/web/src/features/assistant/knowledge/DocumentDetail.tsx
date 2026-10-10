@@ -1,33 +1,34 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FileUp, Loader2, Pencil, Trash2 } from "lucide-react";
 import {
-  KIARA_AUDIENCES,
   deleteKiaraDocument,
   getKiaraDocument,
   setKiaraDocumentStatus,
   updateKiaraDocumentDetails,
   uploadKnowledgeDocx,
-  type KiaraAudience,
+  type KiaraDepartmentOption,
   type KiaraDocumentDetail,
+  type KiaraVisibility,
   type KiaraUploadState,
 } from "@jewelos/data/assistant/knowledge";
 import { Button, Notice } from "@/components/ui";
 import { KnowledgeTextEditor } from "./KnowledgeTextEditor";
-import { AUDIENCE_LABELS, STAGE_LABELS, STATUS_LABELS, STATUS_TONES, documentWarnings, formatUpdated } from "./labels";
+import { AccessFields, accessProblem } from "./AccessFields";
+import { STAGE_LABELS, STATUS_LABELS, STATUS_TONES, documentWarnings, formatUpdated } from "./labels";
 
 const quiet = "border-task-border bg-task-bg text-task-text hover:bg-task-muted";
 
 /**
  * One document: what Kiara reads (its sections exactly as extracted), its
- * details and audience, status, replacement, in-app editing, and deletion.
+ * details, visibility and departments, status, replacement, in-app editing, and deletion.
  * Files are never offered for download.
  */
-export function DocumentDetail({ documentId, onChanged, onClosed }: { documentId: string; onChanged: () => void; onClosed: () => void }) {
+export function DocumentDetail({ departments, documentId, onChanged, onClosed }: { departments: readonly KiaraDepartmentOption[]; documentId: string; onChanged: () => void; onClosed: () => void }) {
   const [document, setDocument] = useState<KiaraDocumentDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [details, setDetails] = useState<{ title: string; category: string; audience: KiaraAudience } | null>(null);
+  const [details, setDetails] = useState<{ title: string; category: string; visibility: KiaraVisibility; departmentTags: string[] } | null>(null);
   const [replace, setReplace] = useState<KiaraUploadState | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -36,7 +37,7 @@ export function DocumentDetail({ documentId, onChanged, onClosed }: { documentId
     try {
       const next = await getKiaraDocument(documentId);
       setDocument(next);
-      setDetails({ title: next.title, category: next.category ?? "", audience: next.audience });
+      setDetails({ title: next.title, category: next.category ?? "", visibility: next.visibility, departmentTags: [...next.department_tags] });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "This document could not be loaded.");
     }
@@ -59,7 +60,7 @@ export function DocumentDetail({ documentId, onChanged, onClosed }: { documentId
 
   const runReplace = async (file: File, previous?: KiaraUploadState) => {
     if (!document) return;
-    const final = await uploadKnowledgeDocx({ file, title: document.title, category: document.category, audience: document.audience, replaceDocumentId: document.id }, setReplace, previous);
+    const final = await uploadKnowledgeDocx({ file, title: document.title, category: document.category, visibility: document.visibility, departmentTags: document.department_tags, replaceDocumentId: document.id }, setReplace, previous);
     if (final.stage === "ready") {
       await load();
       onChanged();
@@ -76,8 +77,9 @@ export function DocumentDetail({ documentId, onChanged, onClosed }: { documentId
 
   if (editing) {
     return <KnowledgeTextEditor
+      departments={departments}
       documentId={document.id}
-      initial={{ title: document.title, category: document.category ?? "", audience: document.audience, text: document.text ?? "" }}
+      initial={{ title: document.title, category: document.category ?? "", visibility: document.visibility, departmentTags: document.department_tags, text: document.text ?? "" }}
       onCancel={() => setEditing(false)}
       onSaved={() => { setEditing(false); void load(); onChanged(); }}
     />;
@@ -104,14 +106,9 @@ export function DocumentDetail({ documentId, onChanged, onClosed }: { documentId
           <input className="task-field mt-1 w-full" maxLength={80} onChange={(event) => setDetails({ ...details, category: event.target.value })} value={details.category} />
         </label>
       </div>
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="block">
-          <span className="text-xs font-semibold text-task-text-muted">Who can get answers from it</span>
-          <select className="task-field mt-1 w-64" onChange={(event) => setDetails({ ...details, audience: event.target.value as KiaraAudience })} value={details.audience}>
-            {KIARA_AUDIENCES.map((audience) => <option key={audience} value={audience}>{AUDIENCE_LABELS[audience]}</option>)}
-          </select>
-        </label>
-        <Button className={quiet} disabled={busy || !details.title.trim()} onClick={() => void act(() => updateKiaraDocumentDetails(document.id, { title: details.title.trim(), category: details.category.trim() || null, audience: details.audience }))} type="button" variant="secondary">Save details</Button>
+      <AccessFields departments={departments} idPrefix="kb-detail" onChange={(access) => setDetails({ ...details, ...access })} value={details} />
+      <div className="flex justify-end">
+        <Button className={quiet} disabled={busy || !details.title.trim() || accessProblem(details) !== null} onClick={() => void act(() => updateKiaraDocumentDetails(document.id, { title: details.title.trim(), category: details.category.trim() || null, visibility: details.visibility, departmentTags: details.departmentTags }))} type="button" variant="secondary">Save details</Button>
       </div>
     </section> : null}
 

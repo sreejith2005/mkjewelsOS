@@ -6995,12 +6995,13 @@ export type Database = {
       kiara_documents: {
         Row: {
           active_version_id: string | null
-          audience: string
           category: string | null
           created_at: string
           created_by: string | null
           deleted_at: string | null
           deleted_by: string | null
+          department_keys: string[] | null
+          department_tags: string[]
           id: string
           source_kind: string
           status: string
@@ -7008,15 +7009,17 @@ export type Database = {
           title: string
           updated_at: string
           updated_by: string | null
+          visibility: string
         }
         Insert: {
           active_version_id?: string | null
-          audience?: string
           category?: string | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
+          department_keys?: string[] | null
+          department_tags?: string[]
           id?: string
           source_kind: string
           status: string
@@ -7024,15 +7027,17 @@ export type Database = {
           title: string
           updated_at?: string
           updated_by?: string | null
+          visibility?: string
         }
         Update: {
           active_version_id?: string | null
-          audience?: string
           category?: string | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
+          department_keys?: string[] | null
+          department_tags?: string[]
           id?: string
           source_kind?: string
           status?: string
@@ -7040,6 +7045,7 @@ export type Database = {
           title?: string
           updated_at?: string
           updated_by?: string | null
+          visibility?: string
         }
         Relationships: [
           {
@@ -11853,6 +11859,15 @@ export type Database = {
         Args: { p_target_profile_id: string }
         Returns: undefined
       }
+      bulk_update_kiara_documents_access_with_audit: {
+        Args: {
+          p_department_tags: string[]
+          p_document_ids: string[]
+          p_tag_mode?: string
+          p_visibility: string
+        }
+        Returns: Json
+      }
       can_access_form_template: {
         Args: { p_template_id: string }
         Returns: boolean
@@ -12218,12 +12233,13 @@ export type Database = {
       }
       create_kiara_document_with_audit: {
         Args: {
-          p_audience: string
           p_byte_size: number
           p_category: string
+          p_department_tags?: string[]
           p_filename: string
           p_sha256: string
           p_title: string
+          p_visibility: string
         }
         Returns: Json
       }
@@ -12693,6 +12709,7 @@ export type Database = {
         Args: { p_chunk_id: string }
         Returns: Json
       }
+      get_kiara_knowledge_filters: { Args: never; Returns: Json }
       get_kiara_version_for_ingest: {
         Args: { p_version_id: string }
         Returns: Json
@@ -12923,7 +12940,7 @@ export type Database = {
       list_crm_followups: { Args: { p_filter?: Json }; Returns: Json[] }
       list_designation_daily_checklists: { Args: never; Returns: Json }
       list_kiara_documents: {
-        Args: { p_search?: string; p_status?: string }
+        Args: { p_department?: string; p_search?: string; p_status?: string }
         Returns: Json
       }
       list_my_kiara_conversations: { Args: { p_limit?: number }; Returns: Json }
@@ -13660,12 +13677,13 @@ export type Database = {
       }
       save_kiara_document_text_with_audit: {
         Args: {
-          p_audience: string
           p_category: string
           p_chunks: Json
+          p_department_tags?: string[]
           p_document_id: string
           p_text: string
           p_title: string
+          p_visibility: string
         }
         Returns: Json
       }
@@ -14081,10 +14099,11 @@ export type Database = {
       }
       update_kiara_document_details_with_audit: {
         Args: {
-          p_audience: string
           p_category: string
+          p_department_tags?: string[]
           p_document_id: string
           p_title: string
+          p_visibility: string
         }
         Returns: undefined
       }
