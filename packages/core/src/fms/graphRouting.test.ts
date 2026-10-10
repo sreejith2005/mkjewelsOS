@@ -4,6 +4,28 @@ import { routeFmsGraphEdges } from "./graphRouting";
 const positions = new Map([["a", { x: 60, y: 100 }], ["b", { x: 420, y: 100 }], ["c", { x: 780, y: 100 }]]);
 const size = { width: 208, height: 104 };
 describe("shared FMS connection geometry", () => {
+  it("keeps slightly staggered neighboring cards connected by a short smooth link", () => {
+    const [edge] = routeFmsGraphEdges([{ id: "near", from: "a", to: "b", label: "Next" }], new Map([["a", { x: 60, y: 100 }], ["b", { x: 420, y: 135 }]]), size);
+    expect(edge!.path).toContain(" C ");
+    expect(Math.max(...edge!.points.map((p) => p.y))).toBeLessThanOrEqual(edge!.end.y);
+  });
+  it("does not send neighboring routes below the workflow to make room for labels", () => {
+    const routes = routeFmsGraphEdges([{ id: "one", from: "a", to: "b", label: "A long answer label for this route" }, { id: "two", from: "a", to: "b", label: "Another long answer label" }], positions, size);
+    expect(routes.every((edge) => edge.path.includes(" C "))).toBe(true);
+    expect(routes.every((edge) => Math.max(...edge.points.map((p) => p.y)) < 204)).toBe(true);
+    expect(Math.abs(routes[0]!.label.y - routes[1]!.label.y)).toBeGreaterThanOrEqual(24);
+  });
+  it("keeps obstacle detours local despite unrelated distant cards", () => {
+    const withDistant = new Map([...positions, ["distant", { x: 2500, y: 3000 }] as const]);
+    const [edge] = routeFmsGraphEdges([{ id: "skip", from: "a", to: "c", label: "Skip" }], withDistant, size);
+    expect(edge!.bounds.bottom).toBeLessThan(500);
+  });
+  it("keeps compact labels beside their link without overlapping neighboring cards", () => {
+    const [edge] = routeFmsGraphEdges([{ id: "near", from: "a", to: "b", label: "Interested proceed to next step" }], new Map([["a", { x: 60, y: 100 }], ["b", { x: 360, y: 100 }]]), size);
+    expect(edge!.label.x - edge!.labelWidth / 2).toBeGreaterThan(edge!.start.x);
+    expect(edge!.label.x + edge!.labelWidth / 2).toBeLessThan(edge!.end.x);
+    expect(Math.abs(edge!.label.y - edge!.start.y)).toBeLessThan(30);
+  });
   it("routes returns around intervening cards and labels them outside cards", () => {
     const [edge] = routeFmsGraphEdges([{ id: "return", from: "c", to: "a", label: "Try again" }], positions, size);
     expect(edge!.isReturn).toBe(true);

@@ -59,11 +59,13 @@ function roundedPath(points: readonly FmsPoint[]): string {
   return `${path} L ${points.at(-1)!.x} ${points.at(-1)!.y}`;
 }
 
-/** Separate ports and exterior lanes keep returns and shared endpoints distinguishable. */
+/** Short forward curves; only obstacles and returns need exterior lanes. */
 export function routeFmsGraphEdges(edges: readonly FmsCanvasEdge[], positions: ReadonlyMap<string, FmsPoint>, node: FmsSize): readonly FmsRoutedEdge[] {
   const usable = edges.filter((edge) => positions.has(edge.from) && positions.has(edge.to));
+  const nodeKeys = [...positions.keys()];
   const boxes = [...positions.values()].map((p) => ({ left: p.x - 14, top: p.y - 14, right: p.x + node.width + 14, bottom: p.y + node.height + 14 }));
-  const bottom = Math.max(0, ...boxes.map((box) => box.bottom)); let lane = 0;
+  const cards = [...positions.values()].map((p) => ({ left: p.x, top: p.y, right: p.x + node.width, bottom: p.y + node.height }));
+  const lanes: Box[] = [];
   const labels: Box[] = [];
   return usable.map((edge) => {
     const from = positions.get(edge.from)!; const to = positions.get(edge.to)!;
@@ -72,16 +74,36 @@ export function routeFmsGraphEdges(edges: readonly FmsCanvasEdge[], positions: R
     const end = { x: to.x, y: to.y + node.height * (incoming.indexOf(edge) + 1) / (incoming.length + 1) };
     const a = { x: start.x + 20 + Math.min(24, outgoing.indexOf(edge) * 6), y: start.y }; const b = { x: end.x - 20 - Math.min(24, incoming.indexOf(edge) * 6), y: end.y };
     const isReturn = end.x <= start.x;
-    const labelWidth = Math.min(244, Math.max(50, (edge.label?.length ?? 0) * 6.4 + (isReturn ? 38 : 20)));
+    let labelWidth = Math.min(200, Math.max(isReturn ? 80 : 50, (edge.label?.length ?? 0) * 6.4 + (isReturn ? 38 : 20)));
     const directLabel = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - 16 };
     const labelBox = (p: FmsPoint): Box => ({ left: p.x - labelWidth / 2 - 4, right: p.x + labelWidth / 2 + 4, top: p.y - 15, bottom: p.y + 15 });
     const overlaps = (box: Box, other: Box) => box.left < other.right && box.right > other.left && box.top < other.bottom && box.bottom > other.top;
-    const direct = !isReturn && a.y === b.y && clear(a, b, boxes) && (!edge.label || ![...boxes, ...labels].some((box) => overlaps(labelBox(directLabel), box)));
-    let label = directLabel; let middle: FmsPoint[];
-    if (direct) middle = [a, b];
+    const between = boxes.filter((_, index) => nodeKeys[index] !== edge.from && nodeKeys[index] !== edge.to);
+    const corridor = { left: start.x, right: end.x, top: Math.min(start.y, end.y) - 1, bottom: Math.max(start.y, end.y) + 1 };
+    const direct = !isReturn && !between.some((box) => overlaps(corridor, box));
+    let label = directLabel; let middle: FmsPoint[]; let path: string | undefined;
+    if (direct) {
+      labelWidth = Math.min(labelWidth, Math.max(50, end.x - start.x - 16));
+      const bend = Math.min(120, (end.x - start.x) / 2);
+      const c1 = { x: start.x + bend, y: start.y }; const c2 = { x: end.x - bend, y: end.y };
+      middle = [c1, c2];
+      path = `M ${start.x} ${start.y} C ${c1.x} ${c1.y} ${c2.x} ${c2.y} ${end.x} ${end.y}`;
+      // Labels move independently. A crowded label must never turn a short link into a detour.
+      if (edge.label) {
+        const obstacles = [...cards, ...labels];
+        for (let offset = 0; offset <= usable.length + 4; offset++) {
+          const candidate = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 - 16 - offset * 26 };
+          label = candidate;
+          if (!obstacles.some((box) => overlaps(labelBox(candidate), box))) break;
+        }
+      }
+    }
     else {
-      const y = bottom + 42 + lane++ * 40;
+      const local = boxes.filter((box) => box.right >= Math.min(from.x, to.x) - 40 && box.left <= Math.max(from.x, to.x) + node.width + 40 && box.top <= Math.max(from.y, to.y) + node.height + 48 && box.bottom >= Math.min(from.y, to.y) - 48);
+      let y = Math.max(from.y + node.height, to.y + node.height, ...local.map((box) => box.bottom)) + 36;
       const left = Math.min(a.x, b.x) - (a.x === b.x ? 40 : 0); const right = Math.max(a.x, b.x);
+      while (lanes.some((lane) => lane.left < right && lane.right > left && Math.abs(lane.top - y) < 32)) y += 32;
+      lanes.push({ left, right, top: y, bottom: y });
       label = { x: (left + right) / 2, y };
       // Reserve enough horizontal run for the label even for a tiny same-column route.
       const l = Math.min(left, label.x - labelWidth / 2 - 16); const r = Math.max(right, label.x + labelWidth / 2 + 16);
@@ -91,6 +113,6 @@ export function routeFmsGraphEdges(edges: readonly FmsCanvasEdge[], positions: R
     if (edge.label) labels.push(labelBox(label));
     const points = [start, ...middle, end].filter((p, i, all) => i === 0 || distance(p, all[i - 1]!) > 0);
     const bounds = { left: Math.min(...points.map((p) => p.x), label.x - labelWidth / 2), right: Math.max(...points.map((p) => p.x), label.x + labelWidth / 2), top: Math.min(...points.map((p) => p.y), label.y - 16), bottom: Math.max(...points.map((p) => p.y), label.y + 16) };
-    return { ...edge, start, end, isReturn, points, path: roundedPath(points), label, labelWidth, bounds };
+    return { ...edge, start, end, isReturn, points, path: path ?? roundedPath(points), label, labelWidth, bounds };
   });
 }

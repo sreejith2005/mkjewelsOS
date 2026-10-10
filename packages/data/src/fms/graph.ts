@@ -24,8 +24,8 @@ export function fmsRouteLabel(rule: FmsBranchRule, naming: FmsRouteNaming = {}):
   return `${question} ${verb}${rule.operator === "not_empty" ? "" : ` ${value}`}`.trim();
 }
 
-const COLUMN_WIDTH = 360;
-const ROW_HEIGHT = 184;
+const COLUMN_WIDTH = 300;
+const ROW_HEIGHT = 160;
 
 /** A deterministic editor-only layout. Runtime routing never reads these coordinates. */
 export function layoutFmsDefinition(definition: FmsFlowDefinition): ReadonlyMap<string, FmsGraphPosition> {
@@ -40,6 +40,15 @@ export function layoutFmsDefinition(definition: FmsFlowDefinition): ReadonlyMap<
       if (!byKey.has(next) || depth.has(next)) continue;
       depth.set(next, nextDepth);
       queue.push(next);
+    }
+  }
+  // A shortcut to the finish must not place it before the longer forward path.
+  // Backward routes retain their return direction rather than expanding layout forever.
+  for (const stage of [...definition.stages].sort((a, b) => a.order - b.order)) {
+    if (!depth.has(stage.key)) continue;
+    for (const next of fmsOutgoingStageKeys(stage)) {
+      const target = byKey.get(next);
+      if (target && target.order > stage.order) depth.set(next, Math.max(depth.get(next) ?? 0, depth.get(stage.key)! + 1));
     }
   }
   let fallbackDepth = Math.max(-1, ...depth.values()) + 1;
