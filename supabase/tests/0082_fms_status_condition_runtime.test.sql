@@ -11,7 +11,7 @@ select results_eq($$select fms_status_condition_matches('greater_than_or_equal',
 select results_eq($$select fms_status_condition_matches('less_than_or_equal','b','b')$$,array[true],'less_than_or_equal works');
 select results_eq($$select fms_status_condition_matches('contains','pen','open')$$,array[true],'contains works');
 select results_eq($$select fms_status_condition_matches('not_contains','pen','closed')$$,array[true],'not_contains works');
-select ok((select pg_get_functiondef('activate_fms_stage_internal(uuid,uuid,uuid,uuid,integer)'::regprocedure) like '%fms_stage_condition_skipped%'),'unmet conditions write an audit log');
+select ok((select pg_get_functiondef('activate_fms_stage_v2_internal(uuid,uuid,uuid,uuid,integer,uuid,uuid,uuid[],uuid)'::regprocedure) like '%fms_stage_condition_skipped%'),'unmet conditions write an audit log');
 
 select * from finish();
 rollback;

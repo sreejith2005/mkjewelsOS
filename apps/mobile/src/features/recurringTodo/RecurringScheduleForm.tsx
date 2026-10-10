@@ -26,6 +26,7 @@ export type RecurringScheduleFormProps = Readonly<{
   data: TaskReferenceData;
   /** `null` for a new schedule, a template to edit an existing one. */
   template: RecurringTemplate | null;
+  initialAssigneeId?: string;
   onCancel: () => void;
   onSave: (id: string | null, payload: Json) => Promise<void>;
 }>;
@@ -38,9 +39,9 @@ export type RecurringScheduleFormProps = Readonly<{
  * saved payload both come from `@jewelos/core`, so a schedule created here and
  * one created in a browser are the same row.
  */
-export function RecurringScheduleForm({ data, template, onCancel, onSave }: RecurringScheduleFormProps) {
+export function RecurringScheduleForm({ data, template, initialAssigneeId, onCancel, onSave }: RecurringScheduleFormProps) {
   const styles = useStyles();
-  const [user, setUser] = useState(template?.default_assignee_user_id ?? "");
+  const [user, setUser] = useState(template?.default_assignee_user_id ?? initialAssigneeId ?? "");
   const [title, setTitle] = useState(template?.title ?? "");
   const [description, setDescription] = useState(template?.description ?? "");
   const [frequency, setFrequency] = useState(() => recurringTemplateFrequency(template));

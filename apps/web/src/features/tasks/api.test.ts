@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { equalityFilters, identifierFilters, selectedTables, taskRows, taskScopeRows, taskUsers } = vi.hoisted(() => ({
+const { pageRpc, equalityFilters, identifierFilters, selectedTables, taskRows, taskScopeRows, taskUsers } = vi.hoisted(() => ({
+  pageRpc: vi.fn(),
   equalityFilters: [] as Array<[string, unknown]>,
   identifierFilters: [] as Array<{ table: string; values: unknown[] }>,
   selectedTables: [] as string[],
@@ -34,11 +35,12 @@ function query(table: string) {
   return builder;
 }
 
-vi.mock("@jewelos/api-client", () => ({ supabase: { from: (table: string) => query(table) } }));
+vi.mock("@jewelos/api-client", () => ({ supabase: { rpc: pageRpc, from: (table: string) => query(table) } }));
 
-import { loadTaskFeed, taskFeedCurrentOrOverdueFilter, taskFeedIdBatches } from "./api";
+import { loadTaskPage, loadTaskFeed, taskFeedCurrentOrOverdueFilter, taskFeedIdBatches } from "./api";
 
 beforeEach(() => {
+  pageRpc.mockReset();
   equalityFilters.splice(0);
   identifierFilters.splice(0);
   selectedTables.splice(0);
@@ -185,3 +187,45 @@ describe("task feed effective-deadline scope", () => {
 });
 
  it("loads a persisted task identity outside the feed date window for insights",async()=>{taskRows.push({id:"20261009-0000-4000-8000-000000000001",title:"Historical task",task_type:"delegation",status:"completed",planned_datetime:"2020-01-01T00:00:00Z",actual_datetime:"2020-01-01T01:00:00Z",assignee_id:"doer-1"});const rows=await loadTaskFeed("doer-1","2026-10-09T00:00:00Z","2026-10-10T00:00:00Z",{tenantId:"tenant-1",recordId:"20261009-0000-4000-8000-000000000001"});expect(rows.map(r=>r.id)).toEqual(["20261009-0000-4000-8000-000000000001"]);expect(identifierFilters).toContainEqual({table:"v_all_tasks",values:["20261009-0000-4000-8000-000000000001"]});});
+
+
+describe("bounded page hydration", () => {
+  it("hydrates only supplied ids without discovering the entire feed", async () => {
+    const id = "00000000-0000-4000-8000-000000000001";
+    taskRows.push({ id, assignee_id: "doer-1", task_type: "delegation", status: "pending", planned_datetime: "2030-01-01T00:00:00Z" });
+    const rows = await loadTaskFeed("doer-1", "", "", { tenantId: "tenant-1", recordIds: [id] });
+    expect(rows.map((row) => row.id)).toEqual([id]);
+    expect(selectedTables).not.toContain("v_task_feed_scope");
+    expect(identifierFilters.find((filter) => filter.table === "v_all_tasks")?.values).toEqual([id]);
+  });
+  it("does not turn an empty server page into an unbounded feed", async () => {
+    expect(await loadTaskFeed("doer-1", "", "", { tenantId: "tenant-1", recordIds: [] })).toEqual([]);
+    expect(selectedTables).toEqual([]);
+  });
+});
+
+
+describe("server task page access", () => {
+  it("preserves server ordering and full counts after detail hydration", async () => {
+    const ids = ["00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002"];
+    const counts = { pending: 12000, overdue: 40, completed: 10, open: 12040 };
+    pageRpc.mockResolvedValue({ data: { ids, total: 12000, counts }, error: null });
+    taskRows.push(...ids.map((id, index) => ({ id, task_type: "delegation", status: "pending", assignee_id: "doer-1", planned_datetime: `2030-01-0${index + 1}T00:00:00Z` })));
+    const page = await loadTaskPage("admin-1", "tenant-1", "all", "pending", 50);
+    expect(page.tasks.map((task) => task.id)).toEqual(ids);
+    expect(page.total).toBe(12000);
+    expect(page.counts).toEqual(counts);
+    expect(pageRpc).toHaveBeenCalledWith("task_feed_page", { p_view: "all", p_status: "pending", p_offset: 50, p_limit: 50 });
+    expect(selectedTables).not.toContain("v_task_feed_scope");
+  });
+  it("does not hydrate an empty server page", async () => {
+    pageRpc.mockResolvedValue({ data: { ids: [], total: 0, counts: { pending: 0, overdue: 0, completed: 0, open: 0 } }, error: null });
+    expect((await loadTaskPage("admin-1", "tenant-1", "all", "pending")).tasks).toEqual([]);
+    expect(selectedTables).toEqual([]);
+  });
+  it("propagates page authorization failures without reading task details", async () => {
+    pageRpc.mockResolvedValue({ data: null, error: new Error("All tasks access denied") });
+    await expect(loadTaskPage("staff-1", "tenant-1", "all", "pending")).rejects.toThrow("All tasks access denied");
+    expect(selectedTables).toEqual([]);
+  });
+});

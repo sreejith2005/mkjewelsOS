@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type WheelEvent } from "react";
-import { CheckSquare, CircleHelp, Copy, FileText, Flag, GitBranch, Layers, Maximize, Merge, Minus, MousePointer2, Plus, ShieldCheck, Trash2, Zap } from "lucide-react";
-import { fmsOutgoingStageKeys, hasFmsStageRouting, type FmsFlowDefinition, type FmsFormFieldRef, type FmsStageDefinition } from "@jewelos/core";
+import { CheckSquare, CircleHelp, Copy, FileText, Flag, GitBranch, Layers, Maximize, Merge, Minus, MousePointer2, Plus, ShieldCheck, Trash2, Zap, LayoutGrid } from "lucide-react";
+import { FMS_MIN_ZOOM as MIN_ZOOM, FMS_MAX_ZOOM as MAX_ZOOM, routeFmsGraphEdges, fmsOutgoingStageKeys, hasFmsStageRouting, type FmsFlowDefinition, type FmsFormFieldRef, type FmsStageDefinition } from "@jewelos/core";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { fmsGraphEdges, fmsStageSummary, fmsTimingSummary, layoutFmsDefinition, type FmsGraphEdge, type FmsGraphPosition } from "./graph";
 
 const NODE_WIDTH = 208;
 const NODE_HEIGHT = 104;
-const MIN_ZOOM = 0.3;
-const MAX_ZOOM = 2;
 const ZOOM_STEP = 1.15;
 const WORLD_SIZE = 6000;
 const FIT_PADDING = 80;
@@ -68,6 +66,7 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
   const [connecting, setConnecting] = useState<Readonly<{ from: string; x: number; y: number }> | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
+  const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
   const [marquee, setMarquee] = useState<Readonly<{ x: number; y: number; width: number; height: number }> | null>(null);
   const marqueeStart = useRef<FmsGraphPosition | null>(null);
   /** On a phone the gesture help is a toggle, so it never sits on top of the cards. */
@@ -88,8 +87,15 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
   const position = useCallback((key: string): FmsGraphPosition => {
     const base = saved.get(key) ?? layout.get(key) ?? { x: 60, y: 60 };
     const offset = offsets[key] ?? { x: 0, y: 0 };
-    return { x: clamp(base.x + offset.x, 0, WORLD_SIZE - NODE_WIDTH), y: clamp(base.y + offset.y, 0, WORLD_SIZE - NODE_HEIGHT) };
+    return { x: Math.max(0, base.x + offset.x), y: Math.max(0, base.y + offset.y) };
   }, [layout, offsets, saved]);
+
+  const routedEdges = useMemo(() => routeFmsGraphEdges(edges.map((edge) => ({ ...edge, id: edgeId(edge) })), new Map(definition.stages.map((stage) => [stage.key, position(stage.key)])), { width: NODE_WIDTH, height: NODE_HEIGHT }), [edges, definition.stages, position]);
+  const routeById = useMemo(() => new Map(routedEdges.map((edge) => [edge.id, edge])), [routedEdges]);
+  const worldWidth = Math.max(WORLD_SIZE, ...definition.stages.map((stage) => position(stage.key).x + NODE_WIDTH + 120), ...routedEdges.map((edge) => edge.bounds.right + 80));
+  const worldHeight = Math.max(WORLD_SIZE, ...definition.stages.map((stage) => position(stage.key).y + NODE_HEIGHT + 120), ...routedEdges.map((edge) => edge.bounds.bottom + 80));
+  const edgeDetails = edges.find((edge) => edgeId(edge) === selectedEdge);
+  const nameOf = (key: string) => definition.stages.find((stage) => stage.key === key)?.name || key;
 
   /** Client coordinates translated into canvas-world coordinates at the current pan/zoom. */
   const toWorld = useCallback((clientX: number, clientY: number) => {
@@ -101,14 +107,14 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
     const viewport = viewportRef.current;
     if (!viewport || !definition.stages.length) return;
     const points = definition.stages.map((stage) => position(stage.key));
-    const left = Math.min(...points.map((point) => point.x));
-    const right = Math.max(...points.map((point) => point.x + NODE_WIDTH));
-    const top = Math.min(...points.map((point) => point.y));
-    const bottom = Math.max(...points.map((point) => point.y + NODE_HEIGHT));
+    const left = Math.min(...points.map((point) => point.x), ...routedEdges.map((edge) => edge.bounds.left));
+    const right = Math.max(...points.map((point) => point.x + NODE_WIDTH), ...routedEdges.map((edge) => edge.bounds.right));
+    const top = Math.min(...points.map((point) => point.y), ...routedEdges.map((edge) => edge.bounds.top));
+    const bottom = Math.max(...points.map((point) => point.y + NODE_HEIGHT), ...routedEdges.map((edge) => edge.bounds.bottom));
     const next = clamp(Math.min((viewport.clientWidth - FIT_PADDING) / Math.max(1, right - left), (viewport.clientHeight - FIT_PADDING) / Math.max(1, bottom - top)), MIN_ZOOM, 1);
     setZoom(next);
     setPan({ x: viewport.clientWidth / 2 - ((left + right) / 2) * next, y: viewport.clientHeight / 2 - ((top + bottom) / 2) * next });
-  }, [definition.stages, position]);
+  }, [definition.stages, position, routedEdges]);
 
   useLayoutEffect(() => { if (!hasCenteredRef.current && definition.stages.length) { fitView(); hasCenteredRef.current = true; } }, [definition.stages.length, fitView]);
 
@@ -161,6 +167,9 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
     pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (pointersRef.current.size >= 2) { event.currentTarget.setPointerCapture(event.pointerId); startPinch(); return; }
     const endpoint = target.closest<HTMLElement>("[data-edge-from]");
+    const edgeHit = target.closest<SVGElement>("[data-edge-hit]");
+    if (edgeHit?.dataset.edgeHit) { setSelectedEdge(edgeHit.dataset.edgeHit); setHoveredEdge(edgeHit.dataset.edgeHit); }
+    else if (!endpoint) setSelectedEdge(null);
     const handle = target.closest<HTMLElement>("[data-node-output]");
     const card = target.closest<HTMLElement>("[data-node-key]");
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -242,7 +251,7 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
       for (const key of drag.keys) {
         const base = saved.get(key) ?? layout.get(key) ?? { x: 60, y: 60 };
         const origin = drag.origins.get(key) ?? base;
-        next[key] = { x: clamp(origin.x + dx, 0, WORLD_SIZE - NODE_WIDTH) - base.x, y: clamp(origin.y + dy, 0, WORLD_SIZE - NODE_HEIGHT) - base.y };
+        next[key] = { x: Math.max(0, origin.x + dx) - base.x, y: Math.max(0, origin.y + dy) - base.y };
       }
       return next;
     });
@@ -257,7 +266,7 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
     if (drag?.kind === "marquee") { marqueeStart.current = null; setMarquee(null); return; }
     if (drag?.kind === "connect" || drag?.kind === "reconnect") {
       const target = nodeKeyAt(event.clientX, event.clientY);
-      if (target && target !== drag.from) {
+      if (target) {
         if (drag.kind === "connect") onConnect(drag.from, target);
         else if (target !== drag.to) onReconnect(drag.from, drag.to, target, drag.ruleId);
       }
@@ -303,6 +312,7 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
       <span className="grid min-w-12 place-items-center text-xs text-champagne">{Math.round(zoom * 100)}%</span>
       <button aria-label="Zoom in" className="rounded p-2 text-gold hover:bg-gold/10 max-md:p-2.5" onClick={() => zoomAt(ZOOM_STEP)} type="button"><Plus className="size-4" /></button>
       <button aria-label="Fit workflow to view" className="rounded p-2 text-gold hover:bg-gold/10 max-md:p-2.5" onClick={fitView} type="button"><Maximize className="size-4" /></button>
+      <button aria-label="Auto-arrange workflow" className="rounded p-2 text-gold hover:bg-gold/10 max-md:p-2.5" onClick={() => { setOffsets({}); onMove(Object.fromEntries(layout)); }} type="button"><LayoutGrid className="size-4" /></button>
       {isPhone ? <button aria-expanded={hintOpen} aria-label="How to use the map" className={cn("rounded p-2.5 text-gold hover:bg-gold/10", hintOpen && "bg-gold/15")} onClick={() => setHintOpen((open) => !open)} type="button"><CircleHelp className="size-4" /></button> : null}
     </div>
     {isPhone ? (hintOpen ? <p className="pointer-events-none absolute inset-x-3 top-16 z-30 rounded-2xl border border-gold/20 bg-charcoal/95 px-3 py-2 text-xs leading-relaxed text-soft-grey">
@@ -312,25 +322,26 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
     </p>}
 
     <div className={cn("absolute inset-0 overflow-hidden", connecting ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing")}>
-      <div className="absolute origin-top-left bg-[radial-gradient(circle_at_1px_1px,rgba(217,184,117,0.16)_1px,transparent_0)] bg-[size:22px_22px]" style={{ height: WORLD_SIZE, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, width: WORLD_SIZE }}>
-        <svg className="pointer-events-none absolute inset-0" height={WORLD_SIZE} width={WORLD_SIZE}>
+      <div className="absolute origin-top-left bg-[radial-gradient(circle_at_1px_1px,rgba(217,184,117,0.16)_1px,transparent_0)] bg-[size:22px_22px]" style={{ height: worldHeight, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, width: worldWidth }}>
+        <svg className="pointer-events-none absolute inset-0" height={worldHeight - Math.min(0, ...routedEdges.map((edge) => edge.bounds.top - 40))} width={worldWidth - Math.min(0, ...routedEdges.map((edge) => edge.bounds.left - 40))} style={{ overflow: "visible" }}>
           <defs><marker id="fms-arrow" markerHeight="7" markerWidth="7" orient="auto" refX="6" refY="3.5"><path d="M0,0 L0,7 L7,3.5 z" fill="currentColor" /></marker></defs>
           {edges.map((edge) => {
-            const from = position(edge.from); const to = position(edge.to);
-            const startX = from.x + NODE_WIDTH; const startY = from.y + NODE_HEIGHT / 2;
-            const endX = to.x; const endY = to.y + NODE_HEIGHT / 2;
-            const id = edgeId(edge);
-            const active = hoveredEdge === id;
-            const midX = (startX + endX) / 2; const midY = (startY + endY) / 2;
-            const path = curve(startX, startY, endX, endY);
-            const labelWidth = edge.label ? Math.min(200, edge.label.length * 6.4 + 18) : 0;
+            const id = edgeId(edge); const route = routeById.get(id);
+            if (!route) return null;
+            const endX = route.end.x; const endY = route.end.y;
+            const active = hoveredEdge === id || selectedEdge === id;
+            const connected = edge.from === selectedKey || edge.to === selectedKey;
+            const midX = route.label.x; const midY = route.label.y;
+            const path = route.path; const labelWidth = route.labelWidth;
+            const label = `${route.isReturn ? "↩ " : ""}${edge.label ?? (route.isReturn ? nameOf(edge.to) : "")}`;
+            const description = `${route.isReturn ? "Return: " : ""}${nameOf(edge.from)} → ${nameOf(edge.to)}${edge.label ? `: ${edge.label}` : ""}`;
             return <g className={edge.kind === "branch" ? "text-danger" : edge.kind === "parallel" ? "text-champagne" : "text-gold"} key={id}>
-              <path className="pointer-events-auto" d={path} data-edge-hit={id} fill="none" onPointerEnter={() => setHoveredEdge(id)} onPointerLeave={(event) => { if (event.pointerType === "mouse") setHoveredEdge((current) => current === id ? null : current); }} stroke="transparent" strokeWidth="24" />
-              <path d={path} fill="none" markerEnd="url(#fms-arrow)" stroke="currentColor" strokeDasharray={edge.kind === "parallel" ? "4 4" : undefined} strokeOpacity={active ? 1 : 0.85} strokeWidth={active ? 3 : 2} />
-              {edge.label ? <g><rect fill="rgb(var(--color-charcoal))" height="18" rx="9" stroke="currentColor" strokeOpacity="0.45" width={labelWidth} x={midX - labelWidth / 2} y={midY - 27} /><text fill="currentColor" fontSize="11" textAnchor="middle" x={midX} y={midY - 14}>{edge.label.length > 29 ? `${edge.label.slice(0, 28)}…` : edge.label}</text></g> : null}
+              <path aria-label={description} role="button" tabIndex={0} className="pointer-events-auto cursor-pointer" d={path} data-edge-hit={id} fill="none" onClick={() => setSelectedEdge(id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedEdge(id); } }} onPointerEnter={() => setHoveredEdge(id)} onPointerLeave={(event) => { if (event.pointerType === "mouse") setHoveredEdge((current) => current === id ? null : current); }} stroke="transparent" strokeWidth="24"><title>{description}</title></path>
+              <path d={path} fill="none" markerEnd="url(#fms-arrow)" stroke="currentColor" strokeDasharray={edge.kind === "parallel" ? "4 4" : undefined} strokeOpacity={active || connected ? 1 : selectedKey ? 0.25 : 0.8} strokeWidth={active || connected ? 3 : 2} />
+              {label ? <g><rect fill="rgb(var(--color-charcoal))" height="24" rx="6" stroke="currentColor" strokeOpacity="0.55" width={labelWidth} x={midX - labelWidth / 2} y={midY - 12} /><text fill="currentColor" fontSize="11" textAnchor="middle" x={midX} y={midY + 4}>{label.length > 34 ? `${label.slice(0, 33)}\u2026` : label}</text><title>{description}</title></g> : null}
               {active ? <g className="pointer-events-auto cursor-pointer" data-canvas-control onPointerEnter={() => setHoveredEdge(id)} onPointerLeave={(event) => { if (event.pointerType === "mouse") setHoveredEdge((current) => current === id ? null : current); }}>
-                <circle cx={midX} cy={midY} fill="rgb(var(--color-charcoal))" onClick={() => onDisconnect(edge.from, edge.to, edge.ruleId)} r="11" stroke="currentColor" strokeWidth="1.5"><title>{`Remove the connection to ${edge.to}`}</title></circle>
-                <path className="pointer-events-none" d={`M ${midX - 4} ${midY - 4} L ${midX + 4} ${midY + 4} M ${midX + 4} ${midY - 4} L ${midX - 4} ${midY + 4}`} stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+                <circle cx={midX} cy={midY + 28} fill="rgb(var(--color-charcoal))" onClick={() => onDisconnect(edge.from, edge.to, edge.ruleId)} r="11" stroke="currentColor" strokeWidth="1.5"><title>{`Remove the connection to ${edge.to}`}</title></circle>
+                <path className="pointer-events-none" d={`M ${midX - 4} ${midY + 24} L ${midX + 4} ${midY + 32} M ${midX + 4} ${midY + 24} L ${midX - 4} ${midY + 32}`} stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
               </g> : null}
               {active ? <circle className="pointer-events-auto cursor-crosshair" cx={endX - 10} cy={endY} data-edge-from={edge.from} data-edge-rule={edge.ruleId ?? ""} data-edge-to={edge.to} fill="rgb(var(--color-charcoal))" onPointerEnter={() => setHoveredEdge(id)} r="7" stroke="currentColor" strokeWidth="2"><title>{`Drag to move this connection onto another step`}</title></circle> : null}
             </g>;
@@ -341,7 +352,7 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
 
         {definition.stages.map((stage) => {
           const point = position(stage.key); const item = appearance[stage.type];
-          const active = selection.includes(stage.key) || stage.key === selectedKey;
+          const active = selection.includes(stage.key) || stage.key === selectedKey || edgeDetails?.from === stage.key || edgeDetails?.to === stage.key;
           const invalid = invalidKeys.has(stage.key);
           const canOutput = stage.type !== "end";
           const canAppend = !["end", "branch", "parallel_start"].includes(stage.type);
@@ -385,6 +396,7 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
       </div>
     </div>
 
+    {edgeDetails ? <div className="absolute bottom-3 left-3 right-3 z-30 rounded-xl border border-gold/30 bg-charcoal p-3 text-sm text-champagne" data-canvas-control><p className="font-semibold">{nameOf(edgeDetails.from)} → {nameOf(edgeDetails.to)}</p><p className="text-xs text-soft-grey">{edgeDetails.label || "Continue to next step"}</p><button className="mt-2 text-xs text-danger" onClick={() => { onDisconnect(edgeDetails.from, edgeDetails.to, edgeDetails.ruleId); setSelectedEdge(null); }} type="button">Remove connection</button></div> : null}
     {selection.length > 1 ? <p className="pointer-events-none absolute bottom-3 left-4 z-30 rounded-full border border-gold/20 bg-charcoal/95 px-3 py-1 text-xs text-champagne">{selection.length} steps selected &middot; drag to move them together</p> : null}
     {connecting ? <p className="pointer-events-none absolute bottom-3 right-4 z-30 rounded-full border border-gold/40 bg-charcoal px-3 py-1 text-xs text-gold">Drop on a step to connect &middot; release on empty space to cancel</p> : null}
   </div>;

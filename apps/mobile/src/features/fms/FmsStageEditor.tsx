@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, Trash2 } from "lucide-react-native";
 import {
   FMS_BRANCH_OPERATORS,
   fmsFieldOptions,
+  fmsRouteAnswerSelection,
   fmsAssignmentFields,
   hasFmsStageFallback,
   hasFmsStageRouting,
@@ -115,7 +116,7 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete, issueC
   const firstStage = stageIndex === 0;
   const earlierStages = stages.slice(0, Math.max(0, stageIndex));
   const earlierDecisions = earlierStages.filter((item) => item.sla.decisionMode === "decision" || item.sla.decisionMode === "yes_no");
-  const others = stages.filter((item) => item.key !== stage.key);
+  const others = stages;
   const human = humanTypes.includes(stage.type);
   const canChooseNext = !["branch", "parallel_start", "end"].includes(stage.type);
   const decision = stage.sla.decisionMode === "decision" || stage.sla.decisionMode === "yes_no";
@@ -199,9 +200,9 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete, issueC
         </Section>
       ) : null}
 
-      {stage.type === "branch" ? <BranchEditor changeRule={changeBranchRule} highlight={["invalid_branch", "unsupported_cycle", "missing_completion_path"].includes(issueCode ?? "")} issueMessage={issueCode === "unsupported_cycle" ? issueMessage : undefined} moveRule={moveBranchRule} onIssueLayout={onIssueLayout} others={others} stage={stage} update={update} /> : null}
+      {stage.type === "branch" ? <BranchEditor changeRule={changeBranchRule} highlight={["invalid_branch", "automatic_cycle", "missing_completion_path"].includes(issueCode ?? "")} issueMessage={issueCode === "automatic_cycle" ? issueMessage : undefined} moveRule={moveBranchRule} onIssueLayout={onIssueLayout} others={others} stage={stage} update={update} /> : null}
       {stage.type === "parallel_start" ? (
-        <Section title="Parallel paths" {...mark(["invalid_parallel", "unsupported_cycle", "missing_completion_path"].includes(issueCode ?? ""))}>
+        <Section title="Parallel paths" {...mark(["invalid_parallel", "automatic_cycle", "missing_completion_path"].includes(issueCode ?? ""))}>
           {others.map((item) => <ToggleField disabled={false} key={item.key} label={item.name} onChange={(checked) => update({ parallelTargetStageKeys: checked ? [...stage.parallelTargetStageKeys, item.key] : stage.parallelTargetStageKeys.filter((key) => key !== item.key) })} required={false} value={stage.parallelTargetStageKeys.includes(item.key)} />)}
         </Section>
       ) : null}
@@ -228,7 +229,7 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete, issueC
 function StageRouting({ stage, others, fields, decision, update, changeRule, moveRule, highlight, issueCode, issueMessage, onIssueLayout }: { stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; fields: readonly FmsFormFieldRef[]; decision: boolean; update: (patch: Partial<FmsStageDefinition>) => void; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void; highlight: boolean; issueCode?: string | undefined; issueMessage?: string | undefined; onIssueLayout?: ((event: LayoutChangeEvent) => void) | undefined }) {
   const styles = useStyles();
   const routed = hasFmsStageRouting(stage);
-  const cycle = issueCode === "unsupported_cycle";
+  const cycle = issueCode === "automatic_cycle";
   const cycleRouteNumber = cycle ? /^Route (\d+) destination/.exec(issueMessage ?? "")?.[1] : undefined;
   const cycleDefault = cycle && !cycleRouteNumber && !issueMessage?.startsWith("Parallel");
   const addRoute = () => {
@@ -292,12 +293,13 @@ function RouteRow({ rule, index, stage, others, fields, decision, changeRule, mo
         <Text tone="muted" variant="caption">Uses the outcome the doer selects on this step.</Text>
       )}
       <OptionPicker label="Condition" onChange={(values) => { const operator = (values[0] ?? rule.operator) as FmsBranchOperator; changeRule(index, { operator, value: operator === "in" ? [] : "" }); }} options={routeOperators} selected={[rule.operator]} />
+      {options.length && rule.source === "form_answer" && (rule.operator === "equals" || rule.operator === "in") ? <Text tone="muted" variant="caption">Select one or more. Any selected answer uses this route.</Text> : null}
       {VALUE_FREE_OPERATORS.has(rule.operator) ? null
         : options.length ? (
           <OptionPicker
             label="Answer"
-            multiple={rule.operator === "in"}
-            onChange={(values) => changeRule(index, { value: rule.operator === "in" ? [...values] : values[0] ?? "" })}
+            multiple={rule.operator === "in" || rule.source === "form_answer" && rule.operator === "equals"}
+            onChange={(values) => changeRule(index, rule.source === "form_answer" && (rule.operator === "equals" || rule.operator === "in") ? fmsRouteAnswerSelection(rule.operator, values) : { value: rule.operator === "in" ? [...values] : values[0] ?? "" })}
             options={[...options, ...removed]}
             placeholder="Select an answer"
             selected={selected}

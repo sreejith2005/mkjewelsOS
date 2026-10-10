@@ -3,7 +3,7 @@ import { useState } from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
-import type { FmsStageDefinition } from "@jewelos/core";
+import type { FmsBranchRule, FmsStageDefinition } from "@jewelos/core";
 import type { FmsData } from "./api";
 import { newFmsStage } from "./definition";
 import { FmsStageEditor } from "./FmsStageEditor";
@@ -35,10 +35,10 @@ function LaterFormHarness() {
 
 let latestStage: FmsStageDefinition | null = null;
 
-function RoutingHarness() {
+function RoutingHarness({ rule }: { rule?: FmsBranchRule } = {}) {
   const first = { ...newFmsStage("form", 0), key: "initial", name: "Initial details", formTemplateId: data.forms[0]!.id, defaultNextStageKey: "qualify" };
   const wholesale = { ...newFmsStage("task", 2), key: "wholesale_desk", name: "Wholesale desk" };
-  const [stage, setStage] = useState<FmsStageDefinition>(() => ({ ...newFmsStage("task", 1), key: "qualify", name: "Customer qualification", formTemplateId: data.forms[0]!.id }));
+  const [stage, setStage] = useState<FmsStageDefinition>(() => ({ ...newFmsStage("task", 1), key: "qualify", name: "Customer qualification", formTemplateId: data.forms[0]!.id, branchRules: rule ? [rule] : [] }));
   latestStage = stage;
   return <FmsStageEditor data={data} onChange={(value) => { latestStage = value; setStage(value); }} onDelete={() => undefined} stage={stage} stages={[first, stage, wholesale]} />;
 }
@@ -139,7 +139,7 @@ describe("FMS stage editor", () => {
     await user.click(screen.getByRole("button", { name: "Add conditional route" }));
     expect((screen.getByLabelText("Route 1 source") as HTMLSelectElement).value).toBe("form_answer");
     expect((screen.getByLabelText("Route 1 question") as HTMLSelectElement).value).toBe("customer_type");
-    await user.selectOptions(screen.getByLabelText("Route 1 answer"), "wholesale");
+    await user.click(screen.getByRole("checkbox", { name: "Wholesale buyer" }));
     await user.selectOptions(screen.getByLabelText("Route 1 then go to"), "wholesale_desk");
     const rule = latestStage!.branchRules[0]!;
     expect(rule).toMatchObject({ source: "form_answer", sourceKey: "customer_type", operator: "equals", value: "wholesale", nextStageKey: "wholesale_desk" });
@@ -149,10 +149,33 @@ describe("FMS stage editor", () => {
     const user = userEvent.setup();
     render(<RoutingHarness />);
     await user.click(screen.getByRole("button", { name: "Add conditional route" }));
-    const answers = screen.getByLabelText("Route 1 answer") as HTMLSelectElement;
-    expect([...answers.options].map((option) => option.textContent)).toEqual(["Select an answer", "Retail buyer", "Wholesale buyer", "Distributor"]);
-    await user.selectOptions(answers, "Wholesale buyer");
+    expect(screen.getByRole("group", { name: "Route 1 answer" }).textContent).toContain("Retail buyer");
+    await user.click(screen.getByRole("checkbox", { name: "Wholesale buyer" }));
     expect(latestStage!.branchRules[0]!.value).toBe("wholesale");
+  });
+  it("uses the same destination for any selected answer and supports deselection", async () => {
+    const user = userEvent.setup();
+    render(<RoutingHarness />);
+    await user.click(screen.getByRole("button", { name: "Add conditional route" }));
+    await user.click(screen.getByRole("checkbox", { name: "Wholesale buyer" }));
+    await user.click(screen.getByRole("checkbox", { name: "Distributor" }));
+    await user.selectOptions(screen.getByLabelText("Route 1 then go to"), "wholesale_desk");
+    expect(latestStage!.branchRules[0]).toMatchObject({ operator: "in", value: ["wholesale", "distributor"], nextStageKey: "wholesale_desk" });
+    expect((screen.getByRole("checkbox", { name: "Wholesale buyer" }) as HTMLInputElement).checked).toBe(true);
+    await user.click(screen.getByRole("checkbox", { name: "Wholesale buyer" }));
+    expect(latestStage!.branchRules[0]).toMatchObject({ operator: "in", value: ["distributor"], nextStageKey: "wholesale_desk" });
+  });
+  it("restores saved multi-answer routes and keeps removed choices visible", () => {
+    render(<RoutingHarness rule={{ id: "saved", source: "form_answer", sourceKey: "customer_type", operator: "in", value: ["wholesale", "retired"], order: 0, nextStageKey: "wholesale_desk" }} />);
+    expect((screen.getByRole("checkbox", { name: "Wholesale buyer" }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("checkbox", { name: "retired (removed)" }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("Route 1 then go to") as HTMLSelectElement).value).toBe("wholesale_desk");
+  });
+  it("preserves single selection for is-not conditions", async () => {
+    const user = userEvent.setup();
+    render(<RoutingHarness rule={{ id: "saved", source: "form_answer", sourceKey: "customer_type", operator: "not_equals", value: "retail", order: 0 }} />);
+    await user.selectOptions(screen.getByLabelText("Route 1 answer"), "wholesale");
+    expect(latestStage!.branchRules[0]).toMatchObject({ operator: "not_equals", value: "wholesale" });
   });
   it("warns until an unmatched answer has somewhere to go", async () => {
     const user = userEvent.setup();

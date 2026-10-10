@@ -13,7 +13,7 @@ select ok(public.is_valid_fms_timing_rule('{"deadlineEnabled":false,"decisionMod
 -- status condition is no longer accepted when a rule is written...
 select ok(not public.is_valid_fms_timing_rule('{"deadlineEnabled":false,"conditional":{"field":"status","operator":"equals","value":"interested"}}'::jsonb),'authoring no longer accepts a legacy status condition');
 -- ...while the runtime still honours the ones already stored on published flows.
-select ok((select pg_get_functiondef('activate_fms_stage_internal(uuid,uuid,uuid,uuid,integer)'::regprocedure) like '%{conditional,field}%'),'the runtime still evaluates existing status conditions');
+select ok((select pg_get_functiondef('activate_fms_stage_v2_internal(uuid,uuid,uuid,uuid,integer,uuid,uuid,uuid[],uuid)'::regprocedure) like '%{conditional,field}%'),'the runtime still evaluates existing status conditions');
 select ok(not public.is_valid_fms_timing_rule('{"deadlineEnabled":false,"decisionMode":"decision","decisionOptions":[{"key":"connected","label":"Call Connected"}],"conditional":{"decisionStageKey":"introduction_call","decisionOptionKey":"removed"}}'::jsonb),'disabled deadline does not bypass malformed dynamic rules');
 
 select * from finish();

@@ -9,9 +9,9 @@ import {
 import { Button, Field, Notice } from "@/components/ui";
 import type { TaskReferenceData, TaskTemplate } from "./api";
 
-export function TaskTemplateForm({ data, template, onCancel, onSave }: { data: TaskReferenceData; template: TaskTemplate | null; onCancel: () => void; onSave: (id: string | null, payload: Json) => Promise<void> }) {
+export function TaskTemplateForm({ data, template, initialAssigneeId, onCancel, onSave }: { data: TaskReferenceData; template: TaskTemplate | null; initialAssigneeId?: string; onCancel: () => void; onSave: (id: string | null, payload: Json) => Promise<void> }) {
   void onCancel;
-  const [user, setUser] = useState(template?.default_assignee_user_id ?? "");
+  const [user, setUser] = useState(template?.default_assignee_user_id ?? initialAssigneeId ?? "");
   const [title, setTitle] = useState(template?.title ?? "");
   const [description, setDescription] = useState(template?.description ?? "");
   const [frequency, setFrequency] = useState(() => recurringTemplateFrequency(template));

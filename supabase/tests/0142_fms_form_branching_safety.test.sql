@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions;
-select plan(20);
+select plan(22);
 
 -- Contract surface
 select function_owner_is('public','fms_stage_matched_route',array['uuid','uuid','uuid','text'],'postgres','the route resolver runs as postgres');
@@ -23,6 +23,8 @@ select ok(not fms_rule_matches('not_empty',null,'[]'::jsonb),'an empty multi-sel
 -- Scalar answers keep 0010's behaviour exactly.
 select ok(fms_rule_matches('equals','wholesale',to_jsonb('wholesale'::text)),'a scalar equals route is unchanged');
 select ok(fms_rule_matches('in','["retail","wholesale"]',to_jsonb('retail'::text)),'a scalar in route is unchanged');
+select ok(fms_rule_matches('in','["retail","wholesale"]',to_jsonb('wholesale'::text)),'the second selected route answer also matches');
+select ok(not fms_rule_matches('in','["retail","wholesale"]',to_jsonb('distributor'::text)),'an unselected route answer does not match');
 
 -- ---------------------------------------------------------------------------
 -- A published flow whose routed step has no fallback, so an unmatched answer

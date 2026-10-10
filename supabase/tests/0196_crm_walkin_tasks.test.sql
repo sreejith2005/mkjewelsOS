@@ -105,6 +105,13 @@ select is((select user_profile_id from task_assignees where task_instance_id = (
   (select id from walkin_fixture where name = 'manager'), 'the manager is the doer');
 select ok((pg_temp.task_for('02')).description like '%assigned to the branch manager%', 'the task says why');
 
+-- Deletion is a durable administrative decision, including later CRM events.
+update task_instances set deleted_at=now() where id=(pg_temp.task_for('02')).id;
+set local role service_role;
+select pg_temp.as_service();
+select is(public.crm_sync_apply_walkin('crm.walkin.2.2',pg_temp.snap('02','sales',true,'2026-10-05T12:00:00Z'))->>'outcome','administratively_deleted','later walk-in completion acknowledges deleted task without mutation');
+select is(public.crm_sync_apply_walkin('crm.walkin.2.3',pg_temp.snap('02','sales',false,'2026-10-05T13:00:00Z'))->>'outcome','administratively_deleted','later registration cannot resurrect deleted work');
+reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.role', 'authenticated', true), set_config('request.jwt.claims', '{"role":"authenticated"}', true);
 select throws_ok($$select public.crm_sync_apply_walkin('crm.walkin.9.1', '{}'::jsonb)$$, '42501', null, 'a signed-in user cannot call it');

@@ -15,8 +15,14 @@
  * reporting the bad one.
  */
 
-export const FMS_MIN_ZOOM = 0.5;
+export const FMS_MIN_ZOOM = 0.1;
 export const FMS_MAX_ZOOM = 2;
+
+/** Overview zoom must not expand a port's hit area across the entire card. */
+export function fmsCanvasHandleRadius(zoom: number, nodeHeight: number, screenRadius = 28): number {
+  if (!Number.isFinite(zoom) || zoom <= 0 || !Number.isFinite(nodeHeight) || nodeHeight <= 0) return 0;
+  return Math.min(screenRadius / zoom, nodeHeight / 3);
+}
 
 export type FmsPoint = Readonly<{ x: number; y: number }>;
 export type FmsViewport = Readonly<{ x: number; y: number; zoom: number }>;

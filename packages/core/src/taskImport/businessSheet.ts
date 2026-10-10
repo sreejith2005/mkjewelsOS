@@ -51,7 +51,7 @@ export const TASK_IMPORT_BUSINESS_COLUMNS: readonly TaskImportBusinessColumn[] =
   { header: "START TIME", required: false, width: 14, comment: "24-hour HH:MM. Blank uses the applicable import timing preset.", example: "09:00" },
   { header: "DUE TIME", required: false, width: 14, comment: "24-hour HH:MM and later than start time. Blank uses a timing preset.", example: "11:00" },
   { header: "PRIORITY", required: false, width: 13, comment: "LOW, MEDIUM, or HIGH. Blank defaults to MEDIUM.", example: "Medium" },
-  { header: "EVIDENCE REQUIRED", required: false, width: 20, comment: "YES or NO. Blank defaults to NO.", example: "No" },
+  { header: "EVIDENCE REQUIRED", required: false, width: 20, comment: "Tasks always require a file upload. Checklists are click-to-complete. The source value is retained for import matching.", example: "Yes" },
   { header: "VERIFICATION REQUIRED", required: false, width: 23, comment: "YES or NO. Blank defaults to NO.", example: "No" },
   { header: "VERIFIER", required: false, width: 24, comment: "Verifier name or email when verification is required.", example: "" },
   { header: "BUDDY ALLOWED", required: false, width: 17, comment: "YES or NO. Blank defaults to YES.", example: "Yes" },

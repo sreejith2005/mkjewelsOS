@@ -11,7 +11,7 @@ select ok(has_function_privilege('authenticated','assert_fms_flow_publishable(uu
 select ok(has_function_privilege('authenticated','resolve_fms_stage_assignees(uuid,uuid,uuid)','EXECUTE'),'runtime keeps resolver access');
 select ok((select pg_get_functiondef('assert_fms_flow_publishable(uuid)'::regprocedure) like '%first workflow step must be a Form%'),'publish requires a Form first');
 select ok((select pg_get_functiondef('assert_fms_flow_publishable(uuid)'::regprocedure) like '%End nodes are no longer used%'),'publish rejects legacy End nodes');
-select ok((select pg_get_functiondef('activate_fms_stage_internal(uuid,uuid,uuid,uuid,integer)'::regprocedure) like '%not v_activated_next%'),'automatic leaf steps complete their instance');
+select ok((select pg_get_functiondef('activate_fms_stage_v1_internal(uuid,uuid,uuid,uuid,integer)'::regprocedure) like '%not v_activated_next%'),'legacy automatic leaf behavior remains pinned; v2 fan-out is exercised in 0212');
 
 select * from finish();
 rollback;

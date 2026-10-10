@@ -71,6 +71,12 @@ update task_instances set coverage_status='covered',coverage_original_assignee_i
   coverage_resolution='primary_buddy',coverage_resolved_for_date=date '2026-01-06'
 where id='17760000-0000-4000-8000-000000000001';
 reset role;
+insert into task_instances(id,tenant_id,branch_id,department_id,task_type,title,status,planned_datetime,created_by)
+select '17760000-0000-4000-8000-000000000099',tenant_id,branch_id,department_id,task_type,'Deleted coverage work','pending',planned_datetime,created_by from task_instances where id='17760000-0000-4000-8000-000000000001';
+insert into task_assignees(task_instance_id,user_profile_id,role_at_task,is_original,is_active)
+values('17760000-0000-4000-8000-000000000099','17740000-0000-4000-8000-000000000001','doer',true,true);
+update task_instances set deleted_at=now() where id='17760000-0000-4000-8000-000000000099';
+select lives_ok($$select sync_leave_half_day_tasks(timestamptz '2026-01-06 13:00 Asia/Kolkata')$$,'coverage reconciliation ignores deleted tasks');
 select sync_leave_half_day_tasks((timestamptz '2026-01-06 13:00 Asia/Kolkata'));
 select ok(exists(select 1 from task_assignees where task_instance_id='17760000-0000-4000-8000-000000000001' and user_profile_id='17740000-0000-4000-8000-000000000001' and is_active),'open task returns to employee at cutoff');
 select ok(not exists(select 1 from task_assignees where task_instance_id='17760000-0000-4000-8000-000000000001' and user_profile_id='17740000-0000-4000-8000-000000000002' and is_active),'buddy loses returned task');
