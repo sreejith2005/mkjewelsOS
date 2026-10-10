@@ -4,6 +4,15 @@ import { fmsGraphEdges, layoutFmsDefinition } from "./graph";
 import { routeFmsGraphEdges } from "@jewelos/core";
 
 describe("FMS graph presentation", () => {
+  it("auto-arranges compactly and puts a shared finish after the longer follow-up path", () => {
+    const first = { ...newFmsStage("form", 0), key: "first", defaultNextStageKey: "follow", branchRules: [{ id: "exit", source: "context" as const, sourceKey: "done", operator: "equals" as const, value: "yes", nextStageKey: "finish", order: 0 }] };
+    const follow = { ...newFmsStage("task", 1), key: "follow", defaultNextStageKey: "later" };
+    const later = { ...newFmsStage("task", 2), key: "later", defaultNextStageKey: "finish" };
+    const finish = { ...newFmsStage("task", 3), key: "finish" };
+    const layout = layoutFmsDefinition({ name: "Follow ups", scope: "tenant", manualTrigger: true, stages: [first, follow, later, finish] });
+    expect(layout.get("follow")!.x - layout.get("first")!.x).toBeLessThan(340);
+    expect(layout.get("finish")!.x).toBeGreaterThan(layout.get("later")!.x);
+  });
   it("draws backward routes with independent return lanes", () => {
     const a = { ...newFmsStage("task", 0), key: "a" };
     const b = { ...newFmsStage("task", 1), key: "b", defaultNextStageKey: "a", branchRules: [{ id: "return", source: "context" as const, sourceKey: "again", operator: "equals" as const, value: "yes", nextStageKey: "a", order: 0 }] };

@@ -346,16 +346,17 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
               const connected = edge.from === selectedKey || edge.to === selectedKey;
               const midX = route.label.x; const midY = route.label.y;
               const path = route.path; const color = edgeColor(edge); const labelWidth = route.labelWidth;
-              const label = `${route.isReturn ? "Return: " : ""}${edge.label ?? (route.isReturn ? nameOf(edge.to) : "")}`;
+              const label = `${route.isReturn ? "↩ " : ""}${edge.label ?? (route.isReturn ? "Return" : "")}`;
+              const maxLabelChars = Math.max(5, Math.floor((labelWidth - 16) / 6.4));
               return (
                 <G key={id}>
                   <Path d={path} fill="none" onPress={() => setActiveEdge(active ? null : id)} stroke="transparent" strokeWidth={24} />
-                  <Path d={path} fill="none" stroke={color} {...(edge.kind === "parallel" ? { strokeDasharray: [4, 4] } : {})} strokeOpacity={active || connected ? 1 : selectedKey ? 0.25 : 0.8} strokeWidth={active || connected ? 3 : 2} />
+                  <Path d={path} fill="none" stroke={color} {...(edge.kind === "parallel" ? { strokeDasharray: [4, 4] } : {})} strokeOpacity={active ? 1 : activeEdge && activeEdge !== id ? 0.25 : connected ? 0.95 : 0.7} strokeWidth={active ? 2.5 : 1.8} />
                   <Polygon fill={color} points={`${endX},${endY} ${endX - 7},${endY - 3.5} ${endX - 7},${endY + 3.5}`} />
                   {label ? (
                     <>
-                      <Rect fill={theme.colors.surface} height={24} rx={6} stroke={color} strokeOpacity={0.45} width={labelWidth} x={midX - labelWidth / 2} y={midY - 12} />
-                      <SvgText fill={color} fontSize={11} textAnchor="middle" x={midX} y={midY + 4}>{label.length > 34 ? `${label.slice(0, 33)}…` : label}</SvgText>
+                      <Rect fill={theme.colors.surface} height={18} rx={9} stroke={color} strokeOpacity={0.4} width={labelWidth} x={midX - labelWidth / 2} y={midY - 9} />
+                      <SvgText fill={color} fontSize={11} textAnchor="middle" x={midX} y={midY + 4}>{label.length > maxLabelChars ? `${label.slice(0, maxLabelChars - 1)}…` : label}</SvgText>
                     </>
                   ) : null}
                   {active ? <Rect fill={theme.colors.surface} height={14} rx={7} stroke={color} strokeWidth={2} width={14} x={endX - 17} y={endY - 7} /> : null}

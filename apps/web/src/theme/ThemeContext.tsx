@@ -1,22 +1,30 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from "react";
+import { themes } from "@jewelos/ui-tokens";
 import type { Theme } from "@/components/ThemeToggle";
 
 const THEME_STORAGE_KEY = "jewelos-theme";
 type ThemeContextValue = Readonly<{ theme: Theme; setTheme: (theme: Theme) => void }>;
 const ThemeContext = createContext<ThemeContextValue | null>(null);
-const storedTheme = (): Theme => window.localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light";
+const storedTheme = (): Theme => {
+  try { return window.localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light"; }
+  catch { return "light"; }
+};
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(storedTheme);
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.dataset.theme = theme;
+    root.classList.toggle("dark", theme === "dark");
+    root.style.colorScheme = `only ${theme}`;
+    // Storage restrictions must not interrupt loading or an explicit theme change.
+    try { window.localStorage.setItem(THEME_STORAGE_KEY, theme); } catch {}
     // Keeps the phone browser's own chrome (address bar, status bar) the same
     // colour as the app instead of a mismatched strip above the header.
     for (const meta of document.querySelectorAll('meta[name="theme-color"]')) meta.remove();
     const meta = document.createElement("meta");
     meta.name = "theme-color";
-    meta.content = theme === "dark" ? "#120f0c" : "#ffffff";
+    meta.content = themes[theme].obsidian;
     document.head.append(meta);
   }, [theme]);
   return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;

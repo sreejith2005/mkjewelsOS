@@ -74,6 +74,10 @@ export function ApplicationShell({
   fullBleed?: boolean;
 }) {
   const sidebarNavigation = getSidebarNavigation(nav);
+  const navigateFromSidebar = (destination: string) => {
+    navigate(destination);
+    setSidebarOpen(false);
+  };
 
   return (
     // `overflow-x-clip` on a normal element is a real clip: unlike the body
@@ -114,7 +118,7 @@ export function ApplicationShell({
             <button
               className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition", currentPage === item.id ? "bg-gold text-obsidian" : "text-champagne hover:bg-gold/10 hover:text-gold")}
               key={item.id}
-              onClick={() => navigate(item.path)}
+              onClick={() => navigateFromSidebar(item.path)}
               type="button"
             >
               <Icon className="size-4 shrink-0" />{item.label}
@@ -126,7 +130,7 @@ export function ApplicationShell({
             <button
               className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition", currentPage === item.id ? "bg-gold text-obsidian" : "text-champagne hover:bg-gold/10 hover:text-gold")}
               key={item.id}
-              onClick={() => navigate(item.path)}
+              onClick={() => navigateFromSidebar(item.path)}
               type="button"
             >
               <Icon className="size-4 shrink-0" />{item.label}

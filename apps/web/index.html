@@ -1,11 +1,24 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
-    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#120f0c" media="(prefers-color-scheme: dark)" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#F8FAFC" />
+    <script data-theme-bootstrap>
+      // Apply the saved choice before first paint; device dark mode is not the default.
+      (() => {
+        let theme = "light";
+        try { if (localStorage.getItem("jewelos-theme") === "dark") theme = "dark"; } catch {}
+        const root = document.documentElement;
+        root.dataset.theme = theme;
+        root.classList.toggle("dark", theme === "dark");
+        // Prevent browser automatic darkening from recolouring explicit light mode.
+        root.style.colorScheme = `only ${theme}`;
+        document.querySelector('meta[name="theme-color"]').content = theme === "dark" ? "#17130F" : "#F8FAFC";
+      })();
+    </script>
     <meta name="format-detection" content="telephone=no" />
     <title>JewelOS</title>
   </head>

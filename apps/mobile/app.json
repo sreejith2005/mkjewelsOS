@@ -5,8 +5,8 @@
     "scheme": "jewelos",
     "version": "1.0.14",
     "orientation": "portrait",
-    "userInterfaceStyle": "dark",
-    "backgroundColor": "#0a0a0a",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#F8FAFC",
     "primaryColor": "#D9B875",
     "assetBundlePatterns": [
       "**/*"
@@ -14,7 +14,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0a0a0a"
+      "backgroundColor": "#F8FAFC"
     },
     "ios": {
       "supportsTablet": true,
@@ -51,7 +51,7 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 220,
           "resizeMode": "contain",
-          "backgroundColor": "#0a0a0a"
+          "backgroundColor": "#F8FAFC"
         }
       ],
       [
