@@ -142,10 +142,32 @@ Target CRM project: `fsydcsyqnddacjfoutfe`. JewelOS remains the separate project
 `20261008000800`; only `20261009000100` was pending. JewelOS was synchronized
 through `0205` and needed no migration from this change.
 
-Pending: reviewed commit, exact final dry run/apply, main push, deployment SHA
-and public smoke verification. No APK is required: no native/shared compiled
-mobile code changed; the existing app loads the hosted CRM. Device performance
-must be measured separately. Preserve all unrelated worktrees and native work.
+Application release commit: `e2caa0a9173190bef8155bf3fddd500fc740ca86`
+(implementation `82abf6b`, fixture evidence `a441be1`). Reviewed named paths
+passed staged whitespace and credential-pattern scans. The release branch
+was pushed to `origin/main`; remote synchronization was verified as `0 0`.
+
+Hosted CRM apply completed with exit 0, and the ledger lists
+`20261009000100` both locally and remotely. A subsequent dry run reports
+up to date. The CLI emitted an optional pg-delta catalog-cache timeout warning
+after applying the migration; the apply and subsequent ledger/preflight passed.
+No JewelOS migration, secret, Edge Function or host configuration changed.
+
+Vercel production deployment `dpl_6cpyDCs73AMf9uQD2VdivyFpn9kC` is Ready and
+aliased to `https://mkjewels-os.vercel.app`. Its build log identifies commit
+`e2caa0a`, transformed 2,109 modules, and completed the production build.
+Anonymous probes on all five new read RPCs returned HTTP 401 / SQLSTATE
+42501. Public desktop (1440 px) and phone (390 px) CRM entry checks returned
+HTTP 200, required login and had zero page errors, overflow or framework
+error overlays. The smoke harness was corrected to select the actual form
+submit control after its older accessible-name locator timed out; application
+source was unchanged. Authenticated hosted workflows and physical-device
+latency remain unproven; the complete workflow checks above are local.
+
+No APK is required: no native/shared compiled mobile code changed; the existing
+app loads the hosted CRM. Device performance must be measured separately.
+Unrelated worktrees and native work were preserved. Documentation-only commits
+after the application release record this evidence without changing behavior.
 
 Recovery: previous web remains compatible with the additive read contracts.
 Roll back a web deployment if needed; correct database behavior with a reviewed

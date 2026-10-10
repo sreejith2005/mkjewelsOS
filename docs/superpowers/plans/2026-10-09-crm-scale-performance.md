@@ -11,7 +11,7 @@
 - [x] Update Followups/Referrals loaders and controls to use server pages, reset page on filter change, debounce search, retain sort/filter options and correct global tab counts. History loads on demand; failed reads show retry and never silently empty the result.
 - [x] Use aggregated Dashboard results; bound profile history sections with explicit next/previous controls so all saved evidence remains reachable. Parallelize independent context/identity reads.
 - [x] Rebuild isolated current-main CRM database, run pgTAP and UI/web/type/build gates. Run reproducible 100,000-row benchmarks under authenticated RLS and rendered desktop/phone/embedded checks. Document request sizes, timings and query plans, including deeper pages and selective search.
-- [ ] Review exact staged paths and secret-safe scan; confirm both hosted ledgers and exact CRM dry run; apply only this migration, push main, verify production deployment/public smoke. No native change means existing Android WebView consumes hosted CRM; do not claim physical-phone timing without a device.
+- [x] Review exact staged paths and secret-safe scan; confirm both hosted ledgers and exact CRM dry run; apply only this migration, push main, verify production deployment/public smoke. No native change means existing Android WebView consumes hosted CRM; do not claim physical-phone timing without a device.
 
 **Compatibility:** Additive reads and a derived projection only; source/history/document data is retained. Projection triggers run in the source transaction and are not granted to clients. A forward corrective migration can restore the prior browse function; previous UI remains compatible.
 
@@ -19,4 +19,4 @@
 
 ## Verification status (2026-10-10)
 
-See docs/CRM_SCALE_PERFORMANCE_2026-10-10.md for counts, measured latency and proof limits. The subsecond target is not uniformly achieved; bounded payloads, complete counts, preserved evidence and access controls are verified. Final CRM suite: 41 files / 182 tests, exit 0. Web: 85 files / 409 tests, exit 0. Both typechecks, scoped CSS and web build passed. Hosted publication remains pending.
+See docs/CRM_SCALE_PERFORMANCE_2026-10-10.md for counts, measured latency and proof limits. The subsecond target is not uniformly achieved; bounded payloads, complete counts, preserved evidence and access controls are verified. Final CRM suite: 41 files / 182 tests, exit 0. Web: 85 files / 409 tests, exit 0. Both typechecks, scoped CSS and web build passed. CRM migration is applied and application release `e2caa0a` is on main and Ready in production. Public and anonymous denial checks passed. Authenticated hosted/device timing and consistently subsecond lakh-scale performance remain unproven; see the evidence record.
