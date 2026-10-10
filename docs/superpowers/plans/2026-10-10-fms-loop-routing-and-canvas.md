@@ -316,3 +316,19 @@ Pre-migration public-schema snapshot completed outside Git.
 Migration SHA256: `6e06cd8ea423a2349e115f6290093faec0247e495922aa9066eb0bde62ac2fd3`.
 
 Fresh monorepo typecheck passed: 6 packages, forced sequential execution.
+
+### Database/Git rollout outcome (2026-10-10)
+
+- Implementation SHA: `4682a4848521f99be18a33e4bb83f32978ebe75f`.
+- Applied only `0212_fms_loop_execution.sql` to the confirmed JewelOS production
+  project `yimafxhuwgfhvzczqqdd`; CLI apply succeeded, without seeds or role imports.
+- Hosted ledger: local/remote both 0212, zero unmatched entries. Post-apply linked
+  dry-run reports up to date and no pending migrations.
+- Post-apply schema snapshot confirms all four provenance tables with RLS enabled
+  and the versioned activation/visit/version-trigger functions. Both schema
+  snapshots remain in the local temporary directory, outside Git.
+- Normal fast-forward push to `origin/main` succeeded; remote main was verified
+  at the implementation SHA. No unrelated paths were included in the FMS commit.
+- This confirms database installation and Git publication. Authenticated hosted
+  workflow smoke tests, web-host readiness and connected native runtime evidence
+  remain separate and unproven. No APK was published and no update was mandatory.
