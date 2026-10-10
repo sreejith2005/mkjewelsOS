@@ -6,7 +6,8 @@ import {
   KIARA_SYSTEM_PROMPT,
   buildTurnContext,
 } from "../../../packages/core/src/assistant/systemPrompt.ts";
-import type { KiaraToolSpec } from "../../../packages/core/src/assistant/tools.ts";
+import { getKiaraTool, validateKiaraToolInput, type KiaraToolSpec } from "../../../packages/core/src/assistant/tools.ts";
+import { decideEscalationOffer, type KiaraEscalationOffer, type KiaraEscalationReason } from "../../../packages/core/src/assistant/escalation.ts";
 import { CITATION_MARKER_PATTERN, applyCitations, type KiaraCitation, type KiaraCitationSource } from "../../../packages/core/src/assistant/citations.ts";
 import { detectLanguageStyle } from "../../../packages/core/src/assistant/language.ts";
 import { parseKiaraQuota, type KiaraQuota } from "../../../packages/core/src/assistant/quota.ts";
@@ -183,7 +184,7 @@ export type RequestUsage = Readonly<{
 export type KiaraUsage = RequestUsage & Readonly<{ requests: number; per_request: readonly RequestUsage[] }>;
 
 export type KiaraTurnResult =
-  | Readonly<{ ok: true; assistantMessageId: string; displayText: string; stopReason: string; quota: KiaraQuota; usage: KiaraUsage; toolsUsed: readonly string[]; citations: readonly KiaraCitation[] }>
+  | Readonly<{ ok: true; assistantMessageId: string; displayText: string; stopReason: string; quota: KiaraQuota; usage: KiaraUsage; toolsUsed: readonly string[]; citations: readonly KiaraCitation[]; escalationOffer: KiaraEscalationOffer | null }>
   | Readonly<{ ok: false; code: KiaraErrorCode; message: string }>;
 
 class ProviderFailure extends Error {}
@@ -305,6 +306,35 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
   let searchNudges = 0;
   let citationShown = false;
   let held = "";
+  // Escalation (spec 12 rule 6): the offer made in this turn, and whether any
+  // tool answered access denied (offers are never allowed then).
+  let escalationOffer: KiaraEscalationOffer | null = null;
+  let accessDenied = false;
+
+  const recordTool = (spec: KiaraToolSpec) => {
+    if (!toolsUsed.includes(spec.definition.name)) toolsUsed.push(spec.definition.name);
+    if (!dataCategories.includes(spec.dataCategory)) dataCategories.push(spec.dataCategory);
+  };
+  // offer_escalation writes nothing: an allowed offer is stored with the answer
+  // and the employee confirms it (create_kiara_escalation).
+  const considerOffer = (raw: unknown): Readonly<{ content: string; isError: boolean }> => {
+    const spec = getKiaraTool("offer_escalation");
+    if (!spec || !offered.includes(spec)) return { content: JSON.stringify({ access: "denied" }), isError: false };
+    const validated = validateKiaraToolInput("offer_escalation", raw);
+    if (!validated.ok) return { content: JSON.stringify({ error: "invalid_input", message: validated.error }), isError: true };
+    recordTool(spec);
+    const reason = validated.input.reason as KiaraEscalationReason;
+    const decision = decideEscalationOffer(reason, { knowledgeSearches: kbSearches, accessDenied, alreadyOffered: escalationOffer !== null });
+    if (!decision.ok) {
+      deps.log({ event: "kiara_offer_refused", code: decision.code });
+      return { content: JSON.stringify({ offered: false, code: decision.code, message: decision.message }), isError: false };
+    }
+    escalationOffer = { offer_id: crypto.randomUUID(), reason, summary_en: String(validated.input.summary_en ?? "") };
+    return {
+      content: JSON.stringify({ offered: true, message: "The user now sees an \"Ask a person\" button under your answer. In one short sentence, say you could not answer this confidently and that they can send it to their manager with that button." }),
+      isError: false,
+    };
+  };
 
   const appendText = (delta: string) => {
     if (!delta) return;
@@ -398,6 +428,11 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
           continue;
         }
         toolCalls += 1;
+        if (toolUse.name === "offer_escalation") {
+          const offer = considerOffer(toolUse.input);
+          results.push({ type: "tool_result", tool_use_id: toolUse.id, content: offer.content, ...(offer.isError ? { is_error: true } : {}) });
+          continue;
+        }
         const executed = await executeKiaraTool(toolUse.name, toolUse.input, {
           actor,
           offered,
@@ -405,13 +440,12 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
           timeZone: started.context.timezone,
           access: input.access,
           now: deps.now(),
+          knowledgeSearches: kbSearches,
         });
         for (const source of executed.citationSources ?? []) citationSources.set(source.chunk_id, source);
         if (toolUse.name === "search_knowledge_base" && executed.spec) kbSearches += 1;
-        if (executed.spec) {
-          if (!toolsUsed.includes(executed.spec.definition.name)) toolsUsed.push(executed.spec.definition.name);
-          if (!dataCategories.includes(executed.spec.dataCategory)) dataCategories.push(executed.spec.dataCategory);
-        }
+        if (/"access"\s*:\s*"denied"/.test(executed.content)) accessDenied = true;
+        if (executed.spec) recordTool(executed.spec);
         results.push({ type: "tool_result", tool_use_id: toolUse.id, content: executed.content, ...(executed.isError ? { is_error: true } : {}) });
       }
       const toolTurn: MessageParam = { role: "user", content: results };
@@ -449,8 +483,8 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
   if (cited.removedMarkers > 0) deps.log({ event: "kiara_citation_removed", count: cited.removedMarkers });
   const usage = totalUsage(perRequest);
   const kbHit = cited.citations.length > 0;
-  // Phase 4 hook: a knowledge search that ended without a valid citation is the
-  // "not in the SOPs" case where the escalation offer will be made.
+  // A knowledge search that ended without a valid citation: the "not in the
+  // SOPs" case where Kiara offers to pass the question to a person.
   const kbNoMatch = toolsUsed.includes("search_knowledge_base") && !kbHit;
 
   const completed = await actor.rpc("complete_kiara_turn", {
@@ -459,7 +493,7 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
     p_api_content: turn,
     p_language: detectLanguageStyle(request.message),
     p_citations: cited.citations,
-    p_escalation_offer: null,
+    p_escalation_offer: escalationOffer,
     p_tools_used: toolsUsed,
     p_data_categories: dataCategories,
     p_kb_hit: kbHit,
@@ -468,14 +502,16 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
     p_usage: usage,
   });
   // Shape only: never question text, answers, or tool data.
-  deps.log({ event: "kiara_turn", ok: !completed.error, model, stop_reason: stopReason, tools: toolsUsed, tool_calls: toolCalls, kb_searches: kbSearches, citations: cited.citations.length, kb_no_match: kbNoMatch, ms: Date.now() - startedAt, usage });
+  deps.log({ event: "kiara_turn", ok: !completed.error, model, stop_reason: stopReason, tools: toolsUsed, tool_calls: toolCalls, kb_searches: kbSearches, citations: cited.citations.length, kb_no_match: kbNoMatch, escalation_offered: escalationOffer !== null, ms: Date.now() - startedAt, usage });
   if (completed.error || typeof completed.data !== "string") {
     return { ok: false, code: "unavailable", message: "Kiara answered, but the answer could not be saved. Please try again." };
   }
   for (const citation of cited.citations) {
     emit({ event: "citation", data: { marker: citation.marker, chunk_id: citation.chunk_id, document_id: citation.document_id, title: citation.title, heading_path: citation.heading_path } });
   }
-  return { ok: true, assistantMessageId: completed.data, displayText: finalText, stopReason, quota: started.quota, usage, toolsUsed, citations: cited.citations };
+  const offer = escalationOffer as KiaraEscalationOffer | null;
+  if (offer) emit({ event: "escalation_offer", data: { message_id: completed.data, offer_id: offer.offer_id, reason: offer.reason, summary: offer.summary_en } });
+  return { ok: true, assistantMessageId: completed.data, displayText: finalText, stopReason, quota: started.quota, usage, toolsUsed, citations: cited.citations, escalationOffer: offer };
 }
 
 /**

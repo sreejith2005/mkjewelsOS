@@ -134,6 +134,9 @@ Deno.serve(async (request: Request) => {
       display_text: result.displayText,
       quota: result.quota,
       citations: result.citations.map(({ marker, chunk_id, document_id, title, heading_path }) => ({ marker, chunk_id, document_id, title, heading_path })),
+      escalation_offer: result.escalationOffer
+        ? { message_id: result.assistantMessageId, offer_id: result.escalationOffer.offer_id, reason: result.escalationOffer.reason, summary: result.escalationOffer.summary_en }
+        : null,
     });
   }
 

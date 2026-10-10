@@ -15,4 +15,8 @@ describe("incoming native app URLs", () => {
     expect(incomingNativePath("jewelos://tasks/fms?form=f", null)).toBeNull();
     expect(incomingNativePath("javascript:alert(1)", null)).toBeNull();
   });
+  it("sends a tapped Ask Kiara link to the notification list (web only for now)", () => {
+    expect(incomingNativePath("jewelos://ask-kiara?conversation=c1", null)).toBe("/notifications");
+    expect(incomingNativePath("https://app.example/ask-kiara?tab=questions&escalation=e1", "https://app.example")).toBe("/notifications");
+  });
 });

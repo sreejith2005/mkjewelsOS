@@ -7148,6 +7148,191 @@ export type Database = {
           },
         ]
       }
+      kiara_escalations: {
+        Row: {
+          answer_message_id: string | null
+          answer_text: string | null
+          answered_at: string | null
+          answered_by: string | null
+          answered_by_label: string | null
+          asker_id: string
+          branch_id: string | null
+          conversation_id: string | null
+          created_at: string
+          department_id: string | null
+          id: string
+          offer_id: string
+          offer_message_id: string | null
+          question_message_id: string | null
+          question_text: string
+          reason: string
+          saved_document_id: string | null
+          status: string
+          summary_en: string | null
+          tenant_id: string
+          withdrawn_at: string | null
+        }
+        Insert: {
+          answer_message_id?: string | null
+          answer_text?: string | null
+          answered_at?: string | null
+          answered_by?: string | null
+          answered_by_label?: string | null
+          asker_id: string
+          branch_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          department_id?: string | null
+          id?: string
+          offer_id: string
+          offer_message_id?: string | null
+          question_message_id?: string | null
+          question_text: string
+          reason: string
+          saved_document_id?: string | null
+          status?: string
+          summary_en?: string | null
+          tenant_id: string
+          withdrawn_at?: string | null
+        }
+        Update: {
+          answer_message_id?: string | null
+          answer_text?: string | null
+          answered_at?: string | null
+          answered_by?: string | null
+          answered_by_label?: string | null
+          asker_id?: string
+          branch_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          department_id?: string | null
+          id?: string
+          offer_id?: string
+          offer_message_id?: string | null
+          question_message_id?: string | null
+          question_text?: string
+          reason?: string
+          saved_document_id?: string | null
+          status?: string
+          summary_en?: string | null
+          tenant_id?: string
+          withdrawn_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kiara_escalations_answer_message_id_fkey"
+            columns: ["answer_message_id"]
+            isOneToOne: false
+            referencedRelation: "kiara_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_escalations_answered_by_fkey"
+            columns: ["answered_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_escalations_answered_by_fkey"
+            columns: ["answered_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_escalations_answered_by_fkey"
+            columns: ["answered_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_escalations_answered_by_fkey"
+            columns: ["answered_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_escalations_asker_id_fkey"
+            columns: ["asker_id"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_escalations_asker_id_fkey"
+            columns: ["asker_id"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_escalations_asker_id_fkey"
+            columns: ["asker_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_escalations_asker_id_fkey"
+            columns: ["asker_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_escalations_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_escalations_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "kiara_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_escalations_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_escalations_offer_message_id_fkey"
+            columns: ["offer_message_id"]
+            isOneToOne: true
+            referencedRelation: "kiara_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_escalations_question_message_id_fkey"
+            columns: ["question_message_id"]
+            isOneToOne: false
+            referencedRelation: "kiara_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_escalations_saved_document_id_fkey"
+            columns: ["saved_document_id"]
+            isOneToOne: false
+            referencedRelation: "kiara_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_escalations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kiara_messages: {
         Row: {
           api_content: Json | null
@@ -7156,6 +7341,7 @@ export type Database = {
           created_at: string
           data_categories: string[]
           display_text: string
+          escalation_id: string | null
           escalation_offer: Json | null
           id: string
           language: string | null
@@ -7178,6 +7364,7 @@ export type Database = {
           created_at?: string
           data_categories?: string[]
           display_text: string
+          escalation_id?: string | null
           escalation_offer?: Json | null
           id?: string
           language?: string | null
@@ -7200,6 +7387,7 @@ export type Database = {
           created_at?: string
           data_categories?: string[]
           display_text?: string
+          escalation_id?: string | null
           escalation_offer?: Json | null
           id?: string
           language?: string | null
@@ -7221,6 +7409,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "kiara_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_messages_escalation_id_fkey"
+            columns: ["escalation_id"]
+            isOneToOne: false
+            referencedRelation: "kiara_escalations"
             referencedColumns: ["id"]
           },
           {
@@ -11539,6 +11734,15 @@ export type Database = {
         Args: { p_comment: string; p_task_id: string }
         Returns: string
       }
+      answer_kiara_escalation_with_audit: {
+        Args: {
+          p_answer: string
+          p_escalation_id: string
+          p_kb_title?: string
+          p_save_to_kb?: boolean
+        }
+        Returns: Json
+      }
       apply_authoritative_admin_roles: {
         Args: { p_profile_ids: string[] }
         Returns: number
@@ -12243,6 +12447,7 @@ export type Database = {
         }
         Returns: Json
       }
+      create_kiara_escalation: { Args: { p_message_id: string }; Returns: Json }
       create_manual_task_with_mode_with_audit: {
         Args: {
           p_checklist: Json
@@ -12705,6 +12910,7 @@ export type Database = {
       get_form_upload_path: { Args: { p_file_id: string }; Returns: string }
       get_home_summary: { Args: { p_context?: Json }; Returns: Json }
       get_kiara_document: { Args: { p_id: string }; Returns: Json }
+      get_kiara_escalation_badge: { Args: never; Returns: number }
       get_kiara_knowledge_excerpt: {
         Args: { p_chunk_id: string }
         Returns: Json
@@ -12900,6 +13106,10 @@ export type Database = {
         }
         Returns: number
       }
+      kiara_can_answer_escalation: {
+        Args: { p_escalation_id: string }
+        Returns: boolean
+      }
       kiara_directory_lookup: {
         Args: { p_limit?: number; p_query: string }
         Returns: Json
@@ -12941,6 +13151,10 @@ export type Database = {
       list_designation_daily_checklists: { Args: never; Returns: Json }
       list_kiara_documents: {
         Args: { p_department?: string; p_search?: string; p_status?: string }
+        Returns: Json
+      }
+      list_kiara_escalations: {
+        Args: { p_limit?: number; p_status?: string }
         Returns: Json
       }
       list_my_kiara_conversations: { Args: { p_limit?: number }; Returns: Json }
@@ -14214,6 +14428,10 @@ export type Database = {
       }
       verify_recurring_task_with_audit: {
         Args: { p_decision: string; p_note?: string; p_task_id: string }
+        Returns: undefined
+      }
+      withdraw_my_kiara_escalation: {
+        Args: { p_escalation_id: string }
         Returns: undefined
       }
     }

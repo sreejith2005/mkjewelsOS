@@ -421,7 +421,7 @@ Deno.test("knowledge search runs as the caller and returns excerpts as untrusted
   const result = await run(actor, "search_knowledge_base", { english_query: "billing check", original_terms: "bill" }, accessFor("staff"));
   assertEquals(actor.rpcs[0], { fn: "search_kiara_knowledge", args: { p_query: "billing check", p_original_terms: "bill", p_limit: 5 } });
   assertEquals(result.json.found, 2);
-  assertEquals((result.json.results as Record<string, unknown>[])[0], { chunk_id: chunk(1, "").chunk_id, title: "Synthetic SOP", section: "Billing", excerpt: { untrusted_text: "Check the bill twice." } });
+  assertEquals((result.json.results as Record<string, unknown>[])[0], { chunk_id: chunk(1, "").chunk_id, title: "Synthetic SOP", section: "Billing", departments: [], excerpt: { untrusted_text: "Check the bill twice." } });
   assertFalse(result.content.includes("internal_rank"));
   assertFalse(result.content.includes("document_id"));
   assertEquals(result.citationSources?.map((source) => source.chunk_id), [chunk(1, "").chunk_id, chunk(2, "").chunk_id]);
@@ -439,10 +439,19 @@ Deno.test("knowledge results over the size cap are dropped whole and are not cit
 
 Deno.test("knowledge search: no results, denial, and the required English query", async () => {
   const empty = await run(new FakeActor({ search_kiara_knowledge: () => ok({ results: [] }) }), "search_knowledge_base", { english_query: "pets" }, accessFor("staff"));
-  assertEquals(empty.json, { results: [], found: 0, message: "No matching SOP sections were found." });
+  assertEquals(empty.json, { results: [], found: 0, message: "No matching SOP sections were found. If this was your first search, search once more with different words before saying you could not find it." });
   assertEquals(empty.citationSources, undefined);
   const deniedResult = await run(new FakeActor({ search_kiara_knowledge: denied }), "search_knowledge_base", { english_query: "pets" }, accessFor("staff"));
   assertEquals(deniedResult.json, { access: "denied" });
   const missing = await run(new FakeActor(), "search_knowledge_base", { original_terms: "chhutti" }, accessFor("staff"));
   assertMatch(String(missing.json.message), /english_query is required/);
+});
+
+Deno.test("knowledge results carry department tags and mark the asker's own department", async () => {
+  const tagged = { ...chunk(1, "Load the van from the back."), departments: ["Drivers", 7], own_department: true };
+  const other = { ...chunk(2, "Greet the customer."), departments: ["Sales"], own_department: false };
+  const result = await run(new FakeActor({ search_kiara_knowledge: () => ok({ results: [tagged, other] }) }), "search_knowledge_base", { english_query: "van" }, accessFor("staff"));
+  const results = result.json.results as Record<string, unknown>[];
+  assertEquals([results[0]!.departments, results[0]!.own_department], [["Drivers"], true]);
+  assertEquals([results[1]!.departments, "own_department" in results[1]!], [["Sales"], false]);
 });

@@ -1,11 +1,12 @@
 import { parseKiaraQuota, type KiaraQuota } from "./quota.ts";
+import { KIARA_ESCALATION_REASONS, type KiaraEscalationReason } from "./escalation.ts";
 
 /**
  * The `POST /functions/v1/ask-kiara/chat` streaming contract (spec 7.2).
  *
  * The Edge Function encodes these events; web and Android parse them with the
- * same parser. Order: `meta` first, then any `status`/`delta`/`citation`
- * events, then exactly one terminal `done` or `error`. A client that cannot
+ * same parser. Order: `meta` first, then any `status`/`delta`/`citation`/
+ * `escalation_offer` events, then exactly one terminal `done` or `error`. A client that cannot
  * stream asks for `application/json` and receives one `KiaraChatResult`.
  */
 export type KiaraMetaEvent = Readonly<{ event: "meta"; data: Readonly<{ conversation_id: string; user_message_id: string; quota: KiaraQuota }> }>;
@@ -14,6 +15,9 @@ export type KiaraDeltaEvent = Readonly<{ event: "delta"; data: Readonly<{ text: 
 /** A validated citation for the answer's "[n]" marker (spec 7.5); sent before `done`. */
 export type KiaraCitationData = Readonly<{ marker: number; chunk_id: string; document_id: string; title: string; heading_path: string }>;
 export type KiaraCitationEvent = Readonly<{ event: "citation"; data: KiaraCitationData }>;
+/** Kiara's offer to pass the question to a person; the client shows "Ask a person" (spec 7.2). */
+export type KiaraEscalationOfferData = Readonly<{ message_id: string; offer_id: string; reason: KiaraEscalationReason; summary: string }>;
+export type KiaraEscalationOfferEvent = Readonly<{ event: "escalation_offer"; data: KiaraEscalationOfferData }>;
 export type KiaraDoneEvent = Readonly<{
   event: "done";
   data: Readonly<{
@@ -31,6 +35,7 @@ export type KiaraStreamEvent =
   | KiaraStatusEvent
   | KiaraDeltaEvent
   | KiaraCitationEvent
+  | KiaraEscalationOfferEvent
   | KiaraDoneEvent
   | KiaraErrorEvent;
 
@@ -54,6 +59,7 @@ export type KiaraChatResult = Readonly<{
   display_text: string;
   quota: KiaraQuota;
   citations: readonly KiaraCitationData[];
+  escalation_offer?: KiaraEscalationOfferData | null | undefined;
 }>;
 
 /** The body of every non-2xx response, streaming or not. */
@@ -83,6 +89,9 @@ export function parseKiaraEvent(name: string, data: unknown): KiaraStreamEvent |
     case "citation":
       return typeof data.marker === "number" && str(data.chunk_id) && str(data.document_id) && str(data.title) && str(data.heading_path)
         ? { event: "citation", data: { marker: data.marker, chunk_id: data.chunk_id, document_id: data.document_id, title: data.title, heading_path: data.heading_path } } : null;
+    case "escalation_offer":
+      return str(data.message_id) && str(data.offer_id) && str(data.summary) && str(data.reason) && (KIARA_ESCALATION_REASONS as readonly string[]).includes(data.reason)
+        ? { event: "escalation_offer", data: { message_id: data.message_id, offer_id: data.offer_id, reason: data.reason as KiaraEscalationReason, summary: data.summary } } : null;
     case "done": {
       const quota = parseKiaraQuota(data.quota);
       return str(data.assistant_message_id) && str(data.stop_reason) && str(data.display_text) && quota

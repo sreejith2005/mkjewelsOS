@@ -92,6 +92,7 @@ export function DocumentDetail({ departments, documentId, onChanged, onClosed }:
       {latest ? documentWarnings({ word_count: latest.word_count, image_count: latest.image_count, status: document.status }).map((warning) =>
         <span className="rounded-full border border-task-overdue/40 bg-task-overdue/10 px-2.5 py-0.5 text-xs font-semibold text-task-overdue" key={warning}>{warning}</span>) : null}
     </div>
+    {document.status === "suggested" ? <Notice tone="task">A person answered an employee's question and saved it here. Kiara does not use it until you approve it. You can edit the text first, or reject it.</Notice> : null}
     {latest?.extraction_status === "failed" ? <Notice tone="danger">Version {latest.version_number} failed: {latest.extraction_error ?? "extraction failed"}.{document.sections.length ? " The previous version is still live." : ""}</Notice> : null}
     {error ? <Notice tone="danger">{error}</Notice> : null}
 
@@ -127,7 +128,7 @@ export function DocumentDetail({ departments, documentId, onChanged, onClosed }:
           void runReplace(file);
         }} ref={fileInput} type="file" />
       </> : null}
-      <Button disabled={busy} onClick={() => setConfirmDelete(true)} type="button" variant="danger"><Trash2 aria-hidden className="size-4" />Delete</Button>
+      <Button disabled={busy} onClick={() => setConfirmDelete(true)} type="button" variant="danger"><Trash2 aria-hidden className="size-4" />{document.status === "suggested" ? "Reject" : "Delete"}</Button>
     </div> : <Notice tone="task">This document was deleted. Past answers that cited it now say it was removed.</Notice>}
 
     {replace ? <Notice tone={replace.stage === "failed" ? "danger" : "task"}>

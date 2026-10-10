@@ -337,18 +337,37 @@ departments for up to 500 documents in one transaction and one audit row holding
 previous values; a department-only result without departments fails the whole selection); and
 visibility plus departments chosen before a bulk upload.
 
-### 5.4 Escalations
+### 5.4 Escalations (built 2026-10-10, migration 0905)
 
 `kiara_escalations`
-- `id uuid pk`, `tenant_id`, `branch_id`, `department_id` (asker's at creation),
-  `asker_id`, `conversation_id`, `question_message_id`, `offer_id uuid unique`,
-  `question_text text` (the asker's original question), `summary_en text`, `reason text`,
-  `status text check in ('open','answered','withdrawn')`, `answered_by`, `answered_at`,
-  `answer_text text check (length <= 4000)`, `saved_document_id uuid null`, `created_at`
-- Indexes: `(tenant_id, status, created_at)`, `(asker_id, created_at desc)`.
-- Grant select to authenticated. Policy: asker, or `kiara_can_answer_escalation(id)` (5.6).
-- Trigger: on `status` leaving `open`, mark the answerers' `kiara_escalation_open` notifications read
-  (derived state, as in 0160).
+- `id uuid pk`, `tenant_id`, `branch_id`, `department_id` (asker's at creation), `asker_id`,
+  `conversation_id`, `question_message_id`, `offer_message_id unique` (Kiara's answer carrying the
+  offer; all three `on delete set null`, so the escalation outlives the conversation-retention purge),
+  `offer_id uuid unique`, `question_text` (the asker's original question, max 2,000), `summary_en`
+  (max 300), `reason` (`no_kb_match` | `conflicting_policy` | `needs_judgment`),
+  `status` (`open` | `answered` | `withdrawn`), `answered_by`, `answered_by_label`
+  ("Name (Designation)" at answer time), `answered_at`, `answer_text` (max 4,000),
+  `answer_message_id`, `saved_document_id`, `withdrawn_at`, `created_at`.
+- Indexes: `(tenant_id, status, created_at desc)`, `(asker_id, created_at desc)`.
+- Grant select to authenticated. Policy: asker, or `kiara_can_answer_escalation(id)` (5.6); plus the
+  restrictive section policy. No client writes.
+- Trigger: on `status` leaving `open`, every answerer's `kiara_escalation_open` notification is marked
+  read (`read_at` kept if already set; rows never deleted). Realtime: `assistant` topic on insert and
+  status change.
+- `kiara_messages.escalation_id` links a `human_answer` row to its escalation.
+
+**Offers.** The `offer_escalation` tool (`{reason, summary_en}`, both required) writes nothing. The
+worker accepts an offer only when `decideEscalationOffer` (packages/core/src/assistant/escalation.ts)
+allows it: the turn ran a knowledge search (company-procedure questions only), `no_kb_match` needs
+two searches, no tool in the turn answered `access: denied`, and at most one offer per question.
+The offer is stored on Kiara's answer by `complete_kiara_turn`, sent as an `escalation_offer` SSE
+event (and in the JSON result), and shown as an "Ask a person" card. Nothing is sent until the
+employee presses it. Escalating never uses a daily question.
+
+**Known limit.** `complete_kiara_turn` is called with the employee's own JWT, so an employee who calls
+the API directly can attach an offer to any of their own answers and send that question to a person.
+This grants no data access (the answerer is a person in their hierarchy who decides what to reply),
+so it is accepted.
 
 ### 5.5 Insights
 
@@ -409,11 +428,12 @@ question text, answers, or data payloads, except where stated.
 | `set_kiara_document_status_with_audit(p_document_id uuid, p_status text) returns void` | `assistant.manage_knowledge` | `active`/`inactive`; approves `suggested`. Audit. |
 | `delete_kiara_document_with_audit(p_document_id uuid) returns text[]` | `assistant.manage_knowledge` | Tombstones the document (`deleted`), deletes chunks, returns storage paths to remove (client removes them; the storage policy only allows deleting paths of deleted documents). Audit. Past citations show "document removed". |
 | `list_kiara_documents()` / `get_kiara_document(p_id uuid)` | `assistant.manage_knowledge` | Admin reads, including versions and extracted text. |
-| `create_kiara_escalation(p_message_id uuid) returns uuid` | asker | Requires the message's `escalation_offer`, owned by the caller, not already escalated. Creates the escalation and in the same transaction inserts in-app notifications (`event_type 'kiara_escalation_open'`, `source_module 'assistant'`, `source_record_id` escalation id, link `/ask-kiara?tab=questions&escalation=<id>`) for the **direct recipients**: the asker's `reports_to_user_id`, department head, and branch manager who satisfy 5.6; if none, every active admin and super admin of the tenant. Audit `assistant_escalation_created` with `{escalation_id, recipients_count}`. Does not consume quota. |
+| `create_kiara_escalation(p_message_id uuid) returns jsonb` | asker | `{escalation_id, status, recipients_count}`. Requires the message's `escalation_offer` (validated shape), owned by the caller, not already escalated (`kiara_escalation_exists`). Creates the escalation and in the same transaction inserts in-app notifications (`event_type 'kiara_escalation_open'`, `source_module 'assistant'`, `source_record_id` escalation id, link `/ask-kiara?tab=questions&escalation=<id>`) for the **direct recipients**: the asker's `reports_to_user_id`, department head, and branch manager who satisfy 5.6; if none, every active admin and super admin of the tenant. Audit `assistant_escalation_created` with `{escalation_id, recipients_count}`. Does not consume quota. |
 | `list_kiara_escalations(p_status text default 'open', p_limit int default 50) returns jsonb` | `assistant.answer_escalations` | Rows the caller may answer (5.6): asker name, department, branch, question, summary, age. Never other conversation content. |
 | `get_kiara_escalation_badge() returns integer` | authenticated | Open escalations the caller may answer; 0 without the permission. |
 | `answer_kiara_escalation_with_audit(p_escalation_id uuid, p_answer text, p_save_to_kb boolean, p_kb_title text) returns jsonb` | `assistant.answer_escalations` and 5.6 | `select ... for update`; rejects unless `open` (first answer wins; later answerers get "already answered by X"). Appends a `human_answer` message to the asker's conversation, notifies the asker (`kiara_escalation_answered`, link `/ask-kiara?conversation=<id>`), closes (trigger marks answerers' notifications read). With `p_save_to_kb`, creates a `suggested` document (`source_kind 'escalation_answer'`) holding question + answer for Super Admin approval. Audit `assistant_escalation_answered` with ids only. |
-| `withdraw_my_kiara_escalation(p_escalation_id uuid) returns void` | asker | Status `withdrawn`; same derived close. Audit. |
+| `withdraw_my_kiara_escalation(p_escalation_id uuid) returns void` | asker | Status `withdrawn`; same derived close. Audit. Idempotent; an answered question cannot be withdrawn. |
+| `get_my_kiara_conversation(p_id uuid)` (redefined in 0905) | owner | Adds per message `escalation {id, status, answered_by, answered_at}` (on Kiara's offer) and `answered_by` (on a human answer). |
 | `get_kiara_insights(p_filters jsonb) returns jsonb` | `assistant.view_insights` | Rows for employees the caller may see: admin/super admin the tenant; manager the reports-to tree (same rule as Users, `is_reporting_descendant`). Never the caller's own row. Filters: branch, department, classification, status. Audit `assistant_insights_viewed` (count only). |
 | `save_kiara_settings_with_audit(p_daily_limit int, p_retention_days int, p_expected_version int) returns void` | `assistant.manage_limits` (protected) | Org defaults. Audit old/new. |
 | `save_kiara_user_limit_with_audit(p_user_profile_id uuid, p_daily_limit int, p_unlimited boolean, p_clear boolean, p_reason text) returns void` | `assistant.manage_limits` | Per-user exception; same tenant; Super Admin targets ignored (always unlimited). Audit old/new. |
@@ -796,7 +816,7 @@ Web route `/ask-kiara` (and the same layout at phone width), design tokens only:
 | Service-role leakage | `ask-kiara` and `kiara-knowledge-ingest` never read the service-role key. Only `kiara-insights` does, and only calls service-role Kiara RPCs. |
 | Prompt injection from CRM notes, tasks, SOPs | Section 12 structure; read-only tools; caller-scoped data; no external links or images. |
 | Hallucinated policy | KB-only policy answers, validated citations, escalation rule. |
-| Escalation used to obtain data | Escalations carry only the question; answerers are humans in the hierarchy; the prompt forbids offering escalation for access denials. |
+| Escalation used to obtain data | Escalations carry only the question; answerers are humans in the hierarchy; the prompt forbids offering escalation for access denials, and the worker refuses an offer in any turn where a tool answered access denied or no knowledge search ran (escalation.ts). |
 | Transcript exposure | Conversations readable only by the asker; insights show derived labels only; no admin transcript view. |
 | Malicious .docx | MIME/extension/size limits, SHA-256 match, ZIP uncompressed-size guard, text-only extraction, private bucket, Super Admin-only upload. |
 | Cost abuse | Daily limit, idempotent consumption, 6-request loop cap, 2,000-character input, conversation cap, voice hourly quota. |

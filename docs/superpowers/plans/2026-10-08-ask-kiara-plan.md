@@ -320,6 +320,26 @@ Exit criteria: end-to-end locally: staff asks an unanswerable policy question, c
 sees the badge, answers, staff sees the answer in the conversation and a notification; history is
 preserved (`is_read`, `read_at`).
 
+**Phase 4 status (2026-10-10, local only).** Built as planned in `0905_ask_kiara_escalations`
+(table, `kiara_escalation_answerer` / `kiara_can_answer_escalation`, `create_kiara_escalation`,
+`list_kiara_escalations`, `get_kiara_escalation_badge`, `answer_kiara_escalation_with_audit`,
+`withdraw_my_kiara_escalation`, derived-close and realtime triggers, `get_my_kiara_conversation`
+with escalation state, manifest). Deviations and additions:
+- Offer rules are enforced in the worker (`decideEscalationOffer`), not only in the prompt: knowledge
+  search required, two searches for `no_kb_match`, never after an access denial, once per question.
+  `needs_approval` was dropped from the reasons (an approval is an action, which Kiara never offers).
+- Escalation foreign keys to conversations and messages are `on delete set null`, so the
+  conversation-retention purge keeps escalations (spec 14: escalations are kept until deleted).
+- Answering un-archives the asker's conversation so the notification always opens it.
+- Save-to-KB makes a `suggested` document (category "Answered question", visibility `everyone`,
+  tagged with the asker's department name); Super Admin approves (Approve), edits (Edit text), or
+  rejects (Reject = audited delete) it in the Knowledge screen, which shows a Suggested count.
+- Native app: Ask Kiara stays hidden (NATIVE_PENDING_PAGES). A Kiara notification shows "Open on web
+  for now" instead of Open, a tapped Ask Kiara link lands on the notification list, and
+  `navigatePath` never opens the unimplemented-section fallback for a pending page.
+- Kiara does not yet see human answers in later turns of the same chat (history replays only its
+  own turns); noted as a follow-up.
+
 ## Phase 5: CRM tools
 
 **Scope:** `crm_search_clients`, `crm_walkins`, `crm_followups` via `crm-session-exchange`.

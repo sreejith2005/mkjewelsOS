@@ -23,8 +23,8 @@ const names = (access: AccessContext, controls: SectionControls = DEFAULT_SECTIO
   offeredKiaraTools(access, controls).map((tool) => tool.definition.name);
 
 describe("tool offering", () => {
-  const STAFF = ["get_my_work_summary", "get_app_help", "search_knowledge_base", "search_my_tasks", "get_fms_work", "get_my_notifications", "search_forms", "get_leave", "get_availability", "get_dashboard_metrics", "list_reports", "run_report", "find_colleague"];
-  const MANAGER = ["get_my_work_summary", "get_app_help", "search_knowledge_base", "search_my_tasks", "get_fms_work", "get_my_notifications", "search_forms", "get_leave", "get_availability", "get_dashboard_metrics", "get_team_progress", "list_reports", "run_report", "find_people", "find_colleague"];
+  const STAFF = ["get_my_work_summary", "get_app_help", "search_knowledge_base", "search_my_tasks", "get_fms_work", "get_my_notifications", "search_forms", "get_leave", "get_availability", "get_dashboard_metrics", "list_reports", "run_report", "find_colleague", "offer_escalation"];
+  const MANAGER = ["get_my_work_summary", "get_app_help", "search_knowledge_base", "search_my_tasks", "get_fms_work", "get_my_notifications", "search_forms", "get_leave", "get_availability", "get_dashboard_metrics", "get_team_progress", "list_reports", "run_report", "find_people", "find_colleague", "offer_escalation"];
 
   it("offers staff only their own-work tools, the scoped Dashboard and Reports, and the directory", () => {
     expect(names(accessFor("staff"))).toEqual(STAFF);

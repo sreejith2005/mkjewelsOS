@@ -43,7 +43,7 @@ describe("askKiara", () => {
     const outcome = await askKiara({ conversationId: null, message: "aaj mera kya pending hai?", client: "web", requestId, onEvent: (event) => seen.push(event.event) });
     expect(seen).toEqual(["meta", "status", "delta", "delta", "citation", "done"]);
     expect(outcome).toEqual({ ok: true, requestId, result: { conversation_id: "c1", user_message_id: "u1", assistant_message_id: "a1", stop_reason: "end_turn", display_text: "Aapke 2 task pending hain.", quota,
-      citations: [{ marker: 1, chunk_id: "k1", document_id: "d1", title: "Synthetic SOP", heading_path: "Opening" }] } });
+      citations: [{ marker: 1, chunk_id: "k1", document_id: "d1", title: "Synthetic SOP", heading_path: "Opening" }], escalation_offer: null } });
     expect(api.invoke).toHaveBeenCalledWith("ask-kiara/chat", expect.objectContaining({
       method: "POST",
       headers: { Accept: "text/event-stream" },

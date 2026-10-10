@@ -57,3 +57,14 @@ marker, so grade citations from `kiara_messages.citations`, not from the model's
 The owner's real SOPs are never added to this file. Questions written from them, and their results,
 live in the git-ignored `docs/superpowers/evals/ask-kiara/private/` folder on the machine that ran
 them.
+
+## Phase 3 follow-ups and Phase 4 (2026-10-10)
+
+Department targeting and step-in cases run in the local seed tenant ("MK JEWELS") with a local-only
+owner-test fixture (Sales, Drivers, Accounts, Karigar Design staff; a manager above Sales and
+Drivers staff; a manager in the same branch outside that chain). Grade escalation offers from
+`kiara_messages.escalation_offer` (null when none) and from `tools_used` in the audit row: an offer
+must follow two knowledge searches for `no_kb_match`, and must never appear for an access denial,
+a request to do something, or an answered question. The worker refuses such offers whatever the
+model asks (`decideEscalationOffer`), so a refused attempt shows as `kiara_offer_refused` in the
+function log, not as a stored offer.

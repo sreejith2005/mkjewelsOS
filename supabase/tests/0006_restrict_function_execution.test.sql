@@ -65,7 +65,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 224, 'authenticated can execute exactly 224 reviewed public application functions');
+), 230, 'authenticated can execute exactly 230 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -226,6 +226,7 @@ select is((
   'create_crm_field_definition(text,text,text,text,jsonb,boolean,jsonb)',
   'create_dropdown_list_with_audit(text,jsonb)',
   'create_kiara_document_with_audit(text,text,text,text,integer,text,text[])',
+  'create_kiara_escalation(uuid)',
   'create_manual_task_with_mode_with_audit(jsonb,uuid[],uuid[],jsonb)',
   -- 0196: admin-only CRM sync health (counts only).
   'crm_sync_health()',
@@ -256,6 +257,7 @@ select is((
   'import_delegation_tasks_with_audit(jsonb,text)',
   'import_task_bulk_with_audit(jsonb,text,text)',
   'is_reporting_descendant(uuid,uuid)',
+  'kiara_can_answer_escalation(uuid)',
   -- 0902: Ask Kiara colleague directory (name, designation, department, branch only).
   'kiara_directory_lookup(text,integer)',
   'kiara_knowledge_object_readable(text)',
@@ -267,6 +269,7 @@ select is((
   'list_assigning_left_tasks()',
   'list_designation_daily_checklists()',
   'list_kiara_documents(text,text,text)',
+  'list_kiara_escalations(text,integer)',
   'list_my_kiara_conversations(integer)',
   'list_task_comments(uuid)',
   'list_task_import_identity_candidates()',
@@ -307,7 +310,8 @@ select is((
   'upsert_crm_branch_mapping(text,text,uuid,jsonb)',
   'upsert_crm_staff_mapping(text,text,uuid,jsonb)',
   'validate_task_bulk_import(jsonb,text)',
-  'verify_recurring_task_with_audit(uuid,text,text)'
+  'verify_recurring_task_with_audit(uuid,text,text)',
+  'withdraw_my_kiara_escalation(uuid)'
 ]::text[], 'authenticated additional EXECUTE grants match the reviewed function identities');
 
 -- Exact service-role allowlist and preservation of recurrence table reads.

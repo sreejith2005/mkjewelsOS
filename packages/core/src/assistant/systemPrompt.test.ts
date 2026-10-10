@@ -16,7 +16,8 @@ describe("system prompt", () => {
 
   it("keeps the persona and the access rule", () => {
     expect(KIARA_SYSTEM_PROMPT).toContain("You are Kiara, the organization assistant of MK Jewels");
-    expect(KIARA_SYSTEM_PROMPT).toMatch(/don't have access to that in JewelOS, and suggest they ask their manager/);
+    expect(KIARA_SYSTEM_PROMPT).toMatch(/don't have access to that in JewelOS. Do not offer to pass such a question to a person/);
+    expect(KIARA_SYSTEM_PROMPT).toMatch(/Never offer it when the user does not have access/);
     expect(KIARA_SYSTEM_PROMPT).toMatch(/Hindi written in English letters/);
     expect(KIARA_SYSTEM_PROMPT).toMatch(/Never invent data/);
   });

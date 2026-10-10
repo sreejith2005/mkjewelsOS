@@ -3,6 +3,8 @@ import { argText, isRecord, isUuid, outcomeForError, records, untrusted, type Ex
 
 /** Excerpts returned per search, and the result size Kiara receives (about 4,000 tokens). */
 export const KNOWLEDGE_RESULT_LIMIT = 5;
+/** The search-again retry casts a wider net (the database allows up to 8). */
+export const KNOWLEDGE_RETRY_LIMIT = 8;
 export const KNOWLEDGE_RESULT_MAX_CHARS = 16_000;
 const EXCERPT_MAX_CHARS = 4_500;
 
@@ -17,13 +19,13 @@ export type KnowledgeSearch = Readonly<{ outcome: ToolOutcome; sources: readonly
  * sources are the only chunks this turn may cite; results that do not fit the
  * size cap are dropped whole (lowest ranked first) and are not citable.
  */
-export async function searchKnowledge(context: ExecutorContext, args: ToolArgs): Promise<KnowledgeSearch> {
+export async function searchKnowledge(context: ExecutorContext, args: ToolArgs, earlierSearches = 0): Promise<KnowledgeSearch> {
   const query = argText(args, "english_query") ?? "";
   const originalTerms = argText(args, "original_terms");
   const { data, error } = await context.actor.rpc("search_kiara_knowledge", {
     p_query: query,
     p_original_terms: originalTerms,
-    p_limit: KNOWLEDGE_RESULT_LIMIT,
+    p_limit: earlierSearches > 0 ? KNOWLEDGE_RETRY_LIMIT : KNOWLEDGE_RESULT_LIMIT,
   });
   if (error) return { outcome: outcomeForError(error), sources: [] };
   const rows = records(isRecord(data) ? data.results : null).filter((row) =>

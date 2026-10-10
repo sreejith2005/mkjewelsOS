@@ -35,6 +35,7 @@ import { crmProjectConfig } from "@/lib/crmProject";
 import { lazyPage } from "@/lib/lazyPage";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { DailyChecklistManager } from "@/features/daily-checklists/DailyChecklistManager";
+import { useKiaraEscalationBadge } from "@/features/assistant/useKiaraEscalationBadge";
 import { DailyChecklistGate } from "@/features/daily-checklists/DailyChecklistGate";
 import { GlobalVoiceTaskButton } from "@/features/tasks/GlobalVoiceTaskButton";
 import { ThemeProvider, useTheme } from "@/theme/ThemeContext";
@@ -268,6 +269,10 @@ function AppShell() {
   // Navigation, route guard, and maintenance overlay all come from one
   // decision: feature availability first, then the user's permission.
   const effectiveAccess = useMemo(() => access ?? (profile ? builtinAccessContext(profile) : null), [access, profile]);
+  // A screen aid: the badge RPC itself answers 0 without assistant.answer_escalations.
+  const kiaraBadge = useKiaraEscalationBadge(profile?.tenant_id, effectiveAccess !== null
+    && hasPermission(effectiveAccess, "assistant.answer_escalations")
+    && resolvePageAccess(effectiveAccess, sectionControls, "ask_kiara") === "allowed");
   const menu = useMemo(() => effectiveAccess ? getAccessibleMenu(effectiveAccess, sectionControls) : [], [effectiveAccess, sectionControls]);
   const nav = useMemo(() => menu.map((item) => ({
     ...item,
@@ -328,7 +333,7 @@ function AppShell() {
           : currentPage === "forms_library" ? <FormsPage />
               : currentPage === "fms_builder" ? <FMSBuilderPage />
                 : currentPage === "notifications" ? <NotificationsPage onNavigate={navigate} />
-                : currentPage === "ask_kiara" ? <AskKiaraPage onNavigate={navigate} />
+                : currentPage === "ask_kiara" ? <AskKiaraPage onNavigate={navigate} search={search} />
             : <DashboardPage />;
 
   // The CRM renders full-screen with its own original shell once the JewelOS gates allow the
@@ -349,6 +354,7 @@ function AppShell() {
   return (
     <>
     <ApplicationShell
+      badges={kiaraBadge ? { ask_kiara: kiaraBadge } : undefined}
       branch={branch}
       currentPage={currentPage}
       developerModeActive={isSuperAdmin && sectionControls.developer_mode_enabled}
