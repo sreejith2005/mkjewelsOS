@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Alert, Linking, RefreshControl, StyleSheet, View, type ListRenderItem } from "react-native";
 import {
   canManageTaskTemplates,
+  hasPermission,
   canSelectTaskControlBranch,
   canViewTaskControl,
   taskControlShowsSearch,
@@ -57,7 +58,8 @@ import {
   type TaskUser,
 } from "@jewelos/data/tasks/api";
 import { getSupabase } from "@jewelos/api-client/client";
-import { useProfile } from "@/auth/AuthProvider";
+import { useAccess, useProfile } from "@/auth/AuthProvider";
+import { TaskManagement } from "@/features/taskControl/TaskManagement";
 import { TaskControlFilterSheet } from "@/features/taskControl/TaskControlFilterSheet";
 import { ProgressRow, StatTile } from "@/features/taskControl/panels";
 import { EvidenceTaskCard, TemplateCard } from "@/features/taskControl/rows";
@@ -110,6 +112,8 @@ type Row =
  */
 export function TaskControlScreen() {
   const profile = useProfile();
+  const access = useAccess();
+  const canAdministerTasks = hasPermission(access, "tasks.view_all");
   const role = profile.user_role;
   const theme = useAppTheme();
   const styles = useStyles();
@@ -129,6 +133,7 @@ export function TaskControlScreen() {
   const [editing, setEditing] = useState<TaskTemplate | null | undefined>(undefined);
   const [scheduling, setScheduling] = useState<TaskTemplateDirectoryRow | null>(null);
   const [scheduleDate, setScheduleDate] = useState(() => tenantToday());
+  const [managedTaskId, setManagedTaskId] = useState<string | null>(null);
 
   // The search term reaches the two server contracts only once it settles;
   // the sheet still shows every keystroke.
@@ -391,7 +396,7 @@ export function TaskControlScreen() {
           />
         );
       }
-      if (item.kind === "task") return <EvidenceTaskCard onOpenFile={openFile} row={item.task} />;
+      if (item.kind === "task") return <EvidenceTaskCard onOpenFile={openFile} onManage={canAdministerTasks ? setManagedTaskId : undefined} row={item.task} />;
       if (item.kind === "person" || item.kind === "attention") {
         return (
           <ProgressRow
@@ -422,7 +427,7 @@ export function TaskControlScreen() {
         </Card>
       );
     },
-    [busyId, canManage, focusUser, openEdit, openFile, openSchedule, remove, toggle],
+    [busyId, canManage, canAdministerTasks, focusUser, openEdit, openFile, openSchedule, remove, toggle],
   );
 
   if (!authorized) {
@@ -469,7 +474,7 @@ export function TaskControlScreen() {
             </View>
 
             <View style={styles.headerActions}>
-              {canManage ? <Button label="Add Task" onPress={() => setEditing(null)} /> : null}
+              {canManage ? <Button disabled={!references} label="Add Task" onPress={() => setEditing(null)} /> : null}
               <Button label="Refresh" onPress={() => void refresh()} variant="secondary" />
               <Button label="Filters" onPress={() => setFiltersOpen(true)} variant="secondary" />
             </View>
@@ -600,12 +605,17 @@ export function TaskControlScreen() {
       >
         {references ? (
           <RecurringScheduleForm
+            initialAssigneeId={filters.user_profile_id}
             data={references}
             onCancel={() => setEditing(undefined)}
             onSave={save}
             template={editing ?? null}
           />
         ) : null}
+      </Sheet>
+
+      <Sheet onClose={() => setManagedTaskId(null)} tall title="Manage assigned task" visible={managedTaskId !== null && canAdministerTasks}>
+        {managedTaskId && canAdministerTasks ? <TaskManagement key={managedTaskId} taskId={managedTaskId} onChanged={async () => { setManagedTaskId(null); setPage(1); await refresh(); }} /> : null}
       </Sheet>
 
       <Sheet onClose={() => setScheduling(null)} title="Task schedule" visible={scheduling !== null}>

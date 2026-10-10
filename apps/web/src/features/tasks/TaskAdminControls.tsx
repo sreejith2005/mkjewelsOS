@@ -1,11 +1,16 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { taskAdminInitialEdit, type TaskAdminEdit } from "@jewelos/core";
 import { Button, Field, Modal, Notice } from "@/components/ui";
 import { adminDeleteTask, adminEditTask } from "./api";
 
 type ManagedTask = Parameters<typeof taskAdminInitialEdit>[0] & Readonly<{ id: string | null; task_template_id: string | null }>;
 
-export function TaskAdminControls({ task, onChanged }: Readonly<{ task: ManagedTask; onChanged: () => Promise<void> }>) {
+function InlineDialog({ title, children }: Readonly<{ title: string; children: ReactNode; onClose: () => void }>) {
+  return <section className="mt-4"><h2 className="mb-3 font-semibold">{title}</h2>{children}</section>;
+}
+
+export function TaskAdminControls({ task, onChanged, embedded = false }: Readonly<{ task: ManagedTask; onChanged: () => Promise<void>; embedded?: boolean }>) {
+  const Dialog = embedded ? InlineDialog : Modal;
   const [mode, setMode] = useState<"edit" | "delete" | null>(null);
   const [edit, setEdit] = useState<TaskAdminEdit>(() => taskAdminInitialEdit(task));
   const [series, setSeries] = useState(false);
@@ -28,7 +33,7 @@ export function TaskAdminControls({ task, onChanged }: Readonly<{ task: ManagedT
       <Button variant="secondary" onClick={() => open("edit")}>Edit task</Button>
       <Button variant="danger" onClick={() => open("delete")}>Delete task</Button>
     </div>
-    {mode ? <Modal title={mode === "edit" ? "Edit task" : "Delete task"} onClose={() => { if (!busy) setMode(null); }}>
+    {mode ? <Dialog title={mode === "edit" ? "Edit task" : "Delete task"} onClose={() => { if (!busy) setMode(null); }}>
       <form className="grid gap-3" onSubmit={(event) => { event.preventDefault(); void save(); }}>
         {error ? <Notice tone="danger">{error}</Notice> : null}
         {mode === "edit" ? <>
@@ -46,6 +51,6 @@ export function TaskAdminControls({ task, onChanged }: Readonly<{ task: ManagedT
         </>}
         <div className="flex gap-2"><Button type="button" variant="secondary" disabled={busy} onClick={() => setMode(null)}>Cancel</Button><Button type="submit" variant={mode === "delete" ? "danger" : "primary"} disabled={busy}>{mode === "edit" ? "Save changes" : "Confirm deletion"}</Button></div>
       </form>
-    </Modal> : null}
+    </Dialog> : null}
   </>;
 }

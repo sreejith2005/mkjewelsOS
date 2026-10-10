@@ -5,7 +5,7 @@ import {
   canManageTaskTemplates, canSelectTaskControlBranch, canViewTaskControl,
   taskControlShowsSearch, taskControlTabsFor,
   TASK_CONTROL_TAB_DESCRIPTIONS,
-  type Json,
+  type Json, hasPermission,
 } from "@jewelos/core";
 import { supabase } from "@jewelos/api-client";
 import { useAuth } from "@/auth/AuthContext";
@@ -22,6 +22,7 @@ import {
 import { fetchReportingOptions, fetchTaskControlSnapshot, type ReportingOptions, type TaskControlSnapshot } from "@/features/taskControl/api";
 import { TaskControlFilterBar } from "@/features/taskControl/FilterBar";
 import { TasksTab } from "@/features/taskControl/TasksTab";
+import { TaskManagement } from "@/features/taskControl/TaskManagement";
 import { OverviewTab } from "@/features/taskControl/OverviewTab";
 import { PeopleTab } from "@/features/taskControl/PeopleTab";
 import { TemplatesTab } from "@/features/taskControl/TemplatesTab";
@@ -58,7 +59,8 @@ function rememberTab(tab: TaskControlTab) {
  * one screen could be trusted against a number on another.
  */
 export function TaskTemplatesPage() {
-  const { profile } = useAuth();
+  const { profile, access } = useAuth();
+  const canAdministerTasks = access ? hasPermission(access, "tasks.view_all") : false;
   const role = profile?.user_role ?? "staff";
   const authorized = canViewTaskControl(role);
   const canManageTemplates = canManageTaskTemplates(role);
@@ -85,6 +87,7 @@ export function TaskTemplatesPage() {
   const [editing, setEditing] = useState<TaskTemplate | null | undefined>(undefined);
   const [scheduling, setScheduling] = useState<TaskTemplateDirectoryRow | null>(null);
   const [scheduleDate, setScheduleDate] = useState(tenantToday());
+  const [managedTaskId, setManagedTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authorized) return;
@@ -249,7 +252,7 @@ export function TaskTemplatesPage() {
           </div>
           <div className="flex gap-2">
             {canManageTemplates ? (
-              <Button className="bg-gold text-obsidian hover:bg-gold/90" onClick={() => setEditing(null)}>
+              <Button disabled={!references} className="bg-gold text-obsidian hover:bg-gold/90" onClick={() => setEditing(null)}>
                 <Plus className="size-4" />
                 Add Task
               </Button>
@@ -313,6 +316,7 @@ export function TaskTemplatesPage() {
               <PeopleTab onSelectUser={(row) => focusUser(row.user_profile_id, "tasks")} progress={snapshot.progress} />
             ) : (
               <TasksTab
+                onManage={canAdministerTasks ? setManagedTaskId : undefined}
                 evidence={snapshot.evidence}
                 onPage={setPage}
                 onPageSize={(size) => { setPageSize(size); setPage(1); }}
@@ -327,9 +331,13 @@ export function TaskTemplatesPage() {
 
       {editing !== undefined && references ? (
         <Modal onClose={() => setEditing(undefined)} title={editing ? "Edit task template" : "Add new task"} wide>
-          <TaskTemplateForm data={references} onCancel={() => setEditing(undefined)} onSave={save} template={editing} />
+          <TaskTemplateForm data={references} initialAssigneeId={filters.user_profile_id} onCancel={() => setEditing(undefined)} onSave={save} template={editing} />
         </Modal>
       ) : null}
+
+      {managedTaskId && canAdministerTasks ? <Modal title="Manage assigned task" onClose={() => setManagedTaskId(null)}>
+        <TaskManagement taskId={managedTaskId} onChanged={async () => { setManagedTaskId(null); setPage(1); await refresh(); }} />
+      </Modal> : null}
 
       {scheduling ? (
         <Modal onClose={() => setScheduling(null)} title="Task schedule">

@@ -17,6 +17,13 @@ const referenceData = {
 
 describe("recurring schedule form", () => {
 
+  it("starts a new task with the employee selected in Task Control", () => {
+    cleanup();
+    render(<TaskTemplateForm data={referenceData} initialAssigneeId="user-1" onCancel={vi.fn()} onSave={vi.fn()} template={null} />);
+    expect((screen.getByLabelText("Assign To User *") as HTMLSelectElement).value).toBe("user-1");
+    cleanup();
+  });
+
   it("uses the selected user's branch and department without showing scope selectors", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     render(<TaskTemplateForm data={referenceData} onCancel={vi.fn()} onSave={onSave} template={null} />);

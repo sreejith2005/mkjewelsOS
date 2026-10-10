@@ -95,3 +95,22 @@ Implementation notes:
   Current branch is feat/department-section-access; no hosted writes or release.
 
 Validation evidence is recorded in docs/TASK_SCALE_VALIDATION_2026-10-10.md.
+
+## Authorized Task Control follow-up
+
+Owner requested adding/editing/deleting work from the filtered Task Control
+workspace, particularly after selecting an employee. This bounded extension
+reuses the existing creator forms and audited admin task RPCs:
+
+- Add a management action on each non-FMS assigned task; load just its persisted
+  instance when selected and reuse TaskAdminControls inside a dialog/sheet.
+- Gate the action with the central tasks.view_all permission; keep server
+  authorization, whole-series deletion and completed history behavior unchanged.
+- Prefill new-task assignee from the selected employee without changing editing
+  defaults or existing callers. Keep scope filters after save/delete and reload
+  totals, templates and task rows; reset pagination to the first page.
+- Cover selected-ID reads, late responses, unavailable records, action visibility,
+  employee prefilling and existing confirmation behavior. Check web/native types,
+  builds and related tests; leave concurrent FMS work untouched.
+- No schema, generated type, RPC, RLS, Storage or audit changes. Signed Android
+  publication still requires the phone gate; adb currently lists no devices.

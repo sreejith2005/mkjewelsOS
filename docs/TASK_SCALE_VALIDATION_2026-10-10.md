@@ -115,3 +115,26 @@ Function changes were performed. A source push does not prove rendered web behav
 - Recovery is a reviewed forward migration, preserving history and tombstones.
   Hosted backup restore readiness and authenticated application smoke tests were
   not independently verified in this run.
+
+## Task Control follow-up
+
+The filtered Tasks panel now offers Edit / delete task for authorized administrators
+on ordinary tasks. It loads only the selected persisted instance and embeds the
+existing audited admin controls; whole-series confirmation and completed history
+preservation are unchanged. FMS work is managed through its existing workflow.
+Add Task is available in the header and prefills the selected employee. Save/delete
+refresh rows, totals and templates while retaining employee/scope/view filters;
+pagination returns to page one. Web and native have matching actions.
+
+No migration, generated type, RPC, RLS, Storage or audit contract changes. Existing
+template editing/creation defaults remain for other callers. Concurrent FMS changes
+in this workspace were not part of this task's reviewed paths.
+
+- Focused web task-control/forms/admin/paging tests: 7 files, 26 passed.
+- npm.cmd --prefix apps/mobile run test: 24 files, 126 passed.
+- npm.cmd --prefix apps/mobile run typecheck: passed.
+- pnpm.cmd --filter web build (includes tsc --noEmit): passed; existing large
+  chunk warning remains. Checks ran in the shared workspace with concurrent FMS work.
+- git diff --check: passed. No new database behavior, so no fresh pgTAP run.
+- Real authenticated browser QA is unverified: browser execution tools unavailable.
+  adb devices -l still lists no devices, so no signed Android update was published.

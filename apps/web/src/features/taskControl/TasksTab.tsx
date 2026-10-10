@@ -68,7 +68,7 @@ function EvidenceCell({ row, onOpen }: { row: TaskRow; onOpen: (file: TaskAttach
   return <span className="text-xs text-task-text-muted">No file required</span>;
 }
 
-function TaskCard({ row, onOpen }: { row: TaskRow; onOpen: (file: TaskAttachmentSummary) => void }) {
+function TaskCard({ row, onOpen, onManage }: { row: TaskRow; onOpen: (file: TaskAttachmentSummary) => void; onManage?: ((id: string) => void) | undefined }) {
   return (
     <article className="rounded-lg border border-task-border p-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -93,6 +93,7 @@ function TaskCard({ row, onOpen }: { row: TaskRow; onOpen: (file: TaskAttachment
       </div>
       <div className="mt-2 border-t border-task-border pt-2">
         <EvidenceCell onOpen={onOpen} row={row} />
+        {onManage && row.task_type !== "fms" ? <Button className="mt-2" variant="secondary" onClick={() => onManage(row.task_id)}>Edit / delete task</Button> : null}
       </div>
     </article>
   );
@@ -111,6 +112,7 @@ export function TasksTab({
   onView,
   onPage,
   onPageSize,
+  onManage,
 }: {
   evidence: EvidenceWorkspace;
   view: TaskView;
@@ -119,6 +121,7 @@ export function TasksTab({
   onView: (view: TaskView) => void;
   onPage: (page: number) => void;
   onPageSize: (size: number) => void;
+  onManage?: ((id: string) => void) | undefined;
 }) {
   const [openError, setOpenError] = useState<string | null>(null);
   const totalPages = Math.max(1, Math.ceil(evidence.tasks_total / pageSize));
@@ -162,7 +165,7 @@ export function TasksTab({
         ) : (
           <>
             <div className="flex flex-col gap-2">
-              {evidence.tasks.map((row) => <TaskCard key={row.task_id} onOpen={(file) => void openFile(file)} row={row} />)}
+              {evidence.tasks.map((row) => <TaskCard key={row.task_id} onOpen={(file) => void openFile(file)} onManage={onManage} row={row} />)}
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
               <Button className="border-task-border bg-task-bg text-task-text hover:bg-task-muted" disabled={page <= 1} onClick={() => onPage(page - 1)} variant="secondary">Previous</Button>

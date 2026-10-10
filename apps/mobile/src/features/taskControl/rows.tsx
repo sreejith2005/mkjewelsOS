@@ -33,9 +33,11 @@ const dateTime = (value: string | null) =>
 export const EvidenceTaskCard = memo(function EvidenceTaskCard({
   row,
   onOpenFile,
+  onManage,
 }: {
   row: TaskRow;
   onOpenFile: (file: TaskAttachmentSummary) => void;
+  onManage?: ((id: string) => void) | undefined;
 }) {
   const styles = useStyles();
   const tone = taskRowTone(row);
@@ -92,6 +94,7 @@ export const EvidenceTaskCard = memo(function EvidenceTaskCard({
           No file required
         </Text>
       )}
+      {onManage && row.task_type !== "fms" ? <Button label="Edit / delete task" variant="secondary" onPress={() => onManage(row.task_id)} /> : null}
     </Card>
   );
 });
