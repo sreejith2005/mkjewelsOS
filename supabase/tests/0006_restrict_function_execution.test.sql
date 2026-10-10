@@ -42,14 +42,14 @@ select is((
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
-), 421, 'exactly 421 postgres-owned public application functions exist in the current migration set');
+), 477, 'exactly 477 postgres-owned public application functions exist in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres' and p.prosecdef
-), 356, 'exactly 356 public application functions are SECURITY DEFINER in the current migration set');
+), 404, 'exactly 404 public application functions are SECURITY DEFINER in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -65,7 +65,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 230, 'authenticated can execute exactly 230 reviewed public application functions');
+), 233, 'authenticated can execute exactly 233 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -81,7 +81,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('postgres', p.oid, 'EXECUTE')
-), 421, 'postgres retains owner execution on every public application function');
+), 477, 'postgres retains owner execution on every public application function');
 select ok(not has_function_privilege('authenticated', 'reject_watcher_task_mutation()', 'EXECUTE'), 'watcher guard trigger cannot be called directly');
 
 -- Exact authenticated allowlist: baseline, Forms, and reviewed FMS entry points.
@@ -211,6 +211,10 @@ select is((
   'add_task_comment_with_audit(uuid,text)',
   'admin_delete_task_with_audit(uuid,boolean,text)',
   'admin_edit_task_with_audit(uuid,jsonb)',
+  -- 0905: Ask Kiara escalations (asker confirm/withdraw; answerers list/badge/answer; RLS helper).
+  'answer_kiara_escalation_with_audit(uuid,text,boolean,text)',
+  -- 0901: Ask Kiara conversation and quota RPCs (caller-scoped, audited writes).
+  'archive_my_kiara_conversation(uuid)',
   'assert_crm_branch_user(uuid,uuid,uuid,text)',
   'assert_fms_flow_publishable(uuid)',
   'assign_imported_task_with_audit(text,uuid,uuid)',
@@ -230,6 +234,7 @@ select is((
   'create_manual_task_with_mode_with_audit(jsonb,uuid[],uuid[],jsonb)',
   -- 0196: admin-only CRM sync health (counts only).
   'crm_sync_health()',
+  -- 0206/0207 (main): management insights reads and audited dashboard saved views.
   'delete_dashboard_view_with_audit(uuid,integer)',
   'delete_fms_flow_with_audit(uuid,text)',
   'delete_form_draft_with_audit(uuid)',
@@ -242,6 +247,11 @@ select is((
   'form_deletion_impact(uuid)',
   'form_usage_impact(uuid)',
   'get_employee_task_progress(jsonb)',
+  'get_kiara_document(uuid)',
+  'get_kiara_escalation_badge()',
+  'get_kiara_knowledge_excerpt(uuid)',
+  'get_kiara_knowledge_filters()',
+  'get_kiara_version_for_ingest(uuid)',
   'get_management_insight_records_v1(jsonb,text,text,integer,integer)',
   'get_management_insights_options_v1(jsonb)',
   'get_management_insights_v1(jsonb)',
@@ -307,6 +317,7 @@ select is((
   'task_attachment_display_name(text)',
   'task_effective_due_datetime(task_instances)',
   'task_feed_page(text,text,integer,integer)',
+  'update_kiara_document_details_with_audit(uuid,text,text,text,text[])',
   'upsert_crm_branch_mapping(text,text,uuid,jsonb)',
   'upsert_crm_staff_mapping(text,text,uuid,jsonb)',
   'validate_task_bulk_import(jsonb,text)',

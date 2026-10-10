@@ -26,6 +26,9 @@ TypeScript/Vitest, React (web), React Native/Expo (Android).
 
 ## Migration numbering
 
+Rebased 2026-10-10 again on `origin/main` `e214179` (main added 0208, 0210-0212): no rename was needed;
+0906 carries main 0212's manifest additions.
+
 History: the branch first took the next number after `origin/main` (0205), then renumbered twice
 (0206/0207 on 2026-10-09, 0208-0210 on 2026-10-10) as main kept adding migrations, and main then
 added a `0209` of its own. To stop that churn, from 2026-10-10 (base `origin/main` `ba481f5`):
@@ -41,6 +44,7 @@ Phase 9 merge, immediately before the first hosted apply.
 | `0903_ask_kiara_knowledge` | 0210 | Phase 3 |
 | `0904_kiara_department_targeting` | new | Phase 3 follow-up (department tags, visibility) |
 | `0905_ask_kiara_escalations` | new | Phase 4 |
+| `0906_kiara_manifest_main_0212` | new | Re-applies main 0212's manifest entries after Kiara's full manifest copy |
 
 Each pgTAP file carries the same number as its migration.
 
@@ -63,7 +67,7 @@ Shared definitions Kiara redefines (re-check each one on every rebase and at mer
 | --- | --- | --- | --- |
 | `default_section_availability()` | 0901 | 0156 | `ask_kiara` key |
 | `validated_section_availability(jsonb)` | 0901 | 0138 | `ask_kiara` key |
-| `production_demo_data_retirement_manifest(uuid)` | 0901, 0903, 0905 | 0207 (`dashboard_saved_views`) | `kiara_*` tables (retained) |
+| `production_demo_data_retirement_manifest(uuid)` | 0901, 0903, 0905, 0906 | 0212 (`fms_execution_scopes`, patched in place by text replacement) | `kiara_*` tables (retained) |
 | `emit_tenant_realtime_event(uuid, text)` and the `tenant_realtime_events_topic_check` constraint | 0903 | 0102 | `assistant` topic |
 | Permission catalog rows (`-- permission-catalog:begin/end`) | 0901 | 0171 (sort 300) | `assistant.*`, sort 310-315 |
 
