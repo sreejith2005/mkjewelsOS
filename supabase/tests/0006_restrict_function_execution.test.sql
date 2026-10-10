@@ -39,14 +39,14 @@ select is((
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
-), 397, 'exactly 397 postgres-owned public application functions exist in the current migration set');
+), 406, 'exactly 406 postgres-owned public application functions exist in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres' and p.prosecdef
-), 333, 'exactly 333 public application functions are SECURITY DEFINER in the current migration set');
+), 341, 'exactly 341 public application functions are SECURITY DEFINER in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -62,7 +62,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 193, 'authenticated can execute exactly 193 reviewed public application functions');
+), 198, 'authenticated can execute exactly 198 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -78,7 +78,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('postgres', p.oid, 'EXECUTE')
-), 397, 'postgres retains owner execution on every public application function');
+), 406, 'postgres retains owner execution on every public application function');
 select ok(not has_function_privilege('authenticated', 'reject_watcher_task_mutation()', 'EXECUTE'), 'watcher guard trigger cannot be called directly');
 
 -- Exact authenticated allowlist: baseline, Forms, and reviewed FMS entry points.
@@ -218,6 +218,8 @@ select is((
   'create_manual_task_with_mode_with_audit(jsonb,uuid[],uuid[],jsonb)',
   -- 0196: admin-only CRM sync health (counts only).
   'crm_sync_health()',
+  -- 0207: dashboard saved views (module + reporting actor checked, audited).
+  'delete_dashboard_view_with_audit(uuid,integer)',
   'delete_fms_flow_with_audit(uuid,text)',
   'delete_form_draft_with_audit(uuid)',
   'delete_form_with_audit(uuid)',
@@ -227,6 +229,11 @@ select is((
   'form_deletion_impact(uuid)',
   'form_usage_impact(uuid)',
   'get_employee_task_progress(jsonb)',
+  -- 0206: management insights reads (dashboard module + reporting actor checked);
+  -- the context/rows/group/metric helpers stay owner-only.
+  'get_management_insight_records_v1(jsonb,text,text,integer,integer)',
+  'get_management_insights_options_v1(jsonb)',
+  'get_management_insights_v1(jsonb)',
   'get_my_daily_checklist_status()',
   'get_my_fms_starter_assignments()',
   'get_recurring_todo_workspace(jsonb)',
@@ -252,6 +259,7 @@ select is((
   'review_leave_request(uuid,boolean,text)',
   'run_recurring_todo_template_now_with_audit(uuid,date)',
   'save_branch_with_audit(uuid,jsonb)',
+  'save_dashboard_view_with_audit(uuid,text,jsonb,integer)',
   'save_department_permissions_with_audit(uuid,jsonb)',
   'save_department_with_audit(uuid,jsonb)',
   'save_designation_daily_checklist_with_audit(uuid,uuid,text,text,jsonb,text,boolean,integer)',
