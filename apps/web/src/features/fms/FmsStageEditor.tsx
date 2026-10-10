@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, GitBranch, Plus, Trash2 } from "lucide-react";
 import {
   FMS_BRANCH_OPERATORS,
   fmsFieldOptions,
+  fmsRouteAnswerSelection,
   fmsAssignmentFields,
   hasFmsStageFallback,
   hasFmsStageRouting,
@@ -184,6 +185,20 @@ function RouteRow({ rule, index, stage, others, fields, decision, changeRule, mo
         : <p className="self-end text-xs text-soft-grey">Uses the outcome the doer selects on this step.</p>}
       <label className="block"><span className="label">Condition</span><select aria-label={`Route ${index + 1} condition`} className="field" onChange={(event) => changeRule(index, { operator: event.target.value as FmsBranchOperator, value: event.target.value === "in" ? [] : "" })} value={rule.operator}>{routeOperators.map((operator) => <option key={operator.value} value={operator.value}>{operator.label}</option>)}</select></label>
       {VALUE_FREE_OPERATORS.has(rule.operator) ? null
+        : options.length && rule.source === "form_answer" && (rule.operator === "equals" || rule.operator === "in") ? (
+          <fieldset aria-label={`Route ${index + 1} answer`} className="min-w-0 space-y-2">
+            <legend className="label">Answers</legend>
+            <p className="text-xs text-soft-grey">Select one or more. Any selected answer uses this route.</p>
+            <div className="max-h-48 space-y-1 overflow-y-auto rounded-xl border border-gold/20 p-2">
+              {[...options, ...selected.filter((value) => !options.some((option) => option.value === value)).map((value) => ({ value, label: `${value} (removed)` }))].map((option) => (
+                <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm" key={option.value}>
+                  <input checked={selected.includes(option.value)} onChange={(event) => changeRule(index, fmsRouteAnswerSelection(rule.operator === "in" ? "in" : "equals", event.target.checked ? [...selected, option.value] : selected.filter((value) => value !== option.value)))} type="checkbox" />
+                  <span className="min-w-0 break-words">{option.label}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        )
         : options.length ? <label className="block"><span className="label">Answer</span><select aria-label={`Route ${index + 1} answer`} className="field" multiple={rule.operator === "in"} onChange={(event) => changeRule(index, { value: rule.operator === "in" ? [...event.target.selectedOptions].map((option) => option.value) : event.target.value })} value={rule.operator === "in" ? selected : selected[0] ?? ""}>{rule.operator === "in" ? null : <option value="">Select an answer</option>}{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}{selected.filter((value) => !options.some((option) => option.value === value)).map((value) => <option key={value} value={value}>{value} (removed)</option>)}</select></label>
         : <label className="block"><span className="label">Answer</span><input aria-label={`Route ${index + 1} answer`} className="field" onChange={(event) => changeRule(index, { value: rule.operator === "in" ? event.target.value.split(",").map((item) => item.trim()).filter(Boolean) : event.target.value })} placeholder={rule.operator === "in" ? "value_a, value_b" : "Expected value"} value={selected.join(", ")} /></label>}
     </div>

@@ -4,3 +4,4 @@ export * from "./assignedWork";
 export * from "./canvas";
 export * from "./graphRouting";
 export * from "./visits";
+export * from "./routeAnswers";

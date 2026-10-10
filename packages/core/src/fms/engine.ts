@@ -254,6 +254,10 @@ export function validateFmsDefinition(raw: FmsFlowDefinition, context: FmsValida
 
 function comparable(value: unknown): string | number | boolean | null { return value === undefined ? null : typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? value : JSON.stringify(value); }
 export function evaluateFmsBranchRule(rule: FmsBranchRule, actual: unknown): boolean {
+  if (rule.operator === "in" && Array.isArray(actual)) {
+    const expected = rule.value;
+    return Array.isArray(expected) && actual.some((answer) => expected.includes(answer));
+  }
   if (rule.operator === "default") return true; const left = comparable(actual); const right = comparable(rule.value);
   switch (rule.operator) { case "equals": return left === right; case "not_equals": return left !== right; case "contains": return typeof left === "string" ? left.includes(String(right ?? "")) : Array.isArray(actual) && actual.includes(rule.value); case "greater_than": return Number(left) > Number(right); case "greater_than_or_equal": return Number(left) >= Number(right); case "less_than": return Number(left) < Number(right); case "less_than_or_equal": return Number(left) <= Number(right); case "in": return Array.isArray(rule.value) && rule.value.includes(actual); case "not_empty": return actual !== null && actual !== undefined && actual !== "" && (!Array.isArray(actual) || actual.length > 0); }
 }

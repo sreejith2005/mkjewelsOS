@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, Trash2 } from "lucide-react-native";
 import {
   FMS_BRANCH_OPERATORS,
   fmsFieldOptions,
+  fmsRouteAnswerSelection,
   fmsAssignmentFields,
   hasFmsStageFallback,
   hasFmsStageRouting,
@@ -292,12 +293,13 @@ function RouteRow({ rule, index, stage, others, fields, decision, changeRule, mo
         <Text tone="muted" variant="caption">Uses the outcome the doer selects on this step.</Text>
       )}
       <OptionPicker label="Condition" onChange={(values) => { const operator = (values[0] ?? rule.operator) as FmsBranchOperator; changeRule(index, { operator, value: operator === "in" ? [] : "" }); }} options={routeOperators} selected={[rule.operator]} />
+      {options.length && rule.source === "form_answer" && (rule.operator === "equals" || rule.operator === "in") ? <Text tone="muted" variant="caption">Select one or more. Any selected answer uses this route.</Text> : null}
       {VALUE_FREE_OPERATORS.has(rule.operator) ? null
         : options.length ? (
           <OptionPicker
             label="Answer"
-            multiple={rule.operator === "in"}
-            onChange={(values) => changeRule(index, { value: rule.operator === "in" ? [...values] : values[0] ?? "" })}
+            multiple={rule.operator === "in" || rule.source === "form_answer" && rule.operator === "equals"}
+            onChange={(values) => changeRule(index, rule.source === "form_answer" && (rule.operator === "equals" || rule.operator === "in") ? fmsRouteAnswerSelection(rule.operator, values) : { value: rule.operator === "in" ? [...values] : values[0] ?? "" })}
             options={[...options, ...removed]}
             placeholder="Select an answer"
             selected={selected}
