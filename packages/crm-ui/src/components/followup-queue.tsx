@@ -1,4 +1,9 @@
 "use client";
+import { FollowupPager } from '@/components/followup-pager';
+import { FollowupHistory } from '@/components/followup-history';
+import { useFollowupControls } from '@/crm-port/use-followup-controls';
+import type { FollowupPaging } from '@/crm-port/followup-page';
+
 
 import Link from "@/next-shim/link"; // crm-port: next/link -> local shim (same hrefs, /crm base path added)
 import { useRouter } from "@/next-shim/navigation"; // crm-port: next/navigation -> local shim (same paths, /crm base path added)
@@ -46,36 +51,32 @@ const saveableStatus = (status: string) => FOLLOW_UP_STATUSES.find((choice) => c
 const inTab = (item: FollowupItem, tab: string, today: string) => queueTabMatches({ status: item.status, next_followup_date: item.next_followup_date, followup_count: item.followup_count }, tab, today);
 type FollowupRpcClient = { rpc: (name: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }> };
 
-export function FollowupQueue({ items, crmNames, enteredByName, branches = [] }: {
-  role: string; branchId: string | null; items: FollowupItem[]; crmNames: string[]; enteredByName: string; branches?: { id: string; name: string }[];
+export function FollowupQueue({ items, crmNames, enteredByName, branches = [], paging }: {
+  role: string; branchId: string | null; items: FollowupItem[]; crmNames: string[]; enteredByName: string; branches?: { id: string; name: string }[]; paging?:FollowupPaging;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState("today");
-  const [crm, setCrm] = useState("");
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
-  const [branch, setBranch] = useState("");
-  const [sort, setSort] = useState("default");
+  const {filters:{tab,crm,search,status,branch,sort},change}=useFollowupControls('not_bought',paging,'default');
   const [open, setOpen] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [syncing, setSyncing] = useState(false);
   const today = kolkataDateKey();
   // The CRM NAME list is the current roster (JewelOS Users); records keep the name saved on the visit.
   const roster = useMemo(() => new Set(crmNames.map(normalizeRosterValue)), [crmNames]);
-  const hasOffRoster = items.some((item) => !roster.has(normalizeRosterValue(item.crm_name)));
-  const statuses = useMemo(() => [...new Set(items.map((item) => item.status))].sort(), [items]);
+  const hasOffRoster = paging?.hasOffRoster ?? items.some((item) => !roster.has(normalizeRosterValue(item.crm_name)));
+  const statuses = useMemo(() => paging?.statuses ?? [...new Set(items.map((item) => item.status))].sort(), [items,paging]);
   const filtered = useMemo(() => items.filter((item) => {
     const text = `${item.client_name} ${item.phone} ${item.reference_number ?? ""}`.toLowerCase();
     const digits = search.replace(/\D/g, "");
     return rosterFilterMatches(item.crm_name, crm, roster) && (!status || item.status === status) && (!branch || item.branch_id === branch)
       && (!search || text.includes(search.toLowerCase()) || (digits !== "" && item.phone.replace(/\D/g, "").includes(digits)));
   }), [items, crm, roster, status, branch, search]);
-  const counts = useMemo(() => Object.fromEntries(TABS.map(([key]) => [key, filtered.filter((item) => inTab(item, key, today)).length])), [filtered, today]);
+  const counts = useMemo(() => paging?.counts ?? Object.fromEntries(TABS.map(([key]) => [key, filtered.filter((item) => inTab(item, key, today)).length])), [filtered, today,paging]);
   const visible = useMemo(() => {
+    if(paging)return items;
     const rows = filtered.filter((item) => inTab(item, tab, today));
     const compare = SORTS.find(([key]) => key === sort)?.[2];
     return compare ? sortQueue(rows, compare) : sortNotBoughtFollowups(rows, tab);
-  }, [filtered, tab, today, sort]);
+  }, [filtered, tab, today, sort,paging,items]);
 
   async function sync() {
     setSyncing(true); setMessage("");
@@ -107,9 +108,9 @@ export function FollowupQueue({ items, crmNames, enteredByName, branches = [] }:
       <div><h1 className="text-3xl font-semibold">Not Bought Follow-Up</h1><p className="mt-1 text-sm text-stone-600">Live CRM data with a manual legacy-compatible sync.</p></div>
       <div className="flex gap-2"><button className="rounded border px-3 py-2 text-sm" disabled={syncing} onClick={() => void sync()}>{syncing ? "SYNCING…" : "SYNC NOT BOUGHT DATA"}</button><button className="rounded bg-amber-800 px-3 py-2 text-sm text-white" onClick={() => router.refresh()}>REFRESH</button></div>
     </div>
-    <div className="mt-5 flex flex-wrap gap-2">{TABS.map(([key, label]) => <button key={key} aria-label={label} className={tab === key ? "rounded bg-amber-800 px-3 py-2 text-xs font-semibold text-white" : "rounded border px-3 py-2 text-xs font-semibold"} onClick={() => setTab(key)}>{label} ({counts[key]})</button>)}</div>
-    <div className="mt-4 flex flex-wrap gap-3"><select aria-label="CRM name" className="rounded border p-2 text-sm" value={crm} onChange={(event) => setCrm(event.target.value)}><option value="">CRM NAME: ALL</option>{crmNames.map((name) => <option key={name} value={normalizeRosterValue(name)}>{name}</option>)}{hasOffRoster && <option value={OFF_ROSTER}>NOT IN CURRENT ROSTER</option>}</select><select aria-label="Status" className="rounded border p-2 text-sm" value={status} onChange={(event) => setStatus(event.target.value)}><option value="">STATUS: ALL</option>{statuses.map((value) => <option key={value}>{value}</option>)}</select>{branches.length > 1 && <select aria-label="Branch" className="rounded border p-2 text-sm" value={branch} onChange={(event) => setBranch(event.target.value)}><option value="">BRANCH: ALL</option>{branches.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>}<select aria-label="Sort by" className="rounded border p-2 text-sm" value={sort} onChange={(event) => setSort(event.target.value)}>{SORTS.map(([key, label]) => <option key={key} value={key}>SORT: {label}</option>)}</select><input className="min-w-64 rounded border p-2 text-sm" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="SEARCH CLIENT / PHONE / REFERENCE" /></div>
-    <p className="mt-2 text-xs text-stone-600">SHOWING {visible.length} OF {items.length} FOLLOW-UPS</p>
+    <div className="mt-5 flex flex-wrap gap-2">{TABS.map(([key, label]) => <button key={key} aria-label={label} className={tab === key ? "rounded bg-amber-800 px-3 py-2 text-xs font-semibold text-white" : "rounded border px-3 py-2 text-xs font-semibold"} onClick={() => change({tab:key})}>{label} ({counts[key]})</button>)}</div>
+    <div className="mt-4 flex flex-wrap gap-3"><select aria-label="CRM name" className="rounded border p-2 text-sm" value={crm} onChange={(event) => change({crm:event.target.value})}><option value="">CRM NAME: ALL</option>{crmNames.map((name) => <option key={name} value={normalizeRosterValue(name)}>{name}</option>)}{hasOffRoster && <option value={OFF_ROSTER}>NOT IN CURRENT ROSTER</option>}</select><select aria-label="Status" className="rounded border p-2 text-sm" value={status} onChange={(event) => change({status:event.target.value})}><option value="">STATUS: ALL</option>{statuses.map((value) => <option key={value}>{value}</option>)}</select>{branches.length > 1 && <select aria-label="Branch" className="rounded border p-2 text-sm" value={branch} onChange={(event) => change({branch:event.target.value})}><option value="">BRANCH: ALL</option>{branches.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>}<select aria-label="Sort by" className="rounded border p-2 text-sm" value={sort} onChange={(event) => change({sort:event.target.value})}>{SORTS.map(([key, label]) => <option key={key} value={key}>SORT: {label}</option>)}</select><input className="min-w-64 rounded border p-2 text-sm" value={search} onChange={(event) => change({search:event.target.value})} placeholder="SEARCH CLIENT / PHONE / REFERENCE" /></div>
+    <p className="mt-2 text-xs text-stone-600">SHOWING {visible.length} OF {paging?.total ?? items.length} FOLLOW-UPS</p>
     {message && <p role="alert" className="mt-3 text-sm text-red-700">{message}</p>}
     <section className="mt-5 overflow-x-auto rounded border bg-white"><table className="w-full min-w-[2200px] text-left text-xs"><thead className="bg-stone-100 uppercase text-stone-600"><tr>{["CRM Name", "Client Name", "Number", "Client Visit Date", "Next Follow Up", "Reason", "Seen Categories", "Product Requirement", "Remark/Product Seen", "Follow Up Remark", "Action Point", "Action"].map((label) => <th key={label} className="p-3">{label}</th>)}</tr></thead><tbody>
       {visible.map((item) => <tr className="border-t align-top" key={item.id}>
@@ -123,10 +124,11 @@ export function FollowupQueue({ items, crmNames, enteredByName, branches = [] }:
             <label>Follow Up Remark<textarea aria-label="Follow Up Remark" name="remark" defaultValue={item.remark ?? ""} maxLength={2000} className="mt-1 w-full rounded border p-1" /></label>
             <button className="rounded bg-amber-800 p-1 text-white">Save</button>
           </form>}
-          {open === `${item.id}:history` && <p className="mt-2 max-w-56 whitespace-pre-wrap text-xs">{item.remark_history || "No logged history."}</p>}
+          {open === `${item.id}:history` && (paging ? <FollowupHistory key={item.id} kind="not_bought" id={item.id}/> : <p className="mt-2 max-w-56 whitespace-pre-wrap text-xs">{item.remark_history || "No logged history."}</p>)}
         </td>
       </tr>)}
       {!visible.length && <tr><td className="p-5 text-sm text-stone-600" colSpan={12}>No follow-ups match this view.</td></tr>}
     </tbody></table></section>
+    {paging&&<FollowupPager kind="not_bought" paging={paging}/>}
   </main>;
 }

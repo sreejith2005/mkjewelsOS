@@ -1,4 +1,5 @@
 "use client";
+import { ClientHistoryPager,type ClientHistoryPaging } from "@/components/client-history-pager";
 import { ClientActivity, type ClientActivityRow } from "@/components/client-activity";
 
 import { WalkinHistory, type SavedWalkin } from '@/components/walkin-history';
@@ -184,6 +185,7 @@ export function ClientProfile({
   activityActorNames = {},
   activityBranchNames = {},
   activitySummary,
+  historyPaging,
 
 }: {
   client: Client;
@@ -218,6 +220,7 @@ export function ClientProfile({
   identity?: ClientIdentity | null;
   family?: FamilyMember[];
   savedWalkins?: SavedWalkin[];
+  historyPaging?:ClientHistoryPaging;
   activity?: ClientActivityRow[];
   leadFieldLabels?: Record<string,string>;
   activityActorNames?: Record<string,string>;
@@ -319,10 +322,12 @@ export function ClientProfile({
             <LegacyProfileCard title="POTENTIAL" rows={[["CLIENT POTENTIAL CATEGORY", client.client_potential_category ?? ""], ["HIGH POTENTIAL REASON", client.high_potential_reason ?? ""], ["PROFILE LAST UPDATED ON", displayDate(client.profile_updated_at)]]} />
           </div>
           <section className="legacy-timeline-card"><h2>FULL TIMELINE HISTORY</h2><div className="overflow-x-auto"><table><thead><tr>{["TIMESTAMP", "CLIENT VISIT DATE", "EVENT TYPE", "BUY STATUS", "BRANCH", "CRM", "SALESPERSON", "SEEN", "BOUGHT", "ORDER", "PRODUCT REQUIREMENT", "REMARK", "REFERENCE NUMBER"].map((heading) => <th key={heading}>{heading}</th>)}</tr></thead><tbody>{timelineRows.length ? timelineRows : <tr><td colSpan={13}>NO TIMELINE FOUND.</td></tr>}</tbody></table></div></section>
+          {historyPaging&&<ClientHistoryPager clientId={client.client_id} section="visits" paging={historyPaging}/>}
           <ClientActivity clientId={client.client_id} activity={activity} fieldLabels={leadFieldLabels} actorNames={activityActorNames} branchNames={activityBranchNames} summary={activitySummary} />
 
+          {historyPaging&&<ClientHistoryPager clientId={client.client_id} section="activity" paging={historyPaging}/>}
           <WalkinHistory visits={savedWalkins} />
-          <section className="legacy-audit-card"><h2>PROFILE EDIT LOG</h2>{audit.length ? <div className="overflow-x-auto"><table><thead><tr><th>FIELD</th><th>OLD VALUE</th><th>NEW VALUE</th><th>UPDATED BY</th><th>UPDATED ON</th></tr></thead><tbody>{audit.map((item) => <tr key={item.id}><td>{label(item.field_name)}</td><td>{JSON.stringify(item.old_value)}</td><td>{JSON.stringify(item.new_value)}</td><td>{item.editor ?? "SYSTEM"}</td><td>{displayDate(item.created_at)}</td></tr>)}</tbody></table></div> : <p>NO PROFILE EDITS YET.</p>}</section>
+          <section className="legacy-audit-card">{historyPaging&&<ClientHistoryPager clientId={client.client_id} section="audit" paging={historyPaging}/>}<h2>PROFILE EDIT LOG</h2>{audit.length ? <div className="overflow-x-auto"><table><thead><tr><th>FIELD</th><th>OLD VALUE</th><th>NEW VALUE</th><th>UPDATED BY</th><th>UPDATED ON</th></tr></thead><tbody>{audit.map((item) => <tr key={item.id}><td>{label(item.field_name)}</td><td>{JSON.stringify(item.old_value)}</td><td>{JSON.stringify(item.new_value)}</td><td>{item.editor ?? "SYSTEM"}</td><td>{displayDate(item.created_at)}</td></tr>)}</tbody></table></div> : <p>NO PROFILE EDITS YET.</p>}</section>
         </section>
       </div>
     </main>;
@@ -362,6 +367,7 @@ export function ClientProfile({
         </p>
       </div>
       <ClientActivity clientId={client.client_id} activity={activity} fieldLabels={leadFieldLabels} actorNames={activityActorNames} branchNames={activityBranchNames} summary={activitySummary} />
+      {historyPaging&&<ClientHistoryPager clientId={client.client_id} section="activity" paging={historyPaging}/>}
       <div className="mt-6 flex gap-4 border-b">
         <button
           onClick={() => setTab("profile")}
@@ -582,6 +588,7 @@ export function ClientProfile({
           ) : (
             <p className="p-5 text-stone-600">No history yet.</p>
           )}
+          {historyPaging&&<ClientHistoryPager clientId={client.client_id} section="visits" paging={historyPaging}/>}
         </section>
       )}
       {tab === "audit" && (
@@ -609,6 +616,7 @@ export function ClientProfile({
           ) : (
             <p className="p-5 text-stone-600">No profile edits yet.</p>
           )}
+          {historyPaging&&<ClientHistoryPager clientId={client.client_id} section="audit" paging={historyPaging}/>}
         </section>
       )}
     </main>

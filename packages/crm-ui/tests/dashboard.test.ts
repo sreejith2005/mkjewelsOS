@@ -4,6 +4,13 @@ import { buildDashboardData, dashboardRange, endExclusive, startInclusive } from
 const visit = (overrides: Record<string, unknown>) => ({ id: crypto.randomUUID(), event_date: "2026-07-24T10:00:00.000Z", created_at: "2026-07-24T10:00:00.000Z", event_type: "VISIT", buy_status: null, branch_id: "branch-a", crm_name: "Anu", remark: null, reference_number: null, client_id: "client-a", branch: { name: "MG Road" }, client: { primary_name: "Client" }, salesperson: null, ...overrides });
 
 describe("legacy dashboard filter and summary parity", () => {
+  it('preserves status totals from aggregates without downloading visits',()=>{
+    const statuses=['NO','STORE_VISIT','PRICE_CALCULATION','PRODUCT_RETURN','YES','YES_AND_ORDER_PLACED','YES AND ORDER_PLACED','ORDER_PLACED','REPAIR_PLACED','ORDER_PICKUP','REPAIR_PICKUP','ORDER_PLACED_AND_BUYING_NEW_PRODUCT','REPAIR_PLACED_AND_MAKING_NEW_ORDER'];
+    const expected=buildDashboardData(statuses.map(buy_status=>visit({buy_status})),'2026-07-24');
+    const aggregated=buildDashboardData([],'2026-07-24',statuses.map(status=>({status,n:1})));
+    expect(aggregated.totals).toEqual(expected.totals);
+    expect(aggregated.statusDistribution).toEqual(expected.statusDistribution);
+  });
   it("defaults to MONTH using the Asia/Kolkata business date", () => {
     expect(dashboardRange({}, new Date("2026-07-31T20:00:00.000Z"))).toEqual({ mode: "MONTH", start: "2026-08-01", end: "2026-08-01" });
   });

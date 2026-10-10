@@ -1,3 +1,5 @@
+import { dashboardSummarySchema } from '@/crm-port/dashboard-summary';
+import { readCrmResults } from '@/crm-port/read-results';
 import Link from "@/next-shim/link"; // crm-port: next/link -> local shim (same hrefs, /crm base path added)
 import { DashboardFilter } from "@/components/dashboard-filter";
 import { TrendChart } from "@/components/trend-chart";
@@ -5,7 +7,6 @@ import { StatusDistributionChart } from "@/components/status-distribution-chart"
 import { SyncHealth } from "@/components/sync-health";
 import { buildDashboardData, dashboardRange, endExclusive, startInclusive } from "@/lib/dashboard";
 import { createClient } from "@/lib/supabase/server";
-import { assertCrmRead } from "@/crm-port/read-results";
 
 const statLabels = [["walkIns", "TOTAL WALK-INS"], ["notBought", "TOTAL NOT BOUGHT"], ["bought", "TOTAL BOUGHT"], ["orderPlaced", "TOTAL ORDER PLACE"], ["repairPlaced", "TOTAL REPAIR PLACE"], ["orderPickup", "TOTAL ORDER PICK UP"], ["repairPickup", "TOTAL REPAIR PICKUP"], ["upsale", "TOTAL UPSALE"], ["productReturn", "TOTAL PRODUCT RETURN"]] as const;
 
@@ -15,21 +16,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const from = startInclusive(range);
   const until = endExclusive(range);
   const supabase = await createClient();
-  // Two-project addition: super admins see CRM sync health here (it was on the removed roster page).
-  const { data: profileRows } = assertCrmRead(await supabase.rpc("get_my_profile"));
-  const isSuperAdmin = profileRows?.[0]?.role === "super_admin";
-  const visits = [];
-  // No branch predicate: dashboard viewing remains global for every active role.
-  for (let offset = 0; ; offset += 1000) {
-    let visitsQuery = supabase.from("client_timeline").select("id,event_date,created_at,event_type,buy_status,branch_id,crm_name,remark,reference_number,client_id,branch:branches(name)").order("event_date", { ascending: false }).order("id", { ascending: false }) /* crm-port: deterministic order */.range(offset, offset + 999);
-    if (from && until) visitsQuery = visitsQuery.gte("event_date", from).lt("event_date", until);
-    const response = assertCrmRead(await visitsQuery);
-    const page = response.data ?? [];
-    visits.push(...page);
-    if (page.length < 1000) break;
-  }
   const today = dashboardRange({ mode: "MONTH" }).end;
-  const data = buildDashboardData(visits, today);
+  const [{data:profileRows},{data:summary}] = await readCrmResults([
+    supabase.rpc('get_my_profile'),supabase.rpc('crm_dashboard_summary',{p_from:from??undefined,p_until:until??undefined,p_today:today}),
+  ]);
+  const isSuperAdmin=profileRows?.[0]?.role==='super_admin';
+  const result=dashboardSummarySchema.parse(summary);
+  const data={...buildDashboardData(result.recentVisits,today,result.statuses),trend:result.trend,branchBreakdown:result.branchBreakdown,crmBreakdown:result.crmBreakdown,recentVisits:result.recentVisits};
   const rangeDescription = range.mode === "ALL" ? "ALL DATA" : `${displayKolkataDate(range.start)} TO ${displayKolkataDate(range.end)}`;
 
   return <main className="mx-auto max-w-7xl px-5 py-7"><div className="flex flex-wrap items-end justify-between gap-4"><div><h1 className="mt-1 text-3xl font-semibold">DASHBOARD</h1><p className="mt-2 text-stone-600">WALK-IN SUMMARY, CLIENT METRICS, BRANCH / CRM BREAKDOWN, AND RECENT VISITS.</p><p className="mt-1 text-sm text-stone-600">FILTER: {range.mode} | {rangeDescription}</p></div><DashboardFilter mode={range.mode} startDate={params.startDate ?? ""} endDate={params.endDate ?? ""} /></div>

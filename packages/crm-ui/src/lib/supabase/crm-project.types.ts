@@ -596,6 +596,91 @@ export type Database = {
           },
         ]
       }
+      crm_client_browse_state: {
+        Row: {
+          client_id: string
+          first_recorded_at: string | null
+          latest_interaction_at: string | null
+          lead_source: string | null
+          next_future_contact_at: string | null
+        }
+        Insert: {
+          client_id: string
+          first_recorded_at?: string | null
+          latest_interaction_at?: string | null
+          lead_source?: string | null
+          next_future_contact_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          first_recorded_at?: string | null
+          latest_interaction_at?: string | null
+          lead_source?: string | null
+          next_future_contact_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_client_browse_state_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "client_identity"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "crm_client_browse_state_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      crm_client_queue_browse_state: {
+        Row: {
+          branch_id: string
+          client_id: string
+          first_recorded_at: string | null
+          latest_interaction_at: string | null
+          next_future_contact_at: string | null
+        }
+        Insert: {
+          branch_id: string
+          client_id: string
+          first_recorded_at?: string | null
+          latest_interaction_at?: string | null
+          next_future_contact_at?: string | null
+        }
+        Update: {
+          branch_id?: string
+          client_id?: string
+          first_recorded_at?: string | null
+          latest_interaction_at?: string | null
+          next_future_contact_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_client_queue_browse_state_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_client_queue_browse_state_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_identity"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "crm_client_queue_browse_state_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       crm_contacts: {
         Row: {
           actor_id: string
@@ -2177,6 +2262,53 @@ export type Database = {
           client_id: string | null
           first_recorded_at: string | null
           latest_interaction_at: string | null
+          lead_source: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_client_browse_state_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "client_identity"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "crm_client_browse_state_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      crm_followup_browse_rows: {
+        Row: {
+          action_point: string | null
+          assigned_doer: string | null
+          branch_id: string | null
+          client_id: string | null
+          client_name: string | null
+          converted_client_id: string | null
+          created_at: string | null
+          crm_name: string | null
+          followup_count: number | null
+          given_by_client_id: string | null
+          given_by_name: string | null
+          id: string | null
+          kind: string | null
+          next_followup_date: string | null
+          phone: string | null
+          product_requirement: string | null
+          product_seen_remark: string | null
+          reference_number: string | null
+          referral_name: string | null
+          referral_number: string | null
+          remark: string | null
+          salesperson: string | null
+          seen_categories: string[] | null
+          source_visit_form_id: string | null
+          status: string | null
+          visit_date: string | null
         }
         Relationships: []
       }
@@ -2251,7 +2383,20 @@ export type Database = {
           total_visits: number
         }[]
       }
+      browse_crm_followups: {
+        Args: {
+          p_filters?: Json
+          p_kind: string
+          p_limit?: number
+          p_offset?: number
+        }
+        Returns: Json
+      }
       browse_crm_records: {
+        Args: { p_filters?: Json; p_limit?: number; p_offset?: number }
+        Returns: Json
+      }
+      browse_crm_records_page: {
         Args: { p_filters?: Json; p_limit?: number; p_offset?: number }
         Returns: Json
       }
@@ -2410,6 +2555,75 @@ export type Database = {
         Args: { p_event_id: string; p_snapshot: Json }
         Returns: Json
       }
+      crm_dashboard_summary: {
+        Args: { p_from?: string; p_today?: string; p_until?: string }
+        Returns: Json
+      }
+      crm_insights_clients_v1: {
+        Args: { c: Json; metric: string }
+        Returns: {
+          has_prior_visit: boolean
+          record: Json
+        }[]
+      }
+      crm_insights_context_v1: { Args: { p: Json }; Returns: Json }
+      crm_insights_group_rows_v1: {
+        Args: { c: Json }
+        Returns: {
+          done: boolean
+          due: string
+          group_id: string
+          group_name: string
+          kind: string
+          known: boolean
+          occurred: string
+          purchase: boolean
+          record_id: string
+        }[]
+      }
+      crm_insights_metric_matches_v1: {
+        Args: {
+          done: boolean
+          due: string
+          e: string
+          kind: string
+          known: boolean
+          m: string
+          occurred: string
+          purchase: boolean
+          r_record?: Json
+          s: string
+        }
+        Returns: boolean
+      }
+      crm_insights_rows_v1: {
+        Args: { c: Json }
+        Returns: {
+          branch_id: string
+          crm_name: string
+          done: boolean
+          due: string
+          kind: string
+          known: boolean
+          occurred: string
+          outcome: string
+          purchase: boolean
+          record: Json
+          salesperson_id: string
+          source: string
+        }[]
+      }
+      crm_queue_tab: {
+        Args: {
+          p_converted?: boolean
+          p_count: number
+          p_date: string
+          p_status: string
+          p_tab: string
+          p_today: string
+        }
+        Returns: boolean
+      }
       crm_reconcile_saved_walkins: {
         Args: { p_apply?: boolean; p_client_id?: string }
         Returns: Json
@@ -2451,6 +2665,18 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       dedupe_category_array: { Args: { p_values: string[] }; Returns: string[] }
+      get_crm_insight_records_v1: {
+        Args: {
+          p_context: Json
+          p_group_id?: string
+          p_limit?: number
+          p_metric: string
+          p_offset?: number
+        }
+        Returns: Json
+      }
+      get_crm_insights_options_v1: { Args: { p_context?: Json }; Returns: Json }
+      get_crm_insights_v1: { Args: { p_context?: Json }; Returns: Json }
       get_crm_lead_option_routes: {
         Args: never
         Returns: {
@@ -2469,6 +2695,17 @@ export type Database = {
           name: string
           role: Database["public"]["Enums"]["user_role"]
         }[]
+      }
+      get_walkin_queue_page: {
+        Args: {
+          p_branch_id?: string
+          p_completed_client_id?: string
+          p_crm_name?: string
+          p_limit?: number
+          p_offset?: number
+          p_tab?: string
+        }
+        Returns: Json
       }
       get_walkin_queue_snapshot: {
         Args: {
@@ -2629,6 +2866,15 @@ export type Database = {
       not_bought_followup_status_is_done: {
         Args: { p_status: string }
         Returns: boolean
+      }
+      read_crm_followup_history: {
+        Args: {
+          p_id: string
+          p_kind: string
+          p_limit?: number
+          p_offset?: number
+        }
+        Returns: Json
       }
       reconcile_crm_lead_profiles: {
         Args: { p_apply?: boolean }
