@@ -43,3 +43,9 @@ it("selects individual task identities and disables empty selected deletion", ()
   fireEvent.click(screen.getByLabelText("Select Wrong task"));
   expect(onChange).toHaveBeenCalledWith(["employee-task"]);
 });
+it("offers Delete All when only unmaterialized schedules may remain", () => {
+  const remove = vi.fn();
+  render(<TasksTab {...props} evidence={{ ...evidence, tasks: [], tasks_total: 0 }} selection={{ ids: [], onChange: vi.fn() }} onBulkDelete={remove} />);
+  fireEvent.click(screen.getByRole("button", { name: "Delete all matching" }));
+  expect(remove).toHaveBeenCalledWith(null);
+});

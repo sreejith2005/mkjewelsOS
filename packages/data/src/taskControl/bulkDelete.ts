@@ -1,9 +1,22 @@
 import type { EvidenceWorkspace } from "../taskEvidence/types";
 import type { JewelosClient } from "@jewelos/api-client/client";
+import { taskControlScheduleMatchesBulkScope } from "@jewelos/core";
+import { parseTaskTemplateDirectory } from "../taskTemplates/model";
 
-export type TaskDeleteTarget = Readonly<{ id: string; task_template_id: string | null }>;
-export type TaskBulkDeleteResult = Readonly<{ succeeded: string[]; failed: Array<{ id: string; message: string }> }>;
+export type TaskDeleteTarget = Readonly<{ id: string; task_template_id: string | null; kind?: "template" }>;
+export type TaskBulkDeleteResult = Readonly<{ succeeded: string[]; failed: Array<{ id: string; message: string; kind?: "template" }> }>;
 type Filter = Record<string, string | number | undefined>;
+
+export async function readTaskDeleteSchedules(client: JewelosClient, filter: Filter): Promise<TaskDeleteTarget[]> {
+  const { data, error } = await client.rpc("get_task_template_directory", { p_filter: { search: typeof filter.search === "string" ? filter.search : "" } });
+  if (error) throw new Error(error.message);
+  return parseTaskTemplateDirectory(data).templates.filter((row) => taskControlScheduleMatchesBulkScope(row, filter))
+    .map((row) => ({ id: row.id, task_template_id: row.id, kind: "template" }));
+}
+
+export function selectTaskBulkDeleteTargets(targets: readonly TaskDeleteTarget[], entireSeries: boolean): TaskDeleteTarget[] {
+  return targets.filter((row) => row.kind !== "template" || entireSeries);
+}
 
 export async function readTaskDeleteTargets(client: JewelosClient, ids: readonly string[]): Promise<TaskDeleteTarget[]> {
   if (ids.length === 0) return [];
@@ -18,6 +31,7 @@ export async function prepareTaskBulkDelete(
   filter: Filter, selected: readonly string[] | null,
   read: (filter: Filter) => Promise<EvidenceWorkspace>,
   readTargets: (ids: readonly string[]) => Promise<readonly TaskDeleteTarget[]>,
+  readSchedules?: (filter: Filter) => Promise<readonly TaskDeleteTarget[]>,
 ): Promise<TaskDeleteTarget[]> {
   let ids = [...new Set(selected ?? [])];
   if (selected === null) {
@@ -43,6 +57,14 @@ export async function prepareTaskBulkDelete(
       || rows.some((row) => !chunk.includes(row.id))) throw new Error("Some selected tasks are no longer available. Refresh and try again.");
     targets.push(...rows);
   }
+  if (selected === null && readSchedules) {
+    const represented = new Set(targets.flatMap((row) => row.task_template_id ? [row.task_template_id] : []));
+    for (const schedule of await readSchedules(filter)) {
+      if (schedule.task_template_id && !represented.has(schedule.task_template_id)) {
+        targets.push(schedule); represented.add(schedule.task_template_id);
+      }
+    }
+  }
   return targets;
 }
 
@@ -51,9 +73,10 @@ export async function executeTaskBulkDelete(
   targets: readonly TaskDeleteTarget[], entireSeries: boolean, reason: string,
   remove: (id: string, entireSeries: boolean, reason: string) => Promise<void>,
   onProgress: (processed: number, total: number) => void,
+  removeTemplate?: (id: string) => Promise<unknown>,
 ): Promise<TaskBulkDeleteResult> {
   const groups = new Map<string, TaskDeleteTarget[]>();
-  for (const target of targets) {
+  for (const target of selectTaskBulkDeleteTargets(targets, entireSeries)) {
     const key = entireSeries && target.task_template_id ? `series:${target.task_template_id}` : `task:${target.id}`;
     const group = groups.get(key) ?? [];
     if (!group.some((row) => row.id === target.id)) group.push(target);
@@ -68,18 +91,21 @@ export async function executeTaskBulkDelete(
       const target = group?.[0];
       if (!group || !target) continue;
       try {
-        await remove(target.id, entireSeries && target.task_template_id !== null, reason);
+        if (target.kind === "template") {
+          if (!removeTemplate) throw new Error("Schedule deletion is unavailable.");
+          await removeTemplate(target.id);
+        } else await remove(target.id, entireSeries && target.task_template_id !== null, reason);
         result.succeeded.push(...group.map((row) => row.id));
       } catch (caught) {
         stopped = true;
         const message = caught instanceof Error ? caught.message : "Task deletion failed";
-        result.failed.push(...group.map((row) => ({ id: row.id, message })));
+        result.failed.push(...group.map((row) => ({ id: row.id, message, ...(row.kind ? { kind: row.kind } : {}) })));
       }
       processed += group.length;
       onProgress(processed, targets.length);
     }
   };
   await Promise.all(Array.from({ length: Math.min(3, queue.length) }, worker));
-  for (const group of queue.slice(cursor)) result.failed.push(...group.map((row) => ({ id: row.id, message: "Not attempted after an earlier failure. Retry the remaining selection." })));
+  for (const group of queue.slice(cursor)) result.failed.push(...group.map((row) => ({ id: row.id, ...(row.kind ? { kind: row.kind } : {}), message: "Not attempted after an earlier failure. Retry the remaining selection." })));
   return result;
 }

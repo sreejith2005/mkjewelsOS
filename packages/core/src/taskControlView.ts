@@ -147,3 +147,16 @@ export function evidenceCellState(row: {
   if (row.attachments.length > 0) return "files";
   return row.requires_upload ? "missing" : "not-required";
 }
+
+/** Schedules have no occurrence date/status; full deletion scopes their owner and work type. */
+export function taskControlScheduleMatchesBulkScope(
+  row: Readonly<{ branch_id: string | null; department_id: string | null; assignee_user_id: string | null; task_type: string; requires_upload: boolean }>,
+  filter: Readonly<Record<string, string | number | undefined>>,
+): boolean {
+  const upload = row.task_type === "delegation" || row.requires_upload;
+  return (!filter.branch_id || row.branch_id === filter.branch_id)
+    && (!filter.department_id || row.department_id === filter.department_id)
+    && (!filter.user_profile_id || row.assignee_user_id === filter.user_profile_id)
+    && (filter.view !== "checklist" || !upload)
+    && (!["upload", "awaiting_evidence"].includes(String(filter.view)) || upload);
+}
