@@ -4,6 +4,8 @@ import type { PageId } from "../../../../packages/core/src/roleMenu.ts";
 import { hasPermission, type AccessContext } from "../../../../packages/core/src/permissions/resolve.ts";
 import { getAppHelpOutcome } from "./appHelp.ts";
 import { getAvailability } from "./availability.ts";
+import { crmClientSummary, crmFollowups, crmStats, crmWalkins, searchCrmClients } from "./crm.ts";
+import type { CrmSession } from "./crmSession.ts";
 import { getDashboardMetrics } from "./dashboard.ts";
 import { getFmsWork } from "./fms.ts";
 import { searchForms } from "./forms.ts";
@@ -18,6 +20,7 @@ import { searchMyTasks } from "./tasks.ts";
 import { getMyWorkSummary } from "./workSummary.ts";
 
 export type { ActorClient, RpcError, RpcResult, SelectFilter, SelectQuery, SelectResult } from "./shared.ts";
+export type { CrmSession } from "./crmSession.ts";
 
 export type ToolContext = Readonly<{
   actor: ActorClient;
@@ -29,6 +32,8 @@ export type ToolContext = Readonly<{
   now: Date;
   /** Knowledge searches already run in this turn (the retry returns more excerpts). */
   knowledgeSearches?: number | undefined;
+  /** This question's CRM-project session (opened on the first CRM tool call), or null when the CRM is not connected. */
+  crm?: CrmSession | null | undefined;
 }>;
 
 export type ExecutedTool = Readonly<{
@@ -115,6 +120,21 @@ export async function executeKiaraTool(name: string, input: unknown, context: To
         break;
       case "find_colleague":
         outcome = await findColleague(executor, args);
+        break;
+      case "crm_search_clients":
+        outcome = await searchCrmClients(context.crm, args, executor);
+        break;
+      case "crm_client_summary":
+        outcome = await crmClientSummary(context.crm, args, executor);
+        break;
+      case "crm_walkins":
+        outcome = await crmWalkins(context.crm, args, executor);
+        break;
+      case "crm_followups":
+        outcome = await crmFollowups(context.crm, args, executor);
+        break;
+      case "crm_stats":
+        outcome = await crmStats(context.crm, args, executor);
         break;
       case "offer_escalation":
         // Decided by the worker from the turn's state (runKiaraTurn); never executed here.

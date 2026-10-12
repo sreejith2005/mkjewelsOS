@@ -24,7 +24,8 @@ const names = (access: AccessContext, controls: SectionControls = DEFAULT_SECTIO
 
 describe("tool offering", () => {
   const STAFF = ["get_my_work_summary", "get_app_help", "search_knowledge_base", "search_my_tasks", "get_fms_work", "get_my_notifications", "search_forms", "get_leave", "get_availability", "get_dashboard_metrics", "list_reports", "run_report", "find_colleague", "offer_escalation"];
-  const MANAGER = ["get_my_work_summary", "get_app_help", "search_knowledge_base", "search_my_tasks", "get_fms_work", "get_my_notifications", "search_forms", "get_leave", "get_availability", "get_dashboard_metrics", "get_team_progress", "list_reports", "run_report", "find_people", "find_colleague", "offer_escalation"];
+  const CRM = ["crm_search_clients", "crm_client_summary", "crm_walkins", "crm_followups", "crm_stats"];
+  const MANAGER = ["get_my_work_summary", "get_app_help", "search_knowledge_base", "search_my_tasks", "get_fms_work", "get_my_notifications", "search_forms", "get_leave", "get_availability", "get_dashboard_metrics", "get_team_progress", "list_reports", "run_report", "find_people", "find_colleague", "offer_escalation", ...CRM];
 
   it("offers staff only their own-work tools, the scoped Dashboard and Reports, and the directory", () => {
     expect(names(accessFor("staff"))).toEqual(STAFF);
@@ -82,9 +83,19 @@ describe("tool offering", () => {
     expect(KIARA_TOOLS.map((tool) => tool.definition.name)).toEqual([...KIARA_TOOL_NAMES]);
   });
 
-  it("declares strict schemas with no additional properties and a fixed status label", () => {
+  it("offers the CRM tools exactly as /crm is open: crm.view and the CRM section", () => {
+    expect(names(accessFor("staff")).filter((name) => name.startsWith("crm_"))).toEqual([]);
+    expect(names(accessFor("hr")).filter((name) => name.startsWith("crm_"))).toEqual([]);
+    expect(names(accessFor("crm")).filter((name) => name.startsWith("crm_"))).toEqual(CRM);
+    expect(names(accessFor("staff", { "crm.view": true })).filter((name) => name.startsWith("crm_"))).toEqual(CRM);
+    expect(names(accessFor("manager", { "crm.view": false })).filter((name) => name.startsWith("crm_"))).toEqual([]);
+    expect(names(accessFor("manager"), withSectionOff("crm")).filter((name) => name.startsWith("crm_"))).toEqual([]);
+    for (const name of CRM) expect(getKiaraTool(name)?.dataCategory).toBe("crm");
+  });
+
+  it("declares schemas with no additional properties and a fixed status label; only CRM tools are non-strict", () => {
     for (const tool of KIARA_TOOLS) {
-      expect(tool.definition.strict).toBe(true);
+      expect(tool.definition.strict).toBe(tool.dataCategory !== "crm");
       expect(tool.definition.input_schema.additionalProperties).toBe(false);
       expect(tool.definition.input_schema.required.every((key) => key in tool.definition.input_schema.properties)).toBe(true);
       expect(tool.statusLabel.length).toBeGreaterThan(0);
@@ -141,11 +152,31 @@ describe("tool input validation", () => {
       .toEqual({ ok: true, input: { name: "search_knowledge_base", english_query: "leave policy" } });
   });
 
+  it("validates the non-strict CRM inputs before anything runs", () => {
+    expect(validateKiaraToolInput("crm_search_clients", { query: " Mehta " })).toEqual({ ok: true, input: { name: "crm_search_clients", query: "Mehta" } });
+    expect(validateKiaraToolInput("crm_search_clients", {})).toEqual({ ok: false, error: "query is required." });
+    expect(validateKiaraToolInput("crm_search_clients", { query: 4521 })).toEqual({ ok: false, error: "query must be text." });
+    expect(validateKiaraToolInput("crm_search_clients", { query: "x".repeat(200) })).toEqual({ ok: true, input: { name: "crm_search_clients", query: "x".repeat(60) } });
+    expect(validateKiaraToolInput("crm_search_clients", { query: "Mehta", limit: 50 })).toEqual({ ok: false, error: "Unknown field: limit" });
+    expect(validateKiaraToolInput("crm_client_summary", { client: "MKC-1", fields: ["primary_phone"] })).toEqual({ ok: false, error: "Unknown field: fields" });
+    expect(validateKiaraToolInput("crm_followups", { view: "overdue" }).ok).toBe(false);
+    expect(validateKiaraToolInput("crm_followups", { kind: "referral", view: "open", whose: "everyone" }))
+      .toEqual({ ok: true, input: { name: "crm_followups", kind: "referral", view: "open", whose: "everyone" } });
+    expect(validateKiaraToolInput("crm_followups", { whose: true }).ok).toBe(false);
+    expect(validateKiaraToolInput("crm_stats", { group_by: "revenue" }).ok).toBe(false);
+    expect(validateKiaraToolInput("crm_stats", { group_by: "salesperson", period: "this_month" })).toEqual({ ok: true, input: { name: "crm_stats", group_by: "salesperson", period: "this_month" } });
+    expect(validateKiaraToolInput("crm_walkins", { branch: { id: "x" } })).toEqual({ ok: false, error: "branch must be text." });
+    expect(validateKiaraToolInput("crm_walkins", "today").ok).toBe(false);
+  });
+
   it("stays inside the API's strict-schema limits for the widest permission shape", () => {
     // Documented per-request limits across all strict tools: 20 tools,
     // 24 optional parameters, 16 parameters with union types.
-    const strict = offeredKiaraTools(accessFor("super_admin"), DEFAULT_SECTION_CONTROLS).map((spec) => spec.definition);
-    expect(strict).toHaveLength(KIARA_TOOLS.length);
+    // Non-strict tools (the CRM tools, owner-approved) are outside these limits.
+    const offered = offeredKiaraTools(accessFor("super_admin"), DEFAULT_SECTION_CONTROLS).map((spec) => spec.definition);
+    expect(offered).toHaveLength(KIARA_TOOLS.length);
+    const strict = offered.filter((tool) => tool.strict);
+    expect(strict).toHaveLength(KIARA_TOOLS.filter((tool) => tool.definition.strict).length);
     expect(strict.length).toBeLessThanOrEqual(20);
     const optional = strict.reduce((total, tool) => total + Object.keys(tool.input_schema.properties).filter((key) => !tool.input_schema.required.includes(key)).length, 0);
     expect(optional).toBeLessThanOrEqual(24);
@@ -154,6 +185,14 @@ describe("tool input validation", () => {
     for (const tool of strict) {
       for (const property of Object.values(tool.input_schema.properties)) {
         for (const unsupported of ["minimum", "maximum", "minLength", "maxLength", "multipleOf"]) expect(property).not.toHaveProperty(unsupported);
+      }
+    }
+  });
+
+  it("states length limits on non-strict tools, which the API does not enforce", () => {
+    for (const spec of KIARA_TOOLS.filter((tool) => !tool.definition.strict)) {
+      for (const property of Object.values(spec.definition.input_schema.properties)) {
+        if (property.type === "string" && !("enum" in property)) expect(typeof property.maxLength).toBe("number");
       }
     }
   });

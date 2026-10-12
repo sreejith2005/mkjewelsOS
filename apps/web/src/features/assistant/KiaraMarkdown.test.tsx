@@ -33,6 +33,15 @@ describe("Kiara answer rendering", () => {
     expect(inAppPath("https://evil.example")).toBeNull();
   });
 
+  it("links CRM client records and CRM list screens, nothing else under /crm", () => {
+    expect(inAppPath("/crm/clients/3f2a1b9c-1d2e-4f50-8a6b-426614174000")).toBe("/crm/clients/3f2a1b9c-1d2e-4f50-8a6b-426614174000");
+    expect(inAppPath("/crm/followups")).toBe("/crm/followups");
+    expect(inAppPath("/crm/referrals")).toBe("/crm/referrals");
+    expect(inAppPath("/crm/clients/not-an-id")).toBeNull();
+    expect(inAppPath("/crm/clients/new?phone=1234")).toBeNull();
+    expect(inAppPath("/crm/settings")).toBeNull();
+  });
+
   it("hides citation markers and heading marks", () => {
     expect(sanitizeKiaraText("## Leave\nApply early [[cite:abc]] and [[ci")).toBe("Leave\nApply early  and ");
     expect(parseKiaraBlocks("one\n\ntwo")).toEqual([{ kind: "paragraph", text: "one" }, { kind: "paragraph", text: "two" }]);

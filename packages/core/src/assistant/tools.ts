@@ -33,9 +33,13 @@ export type KiaraDataCategory =
   | "forms"
   | "notifications"
   | "knowledge"
-  | "escalation";
+  | "escalation"
+  | "crm";
 
-/** A JSON-Schema object the Messages API accepts with `strict: true`. */
+/**
+ * A JSON-Schema object for a tool input. Strict tools carry no length limits
+ * (the API's strict mode does not accept them); non-strict tools state them.
+ */
 export type KiaraInputSchema = Readonly<{
   type: "object";
   properties: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
@@ -43,12 +47,18 @@ export type KiaraInputSchema = Readonly<{
   additionalProperties: false;
 }>;
 
-/** Structurally the Messages API custom-tool shape; the Edge Function passes it as is. */
+/**
+ * Structurally the Messages API custom-tool shape; the Edge Function passes it as is.
+ * The CRM tools are non-strict (owner decision 2026-10-09): the API then does not
+ * enforce the schema, so `validateKiaraToolInput` is the only gate, and it runs
+ * before every execution either way. Non-strict tools do not count toward the
+ * strict-schema limits (24 optional parameters per request).
+ */
 export type KiaraToolDefinition = Readonly<{
   name: KiaraToolName;
   description: string;
   input_schema: KiaraInputSchema;
-  strict: true;
+  strict: boolean;
 }>;
 
 /** One way to qualify for a tool: a permission and the section it opens. */
@@ -84,6 +94,11 @@ export const KIARA_TOOL_NAMES = [
   "find_people",
   "find_colleague",
   "offer_escalation",
+  "crm_search_clients",
+  "crm_client_summary",
+  "crm_walkins",
+  "crm_followups",
+  "crm_stats",
 ] as const;
 export type KiaraToolName = (typeof KIARA_TOOL_NAMES)[number];
 
@@ -102,6 +117,7 @@ export const KIARA_HELP_QUESTION_MAX = 200;
 export const KIARA_TEXT_MAX = 100;
 export const KIARA_NAME_MAX = 60;
 export const KIARA_KB_QUERY_MAX = 200;
+export const KIARA_CRM_QUERY_MAX = 60;
 
 // ---------------------------------------------------------------------------
 // Input fields: one declaration drives both the schema and the validator
@@ -112,7 +128,7 @@ type FieldSpec =
   | Readonly<{ kind: "enum"; values: readonly string[]; description: string }>
   | Readonly<{ kind: "boolean"; description: string }>;
 
-type ToolFields = Readonly<{ fields: Readonly<Record<string, FieldSpec>>; required: readonly string[] }>;
+type ToolFields = Readonly<{ fields: Readonly<Record<string, FieldSpec>>; required: readonly string[]; strict?: false }>;
 
 /**
  * One optional text field for dates, not period/from/to: strict tool schemas
@@ -124,7 +140,7 @@ const nameField = (description: string): FieldSpec => ({ kind: "string", max: KI
 function schemaFor(spec: ToolFields): KiaraInputSchema {
   const properties: Record<string, Record<string, unknown>> = {};
   for (const [key, field] of Object.entries(spec.fields)) {
-    if (field.kind === "string") properties[key] = { type: "string", description: field.description };
+    if (field.kind === "string") properties[key] = spec.strict === false ? { type: "string", maxLength: field.max, description: field.description } : { type: "string", description: field.description };
     else if (field.kind === "enum") properties[key] = { type: "string", enum: [...field.values], description: field.description };
     else properties[key] = { type: "boolean", description: field.description };
   }
@@ -234,12 +250,58 @@ const FIELDS: Readonly<Record<KiaraToolName, ToolFields>> = {
     },
     required: ["query"],
   },
+  // CRM (Phase 5): non-strict, validated by validateKiaraToolInput before every run.
+  crm_search_clients: {
+    fields: {
+      query: { kind: "string", max: KIARA_CRM_QUERY_MAX, description: "A client name (at least 3 letters), an MKC-, MKF- or MKREF- code, or the last 4 digits of the client's phone." },
+    },
+    required: ["query"],
+    strict: false,
+  },
+  crm_client_summary: {
+    fields: {
+      client: { kind: "string", max: KIARA_CRM_QUERY_MAX, description: "The client's MKC code (for example MKC-102731) or the client_id from crm_search_clients." },
+    },
+    required: ["client"],
+    strict: false,
+  },
+  crm_walkins: {
+    fields: {
+      period: { ...periodField, description: `Visit dates. Default today. ${KIARA_PERIOD_HINT}` },
+      branch: { kind: "string", max: KIARA_NAME_MAX, description: "Only this CRM branch (name), for example the user's own branch." },
+      salesperson: { kind: "string", max: KIARA_NAME_MAX, description: "Only visits attended by this salesperson (name)." },
+    },
+    required: [],
+    strict: false,
+  },
+  crm_followups: {
+    fields: {
+      kind: { kind: "enum", values: ["not_bought", "referral"], description: "not_bought (default): Not Bought follow-ups. referral: referral calling." },
+      view: { kind: "enum", values: ["due", "open", "done", "converted"], description: "due (default): due today, overdue, or without a date. open: every unfinished one. done. converted." },
+      whose: { kind: "enum", values: ["mine", "everyone"], description: "mine (default): the user's own, by their CRM name. everyone: the whole list the CRM shows." },
+      salesperson: { kind: "string", max: KIARA_NAME_MAX, description: "Only this CRM person's follow-ups (name); use instead of whose." },
+    },
+    required: [],
+    strict: false,
+  },
+  crm_stats: {
+    fields: {
+      period: { ...periodField, description: `Visit dates. Default this_month. ${KIARA_PERIOD_HINT}` },
+      group_by: { kind: "enum", values: ["salesperson", "crm", "branch", "outcome"], description: "salesperson (default): who attended the visit. crm: the CRM person on the visit. branch. outcome." },
+      branch: { kind: "string", max: KIARA_NAME_MAX, description: "Only this CRM branch (name)." },
+    },
+    required: [],
+    strict: false,
+  },
 };
 
 const tool = (name: KiaraToolName, description: string, rest: Omit<KiaraToolSpec, "definition">): KiaraToolSpec => ({
-  definition: { name, description, input_schema: schemaFor(FIELDS[name]), strict: true },
+  definition: { name, description, input_schema: schemaFor(FIELDS[name]), strict: FIELDS[name].strict !== false },
   ...rest,
 });
+
+/** CRM tools follow /crm access: crm.view and the CRM section switch (the login bridge re-checks both). */
+const CRM_GATE = { permissions: ["crm.view"], pages: ["crm"], dataCategory: "crm" } as const satisfies Pick<KiaraToolSpec, "permissions" | "pages" | "dataCategory">;
 
 export const KIARA_TOOLS: readonly KiaraToolSpec[] = [
   tool(
@@ -321,6 +383,31 @@ export const KIARA_TOOLS: readonly KiaraToolSpec[] = [
     "offer_escalation",
     "Offer to send the user's question to a person above them when you could not answer a valid MK Jewels procedure or policy question confidently after searching the knowledge base. Nothing is sent unless the user confirms. Never use it when the user lacks access to information, when they ask you to do something, or for a question you answered.",
     { permissions: ["assistant.view"], pages: ["ask_kiara"], dataCategory: "escalation", statusLabel: "Preparing to ask a person" },
+  ),
+  tool(
+    "crm_search_clients",
+    "Find CRM clients by name, MKC/MKF/MKREF code, or the last 4 phone digits. Returns code, name, last visit, branch, outcome, the phone's last 4 digits only, and a CRM link.",
+    { ...CRM_GATE, statusLabel: "Searching CRM clients" },
+  ),
+  tool(
+    "crm_client_summary",
+    "One CRM client: visits, recent interactions, follow-ups, last interest, salesperson, branch, status, and a CRM link. No contact details.",
+    { ...CRM_GATE, statusLabel: "Opening the CRM client" },
+  ),
+  tool(
+    "crm_walkins",
+    "CRM walk-in visits recorded for a period, counted as the CRM Dashboard counts them: total, purchase-positive, by branch, and the latest visits with links.",
+    { ...CRM_GATE, statusLabel: "Checking CRM walk-ins" },
+  ),
+  tool(
+    "crm_followups",
+    "CRM Not Bought or referral follow-ups as the CRM Follow-ups and Referrals screens list them, with counts per tab and links.",
+    { ...CRM_GATE, statusLabel: "Checking CRM follow-ups" },
+  ),
+  tool(
+    "crm_stats",
+    "CRM Dashboard numbers for a period: visits and purchase-positive visits (conversions) per salesperson, CRM person, branch, or outcome, plus follow-up and lead totals.",
+    { ...CRM_GATE, statusLabel: "Checking CRM numbers" },
   ),
 ];
 

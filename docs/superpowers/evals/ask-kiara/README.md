@@ -68,3 +68,11 @@ must follow two knowledge searches for `no_kb_match`, and must never appear for 
 a request to do something, or an answered question. The worker refuses such offers whatever the
 model asks (`decideEscalationOffer`), so a refused attempt shows as `kiara_offer_refused` in the
 function log, not as a stored offer.
+
+## Phase 5 CRM fixture
+Phase 5 cases (`p5-*`) need a local CRM-project stack built from `supabase-crm/` with
+`crm-session-exchange` pointed at the local JewelOS stack, and the synthetic
+`supabase/functions/ask-kiara/crm.integration.fixture.sql` applied (psql variables `jos_admin`,
+`jos_manager`, `jos_crm`, `jos_sales`, `jos_bandra` = the local seed profile and branch ids). The
+function needs `CRM_SUPABASE_URL` and `CRM_SUPABASE_ANON_KEY` (local values). All CRM names and
+numbers are invented. `p4f-*` checks that a person's escalation answer is used in a later turn.

@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { ActorClient } from "./tools/index.ts";
 
 /**
@@ -22,8 +22,8 @@ export function createActorClient(client: SupabaseClient): ActorClient {
           if (filter.op === "in") builder = builder.in(filter.column, [...filter.values]);
           else if (filter.op === "contains") builder = builder.contains(filter.column, [...filter.values]);
           else {
-            // Only fixed status words reach here; anything else is refused rather than quoted.
-            if (!filter.values.every((value) => /^[a-z_]+$/.test(value))) throw new Error("Unsupported notIn value");
+            // Only fixed status or kind words reach here; anything else is refused rather than quoted.
+            if (!filter.values.every((value) => /^[A-Za-z_]+$/.test(value))) throw new Error("Unsupported notIn value");
             builder = builder.not(filter.column, "in", `(${filter.values.join(",")})`);
           }
         } else if (filter.op === "ilike") builder = builder.ilike(filter.column, filter.value);
@@ -34,4 +34,16 @@ export function createActorClient(client: SupabaseClient): ActorClient {
       return { data, count: count ?? null, error: error ? { code: error.code, message: error.message } : null };
     },
   };
+}
+
+/**
+ * The CRM-project client for one short-lived CRM access token: the CRM project's
+ * public anon key plus that token, so CRM RLS applies. Used by the function and
+ * the local integration test, so both read the CRM the same way.
+ */
+export function crmActorFor(crmUrl: string, crmAnonKey: string): (crmAccessToken: string) => ActorClient {
+  return (crmAccessToken) => createActorClient(createClient(crmUrl, crmAnonKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    global: { headers: { Authorization: `Bearer ${crmAccessToken}` } },
+  }));
 }

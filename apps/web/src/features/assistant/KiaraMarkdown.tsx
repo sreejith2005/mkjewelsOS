@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode } from "react";
-import { getPageForPath, stripCitationMarkers } from "@jewelos/core";
+import { getPageForPath, isKiaraCrmPath, stripCitationMarkers } from "@jewelos/core";
 
 /**
  * The only formatting Kiara's answers may use (spec 12): paragraphs, bullet and
@@ -61,11 +61,14 @@ export function parseKiaraBlocks(text: string): KiaraBlock[] {
 
 const INLINE = /(\*\*[^*]+\*\*|\[[^\]]+\]\([^)\s]+\))/g;
 
-/** An in-app link target, or null. Query strings are allowed; the path must be a known section. */
+/**
+ * An in-app link target, or null. Query strings are allowed; the path must be a
+ * known section, or a CRM client record / CRM list screen (isKiaraCrmPath).
+ */
 export function inAppPath(target: string): string | null {
   if (!target.startsWith("/") || target.startsWith("//")) return null;
   const path = target.split(/[?#]/)[0] ?? "";
-  return getPageForPath(path) ? target : null;
+  return getPageForPath(path) || isKiaraCrmPath(path) ? target : null;
 }
 
 function Inline({ text, onNavigate }: { text: string; onNavigate: (path: string) => void }) {

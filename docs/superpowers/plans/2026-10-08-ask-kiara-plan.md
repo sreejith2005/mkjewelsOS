@@ -370,6 +370,35 @@ Tests:
 
 Exit criteria: CRM answers match what `/crm` shows the same user; non-CRM users are refused.
 
+**Phase 5 status (2026-10-10, local only).** Built with the owner decisions of 2026-10-10 (access
+mirrors `/crm`; customer PII rule). No CRM-project migration: every tool uses a read contract `/crm`
+already uses.
+
+| Tool | CRM contract | `/crm` screen |
+| --- | --- | --- |
+| `crm_search_clients` `{query}` | `search_clients` (limit 20, 10 shown; "ending 4521" keeps numbers ending so) | client search box |
+| `crm_client_summary` `{client}` (MKC code or id) | `clients` (allow-listed columns), `client_timeline`, `crm_client_activity` (no `details`), `not_bought_followups`, `households`, `branches`/`users` names | client record page |
+| `crm_walkins` `{period?, branch?, salesperson?}` | `get_crm_insights_v1` + `get_crm_insight_records_v1` metric `visits` | CRM Dashboard |
+| `crm_followups` `{kind?, view?, whose?, salesperson?}` | `browse_crm_followups` (+ `clients` codes) | Follow-ups, Referrals |
+| `crm_stats` `{period?, group_by?, branch?}` | `get_crm_insights_v1` grouped | CRM Dashboard |
+
+- Five tools, not one `crm` tool with an `action` enum: each has its own field set, which one schema
+  could not state without cross-field rules. All five are **non-strict** (owner-approved), so they do
+  not count toward the strict 24-optional-parameter budget; `validateKiaraToolInput` checks every input
+  (types, enums, unknown fields, length) before the bridge is called. String fields carry `maxLength`.
+- Access: offered with `crm.view` and the CRM section open (as `/crm`); every question exchanges the
+  caller's JewelOS JWT at `crm-session-exchange` at most once (`tools/crmSession.ts`), holds the CRM
+  token in a closure for that request only, and reads with the CRM anon key + that token (CRM RLS).
+  Bridge 401/403 and CRM 42501 become `access: denied`. Not offered when `CRM_SUPABASE_URL` /
+  `CRM_SUPABASE_ANON_KEY` are unset.
+- PII (`tools/crmPrivacy.ts`): allow-listed columns only; phones as `…1234`; people-written text
+  scrubbed (7+ digit runs -> `[number …1234]`, emails, PAN, address-like notes withheld) then wrapped
+  as untrusted; a final pass scrubs every string in the result. Every client carries
+  `/crm/clients/<id>`; the chat renderer links those paths and the CRM list screens only
+  (`packages/core/src/assistant/crmLinks.ts`), without changing `getPageForPath`.
+- Tests: `tools/crm.test.ts` (fakes), `crm.integration.test.ts` + `crm.integration.fixture.sql`
+  (`KIARA_CRM_STACK=1`, both local stacks, synthetic data).
+
 ## Phase 6: insights and limit settings
 
 **Scope:** spec 5.5, 13; `kiara-insights` worker and cron; Insights tab; Limits tab with settings

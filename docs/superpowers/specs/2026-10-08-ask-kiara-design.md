@@ -572,9 +572,16 @@ Common rules for every tool:
 | `get_my_notifications` | The caller's recent notifications (read-only; never marks read) | `{unread_only?: boolean, limit?: 1..20}` | `notifications` own rows (`packages/data/src/notifications/api.ts:33`) | `notifications.view` | notifications | 2 |
 | `search_knowledge_base` | Search SOPs and policies; call with **English** keywords | `{english_query: string<=200, original_terms?: string<=200}` | new `search_kiara_knowledge` | `assistant.view` | knowledge | 3 |
 | `offer_escalation` | Offer to send the question to a person | `{reason: enum no_kb_match/conflicting_policy/needs_judgment/needs_approval, summary_en: string<=300}` | No write. Stores the offer on the assistant message; the employee confirms through `create_kiara_escalation` | `assistant.view` | escalation | 4 |
-| `crm_search_clients` | Find CRM clients by name, MKC id, or last 4 phone digits; returns profile summary and last interaction | `{query: string<=60, limit?: 1..10}` | CRM project `search_clients` via `crm-session-exchange` token | `crm.view` (and an active CRM grant; exchange returns 403 otherwise) | crm | 5 |
-| `crm_walkins` | Walk-ins for a day and their status | `{date: date, branch?: string}` | CRM `get_walkin_queue_snapshot` / `browse_crm_records` | `crm.view` | crm | 5 |
-| `crm_followups` | Not-bought and referral follow-ups due or overdue | `{status: enum due/overdue/completed, from?: date, to?: date, limit?: 1..20}` | CRM `not_bought_followups`, `referral_calling` with CRM RLS | `crm.view` | crm | 5 |
+| `crm_search_clients` (as built, non-strict) | Find CRM clients by name, MKC/MKF/MKREF code, or last 4 phone digits | `{query: string<=60}` | CRM `search_clients` (20 read, 10 shown) | `crm.view` + CRM section (bridge also needs an active CRM grant) | crm | 5 |
+| `crm_client_summary` (non-strict) | One client: visits, interactions, follow-ups, last interest, salesperson, branch, status | `{client: MKC code or id}` | CRM `clients` (allow-listed columns), `client_timeline`, `crm_client_activity`, `not_bought_followups`, `households` | same | crm | 5 |
+| `crm_walkins` (non-strict) | Recorded walk-in visits for a period, by branch, latest visits | `{period?, branch?, salesperson?}` | CRM `get_crm_insights_v1` / `get_crm_insight_records_v1` (CRM Dashboard) | same | crm | 5 |
+| `crm_followups` (non-strict) | Not Bought or referral follow-ups by tab, mine or everyone's | `{kind?, view?: due/open/done/converted, whose?: mine/everyone, salesperson?}` | CRM `browse_crm_followups` (Follow-ups, Referrals screens) | same | crm | 5 |
+| `crm_stats` (non-strict) | Visits and purchase-positive visits per salesperson, CRM person, branch, or outcome | `{period?, group_by?, branch?}` | CRM `get_crm_insights_v1` grouped (CRM Dashboard) | same | crm | 5 |
+
+CRM tools (Phase 5, owner decisions 2026-10-10): every read uses a CRM token from `crm-session-exchange`
+obtained with the caller's JewelOS JWT once per question and held only in memory for that request.
+Customer privacy: no full phone, email, address, ID/KYC number, document, or photo reaches the
+model; phones appear as their last 4 digits; every client carries its `/crm/clients/<id>` link.
 
 What the three asker types receive (all enforced by the database, summarized from 3.2):
 
@@ -601,8 +608,9 @@ Gaps (no scoped contract today; owner decisions in section 19):
   designation, department, branch of active colleagues, no contact data, built in Phase 2.
 - Branch-scoped availability for a manager without the PEOPLE report roles: only raw RLS (tenant-wide)
   exists. Kiara uses the report path and does not fall back to the raw table.
-- CRM aggregates (counts and conversion by salesperson or period): no CRM-project read RPC; would be
-  a new `supabase-crm` migration.
+- CRM aggregates (counts and conversion by salesperson or period): resolved in Phase 5 without a new
+  migration. The CRM Dashboard's `get_crm_insights_v1` (CRM migration 20261010000100) groups visits
+  by salesperson, CRM person, branch, or outcome with purchase-positive counts.
 - Free-text search across a manager's team tasks: only raw RLS (tenant-wide for managers). Kiara
   answers team task questions through `run_report('task_operations')` instead.
 - Reports and the reporting context use the base role, not dashboard authority (3.2); fixing that is

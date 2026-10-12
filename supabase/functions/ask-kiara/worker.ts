@@ -17,7 +17,7 @@ import { parseKiaraQuota, type KiaraQuota } from "../../../packages/core/src/ass
 import { encodeKiaraEvent, type KiaraErrorCode, type KiaraStreamEvent } from "../../../packages/core/src/assistant/events.ts";
 import type { PageId } from "../../../packages/core/src/roleMenu.ts";
 import type { AccessContext } from "../../../packages/core/src/permissions/resolve.ts";
-import { executeKiaraTool, type ActorClient, type RpcError } from "./tools/index.ts";
+import { executeKiaraTool, type ActorClient, type CrmSession, type RpcError } from "./tools/index.ts";
 
 type MessageParam = Anthropic.Beta.Messages.BetaMessageParam;
 type StreamParams = Parameters<Anthropic["beta"]["messages"]["stream"]>[0];
@@ -191,6 +191,8 @@ export type KiaraTurnInput = Readonly<{
   offered: readonly KiaraToolSpec[];
   accessibleSections: readonly PageId[];
   access: AccessContext;
+  /** The CRM-project session for this question only (never shared between questions). */
+  crm?: CrmSession | null;
 }>;
 
 export type RequestUsage = Readonly<{
@@ -468,6 +470,7 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
           access: input.access,
           now: deps.now(),
           knowledgeSearches: kbSearches,
+          crm: input.crm ?? null,
         });
         for (const source of executed.citationSources ?? []) citationSources.set(source.chunk_id, source);
         if (toolUse.name === "search_knowledge_base" && executed.spec) kbSearches += 1;
