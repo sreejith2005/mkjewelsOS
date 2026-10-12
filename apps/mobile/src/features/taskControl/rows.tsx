@@ -22,6 +22,7 @@ import { Button } from "@/ui/Button";
 import { Card, CardRow, StatusBadge } from "@/ui/Card";
 import { Pressable } from "@/ui/Pressable";
 import { Text } from "@/ui/Text";
+import { ToggleField } from "@/forms/ToggleField";
 
 const dateTime = (value: string | null) =>
   value ? new Date(value).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "—";
@@ -34,10 +35,12 @@ export const EvidenceTaskCard = memo(function EvidenceTaskCard({
   row,
   onOpenFile,
   onManage,
+  selection,
 }: {
   row: TaskRow;
   onOpenFile: (file: TaskAttachmentSummary) => void;
   onManage?: ((id: string) => void) | undefined;
+  selection?: Readonly<{ ids: readonly string[]; onChange: (ids: string[]) => void }> | undefined;
 }) {
   const styles = useStyles();
   const tone = taskRowTone(row);
@@ -94,6 +97,7 @@ export const EvidenceTaskCard = memo(function EvidenceTaskCard({
           No file required
         </Text>
       )}
+      {selection && row.task_type !== "fms" ? <ToggleField disabled={false} required={false} label={`Select ${row.task_title}`} value={selection.ids.includes(row.task_id)} onChange={(checked) => selection.onChange(checked ? [...selection.ids, row.task_id] : selection.ids.filter((id) => id !== row.task_id))} /> : null}
       {onManage && row.task_type !== "fms" ? <Button label="Edit / delete task" variant="secondary" onPress={() => onManage(row.task_id)} /> : null}
     </Card>
   );

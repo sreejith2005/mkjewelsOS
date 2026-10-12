@@ -23,11 +23,12 @@ import { fetchReportingOptions, fetchTaskControlSnapshot, type ReportingOptions,
 import { TaskControlFilterBar } from "@/features/taskControl/FilterBar";
 import { TasksTab } from "@/features/taskControl/TasksTab";
 import { TaskManagement } from "@/features/taskControl/TaskManagement";
+import { BulkDeleteDialog, type BulkDeleteRequest } from "@/features/taskControl/BulkDeleteDialog";
 import { OverviewTab } from "@/features/taskControl/OverviewTab";
 import { PeopleTab } from "@/features/taskControl/PeopleTab";
 import { TemplatesTab } from "@/features/taskControl/TemplatesTab";
 import {
-  defaultFilters, rangeIsValid, tenantToday,
+  defaultFilters, evidenceFilter, rangeIsValid, tenantToday,
   type TaskControlFilters, type TaskControlTab,
 } from "@/features/taskControl/filters";
 import type { TaskView } from "@/features/taskEvidence/types";
@@ -88,6 +89,9 @@ export function TaskTemplatesPage() {
   const [scheduling, setScheduling] = useState<TaskTemplateDirectoryRow | null>(null);
   const [scheduleDate, setScheduleDate] = useState(tenantToday());
   const [managedTaskId, setManagedTaskId] = useState<string | null>(null);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [bulkDelete, setBulkDelete] = useState<BulkDeleteRequest | null>(null);
+  useEffect(() => { setSelectedTaskIds([]); }, [filters, view, profile?.id, canAdministerTasks]);
 
   useEffect(() => {
     if (!authorized) return;
@@ -316,6 +320,8 @@ export function TaskTemplatesPage() {
               <PeopleTab onSelectUser={(row) => focusUser(row.user_profile_id, "tasks")} progress={snapshot.progress} />
             ) : (
               <TasksTab
+                selection={canAdministerTasks ? { ids: selectedTaskIds, onChange: setSelectedTaskIds } : undefined}
+                onBulkDelete={canAdministerTasks ? (selected) => setBulkDelete({ filter: evidenceFilter(filters, view, 1, 100), selected, scopeLabel: filters.user_profile_id ? (users.find((user) => user.id === filters.user_profile_id)?.employee_name ?? "Selected employee") : "All employees matching these filters" }) : undefined}
                 onManage={canAdministerTasks ? setManagedTaskId : undefined}
                 evidence={snapshot.evidence}
                 onPage={setPage}
@@ -329,6 +335,12 @@ export function TaskTemplatesPage() {
           ) : null}
       </div>
 
+      {bulkDelete && canAdministerTasks ? <BulkDeleteDialog request={bulkDelete} onClose={() => setBulkDelete(null)} onFinished={async (result) => {
+        setSelectedTaskIds(result.failed.map((row) => row.id));
+        if (page === 1) await refresh();
+        else { setPage(1); await loadTemplates(); }
+      }} /> : null}
+
       {editing !== undefined && references ? (
         <Modal onClose={() => setEditing(undefined)} title={editing ? "Edit task template" : "Add new task"} wide>
           <TaskTemplateForm data={references} initialAssigneeId={filters.user_profile_id} onCancel={() => setEditing(undefined)} onSave={save} template={editing} />
@@ -336,7 +348,7 @@ export function TaskTemplatesPage() {
       ) : null}
 
       {managedTaskId && canAdministerTasks ? <Modal title="Manage assigned task" onClose={() => setManagedTaskId(null)}>
-        <TaskManagement taskId={managedTaskId} onChanged={async () => { setManagedTaskId(null); setPage(1); await refresh(); }} />
+        <TaskManagement taskId={managedTaskId} onChanged={async () => { setManagedTaskId(null); if (page === 1) await refresh(); else { setPage(1); await loadTemplates(); } }} />
       </Modal> : null}
 
       {scheduling ? (

@@ -25,3 +25,21 @@ it("keeps management unavailable to readers and to FMS work", () => {
   rerender(<TasksTab {...props} onManage={vi.fn()} evidence={{ ...evidence, tasks: evidence.tasks.map((row) => ({ ...row, task_type: "fms" })) }} />);
   expect(screen.queryByRole("button", { name: "Edit / delete task" })).toBeNull();
 });
+it("selects a page without losing tasks selected on another page", () => {
+  const selection = { ids: ["earlier-page"], onChange: vi.fn() };
+  const remove = vi.fn();
+  render(<TasksTab {...props} selection={selection} onBulkDelete={remove} />);
+  fireEvent.click(screen.getByRole("button", { name: "Select this page" }));
+  expect(selection.onChange).toHaveBeenCalledWith(["earlier-page", "employee-task"]);
+  fireEvent.click(screen.getByRole("button", { name: "Delete selected" }));
+  expect(remove).toHaveBeenCalledWith(["earlier-page"]);
+  fireEvent.click(screen.getByRole("button", { name: "Delete all matching" }));
+  expect(remove).toHaveBeenLastCalledWith(null);
+});
+it("selects individual task identities and disables empty selected deletion", () => {
+  const onChange = vi.fn();
+  render(<TasksTab {...props} selection={{ ids: [], onChange }} onBulkDelete={vi.fn()} />);
+  expect((screen.getByRole("button", { name: "Delete selected" }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByLabelText("Select Wrong task"));
+  expect(onChange).toHaveBeenCalledWith(["employee-task"]);
+});

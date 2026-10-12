@@ -1,5 +1,5 @@
 import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Linking, RefreshControl, StyleSheet, View, type ListRenderItem } from "react-native";
 import {
   canManageTaskTemplates,
@@ -26,6 +26,7 @@ import {
 } from "@jewelos/data/taskControl/api";
 import {
   defaultFilters,
+  evidenceFilter,
   delayedScore,
   needsAttention,
   pendingScore,
@@ -60,6 +61,7 @@ import {
 import { getSupabase } from "@jewelos/api-client/client";
 import { useAccess, useProfile } from "@/auth/AuthProvider";
 import { TaskManagement } from "@/features/taskControl/TaskManagement";
+import { BulkDeleteSheet, type BulkDeleteRequest } from "@/features/taskControl/BulkDeleteSheet";
 import { TaskControlFilterSheet } from "@/features/taskControl/TaskControlFilterSheet";
 import { ProgressRow, StatTile } from "@/features/taskControl/panels";
 import { EvidenceTaskCard, TemplateCard } from "@/features/taskControl/rows";
@@ -134,10 +136,13 @@ export function TaskControlScreen() {
   const [scheduling, setScheduling] = useState<TaskTemplateDirectoryRow | null>(null);
   const [scheduleDate, setScheduleDate] = useState(() => tenantToday());
   const [managedTaskId, setManagedTaskId] = useState<string | null>(null);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [bulkDelete, setBulkDelete] = useState<BulkDeleteRequest | null>(null);
 
   // The search term reaches the two server contracts only once it settles;
   // the sheet still shows every keystroke.
   const appliedSearch = useDebouncedValue(filters.search);
+  useEffect(() => { setSelectedTaskIds([]); }, [filters, view, appliedSearch, profile.id, canAdministerTasks]);
   const validRange = rangeIsValid(filters);
 
   // None of these depend on the filters, so they load once. Each falls back on
@@ -159,6 +164,7 @@ export function TaskControlScreen() {
   }, [authorized]);
   const options = referenceState.data?.options ?? { branches: [], departments: [] };
   const users = referenceState.data?.users ?? [];
+  const bulkScopeLabel = filters.user_profile_id ? (users.find((user) => user.id === filters.user_profile_id)?.employee_name ?? "Selected employee") : "All employees matching these filters";
   const references = referenceState.data?.references ?? null;
 
   const snapshotState = useAsyncData(async () => {
@@ -396,7 +402,7 @@ export function TaskControlScreen() {
           />
         );
       }
-      if (item.kind === "task") return <EvidenceTaskCard onOpenFile={openFile} onManage={canAdministerTasks ? setManagedTaskId : undefined} row={item.task} />;
+      if (item.kind === "task") return <EvidenceTaskCard onOpenFile={openFile} onManage={canAdministerTasks ? setManagedTaskId : undefined} selection={canAdministerTasks ? { ids: selectedTaskIds, onChange: setSelectedTaskIds } : undefined} row={item.task} />;
       if (item.kind === "person" || item.kind === "attention") {
         return (
           <ProgressRow
@@ -427,7 +433,7 @@ export function TaskControlScreen() {
         </Card>
       );
     },
-    [busyId, canManage, canAdministerTasks, focusUser, openEdit, openFile, openSchedule, remove, toggle],
+    [busyId, canManage, canAdministerTasks, selectedTaskIds, focusUser, openEdit, openFile, openSchedule, remove, toggle],
   );
 
   if (!authorized) {
@@ -542,6 +548,13 @@ export function TaskControlScreen() {
 
             {tab === "tasks" ? (
               <>
+                {canAdministerTasks ? <View style={styles.headerActions}>
+                  <Button label="Select this page" variant="secondary" disabled={snapshotState.loading} onPress={() => setSelectedTaskIds([...new Set([...selectedTaskIds, ...(evidence?.tasks ?? []).filter((row) => row.task_type !== "fms").map((row) => row.task_id)])])} />
+                  <Button label="Clear selection" variant="secondary" disabled={!selectedTaskIds.length} onPress={() => setSelectedTaskIds([])} />
+                  <Text>{`${selectedTaskIds.length} selected`}</Text>
+                  <Button label="Delete selected" variant="danger" disabled={!selectedTaskIds.length || snapshotState.loading || appliedSearch !== filters.search} onPress={() => setBulkDelete({ filter: evidenceFilter({ ...filters, search: appliedSearch }, view, 1, 100), selected: [...selectedTaskIds], scopeLabel: bulkScopeLabel })} />
+                  <Button label="Delete all matching" variant="danger" disabled={!evidence?.tasks_total || snapshotState.loading || !validRange || appliedSearch !== filters.search} onPress={() => setBulkDelete({ filter: evidenceFilter({ ...filters, search: appliedSearch }, view, 1, 100), selected: null, scopeLabel: bulkScopeLabel })} />
+                </View> : null}
                 <SegmentedControl
                   accessibilityLabel="Task view"
                   onChange={(next) => {
@@ -597,6 +610,12 @@ export function TaskControlScreen() {
         visible={filtersOpen}
       />
 
+      {bulkDelete && canAdministerTasks ? <BulkDeleteSheet request={bulkDelete} onClose={() => setBulkDelete(null)} onFinished={async (result) => {
+        setSelectedTaskIds(result.failed.map((row) => row.id));
+        if (page === 1) await refresh();
+        else { setPage(1); await templateState.refresh(); }
+      }} /> : null}
+
       <Sheet
         onClose={() => setEditing(undefined)}
         tall
@@ -615,7 +634,7 @@ export function TaskControlScreen() {
       </Sheet>
 
       <Sheet onClose={() => setManagedTaskId(null)} tall title="Manage assigned task" visible={managedTaskId !== null && canAdministerTasks}>
-        {managedTaskId && canAdministerTasks ? <TaskManagement key={managedTaskId} taskId={managedTaskId} onChanged={async () => { setManagedTaskId(null); setPage(1); await refresh(); }} /> : null}
+        {managedTaskId && canAdministerTasks ? <TaskManagement key={managedTaskId} taskId={managedTaskId} onChanged={async () => { setManagedTaskId(null); if (page === 1) await refresh(); else { setPage(1); await templateState.refresh(); } }} /> : null}
       </Sheet>
 
       <Sheet onClose={() => setScheduling(null)} title="Task schedule" visible={scheduling !== null}>
