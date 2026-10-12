@@ -272,7 +272,7 @@ Deno.test("run_report: too-long ranges, odd status values, and refusals", async 
 
 Deno.test("find_people never selects or returns personal contact fields", async () => {
   const actor = new FakeActor({}, {
-    user_profiles: () => ok([{ id: "e1", employee_name: "Asha Rao", employee_code: "MK-1", designation_id: "f0000000-0000-4000-8000-0000000000a1", department_id: "f0000000-0000-4000-8000-0000000000d1", branch_id: "f0000000-0000-4000-8000-0000000000b1", working_status: "active", account_status: "active", official_email: "asha@mkjewels.example", personal_mobile: "9812345678", personal_email: "asha@home.example" }]),
+    user_profiles: () => ok([{ id: "e1", employee_name: "Asha Rao", employee_code: "MK-1", designation_id: "f0000000-0000-4000-8000-0000000000a1", department_id: "f0000000-0000-4000-8000-0000000000d1", branch_id: "f0000000-0000-4000-8000-0000000000b1", working_status: "active", account_status: "active", official_email: "asha@mkjewels.example", personal_mobile: "1012345678", personal_email: "asha@home.example" }]),
     departments: () => ok([{ id: "f0000000-0000-4000-8000-0000000000d1", name: "Sales" }]),
     branches: () => ok([{ id: "f0000000-0000-4000-8000-0000000000b1", name: "Andheri" }]),
     dropdown_masters: () => ok([{ id: "f0000000-0000-4000-8000-0000000000a1", label: "Sales Executive" }]),
@@ -289,7 +289,7 @@ Deno.test("find_people never selects or returns personal contact fields", async 
 });
 
 Deno.test("find_colleague returns only the four directory fields", async () => {
-  const actor = new FakeActor({ kiara_directory_lookup: () => ok({ people: [{ name: "Bina", designation: "HR Executive", department: "HR", branch: "Andheri", personal_mobile: "9812345678", email: "bina@home.example" }], truncated: false }) });
+  const actor = new FakeActor({ kiara_directory_lookup: () => ok({ people: [{ name: "Bina", designation: "HR Executive", department: "HR", branch: "Andheri", personal_mobile: "1012345678", email: "bina@home.example" }], truncated: false }) });
   const result = await run(actor, "find_colleague", { query: "HR Andheri" }, accessFor("staff"));
   assertEquals(actor.rpcs[0]!.args, { p_query: "HR Andheri", p_limit: 10 });
   assertEquals(result.json.people, [{ name: "Bina", designation: "HR Executive", department: "HR", branch: "Andheri" }]);
