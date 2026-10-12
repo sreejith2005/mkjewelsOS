@@ -6,7 +6,7 @@ vi.mock("@jewelos/api-client/client", () => ({
   getSupabase: () => ({ functions: { invoke: api.invoke }, rpc: api.rpc }),
 }));
 
-import { askKiara, getMyKiaraConversation, getMyKiaraQuota, listMyKiaraConversations } from "./api";
+import { askKiara, getMyKiaraConversation, getMyKiaraQuota, listMyKiaraConversations, transcribeKiaraVoice } from "./api";
 
 const quota = { used: 2, limit: 10, resets_at: "2026-10-09T18:30:00.000Z" };
 const requestId = "33333333-3333-4333-8333-333333333333";
@@ -125,5 +125,32 @@ describe("conversation reads", () => {
   it("parses the quota", async () => {
     api.rpc.mockResolvedValue({ data: { used: 3, limit: null, resets_at: "2026-10-09T18:30:00Z", timezone: "Asia/Kolkata" }, error: null });
     await expect(getMyKiaraQuota()).resolves.toEqual({ used: 3, limit: null, resets_at: "2026-10-09T18:30:00Z", timezone: "Asia/Kolkata" });
+  });
+});
+
+describe("transcribeKiaraVoice", () => {
+  const clip = () => new File([new Uint8Array([1, 2, 3])], "voice-question.wav", { type: "audio/wav" });
+
+  it("posts the recording to ask-kiara/transcribe and returns the words, never sending a question", async () => {
+    api.invoke.mockResolvedValue({ data: { text: "Aaj mera kya pending hai?", duration_s: 3.1, language: "hindi" }, error: null });
+    await expect(transcribeKiaraVoice(clip())).resolves.toEqual({ text: "Aaj mera kya pending hai?", durationSeconds: 3.1, language: "hindi" });
+    expect(api.invoke).toHaveBeenCalledTimes(1);
+    const [name, options] = api.invoke.mock.calls[0] as [string, { method: string; body: FormData }];
+    expect(name).toBe("ask-kiara/transcribe");
+    expect(options.method).toBe("POST");
+    expect((options.body.get("audio") as File).name).toBe("voice-question.wav");
+  });
+
+  it("throws the function's safe message (permission, allowance, no speech)", async () => {
+    const context = new Response(JSON.stringify({ error: "Too many voice recordings in the last hour.", code: "voice_limit_reached" }), { status: 429 });
+    api.invoke.mockResolvedValue({ data: null, error: { context } });
+    await expect(transcribeKiaraVoice(clip())).rejects.toThrow("Too many voice recordings in the last hour.");
+  });
+
+  it("falls back to a content-free message", async () => {
+    api.invoke.mockResolvedValue({ data: null, error: new Error("network") });
+    await expect(transcribeKiaraVoice(clip())).rejects.toThrow("Voice input is unavailable right now. Please type your question.");
+    api.invoke.mockResolvedValue({ data: { nope: true }, error: null });
+    await expect(transcribeKiaraVoice(clip())).rejects.toThrow("Voice input is unavailable right now. Please type your question.");
   });
 });

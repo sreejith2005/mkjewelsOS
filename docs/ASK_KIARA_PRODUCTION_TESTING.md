@@ -198,3 +198,62 @@ limit that day. A question Kiara could not answer is given back and is not count
    Sign in as staff: there is no Insights or Limits tab.
 6. Nothing to check for the clean-up: old chats are deleted automatically every night, and a
    new company (tenant) would start with Ask Kiara switched off.
+
+## 8. Phase 7: Ask Kiara by voice
+
+New in Phase 7. People can speak a question instead of typing it.
+
+**Who sees the mic.** A mic button appears next to **Send** in the Ask Kiara chat for people with
+**Ask Kiara by voice**. By default that is **Super Admin, Admin and Manager**. HR, Staff and the
+other roles don't have it unless you give it to them. They still type as before.
+
+**How to use it**
+1. Tap the **mic** next to Send. The first time, the browser asks to use the microphone: choose
+   **Allow**.
+2. Speak your question in **Hindi, Hinglish or English**. The box above the input shows
+   **Recording**, the seconds left (60 seconds at most) and a level bar that moves when you speak.
+3. Tap the **stop** button (the square). After a moment the words appear in the input box.
+4. **Read and correct the words**, then press **Send**. Nothing is sent until you press Send.
+   If you already typed something, the spoken words are added after it.
+
+Turning speech into text **does not use one of the daily questions**. Only pressing Send does.
+Voice recordings are not saved anywhere. Each person can record about **40 voice clips an hour**,
+and that allowance is **shared with Tasks voice** (assigning tasks by voice).
+
+**Messages you may see**
+- *Microphone access was blocked*: allow the microphone for this site (the mic or lock icon in the
+  address bar), then try again.
+- *That was too short*: hold on a little longer; record at least one second.
+- *Nothing was heard in the recording* or *Your voice was not heard clearly*: speak closer to the
+  phone or computer and try again.
+- *Too many voice recordings in the last hour*: type the question, or wait a while.
+
+**Give voice to someone else** (Settings → Permission management)
+- A whole role (for example HR): **Roles** tab → click the role → under **Assistant**, tick
+  **Ask Kiara by voice** → **Save 1 change**.
+- One person: **Users** tab → search and click the person → row **Ask Kiara by voice** →
+  **Grant** → **Save access**. **Deny** in the same row takes it away from one person even if
+  their role has it.
+- The person must also be able to use Ask Kiara itself (**Use Ask Kiara**). They see the mic
+  after they reload the page.
+
+### Phase 7 checks on production
+
+Use **desktop Chrome** once and **Chrome on an Android phone** (the web app, not the APK) once.
+
+1. Sign in as a Manager. Ask Kiara shows a mic next to Send. Sign in as a Staff member (or HR):
+   there is no mic.
+2. **Hindi**: tap the mic and say "मेरे आज के पेंडिंग टास्क कौन से हैं?" ("Mere aaj ke pending
+   task kaun se hain?"). The words appear in the box, in Hindi or in Latin letters. Nothing is
+   sent yet. Correct a word if needed, press **Send**, and check the answer.
+3. **Hinglish**: say "Leave apply karne ka process kya hai?". Check the words, press Send and check
+   the answer.
+4. **English**: say "How do I apply for leave?". Check, Send.
+5. Tap the mic and stay silent for 3 seconds, then stop: a "not heard" message appears and the
+   box stays empty.
+6. **Tasks voice still works**: go to Tasks → **Assign Task** (or the round mic button on other
+   pages), record "Ask <a team member's name> to count the display stock by tomorrow 5 pm". The
+   form fills in with that person and deadline as before. Close it without assigning, or assign
+   and delete the test task.
+7. Optional: in Settings → Permission management → **Users**, Grant **Ask Kiara by voice** to one
+   staff member. After a reload they see the mic. Remove the Grant afterwards.

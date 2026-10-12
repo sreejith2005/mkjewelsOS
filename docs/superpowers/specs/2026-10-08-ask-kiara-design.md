@@ -493,7 +493,9 @@ service-role only and stays unchanged for Tasks), then returns
 `{text, duration_s}`. The transcript goes into the input box; the user edits and presses Send. It is
 not auto-sent and does not consume a question until sent. Transcription runs without a `language`
 parameter (auto-detect, needed for Hindi) and with a vocabulary prompt of section names; the existing
-no-speech guard rejects silence.
+no-speech guard rejects silence. (Phase 7, as built: a clip whisper labels Urdu, a common label for spoken
+Hindi, is transcribed once more with `language=hi` so it comes back in Devanagari; errors use the
+codes `voice_limit_reached` (429) and `no_speech` (422); the response also carries `language`.)
 
 ### 7.3 Model call
 

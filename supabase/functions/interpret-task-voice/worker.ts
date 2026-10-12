@@ -18,43 +18,29 @@ import { resolveVoiceDeadline, type VoiceDeadline } from "../../../packages/core
  * the author still presses Assign in the composer.
  */
 
-/**
- * The browser uploads 16 kHz mono 16-bit WAV (~1.9 MB for 60 s), falling back
- * to its own ~150 KB Opus clip. The byte ceiling is the server-side bound.
- */
-export const VOICE_NOTE_MAX_BYTES = 2_621_440;
-export const VOICE_NOTE_MAX_SECONDS = 60;
+// Upload limits, the error type, and the spoken-text guards live in the shared
+// transcription module (Ask Kiara Phase 7). They keep their original names here
+// so this worker's callers and tests are unchanged.
+import {
+  VOICE_NOTE_CONTENT_TYPES,
+  VOICE_NOTE_MAX_BYTES,
+  VOICE_NOTE_MAX_SECONDS,
+  VoiceTranscriptionError as VoiceInterpretationError,
+  assertTranscriptWasSpoken,
+  assertVoiceUpload,
+  type VoiceAudioUpload,
+  type VoiceTranscription,
+} from "../_shared/voice/transcribe.ts";
 
-export const VOICE_NOTE_CONTENT_TYPES: ReadonlySet<string> = new Set([
-  "audio/webm",
-  "audio/ogg",
-  "audio/mp4",
-  "audio/m4a",
-  "audio/mpeg",
-  "audio/wav",
-  "audio/x-wav",
-]);
-
-export class VoiceInterpretationError extends Error {
-  constructor(readonly status: number, message: string) {
-    super(message);
-    this.name = "VoiceInterpretationError";
-  }
-}
-
-export type VoiceAudioUpload = Readonly<{
-  bytes: Uint8Array;
-  contentType: string;
-  filename: string;
-}>;
-
-/** Rejects anything that is not a small audio clip before a paid API is touched. */
-export function assertVoiceUpload(upload: VoiceAudioUpload): void {
-  const contentType = upload.contentType.split(";")[0]?.trim().toLowerCase() ?? "";
-  if (!VOICE_NOTE_CONTENT_TYPES.has(contentType)) throw new VoiceInterpretationError(415, "Unsupported audio format");
-  if (upload.bytes.byteLength === 0) throw new VoiceInterpretationError(400, "The recording is empty");
-  if (upload.bytes.byteLength > VOICE_NOTE_MAX_BYTES) throw new VoiceInterpretationError(413, `Keep the recording under ${VOICE_NOTE_MAX_SECONDS} seconds`);
-}
+export {
+  VOICE_NOTE_CONTENT_TYPES,
+  VOICE_NOTE_MAX_BYTES,
+  VOICE_NOTE_MAX_SECONDS,
+  VoiceInterpretationError,
+  assertTranscriptWasSpoken,
+  assertVoiceUpload,
+};
+export type { VoiceAudioUpload, VoiceTranscription };
 
 export type VoiceExtractionContext = Readonly<{
   /**
@@ -66,17 +52,6 @@ export type VoiceExtractionContext = Readonly<{
   timeZone: string;
   departmentLabels: readonly string[];
   peopleNames: readonly string[];
-}>;
-
-/**
- * What speech-to-text heard. `durationSeconds` and `noSpeech` come from the
- * provider's own segment analysis when the model reports it (whisper-1
- * verbose_json); a model that reports neither leaves them null.
- */
-export type VoiceTranscription = Readonly<{
-  text: string;
-  durationSeconds: number | null;
-  noSpeech: boolean | null;
 }>;
 
 export type VoiceInterpretationGateway = Readonly<{
@@ -138,25 +113,8 @@ export function buildTranscriptionPrompt(context: VoiceExtractionContext): strin
   return words.length > 0 ? `${words.join(", ")}.` : "";
 }
 
-/** Faster than anyone dictates; more words than this per second were not spoken. */
-const MAX_WORDS_PER_SECOND = 4.5;
-
 function normalizeTranscription(value: string | VoiceTranscription): VoiceTranscription {
   return typeof value === "string" ? { text: value, durationSeconds: null, noSpeech: null } : value;
-}
-
-/**
- * Speech-to-text answers a clip it cannot hear with invented, fluent text. A
- * transcript longer than the audio could hold, or one the provider itself
- * marks as no speech, is refused rather than turned into a task.
- */
-export function assertTranscriptWasSpoken(transcription: VoiceTranscription): void {
-  const unheard = "Your voice was not heard clearly. Check the microphone, speak close to it, and try again.";
-  if (transcription.noSpeech === true) throw new VoiceInterpretationError(422, unheard);
-  const duration = transcription.durationSeconds;
-  if (duration === null || !Number.isFinite(duration)) return;
-  const words = transcription.text.split(/\s+/).filter(Boolean).length;
-  if (words > Math.max(6, Math.ceil(duration * MAX_WORDS_PER_SECOND))) throw new VoiceInterpretationError(422, unheard);
 }
 
 /** True when the note carried nothing a task could be built from. */

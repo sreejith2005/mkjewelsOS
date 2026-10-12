@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AskKiaraOptions } from "@jewelos/data/assistant/api";
 
@@ -9,12 +9,19 @@ const data = vi.hoisted(() => ({
   getMyKiaraConversation: vi.fn(),
   getMyKiaraQuota: vi.fn(),
   archiveMyKiaraConversation: vi.fn(),
+  transcribeKiaraVoice: vi.fn(),
 }));
 vi.mock("@jewelos/data/assistant/api", () => ({ ...data, KIARA_CONVERSATION_QUESTION_LIMIT: 15, KIARA_QUESTION_MAX_LENGTH: 2000 }));
 const escalations = vi.hoisted(() => ({ createKiaraEscalation: vi.fn(), withdrawMyKiaraEscalation: vi.fn(), getKiaraEscalationBadge: vi.fn() }));
 vi.mock("@jewelos/data/assistant/escalations", () => escalations);
 vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealtimeRefresh: () => () => {} }));
-vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ profile: { id: "p1", tenant_id: "t1", employee_name: "Asha Rao", user_role: "staff" } }) }));
+const auth = vi.hoisted(() => ({ permissions: {} as Record<string, boolean> }));
+vi.mock("@/auth/AuthContext", () => ({
+  useAuth: () => ({
+    profile: { id: "p1", tenant_id: "t1", employee_name: "Asha Rao", user_role: "staff" },
+    access: { profileId: "p1", baseRole: "staff", dashboardAuthority: null, effectiveRole: "staff", permissions: auth.permissions },
+  }),
+}));
 
 import { AskKiaraPage, bubblesFor, kiaraLocation } from "./AskKiaraPage";
 
@@ -27,9 +34,14 @@ beforeEach(() => {
   for (const mock of Object.values(escalations)) mock.mockReset();
   data.listMyKiaraConversations.mockResolvedValue([]);
   data.getMyKiaraQuota.mockResolvedValue(quota);
+  auth.permissions = {};
   Element.prototype.scrollIntoView = vi.fn();
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 describe("AskKiaraPage", () => {
   it("greets the user with suggestions and the quota chip", async () => {
@@ -135,5 +147,106 @@ describe("AskKiaraPage", () => {
     render(<AskKiaraPage onNavigate={vi.fn()} search="?conversation=c9" />);
     expect(await screen.findByText("Synthetic earlier question")).toBeTruthy();
     expect(data.getMyKiaraConversation).toHaveBeenCalledWith("c9");
+  });
+
+  describe("voice questions (assistant.voice)", () => {
+    class FakeRecorder extends EventTarget {
+      static isTypeSupported = () => true;
+      state: "inactive" | "recording" = "inactive";
+      mimeType = "audio/webm;codecs=opus";
+      constructor(readonly stream: MediaStream) { super(); }
+      start() { this.state = "recording"; }
+      stop() {
+        this.state = "inactive";
+        this.dispatchEvent(Object.assign(new Event("dataavailable"), { data: new Blob(["voice"], { type: this.mimeType }) }));
+        this.dispatchEvent(new Event("stop"));
+      }
+    }
+    class FakeAudioContext {
+      state = "running";
+      resume() { return Promise.resolve(); }
+      createAnalyser() { return { fftSize: 0, getFloatTimeDomainData: (samples: Float32Array) => samples.fill(0.1) }; }
+      createMediaStreamSource() { return { connect: () => undefined }; }
+      close() { return Promise.resolve(); }
+    }
+    const installRecorder = () => {
+      vi.stubGlobal("MediaRecorder", FakeRecorder);
+      vi.stubGlobal("AudioContext", FakeAudioContext);
+      Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: () => Promise.resolve({ getTracks: () => [{ stop: () => undefined }] }) } });
+    };
+    async function speak(milliseconds = 2_000) {
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Ask by voice" })); });
+      await act(async () => { vi.advanceTimersByTime(milliseconds); });
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Stop recording" })); });
+    }
+
+    it("hides the mic without assistant.voice", () => {
+      auth.permissions = { "assistant.view": true };
+      render(<AskKiaraPage onNavigate={vi.fn()} />);
+      expect(screen.queryByRole("button", { name: "Ask by voice" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
+    });
+
+    it("shows the mic beside Send with assistant.voice", () => {
+      auth.permissions = { "assistant.view": true, "assistant.voice": true };
+      render(<AskKiaraPage onNavigate={vi.fn()} />);
+      const mic = screen.getByRole("button", { name: "Ask by voice" });
+      const send = screen.getByRole("button", { name: "Send" });
+      expect(mic.parentElement).toBe(send.parentElement);
+      expect(mic.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("puts the transcript in the input for editing and never sends it on its own", async () => {
+      auth.permissions = { "assistant.view": true, "assistant.voice": true };
+      vi.useFakeTimers();
+      installRecorder();
+      data.transcribeKiaraVoice.mockResolvedValue({ text: "Aaj mera kya pending hai?", durationSeconds: 2, language: "hindi" });
+      render(<AskKiaraPage onNavigate={vi.fn()} />);
+      await act(async () => { await Promise.resolve(); });
+      fireEvent.change(screen.getByLabelText("Your question"), { target: { value: "Namaste." } });
+      await speak();
+      expect(data.transcribeKiaraVoice).toHaveBeenCalledTimes(1);
+      expect((screen.getByLabelText("Your question") as HTMLTextAreaElement).value).toBe("Namaste. Aaj mera kya pending hai?");
+      expect(data.askKiara).not.toHaveBeenCalled();
+      expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it("shows the recording state with the time left, and a clear error when nothing is heard", async () => {
+      auth.permissions = { "assistant.view": true, "assistant.voice": true };
+      vi.useFakeTimers();
+      installRecorder();
+      data.transcribeKiaraVoice.mockRejectedValue(new Error("Nothing was heard in the recording. Speak close to the microphone and try again."));
+      render(<AskKiaraPage onNavigate={vi.fn()} />);
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Ask by voice" })); });
+      expect(screen.getByText("Recording · 60s left")).toBeTruthy();
+      expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
+      await act(async () => { vi.advanceTimersByTime(2_000); });
+      expect(screen.getByText("Recording · 58s left")).toBeTruthy();
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Stop recording" })); });
+      expect(screen.getByRole("alert").textContent).toContain("Nothing was heard");
+      expect(data.askKiara).not.toHaveBeenCalled();
+    });
+
+    it("explains a blocked microphone", async () => {
+      auth.permissions = { "assistant.view": true, "assistant.voice": true };
+      installRecorder();
+      Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: () => Promise.reject(new Error("NotAllowedError")) } });
+      render(<AskKiaraPage onNavigate={vi.fn()} />);
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Ask by voice" })); });
+      expect(screen.getByRole("alert").textContent).toContain("Microphone access was blocked");
+    });
+
+    it("stops at the time limit by itself", async () => {
+      auth.permissions = { "assistant.view": true, "assistant.voice": true };
+      vi.useFakeTimers();
+      installRecorder();
+      data.transcribeKiaraVoice.mockResolvedValue({ text: "How do I apply for leave?", durationSeconds: 60, language: "english" });
+      render(<AskKiaraPage onNavigate={vi.fn()} />);
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Ask by voice" })); });
+      await act(async () => { vi.advanceTimersByTime(60_000); });
+      expect(data.transcribeKiaraVoice).toHaveBeenCalledTimes(1);
+      expect((screen.getByLabelText("Your question") as HTMLTextAreaElement).value).toBe("How do I apply for leave?");
+      expect(data.askKiara).not.toHaveBeenCalled();
+    });
   });
 });

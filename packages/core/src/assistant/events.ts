@@ -48,7 +48,10 @@ export type KiaraErrorCode =
   | "daily_limit_reached"
   | "unavailable"
   | "provider_error"
-  | "interrupted";
+  | "interrupted"
+  // Voice questions (ask-kiara/transcribe, Phase 7).
+  | "voice_limit_reached"
+  | "no_speech";
 
 /** The JSON-mode response: the `done` fields plus the conversation ids. */
 export type KiaraChatResult = Readonly<{

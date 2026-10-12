@@ -70,6 +70,7 @@ export function AskKiaraPage({ onNavigate, search = window.location.search }: { 
   const canAnswer = access ? hasPermission(access, "assistant.answer_escalations") : false;
   const canViewInsights = access ? hasPermission(access, "assistant.view_insights") : false;
   const canManageLimits = access ? hasPermission(access, "assistant.manage_limits") : false;
+  const canUseVoice = access ? hasPermission(access, "assistant.voice") : false;
   const waitingQuestions = useKiaraEscalationBadge(profile?.tenant_id, canAnswer);
   const location = kiaraLocation(search);
   const [tab, setTab] = useState<KiaraTab>(location.tab);
@@ -371,6 +372,7 @@ export function AskKiaraPage({ onNavigate, search = window.location.search }: { 
       <section aria-label="Chat with Kiara" className={`${showList ? "hidden" : "flex"} min-w-0 flex-1 flex-col rounded-2xl border border-task-border bg-task-bg p-3 sm:p-4 md:flex`}>
         <ChatView
           bubbles={bubbles}
+          canUseVoice={canUseVoice}
           disabledReason={disabledReason}
           escalationBusy={escalationBusy}
           onAskPerson={(messageId) => void askPerson(messageId)}

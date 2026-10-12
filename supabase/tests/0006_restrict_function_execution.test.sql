@@ -37,20 +37,21 @@ select ok(not has_function_privilege('service_role', 'rls_auto_enable()', 'EXECU
 -- 0206/0207 add 10 functions (8 definers), 5 authenticated entry points.
 -- 0208/0210 add 11 private/public definers, only 3 authenticated entry points.
 -- 0220 (Ask Kiara Phase 6) adds 21 functions (20 definers): 7 authenticated, 7 service_role.
+-- 0230 (Ask Kiara Phase 7) adds consume_my_voice_quota(): 1 definer, authenticated.
 select is((
   select count(*)::integer
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
-), 504, 'exactly 504 postgres-owned public application functions exist in the current migration set');
+), 505, 'exactly 505 postgres-owned public application functions exist in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres' and p.prosecdef
-), 430, 'exactly 430 public application functions are SECURITY DEFINER in the current migration set');
+), 431, 'exactly 431 public application functions are SECURITY DEFINER in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -66,7 +67,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 241, 'authenticated can execute exactly 241 reviewed public application functions');
+), 242, 'authenticated can execute exactly 242 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -82,7 +83,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('postgres', p.oid, 'EXECUTE')
-), 504, 'postgres retains owner execution on every public application function');
+), 505, 'postgres retains owner execution on every public application function');
 select ok(not has_function_privilege('authenticated', 'reject_watcher_task_mutation()', 'EXECUTE'), 'watcher guard trigger cannot be called directly');
 
 -- Exact authenticated allowlist: baseline, Forms, and reviewed FMS entry points.
@@ -228,6 +229,8 @@ select is((
   'complete_kiara_turn(uuid,text,jsonb,text,jsonb,jsonb,text[],text[],boolean,text,text,jsonb)',
   'complete_recurring_task_with_image_with_audit(uuid,text)',
   'complete_uploaded_task_with_audit(uuid,text)',
+  -- 0230: Ask Kiara voice questions spend the shared hourly voice allowance as the caller.
+  'consume_my_voice_quota()',
   'create_crm_field_definition(text,text,text,text,jsonb,boolean,jsonb)',
   'create_dropdown_list_with_audit(text,jsonb)',
   'create_kiara_document_with_audit(text,text,text,text,integer,text,text[])',
