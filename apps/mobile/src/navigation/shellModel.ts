@@ -9,8 +9,39 @@ import {
   type PageAccessDecision,
   type PageId,
   type SectionControls,
+  notificationDestination,
 } from "@jewelos/core";
 import type { ThemeName } from "@jewelos/ui-tokens";
+
+/**
+ * Sections implemented on web whose native screens have not shipped yet. The
+ * launcher is built from core, so without this list a new web page would show
+ * up natively and open SectionScreen's "not implemented" fallback. Ask Kiara's
+ * native screen arrives in its Phase 8 (docs/superpowers/plans/2026-10-08-ask-kiara-plan.md),
+ * which removes it from this list.
+ */
+export const NATIVE_PENDING_PAGES: readonly PageId[] = ["ask_kiara"];
+
+export function isNativePendingPage(page: PageId): boolean {
+  return NATIVE_PENDING_PAGES.includes(page);
+}
+
+/** True when a link opens a section the app does not have yet (web only for now). */
+export function isNativePendingPath(path: string): boolean {
+  const page = getPageForPath(path.split("?")[0] ?? path);
+  return page !== null && page !== undefined && isNativePendingPage(page);
+}
+
+/**
+ * What tapping "Open" on a notification does in the app: open its screen, or,
+ * for a section only on the web for now (Ask Kiara until its Phase 8), say so
+ * instead of opening a blank screen.
+ */
+export function nativeNotificationAction(link: string | null): Readonly<{ kind: "open"; path: string } | { kind: "web_only" }> | null {
+  const path = notificationDestination(link);
+  if (!path) return null;
+  return isNativePendingPath(path) ? { kind: "web_only" } : { kind: "open", path };
+}
 
 /** The two high-frequency destinations retained in compact bottom navigation. */
 export const COMPACT_DOCK_PATHS = ["/", "/tasks"] as const;
@@ -106,7 +137,7 @@ export function resolveNativeDestination(path: string): NativeDestination | null
   // resolved by `fmsAssignedWorkRoute` at the call site; a bare path lands here.
   if (path === "/tasks/fms" || path.startsWith("/tasks/fms?")) return { kind: "tab", route: "Fms" };
   const page = getPageForPath(path);
-  if (!page) return null;
+  if (!page || isNativePendingPage(page)) return null;
   const route = PAGE_ROUTE[page];
   return route ? { kind: "tab", route } : { kind: "section", page };
 }
@@ -130,6 +161,8 @@ export function crmTabFullScreen(shell: ShellAccess): boolean {
 
 /** Execute a web-path navigation request against the native tab shell. */
 export function navigatePath(path: string, shell: ShellAccess, handlers: NativeNavigationHandlers): boolean {
+  // A web-only section never opens the "not implemented" fallback screen.
+  if (isNativePendingPath(path)) return false;
   const destination = resolveNativeDestination(path);
   if (!destination) return false;
   // Authorize by the page the path itself maps to, not by the page the tab
@@ -148,7 +181,7 @@ export function navigatePath(path: string, shell: ShellAccess, handlers: NativeN
 
 /** Sections this user may open right now, in menu order. */
 export function accessibleMenu(shell: ShellAccess): readonly MenuItem[] {
-  return getAccessibleMenu(shell.access, shell.controls);
+  return getAccessibleMenu(shell.access, shell.controls).filter((item) => !isNativePendingPage(item.id));
 }
 
 /**

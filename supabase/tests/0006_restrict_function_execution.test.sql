@@ -42,14 +42,14 @@ select is((
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
-), 421, 'exactly 421 postgres-owned public application functions exist in the current migration set');
+), 477, 'exactly 477 postgres-owned public application functions exist in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres' and p.prosecdef
-), 356, 'exactly 356 public application functions are SECURITY DEFINER in the current migration set');
+), 404, 'exactly 404 public application functions are SECURITY DEFINER in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -65,7 +65,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 201, 'authenticated can execute exactly 201 reviewed public application functions');
+), 233, 'authenticated can execute exactly 233 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -81,7 +81,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('postgres', p.oid, 'EXECUTE')
-), 421, 'postgres retains owner execution on every public application function');
+), 477, 'postgres retains owner execution on every public application function');
 select ok(not has_function_privilege('authenticated', 'reject_watcher_task_mutation()', 'EXECUTE'), 'watcher guard trigger cannot be called directly');
 
 -- Exact authenticated allowlist: baseline, Forms, and reviewed FMS entry points.
@@ -206,38 +206,59 @@ select is((
     and p.oid::regprocedure::text not in (select identity from expected)
 ), array[
   'acknowledge_daily_checklist_with_audit(uuid,integer,uuid[])',
+  -- 0215: Ask Kiara knowledge base (manager RPCs audited; search read-only; storage path checks).
+  'add_kiara_document_version_with_audit(uuid,text,integer,text)',
   'add_task_comment_with_audit(uuid,text)',
   'admin_delete_task_with_audit(uuid,boolean,text)',
   'admin_edit_task_with_audit(uuid,jsonb)',
+  -- 0217: Ask Kiara escalations (asker confirm/withdraw; answerers list/badge/answer; RLS helper).
+  'answer_kiara_escalation_with_audit(uuid,text,boolean,text)',
+  -- 0213: Ask Kiara conversation and quota RPCs (caller-scoped, audited writes).
+  'archive_my_kiara_conversation(uuid)',
   'assert_crm_branch_user(uuid,uuid,uuid,text)',
   'assert_fms_flow_publishable(uuid)',
   'assign_imported_task_with_audit(text,uuid,uuid)',
   'begin_task_bulk_import(text,text,integer)',
+  -- 0216: Ask Kiara department targeting (bulk visibility/tag edit, filter data; audited).
+  'bulk_update_kiara_documents_access_with_audit(uuid[],text,text[],text)',
   'cancel_task_bulk_import(uuid)',
   'change_dropdown_category_with_audit(text,uuid,text,text,text,integer,boolean)',
   'commit_task_bulk_import_chunk(uuid,jsonb)',
+  'complete_kiara_turn(uuid,text,jsonb,text,jsonb,jsonb,text[],text[],boolean,text,text,jsonb)',
   'complete_recurring_task_with_image_with_audit(uuid,text)',
   'complete_uploaded_task_with_audit(uuid,text)',
   'create_crm_field_definition(text,text,text,text,jsonb,boolean,jsonb)',
   'create_dropdown_list_with_audit(text,jsonb)',
+  'create_kiara_document_with_audit(text,text,text,text,integer,text,text[])',
+  'create_kiara_escalation(uuid)',
   'create_manual_task_with_mode_with_audit(jsonb,uuid[],uuid[],jsonb)',
   -- 0196: admin-only CRM sync health (counts only).
   'crm_sync_health()',
+  -- 0206/0207 (main): management insights reads and audited dashboard saved views.
   'delete_dashboard_view_with_audit(uuid,integer)',
   'delete_fms_flow_with_audit(uuid,text)',
   'delete_form_draft_with_audit(uuid)',
   'delete_form_with_audit(uuid)',
+  'delete_kiara_document_with_audit(uuid)',
   'delete_recurring_todo_template_with_audit(uuid)',
   'duplicate_form_with_audit(uuid,text)',
   'edit_pending_leave(uuid,date,date,date,text)',
+  'fail_kiara_extraction_with_audit(uuid,text)',
   'form_deletion_impact(uuid)',
   'form_usage_impact(uuid)',
   'get_employee_task_progress(jsonb)',
+  'get_kiara_document(uuid)',
+  'get_kiara_escalation_badge()',
+  'get_kiara_knowledge_excerpt(uuid)',
+  'get_kiara_knowledge_filters()',
+  'get_kiara_version_for_ingest(uuid)',
   'get_management_insight_records_v1(jsonb,text,text,integer,integer)',
   'get_management_insights_options_v1(jsonb)',
   'get_management_insights_v1(jsonb)',
   'get_my_daily_checklist_status()',
   'get_my_fms_starter_assignments()',
+  'get_my_kiara_conversation(uuid)',
+  'get_my_kiara_quota()',
   'get_recurring_todo_workspace(jsonb)',
   'get_section_availability()',
   'get_task_attachment_path(uuid)',
@@ -246,16 +267,26 @@ select is((
   'import_delegation_tasks_with_audit(jsonb,text)',
   'import_task_bulk_with_audit(jsonb,text,text)',
   'is_reporting_descendant(uuid,uuid)',
+  'kiara_can_answer_escalation(uuid)',
+  -- 0214: Ask Kiara colleague directory (name, designation, department, branch only).
+  'kiara_directory_lookup(text,integer)',
+  'kiara_knowledge_object_readable(text)',
+  'kiara_knowledge_object_removable(text)',
+  'kiara_knowledge_object_writable(text)',
   'leave_applicant_eligible()',
   'leave_file_readable(text)',
   'leave_file_writable(text)',
   'list_assigning_left_tasks()',
   'list_designation_daily_checklists()',
+  'list_kiara_documents(text,text,text)',
+  'list_kiara_escalations(text,integer)',
+  'list_my_kiara_conversations(integer)',
   'list_task_comments(uuid)',
   'list_task_import_identity_candidates()',
   'prepare_unused_user_deletion(uuid)',
   'reconcile_task_import_assignments(jsonb)',
   'record_availability_range_with_audit(uuid,date,date,availability_status,text)',
+  'refund_kiara_question(uuid)',
   'resolve_fms_stage_assignees(uuid,uuid,uuid)',
   'restore_fms_flow_with_audit(uuid,text)',
   'review_leave_request(uuid,boolean,text)',
@@ -265,15 +296,20 @@ select is((
   'save_department_permissions_with_audit(uuid,jsonb)',
   'save_department_with_audit(uuid,jsonb)',
   'save_designation_daily_checklist_with_audit(uuid,uuid,text,text,jsonb,text,boolean,integer)',
+  'save_kiara_document_text_with_audit(uuid,text,text,text,text,jsonb,text[])',
   'save_published_form_with_audit(uuid,jsonb,jsonb)',
   'save_recurring_todo_template_with_audit(uuid,jsonb)',
   'save_section_availability_with_audit(boolean,jsonb,integer,uuid)',
   'save_task_import_identity_alias_with_audit(text,uuid)',
   'save_user_section_access_with_audit(uuid,jsonb)',
+  'search_kiara_knowledge(text,text,integer)',
   'send_recurring_followup_with_audit(uuid,text)',
   'set_fms_flow_active_with_audit(uuid,boolean,text)',
+  'set_kiara_document_status_with_audit(uuid,text)',
   'set_recurring_todo_template_active_with_audit(uuid,boolean)',
   'start_fms_from_form_submission_with_audit(uuid)',
+  'start_kiara_turn(uuid,uuid,text,text)',
+  'store_kiara_extraction_with_audit(uuid,text,jsonb,integer,integer)',
   'submit_fms_form_and_progress_with_audit(uuid,jsonb,text,uuid,uuid,text,text,jsonb,uuid)',
   'submit_form_and_start_fms_with_audit(uuid,jsonb)',
   'submit_leave_handover(uuid,uuid,text)',
@@ -281,10 +317,12 @@ select is((
   'task_attachment_display_name(text)',
   'task_effective_due_datetime(task_instances)',
   'task_feed_page(text,text,integer,integer)',
+  'update_kiara_document_details_with_audit(uuid,text,text,text,text[])',
   'upsert_crm_branch_mapping(text,text,uuid,jsonb)',
   'upsert_crm_staff_mapping(text,text,uuid,jsonb)',
   'validate_task_bulk_import(jsonb,text)',
-  'verify_recurring_task_with_audit(uuid,text,text)'
+  'verify_recurring_task_with_audit(uuid,text,text)',
+  'withdraw_my_kiara_escalation(uuid)'
 ]::text[], 'authenticated additional EXECUTE grants match the reviewed function identities');
 
 -- Exact service-role allowlist and preservation of recurrence table reads.

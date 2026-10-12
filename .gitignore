@@ -26,3 +26,6 @@ apps/mobile/android/**/.cxx/
 
 # Independent CRM repository (github.com/sreejith2005/mkjewels-crm); never tracked here.
 sreejith-crm/
+
+# Ask Kiara real-SOP eval questions and results (owner data; never tracked).
+docs/superpowers/evals/ask-kiara/private/
