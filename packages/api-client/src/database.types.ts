@@ -11864,6 +11864,7 @@ export type Database = {
           working_status: Database["public"]["Enums"]["working_status"]
         }[]
       }
+      task_assignment_recipient_allowed: { Args: { p_user_id: string }; Returns: boolean }
       task_assignment_scope: { Args: never; Returns: string }
       task_assignment_user_in_scope: {
         Args: { p_user_id: string }
