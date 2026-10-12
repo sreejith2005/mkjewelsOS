@@ -28,7 +28,7 @@ select ('22850000-0000-4000-8000-0000000000' || lpad(f.n::text, 2, '0'))::uuid, 
   case f.t when 'A' then '22820000-0000-4000-8000-000000000001'::uuid else '22820000-0000-4000-8000-000000000002'::uuid end,
   case f.t when 'A' then '22830000-0000-4000-8000-000000000001'::uuid else '22830000-0000-4000-8000-000000000002'::uuid end,
   f.name, '0000228' || lpad(f.n::text, 3, '0'), 'kvoice-' || f.n || '@example.invalid', 'KVOICE-' || f.n,
-  f.role::user_role, 'active', f.status, true, '{}'
+  f.role::user_role, 'active', f.status::user_account_status, true, '{}'
 from (values
   (1, 'KVOICE Super Admin', 'super_admin', 'A', 'active'),
   (2, 'KVOICE Admin', 'admin', 'A', 'active'),
@@ -61,6 +61,7 @@ $$;
 create function pg_temp.spent(p_n integer) returns integer language sql as $$
   select coalesce((select interpretations from voice_interpretation_quotas where user_profile_id = pg_temp.profile(p_n)), 0)
 $$;
+grant execute on function pg_temp.as_user(integer), pg_temp.as_service(), pg_temp.profile(integer) to authenticated, service_role, anon;
 
 -- ---------------------------------------------------------------------------
 -- Contract: authenticated only, definer, owned by postgres

@@ -13069,6 +13069,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      consume_my_voice_quota: { Args: never; Returns: boolean }
       consume_username_login_rate_limit: {
         Args: { p_rate_limit_key: string }
         Returns: boolean
