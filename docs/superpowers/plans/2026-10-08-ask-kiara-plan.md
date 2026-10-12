@@ -453,8 +453,8 @@ shared with Tasks; transcript not auto-sent; Tasks voice regression in `docs/REG
 Exit criteria: Hindi, Hinglish, and English voice questions transcribe acceptably on desktop Chrome
 and Android Chrome; Tasks voice assignment behaves exactly as before.
 
-**Built (2026-10-12, branch `feat/ask-kiara-phase7`):** migration `0228_ask_kiara_voice`
-(`consume_my_voice_quota()`, pgTAP 0228; 0006 inventory +1 authenticated definer).
+**Built (2026-10-12, branch `feat/ask-kiara-phase7`):** migration `0230_ask_kiara_voice`
+(`consume_my_voice_quota()`, pgTAP 0230; 0006 inventory +1 authenticated definer).
 `supabase/functions/_shared/voice/transcribe.ts` holds the upload checks, the whisper call, the
 no-speech/word-rate guards and the shape-only log; `interpret-task-voice` imports it with its
 unchanged English default (`OPENAI_TRANSCRIBE_LANGUAGE`, `"en"`), messages and log event, and its

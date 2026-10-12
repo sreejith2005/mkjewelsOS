@@ -16,7 +16,7 @@ import type { ActorClient } from "./tools/index.ts";
  * words out. The text goes into the asker's input box to be edited; nothing is
  * sent to Kiara, stored, or counted as a question here. The caller's
  * `assistant.voice` permission and the hourly voice allowance shared with Tasks
- * (`consume_my_voice_quota`, 0228) are checked as the caller.
+ * (`consume_my_voice_quota`, 0230) are checked as the caller.
  */
 
 /** Matches the composer's input limit; a minute of speech is far shorter. */

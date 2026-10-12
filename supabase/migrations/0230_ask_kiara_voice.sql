@@ -28,7 +28,7 @@ begin
   -- The same rolling one-hour window and allowance (40) as
   -- consume_voice_interpretation_quota (0162), on the same row, so a person's
   -- Tasks voice notes and Kiara voice questions share one allowance.
-  -- Keep both functions in step if the allowance ever changes (pgTAP 0228).
+  -- Keep both functions in step if the allowance ever changes (pgTAP 0230).
   insert into voice_interpretation_quotas(user_profile_id, interpretations) values (v_actor.id, 0)
   on conflict (user_profile_id) do nothing;
   select * into v_row from voice_interpretation_quotas where user_profile_id = v_actor.id for update;
