@@ -422,10 +422,10 @@ views only their tree; the employee cannot see their own row anywhere.
 - Phase 9 leftover done: `ask-kiara` refunds the question on any failure before answer text (also a crash
   in the worker, an answer that could not be stored, and a worker stopping: `beforeunload` aborts in-flight
   turns through an `AbortSignal`).
-- Fix `0221_kiara_schedule_cron_schema` (found at the hosted deploy): `schedule_kiara_jobs()` read
+- Fix `0227_kiara_schedule_cron_schema` (main took 0221-0226 first) (found at the hosted deploy): `schedule_kiara_jobs()` read
   pg_cron's schema from `pg_extension`, which on Supabase is `pg_catalog`; the functions live in schema
   `cron`. It now takes the schema of `cron.job`. Verified against the Supabase Postgres image with pg_cron
-  registered in `pg_catalog` (0220 version fails as on production, 0221 creates the three jobs, rerun is
+  registered in `pg_catalog` (0220 version fails as on production, 0227 creates the three jobs, rerun is
   idempotent).
 
 ## Phase 7: voice input

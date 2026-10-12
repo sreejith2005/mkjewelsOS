@@ -1,4 +1,4 @@
--- Ask Kiara, Phase 6 fix: schedule_kiara_jobs() (0220) looked up pg_cron's schema
+-- Ask Kiara, Phase 6 fix (0227): schedule_kiara_jobs() (0220) looked up pg_cron's schema
 -- from pg_extension. On Supabase the extension is registered in pg_catalog while its
 -- functions (cron.schedule) live in schema cron, so the call failed on the hosted
 -- project and no job was created. Same signature, grants and behaviour otherwise.
