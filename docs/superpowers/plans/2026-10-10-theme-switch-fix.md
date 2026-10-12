@@ -79,3 +79,32 @@ push, tag or APK publication was performed. Required checks are not all green;
 contains concurrent unrelated edits; these must not be absorbed into a release.
 Resolve the named failing checks, perform the physical Android pass, then follow
 the normal reviewed web publication and `scripts/release-mobile.ps1` procedures.
+
+## Publication follow-up - 2026-10-12
+
+The owner requested necessary migration deployment and publication to `main`.
+The saved source commit is `31549ce`; integration commit `f1741fb` merges the
+current `origin/main` without replacing its CRM documentation update. FMS and
+sidebar changes are already on `main`; the remaining seven-file diff contains
+only the theme implementation, its regressions and this record. Concurrent
+untracked Task Control bulk-delete work is excluded.
+
+- Hosted target: JewelOS production, `yimafxhuwgfhvzczqqdd`.
+- The first migration-list connection timed out. The retry succeeded: local
+  and hosted migration versions match through `0212`.
+- `supabase.cmd db push --linked --dry-run`: `upToDate: true`, zero pending
+  migrations. This theme change requires no database migration or function
+  deployment, so no hosted database writes were performed.
+- Fresh focused web checks: 12 tests passed across theme and mobile-document
+  contracts. Fresh native theme/configuration checks: 2 tests passed.
+- Fresh web build and native typecheck passed. Existing Vite bundle-size and
+  mobile Vitest configuration warnings remain.
+- The reviewed committed diff passes whitespace and credential-pattern checks.
+  Publication target is `origin/main`; Vercel deployment is verified separately
+  after the push. Compatible rollback is the preceding web deployment; there
+  are no schema or persisted-record changes.
+- The earlier broad dashboard/lifecycle test failures remain recorded above;
+  this publication does not claim those suites are green.
+- `adb devices -l` still lists no attached device. Native source is included
+  in Git, but no signed employee update is published until the required physical
+  visual gate and mobile release checks pass.
