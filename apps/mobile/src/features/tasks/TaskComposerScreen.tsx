@@ -4,7 +4,6 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   buildManualTaskCreateRequest,
-  deriveTaskAuthoringCapability,
   hasPermission,
   voiceDraftGapMessage,
   voiceDraftGaps,
@@ -84,16 +83,8 @@ export function TaskComposerScreen() {
   const [deadlineNote, setDeadlineNote] = useState<Readonly<{ text: string; resolved: boolean }> | null>(null);
 
   const data = reference.data;
-  const authoringScope = data ? deriveTaskAuthoringCapability({
-    userRole: profile.user_role,
-    designationValue: data.designations.find((item) => item.id === profile.designation_id)?.value,
-  }).scope : "department";
-  const eligiblePeople = useMemo(() => (data?.users ?? []).filter((person) => {
-    if (!person.id || person.tenant_id !== profile.tenant_id) return false;
-    if (authoringScope === "tenant") return true;
-    if (authoringScope === "branch") return person.branch_id === profile.branch_id;
-    return person.department_id === profile.department_id;
-  }), [authoringScope, data?.users, profile.branch_id, profile.department_id, profile.tenant_id]);
+  // The same assignment RPC supplies authorized users on web and Android.
+  const eligiblePeople = useMemo(() => (data?.users ?? []).filter(person => person.id && person.tenant_id === profile.tenant_id), [data?.users, profile.tenant_id]);
   const peopleOptions = useMemo(() => eligiblePeople.flatMap((person) => person.id
     ? [{ value: person.id, label: personLabel(person) }]
     : []), [eligiblePeople]);

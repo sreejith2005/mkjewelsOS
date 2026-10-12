@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { SECTION_PERMISSIONS, SECTION_ACCESS_OPTIONS, sectionOverrideChanges, type SectionAccessChoice, type SectionAccessDraft } from "@jewelos/core";
+import { DEPARTMENT_PERMISSIONS, SECTION_ACCESS_OPTIONS, ASSIGNMENT_ACCESS_OPTIONS, sectionOverrideChanges, type SectionAccessChoice, type SectionAccessDraft } from "@jewelos/core";
 import { saveDepartmentPermissions, type PermissionAdminContext } from "@jewelos/data/permissions/api";
 import { OptionPicker } from "@/ui/OptionPicker";
 import { Card } from "@/ui/Card";
@@ -14,7 +14,7 @@ export function DepartmentPermissionsTab({ context, onSaved }: { context: Permis
   const [draft, setDraft] = useState<SectionAccessDraft>({}); const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null); const [success, setSuccess] = useState(false);
   const epoch = useRef(0); useEffect(() => () => { epoch.current++; }, []);
-  const saved = context.departmentOverrides[id] ?? {}; const changes = sectionOverrideChanges(saved, draft);
+  const saved = context.departmentOverrides[id] ?? {}; const changes = sectionOverrideChanges(saved, draft, DEPARTMENT_PERMISSIONS);
   const selected = context.departments.find(item => item.id === id);
   const save = async () => {
     if (!selected || saving) return;
@@ -26,11 +26,11 @@ export function DepartmentPermissionsTab({ context, onSaved }: { context: Permis
   if (!context.departments.length) return <Banner>No active departments exist. Add them in Users first.</Banner>;
   return <>
     <OptionPicker label="Department" disabled={saving} selected={[id]} options={context.departments.map(item => ({ value: item.id, label: `${item.name} · ${item.branchName ?? "All branches"}` }))} onChange={value => { epoch.current++; setId(value[0] ?? ""); setDraft({}); setError(null); setSuccess(false); }} />
-    <Text tone="muted" variant="small">Enable or disable sections for this department. Individual choices take priority. Inherit uses designation and role defaults.</Text>
+    <Text tone="muted" variant="small">Configure sections and task assignment for this department. Individual choices take priority. Inherit uses designation and role defaults.</Text>
     {error ? <Banner tone="danger">{error}</Banner> : null}{success ? <Banner tone="success">Department section access saved.</Banner> : null}
-    {!selected ? <Banner tone="danger">Select an active department.</Banner> : SECTION_PERMISSIONS.map(item => <Card key={item.key}>
+    {!selected ? <Banner tone="danger">Select an active department.</Banner> : DEPARTMENT_PERMISSIONS.map(item => <Card key={item.key}>
       <Text weight="semibold">{item.category === "CRM" ? "CRM" : item.label}</Text><Text tone="muted" variant="caption">{item.description}</Text>
-      {saving ? <Text tone="muted">Saving…</Text> : <SegmentedControl<SectionAccessChoice> accessibilityLabel={`${item.category === "CRM" ? "CRM" : item.label} department access`} options={SECTION_ACCESS_OPTIONS} value={(draft[item.key] === undefined ? saved[item.key] : draft[item.key]) ?? "inherit"} onChange={next => setDraft(current => ({ ...current, [item.key]: next === "inherit" ? null : next }))} />}
+      {saving ? <Text tone="muted">Saving…</Text> : <SegmentedControl<SectionAccessChoice> accessibilityLabel={`${item.category === "CRM" ? "CRM" : item.label} department access`} options={item.key === "tasks.assign_others" ? ASSIGNMENT_ACCESS_OPTIONS : SECTION_ACCESS_OPTIONS} value={(draft[item.key] === undefined ? saved[item.key] : draft[item.key]) ?? "inherit"} onChange={next => setDraft(current => ({ ...current, [item.key]: next === "inherit" ? null : next }))} />}
     </Card>)}
     <Button label={saving ? "Saving…" : "Save department access"} disabled={saving || !selected || Object.keys(changes).length === 0} onPress={() => void save()} />
   </>;

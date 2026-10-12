@@ -2,6 +2,7 @@ import { decodeTaskPage, TASK_PAGE_SIZE, taskAdminEditPayload, type TaskAdminEdi
 import { supabase } from "@jewelos/api-client";
 import { groupTaskFeedRows, isTaskFeedItemInCurrentDayOrOverdue, taskFeedCurrentOrOverdueFilter as coreTaskFeedCurrentOrOverdueFilter, type Database, type Enums, type Json, type Tables } from "@jewelos/core";
 import { loadMasterOptions } from "@/features/dropdowns/api";
+import { loadTaskAssignmentUsers } from "@jewelos/data/tasks/api";
 
 export type TaskFeedRow = Database["public"]["Views"]["v_all_tasks"]["Row"];
 export type TaskUser = Pick<Tables<"user_profiles">,
@@ -93,7 +94,7 @@ export async function loadAvailabilityForDate(date: string): Promise<Availabilit
 
 export async function loadTaskAuthoringReferenceData(): Promise<TaskReferenceData> {
   const [users, branchesResult, departmentsResult, categories, priorities, designations, templatesResult, formsResult] = await Promise.all([
-    loadAvailabilityUsers(),
+    loadTaskAssignmentUsers(),
     supabase.from("branches").select("id,name").eq("is_active", true).order("name"),
     supabase.from("departments").select("id,name,branch_id").eq("is_active", true).order("name"),
     loadTaskCategoryOptions(),

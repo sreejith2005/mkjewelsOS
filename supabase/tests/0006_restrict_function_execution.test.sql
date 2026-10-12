@@ -43,14 +43,14 @@ select is((
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
-), 498, 'exactly 498 postgres-owned public application functions exist in the current migration set');
+), 503, 'exactly 503 postgres-owned public application functions exist in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres' and p.prosecdef
-), 424, 'exactly 424 public application functions are SECURITY DEFINER in the current migration set');
+), 429, 'exactly 429 public application functions are SECURITY DEFINER in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -66,7 +66,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 240, 'authenticated can execute exactly 240 reviewed public application functions');
+), 241, 'authenticated can execute exactly 241 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -82,7 +82,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('postgres', p.oid, 'EXECUTE')
-), 498, 'postgres retains owner execution on every public application function');
+), 503, 'postgres retains owner execution on every public application function');
 select ok(not has_function_privilege('authenticated', 'reject_watcher_task_mutation()', 'EXECUTE'), 'watcher guard trigger cannot be called directly');
 
 -- Exact authenticated allowlist: baseline, Forms, and reviewed FMS entry points.
@@ -285,6 +285,7 @@ select is((
   'list_kiara_escalations(text,integer)',
   'list_kiara_usage(date,date)',
   'list_my_kiara_conversations(integer)',
+  'list_task_assignment_users()',
   'list_task_comments(uuid)',
   'list_task_import_identity_candidates()',
   'prepare_unused_user_deletion(uuid)',

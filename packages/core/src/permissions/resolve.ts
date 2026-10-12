@@ -7,6 +7,7 @@ import {
   SECTION_PARENT,
   getPermissionDefinition,
   isPermissionKey,
+  isDepartmentConfigurablePermission,
   type DashboardAuthority,
   type PermissionKey,
 } from "./catalog.ts";
@@ -69,7 +70,7 @@ export function explainPermission(subject: AccessSubject, key: PermissionKey): P
   }
   const configured = subject.rolePermissions?.[effectiveRole]?.[key];
   const roleDefault = configured ?? builtin;
-  const department = definition.kind === "module" ? subject.departmentOverrides?.[key] ?? null : null;
+  const department = isDepartmentConfigurablePermission(key) ? subject.departmentOverrides?.[key] ?? null : null;
   const designation = subject.designationOverrides?.[key] ?? null;
   const user = subject.userOverrides?.[key] ?? null;
   const effective = user ? user === "grant" : department ? department === "grant" : designation ? designation === "grant" : roleDefault;

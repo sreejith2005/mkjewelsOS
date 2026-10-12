@@ -61,6 +61,7 @@ export const PERMISSION_CATALOG = [
   modulePermission("home.view", "home", "Home & Dashboard", "Open Home", "Today's work, linked forms, FMS stages, and activity."),
   modulePermission("dashboard.view", "dashboard", "Home & Dashboard", "Open Dashboard", "Operational analytics for the user's authorized scope."),
   modulePermission("tasks.view", "checklist_tasks", "Tasks", "Open Tasks", "Assigned tasks, manual tasks, and task import."),
+  { key: "tasks.assign_others", kind: "action", category: "Tasks", label: "Assign tasks to other users", description: "Allow assigning and transferring tasks to other users within the existing branch, department or company scope. Deny restricts task assignment to yourself.", defaultRoles: ALL_ROLES, pageId: null },
   { key: "tasks.manage_team", kind: "authority", category: "Tasks", label: "Manage team tasks", description: "Create, edit, and delegate tasks for others. Follows Manager authority or higher.", defaultRoles: ["super_admin", "admin", "manager"], pageId: null },
   { key: "tasks.voice_assign", kind: "action", category: "Tasks", label: "Assign tasks by voice", description: "Record a voice note that fills in the Assign Task form. Assignee scope is unchanged.", defaultRoles: ["super_admin", "admin", "manager", "hr"], pageId: null },
   { key: "tasks.view_all", kind: "authority", category: "Tasks", label: "View all tasks", description: "Tenant-wide task visibility. Follows Admin authority or higher.", defaultRoles: ["super_admin", "admin"], pageId: null },
@@ -118,6 +119,11 @@ export function isPermissionKey(value: unknown): value is PermissionKey {
 export function isConfigurablePermission(key: PermissionKey): boolean {
   const kind = CATALOG_BY_KEY.get(key)?.kind;
   return kind === "module" || kind === "action";
+}
+
+/** Departments configure sections and this explicitly approved task action only. */
+export function isDepartmentConfigurablePermission(key: PermissionKey): boolean {
+  return CATALOG_BY_KEY.get(key)?.kind === "module" || key === "tasks.assign_others";
 }
 
 /** The section-access permission for each page that has one. */

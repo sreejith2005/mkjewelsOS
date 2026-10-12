@@ -37,7 +37,7 @@ function query(table: string) {
 
 vi.mock("@jewelos/api-client/client", () => ({ getSupabase: () => ({ rpc: pageRpc, from: (table: string) => query(table) }) }));
 
-import { loadTaskPage, loadTaskFeed, taskFeedCurrentOrOverdueFilter, taskFeedIdBatches } from "./api";
+import { loadTaskAssignmentUsers, loadTaskPage, loadTaskFeed, taskFeedCurrentOrOverdueFilter, taskFeedIdBatches } from "./api";
 
 beforeEach(() => {
   pageRpc.mockReset();
@@ -47,6 +47,26 @@ beforeEach(() => {
   taskRows.splice(0);
   taskScopeRows.splice(0);
   taskUsers.splice(0);
+});
+
+describe("server-authorized task assignment roster", () => {
+  it("returns authorized peers even when the directory contains no other people", async () => {
+    pageRpc.mockReturnValue({ range: async () => ({ data: [{ id: "peer", employee_name: "Old label", first_name: "Branch", last_name: "Peer" }], error: null }) });
+    const users = await loadTaskAssignmentUsers();
+    expect(users.map(user => [user.id, user.employee_name])).toEqual([["peer", "Branch Peer"]]);
+    expect(selectedTables).not.toContain("user_profiles");
+  });
+  it("fails closed when the assignment RPC denies access instead of falling back to the directory", async () => {
+    pageRpc.mockReturnValue({ range: async () => ({ data: null, error: { message: "Task access denied" } }) });
+    await expect(loadTaskAssignmentUsers()).rejects.toThrow("Load task assignment users: Task access denied");
+    expect(selectedTables).toEqual([]);
+  });
+  it("loads every authorized assignee beyond one response page", async () => {
+    pageRpc.mockReturnValue({ range: async (from: number) => ({ data: from === 0 ? Array.from({ length: 500 }, (_, index) => ({ id: `peer-${index}`, employee_name: `Peer ${index}` })) : [{ id: "last-peer", employee_name: "Last peer" }], error: null }) });
+    const users = await loadTaskAssignmentUsers();
+    expect(users).toHaveLength(501);
+    expect(users.at(-1)?.id).toBe("last-peer");
+  });
 });
 
 describe("task feed effective-deadline scope", () => {

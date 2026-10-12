@@ -32,6 +32,14 @@ const withSection = (page: keyof SectionControls["section_availability"], enable
 });
 
 describe("permission catalog", () => {
+  it("configures assignment independently of team authority with individual and department precedence", () => {
+    expect(isConfigurablePermission("tasks.assign_others")).toBe(true);
+    const subject = { role: "manager" as const, dashboardAuthority: null, departmentOverrides: { "tasks.assign_others": "deny" as const } };
+    expect(explainPermission(subject, "tasks.assign_others").effective).toBe(false);
+    expect(explainPermission(subject, "tasks.manage_team").effective).toBe(true);
+    expect(explainPermission({ ...subject, userOverrides: { "tasks.assign_others": "grant" } }, "tasks.assign_others").effective).toBe(true);
+    expect(explainPermission({ ...subject, role: "super_admin" }, "tasks.assign_others").effective).toBe(true);
+  });
   it("requires an explicit user grant for the leadership leave application exception", () => {
     const base = { role: "super_admin" as const, dashboardAuthority: null };
     expect(explainPermission(base, "availability.apply_leave_exception").effective).toBe(false);

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { AlertTriangle, CalendarDays, Check, ChevronDown, FileText, Flag, Paperclip, Plus, Rocket, Users, UserRoundCheck, X } from "lucide-react";
-import { buildManualTaskCreateRequest, deriveTaskAuthoringCapability, voiceDraftGapMessage, voiceDraftGaps, type Enums, type Json, type VoiceDeadline, type VoiceDraftGap } from "@jewelos/core";
+import { buildManualTaskCreateRequest, voiceDraftGapMessage, voiceDraftGaps, type Enums, type Json, type VoiceDeadline, type VoiceDraftGap } from "@jewelos/core";
 import type { UserProfile } from "@/types";
 import { Button, Modal, Notice } from "@/components/ui";
 import { toast } from "sonner";
@@ -78,16 +78,8 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
   const priorityOptions = useMemo(() => data.priorities.flatMap((option) => option.value === "high" || option.value === "medium" || option.value === "low"
     ? [{ ...option, value: option.value as Enums<"task_priority"> }]
     : []), [data.priorities]);
-  const authoringScope = deriveTaskAuthoringCapability({
-    userRole: profile.user_role,
-    designationValue: data.designations.find((designation) => designation.id === profile.designation_id)?.value,
-  }).scope;
-  const eligiblePeople = useMemo(() => data.users.filter((user) => {
-    if (!user.id || user.tenant_id !== profile.tenant_id) return false;
-    if (authoringScope === "tenant") return true;
-    if (authoringScope === "branch") return user.branch_id === profile.branch_id;
-    return user.department_id === profile.department_id;
-  }), [authoringScope, data.users, profile.branch_id, profile.department_id, profile.tenant_id]);
+  // The assignment RPC resolves effective authority, overrides and scope.
+  const eligiblePeople = useMemo(() => data.users.filter(user => user.id && user.tenant_id === profile.tenant_id), [data.users, profile.tenant_id]);
   const priorityLabel = priorityOptions.find((option) => option.value === priority)?.label ?? priority;
   const selectedDoerName = eligiblePeople.find((person) => person.id === doers[0])?.employee_name;
   const attachedForm = data.forms.find((form) => form.id === formTemplateId);

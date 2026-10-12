@@ -1,8 +1,14 @@
 import { isImplementedPage, type UserRole } from "../roleMenu";
-import { PERMISSION_CATALOG, type PermissionKey } from "./catalog";
+import { PERMISSION_CATALOG, type PermissionKey, type PermissionDefinition } from "./catalog";
 import type { PermissionEffect, PermissionOverrides } from "./resolve";
 
 export const SECTION_PERMISSIONS = PERMISSION_CATALOG.filter(item => item.kind === "module" && item.pageId !== null && isImplementedPage(item.pageId));
+export const DEPARTMENT_PERMISSIONS = PERMISSION_CATALOG.filter(item => SECTION_PERMISSIONS.some(section => section.key === item.key) || item.key === "tasks.assign_others");
+export const ASSIGNMENT_ACCESS_OPTIONS = [
+  { value: "inherit", label: "Inherit" },
+  { value: "grant", label: "Allow" },
+  { value: "deny", label: "Deny" },
+] as const;
 export const SECTION_ACCESS_OPTIONS = [
   { value: "inherit", label: "Inherit" },
   { value: "grant", label: "Enable" },
@@ -22,9 +28,9 @@ export function previewSectionAccess(row: SectionAccessRow, pending: PermissionE
   return { effective: effect ? effect === "grant" : row.roleDefault, source: individual ? "Individual" : row.department ? "Department" : row.designation ? "Designation" : "Role" };
 }
 
-export function sectionOverrideChanges(saved: PermissionOverrides, draft: SectionAccessDraft): SectionAccessDraft {
+export function sectionOverrideChanges(saved: PermissionOverrides, draft: SectionAccessDraft, permissions: readonly (PermissionDefinition & { key: PermissionKey })[] = SECTION_PERMISSIONS): SectionAccessDraft {
   const changes: SectionAccessDraft = {};
-  for (const item of SECTION_PERMISSIONS) {
+  for (const item of permissions) {
     const pending = draft[item.key];
     if (pending !== undefined && pending !== (saved[item.key] ?? null)) changes[item.key] = pending;
   }
