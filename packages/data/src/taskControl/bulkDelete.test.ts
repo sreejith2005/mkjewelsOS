@@ -8,6 +8,24 @@ const workspace = (ids: string[], total: number): EvidenceWorkspace => ({
   tasks: ids.map((task_id) => ({ task_id, task_type: "checklist", task_title: task_id, task_status: "pending", requires_upload: false, is_upload_work: false, overdue: false, branch_name: null, department_name: null, assignee_names: null, planned_datetime: "2026-10-12T00:00:00Z", due_datetime: null, actual_datetime: null, attachments: [] })),
 });
 describe("bulk task deletion", () => {
+  it("includes 16 schedule-only targets alongside 15 generated schedules", async () => {
+    const read = vi.fn().mockResolvedValue(workspace(Array.from({ length: 15 }, (_, i) => `task-${i}`), 15));
+    const targets = vi.fn(async (ids: readonly string[]) => ids.map((id, i) => ({ id, task_template_id: `schedule-${i}` })));
+    const schedules = vi.fn().mockResolvedValue(Array.from({ length: 31 }, (_, i) => ({ id: `schedule-${i}`, task_template_id: `schedule-${i}`, kind: "template" })));
+    const result = await prepareTaskBulkDelete({ user_profile_id: "employee" }, null, read, targets, schedules);
+    expect(result).toHaveLength(31);
+    expect(result.filter((row) => row.kind === "template")).toHaveLength(16);
+    expect(schedules).toHaveBeenCalledWith({ user_profile_id: "employee" });
+    const remove = vi.fn().mockResolvedValue(undefined), removeSchedule = vi.fn().mockResolvedValue(undefined);
+    const outcome = await executeTaskBulkDelete(result, true, "Correction", remove, vi.fn(), removeSchedule);
+    expect(remove).toHaveBeenCalledTimes(15);
+    expect(removeSchedule).toHaveBeenCalledTimes(16);
+    expect(outcome.succeeded).toHaveLength(31);
+  });
+  it("can delete schedules when the occurrence list is empty", async () => {
+    const result = await prepareTaskBulkDelete({}, null, vi.fn().mockResolvedValue(workspace([], 0)), vi.fn(), vi.fn().mockResolvedValue([{ id: "paused", task_template_id: "paused", kind: "template" }]));
+    expect(result).toHaveLength(1);
+  });
   it("collects all filtered pages before any write", async () => {
     const read = vi.fn().mockResolvedValueOnce(workspace(Array.from({ length: 100 }, (_, i) => String(i)), 101)).mockResolvedValueOnce(workspace(["100"], 101));
     const targets = vi.fn(async (ids: readonly string[]) => ids.map((id) => ({ id, task_template_id: null })));

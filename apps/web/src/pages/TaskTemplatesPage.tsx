@@ -336,7 +336,7 @@ export function TaskTemplatesPage() {
       </div>
 
       {bulkDelete && canAdministerTasks ? <BulkDeleteDialog request={bulkDelete} onClose={() => setBulkDelete(null)} onFinished={async (result) => {
-        setSelectedTaskIds(result.failed.map((row) => row.id));
+        setSelectedTaskIds(result.failed.filter((row) => row.kind !== "template").map((row) => row.id));
         if (page === 1) await refresh();
         else { setPage(1); await loadTemplates(); }
       }} /> : null}

@@ -145,7 +145,7 @@ export function TasksTab({
         <Button variant="secondary" disabled={!selection.ids.length} onClick={() => selection.onChange([])}>Clear selection</Button>
         <span className="text-sm">{selection.ids.length} selected</span>
         <Button variant="danger" disabled={!selection.ids.length} onClick={() => onBulkDelete(selection.ids)}>Delete selected</Button>
-        <Button variant="danger" disabled={!evidence.tasks_total} onClick={() => onBulkDelete(null)}>Delete all matching</Button>
+        <Button variant="danger" onClick={() => onBulkDelete(null)}>Delete all matching</Button>
       </div> : null}
       <div className="scroll-x no-scrollbar flex gap-2 pb-1" role="group" aria-label="Task view">
         {TASK_VIEW_LABELS.map(([value, label]) => (

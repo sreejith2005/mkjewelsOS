@@ -553,7 +553,7 @@ export function TaskControlScreen() {
                   <Button label="Clear selection" variant="secondary" disabled={!selectedTaskIds.length} onPress={() => setSelectedTaskIds([])} />
                   <Text>{`${selectedTaskIds.length} selected`}</Text>
                   <Button label="Delete selected" variant="danger" disabled={!selectedTaskIds.length || snapshotState.loading || appliedSearch !== filters.search} onPress={() => setBulkDelete({ filter: evidenceFilter({ ...filters, search: appliedSearch }, view, 1, 100), selected: [...selectedTaskIds], scopeLabel: bulkScopeLabel })} />
-                  <Button label="Delete all matching" variant="danger" disabled={!evidence?.tasks_total || snapshotState.loading || !validRange || appliedSearch !== filters.search} onPress={() => setBulkDelete({ filter: evidenceFilter({ ...filters, search: appliedSearch }, view, 1, 100), selected: null, scopeLabel: bulkScopeLabel })} />
+                  <Button label="Delete all matching" variant="danger" disabled={snapshotState.loading || !validRange || appliedSearch !== filters.search} onPress={() => setBulkDelete({ filter: evidenceFilter({ ...filters, search: appliedSearch }, view, 1, 100), selected: null, scopeLabel: bulkScopeLabel })} />
                 </View> : null}
                 <SegmentedControl
                   accessibilityLabel="Task view"
@@ -611,7 +611,7 @@ export function TaskControlScreen() {
       />
 
       {bulkDelete && canAdministerTasks ? <BulkDeleteSheet request={bulkDelete} onClose={() => setBulkDelete(null)} onFinished={async (result) => {
-        setSelectedTaskIds(result.failed.map((row) => row.id));
+        setSelectedTaskIds(result.failed.filter((row) => row.kind !== "template").map((row) => row.id));
         if (page === 1) await refresh();
         else { setPage(1); await templateState.refresh(); }
       }} /> : null}
