@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { KIARA_TRANSCRIPTION_PROMPT, handleKiaraTranscribe, type KiaraTranscribeDeps } from "./transcribe.ts";
+import { KIARA_TRANSCRIPTION_PROMPT, handleKiaraTranscribe, kiaraRoute, type KiaraTranscribeDeps } from "./transcribe.ts";
 import type { ActorClient, RpcResult } from "./tools/index.ts";
 
 type Call = { fn: string; args: unknown };
@@ -129,4 +129,19 @@ Deno.test("transcribe hides provider failures behind a safe message", async () =
   const result = await handleKiaraTranscribe(recording(), { actor: actor(allowed).actor, openAiKey: "k", model: "whisper-1", fetch: failing, log: () => {} });
   assertEquals([result.status, (result.body as { code: string }).code], [502, "provider_error"]);
   assertEquals((result.body as { error: string }).error.includes("echo"), false);
+});
+
+Deno.test("the function routes /ask-kiara/transcribe to the transcribe handler and keeps the chat paths", () => {
+  assertEquals(kiaraRoute("/functions/v1/ask-kiara/transcribe"), "transcribe");
+  assertEquals(kiaraRoute("/ask-kiara/transcribe/"), "transcribe");
+  assertEquals(kiaraRoute("/functions/v1/ask-kiara"), "chat");
+  assertEquals(kiaraRoute("/ask-kiara/chat"), "chat");
+  assertEquals(kiaraRoute("/ask-kiara/other"), null);
+});
+
+Deno.test("index.ts sends the transcribe route to handleKiaraTranscribe", async () => {
+  // A source-level guard: the route must be wired in the entry point, not only tested here.
+  const source = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  assertEquals(source.includes("kiaraRoute(new URL(request.url).pathname)"), true);
+  assertEquals(source.includes("handleKiaraTranscribe(request,"), true);
 });

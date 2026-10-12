@@ -28,6 +28,14 @@ export const KIARA_TRANSCRIPT_MAX_LENGTH = 2_000;
  */
 export const KIARA_TRANSCRIPTION_PROMPT = "Kiara, JewelOS, MK Jewels, SOP, Tasks, FMS, CRM, Forms, Dashboard, Availability, leave, checklist.";
 
+/** Which handler a request path reaches: `/ask-kiara` or `/ask-kiara/chat`, or `/ask-kiara/transcribe`. */
+export function kiaraRoute(pathname: string): "chat" | "transcribe" | null {
+  const path = pathname.replace(/\/+$/, "");
+  if (/\/ask-kiara\/transcribe$/.test(path)) return "transcribe";
+  if (/\/ask-kiara(\/chat)?$/.test(path)) return "chat";
+  return null;
+}
+
 export type KiaraTranscribeDeps = Readonly<{
   actor: ActorClient;
   openAiKey: string;

@@ -6,6 +6,8 @@ import { accessibleKiaraSections, offeredKiaraTools } from "../../../packages/co
 import type { KiaraChatResult, KiaraErrorBody } from "../../../packages/core/src/assistant/events.ts";
 import { createActorClient, crmActorFor } from "./actor.ts";
 import { createCrmSession, type CrmSession } from "./tools/crmSession.ts";
+import { handleKiaraTranscribe, kiaraRoute, type KiaraTranscribeResult } from "./transcribe.ts";
+import { transcriptionModel } from "../_shared/voice/transcribe.ts";
 import {
   DEFAULT_KIARA_CONFIG,
   KiaraHttpError,
@@ -31,7 +33,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
 };
 
-function json(status: number, body: KiaraErrorBody | KiaraChatResult): Response {
+function json(status: number, body: KiaraErrorBody | KiaraChatResult | KiaraTranscribeResult): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
@@ -63,8 +65,9 @@ if (typeof globalThis.addEventListener === "function") {
 
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  const path = new URL(request.url).pathname.replace(/\/+$/, "");
-  if (!/\/ask-kiara(\/chat)?$/.test(path)) return json(404, { error: "Not found", code: "invalid_request" });
+  const route = kiaraRoute(new URL(request.url).pathname);
+  if (route === null) return json(404, { error: "Not found", code: "invalid_request" });
+  const transcribe = route === "transcribe";
   if (request.method !== "POST") return json(405, { error: "Method not allowed", code: "invalid_request" });
 
   // The token is passed to getUser explicitly (see interpret-task-voice): a
@@ -74,7 +77,7 @@ Deno.serve(async (request: Request) => {
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!token) return json(401, { error: "Authentication required", code: "unauthenticated" });
-  if (!supabaseUrl || !anonKey || !anthropicKey) return json(503, { error: "Ask Kiara is not configured", code: "unavailable" });
+  if (!supabaseUrl || !anonKey || (!transcribe && !anthropicKey)) return json(503, { error: "Ask Kiara is not configured", code: "unavailable" });
 
   const client = createClient(supabaseUrl, anonKey, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -83,6 +86,15 @@ Deno.serve(async (request: Request) => {
   const { data: userData, error: userError } = await client.auth.getUser(token);
   if (userError || !userData.user) return json(401, { error: "Authentication required", code: "unauthenticated" });
   const actor = createActorClient(client);
+
+  // Voice questions (Phase 7): the words go back to the input box for editing.
+  // The OpenAI key is the one Tasks voice already uses.
+  if (transcribe) {
+    const openAiKey = Deno.env.get("OPENAI_API_KEY")?.trim();
+    if (!openAiKey) return json(503, { error: "Voice input is not configured", code: "unavailable" });
+    const result = await handleKiaraTranscribe(request, { actor, openAiKey, model: transcriptionModel(Deno.env.get("OPENAI_TRANSCRIBE_MODEL")), log });
+    return json(result.status, result.body);
+  }
 
   let body: unknown;
   try {
