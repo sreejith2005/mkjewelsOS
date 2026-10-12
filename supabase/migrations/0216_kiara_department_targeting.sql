@@ -80,7 +80,7 @@ create trigger kiara_documents_realtime after insert or delete or update of stat
 -- 3. Field checks
 -- ---------------------------------------------------------------------------
 
--- Same signature as 0903; the third value is now the visibility.
+-- Same signature as 0215; the third value is now the visibility.
 create or replace function kiara_kb_assert_details(p_title text, p_category text, p_audience text)
 returns void language plpgsql immutable set search_path = public as $$
 begin
@@ -450,7 +450,7 @@ end $$;
 -- 5. Reader RPCs: visibility and the own-department boost
 -- ---------------------------------------------------------------------------
 
--- Ranking: full-text rank as in 0903. The asker's own-department documents get
+-- Ranking: full-text rank as in 0215. The asker's own-department documents get
 -- a 1.35x boost, but only when their rank is at least half of the best match
 -- for this query, so an own-department document that barely matches is never
 -- lifted above a clearly relevant one; among comparably relevant hits the

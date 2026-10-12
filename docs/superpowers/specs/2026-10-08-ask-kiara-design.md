@@ -283,7 +283,7 @@ created by the caller, and the caller has `assistant.manage_knowledge`; select f
 permission; delete only through the delete RPC's cleanup list. `.doc` (old binary Word), PDF, and
 images are rejected in v1.
 
-### 5.3a Department targeting (owner decision 2026-10-10; migration 0904)
+### 5.3a Department targeting (owner decision 2026-10-10; migration 0216)
 
 SOPs are written for particular departments (salespersons, drivers, karigar designers, cleaning
 staff, accounts...). Each document carries zero or more **department tags** and one **visibility**.
@@ -337,7 +337,7 @@ departments for up to 500 documents in one transaction and one audit row holding
 previous values; a department-only result without departments fails the whole selection); and
 visibility plus departments chosen before a bulk upload.
 
-### 5.4 Escalations (built 2026-10-10, migration 0905)
+### 5.4 Escalations (built 2026-10-10, migration 0217)
 
 `kiara_escalations`
 - `id uuid pk`, `tenant_id`, `branch_id`, `department_id` (asker's at creation), `asker_id`,
@@ -433,7 +433,7 @@ question text, answers, or data payloads, except where stated.
 | `get_kiara_escalation_badge() returns integer` | authenticated | Open escalations the caller may answer; 0 without the permission. |
 | `answer_kiara_escalation_with_audit(p_escalation_id uuid, p_answer text, p_save_to_kb boolean, p_kb_title text) returns jsonb` | `assistant.answer_escalations` and 5.6 | `select ... for update`; rejects unless `open` (first answer wins; later answerers get "already answered by X"). Appends a `human_answer` message to the asker's conversation, notifies the asker (`kiara_escalation_answered`, link `/ask-kiara?conversation=<id>`), closes (trigger marks answerers' notifications read). With `p_save_to_kb`, creates a `suggested` document (`source_kind 'escalation_answer'`) holding question + answer for Super Admin approval. Audit `assistant_escalation_answered` with ids only. |
 | `withdraw_my_kiara_escalation(p_escalation_id uuid) returns void` | asker | Status `withdrawn`; same derived close. Audit. Idempotent; an answered question cannot be withdrawn. |
-| `get_my_kiara_conversation(p_id uuid)` (redefined in 0905) | owner | Adds per message `escalation {id, status, answered_by, answered_at}` (on Kiara's offer) and `answered_by` (on a human answer). |
+| `get_my_kiara_conversation(p_id uuid)` (redefined in 0217) | owner | Adds per message `escalation {id, status, answered_by, answered_at}` (on Kiara's offer) and `answered_by` (on a human answer). |
 | `get_kiara_insights(p_filters jsonb) returns jsonb` | `assistant.view_insights` | Rows for employees the caller may see: admin/super admin the tenant; manager the reports-to tree (same rule as Users, `is_reporting_descendant`). Never the caller's own row. Filters: branch, department, classification, status. Audit `assistant_insights_viewed` (count only). |
 | `save_kiara_settings_with_audit(p_daily_limit int, p_retention_days int, p_expected_version int) returns void` | `assistant.manage_limits` (protected) | Org defaults. Audit old/new. |
 | `save_kiara_user_limit_with_audit(p_user_profile_id uuid, p_daily_limit int, p_unlimited boolean, p_clear boolean, p_reason text) returns void` | `assistant.manage_limits` | Per-user exception; same tenant; Super Admin targets ignored (always unlimited). Audit old/new. |
@@ -531,7 +531,7 @@ capped at 15 user turns ("start a new conversation" after that). Per-turn contex
 user identity) is a text block at the start of each user turn, not in the system prompt, so the
 system prompt is identical for every request.
 
-People's answers to escalated questions (Phase 4 follow-up, migration 0907) follow the same rule:
+People's answers to escalated questions (Phase 4 follow-up, migration 0219) follow the same rule:
 `start_kiara_turn` returns the conversation's `human_answers`, and the worker puts each answer that
 the stored history does not yet contain into the NEW user turn as a `<human_answers>` block (after
 `<turn_context>`, before the question; question and answer wrapped as untrusted text). The block is

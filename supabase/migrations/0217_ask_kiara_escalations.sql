@@ -390,7 +390,7 @@ begin
 end $$;
 
 -- The asker's conversation, now with each offer's escalation state and who
--- answered (0901 shape plus `escalation` and `answered_by`).
+-- answered (0213 shape plus `escalation` and `answered_by`).
 create or replace function get_my_kiara_conversation(p_id uuid)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare v_actor user_profiles := kiara_actor(); v_conversation kiara_conversations;

@@ -4,7 +4,7 @@
 within the asker's access, from the SOP knowledge base with citations, and with app help, with human
 escalation, insights, daily limits, voice, and Android parity.
 **Spec:** `docs/superpowers/specs/2026-10-08-ask-kiara-design.md` (section numbers below refer to it).
-**Branch / worktree:** `feat/ask-kiara` in `C:\kiara`, based on `origin/main` `fac01b6`.
+**Branch / worktree:** `feat/ask-kiara` in `C:\kiara`, based on `origin/main` `fac01b6`; phases 1-5 merged to `main` as Deploy A (2026-10-12, launched dark).
 **Tech:** Postgres/pgTAP, Supabase Edge Functions (Deno, `npm:@anthropic-ai/sdk`, `npm:mammoth`),
 TypeScript/Vitest, React (web), React Native/Expo (Android).
 
@@ -26,72 +26,39 @@ TypeScript/Vitest, React (web), React Native/Expo (Android).
 
 ## Migration numbering
 
-Rebased 2026-10-10 again on `origin/main` `e214179` (main added 0208, 0210-0212): no rename was needed;
-0906 carries main 0212's manifest additions.
-Rebased 2026-10-10 (Phase 5) on `origin/main` `a6f1c85`, then 2026-10-12 on `b4f51dc` (main added a
-document, FMS canvas, sidebar, theme, and Task Control bulk-delete work): no migration, so no shared definition changed.
+**Final numbers (2026-10-12, Deploy A merge, base `origin/main` `b4f51dc`).** The 09xx development
+series is retired. Kiara's migrations took the next sequential numbers after main's last migration
+(`0212`), in order, each with its pgTAP file:
 
-History: the branch first took the next number after `origin/main` (0205), then renumbered twice
-(0206/0207 on 2026-10-09, 0208-0210 on 2026-10-10) as main kept adding migrations, and main then
-added a `0209` of its own. To stop that churn, from 2026-10-10 (base `origin/main` `ba481f5`):
-
-**Rule: Kiara migrations use a reserved development series, 0901, 0902, 0903, ...** New Kiara
-migrations continue at the next free 09xx number. They receive final sequential numbers once, at the
-Phase 9 merge, immediately before the first hosted apply.
-
-| Development name | Was | Content |
-| --- | --- | --- |
-| `0901_ask_kiara_foundation` | 0208 (0205, 0206) | Phase 1 |
-| `0902_kiara_directory_lookup` | 0209 (0206, 0207) | Phase 2 |
-| `0903_ask_kiara_knowledge` | 0210 | Phase 3 |
-| `0904_kiara_department_targeting` | new | Phase 3 follow-up (department tags, visibility) |
-| `0905_ask_kiara_escalations` | new | Phase 4 |
-| `0906_kiara_manifest_main_0212` | new | Re-applies main 0212's manifest entries after Kiara's full manifest copy |
-| `0907_kiara_human_answers_in_history` | new | Phase 4 follow-up: `start_kiara_turn` also returns the conversation's human answers |
-
-Each pgTAP file carries the same number as its migration.
-
-Why this is safe (checked 2026-10-10):
-1. The Supabase CLI orders migrations by the version string. Every main migration is `0001`-`0899`,
-   so 09xx always applies after all of them; `supabase.cmd db reset` on an isolated stack applied
-   `... 0207, 0209, 0901, 0902, 0903` in that order.
-2. Nothing assumes contiguous numbers. Tests and scripts that read migrations use exact versions
-   (`0007`, `0103` replay tests), sort file names (`catalog.migration.test.ts`), or count files
-   (`scripts/crm-parity`). No test or script looks for gaps or "the last" migration.
-3. A 09xx migration that redefines a function main also redefines must carry main's latest
-   version of that function. Because 09xx always runs last locally, a later main redefinition
-   would be silently overwritten on this branch, so every rebase checks the list below.
-4. The series is never applied to a hosted project under a 09xx name. Hosted history would then
-   be out of order with main's later migrations.
-
-Shared definitions Kiara redefines (re-check each one on every rebase and at merge):
-
-| Object | Kiara copy in | Main's latest at rebase | What Kiara adds |
+| Final name | Development name | Earlier names | Content |
 | --- | --- | --- | --- |
-| `default_section_availability()` | 0901 | 0156 | `ask_kiara` key |
-| `validated_section_availability(jsonb)` | 0901 | 0138 | `ask_kiara` key |
-| `production_demo_data_retirement_manifest(uuid)` | 0901, 0903, 0905, 0906 | 0212 (`fms_execution_scopes`, patched in place by text replacement) | `kiara_*` tables (retained) |
-| `emit_tenant_realtime_event(uuid, text)` and the `tenant_realtime_events_topic_check` constraint | 0903 | 0102 | `assistant` topic |
-| Permission catalog rows (`-- permission-catalog:begin/end`) | 0901 | 0171 (sort 300) | `assistant.*`, sort 310-315 |
+| `0213_ask_kiara_foundation` | 0901 | 0208, 0206, 0205 | Phase 1 |
+| `0214_kiara_directory_lookup` | 0902 | 0209, 0207, 0206 | Phase 2 |
+| `0215_ask_kiara_knowledge` | 0903 | 0210 | Phase 3 |
+| `0216_kiara_department_targeting` | 0904 | - | Phase 3 follow-up (department tags, visibility) |
+| `0217_ask_kiara_escalations` | 0905 | - | Phase 4 |
+| `0218_kiara_manifest_main_0212` | 0906 | - | Re-applies main 0212's manifest entries after Kiara's full manifest copies |
+| `0219_kiara_human_answers_in_history` | 0907 | - | Phase 4 follow-up: `start_kiara_turn` also returns the conversation's human answers |
 
-Rebase checklist (every phase):
-1. `git fetch origin`; `git rebase origin/main`.
-2. For each object above, find main's latest definition
-   (`grep -l "<name>" supabase/migrations/0[0-8]*.sql | tail -1`) and confirm Kiara's last copy
-   contains everything it has (keys, tables, topics). Copy any new entries into a new 09xx
-   migration (never edit an earlier 09xx file that a teammate's stack may have applied).
-3. `supabase.cmd db reset` on the isolated stack and the full pgTAP suite; the 0006 function
-   inventory test counts every function.
+These are the numbers applied to the hosted JewelOS project; they never change again.
 
-Merge-time checklist (Phase 9, before the first hosted apply):
-1. Rebase on `origin/main`; take the next free numbers after main's last migration, in order
-   (`0901` -> N, `0902` -> N+1, ...); `git mv` each migration and its pgTAP file together.
-2. Update number references: comments in `supabase/tests/0006_restrict_function_execution.test.sql`,
-   `packages/core/src/assistant/{language,quota}.ts`, `supabase/functions/ask-kiara/tools/people.ts`,
-   the launch-dark audit reason in the foundation migration, and this plan and the spec.
-3. Re-run the shared-definition check above against main at that moment.
-4. Full gate (reset, pgTAP, lint, Vitest, Deno, typecheck, build), then the hosted apply per
-   `PRODUCTION_SWITCH_PLAYBOOK.md`. After the hosted apply the numbers are final and never change.
+**Rule from now on:** each later phase (6, 7, 8, 9) merges to `main` on its own and its migrations
+take the next free sequential number on `origin/main` at the time the phase is written (rebase
+first; if main gains the same number before the merge, renumber the unapplied file once). No
+reserved series, no development names.
+
+Shared definitions Kiara redefines (re-check each one whenever a phase redefines it again):
+
+| Object | Kiara copy in | Main's latest at merge | What Kiara adds |
+| --- | --- | --- | --- |
+| `default_section_availability()` | 0213 | 0156 | `ask_kiara` key |
+| `validated_section_availability(jsonb)` | 0213 | 0138 | `ask_kiara` key |
+| `production_demo_data_retirement_manifest(uuid)` | 0213, 0215, 0217, 0218 | 0212 (`fms_execution_scopes`, patched in place by text replacement) | `kiara_*` tables (retained) |
+| `emit_tenant_realtime_event(uuid, text)` and the `tenant_realtime_events_topic_check` constraint | 0215 | 0102 | `assistant` topic |
+| Permission catalog rows (`-- permission-catalog:begin/end`, additive) | 0213 | 0181 (sort 300) | `assistant.*`, sort 310-315 |
+
+A later main migration that redefines one of these objects must carry Kiara's additions, and a
+later Kiara migration must carry main's.
 
 ## Phasing rationale (changes from the proposed split)
 
@@ -110,7 +77,7 @@ The owner's nine phases are kept, with three adjustments:
 **Scope:** permissions and page, conversations/messages, quota, `ask-kiara` with two tools
 (`get_my_work_summary`, `get_app_help`), streaming web chat, local tests.
 
-Migration `0901_ask_kiara_foundation.sql` (originally 0205, then 0206, then 0208; see Migration numbering):
+Migration `0213_ask_kiara_foundation.sql` (development names 0205, 0206, 0208, 0901; see Migration numbering):
 - Permission catalog rows (`-- permission-catalog:begin/end`): all six `assistant.*` keys (spec 15)
   so later phases need no catalog change. Sort 310-315.
 - `default_section_availability()` / `validated_section_availability()` with `ask_kiara`; launch-dark
@@ -136,7 +103,7 @@ Files to create:
   client (`fetch` + `ReadableStream`, JSON fallback).
 - `apps/web/src/pages/AskKiaraPage.tsx`, `apps/web/src/features/assistant/` (chat view, message
   renderer with the restricted markdown subset, quota chip, conversation list, tests).
-- `supabase/tests/0901_ask_kiara_foundation.test.sql`.
+- `supabase/tests/0213_ask_kiara_foundation.test.sql`.
 - `docs/superpowers/evals/ask-kiara/` with `cases.json` (role, question, expected tools allowed,
   forbidden tools, must-refuse flag) and `README.md` (how to run against a local stack).
 
@@ -210,7 +177,7 @@ Exit criteria:
 `run_report`, `find_people`, `get_availability`, `get_leave`, `get_fms_work`, `search_forms`,
 `get_my_notifications` (spec 8), and `kiara_directory_lookup` (spec 19 item 8, approved 2026-10-08).
 
-Migration (approved, spec 19 item 8): `0902_kiara_directory_lookup.sql` with
+Migration (approved, spec 19 item 8): `0214_kiara_directory_lookup.sql` with
 `kiara_directory_lookup(p_name text, p_limit int)` (active colleagues in tenant; name, designation,
 department, branch; no contact data; `assert_module_access('ask_kiara')`; pgTAP).
 
@@ -243,7 +210,7 @@ First task (gate): run `npm:mammoth@1.8.0` inside `supabase.cmd functions serve`
 real SOP, measure CPU/memory/time. If it exceeds edge-runtime limits, stop and bring options to the
 owner (smaller files, split documents, or browser-side extraction re-validated server-side).
 
-Migration `0903_ask_kiara_knowledge.sql`: documents, versions, chunks (generated `tsvector`, GIN),
+Migration `0215_ask_kiara_knowledge.sql`: documents, versions, chunks (generated `tsvector`, GIN),
 bucket `kiara-knowledge` with MIME/size limits and path policies, all KB RPCs, `search_kiara_knowledge`,
 `assistant` realtime topic (constraint + `emit_tenant_realtime_event` replace), manifest
 classification.
@@ -288,7 +255,7 @@ and deviations:
 - Real-SOP evaluation questions are kept in the git-ignored `docs/superpowers/evals/ask-kiara/private/`.
 
 **Phase 3 follow-ups (2026-10-10, local only; owner decision on department-specific SOPs).**
-- `0904_kiara_department_targeting`: department tags by NAME (spec 5.3a) and a 3-value `visibility`
+- `0216_kiara_department_targeting`: department tags by NAME (spec 5.3a) and a 3-value `visibility`
   (`everyone` with own-department ranking boost, `departments`, `managers_and_above`) replacing the
   2-value `audience` (same values kept, column renamed). Enforced in `search_kiara_knowledge` and
   `get_kiara_knowledge_excerpt`. New RPCs `bulk_update_kiara_documents_access_with_audit` (one
@@ -305,7 +272,7 @@ and deviations:
 **Scope:** spec 5.4, 5.6, escalation RPCs, `offer_escalation` tool, "Questions for you" tab, nav
 badge (web), notifications, save-to-KB as "suggested".
 
-Migration `0905_ask_kiara_escalations.sql`: `kiara_escalations`, `kiara_escalation_answerer`,
+Migration `0217_ask_kiara_escalations.sql`: `kiara_escalations`, `kiara_escalation_answerer`,
 `kiara_can_answer_escalation`, RPCs, derived-close trigger on notifications, realtime trigger,
 manifest classification.
 
@@ -327,7 +294,7 @@ Exit criteria: end-to-end locally: staff asks an unanswerable policy question, c
 sees the badge, answers, staff sees the answer in the conversation and a notification; history is
 preserved (`is_read`, `read_at`).
 
-**Phase 4 status (2026-10-10, local only).** Built as planned in `0905_ask_kiara_escalations`
+**Phase 4 status (2026-10-10, local only).** Built as planned in `0217_ask_kiara_escalations`
 (table, `kiara_escalation_answerer` / `kiara_can_answer_escalation`, `create_kiara_escalation`,
 `list_kiara_escalations`, `get_kiara_escalation_badge`, `answer_kiara_escalation_with_audit`,
 `withdraw_my_kiara_escalation`, derived-close and realtime triggers, `get_my_kiara_conversation`
@@ -344,7 +311,7 @@ with escalation state, manifest). Deviations and additions:
 - Native app: Ask Kiara stays hidden (NATIVE_PENDING_PAGES). A Kiara notification shows "Open on web
   for now" instead of Open, a tapped Ask Kiara link lands on the notification list, and
   `navigatePath` never opens the unimplemented-section fallback for a pending page.
-- Follow-up done (`0907_kiara_human_answers_in_history`): Kiara sees a person's answer in later turns
+- Follow-up done (`0219_kiara_human_answers_in_history`): Kiara sees a person's answer in later turns
   of the same chat. `start_kiara_turn` returns `human_answers` (escalation id, "Name (Designation)",
   time, question summary, answer). The worker adds each answer the replayed history does not yet
   contain (matched by escalation id) as a `<human_answers>` block in the NEW user turn, after
@@ -404,7 +371,7 @@ already uses.
 **Scope:** spec 5.5, 13; `kiara-insights` worker and cron; Insights tab; Limits tab with settings
 and per-user exceptions; retention purge job.
 
-Migration `09xx_ask_kiara_insights.sql`: `kiara_employee_insights`, service-role RPCs,
+Migration `<next>_ask_kiara_insights.sql` (next free number on main): `kiara_employee_insights`, service-role RPCs,
 `get_kiara_insights`, settings/limit RPCs, `list_kiara_usage`, `purge_kiara_conversations`, pg_cron
 schedules using the vault pattern of 0007 (the cron job is created only when the vault secret exists,
 fail closed), manifest classification.
@@ -431,7 +398,7 @@ views only their tree; the employee cannot see their own row anywhere.
 **Scope:** shared transcription module; `/ask-kiara/transcribe`; `consume_my_voice_quota`; web mic
 button gated by `assistant.voice`.
 
-Migration `09xx_ask_kiara_voice.sql`: `consume_my_voice_quota()` (authenticated, `assistant.voice`,
+Migration `<next>_ask_kiara_voice.sql` (next free number on main): `consume_my_voice_quota()` (authenticated, `assistant.voice`,
 same table as 0162); pgTAP.
 
 Files:

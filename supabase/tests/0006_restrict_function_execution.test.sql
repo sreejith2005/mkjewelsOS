@@ -206,20 +206,20 @@ select is((
     and p.oid::regprocedure::text not in (select identity from expected)
 ), array[
   'acknowledge_daily_checklist_with_audit(uuid,integer,uuid[])',
-  -- 0903: Ask Kiara knowledge base (manager RPCs audited; search read-only; storage path checks).
+  -- 0215: Ask Kiara knowledge base (manager RPCs audited; search read-only; storage path checks).
   'add_kiara_document_version_with_audit(uuid,text,integer,text)',
   'add_task_comment_with_audit(uuid,text)',
   'admin_delete_task_with_audit(uuid,boolean,text)',
   'admin_edit_task_with_audit(uuid,jsonb)',
-  -- 0905: Ask Kiara escalations (asker confirm/withdraw; answerers list/badge/answer; RLS helper).
+  -- 0217: Ask Kiara escalations (asker confirm/withdraw; answerers list/badge/answer; RLS helper).
   'answer_kiara_escalation_with_audit(uuid,text,boolean,text)',
-  -- 0901: Ask Kiara conversation and quota RPCs (caller-scoped, audited writes).
+  -- 0213: Ask Kiara conversation and quota RPCs (caller-scoped, audited writes).
   'archive_my_kiara_conversation(uuid)',
   'assert_crm_branch_user(uuid,uuid,uuid,text)',
   'assert_fms_flow_publishable(uuid)',
   'assign_imported_task_with_audit(text,uuid,uuid)',
   'begin_task_bulk_import(text,text,integer)',
-  -- 0904: Ask Kiara department targeting (bulk visibility/tag edit, filter data; audited).
+  -- 0216: Ask Kiara department targeting (bulk visibility/tag edit, filter data; audited).
   'bulk_update_kiara_documents_access_with_audit(uuid[],text,text[],text)',
   'cancel_task_bulk_import(uuid)',
   'change_dropdown_category_with_audit(text,uuid,text,text,text,integer,boolean)',
@@ -268,7 +268,7 @@ select is((
   'import_task_bulk_with_audit(jsonb,text,text)',
   'is_reporting_descendant(uuid,uuid)',
   'kiara_can_answer_escalation(uuid)',
-  -- 0902: Ask Kiara colleague directory (name, designation, department, branch only).
+  -- 0214: Ask Kiara colleague directory (name, designation, department, branch only).
   'kiara_directory_lookup(text,integer)',
   'kiara_knowledge_object_readable(text)',
   'kiara_knowledge_object_removable(text)',

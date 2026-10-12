@@ -1,4 +1,4 @@
--- Ask Kiara Phase 4 follow-up (development series, see the plan's "Migration numbering"):
+-- Ask Kiara Phase 4 follow-up (see the plan's "Migration numbering"):
 -- Kiara sees a person's answer to an escalated question in later turns of the same chat.
 --
 -- start_kiara_turn also returns `human_answers`: every answered escalation of the
@@ -9,7 +9,7 @@
 -- complete_kiara_turn then stores with that turn, so the request stays append-only and the
 -- answer is sent exactly once into the history.
 --
--- Full copy of 0901's start_kiara_turn with one added key; no other behaviour changes.
+-- Full copy of 0213's start_kiara_turn with one added key; no other behaviour changes.
 
 create or replace function start_kiara_turn(p_conversation_id uuid, p_request_id uuid, p_message text, p_client text)
 returns jsonb language plpgsql volatile security definer set search_path = public as $$

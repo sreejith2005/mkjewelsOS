@@ -1,9 +1,9 @@
--- Ask Kiara: keep main's retirement-manifest additions (development series, see the plan's
--- "Migration numbering"). Kiara's migrations redefine
--- production_demo_data_retirement_manifest in full and run after every main migration, so
--- main's 0212_fms_loop_execution additions (fms_execution_scopes and its visit tables) are
--- re-applied here with the same guarded text replacement 0212 uses. At the Phase 9 merge
--- this folds into the renumbered series; it is a no-op when the entries are already present.
+-- Ask Kiara: keep main's retirement-manifest additions (see the plan's "Migration
+-- numbering"). Kiara's migrations 0213, 0215 and 0217 redefine
+-- production_demo_data_retirement_manifest in full after main's 0212, so main's
+-- 0212_fms_loop_execution additions (fms_execution_scopes and its visit tables) are
+-- re-applied here with the same guarded text replacement 0212 uses. It is a no-op when the
+-- entries are already present.
 set search_path = public, extensions;
 
 do $$
