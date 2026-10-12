@@ -56,3 +56,16 @@ deleted during diagnosis or verification. To obtain a fresh 31-new-record import
 run the corrected full Delete All with series deletion enabled, then upload the
 sheet again. Re-uploading without full deletion must still skip legitimate live
 records. The correction applies generically to every account and employee scope.
+
+## Web publication evidence
+
+Source commit 1ec08ee3a93c8f50adb162879b59a432b932d1a5 was published to main
+as a scoped child of the latest main. A separate Git index preserved concurrent
+assignment work and avoided publishing its pending RPCs/migrations. Fourteen
+reviewed paths passed whitespace and credential-pattern checks.
+
+Both Vercel commit checks (jewelos and mkjewels-os) reported success. The production
+origin https://mkjewels-os.vercel.app returned HTTP 200; its public Task Control
+chunk TaskTemplatesPage-CJ-XeTMl.js contains the updated inactive/not-yet-generated
+schedule deletion confirmation. This proves the updated web asset is served;
+it does not replace authenticated browser or Android device verification.
