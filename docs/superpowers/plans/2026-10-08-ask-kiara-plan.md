@@ -453,6 +453,20 @@ shared with Tasks; transcript not auto-sent; Tasks voice regression in `docs/REG
 Exit criteria: Hindi, Hinglish, and English voice questions transcribe acceptably on desktop Chrome
 and Android Chrome; Tasks voice assignment behaves exactly as before.
 
+**Built (2026-10-12, branch `feat/ask-kiara-phase7`):** migration `0228_ask_kiara_voice`
+(`consume_my_voice_quota()`, pgTAP 0228; 0006 inventory +1 authenticated definer).
+`supabase/functions/_shared/voice/transcribe.ts` holds the upload checks, the whisper call, the
+no-speech/word-rate guards and the shape-only log; `interpret-task-voice` imports it with its
+unchanged English default (`OPENAI_TRANSCRIBE_LANGUAGE`, `"en"`), messages and log event, and its
+`worker.ts` re-exports the moved names, so `worker.test.ts` is untouched.
+`ask-kiara/transcribe.ts` auto-detects the language; a clip whisper labels Urdu is transcribed once
+more as Hindi (Devanagari), spending the allowance once. Web: the Tasks recorder moved into
+`apps/web/src/features/voice/useVoiceRecorder.ts` (Tasks passes its own wording;
+`VoiceTaskCapture.test.tsx` untouched), `features/assistant/KiaraVoiceButton.tsx` adds the mic beside
+Send for `assistant.voice`, and the transcript is appended to the input, never sent.
+`transcribeKiaraVoice` in `packages/data/src/assistant/api.ts` also accepts a native URI recording
+for Phase 8.
+
 ## Phase 8: Android parity and release
 
 Read `docs/MOBILE_RELEASE_GUIDE.md`, `apps/mobile/README.md`, `docs/MOBILE_PARITY_PLAYBOOK.md`,

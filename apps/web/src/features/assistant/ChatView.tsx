@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 import { Loader2, SendHorizontal, Sparkles, UserRound } from "lucide-react";
 import type { KiaraCitationData } from "@jewelos/core";
 import { CitationChips } from "./CitationChips";
+import { KiaraMicButton, KiaraVoiceStatus, appendTranscript, useKiaraVoice } from "./KiaraVoiceButton";
 import { KiaraMarkdown } from "./KiaraMarkdown";
 
 export type ChatEscalation = Readonly<{ id: string; status: "open" | "answered" | "withdrawn"; answeredBy: string | null }>;
@@ -72,6 +73,7 @@ const COUNTER_FROM = 1800;
 
 export function ChatView({
   bubbles,
+  canUseVoice = false,
   disabledReason,
   escalationBusy = false,
   onAskPerson = () => {},
@@ -86,6 +88,8 @@ export function ChatView({
   status,
 }: {
   bubbles: readonly ChatBubble[];
+  /** Shows the mic button (`assistant.voice`; the server checks it again). */
+  canUseVoice?: boolean | undefined;
   /** When set, the composer is locked and this explains why. */
   disabledReason: string | null;
   /** An "Ask a person" or "Withdraw" request is in flight. */
@@ -107,11 +111,14 @@ export function ChatView({
     endRef.current?.scrollIntoView?.({ block: "end" });
   }, [bubbles.length, lastText, status]);
 
+  // Spoken words land in the input box for editing; they are never sent here.
+  const voice = useKiaraVoice((text) => onDraftChange(appendTranscript(draft, text, maxLength)));
+  const voiceBusy = canUseVoice && voice.state !== "idle";
   const locked = sending || disabledReason !== null;
   const submit = (event?: FormEvent) => {
     event?.preventDefault();
     const text = draft.trim();
-    if (!text || locked) return;
+    if (!text || locked || voiceBusy) return;
     onSend(text);
   };
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -127,7 +134,7 @@ export function ChatView({
         <div className="mt-5 flex flex-wrap justify-center gap-2">
           {KIARA_SUGGESTIONS.map((suggestion) => <button
             className="min-h-10 rounded-full border border-task-border bg-task-bg px-4 text-sm text-task-text hover:border-task-accent hover:bg-task-accent-soft disabled:opacity-50"
-            disabled={locked}
+            disabled={locked || voiceBusy}
             key={suggestion}
             onClick={() => onSend(suggestion)}
             type="button"
@@ -162,6 +169,7 @@ export function ChatView({
     </div>
     <form className="border-t border-task-border pt-3" onSubmit={submit}>
       {disabledReason ? <p className="mb-2 rounded-lg bg-task-muted px-3 py-2 text-sm text-task-text">{disabledReason}</p> : null}
+      {canUseVoice ? <KiaraVoiceStatus voice={voice} /> : null}
       <div className="flex items-end gap-2">
         <label className="sr-only" htmlFor="kiara-question">Your question</label>
         <textarea
@@ -171,11 +179,12 @@ export function ChatView({
           maxLength={maxLength}
           onChange={(event) => onDraftChange(event.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Ask Kiara…"
+          placeholder={canUseVoice ? "Ask Kiara, or tap the mic…" : "Ask Kiara…"}
           rows={1}
           value={draft}
         />
-        <button aria-label="Send" className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-task-accent text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50" disabled={locked || !draft.trim()} type="submit">
+        {canUseVoice ? <KiaraMicButton disabled={locked} voice={voice} /> : null}
+        <button aria-label="Send" className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-task-accent text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50" disabled={locked || voiceBusy || !draft.trim()} type="submit">
           {sending ? <Loader2 aria-hidden className="size-5 animate-spin" /> : <SendHorizontal aria-hidden className="size-5" />}
         </button>
       </div>

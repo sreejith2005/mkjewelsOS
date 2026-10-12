@@ -74,6 +74,15 @@ devtools: `supabase.rpc(...)` / `supabase.from(...)` with the user's session).
 - [ ] Recurring tasks generate on schedule; overdue tasks show as overdue.
 - [ ] Staff see own/department tasks; managers see branch; admins see all (task visibility follows dashboard authority).
 - [ ] CSV import and Assigning Left still work for ADM/SA.
+- [ ] Voice assignment (`tasks.voice_assign`; SA/ADM/MGR/HR by default) behaves exactly as before
+      Ask Kiara Phase 7 moved its recorder and transcription into shared code
+      (`apps/web/src/features/voice/useVoiceRecorder.ts`, `supabase/functions/_shared/voice/transcribe.ts`):
+      on Tasks → Assign Task and on the floating mic, record a 10-20 s English instruction naming a
+      person and a deadline. The form fills in with the transcript shown; a < 1 s tap says "too
+      short"; a muted mic says "sent no sound at all"; staff get no voice control and a direct call
+      to `interpret-task-voice` returns 403; the 41st note in an hour returns "Too many voice notes"
+      (the hourly allowance is shared with Kiara voice questions). Automated proof:
+      `interpret-task-voice/worker.test.ts` and `VoiceTaskCapture.test.tsx` pass unchanged.
 
 ### FMS and forms
 

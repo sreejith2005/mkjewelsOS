@@ -11,7 +11,8 @@ import {
   type KiaraQuota,
   type KiaraStreamEvent,
 } from "@jewelos/core";
-import { newRequestKey } from "../runtime";
+import { newRequestKey, uploadBody, type UploadSource } from "../runtime";
+import type { NativeVoiceRecording } from "../tasks/voice";
 
 export type KiaraConversationSummary = Readonly<{
   id: string;
@@ -269,4 +270,36 @@ export async function askKiara(options: AskKiaraOptions): Promise<AskKiaraOutcom
   }
   const seen = meta as Extract<KiaraStreamEvent, { event: "meta" }>["data"] | null;
   return outcome ?? { ok: false, requestId, conversationId: seen?.conversation_id ?? options.conversationId, code: "interrupted", message: "The connection dropped. Open the chat again to see the answer." };
+}
+
+export type KiaraTranscript = Readonly<{ text: string; durationSeconds: number | null; language: string | null }>;
+
+const TRANSCRIBE_FAILURE = "Voice input is unavailable right now. Please type your question.";
+
+/**
+ * Turns a short recording into text for the input box (Phase 7). Nothing is
+ * sent to Kiara and no question is used: the asker edits the words and presses
+ * Send. Throws an Error carrying the function's safe message.
+ */
+export async function transcribeKiaraVoice(file: UploadSource | NativeVoiceRecording): Promise<KiaraTranscript> {
+  const body = new FormData();
+  if ("uri" in file) {
+    // React Native's FormData accepts a URI part; the DOM type only describes browser Blob parts.
+    body.append("audio", { uri: file.uri, name: file.name, type: file.type } as unknown as Blob);
+  } else {
+    const bytes = uploadBody(file);
+    const audio = bytes instanceof Blob ? bytes : new Blob([bytes], { type: file.type });
+    body.append("audio", audio, file.name);
+  }
+  const { data, error } = await db().functions.invoke("ask-kiara/transcribe", { method: "POST", body });
+  if (error) {
+    const failure = await failureFromError(error);
+    throw new Error(failure.message === GENERIC_FAILURE ? TRANSCRIBE_FAILURE : failure.message);
+  }
+  if (!isRecord(data) || typeof data.text !== "string") throw new Error(TRANSCRIBE_FAILURE);
+  return {
+    text: data.text,
+    durationSeconds: typeof data.duration_s === "number" ? data.duration_s : null,
+    language: typeof data.language === "string" ? data.language : null,
+  };
 }
