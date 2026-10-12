@@ -10674,6 +10674,37 @@ export type Database = {
       }
     }
     Functions: {
+      assert_task_assignment_targets: {
+        Args: { p_doer_ids: string[]; p_watcher_ids?: string[] }
+        Returns: undefined
+      }
+      assert_task_assignment_rule: {
+        Args: { p_type: string; p_user_id: string }
+        Returns: undefined
+      }
+      list_task_assignment_users: {
+        Args: never
+        Returns: {
+          branch_id: string
+          buddy_id: string
+          department_id: string
+          employee_code: string
+          employee_name: string
+          first_name: string
+          id: string
+          last_name: string
+          reports_to_user_id: string
+          secondary_buddy_id: string
+          tenant_id: string
+          user_role: Database["public"]["Enums"]["user_role"]
+          working_status: Database["public"]["Enums"]["working_status"]
+        }[]
+      }
+      task_assignment_scope: { Args: never; Returns: string }
+      task_assignment_user_in_scope: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
       commit_task_bulk_import_chunk_v0208: {
         Args: { p_batch_id: string; p_rows: Json }
         Returns: Json

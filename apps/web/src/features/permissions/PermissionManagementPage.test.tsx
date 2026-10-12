@@ -13,6 +13,17 @@ afterEach(() => { cleanup(); vi.resetAllMocks(); mocks.refresh = undefined; });
 const context: PermissionAdminContext = { departments: [], departmentOverrides: {}, roles: ["staff"], rolePermissions: {}, designations: [], designationOverrides: {}, users: [{ id: "target", employeeName: "Synthetic User", employeeCode: "TEST", role: "staff", designationId: null, accountStatus: "active", dashboardAuthority: null, overrideCount: 0 }] };
 const breakdown: UserAccessBreakdown = { profileId: "target", employeeName: "Synthetic User", employeeCode: "TEST", baseRole: "staff", departmentId: null, departmentName: null, designationId: null, designationLabel: null, dashboardAuthority: null, effectiveRole: "staff", rows: [{ key: "tasks.view", roleDefault: true, roleConfigured: false, department: null, designation: null, user: null, effective: true }] };
 
+it("saves an assignment denial for a department separately from section access", async () => {
+  mocks.context.mockResolvedValue({ ...context, departments: [{ id: "dept", name: "Operations", branchName: null }] });
+  render(<PermissionManagementPage onBack={() => {}} />);
+  await act(async () => {});
+  fireEvent.click(screen.getByRole("button", { name: "Departments" }));
+  fireEvent.change(screen.getByLabelText("Assign tasks to other users department access"), { target: { value: "deny" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save department access" }));
+  await act(async () => {});
+  expect(mocks.departmentSave).toHaveBeenCalledWith("dept", { "tasks.assign_others": "deny" });
+});
+
 it("refreshes the selected user's committed access while preserving local authority and override edits", async () => {
   mocks.context.mockResolvedValue(context);
   mocks.breakdown.mockResolvedValue(breakdown);

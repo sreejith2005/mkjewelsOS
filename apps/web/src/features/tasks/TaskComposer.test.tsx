@@ -51,6 +51,11 @@ function renderComposer(overrides: Partial<Parameters<typeof TaskComposer>[0]> =
 }
 
 describe("TaskComposer selector panels", () => {
+  it("honors the server roster for a staff profile with elevated assignment authority", () => {
+    renderComposer({ profile: { ...profile, user_role: "staff" } });
+    fireEvent.click(screen.getByRole("button", { name: /Users/i }));
+    expect(screen.getByLabelText("Other department")).toBeTruthy();
+  });
   it("retries a failed attachment against the saved task without creating another task", async () => {
     const onSave = vi.fn().mockResolvedValue("saved-task");
     const onCreated = vi.fn();
@@ -82,7 +87,7 @@ describe("TaskComposer selector panels", () => {
     expect(screen.queryByTestId("task-panel-users")).toBeNull();
   });
   it("limits normal staff to themselves and colleagues in their department", () => {
-    renderComposer({ profile: { ...profile, user_role: "staff" } });
+    renderComposer({ profile: { ...profile, user_role: "staff" }, data: { ...data, users: data.users.filter(user => user.department_id === "department-1") } });
 
     fireEvent.click(screen.getByRole("button", { name: /Users/i }));
 

@@ -99,6 +99,18 @@ export async function loadAvailabilityForDate(date: string): Promise<Availabilit
   return result.data;
 }
 
+/** Server-authorized assignment roster; independent of directory/availability RLS. */
+export async function loadTaskAssignmentUsers(): Promise<TaskUser[]> {
+  const users: TaskUser[] = [];
+  for (let offset = 0; ; offset += 500) {
+    const result = await db().rpc("list_task_assignment_users").range(offset, offset + 499);
+    fail("Load task assignment users", result.error);
+    const rows = result.data ?? [];
+    users.push(...rows.map(user => ({ ...user, employee_name: [user.first_name, user.last_name].filter((name): name is string => Boolean(name?.trim())).join(" ") || user.employee_name })));
+    if (rows.length < 500) return users;
+  }
+}
+
 export async function loadAvailabilityDepartments(): Promise<Array<Pick<Tables<"departments">, "id" | "name">>> {
   const result = await db().from("departments")
     .select("id,name")
@@ -110,7 +122,7 @@ export async function loadAvailabilityDepartments(): Promise<Array<Pick<Tables<"
 
 export async function loadTaskAuthoringReferenceData(): Promise<TaskReferenceData> {
   const [users, branchesResult, departmentsResult, categories, priorities, designations, templatesResult, formsResult] = await Promise.all([
-    loadAvailabilityUsers(),
+    loadTaskAssignmentUsers(),
     db().from("branches").select("id,name").eq("is_active", true).order("name"),
     db().from("departments").select("id,name,branch_id").eq("is_active", true).order("name"),
     loadTaskCategoryOptions(),
