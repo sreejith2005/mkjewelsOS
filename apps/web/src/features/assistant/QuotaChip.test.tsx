@@ -12,9 +12,15 @@ describe("QuotaChip", () => {
     expect(screen.getByText(/resets 12:00 am on 10 Oct/)).toBeTruthy();
   });
 
-  it("shows Unlimited for Super Admin without a reset time", () => {
+  it("is hidden for people without a limit (Super Admin or an unlimited exception)", () => {
     const { container } = render(<QuotaChip quota={{ used: 40, limit: null, resets_at: "2026-10-09T18:30:00Z" }} />);
-    expect(container.textContent).toBe("Unlimited questions");
+    expect(container.textContent).toBe("");
+    expect(container.querySelector("span")).toBeNull();
+  });
+
+  it("stays visible for a lower personal limit, including when it is used up", () => {
+    render(<QuotaChip quota={{ used: 2, limit: 2, resets_at: "2026-10-09T18:30:00Z", timezone: "Asia/Kolkata" }} />);
+    expect(screen.getByText(/0 of 2 questions left today/)).toBeTruthy();
   });
 
   it("renders nothing before the quota loads", () => {

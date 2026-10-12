@@ -34,7 +34,7 @@ export interface KiaraModelStream extends AsyncIterable<StreamEvent> {
   finalMessage(): Promise<Message>;
 }
 export interface AnthropicLike {
-  stream(params: StreamParams): KiaraModelStream;
+  stream(params: StreamParams, options?: { signal?: AbortSignal }): KiaraModelStream;
 }
 
 export type KiaraEffort = "low" | "medium" | "high";
@@ -183,6 +183,8 @@ export type KiaraTurnDeps = Readonly<{
   config: KiaraConfig;
   now: () => Date;
   log: (entry: Record<string, unknown>) => void;
+  /** Aborted when the runtime is about to stop this worker (index.ts, beforeunload). */
+  signal?: AbortSignal;
 }>;
 
 export type KiaraTurnInput = Readonly<{
@@ -211,6 +213,8 @@ export type KiaraTurnResult =
   | Readonly<{ ok: false; code: KiaraErrorCode; message: string }>;
 
 class ProviderFailure extends Error {}
+
+const NOT_COUNTED_MESSAGE = "Kiara could not answer right now. Your question was not counted. Please try again.";
 
 function requestUsage(message: Message): RequestUsage {
   const usage = message.usage;
@@ -388,12 +392,14 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
 
   try {
     for (let round = 0; round < config.maxRequests; round += 1) {
+      if (deps.signal?.aborted) throw new ProviderFailure("aborted");
       const finalRound = round === config.maxRequests - 1;
       emit({ event: "status", data: { phase: "thinking", label: round === 0 ? "Thinking" : "Putting the answer together" } });
       let message: Message;
       let blockHasText = false;
       try {
-        const stream = anthropic.stream(buildRequestParams(config, offered, messages, finalRound));
+        const params = buildRequestParams(config, offered, messages, finalRound);
+        const stream = deps.signal ? anthropic.stream(params, { signal: deps.signal }) : anthropic.stream(params);
         for await (const event of stream) {
           if (event.type === "content_block_start") {
             blockHasText = false;
@@ -452,6 +458,7 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
       // a result so the stored history stays a valid conversation.
       const runnable = message.stop_reason === "tool_use" && !finalRound;
       for (const toolUse of toolUses) {
+        if (deps.signal?.aborted) throw new ProviderFailure("aborted");
         if (!runnable || toolCalls >= config.maxToolCalls) {
           results.push({ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: JSON.stringify({ error: "limit_reached", message: "No more lookups are possible for this question. Answer with what you already have." }) });
           continue;
@@ -484,14 +491,15 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
       if (!runnable) break;
     }
   } catch (caught) {
-    if (!(caught instanceof ProviderFailure)) throw caught;
-    deps.log({ event: "kiara_provider_failed", kind: caught.message, text_sent: textEmitted, requests: perRequest.length, ms: Date.now() - startedAt });
+    const provider = caught instanceof ProviderFailure;
+    deps.log({ event: provider ? "kiara_provider_failed" : "kiara_turn_failed", kind: provider ? caught.message : "worker_error", text_sent: textEmitted, requests: perRequest.length, ms: Date.now() - startedAt });
     if (!textEmitted) {
-      // Nothing was shown: the question is given back (quota rule, spec 9).
-      const refund = await actor.rpc("refund_kiara_question", { p_request_id: request.request_id });
-      if (refund.error) deps.log({ event: "kiara_refund_failed", code: refund.error.code ?? null });
-      return { ok: false, code: "provider_error", message: "Kiara could not answer right now. Your question was not counted. Please try again." };
+      // Nothing was shown (provider failure, worker stopping, or a crash in this
+      // worker): the question is given back (quota rule, spec 9).
+      await refundQuestion(deps, request.request_id);
+      return { ok: false, code: provider ? "provider_error" : "unavailable", message: NOT_COUNTED_MESSAGE };
     }
+    if (!provider) throw caught;
     return { ok: false, code: "interrupted", message: KIARA_INTERRUPTED_MESSAGE };
   }
 
@@ -534,6 +542,11 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
   // Shape only: never question text, answers, or tool data.
   deps.log({ event: "kiara_turn", ok: !completed.error, model, stop_reason: stopReason, tools: toolsUsed, tool_calls: toolCalls, kb_searches: kbSearches, citations: cited.citations.length, kb_no_match: kbNoMatch, escalation_offered: escalationOffer !== null, ms: Date.now() - startedAt, usage });
   if (completed.error || typeof completed.data !== "string") {
+    // An answer nobody saw and nobody stored does not use up a question.
+    if (!textEmitted) {
+      await refundQuestion(deps, request.request_id);
+      return { ok: false, code: "unavailable", message: NOT_COUNTED_MESSAGE };
+    }
     return { ok: false, code: "unavailable", message: "Kiara answered, but the answer could not be saved. Please try again." };
   }
   for (const citation of cited.citations) {
@@ -542,6 +555,15 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
   const offer = escalationOffer as KiaraEscalationOffer | null;
   if (offer) emit({ event: "escalation_offer", data: { message_id: completed.data, offer_id: offer.offer_id, reason: offer.reason, summary: offer.summary_en } });
   return { ok: true, assistantMessageId: completed.data, displayText: finalText, stopReason, quota: started.quota, usage, toolsUsed, citations: cited.citations, escalationOffer: offer };
+}
+
+async function refundQuestion(deps: KiaraTurnDeps, requestId: string): Promise<void> {
+  try {
+    const refund = await deps.actor.rpc("refund_kiara_question", { p_request_id: requestId });
+    if (refund.error) deps.log({ event: "kiara_refund_failed", code: refund.error.code ?? null });
+  } catch {
+    deps.log({ event: "kiara_refund_failed", code: null });
+  }
 }
 
 /**

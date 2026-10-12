@@ -50,6 +50,17 @@ function configFromEnv(): KiaraConfig {
 
 const log = (entry: Record<string, unknown>) => console.log(JSON.stringify(entry));
 
+// Questions still being answered by this worker. When the runtime is about to stop
+// it (time or memory limit), each one is aborted so the turn ends through its
+// failure path: a question that showed no answer text yet is refunded (spec 9).
+const inflight = new Set<AbortController>();
+if (typeof globalThis.addEventListener === "function") {
+  globalThis.addEventListener("beforeunload", () => {
+    log({ event: "kiara_worker_stopping", inflight: inflight.size });
+    for (const controller of inflight) controller.abort();
+  });
+}
+
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const path = new URL(request.url).pathname.replace(/\/+$/, "");
@@ -116,12 +127,18 @@ Deno.serve(async (request: Request) => {
     return json(503, { error: "Ask Kiara is unavailable right now. Please try again shortly.", code: "unavailable" });
   }
 
+  const controller = new AbortController();
+  inflight.add(controller);
+  const settle = () => {
+    inflight.delete(controller);
+  };
   const deps: KiaraTurnDeps = {
     anthropic: new Anthropic({ apiKey: anthropicKey }).beta.messages,
     actor,
     config: configFromEnv(),
     now: () => new Date(),
     log,
+    signal: controller.signal,
   };
   // CRM (Phase 5): the CRM project's public URL and anon key. Without them the CRM
   // tools are not offered. The session is created per request and exchanges the
@@ -145,7 +162,7 @@ Deno.serve(async (request: Request) => {
 
   const wantsStream = (request.headers.get("Accept") ?? "").includes("text/event-stream");
   if (!wantsStream) {
-    const result = await runKiaraTurn(deps, input, () => {});
+    const result = await runKiaraTurn(deps, input, () => {}).finally(settle);
     if (!result.ok) return json(result.code === "provider_error" || result.code === "unavailable" ? 503 : 500, { error: result.message, code: result.code });
     return json(200, {
       conversation_id: started.conversationId,
@@ -161,7 +178,8 @@ Deno.serve(async (request: Request) => {
     });
   }
 
-  const stream = kiaraEventStream(deps, input, log);
+  // The turn runs inside the stream; it is settled when the stream closes.
+  const stream = kiaraEventStream(deps, input, log).pipeThrough(new TransformStream<Uint8Array, Uint8Array>({ flush: settle }));
   return new Response(stream, {
     status: 200,
     headers: { ...corsHeaders, "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache", "X-Accel-Buffering": "no" },

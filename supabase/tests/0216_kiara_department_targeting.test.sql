@@ -20,6 +20,9 @@ from generate_series(1, 15) n;
 insert into tenants(id, name, slug, timezone) values
   ('20910000-0000-4000-8000-000000000001', 'DT fixture A', 'dt-fixture-a', 'Asia/Kolkata'),
   ('20910000-0000-4000-8000-000000000002', 'DT fixture B', 'dt-fixture-b', 'Asia/Kolkata');
+-- The fixture tenants have Ask Kiara switched on (new tenants start with it off, 0220).
+insert into tenant_section_controls(tenant_id, developer_mode_enabled, section_availability, settings_version)
+select id, false, default_section_availability() || '{"ask_kiara": true}', 1 from tenants where id in ('20910000-0000-4000-8000-000000000001', '20910000-0000-4000-8000-000000000002');
 insert into branches(id, tenant_id, name, code) values
   ('20920000-0000-4000-8000-000000000001', '20910000-0000-4000-8000-000000000001', 'DT branch A1', 'DT-A1'),
   ('20920000-0000-4000-8000-000000000002', '20910000-0000-4000-8000-000000000001', 'DT branch A2', 'DT-A2'),

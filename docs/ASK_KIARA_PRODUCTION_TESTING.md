@@ -108,5 +108,93 @@ deleted. Conversations, documents and questions stay, and come back when you swi
 ## 6. Daily question limit
 
 - Default: **10 questions per person per day**. Super Admin is unlimited.
-- There is no screen to change it yet. **Phase 6 adds the Limits screen**, with a company limit
-  and per-person exceptions. Until then the default of 10 applies.
+- Change it on the **Limits** tab (section 7 below).
+
+## 7. Phase 6: Insights, Limits, and clean-up
+
+New in Phase 6. All of it is in **Ask Kiara**, as extra tabs at the top. You see a tab only if
+you are allowed to use it.
+
+### Insights (who needs SOP training)
+
+**Who sees it.** Super Admin and Admin see everyone in the company. A manager sees only the
+people who report to them (directly or further down). Nobody sees their own row. Staff don't
+see the tab. Nobody, not even Super Admin, can read anyone's questions. Insights show only
+labels and counts.
+
+**How to open it.** Ask Kiara → **Insights**.
+
+**What each card shows**
+- **Rating 1 to 5**: an AI estimate of how well the person knows the SOPs, from the questions
+  they asked Kiara in the **last 60 days**. Higher is better.
+- **Class**:
+  - **Fresher** (rating 1 or 2): asks many basic questions, asks the same thing again on other
+    days, or often needs a person to answer. A good candidate for SOP training.
+  - **Experienced** (rating 3): knows the basics and asks about routine work.
+  - **Veteran** (rating 4 or 5): mostly asks about exceptions and harder cases.
+- **Summary**: one or two lines on what they mostly ask about.
+- **Counts**: SOP questions, on how many days, all questions, and the last day they were active.
+  Under a rated card: how many were basic, asked again on another day, or sent to a person.
+- **Asks most about / SOPs used most / SOP departments**: useful for planning which training to
+  give.
+
+**Not enough questions yet.** A rating needs at least **8 SOP questions on 4 different days**
+in the last 60 days. Until then the card says **Not enough questions yet**. Questions about the
+app or about someone's own tasks still show in the counts, but don't make a rating.
+
+**Filters.** Branch, Department, Class (including "Not enough questions yet"). **Sort by**
+Rating or Activity.
+
+**When it updates.** Every night at about 2:30 am. Kiara labels the new questions in the
+background; results normally appear within an hour after that.
+
+**Refresh insights now (Super Admin only).** On the Insights tab, click **Refresh insights
+now** to label today's new questions without waiting for the night. You can do this once an
+hour. Results usually appear within an hour: come back and reload the page. If it says "the
+insights job is not set up yet", tell Claude.
+
+It is an estimate to plan training. Don't use it for appraisals.
+
+### Limits (Super Admin only)
+
+Ask Kiara → **Limits**. Admins and managers can't open this tab, and the permission can't be
+given to anyone else.
+
+**Company limit.** Questions per person per day (0 to 500; the default is 10). Change the
+number and click **Save**. It applies from the person's **next question**. The day resets at
+midnight India time. Super Admin never has a limit.
+
+**Keep chats for.** How many days chats are kept (30 to 730; default 180). Older chats are
+deleted every night. The text-free question counts used by Insights are kept for 365 days.
+Questions sent to a person ("Ask a person") and their answers are not deleted.
+
+**A person's exception.** Click **Add or change a person**, type part of their name or employee
+code, and pick them. Choose:
+- **Own limit**: a number, higher or lower than the company limit (0 means no questions); or
+- **Unlimited**.
+Add a note if you like (for example "pilot user"). Click **Save exception**. To put someone
+back on the company limit, click **Remove** next to their name. Every change is recorded in
+the audit log.
+
+People with no limit (Super Admin, or an Unlimited exception) no longer see the
+"questions left" chip in the chat. Everyone else still does.
+
+**Usage.** At the bottom of the Limits tab: **Today**, **Last 7 days** or **Last 30 days**. Each
+row is one person: their limit, the questions they asked each day (for up to 7 days), and the
+total. The last row is the total for everyone. A number in red means they used their whole
+limit that day. A question Kiara could not answer is given back and is not counted.
+
+### Phase 6 checks on production
+
+1. Ask Kiara → **Limits**. Set the company limit to **3**, Save. With a test employee who has
+   Ask Kiara, ask 4 questions: the 4th is refused with the reset time. Set it back to 10.
+2. Give that employee an exception of **Unlimited**. In their chat, the "questions left" chip
+   is gone. Remove the exception: the chip is back.
+3. Usage → **Today**: the test employee's questions are listed with the right total.
+4. Ask Kiara → **Insights** → **Refresh insights now**. The button then shows it can be used
+   again in an hour. After about an hour, reload: people who asked questions appear (most will
+   say "Not enough questions yet" at first).
+5. Sign in as a manager: Insights lists only people who report to them, and not the manager.
+   Sign in as staff: there is no Insights or Limits tab.
+6. Nothing to check for the clean-up: old chats are deleted automatically every night, and a
+   new company (tenant) would start with Ask Kiara switched off.

@@ -7148,6 +7148,117 @@ export type Database = {
           },
         ]
       }
+      kiara_employee_insights: {
+        Row: {
+          active_days: number
+          basic_count: number
+          classification: string | null
+          computed_at: string | null
+          escalated_count: number
+          formula_version: number | null
+          last_active_on: string | null
+          model: string | null
+          period_end: string | null
+          period_start: string | null
+          question_count: number
+          rating: number | null
+          repeat_count: number
+          sop_question_count: number
+          status: string
+          summary: string | null
+          summary_at: string | null
+          tenant_id: string
+          top_departments: string[]
+          top_documents: string[]
+          top_topics: string[]
+          user_profile_id: string
+        }
+        Insert: {
+          active_days?: number
+          basic_count?: number
+          classification?: string | null
+          computed_at?: string | null
+          escalated_count?: number
+          formula_version?: number | null
+          last_active_on?: string | null
+          model?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          question_count?: number
+          rating?: number | null
+          repeat_count?: number
+          sop_question_count?: number
+          status?: string
+          summary?: string | null
+          summary_at?: string | null
+          tenant_id: string
+          top_departments?: string[]
+          top_documents?: string[]
+          top_topics?: string[]
+          user_profile_id: string
+        }
+        Update: {
+          active_days?: number
+          basic_count?: number
+          classification?: string | null
+          computed_at?: string | null
+          escalated_count?: number
+          formula_version?: number | null
+          last_active_on?: string | null
+          model?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          question_count?: number
+          rating?: number | null
+          repeat_count?: number
+          sop_question_count?: number
+          status?: string
+          summary?: string | null
+          summary_at?: string | null
+          tenant_id?: string
+          top_departments?: string[]
+          top_documents?: string[]
+          top_topics?: string[]
+          user_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kiara_employee_insights_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_employee_insights_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: true
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_employee_insights_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: true
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_employee_insights_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: true
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kiara_employee_insights_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: true
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kiara_escalations: {
         Row: {
           answer_message_id: string | null
@@ -7333,6 +7444,63 @@ export type Database = {
           },
         ]
       }
+      kiara_insight_batches: {
+        Row: {
+          created_at: string
+          ended_at: string | null
+          error: string | null
+          id: string
+          item_count: number
+          provider_batch_id: string | null
+          question_count: number
+          status: string
+          submitted_at: string | null
+          trigger: string
+        }
+        Insert: {
+          created_at?: string
+          ended_at?: string | null
+          error?: string | null
+          id?: string
+          item_count?: number
+          provider_batch_id?: string | null
+          question_count?: number
+          status?: string
+          submitted_at?: string | null
+          trigger: string
+        }
+        Update: {
+          created_at?: string
+          ended_at?: string | null
+          error?: string | null
+          id?: string
+          item_count?: number
+          provider_batch_id?: string | null
+          question_count?: number
+          status?: string
+          submitted_at?: string | null
+          trigger?: string
+        }
+        Relationships: []
+      }
+      kiara_insights_job_config: {
+        Row: {
+          function_url: string
+          singleton: boolean
+          updated_at: string
+        }
+        Insert: {
+          function_url: string
+          singleton?: boolean
+          updated_at?: string
+        }
+        Update: {
+          function_url?: string
+          singleton?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       kiara_messages: {
         Row: {
           api_content: Json | null
@@ -7442,7 +7610,9 @@ export type Database = {
           escalated: boolean
           id: string
           kb_hit: boolean
+          label_attempts: number
           labelled_at: string | null
+          labelling_batch_id: string | null
           local_date: string
           message_id: string | null
           sop_level: string | null
@@ -7457,7 +7627,9 @@ export type Database = {
           escalated?: boolean
           id?: string
           kb_hit?: boolean
+          label_attempts?: number
           labelled_at?: string | null
+          labelling_batch_id?: string | null
           local_date: string
           message_id?: string | null
           sop_level?: string | null
@@ -7472,7 +7644,9 @@ export type Database = {
           escalated?: boolean
           id?: string
           kb_hit?: boolean
+          label_attempts?: number
           labelled_at?: string | null
+          labelling_batch_id?: string | null
           local_date?: string
           message_id?: string | null
           sop_level?: string | null
@@ -7481,6 +7655,13 @@ export type Database = {
           user_profile_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "kiara_question_facts_labelling_batch_id_fkey"
+            columns: ["labelling_batch_id"]
+            isOneToOne: false
+            referencedRelation: "kiara_insight_batches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "kiara_question_facts_message_id_fkey"
             columns: ["message_id"]
@@ -7529,6 +7710,7 @@ export type Database = {
         Row: {
           conversation_retention_days: number
           daily_question_limit: number
+          insights_refresh_requested_at: string | null
           settings_version: number
           tenant_id: string
           updated_at: string
@@ -7537,6 +7719,7 @@ export type Database = {
         Insert: {
           conversation_retention_days?: number
           daily_question_limit?: number
+          insights_refresh_requested_at?: string | null
           settings_version?: number
           tenant_id: string
           updated_at?: string
@@ -7545,6 +7728,7 @@ export type Database = {
         Update: {
           conversation_retention_days?: number
           daily_question_limit?: number
+          insights_refresh_requested_at?: string | null
           settings_version?: number
           tenant_id?: string
           updated_at?: string
@@ -12261,6 +12445,15 @@ export type Database = {
         Args: { p_instance_stage_id: string }
         Returns: undefined
       }
+      claim_kiara_insight_work: {
+        Args: {
+          p_max_employees?: number
+          p_max_questions?: number
+          p_tenant_id: string
+          p_trigger: string
+        }
+        Returns: Json
+      }
       claim_notification_deliveries: {
         Args: {
           p_lease_minutes?: number
@@ -12339,6 +12532,10 @@ export type Database = {
           p_remark?: string
         }
         Returns: undefined
+      }
+      complete_kiara_insight_batch: {
+        Args: { p_batch_id: string; p_model: string; p_results: Json }
+        Returns: Json
       }
       complete_kiara_turn: {
         Args: {
@@ -12753,6 +12950,10 @@ export type Database = {
         Args: { p_error: string; p_version_id: string }
         Returns: undefined
       }
+      fail_kiara_insight_batch: {
+        Args: { p_batch_id: string; p_error: string }
+        Returns: number
+      }
       finalize_crm_sync_run: {
         Args: {
           p_checkpoint: Json
@@ -12911,11 +13112,13 @@ export type Database = {
       get_home_summary: { Args: { p_context?: Json }; Returns: Json }
       get_kiara_document: { Args: { p_id: string }; Returns: Json }
       get_kiara_escalation_badge: { Args: never; Returns: number }
+      get_kiara_insights: { Args: { p_filters?: Json }; Returns: Json }
       get_kiara_knowledge_excerpt: {
         Args: { p_chunk_id: string }
         Returns: Json
       }
       get_kiara_knowledge_filters: { Args: never; Returns: Json }
+      get_kiara_limits: { Args: never; Returns: Json }
       get_kiara_version_for_ingest: {
         Args: { p_version_id: string }
         Returns: Json
@@ -13114,6 +13317,41 @@ export type Database = {
         Args: { p_limit?: number; p_query: string }
         Returns: Json
       }
+      kiara_insight_inputs: {
+        Args: { p_user_profile_ids: string[] }
+        Returns: Json
+      }
+      kiara_insight_scope: {
+        Args: {
+          p_actor_id: string
+          p_tenant_id: string
+          p_tenant_wide: boolean
+        }
+        Returns: {
+          active_days: number
+          basic_count: number
+          branch: string
+          branch_id: string
+          classification: string
+          computed_at: string
+          department: string
+          department_id: string
+          designation: string
+          escalated_count: number
+          last_active_on: string
+          name: string
+          question_count: number
+          rating: number
+          repeat_count: number
+          sop_question_count: number
+          status: string
+          summary: string
+          top_departments: string[]
+          top_documents: string[]
+          top_topics: string[]
+          user_profile_id: string
+        }[]
+      }
       kiara_knowledge_object_readable: {
         Args: { p_path: string }
         Returns: boolean
@@ -13157,6 +13395,10 @@ export type Database = {
         Args: { p_limit?: number; p_status?: string }
         Returns: Json
       }
+      list_kiara_usage: {
+        Args: { p_from: string; p_to: string }
+        Returns: Json
+      }
       list_my_kiara_conversations: { Args: { p_limit?: number }; Returns: Json }
       list_notification_delivery_logs: {
         Args: {
@@ -13183,6 +13425,7 @@ export type Database = {
           state: string
         }[]
       }
+      list_open_kiara_insight_batches: { Args: never; Returns: Json }
       list_task_comments: {
         Args: { p_task_id: string }
         Returns: {
@@ -13218,6 +13461,10 @@ export type Database = {
         }[]
       }
       mark_all_notifications_read: { Args: never; Returns: number }
+      mark_kiara_insight_batch_submitted: {
+        Args: { p_batch_id: string; p_provider_batch_id: string }
+        Returns: undefined
+      }
       mark_notification_read: {
         Args: { p_is_read?: boolean; p_notification_id: string }
         Returns: undefined
@@ -13375,6 +13622,7 @@ export type Database = {
         }
         Returns: Json
       }
+      purge_kiara_conversations: { Args: never; Returns: Json }
       queue_fms_starter_assignments: {
         Args: { p_assigned_by: string; p_flow_id: string }
         Returns: undefined
@@ -13536,6 +13784,7 @@ export type Database = {
         }
         Returns: string
       }
+      request_kiara_insights_refresh: { Args: never; Returns: Json }
       request_report_export_with_audit: {
         Args: { p_filters: Json; p_report_key: string; p_request_key: string }
         Returns: {
@@ -13901,6 +14150,24 @@ export type Database = {
         }
         Returns: Json
       }
+      save_kiara_settings_with_audit: {
+        Args: {
+          p_daily_limit: number
+          p_expected_version: number
+          p_retention_days: number
+        }
+        Returns: Json
+      }
+      save_kiara_user_limit_with_audit: {
+        Args: {
+          p_clear: boolean
+          p_daily_limit: number
+          p_reason: string
+          p_unlimited: boolean
+          p_user_profile_id: string
+        }
+        Returns: Json
+      }
       save_notification_rule: {
         Args: {
           p_backoff_minutes?: number
@@ -14018,11 +14285,13 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      schedule_kiara_jobs: { Args: { p_function_url: string }; Returns: Json }
       search_crm_clients: { Args: { p_filter?: Json }; Returns: Json[] }
       search_kiara_knowledge: {
         Args: { p_limit?: number; p_original_terms?: string; p_query: string }
         Returns: Json
       }
+      search_kiara_limit_people: { Args: { p_query: string }; Returns: Json }
       seed_default_notification_rules: {
         Args: { p_tenant_id: string }
         Returns: undefined
@@ -14397,6 +14666,7 @@ export type Database = {
         }
         Returns: string
       }
+      upsert_kiara_insights: { Args: { p_rows: Json }; Returns: number }
       use_task_template_with_audit: {
         Args: { p_planned_datetime: string; p_template_id: string }
         Returns: string

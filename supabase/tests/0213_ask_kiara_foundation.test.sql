@@ -14,6 +14,9 @@ from generate_series(1, 9) n;
 insert into tenants(id, name, slug, timezone) values
   ('20510000-0000-4000-8000-000000000001', 'Kiara fixture A', 'kiara-fixture-a', 'Asia/Kolkata'),
   ('20510000-0000-4000-8000-000000000002', 'Kiara fixture B', 'kiara-fixture-b', 'Asia/Kolkata');
+-- The fixture tenants have Ask Kiara switched on (new tenants start with it off, 0220).
+insert into tenant_section_controls(tenant_id, developer_mode_enabled, section_availability, settings_version)
+select id, false, default_section_availability() || '{"ask_kiara": true}', 1 from tenants where id in ('20510000-0000-4000-8000-000000000001', '20510000-0000-4000-8000-000000000002');
 insert into branches(id, tenant_id, name, code) values
   ('20520000-0000-4000-8000-000000000001', '20510000-0000-4000-8000-000000000001', 'Kiara branch A', 'KIA-A'),
   ('20520000-0000-4000-8000-000000000002', '20510000-0000-4000-8000-000000000002', 'Kiara branch B', 'KIA-B');
@@ -61,7 +64,7 @@ select is((select default_roles from permission_catalog where key = 'assistant.v
 select is((select default_roles from permission_catalog where key = 'assistant.answer_escalations'), '{super_admin,admin,manager}'::user_role[], 'HR does not answer escalations by default');
 select is((select kind from permission_catalog where key = 'assistant.manage_limits'), 'protected', 'limits are Super Admin authority only');
 select is((select array_agg(sort_order order by sort_order) from permission_catalog where key like 'assistant.%'), array[310,311,312,313,314,315], 'assistant permissions sort after the existing catalog');
-select ok((default_section_availability() ->> 'ask_kiara')::boolean, 'new tenants get the section on by default');
+select ok(not (default_section_availability() ->> 'ask_kiara')::boolean, 'new tenants get the section off by default (0220)');
 select is(validated_section_availability('{"ask_kiara": false}') ->> 'ask_kiara', 'false', 'section availability accepts the ask_kiara key');
 select ok(exists (select 1 from kiara_settings where tenant_id = '20510000-0000-4000-8000-000000000001' and daily_question_limit = 10 and conversation_retention_days = 180), 'new tenants receive default Kiara settings');
 select lives_ok($$select production_demo_data_retirement_manifest('20510000-0000-4000-8000-000000000001')$$, 'retirement manifest classifies every Kiara table');
@@ -112,7 +115,8 @@ select is((select count(*)::integer from kiara_messages), 0, 'rejected calls wri
 -- Launch dark: the section off keeps staff out, Super Admin in.
 reset role;
 insert into tenant_section_controls(tenant_id, developer_mode_enabled, section_availability, settings_version)
-values ('20510000-0000-4000-8000-000000000001', false, default_section_availability() || '{"ask_kiara": false}', 1);
+values ('20510000-0000-4000-8000-000000000001', false, default_section_availability() || '{"ask_kiara": false}', 1)
+on conflict (tenant_id) do update set section_availability = excluded.section_availability;
 set local role authenticated;
 select pg_temp.as_user(4);
 select throws_ok($$select start_kiara_turn(null, pg_temp.request(906), 'hello', 'web')$$, '42501', 'This section is currently unavailable', 'staff are refused while the section is dark');

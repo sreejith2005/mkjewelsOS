@@ -8,3 +8,4 @@ export * from "./language.ts";
 export * from "./chunking.ts";
 export * from "./escalation.ts";
 export * from "./crmLinks.ts";
+export * from "./insights.ts";
