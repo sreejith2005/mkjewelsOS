@@ -124,6 +124,8 @@ describe("AskKiaraPage", () => {
     expect(kiaraLocation("?tab=questions&escalation=e1")).toEqual({ tab: "questions", escalationId: "e1", conversationId: null });
     expect(kiaraLocation("?conversation=c9")).toEqual({ tab: "chat", escalationId: null, conversationId: "c9" });
     expect(kiaraLocation("?tab=other").tab).toBe("chat");
+    expect(kiaraLocation("?tab=insights").tab).toBe("insights");
+    expect(kiaraLocation("?tab=limits").tab).toBe("limits");
   });
 
   it("opens the conversation a notification points at", async () => {

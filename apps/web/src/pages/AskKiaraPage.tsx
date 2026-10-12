@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { BookOpen, MessageCircleQuestion, MessagesSquare, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { BarChart3, BookOpen, Gauge, MessageCircleQuestion, MessagesSquare, Sparkles, type LucideIcon } from "lucide-react";
 import { formatQuotaReset, hasPermission, isQuotaExhausted, type KiaraQuota } from "@jewelos/core";
 import {
   KIARA_CONVERSATION_QUESTION_LIMIT,
@@ -22,14 +22,17 @@ import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeR
 import { ConversationList } from "@/features/assistant/ConversationList";
 import { QuotaChip } from "@/features/assistant/QuotaChip";
 import { KnowledgeBaseView } from "@/features/assistant/knowledge/KnowledgeBaseView";
+import { InsightsView } from "@/features/assistant/InsightsView";
+import { LimitsView } from "@/features/assistant/LimitsView";
 
-type KiaraTab = "chat" | "questions" | "knowledge";
+type KiaraTab = "chat" | "questions" | "knowledge" | "insights" | "limits";
+const KIARA_TABS: readonly KiaraTab[] = ["chat", "questions", "knowledge", "insights", "limits"];
 /** The tab and item a URL opens (notification links use these). */
 export function kiaraLocation(search: string): Readonly<{ tab: KiaraTab; escalationId: string | null; conversationId: string | null }> {
   const params = new URLSearchParams(search);
   const tab = params.get("tab");
   return {
-    tab: tab === "knowledge" || tab === "questions" ? tab : "chat",
+    tab: (KIARA_TABS as readonly (string | null)[]).includes(tab) ? tab as KiaraTab : "chat",
     escalationId: params.get("escalation"),
     conversationId: params.get("conversation"),
   };
@@ -65,6 +68,8 @@ export function AskKiaraPage({ onNavigate, search = window.location.search }: { 
   // Screen aids only: every knowledge and escalation RPC re-checks its permission.
   const canManageKnowledge = access ? hasPermission(access, "assistant.manage_knowledge") : false;
   const canAnswer = access ? hasPermission(access, "assistant.answer_escalations") : false;
+  const canViewInsights = access ? hasPermission(access, "assistant.view_insights") : false;
+  const canManageLimits = access ? hasPermission(access, "assistant.manage_limits") : false;
   const waitingQuestions = useKiaraEscalationBadge(profile?.tenant_id, canAnswer);
   const location = kiaraLocation(search);
   const [tab, setTab] = useState<KiaraTab>(location.tab);
@@ -276,6 +281,8 @@ export function AskKiaraPage({ onNavigate, search = window.location.search }: { 
     ["chat", "Chat", MessagesSquare, true],
     ["questions", "Questions for you", MessageCircleQuestion, canAnswer],
     ["knowledge", "Knowledge base", BookOpen, canManageKnowledge],
+    ["insights", "Insights", BarChart3, canViewInsights],
+    ["limits", "Limits", Gauge, canManageLimits],
   ] as const).filter(([, , , shown]) => shown);
   const tabs = tabList.length > 1 ? <nav aria-label="Ask Kiara" className="flex flex-wrap gap-1 rounded-xl border border-task-border bg-task-bg p-1">
     {tabList.map(([id, label, Icon]) =>
@@ -299,6 +306,28 @@ export function AskKiaraPage({ onNavigate, search = window.location.search }: { 
       </header>
       <section className="rounded-2xl border border-task-border bg-task-bg p-3 sm:p-4"><QuestionsForYou focusId={location.escalationId} /></section>
     </div>;
+  }
+
+  const adminTab = (Icon: LucideIcon, title: string, subtitle: string, body: ReactNode) => <div className="flex flex-col gap-4">
+    <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-task-border bg-task-bg px-4 py-3 sm:px-5">
+      <div className="flex items-center gap-2">
+        <Icon aria-hidden className="size-6 text-task-accent" />
+        <div>
+          <h1 className="text-xl font-bold text-task-text">{title}</h1>
+          <p className="text-xs text-task-text-muted">{subtitle}</p>
+        </div>
+      </div>
+      {tabs}
+    </header>
+    <section className="rounded-2xl border border-task-border bg-task-bg p-3 sm:p-4">{body}</section>
+  </div>;
+
+  if (canViewInsights && tab === "insights") {
+    return adminTab(BarChart3, "Insights", "What people ask Kiara about, to plan SOP training.", <InsightsView />);
+  }
+
+  if (canManageLimits && tab === "limits") {
+    return adminTab(Gauge, "Limits", "Daily question limits, personal exceptions, and usage. Super Admin only.", <LimitsView />);
   }
 
   if (canManageKnowledge && tab === "knowledge") {

@@ -393,6 +393,36 @@ Tests:
 Exit criteria: on synthetic seed questions, ratings and classes match hand-computed values; manager
 views only their tree; the employee cannot see their own row anywhere.
 
+**Phase 6 status (2026-10-12, branch `feat/ask-kiara-phase6` from `origin/main` `ec94b0e`).** Migration
+`0220_ask_kiara_insights_and_limits` (next free number on main). Built as planned, with these choices:
+- Labelling: the worker claims new questions in the database (`claim_kiara_insight_work`, at most 200
+  employees x 40 questions, last 60 days, given up after 5 attempts), sends one Message Batches request per
+  employee with structured output (`output_config.format`, schema `KIARA_LABEL_OUTPUT_SCHEMA` in
+  `packages/core/src/assistant/insights.ts`), and applies finished batches (`complete_kiara_insight_batch`).
+  Question ids are short aliases (`q1`...); the batch row keeps an id-only map (`item_facts`). An item that
+  failed, was declined, expired, or returned invalid output is given back and retried on the next run.
+- Schedules (pg_cron, created by `schedule_kiara_jobs(url)` only when the Vault secret
+  `kiara_insights_cron_secret` exists, else it raises): `kiara-insights-nightly` 02:30 IST (label + re-rate
+  everyone), `kiara-insights-collect` every 10 minutes (apply finished batches only), and
+  `kiara-retention-purge` 03:00 IST. The purge needs no secret; it is scheduled by the same owner step so the
+  migration itself schedules nothing.
+- "Refresh insights now" (`request_kiara_insights_refresh`): effective Super Admin only, once an hour per
+  tenant (`kiara_settings.insights_refresh_requested_at`), audited, calls the worker through pg_net with the
+  Vault secret; raises `kiara_insights_not_configured` until the jobs are scheduled.
+- Insights rows also carry the SOP titles and SOP department tags cited most (from the answers' citations),
+  last active date, total questions, and the counts behind the rating.
+- Limits tab RPCs: `get_kiara_limits`, `save_kiara_settings_with_audit`, `save_kiara_user_limit_with_audit`
+  (Super Admin targets refused), `search_kiara_limit_people`, `list_kiara_usage` (up to 31 days).
+- Purge: conversations past the tenant retention (with messages), facts past 365 days, usage rows past 365
+  days, closed batches past 90 days; one audit row per tenant that lost data.
+- New tenants: `default_section_availability()` now has `ask_kiara: false` and `module_enabled()` reads the
+  stored flags over the default (it used to treat a missing flag as on). Existing tenants that relied on the
+  old default are pinned to `true` first (audited), so no live access changes.
+- Quota chip hidden when the limit is null (Super Admin or an unlimited exception).
+- Phase 9 leftover done: `ask-kiara` refunds the question on any failure before answer text (also a crash
+  in the worker, an answer that could not be stored, and a worker stopping: `beforeunload` aborts in-flight
+  turns through an `AbortSignal`).
+
 ## Phase 7: voice input
 
 **Scope:** shared transcription module; `/ask-kiara/transcribe`; `consume_my_voice_quota`; web mic

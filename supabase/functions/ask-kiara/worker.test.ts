@@ -360,6 +360,77 @@ Deno.test("a provider failure after text was shown is not refunded", async () =>
   assertEquals(t.actor.called("refund_kiara_question").length, 0);
 });
 
+Deno.test("refund: a crash in this worker before any text refunds the question", async () => {
+  const t = setup([message([text("Never shown")], "end_turn")]);
+  const result = await runKiaraTurn(t.deps, t.input, (event) => {
+    if (event.event === "status") throw new Error("synthetic crash");
+  });
+  assertEquals(result, { ok: false, code: "unavailable", message: "Kiara could not answer right now. Your question was not counted. Please try again." });
+  assertEquals(t.actor.called("refund_kiara_question")[0]!.args, { p_request_id: request.request_id });
+  assertEquals(t.actor.called("complete_kiara_turn").length, 0);
+});
+
+Deno.test("refund: a worker that is stopping refunds before any text and calls no model", async () => {
+  const t = setup([message([text("Never shown")], "end_turn")]);
+  const controller = new AbortController();
+  controller.abort();
+  const result = await runKiaraTurn({ ...t.deps, signal: controller.signal }, t.input, t.emit);
+  assertEquals(!result.ok && result.code, "provider_error");
+  assertEquals(t.anthropic.calls.length, 0);
+  assertEquals(t.actor.called("refund_kiara_question").length, 1);
+});
+
+Deno.test("refund: the abort signal reaches the model request", async () => {
+  const controller = new AbortController();
+  let seen: AbortSignal | undefined;
+  const anthropic: AnthropicLike = {
+    stream(_params, options) {
+      seen = options?.signal;
+      controller.abort();
+      const failure = new Error("Request was aborted.");
+      return { async *[Symbol.asyncIterator]() { throw failure; }, finalMessage: () => Promise.reject(failure) };
+    },
+  };
+  const t = setup([]);
+  const result = await runKiaraTurn({ ...t.deps, anthropic, signal: controller.signal }, t.input, t.emit);
+  assertEquals(seen, controller.signal);
+  assertEquals(!result.ok && result.code, "provider_error");
+  assertEquals(t.actor.called("refund_kiara_question").length, 1);
+});
+
+Deno.test("refund: an answer that could not be saved and was never shown is refunded", async () => {
+  const failing = actorWith({ complete_kiara_turn: () => ({ data: null, error: { code: "XX000", message: "down" } }) });
+  const silent = setup([message([thinking("sig")], "end_turn")], { actor: failing });
+  const result = await runKiaraTurn(silent.deps, silent.input, silent.emit);
+  assertEquals(!result.ok && result.message, "Kiara could not answer right now. Your question was not counted. Please try again.");
+  assertEquals(failing.called("refund_kiara_question").length, 1);
+
+  const shownActor = actorWith({ complete_kiara_turn: () => ({ data: null, error: { code: "XX000", message: "down" } }) });
+  const shown = setup([message([text("You have one task.")], "end_turn")], { actor: shownActor });
+  const after = await runKiaraTurn(shown.deps, shown.input, shown.emit);
+  assertEquals(!after.ok && after.message, "Kiara answered, but the answer could not be saved. Please try again.");
+  assertEquals(shownActor.called("refund_kiara_question").length, 0, "text already shown is not refunded");
+});
+
+Deno.test("refund: a crash after text was shown is not refunded", async () => {
+  const t = setup([message([text("Let me check."), toolUse("tu_1", "get_my_work_summary")], "tool_use"), message([text("Done")], "end_turn")]);
+  let shown = false;
+  let crashed = false;
+  try {
+    await runKiaraTurn(t.deps, t.input, (event) => {
+      if (event.event === "delta") shown = true;
+      if (shown && event.event === "status" && event.data.phase === "tool") {
+        crashed = true;
+        throw new Error("synthetic crash");
+      }
+    });
+  } catch {
+    // The SSE wrapper turns this into one error event.
+  }
+  assert(crashed);
+  assertEquals(t.actor.called("refund_kiara_question").length, 0);
+});
+
 Deno.test("a tool call cut off at max_tokens is not run, and the stored turn stays valid", async () => {
   const t = setup([message([toolUse("tu_1", "get_my_work_summary")], "max_tokens")]);
   const result = await runKiaraTurn(t.deps, t.input, t.emit);

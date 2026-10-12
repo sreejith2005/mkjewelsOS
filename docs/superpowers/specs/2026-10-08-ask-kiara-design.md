@@ -379,6 +379,10 @@ so it is accepted.
   `summary text check (length <= 300)`, `top_topics text[]`, `formula_version integer`,
   `model text`, `computed_at timestamptz`
 - No client grant. Read only through `get_kiara_insights`.
+- As built (0220): also `question_count`, `basic_count`, `repeat_count`, `escalated_count`, `last_active_on`,
+  `top_documents` and `top_departments` (most-cited SOP titles and their department tags), `summary_at`.
+  Batches are tracked in `kiara_insight_batches` (no tenant column, no grant) and facts carry
+  `labelling_batch_id` and `label_attempts`.
 
 ### 5.6 Helper functions
 
@@ -792,7 +796,9 @@ Files that change for the new page and keys:
 
 **Launch dark:** the migration sets `section_availability = section_availability || '{"ask_kiara":
 false}'` for existing tenants (audited), so only Super Admin (Developer Mode bypass) sees the section
-until the owner switches it on in Developer Mode. New tenants get the default (on).
+until the owner switches it on in Developer Mode. ~~New tenants get the default (on).~~ Since migration
+0220 (owner decision 2026-10-12) new tenants start with the section off too: the default is off and
+`module_enabled()` honours it; tenants that relied on the old default were pinned on, audited.
 
 ## 16. User interface
 

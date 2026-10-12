@@ -10,6 +10,9 @@ select ('20b00000-0000-4000-8000-0000000000' || lpad(n::text, 2, '0'))::uuid, 'a
   crypt('local-test-only', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now()
 from generate_series(1, 3) n;
 insert into tenants(id, name, slug, timezone) values ('20b10000-0000-4000-8000-000000000001', 'KHA fixture', 'kha-fixture', 'Asia/Kolkata');
+-- The fixture tenants have Ask Kiara switched on (new tenants start with it off, 0220).
+insert into tenant_section_controls(tenant_id, developer_mode_enabled, section_availability, settings_version)
+select id, false, default_section_availability() || '{"ask_kiara": true}', 1 from tenants where id in ('20b10000-0000-4000-8000-000000000001');
 insert into branches(id, tenant_id, name, code) values ('20b20000-0000-4000-8000-000000000001', '20b10000-0000-4000-8000-000000000001', 'KHA branch', 'KHA-1');
 insert into departments(id, tenant_id, branch_id, name, code)
 values ('20b30000-0000-4000-8000-000000000001', '20b10000-0000-4000-8000-000000000001', '20b20000-0000-4000-8000-000000000001', 'Sales', 'KHA-SALES');

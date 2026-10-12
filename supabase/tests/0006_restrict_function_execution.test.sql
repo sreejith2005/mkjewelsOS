@@ -36,20 +36,21 @@ select ok(not has_function_privilege('service_role', 'rls_auto_enable()', 'EXECU
 -- 0212 adds three owner-only functions and makes the activation dispatcher a definer.
 -- 0206/0207 add 10 functions (8 definers), 5 authenticated entry points.
 -- 0208/0210 add 11 private/public definers, only 3 authenticated entry points.
+-- 0220 (Ask Kiara Phase 6) adds 21 functions (20 definers): 7 authenticated, 7 service_role.
 select is((
   select count(*)::integer
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
-), 477, 'exactly 477 postgres-owned public application functions exist in the current migration set');
+), 498, 'exactly 498 postgres-owned public application functions exist in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres' and p.prosecdef
-), 404, 'exactly 404 public application functions are SECURITY DEFINER in the current migration set');
+), 424, 'exactly 424 public application functions are SECURITY DEFINER in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -65,7 +66,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 233, 'authenticated can execute exactly 233 reviewed public application functions');
+), 240, 'authenticated can execute exactly 240 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -73,7 +74,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('service_role', p.oid, 'EXECUTE')
-), 53, 'service_role can execute exactly 53 reviewed public application functions');
+), 60, 'service_role can execute exactly 60 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -81,7 +82,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('postgres', p.oid, 'EXECUTE')
-), 477, 'postgres retains owner execution on every public application function');
+), 498, 'postgres retains owner execution on every public application function');
 select ok(not has_function_privilege('authenticated', 'reject_watcher_task_mutation()', 'EXECUTE'), 'watcher guard trigger cannot be called directly');
 
 -- Exact authenticated allowlist: baseline, Forms, and reviewed FMS entry points.
@@ -249,8 +250,10 @@ select is((
   'get_employee_task_progress(jsonb)',
   'get_kiara_document(uuid)',
   'get_kiara_escalation_badge()',
+  'get_kiara_insights(jsonb)',
   'get_kiara_knowledge_excerpt(uuid)',
   'get_kiara_knowledge_filters()',
+  'get_kiara_limits()',
   'get_kiara_version_for_ingest(uuid)',
   'get_management_insight_records_v1(jsonb,text,text,integer,integer)',
   'get_management_insights_options_v1(jsonb)',
@@ -280,6 +283,7 @@ select is((
   'list_designation_daily_checklists()',
   'list_kiara_documents(text,text,text)',
   'list_kiara_escalations(text,integer)',
+  'list_kiara_usage(date,date)',
   'list_my_kiara_conversations(integer)',
   'list_task_comments(uuid)',
   'list_task_import_identity_candidates()',
@@ -287,6 +291,7 @@ select is((
   'reconcile_task_import_assignments(jsonb)',
   'record_availability_range_with_audit(uuid,date,date,availability_status,text)',
   'refund_kiara_question(uuid)',
+  'request_kiara_insights_refresh()',
   'resolve_fms_stage_assignees(uuid,uuid,uuid)',
   'restore_fms_flow_with_audit(uuid,text)',
   'review_leave_request(uuid,boolean,text)',
@@ -297,12 +302,15 @@ select is((
   'save_department_with_audit(uuid,jsonb)',
   'save_designation_daily_checklist_with_audit(uuid,uuid,text,text,jsonb,text,boolean,integer)',
   'save_kiara_document_text_with_audit(uuid,text,text,text,text,jsonb,text[])',
+  'save_kiara_settings_with_audit(integer,integer,integer)',
+  'save_kiara_user_limit_with_audit(uuid,integer,boolean,boolean,text)',
   'save_published_form_with_audit(uuid,jsonb,jsonb)',
   'save_recurring_todo_template_with_audit(uuid,jsonb)',
   'save_section_availability_with_audit(boolean,jsonb,integer,uuid)',
   'save_task_import_identity_alias_with_audit(text,uuid)',
   'save_user_section_access_with_audit(uuid,jsonb)',
   'search_kiara_knowledge(text,text,integer)',
+  'search_kiara_limit_people(text)',
   'send_recurring_followup_with_audit(uuid,text)',
   'set_fms_flow_active_with_audit(uuid,boolean,text)',
   'set_kiara_document_status_with_audit(uuid,text)',
@@ -371,6 +379,8 @@ select is((
   'authorize_super_admin_password_reset(uuid,uuid)',
   'begin_crm_sync_run(text,text,uuid,jsonb)',
   'bootstrap_initial_production_super_admin(uuid)',
+  'claim_kiara_insight_work(uuid,text,integer,integer)',
+  'complete_kiara_insight_batch(uuid,jsonb,text)',
   'configure_invited_profile_coverage_with_audit(uuid,uuid,uuid,uuid)',
   'consume_username_login_rate_limit(text)',
   'consume_voice_interpretation_quota(uuid)',
@@ -385,6 +395,7 @@ select is((
   'enrich_legacy_crm_timeline_visit_form(text,text,jsonb,text)',
   'execute_production_demo_data_retirement(uuid,uuid,text,text)',
   'fail_crm_sync_run(uuid,text,uuid,jsonb)',
+  'fail_kiara_insight_batch(uuid,text)',
   'finalize_crm_sync_run(uuid,jsonb,uuid,jsonb)',
   'get_crm_sync_checkpoint(text,text,jsonb)',
   'import_legacy_crm_client(text,text,jsonb,text,uuid)',
@@ -392,6 +403,9 @@ select is((
   'ingest_crm_source_batch(uuid,text,text,jsonb,uuid,jsonb)',
   'invite_profile_with_audit_v2(uuid,uuid,text,text,uuid,uuid,uuid,text,text,text[],user_role,uuid)',
   'invite_profile_with_audit_v3(uuid,uuid,text,text,text,text,uuid,uuid,uuid,text,text,text[],user_role,uuid)',
+  'kiara_insight_inputs(uuid[])',
+  'list_open_kiara_insight_batches()',
+  'mark_kiara_insight_batch_submitted(uuid,text)',
   'preserve_legacy_crm_timeline_visit_form(text,text,jsonb,text)',
   'preview_production_demo_data_retirement(uuid,text,boolean)',
   'purge_demo_data(uuid,text[],text)',
@@ -402,6 +416,7 @@ select is((
   'resolve_task_coverage(uuid,date)',
   'set_new_user_work_identity_with_audit(uuid,text,text)',
   'task_effective_due_datetime(task_instances)',
+  'upsert_kiara_insights(jsonb)',
   'user_profile_has_linked_records(uuid)'
 ]::text[], 'service_role additional EXECUTE grants match the reviewed function identities');
 select ok(has_table_privilege('service_role', 'task_templates', 'SELECT'), 'service_role retains task_templates SELECT');
