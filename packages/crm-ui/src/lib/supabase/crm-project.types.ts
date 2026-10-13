@@ -2715,6 +2715,10 @@ export type Database = {
         }
         Returns: Json
       }
+      get_walkin_crm_roster: {
+        Args: Record<PropertyKey, never>
+        Returns: Database["public"]["Tables"]["crm_allocation"]["Row"][]
+      }
       get_walkin_salespeople: {
         Args: never
         Returns: {

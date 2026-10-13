@@ -35,7 +35,7 @@ function renderWalkInForm() {
     <WalkInForm lookups={masterLookups}
       profile={{ role: "salesperson", branchId, name: "Test CRM" }}
       branches={[{ id: branchId, name: "Test Branch" }]}
-      crms={["Test CRM"]}
+      crms={["Test CRM"]} salespeopleByBranch={{ [branchId]: [{ id: "", name: "Test CRM" }] }}
       queue={null}
       client={null}
     />,
@@ -43,11 +43,11 @@ function renderWalkInForm() {
 }
 
 function renderPrefilledWalkInForm() {
-  return render(<WalkInForm lookups={masterLookups} profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queue={null} client={{ client_id: "20000000-0000-4000-8000-000000000501", primary_name: "Known Client", primary_phone: "919012345678" } as unknown as Client} />);
+  return render(<WalkInForm lookups={masterLookups} profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} salespeopleByBranch={{ [branchId]: [{ id: "", name: "Test CRM" }] }} queue={null} client={{ client_id: "20000000-0000-4000-8000-000000000501", primary_name: "Known Client", primary_phone: "919012345678" } as unknown as Client} />);
 
 }
 function renderQueuedWalkInForm() {
-  return render(<WalkInForm lookups={masterLookups} profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queue={{ id: "queue-501", client_name: "Queue Client", mobile: "9012345509", branch_id: branchId, assigned_crm_name: "Test CRM", client_id: null, status: "pending" }} client={null} />);
+  return render(<WalkInForm lookups={masterLookups} profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} salespeopleByBranch={{ [branchId]: [{ id: "", name: "Test CRM" }] }} queue={{ id: "queue-501", client_name: "Queue Client", mobile: "9012345509", branch_id: branchId, assigned_crm_name: "Test CRM", client_id: null, status: "pending" }} client={null} />);
 }
 
 function openEngagementStep() {
@@ -97,6 +97,16 @@ beforeEach(() => {
 });
 
 describe("WalkInForm proof image uploads", () => {
+  it("lists missing required fields, highlights them and focuses the first", () => {
+    renderWalkInForm();
+    fireEvent.click(screen.getByRole("button", { name: "Submit complete visit" }));
+    expect(screen.getByRole("region", { name: "Fields to complete" }).textContent).toContain("Client name");
+    expect(screen.getByRole("region", { name: "Fields to complete" }).textContent).toContain("Gender");
+    expect(screen.getByLabelText("Client name").getAttribute("aria-invalid")).toBe("true");
+    expect(document.activeElement).toBe(screen.getByLabelText("Client name"));
+    fireEvent.change(screen.getByLabelText("Client name"), { target: { value: "Test client" } });
+    expect(screen.getByLabelText("Client name").hasAttribute("aria-invalid")).toBe(false);
+  });
   it("blocks saving while an optional remark photo is still uploading", async () => {
     rpc.mockResolvedValue({ data: [], error: null });
     upload.mockImplementation(()=>new Promise(()=>{}));
@@ -134,7 +144,7 @@ describe("WalkInForm proof image uploads", () => {
 
   it("clears and reloads CRM and salesperson choices when a super-admin selects another branch", () => {
     const otherBranchId = "10000000-0000-4000-8000-000000000502";
-    render(<WalkInForm lookups={masterLookups} profile={{ role: "super_admin", branchId: null, name: "Admin" }} branches={[{ id: branchId, name: "Andheri" }, { id: otherBranchId, name: "Bandra" }]} crms={[]} crmByBranch={{ [branchId]: ["Andheri CRM"], [otherBranchId]: ["Bandra CRM"] }} queue={null} client={null} />);
+    render(<WalkInForm lookups={masterLookups} profile={{ role: "super_admin", branchId: null, name: "Admin" }} branches={[{ id: branchId, name: "Andheri" }, { id: otherBranchId, name: "Bandra" }]} crms={[]} crmByBranch={{ [branchId]: ["Andheri CRM"], [otherBranchId]: ["Bandra CRM"] }} salespeopleByBranch={{ [branchId]: [{id:"andheri-sales",name:"Andheri Sales"}], [otherBranchId]: [{id:"bandra-sales",name:"Bandra Sales"}] }} queue={null} client={null} />);
     const branch = screen.getByLabelText("Branch") as HTMLSelectElement;
     const crm = screen.getByLabelText("CRM / salesperson") as HTMLSelectElement;
     const salesperson = screen.getByLabelText("Salesperson attending the client") as HTMLSelectElement;
@@ -142,15 +152,16 @@ describe("WalkInForm proof image uploads", () => {
     fireEvent.change(branch, { target: { value: branchId } });
     expect(Array.from(crm.options).map((option) => option.value)).toEqual(["", "Andheri CRM"]);
     fireEvent.change(crm, { target: { value: "Andheri CRM" } });
-    fireEvent.change(salesperson, { target: { value: "Andheri CRM" } });
+    expect(Array.from(salesperson.options).map(option=>option.textContent)).not.toContain("Andheri CRM");
+    fireEvent.change(salesperson, { target: { value: "andheri-sales" } });
     fireEvent.change(branch, { target: { value: otherBranchId } });
     expect(crm.value).toBe("");
     expect(salesperson.value).toBe("");
-    expect(Array.from(salesperson.options).map((option) => option.value)).toEqual(["", "Bandra CRM"]);
+    expect(Array.from(salesperson.options).map((option) => option.value)).toEqual(["", "bandra-sales"]);
   });
 
   it("uses legacy source, bridal, occupation, and category reveal rules", () => {
-    render(<WalkInForm profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queue={null} client={null} lookups={{ ...masterLookups, productCategories: ["Ring", "Other"], notBoughtReasons: [], beverages: [], snacks: [] }} />);
+    render(<WalkInForm profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} salespeopleByBranch={{ [branchId]: [{ id: "", name: "Test CRM" }] }} queue={null} client={null} lookups={{ ...masterLookups, productCategories: ["Ring", "Other"], notBoughtReasons: [], beverages: [], snacks: [] }} />);
     fireEvent.change(screen.getByLabelText("Source of lead"), { target: { value: "Reference" } });
     expect(screen.getByLabelText("Reference name")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "6. Preferences & planning" }));
@@ -391,7 +402,7 @@ describe("WalkInForm proof image uploads", () => {
       ? Promise.resolve({ data: [{ client_id: sharedPhoneId, primary_name: "Family Member", primary_phone: "919012345601" }], error: null })
       : Promise.resolve({ data: [{ client_id: registeredId, timeline_id: "40000000-0000-4000-8000-000000000601", reference_number: "TES-261007-0001" }], error: null }));
     upload.mockResolvedValueOnce({ error: null });
-    render(<WalkInForm lookups={masterLookups} profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]}
+    render(<WalkInForm lookups={masterLookups} profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} salespeopleByBranch={{ [branchId]: [{ id: "", name: "Test CRM" }] }}
 
       queue={{ id: "queue-601", client_name: "Registered Buyer", mobile: "919012345601", branch_id: branchId, assigned_crm_name: "Test CRM", client_id: registeredId, client_is_new: false, status: "pending" }}
       client={{ client_id: registeredId, primary_name: "Registered Buyer", primary_phone: "919012345601" } as unknown as Client} />);
@@ -452,7 +463,7 @@ describe("WalkInForm proof image uploads", () => {
   it("submits the selected staff ID independently of CRM queue labels", async () => {
     rpc.mockResolvedValue({data: [{client_id: "synthetic"}], error: null});
     const sellerId = "10000000-0000-4000-8000-000000000777";
-    render(<WalkInForm lookups={masterLookups} profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} salespeopleByBranch={{ [branchId]: [{ id: sellerId, name: "Active Seller" }] }} queue={null} client={null} />);
+    render(<WalkInForm lookups={masterLookups} profile={{ role: "salesperson", branchId, name: "Test CRM" }} branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} salespeopleByBranch={{ [branchId]: [{ id: "", name: "Test CRM" }] }} salespeopleByBranch={{ [branchId]: [{ id: sellerId, name: "Active Seller" }] }} queue={null} client={null} />);
 
     fireEvent.change(screen.getByLabelText("Client name *"), { target: { value: "Synthetic Attendance" } });
     fireEvent.change(screen.getByLabelText("Mobile *"), { target: { value: "9012345504" } });

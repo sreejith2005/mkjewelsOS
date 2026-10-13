@@ -31,12 +31,14 @@ export function Modal({
   onClose,
   tone = "dark",
   wide = false,
+  stickyHeader = true,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   tone?: "dark" | "light";
   wide?: boolean;
+  stickyHeader?: boolean;
 }) {
   const titleId = useId();
   const dialogRef = useRef<HTMLElement>(null);
@@ -102,11 +104,11 @@ export function Modal({
           wide ? "sm:max-w-4xl" : "sm:max-w-lg",
         )}
       >
-        {/* The sheet keeps its title and close button reachable while a long
-            form scrolls, which on a phone is the only way back out. */}
+        {/* Filling forms can let the title scroll with the questions. */}
         <header
           className={cn(
-            "sticky top-0 z-10 -mx-5 -mt-5 mb-5 flex items-center justify-between gap-3 px-5 pb-3 pt-2 sm:pt-5",
+            "-mx-5 -mt-5 mb-5 flex items-center justify-between gap-3 px-5 pb-3 pt-2 sm:pt-5",
+            stickyHeader && "sticky top-0 z-10",
             tone === "light" ? "bg-task-bg" : "bg-charcoal",
           )}
         >

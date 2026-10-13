@@ -14,18 +14,19 @@ select ok(not has_function_privilege('service_role', 'crm_sync.staff_roster_fiel
 -- ---------------------------------------------------------------------------
 create temporary table roster_fixture(name text primary key, id uuid) on commit drop;
 do $$
-declare v_tenant uuid; v_branch uuid; v_department uuid; v_auth uuid; v_id uuid; v_person record;
+declare v_tenant uuid; v_branch uuid; v_department uuid; v_crm_department uuid; v_auth uuid; v_id uuid; v_person record;
 begin
   insert into tenants(name, slug) values ('Roster test tenant', 'crm-roster-test-tenant') returning id into v_tenant;
   insert into branches(tenant_id, name, code) values (v_tenant, 'Roster Main', 'RSM') returning id into v_branch;
   insert into departments(tenant_id, branch_id, name, code) values (v_tenant, v_branch, 'Sales', 'RSD') returning id into v_department;
+  insert into departments(tenant_id, branch_id, name, code) values (v_tenant, v_branch, 'CRM', 'RCD') returning id into v_crm_department;
   for v_person in select * from (values ('crm_user', 'crm'), ('staff', 'staff'), ('manager', 'manager')) as p(name, role) loop
     insert into auth.users(id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
     values (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
       'roster-' || v_person.name || '@test.local', 'x', now(), now()) returning id into v_auth;
     insert into user_profiles(tenant_id, auth_user_id, branch_id, department_id, employee_name, employee_code, email,
       user_role, working_status, account_status, is_login_enabled)
-    values (v_tenant, v_auth, v_branch, v_department, 'Roster ' || v_person.name, 'RST-' || v_person.name,
+    values (v_tenant, v_auth, v_branch, case when v_person.role='crm' then v_crm_department else v_department end, 'Roster ' || v_person.name, 'RST-' || v_person.name,
       'roster-' || v_person.name || '@test.local', v_person.role::user_role, 'active', 'active', true) returning id into v_id;
     insert into roster_fixture values (v_person.name, v_id);
   end loop;
@@ -90,7 +91,7 @@ select is(pg_temp.offsets('crm_user'), '{1,8,15,22,29}'::int[], 'the weekly off 
 select pg_temp.deliver_all();
 update user_profiles set user_role = 'staff' where id = pg_temp.pid('crm_user');
 select is(pg_temp.open_events('crm_user'), 1, 'a role change enqueues the person');
-select ok(not (pg_temp.snap('crm_user') ->> 'crm_roster')::boolean, 'and takes them off the CRM roster');
+select ok((pg_temp.snap('crm_user') ->> 'crm_roster')::boolean, 'department membership keeps them on the CRM roster independently of role');
 
 -- Both delivery paths carry the roster fields.
 select set_config('request.jwt.claim.role', 'service_role', true), set_config('request.jwt.claims', '{"role":"service_role"}', true);
