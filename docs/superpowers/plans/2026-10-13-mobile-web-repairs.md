@@ -37,8 +37,15 @@ Preserve existing persistence, audited writes, permissions, history and unrelate
 - Separate synthetic browser fixture exercises the actual CRM and form components at all four widths: branch selection, separate staff choices, invalid-field list, red focused border, field actually visible after scrolling, dialog title scrolling and Escape close. No mocked persistence was added to the application. The seeded library has drafts only, so long-form filling uses this test fixture.
 - `git diff --check` passed. Independent review found a company-wide CRM regression in the first draft; it was corrected and regression-tested before handoff.
 
-## Remaining release gates
+## Production release on 2026-10-13
 
-No hosted migration, roster reconciliation, Git publication, web deployment or physical-device test was performed. `adb devices -l` returned no devices. No APK source/binary change was made.
+Owner authorized migration deployment and a push to main. Release is based on current `origin/main` (`db9b8bb`), with only the reviewed repair commit cherry-picked (`be55593`); unrelated earlier task commits and the visual-refresh draft are excluded.
 
-Production needs the reviewed CRM migration, JewelOS 0231/0232, a successful staff reconciliation populating selection metadata, and the web release. Reconcile before treating the staff lists as available: old snapshots have no department classification and are intentionally excluded. Confirm linked targets and migration dry runs under the production playbook; preserve unrelated work in C:\crm and the unrelated visual-refresh spec. Perform authenticated hosted CRM intake/queue and physical phone checks after release.
+- Confirmed targets: JewelOS `jewelos-prod` (`yimafxhuwgfhvzczqqdd`), CRM `walk-in_crm` (`fsydcsyqnddacjfoutfe`). Migration lists and dry runs showed only 0231/0232 and CRM 20261013000100. All three applied successfully; subsequent dry runs were empty.
+- Recovery: pre-change schema-only dumps and affected function definitions saved outside Git. Web rollback uses the previous compatible main deployment; database correction is forward-only. No customer records were migrated.
+- Staff reconciliation returned HTTP 200: 82 snapshots, 35 active grants, 42 CRM roster rows, no ineligible active grants, no roster conflicts, no missing roster users, no absent-user deactivation. Selection metadata populated: 7 eligible CRM and 19 eligible Sales staff; remaining grants intentionally stay outside those choices. Staff outbox is fully delivered. One unmapped active branch remains reported by the existing sync health check; no branch mapping was changed in this repair.
+- Counts and full-row digests matched before/after for clients (1587), visit forms (1995), documents (16), timeline (2184), and leads (9). Anonymous execute is denied for both staff-choice RPCs.
+- Hosted verification exposed pre-existing broad table grants on FMS defaults from production default privileges. Forward migration 0233 explicitly revokes PUBLIC/anon/browser grants and grants only authenticated SELECT; existing RLS and audited SECURITY DEFINER writer remain unchanged. Four new privilege tests and eight FMS read/authorization checks passed locally after simulating those broad grants. The reviewed 0233 dry run contains only that migration.
+- Integration on current main: CRM 191 tests and focused Forms 33 tests passed; web/CRM typechecks and web build passed. Existing large-chunk warning remains.
+
+Publication and final hosted privilege checks follow this record. No Edge Function, secret, Storage, or native binary change. `adb devices -l` returned no devices; authenticated hosted intake/queue and physical-phone UX are not proven by the deployment checks. Existing branch permissions are preserved.
