@@ -2,7 +2,7 @@ begin;
 select plan(11);
 
 select has_table('public','fms_context_assignee_defaults','context defaults are durable configuration');
-select policies_are('public','fms_context_assignee_defaults',array['fms_context_assignee_defaults_select'],'context defaults have tenant-scoped read policy');
+select policies_are('public','fms_context_assignee_defaults',array['fms_context_assignee_defaults_select','fms_context_assignee_defaults_module_access'],'context defaults have tenant and module scoped read policies');
 select has_function('public','save_fms_context_assignee_default_with_audit',array['text','uuid'],'default mapping is saved through an audited RPC');
 select ok((select public.fms_stage_deadline_for_instance('{"deadlineEnabled":false}'::jsonb,'00000000-0000-4000-8000-000000000001'::uuid,'00000000-0000-4000-8000-000000000002'::uuid) is null),'disabled deadlines create no timestamp');
 select ok(public.is_valid_fms_timing_rule('{"deadlineEnabled":false,"dueDate":""}'::jsonb),'disabled deadline rule is valid');

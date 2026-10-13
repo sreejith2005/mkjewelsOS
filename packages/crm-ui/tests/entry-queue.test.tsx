@@ -11,6 +11,14 @@ vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({ rpc, from: () =
 
 import { EntryQueue } from "@/components/entry-queue";
 
+it("keeps assigned-branch controls operable without offering other branches", () => {
+  render(<EntryQueue profile={{role:"salesperson",branchId:"own"}} selectedBranchId="own" selectedCrm="" branches={[{id:"own",name:"Own branch"},{id:"other",name:"Other branch"}]} crms={[]} queueCrms={[]} initialItems={[]} />);
+  for (const select of screen.getAllByLabelText("BRANCH")) {
+    expect((select as HTMLSelectElement).disabled).toBe(false);
+    expect(Array.from((select as HTMLSelectElement).options).map(option=>option.value)).toEqual(["own"]);
+  }
+});
+
 const branchId = "10000000-0000-4000-8000-000000000601";
 function renderQueue() {
   return render(<EntryQueue profile={{ role: "salesperson", branchId }} selectedBranchId={branchId} selectedCrm="" branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queueCrms={["Test CRM"]} initialItems={[{ id: "queue-1", token: "0725-ABCDE", client_name: "Queued Client", mobile: "9012345601", assigned_crm_name: "Test CRM", status: "pending", created_at: "2026-07-25T09:00:00Z", client_id: null }, { id: "queue-2", token: "0725-DONE01", client_name: "Submitted Client", mobile: "9012345603", assigned_crm_name: "Test CRM", status: "complete", created_at: "2026-07-25T10:00:00Z", client_id: "client-2" }]} />);

@@ -1,5 +1,7 @@
 "use client";
 
+import { FormValidationSummary, useFormValidation } from "./form-validation";
+
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "@/next-shim/navigation"; // crm-port: next/navigation -> local shim (same paths, /crm base path added)
 
@@ -224,7 +226,7 @@ export function WalkInForm({
   };
 }) {
   const router = useRouter();
-  const [step, setStep] = useState(0);
+  const validation = useFormValidation();
   const [values, setValues] = useState(() =>
     initialValue(client, queue, profile.branchId ?? "", profile.name),
   );
@@ -257,8 +259,11 @@ export function WalkInForm({
   })();
   const keepsAnchorClient = (phone: string) => anchorPhone !== null && phoneKey(phone) === anchorPhone;
   const [message, setMessage] = useState("");
-  const activeCrms = crmByBranch?.[values.branch_id] ?? crms;
-  const activeSalespeople = salespeopleByBranch?.[values.branch_id] ?? (salespeopleByBranch ? [] : activeCrms.map(name => ({ id: "", name })));
+  const activeCrms = crmByBranch ? crmByBranch[values.branch_id] ?? [] : crms;
+  const activeSalespeople = salespeopleByBranch?.[values.branch_id] ?? [];
+  useEffect(() => {
+    setValues(current => !current.crm_name || activeCrms.includes(current.crm_name) ? current : { ...current, crm_name: "" });
+  }, [activeCrms]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const submitWasExplicit = useRef(false);
@@ -452,20 +457,24 @@ export function WalkInForm({
       setMessage('Wait for every photo or video to upload successfully, or remove the failed upload before submitting.');
       return;
     }
+    if (!validation.validateRequired()) {
+      setMessage("Please complete the highlighted fields.");
+      return;
+    }
     if (
       !values.primary_name.trim() ||
       phoneError(primaryCountry, values.primary_phone) !== null ||
       !values.branch_id
     ) {
       setMessage(phoneError(primaryCountry, values.primary_phone) ?? "Name and branch are required.");
-      setStep(0);
+      validation.reject("Name and a valid mobile number are required.", [!values.primary_name.trim() ? "Client name" : "Mobile *"]);
       return;
     }
     const minimalVisit = ["STORE_VISIT", "PRICE_CALCULATION"].includes(values.visit_status);
     const missingEngagementAnswer = !minimalVisit && engagementKinds.find(([key]) => !engagement[key]?.asked);
     if (missingEngagementAnswer) {
       setMessage(`${missingEngagementAnswer[1]} must be answered.`);
-      setStep(4);
+      validation.reject(`${missingEngagementAnswer[1]} must be answered.`, [missingEngagementAnswer[1]]);
       return;
     }
     const requiredProof = engagementKinds.find(
@@ -474,12 +483,12 @@ export function WalkInForm({
     );
     if (requiredProof) {
       setMessage(`${requiredProof[1]} needs a proof image before submission.`);
-      setStep(4);
+      validation.reject("Proof image required.", [`${requiredProof[1]} proof image`]);
       return;
     }
     if (referrals.some((referral) => referral.name.trim().length === 0 || !phoneKey(referral.mobile))) {
       setMessage("Every referral needs a name and a valid mobile number (10 digits for India, or + and the country code).");
-      setStep(4);
+      validation.reject("Enter referral details.", referrals.flatMap((referral, index) => [!referral.name.trim() ? `Referral ${index + 1} name` : "", !phoneKey(referral.mobile) ? `Referral ${index + 1} number` : ""].filter(Boolean)));
       return;
     }
     const targetClientId = values.client_id || client?.client_id || queue?.client_id || proposedClientId;
@@ -488,7 +497,7 @@ export function WalkInForm({
     );
     if (mismatchedProof) {
       setMessage("The mobile number changed after this proof was uploaded. Remove and add that proof again before submitting.");
-      setStep(4);
+      validation.reject("Upload the proof again for this client.", ["Mobile *"]);
       return;
     }
     const required = [
@@ -509,18 +518,18 @@ export function WalkInForm({
     const invalid = required.find(([, valid]) => !valid);
     if (invalid || (values.occupation.toUpperCase() === "OTHER" && !values.occupation_other.trim()) || (values.bridal_or_non_bridal.toUpperCase() === "BRIDAL" && (!values.wedding_month || !values.wedding_year))) {
       setMessage(`${invalid?.[2] ?? "The conditional legacy fields"} is required.`);
-      const planningField = ["occupation", "bridal_or_non_bridal", "communication_preference"].includes(invalid?.[0] ?? "") || (values.occupation.toUpperCase() === "OTHER" && !values.occupation_other.trim()) || (values.bridal_or_non_bridal.toUpperCase() === "BRIDAL" && (!values.wedding_month || !values.wedding_year));
-      setStep(planningField ? 5 : invalid?.[0] === "visit_status" ? 3 : invalid?.[0] === "salesperson" ? 0 : 1);
+      const labels: Record<string, string> = { salesperson: "Salesperson attending the client", community: "Community / caste", visit_status: "Client bought any product?", bridal_or_non_bridal: "Bridal / non-bridal" };
+      validation.reject("Required", [invalid ? labels[invalid[0]] ?? invalid[2] : values.occupation.toUpperCase() === "OTHER" ? "Occupation other" : !values.wedding_month ? "Wedding month" : "Wedding year"]);
       return;
     }
     if (values.visit_status === "NO" && !notBoughtReasons.length) {
       setMessage("Select at least one reason for not buying.");
-      setStep(3);
+      validation.reject("Select at least one reason.", ["Not bought reasons"]);
       return;
     }
     if (values.visit_status === "NO" && !values.next_visit_date) {
       setMessage("Next visit date is required for Not Bought.");
-      setStep(5);
+      validation.reject("Required for Not Bought.", ["Next visit date"]);
       return;
     }
     setSaving(true);
@@ -692,7 +701,8 @@ export function WalkInForm({
     return <div className="grid gap-3 md:grid-cols-2"><label className="block text-sm">{label}<select aria-label={label} className={inputClass} value={values[countKey]} onChange={(event) => { const next = event.target.value; set(countKey, next); const size = Number(next); setProductTags((current) => ({ ...current, [tagKey]: Number.isFinite(size) && size > 0 ? Array.from({ length: size }, (_, index) => current[tagKey]?.[index] ?? "") : [] })); }}><option value="">Choose</option>{Array.from({ length: 10 }, (_, index) => <option key={index + 1} value={String(index + 1)}>{index + 1}</option>)}{allowNa ? <option value="NA">NA</option> : null}</select></label>{tagCount > 0 ? <div className="grid gap-2">{Array.from({ length: tagCount }, (_, index) => <input key={index} aria-label={`${tagKey} tag ${index + 1}`} className="rounded border p-2" placeholder={`Tag / code ${index + 1}`} value={productTags[tagKey]?.[index] ?? ""} onChange={(event) => setProductTags((current) => ({ ...current, [tagKey]: Array.from({ length: tagCount }, (_, tagIndex) => tagIndex === index ? event.target.value : current[tagKey]?.[tagIndex] ?? "") }))} />)}</div> : null}</div>;
   };
   return (
-    <form onSubmit={submit} className="legacy-walkin-form mt-6">
+    <form ref={validation.formRef} noValidate onSubmit={submit} onChange={(event) => validation.clearControl(event.target)} className="legacy-walkin-form mt-6">
+      <FormValidationSummary problems={validation.problems} />
       <p className="legacy-walkin-note">COMPLETE EACH SECTION IN ORDER. CONDITIONAL QUESTIONS APPEAR ONLY WHEN THEY APPLY.</p>
       <nav className="legacy-walkin-steps" aria-label="Walk-in form sections">
         {sections.map((label, index) => (
@@ -742,7 +752,7 @@ export function WalkInForm({
               </span>
             </label>
             {field("primary_name", "Client name", "text", true)}
-            <PhoneNumberInput label="Mobile *" countryCode={primaryCountry} number={values.primary_phone} inputClassName={inputClass} onCountryCodeChange={(code) => { setPrimaryCountry(code); setValues((current) => ({ ...current, client_id: client?.client_id || queue?.client_id || "", client_type: client?.client_id || queue?.client_id ? "existing" : "new" })); setAutoFilledFields(new Set()); }} onNumberChange={(value) => { setValues((current) => ({ ...current, primary_phone: value, client_id: client?.client_id || queue?.client_id || "", client_type: client?.client_id || queue?.client_id ? "existing" : "new" })); setAutoFilledFields(new Set()); }} onBlur={() => { if (!phoneError(primaryCountry, values.primary_phone) && !keepsAnchorClient(primaryPhone)) void lookupClientByPhone(primaryPhone).then((matched) => { if (currentLookupPhone.current !== primaryPhone) return; if (matched) { setValues((current) => ({ ...current, client_id: matched.client_id, client_type: queue?.client_is_new && matched.client_id === queue.client_id ? "new" /* crm-port fix (owner 2026-09-30): keep the queue's "new" as the other lookups do */ : "existing", ...clientProfileAutofill(matched) })); setProposedClientId(matched.client_id); setAutoFilledFields(new Set(Object.keys(clientProfileAutofill(matched)))); } }); }} />
+            <PhoneNumberInput required label="Mobile *" countryCode={primaryCountry} number={values.primary_phone} inputClassName={inputClass} onCountryCodeChange={(code) => { setPrimaryCountry(code); setValues((current) => ({ ...current, client_id: client?.client_id || queue?.client_id || "", client_type: client?.client_id || queue?.client_id ? "existing" : "new" })); setAutoFilledFields(new Set()); }} onNumberChange={(value) => { setValues((current) => ({ ...current, primary_phone: value, client_id: client?.client_id || queue?.client_id || "", client_type: client?.client_id || queue?.client_id ? "existing" : "new" })); setAutoFilledFields(new Set()); }} onBlur={() => { if (!phoneError(primaryCountry, values.primary_phone) && !keepsAnchorClient(primaryPhone)) void lookupClientByPhone(primaryPhone).then((matched) => { if (currentLookupPhone.current !== primaryPhone) return; if (matched) { setValues((current) => ({ ...current, client_id: matched.client_id, client_type: queue?.client_is_new && matched.client_id === queue.client_id ? "new" /* crm-port fix (owner 2026-09-30): keep the queue's "new" as the other lookups do */ : "existing", ...clientProfileAutofill(matched) })); setProposedClientId(matched.client_id); setAutoFilledFields(new Set(Object.keys(clientProfileAutofill(matched)))); } }); }} />
             {selectField("source_of_lead", "Source of lead", lookups.sourceOfLeads ?? [], true)}
 
             {values.source_of_lead.trim().toUpperCase() === "REFERENCE" ? (
@@ -756,7 +766,7 @@ export function WalkInForm({
               <label className="block text-sm">
                 Branch
                 <select
-                  className={inputClass}
+                  aria-label="Branch" required className={inputClass}
                   value={values.branch_id}
                   onChange={(event) => setValues((current) => ({
                     ...current,
@@ -792,13 +802,13 @@ export function WalkInForm({
                 ))}
               </select>
             </label>
-            <label className="block text-sm">Salesperson attending the client<select aria-label="Salesperson attending the client" className={inputClass} value={values.salesperson_id || values.salesperson} onChange={(event) => { const person = activeSalespeople.find(item => (item.id || item.name) === event.target.value); setValues(current => ({ ...current, salesperson: person?.name ?? "", salesperson_id: person?.id ?? "" })); }} disabled={!values.branch_id}><option value="">{values.branch_id ? "Choose" : "Select branch first"}</option>{activeSalespeople.map((item) => <option value={item.id || item.name} key={item.id || item.name}>{item.name}</option>)}</select></label>
+            <label className="block text-sm">Salesperson attending the client<select aria-label="Salesperson attending the client" required className={inputClass} value={values.salesperson_id || values.salesperson} onChange={(event) => { const person = activeSalespeople.find(item => (item.id || item.name) === event.target.value); setValues(current => ({ ...current, salesperson: person?.name ?? "", salesperson_id: person?.id ?? "" })); }} disabled={!values.branch_id}><option value="">{values.branch_id ? "Choose" : "Select branch first"}</option>{activeSalespeople.map((item) => <option value={item.id || item.name} key={item.id || item.name}>{item.name}</option>)}</select></label>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <h3 className="md:col-span-2 text-sm font-bold tracking-wide">CLIENT PROFILE & CONTACT</h3>
             {selectField("gender", "Gender", lookups.masterFields?.gender ?? [], true)}
 
-            <label className="block text-sm"><span>Billing phone</span><input aria-label="Billing phone" className={inputClass} inputMode="tel" value={billingPhone} disabled={billingMatchesPrimary} onChange={(event) => set("billing_phone", event.target.value)} /><span className="mt-2 flex items-center gap-2"><input aria-label="Same as mobile number" type="checkbox" checked={billingMatchesPrimary} onChange={(event) => { setBillingMatchesPrimary(event.target.checked); set("billing_phone", primaryPhone); }} />Same as mobile number</span></label>
+            <label className="block text-sm"><span>Billing phone</span><input required={!billingMatchesPrimary} aria-label="Billing phone" className={inputClass} inputMode="tel" value={billingPhone} disabled={billingMatchesPrimary} onChange={(event) => set("billing_phone", event.target.value)} /><span className="mt-2 flex items-center gap-2"><input aria-label="Same as mobile number" type="checkbox" checked={billingMatchesPrimary} onChange={(event) => { setBillingMatchesPrimary(event.target.checked); set("billing_phone", primaryPhone); }} />Same as mobile number</span></label>
             {field("country", "Country", "text", true)}
             {field("state", "State", "text", true)}
             {field("city", "City", "text", true)}
@@ -883,7 +893,7 @@ export function WalkInForm({
             <label className="block text-sm">
               Client bought any product?{requiredMark}
               <select
-                aria-label="Client bought any product?"
+                aria-label="Client bought any product?" required
                 className={inputClass}
                 value={values.visit_status}
                 onChange={(event) => { set("visit_status", event.target.value); set("did_buy", event.target.value === "YES" ? "yes" : "no"); }}
@@ -893,7 +903,7 @@ export function WalkInForm({
               </select>
             </label>
             {values.visit_status === "NO" ? (
-              <div className="md:col-span-2">
+              <div tabIndex={-1} aria-label="Not bought reasons" className="md:col-span-2">
                 <p className="text-sm">Not-bought reasons{requiredMark}</p>
                 {lookups.notBoughtReasons.map((reason) => (
                   <label
