@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
 } from "react";
@@ -88,6 +89,9 @@ export function EditUser({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
+  const { access } = useAuth();
+  const canDelete = hasPermission(access, "users.delete");
+  const canManage = hasPermission(access, "users.manage");
   const [draft, setDraft] = useState({
     employee_name: user.employee_name,
     employee_code: user.employee_code,
@@ -130,6 +134,7 @@ export function EditUser({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (!canManage) return;
     if (
       !draft.employee_name.trim() ||
       !draft.employee_code.trim() ||
@@ -166,7 +171,7 @@ export function EditUser({
 
   const remove = async () => {
     if (
-      !superAdmin ||
+      !canDelete ||
       !window.confirm(
         `Permanently delete ${user.employee_name}? This only works for disabled or invited accounts with no linked work.`,
       )
@@ -222,6 +227,7 @@ export function EditUser({
     <Modal onClose={onClose} title={`Edit ${user.employee_name}`} wide>
       <form className="space-y-5" onSubmit={submit}>
         {error ? <Notice tone="danger">{error}</Notice> : null}
+        <fieldset className="contents" disabled={!canManage}>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Employee name">
             <input
@@ -417,6 +423,7 @@ export function EditUser({
             </Field>
           ) : null}
         </div>
+        </fieldset>
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
           {superAdmin ? (
@@ -437,7 +444,7 @@ export function EditUser({
               </Button>
             </div>
           ) : null}
-            {superAdmin ? (
+            {canDelete ? (
               <Button
                 disabled={saving}
                 type="button"
@@ -453,9 +460,9 @@ export function EditUser({
             <Button type="button" variant="secondary" onClick={onClose}>
               Cancel
             </Button>
-            <Button disabled={saving} type="submit">
+            {canManage ? <Button disabled={saving} type="submit">
               {saving ? "Saving..." : "Save user"}
-            </Button>
+            </Button> : null}
           </div>
         </div>
       </form>
@@ -495,6 +502,8 @@ export function AddUserForm({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [created, setCreated] = useState(false);
+  const errorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (error) errorRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" }); }, [error]);
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
   const departments = data.departments.filter(
@@ -553,12 +562,32 @@ export function AddUserForm({
   };
   return (
     <Modal onClose={onClose} title="Add user" wide>
-      <form className="space-y-4" onSubmit={submit}>
-        {error ? <Notice tone="danger">{error}</Notice> : null}
-        {created ? <Notice tone="success">User created and activated. They can sign in with their personal email and the password you set.</Notice> : null}
+      <form className="space-y-4" onSubmit={submit}
+        onInvalidCapture={(event) => {
+          event.preventDefault();
+          const controls = [...event.currentTarget.elements].filter((control): control is HTMLInputElement | HTMLSelectElement =>
+            (control instanceof HTMLInputElement || control instanceof HTMLSelectElement) && control.willValidate && !control.validity.valid);
+          const labels = controls.map((control) => control.labels?.[0]?.querySelector(".label")?.textContent?.trim() ?? control.labels?.[0]?.textContent?.trim() ?? "Field");
+          controls.forEach((control) => {
+            control.setAttribute("aria-invalid", "true");
+            control.style.setProperty("border-color", "rgb(var(--color-danger))");
+          });
+          setError(`Complete the required fields: ${labels.join(", ")}. Check any invalid values shown in red.`);
+          controls[0]?.focus({ preventScroll: true });
+          controls[0]?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+        }}
+        onInput={(event) => {
+          const control = event.target;
+          if (control instanceof HTMLInputElement || control instanceof HTMLSelectElement) {
+            control.removeAttribute("aria-invalid");
+            control.style.removeProperty("border-color");
+          }
+        }}>
+        {error ? <div ref={errorRef} role="alert"><Notice tone="danger">{error}</Notice></div> : null}
+        {created ? <Notice tone="success">User created and activated. They can sign in with their username and the password you set.</Notice> : null}
         <p className="text-sm text-soft-grey">
-          Employee code is generated automatically. Personal email is the login
-          address. Buddy choices are restricted to active users in the same
+          Employee code is generated automatically. Personal email is kept as
+          contact information; sign-in uses the generated username or work email. Buddy choices are restricted to active users in the same
           branch and department at the same or lower hierarchy.
         </p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

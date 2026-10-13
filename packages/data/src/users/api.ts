@@ -34,7 +34,8 @@ export async function loadUserDirectory(): Promise<UserDirectoryData> {
 
 /**
  * What the `invite-user` Edge Function accepts. Employee code is generated
- * server-side, and `personal_email` is the login address.
+ * server-side. `personal_email` is contact information; the server creates the
+ * canonical username and work login email separately.
  */
 export type InviteUserInput = Readonly<{
   first_name: string;

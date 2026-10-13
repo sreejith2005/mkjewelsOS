@@ -76,6 +76,7 @@ export function UsersScreen() {
   const state = useAsyncData(loadUserDirectory, []);
   useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["organization", "settings"], refresh: state.refresh });
   const canManage = hasPermission(access, "users.manage");
+  const canDelete = hasPermission(access, "users.delete");
   const superAdmin = profile.user_role === "super_admin";
   const data = state.data;
 
@@ -111,7 +112,7 @@ export function UsersScreen() {
     <>
       <ListScreen
         data={view === "list" ? visible : []}
-        empty={view === "organization" ? <OrganizationTree profiles={visible} canManage={canManage} onEdit={setEditing} /> : <Card><Text tone="muted">No employees match the selected filters.</Text></Card>}
+        empty={view === "organization" ? <OrganizationTree profiles={visible} canManage={canManage || canDelete} onEdit={setEditing} /> : <Card><Text tone="muted">No employees match the selected filters.</Text></Card>}
         keyExtractor={(item) => item.id}
         refreshControl={
           <RefreshControl
@@ -124,7 +125,7 @@ export function UsersScreen() {
         renderItem={({ item }) => (
           <UserCard
             branchNames={branchNames}
-            canManage={canManage}
+            canManage={canManage || canDelete}
             departmentNames={departmentNames}
             designationNames={designationNames}
             onEdit={setEditing}
@@ -251,6 +252,9 @@ function EditUser({ user, data, superAdmin, onClose, onSaved }: {
   onSaved: () => Promise<void>;
 }) {
   const styles = useStyles();
+  const access = useAccess();
+  const canDelete = hasPermission(access, "users.delete");
+  const canManage = hasPermission(access, "users.manage");
   const [draft, setDraft] = useState({
     employee_name: user.employee_name,
     employee_code: user.employee_code,
@@ -283,6 +287,7 @@ function EditUser({ user, data, superAdmin, onClose, onSaved }: {
   const departments = data.departments.filter((item) => !item.branch_id || item.branch_id === draft.branch_id);
 
   const submit = async () => {
+    if (!canManage) return;
     if (
       !draft.employee_name.trim() ||
       !draft.employee_code.trim() ||
@@ -306,7 +311,7 @@ function EditUser({ user, data, superAdmin, onClose, onSaved }: {
   };
 
   const remove = async () => {
-    if (!superAdmin) return;
+    if (!canDelete) return;
     const ok = await confirm(
       "Delete user?",
       `Permanently delete ${user.employee_name}? This only works for disabled or invited accounts with no linked work.`,
@@ -357,10 +362,11 @@ function EditUser({ user, data, superAdmin, onClose, onSaved }: {
     <Sheet scrollable={false} onClose={onClose} tall title={`Edit ${user.employee_name}`} visible>
       <ScrollView contentContainerStyle={styles.editor} keyboardShouldPersistTaps="handled">
         {error ? <Banner tone="danger">{error}</Banner> : null}
-        <TextField label="Employee name" onChangeText={(value) => set("employee_name", value)} value={draft.employee_name} />
-        <TextField label="Employee code" onChangeText={(value) => set("employee_code", value)} value={draft.employee_code} />
-        <TextField keyboardType="phone-pad" label="Personal mobile" onChangeText={(value) => set("personal_mobile", value)} value={draft.personal_mobile} />
+        <TextField editable={canManage} label="Employee name" onChangeText={(value) => set("employee_name", value)} value={draft.employee_name} />
+        <TextField editable={canManage} label="Employee code" onChangeText={(value) => set("employee_code", value)} value={draft.employee_code} />
+        <TextField editable={canManage} keyboardType="phone-pad" label="Personal mobile" onChangeText={(value) => set("personal_mobile", value)} value={draft.personal_mobile} />
         <OptionPicker
+          disabled={!canManage}
           label="Branch"
           onChange={(values) =>
             setDraft((current) => ({
@@ -376,30 +382,35 @@ function EditUser({ user, data, superAdmin, onClose, onSaved }: {
           selected={[draft.branch_id]}
         />
         <OptionPicker
+          disabled={!canManage}
           label="Department"
           onChange={(values) => setDraft((current) => ({ ...current, department_id: values[0] ?? "", buddy_id: "", secondary_buddy_id: "" }))}
           options={departments.map((item) => ({ value: item.id, label: item.name }))}
           selected={[draft.department_id]}
         />
         <OptionPicker
+          disabled={!canManage}
           label="Designation"
           onChange={(values) => setDraft((current) => ({ ...current, designation_id: values[0] ?? "", buddy_id: "", secondary_buddy_id: "" }))}
           options={[{ value: "", label: "None" }, ...data.designations.map((item) => ({ value: item.id, label: item.label }))]}
           selected={[draft.designation_id]}
         />
         <OptionPicker
+          disabled={!canManage}
           label="Reports to"
           onChange={(values) => set("reports_to_user_id", values[0] ?? "")}
           options={[{ value: "", label: "No manager" }, ...activeProfiles.map((item) => ({ value: item.id, label: item.employee_name }))]}
           selected={[draft.reports_to_user_id]}
         />
         <OptionPicker
+          disabled={!canManage}
           label="Primary buddy"
           onChange={(values) => set("buddy_id", values[0] ?? "")}
           options={[{ value: "", label: "No primary buddy" }, ...buddyProfiles.filter((item) => item.id !== draft.secondary_buddy_id).map((item) => ({ value: item.id, label: item.employee_name }))]}
           selected={[draft.buddy_id]}
         />
         <OptionPicker
+          disabled={!canManage}
           label="Secondary buddy"
           onChange={(values) => set("secondary_buddy_id", values[0] ?? "")}
           options={[{ value: "", label: "No secondary buddy" }, ...buddyProfiles.filter((item) => item.id !== draft.buddy_id).map((item) => ({ value: item.id, label: item.employee_name }))]}
@@ -407,6 +418,7 @@ function EditUser({ user, data, superAdmin, onClose, onSaved }: {
         />
         <Text tone="muted" variant="caption">Fallback order: primary, secondary, then reporting manager.</Text>
         <OptionPicker
+          disabled={!canManage}
           label="Account status"
           onChange={(values) => set("account_status", (values[0] ?? draft.account_status) as typeof draft.account_status)}
           options={ACCOUNT_STATUSES.filter((status) => status !== "left").map((value) => ({ value, label: titleCase(value) }))}
@@ -439,8 +451,8 @@ function EditUser({ user, data, superAdmin, onClose, onSaved }: {
               Enter the {ADMIN_SET_PASSWORD_LENGTH}-character password this employee will use. It is sent only to Supabase Auth and is never stored or displayed by JewelOS.
             </Text>
             {passwordUpdated ? <Banner tone="success">Password updated. The employee can now sign in using their email and this password.</Banner> : null}
-            <TextField label="New password" maxLength={ADMIN_SET_PASSWORD_LENGTH} onChangeText={setNewPassword} secure value={newPassword} />
-            <TextField label="Confirm new password" maxLength={ADMIN_SET_PASSWORD_LENGTH} onChangeText={setConfirmPassword} secure value={confirmPassword} />
+            <TextField editable={canManage} label="New password" maxLength={ADMIN_SET_PASSWORD_LENGTH} onChangeText={setNewPassword} secure value={newPassword} />
+            <TextField editable={canManage} label="Confirm new password" maxLength={ADMIN_SET_PASSWORD_LENGTH} onChangeText={setConfirmPassword} secure value={confirmPassword} />
             <Button
               disabled={saving || !newPassword || !confirmPassword}
               full
@@ -450,8 +462,8 @@ function EditUser({ user, data, superAdmin, onClose, onSaved }: {
             />
           </View>
         ) : null}
-        {superAdmin ? <Button disabled={saving} full label="Delete user" onPress={() => void remove()} variant="danger" /> : null}
-        <Button busy={saving} full label="Save user" onPress={() => void submit()} />
+        {canDelete ? <Button disabled={saving} full label="Delete user" onPress={() => void remove()} variant="danger" /> : null}
+        {canManage ? <Button busy={saving} full label="Save user" onPress={() => void submit()} /> : null}
         <Button full label="Cancel" onPress={onClose} variant="ghost" />
       </ScrollView>
     </Sheet>
@@ -523,11 +535,11 @@ function AddUserSheet({ data, role, onClose, onCreated }: {
         {error ? <Banner tone="danger">{error}</Banner> : null}
         {created ? (
           <Banner tone="success">
-            User created and activated. They can sign in with their personal email and the password you set.
+            User created and activated. They can sign in with their username and the password you set.
           </Banner>
         ) : null}
         <Text tone="muted" variant="small">
-          Employee code is generated automatically. Personal email is the login address. Buddy choices are restricted to
+          Employee code is generated automatically. Personal email is contact information; sign-in uses the generated username or work email. Buddy choices are restricted to
           active users in the same branch and department at the same or lower hierarchy.
         </Text>
         <TextField label="First name" onChangeText={(value) => set("first_name", value)} required value={form.first_name} />
@@ -553,7 +565,7 @@ function AddUserSheet({ data, role, onClose, onCreated }: {
         <TextField
           autoCapitalize="none"
           keyboardType="email-address"
-          label="Personal email (login)"
+          label="Personal email"
           onChangeText={(value) => set("personal_email", value)}
           required
           value={form.personal_email}

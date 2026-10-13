@@ -1,0 +1,31 @@
+# User management permission repairs
+
+Goal: make the configured Create and edit users permission work through employee reads, account creation, coverage and editing; reproduce the reported .in email rejection.
+
+Use the current permission resolver and audited contracts. Preserve role defaults, tenant isolation, buddy eligibility, protected Super Admin actions, historical data and generated work identities. Work in the existing isolated checkout; leave concurrent leave-deletion and visual-refresh work untouched. This repairs existing behavior rather than introducing a new authorization model.
+
+- [x] Add rollback-based database regressions for granted HR/Staff user management, permission revocation, active status, cross-tenant denial, protected account denial, primary/secondary buddy persistence and audit records.
+- [x] Observe failures before changing server contracts. Use forward migration 0235 (0234 is reserved by concurrent work), recheck numbering before deployment.
+- [x] Repair the service-only invite/coverage contracts to use permission_effective_for(actor,'users.manage') and effective dashboard authority; keep active-account and tenant checks and audited writes.
+- [x] Extend existing employee SELECT policy to managers explicitly granted users.manage or users.delete within their tenant. Other viewers retain their own/reporting/HR read scope; assignment/report scope and dashboard authority are unchanged.
+- [x] Repair the web/native delete gate and delete-only editor; protect both assigned and effective Super Admin targets in account editor/deletion/coverage RPCs.
+- [x] Reproduce .in email through rendered Add user, Edge input validation and database persistence. Owner clarified there was no message and the form did not submit. Browser native invalid events now show a persistent alert, mark missing/invalid fields, and focus/scroll. Preserve canonical username/work login; correct misleading personal-email login copy.
+- [x] Run permission/creation/coverage regressions, core/data/web/mobile relevant tests, typechecks and production build. Check desktop, phone web and native parity; report physical-device evidence separately.
+- [ ] Review scoped changes and release evidence; deploy/publish only within the existing authorization and required gates.
+
+Initial findings: production invite_profile_with_audit_v3 and configure_invited_profile_coverage_with_audit still require fixed Admin roles. Employee up_select ignores users.manage and uses dashboard authority, which can reduce an HR employee to own-profile reads. The invite Edge Function already accepts users.manage. Current PostgreSQL email constraints and Edge regex accept .in; the actual rejection needs reproduction.
+
+## Validation and compatibility
+
+- Real local app, Playwright (Browser plugin unavailable): HR account with Staff dashboard authority and individually granted user management. At 360/390/430/1440, both buddies are selectable and a real audited invite succeeds with .in personal and official emails. Invalid submission shows named fields, a red token border and focused first field in the viewport. No runtime errors, framework overlay, or horizontal overflow. Screenshots and synthetic browser helper are outside Git.
+- Web tests: 509 passed. Core: 935 passed. Data: 151 passed. Native: 133 passed. Web/native typechecks and web production build passed. Existing notification error-boundary tests intentionally log synthetic errors; existing Vite large-chunk warning remains.
+- Heavy concurrent local work caused default 5-second test timeouts in FmsFlowBuilder, PermissionManagementPage, appAvailability and themeCoverage. Reruns with two web workers / one native worker and a 30-second runner timeout passed without test/source changes for those cases. The validation commands were `pnpm.cmd --filter web test --maxWorkers=2 --testTimeout=30000` and `npm.cmd --prefix apps/mobile test -- --maxWorkers=1 --testTimeout=30000` from this checkout.
+- Initial database regressions demonstrated invisible buddies and denied HR creation. Three added elevated-target tests failed before that hardening. All 23 new assertions, 53 existing permission checks and four provisioning-contract checks then passed on the stable, synthetic assignment-release baseline (0229), with the full 0235 migration applied inside rollback transactions. No persistent changes to that test database. A separate full-current-history DB-only bootstrap also applied migrations through 0235; its API health is not application-API evidence because the gateway is excluded.
+- The shared test stack had an unrelated `availability.delete_leave` catalog entry, causing a sole 52/53 catalog-count mismatch; a concurrent reset also interrupted a subsequent run. The stable baseline rerun above resolved the validation ambiguity without changing existing assertions.
+- Independent review: corrected an inverted native editable flag and Chart action parity; reviewed the effective-authority target guards. No remaining source-level blockers. Reviewer did not rerun runtime gates.
+- No table-column, generated-type signature, Storage, CRM-project or Edge Function source change. Audited transactions, service-only provisioning grants, buddy rules and historical records are preserved. Intentional changes: explicitly delegated account-management/deletion reads cover their tenant; effective Super Admin targets cannot be edited/deleted by ordinary managers.
+- Native compiled UI changes are in source, but `adb devices -l` returned no device. MOBILE_RELEASE_GUIDE requires phone validation for visual changes; do not publish an APK until that gate is met. Server repairs work with existing native account-creation callers.
+
+## Production preflight
+
+Existing session authorization includes deploying migrations and pushing main. Target confirmed as JewelOS `yimafxhuwgfhvzczqqdd`; current main baseline is c104b48. Dry run lists only 0235. Captured private schema-only recovery copy and aggregate profile/individual/role/dashboard-authority counts and full-row digests before any write (82 / 27 / 18 / 0). No profile/override data migration is intended. Rollback is the compatible prior web build; database corrections remain forward-only. Final database gate passed; hosted application and Git publication follow this record.
