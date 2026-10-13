@@ -1,0 +1,10 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path=public,extensions;
+select plan(4);
+select ok(has_table_privilege('authenticated','public.fms_context_assignee_defaults','SELECT'),'authenticated builder retains read access');
+select ok(not has_table_privilege('anon','public.fms_context_assignee_defaults','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'),'anonymous has no table privilege');
+select ok(not has_table_privilege('authenticated','public.fms_context_assignee_defaults','INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'),'browser writes and RLS-bypassing truncate are denied');
+select ok(has_function_privilege('authenticated','public.save_fms_context_assignee_default_with_audit(text,uuid)','EXECUTE'),'audited writer remains callable');
+select * from finish();
+rollback;
