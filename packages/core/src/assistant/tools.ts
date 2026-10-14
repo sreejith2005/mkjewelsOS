@@ -351,12 +351,12 @@ export const KIARA_TOOLS: readonly KiaraToolSpec[] = [
   ),
   tool(
     "get_dashboard_metrics",
-    "The user's Dashboard numbers for a period, with the previous period of the same length for comparison: tasks assigned, completed, on time, overdue, FMS, forms, and people for managers and above. Scope is what their Dashboard shows (own work for staff, own branch for managers, company for admins).",
+    "The user's Dashboard numbers for a period, with the previous period of the same length for comparison: tasks assigned, completed, on time, overdue, FMS, forms, and people for managers and above. Scope is what their Dashboard shows (own work for staff, own branch for managers, company for admins). overdue_open is all open overdue work in scope right now: use it for \"how many tasks are overdue\".",
     { permissions: ["dashboard.view"], pages: ["dashboard"], dataCategory: "dashboard", statusLabel: "Checking the dashboard" },
   ),
   tool(
     "get_team_progress",
-    "Task Control progress per employee, department, and branch (assigned, completed, on time, remaining, overdue) and the overdue tasks list. Scope as Task Control: own branch for managers, company for admins.",
+    "Task Control progress per employee, department, and branch (assigned, completed, on time, remaining, overdue) and the overdue tasks list. Scope as Task Control: own branch for managers, company for admins. Counts cover tasks planned in the period: use it for who, which department, or which branch.",
     { permissions: ["task_control.view"], pages: ["task_templates"], dataCategory: "tasks", statusLabel: "Checking team progress" },
   ),
   tool(
@@ -371,7 +371,7 @@ export const KIARA_TOOLS: readonly KiaraToolSpec[] = [
   ),
   tool(
     "find_people",
-    "Employees the user can see in Users: name, code, designation, department, branch, working status, official email.",
+    "Employees the user can see in Users: name, code, designation, department, branch, working status, official email. For a manager these are their own team: use it for \"in my team\".",
     { permissions: ["users.view"], pages: ["users"], dataCategory: "people", statusLabel: "Looking up people" },
   ),
   tool(

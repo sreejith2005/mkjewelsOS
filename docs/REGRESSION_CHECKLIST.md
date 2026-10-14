@@ -150,6 +150,28 @@ Android phone-sized device.
 - [ ] Organization settings: ADM yes, MGR no; branch defaults: MGR own branch only.
 - [ ] Daily checklist management: SA and HR only unless granted.
 
+### Ask Kiara
+
+Automated proof: `supabase/functions/ask-kiara/eval.local.ts` (per-role eval on a local stack,
+`docs/superpowers/evals/ask-kiara/README.md`), the `ask-kiara` Deno tests, and pgTAP 0213-0220,
+0227, 0230. Manual pass on the web:
+
+- [ ] STF: "aaj mera kya pending hai?" matches Home and is answered in Latin-letter Hinglish.
+- [ ] STF: a branch or team question is refused (no numbers, no names); no "Ask a person" offer.
+- [ ] MGR: a team question lists only the manager's own scope, matching Task Control.
+- [ ] STF without `crm.view`: a walk-in or client question is refused; a CRM user gets the
+      same numbers as the CRM Dashboard with phones as last 4 digits and `/crm/clients/...` links.
+- [ ] An SOP question shows a Sources chip that opens the right section; a department-only SOP
+      never answers for a person outside that department.
+- [ ] An unanswered SOP question offers "Ask a person"; the manager sees the badge and answers;
+      the answer appears in the asker's chat with a notification.
+- [ ] "Complete my task" / "approve my leave" are refused; nothing changes in Tasks or Leave.
+- [ ] A user at the daily limit gets the reset time; Super Admin shows no counter.
+- [ ] Developer Mode → Ask Kiara off: the menu entry goes and questions are refused for
+      everyone except Super Admin; on again restores it.
+- [ ] A new section, route, or renamed button has its `appHelp.ts` entry and
+      `docs/ASK_KIARA_APP_HELP_REVIEW.md` line updated (AGENTS.md rule).
+
 ### Native parity release gate
 
 - [ ] Create a manual task and checklist on Android, including one doer, watchers, deadline, priority, required form, and attachment; retry an attachment failure without creating a duplicate task.

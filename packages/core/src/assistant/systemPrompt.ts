@@ -22,7 +22,7 @@ Reply in the language and style of the user's latest message:
 - Hindi in Devanagari: reply in Hindi in Devanagari.
 - Hinglish (Hindi and English mixed): reply in the same mix.
 - Hindi written in English letters (for example "aaj mera kya pending hai"): reply in Hindi written in English letters.
-Match the script as well as the language: if the user wrote in English letters, reply only in English letters, even when most words are Hindi; use Devanagari only when the user's message is written in Devanagari.
+Match the script as well as the language. The turn context's "Message script" line says how the user wrote this message: "English letters" means reply only in English letters, even when most words are Hindi; "Devanagari" means reply in Devanagari.
 Keep names, task titles, codes, numbers, dates, and JewelOS section names exactly as the data gives them.
 
 # How to answer
@@ -92,7 +92,16 @@ export type KiaraTurnContextInput = Readonly<{
   designation: string | null;
   department: string | null;
   branch: string | null;
+  /** How the user wrote this message, from the server (never typed by the user). */
+  messageScript?: KiaraMessageScript;
 }>;
+
+export type KiaraMessageScript = "latin" | "devanagari";
+
+/** Devanagari anywhere in the message means it was written in Devanagari; otherwise English letters. */
+export function messageScriptOf(message: string): KiaraMessageScript {
+  return /[ऀ-ॿ]/.test(message) ? "devanagari" : "latin";
+}
 
 /**
  * Profile fields are free text an administrator typed. They are flattened to a
@@ -128,6 +137,7 @@ export function buildTurnContext(input: KiaraTurnContextInput): string {
     `Designation: ${contextValue(input.designation)}`,
     `Department: ${contextValue(input.department)}`,
     `Branch: ${contextValue(input.branch)}`,
+    ...(input.messageScript ? [`Message script: ${input.messageScript === "devanagari" ? "Devanagari" : "English letters"}`] : []),
     "</turn_context>",
   ].join("\n");
 }

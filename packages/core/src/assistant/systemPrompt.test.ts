@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { KIARA_SYSTEM_PROMPT, buildTurnContext } from "./systemPrompt";
+import { KIARA_SYSTEM_PROMPT, buildTurnContext, messageScriptOf } from "./systemPrompt";
 
 describe("system prompt", () => {
   it("holds no volatile content, so every request shares the cached prefix", () => {
@@ -57,6 +57,16 @@ describe("turn context", () => {
     expect(text).toContain("Role: Staff");
     expect(text.startsWith("<turn_context>\n")).toBe(true);
     expect(text.endsWith("\n</turn_context>")).toBe(true);
+  });
+
+  it("states the message script the server detected", () => {
+    expect(messageScriptOf("aaj mera kya pending hai?")).toBe("latin");
+    expect(messageScriptOf("आज मेरे कौन से काम बाकी हैं?")).toBe("devanagari");
+    expect(messageScriptOf("मेरी टीम में कितने काम overdue हैं?")).toBe("devanagari");
+    const latin = buildTurnContext({ ...base, now: new Date("2026-10-09T05:00:00Z"), messageScript: "latin" });
+    expect(latin.endsWith("Message script: English letters\n</turn_context>")).toBe(true);
+    expect(buildTurnContext({ ...base, now: new Date("2026-10-09T05:00:00Z"), messageScript: "devanagari" })).toContain("Message script: Devanagari");
+    expect(buildTurnContext({ ...base, now: new Date("2026-10-09T05:00:00Z") })).not.toContain("Message script");
   });
 
   it("flattens profile text so it cannot close the block or add lines", () => {

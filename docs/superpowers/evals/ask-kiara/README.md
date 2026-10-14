@@ -1,5 +1,46 @@
 # Ask Kiara eval set
 
+## Phase 9: one fixture, one runner (start here)
+
+Since Phase 9 every case runs on ONE synthetic tenant ("Kiara integration") and is graded
+automatically by `supabase/functions/ask-kiara/eval.local.ts`. Older sections below describe
+how earlier phases ran their cases by hand; their user names are now mapped onto this tenant.
+
+1. Start an ISOLATED local stack (own `project_id` and ports; never the shared `jewelos` stack),
+   for example from a `git archive HEAD` copy. On a busy machine use
+   `supabase start --ignore-health-check` (storage can be slow to report healthy).
+2. Apply, in order, with `docker exec -i supabase_db_<project> psql -U postgres`:
+   `supabase/functions/ask-kiara/integration.fixture.sql`, then `eval.fixture.sql`.
+3. For CRM cases: an isolated CRM stack from `supabase-crm/`, then
+   `crm.integration.fixture.sql` with `-v jos_admin=20750000-0000-4000-8000-000000000013
+   -v jos_manager=20750000-0000-4000-8000-000000000009 -v jos_crm=20750000-0000-4000-8000-000000000010
+   -v jos_sales=20750000-0000-4000-8000-000000000011 -v jos_bandra=20710000-0000-4000-8000-00000000000c`,
+   and `functions serve crm-session-exchange --no-verify-jwt` with `JEWELOS_SUPABASE_URL`
+   (`http://host.docker.internal:<jewelos api port>`), `JEWELOS_SUPABASE_ANON_KEY`,
+   `CRM_BRIDGE_ALLOWED_ORIGINS`. Skip CRM cases with `KIARA_EVAL_SKIP_CRM=1`.
+4. `functions serve ask-kiara --env-file <git-ignored file>` with `ANTHROPIC_API_KEY` and, for CRM,
+   `CRM_SUPABASE_URL` / `CRM_SUPABASE_ANON_KEY` (host.docker.internal URL).
+5. Run (from `supabase/functions/ask-kiara`):
+   `KIARA_EVAL=1 SUPABASE_URL=... SUPABASE_ANON_KEY=... KIARA_DB_CONTAINER=supabase_db_<project>
+   KIARA_EVAL_ENV_FILE=<git-ignored file> KIARA_EVAL_OUT=<folder outside the repo>
+   deno run --allow-env --allow-net --allow-read --allow-write --allow-run eval.local.ts`
+   (`KIARA_EVAL_ONLY=p9-,p5-` to run some cases; `KIARA_EVAL_CONCURRENCY`, default 3).
+
+The runner creates the three synthetic SOP articles through the Knowledge base RPC, asks each
+question through the real function as that user, and checks: expected and forbidden tools,
+`min_kb_searches` and `expect_offer` (from the stored turn), then the reply against `must_refuse`
+and `expect` with a Claude judge that sees that turn's tool results as ground truth. It prints a
+pass/fail table per role and writes a JSONL file to `KIARA_EVAL_OUT`. A full run of ~100 cases
+costs about $1 (answers) plus the judge. Infrastructure failures (HTTP 401/500/504 on an
+overloaded machine) are not Kiara failures: re-run those cases.
+
+Fixture users (password `kiara-local-test-only`, local only): 01 KIT Super Admin, 02 KIT Admin
+(crm.view, no CRM account), 03 KIT Manager Andheri, 04 KIT HR Bina, 05 KIT Staff Asha,
+06 KIT Staff Override (manager dashboard authority; CRM salesperson in the CRM fixture),
+07 KIT Staff Borivali, 08 KIT Manager Borivali, 09 Meera Manager (Bandra), 10 Synth Priya CRM
+(role CRM), 11 Sunil Sales (staff, CRM grant but no crm.view), 12 Dev Driver (Kiara Drivers),
+13 KIT Owner (super admin).
+
 `cases.json` is the seed eval set for Ask Kiara (plan: "Eval set grows from Phase 1"). Each phase
 adds its own allowed, denied, language, and injection cases. Phase 9 runs the full set per role.
 

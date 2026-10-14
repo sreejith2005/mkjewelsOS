@@ -6,6 +6,7 @@ import {
   KIARA_SYSTEM_PROMPT,
   buildHumanAnswersBlock,
   buildTurnContext,
+  messageScriptOf,
   pendingHumanAnswers,
   type KiaraHumanAnswer,
 } from "../../../packages/core/src/assistant/systemPrompt.ts";
@@ -320,6 +321,7 @@ export async function runKiaraTurn(deps: KiaraTurnDeps, input: KiaraTurnInput, e
           designation: started.context.designation,
           department: started.context.department,
           branch: started.context.branch,
+          messageScript: messageScriptOf(request.message),
         }),
       },
       // A person's answer the stored history does not carry yet goes into this new

@@ -5,7 +5,7 @@
     "@supabase/supabase-js": "npm:@supabase/supabase-js@2.112.1"
   },
   "tasks": {
-    "check": "deno check index.ts worker.ts worker.test.ts transcribe.ts transcribe.test.ts tools/executors.test.ts tools/crm.test.ts integration.test.ts crm.integration.test.ts",
+    "check": "deno check index.ts worker.ts worker.test.ts transcribe.ts transcribe.test.ts tools/executors.test.ts tools/crm.test.ts integration.test.ts crm.integration.test.ts eval.local.ts",
     "test": "deno test --allow-env --allow-read worker.test.ts transcribe.test.ts tools/executors.test.ts tools/crm.test.ts",
     "test:integration": "deno test --allow-env --allow-net --allow-read --allow-run integration.test.ts"
   }
