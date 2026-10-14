@@ -1,7 +1,8 @@
 import { Archive, MessageSquarePlus } from "lucide-react";
+import { kiaraDateTime } from "@jewelos/core";
 import type { KiaraConversationSummary } from "@jewelos/data/assistant/api";
 
-const when = (iso: string) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(iso));
+const when = (iso: string) => kiaraDateTime(iso) ?? "";
 
 /** The asker's own chats, newest first. Nobody else can list them (RLS and RPC). */
 export function ConversationList({

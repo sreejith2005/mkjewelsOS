@@ -94,6 +94,39 @@ describe("askKiara", () => {
     api.invoke.mockResolvedValue({ data: null, error: new Error("network") });
     const outcome = await askKiara({ conversationId: null, message: "hi", client: "web", requestId });
     expect(outcome).toEqual(expect.objectContaining({ ok: false, code: "unavailable", message: "Kiara could not answer right now. Please try again." }));
+    expect(outcome).not.toHaveProperty("transport");
+  });
+
+  it("marks a request that never reached the function, so Android can retry it as JSON", async () => {
+    api.invoke.mockResolvedValue({ data: null, error: Object.assign(new Error("Failed to send a request to the Edge Function"), { name: "FunctionsFetchError" }) });
+    const outcome = await askKiara({ conversationId: "c1", message: "hi", client: "android", requestId });
+    expect(outcome).toEqual(expect.objectContaining({ ok: false, code: "unavailable", transport: true, conversationId: "c1" }));
+  });
+
+  // Android (Phase 8): expo/fetch returns its own Response class, so nothing may rely on `instanceof Response`.
+  it("streams from a response that is not a global Response (expo/fetch)", async () => {
+    const real = sse([
+      { event: "meta", data: { conversation_id: "c1", user_message_id: "u1", quota } },
+      { event: "delta", data: { text: "नमस्ते, आपके 2 काम बाकी हैं।" } },
+      { event: "done", data: { assistant_message_id: "a1", stop_reason: "end_turn", quota, display_text: "नमस्ते, आपके 2 काम बाकी हैं।" } },
+    ], 5);
+    const expoLike = { headers: real.headers, body: real.body, text: () => real.text(), json: () => real.json(), clone: () => real.clone() };
+    expect(expoLike instanceof Response).toBe(false);
+    const other = { functions: { invoke: vi.fn().mockResolvedValue({ data: expoLike, error: null }) } };
+    const deltas: string[] = [];
+    const outcome = await askKiara({ conversationId: null, message: "kya pending hai", client: "android", requestId, functionsClient: other as never, onEvent: (event) => { if (event.event === "delta") deltas.push(event.data.text); } });
+    expect(deltas.join("")).toBe("नमस्ते, आपके 2 काम बाकी हैं।");
+    expect(outcome.ok && outcome.result.display_text).toBe("नमस्ते, आपके 2 काम बाकी हैं।");
+    expect(other.functions.invoke).toHaveBeenCalledWith("ask-kiara/chat", expect.objectContaining({ body: expect.objectContaining({ client: "android" }) }));
+    expect(api.invoke).not.toHaveBeenCalled();
+  });
+
+  it("reads the error body from a non-global Response (expo/fetch)", async () => {
+    const real = new Response(JSON.stringify({ error: "You have used all your questions for today.", code: "daily_limit_reached", quota: { ...quota, used: 10 } }), { status: 429 });
+    const context = { headers: real.headers, body: null, text: () => real.text(), json: () => real.json(), clone: () => real.clone() };
+    api.invoke.mockResolvedValue({ data: null, error: { context } });
+    const outcome = await askKiara({ conversationId: null, message: "11th", client: "android", requestId });
+    expect(outcome).toEqual(expect.objectContaining({ ok: false, code: "daily_limit_reached", message: "You have used all your questions for today." }));
   });
 });
 

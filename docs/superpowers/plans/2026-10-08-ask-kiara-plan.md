@@ -491,6 +491,24 @@ launches dark, the release can precede the announcement.
 
 Exit criteria: parity matrix entries for Ask Kiara pass on a physical Android phone; release verified.
 
+**Built (2026-10-13, branch `feat/ask-kiara-phase8`; no migration, no function change).**
+- Native: `apps/mobile/src/features/assistant/` (`AskKiaraScreen`, `KiaraChat`, `KiaraMarkdown`,
+  `CitationChips`, `QuestionsForYou`, read-only `InsightsView`, `KiaraVoiceButton`, `askKiaraModel`,
+  `sendKiaraQuestion`, `kiaraStreamClient`, `useKiaraEscalationBadge`, `useKeyboardOverlap`). Knowledge base
+  and Limits show "Open on web" (owner decision). Ask Kiara left `NATIVE_PENDING_PAGES` (now empty); a
+  Section link that carries a query resolves by its pathname; inbox Open and `jewelos://`/web-origin links
+  open the screen, also from a cold start. The floating voice-task button is hidden on Ask Kiara (its
+  composer has its own mic and Send). CRM links in answers open the CRM tab (the WebView has no deep path).
+- Streaming: a function-only `createJewelosAccessTokenClient` on `expo/fetch` (the app's session supplies
+  the token); a connection that fails before `meta` is retried once as JSON with the same request id.
+  `askKiara` accepts that client (`functionsClient`), recognises non-global `Response` objects, and marks
+  transport failures.
+- Shared moves (web now uses them): `packages/core/src/assistant/markdown.ts` (answer formatting),
+  `screen.ts` (link location, suggestions, lock message, transcript append, dates),
+  `packages/data/src/assistant/chat.ts` (bubbles and streamed updates).
+- Voice: Tasks' recording lifecycle moved into `apps/mobile/src/features/voice/useVoiceNoteRecorder.ts`
+  unchanged (same reducer, file name, MIME type, messages); Kiara uploads to `transcribeKiaraVoice`.
+
 ## Phase 9: hardening and hosted deploy
 
 - Full eval run per role (staff denied, manager scoped, owner full), language styles, injection cases

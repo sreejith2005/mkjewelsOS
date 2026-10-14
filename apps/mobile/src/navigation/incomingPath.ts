@@ -13,7 +13,7 @@ export function incomingNativePath(raw: string, webOrigin: string | null): strin
     else return null;
     if (!notificationDestination(path) || !getPageForPath(path.split("?")[0] ?? path)) return null;
     if (path.startsWith("/tasks/fms?") && !resolveNativeWorkPath(path)) return null;
-    // A web-only section (Ask Kiara for now) lands on the notification list.
+    // A web-only section (none today; see NATIVE_PENDING_PAGES) lands on the notification list.
     if (isNativePendingPath(path)) return "/notifications";
     return path;
   } catch { return null; }

@@ -8,6 +8,7 @@ import {
   accessibleMenu,
   buildLauncherItems,
   crmTabFullScreen,
+  hidesGlobalVoiceAction,
   isTaskPath,
   navigatePath,
   nativeNotificationAction,
@@ -139,6 +140,7 @@ describe("buildLauncherItems", () => {
       "forms_library",
       "availability",
       "reports",
+      "ask_kiara",
       "settings",
     ]);
     expect(items.every((item) => item.description.length > 0)).toBe(true);
@@ -200,40 +202,58 @@ describe("CRM tab (CRM Phase 6: the web CRM in a WebView)", () => {
   });
 });
 
-describe("native-pending sections (Ask Kiara until its Phase 8)", () => {
-  it("lists only Ask Kiara", () => {
-    expect(NATIVE_PENDING_PAGES).toEqual(["ask_kiara"]);
+describe("Ask Kiara on Android (Phase 8)", () => {
+  it("has no native-pending sections left", () => {
+    expect(NATIVE_PENDING_PAGES).toEqual([]);
   });
 
-  it("keeps Ask Kiara out of the launcher and menu even though the web section is open", () => {
+  it("lists Ask Kiara in the launcher when the section is on and the user has assistant.view", () => {
     for (const role of ["staff", "manager", "super_admin"] as const) {
       const shell = shellFor(role);
       expect(pageDecision(shell, "ask_kiara")).toBe("allowed");
-      expect(buildLauncherItems(shell).some((item) => item.id === "ask_kiara")).toBe(false);
-      expect(accessibleMenu(shell).some((item) => item.id === "ask_kiara")).toBe(false);
+      expect(buildLauncherItems(shell).some((item) => item.id === "ask_kiara")).toBe(true);
     }
   });
 
-  it("does not route an /ask-kiara link to the unimplemented section fallback", () => {
-    expect(resolveNativeDestination("/ask-kiara")).toBeNull();
-    const calls: string[] = [];
-    const handled = navigatePath("/ask-kiara", shellFor("super_admin"), { navigateSection: () => calls.push("section"), navigateTab: () => calls.push("tab"), setPath: () => calls.push("path") });
-    expect(handled).toBe(false);
+  it("shows no entry when the section is switched off, and refuses a direct link for a denied user", () => {
+    expect(buildLauncherItems(shellFor("staff", withSectionOff("ask_kiara"))).some((item) => item.id === "ask_kiara")).toBe(false);
+    const staff = accessFor("staff");
+    const denied: ShellAccess = { access: { ...staff, permissions: { ...staff.permissions, "assistant.view": false } }, controls: DEFAULT_SECTION_CONTROLS };
+    expect(pageDecision(denied, "ask_kiara")).toBe("denied");
+    expect(buildLauncherItems(denied).some((item) => item.id === "ask_kiara")).toBe(false);
+    const { calls, handlers } = recorder();
+    expect(navigatePath("/ask-kiara?conversation=c1", denied, handlers)).toBe(false);
     expect(calls).toEqual([]);
   });
 
-  it("Ask Kiara notifications say \"Open on web for now\" instead of opening a screen", () => {
-    expect(nativeNotificationAction("/ask-kiara?tab=questions&escalation=e1")).toEqual({ kind: "web_only" });
-    expect(nativeNotificationAction("/ask-kiara?conversation=c1")).toEqual({ kind: "web_only" });
-    const calls: string[] = [];
-    expect(navigatePath("/ask-kiara?conversation=c1", shellFor("staff"), { navigateSection: () => calls.push("section"), navigateTab: () => calls.push("tab"), setPath: () => calls.push("path") })).toBe(false);
-    expect(calls).toEqual([]);
+  it("opens /ask-kiara links, with their query, on the Section stack", () => {
+    expect(resolveNativeDestination("/ask-kiara")).toEqual({ kind: "section", page: "ask_kiara" });
+    expect(resolveNativeDestination("/ask-kiara?conversation=c1")).toEqual({ kind: "section", page: "ask_kiara" });
+    const { calls, handlers } = recorder();
+    expect(navigatePath("/ask-kiara?tab=questions&escalation=e1", shellFor("manager"), handlers)).toBe(true);
+    expect(calls).toEqual(["path:/ask-kiara?tab=questions&escalation=e1", "section:ask_kiara"]);
+  });
+
+  it("keeps exact matching for tab pages that carry a query", () => {
+    expect(resolveNativeDestination("/tasks?tab=delegated")).toBeNull();
+    expect(resolveNativeDestination("/not-a-page?x=1")).toBeNull();
+  });
+
+  it("Ask Kiara notifications (question for you, answered) open the screen", () => {
+    expect(nativeNotificationAction("/ask-kiara?tab=questions&escalation=e1")).toEqual({ kind: "open", path: "/ask-kiara?tab=questions&escalation=e1" });
+    expect(nativeNotificationAction("/ask-kiara?conversation=c1")).toEqual({ kind: "open", path: "/ask-kiara?conversation=c1" });
     expect(nativeNotificationAction("/tasks")).toEqual({ kind: "open", path: "/tasks" });
     expect(nativeNotificationAction("https://evil.example/x")).toBeNull();
     expect(nativeNotificationAction(null)).toBeNull();
   });
 
-  it("leaves every other launcher entry unchanged", () => {
-    expect(buildLauncherItems(shellFor("staff")).map((item) => item.id)).toEqual(["home", "dashboard", "fms_builder", "forms_library", "availability", "reports", "settings"]);
+  it("hides the floating voice-task button only on Ask Kiara, whose composer has its own mic", () => {
+    expect(hidesGlobalVoiceAction("ask_kiara")).toBe(true);
+    expect(hidesGlobalVoiceAction("dashboard")).toBe(false);
+    expect(hidesGlobalVoiceAction("checklist_tasks")).toBe(false);
+  });
+
+  it("adds Ask Kiara in the web launcher position and leaves every other entry unchanged", () => {
+    expect(buildLauncherItems(shellFor("staff")).map((item) => item.id)).toEqual(["home", "dashboard", "fms_builder", "forms_library", "availability", "reports", "ask_kiara", "settings"]);
   });
 });
