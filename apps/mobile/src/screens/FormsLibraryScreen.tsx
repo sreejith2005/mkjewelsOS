@@ -5,8 +5,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { FileText } from "lucide-react-native";
 import { archiveForm, duplicateForm, loadForms, publishAsNewForm, publishForm, reviseForm, type FormBundle } from "@jewelos/data/forms/api";
-import { hasPermission, formMatchesLifecycle, WORK_UPLOAD_FORM_NAME } from "@jewelos/core";
-import { installWorkUploadForm } from "@jewelos/data/forms/installWorkUploadForm";
+import { hasPermission, formMatchesLifecycle } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthProvider";
 import { FormLifecycleActions } from "@/features/forms/FormLifecycleActions";
 import { groupSubmissions } from "@/features/forms/submissionModel";
@@ -88,12 +87,6 @@ export function FormsLibraryScreen() {
     } catch (caught) { setActionError(caught instanceof Error ? caught.message : "Create form version failed"); }
     finally { setBusyId(null); }
   };
-  const installWorkUpload = async () => {
-    setBusyId("work-upload"); setActionError(null);
-    try { await installWorkUploadForm(); await refresh(); setQuery(""); setLifecycle("active"); setTab("templates"); }
-    catch (caught) { await refresh(); setActionError(caught instanceof Error ? caught.message : "Unable to add the work and upload form."); }
-    finally { setBusyId(null); }
-  };
 
   if (loading) return <LoadingState label="Loading forms..." />;
   if (error && !data) return <ErrorState message={error} onRetry={() => void reload()} title="Unable to load Forms" />;
@@ -101,7 +94,6 @@ export function FormsLibraryScreen() {
   return <Screen refreshControl={<RefreshControl colors={[theme.colors.primary]} onRefresh={() => void refresh()} refreshing={refreshing} tintColor={theme.colors.primary} />} scroll>
     <View style={styles.titleRow}><FileText color={theme.colors.primary} size={24} /><View style={styles.titleCopy}><Text variant="heading" weight="bold">Forms Library</Text><Text tone="muted" variant="small">Choose a form, fill it in, and submit. Workflow forms continue automatically in the background.</Text></View></View>
     {canAuthor ? <Button full label="New form" onPress={() => navigation.navigate("FormBuilder", undefined)} /> : null}
-    {canAuthor && !data?.bundles.some((item) => item.name === WORK_UPLOAD_FORM_NAME && item.lifecycle !== "archived") ? <Button busy={busyId === "work-upload"} disabled={busyId !== null} full label="Add work and upload form" onPress={() => void installWorkUpload()} variant="secondary" /> : null}
     <SegmentedControl accessibilityLabel="Forms view" onChange={setTab} options={[{ value: "templates", label: "Forms to fill" }, { value: "submissions", label: "My submissions" }]} value={tab} />
     {actionError ? <Banner tone="danger">{actionError === PINNED_BY_FMS ? "This version is in an active FMS stage. Use Publish as separate form to preserve in-progress work and publish your edited copy." : actionError}</Banner> : null}
     {tab === "templates" ? <>
