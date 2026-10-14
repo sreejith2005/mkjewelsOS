@@ -5,9 +5,9 @@ import type { Theme } from "@/components/ThemeToggle";
 const THEME_STORAGE_KEY = "jewelos-theme";
 type ThemeContextValue = Readonly<{ theme: Theme; setTheme: (theme: Theme) => void }>;
 const ThemeContext = createContext<ThemeContextValue | null>(null);
-// The web dark theme (index.css, "onyx and champagne", 2026-10-14) is darker than the shared
+// The web dark theme (index.css, "warm graphite", 2026-10-14) differs from the shared
 // token palette the Android app still uses, so the browser chrome follows the web header.
-export const BROWSER_BAR_COLOUR: Readonly<Record<Theme, string>> = { light: themes.light.obsidian, dark: "#141210" };
+export const BROWSER_BAR_COLOUR: Readonly<Record<Theme, string>> = { light: themes.light.obsidian, dark: "#262422" };
 const storedTheme = (): Theme => {
   try { return window.localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light"; }
   catch { return "light"; }

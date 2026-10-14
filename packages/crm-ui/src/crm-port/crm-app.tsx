@@ -1,10 +1,13 @@
 // crm-port: the CRM entry point JewelOS renders full-screen for /crm and /crm/*.
 import type { JewelosClient } from "@jewelos/api-client";
 
+import { useMemo } from "react";
+
 import RootLayout from "@/app/layout";
 
 import { CrmAppRouter } from "./app-router";
 import type { CrmProjectConfig } from "./crm-project";
+import { CrmThemeContext } from "./theme-context";
 import { configureCrmHost, type CrmAuth } from "./runtime";
 
 export type CrmAppProps = {
@@ -32,9 +35,13 @@ export type CrmAppProps = {
    * a client fed by the native access token does not have.
    */
   auth?: CrmAuth | undefined;
+  /** The JewelOS theme; with onThemeChange it shows the light/dark switch in the CRM header. */
+  theme?: "light" | "dark" | undefined;
+  onThemeChange?: ((theme: "light" | "dark") => void) | undefined;
 };
 
-export function CrmApp({ supabase, crmProject, jewelosAccessToken, path, search, navigate, onSignOut, jewelosHomePath, auth }: CrmAppProps) {
+export function CrmApp({ supabase, crmProject, jewelosAccessToken, path, search, navigate, onSignOut, jewelosHomePath, auth, theme, onThemeChange }: CrmAppProps) {
   configureCrmHost({ supabase, crmProject, jewelosAccessToken, navigate, onSignOut, jewelosHomePath, auth });
-  return <RootLayout><CrmAppRouter browserPath={path} browserSearch={search} /></RootLayout>;
+  const themeControl = useMemo(() => theme && onThemeChange ? { theme, onThemeChange } : null, [theme, onThemeChange]);
+  return <CrmThemeContext.Provider value={themeControl}><RootLayout><CrmAppRouter browserPath={path} browserSearch={search} /></RootLayout></CrmThemeContext.Provider>;
 }

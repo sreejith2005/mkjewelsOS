@@ -24,8 +24,8 @@
   --crm-green: rgb(var(--color-success));
   --crm-red: rgb(var(--color-task-overdue));
   /* JewelOS dark-theme obsidian/charcoal: the gold-on-black hero bands (same as the Home hero). */
-  --crm-luxe: 12 11 10;
-  --crm-luxe-raised: 22 20 18;
+  --crm-luxe: 23 22 21;
+  --crm-luxe-raised: 37 35 33;
   --crm-shadow-card: 0 1px 2px rgb(var(--color-shadow) / .04), 0 4px 16px -6px rgb(var(--color-shadow) / .08);
   --crm-shadow-lift: 0 2px 4px rgb(var(--color-shadow) / .05), 0 14px 32px -12px rgb(var(--color-shadow) / .18);
   --crm-shadow-gold: 0 1px 2px rgb(var(--color-gold-secondary) / .22), 0 6px 14px -8px rgb(var(--color-gold) / .5);
@@ -131,6 +131,9 @@ html[data-theme="dark"] #crm-theme .crm-app .bg-emerald-100 { background: rgb(va
 #crm-theme .crm-app .crm-topbar-search input[type="search"]:not([type="checkbox"]):not([type="radio"]) { min-height: 2.6rem; padding-top: .55rem !important; padding-bottom: .55rem !important; padding-right: 1rem !important; font-size: 16px; background: rgb(var(--color-task-muted)) !important; border-color: transparent !important; border-radius: 999px !important; padding-left: 2.6rem !important; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") !important; background-repeat: no-repeat !important; background-position: .95rem center !important; }
 #crm-theme .crm-app .crm-topbar-search input[type="search"]:focus { background-color: rgb(var(--color-task-bg)) !important; border-color: rgb(var(--color-gold) / .7) !important; }
 #crm-theme .crm-topbar-status { display: flex; align-items: center; gap: .6rem; margin-left: auto; color: rgb(var(--color-task-text)); font-size: .75rem; letter-spacing: 0; text-transform: none; }
+#crm-theme .crm-theme-toggle { display: inline-flex; flex: 0 0 auto; width: 2.5rem; min-height: 2.5rem !important; align-items: center; justify-content: center; border: 1px solid rgb(var(--color-gold) / .25) !important; border-radius: .75rem !important; background: rgb(var(--color-charcoal)); color: rgb(var(--color-gold-secondary)); }
+#crm-theme .crm-theme-toggle:hover { background: rgb(var(--color-gold) / .1); }
+#crm-theme .crm-theme-toggle .crm-icon { width: 1.05rem; height: 1.05rem; }
 #crm-theme .crm-topbar-who { display: grid; text-align: right; line-height: 1.2; }
 #crm-theme .crm-topbar-who b { font-weight: 600; font-size: .78rem; }
 #crm-theme .crm-topbar-who small { color: rgb(var(--color-gold-secondary)); font-size: .62rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
@@ -212,11 +215,11 @@ html[data-theme="dark"] #crm-theme .crm-app .bg-emerald-100 { background: rgb(va
 #crm-theme .legacy-walkin-card h3 { border-top-color: rgb(var(--color-task-border)); color: rgb(var(--color-task-text)); }
 
 /* ---- Client profile: gold-on-black hero (as JewelOS Home) and JewelOS cards. ---- */
-#crm-theme .legacy-client-hero, #crm-theme .legacy-profile-hero { position: relative; overflow: hidden; border: 1px solid rgb(var(--color-gold) / .2); border-radius: 1.25rem; background: radial-gradient(circle at 100% 0, rgb(223 190 124 / .22), transparent 55%), rgb(var(--crm-luxe)); color: rgb(255 250 241); box-shadow: var(--crm-shadow-lift); }
+#crm-theme .legacy-client-hero, #crm-theme .legacy-profile-hero { position: relative; overflow: hidden; border: 1px solid rgb(var(--color-gold) / .2); border-radius: 1.25rem; background: radial-gradient(circle at 100% 0, rgb(214 182 115 / .22), transparent 55%), rgb(var(--crm-luxe)); color: rgb(255 250 241); box-shadow: var(--crm-shadow-lift); }
 #crm-theme .legacy-client-hero h1, #crm-theme .legacy-profile-hero h1 { color: rgb(255 250 241) !important; }
 #crm-theme .legacy-client-badges span { background: rgb(255 250 241 / .1); color: rgb(241 233 217); }
 #crm-theme .legacy-client-badges span:nth-child(2) { background: rgb(223 190 124 / .18); color: rgb(235 211 162); }
-#crm-theme .legacy-client-hero-actions button { border: 0; text-decoration: none; border-radius: .75rem !important; background: linear-gradient(135deg, rgb(235 211 162 / .5), rgb(223 190 124) 40%, rgb(223 190 124) 60%, rgb(235 211 162 / .55)); color: rgb(var(--crm-luxe)); }
+#crm-theme .legacy-client-hero-actions button { border: 0; text-decoration: none; border-radius: .75rem !important; background: linear-gradient(135deg, rgb(230 204 152), rgb(214 182 115) 45%, rgb(214 182 115) 60%, rgb(230 204 152)); color: rgb(30 24 14); box-shadow: 0 6px 14px -8px rgb(214 182 115 / .6); }
 #crm-theme .legacy-client-hero-actions > div button { border: 1px solid rgb(223 190 124 / .45); background: transparent; color: rgb(241 233 217); }
 #crm-theme .legacy-client-card, #crm-theme .legacy-timeline-card, #crm-theme .legacy-audit-card { border-color: rgb(var(--color-task-border)); border-radius: 1.1rem; background: rgb(var(--color-task-bg)); box-shadow: var(--crm-shadow-card); }
 #crm-theme .legacy-client-card h2, #crm-theme .legacy-timeline-card h2, #crm-theme .legacy-audit-card h2 { border-bottom-color: rgb(var(--color-task-border)); color: rgb(var(--color-task-text)); font-weight: 700 !important; }

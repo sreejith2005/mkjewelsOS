@@ -348,7 +348,7 @@ function AppShell() {
       <>
         <LazyPageErrorBoundary onNavigate={navigate} resetKey={path}>
           <Suspense fallback={<BrandedLoading label="Opening CRM…" />}>
-            <CrmApp crmProject={crmProjectConfig} jewelosHomePath="/" navigate={navigate} onSignOut={logout} path={path} search={search} supabase={supabase} />
+            <CrmApp crmProject={crmProjectConfig} jewelosHomePath="/" navigate={navigate} onSignOut={logout} onThemeChange={setTheme} path={path} search={search} supabase={supabase} theme={theme} />
           </Suspense>
         </LazyPageErrorBoundary>
         <DailyChecklistGate profileId={profile.id} />

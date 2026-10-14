@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 
 import { signOut } from "@/app/actions";
 import { JewelosHomeLink } from "@/crm-port/jewelos-home-link"; // crm-port: "← JewelOS" menu link
+import { useCrmTheme } from "@/crm-port/theme-context";
 import brandWordmark from "@/mk-jewels-logos/mk-jewels-wordmark.png";
 import { ClientSearch } from "./client-search";
 import { CrmIcon } from "./crm-icon";
@@ -27,6 +28,7 @@ export function CrmShell({ profile, children }: { profile: { name: string; role:
   const navigation = [["DASHBOARD", "/dashboard", "dashboard"], ["CLIENT WALK-IN FORM", "/queue", "walkin"], ["NOT BOUGHT FOLLOW UP", "/followups", "followup"], ["REFERRALS CALLING", "/referrals", "referral"], ["CLIENT DATABASE", "/clients", "clients"]] as const; // crm-port: ROSTER / ALLOCATION removed; the roster follows JewelOS Users and Availability
   const [drawerOpen, setDrawerOpen] = useState(false);
   const pathname = usePathname();
+  const themeControl = useCrmTheme();
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setDrawerOpen(false); };
@@ -43,7 +45,7 @@ export function CrmShell({ profile, children }: { profile: { name: string; role:
     <header className="crm-topbar">
       <div className="crm-topbar-left"><button type="button" className="crm-menu-button" aria-label="Open navigation menu" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(true)}><span /><span /><span /></button><BrandLink /></div>
       <div className="crm-topbar-search"><ClientSearch /></div>
-      <span className="crm-topbar-status"><span className="crm-topbar-who"><b>{profile.name}</b><small>{branch}</small></span><span className="crm-avatar" aria-hidden="true">{initials(profile.name)}</span></span>
+      <span className="crm-topbar-status">{themeControl ? <button type="button" className="crm-theme-toggle" aria-label={themeControl.theme === "dark" ? "Switch to light mode" : "Switch to dark mode"} aria-pressed={themeControl.theme === "dark"} onClick={() => themeControl.onThemeChange(themeControl.theme === "dark" ? "light" : "dark")}><CrmIcon name={themeControl.theme === "dark" ? "sun" : "moon"} /></button> : null}<span className="crm-topbar-who"><b>{profile.name}</b><small>{branch}</small></span><span className="crm-avatar" aria-hidden="true">{initials(profile.name)}</span></span>
     </header>
     <button type="button" className={`crm-drawer-backdrop ${drawerOpen ? "is-open" : ""}`} aria-label="Close navigation menu" aria-hidden={!drawerOpen} tabIndex={drawerOpen ? 0 : -1} onClick={() => setDrawerOpen(false)} />
     <aside className={`crm-sidebar ${drawerOpen ? "is-open" : ""}`} aria-label="Main navigation">

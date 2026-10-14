@@ -29,6 +29,9 @@ export type CrmAppProps = {
    * a client fed by the native access token does not have.
    */
   auth?: CrmAuth | undefined;
+  /** The JewelOS theme; with onThemeChange it shows the light/dark switch in the CRM header. */
+  theme?: "light" | "dark" | undefined;
+  onThemeChange?: ((theme: "light" | "dark") => void) | undefined;
 };
 
 /** The CRM Supabase project the CRM reads and writes (public URL and anon key). */

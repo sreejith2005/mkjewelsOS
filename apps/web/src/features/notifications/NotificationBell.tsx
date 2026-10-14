@@ -50,7 +50,7 @@ export function NotificationBell({ profileId, onNavigate }: { profileId: string;
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-label={unread ? `Notifications, ${unread} unread` : "Notifications, none unread"}
-        className="relative flex size-10 items-center justify-center rounded-lg border border-gold/20 bg-obsidian text-gold-secondary hover:bg-gold/10"
+        className="relative flex size-10 items-center justify-center rounded-lg border border-gold/25 bg-charcoal text-gold-secondary transition hover:bg-gold/10"
         onClick={() => { setPanelTop(rootRef.current?.closest("header")?.getBoundingClientRect().bottom ?? null); setOpen((value) => !value); }}
         type="button"
       >
