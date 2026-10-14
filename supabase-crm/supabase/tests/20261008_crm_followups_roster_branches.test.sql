@@ -15,6 +15,10 @@ insert into users(id,name,email,role,branch_id,active) values
 ('20261008-0300-4000-8000-000000000004','Former Roster','followup-former@example.invalid','salesperson','20261008-0300-4000-8000-00000000000a',true);
 insert into crm_sso_access_grants(jewelos_user_id,work_email,legacy_crm_user_id,crm_auth_user_id,active)
 select id,email,id,id,true from users where id::text like '20261008-0300-4000-8000-00000000000_';
+-- The department-aware roster contract requires current synced staff metadata.
+insert into crm_private.staff_sync_state(jewelos_user_id,snapshot_at,outcome,crm_user_id,selection_department)
+select id,now(),'applied',id,case when id='20261008-0300-4000-8000-000000000002' then 'sales' else 'crm' end
+from users where id::text like '20261008-0300-4000-8000-00000000000_';
 \ir fixtures/crm_master_options.sql
 insert into crm_allocation(branch_id,crm_name,crm_user_id,active) values
 ('20261008-0300-4000-8000-00000000000a','ROSTER CRM','20261008-0300-4000-8000-000000000001',true),
@@ -28,7 +32,7 @@ select set_config('request.jwt.claim.sub','20261008-0300-4000-8000-000000000002'
 select lives_ok($$select * from submit_walkin_visit('{
  "branch_id":"20261008-0300-4000-8000-00000000000b","primary_name":"Synthetic Followup Roster Client","primary_phone":"9100830001",
  "proposed_client_id":"20261008-0300-4000-8000-000000000010","proposed_timeline_id":"20261008-0300-4000-8000-000000000011",
- "event_date":"2026-10-08T10:00:00+05:30","crm_name":"BRANCH SELLER","salesperson":"Branch Seller","visit_status":"NO","did_buy":false,
+ "event_date":"2026-10-08T10:00:00+05:30","crm_name":"ROSTER CRM","salesperson":"Branch Seller","salesperson_id":"20261008-0300-4000-8000-000000000002","visit_status":"NO","did_buy":false,
  "seen_categories":["Ring"],"not_bought_reasons":["PRICE"],"category_details":{"seen_count":"1","seen_tags":["T1"]},
  "engagement":{"referrals":{"asked":true}},
  "additional_fields":{"visit_status":"NO","salesperson":"Branch Seller","referrals_count":"1","engagement_answers":{"referrals":"YES"},
