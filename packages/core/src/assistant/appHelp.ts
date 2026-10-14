@@ -140,6 +140,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
       "Apply for leave: open Availability, choose \"Apply leave\", enter the dates and reason, then press \"Submit leave\".",
       "See my leave requests and their status: open Availability and choose \"Leave summary\".",
       "Mark availability for a day: choose Present, Absent, Half day, or Remote for that date.",
+      "Approve or reject leave (people who review leave): open Availability and choose \"Review requests\".",
     ],
   },
   reports: {

@@ -87,6 +87,7 @@ who build workflows, the designs.
 - [ ] Apply for leave: open Availability, choose **Apply leave**, enter the dates and reason, press **Submit leave**.
 - [ ] See my leave requests and their status: open Availability and choose **Leave summary**. *(changed in Phase 9; it used to say "the leave section")*
 - [ ] Mark a day: choose Present, Absent, Half day or Remote for that date.
+- [ ] Approve or reject leave (people who review leave): open Availability and choose **Review requests**. *(added in Phase 9)*
 
 ## Reports
 **What it is:** fixed reports for your level, and private CSV downloads.
