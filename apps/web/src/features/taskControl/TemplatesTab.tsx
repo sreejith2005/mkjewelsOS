@@ -13,7 +13,7 @@ function Chip({ children, tone }: { children: string; tone: "gold" | "muted" }) 
   return (
     <span
       className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-        tone === "gold" ? "bg-gold/15 text-gold" : "bg-task-border/60 text-task-text-muted"
+        tone === "gold" ? "bg-gold/15 text-gold-secondary" : "bg-task-border/60 text-task-text-muted"
       }`}
     >
       {children}
@@ -182,7 +182,7 @@ export function TemplatesTab({
         ))}
         {rows.length === 0 ? (
           <div className="rounded-2xl border border-task-border bg-charcoal py-16 text-center">
-            <ListChecks className="mx-auto size-10 text-gold" />
+            <ListChecks className="mx-auto size-10 text-gold-secondary" />
             <p className="mt-3 text-soft-grey">No templates found.</p>
           </div>
         ) : null}

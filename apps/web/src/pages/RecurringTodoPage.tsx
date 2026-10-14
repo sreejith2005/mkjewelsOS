@@ -98,7 +98,7 @@ const PILL_TONE = {
   danger: "bg-danger/15 text-danger",
   warning: "bg-warning/15 text-warning",
   success: "bg-success/15 text-success",
-  neutral: "bg-gold/10 text-gold",
+  neutral: "bg-gold/10 text-gold-secondary",
 } as const;
 
 function StatusPill({ task }: { task: RecurringInstance }) {
@@ -251,7 +251,7 @@ function WorkCard({
               type="button"
             >
               <span
-                className={`flex size-4 items-center justify-center rounded border ${item.is_completed ? "border-gold bg-gold text-obsidian" : "border-task-border"}`}
+                className={`flex size-4 items-center justify-center rounded border ${item.is_completed ? "border-gold bg-gold text-on-gold" : "border-task-border"}`}
               >
                 {item.is_completed ? <Check className="size-3" /> : null}
               </span>
@@ -270,7 +270,7 @@ function WorkCard({
           </Button>
         ) : null}
         {state.showUpload ? (
-          <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-gold/30 px-4 py-2 text-sm font-semibold text-gold">
+          <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-gold/30 px-4 py-2 text-sm font-semibold text-gold-secondary">
             <Upload className="size-4" />
             {uploading ? "Uploading…" : "Upload image to complete"}
             <input
@@ -447,11 +447,11 @@ export function RecurringTodoPage() {
       <header className="border-b border-task-border bg-charcoal px-4 py-5 sm:px-6">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="rounded-xl bg-gold p-2.5 text-obsidian">
+            <span className="rounded-xl bg-gold-sheen p-2.5 text-on-gold shadow-gold">
               <CalendarClock className="size-5" />
             </span>
             <div>
-              <h1 className="font-display text-2xl sm:text-3xl text-gold">
+              <h1 className="font-display text-[1.85rem] font-semibold leading-tight sm:text-[2.1rem] text-gold-secondary">
                 Recurring / To-Do List
               </h1>
               <p className="text-sm text-soft-grey">
@@ -506,7 +506,7 @@ export function RecurringTodoPage() {
         <div className="scroll-x no-scrollbar mt-5 flex gap-2 border-b border-task-border">
           {tabs.map(([value, label]) => (
             <button
-              className={`min-h-12 shrink-0 border-b-2 px-3 py-3 text-sm font-semibold ${tab === value ? "border-gold text-gold" : "border-transparent text-task-text-muted"}`}
+              className={`min-h-12 shrink-0 border-b-2 px-3 py-3 text-sm font-semibold ${tab === value ? "border-gold text-gold-secondary" : "border-transparent text-task-text-muted"}`}
               key={value}
               onClick={() => setTab(value)}
               type="button"
@@ -625,7 +625,7 @@ export function RecurringTodoPage() {
           </select>
         </div>
         {loading ? (
-          <p className="py-16 text-center text-gold">
+          <p className="py-16 text-center text-gold-secondary">
             Loading recurring work...
           </p>
         ) : tab === "schedules" ? (
@@ -647,7 +647,7 @@ export function RecurringTodoPage() {
                       {template.is_active ? "Active" : "Paused"}
                     </p>
                   </div>
-                  <span className="rounded-full bg-gold/10 px-2 py-1 text-xs text-gold">
+                  <span className="rounded-full bg-gold/10 px-2 py-1 text-xs text-gold-secondary">
                     {template.recurrence_rule}
                   </span>
                 </div>
@@ -761,7 +761,7 @@ export function RecurringTodoPage() {
             ))}
             {visibleTasks.length === 0 ? (
               <div className="col-span-full py-16 text-center">
-                <ClipboardCheck className="mx-auto size-10 text-gold" />
+                <ClipboardCheck className="mx-auto size-10 text-gold-secondary" />
                 <p className="mt-3 text-soft-grey">
                   No work matches this view.
                 </p>

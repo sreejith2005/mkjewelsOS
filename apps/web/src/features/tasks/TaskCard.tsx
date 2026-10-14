@@ -92,7 +92,7 @@ export function TaskCard({ management, capability, categoryLabel, onAction, task
   const statusLabel = completed ? "Completed" : blocked ? "Coverage required" : overdue ? "Overdue" : task.status === "in_progress" ? "In Progress" : "Pending";
   const StatusIcon = completed ? CheckCircle2 : blocked ? PauseCircle : overdue ? AlertTriangle : Clock;
 
-  return <article className={cn("overflow-hidden rounded-2xl border bg-task-bg shadow-sm", completed ? "border-success/40 opacity-80" : blocked ? "border-task-warning/60" : overdue ? "border-task-overdue/50" : task.isWatchedByViewer ? "border-task-accent/50" : "border-task-border")}>
+  return <article className={cn("overflow-hidden rounded-2xl border bg-task-bg shadow-card transition-shadow duration-200 hover:shadow-lift", completed ? "border-success/40 opacity-80" : blocked ? "border-task-warning/60" : overdue ? "border-task-overdue/50" : task.isWatchedByViewer ? "border-task-accent/50" : "border-task-border")}>
     <div className="flex items-start gap-2 p-4">
       <button aria-controls={detailsId} aria-expanded={expanded} className="flex min-w-0 flex-1 items-start gap-3 text-left" onClick={() => setExpanded((value) => !value)} type="button">
         <StatusIcon className={cn("mt-0.5 size-5 shrink-0", completed ? "text-success" : blocked ? "text-task-warning" : overdue ? "text-task-overdue" : "text-task-accent")} />
@@ -101,7 +101,7 @@ export function TaskCard({ management, capability, categoryLabel, onAction, task
             <span className={cn("text-[15px] font-semibold leading-snug text-task-text sm:text-sm", completed && "line-through text-task-text-muted")}>{task.title}</span>
             <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-semibold", completed ? "border-success/40 bg-success/10 text-success" : blocked ? "border-task-warning/50 bg-task-warning/10 text-task-text" : overdue ? "border-task-overdue/40 bg-task-overdue/10 text-task-overdue" : "border-task-border bg-task-muted text-task-text-muted")}>{statusLabel}</span>
             {capability.watcherLabel ? <span className="inline-flex items-center gap-1 rounded-full bg-task-accent-soft px-2 py-0.5 text-[10px] font-semibold text-task-text"><Eye className="size-3" />{capability.watcherLabel}</span> : null}
-            {task.task_type === "fms" ? <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-semibold text-gold">FMS</span> : null}
+            {task.task_type === "fms" ? <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-semibold text-gold-secondary">FMS</span> : null}
             {task.coverageOriginalAssigneeName ? <span className="rounded-full border border-task-accent/40 bg-task-accent-soft px-2 py-0.5 text-[10px] font-semibold text-task-text">Covering for: {task.coverageOriginalAssigneeName}</span> : null}
           </span>
           <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-task-text-muted">

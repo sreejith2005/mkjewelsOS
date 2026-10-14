@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, type ComponentType, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { LogOut, X } from "lucide-react";
 import { Button } from "@/components/ui";
+import wordmarkUrl from "@/assets/mk-jewels-wordmark.png";
+import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export type MobileNavigationDrawerItem = Readonly<{
@@ -81,27 +83,34 @@ export function MobileNavigationDrawer({
 
   return (
     <div className="fixed inset-0 z-50 md:hidden">
-      <div aria-hidden className="absolute inset-0 bg-obsidian/70 backdrop-blur-sm" onMouseDown={onClose} />
+      <div aria-hidden className="absolute inset-0 bg-obsidian/70 backdrop-blur-sm duration-200 animate-in fade-in" onMouseDown={onClose} />
       <section
         aria-labelledby={titleId}
         aria-modal="true"
-        className="relative flex h-full w-[min(20rem,calc(100vw_-_2.5rem))] flex-col border-r border-task-border bg-task-bg text-task-text shadow-2xl"
+        className="relative flex h-full w-[min(20rem,calc(100vw_-_2.5rem))] flex-col border-r border-task-border bg-task-bg text-task-text shadow-2xl duration-300 ease-out animate-in slide-in-from-left"
         onKeyDown={trapFocus}
         ref={drawerRef}
         role="dialog"
         tabIndex={-1}
       >
-        <header className="border-b border-task-border px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
+        <header className="relative px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold" id={titleId}>Navigation</h2>
+            <div className="min-w-0">
+              <img alt="MK Jewels" className="h-4 w-auto" src={wordmarkUrl} />
+              <h2 className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-task-text-muted" id={titleId}>Navigation</h2>
+            </div>
             <Button aria-label="Close navigation" className="size-11 p-0 text-task-text-muted hover:bg-task-muted hover:text-task-text" onClick={onClose} variant="ghost">
               <X />
             </Button>
           </div>
-          <div className="mt-3 rounded-xl bg-task-muted p-3">
-            <p className="truncate text-sm font-semibold text-task-text">{profileName}</p>
-            <p className="mt-1 truncate text-xs text-task-text-muted">{roleLabel} · {branchName}</p>
+          <div className="mt-4 flex items-center gap-3 rounded-2xl border border-task-border bg-task-muted/70 p-3">
+            <span aria-hidden className="flex size-11 shrink-0 items-center justify-center rounded-full bg-gold-sheen text-sm font-bold text-on-gold shadow-gold">{initials(profileName)}</span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold text-task-text">{profileName}</span>
+              <span className="mt-0.5 block truncate text-xs text-task-text-muted">{roleLabel} · {branchName}</span>
+            </span>
           </div>
+          <span aria-hidden className="gold-rule absolute inset-x-0 bottom-0 h-px opacity-60" />
         </header>
         <nav aria-label="Application navigation" className="flex-1 overflow-y-auto overscroll-contain p-3">
           <div className="flex flex-col gap-1">
@@ -110,24 +119,25 @@ export function MobileNavigationDrawer({
               return (
                 <button
                   aria-current={selected ? "page" : undefined}
-                  className={cn("flex min-h-14 items-center gap-3 rounded-xl px-3 py-2 text-left transition", selected ? "bg-task-accent-soft text-task-accent" : "text-task-text hover:bg-task-muted")}
+                  className={cn("group flex min-h-14 items-center gap-3 rounded-2xl px-2.5 py-2 text-left transition-colors active:bg-task-muted", selected ? "bg-gold/10 text-task-text" : "text-task-text hover:bg-task-muted")}
                   key={id}
                   onClick={() => { onNavigate(path); onClose(); }}
                   type="button"
                 >
-                  <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl", selected ? "bg-task-accent text-task-bg" : "bg-task-muted text-task-text-muted")}><Icon className="size-5" /></span>
+                  <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl transition-colors", selected ? "bg-gold-sheen text-on-gold shadow-gold" : "bg-task-muted text-task-text-muted group-hover:text-gold-secondary")}><Icon className="size-5" /></span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold">{label}</span>
                     <span className="block truncate text-xs text-task-text-muted">{description}</span>
                   </span>
                   <NavCountBadge count={badges?.[id]} label="open questions for you" />
+                  {selected ? <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-gold" /> : null}
                 </button>
               );
             })}
           </div>
         </nav>
         <div className="border-t border-task-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <Button className="w-full border-task-border bg-task-bg text-task-overdue hover:bg-task-muted" onClick={() => void onLogout()} variant="secondary">
+          <Button className="w-full border-task-border bg-task-bg text-task-overdue hover:border-task-overdue/40 hover:bg-task-overdue/5" onClick={() => void onLogout()} variant="secondary">
             <LogOut />Sign out
           </Button>
         </div>

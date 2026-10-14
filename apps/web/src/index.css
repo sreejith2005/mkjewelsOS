@@ -3,8 +3,9 @@
 @tailwind utilities;
 
 @layer base {
-  :root { color-scheme: light; --color-obsidian: 248 250 252; --color-gold: 212 175 55; --color-gold-secondary: 184 134 11; --color-charcoal: 255 255 255; --color-champagne: 30 41 59; --color-soft-grey: 100 116 139; --color-danger: 244 63 94; --color-success: 34 197 94; --color-warning: 245 158 11; --color-white: 30 41 59; --color-task-bg: 255 255 255; --color-task-muted: 248 250 252; --color-task-border: 226 232 240; --color-task-text: 30 41 59; --color-task-text-muted: 100 116 139; --color-task-accent: 245 158 11; --color-task-accent-soft: 255 251 235; --color-task-overdue: 244 63 94; --color-task-warning: 245 158 11; }
-  html[data-theme="dark"] { color-scheme: dark; --color-obsidian: 23 19 15; --color-gold: 223 190 124; --color-gold-secondary: 235 211 162; --color-charcoal: 42 35 28; --color-champagne: 241 233 217; --color-soft-grey: 198 189 176; --color-danger: 233 133 127; --color-success: 135 187 145; --color-warning: 227 183 94; --color-white: 255 250 241; --color-task-bg: 42 35 28; --color-task-muted: 58 49 39; --color-task-border: 125 108 88; --color-task-text: 255 250 241; --color-task-text-muted: 206 197 184; --color-task-accent: 223 190 124; --color-task-accent-soft: 79 64 40; --color-task-overdue: 239 133 128; --color-task-warning: 227 183 94; }
+  :root { color-scheme: light; --color-obsidian: 248 250 252; --color-gold: 212 175 55; --color-gold-secondary: 184 134 11; --color-charcoal: 255 255 255; --color-champagne: 30 41 59; --color-soft-grey: 100 116 139; --color-danger: 244 63 94; --color-success: 34 197 94; --color-warning: 245 158 11; --color-white: 30 41 59; --color-task-bg: 255 255 255; --color-task-muted: 248 250 252; --color-task-border: 226 232 240; --color-task-text: 30 41 59; --color-task-text-muted: 100 116 139; --color-task-accent: 245 158 11; --color-task-accent-soft: 255 251 235; --color-task-overdue: 244 63 94; --color-task-warning: 245 158 11; --color-on-gold: 23 19 15; --color-shadow: 15 23 42; }
+  /* .surface-dark: a gold-on-black band (Home hero) that keeps the dark palette in either theme. */
+  html[data-theme="dark"], .surface-dark { color-scheme: dark; --color-obsidian: 23 19 15; --color-gold: 223 190 124; --color-gold-secondary: 235 211 162; --color-charcoal: 42 35 28; --color-champagne: 241 233 217; --color-soft-grey: 198 189 176; --color-danger: 233 133 127; --color-success: 135 187 145; --color-warning: 227 183 94; --color-white: 255 250 241; --color-task-bg: 42 35 28; --color-task-muted: 58 49 39; --color-task-border: 125 108 88; --color-task-text: 255 250 241; --color-task-text-muted: 206 197 184; --color-task-accent: 223 190 124; --color-task-accent-soft: 79 64 40; --color-task-overdue: 239 133 128; --color-task-warning: 227 183 94; --color-on-gold: 23 19 15; --color-shadow: 0 0 0; }
 
   html {
     background: rgb(var(--color-obsidian));
@@ -21,6 +22,45 @@
     overflow-x: clip;
     overscroll-behavior-y: none;
     -webkit-tap-highlight-color: transparent;
+    /* Inter's straight-sided digits and single-storey "a" read better at small sizes. */
+    font-feature-settings: "cv11", "ss01";
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  ::selection {
+    background: rgb(var(--color-gold) / 0.28);
+  }
+
+  /* Figures line up in tables, counters and dates. */
+  td,
+  th,
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Slim, theme-coloured scroll bars on desktop; phones keep their overlay bars. */
+  @media (hover: hover) and (pointer: fine) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: rgb(var(--color-task-text-muted) / 0.35) transparent;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 
   /* A grid item defaults to `min-width: auto`, so a wide table or chip strip
@@ -118,11 +158,11 @@
 
 @layer components {
   .glass-card {
-    @apply border border-task-border bg-charcoal shadow-lg;
+    @apply border border-task-border bg-charcoal shadow-lift;
   }
 
   .field {
-    @apply min-h-11 w-full rounded-lg border border-task-border bg-task-bg px-3 py-2 text-base text-task-text placeholder:text-task-text-muted disabled:cursor-not-allowed disabled:opacity-50 md:text-sm;
+    @apply min-h-11 w-full rounded-lg border border-task-border bg-task-bg px-3 py-2 text-base text-task-text shadow-[inset_0_1px_1px_rgb(var(--color-shadow)/0.03)] transition-[border-color,box-shadow] duration-150 placeholder:text-task-text-muted/80 hover:border-gold/45 focus-visible:border-gold/70 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm;
   }
 
   .label {
@@ -130,6 +170,27 @@
   }
 
   .task-field {
-    @apply min-h-11 w-full rounded-lg border border-task-border bg-task-bg px-3 py-2 text-base text-task-text placeholder:text-task-text-muted disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-task-accent focus-visible:ring-offset-task-bg md:text-sm;
+    @apply min-h-11 w-full rounded-lg border border-task-border bg-task-bg px-3 py-2 text-base text-task-text transition-[border-color,box-shadow] duration-150 placeholder:text-task-text-muted/80 hover:border-task-accent/45 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-task-accent focus-visible:ring-offset-task-bg md:text-sm;
+  }
+
+  /* The MK Jewels gold: a soft metallic sweep built only from the theme's gold tokens. */
+  .bg-gold-sheen {
+    background-image: linear-gradient(135deg, rgb(var(--color-gold-secondary) / 0.35) 0%, rgb(var(--color-gold)) 38%, rgb(var(--color-gold)) 62%, rgb(var(--color-gold-secondary) / 0.45) 100%);
+    background-color: rgb(var(--color-gold));
+  }
+
+  /* A hairline that fades in and out, used under headers and between hero and content. */
+  .gold-rule {
+    background-image: linear-gradient(90deg, transparent, rgb(var(--color-gold) / 0.65) 20%, rgb(var(--color-gold) / 0.65) 80%, transparent);
+  }
+
+  /* Placeholder blocks while data loads: a gentle sweep instead of a blink. */
+  .skeleton {
+    @apply relative overflow-hidden bg-task-muted;
+  }
+
+  .skeleton::after {
+    @apply absolute inset-0 -translate-x-full animate-shimmer content-[''];
+    background-image: linear-gradient(90deg, transparent, rgb(var(--color-task-bg) / 0.7), transparent);
   }
 }

@@ -2289,6 +2289,7 @@ export type Database = {
           client_id: string | null
           client_name: string | null
           converted_client_id: string | null
+            referred_client_id: string | null
           created_at: string | null
           crm_name: string | null
           followup_count: number | null
@@ -2314,6 +2315,7 @@ export type Database = {
       }
     }
     Functions: {
+      crm_search_client_ids: { Args: {p_search: string}; Returns: string[] }
       add_client_to_family: {
         Args: { p_client_id: string; p_member_client_id: string }
         Returns: string

@@ -246,17 +246,17 @@ export function TaskTemplatesPage() {
       <header className="border-b border-task-border bg-charcoal px-4 py-5 sm:px-6">
         <div className="mx-auto flex max-w-[100rem] flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="rounded-xl bg-gold p-2.5 text-obsidian">
+            <span className="rounded-xl bg-gold-sheen p-2.5 text-on-gold shadow-gold">
               <ListChecks className="size-5" />
             </span>
             <div>
-              <h1 className="font-display text-2xl text-gold sm:text-3xl">Task Control</h1>
+              <h1 className="font-display text-[1.85rem] font-semibold leading-tight sm:text-[2.1rem] text-gold-secondary">Task Control</h1>
               <p className="text-sm text-soft-grey">{TASK_CONTROL_TAB_DESCRIPTIONS[tab]}</p>
             </div>
           </div>
           <div className="flex gap-2">
             {canManageTemplates ? (
-              <Button disabled={!references} className="bg-gold text-obsidian hover:bg-gold/90" onClick={() => setEditing(null)}>
+              <Button disabled={!references} className="bg-gold text-on-gold hover:bg-gold/90" onClick={() => setEditing(null)}>
                 <Plus className="size-4" />
                 Add Task
               </Button>
@@ -273,7 +273,7 @@ export function TaskTemplatesPage() {
               aria-current={tab === item ? "page" : undefined}
               className={
                 tab === item
-                  ? "min-h-9 shrink-0 rounded-full bg-gold px-4 text-sm font-semibold text-obsidian"
+                  ? "min-h-9 shrink-0 rounded-full bg-gold px-4 text-sm font-semibold text-on-gold"
                   : "min-h-9 shrink-0 rounded-full bg-white/10 px-4 text-sm font-medium text-champagne hover:bg-white/15"
               }
               key={item}
@@ -355,7 +355,7 @@ export function TaskTemplatesPage() {
         <Modal onClose={() => setScheduling(null)} title="Task schedule">
           <div className="space-y-4">
             <p className="flex items-center gap-2 text-sm text-task-text-muted">
-              <CalendarDays className="size-4 text-gold" />
+              <CalendarDays className="size-4 text-gold-secondary" />
               {[scheduling.assignee_name, scheduling.title, templateFrequencyLabel(scheduling)].filter(Boolean).join(" · ")}
             </p>
             <Field label="Task start date">

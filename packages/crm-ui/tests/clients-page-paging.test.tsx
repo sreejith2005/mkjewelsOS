@@ -3,7 +3,6 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const TOTAL = 206;
-
 let countError: { code: string; message: string } | null = null;
 const lead = { id: "lead-1", phone_number: "9100000001", name: "Synthetic Lead", field_values: {}, created_at: "2026-10-01T10:00:00Z", client_id: "lead-client", clients: { client_code: "MKC-200001", total_visits: 0 } };
 
@@ -17,7 +16,6 @@ function clientRows(offset: number, limit: number) {
 const rpc = vi.fn(async (name: string, args: Record<string, unknown> = {}) => {
   if (name === "browse_crm_records_page" && countError) return { data: null, error: countError };
   if (name === "browse_crm_records_page") return { data: {total:TOTAL,rows:clientRows(Number(args.p_offset),Number(args.p_limit))}, error: null };
-
   if (name === "get_my_profile") return { data: [{ role: "salesperson" }], error: null };
   return { data: null, error: null };
 });
@@ -49,40 +47,39 @@ describe("Client Database paging", () => {
     await expect(ClientsPage({ searchParams: Promise.resolve({ page: "9" }) })).rejects.toBe(countError);
   });
   it("uses one page and one total for all records", async () => {
-
     render(await ClientsPage({ searchParams: Promise.resolve({}) }));
 
-    expect(browseCalls()).toEqual([{ p_filters: {search:""}, p_offset: 0, p_limit: 200 }]);
+    expect(browseCalls()).toEqual([{ p_filters: {search:""}, p_offset: 0, p_limit: 50 }]);
     expect(screen.getByText("206 RESULT(S) FOUND.")).toBeTruthy();
-    expect(screen.getAllByText("SHOWING CLIENTS 1-200 OF 206")).toHaveLength(2);
+    expect(screen.getAllByText("SHOWING CLIENTS 1-50 OF 206")).toHaveLength(2);
     expect(screen.getByText("Synthetic 1")).toBeTruthy();
-    expect(screen.getByText("Synthetic 200")).toBeTruthy();
-    expect(screen.queryByText("Synthetic 201")).toBeNull();
+    expect(screen.getByText("Synthetic 50")).toBeTruthy();
+    expect(screen.queryByText("Synthetic 51")).toBeNull();
     expect(screen.queryByRole("link", { name: "PREVIOUS" })).toBeNull();
     expect(screen.getAllByRole("link", { name: "NEXT" })[0].getAttribute("href")).toBe("/clients?page=2");
   });
 
   it("pages to the remaining clients and keeps the search in the links", async () => {
-    render(await ClientsPage({ searchParams: Promise.resolve({ search: "Synthetic", page: "2" }) }));
+    render(await ClientsPage({ searchParams: Promise.resolve({ search: "Synthetic", page: "5" }) }));
 
-    expect(browseCalls()).toEqual([{ p_filters: {search:"Synthetic"}, p_offset: 200, p_limit: 200 }]);
+    expect(browseCalls()).toEqual([{ p_filters: {search:"Synthetic"}, p_offset: 200, p_limit: 50 }]);
     expect(screen.getAllByText("SHOWING CLIENTS 201-206 OF 206")).toHaveLength(2);
-    expect(screen.getAllByText("PAGE 2 OF 2")).toHaveLength(2);
+    expect(screen.getAllByText("PAGE 5 OF 5")).toHaveLength(2);
     expect(screen.getByText("Synthetic 205")).toBeTruthy();
     expect(screen.queryByText("Synthetic Lead")).toBeNull();
     expect(screen.queryByRole("link", { name: "NEXT" })).toBeNull();
-    expect(screen.getAllByRole("link", { name: "PREVIOUS" })[0].getAttribute("href")).toBe("/clients?search=Synthetic");
+    expect(screen.getAllByRole("link", { name: "PREVIOUS" })[0].getAttribute("href")).toBe("/clients?search=Synthetic&page=4");
   });
 
   it("still shows the total on a page past the last one", async () => {
     render(await ClientsPage({ searchParams: Promise.resolve({ page: "9" }) }));
 
     expect(browseCalls()).toEqual([
-      expect.objectContaining({ p_offset: 1600, p_limit: 200 }),
+      expect.objectContaining({ p_offset: 400, p_limit: 50 }),
     ]);
     expect(screen.getByText("206 RESULT(S) FOUND.")).toBeTruthy();
     expect(screen.getAllByText("NO CLIENTS ON THIS PAGE.")).toHaveLength(2);
-    expect(screen.getAllByRole("link", { name: "PREVIOUS" })[0].getAttribute("href")).toBe("/clients?page=2");
+    expect(screen.getAllByRole("link", { name: "PREVIOUS" })[0].getAttribute("href")).toBe("/clients?page=5");
   });
 
   it("treats a missing or invalid page number as page 1", async () => {

@@ -66,7 +66,7 @@ function Status({ value }: { value: AccountStatus }) {
       ? "bg-success/15 text-success"
       : value === "suspended"
         ? "bg-danger/15 text-danger"
-        : "bg-gold/10 text-gold";
+        : "bg-gold/10 text-gold-secondary";
   return (
     <span
       className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${color}`}
@@ -428,7 +428,7 @@ export function EditUser({
           <div className="flex flex-wrap gap-2">
           {superAdmin ? (
             <div className="space-y-3 rounded-lg border border-gold/20 p-3">
-              <p className="text-sm font-semibold text-gold">Set login password</p>
+              <p className="text-sm font-semibold text-gold-secondary">Set login password</p>
               <p className="text-xs text-soft-grey">
                 Enter the {ADMIN_SET_PASSWORD_LENGTH}-character password this employee will use. It is sent only to Supabase Auth and is never stored or displayed by JewelOS.
               </p>
@@ -826,7 +826,7 @@ function Organization({ profiles }: { profiles: UserProfile[] }) {
           style={{ marginLeft: `${depth * 20}px` }}
         >
           <div className="glass-card flex items-center gap-3 rounded-xl p-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gold font-semibold text-obsidian">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gold font-semibold text-on-gold">
               {initials(user.employee_name)}
             </span>
             <div className="min-w-0 flex-1">
@@ -916,11 +916,11 @@ export function UserManagementPage() {
     <section>
       <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <span className="rounded-xl bg-gold p-2.5 text-obsidian">
+          <span className="rounded-xl bg-gold-sheen p-2.5 text-on-gold shadow-gold">
             <UserCog className="h-5 w-5" />
           </span>
           <div>
-            <h1 className="font-display text-2xl sm:text-3xl text-gold">Team</h1>
+            <h1 className="font-display text-[1.85rem] font-semibold leading-tight sm:text-[2.1rem] text-gold-secondary">Team</h1>
             <p className="text-sm text-soft-grey">
               {users.length} authorized profiles ·{" "}
               {users.filter((user) => user.account_status === "active").length}{" "}
@@ -982,7 +982,7 @@ export function UserManagementPage() {
         </div>
       </div>
       {loading ? (
-        <p className="py-12 text-center text-gold">Loading users…</p>
+        <p className="py-12 text-center text-gold-secondary">Loading users…</p>
       ) : view === "organization" ? (
         <Organization profiles={users} />
       ) : (
@@ -993,7 +993,7 @@ export function UserManagementPage() {
           {users.map((user) => (
             <article className="rounded-xl border border-gold/15 bg-charcoal p-4" key={user.id}>
               <div className="flex items-start gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gold font-semibold text-obsidian">{initials(user.employee_name)}</span>
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gold font-semibold text-on-gold">{initials(user.employee_name)}</span>
                 <div className="min-w-0 flex-1">
                   <p className="break-words font-semibold text-white">{user.employee_name}</p>
                   <p className="text-xs text-soft-grey">{user.employee_code}</p>
@@ -1005,7 +1005,7 @@ export function UserManagementPage() {
                 ) : null}
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="rounded bg-gold/10 px-2 py-1 text-xs text-gold">{titleCase(user.user_role)}</span>
+                <span className="rounded bg-gold/10 px-2 py-1 text-xs text-gold-secondary">{titleCase(user.user_role)}</span>
                 <Status value={user.account_status} />
               </div>
               <dl className="mt-3 grid gap-1.5 border-t border-gold/10 pt-3 text-sm">
@@ -1049,7 +1049,7 @@ export function UserManagementPage() {
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gold font-semibold text-obsidian">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gold font-semibold text-on-gold">
                         {initials(user.employee_name)}
                       </span>
                       <div>
@@ -1074,7 +1074,7 @@ export function UserManagementPage() {
                     )?.employee_name ?? "—"}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="rounded bg-gold/10 px-2 py-1 text-xs text-gold">
+                    <span className="rounded bg-gold/10 px-2 py-1 text-xs text-gold-secondary">
                       {titleCase(user.user_role)}
                     </span>
                   </td>

@@ -41,7 +41,7 @@ export function TaskRemarks({ taskId }: Readonly<{ taskId: string }>) {
   };
 
   return <section aria-label="Remarks" className="flex flex-col gap-3 rounded-xl border border-task-border bg-task-bg p-3">
-    <h3 className="flex items-center gap-2 text-sm font-semibold text-task-text"><MessageSquare className="size-4 text-gold" />Remarks</h3>
+    <h3 className="flex items-center gap-2 text-sm font-semibold text-task-text"><MessageSquare className="size-4 text-gold-secondary" />Remarks</h3>
     {error ? <Notice tone="danger">{error}</Notice> : null}
     {comments === null && !error ? <p className="text-sm text-task-text-muted">Loading remarks…</p> : null}
     {comments?.length === 0 ? <p className="text-center text-sm text-task-text-muted">No remarks yet. Looped-in users and participants can add follow-up comments here.</p> : null}

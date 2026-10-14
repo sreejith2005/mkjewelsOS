@@ -43,7 +43,7 @@ function FileFieldControl({ disabled, field, onChange, registerRef, templateId, 
           {!disabled ? <Button onClick={() => { onChange(""); setName(null); }} type="button" variant="ghost">Replace</Button> : null}
         </div>
       : disabled ? <span className="text-sm text-soft-grey">No file uploaded</span>
-      : <input accept="image/jpeg,image/png,image/webp,application/pdf" className="block w-full text-sm text-champagne file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-lg file:border-0 file:bg-gold file:px-4 file:text-sm file:font-semibold file:text-obsidian" disabled={uploading} onChange={(event) => void onFile(event)} ref={registerRef} type="file" />}
+      : <input accept="image/jpeg,image/png,image/webp,application/pdf" className="block w-full text-sm text-champagne file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-lg file:border-0 file:bg-gold file:px-4 file:text-sm file:font-semibold file:text-on-gold" disabled={uploading} onChange={(event) => void onFile(event)} ref={registerRef} type="file" />}
     {uploading ? <span className="text-xs text-soft-grey">Uploading...</span> : null}
     {error ? <span className="text-xs text-red-400">{error}</span> : null}
   </div>;
@@ -102,7 +102,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
   };
 
   const renderField = (field: FormFieldDefinition) => {
-    if (field.type === "section_header") return <h3 className="text-lg font-semibold text-gold" key={field.key}>{field.label}</h3>;
+    if (field.type === "section_header") return <h3 className="text-lg font-semibold text-gold-secondary" key={field.key}>{field.label}</h3>;
     if (field.type === "divider") return <hr className="border-gold/20" key={field.key} />;
     if (field.type === "file") { const disabled = readOnly || field.editable === false; return <label className="block" key={field.key}><span className="label">{field.label}{field.required ? " *" : ""}</span>{field.helperText ? <span className="mb-1 block text-xs text-soft-grey">{field.helperText}</span> : null}
       <FileFieldControl disabled={disabled} field={field} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} templateId={templateId} value={answers[field.key]} />
@@ -136,7 +136,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
     {resolved.fields.length === 0 ? <Notice tone="danger">This form version has no saved questions. Close it and edit the draft before publishing.</Notice> : null}
     {stepped && activeStep ? <p className="text-sm text-soft-grey" role="status">Step {sections.findIndex(({ section }) => section.key === activeStep.section.key) + 1} of {sections.length}</p> : null}
     {renderedSections.map(({ section, fields }) => <section aria-label={section.title} className={showSectionTitles ? "rounded-xl border border-gold/15 p-4" : ""} key={section.key}>
-      {showSectionTitles ? <header className="mb-3"><h3 className="text-base font-semibold text-gold">{section.title}</h3>{section.description ? <p className="text-xs text-soft-grey">{section.description}</p> : null}</header> : null}
+      {showSectionTitles ? <header className="mb-3"><h3 className="text-base font-semibold text-gold-secondary">{section.title}</h3>{section.description ? <p className="text-xs text-soft-grey">{section.description}</p> : null}</header> : null}
       <div className="flex flex-col gap-4">{fields.map(renderField)}</div>
     </section>)}
     {!readOnly && resolved.fields.length > 0 ? <div className="sticky bottom-0 -mx-1 mt-2 flex flex-wrap gap-2 border-t border-gold/15 bg-task-bg/95 px-1 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">

@@ -166,7 +166,7 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
     <section className="-m-4 min-h-[calc(100dvh-7.875rem)] bg-task-bg pb-24 text-task-text sm:-m-6 md:min-h-[calc(100vh-4rem)] md:pb-10">
       <h1 className="sr-only">Tasks</h1>
       <div className="hidden items-center justify-between border-b border-task-border px-6 py-4 md:flex">
-        <div><h2 className="text-2xl font-semibold text-task-text">Tasks</h2><p className="text-sm text-task-text-muted">Assigned, watched, coverage-blocked, and delegated work in one place.</p></div>
+        <div><h2 className="font-display text-[2rem] font-semibold leading-tight text-task-text">Tasks</h2><p className="text-sm text-task-text-muted">Assigned, watched, coverage-blocked, and delegated work in one place.</p></div>
       </div>
 
       <div className="scroll-x no-scrollbar flex items-stretch gap-2 border-b border-task-border bg-task-bg px-3 pt-3 sm:px-5">
@@ -203,7 +203,7 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
       </nav> : null}
 
       {canCreateTasks ? <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-20 md:bottom-8 md:right-8">
-        <Button aria-label="Create task" className="size-14 rounded-full bg-task-accent p-0 text-task-text shadow-xl hover:bg-task-accent/90 md:h-14 md:w-auto md:rounded-2xl md:px-5" onClick={() => void openComposer()}><Plus className="size-6" /><span className="hidden md:inline">Create Task</span></Button>
+        <Button aria-label="Create task" className="size-14 rounded-full p-0 shadow-lift ring-4 ring-task-bg/60 md:h-14 md:w-auto md:rounded-2xl md:px-5" onClick={() => void openComposer()}><Plus className="size-6" /><span className="hidden md:inline">Create Task</span></Button>
       </div> : null}
 
       {composerOpen && canCreateTasks && references && profile ? <TaskComposer canUseVoice={canUseVoice} data={references} onClose={() => setComposerOpen(false)} onCreated={() => { setComposerOpen(false); void refresh(); }} onSave={createDelegationTask} onUploadAttachment={(taskId, file) => uploadTaskAttachment(profile.tenant_id, taskId, file)} profile={profile} /> : null}

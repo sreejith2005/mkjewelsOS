@@ -30,8 +30,8 @@ export function FmsAssignedWorkPage({ onNavigate }: { onNavigate: (path: string)
 function Frame({ children, subtitle, title }: { children: React.ReactNode; subtitle: string; title: string }) {
   return <section className="mx-auto w-full max-w-3xl space-y-4">
     <header className="rounded-2xl border border-gold/20 bg-charcoal/40 p-4 sm:p-6">
-      <p className="text-xs font-semibold uppercase tracking-wide text-gold">FMS assigned work</p>
-      <h1 className="mt-1 text-2xl font-semibold text-white">{title}</h1>
+      <p className="text-xs font-semibold uppercase tracking-wide text-gold-secondary">FMS assigned work</p>
+      <h1 className="mt-1 font-display text-[1.85rem] font-semibold leading-tight sm:text-[2.1rem] text-white">{title}</h1>
       <p className="mt-1 text-sm text-soft-grey">{subtitle}</p>
     </header>
     {children}

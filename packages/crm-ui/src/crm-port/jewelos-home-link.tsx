@@ -1,6 +1,8 @@
 // crm-port: the single JewelOS addition to the original CRM shell: a menu entry back to
 // JewelOS Home. It uses the existing menu link style and is marked data-crm-port so the
 // parity harness can exclude it from the original-vs-port comparison.
+import { CrmIcon } from "@/components/crm-icon";
+
 import { crmHost } from "./runtime";
 
 export function JewelosHomeLink({ onNavigate }: { onNavigate: () => void }) {
@@ -15,5 +17,5 @@ export function JewelosHomeLink({ onNavigate }: { onNavigate: () => void }) {
       event.preventDefault();
       host.navigate(host.jewelosHomePath);
     }}
-  >← JewelOS</a>;
+  ><span className="crm-nav-icon"><CrmIcon name="home" /></span><span>← JewelOS</span></a>;
 }

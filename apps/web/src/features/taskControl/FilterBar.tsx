@@ -47,7 +47,7 @@ export function TaskControlFilterBar({
             aria-pressed={filters.preset === preset}
             className={
               filters.preset === preset
-                ? "min-h-9 shrink-0 rounded-full bg-gold px-4 text-xs font-semibold text-obsidian"
+                ? "min-h-9 shrink-0 rounded-full bg-gold px-4 text-xs font-semibold text-on-gold"
                 : "min-h-9 shrink-0 rounded-full bg-white/10 px-4 text-xs font-medium text-champagne hover:bg-white/15"
             }
             key={preset}

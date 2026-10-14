@@ -18,7 +18,7 @@ export function useFollowupControls(kind:'not_bought'|'referral',paging:Followup
  },[localFilters,serverFilters]);
  function change(patch:FollowupFilters){
   const next={...filters,...patch};setFilters(next);
-  if(paging&&patch.search===undefined){const href=followupHref(kind,next);sent.current=href;router.push(href);}
+  if(paging&&Object.keys(patch).some(key=>key!=='search')){const href=followupHref(kind,next);sent.current=href;router.push(href);}
  }
  return {filters,change};
 }

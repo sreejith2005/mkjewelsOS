@@ -54,8 +54,8 @@ export function OptionListEditor({ options, onChange }: { options: readonly Form
   return <div className="space-y-2">
     {options.length ? <ul className="space-y-1">{options.map((option, index) => <li className="flex items-center gap-2 rounded-lg border border-gold/15 bg-obsidian px-2 py-1.5" key={option.value}>
       <div className="flex flex-col">
-        <button aria-label={`Move ${option.label} up`} className="text-soft-grey hover:text-gold disabled:opacity-30" disabled={index === 0} onClick={() => move(index, -1)} type="button"><ChevronUp className="size-3.5" /></button>
-        <button aria-label={`Move ${option.label} down`} className="text-soft-grey hover:text-gold disabled:opacity-30" disabled={index === options.length - 1} onClick={() => move(index, 1)} type="button"><ChevronDown className="size-3.5" /></button>
+        <button aria-label={`Move ${option.label} up`} className="text-soft-grey hover:text-gold-secondary disabled:opacity-30" disabled={index === 0} onClick={() => move(index, -1)} type="button"><ChevronUp className="size-3.5" /></button>
+        <button aria-label={`Move ${option.label} down`} className="text-soft-grey hover:text-gold-secondary disabled:opacity-30" disabled={index === options.length - 1} onClick={() => move(index, 1)} type="button"><ChevronDown className="size-3.5" /></button>
       </div>
       <Check className="size-4 shrink-0 text-success" />
       {editingValue === option.value

@@ -1,0 +1,249 @@
+/*
+ * crm-port: the JewelOS look for the CRM (owner request 2026-10-14: "retain the theme, colours and
+ * other things from the JewelOS app ... use those in the CRM"). Presentation only: no markup,
+ * field, label, order or behaviour depends on this file.
+ *
+ * It is appended after crm.generated.css, mobile.css and wide.css (crm-port/document.tsx) and its
+ * "#crm-theme" placeholder becomes the same scope as theirs, so equal-strength rules here win by
+ * order. Every colour comes from the JewelOS theme variables (--color-*, apps/web/src/index.css),
+ * which the CRM root inherits from <html>; light and dark themes therefore follow the JewelOS
+ * theme switch. The original stylesheet stays verbatim.
+ */
+
+/* ---- Palette: the CRM variables now point at JewelOS tokens. ---- */
+#crm-theme {
+  --background: rgb(var(--color-task-muted));
+  --foreground: rgb(var(--color-task-text));
+  --crm-ink: rgb(var(--color-task-text));
+  --crm-muted: rgb(var(--color-task-text-muted));
+  --crm-cream: rgb(var(--color-task-muted));
+  --crm-card: rgb(var(--color-task-bg));
+  --crm-line: rgb(var(--color-task-border));
+  --crm-gold: rgb(var(--color-gold));
+  --crm-gold-dark: rgb(var(--color-gold-secondary));
+  --crm-green: rgb(var(--color-success));
+  --crm-red: rgb(var(--color-task-overdue));
+  /* JewelOS dark-theme obsidian/charcoal: the gold-on-black hero bands (same as the Home hero). */
+  --crm-luxe: 23 19 15;
+  --crm-luxe-raised: 42 35 28;
+  --crm-shadow-card: 0 1px 2px rgb(var(--color-shadow) / .04), 0 4px 16px -6px rgb(var(--color-shadow) / .08);
+  --crm-shadow-lift: 0 2px 4px rgb(var(--color-shadow) / .05), 0 14px 32px -12px rgb(var(--color-shadow) / .18);
+  --crm-shadow-gold: 0 1px 2px rgb(var(--color-gold-secondary) / .22), 0 6px 14px -8px rgb(var(--color-gold) / .5);
+  --crm-sheen: linear-gradient(135deg, rgb(var(--color-gold-secondary) / .35) 0%, rgb(var(--color-gold)) 38%, rgb(var(--color-gold)) 62%, rgb(var(--color-gold-secondary) / .45) 100%);
+  color-scheme: light;
+  background: rgb(var(--color-task-muted));
+  color: rgb(var(--color-task-text));
+  font-family: Inter, system-ui, sans-serif;
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+html[data-theme="dark"] #crm-theme { color-scheme: dark; }
+
+#crm-theme .crm-app { background: rgb(var(--color-task-muted)); color: rgb(var(--color-task-text)); font-family: Inter, system-ui, sans-serif; }
+#crm-theme ::selection { background: rgb(var(--color-gold) / .28); }
+
+/* ---- Type: the JewelOS display serif for page titles, Inter everywhere else. ---- */
+#crm-theme .crm-app h1 { font-family: "Cormorant Garamond", Georgia, serif !important; font-size: clamp(1.75rem, 4.5vw, 2.15rem) !important; font-weight: 600 !important; letter-spacing: .01em; line-height: 1.12; color: rgb(var(--color-task-text)); text-wrap: balance; }
+#crm-theme .crm-app h2, #crm-theme .crm-app h3 { font-family: Inter, system-ui, sans-serif; color: rgb(var(--color-task-text)); }
+#crm-theme .crm-app td, #crm-theme .crm-app th { font-variant-numeric: tabular-nums; }
+
+/* ---- Colour utilities the CRM markup uses, mapped to their JewelOS meaning. ---- */
+#crm-theme .crm-app .text-stone-400, #crm-theme .crm-app .text-stone-500, #crm-theme .crm-app .text-stone-600 { color: rgb(var(--color-task-text-muted)) !important; }
+#crm-theme .crm-app .text-stone-700, #crm-theme .crm-app .text-stone-900 { color: rgb(var(--color-task-text)) !important; }
+#crm-theme .crm-app .text-amber-700, #crm-theme .crm-app .text-amber-800, #crm-theme .crm-app .text-amber-900, #crm-theme .crm-app a.text-amber-800 { color: rgb(var(--color-gold-secondary)) !important; }
+#crm-theme .crm-app [class*="text-red-"] { color: rgb(var(--color-task-overdue)) !important; }
+#crm-theme .crm-app [class*="text-green-"], #crm-theme .crm-app .text-emerald-800 { color: rgb(var(--color-success)) !important; }
+#crm-theme .crm-app .bg-white { background-color: rgb(var(--color-task-bg)) !important; }
+#crm-theme .crm-app .bg-stone-50, #crm-theme .crm-app .bg-stone-100 { background-color: rgb(var(--color-task-muted)) !important; color: inherit; }
+#crm-theme .crm-app .bg-amber-50, #crm-theme .crm-app .bg-amber-100 { background-color: rgb(var(--color-gold) / .12) !important; }
+#crm-theme .crm-app .bg-green-50 { background-color: rgb(var(--color-success) / .1) !important; }
+#crm-theme .crm-app .border, #crm-theme .crm-app .border-b, #crm-theme .crm-app .border-t, #crm-theme .crm-app .border-r { border-color: rgb(var(--color-task-border)) !important; }
+#crm-theme .crm-app .border-stone-300, #crm-theme .crm-app .border-stone-400 { border-color: rgb(var(--color-task-border)) !important; }
+#crm-theme .crm-app [class*="border-amber-"] { border-color: rgb(var(--color-gold) / .55) !important; }
+#crm-theme .crm-app .border-green-200 { border-color: rgb(var(--color-success) / .35) !important; }
+html[data-theme="dark"] #crm-theme .crm-app .bg-violet-100 { background: rgb(167 139 250 / .18) !important; }
+html[data-theme="dark"] #crm-theme .crm-app .text-violet-800 { color: rgb(221 214 254) !important; }
+html[data-theme="dark"] #crm-theme .crm-app .bg-emerald-100 { background: rgb(var(--color-success) / .18) !important; }
+
+/* ---- Surfaces: JewelOS cards (white, hairline border, soft elevation, 1rem corners). ---- */
+#crm-theme .crm-app .rounded, #crm-theme .crm-app .rounded-lg { border-radius: .75rem !important; }
+#crm-theme .crm-app .rounded-xl, #crm-theme .crm-app .rounded-2xl { border-radius: 1rem !important; }
+#crm-theme .crm-app section.rounded, #crm-theme .crm-app section.rounded-xl, #crm-theme .crm-app article.rounded-xl, #crm-theme .crm-app .rounded-xl.border, #crm-theme .crm-app div.rounded.border.bg-white { box-shadow: var(--crm-shadow-card); }
+#crm-theme .crm-app main > * { animation: crm-rise .28s ease-out both; }
+@keyframes crm-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ---- Controls: JewelOS fields and buttons. ---- */
+#crm-theme .crm-app input, #crm-theme .crm-app select, #crm-theme .crm-app textarea { border: 1px solid rgb(var(--color-task-border)) !important; border-radius: .75rem !important; background-color: rgb(var(--color-task-bg)); color: rgb(var(--color-task-text)); transition: border-color .15s ease, box-shadow .15s ease; }
+#crm-theme .crm-app input:hover, #crm-theme .crm-app select:hover, #crm-theme .crm-app textarea:hover { border-color: rgb(var(--color-gold) / .45) !important; }
+#crm-theme .crm-app input:focus, #crm-theme .crm-app select:focus, #crm-theme .crm-app textarea:focus { border-color: rgb(var(--color-gold) / .8) !important; box-shadow: 0 0 0 3px rgb(var(--color-gold) / .22); outline: none; }
+#crm-theme .crm-app input::placeholder, #crm-theme .crm-app textarea::placeholder { color: rgb(var(--color-task-text-muted) / .8); }
+#crm-theme .crm-app input[readonly] { background-color: rgb(var(--color-task-muted)); }
+#crm-theme .crm-app input[type="checkbox"], #crm-theme .crm-app input[type="radio"] { accent-color: rgb(var(--color-gold)); }
+#crm-theme .crm-app label { color: rgb(var(--color-task-text)); }
+
+#crm-theme .crm-app button, #crm-theme .crm-app a.rounded.border, #crm-theme .crm-app a.rounded.bg-amber-800 { border-radius: .75rem !important; font-weight: 600; letter-spacing: .015em; transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .15s ease, filter .15s ease; -webkit-tap-highlight-color: transparent; }
+#crm-theme .crm-app button:not(:disabled):hover { transform: none; }
+#crm-theme .crm-app button:not(:disabled):active, #crm-theme .crm-app a.rounded:active { transform: scale(.97); }
+#crm-theme .crm-app button:disabled { opacity: .55; cursor: not-allowed; box-shadow: none !important; }
+#crm-theme .crm-app button:focus-visible, #crm-theme .crm-app a:focus-visible { outline: 2px solid rgb(var(--color-gold)); outline-offset: 2px; }
+/* Primary: the JewelOS gold button with dark ink (readable in both themes). */
+#crm-theme .crm-app .bg-amber-800, #crm-theme .crm-app .bg-amber-700 { background-color: rgb(var(--color-gold)) !important; background-image: var(--crm-sheen) !important; color: rgb(var(--color-on-gold)) !important; border-color: transparent !important; box-shadow: var(--crm-shadow-gold) !important; }
+#crm-theme .crm-app .bg-amber-800:hover, #crm-theme .crm-app .bg-amber-700:hover { background-color: rgb(var(--color-gold)) !important; filter: brightness(1.05); }
+/* Strong secondary (SEARCH, LOAD QUEUE, Apply filters): the JewelOS outlined gold button. */
+#crm-theme .crm-app .bg-stone-800 { background-color: rgb(var(--color-charcoal)) !important; background-image: none !important; color: rgb(var(--color-champagne)) !important; border: 1px solid rgb(var(--color-gold) / .45) !important; }
+#crm-theme .crm-app .bg-stone-800:hover { background-color: rgb(var(--color-gold) / .1) !important; border-color: rgb(var(--color-gold) / .7) !important; }
+/* Plain bordered buttons and link-buttons. */
+#crm-theme .crm-app button.border:not([class*="bg-amber"]):not(.bg-stone-800), #crm-theme .crm-app a.rounded.border { background-color: rgb(var(--color-task-bg)); color: rgb(var(--color-task-text)); }
+#crm-theme .crm-app button.border:not([class*="bg-amber"]):not(.bg-stone-800):hover, #crm-theme .crm-app a.rounded.border:hover { border-color: rgb(var(--color-gold) / .55) !important; background-color: rgb(var(--color-gold) / .06); }
+#crm-theme .crm-app a.underline { text-decoration-color: rgb(var(--color-gold) / .55); text-underline-offset: 3px; }
+#crm-theme .crm-app a.underline:hover { color: rgb(var(--color-gold-secondary)); }
+
+/* ---- Tables: JewelOS listing style. ---- */
+#crm-theme .crm-app table thead { background: rgb(var(--color-task-muted)) !important; color: rgb(var(--color-task-text-muted)) !important; font-size: .68rem; font-weight: 600; letter-spacing: .06em; }
+#crm-theme .crm-app table th { font-weight: 600; color: rgb(var(--color-task-text-muted)); }
+#crm-theme .crm-app table td { color: rgb(var(--color-task-text)); }
+#crm-theme .crm-app table tbody tr:hover { background: rgb(var(--color-gold) / .05); }
+#crm-theme .crm-app table[data-crm-cards] > thead > tr > th { background: rgb(var(--color-task-muted)); }
+#crm-theme .crm-app table[data-crm-actions] > tbody > tr:hover > td[data-label]:last-child { background: rgb(var(--color-task-bg)); }
+#crm-theme .crm-app table[data-crm-cards]:not(.crm-record-table) > tbody > tr:nth-child(even) > td { background: rgb(var(--color-task-muted) / .55); }
+
+/* Status / count chips inside listing cells. */
+#crm-theme .crm-app table td .flex.gap-1 { flex-wrap: wrap; gap: .3rem; }
+#crm-theme .crm-app table td .flex.gap-1 > span.rounded { padding: .1rem .5rem; border-radius: 999px !important; background: rgb(var(--color-task-muted)) !important; color: rgb(var(--color-task-text-muted)); font-size: .66rem; font-weight: 600; letter-spacing: .03em; white-space: nowrap; }
+
+/* ---- Status chips: JewelOS semantic colours (no blue). ---- */
+#crm-theme .crm-status { border-color: rgb(var(--color-task-border)); background: rgb(var(--color-task-muted)); color: rgb(var(--color-task-text-muted)); font-weight: 600; }
+#crm-theme .crm-status--done { border-color: rgb(var(--color-success) / .4); background: rgb(var(--color-success) / .12); color: rgb(var(--color-success)); }
+#crm-theme .crm-status--converted { border-color: rgb(var(--color-gold) / .5); background: rgb(var(--color-gold) / .14); color: rgb(var(--color-gold-secondary)); }
+#crm-theme .crm-status--active { border-color: rgb(var(--color-warning) / .5); background: rgb(var(--color-warning) / .14); color: rgb(var(--color-task-text)); }
+#crm-theme .crm-status--overdue { border-color: rgb(var(--color-task-overdue) / .45); background: rgb(var(--color-task-overdue) / .1); color: rgb(var(--color-task-overdue)); }
+
+/* ---- Shell: the JewelOS header (frosted, gold hairline) and drawer. ---- */
+#crm-theme .crm-topbar { position: sticky; top: 0; z-index: 30; min-height: calc(3.5rem + env(safe-area-inset-top)); gap: .75rem; padding: env(safe-area-inset-top) max(.75rem, env(safe-area-inset-right)) 0 max(.75rem, env(safe-area-inset-left)); background: rgb(var(--color-task-bg) / .82); -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4); border-bottom: 1px solid rgb(var(--color-task-border)); box-shadow: none; color: rgb(var(--color-task-text)); }
+#crm-theme .crm-topbar::after { content: ""; position: absolute; inset: auto 0 -1px 0; height: 1px; background: linear-gradient(90deg, transparent, rgb(var(--color-gold) / .65) 20%, rgb(var(--color-gold) / .65) 80%, transparent); opacity: .7; pointer-events: none; }
+#crm-theme .crm-topbar-left { gap: .4rem; }
+#crm-theme .crm-menu-button { width: 2.5rem; min-height: 2.5rem !important; border: 0; border-radius: .75rem !important; background: transparent; gap: .28rem; }
+#crm-theme .crm-menu-button span { width: 1.15rem; height: 2px; border-radius: 2px; background: rgb(var(--color-task-text)); }
+#crm-theme .crm-menu-button:hover { background: rgb(var(--color-gold) / .1); }
+#crm-theme .crm-brand { gap: .5rem; color: rgb(var(--color-task-text)); }
+#crm-theme .crm-brand-logo { display: block; width: auto; height: 1rem; object-fit: contain; filter: drop-shadow(0 1px 0 rgb(var(--color-gold-secondary) / .35)); }
+#crm-theme .crm-brand-tag { display: inline-flex; align-items: center; height: 1.25rem; padding: 0 .45rem; border-radius: 999px; background: var(--crm-sheen); color: rgb(var(--color-on-gold)); font-size: .62rem; font-weight: 700; letter-spacing: .14em; box-shadow: var(--crm-shadow-gold); }
+#crm-theme .crm-app .crm-topbar-search input[type="search"]:not([type="checkbox"]):not([type="radio"]) { min-height: 2.6rem; padding-top: .55rem !important; padding-bottom: .55rem !important; padding-right: 1rem !important; font-size: 16px; background: rgb(var(--color-task-muted)) !important; border-color: transparent !important; border-radius: 999px !important; padding-left: 2.6rem !important; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") !important; background-repeat: no-repeat !important; background-position: .95rem center !important; }
+#crm-theme .crm-app .crm-topbar-search input[type="search"]:focus { background-color: rgb(var(--color-task-bg)) !important; border-color: rgb(var(--color-gold) / .7) !important; }
+#crm-theme .crm-topbar-status { display: flex; align-items: center; gap: .6rem; margin-left: auto; color: rgb(var(--color-task-text)); font-size: .75rem; letter-spacing: 0; text-transform: none; }
+#crm-theme .crm-topbar-who { display: grid; text-align: right; line-height: 1.2; }
+#crm-theme .crm-topbar-who b { font-weight: 600; font-size: .78rem; }
+#crm-theme .crm-topbar-who small { color: rgb(var(--color-gold-secondary)); font-size: .62rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+#crm-theme .crm-avatar { display: inline-flex; flex: 0 0 auto; width: 2.25rem; height: 2.25rem; align-items: center; justify-content: center; border-radius: 999px; background: var(--crm-sheen); color: rgb(var(--color-on-gold)); font-size: .75rem; font-weight: 700; letter-spacing: .03em; box-shadow: var(--crm-shadow-gold), 0 0 0 2px rgb(var(--color-task-bg)); }
+
+#crm-theme .crm-drawer-backdrop { inset: 0 !important; z-index: 45; background: rgb(var(--color-obsidian) / .7); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+#crm-theme .crm-sidebar { z-index: 50; top: 0 !important; bottom: 0 !important; width: min(20rem, calc(100vw - 2.5rem)); left: min(-20rem, calc(-100vw + 2.5rem)) !important; padding-bottom: env(safe-area-inset-bottom); background: rgb(var(--color-task-bg)); color: rgb(var(--color-task-text)); border-right: 1px solid rgb(var(--color-task-border)); box-shadow: 0 25px 50px -12px rgb(var(--color-shadow) / .35); transition: left .3s cubic-bezier(.2,.8,.2,1); overflow-y: auto; overscroll-behavior: contain; }
+#crm-theme .crm-sidebar.is-open { left: 0 !important; }
+#crm-theme .crm-sidebar-top { position: relative; min-height: 0; padding: max(1rem, env(safe-area-inset-top)) 1rem .75rem; border-bottom: 0; background: transparent; }
+#crm-theme .crm-sidebar-top > div { display: grid; gap: .45rem; }
+#crm-theme .crm-sidebar-logo { display: block; width: auto; height: 1rem; }
+#crm-theme .crm-sidebar-top span { margin: 0; color: rgb(var(--color-task-text-muted)); font-size: .66rem; font-weight: 600; letter-spacing: .2em; }
+#crm-theme .crm-drawer-close { display: grid !important; place-items: center; width: 2.75rem; min-width: 2.75rem; min-height: 2.75rem; border-radius: .75rem !important; color: rgb(var(--color-task-text-muted)); font-size: 1.9rem; font-weight: 300; line-height: 1; }
+#crm-theme .crm-drawer-close:hover { background: rgb(var(--color-task-muted)); color: rgb(var(--color-task-text)); }
+#crm-theme .crm-user { position: relative; display: flex; align-items: center; gap: .75rem; margin: 0 1rem; padding: .75rem; border: 1px solid rgb(var(--color-task-border)); border-radius: 1rem; background: rgb(var(--color-task-muted) / .7); color: rgb(var(--color-task-text-muted)); font-size: .74rem; }
+#crm-theme .crm-user .crm-avatar { width: 2.75rem; height: 2.75rem; font-size: .85rem; }
+#crm-theme .crm-user > span:last-child { display: grid; min-width: 0; gap: .15rem; }
+#crm-theme .crm-user b { overflow: hidden; color: rgb(var(--color-task-text)); font-size: .88rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+#crm-theme .crm-user > span:last-child > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: capitalize; }
+#crm-theme .crm-navigation { gap: .2rem; padding: 1rem .75rem; border-top: 0; }
+#crm-theme .crm-navigation::before { content: ""; display: block; height: 1px; margin: -.25rem .25rem .6rem; background: linear-gradient(90deg, transparent, rgb(var(--color-gold) / .6) 20%, rgb(var(--color-gold) / .6) 80%, transparent); opacity: .6; }
+#crm-theme .crm-nav-link { display: flex; align-items: center; gap: .75rem; min-height: 3.25rem; padding: .45rem .6rem; border: 0; border-radius: 1rem !important; color: rgb(var(--color-task-text)); font-size: .78rem; font-weight: 600; letter-spacing: .04em; text-decoration: none; transition: background-color .15s ease; }
+#crm-theme .crm-nav-link:hover, #crm-theme .crm-nav-link:focus-visible { background: rgb(var(--color-task-muted)); color: rgb(var(--color-task-text)); outline: none; }
+#crm-theme .crm-nav-link.is-active { background: rgb(var(--color-gold) / .1); border: 0; color: rgb(var(--color-task-text)); }
+#crm-theme .crm-nav-icon { display: inline-flex; flex: 0 0 auto; width: 2.5rem; height: 2.5rem; align-items: center; justify-content: center; border-radius: .75rem; background: rgb(var(--color-task-muted)); color: rgb(var(--color-task-text-muted)); transition: background .15s ease, color .15s ease; }
+#crm-theme .crm-nav-link:hover .crm-nav-icon { color: rgb(var(--color-gold-secondary)); }
+#crm-theme .crm-nav-link.is-active .crm-nav-icon { background: var(--crm-sheen); color: rgb(var(--color-on-gold)); box-shadow: var(--crm-shadow-gold); }
+#crm-theme .crm-nav-link[data-crm-port="jewelos-home"] { margin-top: .5rem; color: rgb(var(--color-task-text-muted)); }
+#crm-theme .crm-icon { width: 1.2rem; height: 1.2rem; }
+#crm-theme .crm-logout { display: flex; align-items: center; justify-content: center; gap: .5rem; width: calc(100% - 1.5rem); margin: .25rem .75rem 1rem; border: 1px solid rgb(var(--color-task-border)); border-radius: .75rem !important; background: rgb(var(--color-task-bg)); color: rgb(var(--color-task-overdue)); font-size: .8rem; font-weight: 600; letter-spacing: .04em; }
+#crm-theme .crm-logout:hover { border-color: rgb(var(--color-task-overdue) / .4); background: rgb(var(--color-task-overdue) / .05); }
+#crm-theme .crm-logout .crm-icon { width: 1.05rem; height: 1.05rem; }
+
+@media (min-width: 768px) {
+  #crm-theme .crm-topbar { min-height: 4rem; padding-inline: 1.25rem; }
+  #crm-theme .crm-brand-logo { height: 1.2rem; }
+  #crm-theme .crm-avatar { width: 2.5rem; height: 2.5rem; }
+}
+@media (max-width: 1023px) {
+  #crm-theme .crm-topbar-who { display: none; }
+}
+@media (max-width: 760px) {
+  #crm-theme .crm-topbar { flex-wrap: wrap; row-gap: .5rem; padding-bottom: .6rem; }
+  #crm-theme .crm-topbar-left { min-height: 2.75rem; }
+  #crm-theme .crm-topbar-status { order: 2; }
+  #crm-theme .crm-topbar-search { order: 3; flex-basis: 100%; max-width: none; }
+  #crm-theme .crm-avatar { width: 2rem; height: 2rem; font-size: .7rem; }
+}
+
+/* ---- Search results, filters and records: JewelOS cards. ---- */
+#crm-theme .crm-app .crm-search-results { border-radius: 1rem; box-shadow: var(--crm-shadow-lift); animation: crm-rise .18s ease-out both; }
+#crm-theme .crm-app .crm-search-result:hover, #crm-theme .crm-app .crm-search-result:focus-visible { background: rgb(var(--color-gold) / .07); outline: 0; box-shadow: inset 3px 0 0 rgb(var(--color-gold)); }
+#crm-theme .crm-app .crm-search-all { color: rgb(var(--color-gold-secondary)); text-decoration: none; }
+#crm-theme .crm-app .crm-filter-panel { border-radius: 1rem; box-shadow: var(--crm-shadow-card); }
+#crm-theme .crm-app .crm-filter-panel > summary { color: rgb(var(--color-task-text)); }
+#crm-theme .crm-app .crm-queue-tabs { scrollbar-width: none; }
+#crm-theme .crm-app .crm-queue-tabs > button { border-radius: 999px !important; }
+#crm-theme .crm-app .crm-queue-tabs > button.border { background: rgb(var(--color-task-bg)); color: rgb(var(--color-task-text-muted)); }
+@media (max-width: 767px) {
+  #crm-theme .crm-app .crm-record-table tbody { gap: .75rem; padding: .75rem; }
+  #crm-theme .crm-app .crm-record-table tbody tr { border-radius: 1rem; background: rgb(var(--color-task-bg)); box-shadow: var(--crm-shadow-card); }
+  #crm-theme .crm-app .crm-record-table tbody tr:hover { background: rgb(var(--color-task-bg)); }
+  #crm-theme .crm-app .crm-record-table td::before { color: rgb(var(--color-task-text-muted)); font-size: .66rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+  #crm-theme .crm-app .crm-record-details { border-radius: 999px !important; }
+  #crm-theme .crm-app .crm-record-actions { gap: .5rem; }
+  #crm-theme .crm-app .crm-record-table td .flex.gap-1 { flex-wrap: wrap; gap: .3rem; margin-top: .35rem; }
+  #crm-theme .crm-app .crm-record-table td .flex.gap-1 > span { padding: .1rem .5rem; border-radius: 999px !important; background: rgb(var(--color-task-muted)) !important; color: rgb(var(--color-task-text-muted)); font-size: .68rem; font-weight: 600; letter-spacing: .03em; }
+  #crm-theme .crm-app .crm-record-actions > a, #crm-theme .crm-app .crm-record-actions > span > button, #crm-theme .crm-app .crm-record-actions > button { display: inline-flex; align-items: center; justify-content: center; min-height: 2.5rem !important; margin: 0 !important; padding: .4rem .85rem !important; border: 1px solid rgb(var(--color-task-border)) !important; border-radius: 999px !important; background: rgb(var(--color-task-bg)); color: rgb(var(--color-task-text)) !important; font-size: .78rem !important; font-weight: 600; text-decoration: none; }
+  #crm-theme .crm-app .crm-record-actions > a[href*="/clients/"] { border-color: transparent !important; background: var(--crm-sheen); color: rgb(var(--color-on-gold)) !important; box-shadow: var(--crm-shadow-gold); }
+}
+
+/* ---- Walk-in form: JewelOS stepper and cards. ---- */
+#crm-theme .legacy-walkin-note { color: rgb(var(--color-task-text-muted)); }
+#crm-theme .legacy-walkin-step { border: 1px solid rgb(var(--color-task-border)); background: rgb(var(--color-task-bg)); color: rgb(var(--color-task-text)); border-radius: .9rem !important; }
+#crm-theme .legacy-walkin-step span { background: rgb(var(--color-task-muted)); color: rgb(var(--color-task-text-muted)); font-weight: 700; }
+#crm-theme .legacy-walkin-step.is-active { border-color: transparent; background: var(--crm-sheen); color: rgb(var(--color-on-gold)); box-shadow: var(--crm-shadow-gold); }
+#crm-theme .legacy-walkin-step.is-active span { background: rgb(var(--color-on-gold)); color: rgb(var(--color-gold)); }
+#crm-theme .legacy-walkin-card { border-color: rgb(var(--color-task-border)); border-radius: 1.25rem; background: rgb(var(--color-task-bg)); box-shadow: var(--crm-shadow-card); }
+#crm-theme .legacy-walkin-card h3 { border-top-color: rgb(var(--color-task-border)); color: rgb(var(--color-task-text)); }
+
+/* ---- Client profile: gold-on-black hero (as JewelOS Home) and JewelOS cards. ---- */
+#crm-theme .legacy-client-hero, #crm-theme .legacy-profile-hero { position: relative; overflow: hidden; border: 1px solid rgb(var(--color-gold) / .2); border-radius: 1.25rem; background: radial-gradient(circle at 100% 0, rgb(223 190 124 / .22), transparent 55%), rgb(var(--crm-luxe)); color: rgb(255 250 241); box-shadow: var(--crm-shadow-lift); }
+#crm-theme .legacy-client-hero h1, #crm-theme .legacy-profile-hero h1 { color: rgb(255 250 241) !important; }
+#crm-theme .legacy-client-badges span { background: rgb(255 250 241 / .1); color: rgb(241 233 217); }
+#crm-theme .legacy-client-badges span:nth-child(2) { background: rgb(223 190 124 / .18); color: rgb(235 211 162); }
+#crm-theme .legacy-client-hero-actions button { border: 0; text-decoration: none; border-radius: .75rem !important; background: linear-gradient(135deg, rgb(235 211 162 / .5), rgb(223 190 124) 40%, rgb(223 190 124) 60%, rgb(235 211 162 / .55)); color: rgb(var(--crm-luxe)); }
+#crm-theme .legacy-client-hero-actions > div button { border: 1px solid rgb(223 190 124 / .45); background: transparent; color: rgb(241 233 217); }
+#crm-theme .legacy-client-card, #crm-theme .legacy-timeline-card, #crm-theme .legacy-audit-card { border-color: rgb(var(--color-task-border)); border-radius: 1.1rem; background: rgb(var(--color-task-bg)); box-shadow: var(--crm-shadow-card); }
+#crm-theme .legacy-client-card h2, #crm-theme .legacy-timeline-card h2, #crm-theme .legacy-audit-card h2 { border-bottom-color: rgb(var(--color-task-border)); color: rgb(var(--color-task-text)); font-weight: 700 !important; }
+#crm-theme .legacy-client-row { border-bottom-color: rgb(var(--color-task-border)); }
+#crm-theme .legacy-client-row span { color: rgb(var(--color-task-text-muted)); font-weight: 600; }
+#crm-theme .legacy-client-row b { color: rgb(var(--color-task-text)); font-weight: 600; }
+#crm-theme .legacy-timeline-card th, #crm-theme .legacy-audit-card th { color: rgb(var(--color-task-text-muted)); font-weight: 600; }
+#crm-theme .legacy-timeline-card td, #crm-theme .legacy-audit-card td { border-bottom-color: rgb(var(--color-task-border)); color: rgb(var(--color-task-text)); }
+#crm-theme .legacy-timeline-card th, #crm-theme .legacy-timeline-card td, #crm-theme .legacy-audit-card th, #crm-theme .legacy-audit-card td { border-bottom-color: rgb(var(--color-task-border)); }
+#crm-theme .legacy-audit-card p { color: rgb(var(--color-task-text-muted)); }
+#crm-theme .legacy-last-visit { box-shadow: var(--crm-shadow-card); }
+
+/* ---- Feedback and validation. ---- */
+#crm-theme .crm-form-errors { border-color: rgb(var(--color-task-overdue) / .5); border-radius: 1rem; background: rgb(var(--color-task-overdue) / .06); color: rgb(var(--color-task-overdue)); }
+
+@media (prefers-reduced-motion: reduce) {
+  #crm-theme .crm-app main > *, #crm-theme .crm-app .crm-search-results { animation: none; }
+  #crm-theme .crm-sidebar, #crm-theme .crm-app button { transition: none; }
+}
+
+/* ---- Dashboard charts: theme-aware ink for the neutral series; categorical colours stay. ---- */
+#crm-theme .crm-app svg circle[fill="#fffdfa"] { fill: rgb(var(--color-task-bg)); }
+#crm-theme .crm-app svg [fill="#44403c"] { fill: rgb(var(--color-task-text)); }
+#crm-theme .crm-app svg polyline[stroke="#44403c"] { stroke: rgb(var(--color-task-text)); }
+#crm-theme .crm-app svg polyline[stroke="#b45309"] { stroke: rgb(var(--color-gold)); }
+#crm-theme .crm-app svg polyline[stroke="#b91c1c"] { stroke: rgb(var(--color-task-overdue)); }
+#crm-theme .crm-app svg line[stroke="#d6d3d1"] { stroke: rgb(var(--color-task-border)); }
+#crm-theme .crm-app svg .fill-stone-500 { fill: rgb(var(--color-task-text-muted)); }
+#crm-theme .crm-app svg .fill-stone-900 { fill: rgb(var(--color-task-text)); }
+#crm-theme .crm-app i[style*="rgb(68, 64, 60)"] { background-color: rgb(var(--color-task-text)) !important; }

@@ -29,7 +29,7 @@ describe("dashboard and report presentation contracts", () => {
   });
 
   it("renders loading and keyboard-retry controls accessibly", () => {
-    expect(renderToStaticMarkup(<LoadingPanels count={2}/>)).toContain("animate-pulse");
+    expect(renderToStaticMarkup(<LoadingPanels count={2}/>)).toContain("skeleton");
     const markup = renderToStaticMarkup(<ErrorPanel message="Safe error" onRetry={() => undefined}/>);
     expect(markup).toContain("Safe error");
     expect(markup).toContain("button");

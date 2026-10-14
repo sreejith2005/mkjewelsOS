@@ -19,7 +19,7 @@ export function RatingField({ disabled, label, onChange, registerRef, value }: {
     {RATINGS.map((rating) => <button
       aria-checked={value === rating}
       aria-label={`${rating} stars`}
-      className={`grid size-10 place-items-center rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${rating <= active ? "text-gold" : "text-soft-grey hover:text-champagne"}`}
+      className={`grid size-10 place-items-center rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${rating <= active ? "text-gold-secondary" : "text-soft-grey hover:text-champagne"}`}
       disabled={disabled}
       key={rating}
       onClick={() => select(rating)}

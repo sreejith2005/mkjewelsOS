@@ -124,7 +124,12 @@ labels, vocabularies, flows, validation, calculations and styling - is the
 acceptance criterion; do not improve, rename, re-order, or merge it with the old
 JewelOS CRM (`public.clients`, `public.client_timeline`, ...), which stays untouched
 until the approved cutover. Approved exception to rule 7: the CRM UI keeps the
-original palette, fonts and CSS, scoped to the CRM surface only. `sreejith-crm/` is
+original palette, fonts and CSS, scoped to the CRM surface only. **Superseded for
+presentation (owner decision 2026-10-14):** the CRM now wears the JewelOS theme (tokens,
+type, controls, shell, light/dark) through `packages/crm-ui/src/crm-port/jewelos-theme.css`,
+appended last by `crm-port/document.tsx`. Fields, labels, order, vocabularies, flows,
+validation and calculations stay at parity; keep new CRM styling in that file and map
+colours to JewelOS `--color-*` variables. `sreejith-crm/` is
 a read-only reference, not a dependency: never import from it or build it, and never
 copy its `.env*`, `*.xlsx`, `migration-backups`, `migration-reports`, or Android
 build outputs. JewelOS login is the only CRM login; CRM identity resolves through

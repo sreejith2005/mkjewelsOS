@@ -72,7 +72,7 @@ export function EmbeddedCrmRoot({ bridge, supabaseUrl, supabaseAnonKey }: Embedd
   }, [broker, post]);
 
   const url = new URL(href);
-  return <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-gold">Loading…</div>}>
+  return <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-gold-secondary">Loading…</div>}>
     <CrmApp auth={auth} crmProject={crmProjectConfig} jewelosAccessToken={jewelosAccessToken} jewelosHomePath="/" navigate={navigate} onSignOut={onSignOut} path={url.pathname} search={url.search} supabase={supabase} />
   </Suspense>;
 }

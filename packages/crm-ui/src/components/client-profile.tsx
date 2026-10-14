@@ -1,4 +1,5 @@
 "use client";
+import { ResponsiveDisclosure } from '@/components/responsive-disclosure';
 import { ClientHistoryPager,type ClientHistoryPaging } from "@/components/client-history-pager";
 import { ClientActivity, type ClientActivityRow } from "@/components/client-activity";
 
@@ -153,6 +154,7 @@ function label(field: string) {
   return field.replaceAll("_", " ");
 }
 function LegacyProfileCard({ title, rows }: { title: string; rows: Array<[string, ReactNode]> }) {
+  if (!['CONTACT','VISIT STATISTICS'].includes(title)) return <ResponsiveDisclosure title={title} className="legacy-client-card"><div className="legacy-client-rows">{rows.map(([name,value])=><div className="legacy-client-row" key={name}><span>{name}</span><b>{value || 'NA'}</b></div>)}</div></ResponsiveDisclosure>;
   return <section className="legacy-client-card"><h2>{title}</h2><div className="legacy-client-rows">{rows.map(([name, value]) => <div className="legacy-client-row" key={name}><span>{name}</span><b>{value || "NA"}</b></div>)}</div></section>;
 }
 // Approved identity extension (2026-10-01): MKC / MKF / MKREF codes, family and referrer.
@@ -230,6 +232,7 @@ export function ClientProfile({
 }) {
   const [values, setValues] = useState(() => initial(client));
   const [tab, setTab] = useState<"profile" | "timeline" | "audit">("profile");
+  const [expandedHistory,setExpandedHistory]=useState<string|null>(null);
   const [editing, setEditing] = useState(false);
   const [message, setMessage] = useState("");
   const queryClient = useQueryClient();
@@ -293,7 +296,7 @@ export function ClientProfile({
     onError: (error) => setMessage(error instanceof z.ZodError && error.issues[0]?.path[0] === "primary_phone" ? error.issues[0].message : "Could not save the profile. Check the entered values and try again."),
   });
   if (!editing) {
-    const timelineRows = timeline.map((item) => <tr key={item.id}><td>{displayDate(item.created_at)}</td><td>{displayDate(item.event_date)}</td><td>{item.event_type}</td><td>{item.buy_status ?? "NA"}</td><td>{item.branch ?? "NA"}</td><td>{item.crm_name ?? "NA"}</td><td>{item.salesperson ?? "NA"}</td><td>{item.seen_categories.join(", ") || "NA"}</td><td>{item.bought_categories.join(", ") || "NA"}</td><td>{item.order_categories.join(", ") || "NA"}</td><td>{item.product_requirement ?? "NA"}</td><td>{item.remark ?? "NA"}</td><td>{item.reference_number ?? "NO REF"}</td></tr>);
+    const timelineRows = timeline.map((item) => <tr key={item.id} className={expandedHistory===item.id?"is-expanded":""}><td data-label="Timestamp">{displayDate(item.created_at)}<button type="button" className="crm-record-details" aria-expanded={expandedHistory===item.id} onClick={()=>setExpandedHistory(expandedHistory===item.id?null:item.id)}>{expandedHistory===item.id?"Less":"Details"}</button></td><td data-label="Visit date">{displayDate(item.event_date)}</td><td data-label="Event" data-secondary="true">{item.event_type}</td><td data-label="Purchase status">{item.buy_status ?? "NA"}</td><td data-label="Branch" data-secondary="true">{item.branch ?? "NA"}</td><td data-label="CRM" data-secondary="true">{item.crm_name ?? "NA"}</td><td data-label="Salesperson" data-secondary="true">{item.salesperson ?? "NA"}</td><td data-label="Seen" data-secondary="true">{item.seen_categories.join(", ") || "NA"}</td><td data-label="Bought" data-secondary="true">{item.bought_categories.join(", ") || "NA"}</td><td data-label="Order" data-secondary="true">{item.order_categories.join(", ") || "NA"}</td><td data-label="Product requirement" data-secondary="true">{item.product_requirement ?? "NA"}</td><td data-label="Remark" data-secondary="true">{item.remark ?? "NA"}</td><td data-label="Reference">{item.reference_number ?? "NO REF"}</td></tr>);
     return <main className="legacy-client-profile mx-auto max-w-7xl px-5 py-7">
       <div className="legacy-profile-grid">
         <aside className="legacy-profile-left">
@@ -321,13 +324,13 @@ export function ClientProfile({
             <LegacyProfileCard title="PRODUCT INTERESTS" rows={[["LAST SEEN CATEGORIES", client.last_seen_categories?.join(", ") ?? ""], ["LAST BOUGHT CATEGORIES", client.last_bought_categories?.join(", ") ?? ""], ["LAST ORDER CATEGORIES", client.last_order_categories?.join(", ") ?? ""]]} />
             <LegacyProfileCard title="POTENTIAL" rows={[["CLIENT POTENTIAL CATEGORY", client.client_potential_category ?? ""], ["HIGH POTENTIAL REASON", client.high_potential_reason ?? ""], ["PROFILE LAST UPDATED ON", displayDate(client.profile_updated_at)]]} />
           </div>
-          <section className="legacy-timeline-card"><h2>FULL TIMELINE HISTORY</h2><div className="overflow-x-auto"><table><thead><tr>{["TIMESTAMP", "CLIENT VISIT DATE", "EVENT TYPE", "BUY STATUS", "BRANCH", "CRM", "SALESPERSON", "SEEN", "BOUGHT", "ORDER", "PRODUCT REQUIREMENT", "REMARK", "REFERENCE NUMBER"].map((heading) => <th key={heading}>{heading}</th>)}</tr></thead><tbody>{timelineRows.length ? timelineRows : <tr><td colSpan={13}>NO TIMELINE FOUND.</td></tr>}</tbody></table></div></section>
+          <section className="legacy-timeline-card"><h2>FULL TIMELINE HISTORY</h2><div className="overflow-x-auto"><table className="crm-record-table"><thead><tr>{["TIMESTAMP", "CLIENT VISIT DATE", "EVENT TYPE", "BUY STATUS", "BRANCH", "CRM", "SALESPERSON", "SEEN", "BOUGHT", "ORDER", "PRODUCT REQUIREMENT", "REMARK", "REFERENCE NUMBER"].map((heading) => <th key={heading}>{heading}</th>)}</tr></thead><tbody>{timelineRows.length ? timelineRows : <tr><td colSpan={13}>NO TIMELINE FOUND.</td></tr>}</tbody></table></div></section>
           {historyPaging&&<ClientHistoryPager clientId={client.client_id} section="visits" paging={historyPaging}/>}
           <ClientActivity clientId={client.client_id} activity={activity} fieldLabels={leadFieldLabels} actorNames={activityActorNames} branchNames={activityBranchNames} summary={activitySummary} />
 
           {historyPaging&&<ClientHistoryPager clientId={client.client_id} section="activity" paging={historyPaging}/>}
           <WalkinHistory visits={savedWalkins} />
-          <section className="legacy-audit-card">{historyPaging&&<ClientHistoryPager clientId={client.client_id} section="audit" paging={historyPaging}/>}<h2>PROFILE EDIT LOG</h2>{audit.length ? <div className="overflow-x-auto"><table><thead><tr><th>FIELD</th><th>OLD VALUE</th><th>NEW VALUE</th><th>UPDATED BY</th><th>UPDATED ON</th></tr></thead><tbody>{audit.map((item) => <tr key={item.id}><td>{label(item.field_name)}</td><td>{JSON.stringify(item.old_value)}</td><td>{JSON.stringify(item.new_value)}</td><td>{item.editor ?? "SYSTEM"}</td><td>{displayDate(item.created_at)}</td></tr>)}</tbody></table></div> : <p>NO PROFILE EDITS YET.</p>}</section>
+          <section className="legacy-audit-card">{historyPaging&&<ClientHistoryPager clientId={client.client_id} section="audit" paging={historyPaging}/>}<h2>PROFILE EDIT LOG</h2>{audit.length ? <div className="overflow-x-auto"><table className="crm-record-table"><thead><tr><th>FIELD</th><th>OLD VALUE</th><th>NEW VALUE</th><th>UPDATED BY</th><th>UPDATED ON</th></tr></thead><tbody>{audit.map((item) => <tr key={item.id}><td data-label="Field">{label(item.field_name)}</td><td data-label="Old value">{JSON.stringify(item.old_value)}</td><td data-label="New value">{JSON.stringify(item.new_value)}</td><td data-label="Updated by">{item.editor ?? "SYSTEM"}</td><td data-label="Updated on">{displayDate(item.created_at)}</td></tr>)}</tbody></table></div> : <p>NO PROFILE EDITS YET.</p>}</section>
         </section>
       </div>
     </main>;

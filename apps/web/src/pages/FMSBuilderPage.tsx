@@ -33,7 +33,7 @@ const FILTERS: Array<{ id: Filter; label: string }> = [
   { id: "archived", label: "Archived" },
 ];
 const STATE_STYLES: Record<FlowState, string> = {
-  live: "border-gold/40 bg-gold/15 text-gold",
+  live: "border-gold/40 bg-gold/15 text-gold-secondary",
   paused: "border-soft-grey/40 bg-charcoal text-soft-grey",
   draft: "border-champagne/30 bg-champagne/10 text-champagne",
   archived: "border-soft-grey/30 bg-charcoal text-soft-grey",
@@ -164,9 +164,9 @@ export function FMSBuilderPage() {
     <section className="mx-auto w-full max-w-7xl space-y-5">
       <header className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-gold/30 bg-gold/15 p-5 sm:p-6">
         <div className="flex min-w-0 items-center gap-3">
-          <GitBranch className="size-7 shrink-0 text-gold" />
+          <GitBranch className="size-7 shrink-0 text-gold-secondary" />
           <div className="min-w-0">
-            <h1 className="text-xl font-semibold text-white sm:text-2xl">FMS</h1>
+            <h1 className="font-display text-2xl font-semibold leading-tight text-white sm:text-[1.85rem]">FMS</h1>
             <p className="text-sm text-soft-grey">Every workflow in one place — start it, run its tasks, edit, pause, or remove it.</p>
           </div>
         </div>
@@ -181,7 +181,7 @@ export function FMSBuilderPage() {
       <div className="flex flex-wrap gap-2">
         {FILTERS.map((item) => (
           <button
-            className={filter === item.id ? "min-h-11 rounded-full border border-gold bg-gold px-4 py-2 text-sm font-semibold text-obsidian" : "min-h-11 rounded-full border border-gold/25 px-4 py-2 text-sm font-semibold text-champagne hover:bg-gold/10"}
+            className={filter === item.id ? "min-h-11 rounded-full border border-gold bg-gold px-4 py-2 text-sm font-semibold text-on-gold" : "min-h-11 rounded-full border border-gold/25 px-4 py-2 text-sm font-semibold text-champagne hover:bg-gold/10"}
             key={item.id}
             onClick={() => setFilter(item.id)}
             type="button"

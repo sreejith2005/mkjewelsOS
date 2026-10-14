@@ -14,13 +14,13 @@ const FIT_PADDING = 80;
 const DRAG_THRESHOLD = 4;
 
 const appearance: Record<FmsStageDefinition["type"], { Icon: typeof CheckSquare; label: string; className: string }> = {
-  task: { Icon: CheckSquare, label: "Step", className: "border-gold/40 bg-gold/10 text-gold" },
+  task: { Icon: CheckSquare, label: "Step", className: "border-gold/40 bg-gold/10 text-gold-secondary" },
   form: { Icon: FileText, label: "Form", className: "border-success/40 bg-success/10 text-success" },
-  approval: { Icon: ShieldCheck, label: "Approval", className: "border-gold/50 bg-gold/15 text-gold" },
+  approval: { Icon: ShieldCheck, label: "Approval", className: "border-gold/50 bg-gold/15 text-gold-secondary" },
   branch: { Icon: GitBranch, label: "Decision", className: "border-danger/40 bg-danger/10 text-danger" },
   parallel_start: { Icon: Layers, label: "Split", className: "border-gold/40 bg-charcoal text-champagne" },
   parallel_join: { Icon: Merge, label: "Join", className: "border-gold/40 bg-charcoal text-champagne" },
-  notification: { Icon: Zap, label: "Notify", className: "border-gold/40 bg-gold/5 text-gold" },
+  notification: { Icon: Zap, label: "Notify", className: "border-gold/40 bg-gold/5 text-gold-secondary" },
   end: { Icon: Flag, label: "End", className: "border-success/40 bg-success/10 text-success" },
 };
 
@@ -308,17 +308,17 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
     tabIndex={0}
   >
     <div className="absolute right-3 top-3 z-30 flex gap-1 rounded-lg border border-gold/20 bg-charcoal p-1" data-canvas-control>
-      <button aria-label="Zoom out" className="rounded p-2 text-gold hover:bg-gold/10 max-md:p-2.5" onClick={() => zoomAt(1 / ZOOM_STEP)} type="button"><Minus className="size-4" /></button>
+      <button aria-label="Zoom out" className="rounded p-2 text-gold-secondary hover:bg-gold/10 max-md:p-2.5" onClick={() => zoomAt(1 / ZOOM_STEP)} type="button"><Minus className="size-4" /></button>
       <span className="grid min-w-12 place-items-center text-xs text-champagne">{Math.round(zoom * 100)}%</span>
-      <button aria-label="Zoom in" className="rounded p-2 text-gold hover:bg-gold/10 max-md:p-2.5" onClick={() => zoomAt(ZOOM_STEP)} type="button"><Plus className="size-4" /></button>
-      <button aria-label="Fit workflow to view" className="rounded p-2 text-gold hover:bg-gold/10 max-md:p-2.5" onClick={fitView} type="button"><Maximize className="size-4" /></button>
-      <button aria-label="Auto-arrange workflow" className="rounded p-2 text-gold hover:bg-gold/10 max-md:p-2.5" onClick={() => { setOffsets({}); onMove(Object.fromEntries(layout)); }} type="button"><LayoutGrid className="size-4" /></button>
-      {isPhone ? <button aria-expanded={hintOpen} aria-label="How to use the map" className={cn("rounded p-2.5 text-gold hover:bg-gold/10", hintOpen && "bg-gold/15")} onClick={() => setHintOpen((open) => !open)} type="button"><CircleHelp className="size-4" /></button> : null}
+      <button aria-label="Zoom in" className="rounded p-2 text-gold-secondary hover:bg-gold/10 max-md:p-2.5" onClick={() => zoomAt(ZOOM_STEP)} type="button"><Plus className="size-4" /></button>
+      <button aria-label="Fit workflow to view" className="rounded p-2 text-gold-secondary hover:bg-gold/10 max-md:p-2.5" onClick={fitView} type="button"><Maximize className="size-4" /></button>
+      <button aria-label="Auto-arrange workflow" className="rounded p-2 text-gold-secondary hover:bg-gold/10 max-md:p-2.5" onClick={() => { setOffsets({}); onMove(Object.fromEntries(layout)); }} type="button"><LayoutGrid className="size-4" /></button>
+      {isPhone ? <button aria-expanded={hintOpen} aria-label="How to use the map" className={cn("rounded p-2.5 text-gold-secondary hover:bg-gold/10", hintOpen && "bg-gold/15")} onClick={() => setHintOpen((open) => !open)} type="button"><CircleHelp className="size-4" /></button> : null}
     </div>
     {isPhone ? (hintOpen ? <p className="pointer-events-none absolute inset-x-3 top-16 z-30 rounded-2xl border border-gold/20 bg-charcoal/95 px-3 py-2 text-xs leading-relaxed text-soft-grey">
       Tap a card to edit it · drag a card to move it · drag empty space to pan · pinch to zoom · drag a card&rsquo;s right dot onto another card to connect · tap a connection, then its &times; to remove it
     </p> : null) : <p className="pointer-events-none absolute left-4 top-4 z-30 flex max-w-[min(30rem,60%)] items-center gap-2 rounded-2xl border border-gold/20 bg-charcoal/95 px-3 py-1.5 text-xs text-soft-grey">
-      <MousePointer2 className="size-3 shrink-0 text-gold" />Drag a card to move it · drag empty space to pan · Shift+drag to select several · scroll to move, Ctrl+scroll to zoom · drag a card&rsquo;s right dot onto another card to connect, or drag a connection&rsquo;s arrow end to move it
+      <MousePointer2 className="size-3 shrink-0 text-gold-secondary" />Drag a card to move it · drag empty space to pan · Shift+drag to select several · scroll to move, Ctrl+scroll to zoom · drag a card&rsquo;s right dot onto another card to connect, or drag a connection&rsquo;s arrow end to move it
     </p>}
 
     <div className={cn("absolute inset-0 overflow-hidden", connecting ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing")}>
@@ -336,7 +336,7 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
             const label = `${route.isReturn ? "↩ " : ""}${edge.label ?? (route.isReturn ? "Return" : "")}`;
             const maxLabelChars = Math.max(5, Math.floor((labelWidth - 16) / 6.4));
             const description = `${route.isReturn ? "Return: " : ""}${nameOf(edge.from)} → ${nameOf(edge.to)}${edge.label ? `: ${edge.label}` : ""}`;
-            return <g className={edge.kind === "branch" ? "text-danger" : edge.kind === "parallel" ? "text-champagne" : "text-gold"} key={id}>
+            return <g className={edge.kind === "branch" ? "text-danger" : edge.kind === "parallel" ? "text-champagne" : "text-gold-secondary"} key={id}>
               <path aria-label={description} role="button" tabIndex={0} className="pointer-events-auto cursor-pointer" d={path} data-edge-hit={id} fill="none" onClick={() => setSelectedEdge(id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedEdge(id); } }} onPointerEnter={() => setHoveredEdge(id)} onPointerLeave={(event) => { if (event.pointerType === "mouse") setHoveredEdge((current) => current === id ? null : current); }} stroke="transparent" strokeWidth="24"><title>{description}</title></path>
               <path d={path} fill="none" markerEnd="url(#fms-arrow)" stroke="currentColor" strokeDasharray={edge.kind === "parallel" ? "4 4" : undefined} strokeOpacity={active ? 1 : selectedEdge && selectedEdge !== id ? 0.25 : connected ? 0.95 : 0.7} strokeWidth={active ? 2.5 : 1.8} />
               {label ? <g><rect fill="rgb(var(--color-charcoal))" height="18" rx="9" stroke="currentColor" strokeOpacity="0.4" width={labelWidth} x={midX - labelWidth / 2} y={midY - 9} /><text fill="currentColor" fontSize="11" textAnchor="middle" x={midX} y={midY + 4}>{label.length > maxLabelChars ? `${label.slice(0, maxLabelChars - 1)}\u2026` : label}</text><title>{description}</title></g> : null}
@@ -347,8 +347,8 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
               {active ? <circle className="pointer-events-auto cursor-crosshair" cx={endX - 10} cy={endY} data-edge-from={edge.from} data-edge-rule={edge.ruleId ?? ""} data-edge-to={edge.to} fill="rgb(var(--color-charcoal))" onPointerEnter={() => setHoveredEdge(id)} r="7" stroke="currentColor" strokeWidth="2"><title>{`Drag to move this connection onto another step`}</title></circle> : null}
             </g>;
           })}
-          {marquee ? <rect className="text-gold" fill="currentColor" fillOpacity="0.08" height={marquee.height} rx="4" stroke="currentColor" strokeDasharray="4 4" strokeWidth="1.5" width={marquee.width} x={marquee.x} y={marquee.y} /> : null}
-          {connecting ? <path className="text-gold" d={curve(position(connecting.from).x + NODE_WIDTH, position(connecting.from).y + NODE_HEIGHT / 2, connecting.x, connecting.y)} fill="none" markerEnd="url(#fms-arrow)" stroke="currentColor" strokeDasharray="5 5" strokeWidth="2" /> : null}
+          {marquee ? <rect className="text-gold-secondary" fill="currentColor" fillOpacity="0.08" height={marquee.height} rx="4" stroke="currentColor" strokeDasharray="4 4" strokeWidth="1.5" width={marquee.width} x={marquee.x} y={marquee.y} /> : null}
+          {connecting ? <path className="text-gold-secondary" d={curve(position(connecting.from).x + NODE_WIDTH, position(connecting.from).y + NODE_HEIGHT / 2, connecting.x, connecting.y)} fill="none" markerEnd="url(#fms-arrow)" stroke="currentColor" strokeDasharray="5 5" strokeWidth="2" /> : null}
         </svg>
 
         {definition.stages.map((stage) => {
@@ -372,12 +372,12 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
             key={stage.key}
             style={{ height: NODE_HEIGHT, left: point.x, top: point.y, width: NODE_WIDTH }}
           >
-            {isFirst ? <span className="pointer-events-none absolute -top-7 left-0 rounded-md border border-gold/30 bg-charcoal px-2 py-1 text-[10px] font-semibold text-gold">Starts here</span> : null}
+            {isFirst ? <span className="pointer-events-none absolute -top-7 left-0 rounded-md border border-gold/30 bg-charcoal px-2 py-1 text-[10px] font-semibold text-gold-secondary">Starts here</span> : null}
             {isLeaf ? <span className="pointer-events-none absolute -bottom-7 left-0 rounded-md border border-success/30 bg-charcoal px-2 py-1 text-[10px] font-semibold text-success">Completes here</span> : null}
             <div className="mb-2 flex items-center justify-between gap-1">
               <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide", item.className)}><item.Icon className="size-3" />{stage.sla.decisionMode === "yes_no" || stage.sla.decisionMode === "decision" ? "Decision" : item.label}</span>
               <span className="flex gap-1" data-canvas-control>
-                <button aria-label={`Duplicate ${stage.name}`} className="rounded p-1 text-soft-grey hover:bg-gold/10 hover:text-gold" onClick={() => onDuplicate(stage.key)} type="button"><Copy className="size-3.5" /></button>
+                <button aria-label={`Duplicate ${stage.name}`} className="rounded p-1 text-soft-grey hover:bg-gold/10 hover:text-gold-secondary" onClick={() => onDuplicate(stage.key)} type="button"><Copy className="size-3.5" /></button>
                 <button aria-label={`Delete ${stage.name}`} className="rounded p-1 text-soft-grey hover:bg-danger/10 hover:text-danger" onClick={() => onDelete(stage.key)} type="button"><Trash2 className="size-3.5" /></button>
               </span>
             </div>
@@ -391,7 +391,7 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
               data-node-output={stage.key}
               type="button"
             ><span className={cn("size-4 rounded-full border-2 border-charcoal shadow transition hover:scale-125", routed ? "bg-danger" : "bg-gold")} /></button> : null}
-            {canAppend ? <button aria-label={`Add next step after ${stage.name}`} className="absolute -right-14 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-full border border-gold/40 bg-charcoal text-gold shadow transition hover:bg-gold hover:text-obsidian" data-canvas-control onClick={() => onAddAfter(stage.key)} type="button"><Plus className="size-4" /></button> : null}
+            {canAppend ? <button aria-label={`Add next step after ${stage.name}`} className="absolute -right-14 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-full border border-gold/40 bg-charcoal text-gold-secondary shadow transition hover:bg-gold hover:text-on-gold" data-canvas-control onClick={() => onAddAfter(stage.key)} type="button"><Plus className="size-4" /></button> : null}
           </article>;
         })}
       </div>
@@ -399,6 +399,6 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
 
     {edgeDetails ? <div className="absolute bottom-3 left-3 right-3 z-30 rounded-xl border border-gold/30 bg-charcoal p-3 text-sm text-champagne" data-canvas-control><p className="font-semibold">{nameOf(edgeDetails.from)} → {nameOf(edgeDetails.to)}</p><p className="text-xs text-soft-grey">{edgeDetails.label || "Continue to next step"}</p><button className="mt-2 text-xs text-danger" onClick={() => { onDisconnect(edgeDetails.from, edgeDetails.to, edgeDetails.ruleId); setSelectedEdge(null); }} type="button">Remove connection</button></div> : null}
     {selection.length > 1 ? <p className="pointer-events-none absolute bottom-3 left-4 z-30 rounded-full border border-gold/20 bg-charcoal/95 px-3 py-1 text-xs text-champagne">{selection.length} steps selected &middot; drag to move them together</p> : null}
-    {connecting ? <p className="pointer-events-none absolute bottom-3 right-4 z-30 rounded-full border border-gold/40 bg-charcoal px-3 py-1 text-xs text-gold">Drop on a step to connect &middot; release on empty space to cancel</p> : null}
+    {connecting ? <p className="pointer-events-none absolute bottom-3 right-4 z-30 rounded-full border border-gold/40 bg-charcoal px-3 py-1 text-xs text-gold-secondary">Drop on a step to connect &middot; release on empty space to cancel</p> : null}
   </div>;
 }

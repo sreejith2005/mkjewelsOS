@@ -104,22 +104,22 @@
   /* Listings: compact tables swiped sideways inside their box (the page itself never pans).
      --crm-columns (set by crm-port/mobile-tables.ts) gives each column room, so short values sit
      on one line and long remarks wrap. */
-  #crm-mobile .crm-app [class*="overflow-x-auto"]:has(> table[data-crm-cards]) { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
-  #crm-mobile .crm-app table[data-crm-cards] { width: 100%; min-width: calc(var(--crm-columns, 8) * 5.6rem) !important; max-width: none; font-size: 11px; line-height: 1.35; }
-  #crm-mobile .crm-app table[data-crm-cards] > thead > tr > th { padding: .5rem .5rem !important; font-size: 9.5px; letter-spacing: .04em; white-space: nowrap; vertical-align: bottom; }
-  #crm-mobile .crm-app table[data-crm-cards] > tbody > tr > td { min-width: 5.5rem; padding: .45rem .5rem !important; font-size: 11px; line-height: 1.35; vertical-align: top; overflow-wrap: break-word; }
-  #crm-mobile .crm-app table[data-crm-cards] > tbody > tr:nth-child(even) > td { background: #fafafa; }
-  #crm-mobile .crm-app table[data-crm-cards] > tbody > tr > td .flex.gap-1:not(.flex-col) { flex-wrap: nowrap; gap: .2rem; }
-  #crm-mobile .crm-app table[data-crm-cards] > tbody > tr > td .flex.gap-1 > span { padding-inline: .2rem; font-size: 9px; white-space: nowrap; }
-  #crm-mobile .crm-app table[data-crm-cards] > tbody > tr > td[data-label]:not([data-crm-long]):not(:last-child) { white-space: nowrap; }
-  #crm-mobile .crm-app table[data-crm-cards] > tbody > tr > td[data-crm-long] { min-width: 11rem; }
+  #crm-mobile .crm-app [class*="overflow-x-auto"]:has(> table[data-crm-cards]:not(.crm-record-table)) { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+  #crm-mobile .crm-app table[data-crm-cards]:not(.crm-record-table) { width: 100%; min-width: calc(var(--crm-columns, 8) * 5.6rem) !important; max-width: none; font-size: 11px; line-height: 1.35; }
+  #crm-mobile .crm-app table[data-crm-cards]:not(.crm-record-table) > thead > tr > th { padding: .5rem .5rem !important; font-size: 9.5px; letter-spacing: .04em; white-space: nowrap; vertical-align: bottom; }
+  #crm-mobile .crm-app table[data-crm-cards]:not(.crm-record-table) > tbody > tr > td { min-width: 5.5rem; padding: .45rem .5rem !important; font-size: 11px; line-height: 1.35; vertical-align: top; overflow-wrap: break-word; }
+  #crm-mobile .crm-app table[data-crm-cards]:not(.crm-record-table) > tbody > tr:nth-child(even) > td { background: #fafafa; }
+  #crm-mobile .crm-app table[data-crm-cards]:not(.crm-record-table) > tbody > tr > td .flex.gap-1:not(.flex-col) { flex-wrap: nowrap; gap: .2rem; }
+  #crm-mobile .crm-app table[data-crm-cards]:not(.crm-record-table) > tbody > tr > td .flex.gap-1 > span { padding-inline: .2rem; font-size: 9px; white-space: nowrap; }
+  #crm-mobile .crm-app table[data-crm-cards]:not(.crm-record-table) > tbody > tr > td[data-label]:not([data-crm-long]):not(:last-child) { white-space: nowrap; }
+  #crm-mobile .crm-app table[data-crm-cards]:not(.crm-record-table) > tbody > tr > td[data-crm-long] { min-width: 11rem; }
   /* Row buttons: small and side by side, so a row stays one or two lines tall; an opened
      follow-up form keeps a usable width. */
-  #crm-mobile .crm-app table[data-crm-cards] button, #crm-mobile .crm-app table[data-crm-cards] a.rounded.border { min-height: 1.9rem; padding: .25rem .5rem; font-size: 9.5px; line-height: 1.2; white-space: nowrap; }
-  #crm-mobile .crm-app table[data-crm-cards] > tbody > tr > td:last-child .flex-col { flex-direction: row; gap: .3rem; }
-  #crm-mobile .crm-app table[data-crm-cards] > tbody > tr > td:last-child .flex-col > * { display: flex; align-items: center; justify-content: center; text-align: center; }
-  #crm-mobile .crm-app table[data-crm-cards] > tbody > tr > td:last-child form { min-width: 13rem; font-size: 11px; }
-  #crm-mobile .crm-app table[data-crm-cards] > tbody > tr > td:last-child form button { width: 100%; min-height: 2.3rem; font-size: .72rem; }
+  #crm-mobile .crm-app table[data-crm-cards]:not(.crm-record-table) button, #crm-mobile .crm-app table[data-crm-cards]:not(.crm-record-table) a.rounded.border { min-height: 1.9rem; padding: .25rem .5rem; font-size: 9.5px; line-height: 1.2; white-space: nowrap; }
+  #crm-mobile .crm-app table[data-crm-cards]:not(.crm-record-table) > tbody > tr > td:last-child .flex-col { flex-direction: row; gap: .3rem; }
+  #crm-mobile .crm-app table[data-crm-cards]:not(.crm-record-table) > tbody > tr > td:last-child .flex-col > * { display: flex; align-items: center; justify-content: center; text-align: center; }
+  #crm-mobile .crm-app table[data-crm-cards]:not(.crm-record-table) > tbody > tr > td:last-child form { min-width: 13rem; font-size: 11px; }
+  #crm-mobile .crm-app table[data-crm-cards]:not(.crm-record-table) > tbody > tr > td:last-child form button { width: 100%; min-height: 2.3rem; font-size: .72rem; }
 
   /* Pagers and badges stay tappable and readable. */
   #crm-mobile .crm-app nav[aria-label="Client pages"] a { display: inline-flex; min-height: 2.75rem; align-items: center; padding-inline: 1rem; }

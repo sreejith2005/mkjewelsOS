@@ -4,6 +4,8 @@ import {
   CalendarCheck,
   CheckSquare,
   ClipboardList,
+  Eye,
+  EyeOff,
   FileSpreadsheet,
   FolderCheck,
   GitBranch,
@@ -11,6 +13,7 @@ import {
   LayoutDashboard,
   ListChecks,
   ListFilter,
+  Loader2,
   Settings,
   Sparkles,
   Users,
@@ -30,10 +33,10 @@ import { AuthProvider, useAuth } from "@/auth/AuthContext";
 import { supabase } from "@jewelos/api-client";
 import { Button, Notice } from "@/components/ui";
 import { ApplicationShell } from "@/components/shell/ApplicationShell";
+import { AuthLayout, BrandedLoading, PageLoading } from "@/components/shell/BrandScreens";
 import { LazyPageErrorBoundary } from "@/components/LazyPageErrorBoundary";
 import { crmProjectConfig } from "@/lib/crmProject";
 import { lazyPage } from "@/lib/lazyPage";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { DailyChecklistManager } from "@/features/daily-checklists/DailyChecklistManager";
 import { useKiaraEscalationBadge } from "@/features/assistant/useKiaraEscalationBadge";
 import { DailyChecklistGate } from "@/features/daily-checklists/DailyChecklistGate";
@@ -44,8 +47,8 @@ import { SectionMaintenanceNotice } from "@/components/SectionMaintenanceNotice"
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { saveSectionControls } from "@/features/settings/api";
 import type { MobileNavigationDrawerItem } from "@/components/shell/MobileNavigationDrawer";
-import logoDarkUrl from "../../../mk-jewels-logos/WhatsApp Image 2026-06-24 at 13.01.41 (1).jpeg";
-import logoLightUrl from "../../../mk-jewels-logos/WhatsApp Image 2026-06-24 at 13.01.40 (1).jpeg";
+// Transparent gold wordmark cut from the MK Jewels logo, so it sits on any surface in both themes.
+import wordmarkUrl from "@/assets/mk-jewels-wordmark.png";
 import { Toaster, toast } from "sonner";
 
 const AvailabilityPage = lazyPage("availability", () => import("@/pages/AvailabilityPage").then((module) => ({ default: module.AvailabilityPage })));
@@ -134,6 +137,7 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -149,42 +153,46 @@ function LoginPage() {
   };
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center bg-obsidian px-5 py-10">
-      <ThemeToggle className="absolute right-4 top-4" onChange={setTheme} theme={theme} />
-      <section className="glass-card w-full max-w-md rounded-2xl p-7 sm:p-9">
-        <img alt="MK Jewels" className="mx-auto mb-8 h-14 w-auto object-contain" src={logoDarkUrl} />
-        <p className="mb-6 text-center text-sm text-soft-grey">Sign in to JewelOS</p>
+    <AuthLayout onThemeChange={setTheme} theme={theme}>
+        <h1 className="text-center font-display text-3xl font-semibold text-white">Welcome back</h1>
+        <p className="mb-6 mt-1 text-center text-sm text-soft-grey">Sign in to JewelOS</p>
         {statusMessage ? <div className="mb-5"><Notice tone="danger">{statusMessage}</Notice></div> : null}
         {error ? <div className="mb-5"><Notice tone="danger">{error}</Notice></div> : null}
         <form className="space-y-4" onSubmit={submit}>
           <label className="block">
             <span className="label">Username or work email</span>
             <input
+              autoCapitalize="none"
               autoComplete="username"
               className="field"
               onChange={(event) => setUsername(event.target.value.toLowerCase())}
               required
+              spellCheck={false}
               value={username}
             />
           </label>
           <label className="block">
             <span className="label">Password</span>
-            <input
-              autoComplete="current-password"
-              className="field"
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              type="password"
-              value={password}
-            />
+            <span className="relative block">
+              <input
+                autoComplete="current-password"
+                className="field pr-12"
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                type={showPassword ? "text" : "password"}
+                value={password}
+              />
+              <button aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-r-lg text-task-text-muted transition-colors hover:text-gold-secondary" onClick={() => setShowPassword((shown) => !shown)} type="button">
+                {showPassword ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
+              </button>
+            </span>
           </label>
-          <Button className="mt-2 w-full" disabled={submitting} type="submit">
-            {submitting ? "Signing in…" : "Sign in"}
+          <Button className="mt-2 min-h-12 w-full text-base" disabled={submitting} type="submit">
+            {submitting ? <><Loader2 className="size-4 animate-spin" />Signing in…</> : "Sign in"}
           </Button>
           <p className="text-center text-xs text-soft-grey">For a password reset, contact your Super Admin.</p>
         </form>
-      </section>
-    </main>
+    </AuthLayout>
   );
 }
 
@@ -210,29 +218,25 @@ function ResetPasswordPage() {
     setSuccess(true);
   };
 
-  return <main className="relative flex min-h-screen items-center justify-center bg-obsidian px-5 py-10">
-    <ThemeToggle className="absolute right-4 top-4" onChange={setTheme} theme={theme} />
-    <section className="glass-card w-full max-w-md rounded-2xl p-7 sm:p-9">
-      <img alt="MK Jewels" className="mx-auto mb-8 h-14 w-auto object-contain" src={logoDarkUrl} />
-      <h1 className="mb-2 text-center font-display text-2xl text-gold">Set your password</h1>
+  return <AuthLayout onThemeChange={setTheme} theme={theme}>
+      <h1 className="mb-1 text-center font-display text-3xl font-semibold text-white">Set your password</h1>
       <p className="mb-6 text-center text-sm text-soft-grey">Choose a new password for your JewelOS account.</p>
       {error ? <div className="mb-5"><Notice tone="danger">{error}</Notice></div> : null}
       {success ? <div className="space-y-5"><Notice tone="success">Password updated. You can now sign in.</Notice><Button className="w-full" onClick={() => void logout()}>Return to sign in</Button></div> : <form className="space-y-4" onSubmit={submit}>
         <label className="block"><span className="label">New password</span><input autoComplete="new-password" className="field" minLength={8} onChange={(event) => setPassword(event.target.value)} required type="password" value={password} /></label>
         <label className="block"><span className="label">Confirm new password</span><input autoComplete="new-password" className="field" minLength={8} onChange={(event) => setConfirmPassword(event.target.value)} required type="password" value={confirmPassword} /></label>
-        <Button className="mt-2 w-full" disabled={submitting} type="submit">{submitting ? "Updating…" : "Update password"}</Button>
+        <Button className="mt-2 min-h-12 w-full text-base" disabled={submitting} type="submit">{submitting ? "Updating…" : "Update password"}</Button>
       </form>}
-    </section>
-  </main>;
+  </AuthLayout>;
 }
 
 function IncompleteAccount() {
   const { logout, statusMessage } = useAuth();
   return (
-    <main className="flex min-h-screen items-center justify-center px-5">
-      <section className="glass-card max-w-lg rounded-2xl p-8 text-center">
-        <Building2 className="mx-auto mb-4 h-10 w-10 text-gold" />
-        <h1 className="font-display text-3xl text-gold">Account setup incomplete</h1>
+    <main className="flex min-h-[100dvh] items-center justify-center bg-obsidian px-5">
+      <section className="glass-card max-w-lg rounded-3xl p-8 text-center duration-500 animate-in fade-in slide-in-from-bottom-4">
+        <span className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-gold-sheen text-on-gold shadow-gold"><Building2 className="size-7" /></span>
+        <h1 className="font-display text-3xl font-semibold text-gold-secondary">Account setup incomplete</h1>
         <p className="mt-3 text-sm text-champagne">{statusMessage}</p>
         <Button className="mt-6" onClick={() => void logout()} variant="secondary">Sign out</Button>
       </section>
@@ -342,7 +346,7 @@ function AppShell() {
     return (
       <>
         <LazyPageErrorBoundary onNavigate={navigate} resetKey={path}>
-          <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-gold">Loading…</div>}>
+          <Suspense fallback={<BrandedLoading label="Opening CRM…" />}>
             <CrmApp crmProject={crmProjectConfig} jewelosHomePath="/" navigate={navigate} onSignOut={logout} path={path} search={search} supabase={supabase} />
           </Suspense>
         </LazyPageErrorBoundary>
@@ -358,11 +362,11 @@ function AppShell() {
       branch={branch}
       currentPage={currentPage}
       developerModeActive={isSuperAdmin && sectionControls.developer_mode_enabled}
-      developerModeControl={isSuperAdmin ? <button aria-checked={sectionControls.developer_mode_enabled} className={`relative flex h-8 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition ${sectionControls.developer_mode_enabled ? "border-gold bg-gold text-obsidian" : "border-gold/30 text-gold hover:bg-gold/10"}`} disabled={savingSectionControls} onClick={() => void persistSectionControls({ ...sectionControls, developer_mode_enabled: !sectionControls.developer_mode_enabled })} role="switch" type="button"><span className={`size-2 rounded-full ${sectionControls.developer_mode_enabled ? "bg-obsidian" : "bg-task-text-muted"}`} />Developer Mode{disabledSectionCount ? ` · ${disabledSectionCount} off` : ""}</button> : undefined}
+      developerModeControl={isSuperAdmin ? <button aria-checked={sectionControls.developer_mode_enabled} className={`relative flex h-8 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition ${sectionControls.developer_mode_enabled ? "border-gold bg-gold text-on-gold" : "border-gold/30 text-gold-secondary hover:bg-gold/10"}`} disabled={savingSectionControls} onClick={() => void persistSectionControls({ ...sectionControls, developer_mode_enabled: !sectionControls.developer_mode_enabled })} role="switch" type="button"><span className={`size-2 rounded-full ${sectionControls.developer_mode_enabled ? "bg-obsidian" : "bg-task-text-muted"}`} />Developer Mode{disabledSectionCount ? ` · ${disabledSectionCount} off` : ""}</button> : undefined}
       developerSectionControls={isSuperAdmin ? <nav aria-label="Developer Mode section controls" className="scroll-x no-scrollbar flex gap-2 pb-1">{nav.map((item) => <label className="flex shrink-0 items-center gap-2 rounded-full border border-gold/20 px-3 py-1.5 text-xs text-champagne" key={item.id}><span>{item.label}</span><button aria-checked={sectionControls.section_availability[item.id]} aria-label={`${item.label} availability`} className={`relative h-5 w-9 rounded-full transition ${sectionControls.section_availability[item.id] ? "bg-success" : "bg-task-overdue"}`} disabled={savingSectionControls} onClick={() => void persistSectionControls({ ...sectionControls, section_availability: { ...sectionControls.section_availability, [item.id]: !sectionControls.section_availability[item.id] } })} role="switch" type="button"><span className={`absolute top-0.5 size-4 rounded-full bg-task-bg transition ${sectionControls.section_availability[item.id] ? "left-4" : "left-0.5"}`} /></button></label>)}</nav> : undefined}
       launcherItems={launcherItems}
-      logoDarkUrl={logoDarkUrl}
-      logoLightUrl={logoLightUrl}
+      logoDarkUrl={wordmarkUrl}
+      logoLightUrl={wordmarkUrl}
       drawerOpen={drawerOpen}
       nav={nav}
       navigate={navigate}
@@ -376,7 +380,7 @@ function AppShell() {
       onThemeChange={setTheme}
       fullBleed={FULL_WIDTH_PAGES.has(currentPage)}
     >
-      <LazyPageErrorBoundary onNavigate={navigate} resetKey={path}><Suspense fallback={<div className="flex min-h-48 items-center justify-center text-gold">Loading…</div>}>{pageContent}</Suspense></LazyPageErrorBoundary>
+      <LazyPageErrorBoundary onNavigate={navigate} resetKey={path}><Suspense fallback={<PageLoading />}>{pageContent}</Suspense></LazyPageErrorBoundary>
     </ApplicationShell>
     {canUseGlobalVoice ? <GlobalVoiceTaskButton profile={profile} raised={currentPage === "checklist_tasks"} /> : null}
     <DailyChecklistGate profileId={profile.id} />
@@ -387,7 +391,7 @@ function AppShell() {
 function AuthenticatedApp() {
   const { status } = useAuth();
   if (status === "loading") {
-    return <main className="flex min-h-screen items-center justify-center text-gold">Loading JewelOS…</main>;
+    return <BrandedLoading label="Loading JewelOS…" />;
   }
   if (status === "incomplete") return <IncompleteAccount />;
   if (status !== "authenticated") return <LoginPage />;

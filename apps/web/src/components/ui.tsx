@@ -8,15 +8,16 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 export function Button({ className, variant = "primary", ...props }: ButtonProps) {
   const variants = {
-    primary: "bg-gold text-obsidian hover:bg-gold-secondary",
-    secondary: "border border-gold/30 bg-charcoal text-champagne hover:bg-gold/10",
+    // Dark ink on gold in both themes: white on gold failed contrast in the light theme.
+    primary: "bg-gold-sheen text-on-gold shadow-gold hover:brightness-[1.05] hover:shadow-lift",
+    secondary: "border border-gold/30 bg-charcoal text-champagne hover:border-gold/60 hover:bg-gold/10",
     danger: "border border-danger/40 bg-danger/10 text-danger hover:bg-danger/20",
-    ghost: "text-soft-grey hover:bg-gold/10 hover:text-gold",
+    ghost: "text-soft-grey hover:bg-gold/10 hover:text-gold-secondary",
   } as const;
   return (
     <button
       className={cn(
-        "inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex min-h-10 select-none items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-[background-color,border-color,color,box-shadow,transform,filter] duration-150 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:active:scale-100 [&_svg]:shrink-0",
         variants[variant],
         className,
       )}
@@ -88,7 +89,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-obsidian/70 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-obsidian/70 p-0 backdrop-blur-sm duration-200 animate-in fade-in sm:items-center sm:p-4"
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
     >
       <section
@@ -99,7 +100,7 @@ export function Modal({
         tabIndex={-1}
         onKeyDown={trapFocus}
         className={cn(
-          "max-h-[92dvh] w-full overflow-y-auto overscroll-contain rounded-t-2xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl sm:max-h-[90dvh] sm:rounded-2xl",
+          "max-h-[92dvh] w-full overflow-y-auto overscroll-contain rounded-t-3xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl duration-300 ease-out animate-in slide-in-from-bottom-8 sm:max-h-[90dvh] sm:rounded-2xl sm:duration-200 sm:slide-in-from-bottom-0 sm:zoom-in-95",
           tone === "light" ? "border border-task-border bg-task-bg text-task-text" : "glass-card",
           wide ? "sm:max-w-4xl" : "sm:max-w-lg",
         )}
@@ -113,7 +114,7 @@ export function Modal({
           )}
         >
           <span aria-hidden className="absolute inset-x-0 top-2 mx-auto h-1 w-10 rounded-full bg-task-text-muted/40 sm:hidden" />
-          <h2 className={cn("min-w-0 flex-1 pt-4 text-lg font-semibold sm:pt-0 sm:text-xl", tone === "light" ? "text-task-text" : "font-display text-2xl text-gold")} id={titleId}>{title}</h2>
+          <h2 className={cn("min-w-0 flex-1 pt-4 text-lg font-semibold sm:pt-0 sm:text-xl", tone === "light" ? "text-task-text" : "font-display text-2xl text-gold-secondary")} id={titleId}>{title}</h2>
           <Button aria-label="Close dialog" className={cn("mt-4 size-11 shrink-0 p-0 sm:mt-0", tone === "light" && "text-task-text-muted hover:bg-task-muted hover:text-task-text")} onClick={onClose} variant="ghost">
             <X />
           </Button>
@@ -140,5 +141,5 @@ export function Notice({ children, tone = "neutral" }: { children: ReactNode; to
     success: "border-success/40 bg-success/10 text-success",
     task: "border-task-border bg-task-bg text-task-text-muted",
   } as const;
-  return <div className={cn("rounded-lg border p-3 text-sm", tones[tone])}>{children}</div>;
+  return <div className={cn("rounded-xl border p-3 text-sm leading-relaxed", tones[tone])}>{children}</div>;
 }

@@ -21,7 +21,7 @@ function WorkTypeChip({ row }: { row: TaskRow }) {
   return (
     <span
       className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-        row.is_upload_work ? "bg-task-border/60 text-task-text-muted" : "bg-gold/15 text-gold"
+        row.is_upload_work ? "bg-task-border/60 text-task-text-muted" : "bg-gold/15 text-gold-secondary"
       }`}
     >
       {row.is_upload_work ? "Upload" : "Checkbox"}
@@ -153,7 +153,7 @@ export function TasksTab({
             aria-pressed={view === value}
             className={
               view === value
-                ? "min-h-9 shrink-0 rounded-full bg-gold px-4 text-xs font-semibold text-obsidian"
+                ? "min-h-9 shrink-0 rounded-full bg-gold px-4 text-xs font-semibold text-on-gold"
                 : "min-h-9 shrink-0 rounded-full bg-task-muted px-4 text-xs font-medium text-task-text hover:bg-gold/10"
             }
             key={value}
