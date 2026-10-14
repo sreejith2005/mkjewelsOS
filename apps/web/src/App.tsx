@@ -17,6 +17,7 @@ import {
   Settings,
   Sparkles,
   Users,
+  Wrench,
 } from "lucide-react";
 import {
   ALL_MENU_ITEMS, DEFAULT_SECTION_CONTROLS, validateSectionControls,
@@ -362,7 +363,7 @@ function AppShell() {
       branch={branch}
       currentPage={currentPage}
       developerModeActive={isSuperAdmin && sectionControls.developer_mode_enabled}
-      developerModeControl={isSuperAdmin ? <button aria-checked={sectionControls.developer_mode_enabled} className={`relative flex h-8 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition ${sectionControls.developer_mode_enabled ? "border-gold bg-gold text-on-gold" : "border-gold/30 text-gold-secondary hover:bg-gold/10"}`} disabled={savingSectionControls} onClick={() => void persistSectionControls({ ...sectionControls, developer_mode_enabled: !sectionControls.developer_mode_enabled })} role="switch" type="button"><span className={`size-2 rounded-full ${sectionControls.developer_mode_enabled ? "bg-obsidian" : "bg-task-text-muted"}`} />Developer Mode{disabledSectionCount ? ` · ${disabledSectionCount} off` : ""}</button> : undefined}
+      developerModeControl={isSuperAdmin ? <button aria-checked={sectionControls.developer_mode_enabled} aria-label={`Developer Mode${disabledSectionCount ? `, ${disabledSectionCount} sections off` : ""}`} className={`relative flex h-9 shrink-0 items-center gap-2 rounded-full border px-2.5 text-xs font-semibold transition md:h-8 md:px-3 ${sectionControls.developer_mode_enabled ? "border-gold bg-gold-sheen text-on-gold shadow-gold" : "border-gold/30 text-gold-secondary hover:bg-gold/10"}`} disabled={savingSectionControls} onClick={() => void persistSectionControls({ ...sectionControls, developer_mode_enabled: !sectionControls.developer_mode_enabled })} role="switch" type="button"><Wrench aria-hidden className="size-4 md:hidden" /><span aria-hidden className={`size-2 rounded-full ${sectionControls.developer_mode_enabled ? "bg-on-gold" : "bg-task-text-muted"}`} /><span aria-hidden className="hidden md:inline">Developer Mode{disabledSectionCount ? ` · ${disabledSectionCount} off` : ""}</span></button> : undefined}
       developerSectionControls={isSuperAdmin ? <nav aria-label="Developer Mode section controls" className="scroll-x no-scrollbar flex gap-2 pb-1">{nav.map((item) => <label className="flex shrink-0 items-center gap-2 rounded-full border border-gold/20 px-3 py-1.5 text-xs text-champagne" key={item.id}><span>{item.label}</span><button aria-checked={sectionControls.section_availability[item.id]} aria-label={`${item.label} availability`} className={`relative h-5 w-9 rounded-full transition ${sectionControls.section_availability[item.id] ? "bg-success" : "bg-task-overdue"}`} disabled={savingSectionControls} onClick={() => void persistSectionControls({ ...sectionControls, section_availability: { ...sectionControls.section_availability, [item.id]: !sectionControls.section_availability[item.id] } })} role="switch" type="button"><span className={`absolute top-0.5 size-4 rounded-full bg-task-bg transition ${sectionControls.section_availability[item.id] ? "left-4" : "left-0.5"}`} /></button></label>)}</nav> : undefined}
       launcherItems={launcherItems}
       logoDarkUrl={wordmarkUrl}

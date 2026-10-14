@@ -101,10 +101,11 @@ export function ApplicationShell({
         <Button aria-label="Open navigation" className="-ml-1 mr-1 size-10 p-0 md:hidden" onClick={() => onDrawerOpenChange(true)} variant="ghost">
           <Menu />
         </Button>
-        <button aria-label="MK Jewels, go to Home" className="flex min-h-10 min-w-0 shrink items-center rounded-lg px-1 transition-opacity hover:opacity-85" onClick={() => navigate("/")} type="button">
-          <img alt="MK Jewels" className="h-4 w-auto max-w-[9.5rem] object-contain object-left drop-shadow-[0_1px_0_rgb(var(--color-gold-secondary)/0.35)] sm:h-[18px] sm:max-w-none md:h-5" src={theme === "dark" ? logoDarkUrl : logoLightUrl} />
+        {/* The wordmark gives way first: role-dependent controls on the right never overlap it. */}
+        <button aria-label="MK Jewels, go to Home" className="mr-2 flex min-h-10 min-w-0 flex-1 items-center overflow-hidden rounded-lg px-1 transition-opacity hover:opacity-85" onClick={() => navigate("/")} type="button">
+          <img alt="MK Jewels" className="h-4 w-auto min-w-0 max-w-full object-contain object-left drop-shadow-[0_1px_0_rgb(var(--color-gold-secondary)/0.35)] sm:h-[18px] md:h-5" src={theme === "dark" ? logoDarkUrl : logoLightUrl} />
         </button>
-        <div className="ml-auto flex shrink-0 items-center gap-1.5 md:gap-3">
+        <div className="flex shrink-0 items-center gap-1.5 md:gap-3">
           <span className="hidden items-center gap-2 rounded-full border border-task-border bg-task-muted/60 px-3 py-1.5 text-xs font-medium text-champagne lg:inline-flex"><span aria-hidden className="size-1.5 rounded-full bg-success" />{branch?.name ?? "Branch unavailable"}</span>
           {developerModeControl}
           <ThemeToggle onChange={onThemeChange} theme={theme} />

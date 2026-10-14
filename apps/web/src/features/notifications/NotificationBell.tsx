@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { Bell, Check, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui";
@@ -9,6 +9,8 @@ import { notificationDestination, unreadBadge } from "./viewModel";
 export function NotificationBell({ profileId, onNavigate }: { profileId: string; onNavigate: (path: string) => void }) {
   const [items, setItems] = useState<InboxNotification[]>([]);
   const [open, setOpen] = useState(false);
+  // Phone panel offset: the header's real bottom edge (it grows when Developer Mode adds a row).
+  const [panelTop, setPanelTop] = useState<number | null>(null);
   const [error, setError] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const refresh = useCallback(async (payload?: any) => {
@@ -49,14 +51,16 @@ export function NotificationBell({ profileId, onNavigate }: { profileId: string;
         aria-haspopup="dialog"
         aria-label={unread ? `Notifications, ${unread} unread` : "Notifications, none unread"}
         className="relative flex size-10 items-center justify-center rounded-lg border border-gold/20 bg-obsidian text-gold-secondary hover:bg-gold/10"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => { setPanelTop(rootRef.current?.closest("header")?.getBoundingClientRect().bottom ?? null); setOpen((value) => !value); }}
         type="button"
       >
         <Bell className="size-4" />
         {unread ? <span className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full bg-danger px-1 text-[10px] font-bold leading-5 text-white">{unreadBadge(unread)}</span> : null}
       </button>
       {open ? (
-        <section aria-label="Recent notifications" className="absolute right-0 top-12 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-xl border border-gold/20 bg-charcoal p-3 shadow-2xl">
+        // Phones: pinned to both screen edges under the header, so it never depends on where the
+        // bell sits among the other header controls. Wider screens: anchored under the bell.
+        <section aria-label="Recent notifications" style={panelTop === null ? undefined : { "--panel-top": `${Math.round(panelTop + 8)}px` } as CSSProperties} className="fixed inset-x-3 top-[var(--panel-top,calc(3.5rem_+_env(safe-area-inset-top)_+_0.5rem))] z-50 max-h-[min(70dvh,32rem)] overflow-y-auto overscroll-contain rounded-2xl border border-task-border bg-charcoal p-3 shadow-lift duration-200 animate-in fade-in slide-in-from-top-2 sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:w-96">
           <div className="mb-2 flex items-center justify-between">
             <h2 className="font-semibold text-white">Recent notifications</h2>
             <Button className="min-h-8 px-2 py-1 text-xs" onClick={() => { onNavigate("/notifications"); setOpen(false); }} variant="ghost">View all <ExternalLink className="size-3" /></Button>

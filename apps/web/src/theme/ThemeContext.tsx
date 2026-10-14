@@ -5,6 +5,9 @@ import type { Theme } from "@/components/ThemeToggle";
 const THEME_STORAGE_KEY = "jewelos-theme";
 type ThemeContextValue = Readonly<{ theme: Theme; setTheme: (theme: Theme) => void }>;
 const ThemeContext = createContext<ThemeContextValue | null>(null);
+// The web dark theme (index.css, "onyx and champagne", 2026-10-14) is darker than the shared
+// token palette the Android app still uses, so the browser chrome follows the web header.
+export const BROWSER_BAR_COLOUR: Readonly<Record<Theme, string>> = { light: themes.light.obsidian, dark: "#141210" };
 const storedTheme = (): Theme => {
   try { return window.localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light"; }
   catch { return "light"; }
@@ -24,7 +27,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     for (const meta of document.querySelectorAll('meta[name="theme-color"]')) meta.remove();
     const meta = document.createElement("meta");
     meta.name = "theme-color";
-    meta.content = themes[theme].obsidian;
+    meta.content = BROWSER_BAR_COLOUR[theme];
     document.head.append(meta);
   }, [theme]);
   return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;

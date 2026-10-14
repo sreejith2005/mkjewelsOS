@@ -36,7 +36,7 @@ describe("theme selection", () => {
       expect(localStorage.getItem("jewelos-theme")).toBe(theme);
       expect(document.querySelectorAll('meta[name="theme-color"]')).toHaveLength(1);
       expect(document.querySelector('meta[name="theme-color"]')?.getAttribute("content"))
-        .toBe(theme === "dark" ? "#17130F" : "#F8FAFC");
+        .toBe(theme === "dark" ? "#141210" : "#F8FAFC");
     }
   });
 

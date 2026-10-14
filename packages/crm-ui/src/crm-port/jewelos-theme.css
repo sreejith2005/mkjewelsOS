@@ -24,8 +24,8 @@
   --crm-green: rgb(var(--color-success));
   --crm-red: rgb(var(--color-task-overdue));
   /* JewelOS dark-theme obsidian/charcoal: the gold-on-black hero bands (same as the Home hero). */
-  --crm-luxe: 23 19 15;
-  --crm-luxe-raised: 42 35 28;
+  --crm-luxe: 12 11 10;
+  --crm-luxe-raised: 22 20 18;
   --crm-shadow-card: 0 1px 2px rgb(var(--color-shadow) / .04), 0 4px 16px -6px rgb(var(--color-shadow) / .08);
   --crm-shadow-lift: 0 2px 4px rgb(var(--color-shadow) / .05), 0 14px 32px -12px rgb(var(--color-shadow) / .18);
   --crm-shadow-gold: 0 1px 2px rgb(var(--color-gold-secondary) / .22), 0 6px 14px -8px rgb(var(--color-gold) / .5);
