@@ -1,0 +1,5 @@
+# SQL must be LF in every checkout: some migration guards compare function bodies and
+# break on CRLF (Windows core.autocrlf=true). The index already holds LF for every *.sql,
+# so this changes checkouts only, never file content.
+*.sql text eol=lf
+*.psql text eol=lf

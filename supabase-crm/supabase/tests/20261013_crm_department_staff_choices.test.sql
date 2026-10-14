@@ -13,7 +13,7 @@ select id,email,id,id,true from users where id in ('20261013-0000-4000-8000-0000
 insert into crm_private.staff_sync_state(jewelos_user_id,snapshot_at,outcome,crm_user_id,selection_department)
 select id,now(),'applied',id,case when id in ('20261013-0000-4000-8000-000000000011','20261013-0000-4000-8000-000000000014') then 'sales' when id='20261013-0000-4000-8000-000000000012' then 'crm' else 'other' end
 from users where id in ('20261013-0000-4000-8000-000000000011','20261013-0000-4000-8000-000000000012','20261013-0000-4000-8000-000000000013','20261013-0000-4000-8000-000000000014');
-\ir fixtures/crm_master_options.sql
+\ir fixtures/crm_master_options.psql
 set local role authenticated;
 select set_config('request.jwt.claim.sub','20261013-0000-4000-8000-000000000012',true);
 select set_config('request.jwt.claim.role','authenticated',true);

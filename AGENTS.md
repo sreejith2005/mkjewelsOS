@@ -96,8 +96,8 @@ chat content.
 
 The current web source contains authenticated, role-aware routes for Home,
 Dashboard, Tasks, FMS, Forms Library, Notifications, CRM, Users, Availability,
-Reports, Dropdown Master, and Settings. Meeting AI remains a menu identifier,
-not an implemented route. `apps/mobile` is not production-ready.
+Reports, Dropdown Master, Settings, and Ask Kiara. Meeting AI remains a menu
+identifier, not an implemented route. `apps/mobile` is not production-ready.
 
 Important current contracts include:
 
@@ -113,7 +113,35 @@ Important current contracts include:
   documents;
 - notifications/outbox contracts, reports/private export processing, role-aware
   user administration, controlled roster reconciliation, and section
-  maintenance controls.
+  maintenance controls;
+- Ask Kiara (`/ask-kiara`, section `ask_kiara`, migrations 0213-0220, 0227,
+  0230): a read-only assistant that answers about the asker's own work, their
+  Dashboard / Task Control / Reports / leave numbers, colleagues' names and
+  roles, CRM clients (for `crm.view` holders), how to use JewelOS, and the SOP
+  knowledge base with citations, plus "Ask a person" escalations, insights,
+  daily limits, and voice. Edge Functions `ask-kiara`, `kiara-knowledge-ingest`,
+  `kiara-insights`. Design and phases:
+  `docs/superpowers/specs/2026-10-08-ask-kiara-design.md` and
+  `docs/superpowers/plans/2026-10-08-ask-kiara-plan.md`; owner guide
+  `docs/ASK_KIARA_PRODUCTION_TESTING.md`.
+
+### Keeping Ask Kiara current (its "second brain")
+
+Kiara answers only from its tools and from `packages/core/src/assistant/appHelp.ts`,
+so it goes stale silently when the app changes. Any change that adds or renames a
+section, route, screen, button label, or major feature must, in the same change:
+
+1. Update the section's entry in `packages/core/src/assistant/appHelp.ts` (summary
+   and recipes use the exact labels on screen) and
+   `docs/ASK_KIARA_APP_HELP_REVIEW.md`. A new implemented page needs a new entry;
+   `appHelp.test.ts` fails without one.
+2. Decide whether Kiara needs a read tool for the new data, and write the answer in
+   the PR description. A Kiara tool reads only through an existing section RPC or
+   view called as the asker (never the service role, never a wider raw table read),
+   is offered only with that section's permission and section switch
+   (`packages/core/src/assistant/tools.ts`), and gets allowed and denied eval cases in
+   `docs/superpowers/evals/ask-kiara/cases.json`.
+3. Never let a Kiara tool perform a write. Kiara only answers questions.
 
 ### CRM (2026-09-25 owner decision)
 

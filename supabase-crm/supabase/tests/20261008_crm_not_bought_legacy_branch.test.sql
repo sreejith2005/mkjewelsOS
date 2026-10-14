@@ -21,7 +21,24 @@ insert into not_bought_followups(id,client_id,reference_number,status,branch_id,
 ('20261008-0400-4000-8000-0000000000f2','20261008-0400-4000-8000-0000000000c2','MK-WK-SYN-LV2-AA-2','NO',null,'2026-04-02','20261008-0400-4000-8000-0000000000a1'),
 ('20261008-0400-4000-8000-0000000000f3','20261008-0400-4000-8000-0000000000c3','MK-WK-SYN-LV3-AA-9','NO',null,'2026-04-02','20261008-0400-4000-8000-0000000000a1');
 
-\ir ../migrations/20261008000400_crm_not_bought_legacy_branch.sql
+-- Re-run the exact SQL of migration 20261008000400 as recorded by the migration engine.
+-- `supabase test db` mounts only the tests folder, so a psql \ir of ../migrations fails
+-- there and the backfill never ran (the cause of the old failures 1-3).
+do $run$
+declare
+  v_sql text;
+begin
+  select string_agg(statement, E';
+' order by ordinal)
+  into v_sql
+  from supabase_migrations.schema_migrations migration
+  cross join lateral unnest(migration.statements) with ordinality as item(statement, ordinal)
+  where migration.version = '20261008000400';
+  if v_sql is null then
+    raise exception 'migration 20261008000400 is absent from local migration history';
+  end if;
+  execute v_sql;
+end $run$;
 
 select is((select branch_id from not_bought_followups where id='20261008-0400-4000-8000-0000000000f1'),'20261008-0400-4000-8000-0000000000b1'::uuid,'branch from the visit with the same reference and client');
 select is((select branch_id from not_bought_followups where id='20261008-0400-4000-8000-0000000000f2'),'20261008-0400-4000-8000-0000000000b2'::uuid,'branch from the client''s last visit branch');

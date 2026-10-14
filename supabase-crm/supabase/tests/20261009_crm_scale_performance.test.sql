@@ -15,7 +15,7 @@ insert into users(id,name,email,role,branch_id,active) values
 insert into crm_sso_access_grants(jewelos_user_id,work_email,legacy_crm_user_id,crm_auth_user_id,active) select id,email,id,id,true from users where id::text like '20261009-0001-4000-8000-00000000000_';
 insert into clients(client_id,primary_name,primary_phone,last_branch_id) values('20261009-0001-4000-8000-000000000010','Scale Contract Client','919900000010','20261009-0001-4000-8000-00000000000a');
 insert into crm_allocation(branch_id,crm_name,crm_user_id,active) values('20261009-0001-4000-8000-00000000000a','Scale Staff','20261009-0001-4000-8000-000000000001',true);
-\ir fixtures/crm_master_options.sql
+\ir fixtures/crm_master_options.psql
 -- Bulk queue rows do not add a contact. Avoid recomputing the same client's unchanged
 -- projection 1,201 times in the fixture; ordinary source writes are tested below.
 alter table not_bought_followups disable trigger zz_client_browse_state;

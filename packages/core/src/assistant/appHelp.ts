@@ -138,8 +138,9 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     summary: "Availability records whether people are present, absent, on half day, or remote, and holds leave applications.",
     recipes: [
       "Apply for leave: open Availability, choose \"Apply leave\", enter the dates and reason, then press \"Submit leave\".",
-      "See my leave requests and their status: open the leave section in Availability.",
+      "See my leave requests and their status: open Availability and choose \"Leave summary\".",
       "Mark availability for a day: choose Present, Absent, Half day, or Remote for that date.",
+      "Approve or reject leave (people who review leave): open Availability and choose \"Review requests\".",
     ],
   },
   reports: {
@@ -179,17 +180,21 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     summary: "Settings holds the user's own preferences and, for authorized roles, organization defaults and permissions.",
     recipes: [
       "Change the theme or table density: open Settings and change your preferences.",
-      "Manage permissions: Settings > Permissions (Super Admin only).",
+      "Manage permissions: Settings > \"Open permission management\" (Super Admin only).",
     ],
   },
   ask_kiara: {
     section: "ask_kiara",
     title: "Ask Kiara",
     path: "/ask-kiara",
-    summary: "Ask Kiara answers questions about the user's own work (tasks, FMS, forms, notifications, leave, availability), their Dashboard, Task Control and Reports numbers, colleagues' names and roles, and how to use JewelOS, never showing more than the user's own screens show them.",
+    summary: "Ask Kiara answers questions about the user's own work (tasks, FMS, forms, notifications, leave, availability), their Dashboard, Task Control and Reports numbers, colleagues' names and roles, CRM clients for CRM users, company SOPs (with sources), and how to use JewelOS, never showing more than the user's own screens show them. Kiara only answers; it never does anything in JewelOS.",
     recipes: [
       "Ask a question: type it in the box at the bottom and press Send. English, Hindi, and Hinglish all work.",
-      "See how many questions are left today: the counter next to the box shows it and when it resets.",
+      "Ask by voice (if the mic is shown): tap the mic next to Send, speak, tap stop, check the words, then press Send.",
+      "See how many questions are left today: the counter at the top of Ask Kiara shows it and when it resets (midnight India time).",
+      "Check where an SOP answer comes from: tap the source chip under \"Sources\" to open that SOP section.",
+      "When Kiara cannot answer a company question: press \"Ask a person\" under the answer to send it to your manager; the answer comes back in the same chat with a notification.",
+      "Answer a question someone sent you (managers): open the \"Questions for you\" tab, type the answer, and press \"Answer\".",
       "Start fresh: press \"New chat\". Earlier chats stay in the list on the left (or under \"Chats\" on a phone).",
       "Ask about a team or branch: Kiara answers from the same Dashboard, Task Control, Reports, and leave screens the user can open; if a screen is not open to the user, Kiara says so.",
     ],

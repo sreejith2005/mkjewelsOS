@@ -1,10 +1,13 @@
 # Ask Kiara: testing on production
 
-For the owner. Ask Kiara is live on https://mkjewels-os.vercel.app but **switched off for
-everyone except Super Admin**. Employees cannot see it or use it until you switch it on.
+For the owner. Ask Kiara is live on https://mkjewels-os.vercel.app. **Since 2026-10-14 it is
+switched on for everyone** (you told us so before Phase 9). Sections 1-3 below are the
+earlier owner tests and the pilot method, kept for reference. **Section 4 is the final
+launch checklist** and section 5 is how to switch it off again.
 
-Use a computer browser (Chrome). Ask Kiara is not in the Android app yet; employees who open a
-Kiara notification on the phone see "Open on web for now".
+Use a computer browser (Chrome), or Chrome on a phone. Ask Kiara is not in the Android app
+yet (it comes with the next app update); employees who open a Kiara notification in the
+Android app see "Open on web for now".
 
 ## 1. Smoke test (as Super Admin)
 
@@ -30,7 +33,7 @@ Kiara notification on the phone see "Open on web for now".
 If an answer looks wrong, note the question and the time and send them to me. Don't paste
 customer phone numbers into the chat with me.
 
-## 2. Check that employees can't see it yet
+## 2. Check that employees can't see it yet (only while it was dark; no longer needed)
 
 - Ask any employee to refresh the web app. **Ask Kiara** is not in their menu, and opening
   https://mkjewels-os.vercel.app/ask-kiara shows that the section is unavailable.
@@ -39,7 +42,7 @@ customer phone numbers into the chat with me.
 - In the top bar, **Developer Mode** shows how many sections are off ("· 1 off" or more). Turn
   Developer Mode on and the **Ask Kiara** switch is shown as off.
 
-## 3. Small pilot with 2-3 trusted employees
+## 3. Small pilot with 2-3 trusted employees (only if you ever go back to a pilot)
 
 Switching the section on opens it for **every role that has "Use Ask Kiara"**, which is every role
 by default. So for a pilot, first take the permission away from all roles. Then give it back to
@@ -90,20 +93,84 @@ be denied.
 Employees have **10 questions a day**. After the 10th, Kiara tells them when the limit resets
 (midnight India time).
 
-## 4. Switch it on for everyone (later)
+## 4. Switch on for everyone: final checklist (Phase 9)
 
-Phase 9 does this formally, after the remaining phases. When you decide to:
-1. Settings → Permission management → **Roles**: for each role you denied in the pilot, click the
-   **reset** arrow next to **Use Ask Kiara** (or tick it again). Click **Save**.
-2. Leave the section switch on.
+Ask Kiara is already on for everyone. This checklist makes sure that is really true for every
+role, then does one last check. It takes about 15 minutes. Do it on a computer, signed in as
+Super Admin. **You switch things; Claude never does.**
 
-The pilot people's personal Grant can stay; it changes nothing once the role has it.
+**A. The section switch is on**
+1. Settings → section **Developer mode**: the **Ask Kiara** box in the list of sections is
+   ticked. (Or: top bar → **Developer Mode** on → the **Ask Kiara** switch is on.)
+2. If it is not ticked: tick it and press **Save developer controls**.
+
+**B. No role has "Use Ask Kiara" taken away**
+1. Settings → **Open permission management** → tab **Roles**.
+2. Click **Admin**. Under **Assistant**, look at **Use Ask Kiara**:
+   - ticked and no small round arrow next to it: fine, go to the next role;
+   - a small round arrow next to it (**Reset Use Ask Kiara to default**): click the arrow, then
+     **Save 1 change**. The arrow means the role was changed from the default (for example
+     during a pilot).
+3. Do the same for **Manager**, **HR**, **CRM**, **Staff**, **Doer** and **Housekeeping**.
+   Super Admin always has it.
+4. Tab **Departments**: pick each department in turn. The **Use Ask Kiara** row must say
+   **Inherit** (not Disable). Fix any that say Disable and press **Save department access**.
+5. Tab **Designations**: no designation may have **Use Ask Kiara** set to **Deny**. Fix and press
+   **Save designation**.
+6. Tab **Users**: a person's own **Deny** still beats everything. That is how you keep Kiara from
+   one person on purpose. Leave those as they are. Personal **Grant** rows from a pilot can stay;
+   they change nothing now.
+
+**C. "Ask a person" reaches managers**
+Managers, Admins and Super Admin have **Answer escalated questions** by default. If you changed
+it for a role, reset it the same way as in B (Roles → the role → **Answer escalated questions**).
+HR does not answer by default; tick it for HR only if you want HR to answer too.
+
+**D. The daily limit**
+Ask Kiara → **Limits**. The company limit should be **10 questions per person per day** (the
+default). Super Admin is always unlimited. Remove any pilot exceptions you no longer want
+("Remove" next to the name). Change the number if you want a different limit; it applies from
+each person's next question.
+
+**E. Final check with two real accounts** (ask the people to do it with you, on their own login)
+1. One **staff** member refreshes the page. **Ask Kiara** is in the menu.
+   - They ask: **aaj mera kya pending hai?** The answer matches their Home screen.
+   - They ask: **How do I apply for leave?** They get short steps.
+   - They ask a question from one of your SOPs (for example about opening the store). The answer
+     has a **Sources** chip that opens the right SOP.
+   - They ask: **How is the whole branch doing this week?** Kiara says they don't have access to
+     branch numbers (or gives only their own work and says so).
+   - The counter at the top shows **questions left today** out of 10.
+2. One **manager** refreshes. **Ask Kiara** is in the menu.
+   - They ask: **Meri team mein sabse zyada overdue kiske hain?** The names are only from their
+     team and match Task Control.
+   - They open the **Questions for you** tab (it may be empty).
+3. If either person does not see Ask Kiara after a refresh, go back to B for their role,
+   department and designation, and check their own row on the Users tab.
+
+**F. Tell everyone**
+Send the message in `docs/ASK_KIARA_EMPLOYEE_ANNOUNCEMENT.md` (English and Hinglish) on WhatsApp.
+The one-page "How to use Kiara" in the same file can be printed or shared as a picture.
 
 ## 5. Roll back quickly
 
-Top bar → **Developer Mode** on → click the **Ask Kiara** switch off. Everyone except Super Admin
-loses access at once: the menu entry goes, and the server refuses their questions. Nothing is
-deleted. Conversations, documents and questions stay, and come back when you switch it on again.
+**For everyone at once (fastest):** top bar → **Developer Mode** on → click the **Ask Kiara**
+switch off (or Settings → Developer mode → untick **Ask Kiara** → **Save developer controls**).
+Everyone except Super Admin loses access at once: the menu entry goes, and the server refuses
+their questions. Nothing is deleted. Conversations, documents and questions stay, and come back
+when you switch it on again.
+
+**For one role:** Settings → Open permission management → **Roles** → the role → untick **Use
+Ask Kiara** → **Save 1 change**.
+
+**For one person:** Settings → Open permission management → **Users** → search the person → row
+**Use Ask Kiara** → **Deny** → **Save access**.
+
+**To stop spending without switching it off:** Ask Kiara → **Limits** → set the company limit
+to **0**. Nobody except Super Admin can ask a question until you set it back.
+
+If something looks wrong in answers, note the question and the time and tell Claude. Don't paste
+customer phone numbers into the chat.
 
 ## 6. Daily question limit
 

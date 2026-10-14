@@ -19,7 +19,7 @@ select id,email,id,id,true from users where id::text like '20261008-0300-4000-80
 insert into crm_private.staff_sync_state(jewelos_user_id,snapshot_at,outcome,crm_user_id,selection_department)
 select id,now(),'applied',id,case when id='20261008-0300-4000-8000-000000000002' then 'sales' else 'crm' end
 from users where id::text like '20261008-0300-4000-8000-00000000000_';
-\ir fixtures/crm_master_options.sql
+\ir fixtures/crm_master_options.psql
 insert into crm_allocation(branch_id,crm_name,crm_user_id,active) values
 ('20261008-0300-4000-8000-00000000000a','ROSTER CRM','20261008-0300-4000-8000-000000000001',true),
 ('20261008-0300-4000-8000-00000000000b','ROSTER CRM','20261008-0300-4000-8000-000000000001',true),
