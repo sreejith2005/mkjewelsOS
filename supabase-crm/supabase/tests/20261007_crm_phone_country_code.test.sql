@@ -60,7 +60,7 @@ grant execute on function pg_temp.phone_of(uuid), pg_temp.indexed(text), pg_temp
 -- ---------------------------------------------------------------------------
 -- Write paths
 -- ---------------------------------------------------------------------------
-\ir fixtures/crm_master_options.sql
+\ir fixtures/crm_master_options.psql
 set local role authenticated;
 select pg_temp.act_as_staff();
 

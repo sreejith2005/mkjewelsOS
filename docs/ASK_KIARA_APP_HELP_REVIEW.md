@@ -1,0 +1,129 @@
+# Ask Kiara: app help for you to check
+
+For the owner. When someone asks Kiara **"how do I … in JewelOS?"**, Kiara answers only from
+the text below. It does not make up other steps. Please read each section and tick it, or
+write what is wrong next to it and send the list back. Kiara rewrites these answers in
+simple words and in the language of the question (English, Hindi or Hinglish).
+
+How it works:
+- Kiara explains a section **only if that person can open it**. A staff member who asks
+  "how do I add a new employee?" is told they don't have access to Users. No steps are given.
+- Every answer also carries this note: *"If a button described here is missing, your role may
+  not have that action; ask your manager or Super Admin."*
+- Company rules and procedures ("how many leaves do I get?") are **not** here. They come
+  only from the SOPs in the Knowledge base.
+
+The source is `packages/core/src/assistant/appHelp.ts`. Keep this file and that one in step
+(AGENTS.md, "Keeping Ask Kiara current").
+
+Last checked against the screens: 2026-10-14.
+
+---
+
+## Home (menu: Home)
+**What it is:** your own work for today: open and overdue tasks, your FMS stages, forms to
+fill, and recent activity.
+- [ ] See today's work: open Home from the menu. Overdue items are listed first.
+- [ ] Open a task or stage: tap it on Home to go straight to that work.
+- [ ] Fill a form linked to a task: use the form item on Home. It opens the exact form for that task.
+
+## Dashboard
+**What it is:** task, FMS and form numbers for your own scope and a period you choose, with
+the formula behind each number.
+- [ ] Change the period: pick today, this week, this month, etc. at the top of Dashboard.
+- [ ] Understand a number: each card explains its formula.
+
+## Tasks
+**What it is:** work given to you, tasks you gave to others, and tasks you are watching.
+- [ ] See my tasks: open Tasks. **Assigned to me** lists work given to you.
+- [ ] Complete a task: open it, finish any checklist items, form or photo, then mark it complete.
+- [ ] Create a task: in Tasks press **Create Task**, fill in the title, the person and the due date, then save.
+- [ ] See tasks I gave to others: **Delegated** in Tasks.
+- [ ] Add many tasks at once: **Bulk Import** in Tasks (only roles that can assign work).
+- [ ] See people with no work given: **Assigning Left** in Tasks (only roles that can assign work).
+
+## Recurring / To-Do
+**What it is:** repeating schedules, personal to-dos, checking finished work, follow-ups and coverage.
+- [ ] Filter the list: branch, department, frequency, priority and status filters at the top.
+- [ ] Check finished work: open the **Verification** view and review each item.
+- [ ] Chase a late item: use **Follow-ups**.
+
+## Task Control (for managers)
+**What it is:** team progress, overdue work, evidence review and task templates.
+- [ ] Check team progress: open Task Control and choose the dates and department.
+- [ ] Review evidence: open the evidence panel in Task Control.
+- [ ] Change a schedule: edit the template and press **Save schedule**.
+
+## FMS (workflows)
+**What it is:** company workflows: live workflows, the stages given to you, and, for people
+who build workflows, the designs.
+- [ ] Do my stage: open it from Home or Tasks, complete its form or evidence, and submit.
+- [ ] Start a workflow: open FMS, choose the workflow, press **Start instance** (if your role may start it).
+- [ ] Design a workflow: **New workflow** in FMS (workflow builders only).
+
+## FMS work (my assigned stages)
+**What it is:** the workflow stages and starting forms waiting for you.
+- [ ] Open a stage: tap it from Home or Tasks. It opens that exact stage.
+
+## Forms Library
+**What it is:** published forms you can fill, and forms you sent.
+- [ ] Fill a form: open Forms Library, find the form under **Forms to fill**, press **Fill**.
+- [ ] See what I sent: **My submissions** shows each one and whether it was reviewed.
+- [ ] Make a form: **New form** (form makers only), then **Publish** when ready.
+
+## Notifications
+**What it is:** your inbox of alerts about your work, such as new tasks.
+- [ ] Open the work behind an alert: tap the notification.
+- [ ] See unread alerts: the bell shows how many are unread.
+
+## Users
+**What it is:** the employee list for the people you may see, and account tools for allowed roles.
+- [ ] Find an employee: open Users and filter by branch or department.
+- [ ] Add an employee: **Add user** (allowed roles only).
+- [ ] Set someone's login password: open the employee, **Set login password** (allowed roles only).
+
+## Availability (attendance and leave)
+**What it is:** who is present, absent, on half day or remote, and leave applications.
+- [ ] Apply for leave: open Availability, choose **Apply leave**, enter the dates and reason, press **Submit leave**.
+- [ ] See my leave requests and their status: open Availability and choose **Leave summary**. *(changed in Phase 9; it used to say "the leave section")*
+- [ ] Mark a day: choose Present, Absent, Half day or Remote for that date.
+
+## Reports
+**What it is:** fixed reports for your level, and private CSV downloads.
+- [ ] See a report: open Reports, pick the report and the dates.
+- [ ] Download a report: request a CSV export. It is prepared privately for you to download.
+
+## CRM
+**What it is:** client records, walk-ins, interactions and follow-ups, for CRM users.
+- [ ] Find a client: open CRM and search by name or client id.
+- [ ] Record a walk-in or follow-up: use the walk-in and follow-up screens in CRM.
+
+## Dropdown Master
+**What it is:** the shared option lists used across JewelOS.
+- [ ] Add an option: open the list, press **Add item**.
+- [ ] Hide an option without deleting it: mark it **Inactive**.
+
+## Settings
+**What it is:** your own preferences and, for allowed roles, company defaults and permissions.
+- [ ] Change the theme or table density: open Settings and change your preferences.
+- [ ] Manage permissions: Settings, then **Open permission management** (Super Admin only). *(changed in Phase 9; it used to say "Settings > Permissions")*
+
+## Ask Kiara itself *(rewritten in Phase 9)*
+**What it is:** answers about your own work, your Dashboard, Task Control and Reports numbers,
+colleagues' names and roles, CRM clients (for CRM users), company SOPs with their source, and
+how to use JewelOS. It never shows more than your own screens show you. Kiara only answers;
+it never does anything in JewelOS.
+- [ ] Ask: type in the box at the bottom and press Send. English, Hindi and Hinglish all work.
+- [ ] Ask by voice (if the mic is shown): tap the mic next to Send, speak, tap stop, check the words, press Send.
+- [ ] Questions left today: the counter at the top of Ask Kiara shows it and when it resets (midnight India time).
+- [ ] Where an SOP answer comes from: tap the source chip under **Sources** to open that SOP section.
+- [ ] When Kiara can't answer a company question: press **Ask a person** under the answer to send it to your manager. The answer comes back in the same chat, with a notification.
+- [ ] Answer a question someone sent you (managers): open **Questions for you**, type the answer, press **Answer**.
+- [ ] Start fresh: press **New chat**. Old chats stay in the list on the left (under **Chats** on a phone).
+- [ ] Ask about a team or branch: Kiara answers from the same Dashboard, Task Control, Reports and leave screens you can open. If you can't open a screen, Kiara says so.
+
+---
+
+## Not covered (Kiara says it can't help)
+- **Meeting AI** is only a menu name; there is no screen yet, so Kiara has no help for it.
+- Anything that is a company rule rather than a button: that comes from the SOPs.

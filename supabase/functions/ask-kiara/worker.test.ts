@@ -8,6 +8,7 @@ import { createKiaraEventParser, type KiaraStreamEvent } from "../../../packages
 import { serializeToolResult } from "./tools/shared.ts";
 import {
   DEFAULT_KIARA_CONFIG,
+  authFailureToHttp,
   buildRequestParams,
   echoableContent,
   kiaraEventStream,
@@ -496,6 +497,15 @@ Deno.test("request validation", () => {
   assertEquals(validateChatRequest({ ...request, message: "x".repeat(2001) }), null);
   assertEquals(validateChatRequest({ ...request, client: "ios" }), null);
   assertEquals(validateChatRequest("hi"), null);
+});
+
+Deno.test("a rejected token is 401; an auth outage or timeout is 503", () => {
+  assertEquals(authFailureToHttp({ status: 401 }).status, 401);
+  assertEquals(authFailureToHttp({ status: 403 }).code, "unauthenticated");
+  assertEquals(authFailureToHttp(null).status, 401);
+  assertEquals(authFailureToHttp({}).status, 503);
+  assertEquals(authFailureToHttp({ status: 0 }).status, 503);
+  assertEquals(authFailureToHttp({ status: 504 }).code, "unavailable");
 });
 
 Deno.test("start errors map to the documented statuses", async () => {

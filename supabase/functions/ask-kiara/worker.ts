@@ -131,6 +131,19 @@ export function startErrorToHttp(error: RpcError): KiaraHttpError {
   return new KiaraHttpError(503, "unavailable", "Ask Kiara is unavailable right now. Please try again shortly.");
 }
 
+/**
+ * The caller's token check failed. A token the auth server rejects (4xx) means
+ * "sign in again"; an auth outage, timeout or network error (no status, or 5xx)
+ * is not the user's fault and is reported as "try again shortly".
+ */
+export function authFailureToHttp(error: { status?: number } | null): KiaraHttpError {
+  const status = error?.status;
+  if (error && (!status || status >= 500)) {
+    return new KiaraHttpError(503, "unavailable", "Ask Kiara is unavailable right now. Please try again shortly.");
+  }
+  return new KiaraHttpError(401, "unauthenticated", "Authentication required");
+}
+
 export async function startTurn(actor: ActorClient, request: KiaraChatRequest): Promise<StartedTurn> {
   const { data, error } = await actor.rpc("start_kiara_turn", {
     p_conversation_id: request.conversation_id,

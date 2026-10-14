@@ -11,6 +11,7 @@ import { transcriptionModel } from "../_shared/voice/transcribe.ts";
 import {
   DEFAULT_KIARA_CONFIG,
   KiaraHttpError,
+  authFailureToHttp,
   kiaraEventStream,
   runKiaraTurn,
   startTurn,
@@ -84,7 +85,11 @@ Deno.serve(async (request: Request) => {
     global: { headers: { Authorization: `Bearer ${token}` } },
   });
   const { data: userData, error: userError } = await client.auth.getUser(token);
-  if (userError || !userData.user) return json(401, { error: "Authentication required", code: "unauthenticated" });
+  if (userError || !userData.user) {
+    const authFailure = authFailureToHttp(userError);
+    if (authFailure.status !== 401) log({ event: "kiara_auth_unavailable", status: userError?.status ?? null });
+    return failure(authFailure);
+  }
   const actor = createActorClient(client);
 
   // Voice questions (Phase 7): the words go back to the input box for editing.

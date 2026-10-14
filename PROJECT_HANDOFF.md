@@ -125,6 +125,33 @@ and timing-rule execution where a human deadline is not meaningful.
   authoritative roster reconciliation. The roster script dry run must stop for
   approval when active Auth-email collisions would require account retirement.
 
+### Ask Kiara (organization assistant, live since 2026-10-12)
+
+Route `/ask-kiara`, section `ask_kiara`, permissions `assistant.*` (catalog sort 310-315).
+A read-only assistant on Claude Sonnet (`claude-sonnet-5-5`, effort low) behind the
+`ask-kiara` Edge Function. It answers about the asker's own work, their Dashboard / Task
+Control / Reports / leave numbers, colleagues' names and roles, CRM clients for `crm.view`
+holders (through `crm-session-exchange`, phones as last 4 digits), how to use JewelOS
+(`packages/core/src/assistant/appHelp.ts`), and the SOP knowledge base with citations. Every
+tool reads as the asker through an existing section RPC; the answer path never uses the
+service role. Kiara never writes.
+
+- Knowledge base: Super Admin uploads `.docx` SOPs (`kiara-knowledge-ingest`), with
+  per-document visibility (everyone, departments, managers and above).
+- "Ask a person": after two failed SOP searches Kiara offers to send the question up the
+  reporting line; answers return to the chat and can be saved as a suggested SOP.
+- Insights (rating 1-5 and Fresher/Experienced/Veteran from labels, never transcripts;
+  `kiara-insights` nightly through pg_cron), Limits (default 10 questions a day, Super Admin
+  unlimited, per-person exceptions), retention purge (chats 180 days), voice input
+  (`assistant.voice`, shared quota with Tasks voice).
+- Native Android screen exists in source (Phase 8); not yet in a published APK.
+- Migrations 0213-0220, 0227, 0230. Spec/plan: `docs/superpowers/specs/2026-10-08-ask-kiara-design.md`,
+  `docs/superpowers/plans/2026-10-08-ask-kiara-plan.md`. Owner guide and launch/rollback
+  checklist: `docs/ASK_KIARA_PRODUCTION_TESTING.md`. Eval set and runner:
+  `docs/superpowers/evals/ask-kiara/` and `supabase/functions/ask-kiara/eval.local.ts`.
+- Keep it current: AGENTS.md "Keeping Ask Kiara current" (app help + read-tool decision for
+  every new section or major feature); owner review copy `docs/ASK_KIARA_APP_HELP_REVIEW.md`.
+
 ## 4. Database and security state
 
 Migrations `0001` through `0109` are present. They are append-only history;
