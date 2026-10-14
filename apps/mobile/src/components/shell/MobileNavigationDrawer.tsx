@@ -13,7 +13,18 @@ export type MobileNavigationDrawerItem = Readonly<{
   path: string;
 }>;
 
+/** A count on a drawer entry (Ask Kiara's open questions), as the web drawer's NavCountBadge. */
+export function NavCountBadge({ count, label }: { count: number | undefined; label: string }) {
+  if (!count) return null;
+  return (
+    <View accessibilityLabel={`${count} ${label}`} accessibilityRole="text" className="min-w-5 rounded-full bg-task-accent px-1.5">
+      <Text className="text-center text-xs font-bold leading-5 text-white">{count > 99 ? "99+" : count}</Text>
+    </View>
+  );
+}
+
 export function MobileNavigationDrawer({
+  badges,
   branchName,
   currentPath,
   items,
@@ -24,6 +35,8 @@ export function MobileNavigationDrawer({
   roleLabel,
   visible,
 }: {
+  /** Counts shown on entries, by page id. */
+  badges?: Readonly<Record<string, number>> | undefined;
   branchName: string;
   currentPath: string;
   items: readonly MobileNavigationDrawerItem[];
@@ -81,6 +94,7 @@ export function MobileNavigationDrawer({
                     <Text className={cn("text-sm font-semibold", selected ? "text-task-accent" : "text-task-text")} numberOfLines={1}>{label}</Text>
                     <Text className="text-xs text-task-text-muted" numberOfLines={1}>{description}</Text>
                   </View>
+                  <NavCountBadge count={badges?.[id]} label="open questions for you" />
                 </Pressable>
               );
             })}

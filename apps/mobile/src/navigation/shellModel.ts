@@ -16,11 +16,19 @@ import type { ThemeName } from "@jewelos/ui-tokens";
 /**
  * Sections implemented on web whose native screens have not shipped yet. The
  * launcher is built from core, so without this list a new web page would show
- * up natively and open SectionScreen's "not implemented" fallback. Ask Kiara's
- * native screen arrives in its Phase 8 (docs/superpowers/plans/2026-10-08-ask-kiara-plan.md),
- * which removes it from this list.
+ * up natively and open SectionScreen's "not implemented" fallback. Empty since
+ * Ask Kiara's native screen shipped (its Phase 8); keep the list for the next
+ * web-first section.
  */
-export const NATIVE_PENDING_PAGES: readonly PageId[] = ["ask_kiara"];
+export const NATIVE_PENDING_PAGES: readonly PageId[] = [];
+
+/**
+ * Pages that hide the floating "assign a task by voice" button: Ask Kiara's
+ * composer has its own mic and Send button where that button would sit.
+ */
+export function hidesGlobalVoiceAction(page: PageId): boolean {
+  return page === "ask_kiara";
+}
 
 export function isNativePendingPage(page: PageId): boolean {
   return NATIVE_PENDING_PAGES.includes(page);
@@ -131,12 +139,24 @@ export function pageForTopLevelRoute(route: NativeTopLevelRoute): PageId {
   return ROUTE_PAGE[route];
 }
 
+/**
+ * A Section page link that carries a query, such as Ask Kiara's
+ * `/ask-kiara?conversation=<id>`: the page comes from the pathname and the
+ * screen reads the query from the shell path. Tab pages keep exact matching.
+ */
+function sectionPageWithQuery(path: string): PageId | undefined {
+  const query = path.indexOf("?");
+  if (query === -1) return undefined;
+  const page = getPageForPath(path.slice(0, query));
+  return page && !PAGE_ROUTE[page] ? page : undefined;
+}
+
 export function resolveNativeDestination(path: string): NativeDestination | null {
   // `/tasks/fms` is authorized as Tasks on both clients, but natively the FMS
   // tab owns that workspace. A link carrying assigned-work parameters is
   // resolved by `fmsAssignedWorkRoute` at the call site; a bare path lands here.
   if (path === "/tasks/fms" || path.startsWith("/tasks/fms?")) return { kind: "tab", route: "Fms" };
-  const page = getPageForPath(path);
+  const page = getPageForPath(path) ?? sectionPageWithQuery(path);
   if (!page || isNativePendingPage(page)) return null;
   const route = PAGE_ROUTE[page];
   return route ? { kind: "tab", route } : { kind: "section", page };

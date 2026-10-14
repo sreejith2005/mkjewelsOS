@@ -1,4 +1,4 @@
-import { getSupabase as db } from "@jewelos/api-client/client";
+import { getSupabase as db, type JewelosClient } from "@jewelos/api-client/client";
 import {
   createKiaraEventParser,
   parseKiaraEscalationOffer,
@@ -172,20 +172,46 @@ export type AskKiaraOptions = Readonly<{
   stream?: boolean | undefined;
   signal?: AbortSignal | undefined;
   onEvent?: ((event: KiaraStreamEvent) => void) | undefined;
+  /**
+   * The client that calls the function (default: the registered one). Android
+   * passes a client built on `expo/fetch`, whose responses can stream.
+   */
+  functionsClient?: JewelosClient | undefined;
 }>;
 
 export type AskKiaraOutcome =
   | Readonly<{ ok: true; requestId: string; result: KiaraChatResult }>
-  | Readonly<{ ok: false; requestId: string; code: KiaraErrorCode; message: string; quota?: KiaraQuota | undefined; conversationId: string | null }>;
+  | Readonly<{
+    ok: false;
+    requestId: string;
+    code: KiaraErrorCode;
+    message: string;
+    quota?: KiaraQuota | undefined;
+    conversationId: string | null;
+    /** The request never reached the function (the fetch itself failed), so a retry with the same id is safe. */
+    transport?: true | undefined;
+  }>;
 
 const GENERIC_FAILURE = "Kiara could not answer right now. Please try again.";
+
+/**
+ * A fetch Response from any implementation. `expo/fetch` returns its own
+ * class, so `instanceof Response` is not a reliable test on Android.
+ */
+type ResponseLike = Pick<Response, "headers" | "text" | "json" | "clone" | "body">;
+function isResponseLike(value: unknown): value is ResponseLike {
+  if (typeof Response !== "undefined" && value instanceof Response) return true;
+  return typeof value === "object" && value !== null
+    && typeof (value as { text?: unknown }).text === "function"
+    && typeof (value as { json?: unknown }).json === "function";
+}
 
 /** The function's error body ({ error, code, quota }) when it sent one. */
 async function failureFromError(error: unknown): Promise<Readonly<{ code: KiaraErrorCode; message: string; quota?: KiaraQuota | undefined }>> {
   const context = (error as { context?: unknown }).context;
-  if (context instanceof Response) {
+  if (isResponseLike(context)) {
     try {
-      const body = await context.clone().json() as { error?: unknown; code?: unknown; quota?: unknown };
+      const body = await (typeof context.clone === "function" ? context.clone() : context).json() as { error?: unknown; code?: unknown; quota?: unknown };
       return {
         code: typeof body.code === "string" ? body.code as KiaraErrorCode : "unavailable",
         message: typeof body.error === "string" && body.error.trim() ? body.error : GENERIC_FAILURE,
@@ -198,7 +224,7 @@ async function failureFromError(error: unknown): Promise<Readonly<{ code: KiaraE
   return { code: "unavailable", message: GENERIC_FAILURE };
 }
 
-async function readEvents(response: Response, onEvent: (event: KiaraStreamEvent) => void): Promise<void> {
+async function readEvents(response: ResponseLike, onEvent: (event: KiaraStreamEvent) => void): Promise<void> {
   const parser = createKiaraEventParser(onEvent);
   // React Native's fetch has no streaming body; it buffers the same SSE text.
   if (!response.body) {
@@ -225,15 +251,18 @@ async function readEvents(response: Response, onEvent: (event: KiaraStreamEvent)
 export async function askKiara(options: AskKiaraOptions): Promise<AskKiaraOutcome> {
   const requestId = options.requestId ?? newRequestKey();
   const stream = options.stream !== false;
-  const { data, error } = await db().functions.invoke("ask-kiara/chat", {
+  const { data, error } = await (options.functionsClient ?? db()).functions.invoke("ask-kiara/chat", {
     method: "POST",
     body: { conversation_id: options.conversationId, request_id: requestId, message: options.message, client: options.client },
     headers: { Accept: stream ? "text/event-stream" : "application/json" },
     ...(options.signal ? { signal: options.signal } : {}),
   });
-  if (error) return { ok: false, requestId, conversationId: options.conversationId, ...(await failureFromError(error)) };
+  if (error) {
+    const transport = (error as { name?: unknown }).name === "FunctionsFetchError";
+    return { ok: false, requestId, conversationId: options.conversationId, ...(await failureFromError(error)), ...(transport ? { transport: true as const } : {}) };
+  }
 
-  if (!stream || !(data instanceof Response)) {
+  if (!stream || !isResponseLike(data)) {
     if (isRecord(data) && str(data.conversation_id) && str(data.user_message_id) && str(data.assistant_message_id) && str(data.display_text) && str(data.stop_reason)) {
       const quota = parseKiaraQuota(data.quota);
       if (quota) {

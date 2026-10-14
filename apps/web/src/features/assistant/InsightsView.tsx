@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
-import { KIARA_CLASSIFICATION_LABELS, type KiaraClassification } from "@jewelos/core";
+import { KIARA_CLASSIFICATION_LABELS, kiaraDateTime as formatTime, kiaraPlural as plural, kiaraShortDay as formatDay, type KiaraClassification } from "@jewelos/core";
 import { getKiaraInsights, requestKiaraInsightsRefresh, type KiaraInsightFilters, type KiaraInsightRow, type KiaraInsightsView } from "@jewelos/data/assistant/insights";
 import { Button, Notice } from "@/components/ui";
 
@@ -10,17 +10,6 @@ const CLASS_TONES: Readonly<Record<KiaraClassification, string>> = {
   veteran: "border-success/40 bg-success/10 text-success",
 };
 
-const formatDay = (value: string | null) => {
-  if (!value) return null;
-  const date = new Date(`${value.slice(0, 10)}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-};
-const formatTime = (value: string | null) => {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true });
-};
-const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
 /**
  * Insights (assistant.view_insights): a derived, per-employee estimate of SOP

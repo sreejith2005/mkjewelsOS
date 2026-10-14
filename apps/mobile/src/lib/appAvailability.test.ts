@@ -35,4 +35,5 @@ it("shares OS listeners, reports background and reconnect, and releases them aft
   stopSecond();
   expect(native.removeApp).toHaveBeenCalledTimes(1);
   expect(native.removeNetwork).toHaveBeenCalledTimes(1);
-});
+  // The cold dynamic import above takes about 3 s alone; under a full parallel run it can pass 5 s.
+}, 20_000);

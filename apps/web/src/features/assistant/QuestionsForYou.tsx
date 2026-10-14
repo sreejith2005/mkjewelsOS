@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, Loader2, MessageCircleQuestion } from "lucide-react";
-import { KIARA_ESCALATION_REASON_LABELS } from "@jewelos/core";
+import { KIARA_ESCALATION_REASON_LABELS, kiaraRelativeAge as age } from "@jewelos/core";
 import {
   KIARA_ANSWER_MAX_LENGTH,
   answerKiaraEscalation,
@@ -12,16 +12,6 @@ import { Button, Notice } from "@/components/ui";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 
 type View = "open" | "answered";
-
-function age(value: string, now = Date.now()): string {
-  const minutes = Math.max(0, Math.round((now - new Date(value).getTime()) / 60000));
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
-  const days = Math.round(hours / 24);
-  return `${days} day${days === 1 ? "" : "s"} ago`;
-}
 
 /**
  * "Questions for you" (assistant.answer_escalations): questions Kiara could

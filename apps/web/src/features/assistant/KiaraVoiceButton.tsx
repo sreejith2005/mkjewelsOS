@@ -1,4 +1,5 @@
 import { Loader2, Mic, Square } from "lucide-react";
+import { appendKiaraTranscript } from "@jewelos/core";
 import { transcribeKiaraVoice, type KiaraTranscript } from "@jewelos/data/assistant/api";
 import { cn } from "@/lib/utils";
 import { VOICE_NOTE_MAX_SECONDS, useVoiceRecorder, type VoiceRecorder } from "@/features/voice/useVoiceRecorder";
@@ -21,13 +22,8 @@ export function useKiaraVoice(onTranscript: (text: string) => void): VoiceRecord
   });
 }
 
-/** Adds spoken words to whatever is already typed, within the input limit. */
-export function appendTranscript(draft: string, text: string, maxLength: number): string {
-  const words = text.trim();
-  if (!words) return draft;
-  const joined = draft.trim() ? `${draft.replace(/\s+$/, "")} ${words}` : words;
-  return joined.slice(0, maxLength);
-}
+/** Adds spoken words to whatever is already typed, within the input limit (shared with Android). */
+export const appendTranscript = appendKiaraTranscript;
 
 export function KiaraMicButton({ disabled, voice }: { disabled: boolean; voice: VoiceRecorder }) {
   const recording = voice.state === "recording";

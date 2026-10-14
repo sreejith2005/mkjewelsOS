@@ -15,8 +15,10 @@ describe("incoming native app URLs", () => {
     expect(incomingNativePath("jewelos://tasks/fms?form=f", null)).toBeNull();
     expect(incomingNativePath("javascript:alert(1)", null)).toBeNull();
   });
-  it("sends a tapped Ask Kiara link to the notification list (web only for now)", () => {
-    expect(incomingNativePath("jewelos://ask-kiara?conversation=c1", null)).toBe("/notifications");
-    expect(incomingNativePath("https://app.example/ask-kiara?tab=questions&escalation=e1", "https://app.example")).toBe("/notifications");
+  it("opens Ask Kiara links (also from a cold start) with their conversation or question", () => {
+    expect(incomingNativePath("jewelos://ask-kiara", null)).toBe("/ask-kiara");
+    expect(incomingNativePath("jewelos://ask-kiara?conversation=c1", null)).toBe("/ask-kiara?conversation=c1");
+    expect(incomingNativePath("https://app.example/ask-kiara?tab=questions&escalation=e1", "https://app.example")).toBe("/ask-kiara?tab=questions&escalation=e1");
+    expect(incomingNativePath("https://foreign.example/ask-kiara?conversation=c1", "https://app.example")).toBeNull();
   });
 });

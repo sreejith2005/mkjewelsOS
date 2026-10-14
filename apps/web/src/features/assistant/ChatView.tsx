@@ -1,35 +1,16 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { Loader2, SendHorizontal, Sparkles, UserRound } from "lucide-react";
-import type { KiaraCitationData } from "@jewelos/core";
+import { KIARA_DRAFT_COUNTER_FROM, KIARA_SUGGESTIONS, kiaraDateTime } from "@jewelos/core";
+import type { KiaraChatBubble, KiaraChatEscalation } from "@jewelos/data/assistant/chat";
 import { CitationChips } from "./CitationChips";
 import { KiaraMicButton, KiaraVoiceStatus, appendTranscript, useKiaraVoice } from "./KiaraVoiceButton";
 import { KiaraMarkdown } from "./KiaraMarkdown";
 
-export type ChatEscalation = Readonly<{ id: string; status: "open" | "answered" | "withdrawn"; answeredBy: string | null }>;
+/** The bubble model is shared with Android (`@jewelos/data/assistant/chat`). */
+export type ChatEscalation = KiaraChatEscalation;
+export type ChatBubble = KiaraChatBubble;
 
-export type ChatBubble = Readonly<{
-  id: string;
-  /** "human": an answer from a person the question was sent to. */
-  role: "user" | "assistant" | "human";
-  text: string;
-  /** Streaming in progress for this answer. */
-  pending?: boolean | undefined;
-  /** A note shown instead of an answer (failure, refund, interruption). */
-  note?: string | undefined;
-  /** Knowledge-base sources for the answer's [n] markers. */
-  citations?: readonly KiaraCitationData[] | undefined;
-  /** Kiara offered to pass the question to a person (its answer message id). */
-  offer?: Readonly<{ messageId: string; summary: string }> | undefined;
-  /** The escalation made from that offer. */
-  escalation?: ChatEscalation | undefined;
-  /** Human answers: who answered, and when. */
-  answeredBy?: string | undefined;
-  createdAt?: string | undefined;
-}>;
-
-const answeredAt = (value: string | undefined) => value
-  ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(value))
-  : "";
+const answeredAt = (value: string | undefined) => kiaraDateTime(value) ?? "";
 
 /** The "Ask a person" card under an answer, and what happened to the question after. */
 function EscalationCard({ bubble, busy, onAskPerson, onWithdraw }: {
@@ -62,14 +43,9 @@ function EscalationCard({ bubble, busy, onAskPerson, onWithdraw }: {
   return <p className="mt-2 text-xs text-task-text-muted">{escalation.status === "answered" ? `Answered by ${escalation.answeredBy ?? "a person"} (below).` : "You withdrew this question."}</p>;
 }
 
-export const KIARA_SUGGESTIONS = [
-  "What is pending for me today?",
-  "Aaj mera kya pending hai?",
-  "How do I apply for leave?",
-  "Mere overdue tasks kaun se hain?",
-] as const;
+export { KIARA_SUGGESTIONS };
 
-const COUNTER_FROM = 1800;
+const COUNTER_FROM = KIARA_DRAFT_COUNTER_FROM;
 
 export function ChatView({
   bubbles,

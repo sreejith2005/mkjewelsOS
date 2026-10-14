@@ -257,6 +257,7 @@ Status as of 2026-09-21. Source parity is tracked in `MOBILE_PARITY_MATRIX.md`; 
 | Forms library and review | `FormsLibraryScreen`, `FormBuilderScreen`, `FormSubmissionsScreen`, `FormSubmissionScreen` | Lifecycle, authoring, fill, immutable snapshots, file access, approve/reject, delete impact |
 | Dropdown Master | `DropdownMasterScreen` | Status/search/category filters, counts, create/edit, safe deactivate/reactivate |
 | User organization | `UsersScreen`, `features/users/OrganizationTree` | List and hierarchy, status/branch/department/search filters, cycle-safe reporting tree |
+| Ask Kiara | `features/assistant/AskKiaraScreen` (Section stack) | Chat (streaming via `expo/fetch`, JSON fallback), citations, quota, Ask a person, Questions for you + drawer badge, read-only Insights, voice on the shared `features/voice/useVoiceNoteRecorder` (also used by Tasks voice). Knowledge base and Limits stay web-only ("Open on web"). Phase 8, 2026-10-13 |
 
 ### Partial — thin against web
 

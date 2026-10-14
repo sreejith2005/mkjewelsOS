@@ -15,12 +15,14 @@ import { SectionMaintenanceNotice } from "@/components/SectionMaintenanceNotice"
 import { MobileBottomNav } from "@/components/shell/MobileBottomNav";
 import { MobileHeader } from "@/components/shell/MobileHeader";
 import { MobileNavigationDrawer, type MobileNavigationDrawerItem } from "@/components/shell/MobileNavigationDrawer";
+import { kiaraBadgeEnabled } from "@/features/assistant/askKiaraModel";
+import { useKiaraEscalationBadge } from "@/features/assistant/useKiaraEscalationBadge";
 import { GlobalVoiceTaskButton } from "@/features/tasks/GlobalVoiceTaskButton";
 import { titleCase } from "@/lib/format";
 import { createRefreshLifecycle } from "@/lib/refreshLifecycle";
 import { subscribeAppAvailability } from "@/lib/useTenantRealtimeRefresh";
 import {
-  buildLauncherItems, crmTabFullScreen, navigatePath, pageDecision, pageForTopLevelRoute, pathForTopLevelRoute,
+  buildLauncherItems, crmTabFullScreen, hidesGlobalVoiceAction, navigatePath, pageDecision, pageForTopLevelRoute, pathForTopLevelRoute,
   type NativeTopLevelRoute, type ShellAccess,
 } from "@/navigation/shellModel";
 import type { TabParamList, RootStackParamList } from "@/navigation/types";
@@ -54,7 +56,6 @@ const PAGE_ICONS: Record<PageId, MobileNavigationDrawerItem["Icon"]> = {
   reports: FileSpreadsheet,
   dropdown_master: ListFilter,
   settings: Settings,
-  // Hidden natively until Phase 8 (NATIVE_PENDING_PAGES); the map stays exhaustive.
   ask_kiara: Sparkles,
 };
 
@@ -124,13 +125,13 @@ function SectionGate({ page, children }: { page: PageId; children: ReactNode }) 
   return <>{children}</>;
 }
 
-function ShellPage({ children, raiseVoiceAction = false }: { children: ReactNode; raiseVoiceAction?: boolean }) {
+function ShellPage({ children, raiseVoiceAction = false, hideVoiceAction = false }: { children: ReactNode; raiseVoiceAction?: boolean; hideVoiceAction?: boolean }) {
   const profile = useProfile();
   const { setDrawerOpen, shellAccess } = useShell();
   const navigate = usePathNavigation();
   // Offered on the same terms as the Create Task voice card, and only while
   // the Tasks section is open to this user.
-  const canUseVoice = hasPermission(shellAccess.access, "tasks.voice_assign") && pageDecision(shellAccess, "checklist_tasks") === "allowed";
+  const canUseVoice = !hideVoiceAction && hasPermission(shellAccess.access, "tasks.voice_assign") && pageDecision(shellAccess, "checklist_tasks") === "allowed";
   return (
     <View className="flex-1 bg-obsidian">
       <MobileHeader onNavigate={navigate} onOpenNavigation={() => setDrawerOpen(true)} profileId={profile.id} profileName={profile.employee_name} />
@@ -172,8 +173,9 @@ function CrmTab() {
 }
 function SectionTab() {
   const { params } = useRoute<RouteProp<TabParamList, "Section">>();
+  const { path } = useShell();
   const navigate = usePathNavigation();
-  return <ShellPage><SectionGate page={params.page}><SectionScreen onNavigate={navigate} /></SectionGate></ShellPage>;
+  return <ShellPage hideVoiceAction={hidesGlobalVoiceAction(params.page)}><SectionGate page={params.page}><SectionScreen onNavigate={navigate} path={path} /></SectionGate></ShellPage>;
 }
 
 function ParityTabBar({ navigation, state }: BottomTabBarProps) {
@@ -195,6 +197,8 @@ function ParityTabBar({ navigation, state }: BottomTabBarProps) {
   const launcherItems = useMemo<MobileNavigationDrawerItem[]>(() =>
     buildLauncherItems(shell.shellAccess).map((item) => ({ ...item, Icon: PAGE_ICONS[item.id] })),
   [shell.shellAccess]);
+  // Open Ask Kiara questions this user may answer, on the drawer entry (as the web shell does).
+  const kiaraBadge = useKiaraEscalationBadge(profile.tenant_id, kiaraBadgeEnabled(shell.shellAccess));
 
   // The full-screen CRM has no JewelOS dock, as on web; its own menu and "← JewelOS" lead back.
   if (current?.name === "Crm" && crmTabFullScreen(shell.shellAccess)) return null;
@@ -206,6 +210,7 @@ function ParityTabBar({ navigation, state }: BottomTabBarProps) {
         path={currentPath}
       />
       <MobileNavigationDrawer
+        badges={kiaraBadge ? { ask_kiara: kiaraBadge } : undefined}
         branchName={branch?.name ?? "Branch unavailable"}
         currentPath={currentPath}
         items={launcherItems}

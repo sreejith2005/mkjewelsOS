@@ -14,12 +14,18 @@ import { RecurringTodoScreen } from "@/screens/RecurringTodoScreen";
 import { TaskControlScreen } from "@/screens/TaskControlScreen";
 import { UsersScreen } from "@/screens/UsersScreen";
 import { DropdownMasterScreen } from "@/screens/DropdownMasterScreen";
+import { AskKiaraScreen } from "@/features/assistant/AskKiaraScreen";
 
 type Route = RouteProp<TabParamList, "Section">;
 
-/** Routes every web-implemented launcher page to its real native workspace. */
-export function SectionScreen({ onNavigate }: { onNavigate: (path: string) => void }) {
+/**
+ * Routes every web-implemented launcher page to its real native workspace.
+ * `path` is the shell's current link, which carries Ask Kiara's query
+ * (`?conversation=`, `?tab=questions&escalation=`).
+ */
+export function SectionScreen({ onNavigate, path = "" }: { onNavigate: (path: string) => void; path?: string }) {
   const { params } = useRoute<Route>();
+  if (params.page === "ask_kiara") return <AskKiaraScreen onNavigate={onNavigate} path={path.startsWith("/ask-kiara") ? path : "/ask-kiara"} />;
   if (params.page === "dashboard") return <DashboardScreen />;
   if (params.page === "notifications") return <NotificationsScreen onNavigate={onNavigate} />;
   if (params.page === "availability") return <AvailabilityScreen />;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { BarChart3, BookOpen, Gauge, MessageCircleQuestion, MessagesSquare, Sparkles, type LucideIcon } from "lucide-react";
-import { formatQuotaReset, hasPermission, isQuotaExhausted, type KiaraQuota } from "@jewelos/core";
+import { hasPermission, kiaraComposerDisabledReason, kiaraLocation, type KiaraQuota, type KiaraTab } from "@jewelos/core";
 import {
   KIARA_CONVERSATION_QUESTION_LIMIT,
   KIARA_QUESTION_MAX_LENGTH,
@@ -9,9 +9,15 @@ import {
   getMyKiaraConversation,
   getMyKiaraQuota,
   listMyKiaraConversations,
-  type KiaraConversation,
   type KiaraConversationSummary,
 } from "@jewelos/data/assistant/api";
+import {
+  kiaraAnswerAfterEvent,
+  kiaraAnswerFromResult,
+  kiaraBubblesWithEscalation,
+  kiaraBubblesWithdrawn,
+  kiaraChatBubbles,
+} from "@jewelos/data/assistant/chat";
 import { createKiaraEscalation, withdrawMyKiaraEscalation } from "@jewelos/data/assistant/escalations";
 import { useAuth } from "@/auth/AuthContext";
 import { Notice } from "@/components/ui";
@@ -25,41 +31,9 @@ import { KnowledgeBaseView } from "@/features/assistant/knowledge/KnowledgeBaseV
 import { InsightsView } from "@/features/assistant/InsightsView";
 import { LimitsView } from "@/features/assistant/LimitsView";
 
-type KiaraTab = "chat" | "questions" | "knowledge" | "insights" | "limits";
-const KIARA_TABS: readonly KiaraTab[] = ["chat", "questions", "knowledge", "insights", "limits"];
-/** The tab and item a URL opens (notification links use these). */
-export function kiaraLocation(search: string): Readonly<{ tab: KiaraTab; escalationId: string | null; conversationId: string | null }> {
-  const params = new URLSearchParams(search);
-  const tab = params.get("tab");
-  return {
-    tab: (KIARA_TABS as readonly (string | null)[]).includes(tab) ? tab as KiaraTab : "chat",
-    escalationId: params.get("escalation"),
-    conversationId: params.get("conversation"),
-  };
-}
-
-/** Display bubbles for a stored conversation. A question without an answer says why. */
-export function bubblesFor(conversation: KiaraConversation): ChatBubble[] {
-  const answered = new Set(conversation.messages.flatMap((message) => message.reply_to_message_id ? [message.reply_to_message_id] : []));
-  return conversation.messages.flatMap((message): ChatBubble[] => {
-    if (message.role === "user") {
-      const bubble: ChatBubble = { id: message.id, role: "user", text: message.display_text };
-      if (answered.has(message.id)) return [bubble];
-      return [bubble, { id: `${message.id}:missing`, role: "assistant", text: "", note: message.refunded ? "Kiara could not answer this one, so it was not counted." : "No answer was saved for this question." }];
-    }
-    if (message.role === "human_answer") {
-      return [{ id: message.id, role: "human", text: message.display_text, answeredBy: message.answered_by ?? undefined, createdAt: message.created_at }];
-    }
-    return [{
-      id: message.id,
-      role: "assistant",
-      text: message.display_text,
-      citations: message.citations,
-      ...(message.escalation_offer ? { offer: { messageId: message.id, summary: message.escalation_offer.summary_en } } : {}),
-      ...(message.escalation ? { escalation: { id: message.escalation.id, status: message.escalation.status, answeredBy: message.escalation.answered_by } } : {}),
-    }];
-  });
-}
+/** The tab and item a URL opens, and the bubbles for a stored chat: shared with Android. */
+export { kiaraLocation };
+export const bubblesFor = kiaraChatBubbles;
 
 const errorText = (caught: unknown, fallback: string) => caught instanceof Error && caught.message ? caught.message : fallback;
 
@@ -161,7 +135,7 @@ export function AskKiaraPage({ onNavigate, search = window.location.search }: { 
   useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["assistant"], refresh: refreshActive });
 
   const updateBubbleEscalation = (messageId: string, escalation: NonNullable<ChatBubble["escalation"]>) =>
-    setBubbles((current) => current.map((bubble) => bubble.offer?.messageId === messageId ? { ...bubble, escalation } : bubble));
+    setBubbles((current) => kiaraBubblesWithEscalation(current, messageId, escalation));
   const askPerson = async (messageId: string) => {
     setEscalationBusy(true);
     setNotice(null);
@@ -179,7 +153,7 @@ export function AskKiaraPage({ onNavigate, search = window.location.search }: { 
     setNotice(null);
     try {
       await withdrawMyKiaraEscalation(escalationId);
-      setBubbles((current) => current.map((bubble) => bubble.escalation?.id === escalationId ? { ...bubble, escalation: { ...bubble.escalation, status: "withdrawn" } } : bubble));
+      setBubbles((current) => kiaraBubblesWithdrawn(current, escalationId));
     } catch (caught) {
       setNotice(errorText(caught, "The question could not be withdrawn."));
       void refreshActive();
@@ -232,30 +206,16 @@ export function AskKiaraPage({ onNavigate, search = window.location.search }: { 
           setQuestionCount((count) => count + 1);
         } else if (event.event === "status") {
           setStatus(event.data.label);
-        } else if (event.event === "delta") {
-          updateAnswer((bubble) => ({ ...bubble, text: bubble.text + event.data.text }));
-        } else if (event.event === "citation") {
-          updateAnswer((bubble) => ({ ...bubble, citations: [...(bubble.citations ?? []), event.data] }));
-        } else if (event.event === "escalation_offer") {
-          const offer = { messageId: event.data.message_id, summary: event.data.summary };
-          updateAnswer((bubble) => ({ ...bubble, offer }));
-        } else if (event.event === "done") {
-          updateAnswer((bubble) => ({ ...bubble, text: event.data.display_text, pending: false }));
-          applyQuota(event.data.quota);
+        } else {
+          updateAnswer((bubble) => kiaraAnswerAfterEvent(bubble, event));
+          if (event.event === "done") applyQuota(event.data.quota);
         }
       },
     });
     setStatus(null);
     setSending(false);
     if (outcome.ok) {
-      const offer = outcome.result.escalation_offer;
-      updateAnswer((bubble) => ({
-        ...bubble,
-        text: outcome.result.display_text,
-        pending: false,
-        citations: outcome.result.citations,
-        ...(offer ? { offer: { messageId: offer.message_id, summary: offer.summary } } : {}),
-      }));
+      updateAnswer((bubble) => kiaraAnswerFromResult(bubble, outcome.result));
       void refreshList();
       return;
     }
@@ -272,10 +232,7 @@ export function AskKiaraPage({ onNavigate, search = window.location.search }: { 
     void refreshList();
   };
 
-  const conversationFull = activeId !== null && questionCount >= KIARA_CONVERSATION_QUESTION_LIMIT;
-  const disabledReason = quota && isQuotaExhausted(quota)
-    ? `You have used all ${quota.limit} questions for today. They reset at ${formatQuotaReset(quota)}.`
-    : conversationFull ? "This chat is full. Press \"New chat\" to keep asking." : null;
+  const disabledReason = kiaraComposerDisabledReason({ quota, activeConversationId: activeId, questionCount, conversationLimit: KIARA_CONVERSATION_QUESTION_LIMIT });
   const firstName = (profile?.employee_name ?? "").trim().split(/\s+/)[0] ?? "";
 
   const tabList = ([
