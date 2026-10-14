@@ -531,6 +531,25 @@ Exit criteria: parity matrix entries for Ask Kiara pass on a physical Android ph
 Exit criteria: eval pass rates agreed with the owner; hosted smoke evidence recorded separately from
 local evidence; owner sign-off before enabling.
 
+**Built (2026-10-14, branch `feat/ask-kiara-phase9`; no migration; `ask-kiara` function change only).**
+- Eval: every case runs on one synthetic tenant (`integration.fixture.sql` + `eval.fixture.sql`, CRM
+  cases with `crm.integration.fixture.sql` mapped to the same users) through
+  `supabase/functions/ask-kiara/eval.local.ts`, which grades tools, knowledge searches and offers from
+  the stored turn and the text with a Claude judge that sees the turn's tool results. 97 cases
+  (27 new). Final run: 96/97 (staff 53/54, CRM 10/10, HR 6/6, manager 16/16, admin 4/4, super admin
+  7/7); all 9 injection cases pass. The one failure is a stray Devanagari word in a Latin-letter
+  Hinglish reply.
+- Fixes from the runs: the prompt matches the script of the question; after a tool error Kiara says
+  so instead of answering from another tool; a client contact request is looked up (last 4 digits +
+  link); "where to do it" comes from app help; sentences addressed to an assistant are left out of
+  notes. Tool descriptions say Dashboard `overdue_open` is open overdue work now and Task Control
+  counts tasks planned in the period. An auth outage or timeout answers 503, not 401. A server
+  "Message script" line in the turn context was tried and reverted (it made language choice worse).
+- Effort stays `low` (no quality gap found that effort would fix); production has too few
+  questions (12 by 2026-10-14) to tune ranking or retry sizes.
+- Leftovers: CRM pgTAP green (legacy-branch test re-runs the recorded migration SQL; the shared
+  fixture is `.psql`; walk-in tests seed the department-aware roster); `.gitattributes` keeps SQL LF.
+
 ## Review checklist (every phase)
 
 - No service-role client in the answer path; no data read outside a caller-scoped contract.
