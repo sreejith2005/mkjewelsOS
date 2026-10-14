@@ -8,6 +8,10 @@ insert into users(id,name,email,role,branch_id,active) values
 ('20261007-0013-4000-8000-000000000003','Synthetic Branch Staff','seller13@example.invalid','salesperson','20261007-0013-4000-8000-000000000001',true);
 insert into crm_sso_access_grants(jewelos_user_id,work_email,legacy_crm_user_id,crm_auth_user_id,active)
 select id,email,id,id,true from users where id in ('20261007-0013-4000-8000-000000000002','20261007-0013-4000-8000-000000000003');
+-- The department-aware roster (20261013000100) needs current synced staff metadata:
+-- the salesperson is synced from Sales, the other staff from CRM.
+insert into crm_private.staff_sync_state(jewelos_user_id,snapshot_at,outcome,crm_user_id,selection_department)
+select id,now(),'applied',id,case when role='salesperson' then 'sales' else 'crm' end from users where id::text like '20261007-0013-4000-8000-00000000000_';
 \ir fixtures/crm_master_options.psql
 set local role authenticated;
 select set_config('request.jwt.claim.role','authenticated',true);
