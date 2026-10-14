@@ -14399,6 +14399,18 @@ export type Database = {
         Args: { p_approve: boolean; p_id: string; p_remark: string }
         Returns: undefined
       }
+      delete_leave_requests_with_audit: {
+        Args: { p_ids: string[] }
+        Returns: number
+      }
+      restore_deleted_leave_coverage: {
+        Args: { p_date: string; p_user: string }
+        Returns: undefined
+      }
+      leave_file_retained_for_audit: {
+        Args: { p_path: string }
+        Returns: boolean
+      }
       review_resignation_with_audit: {
         Args: { p_decision: string; p_resignation_id: string }
         Returns: {

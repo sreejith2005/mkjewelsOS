@@ -13,7 +13,7 @@ const leave = (id: string, reference: string) => ({
 
 const api = vi.hoisted(() => ({
   canSubmitLeave: vi.fn(), editPendingLeave: vi.fn(), leaveHandoverCandidates: vi.fn(), leaveSummaryApplicants: vi.fn(), leaveTypes: vi.fn(),
-  listLeaveRequests: vi.fn(), reviewLeave: vi.fn(), signedLeaveImage: vi.fn(), submitHandover: vi.fn(), submitLeave: vi.fn(),
+  listLeaveRequests: vi.fn(), deleteLeaveRequests: vi.fn(), reviewLeave: vi.fn(), signedLeaveImage: vi.fn(), submitHandover: vi.fn(), submitLeave: vi.fn(),
 }));
 const actor = vi.hoisted(() => ({ role: "staff" as "staff" | "super_admin" }));
 vi.mock("@jewelos/data/leave/api", () => api);
@@ -64,5 +64,43 @@ describe("LeaveApplications handover", () => {
     expect(screen.getByRole("button", { name: "Selected" })).toBeTruthy();
     await waitFor(() => expect(Element.prototype.scrollIntoView).toHaveBeenCalled());
     await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Handover done?")));
+  });
+
+  it("confirms individual removal and refreshes the summary", async () => {
+    actor.role = "super_admin";
+    api.canSubmitLeave.mockResolvedValue(false);
+    api.deleteLeaveRequests.mockResolvedValue(1);
+    render(<LeaveApplications />);
+    fireEvent.click((await screen.findAllByRole("button", { name: "Delete" }))[0]!);
+    expect(api.deleteLeaveRequests).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "Delete leave requests" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(api.deleteLeaveRequests).not.toHaveBeenCalled();
+    fireEvent.click(screen.getAllByRole("button", { name: "Delete" })[0]!);
+    api.listLeaveRequests.mockResolvedValue([leave("two", "RICHELLE-25-SEP-2026-110000")]);
+    fireEvent.click(screen.getByRole("button", { name: "Confirm deletion" }));
+    await waitFor(() => expect(screen.queryByText("RICHELLE-25-SEP-2026-100000")).toBeNull());
+    expect(api.deleteLeaveRequests).toHaveBeenCalledWith(["one"]);
+    expect(screen.getByText("1 leave request deleted.")).toBeTruthy();
+  });
+
+  it("selects all for bulk removal and keeps entries on failure", async () => {
+    actor.role = "super_admin";
+    api.canSubmitLeave.mockResolvedValue(false);
+    api.deleteLeaveRequests.mockRejectedValue(new Error("Deletion denied"));
+    render(<LeaveApplications />);
+    fireEvent.click(await screen.findByLabelText("Select all leave requests"));
+    fireEvent.click(screen.getByRole("button", { name: "Delete selected (2)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm deletion" }));
+    expect(await screen.findByText("Deletion denied")).toBeTruthy();
+    expect(api.deleteLeaveRequests).toHaveBeenCalledWith(["one", "two"]);
+    expect(screen.getAllByText("RICHELLE-25-SEP-2026-100000").length).toBeGreaterThan(0);
+  });
+
+  it("does not offer deletion to ordinary users", async () => {
+    render(<LeaveApplications />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Leave summary" }));
+    expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+    expect(screen.queryByLabelText("Select all leave requests")).toBeNull();
   });
 });

@@ -32,6 +32,13 @@ const withSection = (page: keyof SectionControls["section_availability"], enable
 });
 
 describe("permission catalog", () => {
+  it("reserves leave deletion for Super Admin authority regardless of action overrides", () => {
+    expect(isConfigurablePermission("availability.delete_leave")).toBe(false);
+    for (const role of USER_ROLES) {
+      expect(explainPermission({ role, dashboardAuthority: null, userOverrides: { "availability.delete_leave": "grant" } }, "availability.delete_leave").effective).toBe(role === "super_admin");
+    }
+  });
+
   it("configures assignment independently of team authority with individual and department precedence", () => {
     expect(isConfigurablePermission("tasks.assign_others")).toBe(true);
     const subject = { role: "manager" as const, dashboardAuthority: null, departmentOverrides: { "tasks.assign_others": "deny" as const } };
@@ -80,7 +87,7 @@ describe("permission catalog", () => {
     expect(isConfigurablePermission("users.manage")).toBe(true);
     expect(isConfigurablePermission("tasks.view_all")).toBe(false);
     expect(isConfigurablePermission("permissions.manage")).toBe(false);
-    expect(PERMISSION_CATALOG.filter((item) => item.kind === "protected").map((item) => item.key).sort()).toEqual(["assistant.manage_limits", "developer_mode.manage", "organization.manage", "permissions.manage"]);
+    expect(PERMISSION_CATALOG.filter((item) => item.kind === "protected").map((item) => item.key).sort()).toEqual(["assistant.manage_limits", "availability.delete_leave", "developer_mode.manage", "organization.manage", "permissions.manage"]);
   });
 });
 

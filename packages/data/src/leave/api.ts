@@ -127,3 +127,10 @@ export async function signedLeaveImage(path: string): Promise<string> {
   if (!data) throw new Error("Approval image could not be opened");
   return data.signedUrl;
 }
+
+export async function deleteLeaveRequests(ids: readonly string[]): Promise<number> {
+  const { data, error } = await db().rpc("delete_leave_requests_with_audit", { p_ids: [...ids] });
+  fail(error, "Delete leave requests");
+  if (data === null) throw new Error("Leave deletion did not return a result");
+  return data;
+}

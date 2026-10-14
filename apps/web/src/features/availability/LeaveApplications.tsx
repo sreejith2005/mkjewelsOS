@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { countLeaveDays, formatLeaveDate, hasPermission, leaveInformStatus, leaveNeedsHandover, leaveSummaryTotals, type LeaveHalf, type ReturnHalf } from "@jewelos/core";
-import { canSubmitLeave, editPendingLeave, leaveHandoverCandidates, leaveSummaryApplicants, leaveTypes, listLeaveRequests, reviewLeave, signedLeaveImage, submitHandover, submitLeave, type LeaveDraft, type LeaveRequest } from "@jewelos/data/leave/api";
+import { canSubmitLeave, deleteLeaveRequests, editPendingLeave, leaveHandoverCandidates, leaveSummaryApplicants, leaveTypes, listLeaveRequests, reviewLeave, signedLeaveImage, submitHandover, submitLeave, type LeaveDraft, type LeaveRequest } from "@jewelos/data/leave/api";
 import { useAuth } from "@/auth/AuthContext";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
-import { Button, Notice } from "@/components/ui";
+import { Button, Modal, Notice } from "@/components/ui";
 
 const durations: LeaveHalf[] = ["FULL DAY", "1ST HALF", "2ND HALF"];
 const halves: ReturnHalf[] = ["1ST HALF", "2ND HALF"];
@@ -24,6 +24,9 @@ export function LeaveApplications() {
   const { access, branch, profile } = useAuth();
   const canReview = hasPermission(access, "availability.review_leave") && hasPermission(access, "availability.manage_others");
   const canViewOffice = hasPermission(access, "availability.view_leave_summary");
+  const canDelete = hasPermission(access, "availability.delete_leave");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [deleteIds, setDeleteIds] = useState<string[] | null>(null);
   const [canApply, setCanApply] = useState<boolean | null>(null);
   const [tab, setTab] = useState<Tab>("apply");
   const [types, setTypes] = useState<Array<{ value: string; label: string }>>([]);
@@ -56,6 +59,7 @@ export function LeaveApplications() {
         leaveTypes(), leaveHandoverCandidates(), canSubmitLeave(), canViewOffice ? leaveSummaryApplicants() : Promise.resolve([]),
       ]);
       setRows([...summaryRows, ...reviewRows.filter((row) => !summaryRows.some((summary) => summary.id === row.id))]);
+      setSelectedIds((current) => current.filter((id) => summaryRows.some((row) => row.id === id)));
       setTypes(nextTypes); setPeople(nextPeople); setApplicants(nextApplicants);
       setCanApply(applicantEligible);
       if (!applicantEligible) setTab((current) => current === "apply" ? (canViewOffice ? "history" : canReview ? "review" : "history") : current);
@@ -82,6 +86,9 @@ export function LeaveApplications() {
   const handoverRows = useMemo(() => myRows.filter(leaveNeedsHandover), [myRows]);
   const summaryRows = canViewOffice ? rows : myRows;
   const totals = useMemo(() => leaveSummaryTotals(summaryRows), [summaryRows]);
+  const selectableRows = summaryRows.slice(0, 500);
+  const allSelected = selectableRows.length > 0 && selectableRows.every((row) => selectedIds.includes(row.id));
+  const toggleSelection = (id: string) => setSelectedIds((current) => current.includes(id) ? current.filter((value) => value !== id) : current.length < 500 ? [...current, id] : current);
   const peopleById = useMemo(() => new Map(people.map((person) => [person.id, person])), [people]);
   const applicantNames = useMemo(() => new Map(applicants.map((person) => [person.id, person.employee_name])), [applicants]);
   const selectedHandover = handoverRows.find((row) => row.id === handoverId) ?? null;
@@ -101,6 +108,15 @@ export function LeaveApplications() {
     catch (caught) { setError(caught instanceof Error ? caught.message : "Leave action failed"); }
     finally { setBusy(false); }
   };
+  const confirmDeletion = () => {
+    if (!canDelete || !deleteIds || busy) return;
+    const ids = deleteIds;
+    void run(async () => {
+      await deleteLeaveRequests(ids);
+      setSelectedIds((current) => current.filter((id) => !ids.includes(id)));
+      setDeleteIds(null);
+    }, `${ids.length} leave request${ids.length === 1 ? "" : "s"} deleted.`);
+  };
   const openImage = async (path: string) => {
     try { window.open(await signedLeaveImage(path), "_blank", "noopener,noreferrer"); }
     catch (caught) { setError(caught instanceof Error ? caught.message : "Image unavailable"); }
@@ -114,7 +130,7 @@ export function LeaveApplications() {
     {canApply !== null ? <div className="flex flex-wrap gap-2" role="tablist" aria-label="Leave management">
       {tabs.map((item) => <Button aria-selected={tab === item} key={item} onClick={() => switchTab(item)} role="tab" variant={tab === item ? "primary" : "secondary"}>{tabLabels[item]}{item === "handover" && handoverRows.length ? ` (${handoverRows.length})` : ""}</Button>)}
     </div> : null}
-    {error ? <Notice tone="danger">{error}</Notice> : null}
+    {error && !deleteIds ? <Notice tone="danger">{error}</Notice> : null}
     {message ? <Notice tone="success">{message}</Notice> : null}
 
     {tab === "apply" && canApply ? <form className="grid gap-4 rounded-xl border border-gold/15 p-4 sm:grid-cols-2" onSubmit={(event) => {
@@ -184,7 +200,16 @@ export function LeaveApplications() {
         </div>)}
       </div>
       <h3 className="font-semibold text-champagne">{canViewOffice ? "Office leave history" : "My leave history"}</h3>
+      {canDelete && summaryRows.length > 0 ? <div className="flex flex-wrap items-center gap-3">
+        <label className="flex min-h-10 items-center gap-2"><input type="checkbox" aria-label="Select all leave requests" checked={allSelected} disabled={busy} onChange={() => setSelectedIds(allSelected ? [] : selectableRows.map((row) => row.id))} />Select all</label>
+        <Button variant="danger" disabled={busy || selectedIds.length === 0} onClick={() => setDeleteIds([...selectedIds])}>Delete selected ({selectedIds.length})</Button>
+        <span className="text-sm text-soft-grey">Select up to 500 requests per batch.</span>
+      </div> : null}
       {summaryRows.length === 0 ? <Notice tone="task">No leave applications yet.</Notice> : summaryRows.map((row) => <article className="space-y-2 rounded-xl border border-gold/15 p-4 text-sm" key={row.id}>
+        {canDelete ? <div className="flex items-center justify-between gap-2">
+          <label className="flex min-h-10 items-center gap-2"><input type="checkbox" aria-label={`Select ${row.reference_code}`} checked={selectedIds.includes(row.id)} disabled={busy || (selectedIds.length >= 500 && !selectedIds.includes(row.id))} onChange={() => toggleSelection(row.id)} />Select</label>
+          <Button variant="danger" disabled={busy} onClick={() => setDeleteIds([row.id])}>Delete</Button>
+        </div> : null}
         <div className="flex flex-wrap items-start justify-between gap-2"><div><strong>{canViewOffice ? `${applicantNames.get(row.applicant_id) ?? (row.applicant_id === profile.id ? profile.employee_name : row.applicant_id)} · ` : ""}{row.leave_type} · {row.duration}</strong><p className="font-mono text-xs text-soft-grey">{row.reference_code}</p></div><StatusPill status={row.status} /></div>
         <p>{formatLeaveDate(row.leave_start)} to {formatLeaveDate(row.leave_end)} · {row.total_leave_count} days · {row.inform_status}</p>
         {canViewOffice ? <p>Reason: {row.reason}</p> : null}
@@ -207,5 +232,13 @@ export function LeaveApplications() {
     </div> : null}
 
     {tab === "review" && canReview ? <div className="space-y-3">{rows.filter((row) => row.status === "pending").map((row) => <article className="space-y-2 rounded-xl border border-gold/15 p-4 text-sm" key={row.id}><strong>{peopleById.get(row.applicant_id)?.employee_name ?? row.applicant_id} · {row.leave_type}</strong><p className="font-mono text-xs text-soft-grey">{row.reference_code}</p><p>{formatLeaveDate(row.leave_start)} to {formatLeaveDate(row.leave_end)} · {row.total_leave_count} days · {row.inform_status}</p><p>{row.reason}</p><p>Handover: {row.handed_over_at ? peopleById.get(row.handover_to ?? "")?.employee_name ?? "Done" : "Pending"}</p><div className="flex gap-2"><Button onClick={() => void openImage(row.tl_approval_path)} variant="secondary">TL approval</Button>{row.handover_approval_path ? <Button onClick={() => void openImage(row.handover_approval_path!)} variant="secondary">Handover proof</Button> : null}</div>{reviewId === row.id ? <><label className="block">HR remark<textarea className="task-field mt-1 w-full" maxLength={1000} value={remark} onChange={(e) => setRemark(e.target.value)} /></label><div className="flex gap-2"><Button disabled={busy || row.applicant_id === profile.id} onClick={() => void run(async () => { await reviewLeave(row.id, true, remark); setReviewId(null); setRemark(""); }, "Leave approved and Availability updated.")}>Approve</Button><Button disabled={busy || row.applicant_id === profile.id || !remark.trim()} onClick={() => void run(async () => { await reviewLeave(row.id, false, remark); setReviewId(null); setRemark(""); }, "Leave rejected.")} variant="secondary">Reject</Button></div></> : <Button disabled={row.applicant_id === profile.id} onClick={() => { setReviewId(row.id); setRemark(""); }} variant="secondary">Review this request</Button>}</article>)}{rows.every((row) => row.status !== "pending") ? <Notice tone="task">No pending requests.</Notice> : null}</div> : null}
+    {canDelete && deleteIds ? <Modal title="Delete leave requests" onClose={() => { if (!busy) setDeleteIds(null); }}>
+      <div className="space-y-4">
+        <p>Delete {deleteIds.length} leave request{deleteIds.length === 1 ? "" : "s"}? They will be removed from leave history and summary totals. Linked availability will be reconciled. Audit history and private approval evidence will be retained.</p>
+        <ul className="max-h-48 overflow-auto text-sm">{deleteIds.map((id) => <li key={id}>{rows.find((row) => row.id === id)?.reference_code ?? id}</li>)}</ul>
+        {error ? <Notice tone="danger">{error}</Notice> : null}
+        <div className="flex flex-wrap gap-2"><Button variant="secondary" disabled={busy} onClick={() => setDeleteIds(null)}>Cancel</Button><Button variant="danger" disabled={busy} onClick={confirmDeletion}>{busy ? "Deleting…" : "Confirm deletion"}</Button></div>
+      </div>
+    </Modal> : null}
   </section>;
 }

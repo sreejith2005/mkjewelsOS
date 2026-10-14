@@ -32,6 +32,7 @@ select ok(not has_function_privilege('anon', 'rls_auto_enable()', 'EXECUTE'), 'f
 select ok(not has_function_privilege('authenticated', 'rls_auto_enable()', 'EXECUTE'), 'future public functions do not default-grant authenticated');
 select ok(not has_function_privilege('service_role', 'rls_auto_enable()', 'EXECUTE'), 'future public functions do not default-grant service_role');
 
+-- 0234 adds three definers, with two authenticated entry points for deletion and Storage policy references.
 -- Current application-function matrix, including the linked-only helper above.
 -- 0212 adds three owner-only functions and makes the activation dispatcher a definer.
 -- 0206/0207 add 10 functions (8 definers), 5 authenticated entry points.
@@ -44,14 +45,14 @@ select is((
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
-), 505, 'exactly 505 postgres-owned public application functions exist in the current migration set');
+), 508, 'exactly 508 postgres-owned public application functions exist in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres' and p.prosecdef
-), 431, 'exactly 431 public application functions are SECURITY DEFINER in the current migration set');
+), 434, 'exactly 434 public application functions are SECURITY DEFINER in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -67,7 +68,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 242, 'authenticated can execute exactly 242 reviewed public application functions');
+), 244, 'authenticated can execute exactly 244 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -83,7 +84,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('postgres', p.oid, 'EXECUTE')
-), 505, 'postgres retains owner execution on every public application function');
+), 508, 'postgres retains owner execution on every public application function');
 select ok(not has_function_privilege('authenticated', 'reject_watcher_task_mutation()', 'EXECUTE'), 'watcher guard trigger cannot be called directly');
 
 -- Exact authenticated allowlist: baseline, Forms, and reviewed FMS entry points.
@@ -244,6 +245,7 @@ select is((
   'delete_form_draft_with_audit(uuid)',
   'delete_form_with_audit(uuid)',
   'delete_kiara_document_with_audit(uuid)',
+  'delete_leave_requests_with_audit(uuid[])',
   'delete_recurring_todo_template_with_audit(uuid)',
   'duplicate_form_with_audit(uuid,text)',
   'edit_pending_leave(uuid,date,date,date,text)',
@@ -281,6 +283,7 @@ select is((
   'kiara_knowledge_object_writable(text)',
   'leave_applicant_eligible()',
   'leave_file_readable(text)',
+  'leave_file_retained_for_audit(text)',
   'leave_file_writable(text)',
   'list_assigning_left_tasks()',
   'list_designation_daily_checklists()',
