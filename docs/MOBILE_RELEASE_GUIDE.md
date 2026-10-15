@@ -46,10 +46,10 @@ Hard rules:
 |---|---|
 | App name | JewelOS |
 | Android package | `com.jewelos.mobile` (never change it; a new id is a different app) |
-| Source | `apps/mobile` — Expo SDK 57 / React Native 0.86, a real native app, not a WebView |
+| Source | `apps/mobile` — Expo SDK 57 / React Native 0.86: a native shell that shows the web app full screen in one WebView (since 2026-10-15; see below) |
 | Shared logic | `packages/core`, `packages/data`, `packages/ui-tokens` (shared with `apps/web`) |
-| Backend | Hosted Supabase `yimafxhuwgfhvzczqqdd.supabase.co` (same as web) |
-| Web app | `apps/web`, deployed separately on Vercel. Not affected by mobile releases. |
+| Web origin | `https://mkjewels-os.vercel.app`, built in from `EXPO_PUBLIC_JEWELOS_WEB_ORIGIN` (§4) |
+| Web app | `apps/web`, deployed on Vercel. **What the app shows**: every web deploy reaches phones without an APK. |
 | ABI | arm64-v8a only by default (see `-AllAbis`, §4) |
 | Signing | Release upload key `CN=MK Jewels`, kept outside Git (§6) |
 
@@ -59,8 +59,15 @@ release and distribution:
 - `AGENTS.md` — repository rules (read first, always)
 - `PROJECT_HANDOFF.md` — product and database state
 - `apps/mobile/README.md` — toolchain, why mobile installs with npm, device dev
-- `docs/MOBILE_HANDOFF.md`, `docs/MOBILE_PARITY_PLAYBOOK.md` — mobile history, traps
+- `docs/MOBILE_HANDOFF.md`, `docs/MOBILE_PARITY_PLAYBOOK.md` — history of the native
+  screens (superseded; the code is under the Git tag `mobile-native-archive`)
 - `PRODUCTION_SWITCH_PLAYBOOK.md` — Supabase migrations / Edge Functions / Vercel
+
+**Web shell (owner decision 2026-10-15).** The app holds no screens of its own: it shows the
+deployed web app, which signs in and keeps its own session inside the WebView. Native code is
+only the shell (`apps/mobile/src/features/webShell/`: navigation allowlist, downloads, theme,
+back button, offline screen) and the update prompt. The first shell release (1.0.15 or later)
+asks each employee to sign in once more, because the old native session is not carried over.
 
 ---
 
@@ -136,17 +143,16 @@ Releases page. Every APK is also archived locally in
 
 | You changed | What to do |
 |---|---|
-| Anything in `apps/mobile/**` | Mobile release (this guide) |
-| `packages/core`, `packages/data`, `packages/ui-tokens` | Mobile release **and** web deploy; both apps bundle them |
-| `apps/web/**` only | Web deploy only (Vercel), no APK |
-| Supabase migration / RPC / RLS / Edge Function | `PRODUCTION_SWITCH_PLAYBOOK.md`. No APK unless the app code changed too. **Keep it backward-compatible with the app versions still installed.** If it breaks older apps, release a mobile build that works with it and publish that release with `-Mandatory`. |
-| `apps/mobile/.env` (Supabase URL/key, CRM web origin) | Mobile release. Values are baked in at build time. |
+| Anything in `apps/mobile/**` (the shell, `app.json`, icons, permissions) | Mobile release (this guide) |
+| `apps/web/**`, `packages/core`, `packages/data`, `packages/crm-ui` | Web deploy only (Vercel). The app shows the deployed web, so phones get it on the next page load. No APK. |
+| `packages/ui-tokens` | Web deploy; a mobile release only if the shell's own screens (update prompt, offline/error screens) should change too |
+| Supabase migration / RPC / RLS / Edge Function | `PRODUCTION_SWITCH_PLAYBOOK.md`. No APK. While phones still run a native build older than the shell (1.0.14 or earlier), **keep it backward-compatible with them**, or publish the shell with `-Mandatory` first. |
+| `apps/mobile/.env` (the web origin) | Mobile release. Baked in at build time. |
 | `app.json` plugins/permissions, native deps (`npx expo install …`) | Mobile release. Covered automatically: every release is a full native build. |
 
-There are **no over-the-air JS updates** (no `expo-updates` / EAS Update).
-Every change reaches phones as a new APK through the prompt. That was a
-deliberate choice (2026-09-14): no extra account, one mechanism for every kind
-of change. EAS Update could be added later if silent updates become important.
+There are **no over-the-air JS updates of the shell** (no `expo-updates` / EAS
+Update): a shell change reaches phones as a new APK through the prompt
+(decision 2026-09-14). Product changes need none of this: they are web deploys.
 
 ---
 
@@ -154,14 +160,18 @@ of change. EAS Update could be added later if silent updates become important.
 
 ### Before
 
-1. Work is finished and tested. Run it on a phone (`npm run android` in
-   `apps/mobile`) for anything visual.
+1. Work is finished and tested. For a shell change, install a `-NoPublish`
+   build on a phone first (§4 options) and check sign-in, back button, an
+   upload, a download, a voice note and a phone/WhatsApp link.
 2. Commit it. The script refuses to run if `apps/mobile`, `packages`, or root
    lockfiles/config have uncommitted **or untracked** changes. The APK is
    built from the working tree, and this guarantees it equals a commit.
    Unrelated dirt elsewhere (e.g. `sreejith-crm/`) does not block.
 3. Be on `main`.
 4. At least 3 GB free on `C:`.
+5. `apps/mobile/node_modules` matches `package-lock.json` (`npm ci` in
+   `apps/mobile` after a dependency change). Native libraries left in
+   `node_modules` from an older lockfile can still be built into the APK.
 
 ### Run
 
@@ -179,10 +189,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\release-mobile.ps1 -
 | `-SkipChecks` | Skip mobile typecheck/tests. Only if you just ran them. |
 | `-NoPublish` | Build and verify only, for testing. No commit/tag/release; `app.json` restored. Don't hand this APK to employees. |
 
-### The CRM web origin (required)
+### The web origin (required)
 
-The CRM tab shows the web app's `/crm` route in a WebView, so every release must carry the
-JewelOS web origin, baked in at build time:
+The app shows the web app full screen, so every release must carry the JewelOS web origin,
+baked in at build time:
 
 ```text
 # apps/mobile/.env
@@ -195,18 +205,19 @@ EXPO_PUBLIC_JEWELOS_WEB_ORIGIN=https://mkjewels-os.vercel.app
 - A variable set in the PowerShell session (`$env:EXPO_PUBLIC_JEWELOS_WEB_ORIGIN = ...`) wins
   over `.env`, exactly as in Expo's own loading.
 - The script refuses to build (also with `-NoPublish`) when the value is missing, not an absolute
-  URL, not `https`, has a path/query/fragment/credentials, or points at this computer. It prints
-  the value and its source, e.g. `CRM web origin (EXPO_PUBLIC_JEWELOS_WEB_ORIGIN, from
-  apps/mobile/.env): https://...`, again at the end of the run. Check it before you walk away.
+  URL, not `https`, has a path/query/fragment/credentials, points at this computer, or is not
+  the production origin (`$ExpectedWebOrigin` in the script). It prints the value and its source,
+  e.g. `Web origin (EXPO_PUBLIC_JEWELOS_WEB_ORIGIN, from apps/mobile/.env): https://...`, again at
+  the end of the run. Check it before you walk away.
 - Changing the origin (new domain) needs a new release: installed apps keep the origin they were
   built with.
 
 ### What the script does
 
 1. **Preflight**: `main`; clean source; `gh auth status`; keystore descriptor
-   exists and has no BOM; `.env` points at `yimafxhuwgfhvzczqqdd.supabase.co`;
-   `EXPO_PUBLIC_JEWELOS_WEB_ORIGIN` is a valid https origin (printed as
-   `CRM web origin (...): https://...`; see below); build-tools present; disk space.
+   exists and has no BOM; `EXPO_PUBLIC_JEWELOS_WEB_ORIGIN` is the production https
+   origin (printed as `Web origin (...): https://...`; see above); build-tools
+   present; disk space.
 2. **Version**: reads `app.json` and the published `latest.json`, takes the
    higher, bumps it. Refuses if the tag/release already exists.
 3. **Checks**: `npm --prefix apps/mobile run typecheck` and `run test`.
@@ -251,7 +262,7 @@ EXPO_PUBLIC_JEWELOS_WEB_ORIGIN=https://mkjewels-os.vercel.app
 ## 5. Build machine requirements
 
 Already set up on this PC (Windows 11, 16 GB RAM, 4 cores). Details and
-reasons in `apps/mobile/README.md` and `docs/MOBILE_HANDOFF.md` §4.4.
+reasons in `apps/mobile/README.md`.
 
 | Tool | Value |
 |---|---|
@@ -262,7 +273,7 @@ reasons in `apps/mobile/README.md` and `docs/MOBILE_HANDOFF.md` §4.4.
 | Mobile deps | `apps/mobile` installs with **npm** (`npm install`), not pnpm |
 | Workspace deps | root `pnpm.cmd install` (for `packages/*`) |
 | Signing | `%USERPROFILE%\.gradle\gradle.properties` → `JEWELOS_KEYSTORE_PROPERTIES` |
-| Build config file | `apps/mobile/.env` (untracked): `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_JEWELOS_WEB_ORIGIN` only |
+| Build config file | `apps/mobile/.env` (untracked): `EXPO_PUBLIC_JEWELOS_WEB_ORIGIN` only (older checkouts may still carry unused `EXPO_PUBLIC_SUPABASE_*` lines; they are ignored) |
 
 Never put a service-role key or any other secret in `apps/mobile/.env`. It is
 compiled into an APK that anyone can download.
@@ -355,8 +366,8 @@ over USB during development) must uninstall it first ("App not installed" /
 |---|---|
 | `uncommitted changes would be built into the APK` | Commit, or `git stash -u -- <paths>`. If another person/session is mid-work in this checkout, wait for them to commit. |
 | `GitHub CLI is not logged in` | `gh auth login` |
-| `EXPO_PUBLIC_JEWELOS_WEB_ORIGIN is not set` / `is not an absolute URL` / `is not https` / `must be an origin only` / `points at this computer` | Put the production web origin (`https://host`, no path) in `apps/mobile/.env` (§4 "The CRM web origin"). |
-| `does not point at yimafxhuwgfhvzczqqdd.supabase.co` | Fix `apps/mobile/.env`. If production genuinely moved, update `$ExpectedSupabaseHost` in the script **and** §1 of this guide. |
+| `EXPO_PUBLIC_JEWELOS_WEB_ORIGIN is not set` / `is not an absolute URL` / `is not https` / `must be an origin only` / `points at this computer` | Put the production web origin (`https://host`, no path) in `apps/mobile/.env` (§4 "The web origin"). |
+| `is not the production web origin` | Fix `apps/mobile/.env`. If production genuinely moved to a new domain, update `$ExpectedWebOrigin` in the script **and** §1 of this guide. |
 | `signed with the DEBUG key` / BOM | §6 |
 | `Filename longer than 260 characters` / `build.ninja still dirty` | Checkout path too long (§5), or `apps/mobile` installed with pnpm. Use npm. |
 | Gradle killed / out of memory | Close other heavy apps; `plugins/withAndroidBuildBudget.js` already bounds memory. |

@@ -1,5 +1,10 @@
 # JewelOS Mobile — Handoff for a fresh session
 
+> **Superseded (2026-10-15).** The Android app is now a shell around the deployed
+> web app (`apps/mobile/README.md`); the native screens this document describes
+> were removed and remain only under the Git tag `mobile-native-archive`. Keep
+> this file as history. Do not follow its parity rules for new work.
+
 **Decision made: React Native only. No Capacitor, no WebView, no third-party
 wrapper. The native app must reach parity with the approved web app.**
 

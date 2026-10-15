@@ -36,7 +36,7 @@ JewelOS is a strict-TypeScript pnpm monorepo:
 | Area | Responsibility |
 | --- | --- |
 | `apps/web` | React 18/Vite application, role-aware shell and feature UI |
-| `apps/mobile` | Expo/React Native starter; not a production release track yet |
+| `apps/mobile` | Android shell around the deployed web app (one WebView, 2026-10-15); released with `scripts/release-mobile.ps1` |
 | `packages/core` | Pure domain logic, RBAC/menu, generated DB types, validation and presentation helpers |
 | `packages/api-client` | Typed Supabase browser client |
 | `packages/ui-tokens` | Shared design tokens |
@@ -215,8 +215,9 @@ unavailable does not justify calling database/RLS/RPC behaviour verified.
 
 ## 6. Known limits and approval gates
 
-1. **Mobile:** the Expo app is still a starter and lacks the complete real
-   auth/navigation/API/upload/offline/device-release proof required for launch.
+1. **Mobile:** the Android app is a shell around the web app (2026-10-15). Its
+   first shell release still needs the owner's phone check (sign-in, back button,
+   upload, download, voice note, phone/WhatsApp links) before it is published.
 2. **Meeting AI:** role/menu support exists, but there is no implemented route
    or backend contract.
 3. **Hosted proof:** this source audit does not establish the currently linked

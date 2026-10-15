@@ -1,4 +1,4 @@
-﻿{
+{
     "extends":  [
                     "expo/tsconfig.base",
                     "../../tsconfig.base.json"
@@ -19,7 +19,6 @@
                     "App.tsx",
                     "index.js",
                     "src/**/*.ts",
-                    "src/**/*.tsx",
-                    "nativewind-env.d.ts"
+                    "src/**/*.tsx"
                 ]
 }
