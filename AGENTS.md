@@ -40,7 +40,7 @@ JewelOS is a pnpm monorepo for MK Jewels' multi-tenant retail operations:
 
 ```text
 apps/web              React 18 + Vite web application
-apps/mobile           Expo/React Native client; separate, incomplete release track
+apps/mobile           Android shell: the deployed web app in one WebView (2026-10-15)
 packages/core         Pure TypeScript business rules, types, validation, RBAC
 packages/api-client   Typed Supabase browser client
 packages/ui-tokens    Shared design tokens
@@ -97,7 +97,20 @@ chat content.
 The current web source contains authenticated, role-aware routes for Home,
 Dashboard, Tasks, FMS, Forms Library, Notifications, CRM, Users, Availability,
 Reports, Dropdown Master, Settings, and Ask Kiara. Meeting AI remains a menu
-identifier, not an implemented route. `apps/mobile` is not production-ready.
+identifier, not an implemented route.
+
+### Android app (2026-10-15 owner decision)
+
+The Android app is a native shell that shows the deployed web app full screen
+in one WebView (`apps/mobile/src/features/webShell/`), so the app and the web
+are the same build. Product work happens only in `apps/web` and the shared
+packages; there are no native screens to keep in parity. The hand-written
+native screens were removed; they remain under the Git tag
+`mobile-native-archive` and are not a reference for new work. Native code is
+limited to what a web page cannot do on a phone (navigation allowlist,
+downloads, theme strips, back button, offline screen, the update prompt), and
+the web signs in and keeps its own session inside the WebView. Rules and
+security notes: `apps/mobile/README.md`.
 
 Important current contracts include:
 
@@ -273,15 +286,16 @@ release, reuse a `versionCode`, or publish a non-mobile GitHub release as
 "latest" in this repository.
 
 **Standing user release instruction (2026-09-23):** After completing an
-authorized change that affects the employee Android app (`apps/mobile/**` or
-mobile-consumed shared code/configuration), run the required checks, commit the
+authorized change that affects the employee Android app (`apps/mobile/**`
+only: since the 2026-10-15 web shell, web and shared-package changes reach the
+app through the web deploy), run the required checks, commit the
 reviewed paths, publish the next signed Android update with
 `scripts/release-mobile.ps1`, push its release commit to `origin/main`, and
 verify the public `latest.json` and APK asset. Do this as part of the task,
 including in new chats, without asking again for routine release approval.
 Stop and report if a required gate fails; do not publish an unverified APK.
-For web changes, check native parity and include any needed native work before
-the release. Documentation-only edits do not require a new APK. `-Mandatory`
+Web changes need no APK and no native work. Documentation-only edits do not
+require a new APK. `-Mandatory`
 still requires explicit user approval because it blocks employees until they
 update. The permanent employee download link is
 `https://github.com/sreejith2005/mkjewelsOS/releases/latest/download/JewelOS.apk`.
@@ -329,23 +343,23 @@ Before marking a task complete, verify:
 
 ### Protected cross-surface workflows
 
-Home alerts, Notifications, Tasks, a direct URL, the web app, and the native app
-are **entry surfaces onto one persisted work item** — not separate features. A
+Home alerts, Notifications, Tasks, a direct URL, and the web app (also inside
+the Android shell) are **entry surfaces onto one persisted work item** — not
+separate features. A
 change to a task, FMS, or form identifier, route, completion path, or
 notification state is a change to every one of them at once.
 
 Before changing any of those, inventory the consumers across `apps/web`,
-`apps/mobile`, `packages/core`, `packages/data`, and `supabase/migrations`, and
-cover the change with tests on more than one surface.
+`packages/core`, `packages/data`, and `supabase/migrations`, and cover the
+change with tests on more than one surface.
 
 - **Identify assigned work by its assignment, never by inference.** A starter
   assignment is addressed by `fms_starter_assignment_id`; a runtime step by
   `fms_instance_id` + `fms_instance_stage_id`. One form template backs many
   assignments, so inferring work from a form id opens someone else's work.
 - **One destination contract.** `fmsAssignedWorkPath` / `parseFmsAssignedWorkPath`
-  in `@jewelos/core` are the only definition of an FMS work link; native maps the
-  same union in `apps/mobile/src/features/fms/assignedWorkNavigation.ts`. Do not
-  add a client-local deep-link helper.
+  in `@jewelos/core` are the only definition of an FMS work link. Do not add a
+  client-local deep-link helper.
 - **Submission and completion are one server-side transaction.** Submitting the
   required form and completing/progressing its stage must not be two client
   calls that can half-fail.
@@ -358,9 +372,9 @@ cover the change with tests on more than one surface.
   work only; open FMS work stays visible regardless of its date, including when
   it is future-dated or has no date. The filter lives in
   `taskFeedCurrentOrOverdueFilter` — both API layers call it, neither copies it.
-- **Builder and canvas edits need mobile parity checks.** A web-only fix to the
-  FMS builder, the forms builder, or their canvases is incomplete until the
-  native surface is checked at phone width.
+- **Builder and canvas edits need phone-width checks.** A fix to the FMS
+  builder, the forms builder, or their canvases is incomplete until it is
+  checked at phone width, which is also what the Android app shows.
 
 ### Authorization map (migration 0156)
 

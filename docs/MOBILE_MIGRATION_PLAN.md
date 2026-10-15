@@ -1,5 +1,10 @@
 # JewelOS Android (React Native) — Audit & Migration Plan
 
+> **Superseded (2026-10-15).** The Android app is now a shell around the deployed
+> web app (`apps/mobile/README.md`); the native screens this document describes
+> were removed and remain only under the Git tag `mobile-native-archive`. Keep
+> this file as history. Do not follow its parity rules for new work.
+
 Status: **Phases 1-6 complete and verified; 7-11 implemented, pending device test.**
 Progress and validation evidence are recorded in section 6.
 Repository authority: `C:\jos` (moved from `C:\Users\MIS\Downloads\MKJewelOS\jewelos`; see the decisions below).

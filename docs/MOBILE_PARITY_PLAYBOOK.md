@@ -1,4 +1,9 @@
-                                                   # JewelOS mobile parity playbook
+# JewelOS mobile parity playbook
+
+> **Superseded (2026-10-15).** The Android app is now a shell around the deployed
+> web app (`apps/mobile/README.md`); the native screens this document describes
+> were removed and remain only under the Git tag `mobile-native-archive`. Keep
+> this file as history. Do not follow its parity rules for new work.
 
 Read this before touching `apps/mobile`. Update the tracker at the end of every
 session.

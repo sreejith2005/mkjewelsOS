@@ -7,8 +7,8 @@
   Full procedure and troubleshooting: docs/MOBILE_RELEASE_GUIDE.md
 
   1. Preflight: main branch, committed mobile/shared source, GitHub login,
-     upload keystore, production Supabase URL in apps/mobile/.env, and an
-     https EXPO_PUBLIC_JEWELOS_WEB_ORIGIN (printed) for the CRM tab.
+     upload keystore, and EXPO_PUBLIC_JEWELOS_WEB_ORIGIN (printed) equal to
+     the production web origin the app shows full screen.
   2. Next version: one above the higher of app.json and the published release.
   3. Mobile typecheck and tests (skip with -SkipChecks).
   4. Signed release APK built from the working tree, which step 1 proved
@@ -43,7 +43,8 @@ Set-StrictMode -Version 3
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $Repo = 'sreejith2005/mkjewelsOS'
-$ExpectedSupabaseHost = 'yimafxhuwgfhvzczqqdd.supabase.co'
+# The app is the web app in a WebView, so this origin is what every phone opens.
+$ExpectedWebOrigin = 'https://mkjewels-os.vercel.app'
 $AssetName = 'JewelOS.apk'
 $PackageName = 'com.jewelos.mobile'
 $BuildTools = 'C:\Android\build-tools\36.0.0'
@@ -118,16 +119,11 @@ if ($descriptorBytes.Length -ge 3 -and $descriptorBytes[0] -eq 0xEF -and $descri
 }
 
 $envFile = 'apps/mobile/.env'
-if (-not (Test-Path $envFile)) { Stop-Release "$envFile is missing; the APK would have no server address." }
-$envText = Get-Content $envFile -Raw
-if ($envText -notmatch "EXPO_PUBLIC_SUPABASE_URL=https://$([regex]::Escape($ExpectedSupabaseHost))") {
-  Stop-Release "$envFile does not point at $ExpectedSupabaseHost. Employees would get a build talking to the wrong database."
-}
-if ($envText -notmatch 'EXPO_PUBLIC_SUPABASE_ANON_KEY=\S+') { Stop-Release "$envFile has no EXPO_PUBLIC_SUPABASE_ANON_KEY." }
+$envText = if (Test-Path $envFile) { Get-Content $envFile -Raw } else { '' }
 
-# The JewelOS web origin whose /crm route the CRM tab shows. Expo inlines it at build time, and a
-# variable already set in this session wins over apps/mobile/.env, as in Expo's own loading.
-# Without a valid https origin every phone would get a CRM tab that says "CRM not configured".
+# The JewelOS web origin the app shows. Expo inlines it at build time, and a variable already set
+# in this session wins over apps/mobile/.env, as in Expo's own loading. Without a valid https
+# origin every phone would get an app that says "JewelOS not configured".
 $webOriginSource = $envFile
 $webOriginValue = $env:EXPO_PUBLIC_JEWELOS_WEB_ORIGIN
 if ($webOriginValue) { $webOriginSource = 'the EXPO_PUBLIC_JEWELOS_WEB_ORIGIN session variable' }
@@ -152,7 +148,10 @@ if ($webOriginUri.IsLoopback) {
   Stop-Release "EXPO_PUBLIC_JEWELOS_WEB_ORIGIN ('$webOriginValue', from $webOriginSource) points at this computer, which no phone can reach."
 }
 $webOrigin = $webOriginUri.GetLeftPart([UriPartial]::Authority)
-Write-Host "CRM web origin (EXPO_PUBLIC_JEWELOS_WEB_ORIGIN, from $webOriginSource): $webOrigin"
+if ($webOrigin -ne $ExpectedWebOrigin) {
+  Stop-Release "EXPO_PUBLIC_JEWELOS_WEB_ORIGIN ('$webOrigin', from $webOriginSource) is not the production web origin $ExpectedWebOrigin. Employees would get an app showing the wrong site. If production genuinely moved, update `$ExpectedWebOrigin in this script and docs/MOBILE_RELEASE_GUIDE.md."
+}
+Write-Host "Web origin (EXPO_PUBLIC_JEWELOS_WEB_ORIGIN, from $webOriginSource): $webOrigin"
 
 foreach ($tool in @("$BuildTools\apksigner.bat", "$BuildTools\aapt2.exe")) {
   if (-not (Test-Path $tool)) { Stop-Release "$tool is missing. Install Android build-tools 36.0.0." }
@@ -273,7 +272,7 @@ Write-Host "Archived: $outDir ($([math]::Round($apkItem.Length / 1MB, 1)) MB)"
 
 if ($NoPublish) {
   Write-Utf8NoBom $appJsonPath $appJson
-  Write-Step "Built and verified only (-NoPublish). app.json restored. APK: $releasedApk (CRM web origin $webOrigin)"
+  Write-Step "Built and verified only (-NoPublish). app.json restored. APK: $releasedApk (web origin $webOrigin)"
   exit 0
 }
 
@@ -313,6 +312,6 @@ Write-Host ''
 Write-Host "JewelOS $newName is live." -ForegroundColor Green
 Write-Host "  Download link (always the newest): https://github.com/$Repo/releases/latest/download/$AssetName"
 Write-Host "  Release page:                      https://github.com/$Repo/releases/tag/$tag"
-Write-Host "  CRM web origin built in:           $webOrigin"
+Write-Host "  Web origin built in:               $webOrigin"
 Write-Host "  Installed apps will prompt on their next launch or return to the foreground."
 Write-Host "  Remember to push main when you are ready: git push origin main"

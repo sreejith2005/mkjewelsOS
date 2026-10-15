@@ -1,12 +1,9 @@
-// NativeWind's compiled stylesheet. It must be imported before anything that
-// uses a `className`, which is why it sits at the top.
-import "./global.css";
-import { View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/ErrorBoundary";
 import { AppUpdatePrompt } from "@/features/appUpdate/AppUpdatePrompt";
 import { WebAppScreen } from "@/features/webShell/WebAppScreen";
-import { ThemeProvider, useTheme } from "@/theme/ThemeProvider";
+import { ThemeProvider, useAppTheme } from "@/theme/ThemeProvider";
 
 /**
  * The app is the JewelOS web app in one full-screen WebView (owner decision 2026-10-15), so the
@@ -16,9 +13,9 @@ import { ThemeProvider, useTheme } from "@/theme/ThemeProvider";
  * The theme follows the page (WebAppScreen reports it), so the native dialogs match the web.
  */
 function Themed() {
-  const { name } = useTheme();
+  const theme = useAppTheme();
   return (
-    <View className={`flex-1 bg-task-muted ${name === "dark" ? "dark" : ""}`}>
+    <View style={[styles.fill, { backgroundColor: theme.colors.background }]}>
       <ErrorBoundary>
         <WebAppScreen />
         <AppUpdatePrompt />
@@ -36,3 +33,5 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({ fill: { flex: 1 } });

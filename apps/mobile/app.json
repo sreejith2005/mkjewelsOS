@@ -39,11 +39,10 @@
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE"
-      ]
+      ],
+      "allowBackup": false
     },
     "plugins": [
-      "expo-secure-store",
-      "expo-web-browser",
       "expo-sharing",
       [
         "expo-splash-screen",
@@ -54,27 +53,7 @@
           "backgroundColor": "#F8FAFC"
         }
       ],
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "JewelOS needs access to your photos so you can attach evidence to a task or form.",
-          "cameraPermission": "JewelOS needs the camera so you can capture evidence for a task or form."
-        }
-      ],
-      [
-        "expo-document-picker",
-        {
-          "iCloudContainerEnvironment": "Production"
-        }
-      ],
-      "./plugins/withAndroidBuildBudget.js",
-      [
-        "expo-audio",
-        {
-          "microphonePermission": "JewelOS needs microphone access only while you record a task instruction for review.",
-          "enableBackgroundRecording": false
-        }
-      ]
+      "./plugins/withAndroidBuildBudget.js"
     ],
     "experiments": {
       "typedRoutes": false

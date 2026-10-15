@@ -1,9 +1,32 @@
 # JewelOS for Android
 
-A native React Native application, not a wrapper around the web app. It shares
-`@jewelos/core` (business rules), `@jewelos/data` (the Supabase data layer), and
-`@jewelos/ui-tokens` with `apps/web`, and rebuilds the presentation layer with
-real React Native components.
+The Android app is a thin native shell around the JewelOS web app: one
+full-screen WebView of the deployed web origin (`EXPO_PUBLIC_JEWELOS_WEB_ORIGIN`),
+so the app and the web are always the same build. Owner decision 2026-10-15; it
+replaced the hand-written native screens, which are kept in Git under the tag
+`mobile-native-archive`.
+
+**A web deploy is an app update.** Every change to `apps/web` (or to the shared
+packages the web bundles) reaches phones the next time the page loads. A new APK
+is needed only for a change to this folder: the shell, `app.json`, permissions,
+icons, or a native dependency.
+
+What the shell does, and nothing more (`src/features/webShell/`):
+
+| Concern | Behaviour |
+|---|---|
+| Sign-in | The page signs in and keeps its own session in the WebView's storage. The app holds no session or token. App backup is off, so that storage never leaves the phone. |
+| Navigation | The top frame stays on the web origin. Other web addresses (including signed file links opened with `window.open`), `tel:`, `mailto:`, WhatsApp and other app links open outside the app. Anything else is blocked. |
+| Downloads | A file the page builds in memory (`blob:`/`data:` with `<a download>`) is handed to the app and offered through Android's share sheet (15 MB cap, sanitised name). |
+| Uploads, camera, microphone | The WebView's own file chooser and capture; Android asks for camera or microphone permission the first time. |
+| Theme | The page reports its theme and colours; the status-bar and gesture-bar strips and the native dialogs follow. |
+| Back button | Walks the page's history, then leaves the app. |
+| Offline / crash | An offline banner, a "No connection" screen with retry, and a reload if Android stops the page's renderer. |
+| Updates | The in-app update prompt (`src/features/appUpdate/`), unchanged. |
+| Links into the app | `jewelos://<path>` and links on the web origin open that page. |
+
+The web knows it is inside the app from the `JewelOSApp/1` user-agent token. It
+does not change its behaviour for it today.
 
 ---
 
@@ -32,28 +55,18 @@ sdk.dir=C:/Android
 
 ## Environment configuration
 
-`apps/mobile/.env` (untracked) holds:
+`apps/mobile/.env` (untracked) holds one value, copied from `.env.example`:
 
 ```bash
-EXPO_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon key>
+EXPO_PUBLIC_JEWELOS_WEB_ORIGIN=https://mkjewels-os.vercel.app
 ```
 
-The CRM tab (CRM Phase 6) also reads
-`EXPO_PUBLIC_JEWELOS_WEB_ORIGIN=https://<jewelos web host>`: the JewelOS web origin whose `/crm`
-route the tab shows in a WebView. It is **required for a release**: `scripts/release-mobile.ps1`
-refuses to build without a valid https origin and prints the value it uses
-(`docs/MOBILE_RELEASE_GUIDE.md`). A debug build may leave it out (the tab then says "CRM not
-configured") or use a local `http://10.0.2.2:<port>` (emulator) or LAN address.
-
-Only the `EXPO_PUBLIC_` prefix is inlined by Expo's Babel transform, and it is
-inlined **at build time**. Changing either value requires a rebuild — a Metro
-reload will not pick it up. The anon key is safe to ship for the same reason it
-is safe on the web: the database enforces RLS. Nothing else may go in here; a
-service-role key in a mobile bundle is a key handed to every user.
-
-`src/config/env.ts` is the only place these are read, and it throws with a clear
-message if either is missing rather than failing later inside Supabase.
+It is **required for a release**: `scripts/release-mobile.ps1` refuses to build
+without a valid https origin and prints the value it uses. A debug build may use
+a local `http://10.0.2.2:<port>` (emulator) or LAN address. It is inlined **at
+build time**, so changing it needs a rebuild and a new release; installed apps
+keep the origin they were built with. Nothing secret belongs in this file: it is
+compiled into an APK anyone can download.
 
 ---
 
@@ -63,8 +76,8 @@ The physical phone is the primary target; no emulator is required.
 
 ```powershell
 # 1. Install. The mobile app has its own install, separate from the pnpm
-#    workspace — see "Why this app installs separately" below.
-pnpm.cmd install          # from C:\jos — the workspace: web and packages/*
+#    workspace — see "Why this app installs with npm" below.
+pnpm.cmd install          # from the repository root — the workspace: web and packages/*
 cd apps\mobile
 npm install               # this app installs with npm, not pnpm
 
@@ -107,21 +120,24 @@ entry. Keep `paths` to genuine source aliases such as `@/*`.
 
 ---
 
-## Building an APK by hand
+## Checks
 
 ```powershell
-# Debug — installable on any device, expects Metro unless bundled
-npm run apk:debug
-# → android/app/build/outputs/apk/debug/app-debug.apk
-
-# Release — self-contained, no Metro, minified
-npm run apk:release
-# → android/app/build/outputs/apk/release/app-release.apk
+cd apps\mobile
+npm run typecheck
+npm test
 ```
 
-A release build embeds the JavaScript bundle, so the installed application never
-contacts a development server. It uses whatever `EXPO_PUBLIC_SUPABASE_URL` was
-present at build time — check `.env` before cutting a release.
+The tests cover the pure modules: the shell's navigation and message rules
+(`webShellBridge.test.ts`), the update manifest, and the theme. The page script
+the shell injects is plain ES2017 in `webShellBridge.ts`; keep it small and
+dependency-free.
+
+## Building an APK
+
+Releases are built, signed and published only by `scripts/release-mobile.ps1`
+(`docs/MOBILE_RELEASE_GUIDE.md`). `npm run apk:debug` builds a debug APK for a
+USB-connected test phone; it expects Metro unless bundled.
 
 ### Why this app installs with npm
 
@@ -172,106 +188,20 @@ inside `apps/mobile`, or the `mobile:*` scripts from the repository root.
 
 ---
 
-## Signing a release
-
-The debug build is signed with Android's shared debug key and is not
-distributable. A real release needs a keystore, which **must never be committed**.
-
-```powershell
-# Create once, and back it up somewhere safe. Losing it means no future release
-# can update an already-installed app.
-keytool -genkeypair -v -storetype PKCS12 `
-  -keystore $HOME\jewelos-release.keystore `
-  -alias jewelos -keyalg RSA -keysize 2048 -validity 10000
-```
-
-Put the credentials in `%USERPROFILE%\.gradle\gradle.properties`, which is
-outside the repository:
-
-```properties
-JEWELOS_UPLOAD_STORE_FILE=C:/Users/<you>/jewelos-release.keystore
-JEWELOS_UPLOAD_KEY_ALIAS=jewelos
-JEWELOS_UPLOAD_STORE_PASSWORD=<password>
-JEWELOS_UPLOAD_KEY_PASSWORD=<password>
-```
-
-Then add the signing config to `android/app/build.gradle` (the properties are
-read from Gradle's home, so nothing secret enters the repository):
-
-```groovy
-signingConfigs {
-    release {
-        if (project.hasProperty('JEWELOS_UPLOAD_STORE_FILE')) {
-            storeFile file(JEWELOS_UPLOAD_STORE_FILE)
-            storePassword JEWELOS_UPLOAD_STORE_PASSWORD
-            keyAlias JEWELOS_UPLOAD_KEY_ALIAS
-            keyPassword JEWELOS_UPLOAD_KEY_PASSWORD
-        }
-    }
-}
-buildTypes {
-    release {
-        signingConfig signingConfigs.release
-        // ...the rest of the generated release block
-    }
-}
-```
-
----
-
-## Versioning
-
-Both values live only in `app.json`. `android/app/build.gradle` reads them at
-build time, and `scripts/release-mobile.ps1` bumps them. Do not edit them by
-hand for a release:
-
-```json
-"version": "1.0.0",
-"android": { "versionCode": 1 }
-```
-
-`versionCode` is what Android compares, and it must increase on **every**
-release. A build that reuses a `versionCode` cannot be installed over its
-predecessor.
-
-| Release | `version` | `versionCode` |
-|---|---|---|
-| first | 1.0.0 | 1 |
-| next | 1.0.1 | 2 |
-| next | 1.1.0 | 3 |
-
-Distribution and updates: the APK is published to GitHub Releases, and the
-in-app prompt (`src/features/appUpdate/`) offers each new build to installed
-phones. The whole procedure is in `docs/MOBILE_RELEASE_GUIDE.md`.
-
----
-
 ## How the code is arranged
 
 ```text
-App.tsx                     registers the UUID source, then mounts the providers
+App.tsx                     theme, error boundary, the web shell, the update prompt
 index.js                    Expo entry point
 plugins/                    config plugins applied during prebuild
 src/
-  auth/AuthProvider.tsx     session restore, sign-in, blocked-account states
   config/env.ts             the only reader of EXPO_PUBLIC_* values
-  forms/                    the native form renderer and its field controls
-  fms/                      workflow helpers that are not screens
-  lib/                      supabase client, secure storage, formatting, pickers
-  navigation/               the tab and stack trees
-  screens/                  one file per screen
-  theme/                    the brand palette, from @jewelos/ui-tokens
-  ui/                       the shared component vocabulary
+  features/webShell/        the WebView screen, its rules, and download saving
+  features/appUpdate/       the in-app update prompt and installer
+  lib/                      logging, the offline banner
+  theme/                    the native palette (from @jewelos/ui-tokens) for the shell's own screens
+  ui/                       the few components the shell's own screens use
 ```
 
-Three rules hold this together:
-
-1. **No business rule lives here.** Visibility, validation, SLA, role
-   permissions, and workflow routing all come from `@jewelos/core`. If a
-   decision belongs to the product rather than the screen, it goes there.
-2. **No question or workflow branch is hard-coded.** The form renderer maps
-   *field types* to controls and nothing else; which questions appear and where
-   a workflow goes next are read from the saved definition and decided by the
-   server.
-3. **The server is the authority.** A hidden button is a courtesy. Every
-   mutation goes through an audited RPC that re-checks the actor.
+Keep it this small. A feature belongs in the web app; native code is only for
+what a web page cannot do on a phone.
