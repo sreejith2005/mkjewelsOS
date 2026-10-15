@@ -3,3 +3,7 @@
 # so this changes checkouts only, never file content.
 *.sql text eol=lf
 *.psql text eol=lf
+
+# patch-package diffs (apps/mobile/patches) must stay byte-exact LF: context lines are a single
+# space and a CRLF checkout would stop the patch applying on install.
+apps/mobile/patches/*.patch -text whitespace=-blank-at-eol,-blank-at-eof,-trailing-space

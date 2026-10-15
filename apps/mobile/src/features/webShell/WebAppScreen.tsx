@@ -42,6 +42,9 @@ function WebApp({ origin }: { origin: string }) {
   const [topColour, setTopColour] = useState<string | null>(null);
   const [bottomColour, setBottomColour] = useState<string | null>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  // Whether the page pads for the status and gesture bars itself (it does wherever the WebView
+  // reports safe-area insets). Until the page says, the app pads, so nothing starts under a bar.
+  const [pageInsets, setPageInsets] = useState<{ top: boolean; bottom: boolean }>({ top: false, bottom: false });
   const injectedScript = useMemo(webShellInjectedScript, []);
 
   useEffect(() => {
@@ -115,6 +118,9 @@ function WebApp({ origin }: { origin: string }) {
         setTopColour(message.barColour);
         setBottomColour(message.bottomColour);
         return;
+      case "insets":
+        setPageInsets({ top: message.top > 0, bottom: message.bottom > 0 });
+        return;
       case "download":
         void saveWebDownload(message).catch((error: unknown) => {
           log.error("navigation", "could not save a downloaded file", error);
@@ -151,9 +157,8 @@ function WebApp({ origin }: { origin: string }) {
   // pads by the measured overlap only, which is zero where the system already made room; the
   // gesture-bar strip goes while the keyboard covers it.
   return (
-    <KeyboardAvoidingView behavior="padding" style={[styles.fill, { backgroundColor: top, paddingTop: insets.top }]}>
+    <KeyboardAvoidingView behavior="padding" style={[styles.fill, { backgroundColor: top, paddingTop: pageInsets.top ? 0 : insets.top }]}>
       <StatusBar style={statusBarStyleFor(top)} />
-      <NetworkBanner />
       <WebView
         allowFileAccess={false}
         allowFileAccessFromFileURLs={false}
@@ -187,7 +192,9 @@ function WebApp({ origin }: { origin: string }) {
         thirdPartyCookiesEnabled={false}
         webviewDebuggingEnabled={__DEV__}
       />
-      <View style={{ height: keyboardOpen ? 0 : insets.bottom, backgroundColor: bottom }} />
+      <View style={{ height: keyboardOpen || pageInsets.bottom ? 0 : insets.bottom, backgroundColor: bottom }} />
+      {/* Floats just below the status bar so it never moves the page. */}
+      <View pointerEvents="none" style={[styles.banner, { top: insets.top }]}><NetworkBanner /></View>
       {loadState === "loading" ? (
         <View style={[StyleSheet.absoluteFill, styles.overlay, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
           <LoadingState label="Opening JewelOS..." />
@@ -218,4 +225,5 @@ export function WebAppScreen() {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   overlay: { justifyContent: "center" },
+  banner: { position: "absolute", left: 0, right: 0 },
 });

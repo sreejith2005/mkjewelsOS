@@ -51,8 +51,15 @@ export function isFromWebOrigin(senderUrl: string | undefined, origin: string): 
 /** The page theme, its header colour (status-bar strip) and the colour at its bottom edge. */
 export type WebShellTheme = Readonly<{ theme: "light" | "dark"; barColour: string | null; bottomColour: string | null }>;
 export type WebShellDownload = Readonly<{ fileName: string; mimeType: string; base64: string }>;
+/**
+ * The safe-area insets the page itself sees, in CSS pixels. A recent Android WebView reports the
+ * status and gesture bars to the page, and the web pads for them; where it does, the app must not
+ * pad as well.
+ */
+export type WebShellInsets = Readonly<{ top: number; bottom: number }>;
 export type WebShellMessage =
   | Readonly<{ kind: "theme" } & WebShellTheme>
+  | Readonly<{ kind: "insets" } & WebShellInsets>
   | Readonly<{ kind: "download" } & WebShellDownload>
   | Readonly<{ kind: "download-failed"; reason: "too-large" | "unreadable" }>;
 
@@ -98,6 +105,12 @@ export function parseWebShellMessage(raw: string): WebShellMessage | null {
       if (typeof base64 !== "string" || base64.length === 0 || base64.length > MAX_BASE64_LENGTH || !BASE64.test(base64)) return null;
       const mimeType = typeof message.mimeType === "string" && MIME_TYPE.test(message.mimeType) ? message.mimeType : "application/octet-stream";
       return { kind: "download", fileName: safeDownloadName(message.name), mimeType, base64 };
+    }
+    case "insets": {
+      const inset = (value: unknown) => (typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 400 ? value : null);
+      const top = inset(message.top);
+      const bottom = inset(message.bottom);
+      return top === null || bottom === null ? null : { kind: "insets", top, bottom };
     }
     case "download-failed":
       return { kind: "download-failed", reason: message.reason === "too-large" ? "too-large" : "unreadable" };
@@ -145,7 +158,8 @@ export function incomingWebPath(raw: string, origin: string): string | null {
  *     because the web revokes the URL right after the click;
  *   - the page theme (`<html data-theme>` and the `theme-color` meta the web keeps in step) and
  *     the colour at the page's bottom edge, re-read on theme and route changes, so the strips
- *     above and below the page (status bar, gesture bar) match it.
+ *     above and below the page (status bar, gesture bar) match it;
+ *   - the safe-area insets the page sees, so the app pads only where the web does not.
  */
 export function webShellInjectedScript(): string {
   return `(function () {
@@ -231,7 +245,25 @@ export function webShellInjectedScript(): string {
   function watchHead() { if (document.head) new MutationObserver(soon).observe(document.head, { childList: true }); }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { watchHead(); soon(); });
   else { watchHead(); soon(); }
-  window.addEventListener("pageshow", function () { lastTheme = ""; soon(); });
+  var lastInsets = "";
+  function reportInsets() {
+    if (!document.body) return;
+    var probe = document.createElement("div");
+    probe.style.cssText = "position:fixed;top:0;left:0;width:0;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)";
+    document.body.appendChild(probe);
+    var style = getComputedStyle(probe);
+    var top = parseFloat(style.paddingTop) || 0;
+    var bottom = parseFloat(style.paddingBottom) || 0;
+    probe.remove();
+    var key = top + "|" + bottom;
+    if (key === lastInsets) return;
+    lastInsets = key;
+    post({ kind: "insets", top: top, bottom: bottom });
+  }
+  window.addEventListener("resize", function () { setTimeout(reportInsets, 50); });
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", reportInsets);
+  else reportInsets();
+  window.addEventListener("pageshow", function () { lastTheme = ""; lastInsets = ""; soon(); reportInsets(); });
   window.addEventListener("popstate", soon);
   ["pushState", "replaceState"].forEach(function (name) {
     var original = history[name];

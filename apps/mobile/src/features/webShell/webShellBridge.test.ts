@@ -85,6 +85,14 @@ describe("parseWebShellMessage", () => {
     expect(parseWebShellMessage(message({ kind: "eval", code: "x" }))).toBeNull();
   });
 
+  it("reads the page's safe-area insets and refuses nonsense", () => {
+    expect(parseWebShellMessage(message({ kind: "insets", top: 36.5, bottom: 24 }))).toEqual({ kind: "insets", top: 36.5, bottom: 24 });
+    expect(parseWebShellMessage(message({ kind: "insets", top: 0, bottom: 0 }))).toEqual({ kind: "insets", top: 0, bottom: 0 });
+    expect(parseWebShellMessage(message({ kind: "insets", top: -1, bottom: 0 }))).toBeNull();
+    expect(parseWebShellMessage(message({ kind: "insets", top: "36", bottom: 0 }))).toBeNull();
+    expect(parseWebShellMessage(message({ kind: "insets", top: 1e9, bottom: 0 }))).toBeNull();
+  });
+
   it("reports a failed download with a known reason", () => {
     expect(parseWebShellMessage(message({ kind: "download-failed", reason: "too-large" }))).toEqual({ kind: "download-failed", reason: "too-large" });
     expect(parseWebShellMessage(message({ kind: "download-failed", reason: "?" }))).toEqual({ kind: "download-failed", reason: "unreadable" });
