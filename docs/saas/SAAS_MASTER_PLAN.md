@@ -2,7 +2,7 @@
 
 > The single source of truth for the cleanup + SaaS project. The orchestrator chat reads this
 > first and updates the **Status** section (via the owner) after every completed step.
-> Facts marked (verify) were observed on 2026-10-15 and must be re-checked against the code.
+> Facts marked (verify) were observed on 2026-10-15 and verified by the orchestrator the same day (corrections applied).
 
 ## 1. Vision (owner's words, summarised)
 JewelOS is the operations web app (plus Android app) the owner built for MK Jewels: tasks,
@@ -47,7 +47,8 @@ Goal: turn it into a **universal SaaS product** that the owner can sell to other
   - `packages/core` (pure business rules, RBAC), `packages/api-client`, `packages/data`,
     `packages/crm-ui`, `packages/ui-tokens`;
   - `supabase/` (migrations, pgTAP tests, Edge Functions);
-  - `supabase-crm/` (the CRM project).
+  - `supabase-crm/supabase/` (the CRM project: 34 timestamp-named migrations, 21 pgTAP files,
+    5 Edge Functions) and `supabase-crm/apps-script`.
 - **Two live Supabase projects for MK Jewels:** JewelOS (users and internal records; ref starts
   `yima`, name `jewelos-prod`) and CRM (client database), connected by an audited two-way
   outbox/inbox sync (roster JewelOS → CRM, walk-in → JewelOS task, Apps Script walk-in feed).
@@ -55,40 +56,52 @@ Goal: turn it into a **universal SaaS product** that the owner can sell to other
   - **Open question:** does a tenant get two projects, or does the CRM become an optional
     module in one project?
 - **Multi-tenant groundwork:**
-  - `tenants` table in `0001`; about 180 migrations reference `tenant_id`; RLS uses
+  - `tenants` table in `0001`; 188 migration files reference `tenant_id`; RLS uses
     `current_tenant_id()`.
   - **Security finding:** policies follow the pattern
     `tenant_id = current_tenant_id() or is_super_admin()`, and `is_super_admin()` checks role
-    only, not tenant (`0001_init_schema.sql` around line 693; also `crm.is_super_admin()`).
+    only, not tenant (defined in `0001_init_schema.sql` line 688, redefined in `0002`; the exact
+    pattern appears 15× in 3 files and `is_super_admin()` is used in 8 files; the same role-only
+    check exists in `crm.is_super_admin()` (`0185`) and the CRM project's
+    `public.is_super_admin()`).
     That's harmless with one company per project, but must be fixed.
   - Groundwork is not full isolation. Also audit Storage paths, Edge Functions, cron/background
     jobs, integrations, realtime and caches.
 - **Migrations:**
   - `origin/main` has 233 files up to `0238`, with no duplicate numbers. Gaps come from
     renumbering.
-  - Heavy redefinition (`assert_fms_flow_publishable` 12×, `resolve_fms_stage_assignees` 9×).
+  - Heavy redefinition (`assert_fms_flow_publishable` 13×, `resolve_fms_stage_assignees` 11×).
     Several files are over 1,000 lines (`0005`, `0084`, `0183`, `0185`).
 - **Branch hygiene in the original repo:**
   - 53 local branches (45 already merged into `origin/main`) and 22 worktrees.
   - Parallel branches picking "next number" caused collisions.
   - `feat/department-section-access` holds `0213`–`0217` copies identical to `main`'s
-    `0221`–`0225`; it must not merge as-is.
-- **Repo hazard:** `supabase/.temp/linked-project.json` is **tracked in git** and links to
-  `jewelos-prod`. Any clone arrives pointed at production.
+    `0221`–`0225`, plus `0231`–`0233` with the same names as `main`; it must not merge as-is.
+    The original checkout also has 277 uncommitted changes.
+- **Repo hazard:** `supabase/.temp/linked-project.json` is **tracked in git** (it is in `.gitignore`,
+  which does not untrack it) and links to `jewelos-prod`. Any clone arrives pointed at production.
 - **Code smells:**
   - `apps/web/src/pages/UserManagementPage.tsx` (about 1,100 lines);
   - `packages/crm-ui/src/components/walk-in-form.tsx` (about 1,100);
   - `RecurringTodoPage.tsx` (about 820);
-  - task API possibly duplicated in `packages/data/src/tasks/api.ts` and
+  - task API duplicated (all 25 exports of the web file exist by name in the data package) in
+    `packages/data/src/tasks/api.ts` and
     `apps/web/src/features/tasks/api.ts`.
-- **Safety net:** about 129 pgTAP files, about 263 unit test files, `.github/workflows/ci.yml`.
+- **Safety net:** 137 pgTAP files (+21 in the CRM project), 311 unit test files,
+  `.github/workflows/ci.yml`.
 - **Owner's testing habit:** the owner tests on production, not locally. For SaaS, a
   staging/Demo Co project is mandatory.
 - **Privacy:** real CRM/customer data never appears in chat, Git or terminal output (counts
   only).
+- **Rule-file hazard:** `AGENTS.md`, `CLAUDE.md`, `PROJECT_HANDOFF.md` and
+  `PRODUCTION_SWITCH_PLAYBOOK.md` name `C:\Users\MIS\Downloads\MKJewelOS` as the only repo.
+  Every executor prompt overrides this until an MK-safe PR updates them.
 
 ## 4. MK-specific inventory (start list — the audit completes it)
-- The "MK Jewels" name in about 10 web/package files and 12 migrations.
+- The "MK Jewels" name in 21 web/mobile/package source files, 12 JewelOS migrations and 4
+  CRM-project migrations.
+- `scripts/release-mobile.ps1` pins the production Supabase host.
+- 26 files use `MKC-` / `MKF-` / `MKREF-`.
 - `mk-jewels-logos/`.
 - CRM `MKC-` / `MKF-` / `MKREF-` IDs.
 - Apps Script walk-in feed (`crm-walkin-ingest`) and Runo push (`crm-runo-push`).
@@ -112,6 +125,8 @@ Goal: turn it into a **universal SaaS product** that the owner can sell to other
   - Secrets only through hidden `Read-Host -AsSecureString`, never pasted into chat.
   - Always state the target project ref before a hosted command.
   - Windows: `pnpm.cmd`, `supabase.cmd`.
+  - No `saas/*` branch is pushed until Vercel preview deployments are confirmed not to use
+    production variables.
 
 ## 6. Phases
 - **Phase 0 — Safe setup.**
@@ -185,9 +200,13 @@ Read-only tasks say "make no changes."
 
 ## 9. Status
 - **Current phase:** 0 — Safe setup
-- **Done:** fresh clone at `C:\JewelOS-SaaS` on `saas/setup`; `supabase/.temp` deleted locally
-  (not committed); no `.env` copied; `pnpm install` done.
-- **Next:** orchestrator verifies sections 3–4 and gives Phase 0, step 1.
+- **Done:** fresh clone at `C:\JewelOS-SaaS` on `saas/setup`; no `.env` copied; `pnpm install`
+  done. 2026-10-15: orchestrator verified sections 3–4 (corrections applied); read-only
+  isolation checks passed (no `.env*` except examples, no `supabase/.temp` or
+  `supabase-crm/supabase/.temp`, no `.vercel`, no prod URL/key in app source); tracked
+  `supabase/.temp/linked-project.json` removed by commit on `saas/setup` (not pushed).
+- **Next:** Phase 0 step 2 — owner reports Vercel Preview env-var scope; orchestrator sets the
+  push rule and the rules for executors; then branch/worktree advice for the original repo.
 
 ## 10. Decision log
 | Date | Decision |
