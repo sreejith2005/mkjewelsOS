@@ -125,3 +125,19 @@ Prefer a forward correction for rollback. An older web build cannot supply all
 newly configurable form-plus-remark combinations, so it needs a compatibility
 review before rollback. Historical rows are retained and applied migration
 history is never rewritten.
+
+## Hosted migration receipt - 2026-10-15
+
+Implementation commit: `3c7d6c622bec4b5829986ede380dd93cdfe857e9`.
+Owner authorization: deploy migrations and push to main. The final linked dry
+run listed only 0238; `supabase.cmd db push --linked --yes` applied exactly
+`0238_full_task_edit.sql` to `jewelos-prod` (`yimafxhuwgfhvzczqqdd`). No seeds,
+role files, other migrations, Edge Functions or secrets were deployed.
+
+Read-only hosted SQL passed all 11 checks: ledger entry, archive and override
+columns, live-view alignment, authenticated form RPC grant, anon/service denial,
+private internal helpers, restrictive archive policy, null-safe override guard
+and transactional form completion. A subsequent linked dry run reports the
+remote database up to date with no pending migrations. No operational task or
+customer record was used for hosted testing. Hosted authenticated user-flow
+validation remains separate from this schema/grant verification.
