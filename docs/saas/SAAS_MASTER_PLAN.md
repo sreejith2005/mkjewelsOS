@@ -96,6 +96,10 @@ Goal: turn it into a **universal SaaS product** that the owner can sell to other
 - **Rule-file hazard:** `AGENTS.md`, `CLAUDE.md`, `PROJECT_HANDOFF.md` and
   `PRODUCTION_SWITCH_PLAYBOOK.md` name `C:\Users\MIS\Downloads\MKJewelOS` as the only repo.
   Every executor prompt overrides this until an MK-safe PR updates them.
+- **Vercel previews use production:** `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are set for
+  Production and Preview together; the CRM `VITE_CRM_*` variables have separate Preview entries
+  (values not checked; assume production). Non-`main` preview deployments already exist.
+  Production branch: `main`.
 
 ## 4. MK-specific inventory (start list — the audit completes it)
 - The "MK Jewels" name in 21 web/mobile/package source files, 12 JewelOS migrations and 4
@@ -125,8 +129,10 @@ Goal: turn it into a **universal SaaS product** that the owner can sell to other
   - Secrets only through hidden `Read-Host -AsSecureString`, never pasted into chat.
   - Always state the target project ref before a hosted command.
   - Windows: `pnpm.cmd`, `supabase.cmd`.
-  - No `saas/*` branch is pushed until Vercel preview deployments are confirmed not to use
-    production variables.
+  - `vercel.json` sets `git.deploymentEnabled` to `false` for `saas/*`. Vercel reads it from the
+    pushed branch, so every `saas/*` branch is created from `saas/setup` (or from `main` once it
+    carries this setting). After each first push, check that no Vercel deployment appears for
+    that branch.
 
 ## 6. Phases
 - **Phase 0 — Safe setup.**
@@ -205,8 +211,10 @@ Read-only tasks say "make no changes."
   isolation checks passed (no `.env*` except examples, no `supabase/.temp` or
   `supabase-crm/supabase/.temp`, no `.vercel`, no prod URL/key in app source); tracked
   `supabase/.temp/linked-project.json` removed by commit on `saas/setup` (not pushed).
-- **Next:** Phase 0 step 2 — owner reports Vercel Preview env-var scope; orchestrator sets the
-  push rule and the rules for executors; then branch/worktree advice for the original repo.
+  `vercel.json` disables Vercel deployments for `saas/*` (committed on `saas/setup`, not yet
+  pushed or verified).
+- **Next:** Phase 0 step 3 — owner pushes `saas/setup` and confirms that Vercel creates no
+  deployment for it; then branch/worktree advice for the original repo.
 
 ## 10. Decision log
 | Date | Decision |
