@@ -3,7 +3,7 @@
     "name": "JewelOS",
     "slug": "jewelos-mobile",
     "scheme": "jewelos",
-    "version": "1.0.14",
+    "version": "1.0.15",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#F8FAFC",
@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "com.jewelos.mobile",
-      "versionCode": 15,
+      "versionCode": 16,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
