@@ -1,3 +1,4 @@
+import { FmsAssignmentEditor } from "./FmsAssignmentEditor";
 import { useEffect, useState, type ReactNode } from "react";
 import { StyleSheet, View, type LayoutChangeEvent } from "react-native";
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react-native";
@@ -107,7 +108,8 @@ function StageSelect({ others, value, label, onChange, invalid }: { others: read
   );
 }
 
-export function FmsStageEditor({ stage, stages, data, onChange, onDelete, issueCode, issueMessage, onIssueLayout }: { stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; onChange: (value: FmsStageDefinition) => void; onDelete: () => void; issueCode?: string | undefined; issueMessage?: string | undefined; onIssueLayout?: ((event: LayoutChangeEvent) => void) | undefined }) {
+export function FmsStageEditor({
+  assignmentVersion = 1, stage, stages, data, onChange, onDelete, issueCode, issueMessage, onIssueLayout }: { assignmentVersion?: 1 | 2 | undefined; stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; onChange: (value: FmsStageDefinition) => void; onDelete: () => void; issueCode?: string | undefined; issueMessage?: string | undefined; onIssueLayout?: ((event: LayoutChangeEvent) => void) | undefined }) {
   const styles = useStyles();
   const theme = useAppTheme();
   const update = (patch: Partial<FmsStageDefinition>) => onChange({ ...stage, ...patch });
@@ -159,11 +161,13 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete, issueC
       {human ? (
         <Section help={firstStage ? "The first step uses this form to collect the workflow’s initial details." : "Attach a Form the doer fills in when completing this step. Its answers can also drive the routing below."} title="Linked form" {...mark(formIssue)}>
           <LinkedForm data={data} firstStage={firstStage} invalid={formIssue} stage={stage} update={update} />
-          <OptionPicker label="User question that assigns later steps" invalid={invalidAssignment} options={[{ value: "", label: "Use workflow default assignees" }, ...assignmentFields.map((field) => ({ value: field.key, label: field.label }))]} selected={[stage.sla.assignmentFieldKey ?? ""]} onChange={(values) => updateSla({ assignmentFieldKey: values[0] || undefined })} />
+          {assignmentVersion !== 2 ? <>          <OptionPicker label="User question that assigns later steps" invalid={invalidAssignment} options={[{ value: "", label: "Use workflow default assignees" }, ...assignmentFields.map((field) => ({ value: field.key, label: field.label }))]} selected={[stage.sla.assignmentFieldKey ?? ""]} onChange={(values) => updateSla({ assignmentFieldKey: values[0] || undefined })} />
           {invalidAssignment ? <Text tone="danger" variant="small">{`The assignment question ${stage.sla.assignmentFieldKey} is unavailable. Choose an eligible User question or use workflow defaults.`}</Text> : null}
-          <Text tone="muted" variant="caption">A required, always visible User answer sets the default for later steps. Explicit step assignments take priority.</Text>
+          <Text tone="muted" variant="caption">A required, always visible User answer sets the default for later steps. Explicit step assignments take priority.</Text></> : null}
         </Section>
       ) : null}
+
+      {human && !firstStage && assignmentVersion === 2 ? <FmsAssignmentEditor stage={stage} stages={stages} data={data} onChange={onChange} /> : null}
 
       {canChooseNext ? <StageRouting changeRule={changeBranchRule} decision={decision} fields={formFields} highlight={!formIssue && !deadlineIssue && /route|reference|completion_path|cycle|unreachable/.test(issueCode ?? "")} issueCode={issueCode} issueMessage={issueMessage} moveRule={moveBranchRule} onIssueLayout={onIssueLayout} others={others} stage={stage} update={update} /> : null}
 
@@ -226,7 +230,7 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete, issueC
  * historical single successor; adding rules turns it into an ordered switch
  * whose fallback stays `defaultNextStageKey`, so published flows are unaffected.
  */
-function StageRouting({ stage, others, fields, decision, update, changeRule, moveRule, highlight, issueCode, issueMessage, onIssueLayout }: { stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; fields: readonly FmsFormFieldRef[]; decision: boolean; update: (patch: Partial<FmsStageDefinition>) => void; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void; highlight: boolean; issueCode?: string | undefined; issueMessage?: string | undefined; onIssueLayout?: ((event: LayoutChangeEvent) => void) | undefined }) {
+function StageRouting({ stage, others, fields, decision, update, changeRule, moveRule, highlight, issueCode, issueMessage, onIssueLayout }: { assignmentVersion?: 1 | 2 | undefined; stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; fields: readonly FmsFormFieldRef[]; decision: boolean; update: (patch: Partial<FmsStageDefinition>) => void; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void; highlight: boolean; issueCode?: string | undefined; issueMessage?: string | undefined; onIssueLayout?: ((event: LayoutChangeEvent) => void) | undefined }) {
   const styles = useStyles();
   const routed = hasFmsStageRouting(stage);
   const cycle = issueCode === "automatic_cycle";
@@ -378,7 +382,7 @@ function LinkedForm({ data, firstStage, stage, update, invalid }: { data: FmsDat
   );
 }
 
-function BranchEditor({ stage, others, update, changeRule, moveRule, highlight, issueMessage, onIssueLayout }: { stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; update: (patch: Partial<FmsStageDefinition>) => void; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void; highlight: boolean; issueMessage?: string | undefined; onIssueLayout?: ((event: LayoutChangeEvent) => void) | undefined }) {
+function BranchEditor({ stage, others, update, changeRule, moveRule, highlight, issueMessage, onIssueLayout }: { assignmentVersion?: 1 | 2 | undefined; stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; update: (patch: Partial<FmsStageDefinition>) => void; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void; highlight: boolean; issueMessage?: string | undefined; onIssueLayout?: ((event: LayoutChangeEvent) => void) | undefined }) {
   const styles = useStyles();
   const theme = useAppTheme();
   return (

@@ -178,7 +178,7 @@ export type PageAccessDecision = "allowed" | "disabled" | "denied";
  * enabled section is available only to users holding its permission.
  */
 export function resolvePageAccess(access: AccessContext, controls: SectionControls, page: PageId): PageAccessDecision {
-  if (!isImplementedPage(page) || !canViewPage(access, page)) return "denied";
+  if (!isImplementedPage(page) || !canViewPage(access, page) || page === "fms_builder" && !hasPermission(access, "fms.manage")) return "denied";
   if (!isSectionEnabled(controls, page) && !hasPermission(access, "developer_mode.manage")) return "disabled";
   return "allowed";
 }

@@ -1,4 +1,6 @@
+import { requireFmsAssignmentSourceForms } from "./assignmentAuthoring";
 import type { UserRole } from "../roleMenu";
+import { validateFmsAssignmentConfig } from "./assignmentConfig";
 import { FMS_ASSIGNEE_TYPES, FMS_BRANCH_OPERATORS, FMS_STAGE_TYPES, type FmsAssignmentCandidate, type FmsAssigneeRule, type FmsBranchRule, type FmsChecklistItemDefinition, type FmsDecisionOption, type FmsFlowDefinition, type FmsFormFieldOption, type FmsFormFieldRef, type FmsInstanceStatus, type FmsStageActorState, type FmsStageDefinition, type FmsStageStatus, type FmsTimingMethod, type FmsTransitionCapability, type FmsValidationContext, type FmsValidationIssue } from "./types";
 
 const KEY = /^[a-z][a-z0-9_]{0,63}$/;
@@ -39,7 +41,7 @@ export function normalizeFmsDefinition(input: FmsFlowDefinition): FmsFlowDefinit
     allowMultipleDoers: bool(stage.allowMultipleDoers), requiresUpload: bool(stage.requiresUpload), requiresRemark: bool(stage.requiresRemark),
     checklist: array<FmsChecklistItemDefinition>(stage.checklist).map((item) => ({ key: text(item.key).toLowerCase(), label: text(item.label), required: bool(item.required, true) })),
     formTemplateId: text(stage.formTemplateId) || undefined,
-    assigneeRules: array<FmsAssigneeRule>(stage.assigneeRules).map((rule) => ({ ...rule, userProfileId: text(rule.userProfileId) || undefined, fallbackUserProfileId: undefined, allowNextSelection: bool(rule.allowNextSelection) })),
+    assigneeRules: array<FmsAssigneeRule>(stage.assigneeRules).map((rule) => ({ ...rule, userProfileId: text(rule.userProfileId) || undefined, fallbackUserProfileId: text(rule.fallbackUserProfileId) || undefined, allowNextSelection: bool(rule.allowNextSelection) })),
     requiresNextDoerHandoff: bool(stage.requiresNextDoerHandoff), canMoveBackward: bool(stage.canMoveBackward), canReject: bool(stage.canReject),
     canRequestRevision: bool(stage.canRequestRevision), canEscalate: bool(stage.canEscalate), defaultNextStageKey: text(stage.defaultNextStageKey).toLowerCase() || undefined,
     branchRules: array<FmsBranchRule>(stage.branchRules).map((rule, index) => ({ ...rule, id: text(rule.id) || `rule_${index + 1}`, sourceKey: text(rule.sourceKey) || undefined, nextStageKey: text(rule.nextStageKey).toLowerCase() || undefined, nextFlowId: text(rule.nextFlowId) || undefined, order: index })),
@@ -48,6 +50,10 @@ export function normalizeFmsDefinition(input: FmsFlowDefinition): FmsFlowDefinit
     splitToFlowId: text(stage.splitToFlowId) || undefined,
     position: Number.isFinite(stage.position?.x) && Number.isFinite(stage.position?.y) ? { x: Math.max(0, Math.round(stage.position!.x)), y: Math.max(0, Math.round(stage.position!.y)) } : undefined,
     sla: {
+      ...(stage.sla?.assignment ? { assignment: stage.sla.assignment } : {}),
+      ...(stage.sla?.completionFormRequired !== undefined ? { completionFormRequired: stage.sla.completionFormRequired } : {}),
+      ...(stage.sla?.taskDisplay ? { taskDisplay: stage.sla.taskDisplay } : {}),
+      ...(stage.sla?.followUp ? { followUp: stage.sla.followUp } : {}),
       ...(text(stage.sla?.assignmentFieldKey) ? { assignmentFieldKey: text(stage.sla.assignmentFieldKey).toLowerCase() } : {}),
       timingMethod: TIMING_METHODS.has(stage.sla?.timingMethod as FmsTimingMethod) ? stage.sla.timingMethod as FmsTimingMethod : "completion_date",
       dueDate: text(stage.sla?.dueDate), deadlineEnabled: stage.sla?.deadlineEnabled !== false,
@@ -63,7 +69,7 @@ export function normalizeFmsDefinition(input: FmsFlowDefinition): FmsFlowDefinit
       ...(stage.sla?.conditional && "decisionStageKey" in stage.sla.conditional ? (() => { const decisionOptionKey = text("decisionOptionKey" in stage.sla.conditional ? stage.sla.conditional.decisionOptionKey : stage.sla.conditional.outcome).toLowerCase(); return { conditional: { decisionStageKey: text(stage.sla.conditional.decisionStageKey).toLowerCase(), decisionOptionKey, outcome: decisionOptionKey } }; })() : {}),
     },
   }));
-  return { ...input, name: text(input.name), description: text(input.description) || undefined, manualTrigger: true, stages };
+  return requireFmsAssignmentSourceForms({ ...input, name: text(input.name), description: text(input.description) || undefined, manualTrigger: true, stages });
 }
 
 /** True when the stage carries its own ordered routes instead of a single successor. */
@@ -249,7 +255,7 @@ export function validateFmsDefinition(raw: FmsFlowDefinition, context: FmsValida
   }
   const reached = reachableFmsStageKeys(definition); for (const stage of definition.stages) if (!reached.has(stage.key)) issues.push({ code: "unreachable_stage", message: `Stage ${stage.key} is unreachable`, stageKey: stage.key });
   issues.push(...validateFmsRoutingGraph(definition.stages));
-  return issues;
+  return [...issues, ...validateFmsAssignmentConfig(definition, context)];
 }
 
 function comparable(value: unknown): string | number | boolean | null { return value === undefined ? null : typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? value : JSON.stringify(value); }

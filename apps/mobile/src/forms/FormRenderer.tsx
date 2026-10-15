@@ -39,7 +39,7 @@ export type FormRendererProps = Readonly<{
   templateId?: string;
   readOnly?: boolean;
   submitLabel?: string;
-  onSubmit?: (answers: FormAnswers) => Promise<void>;
+  onSubmit?: (answers: FormAnswers) => Promise<void | boolean>;
   /** Called whenever an answer changes, so a screen can warn before discarding a draft. */
   onDirtyChange?: (dirty: boolean) => void;
 }>;
@@ -155,7 +155,7 @@ export function FormRenderer({
     setBusy(true);
     setError(null);
     try {
-      await onSubmit(normalizeFormAnswers(resolved, answers));
+      if (await onSubmit(normalizeFormAnswers(resolved, answers)) === false) return;
       setSubmitted(true);
       onDirtyChange?.(false);
     } catch (caught) {

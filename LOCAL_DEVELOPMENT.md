@@ -3,7 +3,7 @@
 This guide starts the JewelOS web application against the local Supabase stack on Windows. It deliberately uses temporary PowerShell environment variables so existing `.env` files that may point to a hosted project are not overwritten.
 
 
-Set-Location 'C:\Users\MIS\Downloads\MKJewelOS\jewelos'
+ Set-Location 'C:\Users\MIS\Downloads\MKJewelOS\jewelos'
 supabase.cmd start
 
 $localSupabase = supabase.cmd status -o json | ConvertFrom-Json

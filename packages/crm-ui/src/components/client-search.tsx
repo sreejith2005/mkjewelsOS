@@ -1,54 +1,70 @@
 "use client";
-
-import Link from "@/next-shim/link"; // crm-port: next/link -> local shim (same hrefs, /crm base path added)
-import { useEffect, useState } from "react";
-
-import { createClient } from "@/lib/supabase/client";
-import { formatPhone } from "@/lib/phone";
-import type { Database } from "@/lib/supabase/database.types";
-
-type Result = Database["public"]["Functions"]["search_clients"]["Returns"][number] & { total_visits?: number; last_buy_status?: string | null };
+import Link from '@/next-shim/link';
+import { useEffect, useId, useRef, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { formatPhone } from '@/lib/phone';
+import { clientListHref } from '@/lib/client-browse';
+import type { Database } from '@/lib/supabase/database.types';
+type Result = Database['public']['Functions']['search_clients']['Returns'][number] & { total_visits?: number; last_buy_status?: string | null };
 
 export function ClientSearch({ onSelect }: { onSelect?: (client: Result) => void } = {}) {
-  const [term, setTerm] = useState("");
+  const [term, setTerm] = useState('');
   const [results, setResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(false);
-  const canSearch = term.trim().length >= 3 || term.replace(/\D/g, "").length >= 3;
-  // crm-port fix (owner 2026-09-30): the header outlives navigation, so close the results once one is followed.
-  const close = () => { setTerm(""); setResults([]); };
-
+  const [error, setError] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const root = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const id = useId();
+  const value = term.trim();
+  const canSearch = value.length > 0;
+  const close = () => { setOpen(false); setTerm(''); setResults([]); };
   useEffect(() => {
-    if (!canSearch) return;
-
     let cancelled = false;
-    const value = term.trim();
+    setResults([]); setError(false); setLoading(canSearch);
+    if (!canSearch) return;
     const timer = window.setTimeout(async () => {
-      setLoading(true);
-      const { data } = await createClient().rpc("search_clients", {
-        search_text: value,
-        result_limit: 8,
-      });
-      if (!cancelled) {
-        setResults(data ?? []);
-        setLoading(false);
-      }
+      try {
+        const response = await createClient().rpc('search_clients', { search_text: value, result_limit: 8 });
+        if (cancelled) return;
+        if (response.error) { setError(true); setResults([]); }
+        else setResults(response.data ?? []);
+      } catch { if (!cancelled) { setError(true); setResults([]); } }
+      finally { if (!cancelled) setLoading(false); }
     }, 220);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [canSearch, term]);
-
-  return (
-    <div className="relative w-full max-w-xl">
-      <label className="sr-only" htmlFor="global-client-search">Search client</label>
-      <input id="global-client-search" className="w-full rounded-lg border border-stone-300 bg-white px-4 py-2" value={term} onChange={(event) => setTerm(event.target.value)} placeholder="Search by phone, client name or MKC / MKF / MKREF ID" />
-      {canSearch ? <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-stone-200 bg-white shadow-lg">
-        {loading ? <p className="p-3 text-sm text-stone-500">Searching…</p> : null}
-        {!loading ? results.map((result) => onSelect ? <button className="block w-full border-b border-stone-100 px-4 py-3 text-left hover:bg-amber-50" type="button" onClick={() => { onSelect(result); setTerm(""); setResults([]); }} key={result.client_id}><b>{result.primary_name}</b><span className="ml-2 text-sm text-stone-600">{formatPhone(result.matched_phone ?? result.primary_phone)}</span><span className="ml-2 text-xs text-stone-500">{result.client_code}</span><span className="float-right text-xs text-stone-500">Select</span></button> : <div className="border-b border-stone-100 px-4 py-3" key={result.client_id}><div className="flex flex-wrap items-center justify-between gap-2"><Link className="font-semibold hover:underline" href={`/clients/${result.client_id}`} onClick={close}>{result.primary_name} <span className="font-normal text-stone-600">{formatPhone(result.matched_phone ?? result.primary_phone)}</span> <span className="font-normal text-xs text-stone-500">{[result.client_code, result.household_code].filter(Boolean).join(" · ")}</span></Link><span className="text-xs text-stone-500">{result.total_visits ?? 0} visits · Last status {result.last_buy_status ?? "—"}</span></div><div className="mt-2 flex gap-3 text-xs"><Link className="underline" href={`/clients/${result.client_id}`} onClick={close}>View Client Profile</Link><Link className="underline" href={`/visits/new?client=${result.client_id}`} onClick={close}>Make Walk-in Entry</Link></div></div>) : null}
-        {!loading && results.length === 0 ? <p className="p-3 text-sm">No client found — <Link className="font-semibold text-amber-800 underline" href={`/clients/new?phone=${encodeURIComponent(term)}`} onClick={close}>create new?</Link></p> : null}
-      </div> : null}
-    </div>
-  );
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [value, canSearch, retry]);
+  useEffect(() => {
+    const dismiss = (event: PointerEvent) => { if (event.target instanceof Node && !root.current?.contains(event.target)) setOpen(false); };
+    document.addEventListener('pointerdown', dismiss);
+    return () => document.removeEventListener('pointerdown', dismiss);
+  }, []);
+  return <div ref={root} role="search" className="crm-universal-search" onBlur={(event) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+  }} onKeyDown={(event) => {
+    if (event.key === 'Escape') { event.preventDefault(); input.current?.focus(); setOpen(false); }
+    if (event.key === 'ArrowDown' && event.target === input.current) {
+      event.preventDefault(); root.current?.querySelector<HTMLElement>('.crm-search-results a, .crm-search-results button')?.focus();
+    }
+    if (event.key === 'Enter' && event.target === input.current) {
+      event.preventDefault();
+      if (onSelect) root.current?.querySelector<HTMLButtonElement>('.crm-search-result')?.click();
+      else if (canSearch) root.current?.querySelector<HTMLAnchorElement>('[data-all-results]')?.click();
+    }
+  }}>
+    <label className="sr-only" htmlFor={id}>Search client</label>
+    <input ref={input} id={id} autoComplete="off" type="search" aria-controls={`${id}-results`} aria-expanded={open && canSearch} value={term}
+      onFocus={() => setOpen(true)} onChange={(event) => { const next=event.target.value; setTerm(next); setOpen(true); if(next.trim()!==value){setResults([]); setLoading(next.trim().length > 0);} }}
+      placeholder="Search clients, leads, phone or ID" />
+    {open && canSearch ? <div id={`${id}-results`} className="crm-search-results" aria-label="Client search results">
+      <div aria-live="polite">{loading ? <p className="p-3 text-sm">Searching…</p> : null}</div>
+      {error ? <div role="alert" className="p-3 text-sm">Search could not load. <button type="button" onClick={() => { setError(false); setLoading(true); setRetry(n => n + 1); }}>Retry search</button></div> : null}
+      {!loading && !error ? results.map(result => onSelect
+        ? <button className="crm-search-result" type="button" key={result.client_id} onClick={() => { onSelect(result); close(); }}><strong>{result.primary_name}</strong><span>{formatPhone(result.matched_phone ?? result.primary_phone)} · {result.client_code}</span></button>
+        : <Link className="crm-search-result" href={`/clients/${result.client_id}`} onClick={close} key={result.client_id}><strong>{result.primary_name}</strong><span>{formatPhone(result.matched_phone ?? result.primary_phone)}</span><small>{[result.client_code, result.household_code, result.referral_code].filter(Boolean).join(' · ')}</small></Link>) : null}
+      {!loading && !error && results.length === 0 ? <p className="p-3 text-sm">No matching clients or leads.</p> : null}
+      {!onSelect ? <Link data-all-results className="crm-search-all" href={clientListHref(value, 1)} onClick={close}>See all results</Link> : null}
+    </div> : null}
+  </div>;
 }

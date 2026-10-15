@@ -15,6 +15,11 @@ const items: readonly MobileNavigationDrawerItem[] = [
 afterEach(cleanup);
 
 describe("MobileNavigationDrawer", () => {
+  it("shows the same exact count in the phone drawer", () => {
+    render(<MobileNavigationDrawer counts={{ checklist_tasks: 1203 }} branchName="Bandra" currentPath="/" items={items} onClose={vi.fn()} onLogout={vi.fn()} onNavigate={vi.fn()} profileName="Asha Shah" roleLabel="Staff" />);
+    expect(screen.getByRole("button", { name: /^Tasks \(1203\)/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Home/ })).toBeTruthy();
+  });
   it("shows Forms Library to an authorized staff member in the mobile web drawer", () => {
     const access = builtinAccessContext({ id: "staff-1", user_role: "staff" });
     const accessible = new Set(getAccessibleMenu(access, DEFAULT_SECTION_CONTROLS).map((item) => item.id));

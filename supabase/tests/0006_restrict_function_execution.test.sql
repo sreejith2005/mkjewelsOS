@@ -32,6 +32,8 @@ select ok(not has_function_privilege('anon', 'rls_auto_enable()', 'EXECUTE'), 'f
 select ok(not has_function_privilege('authenticated', 'rls_auto_enable()', 'EXECUTE'), 'future public functions do not default-grant authenticated');
 select ok(not has_function_privilege('service_role', 'rls_auto_enable()', 'EXECUTE'), 'future public functions do not default-grant service_role');
 
+-- 0234 adds three definers: internal coverage restoration, audited deletion,
+-- and a boolean evidence reference used by authenticated Storage policies.
 -- Current application-function matrix, including the linked-only helper above.
 -- 0212 adds three owner-only functions and makes the activation dispatcher a definer.
 -- 0213/0214 add five definers; only the narrow assignment roster is client-callable.
@@ -43,14 +45,14 @@ select is((
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
-), 426, 'exactly 426 postgres-owned public application functions exist in the current migration set');
+), 432, 'exactly 432 postgres-owned public application functions exist in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres' and p.prosecdef
-), 361, 'exactly 361 public application functions are SECURITY DEFINER in the current migration set');
+), 367, 'exactly 367 public application functions are SECURITY DEFINER in the current migration set');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -66,7 +68,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
-), 202, 'authenticated can execute exactly 202 reviewed public application functions');
+), 205, 'authenticated can execute exactly 205 reviewed public application functions');
 select is((
   select count(*)::integer
   from pg_proc p
@@ -82,7 +84,7 @@ select is((
   join pg_roles r on r.oid = p.proowner
   where n.nspname = 'public' and r.rolname = 'postgres'
     and has_function_privilege('postgres', p.oid, 'EXECUTE')
-), 426, 'postgres retains owner execution on every public application function');
+), 432, 'postgres retains owner execution on every public application function');
 select ok(not has_function_privilege('authenticated', 'reject_watcher_task_mutation()', 'EXECUTE'), 'watcher guard trigger cannot be called directly');
 
 -- Exact authenticated allowlist: baseline, Forms, and reviewed FMS entry points.
@@ -228,6 +230,7 @@ select is((
   'delete_fms_flow_with_audit(uuid,text)',
   'delete_form_draft_with_audit(uuid)',
   'delete_form_with_audit(uuid)',
+  'delete_leave_requests_with_audit(uuid[])',
   'delete_recurring_todo_template_with_audit(uuid)',
   'duplicate_form_with_audit(uuid,text)',
   'edit_pending_leave(uuid,date,date,date,text)',
@@ -239,6 +242,8 @@ select is((
   'get_management_insights_v1(jsonb)',
   'get_my_daily_checklist_status()',
   'get_my_fms_starter_assignments()',
+  'get_my_leave_update_ids()',
+  'get_my_sidebar_counts()',
   'get_recurring_todo_workspace(jsonb)',
   'get_section_availability()',
   'get_task_attachment_path(uuid)',
@@ -249,12 +254,14 @@ select is((
   'is_reporting_descendant(uuid,uuid)',
   'leave_applicant_eligible()',
   'leave_file_readable(text)',
+  'leave_file_retained_for_audit(text)',
   'leave_file_writable(text)',
   'list_assigning_left_tasks()',
   'list_designation_daily_checklists()',
   'list_task_assignment_users()',
   'list_task_comments(uuid)',
   'list_task_import_identity_candidates()',
+  'mark_my_leave_updates_read(uuid[],uuid[])',
   'prepare_unused_user_deletion(uuid)',
   'reconcile_task_import_assignments(jsonb)',
   'record_availability_range_with_audit(uuid,date,date,availability_status,text)',
@@ -280,6 +287,7 @@ select is((
   'submit_form_and_start_fms_with_audit(uuid,jsonb)',
   'submit_leave_handover(uuid,uuid,text)',
   'submit_leave_request(text,text,text,date,date,date,text,text)',
+  'submit_task_form_with_audit(uuid,uuid,jsonb,text)',
   'task_attachment_display_name(text)',
   'task_effective_due_datetime(task_instances)',
   'task_feed_page(text,text,integer,integer)',

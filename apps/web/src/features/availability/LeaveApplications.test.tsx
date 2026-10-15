@@ -1,5 +1,5 @@
 ﻿// @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LeaveApplications } from "./LeaveApplications";
 
@@ -13,11 +13,14 @@ const leave = (id: string, reference: string) => ({
 
 const api = vi.hoisted(() => ({
   canSubmitLeave: vi.fn(), editPendingLeave: vi.fn(), leaveHandoverCandidates: vi.fn(), leaveSummaryApplicants: vi.fn(), leaveTypes: vi.fn(),
-  listLeaveRequests: vi.fn(), reviewLeave: vi.fn(), signedLeaveImage: vi.fn(), submitHandover: vi.fn(), submitLeave: vi.fn(),
+  listLeaveRequests: vi.fn(), deleteLeaveRequests: vi.fn(), reviewLeave: vi.fn(), signedLeaveImage: vi.fn(), submitHandover: vi.fn(), submitLeave: vi.fn(),
 }));
 const actor = vi.hoisted(() => ({ role: "staff" as "staff" | "super_admin" }));
+const sidebarApi = vi.hoisted(() => ({ markMyLeaveUpdatesRead: vi.fn().mockResolvedValue(1), loadMyLeaveUpdateIds: vi.fn().mockResolvedValue(["old-update"]) }));
+const realtime = vi.hoisted(() => ({ refresh: undefined as (() => Promise<void>) | undefined }));
+vi.mock("@jewelos/data/sidebar/api", () => sidebarApi);
 vi.mock("@jewelos/data/leave/api", () => api);
-vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealtimeRefresh: vi.fn() }));
+vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealtimeRefresh: ({ refresh }: { refresh: () => Promise<void> }) => { realtime.refresh = refresh; } }));
 vi.mock("@/auth/AuthContext", async () => {
   const { builtinAccessContext } = await vi.importActual<typeof import("@jewelos/core")>("@jewelos/core");
   const staffProfile = { id: "me", tenant_id: "t", employee_name: "Richelle", user_role: "staff" as const };
@@ -29,9 +32,48 @@ vi.mock("@/auth/AuthContext", async () => {
 });
 
 describe("LeaveApplications handover", () => {
-  afterEach(cleanup);
+  it("keeps a background-loaded history snapshot unread until the page becomes visible", async () => {
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    render(<LeaveApplications />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Leave summary" }));
+    await waitFor(() => expect(api.listLeaveRequests).toHaveBeenCalledTimes(2));
+    expect(sidebarApi.markMyLeaveUpdatesRead).not.toHaveBeenCalled();
+    visibility.mockReturnValue("visible");
+    fireEvent(document, new Event("visibilitychange"));
+    await waitFor(() => expect(sidebarApi.markMyLeaveUpdatesRead).toHaveBeenCalledWith(["old-update"], ["one", "two"]));
+    visibility.mockRestore();
+  });
+  it("keeps updates unread on Apply and acknowledges only a visible loaded history snapshot", async () => {
+    render(<LeaveApplications />);
+    await screen.findByRole("tab", { name: "Leave summary" });
+    expect(sidebarApi.markMyLeaveUpdatesRead).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("tab", { name: "Leave summary" }));
+    await waitFor(() => expect(sidebarApi.markMyLeaveUpdatesRead).toHaveBeenCalledWith(["old-update"], ["one", "two"]));
+    expect(sidebarApi.loadMyLeaveUpdateIds.mock.invocationCallOrder[0]).toBeLessThan(api.listLeaveRequests.mock.invocationCallOrder[0]!);
+  });
+  it("acknowledges new successful snapshots while history remains open without a reload loop", async () => {
+    render(<LeaveApplications />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Leave summary" }));
+    await waitFor(() => expect(sidebarApi.markMyLeaveUpdatesRead).toHaveBeenCalled());
+    sidebarApi.markMyLeaveUpdatesRead.mockClear();
+    sidebarApi.loadMyLeaveUpdateIds.mockResolvedValueOnce(["new-update"]);
+    await act(async () => { await realtime.refresh?.(); });
+    await waitFor(() => expect(sidebarApi.markMyLeaveUpdatesRead).toHaveBeenCalledExactlyOnceWith(["new-update"], ["one", "two"]));
+    sidebarApi.markMyLeaveUpdatesRead.mockClear();
+    api.listLeaveRequests.mockRejectedValueOnce(new Error("Reload failed"));
+    await act(async () => { await realtime.refresh?.(); });
+    expect(sidebarApi.markMyLeaveUpdatesRead).not.toHaveBeenCalled();
+  });
+  it("does not acknowledge unread status updates when leave loading fails", async () => {
+    api.listLeaveRequests.mockRejectedValueOnce(new Error("Leave data unavailable"));
+    render(<LeaveApplications />);
+    expect(await screen.findByText("Leave data unavailable")).toBeTruthy();
+    expect(sidebarApi.markMyLeaveUpdatesRead).not.toHaveBeenCalled();
+  });
+  afterEach(() => { cleanup(); vi.restoreAllMocks(); });
   beforeEach(() => {
     vi.clearAllMocks();
+    sidebarApi.loadMyLeaveUpdateIds.mockResolvedValue(["old-update"]);
     actor.role = "staff";
     Element.prototype.scrollIntoView = vi.fn();
     api.canSubmitLeave.mockResolvedValue(true);
@@ -64,5 +106,43 @@ describe("LeaveApplications handover", () => {
     expect(screen.getByRole("button", { name: "Selected" })).toBeTruthy();
     await waitFor(() => expect(Element.prototype.scrollIntoView).toHaveBeenCalled());
     await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Handover done?")));
+  });
+
+  it("confirms individual removal and refreshes the summary", async () => {
+    actor.role = "super_admin";
+    api.canSubmitLeave.mockResolvedValue(false);
+    api.deleteLeaveRequests.mockResolvedValue(1);
+    render(<LeaveApplications />);
+    fireEvent.click((await screen.findAllByRole("button", { name: "Delete" }))[0]!);
+    expect(api.deleteLeaveRequests).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "Delete leave requests" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(api.deleteLeaveRequests).not.toHaveBeenCalled();
+    fireEvent.click(screen.getAllByRole("button", { name: "Delete" })[0]!);
+    api.listLeaveRequests.mockResolvedValue([leave("two", "RICHELLE-25-SEP-2026-110000")]);
+    fireEvent.click(screen.getByRole("button", { name: "Confirm deletion" }));
+    await waitFor(() => expect(screen.queryByText("RICHELLE-25-SEP-2026-100000")).toBeNull());
+    expect(api.deleteLeaveRequests).toHaveBeenCalledWith(["one"]);
+    expect(screen.getByText("1 leave request deleted.")).toBeTruthy();
+  });
+
+  it("selects all for bulk removal and keeps entries on failure", async () => {
+    actor.role = "super_admin";
+    api.canSubmitLeave.mockResolvedValue(false);
+    api.deleteLeaveRequests.mockRejectedValue(new Error("Deletion denied"));
+    render(<LeaveApplications />);
+    fireEvent.click(await screen.findByLabelText("Select all leave requests"));
+    fireEvent.click(screen.getByRole("button", { name: "Delete selected (2)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm deletion" }));
+    expect(await screen.findByText("Deletion denied")).toBeTruthy();
+    expect(api.deleteLeaveRequests).toHaveBeenCalledWith(["one", "two"]);
+    expect(screen.getAllByText("RICHELLE-25-SEP-2026-100000").length).toBeGreaterThan(0);
+  });
+
+  it("does not offer deletion to ordinary users", async () => {
+    render(<LeaveApplications />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Leave summary" }));
+    expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+    expect(screen.queryByLabelText("Select all leave requests")).toBeNull();
   });
 });

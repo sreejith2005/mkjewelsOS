@@ -7,6 +7,14 @@ const router=vi.hoisted(()=>({push:vi.fn()}));
 vi.mock('@/next-shim/navigation',()=>({useRouter:()=>router}));
 afterEach(()=>{vi.useRealTimers();vi.clearAllMocks();});
 const paging:FollowupPaging={page:7,total:120001,counts:{pending:120001},statuses:['PENDING'],hasOffRoster:false,filters:{tab:'pending',search:'',sort:'default'}};
+it('clears committed queue filters immediately even when the search is already empty',()=>{
+ vi.useFakeTimers();
+ const {result}=renderHook(()=>useFollowupControls('not_bought',{...paging,filters:{...paging.filters,crm:'STAFF',status:'PENDING',branch:'branch-a'}},'default'));
+ act(()=>result.current.change({crm:'',status:'',branch:'',search:'',sort:'default'}));
+ expect(router.push).toHaveBeenCalledWith('/followups?tab=pending&sort=default');
+ act(()=>vi.advanceTimersByTime(500));
+ expect(router.push).toHaveBeenCalledTimes(1);
+});
 it('debounces typing, resets pagination, and allows repeating a search after Back',()=>{
  vi.useFakeTimers();
  const {result,rerender}=renderHook(({page})=>useFollowupControls('not_bought',page,'default'),{initialProps:{page:paging}});

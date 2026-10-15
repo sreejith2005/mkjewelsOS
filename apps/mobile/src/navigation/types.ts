@@ -22,7 +22,7 @@ export type RootStackParamList = {
   TaskForm: { taskId: string; formTemplateId: string; taskType?: string | null };
   FmsInstance: { instanceId: string };
   FmsStage: { instanceId: string; instanceStageId: string };
-  FmsStageForm: { instanceId: string; instanceStageId: string; formTemplateId: string };
+  FmsStageForm: { instanceId: string; instanceStageId: string; formTemplateId: string; outcome?: string; remark?: string; checklist?: Record<string, boolean>; nextAssigneeId?: string };
   FormFill: { formTemplateId: string; starterAssignmentId?: string };
   FormBuilder: { formTemplateId?: string } | undefined;
   FormSubmission: { submissionId: string };

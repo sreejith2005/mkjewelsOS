@@ -2,16 +2,18 @@ import { useEffect, useId, useRef, type ComponentType, type KeyboardEvent as Rea
 import { LogOut, X } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { sidebarCountLabel, type SidebarCounts, type PageId } from "@jewelos/core";
 
 export type MobileNavigationDrawerItem = Readonly<{
   Icon: ComponentType<{ className?: string }>;
   description: string;
-  id: string;
+  id: PageId;
   label: string;
   path: string;
 }>;
 
 export function MobileNavigationDrawer({
+  counts = {},
   branchName,
   currentPath,
   items,
@@ -21,6 +23,7 @@ export function MobileNavigationDrawer({
   profileName,
   roleLabel,
 }: {
+  counts?: SidebarCounts;
   branchName: string;
   currentPath: string;
   items: readonly MobileNavigationDrawerItem[];
@@ -108,7 +111,7 @@ export function MobileNavigationDrawer({
                 >
                   <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl", selected ? "bg-task-accent text-task-bg" : "bg-task-muted text-task-text-muted")}><Icon className="size-5" /></span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold">{label}</span>
+                    <span className="block truncate text-sm font-semibold">{sidebarCountLabel(label, counts[id])}</span>
                     <span className="block truncate text-xs text-task-text-muted">{description}</span>
                   </span>
                 </button>

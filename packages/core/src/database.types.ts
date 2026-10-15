@@ -8426,6 +8426,7 @@ export type Database = {
       }
       task_checklists: {
         Row: {
+          deleted_at: string | null
           completed_at: string | null
           completed_by: string | null
           id: string
@@ -8436,6 +8437,7 @@ export type Database = {
           task_instance_id: string
         }
         Insert: {
+          deleted_at?: string | null
           completed_at?: string | null
           completed_by?: string | null
           id?: string
@@ -8446,6 +8448,7 @@ export type Database = {
           task_instance_id: string
         }
         Update: {
+          deleted_at?: string | null
           completed_at?: string | null
           completed_by?: string | null
           id?: string
@@ -8837,6 +8840,7 @@ export type Database = {
       }
       task_instances: {
         Row: {
+          upload_requirement_overridden: boolean
           deleted_at: string | null
           actual_datetime: string | null
           assignment_status: string
@@ -8886,6 +8890,7 @@ export type Database = {
           verifier_user_profile_id: string | null
         }
         Insert: {
+          upload_requirement_overridden?: boolean
           deleted_at?: string | null
           actual_datetime?: string | null
           assignment_status?: string
@@ -8935,6 +8940,7 @@ export type Database = {
           verifier_user_profile_id?: string | null
         }
         Update: {
+          upload_requirement_overridden?: boolean
           deleted_at?: string | null
           actual_datetime?: string | null
           assignment_status?: string
@@ -10694,6 +10700,7 @@ export type Database = {
           title: string | null
           updated_at: string | null
           updated_by: string | null
+          upload_requirement_overridden: boolean | null
           verification_note: string | null
           verification_status: string | null
           verified_at: string | null
@@ -10743,6 +10750,7 @@ export type Database = {
           title?: string | null
           updated_at?: string | null
           updated_by?: string | null
+          upload_requirement_overridden?: boolean | null
           verification_note?: string | null
           verification_status?: string | null
           verified_at?: string | null
@@ -10792,6 +10800,7 @@ export type Database = {
           title?: string | null
           updated_at?: string | null
           updated_by?: string | null
+          upload_requirement_overridden?: boolean | null
           verification_note?: string | null
           verification_status?: string | null
           verified_at?: string | null
@@ -11112,6 +11121,16 @@ export type Database = {
       }
     }
     Functions: {
+      get_fms_work_mutation_result: { Args: { p_idempotency_key: string }; Returns: Json }
+      list_fms_form_starters: { Args: { p_form_template_id: string }; Returns: Json }
+      submit_form_and_start_fms_idempotent: { Args: { p_form_template_id: string; p_answers: Json; p_idempotency_key: string; p_flow_id?: string }; Returns: Json }
+
+      preview_fms_work_transition: { Args: { p_request: Json }; Returns: Json }
+      transition_fms_work_with_audit: { Args: { p_request: Json; p_idempotency_key: string; p_handoffs: Json; p_preview_fingerprint: string }; Returns: Json }
+      list_fms_handoff_recipients: { Args: { p_request: Json; p_target_stage_id: string; p_query?: string; p_cursor?: string; p_limit?: number }; Returns: Json }
+      get_fms_assigned_stage: { Args: { p_instance_id: string; p_instance_stage_id?: string }; Returns: Json }
+      get_fms_assigned_work_context: { Args: { p_instance_id: string; p_instance_stage_id: string; p_cursor?: string; p_limit?: number }; Returns: Json }
+
       assert_task_assignment_targets: {
         Args: { p_doer_ids: string[]; p_watcher_ids?: string[] }
         Returns: undefined
@@ -11137,6 +11156,13 @@ export type Database = {
           user_role: Database["public"]["Enums"]["user_role"]
           working_status: Database["public"]["Enums"]["working_status"]
         }[]
+      }
+      task_form_submission_module_matches: {
+        Args: {
+          p_module: string
+          p_task: Database["public"]["Tables"]["task_instances"]["Row"]
+        }
+        Returns: boolean
       }
       task_assignment_scope: { Args: never; Returns: string }
       task_assignment_user_in_scope: {
@@ -12322,6 +12348,9 @@ export type Database = {
       get_dashboard_metrics: { Args: { p_context?: Json }; Returns: Json }
       get_employee_task_progress: { Args: { p_context?: Json }; Returns: Json }
       get_form_upload_path: { Args: { p_file_id: string }; Returns: string }
+      get_my_sidebar_counts: { Args: Record<PropertyKey, never>; Returns: Json }
+      get_my_leave_update_ids: { Args: Record<PropertyKey, never>; Returns: string[] }
+      mark_my_leave_updates_read: { Args: { p_notification_ids: string[]; p_leave_ids: string[] }; Returns: number }
       get_home_summary: { Args: { p_context?: Json }; Returns: Json }
       get_my_access_context: { Args: never; Returns: Json }
       get_my_daily_checklist_status: { Args: never; Returns: Json }
@@ -12747,6 +12776,7 @@ export type Database = {
         }
         Returns: Json
       }
+      progress_fms_initial_form_internal: { Args: { p_instance_stage_id: string }; Returns: undefined }
       queue_fms_starter_assignments: {
         Args: { p_assigned_by: string; p_flow_id: string }
         Returns: undefined
@@ -13052,6 +13082,18 @@ export type Database = {
       review_leave_request: {
         Args: { p_approve: boolean; p_id: string; p_remark: string }
         Returns: undefined
+      }
+      delete_leave_requests_with_audit: {
+        Args: { p_ids: string[] }
+        Returns: number
+      }
+      restore_deleted_leave_coverage: {
+        Args: { p_date: string; p_user: string }
+        Returns: undefined
+      }
+      leave_file_retained_for_audit: {
+        Args: { p_path: string }
+        Returns: boolean
       }
       review_resignation_with_audit: {
         Args: { p_decision: string; p_resignation_id: string }
@@ -13487,6 +13529,15 @@ export type Database = {
           p_form_template_id: string
           p_linked_module?: string
           p_linked_record_id?: string
+        }
+        Returns: string
+      }
+      submit_task_form_with_audit: {
+        Args: {
+          p_answers: Json
+          p_form_template_id: string
+          p_remark?: string
+          p_task_id: string
         }
         Returns: string
       }

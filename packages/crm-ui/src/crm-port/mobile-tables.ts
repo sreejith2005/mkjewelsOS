@@ -40,6 +40,9 @@ export function labelTableCells(root: ParentNode): void {
     // crm-port/wide.css pins an actions column to the right edge on tablets and desktops.
     if (ACTIONS_HEADING.test(headings[headings.length - 1] ?? "")) setAttribute(listing, "data-crm-actions", "");
     else if (listing.hasAttribute("data-crm-actions")) listing.removeAttribute("data-crm-actions");
+    // Authored records already carry readable labels and their own phone disclosure.
+    // Keep the desktop fitted scroller, but never rewrite React-owned labels.
+    if (listing.classList.contains("crm-record-table")) continue;
     const rows = Array.from(listing.querySelectorAll(":scope > tbody > tr")).map((row) => Array.from(row.children)).filter((cells) => cells.length === headings.length);
     // A column holding long text (reasons, remarks) gets more room on a phone; the others stay on one line.
     const longest = headings.map((_, index) => Math.max(0, ...rows.map((cells) => (cells[index]?.textContent ?? "").trim().length)));

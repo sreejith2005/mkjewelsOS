@@ -29,8 +29,8 @@ describe("task detail labels", () => {
     expect(taskVerificationLabel({ verification_required: true, verification_status: null })).toBe("Verification required");
   });
 
-  it("never reports evidence as owed on a checklist", () => {
-    expect(taskEvidenceLabel({ task_type: "checklist", requires_upload: true }, false)).toBe("Not required");
+  it("reports the saved upload requirement independently of task type", () => {
+    expect(taskEvidenceLabel({ task_type: "checklist", requires_upload: true }, false)).toBe("Evidence required");
     expect(taskEvidenceLabel({ task_type: "delegation", requires_upload: true }, false)).toBe("Evidence required");
     expect(taskEvidenceLabel({ task_type: "delegation", requires_upload: true }, true)).toBe("Evidence required · Uploaded");
   });

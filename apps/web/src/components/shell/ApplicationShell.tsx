@@ -1,6 +1,7 @@
 import type { ComponentType, ReactNode } from "react";
 import { Menu, PanelLeftClose } from "lucide-react";
-import type { PageId } from "@jewelos/core";
+import { sidebarCountLabel, type PageId } from "@jewelos/core";
+import { useSidebarCounts } from "@/features/sidebar/useSidebarCounts";
 import { Button } from "@/components/ui";
 import { initials, titleCase } from "@/lib/format";
 import type { Branch, UserProfile } from "@/types";
@@ -74,6 +75,7 @@ export function ApplicationShell({
   fullBleed?: boolean;
 }) {
   const sidebarNavigation = getSidebarNavigation(nav);
+  const counts = useSidebarCounts(profile.id, profile.tenant_id);
   const navigateFromSidebar = (destination: string) => {
     navigate(destination);
     setSidebarOpen(false);
@@ -99,7 +101,7 @@ export function ApplicationShell({
           <span className="hidden text-sm text-champagne md:inline">{branch?.name ?? "Branch unavailable"}</span>
           {developerModeControl}
           <ThemeToggle onChange={onThemeChange} theme={theme} />
-          <NotificationBell onNavigate={navigate} profileId={profile.id} />
+          <NotificationBell onNavigate={navigate} profileId={profile.id} unreadCount={counts.notifications} />
           <span aria-label={profile.employee_name} className="flex size-10 items-center justify-center rounded-full bg-task-accent-soft text-sm font-bold text-task-text md:rounded-lg md:border md:border-gold/20 md:bg-obsidian md:text-gold" role="img">
             {initials(profile.employee_name)}
           </span>
@@ -121,7 +123,7 @@ export function ApplicationShell({
               onClick={() => navigateFromSidebar(item.path)}
               type="button"
             >
-              <Icon className="size-4 shrink-0" />{item.label}
+              <Icon className="size-4 shrink-0" />{sidebarCountLabel(item.label, counts[item.id])}
             </button>
           ))}
         </nav>
@@ -133,7 +135,7 @@ export function ApplicationShell({
               onClick={() => navigateFromSidebar(item.path)}
               type="button"
             >
-              <Icon className="size-4 shrink-0" />{item.label}
+              <Icon className="size-4 shrink-0" />{sidebarCountLabel(item.label, counts[item.id])}
             </button>
           ))}
         </nav> : null}
@@ -143,8 +145,8 @@ export function ApplicationShell({
         <div className={cn(fullBleed ? "w-full p-4 sm:p-6 [&>section]:max-w-none [&>section]:mx-0" : "mx-auto max-w-7xl p-4 sm:p-6")}>{children}</div>
       </main>
 
-      <MobileBottomNav onNavigate={navigate} path={path} />
-      {drawerOpen ? <MobileNavigationDrawer branchName={branch?.name ?? "Branch unavailable"} currentPath={path} items={launcherItems} onClose={() => onDrawerOpenChange(false)} onLogout={onLogout} onNavigate={navigate} profileName={profile.employee_name} roleLabel={titleCase(profile.user_role)} /> : null}
+      <MobileBottomNav onNavigate={navigate} path={path} taskCount={counts.checklist_tasks} />
+      {drawerOpen ? <MobileNavigationDrawer counts={counts} branchName={branch?.name ?? "Branch unavailable"} currentPath={path} items={launcherItems} onClose={() => onDrawerOpenChange(false)} onLogout={onLogout} onNavigate={navigate} profileName={profile.employee_name} roleLabel={titleCase(profile.user_role)} /> : null}
     </div>
   );
 }

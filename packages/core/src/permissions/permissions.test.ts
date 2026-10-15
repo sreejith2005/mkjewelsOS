@@ -32,6 +32,19 @@ const withSection = (page: keyof SectionControls["section_availability"], enable
 });
 
 describe("permission catalog", () => {
+  it("requires effective builder authority while preserving assigned Tasks entry", () => {
+    const employee = access({ role: "staff", dashboardAuthority: null, userOverrides: { "fms.view": "grant", "fms.manage": "deny" } });
+    expect(resolvePageAccess(employee, DEFAULT_SECTION_CONTROLS, "fms_builder")).toBe("denied");
+    expect(resolvePageAccess(employee, DEFAULT_SECTION_CONTROLS, "checklist_tasks")).toBe("allowed");
+    const delegated = access({ role: "staff", dashboardAuthority: null, userOverrides: { "fms.view": "grant", "fms.manage": "grant" } });
+    expect(resolvePageAccess(delegated, DEFAULT_SECTION_CONTROLS, "fms_builder")).toBe("allowed");
+  });
+  it("reserves leave deletion for Super Admin authority regardless of action overrides", () => {
+    expect(isConfigurablePermission("availability.delete_leave")).toBe(false);
+    for (const role of USER_ROLES) {
+      expect(explainPermission({ role, dashboardAuthority: null, userOverrides: { "availability.delete_leave": "grant" } }, "availability.delete_leave").effective).toBe(role === "super_admin");
+    }
+  });
   it("configures assignment independently of team authority with individual and department precedence", () => {
     expect(isConfigurablePermission("tasks.assign_others")).toBe(true);
     const subject = { role: "manager" as const, dashboardAuthority: null, departmentOverrides: { "tasks.assign_others": "deny" as const } };
@@ -62,7 +75,7 @@ describe("permission catalog", () => {
   it("keeps the implemented menu identical for every role with no overrides", () => {
     for (const role of USER_ROLES) {
       const menu = getAccessibleMenu(builtinAccessContext({ id: "p", user_role: role }), DEFAULT_SECTION_CONTROLS).map((item) => item.id);
-      const expected = getImplementedMenuForRole(role).map((item) => item.id);
+      const expected = getImplementedMenuForRole(role).filter(item => item.id !== "fms_builder" || hasPermission(builtinAccessContext({ id: "p", user_role: role }), "fms.manage")).map((item) => item.id);
       // Super Admins see every section; nobody else gains or loses one.
       expect(menu, role).toEqual(expected);
     }
@@ -80,7 +93,7 @@ describe("permission catalog", () => {
     expect(isConfigurablePermission("users.manage")).toBe(true);
     expect(isConfigurablePermission("tasks.view_all")).toBe(false);
     expect(isConfigurablePermission("permissions.manage")).toBe(false);
-    expect(PERMISSION_CATALOG.filter((item) => item.kind === "protected").map((item) => item.key).sort()).toEqual(["developer_mode.manage", "organization.manage", "permissions.manage"]);
+    expect(PERMISSION_CATALOG.filter((item) => item.kind === "protected").map((item) => item.key).sort()).toEqual(["availability.delete_leave", "developer_mode.manage", "organization.manage", "permissions.manage"]);
   });
 });
 

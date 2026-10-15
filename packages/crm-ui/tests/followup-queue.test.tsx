@@ -48,8 +48,8 @@ describe("FollowupQueue roster, sorting and finding (owner request 2026-10-08)",
   });
   it("counts each tab and sorts by client name or visit date on request", () => {
     renderItems([row("a", { client_name: "Zara", visit_date: "2026-10-01" }), row("b", { client_name: "Asha", visit_date: "2026-09-01", status: "ALREADY PURCHASED FROM MK JEWELS" }), row("c", { client_name: "Meera", visit_date: "2026-10-05" })], []);
-    expect(screen.getByRole("button", { name: "TODAY FOLLOW UP" }).textContent).toBe("TODAY FOLLOW UP (2)");
-    expect(screen.getByRole("button", { name: "ALL DONE" }).textContent).toBe("ALL DONE (1)");
+    expect(screen.getByRole("button", { name: "TODAY FOLLOW UP" }).textContent).toBe("Today (2)");
+    expect(screen.getByRole("button", { name: "ALL DONE" }).textContent).toBe("Done (1)");
     const names = () => screen.getAllByRole("row").slice(1).map((tr) => tr.querySelectorAll("td")[1]?.querySelector("a")?.textContent);
     fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "client" } });
     expect(names()).toEqual(["Meera", "Zara"]);

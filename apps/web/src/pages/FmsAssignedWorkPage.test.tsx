@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FmsAssignedWorkPage } from "./FmsAssignedWorkPage";
 
 const mocks = vi.hoisted(() => ({
@@ -34,6 +34,7 @@ vi.mock("@/features/fms/FmsStageRunner", () => ({
 }));
 
 const OPTIONS = { users: [], branches: [], departments: [], masters: [] };
+beforeEach(() => { mocks.loadTaskForms.mockResolvedValue({ bundles: [], submissions: [] }); });
 
 function stageBundle(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -73,9 +74,9 @@ describe("focused FMS assigned work", () => {
     expect(screen.queryByText("Forms Library")).toBeNull();
     await user.click(screen.getByRole("button", { name: "Submit exact form" }));
     await waitFor(() => expect(mocks.submitFmsStarterAssignment).toHaveBeenCalledWith("form-7", "starter-2", { approved: "yes" }));
-    // Submitting the starting form starts the process, so the user continues
-    // into it rather than being dropped back on a list.
-    expect(onNavigate).toHaveBeenCalledWith("/tasks/fms?instance=instance-5");
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(await screen.findByRole("heading", { name: "Form submitted successfully" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Open my next work" })).toBeNull();
   });
 
   it("falls back to the work list when a replayed submission names no process", async () => {
@@ -92,7 +93,8 @@ describe("focused FMS assigned work", () => {
     render(<FmsAssignedWorkPage onNavigate={onNavigate} />);
 
     await user.click(await screen.findByRole("button", { name: "Submit exact form" }));
-    await waitFor(() => expect(onNavigate).toHaveBeenCalledWith("/tasks"));
+    await user.click(await screen.findByRole("button", { name: "Back to my work" }));
+    expect(onNavigate).toHaveBeenCalledWith("/tasks");
   });
 
   it("opens the exact runtime step and its pinned form, not the instance list", async () => {
@@ -105,7 +107,9 @@ describe("focused FMS assigned work", () => {
 
     expect(await screen.findByText("Running stage-3 form form-7")).toBeTruthy();
     // Scoped by id — never the whole-workspace loader that caps its results.
-    expect(mocks.loadFmsAssignedStage).toHaveBeenCalledWith("instance-5");
+    expect(mocks.loadFmsAssignedStage).toHaveBeenCalledWith("instance-5", "stage-3");
+    expect(mocks.loadForms).not.toHaveBeenCalled();
+    expect(mocks.loadTaskForms).toHaveBeenCalledWith(["form-7"], []);
     expect(screen.queryByText("Live instances")).toBeNull();
     expect(screen.queryByText("No FMS instances match this view.")).toBeNull();
   });

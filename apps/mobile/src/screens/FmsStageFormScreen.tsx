@@ -1,10 +1,9 @@
 import { useCallback, useState } from "react";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import type { Json } from "@jewelos/core";
-import { submitFmsFormAndProgress } from "@jewelos/data/fms/api";
+import { Alert } from "react-native";
+import { useFmsHandoffConfirmation } from "@/features/fms/FmsHandoffConfirmation";
 import { loadFormDynamicOptions, loadTaskForms } from "@jewelos/data/forms/api";
-import { newRequestKey } from "@jewelos/data/runtime";
 import { useAsyncData } from "@/lib/useAsyncData";
 import { useUnsavedGuard } from "@/lib/useUnsavedGuard";
 import { Screen } from "@/ui/Screen";
@@ -28,7 +27,7 @@ export function FmsStageFormScreen() {
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<Route>();
   const [dirty, setDirty] = useState(false);
-  const [idempotencyKey] = useState(() => newRequestKey());
+  const { confirmWork, confirmation } = useFmsHandoffConfirmation();
 
   // Android's back gesture would otherwise discard a half-filled form silently.
   useUnsavedGuard(dirty, "Discard this form?", "Your answers have not been submitted.");
@@ -63,7 +62,7 @@ export function FmsStageFormScreen() {
   const { bundle, options } = data;
 
   return (
-    <FormRenderer
+    <><FormRenderer
       definition={{
         name: bundle.name,
         ...(bundle.description === null ? {} : { description: bundle.description }),
@@ -73,23 +72,27 @@ export function FmsStageFormScreen() {
       dynamicOptions={options}
       onDirtyChange={setDirty}
       onSubmit={async (answers) => {
-        await submitFmsFormAndProgress({
+        const result = await confirmWork({
+          kind: "stage_form",
           formTemplateId: bundle.id,
-          answers: answers as unknown as Json,
+          answers,
           instanceStageId: params.instanceStageId,
-          idempotencyKey,
-          outcome: "",
-          remark: "",
-          checklist: {},
-          nextAssigneeId: null,
+          outcome: params.outcome ?? "",
+          remark: params.remark ?? "",
+          checklist: params.checklist ?? {},
+          ...(params.nextAssigneeId ? { nextAssigneeId: params.nextAssigneeId } : {}),
         });
+        if (!result) return false;
         setDirty(false);
         // Back to the step, which reloads and shows whichever step the answers
         // opened next.
-        navigation.goBack();
+        Alert.alert("Work saved", result.state === "workflow_completed" ? "Workflow completed." : result.state === "successors_activated"
+          ? result.destinations.map(item => `${item.stageName} has been assigned to ${item.employeeName ?? "the configured employee"}.`).join(" ")
+          : "Form saved. Complete the remaining requirements or wait for approval before next work starts.");
+        navigation.goBack(); return true;
       }}
       submitLabel="Submit and continue the workflow"
       templateId={bundle.id}
-    />
+    />{confirmation}</>
   );
 }

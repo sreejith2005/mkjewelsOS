@@ -12,7 +12,6 @@ import {
   restoreFmsFlow,
   reviseFmsFlow,
   setFmsFlowActive,
-  startFmsInstance,
   type FmsFlowRow,
 } from "@jewelos/data/fms/api";
 import { useAccess, useProfile } from "@/auth/AuthProvider";
@@ -144,21 +143,7 @@ export function FmsScreen() {
     }
   };
 
-  const start = (flow: FmsFlowRow) => run(flow.id, async () => {
-    const stage = (data?.stages ?? []).filter((item) => item.fms_flow_id === flow.id).sort((left, right) => left.sort_order - right.sort_order)[0];
-    const firstAssigneeId = (data?.assignees ?? []).find((item) => item.fms_stage_id === stage?.id && item.assignee_type === "specific_user")?.user_profile_id ?? null;
-    const result = await startFmsInstance({
-      flowId: flow.id,
-      title: flow.name,
-      priority: "medium",
-      context: {},
-      branchId: flow.branch_id ?? profile.branch_id ?? "",
-      departmentId: flow.department_id ?? profile.department_id ?? "",
-      firstAssigneeId,
-    });
-    setNotice(`Started ${result.reference_number}`);
-    navigation.navigate("FmsInstance", { instanceId: result.instance_id });
-  });
+
 
   const remove = async (flow: FmsFlowRow) => {
     const permanent = flow.status === "draft";
@@ -221,7 +206,7 @@ export function FmsScreen() {
               {`v${flow.version} · used ${flow.usage_count} times · ${counts.running} running · ${counts.completed} completed${counts.mine ? ` · ${counts.mine} assigned to you` : ""}`}
             </Text>
             <View style={styles.actions}>
-              {flowStatus === "live" ? <Button busy={busy} label="Start instance" onPress={() => void start(flow)} /> : null}
+              
               <Button label={`Tasks${counts.mine ? ` (${counts.mine})` : ""}`} onPress={() => setTasksFor(family)} variant="secondary" />
               {canManage && draft ? <Button disabled={busy} label="Edit draft" onPress={() => openBuilder(draft.id)} variant="secondary" /> : null}
               {canManage && !draft && flow.status !== "draft" ? <Button disabled={busy} label="New version" onPress={() => void revise(flow)} variant="secondary" /> : null}

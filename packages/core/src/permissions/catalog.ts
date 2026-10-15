@@ -81,6 +81,7 @@ export const PERMISSION_CATALOG = [
   { key: "availability.review_leave", kind: "action", category: "People", label: "Review leave requests", description: "Approve or reject leave applications. Approval also requires availability management.", defaultRoles: ["super_admin", "admin", "hr"], pageId: null },
   { key: "availability.view_leave_summary", kind: "action", category: "People", label: "View office leave summary", description: "Read leave requests and status across the organization.", defaultRoles: ["super_admin", "admin", "manager"], pageId: null },
   { key: "availability.apply_leave_exception", kind: "action", category: "People", label: "Apply despite leadership exemption", description: "Permit a named leadership account to submit its own leave requests.", defaultRoles: [], pageId: null },
+  { key: "availability.delete_leave", kind: "protected", category: "People", label: "Delete leave requests", description: "Remove individual or selected leave requests with audit evidence. Super Admin authority only.", defaultRoles: ["super_admin"], pageId: null },
   modulePermission("reports.view", "reports", "Reports", "Open Reports", "Preview the reports available to the user's level."),
   { key: "reports.export", kind: "action", category: "Reports", label: "Export reports", description: "Request private CSV exports of the reports the user can view.", defaultRoles: ALL_ROLES, pageId: null },
   modulePermission("dropdowns.view", "dropdown_master", "Master data", "Open Dropdown Master", "Master dropdown values."),

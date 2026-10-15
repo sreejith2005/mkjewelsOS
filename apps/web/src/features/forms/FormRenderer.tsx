@@ -49,7 +49,7 @@ function FileFieldControl({ disabled, field, onChange, registerRef, templateId, 
   </div>;
 }
 
-export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initialAnswers = {}, onSubmit, preview = false, readOnly = false, templateId, workflowHint = false }: { definition: FormTemplateDefinition; dynamicOptions?: DynamicOptions; initialAnswers?: FormAnswers; onSubmit?: (answers: FormAnswers) => Promise<void>; preview?: boolean; readOnly?: boolean; templateId?: string; workflowHint?: boolean }) {
+export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initialAnswers = {}, onSubmit, preview = false, readOnly = false, templateId, workflowHint = false }: { definition: FormTemplateDefinition; dynamicOptions?: DynamicOptions; initialAnswers?: FormAnswers; onSubmit?: (answers: FormAnswers) => Promise<void | boolean>; preview?: boolean; readOnly?: boolean; templateId?: string; workflowHint?: boolean }) {
   const [answers, setAnswers] = useState<Record<string, FormAnswer>>(() => Object.fromEntries(Object.entries(initialAnswers).filter((entry): entry is [string, FormAnswer] => entry[1] !== null && entry[1] !== undefined)));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -98,7 +98,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
     }
     if (!onSubmit || preview) return;
     setBusy(true); setError(null);
-    try { await onSubmit(normalized); setSuccess(true); } catch (caught) { setError(caught instanceof Error ? caught.message : "Submission failed"); } finally { setBusy(false); }
+    try { if (await onSubmit(normalized) !== false) setSuccess(true); } catch (caught) { setError(caught instanceof Error ? caught.message : "Submission failed"); } finally { setBusy(false); }
   };
 
   const renderField = (field: FormFieldDefinition) => {

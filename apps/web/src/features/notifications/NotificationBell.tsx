@@ -4,9 +4,9 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui";
 import { loadInbox, markNotification, subscribeToInbox } from "./api";
 import type { InboxNotification } from "./types";
-import { notificationDestination, unreadBadge } from "./viewModel";
+import { notificationDestination } from "./viewModel";
 
-export function NotificationBell({ profileId, onNavigate }: { profileId: string; onNavigate: (path: string) => void }) {
+export function NotificationBell({ profileId, onNavigate, unreadCount }: { profileId: string; onNavigate: (path: string) => void; unreadCount: number | undefined }) {
   const [items, setItems] = useState<InboxNotification[]>([]);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState(false);
@@ -34,7 +34,7 @@ export function NotificationBell({ profileId, onNavigate }: { profileId: string;
     return () => document.removeEventListener("mousedown", close);
   }, [open]);
 
-  const unread = items.filter((item) => !item.is_read).length;
+  const unread = unreadCount;
   const openItem = async (item: InboxNotification) => {
     if (!item.is_read) { try { await markNotification(item.id, true); await refresh(); } catch { setError(true); return; } }
     const destination = notificationDestination(item.link_url);
@@ -47,13 +47,13 @@ export function NotificationBell({ profileId, onNavigate }: { profileId: string;
       <button
         aria-expanded={open}
         aria-haspopup="dialog"
-        aria-label={unread ? `Notifications, ${unread} unread` : "Notifications, none unread"}
+        aria-label={unread === undefined ? "Notifications" : unread ? `Notifications, ${unread} unread` : "Notifications, none unread"}
         className="relative flex size-10 items-center justify-center rounded-lg border border-gold/20 bg-obsidian text-gold hover:bg-gold/10"
         onClick={() => setOpen((value) => !value)}
         type="button"
       >
         <Bell className="size-4" />
-        {unread ? <span className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full bg-danger px-1 text-[10px] font-bold leading-5 text-white">{unreadBadge(unread)}</span> : null}
+        {unread ? <span className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full bg-danger px-1 text-[10px] font-bold leading-5 text-white">{unread}</span> : null}
       </button>
       {open ? (
         <section aria-label="Recent notifications" className="absolute right-0 top-12 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-xl border border-gold/20 bg-charcoal p-3 shadow-2xl">

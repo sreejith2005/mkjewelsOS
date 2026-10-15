@@ -101,11 +101,11 @@ describe("deriveTaskCardState", () => {
       expect(state.showDirectUpload).toBe(false);
     });
 
-    it("never asks a checklist for evidence, even with a legacy imported upload flag", () => {
+    it("honors an explicitly required upload on a checklist", () => {
       const state = derive({ task: task({ requires_upload: true, task_type: "checklist" }), hasAttachment: false });
-      expect(state.requiresEvidence).toBe(false);
-      expect(state.canComplete).toBe(true);
-      expect(state.showDirectUpload).toBe(false);
+      expect(state.requiresEvidence).toBe(true);
+      expect(state.canComplete).toBe(false);
+      expect(state.showDirectUpload).toBe(true);
       expect(state.showDirectComplete).toBe(true);
     });
 

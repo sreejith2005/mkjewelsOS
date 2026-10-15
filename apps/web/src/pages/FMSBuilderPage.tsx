@@ -9,7 +9,6 @@ import {
   restoreFmsFlow,
   reviseFmsFlow,
   setFmsFlowActive,
-  startFmsInstance,
   type FmsData,
   type FmsFlowRow,
 } from "@/features/fms/api";
@@ -108,21 +107,7 @@ export function FMSBuilderPage() {
     finally { setBusyId(null); }
   };
 
-  const start = (flow: FmsFlowRow) => run(flow.id, async () => {
-    const stage = (data?.stages ?? []).filter((item) => item.fms_flow_id === flow.id).sort((left, right) => left.sort_order - right.sort_order)[0];
-    const firstAssigneeId = (data?.assignees ?? []).find((item) => item.fms_stage_id === stage?.id && item.assignee_type === "specific_user")?.user_profile_id ?? null;
-    const result = await startFmsInstance({
-      flowId: flow.id,
-      title: flow.name,
-      priority: "medium",
-      context: {},
-      branchId: flow.branch_id ?? profile?.branch_id ?? "",
-      departmentId: flow.department_id ?? profile?.department_id ?? "",
-      firstAssigneeId,
-    });
-    setOpenInstanceId(result.instance_id);
-    setNotice(`Started ${result.reference_number}`);
-  });
+
 
   const revise = (flow: FmsFlowRow) => run(flow.id, async () => {
     const draftId = await reviseFmsFlow(flow.id);
@@ -217,7 +202,7 @@ export function FMSBuilderPage() {
                     <p className="mt-2 text-xs text-soft-grey">v{flow.version} · used {flow.usage_count} times · {counts.running} running · {counts.completed} completed{counts.mine ? ` · ${counts.mine} assigned to you` : ""}</p>
                   </div>
                   <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-                    {state === "live" ? <Button disabled={busy} onClick={() => void start(flow)}><Play className="size-4" />Start instance</Button> : null}
+                    
                     <Button onClick={() => setTasksFor(family)} variant="secondary"><ListChecks className="size-4" />Tasks{counts.mine ? ` (${counts.mine})` : ""}</Button>
                     {canManage && draft ? <Button disabled={busy} onClick={() => setEdit(draft)} variant="secondary"><Pencil className="size-4" />Edit draft</Button> : null}
                     {canManage && !draft && flow.status !== "draft" ? <Button disabled={busy} onClick={() => void revise(flow)} variant="secondary"><Pencil className="size-4" />New version</Button> : null}

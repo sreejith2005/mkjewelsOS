@@ -1,15 +1,16 @@
 import { CheckCircle2, Home } from "lucide-react";
-import { TASK_IN_LOOP_PATH } from "@jewelos/core";
+import { TASK_IN_LOOP_PATH, sidebarCountLabel } from "@jewelos/core";
 import { cn } from "@/lib/utils";
 
 type MobileBottomNavProps = {
   onNavigate: (path: string) => void;
   path: string;
+  taskCount?: number | undefined;
 };
 
 const TASK_PATHS = new Set(["/tasks", "/tasks/checklist", "/tasks/delegation", TASK_IN_LOOP_PATH, "/tasks/fms", "/tasks/import", "/tasks/assigning-left"]);
 
-export function MobileBottomNav({ onNavigate, path }: MobileBottomNavProps) {
+export function MobileBottomNav({ onNavigate, path, taskCount }: MobileBottomNavProps) {
   const destinations = [
     // "/" is where every signed-in employee lands, so it is the tab that has to
     // read as selected on arrival.
@@ -35,7 +36,7 @@ export function MobileBottomNav({ onNavigate, path }: MobileBottomNavProps) {
             type="button"
           >
             <Icon className="size-[22px]" strokeWidth={selected ? 2.4 : 1.9} />
-            <span>{label}</span>
+            <span>{sidebarCountLabel(label, label === "Tasks" ? taskCount : undefined)}</span>
           </button>
         ))}
       </div>

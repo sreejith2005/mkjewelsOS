@@ -1,3 +1,6 @@
+import { suggestFmsAssignment } from "@jewelos/core";
+import { useAccess } from "@/auth/AuthProvider";
+import { hasPermission } from "@jewelos/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, ScrollView, StyleSheet, View, type LayoutChangeEvent } from "react-native";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
@@ -37,6 +40,12 @@ const confirm = (title: string, message: string, action: string) =>
 
 /** Loads the builder data, then opens the flow named in the route (or a new one). */
 export function FmsBuilderScreen() {
+  const access = useAccess();
+  if (!hasPermission(access, "fms.manage")) return <Screen><ErrorState message="Workflow builder access is not available to your account." /></Screen>;
+  return <AuthorizedFmsBuilderScreen />;
+}
+
+function AuthorizedFmsBuilderScreen() {
   const { params } = useRoute<Route>();
   const navigation = useNavigation();
   const state = useAsyncData(loadFmsBuilderData, []);
@@ -137,7 +146,8 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
       const sourceIndex = sourceKey ? currentStages.findIndex((item) => item.key === sourceKey) : -1;
       const source = sourceIndex >= 0 ? currentStages[sourceIndex] : undefined;
       const next = source?.defaultNextStageKey;
-      const prepared = next ? { ...stage, defaultNextStageKey: next } : stage;
+      const configured = current.assignmentVersion === 2 ? { ...stage, sla: { ...stage.sla, assignment: suggestFmsAssignment(source ?? currentStages.at(-1), data.formFields) } } : stage;
+      const prepared = next ? { ...configured, defaultNextStageKey: next } : configured;
       const stages = [...currentStages];
       if (sourceIndex >= 0) { stages[sourceIndex] = { ...source!, defaultNextStageKey: stage.key }; stages.splice(sourceIndex + 1, 0, prepared); }
       else stages.push(prepared);
@@ -330,7 +340,7 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
         <Sheet scrollable={false} onClose={() => setSelectedKey(null)} tall title={`${selected.type.replaceAll("_", " ")} · ${selected.name}`} visible>
           <ScrollView keyboardShouldPersistTaps="handled" ref={editorScrollRef}>
             {issues.filter((issue) => issue.stageKey === selected.key).map((issue, index) => <Banner key={`${issue.code}-${index}`} tone="danger">{issue.message}</Banner>)}
-            <FmsStageEditor data={data} issueCode={focusedIssueCode} issueMessage={focusedIssue?.message} onIssueLayout={scrollToIssue} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); }} onDelete={() => void remove(selected.key)} stage={selected} stages={normalized.stages} />
+            <FmsStageEditor assignmentVersion={normalized.assignmentVersion} data={data} issueCode={focusedIssueCode} issueMessage={focusedIssue?.message} onIssueLayout={scrollToIssue} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); }} onDelete={() => void remove(selected.key)} stage={selected} stages={normalized.stages} />
           </ScrollView>
         </Sheet>
       ) : null}

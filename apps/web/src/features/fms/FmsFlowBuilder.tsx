@@ -1,3 +1,4 @@
+import { suggestFmsAssignment } from "@jewelos/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, CheckCircle2, ChevronDown, FileText, Plus, Redo2, Save, Send, TestTube2, Undo2, UserRoundPlus, X } from "lucide-react";
 import { copyFirstFmsAssigneeToHumanStages, normalizeFmsDefinition, validateFmsDefinition, type FmsFlowDefinition, type FmsStageDefinition } from "@jewelos/core";
@@ -129,7 +130,8 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { fl
       const sourceIndex = sourceKey ? currentStages.findIndex((item) => item.key === sourceKey) : -1;
       const source = sourceIndex >= 0 ? currentStages[sourceIndex] : undefined;
       const next = source?.defaultNextStageKey;
-      const prepared = next ? { ...stage, defaultNextStageKey: next } : stage;
+      const configured = current.assignmentVersion === 2 ? { ...stage, sla: { ...stage.sla, assignment: suggestFmsAssignment(source ?? currentStages.at(-1), data.formFields) } } : stage;
+      const prepared = next ? { ...configured, defaultNextStageKey: next } : configured;
       const stages = [...currentStages];
       if (sourceIndex >= 0) { stages[sourceIndex] = { ...source!, defaultNextStageKey: stage.key }; stages.splice(sourceIndex + 1, 0, prepared); }
       else stages.push(prepared);
@@ -198,7 +200,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { fl
         <Button aria-label="Close inspector" className="shrink-0" onClick={() => setSelectedKey(null)} variant="ghost"><X className="size-5" /></Button>
       </div>
       {issues.filter((issue) => issue.stageKey === selected.key).map((issue, index) => <Notice key={`${issue.code}-${index}`} tone="danger">{issue.message}</Notice>)}
-      <FmsStageEditor data={data} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); }} onDelete={() => remove(selected.key)} stage={selected} stages={normalized.stages} />
+      <FmsStageEditor assignmentVersion={normalized.assignmentVersion} data={data} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); }} onDelete={() => remove(selected.key)} stage={selected} stages={normalized.stages} />
     </aside>
   </> : null;
 

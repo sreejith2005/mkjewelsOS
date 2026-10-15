@@ -1,3 +1,9 @@
+import { listFmsFormStarters, beginNewLibrarySubmission, type FmsStartConfirmation } from "@jewelos/data/fms/work";
+import { fmsAssignedWorkRoute, navigateFmsAssignedWork } from "@/features/fms/assignedWorkNavigation";
+import { Text } from "@/ui/Text";
+import { Button } from "@/ui/Button";
+import { OptionPicker } from "@/ui/OptionPicker";
+import { Banner } from "@/ui/states";
 import { useCallback, useState } from "react";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -26,6 +32,10 @@ export function FormFillScreen() {
   const profile = useProfile();
   const { params } = useRoute<Route>();
   const [dirty, setDirty] = useState(false);
+  const [started, setStarted] = useState<FmsStartConfirmation | null>(null);
+  const [flowId, setFlowId] = useState("");
+  const [generation, setGeneration] = useState(0);
+  const [startError, setStartError] = useState<string | null>(null);
 
   useUnsavedGuard(dirty, "Discard this form?", "Your answers have not been submitted.");
 
@@ -34,12 +44,13 @@ export function FormFillScreen() {
     // tenant to render one form. `loadTaskForms` fetches exactly the version
     // this screen needs, which is the difference between a few kilobytes and a
     // few hundred on a phone.
-    const [forms, options] = await Promise.all([
+    const [forms, options, flows] = await Promise.all([
       loadTaskForms([params.formTemplateId], []),
       loadFormDynamicOptions(),
+      params.starterAssignmentId ? Promise.resolve([]) : listFmsFormStarters(params.formTemplateId),
     ]);
-    return { bundle: forms.bundles[0] ?? null, options };
-  }, [params.formTemplateId]);
+    return { bundle: forms.bundles[0] ?? null, options, flows };
+  }, [params.formTemplateId, params.starterAssignmentId]);
 
   const { data, error, loading, reload } = useAsyncData(load, [load]);
 
@@ -61,32 +72,30 @@ export function FormFillScreen() {
     fields: bundle.fields,
   };
 
-  return (
+  if (started) return <Screen scroll>
+    <Banner tone="success">{`Form submitted successfully. ${started.workflowName ?? ""} ${started.referenceNumber ?? ""}`}</Banner>
+    {started.assignmentSummary?.map((item, index) => <Text key={index}>{`${item.stageName}: ${item.employeeName}`}</Text>)}
+    {started.ownWorkTargets?.[0] ? <Button label="Open my next work" onPress={() => { const own = started.ownWorkTargets?.[0]; if (own) navigateFmsAssignedWork(navigation, fmsAssignedWorkRoute(own)); }} /> : null}
+    <Button label="Back to my work" variant="secondary" onPress={() => navigation.goBack()} />
+    {!params.starterAssignmentId ? <Button label="Start another submission" variant="secondary" onPress={() => { void beginNewLibrarySubmission(bundle.id, flowId || undefined).then(() => { setStarted(null); setGeneration(n => n + 1); }).catch((e: unknown) => setStartError(e instanceof Error ? e.message : "Could not start another submission")); }} /> : null}
+    {startError ? <Banner tone="danger">{startError}</Banner> : null}
+  </Screen>;
+  return <>
+    {data.flows.length > 1 ? <OptionPicker label="Workflow to start" options={data.flows.map(flow => ({ value: flow.flowId, label: `${flow.name} (v${flow.version})` }))} selected={flowId ? [flowId] : []} onChange={values => setFlowId(values[0] ?? "")} /> : null}
     <FormRenderer
+      key={generation}
       definition={definition}
       dynamicOptions={options}
       initialAnswers={isWorkUploadForm(definition) && options.users.some((user) => user.id === profile.id) ? { crm_follow_up: profile.id } : {}}
       onDirtyChange={setDirty}
       onSubmit={async (answers) => {
-        if (params.starterAssignmentId) {
-          const started = await submitFmsStarterAssignment(bundle.id, params.starterAssignmentId, answers);
-          setDirty(false);
-          // Going back would return to whatever screen opened this form — the
-          // Forms Library, for instance. The starting form starts the process,
-          // so continue into it and let the next step take over.
-          if (started.instanceId) navigation.replace("FmsInstance", { instanceId: started.instanceId });
-          else navigation.goBack();
-          return;
-        }
-        const started = await submitStandaloneFormAndStartFms(bundle.id, answers);
-        setDirty(false);
-        if (started.instanceId) {
-          navigation.replace("FmsInstance", { instanceId: started.instanceId });
-          return;
-        }
-        navigation.goBack();
+        if (!params.starterAssignmentId && data.flows.length > 1 && !flowId) throw new Error("Choose a workflow before submitting this form.");
+        const result = params.starterAssignmentId
+          ? await submitFmsStarterAssignment(bundle.id, params.starterAssignmentId, answers)
+          : await submitStandaloneFormAndStartFms(bundle.id, answers, flowId || undefined);
+        setDirty(false); setStarted(result);
       }}
       templateId={bundle.id}
     />
-  );
+  </>;
 }

@@ -1,18 +1,17 @@
-import { useMemo, useState } from "react";
-import { deriveFmsTransitionCapability, hasFmsFormAssignmentSource, type FmsStageDefinition, type Json } from "@jewelos/core";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { deriveFmsTransitionCapability, hasFmsFormAssignmentSource, type FmsStageDefinition, type FmsTransitionRequest, type FmsWorkPreview, type FmsHandoffChoice, type FmsWorkResult } from "@jewelos/core";
+import { runFmsHandoff } from "@jewelos/data/fms/confirmation";
+import { FmsHandoffConfirmation } from "./FmsHandoffConfirmation";
 import { Button, Field, Modal, Notice } from "@/components/ui";
 import { AssigneePicker } from "@/components/assignees/AssigneePicker";
 import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer";
 import { type FormBundle } from "@/features/forms/api";
 import {
   claimFmsStage,
-  completeFmsStage,
   escalateFmsStage,
   moveFmsStageBackward,
   reassignFmsStage,
   requestFmsRevision,
-  submitFmsFormAndProgress,
-  reviewFmsStage,
   signedFmsEvidenceUrl,
   updateFmsChecklistItem,
   uploadFmsEvidence,
@@ -60,7 +59,8 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
   onRefresh: () => Promise<void>;
   requestedFormTemplateId?: string;
 }) {
-  const requiresLinkedForm = isInitialFmsDefinition(definitions, definition) || hasFmsFormAssignmentSource(definition.planned_time_rule);
+  const requiresLinkedForm = isInitialFmsDefinition(definitions, definition) || hasFmsFormAssignmentSource(definition.planned_time_rule)
+    || !!(definition.planned_time_rule && typeof definition.planned_time_rule === "object" && !Array.isArray(definition.planned_time_rule) && definition.planned_time_rule.completionFormRequired === true);
   const shouldOpenInitialForm = shouldOpenFmsForm(definitions, definition, stage, requestedFormTemplateId);
   const [remark, setRemark] = useState("");
   const [outcome, setOutcome] = useState("");
@@ -68,7 +68,11 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(shouldOpenInitialForm);
-  const [formMutationKey] = useState(() => crypto.randomUUID());
+  const [result, setResult] = useState<FmsWorkResult | null>(null);
+  const [confirmation, setConfirmation] = useState<{ request: FmsTransitionRequest; preview: FmsWorkPreview } | null>(null);
+  const resolver = useRef<((choices: readonly FmsHandoffChoice[] | null) => void) | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; resolver.current?.(null); resolver.current = null; }; }, [stage.id]);
   const [managedAction, setManagedAction] = useState<ManagedAction | null>(null);
   const [fromUser, setFromUser] = useState("");
   const [targetUser, setTargetUser] = useState("");
@@ -102,6 +106,18 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
     catch (caught) { setError(caught instanceof Error ? caught.message : "FMS action failed"); }
     finally { setBusy(false); }
   };
+  const finishConfirmation = (choices: readonly FmsHandoffChoice[] | null) => {
+    resolver.current?.(choices); resolver.current = null; setConfirmation(null);
+  };
+  const confirmWork = async (request: FmsTransitionRequest) => {
+    const completed = await runFmsHandoff(request, preview => {
+      if (!mounted.current) return Promise.resolve(null);
+      setConfirmation({ request, preview });
+      return new Promise(resolve => { resolver.current = resolve; });
+    });
+    if (completed && mounted.current) setResult(completed);
+    return completed !== null;
+  };
   const checklistPayload = Object.fromEntries(checklist.map((item) => [item.item_key, item.is_completed]));
   const openManagedAction = (action: ManagedAction) => {
     setManagedAction(action);
@@ -121,6 +137,10 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
 
   return <section className="space-y-3 rounded-2xl border border-gold/20 p-4">
     {error ? <Notice tone="danger">{error}</Notice> : null}
+    {result ? <Notice tone="success">{result.state === "workflow_completed" ? "Workflow completed." : result.state === "successors_activated"
+      ? result.destinations.map(item => `${item.stageName} has been assigned to ${item.employeeName ?? "the configured employee"}.`).join(" ")
+      : result.state === "awaiting_approval" ? "Form saved. Waiting for approval." : result.state === "awaiting_other_doers" ? "Work saved. Waiting for the remaining employees or branches."
+      : "Form saved. Complete the remaining requirements to activate the next work."}</Notice> : null}
     <div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-semibold text-white">{definition.name}{stage.visit_number && stage.visit_number > 1 ? ` (visit ${stage.visit_number})` : ""}</h3><p className="text-sm text-soft-grey">{definition.method}</p></div><span className="rounded-full bg-gold/10 px-3 py-1 text-xs text-gold">{stage.status.replaceAll("_", " ")}</span></div>
     <p className="text-xs text-soft-grey">Assigned: {(stage.assigned_to ?? []).map((id) => users.find((user) => user.id === id)?.employee_name ?? "Historical user").join(", ") || "Automatic"} · Due {stage.planned_datetime ? new Date(stage.planned_datetime).toLocaleDateString("en-IN") : "—"}{stage.delay_minutes && stage.delay_minutes > 0 ? " · overdue" : ""}</p>
     {canClaim ? <Button disabled={busy} onClick={() => void work(() => claimFmsStage(stage.id))} variant="secondary">Claim stage</Button> : null}
@@ -130,18 +150,22 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
     {definition.form_template_id ? stage.form_submission_id ? <Notice tone="success">Linked form version submitted and locked.</Notice> : linkedForm ? <Button onClick={() => setShowForm(true)} variant="secondary">Fill {requiresLinkedForm ? "required" : "optional"} form · {linkedForm.name} v{linkedForm.version}</Button> : requiresLinkedForm ? <Notice tone="danger">The exact pinned form version is not visible.</Notice> : <Notice>Optional linked form is not currently visible. You can still complete this step.</Notice> : null}
     {(capability.canComplete || capability.canApprove) ? <>
       <div className="grid gap-2 sm:grid-cols-2">{isDecision ? <Field label="Decision *"><div className="grid gap-2">{decisionOptions.map((option) => <button className={`min-h-12 rounded-lg border px-3 py-2 text-left ${outcome === option.key ? "border-gold bg-gold/10 text-white" : "border-gold/20 text-soft-grey"}`} key={option.key} onClick={() => setOutcome(option.key)} type="button">{option.label}</button>)}</div></Field> : <Field label="Outcome"><input className="field" maxLength={500} onChange={(event) => setOutcome(event.target.value)} value={outcome} /></Field>}<Field label={definition.requires_remark ? "Remark *" : "Remark"}><textarea className="field" maxLength={4000} onChange={(event) => setRemark(event.target.value)} value={remark} /></Field></div>
-      {definition.requires_next_doer_handoff ? <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} label="Next-stage assignee" multiple={false} onChange={(ids) => setNextAssignee(ids[0] ?? "")} people={pickerPeople} selectedIds={nextAssignee ? [nextAssignee] : []}/> : null}
+      {definition.requires_next_doer_handoff && instance.assignment_version !== 2 ? <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} label="Next-stage assignee" multiple={false} onChange={(ids) => setNextAssignee(ids[0] ?? "")} people={pickerPeople} selectedIds={nextAssignee ? [nextAssignee] : []}/> : null}
       <div className="flex flex-wrap gap-2">
-        {capability.canComplete ? <Button disabled={busy || (isDecision && !outcome) || (requiresLinkedForm && !stage.form_submission_id)} onClick={() => void work(() => completeFmsStage(stage.id, outcome, remark, checklistPayload, nextAssignee || null))}>{isDecision ? "Submit decision" : "Complete stage"}</Button> : null}
-        {capability.canApprove ? <Button disabled={busy} onClick={() => void work(() => reviewFmsStage(stage.id, "approved", remark, nextAssignee || null))}>Approve</Button> : null}
-        {capability.canReject ? <Button disabled={busy} onClick={() => window.confirm("Reject this stage?") && void work(() => reviewFmsStage(stage.id, "rejected", remark, nextAssignee || null))} variant="danger">Reject</Button> : null}
+        {capability.canComplete ? <Button disabled={busy || (isDecision && !outcome) || (requiresLinkedForm && !stage.form_submission_id)} onClick={() => void work(() => confirmWork({ kind: "complete", instanceStageId: stage.id, outcome, remark, checklist: checklistPayload, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) }))}>{isDecision ? "Submit decision" : "Complete stage"}</Button> : null}
+        {capability.canApprove ? <Button disabled={busy} onClick={() => void work(() => confirmWork({ kind: "review", instanceStageId: stage.id, decision: "approved", remark }))}>Approve</Button> : null}
+        {capability.canReject ? <Button disabled={busy} onClick={() => void work(() => confirmWork({ kind: "review", instanceStageId: stage.id, decision: "rejected", remark }))} variant="danger">Reject</Button> : null}
         {capability.canRequestRevision && priorStages.length ? <Button disabled={busy} onClick={() => openManagedAction("revision")} variant="secondary">Request revision</Button> : null}
         {capability.canMoveBackward && priorStages.length ? <Button disabled={busy} onClick={() => openManagedAction("backward")} variant="secondary">Move backward</Button> : null}
         {capability.canEscalate ? <Button disabled={busy} onClick={() => openManagedAction("escalate")} variant="secondary">Escalate</Button> : null}
       </div>
     </> : <p className="text-xs text-soft-grey">{capability.reason}</p>}
     {capability.canReassign && (stage.assigned_to?.length ?? 0) > 0 ? <Button disabled={busy} onClick={() => openManagedAction("reassign")} variant="secondary">Reassign</Button> : null}
-    {showForm && linkedForm ? <Modal onClose={() => setShowForm(false)} title={`${requiresLinkedForm ? "Required" : "Optional"} form: ${linkedForm.name} v${linkedForm.version}`} wide><FormRenderer definition={{ name: linkedForm.name, description: linkedForm.description ?? undefined, sections: linkedForm.sections, fields: linkedForm.fields }} dynamicOptions={formOptions} templateId={linkedForm.id} onSubmit={async (answers) => { await submitFmsFormAndProgress({ formTemplateId: linkedForm.id, answers: answers as unknown as Json, instanceStageId: stage.id, idempotencyKey: formMutationKey, outcome, remark, checklist: checklistPayload, nextAssigneeId: nextAssignee || null }); setShowForm(false); await onRefresh(); }} workflowHint /></Modal> : null}
+    {showForm && linkedForm ? <Modal onClose={() => setShowForm(false)} title={`${requiresLinkedForm ? "Required" : "Optional"} form: ${linkedForm.name} v${linkedForm.version}`} wide><FormRenderer definition={{ name: linkedForm.name, description: linkedForm.description ?? undefined, sections: linkedForm.sections, fields: linkedForm.fields }} dynamicOptions={formOptions} templateId={linkedForm.id} onSubmit={async (answers) => {
+      if (!await confirmWork({ kind: "stage_form", formTemplateId: linkedForm.id, answers, instanceStageId: stage.id, outcome, remark, checklist: checklistPayload, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) })) return false;
+      setShowForm(false); await onRefresh(); return true;
+    }} workflowHint /></Modal> : null}
+    {confirmation ? <FmsHandoffConfirmation request={confirmation.request} preview={confirmation.preview} onConfirm={choices => finishConfirmation(choices)} onCancel={() => finishConfirmation(null)} /> : null}
     {managedAction ? <Modal onClose={() => setManagedAction(null)} title={managedAction.replace("_", " ")}>
       <div className="space-y-3">
         {managedAction === "reassign" ? <Field label="Current assignee"><select className="field" onChange={(event) => setFromUser(event.target.value)} value={fromUser}>{(stage.assigned_to ?? []).map((id) => <option key={id} value={id}>{users.find((user) => user.id === id)?.employee_name ?? "Historical user"}</option>)}</select></Field> : null}

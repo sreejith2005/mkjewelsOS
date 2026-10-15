@@ -1,19 +1,20 @@
+import { FmsWorkContext } from "@/features/fms/FmsWorkContext";
+import { loadFmsAssignedStage } from "@jewelos/data/fms/assignedStage";
 import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
+import { useFmsHandoffConfirmation } from "@/features/fms/FmsHandoffConfirmation";
 import { useCallback, useMemo, useState } from "react";
-import { Alert, RefreshControl, StyleSheet, View } from "react-native";
+import { RefreshControl, StyleSheet, View } from "react-native";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as WebBrowser from "expo-web-browser";
 import { deriveFmsTransitionCapability, hasFmsFormAssignmentSource } from "@jewelos/core";
 import {
   claimFmsStage,
-  completeFmsStage,
   escalateFmsStage,
-  loadFmsRuntime,
+
   moveFmsStageBackward,
   reassignFmsStage,
   requestFmsRevision,
-  reviewFmsStage,
   signedFmsEvidenceUrl,
   updateFmsChecklistItem,
   uploadFmsEvidence,
@@ -50,15 +51,6 @@ const MANAGED_TITLES: Record<ManagedAction, string> = {
   escalate: "Escalate",
 };
 
-function confirm(title: string, message: string, action: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    Alert.alert(title, message, [
-      { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
-      { text: action, style: "destructive", onPress: () => resolve(true) },
-    ], { cancelable: true, onDismiss: () => resolve(false) });
-  });
-}
-
 /**
  * One workflow step, and everything a person can do to it — the web
  * `FmsStageRunner`.
@@ -76,6 +68,7 @@ export function FmsStageScreen() {
   const { params } = useRoute<Route>();
 
   const [remark, setRemark] = useState("");
+  const { confirmWork, confirmation, result } = useFmsHandoffConfirmation();
   const [outcome, setOutcome] = useState("");
   const [nextAssignee, setNextAssignee] = useState("");
   const [busy, setBusy] = useState(false);
@@ -87,7 +80,9 @@ export function FmsStageScreen() {
   const [actionReason, setActionReason] = useState("");
 
   const load = useCallback(async () => {
-    const [runtime, options] = await Promise.all([loadFmsRuntime(params.instanceId), loadFormDynamicOptions()]);
+    const [assigned, options] = await Promise.all([loadFmsAssignedStage(params.instanceId, params.instanceStageId), loadFormDynamicOptions()]);
+    if (!assigned) throw new Error("This workflow assignment is unavailable.");
+    const runtime = { instances: [assigned.instance], stages: assigned.instanceStages, definitions: assigned.definitions, checklist: assigned.checklist, evidence: assigned.evidence, users: assigned.users };
     // Which form this step links to is only known once the runtime has loaded,
     // so the form is fetched afterwards — one template rather than the whole
     // library, which `loadForms()` would have pulled.
@@ -173,7 +168,7 @@ export function FmsStageScreen() {
       : {};
   const decisions = runtimeDecisionOptions(plannedRule);
   const isDecision = decisions.length > 0;
-  const requiresLinkedForm = isInitialFmsDefinition(data.runtime.definitions, definition) || hasFmsFormAssignmentSource(definition.planned_time_rule);
+  const requiresLinkedForm = isInitialFmsDefinition(data.runtime.definitions, definition) || hasFmsFormAssignmentSource(definition.planned_time_rule) || plannedRule.completionFormRequired === true;
   const linkedForm = data.forms.find((form) => form.id === definition.form_template_id) ?? null;
   const checklistPayload = Object.fromEntries(checklist.map((item) => [item.item_key, item.is_completed]));
   const canClaim =
@@ -215,8 +210,7 @@ export function FmsStageScreen() {
   };
 
   const reject = async () => {
-    if (!(await confirm("Reject this stage?", "The stage is rejected with your remark.", "Reject"))) return;
-    await run(() => reviewFmsStage(stage.id, "rejected", remark, nextAssignee || null));
+    await run(() => confirmWork({ kind: "review", instanceStageId: stage.id, decision: "rejected", remark }));
   };
 
   const confirmDisabled = busy
@@ -251,6 +245,8 @@ export function FmsStageScreen() {
           {`Assigned: ${assignedNames} · Due ${stage.planned_datetime ? formatDate(stage.planned_datetime) : "—"}${stage.delay_minutes && stage.delay_minutes > 0 ? " · overdue" : ""}`}
         </Text>
       </View>
+
+      <FmsWorkContext instanceId={instance.id} instanceStageId={stage.id} />
 
       {canClaim ? (
         <Button busy={busy} label="Claim stage" onPress={() => void run(() => claimFmsStage(stage.id))} variant="secondary" />
@@ -307,6 +303,7 @@ export function FmsStageScreen() {
                 instanceId: params.instanceId,
                 instanceStageId: stage.id,
                 formTemplateId: linkedForm.id,
+                outcome, remark, checklist: checklistPayload, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}),
               })
             }
             variant="secondary"
@@ -344,7 +341,7 @@ export function FmsStageScreen() {
             value={remark}
           />
 
-          {definition.requires_next_doer_handoff ? (
+          {definition.requires_next_doer_handoff && instance.assignment_version !== 2 ? (
             <OptionPicker
               label="Next-stage assignee"
               onChange={(next) => setNextAssignee(next[0] ?? "")}
@@ -359,14 +356,14 @@ export function FmsStageScreen() {
                 busy={busy}
                 disabled={(isDecision && !outcome) || (requiresLinkedForm && !stage.form_submission_id)}
                 label={isDecision ? "Submit decision" : "Complete stage"}
-                onPress={() => void run(() => completeFmsStage(stage.id, outcome, remark, checklistPayload, nextAssignee || null))}
+                onPress={() => void run(() => confirmWork({ kind: "complete", instanceStageId: stage.id, outcome, remark, checklist: checklistPayload, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) }))}
               />
             ) : null}
             {capability.canApprove ? (
               <Button
                 busy={busy}
                 label="Approve"
-                onPress={() => void run(() => reviewFmsStage(stage.id, "approved", remark, nextAssignee || null))}
+                onPress={() => void run(() => confirmWork({ kind: "review", instanceStageId: stage.id, decision: "approved", remark }))}
               />
             ) : null}
             {capability.canReject ? <Button busy={busy} label="Reject" onPress={() => void reject()} variant="danger" /> : null}
@@ -428,6 +425,9 @@ export function FmsStageScreen() {
           <Button label="Cancel" onPress={() => setManagedAction(null)} variant="ghost" />
         </View>
       </Sheet>
+      {confirmation}
+      {result ? <Banner tone="success">{result.state === "workflow_completed" ? "Workflow completed." : result.state === "successors_activated"
+        ? result.destinations.map(item => `${item.stageName} assigned to ${item.employeeName ?? "the configured employee"}.`).join(" ") : "Work saved. Remaining requirements or approvals are pending."}</Banner> : null}
     </Screen>
   );
 }

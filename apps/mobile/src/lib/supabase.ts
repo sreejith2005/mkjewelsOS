@@ -7,6 +7,7 @@ import { AppState, type AppStateStatus } from "react-native";
 import { createJewelosClient, setSupabaseClient, type JewelosClient } from "@jewelos/api-client/client";
 import { env } from "@/config/env";
 import { secureSessionStorage } from "@/lib/secureSessionStorage";
+import { setFmsMutationStorage } from "@jewelos/data/fms/mutationIdentity";
 
 /**
  * The native Supabase client. It differs from the browser client in three ways:
@@ -28,6 +29,7 @@ export const supabase: JewelosClient = createJewelosClient({
 // Shared data modules resolve the client through `getSupabase()`; register it
 // before any screen can issue a query.
 setSupabaseClient(supabase);
+setFmsMutationStorage(secureSessionStorage);
 
 let lifecycleSubscription: { remove: () => void } | null = null;
 

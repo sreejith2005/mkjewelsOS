@@ -51,7 +51,7 @@ describe("phone table cards", () => {
   it("swipes phone listings sideways as compact tables instead of cards", () => {
     expect(mobileSource).not.toMatch(/thead\s*\{\s*display:\s*none/);
     expect(mobileSource).not.toMatch(/content:\s*attr\(data-label\)/);
-    expect(mobileSource).toMatch(/\[class\*="overflow-x-auto"\]:has\(> table\[data-crm-cards\]\) \{ overflow-x: auto;/);
+    expect(mobileSource).toMatch(/\[class\*="overflow-x-auto"\]:has\(> table\[data-crm-cards\]:not\(\.crm-record-table\)\) \{ overflow-x: auto;/);
     expect(mobileSource).toMatch(/min-width: calc\(var\(--crm-columns, 8\) \* 5\.6rem\)/);
   });
 

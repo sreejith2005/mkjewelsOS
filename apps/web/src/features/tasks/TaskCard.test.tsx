@@ -71,6 +71,11 @@ const task = {
 } as TaskBundle;
 
 describe("TaskCard direct completion", () => {
+  it("offers the required upload on an edited checklist", () => {
+    render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={vi.fn()} task={{ ...task, task_type: "checklist", requires_upload: true, title: "Edited checklist" }} />);
+    expect(screen.getByLabelText("Upload task: Edited checklist")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Complete task: Edited checklist" })).toBeNull();
+  });
   it("shows a manager watcher the remark thread without task mutation actions", () => {
     const watcher = deriveTaskMutationCapability({ assigneeIds: ["doer-1"], isWatcher: true, viewerId: "manager-1", viewerRole: "manager" });
     render(<TaskCard capability={watcher} categoryLabel="Uncategorized" onAction={vi.fn()} task={{ ...task, isWatchedByViewer: true }} />);
@@ -151,7 +156,7 @@ describe("TaskCard direct completion", () => {
 
   it("keeps the completion action available while a required checklist item is outstanding", async () => {
     const onAction = vi.fn().mockResolvedValue(undefined);
-    const checklists = [{ completed_at: null, completed_by: null, id: "item-1", is_completed: false, is_required: true, item_text: "Photograph the tray", sort_order: 1, task_instance_id: "task-1" }];
+    const checklists = [{ deleted_at: null, completed_at: null, completed_by: null, id: "item-1", is_completed: false, is_required: true, item_text: "Photograph the tray", sort_order: 1, task_instance_id: "task-1" }];
 
     render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, checklists, title: "Checklist task" }} />);
 
@@ -165,7 +170,7 @@ describe("TaskCard direct completion", () => {
   it("offers the one-shot upload while a required checklist item is outstanding", async () => {
     const onAction = vi.fn().mockResolvedValue(undefined);
     const file = new File(["evidence"], "evidence.png", { type: "image/png" });
-    const checklists = [{ completed_at: null, completed_by: null, id: "item-1", is_completed: false, is_required: true, item_text: "Photograph the tray", sort_order: 1, task_instance_id: "task-1" }];
+    const checklists = [{ deleted_at: null, completed_at: null, completed_by: null, id: "item-1", is_completed: false, is_required: true, item_text: "Photograph the tray", sort_order: 1, task_instance_id: "task-1" }];
 
     render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, checklists, requires_upload: true, title: "Checklist upload task" }} />);
 
@@ -174,12 +179,12 @@ describe("TaskCard direct completion", () => {
     await waitFor(() => expect(onAction).toHaveBeenCalledWith({ file, kind: "upload_and_complete" }));
   });
 
-  it("treats an imported checklist as click-to-complete even when legacy data requires evidence", async () => {
+  it("keeps an imported checklist without an upload requirement click-to-complete", async () => {
     const onAction = vi.fn().mockResolvedValue(undefined);
 
     render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{
       ...task,
-      requires_upload: true,
+      requires_upload: false,
       task_type: "checklist",
       title: "Open the showroom",
     }} />);
@@ -198,7 +203,7 @@ describe("TaskCard direct completion", () => {
 
   it("still lets a doer tick an individual checklist item", async () => {
     const onAction = vi.fn().mockResolvedValue(undefined);
-    const checklists = [{ completed_at: null, completed_by: null, id: "item-1", is_completed: false, is_required: true, item_text: "Photograph the tray", sort_order: 1, task_instance_id: "task-1" }];
+    const checklists = [{ deleted_at: null, completed_at: null, completed_by: null, id: "item-1", is_completed: false, is_required: true, item_text: "Photograph the tray", sort_order: 1, task_instance_id: "task-1" }];
 
     render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, checklists, title: "Checklist task" }} />);
 

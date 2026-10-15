@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { decodeTaskPage, taskAdminInitialEdit, taskAdminEditPayload } from "./taskPage";
+import { decodeTaskPage, taskAdminInitialEdit, taskAdminEditPayload, taskFormSubmissionKey, taskNeedsCompletionRemark } from "./taskPage";
 
 describe("task page contracts", () => {
+  it("requires a completion remark for explicit requirements and on-behalf work", () => {
+    const task = { requires_remark: false, assignees: [{ id: "doer" }] };
+    expect(taskNeedsCompletionRemark(task, "doer")).toBe(false);
+    expect(taskNeedsCompletionRemark(task, "admin")).toBe(true);
+    expect(taskNeedsCompletionRemark({ ...task, requires_remark: true }, "doer")).toBe(true);
+  });
+  it("retains exact-task form proof across task/checklist conversion", () => {
+    expect(taskFormSubmissionKey("task-1", "delegation_task", "form-1")).toBe(taskFormSubmissionKey("task-1", "checklist_task", "form-1"));
+    expect(taskFormSubmissionKey("task-2", "checklist_task", "form-1")).not.toBe(taskFormSubmissionKey("task-1", "checklist_task", "form-1"));
+    expect(taskFormSubmissionKey("task-1", "fms", "form-1")).not.toBe(taskFormSubmissionKey("task-1", "checklist_task", "form-1"));
+  });
   it("retains full server counts on a bounded page", () => {
     const result = decodeTaskPage({ ids: ["00000000-0000-4000-8000-000000000001"], total: 12000,
       counts: { pending: 12000, overdue: 50, completed: 200, open: 12050 } });
@@ -32,5 +43,22 @@ describe("task page contracts", () => {
     });
     expect(() => taskAdminEditPayload({ title: "", description: "", priority: "low", planned: "invalid", due: "invalid" })).toThrow();
     expect(() => taskAdminEditPayload({ title: "Task", description: "", priority: "low", planned: "2026-10-10T13:00:00Z", due: "2026-10-10T11:00:00Z" })).toThrow();
+  });
+  it("retains current requirements and checklist identities in a full edit", () => {
+    const initial = taskAdminInitialEdit({ title: "Opening", description: null, priority: "high", planned_datetime: "2026-10-13T04:00:00Z", due_datetime: null, revised_datetime: null,
+      task_type: "checklist", requires_upload: false, requires_form: false, requires_remark: true, buddy_assignment_allowed: true,
+      branch_id: null, department_id: null, category_id: null, core_task_label: "Opening group", form_template_id: null,
+      verification_status: "not_required", verifier_user_profile_id: null,
+      doer_ids: ["00000000-0000-4000-8000-000000000001"], watcher_ids: [],
+      checklists: [{ id: "00000000-0000-4000-8000-000000000002", item_text: "Unlock", is_required: true, is_completed: true }] });
+    expect(initial).toMatchObject({ taskType: "checklist", requiresUpload: false, requiresRemark: true, buddyAssignmentAllowed: true });
+    expect(taskAdminEditPayload(initial)).toMatchObject({ task_type: "checklist", requires_upload: false, requires_remark: true,
+      doer_ids: ["00000000-0000-4000-8000-000000000001"], checklist: [{ id: "00000000-0000-4000-8000-000000000002", item_text: "Unlock", is_required: true }] });
+  });
+  it("rejects incompatible requirements and duplicate participants before saving", () => {
+    const edit = { title: "Task", description: "", priority: "low" as const, planned: "2026-10-13T09:00", due: "2026-10-13T10:00", requiresForm: true, formTemplateId: "" };
+    expect(() => taskAdminEditPayload(edit)).toThrow(/form/i);
+    const id = "00000000-0000-4000-8000-000000000001";
+    expect(() => taskAdminEditPayload({ ...edit, requiresForm: false, doerIds: [id], watcherIds: [id] })).toThrow(/In Loop/i);
   });
 });

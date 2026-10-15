@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, View } from "react-native";
+import { useIsFocused } from "@react-navigation/native";
 import { countLeaveDays, formatLeaveDate, hasPermission, leaveInformStatus, leaveNeedsHandover, leaveSummaryTotals, type LeaveHalf, type ReturnHalf } from "@jewelos/core";
 import { canSubmitLeave, editPendingLeave, leaveHandoverCandidates, leaveSummaryApplicants, leaveTypes, listLeaveRequests, reviewLeave, signedLeaveImage, submitHandover, submitLeave, type LeaveDraft, type LeaveRequest } from "@jewelos/data/leave/api";
 import type { UploadableFile } from "@jewelos/data/runtime";
+import { loadMyLeaveUpdateIds, markMyLeaveUpdatesRead } from "@jewelos/data/sidebar/api";
 import { useAccess, useAuth, useProfile } from "@/auth/AuthProvider";
-import { useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
+import { subscribeAppAvailability, useTenantRealtimeRefresh } from "@/lib/useTenantRealtimeRefresh";
 import { DateField } from "@/forms/DateField";
 import { pickFileFromChooser } from "@/lib/pickFile";
 import { Button } from "@/ui/Button";
@@ -23,12 +25,16 @@ type Tab = "apply" | "handover" | "history" | "review";
 const statusTone = (status: string) => status === "approved" ? "success" as const : status === "rejected" ? "danger" as const : "warning" as const;
 
 export function LeaveApplications() {
+  const focused = useIsFocused();
+  const [appAvailable, setAppAvailable] = useState(false);
+  useEffect(() => subscribeAppAvailability(setAppAvailable), []);
   const profile = useProfile();
   const access = useAccess();
   const { branch } = useAuth();
   const canReview = hasPermission(access, "availability.review_leave") && hasPermission(access, "availability.manage_others");
   const canViewOffice = hasPermission(access, "availability.view_leave_summary");
   const [canApply, setCanApply] = useState<boolean | null>(null);
+  const [readSnapshot, setReadSnapshot] = useState<{ profileId: string; notificationIds: string[]; leaveIds: string[] } | null>(null);
   const [tab, setTab] = useState<Tab>("apply");
   const [rows, setRows] = useState<LeaveRequest[]>([]);
   const [applicants, setApplicants] = useState<Array<{ id: string; employee_name: string }>>([]);
@@ -50,6 +56,7 @@ export function LeaveApplications() {
 
   const load = useCallback(async () => {
     try {
+      const notificationIds = await loadMyLeaveUpdateIds().catch(() => []);
       const [summaryRows, reviewRows, nextTypes, nextPeople, applicantEligible, nextApplicants] = await Promise.all([
         listLeaveRequests(canViewOffice ? undefined : profile.id), canReview && !canViewOffice ? listLeaveRequests(undefined, "pending") : Promise.resolve([]),
         leaveTypes(), leaveHandoverCandidates(), canSubmitLeave(), canViewOffice ? leaveSummaryApplicants() : Promise.resolve([]),
@@ -57,10 +64,16 @@ export function LeaveApplications() {
       setRows([...summaryRows, ...reviewRows.filter((row) => !summaryRows.some((summary) => summary.id === row.id))]);
       setTypes(nextTypes); setPeople(nextPeople); setApplicants(nextApplicants);
       setCanApply(applicantEligible);
+      setReadSnapshot({ profileId: profile.id, notificationIds, leaveIds: summaryRows.filter((row) => row.applicant_id === profile.id).map((row) => row.id) });
       if (!applicantEligible) setTab((current) => current === "apply" ? (canViewOffice ? "history" : canReview ? "review" : "history") : current);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not load leave requests"); }
   }, [canReview, canViewOffice, profile.id]);
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (focused && appAvailable && tab === "history" && readSnapshot?.profileId === profile.id && readSnapshot.notificationIds.length && readSnapshot.leaveIds.length) {
+      void markMyLeaveUpdatesRead(readSnapshot.notificationIds, readSnapshot.leaveIds).catch(() => {});
+    }
+  }, [appAvailable, focused, readSnapshot, tab, profile.id]);
   useTenantRealtimeRefresh({ tenantId: profile.tenant_id, topics: ["organization", "tasks"], refresh: load });
 
   const mine = useMemo(() => rows.filter((row) => row.applicant_id === profile.id), [profile.id, rows]);

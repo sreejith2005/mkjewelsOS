@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { fmsAssignedWorkPath, parseFmsAssignedWorkPath, type FmsAssignedWorkTarget } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
-import { loadFormDynamicOptions, loadForms, loadTaskForms, submitFmsStarterAssignment, type FormBundle } from "@/features/forms/api";
+import { loadFormDynamicOptions, loadTaskForms, submitFmsStarterAssignment, type FormBundle, type FmsStarterResult } from "@/features/forms/api";
 import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer";
 import { FmsStageRunner } from "@/features/fms/FmsStageRunner";
 import { loadFmsAssignedStage, type FmsAssignedStageBundle } from "@/features/fms/api";
+import { FmsWorkContext } from "@/features/fms/FmsWorkContext";
 
 const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: [], masters: [] };
 
@@ -45,6 +46,7 @@ function StarterForm({ onNavigate, target }: {
   target: Extract<FmsAssignedWorkTarget, { kind: "starter_form" }>;
 }) {
   const [form, setForm] = useState<FormBundle | null>();
+  const [started, setStarted] = useState<FmsStarterResult | null>(null);
   const [options, setOptions] = useState<DynamicOptions>(EMPTY_OPTIONS);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,6 +67,11 @@ function StarterForm({ onNavigate, target }: {
   }, [target.formTemplateId]);
 
   if (error) return <Notice tone="danger">{error}</Notice>;
+  if (started) return <Frame subtitle={started.referenceNumber ?? "Submission saved"} title="Form submitted successfully">
+    <Notice tone="success">Form submitted successfully.{started.instanceId ? ` ${started.workflowName ?? "The workflow"} has started.` : ""} {started.assignmentSummary?.map(item => `${item.stageName} has been assigned to ${item.employeeName}.`).join(" ")}</Notice>
+    {started.ownWorkTargets?.[0] ? <Button onClick={() => onNavigate(fmsAssignedWorkPath(started.ownWorkTargets![0]!))}>Open my next work</Button> : null}
+    <Button onClick={() => onNavigate("/tasks")} variant="secondary">Back to my work</Button>
+  </Frame>;
   if (form === undefined) return <Loading />;
   if (form === null) return <Notice>This FMS assignment is complete, withdrawn, or no longer available to your account.</Notice>;
 
@@ -74,13 +81,7 @@ function StarterForm({ onNavigate, target }: {
         definition={{ name: form.name, description: form.description ?? undefined, sections: form.sections, fields: form.fields }}
         dynamicOptions={options}
         onSubmit={async (answers) => {
-          const started = await submitFmsStarterAssignment(form.id, target.starterAssignmentId, answers);
-          // Submitting the starting form starts the process, so carry the user
-          // straight into whichever step it activated rather than dropping them
-          // back on a list they then have to search.
-          onNavigate(started.instanceId
-            ? fmsAssignedWorkPath({ kind: "stage", instanceId: started.instanceId, instanceStageId: null })
-            : "/tasks");
+          setStarted(await submitFmsStarterAssignment(form.id, target.starterAssignmentId, answers));
         }}
         templateId={form.id}
         workflowHint
@@ -100,15 +101,18 @@ function AssignedStage({ onNavigate, target }: {
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const [loaded, formData, dynamicOptions] = await Promise.all([
-      loadFmsAssignedStage(target.instanceId),
-      loadForms(),
+    const [loaded, dynamicOptions] = await Promise.all([
+      loadFmsAssignedStage(target.instanceId, target.instanceStageId ?? undefined),
       loadFormDynamicOptions(),
     ]);
+    const requestedStage = target.instanceStageId ? loaded?.instanceStages.find(item => item.id === target.instanceStageId)
+      : loaded?.instanceStages.find(item => ["pending", "in_progress", "in_review", "overdue"].includes(item.status) && item.assigned_to?.includes(profile?.id ?? ""));
+    const formId = loaded?.definitions.find(item => item.id === requestedStage?.fms_stage_id)?.form_template_id;
+    const formData = formId ? await loadTaskForms([formId], []) : { bundles: [] };
     setBundle(loaded);
     setForms(formData.bundles);
     setOptions(dynamicOptions);
-  }, [target.instanceId]);
+  }, [profile?.id, target.instanceId, target.instanceStageId]);
 
   useEffect(() => {
     let active = true;
@@ -144,6 +148,7 @@ function AssignedStage({ onNavigate, target }: {
   const requested = target.kind === "stage_form" ? target.formTemplateId : definition.form_template_id;
 
   return <Frame subtitle={`${bundle.instance.title} · ${bundle.instance.reference_number}`} title={definition.name}>
+    <FmsWorkContext instanceId={bundle.instance.id} instanceStageId={stage.id} />
     <FmsStageRunner
       branches={options.branches}
       checklist={bundle.checklist.filter((item) => item.fms_instance_stage_id === stage.id)}

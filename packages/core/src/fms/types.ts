@@ -1,4 +1,5 @@
 import type { UserRole } from "../roleMenu";
+import type { FmsAssignmentConfig, FmsTaskDisplay, FmsFollowUp } from "./workContracts";
 
 export const FMS_STAGE_TYPES = ["task", "approval", "form", "notification", "branch", "parallel_start", "parallel_join", "end"] as const;
 /** New workflows use implicit entry/exit. `end` remains readable for legacy versions only. */
@@ -30,6 +31,10 @@ export type FmsDecisionOption = Readonly<{ key: string; label: string }>;
 /** A conditional step activates only for one configured option of an earlier Decision Step. */
 export type FmsConditionalRule = Readonly<{ decisionStageKey: string; outcome: string } | { decisionStageKey: string; decisionOptionKey: string }>;
 export type FmsSlaRule = Readonly<{
+  assignment?: FmsAssignmentConfig | undefined;
+  completionFormRequired?: boolean | undefined;
+  taskDisplay?: FmsTaskDisplay | undefined;
+  followUp?: FmsFollowUp | undefined;
   /** User question on this stage's linked Form that sets the default for later steps. */
   assignmentFieldKey?: string | undefined;
   timingMethod?: FmsTimingMethod | undefined;
@@ -95,6 +100,7 @@ export type FmsStageDefinition = Readonly<{
 }>;
 
 export type FmsFlowDefinition = Readonly<{
+  assignmentVersion?: 1 | 2 | undefined;
   id?: string | undefined;
   familyId?: string | undefined;
   version?: number | undefined;
