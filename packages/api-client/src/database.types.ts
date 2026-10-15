@@ -9152,6 +9152,7 @@ export type Database = {
       }
       task_checklists: {
         Row: {
+          deleted_at: string | null
           completed_at: string | null
           completed_by: string | null
           id: string
@@ -9162,6 +9163,7 @@ export type Database = {
           task_instance_id: string
         }
         Insert: {
+          deleted_at?: string | null
           completed_at?: string | null
           completed_by?: string | null
           id?: string
@@ -9172,6 +9174,7 @@ export type Database = {
           task_instance_id: string
         }
         Update: {
+          deleted_at?: string | null
           completed_at?: string | null
           completed_by?: string | null
           id?: string
@@ -9563,6 +9566,7 @@ export type Database = {
       }
       task_instances: {
         Row: {
+          upload_requirement_overridden: boolean
           deleted_at: string | null
           actual_datetime: string | null
           assignment_status: string
@@ -9612,6 +9616,7 @@ export type Database = {
           verifier_user_profile_id: string | null
         }
         Insert: {
+          upload_requirement_overridden?: boolean
           deleted_at?: string | null
           actual_datetime?: string | null
           assignment_status?: string
@@ -9661,6 +9666,7 @@ export type Database = {
           verifier_user_profile_id?: string | null
         }
         Update: {
+          upload_requirement_overridden?: boolean
           deleted_at?: string | null
           actual_datetime?: string | null
           assignment_status?: string
@@ -11378,6 +11384,7 @@ export type Database = {
       }
       task_instances_live: {
         Row: {
+          upload_requirement_overridden: boolean | null
           actual_datetime: string | null
           assignment_status: string | null
           branch_id: string | null
@@ -11427,6 +11434,7 @@ export type Database = {
           verifier_user_profile_id: string | null
         }
         Insert: {
+          upload_requirement_overridden?: boolean | null
           actual_datetime?: string | null
           assignment_status?: string | null
           branch_id?: string | null
@@ -11476,6 +11484,7 @@ export type Database = {
           verifier_user_profile_id?: string | null
         }
         Update: {
+          upload_requirement_overridden?: boolean | null
           actual_datetime?: string | null
           assignment_status?: string | null
           branch_id?: string | null
@@ -11865,6 +11874,22 @@ export type Database = {
         }[]
       }
       task_assignment_recipient_allowed: { Args: { p_user_id: string }; Returns: boolean }
+      task_form_submission_module_matches: {
+        Args: {
+          p_module: string
+          p_task: Database["public"]["Tables"]["task_instances"]["Row"]
+        }
+        Returns: boolean
+      }
+      submit_task_form_with_audit: {
+        Args: {
+          p_answers: Json
+          p_form_template_id: string
+          p_remark?: string
+          p_task_id: string
+        }
+        Returns: string
+      }
       task_assignment_scope: { Args: never; Returns: string }
       task_assignment_user_in_scope: {
         Args: { p_user_id: string }

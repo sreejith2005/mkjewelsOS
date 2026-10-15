@@ -52,6 +52,7 @@ the formula behind each number.
 **What it is:** team progress, overdue work, evidence review and task templates.
 - [ ] Check team progress: open Task Control and choose the dates and department.
 - [ ] Review evidence: open the evidence panel in Task Control.
+- [ ] Edit one task: **Edit task** changes Task/Checklist type, requirements, participants, dates, categorization and checklist items. Press **Save changes**. History is retained; future schedules have their own editor.
 - [ ] Change a schedule: edit the template and press **Save schedule**.
 
 ## FMS (workflows)
@@ -128,3 +129,11 @@ it never does anything in JewelOS.
 ## Not covered (Kiara says it can't help)
 - **Meeting AI** is only a menu name; there is no screen yet, so Kiara has no help for it.
 - Anything that is a company rule rather than a button: that comes from the SOPs.
+
+
+## Task editing - 2026-10-15
+
+Task Control help now describes Edit task, Task/Checklist conversion, all authoring
+requirements and participants, Save changes, retained history, and the separate
+future schedule editor. No new read tool is needed: this is authoring guidance
+for existing work; Kiara remains read-only through existing section tools.

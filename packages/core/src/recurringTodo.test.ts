@@ -339,10 +339,11 @@ describe("deriveRecurringWorkCardState", () => {
     ).toBe(true);
   });
 
-  it("offers upload-to-complete only for a delegation task that still owes an image", () => {
+  it("offers upload-to-complete for either task type when upload is required", () => {
     expect(view(instance({ task_type: "delegation", requires_upload: true })).showUpload).toBe(true);
     expect(view(instance({ task_type: "delegation", requires_upload: true, has_attachment: true })).showUpload).toBe(false);
-    expect(view(instance({ task_type: "checklist", requires_upload: true })).showUpload).toBe(false);
+    expect(view(instance({ task_type: "checklist", requires_upload: true })).showUpload).toBe(true);
+    expect(view(instance({ task_type: "checklist", requires_upload: true })).showCompleteChecklist).toBe(false);
   });
 
   it("offers follow-up only to a manager, on an enabled schedule, while work is outstanding", () => {

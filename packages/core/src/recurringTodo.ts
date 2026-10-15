@@ -252,10 +252,10 @@ export function deriveRecurringWorkCardState(input: {
     remarkPrompt: isOwnWork ? "Completion remark" : "Why are you completing this on behalf of the doer?",
     showCompleteForm: requiresForm && !completed && !coverageRequired,
     completeFormDisabled: !task.form_template_id,
-    showCompleteChecklist: !requiresForm && task.task_type === "checklist" && !completed,
+    showCompleteChecklist: !requiresForm && task.task_type === "checklist" && !completed && (!task.requires_upload || Boolean(task.has_attachment)),
     showComplete: !requiresForm && task.task_type !== "checklist" && !completed && !coverageRequired && canComplete,
     showUpload:
-      !requiresForm && task.task_type === "delegation" && Boolean(task.requires_upload) && !task.has_attachment,
+      !completed && !coverageRequired && Boolean(task.requires_upload) && !task.has_attachment,
     showFollowup: !requiresForm && followupEnabled && canManage && !completed,
     showVerify: !requiresForm && canVerify && completed && task.verification_status === "pending",
     showChecklist: !requiresForm && (task.checklist ?? []).length > 0,

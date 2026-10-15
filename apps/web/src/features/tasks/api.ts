@@ -1,8 +1,9 @@
-import { decodeTaskPage, TASK_PAGE_SIZE, taskAdminEditPayload, type TaskAdminEdit, type TaskPageScope, type TaskFeedStatusFilter, type TaskWorkspaceView } from "@jewelos/core";
+import { decodeTaskPage, TASK_PAGE_SIZE, taskFormSubmissionKey, taskAdminEditPayload, type TaskAdminEdit, type TaskPageScope, type TaskFeedStatusFilter, type TaskWorkspaceView } from "@jewelos/core";
 import { supabase } from "@jewelos/api-client";
 import { groupTaskFeedRows, isTaskFeedItemInCurrentDayOrOverdue, taskFeedCurrentOrOverdueFilter as coreTaskFeedCurrentOrOverdueFilter, type Database, type Enums, type Json, type Tables } from "@jewelos/core";
 import { loadMasterOptions } from "@/features/dropdowns/api";
 import { loadTaskAssignmentUsers } from "@jewelos/data/tasks/api";
+export { loadTaskAdminEditData, submitTaskForm, type TaskAdminEditData } from "@jewelos/data/tasks/api";
 
 export type TaskFeedRow = Database["public"]["Views"]["v_all_tasks"]["Row"];
 export type TaskUser = Pick<Tables<"user_profiles">,
@@ -318,8 +319,8 @@ export async function loadTaskFeed(
   const userNames = new Map(users.map((user) => [user.id, user.employee_name]));
   const attachedTasks = new Set(attachments.map((row) => row.task_instance_id));
   const matchingSubmissions = new Set(submissions.flatMap((row) =>
-    row.linked_record_id && row.linked_module
-      ? [`${row.linked_record_id}|${row.linked_module}|${row.form_template_id}`]
+    row.linked_record_id && row.linked_module && row.form_template_id
+      ? [taskFormSubmissionKey(row.linked_record_id, row.linked_module, row.form_template_id)]
       : []));
   return groupedRows.map(({ assigneeIds, row }) => {
     const assignees = assigneeIds.map((id) => ({ id, name: userNames.get(id) ?? "Assigned user" }));
@@ -333,7 +334,7 @@ export async function loadTaskFeed(
       checklists: row.id ? checklistsByTask.get(row.id) ?? [] : [],
       hasAttachment: row.id ? attachedTasks.has(row.id) : false,
       hasFormSubmission: row.id && row.form_template_id && row.task_type
-        ? matchingSubmissions.has(`${row.id}|${row.task_type === "delegation" ? "delegation_task" : "checklist_task"}|${row.form_template_id}`)
+        ? matchingSubmissions.has(taskFormSubmissionKey(row.id, row.task_type === "delegation" ? "delegation_task" : "checklist_task", row.form_template_id))
       : false,
       isWatchedByViewer: Boolean(row.id && watchedTaskIds.has(row.id) && !assigneeIds.includes(viewerId)),
       verifierName: row.verifier_user_profile_id

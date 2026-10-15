@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import {
+  taskNeedsCompletionRemark,
   canManageRecurringWorkspace,
   canPauseRecurringTemplate,
   canRunRecurringTemplateNow,
@@ -11,7 +12,6 @@ import {
   recurringPerformanceRows,
   recurringStatusPill,
   recurringTemplateDeletePrompt,
-  taskFormLinkedModule,
   RECURRING_FREQUENCY_FILTERS,
   RECURRING_PRIORITY_FILTERS,
   RECURRING_STATUS_FILTERS,
@@ -37,23 +37,21 @@ import {
 import { useAuth } from "@/auth/AuthContext";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { Button, Modal, Notice } from "@/components/ui";
+import { TaskRequiredForm } from "@/features/tasks/TaskRequiredForm";
 import { TaskTemplateForm } from "@/features/tasks/TaskForms";
 import {
   loadTaskAuthoringReferenceData,
   completeRecurringTaskWithImage,
+  uploadTaskAttachment,
   updateTask,
   type TaskReferenceData,
 } from "@/features/tasks/api";
 import {
   loadFormDynamicOptions,
   loadTaskForms,
-  submitForm,
   type FormBundle,
 } from "@/features/forms/api";
-import {
-  FormRenderer,
-  type DynamicOptions,
-} from "@/features/forms/FormRenderer";
+import type { DynamicOptions } from "@/features/forms/FormRenderer";
 import {
   deleteRecurringTemplate,
   loadRecurringWorkspace,
@@ -179,7 +177,8 @@ function WorkCard({
     setUploading(true);
     setUploadError(null);
     try {
-      await completeRecurringTaskWithImage(profile.tenant_id, task.id, file);
+      if (task.requires_form || state.needsRemark) await uploadTaskAttachment(profile.tenant_id, task.id, file);
+      else await completeRecurringTaskWithImage(profile.tenant_id, task.id, file);
       await onChanged();
     } catch (caught) {
       setUploadError(caught instanceof Error ? caught.message : "Upload failed");
@@ -272,7 +271,7 @@ function WorkCard({
         {state.showUpload ? (
           <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-gold/30 px-4 py-2 text-sm font-semibold text-gold-secondary">
             <Upload className="size-4" />
-            {uploading ? "Uploading…" : "Upload image to complete"}
+            {uploading ? "Uploading…" : task.requires_form || state.needsRemark ? "Upload evidence" : "Upload image to complete"}
             <input
               className="sr-only"
               disabled={uploading}
@@ -795,7 +794,7 @@ export function RecurringTodoPage() {
                 title={`Required form: ${form.name}`}
                 wide
               >
-                <FormRenderer
+                <TaskRequiredForm taskId={formTarget.id} requiresRemark={taskNeedsCompletionRemark(formTarget, profile?.id)} requiresUpload={Boolean(formTarget.requires_upload)}
                   definition={{
                     name: form.name,
                     description: form.description ?? undefined,
@@ -804,16 +803,7 @@ export function RecurringTodoPage() {
                   }}
                   dynamicOptions={formOptions}
                   templateId={form.id}
-                  onSubmit={async (answers) => {
-                    await submitForm(
-                      form.id,
-                      answers,
-                      taskFormLinkedModule(formTarget.task_type),
-                      formTarget.id,
-                    );
-                    setFormTarget(null);
-                    await load();
-                  }}
+                  onCompleted={async () => { setFormTarget(null); await load(); }}
                 />
               </Modal>
             ) : (

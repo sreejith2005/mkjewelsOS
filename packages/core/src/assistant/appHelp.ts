@@ -72,10 +72,11 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     section: "task_templates",
     title: "Task Control",
     path: "/task-templates",
-    summary: "Task Control is for managers: team progress, overdue work, evidence review, and task templates.",
+    summary: "Task Control is for managers: team progress, overdue work, evidence review, task templates, and editing task details and requirements.",
     recipes: [
       "Check team progress: open Task Control and choose the date range and department.",
       "Review evidence: open the evidence panel inside Task Control.",
+      "Edit one task: choose \"Edit task\" to change Task or Checklist type, upload/remark/form requirements, verification, buddy assignment, Assignees, In Loop, dates, categorization and checklist items; then press \"Save changes\". Existing history stays intact; future schedules are edited separately.",
       "Change a schedule: edit the template and press \"Save schedule\".",
     ],
   },

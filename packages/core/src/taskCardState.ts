@@ -85,7 +85,7 @@ export function deriveTaskCardState(input: {
   // Checklists are a click-to-complete task type. Older imports copied the
   // sheet's evidence flag onto checklist records (repaired by migration 0148),
   // so the rule is normalised here rather than trusted from the row.
-  const requiresEvidence = task.task_type !== "checklist" && Boolean(task.requires_upload);
+  const requiresEvidence = Boolean(task.requires_upload);
 
   const canComplete =
     (!requiresEvidence || hasAttachment) && (!task.requires_form || hasFormSubmission);

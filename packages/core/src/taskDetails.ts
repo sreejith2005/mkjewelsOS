@@ -37,7 +37,7 @@ export function taskVerificationLabel(task: Readonly<{ verification_required?: b
 }
 
 export function taskEvidenceLabel(task: Readonly<{ task_type?: string | null; requires_upload?: boolean | null }>, hasAttachment: boolean): string {
-  if (task.task_type === "checklist" || !task.requires_upload) return "Not required";
+  if (!task.requires_upload) return "Not required";
   return hasAttachment ? "Evidence required · Uploaded" : "Evidence required";
 }
 

@@ -1,4 +1,4 @@
-import { decodeTaskPage, TASK_PAGE_SIZE, taskAdminEditPayload, type TaskAdminEdit, type TaskPageScope, type TaskFeedStatusFilter, type TaskWorkspaceView } from "@jewelos/core";
+import { decodeTaskPage, TASK_PAGE_SIZE, taskFormSubmissionKey, taskAdminEditPayload, taskAdminInitialEdit, type TaskAdminEdit, type TaskPageScope, type TaskFeedStatusFilter, type TaskWorkspaceView } from "@jewelos/core";
 import { getSupabase as db } from "@jewelos/api-client/client";
 import { groupTaskFeedRows, isTaskFeedItemInCurrentDayOrOverdue, taskFeedCurrentOrOverdueFilter as coreTaskFeedCurrentOrOverdueFilter, type Database, type Enums, type Json, type Tables } from "@jewelos/core";
 import { loadMasterOptions } from "../dropdowns/api";
@@ -149,6 +149,35 @@ export async function loadTaskAuthoringReferenceData(): Promise<TaskReferenceDat
 
 /** @deprecated Use the bounded loaders for each task surface. */
 export const loadTaskReferenceData = loadTaskAuthoringReferenceData;
+
+export type TaskAdminEditData = Readonly<{
+  edit: TaskAdminEdit;
+  reference: Pick<TaskReferenceData, "users" | "branches" | "departments" | "categories" | "forms">;
+}>;
+
+/** Read current state on open so stale feed rows cannot overwrite task settings. */
+export async function loadTaskAdminEditData(taskId: string): Promise<TaskAdminEditData> {
+  const [task, assignees, watchers, checklist, users, branches, departments, categories, forms] = await Promise.all([
+    db().from("task_instances").select("*").eq("id", taskId).maybeSingle(),
+    db().from("task_assignees").select("user_profile_id").eq("task_instance_id", taskId).eq("role_at_task", "doer").eq("is_active", true),
+    db().from("task_watchers").select("user_profile_id").eq("task_instance_id", taskId),
+    db().from("task_checklists").select("*").eq("task_instance_id", taskId).order("sort_order").order("id"),
+    loadTaskAssignmentUsers(),
+    db().from("branches").select("id,name").eq("is_active", true).order("name"),
+    db().from("departments").select("id,name,branch_id").eq("is_active", true).order("name"),
+    loadTaskCategoryOptions(),
+    db().from("form_templates").select("id,name,version,family_id,lifecycle,is_active").in("lifecycle", ["published", "archived"]).order("name"),
+  ]);
+  for (const result of [task, assignees, watchers, checklist, branches, departments, forms]) fail("Load task editor", result.error);
+  if (!task.data || task.data.deleted_at || task.data.task_type === "fms") throw new Error("This task is no longer available for editing.");
+  const currentFormId = task.data.form_template_id;
+  return {
+    edit: taskAdminInitialEdit({ ...task.data, doer_ids: (assignees.data ?? []).map(row => row.user_profile_id),
+      watcher_ids: (watchers.data ?? []).map(row => row.user_profile_id), checklists: checklist.data ?? [] }),
+    reference: { users, branches: branches.data ?? [], departments: departments.data ?? [], categories,
+      forms: (forms.data ?? []).filter(form => (form.lifecycle === "published" && form.is_active) || form.id === currentFormId) },
+  };
+}
 
 const TASK_FEED_PAGE_SIZE = 1_000;
 // v_all_tasks applies several security-invoker joins. Keep each hydration
@@ -343,8 +372,8 @@ export async function loadTaskFeed(
   const userNames = new Map(users.map((user) => [user.id, user.employee_name]));
   const attachedTasks = new Set(attachments.map((row) => row.task_instance_id));
   const matchingSubmissions = new Set(submissions.flatMap((row) =>
-    row.linked_record_id && row.linked_module
-      ? [`${row.linked_record_id}|${row.linked_module}|${row.form_template_id}`]
+    row.linked_record_id && row.linked_module && row.form_template_id
+      ? [taskFormSubmissionKey(row.linked_record_id, row.linked_module, row.form_template_id)]
       : []));
   return groupedRows.map(({ assigneeIds, row }) => {
     const assignees = assigneeIds.map((id) => ({ id, name: userNames.get(id) ?? "Assigned user" }));
@@ -358,7 +387,7 @@ export async function loadTaskFeed(
       checklists: row.id ? checklistsByTask.get(row.id) ?? [] : [],
       hasAttachment: row.id ? attachedTasks.has(row.id) : false,
       hasFormSubmission: row.id && row.form_template_id && row.task_type
-        ? matchingSubmissions.has(`${row.id}|${row.task_type === "delegation" ? "delegation_task" : "checklist_task"}|${row.form_template_id}`)
+        ? matchingSubmissions.has(taskFormSubmissionKey(row.id, row.task_type === "delegation" ? "delegation_task" : "checklist_task", row.form_template_id))
       : false,
       isWatchedByViewer: Boolean(row.id && watchedTaskIds.has(row.id) && !assigneeIds.includes(viewerId)),
       verifierName: row.verifier_user_profile_id
@@ -550,6 +579,20 @@ export async function loadTaskPage(viewerId: string, tenantId: string, view: Tas
 export async function adminEditTask(taskId: string, edit: TaskAdminEdit): Promise<void> {
   const { error } = await db().rpc("admin_edit_task_with_audit", { p_task_id: taskId, p_payload: taskAdminEditPayload(edit) });
   fail("Edit task", error);
+}
+
+export async function submitTaskForm(taskId: string, formTemplateId: string, answers: import("@jewelos/core").FormAnswers, remark = ""): Promise<string> {
+  // Form answers contain readonly option arrays; copy those into the JSON payload.
+  const payload: Record<string, Json> = {};
+  for (const [key, value] of Object.entries(answers)) {
+    if (value !== undefined) payload[key] = typeof value === "object" && value !== null ? [...value] : value;
+  }
+  const { data, error } = await db().rpc("submit_task_form_with_audit", {
+    p_task_id: taskId, p_form_template_id: formTemplateId, p_answers: payload, p_remark: remark,
+  });
+  fail("Submit task form", error);
+  if (!data) throw new Error("Submit task form: the server did not return a submission id");
+  return data;
 }
 
 export async function adminDeleteTask(taskId: string, entireSeries: boolean, reason: string): Promise<void> {
