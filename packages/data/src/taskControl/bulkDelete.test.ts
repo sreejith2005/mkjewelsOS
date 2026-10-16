@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { prepareTaskBulkDelete, executeTaskBulkDelete } from "./bulkDelete";
+import { prepareTaskBulkDelete, executeTaskBulkDelete, readTaskDeleteTargets } from "./bulkDelete";
 import type { EvidenceWorkspace } from "../taskEvidence/types";
 const workspace = (ids: string[], total: number): EvidenceWorkspace => ({
   filters: { from: "2026-10-01", to: "2026-10-12", view: "all", page: 1, page_size: 100 },
@@ -60,6 +60,23 @@ describe("bulk task deletion", () => {
     expect(remove).toHaveBeenCalledTimes(3);
     expect(result.failed).toHaveLength(10);
     expect(result.failed.filter((row) => row.message.startsWith("Not attempted"))).toHaveLength(7);
+  });
+  it("deletes occurrences of an already-retired series individually", async () => {
+    const tables: Record<string, Array<Record<string, unknown>>> = {
+      task_instances: [{ id: "done-1", task_template_id: "retired" }, { id: "done-2", task_template_id: "retired" }, { id: "open", task_template_id: "live" }],
+      task_templates: [{ id: "live" }],
+    };
+    const query = (table: string) => {
+      const result = Promise.resolve({ data: tables[table], error: null });
+      const chain = Object.assign(result, { select: () => chain, neq: () => chain, in: () => chain });
+      return chain;
+    };
+    const targets = await readTaskDeleteTargets({ from: query } as unknown as Parameters<typeof readTaskDeleteTargets>[0], ["done-1", "done-2", "open"]);
+    expect(targets).toEqual([{ id: "done-1", task_template_id: null }, { id: "done-2", task_template_id: null }, { id: "open", task_template_id: "live" }]);
+    const remove = vi.fn().mockResolvedValue(undefined);
+    const outcome = await executeTaskBulkDelete(targets, true, "", remove, vi.fn());
+    expect(remove.mock.calls).toEqual(expect.arrayContaining([["done-1", false, ""], ["done-2", false, ""], ["open", true, ""]]));
+    expect(outcome.failed).toEqual([]);
   });
   it("keeps ordinary tasks as occurrence deletes when series mode is selected", async () => {
     const remove = vi.fn().mockResolvedValue(undefined);
