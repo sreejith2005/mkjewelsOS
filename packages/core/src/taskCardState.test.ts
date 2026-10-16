@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveTaskCardState, taskEvidenceFileError, taskFormLinkedModule, type TaskCardInput } from "./taskCardState";
+import { deriveTaskCardState, taskEvidenceContentType, taskEvidenceFileError, taskFormLinkedModule, type TaskCardInput } from "./taskCardState";
 import type { TaskMutationCapability } from "./taskCapabilities";
 
 const NOW = new Date("2026-09-09T10:00:00.000Z");
@@ -184,15 +184,40 @@ describe("taskFormLinkedModule", () => {
 });
 
 describe("taskEvidenceFileError", () => {
+  const message = "Upload a photo or PDF up to 10 MB, or a video up to 50 MB.";
+
   it("accepts images and PDFs up to 10 MB", () => {
     expect(taskEvidenceFileError({ size: 1024, type: "image/jpeg" })).toBeNull();
     expect(taskEvidenceFileError({ size: 10 * 1024 * 1024, type: "application/pdf" })).toBeNull();
   });
 
-  it("refuses other types, empty files, and files over 10 MB with the web wording", () => {
-    const message = "Upload a JPG, PNG, WebP, or PDF up to 10 MB.";
+  it("accepts phone videos up to 50 MB", () => {
+    expect(taskEvidenceFileError({ size: 50 * 1024 * 1024, type: "video/mp4" })).toBeNull();
+    expect(taskEvidenceFileError({ size: 20 * 1024 * 1024, type: "video/quicktime" })).toBeNull();
+    expect(taskEvidenceFileError({ size: 1024, type: "video/3gpp" })).toBeNull();
+    expect(taskEvidenceFileError({ size: 50 * 1024 * 1024 + 1, type: "video/mp4" })).toBe("Videos can be up to 50 MB. Record a shorter clip and try again.");
+  });
+
+  it("refuses other types, empty files, and photos or PDFs over 10 MB", () => {
     expect(taskEvidenceFileError({ size: 1024, type: "image/heic" })).toBe(message);
+    expect(taskEvidenceFileError({ size: 1024, type: "video/x-msvideo" })).toBe(message);
     expect(taskEvidenceFileError({ size: 0, type: "image/png" })).toBe(message);
     expect(taskEvidenceFileError({ size: 10 * 1024 * 1024 + 1, type: "image/png" })).toBe(message);
+  });
+});
+
+describe("taskEvidenceContentType", () => {
+  it("keeps an accepted reported type", () => {
+    expect(taskEvidenceContentType({ name: "clip.mp4", type: "video/mp4" })).toBe("video/mp4");
+  });
+
+  it("falls back to the extension when a picker reports no type", () => {
+    expect(taskEvidenceContentType({ name: "VID_2026.MOV", type: "" })).toBe("video/quicktime");
+    expect(taskEvidenceContentType({ name: "clip.3gp", type: "application/octet-stream" })).toBe("video/3gpp");
+    expect(taskEvidenceContentType({ name: "notes.txt", type: "" })).toBeNull();
+  });
+
+  it("never overrides a reported type that is not accepted", () => {
+    expect(taskEvidenceContentType({ name: "renamed.mp4", type: "image/gif" })).toBeNull();
   });
 });

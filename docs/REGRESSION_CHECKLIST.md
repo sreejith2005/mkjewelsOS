@@ -71,6 +71,7 @@ devtools: `supabase.rpc(...)` / `supabase.from(...)` with the user's session).
 ### Tasks
 
 - [ ] Create manual task, delegate, edit, complete, attach evidence, required-form completion.
+- [ ] Task evidence accepts a photo, a PDF (10 MB) and a phone video (MP4/MOV, 50 MB); a longer clip shows the 50 MB message. In the Android app, Upload always offers Take photo / Record video / Choose from gallery or files, and other upload fields (forms, FMS) still offer the camera.
 - [ ] Recurring tasks generate on schedule; overdue tasks show as overdue.
 - [ ] Staff see own/department tasks; managers see branch; admins see all (task visibility follows dashboard authority).
 - [ ] CSV import and Assigning Left still work for ADM/SA.

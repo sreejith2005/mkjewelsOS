@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { FileText, Image as ImageIcon } from "lucide-react";
+import { FileText, Image as ImageIcon, Video } from "lucide-react";
 import { fetchTaskAttachments, signedTaskEvidenceUrl } from "@/features/taskEvidence/api";
 
 type Attachment = Awaited<ReturnType<typeof fetchTaskAttachments>>[number];
@@ -41,7 +41,7 @@ export function TaskAttachmentList({ taskId }: { taskId: string }) {
           onClick={() => void open(row.id)}
           type="button"
         >
-          {row.mime_type?.startsWith("image/") ? <ImageIcon className="size-4 shrink-0 text-task-text-muted" /> : <FileText className="size-4 shrink-0 text-task-text-muted" />}
+          {row.mime_type?.startsWith("image/") ? <ImageIcon className="size-4 shrink-0 text-task-text-muted" /> : row.mime_type?.startsWith("video/") ? <Video className="size-4 shrink-0 text-task-text-muted" /> : <FileText className="size-4 shrink-0 text-task-text-muted" />}
           <span className="min-w-0 flex-1 truncate">{row.original_filename ?? "Uploaded file"}</span>
           <span className="shrink-0 text-xs text-task-text-muted">
             {new Date(row.created_at ?? "").toLocaleDateString("en-IN", { dateStyle: "medium" })}{fileSize(row.size_bytes)}

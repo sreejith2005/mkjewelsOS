@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileText, Image as ImageIcon, Paperclip } from "lucide-react";
+import { FileText, Image as ImageIcon, Paperclip, Video } from "lucide-react";
 import { Button } from "@/components/ui";
 import { EmptyMessage, Panel, StatusDot } from "@/features/analytics/components";
 import { signedTaskEvidenceUrl } from "@/features/taskEvidence/api";
@@ -34,7 +34,7 @@ function WorkTypeChip({ row }: { row: TaskRow }) {
  * durable object link is ever rendered into the page.
  */
 function AttachmentChip({ file, onOpen }: { file: TaskAttachmentSummary; onOpen: () => void }) {
-  const Icon = file.mime_type?.startsWith("image/") ? ImageIcon : FileText;
+  const Icon = file.mime_type?.startsWith("image/") ? ImageIcon : file.mime_type?.startsWith("video/") ? Video : FileText;
   return (
     <button
       className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-task-border px-2.5 py-1 text-[11px] text-task-text hover:bg-gold/10"

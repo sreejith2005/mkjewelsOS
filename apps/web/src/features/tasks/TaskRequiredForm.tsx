@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { FormTemplateDefinition } from "@jewelos/core";
+import { TASK_EVIDENCE_ACCEPT, taskEvidenceFileError, type FormTemplateDefinition } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthContext";
 import { Field, Notice } from "@/components/ui";
 import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer";
@@ -17,9 +17,11 @@ export function TaskRequiredForm({ definition, dynamicOptions, templateId, taskI
   const [error, setError] = useState<string | null>(null);
   return <div className="grid gap-3">
     {error ? <Notice tone="danger">{error}</Notice> : null}
-    {requiresUpload ? <Field label="Required task evidence"><input aria-label="Required task evidence" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" disabled={uploading} onChange={event => {
+    {requiresUpload ? <Field label="Required task evidence"><input aria-label="Required task evidence" type="file" accept={TASK_EVIDENCE_ACCEPT} disabled={uploading} onChange={event => {
       const file = event.target.files?.[0]; event.target.value = "";
       if (!file || !profile) return;
+      const fileError = taskEvidenceFileError(file);
+      if (fileError) { setError(fileError); return; }
       setUploading(true); setError(null);
       void uploadTaskAttachment(profile.tenant_id, taskId, file).then(() => setUploadName(file.name))
         .catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Upload failed"))
