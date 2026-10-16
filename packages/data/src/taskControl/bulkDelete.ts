@@ -23,7 +23,15 @@ export async function readTaskDeleteTargets(client: JewelosClient, ids: readonly
   if (ids.length > 100) throw new Error("Task selection read exceeds page size.");
   const { data, error } = await client.from("task_instances").select("id,task_template_id").in("id", [...ids]).neq("task_type", "fms");
   if (error) throw new Error(error.message);
-  return data ?? [];
+  const rows = data ?? [];
+  const templateIds = [...new Set(rows.flatMap((row) => row.task_template_id ? [row.task_template_id] : []))];
+  if (templateIds.length === 0) return rows;
+  // Soft-deleted schedules are hidden by RLS. Their remaining (completed) occurrences
+  // have no series left to retire, so they are deleted as individual occurrences.
+  const live = await client.from("task_templates").select("id").in("id", templateIds);
+  if (live.error) throw new Error(live.error.message);
+  const liveIds = new Set((live.data ?? []).map((row) => row.id));
+  return rows.map((row) => row.task_template_id && !liveIds.has(row.task_template_id) ? { ...row, task_template_id: null } : row);
 }
 
 /** Resolve a frozen, bounded-read selection before confirmation and before writes. */

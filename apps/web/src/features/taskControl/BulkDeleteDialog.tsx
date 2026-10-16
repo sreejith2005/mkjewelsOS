@@ -42,7 +42,7 @@ export function BulkDeleteDialog({ request, onClose, onFinished }: Readonly<{ re
       {result ? <Notice tone={result.failed.length ? "danger" : "task"}>
         {result.succeeded.length} of {chosen?.length ?? 0} work selections processed.
         {result.failed.length ? ` ${result.failed.length} remain for retry. Tasks remain selected; use Delete all matching to include remaining schedules. ${result.failed[0]?.message ?? ""}` : ""}
-        {series ? " Completed history and evidence were preserved." : ""}
+        {series && chosen?.some((row) => row.task_template_id) ? " Completed history and evidence were preserved." : ""}
       </Notice> : targets ? <>
         <p className="font-semibold">{schedules ? `${(chosen?.length ?? 0) - schedules} task occurrence(s) and ${schedules} schedule(s) selected for deletion.` : `${chosen?.length ?? 0} task(s) selected for deletion.`}</p>
         {targets.some((row) => row.task_template_id) ? <label className="flex min-h-11 items-center gap-2"><input type="checkbox" disabled={busy} checked={series} onChange={(event) => setSeries(event.target.checked)} />Delete entire recurring series</label> : null}
