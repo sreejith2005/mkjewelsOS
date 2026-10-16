@@ -154,6 +154,34 @@ describe("TaskCard direct completion", () => {
     expect(screen.queryByRole("button", { name: "Complete task: Upload completion task" })).toBeNull();
   });
 
+  it("offers videos as evidence and completes the task with a phone recording", async () => {
+    const onAction = vi.fn().mockResolvedValue(undefined);
+    const file = new File(["evidence"], "VID_20261016.mp4", { type: "video/mp4" });
+
+    render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, requires_upload: true, title: "Video proof task" }} />);
+
+    const input = screen.getByLabelText("Upload task: Video proof task") as HTMLInputElement;
+    expect(input.accept).toContain("video/mp4");
+    expect(input.accept).toContain("video/quicktime");
+    expect(input.hasAttribute("capture")).toBe(false);
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ file, kind: "upload_and_complete" }));
+  });
+
+  it("explains the video size limit instead of uploading an oversized clip", async () => {
+    const onAction = vi.fn().mockResolvedValue(undefined);
+    const file = new File(["evidence"], "long.mp4", { type: "video/mp4" });
+    Object.defineProperty(file, "size", { value: 50 * 1024 * 1024 + 1 });
+
+    render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, requires_upload: true, title: "Long video task" }} />);
+
+    fireEvent.change(screen.getByLabelText("Upload task: Long video task"), { target: { files: [file] } });
+
+    await waitFor(() => expect(screen.getByText("Videos can be up to 50 MB. Record a shorter clip and try again.")).toBeTruthy());
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
   it("keeps the completion action available while a required checklist item is outstanding", async () => {
     const onAction = vi.fn().mockResolvedValue(undefined);
     const checklists = [{ deleted_at: null, completed_at: null, completed_by: null, id: "item-1", is_completed: false, is_required: true, item_text: "Photograph the tray", sort_order: 1, task_instance_id: "task-1" }];

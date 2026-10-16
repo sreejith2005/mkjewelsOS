@@ -78,3 +78,170 @@ index 07f73fd..1441788 100644
      @Override
      public void onPermissionRequest(final PermissionRequest request) {
  
+diff --git a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewModuleImpl.java b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewModuleImpl.java
+index 951749c..e6cf441 100644
+--- a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewModuleImpl.java
++++ b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewModuleImpl.java
+@@ -2,6 +2,7 @@ package com.reactnativecommunity.webview;
+ 
+ import android.Manifest;
+ import android.app.Activity;
++import android.app.AlertDialog;
+ import android.app.DownloadManager;
+ import android.content.Context;
+ import android.content.Intent;
+@@ -50,6 +51,7 @@ public class RNCWebViewModuleImpl implements ActivityEventListener {
+     public static final int PICKER = 1;
+     public static final int PICKER_LEGACY = 3;
+     public static final int FILE_DOWNLOAD_PERMISSION_REQUEST = 1;
++    public static final int CAMERA_PERMISSION_REQUEST = 4111;
+ 
+     final private ReactApplicationContext mContext;
+ 
+@@ -262,48 +264,115 @@ public class RNCWebViewModuleImpl implements ActivityEventListener {
+         }
+     }
+ 
++    // JewelOS patch: file inputs. The library hands the choice to the system chooser
++    // (a file picker plus camera "initial intents"). Some phones open the camera
++    // straight away from that chooser, or remember a one-time "Always" choice, so
++    // people could not pick a photo or video from the gallery. It also offered no
++    // camera at all until the camera permission had been granted elsewhere, and a
++    // `capture` input that accepts only video opened the photo camera. Instead:
++    // a `capture` input opens the matching camera directly; any other input that
++    // accepts photos or videos shows one app-owned menu (take photo / record video /
++    // choose from gallery or files) that looks the same on every phone; and the
++    // camera permission is requested when a camera option is chosen.
+     public boolean startPhotoPickerIntent(final String[] acceptTypes, final boolean allowMultiple, final ValueCallback<Uri[]> callback, final boolean isCaptureEnabled) {
+         mFilePathCallback = callback;
+-        Activity activity = mContext.getCurrentActivity();
++        final Activity activity = mContext.getCurrentActivity();
++        if (activity == null || activity.isFinishing()) {
++            finishFileChooser(null);
++            return true;
++        }
++        final boolean images = acceptsImages(acceptTypes);
++        final boolean videos = acceptsVideo(acceptTypes);
+ 
+-        ArrayList<Parcelable> extraIntents = new ArrayList<>();
+-        Intent photoIntent = null;
+-        if (!needsCameraPermission()) {
+-            if (acceptsImages(acceptTypes)) {
+-                photoIntent = getPhotoIntent();
+-                if (photoIntent != null) {
+-                    extraIntents.add(photoIntent);
+-                }
+-            }
+-            if (acceptsVideo(acceptTypes)) {
+-                Intent videoIntent = getVideoIntent();
+-                if (videoIntent != null) {
+-                    extraIntents.add(videoIntent);
+-                }
+-            }
++        if (isCaptureEnabled && (images || videos)) {
++            launchCamera(activity, images ? MimeType.IMAGE : MimeType.VIDEO, acceptTypes, allowMultiple);
++            return true;
++        }
++        if (!images && !videos) {
++            launchFileSelection(activity, acceptTypes, allowMultiple);
++            return true;
+         }
+ 
+-        Intent chooserIntent = new Intent(Intent.ACTION_CHOOSER);
+-        if (isCaptureEnabled) {
+-            chooserIntent = photoIntent;
+-        } else {
+-            Intent fileSelectionIntent = getFileChooserIntent(acceptTypes, allowMultiple);
++        final ArrayList<String> labels = new ArrayList<>();
++        final ArrayList<Runnable> actions = new ArrayList<>();
++        if (images) {
++            labels.add("Take photo");
++            actions.add(() -> launchCamera(activity, MimeType.IMAGE, acceptTypes, allowMultiple));
++        }
++        if (videos) {
++            labels.add("Record video");
++            actions.add(() -> launchCamera(activity, MimeType.VIDEO, acceptTypes, allowMultiple));
++        }
++        labels.add("Choose from gallery or files");
++        actions.add(() -> launchFileSelection(activity, acceptTypes, allowMultiple));
++
++        activity.runOnUiThread(() -> new AlertDialog.Builder(activity)
++            .setItems(labels.toArray(new String[0]), (dialog, which) -> actions.get(which).run())
++            .setOnCancelListener(dialog -> finishFileChooser(null))
++            .show());
++        return true;
++    }
+ 
+-            chooserIntent.putExtra(Intent.EXTRA_INTENT, fileSelectionIntent);
+-            chooserIntent.putExtra(Intent.EXTRA_INITIAL_INTENTS, extraIntents.toArray(new Parcelable[]{}));
++    // The WebView opens no further file chooser until the previous one is answered,
++    // so every path that does not reach onActivityResult must answer it here.
++    private void finishFileChooser(@Nullable Uri[] result) {
++        if (mFilePathCallback != null) {
++            mFilePathCallback.onReceiveValue(result);
+         }
++        mFilePathCallback = null;
++        mOutputImage = null;
++        mOutputVideo = null;
++    }
++
++    private void launchFileSelection(Activity activity, String[] acceptTypes, boolean allowMultiple) {
++        Intent intent = getFileChooserIntent(acceptTypes, allowMultiple);
++        try {
++            activity.startActivityForResult(intent, PICKER);
++        } catch (android.content.ActivityNotFoundException e) {
++            Log.w("RNCWebViewModule", "there is no Activity to handle this Intent", e);
++            finishFileChooser(null);
++        }
++    }
+ 
+-        if (chooserIntent != null) {
+-            if (chooserIntent.resolveActivity(activity.getPackageManager()) != null) {
+-                activity.startActivityForResult(chooserIntent, PICKER);
++    private void launchCamera(final Activity activity, final MimeType kind, final String[] acceptTypes, final boolean allowMultiple) {
++        if (!needsCameraPermission()) {
++            startCamera(activity, kind, acceptTypes, allowMultiple);
++            return;
++        }
++        PermissionAwareActivity permissionActivity;
++        try {
++            permissionActivity = getPermissionAwareActivity();
++        } catch (IllegalStateException e) {
++            launchFileSelection(activity, acceptTypes, allowMultiple);
++            return;
++        }
++        permissionActivity.requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST, (requestCode, permissions, grantResults) -> {
++            if (requestCode != CAMERA_PERMISSION_REQUEST) return false;
++            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
++                startCamera(activity, kind, acceptTypes, allowMultiple);
+             } else {
+-                Log.w("RNCWebViewModule", "there is no Activity to handle this Intent");
++                // Without the camera the person can still attach an existing file.
++                Toast.makeText(activity, "Camera permission is off. Choose a file instead.", Toast.LENGTH_SHORT).show();
++                launchFileSelection(activity, acceptTypes, allowMultiple);
+             }
+-        } else {
+-            Log.w("RNCWebViewModule", "there is no Camera permission");
+-        }
++            return true;
++        });
++    }
+ 
+-        return true;
++    private void startCamera(Activity activity, MimeType kind, String[] acceptTypes, boolean allowMultiple) {
++        Intent intent = kind == MimeType.VIDEO ? getVideoIntent() : getPhotoIntent();
++        if (intent == null) {
++            launchFileSelection(activity, acceptTypes, allowMultiple);
++            return;
++        }
++        try {
++            activity.startActivityForResult(intent, PICKER);
++        } catch (android.content.ActivityNotFoundException e) {
++            Log.w("RNCWebViewModule", "there is no camera app", e);
++            mOutputImage = null;
++            mOutputVideo = null;
++            launchFileSelection(activity, acceptTypes, allowMultiple);
++        }
+     }
+ 
+     public void setDownloadRequest(DownloadManager.Request request) {

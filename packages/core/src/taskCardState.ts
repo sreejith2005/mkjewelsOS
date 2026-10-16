@@ -125,17 +125,44 @@ export function taskFormLinkedModule(taskType: string | null | undefined): "chec
   return taskType === "delegation" ? "delegation_task" : "checklist_task";
 }
 
-/** The file types a task accepts as evidence, the same list the web file input offers. */
-export const TASK_EVIDENCE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"] as const;
+/**
+ * The file types a task accepts as evidence: photos, PDFs and short videos
+ * (MP4 from Android, QuickTime from iPhone, WebM/3GPP from older phones).
+ * Migration 0259 enforces the same list and limits on the bucket and RPCs.
+ */
+export const TASK_EVIDENCE_VIDEO_MIME_TYPES = ["video/mp4", "video/quicktime", "video/webm", "video/3gpp"] as const;
+export const TASK_EVIDENCE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf", ...TASK_EVIDENCE_VIDEO_MIME_TYPES] as const;
 export const TASK_EVIDENCE_MAX_BYTES = 10 * 1024 * 1024;
+export const TASK_EVIDENCE_VIDEO_MAX_BYTES = 50 * 1024 * 1024;
+
+const TASK_EVIDENCE_EXTENSION_TYPES: Readonly<Record<string, (typeof TASK_EVIDENCE_MIME_TYPES)[number]>> = {
+  jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", pdf: "application/pdf",
+  mp4: "video/mp4", m4v: "video/mp4", mov: "video/quicktime", webm: "video/webm", "3gp": "video/3gpp",
+};
+
+/** The `accept` value for an evidence file input. Extensions help pickers that report no MIME type. */
+export const TASK_EVIDENCE_ACCEPT = [...TASK_EVIDENCE_MIME_TYPES, ...Object.keys(TASK_EVIDENCE_EXTENSION_TYPES).map((extension) => `.${extension}`)].join(",");
+
+/**
+ * The content type to upload a picked file with, or `null` when it is not
+ * accepted. Some Android pickers report a video with no type (or a generic
+ * binary type), so the file extension is used as a fallback.
+ */
+export function taskEvidenceContentType(file: Readonly<{ name?: string; type: string }>): string | null {
+  if ((TASK_EVIDENCE_MIME_TYPES as readonly string[]).includes(file.type)) return file.type;
+  if (file.type && file.type !== "application/octet-stream") return null;
+  const extension = file.name?.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
+  return (extension && TASK_EVIDENCE_EXTENSION_TYPES[extension]) || null;
+}
 
 /**
  * Why a picked file cannot be used as task evidence, or `null` when it can.
  * Both clients check before uploading so a person sees the rule instead of a
  * storage error; the bucket policy remains the authority.
  */
-export function taskEvidenceFileError(file: Readonly<{ size: number; type: string }>): string | null {
-  const acceptedType = (TASK_EVIDENCE_MIME_TYPES as readonly string[]).includes(file.type);
-  if (file.size < 1 || file.size > TASK_EVIDENCE_MAX_BYTES || !acceptedType) return "Upload a JPG, PNG, WebP, or PDF up to 10 MB.";
+export function taskEvidenceFileError(file: Readonly<{ name?: string; size: number; type: string }>): string | null {
+  const contentType = taskEvidenceContentType(file);
+  if (contentType?.startsWith("video/") && file.size > TASK_EVIDENCE_VIDEO_MAX_BYTES) return "Videos can be up to 50 MB. Record a shorter clip and try again.";
+  if (file.size < 1 || !contentType || (!contentType.startsWith("video/") && file.size > TASK_EVIDENCE_MAX_BYTES)) return "Upload a photo or PDF up to 10 MB, or a video up to 50 MB.";
   return null;
 }

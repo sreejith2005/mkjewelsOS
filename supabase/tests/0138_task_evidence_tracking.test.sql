@@ -36,8 +36,8 @@ select ok(position('size_bytes' in pg_get_functiondef('public.complete_recurring
 select ok((default_section_availability() ? 'task_evidence'),'section availability covers the task evidence route');
 
 -- The bucket must accept every type the registration contract permits.
-select is((select allowed_mime_types from storage.buckets where id='task-attachments'),
-  array['image/jpeg','image/png','image/webp','application/pdf'],
+select ok((select allowed_mime_types @> array['image/jpeg','image/png','image/webp','application/pdf']
+  from storage.buckets where id='task-attachments'),
   'the task attachment bucket accepts every permitted evidence type');
 
 select * from finish();

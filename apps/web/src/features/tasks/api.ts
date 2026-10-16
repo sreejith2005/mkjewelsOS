@@ -1,4 +1,4 @@
-import { decodeTaskPage, TASK_PAGE_SIZE, taskFormSubmissionKey, taskAdminEditPayload, type TaskAdminEdit, type TaskPageScope, type TaskFeedStatusFilter, type TaskWorkspaceView } from "@jewelos/core";
+import { decodeTaskPage, TASK_PAGE_SIZE, taskEvidenceContentType, taskFormSubmissionKey, taskAdminEditPayload, type TaskAdminEdit, type TaskPageScope, type TaskFeedStatusFilter, type TaskWorkspaceView } from "@jewelos/core";
 import { supabase } from "@jewelos/api-client";
 import { groupTaskFeedRows, isTaskFeedItemInCurrentDayOrOverdue, taskFeedCurrentOrOverdueFilter as coreTaskFeedCurrentOrOverdueFilter, type Database, type Enums, type Json, type Tables } from "@jewelos/core";
 import { loadMasterOptions } from "@/features/dropdowns/api";
@@ -420,7 +420,7 @@ export async function uploadTaskAttachment(
   const path = `${tenantId}/${taskId}/${crypto.randomUUID()}-${safeName}`;
   const { error: uploadError } = await supabase.storage.from("task-attachments").upload(path, file, {
     cacheControl: "3600",
-    contentType: file.type,
+    contentType: taskEvidenceContentType(file) ?? file.type,
     upsert: false,
   });
   fail("Upload task attachment", uploadError);
@@ -445,7 +445,7 @@ export async function uploadAndCompleteTask(tenantId: string, taskId: string, fi
   const path = `${tenantId}/${taskId}/${crypto.randomUUID()}-${safeName}`;
   const { error: uploadError } = await supabase.storage.from("task-attachments").upload(path, file, {
     cacheControl: "3600",
-    contentType: file.type,
+    contentType: taskEvidenceContentType(file) ?? file.type,
     upsert: false,
   });
   fail("Upload task attachment", uploadError);

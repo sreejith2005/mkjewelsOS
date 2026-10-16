@@ -1,6 +1,6 @@
 import { useState, type ReactNode, type ChangeEvent } from "react";
 import { AlertTriangle, Check, CheckCircle2, ChevronDown, Clock, Eye, FileUp, PauseCircle, Users } from "lucide-react";
-import { calculateTaskChecklistProgress, effectiveTaskDeadline, isTaskFeedItemOverdue, taskNeedsCompletionRemark, type Enums, type TaskMutationCapability } from "@jewelos/core";
+import { calculateTaskChecklistProgress, effectiveTaskDeadline, isTaskFeedItemOverdue, TASK_EVIDENCE_ACCEPT, taskEvidenceFileError, taskNeedsCompletionRemark, type Enums, type TaskMutationCapability } from "@jewelos/core";
 import { Button, Field, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import type { TaskBundle } from "./api";
@@ -77,8 +77,9 @@ export function TaskCard({ management, capability, categoryLabel, onAction, task
     const input = event.currentTarget;
     const file = event.target.files?.[0];
     if (!file) return;
-    if (file.size < 1 || file.size > 10 * 1024 * 1024 || !["image/jpeg", "image/png", "image/webp", "application/pdf"].includes(file.type)) {
-      setError("Upload a JPG, PNG, WebP, or PDF up to 10 MB.");
+    const fileError = taskEvidenceFileError(file);
+    if (fileError) {
+      setError(fileError);
       setExpanded(true);
       input.value = "";
       return;
@@ -114,7 +115,7 @@ export function TaskCard({ management, capability, categoryLabel, onAction, task
         </span>
         <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-task-text-muted"><span className="sr-only sm:not-sr-only">{expanded ? "Hide details" : "View details"}</span><ChevronDown className={cn("size-4 transition-transform", expanded && "rotate-180")} /></span>
       </button>
-      {canShowDirectUpload ? <label className="inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-task-accent px-4 py-2 text-sm font-semibold text-task-text transition hover:bg-task-accent/90"><FileUp className="size-4" />Upload<input accept="image/jpeg,image/png,image/webp,application/pdf" aria-label={`Upload task: ${task.title ?? "task"}`} className="sr-only" disabled={busy} onChange={(event) => void upload(event, needsRemark ? "upload" : "upload_and_complete")} type="file" /></label> : canShowDirectComplete ? <Button aria-label={`Complete task: ${task.title ?? "task"}`} className="shrink-0 bg-task-accent text-task-text hover:bg-task-accent/90" disabled={busy || !canComplete || Boolean(needsRemark && !remark.trim())} onClick={() => void act({ kind: "complete", remark })} type="button"><CheckCircle2 />Complete</Button> : null}
+      {canShowDirectUpload ? <label className="inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-task-accent px-4 py-2 text-sm font-semibold text-task-text transition hover:bg-task-accent/90"><FileUp className="size-4" />Upload<input accept={TASK_EVIDENCE_ACCEPT} aria-label={`Upload task: ${task.title ?? "task"}`} className="sr-only" disabled={busy} onChange={(event) => void upload(event, needsRemark ? "upload" : "upload_and_complete")} type="file" /></label> : canShowDirectComplete ? <Button aria-label={`Complete task: ${task.title ?? "task"}`} className="shrink-0 bg-task-accent text-task-text hover:bg-task-accent/90" disabled={busy || !canComplete || Boolean(needsRemark && !remark.trim())} onClick={() => void act({ kind: "complete", remark })} type="button"><CheckCircle2 />Complete</Button> : null}
     </div>
     {expanded ? <section aria-label={detailsLabel} className="flex flex-col gap-4 border-t border-task-border bg-task-muted p-4" id={detailsId}>
       {error ? <Notice tone="danger">{error}</Notice> : null}
@@ -123,7 +124,7 @@ export function TaskCard({ management, capability, categoryLabel, onAction, task
       {blocked ? <Notice tone="task">Coverage required. An authorized manager must resolve coverage through a future database-backed workflow; no simulated resolution is available here.</Notice> : null}
       {!formOnlyAction ? task.checklists.map((item) => <div className="flex items-start gap-3 text-sm text-task-text" key={item.id}><button aria-label={item.is_completed ? "Mark incomplete" : "Mark complete"} className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded border", item.is_completed ? "border-task-accent bg-task-accent text-task-text" : "border-task-border bg-task-bg")} disabled={busy || completed || readOnly || blocked} onClick={() => void act({ kind: "checklist", checklistId: item.id, completed: !item.is_completed })} type="button">{item.is_completed ? <Check className="size-3" /> : null}</button><span className={cn(item.is_completed && "line-through text-task-text-muted")}>{item.item_text}{item.is_required ? <span className="ml-1 text-task-overdue">*</span> : null}</span></div>) : null}
       {fmsFormAction && !blocked ? <Button disabled={busy || !task.form_template_id} onClick={() => void act({ kind: "fill_fms_form" })} type="button"><CheckCircle2 />Complete FMS form</Button> : fmsStageAction && !blocked ? <Button disabled={busy} onClick={() => void act({ kind: "open_fms_stage" })} type="button"><CheckCircle2 />Open FMS workflow</Button> : formOnlyAction && !readOnly && !blocked ? <Button disabled={busy || !task.form_template_id} onClick={() => void act({ kind: "fill_form" })} type="button"><CheckCircle2 />Complete form</Button> : null}
-      {!readOnly && requiresEvidence && !completed ? <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-task-border bg-task-bg p-3 text-sm text-task-text"><FileUp className="size-4" /><span>{task.hasAttachment ? "Evidence uploaded · add another" : "Upload required evidence"}</span><input accept="image/jpeg,image/png,image/webp,application/pdf" className="sr-only" disabled={busy} onChange={(event) => void upload(event)} type="file" /></label> : null}
+      {!readOnly && requiresEvidence && !completed ? <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-task-border bg-task-bg p-3 text-sm text-task-text"><FileUp className="size-4" /><span>{task.hasAttachment ? "Evidence uploaded · add another" : "Upload required evidence"}</span><input accept={TASK_EVIDENCE_ACCEPT} className="sr-only" disabled={busy} onChange={(event) => void upload(event)} type="file" /></label> : null}
       {!formOnlyAction && !readOnly && needsRemark && !completed ? <Field label="Completion remark"><textarea className="task-field min-h-16" onChange={(event) => setRemark(event.target.value)} value={remark} /></Field> : null}
       {task.task_type === "fms" ? <Notice tone="task">FMS work is completed in its protected workflow runner.</Notice> : null}
       {task.task_type !== "fms" && task.id ? <TaskRemarks taskId={task.id} /> : null}
