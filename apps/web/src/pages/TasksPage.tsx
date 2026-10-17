@@ -6,6 +6,7 @@ import { Button, Modal, Notice } from "@/components/ui";
 import {
   createDelegationTask,
   loadTaskPage,
+  loadTaskTabCounts,
   ensureMyRecurringTasks,
   loadTaskFeed,
   loadTaskAuthoringReferenceData,
@@ -31,7 +32,7 @@ import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeR
 import { fmsAssignedWorkPath } from "@jewelos/core";
 import { loadFmsTaskDeepLink } from "@/features/tasks/api";
 
-const TASK_TOPICS = ["tasks", "forms", "organization"] as const;
+const TASK_TOPICS = ["tasks", "forms", "fms", "organization"] as const;
 
 export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const { access, profile } = useAuth();
@@ -50,6 +51,7 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const [references, setReferences] = useState<TaskReferenceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [countsError, setCountsError] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [formBundles, setFormBundles] = useState<FormBundle[]>([]);
   const [formDynamicOptions, setFormDynamicOptions] = useState<DynamicOptions>({ users: [], branches: [], departments: [], masters: [] });
@@ -77,6 +79,14 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
         return;
       }
       const loadPage = () => loadTaskPage(profile.id, profile.tenant_id, workspaceView, statusFilter, offset);
+      let countsGeneration = 0;
+      const refreshTabCounts = async () => {
+        const request = ++countsGeneration;
+        const tabs = await loadTaskTabCounts(hasAdminTaskView).catch(() => null);
+        if (generation !== refreshGeneration.current || request !== countsGeneration) return;
+        setCountsError(tabs === null);
+        if (tabs) setTabCounts(tabs);
+      };
       const applyPage = (page: Awaited<ReturnType<typeof loadPage>>) => {
         if (generation !== refreshGeneration.current) return;
         if (offset > 0 && offset >= page.total) { setOffset(Math.max(0, Math.floor((page.total - 1) / TASK_PAGE_SIZE) * TASK_PAGE_SIZE)); return; }
@@ -85,11 +95,17 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
         setLoadedIdentity(pageIdentity);
       };
       const [page, referenceData] = await Promise.all([
-        prepareRecurringTasksThenLoad(ensureMyRecurringTasks, loadPage, applyPage),
+        prepareRecurringTasksThenLoad(ensureMyRecurringTasks, loadPage, async (nextPage) => {
+          applyPage(nextPage);
+          await refreshTabCounts();
+        }),
         loadTaskFeedReferenceData().catch(() => ({ categories: [] })),
+        refreshTabCounts(),
       ]);
       applyPage(page);
-      if (generation === refreshGeneration.current) setCategories(referenceData.categories);
+      if (generation === refreshGeneration.current) {
+        setCategories(referenceData.categories);
+      }
     } catch (caught) {
       if (generation === refreshGeneration.current) setError(caught instanceof Error ? caught.message : "Unable to load tasks");
     } finally {
@@ -98,9 +114,9 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
         setLoading(false);
       }
     }
-  }, [profile, focusedTaskId, workspaceView, statusFilter, offset, pageIdentity]);
+  }, [profile, focusedTaskId, workspaceView, statusFilter, offset, pageIdentity, hasAdminTaskView]);
 
-  useEffect(() => { hasCompletedInitialLoad.current = false; }, [profile?.id]);
+  useEffect(() => { hasCompletedInitialLoad.current = false; setTabCounts({}); setCountsError(false); }, [profile?.id]);
   useEffect(() => { if (path === TASK_IN_LOOP_PATH) setWorkspaceView("inLoop"); }, [path]);
   useEffect(() => { void refresh(); return () => { refreshGeneration.current++; }; }, [refresh]);
   useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: TASK_TOPICS, refresh });
@@ -194,6 +210,7 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
       <>{focusedTaskId?<div className="px-4 py-3 text-sm text-task-text-muted">Selected task | <button className="min-h-11 text-task-accent" onClick={()=>navigateTo("/tasks")}>Return to task feed</button></div>:null}</><TaskFilterBar counts={counts} onStatusChange={changeStatus} status={statusFilter} />
 
       <div className="w-full p-3 sm:p-5">
+        {countsError ? <Notice tone="danger">Unable to refresh subsection counts. Reopen Tasks to retry.</Notice> : null}
         {error ? <div className="flex flex-col gap-3 rounded-xl border border-danger/40 bg-danger/10 p-4"><Notice tone="danger">{error}</Notice><Button className="self-start border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={() => void refresh()} variant="secondary"><RefreshCw />Retry</Button></div> : shouldShowTaskLoading(loading || loadedIdentity !== pageIdentity, hasCompletedInitialLoad.current && loadedIdentity === pageIdentity) ? <div aria-label="Loading tasks" className="flex flex-col gap-3">{[0, 1, 2].map((item) => <div className="h-28 animate-pulse rounded-2xl border border-task-border bg-task-muted" key={item} />)}</div> : scopedTasks.length === 0 ? <div className="flex min-h-[48dvh] flex-col items-center justify-center px-5 text-center"><span className="mb-5 flex size-20 items-center justify-center rounded-[1.75rem] bg-task-muted text-task-accent"><CheckCircle2 className="size-10" /></span><h2 className="text-2xl font-semibold text-task-text">No Tasks Here</h2><p className="mt-1 max-w-sm text-sm text-task-text-muted">It seems that you don’t have any tasks in this list.</p></div> : <div className="flex flex-col gap-3">{profile ? scopedTasks.map((task) => <TaskCard viewerId={profile.id} management={hasAdminTaskView && task.task_type !== "fms" ? <TaskAdminControls task={task} onChanged={refresh} /> : undefined} capability={deriveTaskMutationCapability({ assigneeIds: task.assignees.map((assignee) => assignee.id), isWatcher: task.isWatchedByViewer, viewerId: profile.id, viewerRole: profile.user_role })} categoryLabel={task.category_id ? categoryNames.get(task.category_id) ?? "Uncategorized" : "Uncategorized"} key={task.id} onAction={(action) => handleAction(task, action)} task={task} />) : null}</div>}
       </div>
 

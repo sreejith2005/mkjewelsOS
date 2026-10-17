@@ -573,6 +573,17 @@ export async function recordAvailabilityRange(
 
 export type TaskPage = Omit<TaskPageScope, "ids"> & Readonly<{ tasks: TaskBundle[] }>;
 
+/** Count unopened tabs without fetching their cards or any caller-selected actor. */
+export async function loadTaskTabCounts(includeAll: boolean): Promise<Partial<Record<TaskWorkspaceView, number>>> {
+  const views: TaskWorkspaceView[] = ["mine", "delegated", "inLoop", ...(includeAll ? ["all" as const] : [])];
+  const entries = await Promise.all(views.map(async (view) => {
+    const { data, error } = await db().rpc("task_feed_page", { p_view: view, p_status: "pending", p_offset: 0, p_limit: 1 });
+    fail("Load task subsection counts", error);
+    return [view, decodeTaskPage(data).counts.open] as const;
+  }));
+  return Object.fromEntries(entries);
+}
+
 export async function loadTaskPage(viewerId: string, tenantId: string, view: TaskWorkspaceView, status: TaskFeedStatusFilter, offset = 0): Promise<TaskPage> {
   const { data, error } = await db().rpc("task_feed_page", { p_view: view, p_status: status, p_offset: offset, p_limit: TASK_PAGE_SIZE });
   fail("Load task page", error);

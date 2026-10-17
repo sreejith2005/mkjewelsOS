@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TasksPage } from "./TasksPage";
 
-const mocks = vi.hoisted(() => ({ page: vi.fn(), feed: vi.fn() }));
+const mocks = vi.hoisted(() => ({ page: vi.fn(), feed: vi.fn(), tabs: vi.fn(), prepare: vi.fn() }));
 vi.mock("@/auth/AuthContext", async () => {
   const { builtinAccessContext } = await vi.importActual<typeof import("@jewelos/core")>("@jewelos/core");
   const profile = { id: "admin", tenant_id: "tenant", user_role: "admin" as const };
@@ -11,7 +11,8 @@ vi.mock("@/auth/AuthContext", async () => {
 });
 vi.mock("@/features/tasks/api", () => ({
   loadTaskPage: mocks.page, loadTaskFeed: mocks.feed,
-  ensureMyRecurringTasks: async () => ({ created: 0 }),
+  loadTaskTabCounts: mocks.tabs,
+  ensureMyRecurringTasks: mocks.prepare,
   loadTaskFeedReferenceData: async () => ({ categories: [] }),
   loadTaskAuthoringReferenceData: vi.fn(), createDelegationTask: vi.fn(),
   reviseTask: vi.fn(), updateTask: vi.fn(), uploadAndCompleteTask: vi.fn(),
@@ -25,10 +26,41 @@ const page = (title: string, total = 12000) => ({
   tasks: [{ id: title, title, task_type: "delegation", assignees: [], isWatchedByViewer: false }],
   total, counts: { pending: total, overdue: 20, completed: 10, open: total + 20 },
 });
-beforeEach(() => { mocks.page.mockReset(); mocks.feed.mockReset(); window.history.replaceState({}, "", "/tasks"); });
+beforeEach(() => { mocks.page.mockReset(); mocks.feed.mockReset(); mocks.tabs.mockReset(); mocks.prepare.mockReset(); mocks.prepare.mockResolvedValue({ created: 0 }); mocks.tabs.mockResolvedValue({ mine: 4, delegated: 7, inLoop: 2, all: 13 }); window.history.replaceState({}, "", "/tasks"); });
 afterEach(cleanup);
 
 describe("task workspace paging", () => {
+  it("refreshes unopened My Tasks counts when recurring catch-up creates work", async () => {
+    mocks.page.mockResolvedValue(page("Available task"));
+    render(<TasksPage />);
+    await screen.findByText("Available task");
+    let finishPreparation: ((value: { created: number }) => void) | undefined;
+    mocks.prepare.mockImplementationOnce(() => new Promise(resolve => { finishPreparation = resolve; }));
+    fireEvent.click(screen.getByRole("button", { name: /In Loop/ }));
+    await waitFor(() => expect(finishPreparation).toBeTypeOf("function"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "My Tasks (4)" })).toBeTruthy());
+    mocks.tabs.mockResolvedValue({ mine: 5, delegated: 7, inLoop: 12020, all: 13 });
+    await act(async () => { finishPreparation?.({ created: 1 }); });
+    await waitFor(() => expect(screen.getByRole("button", { name: "My Tasks (5)" })).toBeTruthy());
+  });
+  it("shows every authorized subsection count without opening the subsection", async () => {
+    mocks.page.mockResolvedValue(page("First page", 4));
+    render(<TasksPage />);
+    await screen.findByText("First page");
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Delegated (7)" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "In Loop (2)" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "All Tasks (13)" })).toBeTruthy();
+    });
+    expect(mocks.page).toHaveBeenCalledTimes(1);
+  });
+  it("keeps tasks usable when unopened subsection counts cannot refresh", async () => {
+    mocks.page.mockResolvedValue(page("Available task"));
+    mocks.tabs.mockRejectedValue(new Error("Counts temporarily unavailable"));
+    render(<TasksPage />);
+    await screen.findByText("Available task");
+    expect(screen.getByText(/Unable to refresh subsection counts/)).toBeTruthy();
+  });
   it("uses complete counts and fetches only the selected page", async () => {
     mocks.page.mockResolvedValue(page("First page"));
     render(<TasksPage />);

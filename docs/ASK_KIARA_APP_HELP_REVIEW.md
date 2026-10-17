@@ -16,7 +16,7 @@ How it works:
 The source is `packages/core/src/assistant/appHelp.ts`. Keep this file and that one in step
 (AGENTS.md, "Keeping Ask Kiara current").
 
-Last checked against the screens: 2026-10-14.
+Tasks entry updated against the screens: 2026-10-17. Other entries last checked: 2026-10-14.
 
 ---
 
@@ -35,8 +35,8 @@ the formula behind each number.
 
 ## Tasks
 **What it is:** work given to you, tasks you gave to others, and tasks you are watching.
-- [ ] See my tasks: open Tasks. **Assigned to me** lists work given to you.
-- [ ] Complete a task: open it, finish any checklist items, form or photo, then mark it complete.
+- [ ] See my tasks: open Tasks. **My Tasks** lists recurring and FMS work; **Delegated** lists one-time assigned work for employees; **In Loop** lists watched work. Subsection counts load when Tasks opens.
+- [ ] Complete a task: finish the required form or upload, then press **Complete**. If a remark is required, the button opens and focuses the remark field; enter it and press **Complete** again. FMS work opens its protected workflow runner.
 - [ ] Create a task: in Tasks press **Create Task**, fill in the title, the person and the due date, then save.
 - [ ] See tasks I gave to others: **Delegated** in Tasks.
 - [ ] Add many tasks at once: **Bulk Import** in Tasks (only roles that can assign work).

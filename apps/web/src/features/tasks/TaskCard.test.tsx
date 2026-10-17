@@ -84,6 +84,21 @@ const task = {
 } as TaskBundle;
 
 describe("TaskCard direct completion", () => {
+  it("opens and focuses the required remark when completing a collapsed checklist", async () => {
+    const onAction = vi.fn().mockResolvedValue(undefined);
+    render(<TaskCard viewerId="doer-1" capability={capability} categoryLabel="Uncategorized" onAction={onAction}
+      task={{ ...task, task_type: "checklist", requires_remark: true }} />);
+    const complete = screen.getByRole("button", { name: "Complete task: Direct completion task" });
+    expect(complete).toHaveProperty("disabled", false);
+    fireEvent.click(complete);
+    const input = await screen.findByRole("textbox", { name: "Completion remark" });
+    await waitFor(() => expect(document.activeElement).toBe(input));
+    expect(onAction).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: "Opening checks finished" } });
+    fireEvent.click(complete);
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ kind: "complete", remark: "Opening checks finished" }));
+  });
+
   it("offers the required upload on an edited checklist", () => {
     render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={vi.fn()} task={{ ...task, task_type: "checklist", requires_upload: true, title: "Edited checklist" }} />);
     expect(screen.getByLabelText("Upload task: Edited checklist")).toBeTruthy();
