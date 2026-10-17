@@ -51,8 +51,7 @@ policy and unchanged RPC output. No secrets/configuration/functions changed.
   Build emits size/plugin-timing warnings, with no compile errors.
 - Task card/paging and FMS builder retry:48/48 passed with one worker and a
   20-second test timeout. The broad web run encountered two five-second FMS
-  timeouts during concurrent checks; both pass in this retry. Its remaining
-  results are recorded below when complete.
+  timeouts during concurrent checks; both pass in this retry. The full run completed with539 passing assertions and only those two timeout failures; all failed cases passed in the48-test retry.
 - Exact release source browser:390x844 and1440x1000, all subsection counts on
   entry, archived/cross-branch runtime cards, remark focus, and two persisted
   checklist completions passed. Local recurrence Edge Runtime is absent and
@@ -65,3 +64,23 @@ policy and unchanged RPC output. No secrets/configuration/functions changed.
 
 No signed-in production employee flow or physical Android behavior is asserted
 from local checks, migration ledger, Git push, or web-host status alone.
+
+## Production migration outcome
+
+Source commit: `da8f972cb4d17e6dc5e83affe9d3aab5e5eb1078`.
+`supabase.cmd --workdir .worktrees/task-workspace-release-20261017 db push --linked`
+applied only0286. A subsequent linked migration list confirms local/remote0286;
+`db push --linked --dry-run` reports upToDate=true and zero pending migrations.
+Post-apply `db lint --linked --level error` reports no errors. Three repeated
+anonymous API probes (task page, task feed, flow definitions) all return
+HTTP401 /SQLSTATE42501. No customer data was read or changed for verification.
+
+The broad web scan completed:111 files,539 passing assertions and two existing
+FMS builder five-second timeout failures during concurrent host work. The
+isolated builder/task-card/paging retry passes48/48 with one worker and a
+20-second timeout. No failed functional assertion remains unreproduced or
+hidden. Neither attempt altered product code to accommodate the timeout.
+
+Git publication and hosted web status remain separate from migration success;
+the final response records their verified commit/status. Authenticated
+production employee workflow smoke and physical Android proof remain absent.
