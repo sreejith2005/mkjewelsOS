@@ -1,3 +1,5 @@
+import { defaultTaskSearch, taskSearchActive, TASK_SUBSECTION_LABELS, type TaskSearchFilters } from "@jewelos/core";
+import { TaskSearchControls } from "@/features/tasks/TaskSearchControls";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Plus, RefreshCw, Upload, UserRoundPlus } from "lucide-react";
 import { TASK_IN_LOOP_PATH, deriveTaskMutationCapability, taskNeedsCompletionRemark, hasPermission, type TaskFeedStatusFilter } from "@jewelos/core";
@@ -6,6 +8,7 @@ import { Button, Modal, Notice } from "@/components/ui";
 import {
   createDelegationTask,
   loadTaskPage,
+  loadTaskSearchPage,
   loadTaskTabCounts,
   ensureMyRecurringTasks,
   loadTaskFeed,
@@ -38,6 +41,14 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const { access, profile } = useAuth();
   const selectedTaskId=new URLSearchParams(window.location.search).get("task_id");
   const focusedTaskId=selectedTaskId&&/^[0-9a-f-]{36}$/i.test(selectedTaskId)?selectedTaskId:null;
+  const [filters, setFilters] = useState<TaskSearchFilters>(defaultTaskSearch);
+  const [query, setQuery] = useState("");
+  const [sections, setSections] = useState<Record<string, TaskWorkspaceView>>({});
+  useEffect(() => { const timer = window.setTimeout(() => { setQuery(filters.query.trim()); setOffset(0); }, 250); return () => window.clearTimeout(timer); }, [filters.query]);
+  const effectiveFilters = useMemo(() => ({ ...filters, query }), [query, filters.kind, filters.status, filters.priority, filters.from, filters.to, filters.subsection, filters.requirement, filters.sort]);
+  const exploring = taskSearchActive(effectiveFilters) && !focusedTaskId;
+  const searchIdentity = JSON.stringify(effectiveFilters);
+  const changeSearch = (next: TaskSearchFilters) => { setFilters(next); if (next.query === filters.query || !next.query.trim()) setOffset(0); if (!next.query.trim()) setQuery(""); };
   const [focusedTasks,setFocusedTasks]=useState<TaskBundle[]>([]);
   const [statusFilter, setStatusFilter] = useState<TaskFeedStatusFilter>("pending");
   const [pageTasks, setPageTasks] = useState<TaskBundle[]>([]);
@@ -64,7 +75,7 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
   // The database resolves this key; the flag only decides whether the control is offered.
   const canUseVoice = access ? hasPermission(access, "tasks.voice_assign") : false;
 
-  const pageIdentity = `${profile?.id}|${workspaceView}|${statusFilter}|${offset}|${focusedTaskId}`;
+  const pageIdentity = `${profile?.id}|${workspaceView}|${statusFilter}|${offset}|${focusedTaskId}|${searchIdentity}`;
 
   const refresh = useCallback(async () => {
     if (!profile) return;
@@ -76,6 +87,14 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
         const rows = await loadTaskFeed(profile.id, "", "", { tenantId: profile.tenant_id, recordId: focusedTaskId });
         const referenceData = await loadTaskFeedReferenceData().catch(() => ({ categories: [] }));
         if (generation === refreshGeneration.current) { setFocusedTasks(rows); setCategories(referenceData.categories); setLoadedIdentity(pageIdentity); }
+        return;
+      }
+      if (exploring) {
+        const [result, referenceData] = await Promise.all([loadTaskSearchPage(profile.id, profile.tenant_id, effectiveFilters, offset), loadTaskFeedReferenceData().catch(() => ({ categories: [] }))]);
+        if (generation !== refreshGeneration.current) return;
+        if (offset > 0 && offset >= result.total) { setOffset(Math.max(0, Math.floor((result.total - 1) / TASK_PAGE_SIZE) * TASK_PAGE_SIZE)); return; }
+        setPageTasks(result.tasks); setServerCounts(result.counts); setTotal(result.total); setSections(result.sections); setLoadedIdentity(pageIdentity);
+        setCategories(referenceData.categories);
         return;
       }
       const loadPage = () => loadTaskPage(profile.id, profile.tenant_id, workspaceView, statusFilter, offset);
@@ -114,9 +133,9 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
         setLoading(false);
       }
     }
-  }, [profile, focusedTaskId, workspaceView, statusFilter, offset, pageIdentity, hasAdminTaskView]);
+  }, [profile, focusedTaskId, workspaceView, statusFilter, offset, pageIdentity, hasAdminTaskView, exploring, effectiveFilters]);
 
-  useEffect(() => { hasCompletedInitialLoad.current = false; setTabCounts({}); setCountsError(false); }, [profile?.id]);
+  useEffect(() => { hasCompletedInitialLoad.current = false; setTabCounts({}); setCountsError(false); setFilters(defaultTaskSearch()); setQuery(""); setSections({}); setOffset(0); }, [profile?.id]);
   useEffect(() => { if (path === TASK_IN_LOOP_PATH) setWorkspaceView("inLoop"); }, [path]);
   useEffect(() => { void refresh(); return () => { refreshGeneration.current++; }; }, [refresh]);
   useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: TASK_TOPICS, refresh });
@@ -186,7 +205,8 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
         <div><h2 className="font-display text-[2rem] font-semibold leading-tight text-task-text">Tasks</h2><p className="text-sm text-task-text-muted">Assigned, watched, coverage-blocked, and delegated work in one place.</p></div>
       </div>
 
-      <div className="scroll-x no-scrollbar flex items-stretch gap-2 border-b border-task-border bg-task-bg px-3 pt-3 sm:px-5">
+      {!focusedTaskId ? <TaskSearchControls value={filters} onChange={changeSearch} canViewAll={hasAdminTaskView} /> : null}
+      {!exploring ? <div className="scroll-x no-scrollbar flex items-stretch gap-2 border-b border-task-border bg-task-bg px-3 pt-3 sm:px-5">
         {([
           ["mine", "My Tasks", tabCounts.mine],
           ["delegated", "Delegated", tabCounts.delegated],
@@ -207,11 +227,12 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
         </div> : null}
       </div>
 
-      <>{focusedTaskId?<div className="px-4 py-3 text-sm text-task-text-muted">Selected task | <button className="min-h-11 text-task-accent" onClick={()=>navigateTo("/tasks")}>Return to task feed</button></div>:null}</><TaskFilterBar counts={counts} onStatusChange={changeStatus} status={statusFilter} />
+      : <div className="px-4 py-2 text-xs text-task-text-muted" role="status">{loadedIdentity === pageIdentity ? `${total} results` : "Searching..."} | {effectiveFilters.subsection === "any" ? "All subsections" : TASK_SUBSECTION_LABELS[effectiveFilters.subsection]} | Includes earlier and completed work</div>}
+      <>{focusedTaskId?<div className="px-4 py-3 text-sm text-task-text-muted">Selected task | <button className="min-h-11 text-task-accent" onClick={()=>navigateTo("/tasks")}>Return to task feed</button></div>:null}</>{!exploring ? <TaskFilterBar counts={counts} onStatusChange={changeStatus} status={statusFilter} /> : null}
 
       <div className="w-full p-3 sm:p-5">
-        {countsError ? <Notice tone="danger">Unable to refresh subsection counts. Reopen Tasks to retry.</Notice> : null}
-        {error ? <div className="flex flex-col gap-3 rounded-xl border border-danger/40 bg-danger/10 p-4"><Notice tone="danger">{error}</Notice><Button className="self-start border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={() => void refresh()} variant="secondary"><RefreshCw />Retry</Button></div> : shouldShowTaskLoading(loading || loadedIdentity !== pageIdentity, hasCompletedInitialLoad.current && loadedIdentity === pageIdentity) ? <div aria-label="Loading tasks" className="flex flex-col gap-3">{[0, 1, 2].map((item) => <div className="h-28 animate-pulse rounded-2xl border border-task-border bg-task-muted" key={item} />)}</div> : scopedTasks.length === 0 ? <div className="flex min-h-[48dvh] flex-col items-center justify-center px-5 text-center"><span className="mb-5 flex size-20 items-center justify-center rounded-[1.75rem] bg-task-muted text-task-accent"><CheckCircle2 className="size-10" /></span><h2 className="text-2xl font-semibold text-task-text">No Tasks Here</h2><p className="mt-1 max-w-sm text-sm text-task-text-muted">It seems that you don’t have any tasks in this list.</p></div> : <div className="flex flex-col gap-3">{profile ? scopedTasks.map((task) => <TaskCard viewerId={profile.id} management={hasAdminTaskView && task.task_type !== "fms" ? <TaskAdminControls task={task} onChanged={refresh} /> : undefined} capability={deriveTaskMutationCapability({ assigneeIds: task.assignees.map((assignee) => assignee.id), isWatcher: task.isWatchedByViewer, viewerId: profile.id, viewerRole: profile.user_role })} categoryLabel={task.category_id ? categoryNames.get(task.category_id) ?? "Uncategorized" : "Uncategorized"} key={task.id} onAction={(action) => handleAction(task, action)} task={task} />) : null}</div>}
+        {countsError && !exploring ? <Notice tone="danger">Unable to refresh subsection counts. Reopen Tasks to retry.</Notice> : null}
+        {error ? <div className="flex flex-col gap-3 rounded-xl border border-danger/40 bg-danger/10 p-4"><Notice tone="danger">{error}</Notice><Button className="self-start border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={() => void refresh()} variant="secondary"><RefreshCw />Retry</Button></div> : shouldShowTaskLoading(loading || loadedIdentity !== pageIdentity, hasCompletedInitialLoad.current && loadedIdentity === pageIdentity) ? <div aria-label="Loading tasks" className="flex flex-col gap-3">{[0, 1, 2].map((item) => <div className="h-28 animate-pulse rounded-2xl border border-task-border bg-task-muted" key={item} />)}</div> : scopedTasks.length === 0 ? <div className="flex min-h-[48dvh] flex-col items-center justify-center px-5 text-center"><span className="mb-5 flex size-20 items-center justify-center rounded-[1.75rem] bg-task-muted text-task-accent"><CheckCircle2 className="size-10" /></span><h2 className="text-2xl font-semibold text-task-text">No Tasks Here</h2><p className="mt-1 max-w-sm text-sm text-task-text-muted">It seems that you don’t have any tasks in this list.</p></div> : <div className="flex flex-col gap-3">{profile ? scopedTasks.map((task) => <div key={task.id}>{exploring && task.id && sections[task.id] ? <span className="mb-1 inline-block rounded-full bg-task-accent-soft px-2 py-0.5 text-xs font-medium text-task-text">{TASK_SUBSECTION_LABELS[sections[task.id] ?? "mine"]}</span> : null}<TaskCard viewerId={profile.id} management={hasAdminTaskView && task.task_type !== "fms" ? <TaskAdminControls task={task} onChanged={refresh} /> : undefined} capability={deriveTaskMutationCapability({ assigneeIds: task.assignees.map((assignee) => assignee.id), isWatcher: task.isWatchedByViewer, viewerId: profile.id, viewerRole: profile.user_role })} categoryLabel={task.category_id ? categoryNames.get(task.category_id) ?? "Uncategorized" : "Uncategorized"} key={task.id} onAction={(action) => handleAction(task, action)} task={task} /></div>) : null}</div>}
       </div>
 
       {!focusedTaskId && loadedIdentity === pageIdentity ? <nav aria-label="Task pages" className="flex items-center justify-center gap-3 px-4 pb-5">

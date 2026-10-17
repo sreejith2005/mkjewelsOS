@@ -5,7 +5,7 @@ import { supabase } from "@jewelos/api-client";
 import { groupTaskFeedRows, isTaskFeedItemInCurrentDayOrOverdue, taskFeedCurrentOrOverdueFilter as coreTaskFeedCurrentOrOverdueFilter, type Database, type Enums, type Json, type Tables } from "@jewelos/core";
 import { loadMasterOptions } from "@/features/dropdowns/api";
 import { loadTaskAssignmentUsers } from "@jewelos/data/tasks/api";
-export { loadTaskTabCounts, loadTaskAdminEditData, submitTaskForm, type TaskAdminEditData } from "@jewelos/data/tasks/api";
+export { loadTaskSearchPage, loadTaskTabCounts, loadTaskAdminEditData, submitTaskForm, type TaskAdminEditData } from "@jewelos/data/tasks/api";
 
 export type TaskFeedRow = Database["public"]["Views"]["v_all_tasks"]["Row"];
 export type TaskUser = Pick<Tables<"user_profiles">,

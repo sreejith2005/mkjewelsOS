@@ -12500,6 +12500,10 @@ export type Database = {
         Args: { p_payload: Json; p_task_id: string }
         Returns: undefined
       }
+      task_workspace_page: {
+        Args: { p_filter?: Json; p_offset?: number; p_limit?: number }
+        Returns: Json
+      }
       task_feed_page: {
         Args: {
           p_limit?: number

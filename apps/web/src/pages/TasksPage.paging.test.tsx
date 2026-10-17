@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TasksPage } from "./TasksPage";
 
-const mocks = vi.hoisted(() => ({ page: vi.fn(), feed: vi.fn(), tabs: vi.fn(), prepare: vi.fn() }));
+const mocks = vi.hoisted(() => ({ page: vi.fn(), feed: vi.fn(), tabs: vi.fn(), search: vi.fn(), prepare: vi.fn() }));
 vi.mock("@/auth/AuthContext", async () => {
   const { builtinAccessContext } = await vi.importActual<typeof import("@jewelos/core")>("@jewelos/core");
   const profile = { id: "admin", tenant_id: "tenant", user_role: "admin" as const };
@@ -11,7 +11,7 @@ vi.mock("@/auth/AuthContext", async () => {
 });
 vi.mock("@/features/tasks/api", () => ({
   loadTaskPage: mocks.page, loadTaskFeed: mocks.feed,
-  loadTaskTabCounts: mocks.tabs,
+  loadTaskTabCounts: mocks.tabs, loadTaskSearchPage: mocks.search,
   ensureMyRecurringTasks: mocks.prepare,
   loadTaskFeedReferenceData: async () => ({ categories: [] }),
   loadTaskAuthoringReferenceData: vi.fn(), createDelegationTask: vi.fn(),
@@ -26,10 +26,23 @@ const page = (title: string, total = 12000) => ({
   tasks: [{ id: title, title, task_type: "delegation", assignees: [], isWatchedByViewer: false }],
   total, counts: { pending: total, overdue: 20, completed: 10, open: total + 20 },
 });
-beforeEach(() => { mocks.page.mockReset(); mocks.feed.mockReset(); mocks.tabs.mockReset(); mocks.prepare.mockReset(); mocks.prepare.mockResolvedValue({ created: 0 }); mocks.tabs.mockResolvedValue({ mine: 4, delegated: 7, inLoop: 2, all: 13 }); window.history.replaceState({}, "", "/tasks"); });
+beforeEach(() => { mocks.search.mockReset(); mocks.page.mockReset(); mocks.feed.mockReset(); mocks.tabs.mockReset(); mocks.prepare.mockReset(); mocks.prepare.mockResolvedValue({ created: 0 }); mocks.tabs.mockResolvedValue({ mine: 4, delegated: 7, inLoop: 2, all: 13 }); window.history.replaceState({}, "", "/tasks"); });
 afterEach(cleanup);
 
 describe("task workspace paging", () => {
+  it("searches unopened subsections and restores the board on clear", async () => {
+    mocks.page.mockResolvedValue(page("Board task"));
+    mocks.search.mockResolvedValue({ ...page("Matching watched task", 1), sections: { "Matching watched task": "inLoop" } });
+    render(<TasksPage />);
+    await screen.findByText("Board task");
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search all tasks" }), { target: { value: "watched" } });
+    await screen.findByText("Matching watched task");
+    expect(mocks.search).toHaveBeenCalledWith("admin", "tenant", expect.objectContaining({ query: "watched", subsection: "any" }), 0);
+    expect(screen.getByText("In Loop")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Clear search and filters" }));
+    await screen.findByText("Board task");
+  });
+
   it("refreshes unopened My Tasks counts when recurring catch-up creates work", async () => {
     mocks.page.mockResolvedValue(page("Available task"));
     render(<TasksPage />);

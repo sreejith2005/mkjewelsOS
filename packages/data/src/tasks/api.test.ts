@@ -37,7 +37,7 @@ function query(table: string) {
 
 vi.mock("@jewelos/api-client/client", () => ({ getSupabase: () => ({ rpc: pageRpc, from: (table: string) => query(table) }) }));
 
-import { loadTaskAssignmentUsers, loadTaskPage, loadTaskTabCounts, loadTaskFeed, taskFeedCurrentOrOverdueFilter, taskFeedIdBatches } from "./api";
+import { loadTaskAssignmentUsers, loadTaskSearchPage, loadTaskPage, loadTaskTabCounts, loadTaskFeed, taskFeedCurrentOrOverdueFilter, taskFeedIdBatches } from "./api";
 
 beforeEach(() => {
   pageRpc.mockReset();
@@ -260,4 +260,17 @@ describe("server task page access", () => {
     await expect(loadTaskPage("staff-1", "tenant-1", "all", "pending")).rejects.toThrow("All tasks access denied");
     expect(selectedTables).toEqual([]);
   });
+});
+
+it("searches on the server and hydrates only returned IDs with subsection labels", async () => {
+  const id = "00000000-0000-4000-8000-000000000001";
+  pageRpc.mockResolvedValue({ data: { ids: [id], total: 850, counts: { pending: 800, overdue: 50, completed: 0, open: 850 }, sections: { [id]: "inLoop" } }, error: null });
+  taskRows.push({ id, task_type: "checklist", status: "pending", assignee_id: "doer-1", planned_datetime: "2030-01-01T00:00:00Z" });
+  const { defaultTaskSearch } = await import("@jewelos/core");
+  const result = await loadTaskSearchPage("viewer", "tenant", { ...defaultTaskSearch(), query: "silver", kind: "crm" }, 50);
+  expect(result.total).toBe(850);
+  expect(result.tasks.map(task => task.id)).toEqual([id]);
+  expect(result.sections[id]).toBe("inLoop");
+  expect(pageRpc).toHaveBeenCalledWith("task_workspace_page", expect.objectContaining({ p_filter: expect.objectContaining({ query: "silver", kind: "crm" }), p_limit: 50, p_offset: 50 }));
+  expect(selectedTables).not.toContain("v_task_feed_scope");
 });

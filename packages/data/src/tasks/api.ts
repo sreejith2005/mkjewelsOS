@@ -1,3 +1,4 @@
+import { decodeTaskSearchPage, taskSearchPayload, type TaskSearchFilters } from "@jewelos/core";
 import { loadFmsTaskContexts } from "../fms/work";
 import type { FmsWorkContext } from "@jewelos/core";
 import { decodeTaskPage, TASK_PAGE_SIZE, taskEvidenceContentType, taskFormSubmissionKey, taskAdminEditPayload, taskAdminInitialEdit, type TaskAdminEdit, type TaskPageScope, type TaskFeedStatusFilter, type TaskWorkspaceView } from "@jewelos/core";
@@ -615,4 +616,15 @@ export async function submitTaskForm(taskId: string, formTemplateId: string, ans
 export async function adminDeleteTask(taskId: string, entireSeries: boolean, reason: string): Promise<void> {
   const { error } = await db().rpc("admin_delete_task_with_audit", { p_task_id: taskId, p_entire_series: entireSeries, p_reason: reason });
   fail("Delete task", error);
+}
+
+/** Search every authorized subsection/history, hydrating only the server's page. */
+export async function loadTaskSearchPage(viewerId: string, tenantId: string, filters: TaskSearchFilters, offset = 0) {
+  const { data, error } = await db().rpc("task_workspace_page", { p_filter: taskSearchPayload(filters), p_offset: offset, p_limit: TASK_PAGE_SIZE });
+  fail("Search tasks", error);
+  const scope = decodeTaskSearchPage(data);
+  const rows = await loadTaskFeed(viewerId, "", "", { tenantId, recordIds: scope.ids });
+  const byId = new Map(rows.map(row => [row.id, row]));
+  return { counts: scope.counts, total: scope.total, sections: scope.sections,
+    tasks: scope.ids.flatMap(id => { const row = byId.get(id); return row ? [row] : []; }) };
 }

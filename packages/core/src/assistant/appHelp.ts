@@ -50,6 +50,8 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     summary: "Tasks lists the work assigned to the user, the tasks they delegated, and tasks they are watching.",
     recipes: [
       "See my tasks: open Tasks. My Tasks lists recurring and FMS work; Delegated lists one-time assigned work for employees; In Loop lists watched work. Subsection counts load when Tasks opens.",
+      "Find any of my tasks: use Search all tasks above the subsections. Search includes earlier and completed work, task descriptions and FMS references. Results show their subsection. Clear search and filters to return to the board.",
+      "Narrow tasks: press Filter, combine work kind (FMS, CRM, recurring or other tasks), status, priority, due dates, subsection and requirements, then Apply filters. Due today and This week use the business timezone; sort by due date, newest or priority.",
       "Complete a task: finish the required form or upload, then press Complete. If a completion remark is required, Complete opens and focuses the remark field; enter the remark and press Complete again. FMS work opens its protected workflow runner.",
       "Create a task: in Tasks press \"Create Task\", fill in the title, assignee, and due date, then save.",
       "See tasks I gave to others: use \"Delegated\" in Tasks.",
