@@ -152,3 +152,15 @@ Android phone-sized device.
 - [ ] Filter Dropdown Master by all/active/inactive and deactivate/reactivate an item without changing its stable value.
 - [ ] Switch Users between list and organization views; apply search/status/branch/department filters and confirm missing-manager/cycle warnings do not freeze the UI.
 - [ ] Repeat portrait, landscape, compact height, keyboard-open, large-font, light/dark, safe-area, Android Back, offline/retry, and pull-to-refresh checks for every row in `MOBILE_PARITY_MATRIX.md`.
+
+### Stage-specific FMS assignments
+
+- [ ] Start from the exact assigned initial Form; cancel without saving; recover a lost response without another instance.
+- [ ] Follow form-selected owners, eligible replacements, fixed-owner protection, and changed availability coverage requiring fresh confirmation.
+- [ ] Open the same assignment from Home, Tasks, Notifications, direct URL, web and Android; retain notification history on completion.
+- [ ] Repeat a visit with a new owner and preserve earlier owner/Form history; return to the initial Form using its configured incoming assignment.
+- [ ] Complete nested parallel branches in different orders; preview and actual successor agree without unrelated branch answers.
+- [ ] Reach a follow-up limit, review/resume and take the exit; held work stays visible.
+- [ ] Verify scoped information, historical labels and exact private files; deny inactive, cross-tenant, unassigned and protected-recipient API requests.
+- [ ] Race confirmations; exactly one Form, instance/next visit and assignment decision survive.
+- [ ] Check guided builder, pipeline groups, canvas, simulation, keyboard/focus/cancel and overflow at phone/desktop widths.

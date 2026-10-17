@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { presentFmsWorkContext, type FmsWorkContext as WorkContext } from "@jewelos/core";
-import { loadFmsWorkContext } from "@jewelos/data/fms/work";
+import { loadFmsWorkContext, signedFmsContextFileUrl } from "@jewelos/data/fms/work";
 import { Button, Notice } from "@/components/ui";
 
 export function FmsWorkContext({ instanceId, instanceStageId }: { instanceId: string; instanceStageId: string }) {
@@ -8,6 +8,14 @@ export function FmsWorkContext({ instanceId, instanceStageId }: { instanceId: st
   const [failed, setFailed] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [openingFile, setOpeningFile] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const openFile = async (fileId: string) => {
+    setOpeningFile(fileId); setFileError(null);
+    try { window.open(await signedFmsContextFileUrl(instanceId, instanceStageId, fileId), "_blank", "noopener"); }
+    catch (error) { setFileError(error instanceof Error ? error.message : "Could not open this attachment"); }
+    finally { setOpeningFile(null); }
+  };
   useEffect(() => {
     let active = true; setContext(null); setFailed(false);
     void loadFmsWorkContext(instanceId, instanceStageId).then(value => { if (active) setContext(value); })
@@ -29,8 +37,9 @@ export function FmsWorkContext({ instanceId, instanceStageId }: { instanceId: st
       {work.shortDescription ? <p className="mt-1 text-sm text-soft-grey">{work.shortDescription}</p> : null}
       <p className="mt-2 text-sm text-soft-grey">Assigned: {work.assignedNames.join(", ") || "Configured employee"}{work.dueAt ? ` · ${work.dueLabel}: ${new Date(work.dueAt).toLocaleString("en-IN")}` : ""}</p></header>
     {work.answers.length ? <div><h3 className="mb-2 font-semibold text-champagne">Information Received</h3><dl className="space-y-2">{work.answers.map((answer, index) => <div className="grid gap-1 border-b border-gold/10 pb-2 sm:grid-cols-[minmax(8rem,1fr)_2fr]" key={`${answer.label}-${index}`}>
-      <dt className="text-sm text-soft-grey">{answer.label}<span className="block text-xs">{answer.source}</span></dt><dd className="break-words text-sm text-white">{answer.display}</dd>
+      <dt className="text-sm text-soft-grey">{answer.label}<span className="block text-xs">{answer.source}</span></dt><dd className="break-words text-sm text-white">{context.receivedFields[index]?.attachment ? <Button disabled={openingFile !== null} onClick={() => { const file = context.receivedFields[index]?.attachment; if (file) void openFile(file.id); }} variant="secondary">{openingFile === context.receivedFields[index]?.attachment?.id ? "Opening..." : `Open attachment: ${context.receivedFields[index]?.attachment?.name}`}</Button> : answer.display}</dd>
     </div>)}</dl></div> : null}
+    {fileError ? <Notice tone="danger">{fileError}</Notice> : null}
     <div><h3 className="font-semibold text-champagne">What You Need To Do</h3><p className="mt-1 whitespace-pre-wrap text-sm text-white">{work.instructions || "Complete the linked work and record the outcome."}</p></div>
     {work.expectedResult ? <p className="text-sm text-soft-grey">Expected result: {work.expectedResult}</p> : null}
     {work.journey.length ? <details><summary className="min-h-11 cursor-pointer text-sm font-semibold text-champagne">Workflow Journey</summary><ol className="mt-2 space-y-2">{work.journey.map(item => <li className="border-l border-gold/30 pl-3 text-sm" key={item.id}>

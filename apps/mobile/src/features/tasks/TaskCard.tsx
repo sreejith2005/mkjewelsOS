@@ -1,3 +1,4 @@
+import { presentFmsWorkContext } from "@jewelos/core";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import {
@@ -12,6 +13,7 @@ import {
 } from "lucide-react-native";
 import {
   deriveTaskCardState,
+  taskNeedsCompletionRemark,
   effectiveTaskDeadline,
   type Enums,
   type TaskMutationCapability,
@@ -58,6 +60,7 @@ export function TaskCard({
   onAction,
   onOpenDetails,
   task: taskInput,
+  viewerId,
 }: {
   capability: TaskMutationCapability;
   categoryLabel: string;
@@ -65,8 +68,10 @@ export function TaskCard({
   /** The web expands in place; a phone opens the detail screen instead. */
   onOpenDetails: () => void;
   task: TaskBundle;
+  viewerId?: string;
 }) {
   const task = { ...taskInput, planned_datetime: effectiveTaskDeadline(taskInput) };
+  const fmsWork = task.fmsWorkContext ? presentFmsWorkContext(task.fmsWorkContext) : null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -154,7 +159,7 @@ export function TaskCard({
                   completed && "text-task-text-muted line-through",
                 )}
               >
-                {task.title}
+                {fmsWork?.title ?? task.title}
               </Text>
               <View
                 className={cn(
@@ -203,6 +208,7 @@ export function TaskCard({
               ) : null}
             </View>
 
+            {fmsWork ? <View className="mt-2 gap-1"><Text className="text-xs text-gold">{`${task.fmsWorkContext?.workflowName ?? ""} · ${task.fmsWorkContext?.stageName ?? ""}`}</Text>{fmsWork.answers.slice(0, 3).map((answer, index) => <Text className="text-xs text-task-text-muted" key={index}>{`${answer.label}: ${answer.display}`}</Text>)}<Text className="text-xs text-task-text-muted">{fmsWork.shortDescription || fmsWork.instructions}</Text></View> : task.fmsContextUnavailable ? <Text className="mt-2 text-xs text-task-text-muted">Work information is temporarily unavailable. Open the step to retry.</Text> : null}
             <View className="mt-2 flex-row flex-wrap items-center gap-x-3 gap-y-1">
               <View className="min-w-0 flex-row items-center gap-1">
                 <Users className="text-task-text-muted" size={12} />
@@ -244,7 +250,7 @@ export function TaskCard({
             accessibilityLabel={`Upload task: ${task.title ?? "task"}`}
             className="shrink-0 bg-task-accent"
             disabled={busy}
-            onPress={() => void act({ kind: "upload_and_complete" })}
+            onPress={() => { if (taskNeedsCompletionRemark(task, viewerId)) onOpenDetails(); else void act({ kind: "upload_and_complete" }); }}
           >
             <FileUp className="text-task-text" size={16} />
             <Text className="text-sm font-semibold text-task-text">Upload</Text>
@@ -253,8 +259,8 @@ export function TaskCard({
           <Button
             accessibilityLabel={`Complete task: ${task.title ?? "task"}`}
             className="shrink-0 bg-task-accent"
-            disabled={busy || !canComplete || Boolean(task.requires_remark)}
-            onPress={() => void act({ kind: "complete", remark: "" })}
+            disabled={busy || !canComplete}
+            onPress={() => { if (taskNeedsCompletionRemark(task, viewerId)) onOpenDetails(); else void act({ kind: "complete", remark: "" }); }}
           >
             <CheckCircle2 className="text-task-text" size={16} />
             <Text className="text-sm font-semibold text-task-text">Complete</Text>

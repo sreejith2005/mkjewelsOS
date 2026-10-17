@@ -13,20 +13,23 @@ export type FmsTaskDisplay = Readonly<{
 }>;
 export type FmsFollowUp = Readonly<{ maxVisits: number; onLimit: "hold" | "escalate" }>;
 export type FmsHandoffChoice = Readonly<{ targetStageId: string; userProfileId: string }>;
-export type FmsWorkState = "form_saved_pending_completion" | "awaiting_other_doers" | "awaiting_approval" | "successors_activated" | "workflow_completed";
+export type FmsWorkState = "form_saved_pending_completion" | "awaiting_other_doers" | "awaiting_approval" | "successors_activated" | "workflow_completed" | "workflow_on_hold";
 type StageCompletion = Readonly<{ instanceStageId: string; outcome: string; remark: string; checklist: Readonly<Record<string, boolean>>; nextAssigneeId?: string | undefined }>;
 export type FmsTransitionRequest =
   | Readonly<StageCompletion & { kind: "stage_form"; formTemplateId: string; answers: FormAnswers }>
   | Readonly<StageCompletion & { kind: "complete" }>
-  | Readonly<{ kind: "review"; instanceStageId: string; decision: "approved" | "rejected" | "revision_requested"; remark: string }>
+  | Readonly<{ kind: "review"; instanceStageId: string; decision: "approved" | "rejected" | "revision_requested"; remark: string; nextAssigneeId?: string | undefined }>
   | Readonly<{ kind: "starter_form"; starterAssignmentId: string; formTemplateId: string; answers: FormAnswers }>
   | Readonly<{ kind: "flow_form"; flowId: string; formTemplateId: string; answers: FormAnswers }>;
 export type FmsWorkDestination = Readonly<{
   targetStageId: string; stageName: string; formTemplateId: string | null;
   selectedUserId: string | null; effectiveUserId: string | null; employeeName: string | null;
+  selectedEmployeeName?: string | null | undefined;
   assignmentMethod: string; locked: boolean; allowHandoff: boolean; issue: string | null;
 }>;
 export type FmsWorkPreview = Readonly<{ fingerprint: string; currentStageName: string; wouldDefer: boolean; requirements: readonly string[]; destinations: readonly FmsWorkDestination[] }>;
+export type FmsHandoffDecision = Readonly<{ handoffs: readonly FmsHandoffChoice[]; preview: FmsWorkPreview }>;
 export type FmsWorkResult = Readonly<{ state: FmsWorkState; submissionId: string | null; instanceId: string;
+  workflowName?: string | undefined;
   sourceInstanceStageId: string | null; referenceNumber: string; destinations: readonly FmsWorkDestination[];
   ownWorkTargets: readonly FmsAssignedWorkTarget[] }>;

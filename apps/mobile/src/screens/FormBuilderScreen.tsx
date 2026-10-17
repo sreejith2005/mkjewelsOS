@@ -73,7 +73,7 @@ export function FormBuilderScreen() {
   return <>{state.error ? <Banner tone="danger">{state.error}</Banner> : null}<FormBuilderWorkspace bundle={state.data.bundle} dynamicOptions={state.data.dynamicOptions} onRefresh={state.refresh} /></>;
 }
 
-function FormBuilderWorkspace({ bundle, dynamicOptions, onRefresh }: Readonly<{ bundle: FormBundle | undefined; dynamicOptions: Awaited<ReturnType<typeof loadFormDynamicOptions>>; onRefresh: () => Promise<void> }>) {
+export function FormBuilderWorkspace({ bundle, dynamicOptions, onRefresh, onClose }: Readonly<{ bundle: FormBundle | undefined; dynamicOptions: Awaited<ReturnType<typeof loadFormDynamicOptions>>; onRefresh: () => Promise<void>; onClose?: () => void }>) {
   const navigation = useNavigation();
   const styles = useStyles();
   const initial = useMemo(() => formBuilderDefinition(bundle), [bundle]);
@@ -96,6 +96,11 @@ function FormBuilderWorkspace({ bundle, dynamicOptions, onRefresh }: Readonly<{ 
   const dirty = JSON.stringify(normalized) !== baseline;
   const selected = normalized.fields.find((field) => field.key === selectedKey);
   useUnsavedGuard(dirty, "Discard changes?", "This form has unsaved changes.");
+  const close = () => {
+    if (!onClose) { navigation.goBack(); return; }
+    if (!dirty) { onClose(); return; }
+    Alert.alert("Discard changes?", "This form has unsaved changes.", [{ text: "Keep editing", style: "cancel" }, { text: "Discard", style: "destructive", onPress: onClose }]);
+  };
 
   const mutate = (next: FormTemplateDefinition) => { setDefinition(next); setMessage(null); };
   const save = async (publish: boolean) => {
@@ -126,7 +131,7 @@ function FormBuilderWorkspace({ bundle, dynamicOptions, onRefresh }: Readonly<{ 
   if (mode === "routes") return <View style={styles.fill}><View style={styles.header}><Button label="Back to builder" onPress={() => setMode("edit")} variant="ghost" /><Text style={styles.headerTitle} numberOfLines={1} weight="semibold">Answer routes</Text></View><FlatList contentContainerStyle={styles.list} data={routingDefinition.fields.filter((field) => OPTION_FIELD_TYPES.has(field.type))} keyExtractor={(field) => field.key} ListEmptyComponent={<Banner>No choice questions have routes yet.</Banner>} renderItem={({ item }) => <RouteCard definition={definition} field={item} onChange={mutate} sources={dynamicOptions} />} /></View>;
 
   return <View style={styles.fill}>
-    <View style={styles.header}><Button label="Close" onPress={() => navigation.goBack()} variant="ghost" /><View style={styles.headerTitle}><Text numberOfLines={1} weight="semibold">{normalized.name || "New form"}</Text><Text tone="muted" variant="caption">{dirty ? "Unsaved changes" : "All changes saved"}</Text></View><StatusBadge label={`${normalized.fields.length} fields`} /></View>
+    <View style={styles.header}><Button label="Close" onPress={close} variant="ghost" /><View style={styles.headerTitle}><Text numberOfLines={1} weight="semibold">{normalized.name || "New form"}</Text><Text tone="muted" variant="caption">{dirty ? "Unsaved changes" : "All changes saved"}</Text></View><StatusBadge label={`${normalized.fields.length} fields`} /></View>
     <View style={styles.toolbar}><Button label="Routes" onPress={() => setMode("routes")} variant="ghost" /><Button label="Preview" onPress={() => setMode("preview")} variant="secondary" /><Button busy={busy === "save"} label={template?.lifecycle === "published" ? "Save changes" : "Save draft"} onPress={() => void save(false)} />{template?.lifecycle !== "published" ? <Button busy={busy === "publish"} label="Publish" onPress={() => void save(true)} variant="secondary" /> : null}</View>
     <FlatList
       contentContainerStyle={styles.list}

@@ -5213,6 +5213,7 @@ export type Database = {
           updated_by: string | null
           usage_count: number
           version: number
+          assignment_version: number
         }
         Insert: {
           archived_at?: string | null
@@ -5236,6 +5237,7 @@ export type Database = {
           updated_by?: string | null
           usage_count?: number
           version?: number
+          assignment_version?: number
         }
         Update: {
           archived_at?: string | null
@@ -5259,6 +5261,7 @@ export type Database = {
           updated_by?: string | null
           usage_count?: number
           version?: number
+          assignment_version?: number
         }
         Relationships: [
           {
@@ -5681,6 +5684,7 @@ export type Database = {
           tenant_id: string
           title: string
           updated_at: string | null
+          assignment_version: number
         }
         Insert: {
           branch_id?: string | null
@@ -5709,6 +5713,7 @@ export type Database = {
           tenant_id: string
           title: string
           updated_at?: string | null
+          assignment_version?: number
         }
         Update: {
           branch_id?: string | null
@@ -5737,6 +5742,7 @@ export type Database = {
           tenant_id?: string
           title?: string
           updated_at?: string | null
+          assignment_version?: number
         }
         Relationships: [
           {
@@ -6200,6 +6206,7 @@ export type Database = {
           mutation_key: string
           response: Json | null
           tenant_id: string
+          request_hash: string | null
         }
         Insert: {
           actor_id: string
@@ -6211,6 +6218,7 @@ export type Database = {
           mutation_key: string
           response?: Json | null
           tenant_id: string
+          request_hash?: string | null
         }
         Update: {
           actor_id?: string
@@ -6222,6 +6230,7 @@ export type Database = {
           mutation_key?: string
           response?: Json | null
           tenant_id?: string
+          request_hash?: string | null
         }
         Relationships: [
           {
@@ -10006,6 +10015,115 @@ export type Database = {
           },
         ]
       }
+          fms_stage_assignment_decisions: {
+        Row: {
+          id: string
+          tenant_id: string
+          fms_instance_id: string
+          source_instance_stage_id: string | null
+          target_stage_id: string
+          target_instance_stage_id: string
+          source_submission_id: string | null
+          selected_user_ids: string[]
+          effective_user_ids: string[]
+          assignment_method: string
+          actor_id: string
+          execution_scope_id: string | null
+          parallel_scope_id: string | null
+          parallel_branch_id: string | null
+          visit_number: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          fms_instance_id: string
+          source_instance_stage_id?: string | null
+          target_stage_id: string
+          target_instance_stage_id: string
+          source_submission_id?: string | null
+          selected_user_ids: string[]
+          effective_user_ids: string[]
+          assignment_method: string
+          actor_id: string
+          execution_scope_id?: string | null
+          parallel_scope_id?: string | null
+          parallel_branch_id?: string | null
+          visit_number: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          fms_instance_id?: string
+          source_instance_stage_id?: string | null
+          target_stage_id?: string
+          target_instance_stage_id?: string
+          source_submission_id?: string | null
+          selected_user_ids?: string[]
+          effective_user_ids?: string[]
+          assignment_method?: string
+          actor_id?: string
+          execution_scope_id?: string | null
+          parallel_scope_id?: string | null
+          parallel_branch_id?: string | null
+          visit_number?: number
+          created_at?: string
+        }
+        Relationships: [
+          { foreignKeyName: "fms_stage_assignment_decisions_actor_id_fkey"; columns: ["actor_id"]; isOneToOne: false; referencedRelation: "user_profiles"; referencedColumns: ["id"] },
+          { foreignKeyName: "fms_stage_assignment_decisions_fms_instance_id_fkey"; columns: ["fms_instance_id"]; isOneToOne: false; referencedRelation: "fms_instances"; referencedColumns: ["id"] },
+          { foreignKeyName: "fms_stage_assignment_decisions_source_instance_stage_id_fkey"; columns: ["source_instance_stage_id"]; isOneToOne: false; referencedRelation: "fms_instance_stages"; referencedColumns: ["id"] },
+          { foreignKeyName: "fms_stage_assignment_decisions_source_submission_id_fkey"; columns: ["source_submission_id"]; isOneToOne: false; referencedRelation: "form_submissions"; referencedColumns: ["id"] },
+          { foreignKeyName: "fms_stage_assignment_decisions_target_instance_stage_id_fkey"; columns: ["target_instance_stage_id"]; isOneToOne: true; referencedRelation: "fms_instance_stages"; referencedColumns: ["id"] },
+          { foreignKeyName: "fms_stage_assignment_decisions_target_stage_id_fkey"; columns: ["target_stage_id"]; isOneToOne: false; referencedRelation: "fms_stages"; referencedColumns: ["id"] },
+          { foreignKeyName: "fms_stage_assignment_decisions_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] }
+        ]
+      }
+          fms_stage_assignment_intents: {
+        Row: {
+          tenant_id: string
+          fms_instance_id: string
+          source_instance_stage_id: string
+          target_stage_id: string
+          source_submission_id: string | null
+          selected_user_id: string
+          actor_id: string
+          assignment_method: string
+          created_at: string
+        }
+        Insert: {
+          tenant_id: string
+          fms_instance_id: string
+          source_instance_stage_id: string
+          target_stage_id: string
+          source_submission_id?: string | null
+          selected_user_id: string
+          actor_id: string
+          assignment_method: string
+          created_at?: string
+        }
+        Update: {
+          tenant_id?: string
+          fms_instance_id?: string
+          source_instance_stage_id?: string
+          target_stage_id?: string
+          source_submission_id?: string | null
+          selected_user_id?: string
+          actor_id?: string
+          assignment_method?: string
+          created_at?: string
+        }
+        Relationships: [
+          { foreignKeyName: "fms_stage_assignment_intents_actor_id_fkey"; columns: ["actor_id"]; isOneToOne: false; referencedRelation: "user_profiles"; referencedColumns: ["id"] },
+          { foreignKeyName: "fms_stage_assignment_intents_fms_instance_id_fkey"; columns: ["fms_instance_id"]; isOneToOne: false; referencedRelation: "fms_instances"; referencedColumns: ["id"] },
+          { foreignKeyName: "fms_stage_assignment_intents_selected_user_id_fkey"; columns: ["selected_user_id"]; isOneToOne: false; referencedRelation: "user_profiles"; referencedColumns: ["id"] },
+          { foreignKeyName: "fms_stage_assignment_intents_source_instance_stage_id_fkey"; columns: ["source_instance_stage_id"]; isOneToOne: false; referencedRelation: "fms_instance_stages"; referencedColumns: ["id"] },
+          { foreignKeyName: "fms_stage_assignment_intents_source_submission_id_fkey"; columns: ["source_submission_id"]; isOneToOne: false; referencedRelation: "form_submissions"; referencedColumns: ["id"] },
+          { foreignKeyName: "fms_stage_assignment_intents_target_stage_id_fkey"; columns: ["target_stage_id"]; isOneToOne: false; referencedRelation: "fms_stages"; referencedColumns: ["id"] },
+          { foreignKeyName: "fms_stage_assignment_intents_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] }
+        ]
+      }
     }
     Views: {
       task_templates_live: {
@@ -10687,9 +10805,11 @@ export type Database = {
       list_fms_form_starters: { Args: { p_form_template_id: string }; Returns: Json }
       submit_form_and_start_fms_idempotent: { Args: { p_form_template_id: string; p_answers: Json; p_idempotency_key: string; p_flow_id?: string }; Returns: Json }
 
-      preview_fms_work_transition: { Args: { p_request: Json }; Returns: Json }
+      preview_fms_work_transition: { Args: { p_request: Json; p_handoffs?: Json }; Returns: Json }
       transition_fms_work_with_audit: { Args: { p_request: Json; p_idempotency_key: string; p_handoffs: Json; p_preview_fingerprint: string }; Returns: Json }
       list_fms_handoff_recipients: { Args: { p_request: Json; p_target_stage_id: string; p_query?: string; p_cursor?: string; p_limit?: number }; Returns: Json }
+      get_fms_work_file_path: { Args: { p_instance_id: string; p_instance_stage_id: string; p_file_id: string }; Returns: string }
+      get_fms_task_contexts: { Args: { p_visit_ids: string[] }; Returns: Json }
       get_fms_assigned_stage: { Args: { p_instance_id: string; p_instance_stage_id?: string }; Returns: Json }
       get_fms_assigned_work_context: { Args: { p_instance_id: string; p_instance_stage_id: string; p_cursor?: string; p_limit?: number }; Returns: Json }
 

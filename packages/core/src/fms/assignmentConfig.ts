@@ -1,3 +1,4 @@
+import { fmsStageNeedsAssignment } from "./assignmentAuthoring";
 import { FMS_ASSIGNMENT_MODES } from "./workContracts";
 import type { FmsFlowDefinition, FmsValidationContext, FmsValidationIssue } from "./types";
 
@@ -6,9 +7,8 @@ export function validateFmsAssignmentConfig(flow: FmsFlowDefinition, context: Fm
   if (flow.assignmentVersion !== 2) return [];
   const issues: FmsValidationIssue[] = [];
   const automatic = new Set(["branch", "parallel_start", "parallel_join", "notification", "end"]);
-  const first = flow.stages[0]?.key;
   for (const stage of flow.stages) {
-    if (automatic.has(stage.type) || stage.key === first) continue;
+    if (automatic.has(stage.type) || !fmsStageNeedsAssignment(flow.stages, stage.key)) continue;
     const fail = (code: string, message: string) => issues.push({ code, message, stageKey: stage.key });
     const config = stage.sla.assignment;
     if (!config || !FMS_ASSIGNMENT_MODES.includes(config.mode)) {
@@ -24,6 +24,9 @@ export function validateFmsAssignmentConfig(flow: FmsFlowDefinition, context: Fm
       for (const source of config.sources) {
         const previous = flow.stages.find(s => s.key === source.sourceStageKey);
         const question = context.formFields?.[source.formTemplateId]?.find(f => f.key === source.fieldKey);
+        if (source.routeRuleId && !previous?.branchRules.some(rule => rule.id === source.routeRuleId)) {
+          fail("invalid_assignment_route", "Choose a route belonging to the exact assignment source step.");
+        }
         if (!previous || previous.formTemplateId !== source.formTemplateId || (context.formFields && (!question || question.type !== "user_dropdown"))) {
           fail("invalid_assignment_source", "The assignment question must belong to the exact linked source form version.");
         } else if (question && (!question.required || question.shown === false || question.hasCondition) && !config.fallbackRule) {
@@ -32,6 +35,8 @@ export function validateFmsAssignmentConfig(flow: FmsFlowDefinition, context: Fm
       }
     }
     if (stage.sla.completionFormRequired && !stage.formTemplateId) fail("missing_required_completion_form", "Select the required completion form.");
+    const display = stage.sla.taskDisplay;
+    if (display?.referenceField && !display.fields.some(field => field.sourceStageKey === display.referenceField?.sourceStageKey && field.formTemplateId === display.referenceField.formTemplateId && field.fieldKey === display.referenceField.fieldKey)) fail("invalid_reference_question", "Choose a reference from the configured work-information questions.");
     const cap = stage.sla.followUp;
     if (cap && (!Number.isInteger(cap.maxVisits) || cap.maxVisits < 1 || !["hold", "escalate"].includes(cap.onLimit))) fail("invalid_visit_limit", "Choose a positive visit limit and a hold or escalation outcome.");
   }

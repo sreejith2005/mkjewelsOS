@@ -131,7 +131,7 @@ export function FMSBuilderPage() {
   if (edit !== undefined && data) return (
     <section>
       <header className="mb-5 flex justify-between"><Button onClick={() => setEdit(undefined)} variant="ghost"><ArrowLeft className="size-4" />Back to FMS</Button></header>
-      <FmsFlowBuilder data={data} flow={edit} onClose={() => setEdit(undefined)} onSaved={refresh} />
+      <FmsFlowBuilder data={data} flow={edit} canManageForms={hasPermission(access, "forms.manage")} onClose={() => setEdit(undefined)} onSaved={refresh} />
     </section>
   );
 

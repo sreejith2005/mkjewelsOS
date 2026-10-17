@@ -37,7 +37,7 @@ function query(table: string) {
 
 vi.mock("@jewelos/api-client/client", () => ({ getSupabase: () => ({ rpc: pageRpc, from: (table: string) => query(table) }) }));
 
-import { loadTaskAssignmentUsers, loadTaskPage, loadTaskFeed, taskFeedCurrentOrOverdueFilter, taskFeedIdBatches } from "./api";
+import { loadTaskAssignmentUsers, loadTaskPage, loadTaskTabCounts, loadTaskFeed, taskFeedCurrentOrOverdueFilter, taskFeedIdBatches } from "./api";
 
 beforeEach(() => {
   pageRpc.mockReset();
@@ -50,6 +50,20 @@ beforeEach(() => {
 });
 
 describe("server-authorized task assignment roster", () => {
+  it("loads all personal subsection counts without hydrating tasks or querying the admin scope", async () => {
+    pageRpc.mockImplementation(async (_name: string, args: { p_view: string }) => ({
+      data: { ids: [], total: 0, counts: { pending: args.p_view === "mine" ? 5 : 2, overdue: 1, completed: 0, open: args.p_view === "mine" ? 6 : 3 } }, error: null,
+    }));
+    expect(await loadTaskTabCounts(false)).toEqual({ mine: 6, delegated: 3, inLoop: 3 });
+    expect(pageRpc.mock.calls.map(call => call[1].p_view)).toEqual(["mine", "delegated", "inLoop"]);
+    expect(selectedTables).toEqual([]);
+  });
+  it("requests the admin count only when offered, and propagates server denial", async () => {
+    pageRpc.mockResolvedValue({ data: null, error: { message: "All tasks access denied" } });
+    await expect(loadTaskTabCounts(true)).rejects.toThrow("All tasks access denied");
+    expect(pageRpc.mock.calls.map(call => call[1].p_view)).toContain("all");
+    expect(selectedTables).toEqual([]);
+  });
   it("returns authorized peers even when the directory contains no other people", async () => {
     pageRpc.mockReturnValue({ range: async () => ({ data: [{ id: "peer", employee_name: "Old label", first_name: "Branch", last_name: "Peer" }], error: null }) });
     const users = await loadTaskAssignmentUsers();

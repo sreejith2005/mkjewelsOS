@@ -14,6 +14,7 @@ function destination(raw: unknown): FmsWorkDestination {
   const v = record(raw);
   return { targetStageId: string(v.targetStageId), stageName: string(v.stageName), formTemplateId: nullable(v.formTemplateId),
     selectedUserId: nullable(v.selectedUserId), effectiveUserId: nullable(v.effectiveUserId), employeeName: nullable(v.employeeName),
+    selectedEmployeeName: v.selectedEmployeeName === undefined ? nullable(v.employeeName) : nullable(v.selectedEmployeeName),
     assignmentMethod: string(v.assignmentMethod), locked: boolean(v.locked), allowHandoff: boolean(v.allowHandoff), issue: nullable(v.issue) };
 }
 export function parseFmsWorkPreview(raw: unknown): FmsWorkPreview {
@@ -30,8 +31,9 @@ function target(raw: unknown): FmsAssignedWorkTarget {
 }
 export function parseFmsWorkResult(raw: unknown): FmsWorkResult {
   const v = record(raw); const state = v.state;
-  if (state !== "form_saved_pending_completion" && state !== "awaiting_other_doers" && state !== "awaiting_approval" && state !== "successors_activated" && state !== "workflow_completed") throw invalid();
+  if (state !== "form_saved_pending_completion" && state !== "awaiting_other_doers" && state !== "awaiting_approval" && state !== "successors_activated" && state !== "workflow_completed" && state !== "workflow_on_hold") throw invalid();
   return { state, submissionId: nullable(v.submissionId), instanceId: string(v.instanceId), sourceInstanceStageId: nullable(v.sourceInstanceStageId),
+    ...(v.workflowName == null ? {} : { workflowName: string(v.workflowName) }),
     referenceNumber: string(v.referenceNumber), destinations: array(v.destinations).map(destination), ownWorkTargets: array(v.ownWorkTargets).map(target) };
 }
 /** Checked conversion also turns readonly answer arrays into mutable RPC JSON. */
@@ -42,8 +44,8 @@ export function fmsWorkJson(value: unknown): Json {
   if (typeof value === "object" && value !== null) return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined).map(([k, v]) => [k, fmsWorkJson(v)]));
   throw new Error("Workflow request contains a non-JSON value");
 }
-export async function previewFmsWork(request: FmsTransitionRequest): Promise<FmsWorkPreview> {
-  const result = await getSupabase().rpc("preview_fms_work_transition", { p_request: fmsWorkJson(request) });
+export async function previewFmsWork(request: FmsTransitionRequest, handoffs: readonly FmsHandoffChoice[] = []): Promise<FmsWorkPreview> {
+  const result = await getSupabase().rpc("preview_fms_work_transition", { p_request: fmsWorkJson(request), p_handoffs: fmsWorkJson(handoffs) });
   if (result.error) throw new Error(result.error.message);
   return parseFmsWorkPreview(result.data);
 }
@@ -70,12 +72,14 @@ function formAnswer(value: unknown): FormAnswer | null {
 function fieldType(value: unknown): FormFieldType { const found = FORM_DRAFT_FIELD_TYPES.find(type => type === value); if (!found) throw invalid(); return found; }
 export function parseFmsWorkContext(raw: unknown): FmsWorkContext {
   const v = record(raw);
-  return { workflowName: string(v.workflowName), stageName: string(v.stageName), reference: string(v.reference), instructions: string(v.instructions),
+  return { workflowName: string(v.workflowName), stageName: string(v.stageName), reference: string(v.reference), referenceKey: nullable(v.referenceKey), instructions: string(v.instructions),
     expectedResult: string(v.expectedResult), dueAt: nullable(v.dueAt), assignedNames: array(v.assignedNames).map(string), titleTemplate: string(v.titleTemplate),
     shortDescription: string(v.shortDescription), dueLabel: string(v.dueLabel), nextCursor: nullable(v.nextCursor), receivedFields: array(v.receivedFields).map(raw => {
       const received = record(raw); const field = record(received.field);
+      const attachment = received.attachment == null ? null : record(received.attachment);
       return { sourceStageKey: string(received.sourceStageKey), submissionId: string(received.submissionId), formTemplateId: string(received.formTemplateId),
         formName: string(received.formName), formVersion: integer(received.formVersion), value: formAnswer(received.value), userName: nullable(received.userName),
+        attachment: attachment ? { id: string(attachment.id), name: string(attachment.name), mimeType: string(attachment.mimeType), sizeBytes: integer(attachment.sizeBytes) } : null,
         field: { key: string(field.key), label: string(field.label), type: fieldType(field.type), sortOrder: integer(field.sortOrder), options: parseFormOptions(field.options) } };
     }), journey: array(v.journey).map(raw => { const item = record(raw); return { id: string(item.id), stageName: string(item.stageName), status: string(item.status),
       employeeName: nullable(item.employeeName), visitNumber: integer(item.visitNumber), completedAt: nullable(item.completedAt) }; }) };
@@ -84,6 +88,30 @@ export async function loadFmsWorkContext(instanceId: string, instanceStageId: st
   const result = await getSupabase().rpc("get_fms_assigned_work_context", { p_instance_id: instanceId, p_instance_stage_id: instanceStageId, ...(cursor ? { p_cursor: cursor } : {}), p_limit: 20 });
   if (result.error) throw new Error(result.error.message);
   return parseFmsWorkContext(result.data);
+}
+
+export async function loadFmsTaskContexts(visitIds: readonly string[]): Promise<ReadonlyMap<string, FmsWorkContext>> {
+  const contexts = new Map<string, FmsWorkContext>();
+  const ids = [...new Set(visitIds)];
+  for (let offset = 0; offset < ids.length; offset += 100) {
+    const result = await getSupabase().rpc("get_fms_task_contexts", { p_visit_ids: ids.slice(offset, offset + 100) });
+    if (result.error) throw new Error(result.error.message);
+    for (const [id, value] of Object.entries(record(result.data))) {
+      if (!ids.includes(id)) throw invalid();
+      contexts.set(id, parseFmsWorkContext(value));
+    }
+  }
+  return contexts;
+}
+
+export async function signedFmsContextFileUrl(instanceId: string, instanceStageId: string, fileId: string): Promise<string> {
+  const result = await getSupabase().rpc("get_fms_work_file_path", { p_instance_id: instanceId, p_instance_stage_id: instanceStageId, p_file_id: fileId });
+  if (result.error) throw new Error(result.error.message);
+  if (typeof result.data !== "string" || !result.data) throw invalid();
+  const signed = await getSupabase().storage.from("form-uploads").createSignedUrl(result.data, 60);
+  if (signed.error) throw new Error(signed.error.message);
+  if (!signed.data?.signedUrl) throw invalid();
+  return signed.data.signedUrl;
 }
 
 async function actorId(): Promise<string> {
@@ -108,13 +136,32 @@ export async function recoverFmsWork(request: Pick<FmsTransitionRequest, "kind">
   const id = await getFmsMutationIdentity(getFmsMutationStorage(), user, request.kind, request.targetId);
   const result = await getSupabase().rpc("get_fms_work_mutation_result", { p_idempotency_key: id });
   if (result.error) throw new Error(result.error.message);
-  return result.data === null ? null : parseFmsWorkResult(result.data);
+  if (result.data === null) return null;
+  const recovered = parseFmsWorkResult(result.data);
+  await markFmsMutationComplete(getFmsMutationStorage(), user, request.kind, request.targetId);
+  return recovered;
 }
 function checkedAnswers(value: object) {
   return Object.fromEntries(Object.entries(value).map(([key, answer]) => [key, answer === undefined ? undefined : formAnswer(answer)]));
 }
 export type FmsStartConfirmation = Readonly<{ instanceId: string | null; referenceNumber: string | null; workflowName?: string;
   ownWorkTargets?: readonly FmsAssignedWorkTarget[]; assignmentSummary?: readonly Readonly<{ stageName: string; employeeName: string }>[] }>;
+export function fmsStartConfirmationFromWork(result: FmsWorkResult, workflowName?: string): FmsStartConfirmation {
+  const name = result.workflowName ?? workflowName;
+  return { instanceId: result.instanceId, referenceNumber: result.referenceNumber, ...(name ? { workflowName: name } : {}),
+    ownWorkTargets: result.ownWorkTargets, assignmentSummary: result.destinations.map(destination => ({ stageName: destination.stageName, employeeName: destination.employeeName ?? "Configured employee" })) };
+}
+export async function recoverFmsStartingWork(starterAssignmentId: string): Promise<FmsStartConfirmation | null> {
+  const result = await recoverFmsWork({ kind: "starter_form", targetId: starterAssignmentId });
+  return result ? fmsStartConfirmationFromWork(result) : null;
+}
+export async function recoverFmsStartingFlow(flowId: string): Promise<FmsStartConfirmation | null> {
+  const result = await recoverFmsWork({ kind: "flow_form", targetId: flowId });
+  return result ? fmsStartConfirmationFromWork(result) : null;
+}
+export async function beginNewFmsStartingFlow(flowId: string): Promise<void> {
+  await beginNewFmsMutation(getFmsMutationStorage(), await actorId(), "flow_form", flowId);
+}
 export function readFmsStartConfirmation(raw: unknown): FmsStartConfirmation {
   const v = raw === null || raw === undefined ? {} : record(raw);
   return { instanceId: typeof v.instance_id === "string" ? v.instance_id : null,
@@ -132,8 +179,7 @@ export async function submitFmsStartingWork(formTemplateId: string, starterAssig
   const preview = recovered.data === null ? await previewFmsWork(request) : null;
   const result = recovered.data === null && preview ? await transitionFmsWork({ request, idempotencyKey: key, handoffs: [], previewFingerprint: preview.fingerprint }) : parseFmsWorkResult(recovered.data);
   await markFmsMutationComplete(storage, user, request.kind, starterAssignmentId);
-  return { instanceId: result.instanceId, referenceNumber: result.referenceNumber, ...(preview ? { workflowName: preview.currentStageName } : {}),
-    ownWorkTargets: result.ownWorkTargets, assignmentSummary: result.destinations.map(d => ({ stageName: d.stageName, employeeName: d.employeeName ?? "Configured employee" })) };
+  return fmsStartConfirmationFromWork(result, preview?.currentStageName);
 }
 export async function submitLibraryForm(formTemplateId: string, answers: object, flowId?: string): Promise<FmsStartConfirmation> {
   const user = await actorId(); const storage = getFmsMutationStorage(); const targetId = `${formTemplateId}:${flowId ?? "library"}`;
@@ -159,5 +205,6 @@ export async function recoverLibrarySubmission(formTemplateId: string, flowId?: 
   const key = await getFmsMutationIdentity(getFmsMutationStorage(), await actorId(), "library_form", `${formTemplateId}:${flowId ?? "library"}`);
   const result = await getSupabase().rpc("get_fms_work_mutation_result", { p_idempotency_key: key });
   if (result.error) throw new Error(result.error.message);
+  if (result.data !== null) await markFmsMutationComplete(getFmsMutationStorage(), await actorId(), "library_form", `${formTemplateId}:${flowId ?? "library"}`);
   return result.data === null ? null : readFmsStartConfirmation(result.data);
 }

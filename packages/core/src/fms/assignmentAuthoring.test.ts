@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { requireFmsAssignmentSourceForms, suggestFmsAssignment } from "./assignmentAuthoring";
+import { fmsSourceQuestions, requireFmsAssignmentSourceForms, suggestFmsAssignment } from "./assignmentAuthoring";
 import { normalizeFmsDefinition } from "./engine";
 import type { FmsFlowDefinition, FmsStageDefinition } from "./types";
 const stage = { key: "call", name: "Call", formTemplateId: "form", sla: {}, assigneeRules: [] } as unknown as FmsStageDefinition;
@@ -19,4 +19,8 @@ describe("assignment authoring defaults", () => {
     const flow = { stages: [{ ...stage, assigneeRules: [{ type: "specific_user", userProfileId: "owner", fallbackUserProfileId: "cover" }] }] } as unknown as FmsFlowDefinition;
     expect(normalizeFmsDefinition(flow).stages[0]?.assigneeRules[0]?.fallbackUserProfileId).toBe("cover");
   });
+  it("allows a loop to use the previous visit of its own linked form", () => {
+    expect(fmsSourceQuestions([stage], { form: [{ key: "employee", label: "Employee", type: "user_dropdown" }] }, stage.key)).toHaveLength(1);
+  });
+
 });

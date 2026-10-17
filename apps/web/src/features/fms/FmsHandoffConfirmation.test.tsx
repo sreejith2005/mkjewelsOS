@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FmsTransitionRequest, FmsWorkPreview } from "@jewelos/core";
 import { FmsHandoffConfirmation } from "./FmsHandoffConfirmation";
 const list = vi.hoisted(() => vi.fn());
-vi.mock("@jewelos/data/fms/work", () => ({ listFmsHandoffRecipients: list }));
+const check = vi.hoisted(() => vi.fn());
+vi.mock("@jewelos/data/fms/work", () => ({ listFmsHandoffRecipients: list, previewFmsWork: check }));
 const request: FmsTransitionRequest = { kind: "complete", instanceStageId: "visit", outcome: "", remark: "", checklist: {} };
 const preview: FmsWorkPreview = { fingerprint: "preview", currentStageName: "Introduction Call", wouldDefer: false, requirements: [],
   destinations: [{ targetStageId: "demo", stageName: "Product Demonstration", selectedUserId: "c", effectiveUserId: "c", employeeName: "Employee C",
@@ -18,16 +19,21 @@ describe("pre-transition handoff confirmation", () => {
     expect(screen.getByRole("dialog").textContent).toContain("Product Demonstration");
     expect(screen.getByRole("dialog").textContent).toContain("Employee C");
     await userEvent.click(screen.getByRole("button", { name: "Continue with Selected Employee" }));
-    expect(onConfirm).toHaveBeenCalledWith([]);
+    expect(onConfirm).toHaveBeenCalledWith({ handoffs: [], preview });
   });
   it("loads eligible replacements and preserves the form on cancel", async () => {
     list.mockResolvedValue({ people: [{ id: "d", employeeName: "Employee D", designation: "Sales", branch: "Main", department: "Retail" }], nextCursor: null });
+    const coveredPreview = { ...preview, fingerprint: "chosen-preview", destinations: [{ ...preview.destinations[0]!, selectedUserId: "d", effectiveUserId: "e", selectedEmployeeName: "Employee D", employeeName: "Employee E" }] };
+    check.mockResolvedValue(coveredPreview);
     const onConfirm = vi.fn(); const onCancel = vi.fn();
     render(<FmsHandoffConfirmation request={request} preview={preview} onConfirm={onConfirm} onCancel={onCancel} />);
     await userEvent.click(screen.getByRole("button", { name: "Assign to a Different Employee" }));
     await userEvent.click(await screen.findByRole("radio", { name: /Employee D/ }));
+    await screen.findByText("Assigned employee through availability coverage: Employee E");
+    await waitFor(() => expect((screen.getByRole("button", { name: "Confirm Next Work" }) as HTMLButtonElement).disabled).toBe(false));
     await userEvent.click(screen.getByRole("button", { name: "Confirm Next Work" }));
-    expect(onConfirm).toHaveBeenCalledWith([{ targetStageId: "demo", userProfileId: "d" }]);
+    expect(check).toHaveBeenCalledWith(request, [{ targetStageId: "demo", userProfileId: "d" }]);
+    expect(onConfirm).toHaveBeenCalledWith({ handoffs: [{ targetStageId: "demo", userProfileId: "d" }], preview: coveredPreview });
     await userEvent.click(screen.getByRole("button", { name: "Cancel and Return to Form" }));
     expect(onCancel).toHaveBeenCalledOnce();
   });

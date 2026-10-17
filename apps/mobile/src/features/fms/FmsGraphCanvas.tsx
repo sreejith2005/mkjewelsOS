@@ -417,7 +417,7 @@ export function FmsGraphCanvas(props: FmsGraphCanvasProps) {
                       <Pressable accessibilityLabel={`Delete ${stage.name}`} hitSlop={6} onPress={() => onDelete(stage.key)} style={styles.nodeAction}><Trash2 color={theme.colors.textMuted} size={14} /></Pressable>
                     </View>
                   </View>
-                  <Text numberOfLines={1} variant="small" weight="semibold">{stage.name || "Untitled stage"}</Text>
+                  <Text numberOfLines={1} variant="small" weight="semibold">{stage.sla.pipelineName ? `${stage.sla.pipelineName} / ` : ""}{stage.name || "Untitled stage"}</Text>
                   <Text numberOfLines={1} tone="muted" variant="caption">{`${fmsStageSummary(stage)} · ${fmsTimingSummary(stage)}`}</Text>
                   {invalid ? <Text numberOfLines={1} tone="danger" variant="caption" weight="medium">Needs attention</Text> : null}
                 </Pressable>

@@ -1,6 +1,9 @@
 # FMS operational audit, 2026-10-15
 
-Evidence level: source investigation and read-only migration/catalog checks.
+This document records the initial pre-implementation audit. For current repair
+and validation outcomes see `FMS_OPERATIONAL_VERIFICATION_2026-10-15.md`.
+
+Evidence level at the original audit checkpoint: source investigation and read-only migration/catalog checks.
 No product code, database schema, production records or applied migrations were
 changed. This is the pre-implementation audit, not a completed repair report.
 
@@ -125,7 +128,7 @@ Not executed: local reset, migration apply, pgTAP, unit/component tests, typeche
 build, browser/device execution, hosted data mutation, Git commit/push, or release.
 There is no new product implementation to validate at this checkpoint.
 
-## Next gate
+## Original next gate (subsequently approved)
 
 Review `docs/superpowers/specs/2026-10-15-fms-operational-handoff-design.md`.
 After design approval, write the detailed implementation plan with exact RPC

@@ -20,6 +20,11 @@ function flow(): FmsFlowDefinition {
 const fields = { formFields: { [formId]: [{ key: "Assigned_To", label: "Owner", type: "user_dropdown", required: true, shown: true }] } };
 
 describe("versioned FMS assignment authoring", () => {
+  it("rejects a source route that does not belong to the pinned source step", () => {
+    const original = flow();
+    const configured = { ...original, stages: original.stages.map(stage => stage.key === "call" ? { ...stage, sla: { ...stage.sla, assignment: { ...stage.sla.assignment!, sources: [{ sourceStageKey: "intake", formTemplateId: formId, fieldKey: "Assigned_To", routeRuleId: "foreign-route" }] } } } : stage) };
+    expect(validateFmsDefinition(configured, fields).some(issue => issue.code === "invalid_assignment_route")).toBe(true);
+  });
   it("preserves exact pinned field identities and assignment settings during normalization", () => {
     const result = normalizeFmsDefinition(flow());
     expect(result.assignmentVersion).toBe(2);
@@ -62,4 +67,10 @@ describe("versioned FMS assignment authoring", () => {
     expect(normalizeFmsDefinition(configured).stages[0]?.sla).toMatchObject({ completionFormRequired: true,
       taskDisplay: { instructions: "Call client" }, followUp: { maxVisits: 5, onLimit: "hold" } });
   });
+  it("requires assignment on a return route to the initial form", () => {
+    const original = flow();
+    const returned = { ...original, stages: original.stages.map(stage => stage.key === "call" ? { ...stage, defaultNextStageKey: "intake" } : stage) };
+    expect(validateFmsDefinition(returned, fields).some(issue => issue.code === "missing_assignment_strategy" && issue.stageKey === "intake")).toBe(true);
+  });
+
 });

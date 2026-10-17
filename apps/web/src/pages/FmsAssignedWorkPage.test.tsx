@@ -8,8 +8,9 @@ const mocks = vi.hoisted(() => ({
   loadFormDynamicOptions: vi.fn(),
   loadForms: vi.fn(),
   loadTaskForms: vi.fn(),
-  submitFmsStarterAssignment: vi.fn(),
+  confirmWork: vi.fn(),
   loadFmsAssignedStage: vi.fn(),
+  recoverFmsStartingWork: vi.fn(),
   runner: vi.fn(),
 }));
 
@@ -17,9 +18,10 @@ vi.mock("@/features/forms/api", () => ({
   loadFormDynamicOptions: mocks.loadFormDynamicOptions,
   loadForms: mocks.loadForms,
   loadTaskForms: mocks.loadTaskForms,
-  submitFmsStarterAssignment: mocks.submitFmsStarterAssignment,
 }));
 vi.mock("@/features/fms/api", () => ({ loadFmsAssignedStage: mocks.loadFmsAssignedStage }));
+vi.mock("@jewelos/data/fms/work", async () => ({ ...(await vi.importActual<typeof import("@jewelos/data/fms/work")>("@jewelos/data/fms/work")), recoverFmsStartingWork: mocks.recoverFmsStartingWork, loadFmsWorkContext: vi.fn().mockRejectedValue(new Error("Optional context unavailable")), signedFmsContextFileUrl: vi.fn() }));
+vi.mock("@/features/fms/useFmsHandoffConfirmation", () => ({ useFmsHandoffConfirmation: () => ({ confirmWork: mocks.confirmWork, result: null, confirmation: null }) }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ profile: { id: "user-1", tenant_id: "tenant-1", user_role: "staff" } }) }));
 vi.mock("@/features/forms/FormRenderer", () => ({
   FormRenderer: ({ onSubmit }: { onSubmit: (answers: Record<string, string>) => Promise<void> }) => (
@@ -34,7 +36,7 @@ vi.mock("@/features/fms/FmsStageRunner", () => ({
 }));
 
 const OPTIONS = { users: [], branches: [], departments: [], masters: [] };
-beforeEach(() => { mocks.loadTaskForms.mockResolvedValue({ bundles: [], submissions: [] }); });
+beforeEach(() => { mocks.loadTaskForms.mockResolvedValue({ bundles: [], submissions: [] }); mocks.recoverFmsStartingWork.mockResolvedValue(null); });
 
 function stageBundle(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -64,7 +66,7 @@ describe("focused FMS assigned work", () => {
       submissions: [],
     });
     mocks.loadFormDynamicOptions.mockResolvedValue(OPTIONS);
-    mocks.submitFmsStarterAssignment.mockResolvedValue({ instanceId: "instance-5", referenceNumber: "FMS-9" });
+    mocks.confirmWork.mockResolvedValue({ state: "successors_activated", instanceId: "instance-5", submissionId: "sub-1", sourceInstanceStageId: null, referenceNumber: "FMS-9", destinations: [], ownWorkTargets: [] });
     const onNavigate = vi.fn();
     const user = userEvent.setup();
 
@@ -73,28 +75,39 @@ describe("focused FMS assigned work", () => {
     expect(await screen.findByRole("heading", { name: "Opening details" })).toBeTruthy();
     expect(screen.queryByText("Forms Library")).toBeNull();
     await user.click(screen.getByRole("button", { name: "Submit exact form" }));
-    await waitFor(() => expect(mocks.submitFmsStarterAssignment).toHaveBeenCalledWith("form-7", "starter-2", { approved: "yes" }));
+    await waitFor(() => expect(mocks.confirmWork).toHaveBeenCalledWith({ kind: "starter_form", formTemplateId: "form-7", starterAssignmentId: "starter-2", answers: { approved: "yes" } }));
     expect(onNavigate).not.toHaveBeenCalled();
     expect(await screen.findByRole("heading", { name: "Form submitted successfully" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Open my next work" })).toBeNull();
   });
 
-  it("falls back to the work list when a replayed submission names no process", async () => {
+  it("recovers a saved starting submission after its response was lost", async () => {
+    window.history.replaceState({}, "", "/tasks/fms?starter=starter-2&form=form-7");
+    mocks.recoverFmsStartingWork.mockResolvedValue({ submissionId: "saved", instanceId: "instance-5", referenceNumber: "FMS-9", workflowName: "Jewellery enquiry", ownWorkTargets: [], assignmentSummary: [{ stageName: "Call", employeeName: "Employee B" }] });
+    mocks.loadFormDynamicOptions.mockResolvedValue(OPTIONS);
+    render(<FmsAssignedWorkPage onNavigate={vi.fn()} />);
+    expect(await screen.findByRole("heading", { name: "Form submitted successfully" })).toBeTruthy();
+    expect(screen.getByText(/Call has been assigned to Employee B/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Submit exact form" })).toBeNull();
+    expect(mocks.confirmWork).not.toHaveBeenCalled();
+  });
+
+  it("preserves the form when starting handoff confirmation is cancelled", async () => {
     window.history.replaceState({}, "", "/tasks/fms?starter=starter-2&form=form-7");
     mocks.loadTaskForms.mockResolvedValue({
       bundles: [{ id: "form-7", name: "Opening details", description: null, sections: [], fields: [], version: 3 }],
       submissions: [],
     });
     mocks.loadFormDynamicOptions.mockResolvedValue(OPTIONS);
-    mocks.submitFmsStarterAssignment.mockResolvedValue({ instanceId: null, referenceNumber: null });
+    mocks.confirmWork.mockResolvedValue(null);
     const onNavigate = vi.fn();
     const user = userEvent.setup();
 
     render(<FmsAssignedWorkPage onNavigate={onNavigate} />);
 
     await user.click(await screen.findByRole("button", { name: "Submit exact form" }));
-    await user.click(await screen.findByRole("button", { name: "Back to my work" }));
-    expect(onNavigate).toHaveBeenCalledWith("/tasks");
+    expect(await screen.findByRole("button", { name: "Submit exact form" })).toBeTruthy();
+    expect(onNavigate).not.toHaveBeenCalled();
   });
 
   it("opens the exact runtime step and its pinned form, not the instance list", async () => {

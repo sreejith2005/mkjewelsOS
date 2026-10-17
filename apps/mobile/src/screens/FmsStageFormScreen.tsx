@@ -37,12 +37,16 @@ export function FmsStageFormScreen() {
     // tenant to render one form. `loadTaskForms` fetches exactly the version
     // this screen needs, which is the difference between a few kilobytes and a
     // few hundred on a phone.
-    const [forms, options] = await Promise.all([
+    const [forms, options, assigned] = await Promise.all([
       loadTaskForms([params.formTemplateId], []),
       loadFormDynamicOptions(),
+      loadFmsAssignedStage(params.instanceId, params.instanceStageId),
     ]);
-    return { bundle: forms.bundles[0] ?? null, options };
-  }, [params.formTemplateId]);
+    const visit = assigned?.instanceStages.find(stage => stage.id === params.instanceStageId);
+    const definition = assigned?.definitions.find(stage => stage.id === visit?.fms_stage_id);
+    if (!visit || definition?.form_template_id !== params.formTemplateId) throw new Error("This form does not match the exact assigned workflow visit.");
+    return { bundle: forms.bundles[0] ?? null, options, formSaved: visit.form_submission_id !== null };
+  }, [params.formTemplateId, params.instanceId, params.instanceStageId]);
 
   const { data, error, loading, reload } = useAsyncData(load, [load]);
 
@@ -60,6 +64,11 @@ export function FmsStageFormScreen() {
   }
 
   const { bundle, options } = data;
+
+  if (data.formSaved) return <Screen>
+    <Banner>The shared completion form has already been submitted and locked. Complete your own remaining work on the step.</Banner>
+    <Button label="Open my step" onPress={() => navigation.replace("FmsStage", { instanceId: params.instanceId, instanceStageId: params.instanceStageId })} />
+  </Screen>;
 
   return (
     <><FormRenderer
@@ -86,7 +95,7 @@ export function FmsStageFormScreen() {
         setDirty(false);
         // Back to the step, which reloads and shows whichever step the answers
         // opened next.
-        Alert.alert("Work saved", result.state === "workflow_completed" ? "Workflow completed." : result.state === "successors_activated"
+        Alert.alert("Work saved", result.state === "workflow_on_hold" ? "Work saved. The workflow is on hold for review after its configured follow-up limit." : result.state === "workflow_completed" ? "Workflow completed." : result.state === "successors_activated"
           ? result.destinations.map(item => `${item.stageName} has been assigned to ${item.employeeName ?? "the configured employee"}.`).join(" ")
           : "Form saved. Complete the remaining requirements or wait for approval before next work starts.");
         navigation.goBack(); return true;
@@ -96,3 +105,6 @@ export function FmsStageFormScreen() {
     />{confirmation}</>
   );
 }
+import { loadFmsAssignedStage } from "@jewelos/data/fms/assignedStage";
+import { Button } from "@/ui/Button";
+import { Banner } from "@/ui/states";

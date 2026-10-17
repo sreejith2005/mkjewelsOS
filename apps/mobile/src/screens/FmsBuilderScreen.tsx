@@ -1,3 +1,7 @@
+import { upgradeFmsAssignmentContract } from "@jewelos/core";
+import { prepareFmsFormAuthoring, type FmsFormAuthoringAction, type FmsFormAuthoringTarget } from "@jewelos/data/fms/formAuthoring";
+import { FmsFormActions, FmsFormAuthoring } from "@/features/fms/FmsFormAuthoring";
+import { FmsSimulation } from "@/features/fms/FmsSimulation";
 import { suggestFmsAssignment } from "@jewelos/core";
 import { useAccess } from "@/auth/AuthProvider";
 import { hasPermission } from "@jewelos/core";
@@ -42,10 +46,10 @@ const confirm = (title: string, message: string, action: string) =>
 export function FmsBuilderScreen() {
   const access = useAccess();
   if (!hasPermission(access, "fms.manage")) return <Screen><ErrorState message="Workflow builder access is not available to your account." /></Screen>;
-  return <AuthorizedFmsBuilderScreen />;
+  return <AuthorizedFmsBuilderScreen canManageForms={hasPermission(access, "forms.manage")} />;
 }
 
-function AuthorizedFmsBuilderScreen() {
+function AuthorizedFmsBuilderScreen({ canManageForms }: { canManageForms: boolean }) {
   const { params } = useRoute<Route>();
   const navigation = useNavigation();
   const state = useAsyncData(loadFmsBuilderData, []);
@@ -56,6 +60,7 @@ function AuthorizedFmsBuilderScreen() {
   return (
     <FmsFlowBuilder
       data={state.data}
+      canManageForms={canManageForms}
       duplicate={params.duplicate ?? false}
       flow={flow}
       onClose={() => navigation.goBack()}
@@ -65,12 +70,13 @@ function AuthorizedFmsBuilderScreen() {
 }
 
 /** The web `FmsFlowBuilder`: the same editing model, validation, and audited saves. */
-function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: FmsFlowRow | null; data: FmsData; duplicate: boolean; onClose: () => void; onSaved: () => Promise<void> }) {
+function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canManageForms }: { flow: FmsFlowRow | null; data: FmsData; duplicate: boolean; onClose: () => void; onSaved: () => Promise<void>; canManageForms: boolean }) {
   const theme = useAppTheme();
   const styles = useStyles();
   const navigation = useNavigation();
   const initial = useMemo(() => { const value = flowToDefinition(flow, data); return duplicate ? { ...value, id: undefined, familyId: undefined, version: 1, lifecycle: "draft" as const, name: `${value.name} (Copy)` } : value; }, [data, duplicate, flow]);
   const [definition, setDefinition] = useState<FmsFlowDefinition>(initial);
+  const [formAuthoring, setFormAuthoring] = useState<FmsFormAuthoringTarget | null>(null);
   const [past, setPast] = useState<FmsFlowDefinition[]>([]);
   const [future, setFuture] = useState<FmsFlowDefinition[]>([]);
   const [screen, setScreen] = useState<"details" | "canvas">(flow ? "canvas" : "details");
@@ -81,6 +87,7 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [assigning, setAssigning] = useState(false);
+  const [simulating, setSimulating] = useState(false);
   /** Steps is a tap-only list and the default; Map is the draggable canvas. */
   const [view, setView] = useState<"steps" | "map">("steps");
   const [issuesOpen, setIssuesOpen] = useState(false);
@@ -200,6 +207,13 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
   }) }));
   const ensureFirstForm = () => { if (normalized.stages.length) return; const first = { ...newFmsStage("form", 0), key: "start_form", name: "Start form", assigneeRules: contextDefaultAssigneeId ? [{ type: "specific_user" as const, userProfileId: contextDefaultAssigneeId }] : [] }; commit({ ...definition, stages: [first] }); };
   const persist = async () => { const id = await saveFmsDraft(persistedId, normalized); setPersistedId(id); setSavedSnapshot(JSON.stringify(normalized)); await onSaved(); return id; };
+  const openForm = async (action: FmsFormAuthoringAction) => {
+    if (!selected) return;
+    setBusy("save"); setError(null);
+    try { setFormAuthoring(await prepareFmsFormAuthoring(normalized, selected.key, action, canManageForms, persist)); }
+    catch (error) { setError(error instanceof Error ? error.message : "Could not open Forms"); }
+    finally { setBusy(null); }
+  };
   const save = async () => { setBusy("save"); setError(null); setSuccess(null); try { await persist(); setSuccess("Draft saved"); } catch (caught) { setError(errorText(caught)); } finally { setBusy(null); } };
   const publish = async () => {
     if (issues.length) { setError("Resolve the publish-readiness issues below before publishing."); return; }
@@ -208,6 +222,7 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
     catch (caught) { setError(errorText(caught)); } finally { setBusy(null); }
   };
 
+  if (formAuthoring) return <FmsFormAuthoring target={formAuthoring} onClose={() => { setFormAuthoring(null); void onSaved(); }} onSaved={onSaved} />;
   if (screen === "details") {
     return (
       <Screen scroll>
@@ -272,8 +287,8 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
           {(["steps", "map"] as const).map((value) => {
             const active = view === value;
             return (
-              <Pressable accessibilityLabel={value === "steps" ? "Steps" : "Map"} accessibilityRole="tab" accessibilityState={{ selected: active }} key={value} onPress={() => setView(value)} style={[styles.viewOption, active && styles.viewOptionActive]}>
-                <Text tone={active ? "inverse" : "warm"} variant="small" weight="semibold">{value === "steps" ? "Steps" : "Map"}</Text>
+              <Pressable accessibilityLabel={value === "steps" ? "Guided Mode" : "Canvas Mode"} accessibilityRole="tab" accessibilityState={{ selected: active }} key={value} onPress={() => setView(value)} style={[styles.viewOption, active && styles.viewOptionActive]}>
+                <Text tone={active ? "inverse" : "warm"} variant="small" weight="semibold">{value === "steps" ? "Guided Mode" : "Canvas Mode"}</Text>
               </Pressable>
             );
           })}
@@ -281,6 +296,8 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
         <Pressable accessibilityLabel="Undo" accessibilityRole="button" accessibilityState={{ disabled: !past.length }} disabled={!past.length} onPress={undo} style={[styles.iconButton, !past.length && styles.disabled]}><Undo2 color={theme.colors.primary} size={20} /></Pressable>
         <Pressable accessibilityLabel="Redo" accessibilityRole="button" accessibilityState={{ disabled: !future.length }} disabled={!future.length} onPress={redo} style={[styles.iconButton, !future.length && styles.disabled]}><Redo2 color={theme.colors.primary} size={20} /></Pressable>
       </View>
+      {normalized.assignmentVersion !== 2 ? <><Banner>This draft uses legacy assignment behavior. Existing running workflows retain their published contract.</Banner><Button label="Upgrade this draft to stage-specific assignment" variant="secondary" onPress={() => commit(upgradeFmsAssignmentContract(normalized, data.formFields))} /></> : null}
+      <Button label="Simulate workflow" variant="secondary" onPress={() => setSimulating(true)} />
       {error ? <Banner tone="danger">{error}</Banner> : null}
       {success ? <Banner tone="success">{success}</Banner> : null}
 
@@ -340,10 +357,12 @@ function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved }: { flow: Fms
         <Sheet scrollable={false} onClose={() => setSelectedKey(null)} tall title={`${selected.type.replaceAll("_", " ")} · ${selected.name}`} visible>
           <ScrollView keyboardShouldPersistTaps="handled" ref={editorScrollRef}>
             {issues.filter((issue) => issue.stageKey === selected.key).map((issue, index) => <Banner key={`${issue.code}-${index}`} tone="danger">{issue.message}</Banner>)}
+            <FmsFormActions linked={!!selected.formTemplateId} canManage={canManageForms} disabled={!!busy} onOpen={action => void openForm(action)} />
             <FmsStageEditor assignmentVersion={normalized.assignmentVersion} data={data} issueCode={focusedIssueCode} issueMessage={focusedIssue?.message} onIssueLayout={scrollToIssue} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); }} onDelete={() => void remove(selected.key)} stage={selected} stages={normalized.stages} />
           </ScrollView>
         </Sheet>
       ) : null}
+      {simulating ? <FmsSimulation definition={normalized} data={data} onClose={() => setSimulating(false)} /> : null}
       {assigning ? <DefaultAssigneesSheet data={data} definition={normalized} onChange={(stages) => commit((current) => ({ ...current, stages }))} onClose={() => setAssigning(false)} /> : null}
     </Screen>
   );

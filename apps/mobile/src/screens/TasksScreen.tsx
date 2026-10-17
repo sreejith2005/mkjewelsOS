@@ -53,7 +53,7 @@ export function TasksScreen({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const hasAdminView = hasPermission(access, "tasks.view_all");
 
   const identity = `${profile.id}|${workspace}|${status}|${offset}`;
-  const load = useCallback(() => loadTaskWorkspacePage(profile, workspace, status, offset), [profile, workspace, status, offset]);
+  const load = useCallback(() => loadTaskWorkspacePage(profile, workspace, status, offset, hasAdminView), [profile, workspace, status, offset, hasAdminView]);
 
   const { data, error, loading, refreshing, reload, refresh } = useAsyncData(load, [load]);
   useEffect(() => {
@@ -69,6 +69,10 @@ export function TasksScreen({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const current = data?.identity === identity;
   const tasks = current ? data.tasks : [];
   const counts = current ? data.counts : { pending: 0, overdue: 0, completed: 0, open: 0 };
+  const tabLabel = (view: Workspace, label: string) => {
+    const count = current ? data.tabCounts?.[view] : undefined;
+    return count === undefined ? label : `${label} (${count})`;
+  };
   const changeWorkspace = (value: Workspace) => { setWorkspace(value); setOffset(0); };
   const changeStatus = (value: TaskFeedStatusFilter) => { setStatus(value); setOffset(0); };
   const categoryNames = useMemo(() => new Map((data?.categories ?? []).map((item) => [item.id, item.label])), [data?.categories]);
@@ -120,10 +124,10 @@ export function TasksScreen({ path = "/tasks" }: Readonly<{ path?: string }>) {
           accessibilityLabel="Task workspace"
           onChange={changeWorkspace}
           options={[
-            { value: "mine", label: "My Tasks" },
-            { value: "delegated", label: "Delegated" },
-            { value: "inLoop", label: "In Loop" },
-            ...(hasAdminView ? [{ value: "all" as const, label: "All Tasks" }] : []),
+            { value: "mine", label: tabLabel("mine", "My Tasks") },
+            { value: "delegated", label: tabLabel("delegated", "Delegated") },
+            { value: "inLoop", label: tabLabel("inLoop", "In Loop") },
+            ...(hasAdminView ? [{ value: "all" as const, label: tabLabel("all", "All Tasks") }] : []),
           ]}
           value={workspace}
         />
@@ -148,6 +152,7 @@ export function TasksScreen({ path = "/tasks" }: Readonly<{ path?: string }>) {
           </View>
         ) : null}
         {error ? <Text tone="danger" variant="caption">{`Could not refresh: ${error}`}</Text> : null}
+        {current && !data.tabCounts ? <Text tone="danger" variant="caption">Unable to refresh subsection counts. Pull to retry.</Text> : null}
       </View>
 
       <FlatList
@@ -172,6 +177,7 @@ export function TasksScreen({ path = "/tasks" }: Readonly<{ path?: string }>) {
         }
         renderItem={({ item }) => (
           <ParityTaskCard
+            viewerId={profile.id}
             capability={deriveTaskMutationCapability({ assigneeIds: item.assignees.map((assignee) => assignee.id), isWatcher: item.isWatchedByViewer, viewerId: profile.id, viewerRole: profile.user_role })}
             categoryLabel={item.category_id ? categoryNames.get(item.category_id) ?? "Uncategorized" : "Uncategorized"}
             onAction={(action) => handleAction(item, action)}

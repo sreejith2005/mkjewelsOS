@@ -1,13 +1,14 @@
-import { listFmsFormStarters, beginNewLibrarySubmission, type FmsStartConfirmation } from "@jewelos/data/fms/work";
+import { listFmsFormStarters, beginNewLibrarySubmission, beginNewFmsStartingFlow, fmsStartConfirmationFromWork, recoverFmsStartingFlow, recoverFmsStartingWork, recoverLibrarySubmission, type FmsStartConfirmation } from "@jewelos/data/fms/work";
+import { useFmsHandoffConfirmation } from "@/features/fms/FmsHandoffConfirmation";
 import { fmsAssignedWorkRoute, navigateFmsAssignedWork } from "@/features/fms/assignedWorkNavigation";
 import { Text } from "@/ui/Text";
 import { Button } from "@/ui/Button";
 import { OptionPicker } from "@/ui/OptionPicker";
 import { Banner } from "@/ui/states";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { loadFormDynamicOptions, loadTaskForms, submitFmsStarterAssignment, submitStandaloneFormAndStartFms } from "@jewelos/data/forms/api";
+import { loadFormDynamicOptions, loadTaskForms, submitStandaloneFormAndStartFms } from "@jewelos/data/forms/api";
 import { useAsyncData } from "@/lib/useAsyncData";
 import { useUnsavedGuard } from "@/lib/useUnsavedGuard";
 import { useProfile } from "@/auth/AuthProvider";
@@ -36,6 +37,7 @@ export function FormFillScreen() {
   const [flowId, setFlowId] = useState("");
   const [generation, setGeneration] = useState(0);
   const [startError, setStartError] = useState<string | null>(null);
+  const { confirmWork, confirmation } = useFmsHandoffConfirmation(params.formTemplateId);
 
   useUnsavedGuard(dirty, "Discard this form?", "Your answers have not been submitted.");
 
@@ -54,6 +56,16 @@ export function FormFillScreen() {
 
   const { data, error, loading, reload } = useAsyncData(load, [load]);
 
+  useEffect(() => {
+    if (!data || !params.starterAssignmentId && data.flows.length > 1 && !flowId) return;
+    let active = true;
+    const selectedFlow = data.flows.find(flow => flow.flowId === flowId) ?? (data.flows.length === 1 ? data.flows[0] : undefined);
+    const pending = params.starterAssignmentId ? recoverFmsStartingWork(params.starterAssignmentId) : selectedFlow ? recoverFmsStartingFlow(selectedFlow.flowId) : recoverLibrarySubmission(params.formTemplateId);
+    void pending.then(result => { if (active && result) { setStarted(result); setDirty(false); } })
+      .catch((e: unknown) => { if (active) setStartError(e instanceof Error ? e.message : "Could not recover this submission"); });
+    return () => { active = false; };
+  }, [data, params.formTemplateId, params.starterAssignmentId, flowId]);
+
   if (loading) return <Screen><LoadingState label="Loading the form…" /></Screen>;
   if (error && !data) return <Screen><ErrorState message={error} onRetry={() => void reload()} /></Screen>;
   if (!data?.bundle) {
@@ -65,6 +77,7 @@ export function FormFillScreen() {
   }
 
   const { bundle, options } = data;
+  const selectedFlow = data.flows.find(flow => flow.flowId === flowId) ?? (data.flows.length === 1 ? data.flows[0] : undefined);
   const definition = {
     name: bundle.name,
     ...(bundle.description === null ? {} : { description: bundle.description }),
@@ -77,7 +90,7 @@ export function FormFillScreen() {
     {started.assignmentSummary?.map((item, index) => <Text key={index}>{`${item.stageName}: ${item.employeeName}`}</Text>)}
     {started.ownWorkTargets?.[0] ? <Button label="Open my next work" onPress={() => { const own = started.ownWorkTargets?.[0]; if (own) navigateFmsAssignedWork(navigation, fmsAssignedWorkRoute(own)); }} /> : null}
     <Button label="Back to my work" variant="secondary" onPress={() => navigation.goBack()} />
-    {!params.starterAssignmentId ? <Button label="Start another submission" variant="secondary" onPress={() => { void beginNewLibrarySubmission(bundle.id, flowId || undefined).then(() => { setStarted(null); setGeneration(n => n + 1); }).catch((e: unknown) => setStartError(e instanceof Error ? e.message : "Could not start another submission")); }} /> : null}
+    {!params.starterAssignmentId ? <Button label="Start another submission" variant="secondary" onPress={() => { void (selectedFlow ? beginNewFmsStartingFlow(selectedFlow.flowId) : beginNewLibrarySubmission(bundle.id)).then(() => { setStarted(null); setGeneration(n => n + 1); }).catch((e: unknown) => setStartError(e instanceof Error ? e.message : "Could not start another submission")); }} /> : null}
     {startError ? <Banner tone="danger">{startError}</Banner> : null}
   </Screen>;
   return <>
@@ -90,12 +103,16 @@ export function FormFillScreen() {
       onDirtyChange={setDirty}
       onSubmit={async (answers) => {
         if (!params.starterAssignmentId && data.flows.length > 1 && !flowId) throw new Error("Choose a workflow before submitting this form.");
-        const result = params.starterAssignmentId
-          ? await submitFmsStarterAssignment(bundle.id, params.starterAssignmentId, answers)
-          : await submitStandaloneFormAndStartFms(bundle.id, answers, flowId || undefined);
-        setDirty(false); setStarted(result);
+        if (params.starterAssignmentId || selectedFlow) {
+          const completed = await confirmWork(params.starterAssignmentId ? { kind: "starter_form", starterAssignmentId: params.starterAssignmentId, formTemplateId: bundle.id, answers }
+            : { kind: "flow_form", flowId: selectedFlow!.flowId, formTemplateId: bundle.id, answers });
+          if (!completed) return false;
+          setStarted(fmsStartConfirmationFromWork(completed, selectedFlow?.name));
+        } else setStarted(await submitStandaloneFormAndStartFms(bundle.id, answers));
+        setDirty(false); return true;
       }}
       templateId={bundle.id}
     />
+    {confirmation}
   </>;
 }

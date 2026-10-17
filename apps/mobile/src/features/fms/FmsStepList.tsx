@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { ArrowRight, CheckSquare, ChevronRight, Copy, FileText, Flag, GitBranch, Layers, Merge, Plus, ShieldCheck, Trash2, Zap } from "lucide-react-native";
 import { fmsStagesInFlowOrder, reachableFmsStageKeys, type FmsFlowDefinition, type FmsFormFieldRef, type FmsStageDefinition } from "@jewelos/core";
@@ -42,11 +42,19 @@ export function FmsStepList({ definition, formFields, selectedKey, invalidKeys, 
   const edges = useMemo(() => fmsGraphEdges(definition.stages, formFields), [definition.stages, formFields]);
   const names = useMemo(() => new Map(definition.stages.map((stage) => [stage.key, stage.name || "Untitled stage"])), [definition.stages]);
   const firstKey = definition.stages[0]?.key;
+  const groups = useMemo(() => [...new Set(definition.stages.flatMap(stage => stage.sla.pipelineName ? [stage.sla.pipelineName] : []))], [definition.stages]);
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    const group = definition.stages.find(stage => stage.key === selectedKey)?.sla.pipelineName;
+    if (group) setCollapsed(current => { if (!current.has(group)) return current; const next = new Set(current); next.delete(group); return next; });
+  }, [selectedKey, definition.stages]);
   const toneColor = (tone: Tone) => tone === "success" ? theme.colors.success : tone === "danger" ? theme.colors.danger : tone === "warm" ? theme.colors.textWarm : theme.colors.brand;
 
   return (
     <View accessibilityLabel="Workflow steps" accessibilityRole="list" style={styles.list}>
+      {groups.map(group => <Pressable accessibilityRole="button" accessibilityState={{ expanded: !collapsed.has(group) }} key={group} onPress={() => setCollapsed(current => { const next = new Set(current); if (next.has(group)) next.delete(group); else next.add(group); return next; })} style={[styles.card, { padding: theme.space.md }]}><Text tone="primary" weight="semibold">{`${group} · ${definition.stages.filter(stage => stage.sla.pipelineName === group).length} steps · ${collapsed.has(group) ? "Expand" : "Collapse"}`}</Text></Pressable>)}
       {ordered.map((stage, index) => {
+        if (stage.sla.pipelineName && collapsed.has(stage.sla.pipelineName)) return null;
         const item = appearance[stage.type];
         const tone = toneColor(item.tone);
         const outgoing = edges.filter((edge) => edge.from === stage.key);
@@ -57,6 +65,7 @@ export function FmsStepList({ definition, formFields, selectedKey, invalidKeys, 
         const borderColor = invalid ? theme.colors.danger : stage.key === selectedKey ? theme.colors.brand : theme.colors.border;
         return (
           <View key={stage.key} style={styles.item}>
+            {stage.sla.pipelineName ? <Text tone="primary" variant="caption">{stage.sla.pipelineName}</Text> : null}
             <View style={[styles.card, { borderColor, borderWidth: invalid || stage.key === selectedKey ? 2 : 1 }]}>
               <Pressable accessibilityLabel={`Edit ${stage.name || "Untitled stage"}`} accessibilityRole="button" onPress={() => onSelect(stage.key)} style={({ pressed }) => [styles.body, pressed && styles.pressed]}>
                 <View style={styles.number}><Text tone="primary" variant="small" weight="semibold">{String(index + 1)}</Text></View>

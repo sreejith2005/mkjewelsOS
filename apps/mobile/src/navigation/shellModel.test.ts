@@ -133,7 +133,6 @@ describe("buildLauncherItems", () => {
     expect(items.map((item) => item.id)).toEqual([
       "home",
       "dashboard",
-      "fms_builder",
       "forms_library",
       "availability",
       "reports",

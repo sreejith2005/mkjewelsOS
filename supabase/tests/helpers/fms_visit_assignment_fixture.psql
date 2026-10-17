@@ -12,7 +12,7 @@ begin
     insert into auth.users(id,instance_id,aud,role,email,encrypted_password,created_at,updated_at)
       values(a,'00000000-0000-0000-0000-000000000000','authenticated','authenticated',person||'-visit@test.local','x',now(),now());
     insert into user_profiles(tenant_id,auth_user_id,branch_id,department_id,employee_name,employee_code,email,user_role,working_status,account_status,is_login_enabled)
-      values(t,a,b,d,'Employee '||upper(person),'VA-'||person,person||'-visit@test.local',case when person='a' then 'super_admin'::user_role else 'staff'::user_role end,'active','active',true) returning id into u;
+      values(t,a,b,d,'Employee '||upper(person),'VA-'||left(t::text,8)||'-'||person,person||'-visit@test.local',case when person='a' then 'super_admin'::user_role else 'staff'::user_role end,'active','active',true) returning id into u;
     insert into visit_assignment_fixture values(person,u),(person||'_auth',a);
   end loop;
   select id into u from visit_assignment_fixture where name='a';
@@ -22,16 +22,28 @@ begin
     values(f,'next_employee','Next employee','user_dropdown',0,true,true);
   insert into form_fields(form_template_id,field_key,field_name,field_type,sort_order,is_required,is_shown)
     values(f,'client_name','Client name','text',1,false,true),(f,'private_notes','Private notes','text',2,false,true);
+  if current_setting('test.fms.with_options',true)='true' then
+    insert into form_fields(form_template_id,field_key,field_name,field_type,sort_order,is_required,is_shown,options,dropdown_option_snapshot)
+      values(f,'historical_choice','Historical choice','select',4,false,true,'[{"value":"historic","label":"Current label"}]','[{"value":"historic","label":"Original label"}]');
+  end if;
+  if current_setting('test.fms.with_file',true)='true' then
+    insert into form_fields(form_template_id,field_key,field_name,field_type,sort_order,is_required,is_shown)
+      values(f,'attachment_file','Client attachment','file',3,false,true);
+    insert into form_submission_files(tenant_id,form_template_id,field_key,storage_path,original_filename,mime_type,size_bytes,uploaded_by)
+      values(t,f,'attachment_file',t::text||'/'||f::text||'/'||gen_random_uuid()::text||'.pdf','Synthetic attachment.pdf','application/pdf',32,u) returning id into a;
+    insert into visit_assignment_fixture values('attachment',a);
+  end if;
   update form_templates set lifecycle='published' where id=f;
   insert into fms_flows(tenant_id,family_id,version,name,scope_type,status,is_active,created_by,updated_by,assignment_version)
     values(t,gen_random_uuid(),1,'Jewellery enquiry','tenant','draft',true,u,u,2) returning id into flow;
   foreach stage_key in array array['initial','call','demo','negotiation','finish','locked'] loop
     insert into fms_stages(fms_flow_id,stage_key,name,step_type,sort_order,is_required,planned_time_rule,form_template_id)
       values(flow,stage_key,initcap(stage_key),case when stage_key='initial' then 'form'::fms_step_type else 'task'::fms_step_type end,n,true,
-        jsonb_build_object('deadlineEnabled',false)||case when source_key is null then '{}'::jsonb when stage_key='locked' then
-          '{"assignment":{"mode":"fixed_employee","allowHandoff":false,"sources":[]}}'::jsonb when stage_key='demo' and current_setting('test.fms.demo_mode',true)='manual_handoff' then '{"assignment":{"mode":"manual_handoff","allowHandoff":true,"sources":[]}}'::jsonb else
+        jsonb_build_object('deadlineEnabled',false,'completionFormRequired',stage_key not in ('finish','locked'))||case when source_key is null then '{}'::jsonb when stage_key='call' and current_setting('test.fms.call_mode',true)='manual_handoff' then
+          '{"assignment":{"mode":"manual_handoff","allowHandoff":true,"sources":[]}}'::jsonb when stage_key='locked' then
+          '{"assignment":{"mode":"fixed_employee","allowHandoff":false,"sources":[]}}'::jsonb when stage_key='demo' and current_setting('test.fms.demo_mode',true)='configured_fallback' then '{"assignment":{"mode":"configured_fallback","allowHandoff":true,"sources":[],"fallbackRule":{"type":"previous_step_doer"}}}'::jsonb when stage_key='demo' and current_setting('test.fms.demo_mode',true)='previous_stage_employee' then '{"assignment":{"mode":"previous_stage_employee","allowHandoff":true,"sources":[]}}'::jsonb when stage_key='demo' and current_setting('test.fms.demo_mode',true)='manual_handoff' then '{"assignment":{"mode":"manual_handoff","allowHandoff":true,"sources":[]}}'::jsonb else
           jsonb_build_object('assignment',jsonb_build_object('mode','previous_form','allowHandoff',true,'sources',jsonb_build_array(jsonb_build_object('sourceStageKey',source_key,'formTemplateId',f,'fieldKey','next_employee')))) end
-          ||case when stage_key='call' then jsonb_build_object('taskDisplay',jsonb_build_object('instructions','Call the client','expectedResult','Record their response','fields',jsonb_build_array(jsonb_build_object('sourceStageKey','initial','formTemplateId',f,'fieldKey','client_name')))) else '{}'::jsonb end,
+          ||case when stage_key='call' then jsonb_build_object('taskDisplay',jsonb_build_object('referenceField',case when current_setting('test.fms.with_reference',true)='true' then jsonb_build_object('sourceStageKey','initial','formTemplateId',f,'fieldKey','client_name') else null end,'instructions','Call the client','expectedResult','Record their response','fields',jsonb_build_array(jsonb_build_object('sourceStageKey','initial','formTemplateId',f,'fieldKey','client_name'))||case when current_setting('test.fms.with_options',true)='true' then jsonb_build_array(jsonb_build_object('sourceStageKey','initial','formTemplateId',f,'fieldKey','historical_choice')) else '[]'::jsonb end||case when current_setting('test.fms.with_file',true)='true' then jsonb_build_array(jsonb_build_object('sourceStageKey','initial','formTemplateId',f,'fieldKey','attachment_file')) else '[]'::jsonb end)) else '{}'::jsonb end,
         case when stage_key in ('finish','locked') then null else f end) returning id into stage_id;
     -- An ordinary configured default must not override the preceding form.
     insert into fms_stage_assignees(fms_stage_id,assignee_type,user_profile_id,sort_order) values(stage_id,'specific_user',u,0);
@@ -46,5 +58,6 @@ set local role authenticated;
 select lives_ok($$select publish_fms_flow_with_audit((select id from visit_assignment_fixture where name='flow'))$$,'form-driven workflow publishes without changing legacy assignment');
 insert into visit_assignment_fixture select 'starter',id from fms_starter_assignments where fms_flow_id=(select id from visit_assignment_fixture where name='flow') and user_profile_id=(select id from visit_assignment_fixture where name='a');
 insert into visit_assignment_fixture select 'instance',(submit_fms_form_and_progress_with_audit(
-  (select id from visit_assignment_fixture where name='form'),jsonb_build_object('next_employee',(select id from visit_assignment_fixture where name='b'),'client_name','Synthetic client','private_notes','Do not expose unconfigured fields'),
-  'fms_entry',(select id from visit_assignment_fixture where name='starter'),gen_random_uuid())->>'instance_id')::uuid;
+  (select id from visit_assignment_fixture where name='form'),jsonb_build_object('next_employee',(select id from visit_assignment_fixture where name='b'),'client_name','Synthetic client','private_notes','Do not expose unconfigured fields')||case when current_setting('test.fms.with_options',true)='true' then jsonb_build_object('historical_choice','historic') else '{}'::jsonb end||case when current_setting('test.fms.with_file',true)='true' then jsonb_build_object('attachment_file',(select id from visit_assignment_fixture where name='attachment')) else '{}'::jsonb end,
+  'fms_entry',(select id from visit_assignment_fixture where name='starter'),gen_random_uuid())->>'instance_id')::uuid
+  where coalesce(current_setting('test.fms.defer_start',true),'false')<>'true';

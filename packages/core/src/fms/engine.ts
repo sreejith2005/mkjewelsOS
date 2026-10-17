@@ -50,6 +50,7 @@ export function normalizeFmsDefinition(input: FmsFlowDefinition): FmsFlowDefinit
     splitToFlowId: text(stage.splitToFlowId) || undefined,
     position: Number.isFinite(stage.position?.x) && Number.isFinite(stage.position?.y) ? { x: Math.max(0, Math.round(stage.position!.x)), y: Math.max(0, Math.round(stage.position!.y)) } : undefined,
     sla: {
+      ...(text(stage.sla?.pipelineName) ? { pipelineName: text(stage.sla.pipelineName).slice(0, 80) } : {}),
       ...(stage.sla?.assignment ? { assignment: stage.sla.assignment } : {}),
       ...(stage.sla?.completionFormRequired !== undefined ? { completionFormRequired: stage.sla.completionFormRequired } : {}),
       ...(stage.sla?.taskDisplay ? { taskDisplay: stage.sla.taskDisplay } : {}),

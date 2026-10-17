@@ -2,11 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import { fmsAssignedWorkPath, parseFmsAssignedWorkPath, type FmsAssignedWorkTarget } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
-import { loadFormDynamicOptions, loadTaskForms, submitFmsStarterAssignment, type FormBundle, type FmsStarterResult } from "@/features/forms/api";
+import { loadFormDynamicOptions, loadTaskForms, type FormBundle, type FmsStarterResult } from "@/features/forms/api";
 import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer";
 import { FmsStageRunner } from "@/features/fms/FmsStageRunner";
 import { loadFmsAssignedStage, type FmsAssignedStageBundle } from "@/features/fms/api";
 import { FmsWorkContext } from "@/features/fms/FmsWorkContext";
+import { fmsStartConfirmationFromWork, recoverFmsStartingWork } from "@jewelos/data/fms/work";
+import { useFmsHandoffConfirmation } from "@/features/fms/useFmsHandoffConfirmation";
 
 const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: [], masters: [] };
 
@@ -47,8 +49,16 @@ function StarterForm({ onNavigate, target }: {
 }) {
   const [form, setForm] = useState<FormBundle | null>();
   const [started, setStarted] = useState<FmsStarterResult | null>(null);
+  const { confirmWork, confirmation } = useFmsHandoffConfirmation(target.starterAssignmentId);
   const [options, setOptions] = useState<DynamicOptions>(EMPTY_OPTIONS);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void recoverFmsStartingWork(target.starterAssignmentId).then(result => { if (active && result) setStarted(result); })
+      .catch((error: unknown) => { if (active) setError(error instanceof Error ? error.message : "Could not recover this submission"); });
+    return () => { active = false; };
+  }, [target.starterAssignmentId]);
 
   useEffect(() => {
     let active = true;
@@ -66,12 +76,12 @@ function StarterForm({ onNavigate, target }: {
     return () => { active = false; };
   }, [target.formTemplateId]);
 
-  if (error) return <Notice tone="danger">{error}</Notice>;
   if (started) return <Frame subtitle={started.referenceNumber ?? "Submission saved"} title="Form submitted successfully">
     <Notice tone="success">Form submitted successfully.{started.instanceId ? ` ${started.workflowName ?? "The workflow"} has started.` : ""} {started.assignmentSummary?.map(item => `${item.stageName} has been assigned to ${item.employeeName}.`).join(" ")}</Notice>
     {started.ownWorkTargets?.[0] ? <Button onClick={() => onNavigate(fmsAssignedWorkPath(started.ownWorkTargets![0]!))}>Open my next work</Button> : null}
     <Button onClick={() => onNavigate("/tasks")} variant="secondary">Back to my work</Button>
   </Frame>;
+  if (error) return <Notice tone="danger">{error}</Notice>;
   if (form === undefined) return <Loading />;
   if (form === null) return <Notice>This FMS assignment is complete, withdrawn, or no longer available to your account.</Notice>;
 
@@ -81,12 +91,16 @@ function StarterForm({ onNavigate, target }: {
         definition={{ name: form.name, description: form.description ?? undefined, sections: form.sections, fields: form.fields }}
         dynamicOptions={options}
         onSubmit={async (answers) => {
-          setStarted(await submitFmsStarterAssignment(form.id, target.starterAssignmentId, answers));
+          const completed = await confirmWork({ kind: "starter_form", formTemplateId: form.id, starterAssignmentId: target.starterAssignmentId, answers });
+          if (!completed) return false;
+          setStarted(fmsStartConfirmationFromWork(completed));
+          return true;
         }}
         templateId={form.id}
         workflowHint
       />
     </div>
+    {confirmation}
   </Frame>;
 }
 

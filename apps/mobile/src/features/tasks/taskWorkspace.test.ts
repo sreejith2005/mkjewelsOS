@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { findWorkspaceTask, loadTaskWorkspacePage, loadTaskDetail, type TaskWorkspace } from "./taskWorkspace";
 
-const api = vi.hoisted(() => ({ page: vi.fn(), feed: vi.fn(), references: vi.fn() }));
-vi.mock("@jewelos/data/tasks/api", () => ({ loadTaskPage: api.page, loadTaskFeed: api.feed, loadTaskFeedReferenceData: api.references }));
+const api = vi.hoisted(() => ({ page: vi.fn(), feed: vi.fn(), references: vi.fn(), tabs: vi.fn() }));
+vi.mock("@jewelos/data/tasks/api", () => ({ loadTaskTabCounts: api.tabs, loadTaskPage: api.page, loadTaskFeed: api.feed, loadTaskFeedReferenceData: api.references }));
 vi.mock("@/lib/log", () => ({ log: { warn: vi.fn(), debug: vi.fn() } }));
 
 describe("task workspace details", () => {
@@ -19,9 +19,11 @@ describe("paged task workspace", () => {
   it("requests only the selected page and keeps full counts", async () => {
     api.page.mockResolvedValue({ tasks: [], total: 12345, counts: { pending: 12345, overdue: 0, completed: 0, open: 12345 } });
     api.references.mockResolvedValue({ categories: [] });
+    api.tabs.mockResolvedValue({ mine: 8, delegated: 12345, inLoop: 3 });
     const page = await loadTaskWorkspacePage({ id: "viewer", tenant_id: "tenant", user_role: "admin" }, "delegated", "pending", 50);
     expect(api.page).toHaveBeenCalledWith("viewer", "tenant", "delegated", "pending", 50);
     expect(page.total).toBe(12345);
+    expect(page.tabCounts).toEqual({ mine: 8, delegated: 12345, inLoop: 3 });
     expect(api.feed).not.toHaveBeenCalled();
   });
   it("opens a persisted task directly without loading the board", async () => {

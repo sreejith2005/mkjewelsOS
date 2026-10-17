@@ -14,6 +14,7 @@ import {
   taskFrequencyLabel,
   taskScheduleStateLabel,
   taskTypeLabel,
+  taskNeedsCompletionRemark,
   taskVerificationLabel,
   type Tables,
 } from "@jewelos/core";
@@ -153,7 +154,8 @@ export function TaskDetailScreen() {
   const fmsFormAction = task.task_type === "fms" && Boolean(task.requires_form) && !completed;
   const fmsStageAction = task.task_type === "fms" && !task.requires_form && !completed;
   const statusLabel = completed ? "Completed" : blocked ? "Coverage required" : overdue ? "Overdue" : task.status === "in_progress" ? "In Progress" : "Pending";
-  const remarkMissing = Boolean(task.requires_remark) && !remark.trim();
+  const needsRemark = taskNeedsCompletionRemark(task, profile.id);
+  const remarkMissing = needsRemark && !remark.trim();
   const description = task.description?.trim();
 
   const pickEvidence = async () => {
@@ -311,12 +313,12 @@ export function TaskDetailScreen() {
         />
       ) : null}
 
-      {!formOnlyAction && !readOnly && task.requires_remark && !completed ? (
+      {!formOnlyAction && !readOnly && needsRemark && !completed ? (
         <TextField label="Completion remark" maxLength={2000} multiline onChangeText={setRemark} value={remark} />
       ) : null}
 
       {state.showDirectUpload ? (
-        <Button busy={busy} full label="Upload" onPress={() => void uploadEvidence(true)} />
+        <Button busy={busy} full label="Upload" onPress={() => void uploadEvidence(!needsRemark)} />
       ) : state.showDirectComplete ? (
         <Button
           busy={busy}

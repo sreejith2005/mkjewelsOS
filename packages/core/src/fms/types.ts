@@ -31,6 +31,7 @@ export type FmsDecisionOption = Readonly<{ key: string; label: string }>;
 /** A conditional step activates only for one configured option of an earlier Decision Step. */
 export type FmsConditionalRule = Readonly<{ decisionStageKey: string; outcome: string } | { decisionStageKey: string; decisionOptionKey: string }>;
 export type FmsSlaRule = Readonly<{
+  pipelineName?: string | undefined;
   assignment?: FmsAssignmentConfig | undefined;
   completionFormRequired?: boolean | undefined;
   taskDisplay?: FmsTaskDisplay | undefined;

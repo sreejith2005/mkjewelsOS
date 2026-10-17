@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, GitBranch, Plus, Trash2 } from "lucide-react";
 import {
   FMS_BRANCH_OPERATORS,
+  fmsStageNeedsAssignment,
   fmsFieldOptions,
   fmsRouteAnswerSelection,
   fmsAssignmentFields,
@@ -100,7 +101,7 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete, assign
       <p className="text-xs text-soft-grey">Choose a required, always visible User question in the linked form. Its answer sets the default for later steps; explicit step assignments take priority.</p></> : null}
     </section> : null}
 
-    {human && !firstStage && assignmentVersion === 2 ? <FmsAssignmentEditor stage={stage} stages={stages} data={data} onChange={onChange} /> : null}
+    {human && fmsStageNeedsAssignment(stages, stage.key) && assignmentVersion === 2 ? <FmsAssignmentEditor stage={stage} stages={stages} data={data} onChange={onChange} /> : null}
 
     {canChooseNext ? <StageRouting decision={decision} fields={formFields} others={others} stage={stage} changeRule={changeBranchRule} moveRule={moveBranchRule} update={update} /> : null}
 
@@ -118,7 +119,7 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete, assign
       </details>
       <details className="rounded-xl border border-gold/15" open={optionCheckboxes.some(({ key }) => stage[key])}>
         <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-champagne">Completion controls</summary>
-        <div className="grid gap-2 px-3 pb-3 text-sm sm:grid-cols-2">{optionCheckboxes.map(({ key, label }) => <label className="rounded-lg border border-gold/15 p-2" key={key}><input checked={stage[key]} onChange={(event) => update({ [key]: event.target.checked })} type="checkbox" /> {label}</label>)}</div>
+        <div className="grid gap-2 px-3 pb-3 text-sm sm:grid-cols-2">{optionCheckboxes.filter(option => assignmentVersion !== 2 || option.key !== "requiresNextDoerHandoff").map(({ key, label }) => <label className="rounded-lg border border-gold/15 p-2" key={key}><input checked={stage[key]} onChange={(event) => update({ [key]: event.target.checked })} type="checkbox" /> {label}</label>)}</div>
       </details>
       <details className="rounded-xl border border-gold/15">
         <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-soft-grey">Technical details</summary>

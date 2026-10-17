@@ -7,6 +7,19 @@ import { TaskCard } from "./TaskCard";
 
 afterEach(cleanup);
 
+it("shows configured FMS context without replacing ordinary task content", () => {
+  const contextual = { ...task, task_type: "fms" as const, fmsWorkContext: {
+    workflowName: "Enquiry", stageName: "Call", reference: "FMS-local", instructions: "Call the client", expectedResult: "Record the reply",
+    dueAt: null, assignedNames: ["Employee B"], titleTemplate: "Call {initial.client_name}", shortDescription: "Follow up on the enquiry", dueLabel: "Due",
+    receivedFields: [{ sourceStageKey: "initial", submissionId: "submission", formTemplateId: "form", formName: "Enquiry form", formVersion: 1,
+      field: { key: "client_name", label: "Client", type: "text" as const, sortOrder: 0 }, value: "Synthetic client" }], journey: [], nextCursor: null,
+  } };
+  render(<TaskCard task={contextual} capability={capability} categoryLabel="FMS" onAction={async () => undefined} />);
+  expect(screen.getByText("Call Synthetic client")).toBeTruthy();
+  expect(screen.getByText("Client:")).toBeTruthy();
+  expect(screen.getByText("Follow up on the enquiry")).toBeTruthy();
+});
+
 const capability: TaskMutationCapability = {
   access: "doer",
   canMutate: true,
@@ -71,6 +84,20 @@ const task = {
 } as TaskBundle;
 
 describe("TaskCard direct completion", () => {
+  it("opens and focuses the required remark when completing a collapsed checklist", async () => {
+    const onAction = vi.fn().mockResolvedValue(undefined);
+    render(<TaskCard viewerId="doer-1" capability={capability} categoryLabel="Uncategorized" onAction={onAction}
+      task={{ ...task, task_type: "checklist", requires_remark: true }} />);
+    const complete = screen.getByRole("button", { name: "Complete task: Direct completion task" });
+    expect(complete).toHaveProperty("disabled", false);
+    fireEvent.click(complete);
+    const input = await screen.findByRole("textbox", { name: "Completion remark" });
+    await waitFor(() => expect(document.activeElement).toBe(input));
+    expect(onAction).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: "Opening checks finished" } });
+    fireEvent.click(complete);
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ kind: "complete", remark: "Opening checks finished" }));
+  });
   it("offers the required upload on an edited checklist", () => {
     render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={vi.fn()} task={{ ...task, task_type: "checklist", requires_upload: true, title: "Edited checklist" }} />);
     expect(screen.getByLabelText("Upload task: Edited checklist")).toBeTruthy();

@@ -22,4 +22,11 @@ describe("FMS work presentation", () => {
     expect(presentFmsWorkContext({ ...context, titleTemplate: "{private_notes}" }).title).toBe("Jewellery enquiry — Introduction Call");
     expect(presentFmsWorkContext({ ...context, titleTemplate: "" }).title).toBe("Jewellery enquiry — Introduction Call");
   });
+  it("uses an authorized received value as the configured reference", () => {
+    const work = presentFmsWorkContext({ ...context, referenceKey: "initial.client_name", titleTemplate: "{reference} - {stage}" });
+    expect(work.reference).toBe("Synthetic client");
+    expect(work.title).toBe("Synthetic client - Introduction Call");
+    expect(presentFmsWorkContext({ ...context, referenceKey: "hidden.secret" }).reference).toBe("FMS-TEST");
+  });
+
 });

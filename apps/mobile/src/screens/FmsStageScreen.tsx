@@ -210,7 +210,7 @@ export function FmsStageScreen() {
   };
 
   const reject = async () => {
-    await run(() => confirmWork({ kind: "review", instanceStageId: stage.id, decision: "rejected", remark }));
+    await run(() => confirmWork({ kind: "review", instanceStageId: stage.id, decision: "rejected", remark, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) }));
   };
 
   const confirmDisabled = busy
@@ -230,6 +230,7 @@ export function FmsStageScreen() {
       }
       scroll
     >
+      {instance.status === "on_hold" ? <Banner>The workflow is on hold for manager review. Your saved form and assigned work are preserved.</Banner> : null}
       {actionError ? <Banner tone="danger">{actionError}</Banner> : null}
 
       <View style={styles.header}>
@@ -363,7 +364,7 @@ export function FmsStageScreen() {
               <Button
                 busy={busy}
                 label="Approve"
-                onPress={() => void run(() => confirmWork({ kind: "review", instanceStageId: stage.id, decision: "approved", remark }))}
+                onPress={() => void run(() => confirmWork({ kind: "review", instanceStageId: stage.id, decision: "approved", remark, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) }))}
               />
             ) : null}
             {capability.canReject ? <Button busy={busy} label="Reject" onPress={() => void reject()} variant="danger" /> : null}
@@ -426,7 +427,7 @@ export function FmsStageScreen() {
         </View>
       </Sheet>
       {confirmation}
-      {result ? <Banner tone="success">{result.state === "workflow_completed" ? "Workflow completed." : result.state === "successors_activated"
+      {result ? <Banner tone="success">{result.state === "workflow_on_hold" ? "Work saved. The workflow is on hold for review after its configured follow-up limit." : result.state === "workflow_completed" ? "Workflow completed." : result.state === "successors_activated"
         ? result.destinations.map(item => `${item.stageName} assigned to ${item.employeeName ?? "the configured employee"}.`).join(" ") : "Work saved. Remaining requirements or approvals are pending."}</Banner> : null}
     </Screen>
   );

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, CheckSquare, ChevronRight, Copy, FileText, Flag, GitBranch, Layers, Merge, Plus, ShieldCheck, Trash2, Zap } from "lucide-react";
 import { fmsStagesInFlowOrder, reachableFmsStageKeys, type FmsFlowDefinition, type FmsFormFieldRef, type FmsStageDefinition } from "@jewelos/core";
 import { cn } from "@/lib/utils";
@@ -35,9 +35,16 @@ export function FmsStepList({ definition, formFields, selectedKey, invalidKeys, 
   const edges = useMemo(() => fmsGraphEdges(definition.stages, formFields), [definition.stages, formFields]);
   const names = useMemo(() => new Map(definition.stages.map((stage) => [stage.key, stage.name || "Untitled stage"])), [definition.stages]);
   const firstKey = definition.stages[0]?.key;
+  const groups = useMemo(() => [...new Set(definition.stages.flatMap(stage => stage.sla.pipelineName ? [stage.sla.pipelineName] : []))], [definition.stages]);
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    const group = definition.stages.find(stage => stage.key === selectedKey)?.sla.pipelineName;
+    if (group) setCollapsed(current => { if (!current.has(group)) return current; const next = new Set(current); next.delete(group); return next; });
+  }, [selectedKey, definition.stages]);
 
-  return <ol aria-label="Workflow steps" className="space-y-2">
+  return <>{groups.length ? <div aria-label="Pipeline groups" className="mb-3 flex flex-wrap gap-2">{groups.map(group => <button aria-expanded={!collapsed.has(group)} className="min-h-11 rounded-xl border border-gold/20 px-3 text-sm text-champagne" key={group} onClick={() => setCollapsed(current => { const next = new Set(current); if (next.has(group)) next.delete(group); else next.add(group); return next; })} type="button">{group} · {definition.stages.filter(stage => stage.sla.pipelineName === group).length} steps · {collapsed.has(group) ? "Expand" : "Collapse"}</button>)}</div> : null}<ol aria-label="Workflow steps" className="space-y-2">
     {ordered.map((stage, index) => {
+      if (stage.sla.pipelineName && collapsed.has(stage.sla.pipelineName)) return null;
       const item = appearance[stage.type];
       const outgoing = edges.filter((edge) => edge.from === stage.key);
       const invalid = invalidKeys.has(stage.key);
@@ -45,6 +52,7 @@ export function FmsStepList({ definition, formFields, selectedKey, invalidKeys, 
       const canAppend = !["end", "branch", "parallel_start"].includes(stage.type);
       const orphan = !isFirst && !reachable.has(stage.key);
       return <li key={stage.key}>
+        {stage.sla.pipelineName ? <p className="mb-1 text-xs font-semibold text-gold">{stage.sla.pipelineName}</p> : null}
         <article className={cn("rounded-2xl border bg-charcoal", stage.key === selectedKey ? "border-gold ring-1 ring-gold" : "border-gold/20", invalid && "border-danger ring-1 ring-danger")}>
           <button aria-label={`Edit ${stage.name || "Untitled stage"}`} className="flex w-full items-start gap-3 p-4 text-left" onClick={() => onSelect(stage.key)} type="button">
             <span className="grid size-8 shrink-0 place-items-center rounded-full border border-gold/30 text-sm font-semibold text-gold">{index + 1}</span>
@@ -74,5 +82,5 @@ export function FmsStepList({ definition, formFields, selectedKey, invalidKeys, 
         {canAppend ? <button aria-label={`Add next step after ${stage.name}`} className="mx-auto mt-2 flex min-h-11 items-center gap-1.5 rounded-full border border-dashed border-gold/40 px-4 text-xs font-semibold text-gold hover:bg-gold/10" onClick={() => onAddAfter(stage.key)} type="button"><Plus className="size-4" />Add step here</button> : null}
       </li>;
     })}
-  </ol>;
+  </ol></>;
 }

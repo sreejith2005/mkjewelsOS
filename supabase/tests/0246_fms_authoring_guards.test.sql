@@ -1,0 +1,23 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path=public,extensions;
+select no_plan();
+\ir helpers/fms_visit_assignment_fixture.psql
+insert into visit_assignment_fixture select 'revision',create_fms_revision_with_audit((select id from visit_assignment_fixture where name='flow'));
+reset role;
+update fms_stages set planned_time_rule=jsonb_set(planned_time_rule,'{completionFormRequired}','false') where fms_flow_id=(select id from visit_assignment_fixture where name='revision') and stage_key='call';
+set local role authenticated;
+select throws_ok($$select publish_fms_flow_with_audit((select id from visit_assignment_fixture where name='revision'))$$,'23514','The assignment source form on step Call must be required','direct API publication cannot allow a required owner form to be skipped');
+reset role;
+update fms_stages set planned_time_rule=jsonb_set(planned_time_rule,'{completionFormRequired}','true') where fms_flow_id=(select id from visit_assignment_fixture where name='revision') and stage_key='call';
+update fms_stages set planned_time_rule=jsonb_set(planned_time_rule,'{taskDisplay,fields}','[{"sourceStageKey":"initial","formTemplateId":"00000000-0000-0000-0000-000000000001","fieldKey":"private_notes"}]') where fms_flow_id=(select id from visit_assignment_fixture where name='revision') and stage_key='call';
+set local role authenticated;
+select throws_ok($$select publish_fms_flow_with_audit((select id from visit_assignment_fixture where name='revision'))$$,'23514','Work-information question for step Call must belong to an exact source form version','task context cannot map a field from a forged form');
+reset role;
+update fms_stages set planned_time_rule=planned_time_rule-'taskDisplay' where fms_flow_id=(select id from visit_assignment_fixture where name='revision') and stage_key='call';
+set local role authenticated;
+select lives_ok($$select publish_fms_flow_with_audit((select id from visit_assignment_fixture where name='revision'))$$,'valid source contract publishes');
+reset role;
+select ok(not has_function_privilege('authenticated','fms_remap_assignment_routes(uuid,jsonb,uuid)','execute'),'route remapping remains internal');
+select * from finish();
+rollback;

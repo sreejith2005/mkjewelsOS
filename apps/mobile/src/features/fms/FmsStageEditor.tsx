@@ -4,6 +4,7 @@ import { StyleSheet, View, type LayoutChangeEvent } from "react-native";
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react-native";
 import {
   FMS_BRANCH_OPERATORS,
+  fmsStageNeedsAssignment,
   fmsFieldOptions,
   fmsRouteAnswerSelection,
   fmsAssignmentFields,
@@ -167,7 +168,7 @@ export function FmsStageEditor({
         </Section>
       ) : null}
 
-      {human && !firstStage && assignmentVersion === 2 ? <FmsAssignmentEditor stage={stage} stages={stages} data={data} onChange={onChange} /> : null}
+      {human && fmsStageNeedsAssignment(stages, stage.key) && assignmentVersion === 2 ? <FmsAssignmentEditor stage={stage} stages={stages} data={data} onChange={onChange} /> : null}
 
       {canChooseNext ? <StageRouting changeRule={changeBranchRule} decision={decision} fields={formFields} highlight={!formIssue && !deadlineIssue && /route|reference|completion_path|cycle|unreachable/.test(issueCode ?? "")} issueCode={issueCode} issueMessage={issueMessage} moveRule={moveBranchRule} onIssueLayout={onIssueLayout} others={others} stage={stage} update={update} /> : null}
 
@@ -181,7 +182,7 @@ export function FmsStageEditor({
         <Section title="Instructions and controls" {...mark(["invalid_checklist", "incompatible_completion_rule"].includes(issueCode ?? ""))}>
           <TextField label={`How / instructions${stage.method ? "" : " (optional)"}`} multiline onChangeText={(method) => update({ method })} placeholder="e.g. Get WhatsApp PO confirmation" value={stage.method ?? ""} />
           <Text tone="muted" variant="label">Completion controls</Text>
-          {optionCheckboxes.map(({ key, label }) => <ToggleField disabled={false} key={key} label={label} onChange={(value) => update({ [key]: value })} required={false} value={stage[key]} />)}
+          {optionCheckboxes.filter(option => assignmentVersion !== 2 || option.key !== "requiresNextDoerHandoff").map(({ key, label }) => <ToggleField disabled={false} key={key} label={label} onChange={(value) => update({ [key]: value })} required={false} value={stage[key]} />)}
           <TextField autoCapitalize="none" label="Stable key (technical)" onChangeText={(value) => update({ key: value.toLowerCase().replace(/[^a-z0-9_]/g, "_") })} value={stage.key} />
         </Section>
       ) : null}

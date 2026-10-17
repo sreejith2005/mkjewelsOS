@@ -1,7 +1,7 @@
 import type { TaskWorkspaceView, TaskFeedStatusFilter } from "@jewelos/core";
 import { kolkataDateKey, splitAssignedTaskFeed, splitWatchedTaskFeed } from "@jewelos/core";
 import type { UserProfile } from "@jewelos/data/auth/session";
-import { ensureMyRecurringTasks, loadTaskPage, loadTaskFeed, loadTaskFeedReferenceData, type TaskBundle, type TaskFeedReferenceData } from "@jewelos/data/tasks/api";
+import { ensureMyRecurringTasks, loadTaskTabCounts, loadTaskPage, loadTaskFeed, loadTaskFeedReferenceData, type TaskBundle, type TaskFeedReferenceData } from "@jewelos/data/tasks/api";
 import { log } from "@/lib/log";
 
 const MANAGER_ROLES = new Set(["super_admin", "admin", "manager"]);
@@ -71,12 +71,13 @@ export function findWorkspaceTask(workspace: TaskWorkspace | null | undefined, t
 }
 
 
-export async function loadTaskWorkspacePage(viewer: WorkspaceViewer, view: TaskWorkspaceView, status: TaskFeedStatusFilter, offset = 0) {
-  const [page, references] = await Promise.all([
+export async function loadTaskWorkspacePage(viewer: WorkspaceViewer, view: TaskWorkspaceView, status: TaskFeedStatusFilter, offset = 0, includeAll = false) {
+  const [page, references, tabCounts] = await Promise.all([
     loadTaskPage(viewer.id, viewer.tenant_id, view, status, offset),
     loadTaskFeedReferenceData().catch(() => ({ categories: [] })),
+    loadTaskTabCounts(includeAll).catch(() => null),
   ]);
-  return { ...page, categories: references.categories, identity: `${viewer.id}|${view}|${status}|${offset}` };
+  return { ...page, tabCounts, categories: references.categories, identity: `${viewer.id}|${view}|${status}|${offset}` };
 }
 
 export async function loadTaskDetail(viewer: WorkspaceViewer, taskId: string): Promise<TaskBundle | null> {

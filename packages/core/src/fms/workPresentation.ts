@@ -2,9 +2,10 @@ import { presentFormSubmission } from "../forms/submissionPresentation";
 import type { FormAnswer, FormFieldDefinition } from "../forms/types";
 
 export type FmsReceivedField = Readonly<{ sourceStageKey: string; submissionId: string; formTemplateId: string;
-  formName: string; formVersion: number; field: FormFieldDefinition; value: FormAnswer | null; userName?: string | null }>;
+  formName: string; formVersion: number; field: FormFieldDefinition; value: FormAnswer | null; userName?: string | null;
+  attachment?: Readonly<{ id: string; name: string; mimeType: string; sizeBytes: number }> | null | undefined }>;
 export type FmsWorkContext = Readonly<{
-  workflowName: string; stageName: string; reference: string; instructions: string; expectedResult: string;
+  workflowName: string; stageName: string; reference: string; referenceKey?: string | null | undefined; instructions: string; expectedResult: string;
   dueAt: string | null; assignedNames: readonly string[]; titleTemplate: string; shortDescription: string; dueLabel: string;
   receivedFields: readonly FmsReceivedField[]; journey: readonly Readonly<{ id: string; stageName: string; status: string;
     employeeName: string | null; visitNumber: number; completedAt: string | null }>[]; nextCursor: string | null;
@@ -26,6 +27,8 @@ export function presentFmsWorkContext(context: FmsWorkContext) {
     substitutions.set(`${received.sourceStageKey}.${received.field.key}`, display);
     return { label: received.field.label, display, source: `${received.formName} · v${received.formVersion}` };
   });
+  const reference = context.referenceKey ? substitutions.get(context.referenceKey) || context.reference : context.reference;
+  substitutions.set("reference", reference);
   let unresolved = false;
   const substituted = context.titleTemplate.slice(0, 500).replace(/\{([^{}]+)\}/g, (_match: string, key: string) => {
     const value = substitutions.get(key);
@@ -33,7 +36,7 @@ export function presentFmsWorkContext(context: FmsWorkContext) {
     return value;
   }).trim();
   return { title: !unresolved && substituted ? substituted.slice(0, 250) : `${context.workflowName} — ${context.stageName}`,
-    answers, instructions: context.instructions, expectedResult: context.expectedResult, shortDescription: context.shortDescription,
+    reference, answers, instructions: context.instructions, expectedResult: context.expectedResult, shortDescription: context.shortDescription,
     dueAt: context.dueAt, dueLabel: context.dueLabel || "Due", assignedNames: context.assignedNames,
     journey: context.journey, nextCursor: context.nextCursor };
 }

@@ -216,4 +216,14 @@ Public RPCs: `preview_fms_work_transition(p_request jsonb) returns jsonb`; `tran
 
 Coverage: original phases 1 and 13 are covered by Tasks 1-6/12; phase 2 by 2-4/9; phase 3 by 4/6/11; phases 4-5 by 2/4/7/9; phase 6 by 5/8/9; phase 7 by 11; phases 8-12 by 2/3/9/10; phases 14-16 and acceptance A-M by 12. The five Review Focus cases each have explicit task tests. Compatibility, inactive/cross-scope denial, exact form pinning, prior-context disclosure, file authorization and signed release gates are included.
 
-Implementation has not begun. Approval of this plan and selection of inline or subagent-driven execution is the next skill-required checkpoint. Existing design approval remains valid and must not be requested again.
+The owner approved this design and plan and selected inline implementation. Implementation and local verification are in progress; publication remains gated by the production playbook and device/runtime evidence. Do not request design approval again.
+
+2026-10-17 scope update: the owner explicitly deferred Android and requested
+the web app be finished first. Android/device/APK items above are deferred for
+this scope. Existing native edits are preserved. Web/database implementation
+and focused verification are recorded in
+`docs/FMS_IMPLEMENTATION_REPORT_2026-10-17.md` and
+`docs/FMS_OPERATIONAL_VERIFICATION_2026-10-15.md`; Task 12 remains open for the
+combined SQL replay/lint, expanded browser proof, independent review and web
+release gates. Docker Desktop currently returns HTTP 500 and the dedicated
+API/database ports are unreachable. No unrelated stack is restarted.
