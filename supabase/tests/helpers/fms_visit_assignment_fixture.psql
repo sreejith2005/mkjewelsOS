@@ -19,7 +19,7 @@ begin
   insert into form_templates(tenant_id,name,version,lifecycle,is_active,created_by,updated_by)
     values(t,'Visit completion',1,'draft',true,u,u) returning id into f;
   insert into form_fields(form_template_id,field_key,field_name,field_type,sort_order,is_required,is_shown)
-    values(f,'next_employee','Next employee','user_dropdown',0,true,true);
+    values(f,'next_employee',case when current_setting('test.fms.assigned_to_label',true)='true' then 'Assigned To' else 'Next employee' end,'user_dropdown',0,true,true);
   insert into form_fields(form_template_id,field_key,field_name,field_type,sort_order,is_required,is_shown)
     values(f,'client_name','Client name','text',1,false,true),(f,'private_notes','Private notes','text',2,false,true);
   if current_setting('test.fms.with_options',true)='true' then

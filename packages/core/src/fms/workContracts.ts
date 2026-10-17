@@ -5,7 +5,7 @@ import type { FmsAssigneeRule } from "./types";
 export const FMS_ASSIGNMENT_MODES = ["previous_form", "fixed_employee", "hierarchy", "previous_stage_employee", "manual_handoff", "configured_fallback"] as const;
 export type FmsAssignmentMode = typeof FMS_ASSIGNMENT_MODES[number];
 export type FmsAssignmentSource = Readonly<{ sourceStageKey: string; formTemplateId: string; fieldKey: string; routeRuleId?: string | undefined }>;
-export type FmsAssignmentConfig = Readonly<{ mode: FmsAssignmentMode; sources: readonly FmsAssignmentSource[]; allowHandoff: boolean; fallbackRule?: FmsAssigneeRule | undefined }>;
+export type FmsAssignmentConfig = Readonly<{ mode: FmsAssignmentMode; sources: readonly FmsAssignmentSource[]; allowHandoff: boolean; fallbackRule?: FmsAssigneeRule | undefined; followFormAssignee?: boolean | undefined }>;
 export type FmsTaskDisplay = Readonly<{
   titleTemplate?: string | undefined; shortDescription?: string | undefined; instructions?: string | undefined;
   expectedResult?: string | undefined; dueLabel?: string | undefined; referenceField?: FmsAssignmentSource | undefined;

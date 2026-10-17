@@ -4,6 +4,27 @@ import { simulateFmsDefinition } from "./simulation";
 const stage = (key: string, patch: Partial<FmsStageDefinition> = {}): FmsStageDefinition => ({ key, name: key, type: "task", order: 0, required: true, completionRule: "any_doer", allowMultipleDoers: false, requiresUpload: false, requiresRemark: false, checklist: [], assigneeRules: [{type:"specific_user",userProfileId:"default"}], requiresNextDoerHandoff:false,canMoveBackward:false,canReject:false,canRequestRevision:false,canEscalate:false,branchRules:[],parallelTargetStageKeys:[],joinRequiredStageKeys:[],sla:{},...patch });
 const flow = (stages: FmsStageDefinition[]): FmsFlowDefinition => ({name:"Simulation",scope:"tenant",manualTrigger:true,assignmentVersion:2,stages:stages.map((s,order)=>({...s,order}))});
 describe("workflow authoring simulation",()=>{
+  it("requires an explicit advanced rule when parallel work merges into a simple step", () => {
+    const result = simulateFmsDefinition(flow([
+      stage("initial", { defaultNextStageKey: "split" }),
+      stage("split", { type: "parallel_start", parallelTargetStageKeys: ["left", "right"] }),
+      stage("left", { defaultNextStageKey: "join" }), stage("right", { defaultNextStageKey: "join" }),
+      stage("join", { type: "parallel_join", joinRule: "all", defaultNextStageKey: "next" }),
+      stage("next", { sla: { assignment: { mode: "previous_form", sources: [], allowHandoff: false, followFormAssignee: true } } }),
+    ]), { starterId: "A", answers: {} });
+    expect(result.events.at(-1)?.status).toBe("waiting");
+    expect(result.events.at(-1)?.note).toMatch(/parallel join/);
+  });
+  it("follows each Assigned To answer and keeps the previous owner when there is no question", () => {
+    const assignment = { mode: "previous_form" as const, sources: [], allowHandoff: false, followFormAssignee: true, fallbackRule: { type: "previous_step_doer" as const } };
+    const result = simulateFmsDefinition(flow([
+      stage("initial", { type: "form", formTemplateId: "form", defaultNextStageKey: "call" }),
+      stage("call", { defaultNextStageKey: "demo", sla: { assignment } }),
+      stage("demo", { formTemplateId: "form", defaultNextStageKey: "finish", sla: { assignment } }),
+      stage("finish", { sla: { assignment } }),
+    ]), { starterId: "A", answers: { initial: [{ assigned_to: "B" }], demo: [{ assigned_to: "C" }] }, forms: { form: { name: "Form", fields: [{ key: "assigned_to", label: "Assigned To", type: "user_dropdown", sortOrder: 0, required: true }] } } });
+    expect(result.events.map(event => event.selectedUserId)).toEqual(["A", "B", "B", "C"]);
+  });
   it("normalizes hidden answers using the pinned Form definition", () => {
     const result = simulateFmsDefinition(flow([stage("initial", { type: "form", formTemplateId: "form", defaultNextStageKey: "call" }), stage("call", { sla: { assignment: { mode: "previous_form", allowHandoff: false, sources: [{ sourceStageKey: "initial", formTemplateId: "form", fieldKey: "owner" }], fallbackRule: { type: "specific_user", userProfileId: "C" } } } })]), { starterId: "A", answers: { initial: [{ owner: "B" }] }, forms: { form: { name: "Pinned", fields: [{ key: "owner", label: "Owner", type: "user_dropdown", sortOrder: 0, shown: false }] } } });
     expect(result.events.at(-1)?.selectedUserId).toBe("C");

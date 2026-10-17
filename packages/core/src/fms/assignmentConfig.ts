@@ -21,7 +21,7 @@ export function validateFmsAssignmentConfig(flow: FmsFlowDefinition, context: Fm
     if (config.mode === "configured_fallback" && !config.fallbackRule) fail("missing_assignment_fallback", "Choose an explicit fallback rule.");
     if (config.mode === "previous_form") {
       if (config.sources.length === 0 && !config.fallbackRule) fail("missing_assignment_source", "Choose the previous form's User question or an explicit fallback.");
-      for (const source of config.sources) {
+      for (const source of config.followFormAssignee ? [] : config.sources) {
         const previous = flow.stages.find(s => s.key === source.sourceStageKey);
         const question = context.formFields?.[source.formTemplateId]?.find(f => f.key === source.fieldKey);
         if (source.routeRuleId && !previous?.branchRules.some(rule => rule.id === source.routeRuleId)) {

@@ -10,8 +10,9 @@ export function upgradeFmsAssignmentContract(flow: FmsFlowDefinition, fields: Re
     if (!fmsStageNeedsAssignment(flow.stages, stage.key) || !["form", "task", "approval"].includes(stage.type) || stage.sla.assignment) return stage;
     const incoming = flow.stages.filter(source => fmsOutgoingStageKeys(source).includes(stage.key));
     const suggestion = suggestFmsAssignment(incoming.length === 1 ? incoming[0] : undefined, fields);
-    const assignment = suggestion.mode === "previous_form" || !stage.assigneeRules.length ? suggestion
-      : { mode: "hierarchy" as const, sources: [], allowHandoff: true };
+    const assignment = suggestion.sources.length > 0
+      ? { ...suggestion, followFormAssignee: false, allowHandoff: true, fallbackRule: undefined }
+      : !stage.assigneeRules.length ? suggestion : { mode: "hierarchy" as const, sources: [], allowHandoff: true };
     return { ...stage, sla: { ...stage.sla, assignment } };
   }) });
 }

@@ -109,6 +109,8 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
     const selector = issueControlSelector(focusedIssue.code, focusedIssue.message);
     const control = inspectorRef.current?.querySelector<HTMLElement>(selector) ?? inspectorRef.current?.querySelector<HTMLElement>("[data-fms-editor] input, [data-fms-editor] select, [data-fms-editor] button");
     if (!control) return;
+    let disclosure = control.closest("details");
+    while (disclosure) { disclosure.open = true; disclosure = disclosure.parentElement?.closest("details") ?? null; }
     control.scrollIntoView?.({ block: "center", behavior: "smooth" });
     control.focus({ preventScroll: true });
     control.classList.add("ring-2", "ring-danger", "ring-offset-2", "ring-offset-obsidian");

@@ -1,0 +1,44 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path=public,extensions;
+select no_plan();
+set local test.fms.defer_start='true';
+set local test.fms.assigned_to_label='true';
+\ir helpers/fms_visit_assignment_fixture.psql
+insert into visit_assignment_fixture select 'revision',create_fms_revision_with_audit((select id from visit_assignment_fixture where name='flow'));
+reset role;
+update fms_stages set planned_time_rule=jsonb_set(planned_time_rule,'{assignment}','{"mode":"previous_form","sources":[],"allowHandoff":false,"followFormAssignee":true,"fallbackRule":{"type":"previous_step_doer"}}')
+where fms_flow_id=(select id from visit_assignment_fixture where name='revision') and stage_key in ('call','demo','negotiation');
+update fms_stages set form_template_id=null,planned_time_rule=jsonb_set(planned_time_rule,'{completionFormRequired}','false') where fms_flow_id=(select id from visit_assignment_fixture where name='revision') and stage_key='call';
+-- Automatic chains follow the actual preceding form, not old inferred pins.
+update fms_stages set planned_time_rule=jsonb_set(planned_time_rule,'{assignment,sources}','[{"sourceStageKey":"removed","formTemplateId":"00000000-0000-4000-8000-000000000001","fieldKey":"removed"}]') where fms_flow_id=(select id from visit_assignment_fixture where name='revision') and stage_key='call';
+set local role authenticated;
+select lives_ok($$select publish_fms_flow_with_audit((select id from visit_assignment_fixture where name='revision'))$$,'simple chain publishes without selecting technical source mappings');
+create temporary table simple_chain(request jsonb,preview jsonb,result jsonb);
+grant all on simple_chain to authenticated;
+insert into simple_chain(request) values(jsonb_build_object('kind','flow_form','flowId',(select id from visit_assignment_fixture where name='revision'),'formTemplateId',(select id from visit_assignment_fixture where name='form'),'answers',jsonb_build_object('next_employee',(select id from visit_assignment_fixture where name='b'))));
+update simple_chain set preview=preview_fms_work_transition(request);
+select is((select preview#>>'{destinations,0,selectedUserId}' from simple_chain),(select id::text from visit_assignment_fixture where name='b'),'initial form previews its selected employee');
+update simple_chain set result=transition_fms_work_with_audit(request,gen_random_uuid(),'[]',preview->>'fingerprint');
+select is((select assigned_to from fms_instance_stages work join fms_stages stage on stage.id=work.fms_stage_id where work.fms_instance_id=(select (result->>'instanceId')::uuid from simple_chain) and stage.stage_key='call'),array[(select id from visit_assignment_fixture where name='b')],'initial form assigns B');
+reset role;
+select is((select resolve_fms_visit_assignment((result->>'instanceId')::uuid,(select id from fms_stages where fms_flow_id=(select id from visit_assignment_fixture where name='revision') and stage_key='demo'),(select id from fms_instance_stages where fms_instance_id=(result->>'instanceId')::uuid and fms_stage_id=(select id from fms_stages where fms_flow_id=(select id from visit_assignment_fixture where name='revision') and stage_key='call')),null,'{}',(select id from fms_stages where fms_flow_id=(select id from visit_assignment_fixture where name='revision') and stage_key='call'),null,null)#>>'{selectedUserIds,0}' from simple_chain),(select id::text from visit_assignment_fixture where name='b'),'an administrator completing on behalf of B does not become the next owner');
+select throws_ok($$select fms_form_chain_choice((select id from visit_assignment_fixture where name='initial'),'{}',array[(select id from visit_assignment_fixture where name='b')])$$,'23514',null,'an existing unanswered employee question cannot silently retain an owner');
+select throws_ok($$select fms_form_chain_choice((select id from fms_stages where fms_flow_id=(select id from visit_assignment_fixture where name='revision') and stage_key='call'),'{}',array[(select id from visit_assignment_fixture where name='b'),(select id from visit_assignment_fixture where name='c')])$$,'23514',null,'multiple previous owners require an explicit rule rather than choosing the first');
+set local role authenticated;
+select set_config('request.jwt.claim.sub',(select id::text from visit_assignment_fixture where name='b_auth'),true);
+update simple_chain set request=jsonb_build_object('kind','complete','instanceStageId',(select work.id from fms_instance_stages work join fms_stages stage on stage.id=work.fms_stage_id where work.fms_instance_id=(simple_chain.result->>'instanceId')::uuid and stage.stage_key='call'),'outcome','','remark','','checklist','{}'::jsonb);
+update simple_chain set preview=preview_fms_work_transition(request);
+select is((select preview#>>'{destinations,0,selectedUserId}' from simple_chain),(select id::text from visit_assignment_fixture where name='b'),'no Assigned To question keeps B in preview');
+update simple_chain set result=transition_fms_work_with_audit(request,gen_random_uuid(),'[]',preview->>'fingerprint');
+select is((select assigned_to from fms_instance_stages work join fms_stages stage on stage.id=work.fms_stage_id where work.fms_instance_id=(select (result->>'instanceId')::uuid from simple_chain) and stage.stage_key='demo'),array[(select id from visit_assignment_fixture where name='b')],'no Assigned To question keeps B in execution');
+update simple_chain set request=jsonb_build_object('kind','stage_form','instanceStageId',(select work.id from fms_instance_stages work join fms_stages stage on stage.id=work.fms_stage_id where work.fms_instance_id=(simple_chain.result->>'instanceId')::uuid and stage.stage_key='demo'),'formTemplateId',(select id from visit_assignment_fixture where name='form'),'answers',jsonb_build_object('next_employee',(select id from visit_assignment_fixture where name='c')),'outcome','','remark','','checklist','{}'::jsonb);
+update simple_chain set preview=preview_fms_work_transition(request);
+select is((select preview#>>'{destinations,0,selectedUserId}' from simple_chain),(select id::text from visit_assignment_fixture where name='c'),'next form previews its new selection C');
+update simple_chain set result=transition_fms_work_with_audit(request,gen_random_uuid(),'[]',preview->>'fingerprint');
+select is((select assigned_to from fms_instance_stages work join fms_stages stage on stage.id=work.fms_stage_id where work.fms_instance_id=(select (result->>'instanceId')::uuid from simple_chain) and stage.stage_key='negotiation'),array[(select id from visit_assignment_fixture where name='c')],'next form hands work to C');
+reset role;
+select is(has_function_privilege('authenticated','fms_form_chain_choice(uuid,jsonb,uuid[])','EXECUTE'),false,'form-chain helper has no direct authenticated grant');
+select is(has_function_privilege('anon','fms_form_chain_choice(uuid,jsonb,uuid[])','EXECUTE'),false,'form-chain helper has no anonymous grant');
+select * from finish();
+rollback;

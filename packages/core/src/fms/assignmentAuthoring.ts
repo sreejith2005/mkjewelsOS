@@ -14,14 +14,28 @@ export function fmsSourceQuestions(stages: readonly FmsStageDefinition[], fields
 }
 export function suggestFmsAssignment(previous: FmsStageDefinition | undefined, fields: Readonly<Record<string, readonly FmsFormFieldRef[]>>): FmsAssignmentConfig {
   const questions = previous?.formTemplateId ? (fields[previous.formTemplateId] ?? []).filter(field => field.type === "user_dropdown" && field.required && field.shown !== false && !field.hasCondition) : [];
-  return previous?.formTemplateId && questions.length === 1 ? { mode: "previous_form", allowHandoff: true,
-    sources: [{ sourceStageKey: previous.key, formTemplateId: previous.formTemplateId, fieldKey: questions[0]!.key }] }
-    : { mode: "manual_handoff", allowHandoff: true, sources: [] };
+  return { mode: "previous_form", allowHandoff: false, followFormAssignee: true,
+    fallbackRule: { type: "previous_step_doer" },
+    sources: previous?.formTemplateId && questions.length === 1
+      ? [{ sourceStageKey: previous.key, formTemplateId: previous.formTemplateId, fieldKey: questions[0]!.key }] : [] };
 }
 /** The form that supplies a required owner cannot be skipped by Complete. */
 export function requireFmsAssignmentSourceForms(flow: FmsFlowDefinition): FmsFlowDefinition {
   if (flow.assignmentVersion !== 2) return flow;
   const required = new Set(flow.stages.flatMap(stage => stage.sla.assignment?.mode === "previous_form" && !stage.sla.assignment.fallbackRule ? stage.sla.assignment.sources.map(source => source.sourceStageKey) : []));
+  for (const target of flow.stages.filter(stage => stage.sla.assignment?.followFormAssignee)) {
+    const visited = new Set<string>();
+    const pending = [target.key];
+    while (pending.length) {
+      const destination = pending.pop()!;
+      if (visited.has(destination)) continue;
+      visited.add(destination);
+      for (const source of flow.stages.filter(stage => fmsOutgoingStageKeys(stage).includes(destination))) {
+        if (["form", "task", "approval"].includes(source.type)) { if (source.formTemplateId) required.add(source.key); }
+        else pending.push(source.key);
+      }
+    }
+  }
   return { ...flow, stages: flow.stages.map(stage => required.has(stage.key) ? { ...stage, sla: { ...stage.sla, completionFormRequired: true } } : stage) };
 }
 

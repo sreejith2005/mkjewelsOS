@@ -24,6 +24,16 @@ export function simulateFmsDefinition(raw: FmsFlowDefinition, input: FmsSimulati
   const arrivals = new Map<string, Map<string, number[]>>();
   const released = new Set<string>();
   const scopes = new Map<string, { targets: readonly string[]; parentCohort: string | null; parentBranch: string | null }>();
+  const eventScopes = new Map<number, { cohort: string | null; branch: string | null }>();
+  const scopeLineage = (context: { cohort: string | null; branch: string | null } | undefined) => {
+    const lineage: { cohort: string; branch: string | null }[] = []; const seen = new Set<string>();
+    while (context?.cohort && !seen.has(context.cohort)) {
+      seen.add(context.cohort); lineage.push({ cohort: context.cohort, branch: context.branch });
+      const parent = scopes.get(context.cohort);
+      context = parent ? { cohort: parent.parentCohort, branch: parent.parentBranch } : undefined;
+    }
+    return lineage;
+  };
   let serial = 0;
   const limit = Math.max(1, Math.min(input.maxEvents ?? 100, 500));
   const route = (stage: FmsStageDefinition, answers: Readonly<Record<string, unknown>>, outcome: string | null) =>
@@ -53,6 +63,24 @@ export function simulateFmsDefinition(raw: FmsFlowDefinition, input: FmsSimulati
         if (selectedIds.length === 1) selected = selectedIds[0] ?? null;
         else if (selectedIds.length > 1 && !stage.allowMultipleDoers) { selectedIds = []; note = "Choose one fixed employee or enable multiple doers."; }
       }
+      else if (config.mode === "previous_form" && config.followFormAssignee) {
+        const previousStage = previousHuman ? byKey.get(previousHuman.stageKey) : undefined;
+        const previousForm = previousHuman?.formTemplateId ? input.forms?.[previousHuman.formTemplateId] : undefined;
+        const questions = previousForm?.fields.filter(field => field.type === "user_dropdown") ?? [];
+        const normalizedName = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const named = questions.filter(field => field.key === previousStage?.sla.assignmentFieldKey || ["assignedto", "assignto"].includes(normalizedName(field.key)) || ["assignedto", "assignto"].includes(normalizedName(field.label)));
+        const choices = named;
+        const previousScope = previousHuman ? eventScopes.get(events.indexOf(previousHuman)) : undefined;
+        const previousLineage = scopeLineage(previousScope);
+        const mergedBranches = token.path.some(index => events[index]?.status === "simulated"
+          && ["form", "task", "approval"].includes(byKey.get(events[index]!.stageKey)?.type ?? "")
+          && scopeLineage(eventScopes.get(index)).some(other => previousLineage.some(own => own.cohort === other.cohort && own.branch !== other.branch)));
+        if (mergedBranches) note = "Simple assignment after a parallel join needs an explicit advanced assignment rule.";
+        else if (previousHuman?.formTemplateId && !previousForm) note = "Load the preceding Form to simulate Assigned To.";
+        else if (choices.length === 0) selected = previousEmployee;
+        else if (choices.length === 1 && typeof previousHuman?.answers[choices[0]!.key] === "string" && previousHuman.answers[choices[0]!.key]) selected = String(previousHuman.answers[choices[0]!.key]);
+        else note = "Choose one Assigned To employee in the preceding form, or configure an advanced assignment rule.";
+      }
       else if (config.mode === "previous_form") {
         for (const index of [...token.path].reverse()) {
           const prior = events[index]!;
@@ -62,7 +90,7 @@ export function simulateFmsDefinition(raw: FmsFlowDefinition, input: FmsSimulati
         }
       } else if (config.mode === "previous_stage_employee") selected = previousEmployee;
       if (config?.allowHandoff && config.mode !== "fixed_employee") selected = input.handoffs?.[stage.key]?.[visit - 1] ?? selected;
-      if (!selected && !selectedIds.length && config?.fallbackRule) {
+      if (!selected && !selectedIds.length && config?.fallbackRule && !config.followFormAssignee) {
         const fallback = config.fallbackRule;
         selected = fallback.type === "specific_user" ? fallback.userProfileId ?? null : fallback.type === "reporter" ? input.starterId ?? null : fallback.type === "previous_step_doer" ? previousEmployee : null;
         method = "configured_fallback";
@@ -89,6 +117,7 @@ export function simulateFmsDefinition(raw: FmsFlowDefinition, input: FmsSimulati
     }
     visits.set(stage.key, visit);
     const index = events.push({ stageKey: stage.key, stageName: stage.name, visit, status, assignmentMethod: method, selectedUserId: selected, selectedUserIds: selectedIds, routeRuleId: skipped ? null : resolveFmsBranch(stage.branchRules, { formAnswers: answers, outcome })?.id ?? null, formTemplateId: stage.formTemplateId ?? null, outcome, answers: skipped ? {} : answers, note }) - 1;
+    eventScopes.set(index, { cohort: token.cohort, branch: token.branch });
     if (status === "waiting" || status === "held" || stage.type === "end") continue;
     const path = [...token.path, index];
     if (stage.type === "parallel_start" && !skipped) {
