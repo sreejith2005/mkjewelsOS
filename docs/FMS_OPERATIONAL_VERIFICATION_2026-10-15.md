@@ -2,8 +2,9 @@
 
 Release numbering: this document records the original isolated development stack. The main-based release uses migrations `0260`-`0284`, preserving production task-video migration `0259`. See `FMS_WEB_RELEASE_2026-10-17.md` for the exact mapping and current release outcome. Do not apply the development filenames to production.
 
-Updated 2026-10-17. Implementation is in progress in the authoritative
-JewelOS repository. This is local evidence, not a production release claim.
+Updated 2026-10-17. This record separates development, integrated release
+and hosted evidence. Production migration results are recorded below;
+authenticated employee acceptance is not inferred from a build or commit.
 
 Owner scope update 2026-10-17: focus on the web app. Android testing and release
 are deferred to the owner and are not a completion gate for this web scope.
@@ -25,21 +26,22 @@ are deferred to the owner and are not a completion gate for this web scope.
   completion, immutable form output, and historical versioning remain the
   existing persisted system. No second execution backend was added.
 
-## Current local evidence
+## Verification evidence
 
 | Check | Result |
 | --- | --- |
 | Isolated Postgres | Dedicated `jewelos-fms-contract`, ports 61321/61322; no hosted writes |
 | Focused core FMS tests | Latest run: 140 passed, including route-source validation and simulation fixes |
-| Full core | 851 passed, 1 failed: pre-existing catalog drift, 42 migration entries versus 36 client entries |
-| Full data | Latest run: 142 passed |
-| Web | Fresh full run: 490/490 passed across 105 files. The later typed sample-answer test also passed its focused simulation run (2/2) |
+| Integrated core | 946 assertions passed; one worker-startup failure followed by 37 passing voice/catalog retry assertions. Catalog parity passes on current main |
+| Full data | Development 142 passed; integrated release 181 passed |
+| Web | Development 490 passed plus simulation 2/2; integrated release 528 full-scan assertions plus 5 proper-directory theme assertions passed |
 | Native | Full run: 127 passed, one availability timeout; isolated retry passed that test. Native typecheck passed before latest simulation error handling |
 | Workspace typecheck | 6 packages passed; final web `tsc --noEmit` also passed with the corrected test fixtures |
-| Build | Five library packages passed the workspace build; final `pnpm.cmd --filter web build` passed including web TypeScript and Vite production output |
+| Build | Integrated release web TypeScript and Vite production build passed (2201 modules) |
 | Real local browser | Passed 390x844 and 1440x900; private PDF upload/sign/download, cancel preserving answers, eligible replacement, atomic owner, three-request retry race, one Form and successor, no other-owner redirect, no overflow/runtime errors |
 | Android device | `adb devices -l`: no connected device |
-| Hosted migration/deployment | Not performed |
+| Hosted migrations | Production 0260-0284 applied and ledger-verified; subsequent dry-run up to date |
+| Hosted schema/security | Public-schema lint zero errors; four anonymous API denials passed |
 | Signed APK/release | Not performed; explicitly deferred by the owner |
 
 The final pgTAP sweep could not start: Docker Desktop returned HTTP 500 on
@@ -65,7 +67,8 @@ The flow/instance assignment version, mutation request hash, handoff-intent
 and assignment-decision tables, scoped RPCs, and private helper contracts are
 reflected in the application-visible portions of both Database type files.
 The scoped generator reads isolated metadata and preserves unrelated dirty
-members; complete schema/type reconciliation remains a release check.
+members; complete schema-wide type regeneration was not performed; relevant FMS
+members are synchronized and release TypeScript passes.
 Tables expose scoped reads, not
 browser writes. Audited server functions own protected mutations. New helper
 functions are revoked from browser and service-role direct execution where
@@ -75,23 +78,23 @@ Version 1 remains compatible; version 2 does not use the old global form
 assignee context as the source of later owners. No historical owner or
 submission is rewritten as part of the upgrade. CRM schema/data is untouched.
 
-## Open gates
+## Remaining evidence limits
 
-1. Restore access to the isolated Docker database, finish the combined SQL
-   regression/lint/replay and expanded browser builder/start-flow checks.
-   The independent reviewer stopped on a provider usage limit before a final
-   report. Its partial important findings were addressed in a consolidated
-   fix pass; author checks do not establish a clean independent review.
-2. Reconcile the unrelated permission catalog baseline before declaring the
-   entire repository green. Preserve the concurrent mixed WIP commit and
-   review named paths before publication.
-3. Clean isolated migration replay and migration ledger verification remain
-   separate from the incremental local SQL applications.
-4. Staging/hosted migration dry-run, authenticated hosted UX, production
-   migration, web deployment and Git publication
-   are separate gates under `PRODUCTION_SWITCH_PLAYBOOK.md`.
-5. Android work is deferred by the owner; no device/APK gate applies to the
-   current web-only scope.
+1. Fresh combined isolated SQL replay and expanded authenticated browser
+   acceptance remain unavailable while Docker is down. Prior individual SQL
+   assertions and exact release-body matching are recorded separately.
+2. The independent reviewer stopped on provider quota before a final report.
+   Partial important findings were fixed and tested; no clean independent
+   approval is claimed.
+3. Signed-in employee workflow smoke requires an authorized test account or
+   session. Anonymous denial checks are not employee success-path proof.
+4. Android is deferred by the owner and is not part of this release.
+
+Production migrations 0260-0284 are applied and ledger-verified; post-apply
+no-op dry-run, public-schema lint (zero errors) and four anonymous denial
+checks pass. The main-based permission catalog parity also passes. See
+FMS_WEB_RELEASE_2026-10-17.md for the current release results; the earlier
+working-stack counts below remain historical command evidence.
 
 See `FMS_USER_GUIDE.md` for configuration and employee instructions, and the
 approved design and plan in `docs/superpowers/` for acceptance scope.
@@ -134,3 +137,5 @@ The earlier browser results establish assigned-work behavior only. The newer
 builder, Forms round trip, and simulation UI have component/type evidence;
 their expanded real-browser run remains blocked. No physical Android evidence
 or authenticated hosted evidence is implied.
+
+Production release source: code commit 9643152. Main-based web 528 assertions plus5 proper-cwd theme tests pass; data 181 pass; web TypeScript and2201-module production build pass. Git/hosting outcomes are verified separately in the handoff.

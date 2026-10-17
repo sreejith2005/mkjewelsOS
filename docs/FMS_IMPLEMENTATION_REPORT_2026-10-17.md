@@ -2,8 +2,9 @@
 
 Release numbering: this document records the original isolated development stack. The main-based release uses migrations `0260`-`0284`, preserving production task-video migration `0259`. See `FMS_WEB_RELEASE_2026-10-17.md` for the exact mapping and current release outcome. Do not apply the development filenames to production.
 
-The approved FMS repair is implemented locally with verification still in
-progress. This report does not authorize or establish a production release.
+Production update: migrations 0260-0284 are applied and ledger-verified in
+jewelos-prod. The web release is built and tested on current main; source code
+commit 9643152 and final publication evidence are in the release record/handoff.
 Current command results and open gates are maintained in
 `FMS_OPERATIONAL_VERIFICATION_2026-10-15.md`; operational instructions are in
 `FMS_USER_GUIDE.md`. The original audit retains its pre-change evidence in
@@ -66,10 +67,10 @@ staging commands.
 
 ## C. Database changes
 
-All changes are forward-only local migration files. Incremental application
-through 0262 succeeded in the dedicated local stack. A clean replay and a
-fresh hosted-ledger comparison are still required before applying anything
-outside that stack.
+The original development migrations were applied incrementally through 0262
+in the isolated stack. Production release copies 0260-0284 are now applied
+and ledger-verified; the release record maps each filename below to its new
+production number. A fresh clean isolated replay remains unavailable.
 
 | Migration filename | Contract |
 | --- | --- |
@@ -128,19 +129,19 @@ employee completion and confirmed handoff. Staff open their assigned work
 from Home, Tasks, Notifications or its exact link; builder permission is not
 required to execute that work.
 
-## F. Remaining blockers
+## F. Remaining evidence limits
 
-1. Docker Desktop HTTP 500 blocks the final isolated SQL sweep/lint/replay and
-   expanded real browser acceptance run. Do not restart unrelated stacks.
-2. The permission catalog baseline has 42 migration entries versus 36 client
-   entries. The six unrelated Kiara permissions need reconciliation before a
-   whole-repository green claim or release.
-3. The independent reviewer exhausted provider quota before a final report.
-   Partial important findings were fixed and tested; this is not clean
-   independent approval. Full review remains a release gate.
-4. Hosted ledger/dry-run, staging, authenticated hosted smoke, named-path Git
-   publication and web deployment are outstanding.
-   No hosted write, push, deployment or APK release was performed here.
+1. Docker Desktop remains unavailable for a fresh combined SQL replay/lint and
+   expanded local browser acceptance run. All25 release SQL bodies match the
+   previously individually tested migrations; hosted schema lint and direct
+   anonymous denial checks pass after application.
+2. Independent review stopped on provider quota before a final report. Its
+   partial important findings were fixed and tested; no clean independent
+   approval is claimed.
+3. Signed-in employee workflow smoke requires an authorized test account or
+   session. This has not been claimed from unit/build or anonymous API checks.
+4. Android testing and release are deferred by the owner.
 
-Android device verification and signed release are explicitly deferred by the
-owner; no APK release is required for the current web-only scope.
+The old permission-catalog mismatch was resolved by integrating onto current
+main; its parity tests pass. See FMS_WEB_RELEASE_2026-10-17.md for the exact
+production migration mapping, backup metadata and deployment results.
