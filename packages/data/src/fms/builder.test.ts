@@ -20,7 +20,7 @@ describe("FMS definition adapter", () => {
   it("uses manager approval for approval stages", () => expect(newFmsStage("approval", 0).completionRule).toBe("manager_approval"));
   it("creates a deterministic default route for branch stages", () => expect(newFmsStage("branch", 0).branchRules[0]?.operator).toBe("default"));
   it("does not create human assignees for automatic stages", () => expect(newFmsStage("notification", 0).assigneeRules).toEqual([]));
-  it("rehydrates graph relationships while leaving legacy role assignments out of the named-user editor", () => {
+  it("rehydrates graph relationships while preserving legacy hierarchy rules", () => {
     const flow: FmsFlowRow = { id: "f", family_id: "family", version: 3, name: "Flow", description: "D", status: "draft", scope_type: "tenant", branch_id: null, department_id: null, is_active: true, usage_count: 2 };
     const stage = { method: null, sort_order: 0, is_required: true, completion_rule: "any_doer" as const, allow_multiple_doers: false, requires_upload: false, requires_remark: false, checklist_definition: [], form_template_id: null, requires_next_doer_handoff: false, can_move_backward: false, can_reject: false, can_request_revision: false, can_escalate: false, parallel_target_stage_ids: [], join_rule: null, join_required_stage_ids: [], split_to_flow_id: null };
     const data = {
@@ -35,7 +35,7 @@ describe("FMS definition adapter", () => {
     const definition = flowToDefinition(flow, data);
     expect(definition.version).toBe(3);
     expect(definition.stages[0]?.defaultNextStageKey).toBe("done");
-    expect(definition.stages[0]?.assigneeRules).toEqual([]);
+    expect(definition.stages[0]?.assigneeRules).toEqual([expect.objectContaining({type:"reporter"})]);
     expect(definition.stages[0]?.sla.dueDate).toBe("2099-12-30");
     expect(definition.stages[1]?.type).toBe("end");
   });

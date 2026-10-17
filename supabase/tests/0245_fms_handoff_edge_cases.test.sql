@@ -1,0 +1,24 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path=public,extensions;
+select no_plan();
+set local test.fms.demo_mode='manual_handoff';
+\ir helpers/fms_visit_assignment_fixture.psql
+reset role;
+create temporary table edge_fixture(name text primary key,value jsonb);
+grant all on edge_fixture to authenticated;
+insert into edge_fixture values('request',jsonb_build_object('kind','stage_form','instanceStageId',(select id from fms_instance_stages where fms_instance_id=(select id from visit_assignment_fixture where name='instance') and fms_stage_id=(select id from visit_assignment_fixture where name='call')),'formTemplateId',(select id from visit_assignment_fixture where name='form'),'answers',jsonb_build_object('next_employee',(select id from visit_assignment_fixture where name='c')),'outcome','','remark','','checklist','{}'::jsonb));
+select set_config('request.jwt.claim.sub',(select id::text from visit_assignment_fixture where name='b_auth'),true);
+set local role authenticated;
+insert into edge_fixture values('preview',preview_fms_work_transition((select value from edge_fixture where name='request')));
+select is((select value#>>'{destinations,0,effectiveUserId}' from edge_fixture where name='preview'),null,'manual assignment has no invented employee');
+select is((select value#>>'{destinations,0,allowHandoff}' from edge_fixture where name='preview'),'true','manual assignment offers the eligible picker');
+select throws_ok($$select transition_fms_work_with_audit((select value from edge_fixture where name='request'),gen_random_uuid(),'[]',(select value->>'fingerprint' from edge_fixture where name='preview'))$$,'23514',null,'manual destination cannot activate without a confirmed owner');
+select is((select count(*)::integer from form_submissions where linked_record_id=((select value->>'instanceStageId' from edge_fixture where name='request'))::uuid),0,'missing manual owner rolls back form writes');
+update edge_fixture set value=preview_fms_work_transition((select value from edge_fixture where name='request'),jsonb_build_array(jsonb_build_object('targetStageId',(select id from visit_assignment_fixture where name='demo'),'userProfileId',(select id from visit_assignment_fixture where name='d')))) where name='preview';
+insert into edge_fixture values('result',transition_fms_work_with_audit((select value from edge_fixture where name='request'),gen_random_uuid(),jsonb_build_array(jsonb_build_object('targetStageId',(select id from visit_assignment_fixture where name='demo'),'userProfileId',(select id from visit_assignment_fixture where name='d'))),(select value->>'fingerprint' from edge_fixture where name='preview')));
+select is((select value->>'state' from edge_fixture where name='result'),'successors_activated','explicit manual handoff activates actual successor');
+select is(length((select value->>'fingerprint' from edge_fixture where name='preview')),64,'preview fingerprint uses SHA256');
+reset role;
+select * from finish();
+rollback;

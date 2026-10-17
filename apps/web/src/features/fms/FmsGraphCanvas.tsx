@@ -381,7 +381,7 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
                 <button aria-label={`Delete ${stage.name}`} className="rounded p-1 text-soft-grey hover:bg-danger/10 hover:text-danger" onClick={() => onDelete(stage.key)} type="button"><Trash2 className="size-3.5" /></button>
               </span>
             </div>
-            <span className="block truncate text-sm font-semibold text-white">{stage.name || "Untitled stage"}</span>
+            <span className="block truncate text-sm font-semibold text-white" title={stage.sla.pipelineName ? `${stage.sla.pipelineName} / ${stage.name}` : stage.name}>{stage.sla.pipelineName ? `${stage.sla.pipelineName} / ` : ""}{stage.name || "Untitled stage"}</span>
             <span className="mt-1 block truncate text-xs text-soft-grey">{fmsStageSummary(stage)} &middot; {fmsTimingSummary(stage)}</span>
             {invalid ? <span className="mt-1 block truncate text-xs font-medium text-danger">Needs attention</span> : null}
             <span aria-hidden="true" className="pointer-events-none absolute -left-1.5 top-1/2 size-3 -translate-y-1/2 rounded-full border-2 border-charcoal bg-gold/70" />

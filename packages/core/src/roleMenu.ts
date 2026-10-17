@@ -178,6 +178,7 @@ export function canAccessPage(role: UserRole, page: PageId): boolean {
 export const TASK_IN_LOOP_PATH = "/tasks/in-loop";
 
 export function getPageForPath(path: string): PageId | undefined {
+  path = path.split(/[?#]/, 1)[0] ?? path;
   // Task evidence used to be its own destination; it is now a panel inside Task
   // Control, so old links and bookmarks land on the workspace that absorbed it.
   if (path === "/task-evidence") return "task_templates";

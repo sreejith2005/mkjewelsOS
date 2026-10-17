@@ -1,8 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { isFormFieldVisible } from "@jewelos/core";
+import { setFmsMutationStorage } from "../fms/mutationIdentity";
 
 const { client } = vi.hoisted(() => ({ client: {} as Record<string, unknown> }));
 vi.mock("@jewelos/api-client/client", () => ({ getSupabase: () => client }));
+beforeEach(() => {
+  const metadata = new Map<string, string>();
+  setFmsMutationStorage({ getItem: key => metadata.get(key) ?? null, setItem: (key, value) => { metadata.set(key, value); }, removeItem: key => { metadata.delete(key); } });
+  Object.assign(client, { auth: { getSession: async () => ({ data: { session: { user: { id: "actor" } } }, error: null }) } });
+});
 
 import { loadFormSubmissionDetail, deletedFormBundle, deleteForm, publishAsNewForm, savePublishedForm, startFmsFromFormSubmission, submitFmsStarterAssignment, toDefinition, type FormField, type FormSubmission, type FormTemplate } from "./api";
 
@@ -96,29 +102,28 @@ describe("startFmsFromFormSubmission", () => {
 
 describe("submitFmsStarterAssignment", () => {
   it("pins the exact starter assignment instead of inferring a workflow from the shared form", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    const preview = { fingerprint: "fingerprint", currentStageName: "Enquiry", wouldDefer: false, requirements: [], destinations: [] };
+    const result = { state: "workflow_completed", submissionId: "submission-1", instanceId: "instance-1", sourceInstanceStageId: null, referenceNumber: "FMS-1", destinations: [], ownWorkTargets: [] };
+    const rpc = vi.fn().mockResolvedValueOnce({ data: null, error: null }).mockResolvedValueOnce({ data: preview, error: null }).mockResolvedValueOnce({ data: result, error: null });
     Object.assign(client, { rpc });
 
     await expect(submitFmsStarterAssignment("form-1", "starter-2", { answer: "yes" }))
-      .resolves.toEqual({ instanceId: null, referenceNumber: null });
-    expect(rpc).toHaveBeenCalledWith("submit_fms_form_and_progress_with_audit", expect.objectContaining({
-      p_form_template_id: "form-1",
-      p_linked_module: "fms_entry",
-      p_linked_record_id: "starter-2",
-      p_answers: { answer: "yes" },
+      .resolves.toEqual({ instanceId: "instance-1", referenceNumber: "FMS-1", workflowName: "Enquiry", ownWorkTargets: [], assignmentSummary: [] });
+    expect(rpc).toHaveBeenCalledWith("transition_fms_work_with_audit", expect.objectContaining({
+      p_request: { kind: "starter_form", formTemplateId: "form-1", starterAssignmentId: "starter-2", answers: { answer: "yes" } },
       p_idempotency_key: expect.any(String),
     }));
   });
 
   it("returns the process the starting form began, so the caller can continue into it", async () => {
     const rpc = vi.fn().mockResolvedValue({
-      data: { submission_id: "sub-1", instance_id: "instance-5", reference_number: "FMS-9", progressed: true },
+      data: { state: "successors_activated", submissionId: "sub-1", instanceId: "instance-5", referenceNumber: "FMS-9", sourceInstanceStageId: null, destinations: [], ownWorkTargets: [] },
       error: null,
     });
     Object.assign(client, { rpc });
 
     await expect(submitFmsStarterAssignment("form-1", "starter-2", { answer: "yes" }))
-      .resolves.toEqual({ instanceId: "instance-5", referenceNumber: "FMS-9" });
+      .resolves.toEqual({ instanceId: "instance-5", referenceNumber: "FMS-9", ownWorkTargets: [], assignmentSummary: [] });
   });
 });
 

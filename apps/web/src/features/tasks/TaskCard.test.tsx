@@ -7,6 +7,19 @@ import { TaskCard } from "./TaskCard";
 
 afterEach(cleanup);
 
+it("shows configured FMS context without replacing ordinary task content", () => {
+  const contextual = { ...task, task_type: "fms" as const, fmsWorkContext: {
+    workflowName: "Enquiry", stageName: "Call", reference: "FMS-local", instructions: "Call the client", expectedResult: "Record the reply",
+    dueAt: null, assignedNames: ["Employee B"], titleTemplate: "Call {initial.client_name}", shortDescription: "Follow up on the enquiry", dueLabel: "Due",
+    receivedFields: [{ sourceStageKey: "initial", submissionId: "submission", formTemplateId: "form", formName: "Enquiry form", formVersion: 1,
+      field: { key: "client_name", label: "Client", type: "text" as const, sortOrder: 0 }, value: "Synthetic client" }], journey: [], nextCursor: null,
+  } };
+  render(<TaskCard task={contextual} capability={capability} categoryLabel="FMS" onAction={async () => undefined} />);
+  expect(screen.getByText("Call Synthetic client")).toBeTruthy();
+  expect(screen.getByText("Client:")).toBeTruthy();
+  expect(screen.getByText("Follow up on the enquiry")).toBeTruthy();
+});
+
 const capability: TaskMutationCapability = {
   access: "doer",
   canMutate: true,

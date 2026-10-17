@@ -26,6 +26,7 @@ describe("task workspace navigation", () => {
     // Assigned FMS work is a Tasks surface. It must not require builder access
     // or fall through to Dashboard when opened from Home or Notifications.
     expect(getPageForPath("/tasks/fms")).toBe("checklist_tasks");
+    expect(getPageForPath("/tasks/fms?instance=i&stage=s&form=f")).toBe("checklist_tasks");
   });
 
   it("keeps unfinished menu destinations out of implemented navigation", () => {

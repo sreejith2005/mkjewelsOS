@@ -8,6 +8,10 @@ import { FmsFlowBuilder } from "./FmsFlowBuilder";
 
 const mocks = vi.hoisted(() => ({ saveFmsDraft: vi.fn(), publishFmsFlow: vi.fn(), saveFmsContextAssigneeDefault: vi.fn() }));
 vi.mock("./api", () => ({ saveFmsDraft: mocks.saveFmsDraft, publishFmsFlow: mocks.publishFmsFlow, saveFmsContextAssigneeDefault: mocks.saveFmsContextAssigneeDefault }));
+vi.mock("./FmsFormAuthoring", async importOriginal => {
+  const actual = await importOriginal<typeof import("./FmsFormAuthoring")>();
+  return { ...actual, FmsFormAuthoring: ({ target, onClose }: { target: { flowId: string; stageKey: string; formTemplateId?: string }; onClose: () => void }) => <section aria-label="Linked Forms workspace"><p>{target.flowId} / {target.formTemplateId}</p><button onClick={onClose}>Return to workflow step</button></section> };
+});
 
 /**
  * The canvas is replaced by plain buttons so these tests exercise the graph
@@ -59,6 +63,7 @@ async function openBuilder(builderData: FmsData = data) {
   await user.type(screen.getByLabelText("Workflow name *"), "Qualification");
   await user.type(screen.getByLabelText("Purpose *"), "Route by customer type");
   await user.click(screen.getByRole("button", { name: /Open builder/ }));
+  await user.click(screen.getByRole("button", { name: "Canvas Mode" }));
   // Adding a step wires it in after the selected one, giving start -> A -> B.
   await user.click(screen.getByRole("button", { name: /Add Step/ }));
   await user.click(screen.getByRole("button", { name: /Add Step/ }));
@@ -69,6 +74,19 @@ async function openBuilder(builderData: FmsData = data) {
 afterEach(() => { cleanup(); vi.clearAllMocks(); latest = null; latestFocusRequest = null; });
 
 describe("FMS builder graph wiring", () => {
+  it("saves before opening Forms and returns to the same step with its version intact", async () => {
+    mocks.saveFmsDraft.mockResolvedValue("saved-flow");
+    const { user, start } = await openBuilder();
+    await user.click(screen.getByRole("button", { name: /Configure the initial details form/ }));
+    await user.selectOptions(screen.getByLabelText("Initial details form"), formId);
+    await user.click(screen.getByRole("button", { name: "Preview Form" }));
+    expect(await screen.findByRole("region", { name: "Linked Forms workspace" })).toBeTruthy();
+    expect(screen.getByText(`saved-flow / ${formId}`)).toBeTruthy();
+    expect(mocks.saveFmsDraft).toHaveBeenCalledWith(null, expect.objectContaining({ name: "Qualification" }));
+    await user.click(screen.getByRole("button", { name: "Return to workflow step" }));
+    expect((screen.getByLabelText("Initial details form") as HTMLSelectElement).value).toBe(formId);
+    expect(stage(start).formTemplateId).toBe(formId);
+  });
   it("no longer asks for workflow context or CRM scope when creating a workflow", () => {
     render(<FmsFlowBuilder data={data} flow={null} onClose={() => undefined} onSaved={async () => undefined} />);
     expect(screen.queryByLabelText("Workflow context")).toBeNull();

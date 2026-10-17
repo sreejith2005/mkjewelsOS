@@ -1,0 +1,22 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path=public,extensions;
+select no_plan();
+select has_function('public','get_fms_assigned_work_context',array['uuid','uuid','text','integer'],'one work item has an authorized contextual read');
+\ir helpers/fms_visit_assignment_fixture.psql
+select set_config('request.jwt.claim.sub',(select id::text from visit_assignment_fixture where name='b_auth'),true);
+create temporary table work_context_fixture(value jsonb);
+grant all on work_context_fixture to authenticated;
+set local role authenticated;
+insert into work_context_fixture select get_fms_assigned_work_context((select id from visit_assignment_fixture where name='instance'),(select id from fms_instance_stages where fms_instance_id=(select id from visit_assignment_fixture where name='instance') and fms_stage_id=(select id from visit_assignment_fixture where name='call')),null,1);
+select is((select value->>'instructions' from work_context_fixture),'Call the client','instructions come from the published stage');
+select is((select value#>>'{receivedFields,0,value}' from work_context_fixture),'Synthetic client','assignee receives only the configured initial answer');
+select is((select value#>>'{receivedFields,0,field,label}' from work_context_fixture),'Client name','the original question label accompanies its answer');
+select ok(not (select value::text like '%Do not expose unconfigured fields%' from work_context_fixture),'unconfigured private data is excluded');
+select is((select jsonb_array_length(value->'journey') from work_context_fixture),1,'journey is bounded by the requested page size');
+select set_config('request.jwt.claim.sub',(select id::text from visit_assignment_fixture where name='e_auth'),true);
+select throws_ok($$select get_fms_assigned_work_context((select id from visit_assignment_fixture where name='instance'),(select id from visit_assignment_fixture where name='call'),null,20)$$,'42501','FMS work context is not available to your account','direct work IDs cannot bypass ownership');
+reset role;
+select ok(not has_function_privilege('anon','get_fms_assigned_work_context(uuid,uuid,text,integer)','EXECUTE'),'anonymous callers cannot read work context');
+select * from finish();
+rollback;

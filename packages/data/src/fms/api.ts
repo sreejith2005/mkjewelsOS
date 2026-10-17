@@ -9,7 +9,7 @@ type DbError = { message: string } | null;
 const fail = (label: string, error: DbError) => { if (error) throw new Error(`${label}: ${error.message}`); };
 
 export type FmsFlowRow = {
-  id: string; family_id: string; version: number; name: string; description: string | null; status: "draft" | "published" | "archived";
+  id: string; family_id: string; version: number; assignment_version?: number; name: string; description: string | null; status: "draft" | "published" | "archived";
   scope_type: "tenant" | "branch" | "department"; branch_id: string | null; department_id: string | null; module_context?: string | null; is_active: boolean; usage_count: number;
 };
 export type FmsStageRow = {
@@ -19,7 +19,7 @@ export type FmsStageRow = {
   can_move_backward: boolean | null; can_reject: boolean | null; can_request_revision: boolean | null; can_escalate: boolean | null; default_next_stage_id: string | null;
   parallel_target_stage_ids: string[]; join_rule: "all" | "any" | "specific" | null; join_required_stage_ids: string[] | null; split_to_flow_id: string | null; canvas_position?: { x: number; y: number } | null;
 };
-export type FmsInstance = { id: string; fms_flow_id: string; reference_number: string; title: string; status: "active" | "completed" | "cancelled" | "on_hold" | "overdue"; priority: "high" | "medium" | "low" | null; context: Json; branch_id: string | null; department_id: string | null; started_by: string; started_at: string | null; completed_at: string | null; parent_instance_id: string | null; flow_version: number; execution_version?: number };
+export type FmsInstance = { id: string; fms_flow_id: string; reference_number: string; title: string; status: "active" | "completed" | "cancelled" | "on_hold" | "overdue"; priority: "high" | "medium" | "low" | null; context: Json; branch_id: string | null; department_id: string | null; started_by: string; started_at: string | null; completed_at: string | null; parent_instance_id: string | null; flow_version: number; assignment_version?: number; execution_version?: number };
 export type FmsInstanceStage = { id: string; fms_instance_id: string; fms_stage_id: string; status: string; assigned_to: string[] | null; planned_datetime: string | null; actual_datetime: string | null; delay_minutes: number | null; sla_breached: boolean | null; form_submission_id: string | null; remark: string | null; outcome: string | null; completed_by: string | null; escalation_count: number; visit_number?: number; execution_scope_id?: string | null };
 export type FmsChecklistItem = { id: string; fms_instance_stage_id: string; item_key: string; label: string; is_required: boolean; is_completed: boolean; sort_order: number };
 export type FmsEvidence = { id: string; fms_instance_stage_id: string; storage_path: string; original_filename: string; mime_type: string; size_bytes: number; uploaded_by: string; created_at: string };
@@ -100,7 +100,7 @@ async function formFieldIndex(templateIds: readonly string[]): Promise<Record<st
 const STRUCTURAL_FIELD_TYPES: ReadonlySet<string> = new Set(["section_header", "divider"]);
 
 export async function saveFmsDraft(flowId: string | null, definition: FmsFlowDefinition): Promise<string> {
-  const metadata = { name: definition.name, description: definition.description ?? "", scope_type: definition.scope, branch_id: definition.branchId ?? "", department_id: definition.departmentId ?? "", module_context: definition.moduleContext ?? "", trigger_type: "manual", is_active: true };
+  const metadata = { assignment_version: definition.assignmentVersion ?? (flowId ? 1 : 2), name: definition.name, description: definition.description ?? "", scope_type: definition.scope, branch_id: definition.branchId ?? "", department_id: definition.departmentId ?? "", module_context: definition.moduleContext ?? "", trigger_type: "manual", is_active: true };
   const { data, error } = await db().rpc("save_fms_flow_draft_with_audit", { p_flow_id: flowId as string, p_metadata: metadata as Json, p_stages: definition.stages as unknown as Json }); fail("Save FMS draft", error); if (!data) throw new Error("Save FMS draft returned no ID"); const { error: contextError } = await db().rpc("set_fms_flow_context_with_audit", { p_flow_id: data, ...(definition.moduleContext ? { p_module_context: definition.moduleContext } : {}) }); fail("Save FMS workflow context", contextError); return data;
 }
 export const saveFmsContextAssigneeDefault = async (moduleContext: string, userProfileId: string) => { const { error } = await db().rpc("save_fms_context_assignee_default_with_audit", { p_module_context: moduleContext, p_user_profile_id: userProfileId }); fail("Save FMS default assignee", error); };

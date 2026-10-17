@@ -1,0 +1,25 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path=public,extensions;
+select no_plan();
+\ir helpers/fms_visit_assignment_fixture.psql
+insert into visit_assignment_fixture select 'legacy_flow',create_fms_revision_with_audit((select id from visit_assignment_fixture where name='flow'));
+reset role;
+update fms_flows set assignment_version=1 where id=(select id from visit_assignment_fixture where name='legacy_flow');
+update fms_stages set step_type='approval',completion_rule='manager_approval',planned_time_rule=planned_time_rule||'{"assignmentFieldKey":"next_employee"}'::jsonb where fms_flow_id=(select id from visit_assignment_fixture where name='legacy_flow') and stage_key='call';
+delete from fms_stage_assignees where fms_stage_id in(select id from fms_stages where fms_flow_id=(select id from visit_assignment_fixture where name='legacy_flow') and stage_key='demo');
+set local role authenticated;
+select publish_fms_flow_with_audit((select id from visit_assignment_fixture where name='legacy_flow'));
+insert into visit_assignment_fixture select 'legacy_instance',(submit_fms_form_and_progress_with_audit((select id from visit_assignment_fixture where name='form'),jsonb_build_object('next_employee',(select id from visit_assignment_fixture where name='b')),'fms_entry',(select id from fms_starter_assignments where fms_flow_id=(select id from visit_assignment_fixture where name='legacy_flow') and user_profile_id=(select id from visit_assignment_fixture where name='a')),gen_random_uuid())->>'instance_id')::uuid;
+insert into visit_assignment_fixture select 'legacy_visit',work.id from fms_instance_stages work join fms_stages stage on stage.id=work.fms_stage_id where work.fms_instance_id=(select id from visit_assignment_fixture where name='legacy_instance') and stage.stage_key='call';
+select submit_fms_form_and_progress_with_audit((select id from visit_assignment_fixture where name='form'),jsonb_build_object('next_employee',(select id from visit_assignment_fixture where name='c')),'fms_stage',(select id from visit_assignment_fixture where name='legacy_visit'),gen_random_uuid());
+create temporary table legacy_review(request jsonb,preview jsonb);
+grant all on legacy_review to authenticated;
+insert into legacy_review(request) values(jsonb_build_object('kind','review','instanceStageId',(select id from visit_assignment_fixture where name='legacy_visit'),'decision','approved','remark','Approved','nextAssigneeId',(select id from visit_assignment_fixture where name='d')));
+update legacy_review set preview=preview_fms_work_transition(request);
+select is((select preview#>>'{destinations,0,effectiveUserId}' from legacy_review),(select id::text from visit_assignment_fixture where name='d'),'legacy review previews the selected next employee');
+select lives_ok($$select transition_fms_work_with_audit(request,gen_random_uuid(),'[]',preview->>'fingerprint') from legacy_review$$,'legacy approval accepts its authorized handoff');
+reset role;
+select is((select work.assigned_to from fms_instance_stages work join fms_stages stage on stage.id=work.fms_stage_id where work.fms_instance_id=(select id from visit_assignment_fixture where name='legacy_instance') and stage.stage_key='demo'),array[(select id from visit_assignment_fixture where name='d')],'actual legacy approval keeps the employee shown in confirmation');
+select * from finish();
+rollback;

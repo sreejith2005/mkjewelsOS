@@ -1,7 +1,10 @@
+import { setFmsMutationStorage } from "@jewelos/data/fms/mutationIdentity";
 import { describe, expect, it, vi } from "vitest";
 import { isFormFieldVisible } from "@jewelos/core";
 
-vi.mock("@jewelos/api-client", () => ({ supabase: {} }));
+const { client } = vi.hoisted(() => ({ client: {} as Record<string, unknown> }));
+vi.mock("@jewelos/api-client", () => ({ supabase: client }));
+vi.mock("@jewelos/api-client/client", () => ({ getSupabase: () => client }));
 
 import { deletedFormBundle, deleteForm, publishAsNewForm, savePublishedForm, startFmsFromFormSubmission, submitStandaloneFormAndStartFms, toDefinition, type FormField, type FormSubmission, type FormTemplate } from "./api";
 
@@ -100,11 +103,13 @@ describe("startFmsFromFormSubmission", () => {
 
 describe("submitStandaloneFormAndStartFms", () => {
   it("uses one server transaction to submit the form and start its workflow", async () => {
+    const metadata = new Map<string, string>();
+    setFmsMutationStorage({ getItem: key => metadata.get(key) ?? null, setItem: (key, value) => { metadata.set(key, value); }, removeItem: key => { metadata.delete(key); } });
     const rpc = vi.fn().mockResolvedValue({ data: { submission_id: "submission-1", instance_id: "instance-1", reference_number: "FMS-1" }, error: null });
     const { supabase } = await import("@jewelos/api-client");
-    Object.assign(supabase, { rpc });
+    Object.assign(supabase, { rpc, auth: { getSession: async () => ({ data: { session: { user: { id: "actor" } } }, error: null }) } });
     await expect(submitStandaloneFormAndStartFms("form-1", { assigned_to: "user-1" })).resolves.toEqual({ instanceId: "instance-1", referenceNumber: "FMS-1" });
     expect(rpc).toHaveBeenCalledTimes(1);
-    expect(rpc).toHaveBeenCalledWith("submit_form_and_start_fms_with_audit", { p_form_template_id: "form-1", p_answers: { assigned_to: "user-1" } });
+    expect(rpc).toHaveBeenCalledWith("submit_form_and_start_fms_idempotent", { p_form_template_id: "form-1", p_answers: { assigned_to: "user-1" }, p_idempotency_key: expect.any(String) });
   });
 });

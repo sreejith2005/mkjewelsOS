@@ -1,0 +1,22 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path=public,extensions;
+select no_plan();
+set local test.fms.with_file='true';
+\ir helpers/fms_visit_assignment_fixture.psql
+insert into visit_assignment_fixture select 'work_visit',id from fms_instance_stages where fms_instance_id=(select id from visit_assignment_fixture where name='instance') and fms_stage_id=(select id from visit_assignment_fixture where name='call');
+select set_config('request.jwt.claim.sub',(select id::text from visit_assignment_fixture where name='b_auth'),true);
+select is(get_fms_assigned_work_context((select id from visit_assignment_fixture where name='instance'),(select id from visit_assignment_fixture where name='work_visit'))#>>'{receivedFields,1,attachment,name}','Synthetic attachment.pdf','mapped attachment exposes a human filename');
+select lives_ok($$select get_fms_work_file_path((select id from visit_assignment_fixture where name='instance'),(select id from visit_assignment_fixture where name='work_visit'),(select id from visit_assignment_fixture where name='attachment'))$$,'assigned employee can open the configured causal file');
+select throws_ok($$select get_fms_work_file_path((select id from visit_assignment_fixture where name='instance'),(select id from visit_assignment_fixture where name='work_visit'),gen_random_uuid())$$,'42501','File is not part of this authorized work context','forged file ID cannot expand file access');
+reset role;
+select ok(can_read_fms_context_upload((select storage_path from form_submission_files where id=(select id from visit_assignment_fixture where name='attachment'))),'Storage signing boundary recognizes the same authorized mapping');
+select set_config('request.jwt.claim.sub',(select id::text from visit_assignment_fixture where name='e_auth'),true);
+select ok(not can_read_fms_context_upload((select storage_path from form_submission_files where id=(select id from visit_assignment_fixture where name='attachment'))),'another employee cannot sign the same private object');
+set local role authenticated;
+select throws_ok($$select get_fms_work_file_path((select id from visit_assignment_fixture where name='instance'),(select id from visit_assignment_fixture where name='work_visit'),(select id from visit_assignment_fixture where name='attachment'))$$,'42501','FMS work context is not available to your account','exact work ID remains required for file access');
+reset role;
+select is((select count(*)::integer from audit_logs where record_id=(select id from visit_assignment_fixture where name='work_visit') and action='fms_context_file_accessed'),1,'successful contextual file access is audited');
+select ok(not has_function_privilege('anon','get_fms_work_file_path(uuid,uuid,uuid)','execute'),'anonymous file access is denied');
+select * from finish();
+rollback;

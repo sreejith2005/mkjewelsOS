@@ -1,7 +1,9 @@
+import { FmsAssignmentEditor } from "./FmsAssignmentEditor";
 import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, GitBranch, Plus, Trash2 } from "lucide-react";
 import {
   FMS_BRANCH_OPERATORS,
+  fmsStageNeedsAssignment,
   fmsFieldOptions,
   fmsRouteAnswerSelection,
   fmsAssignmentFields,
@@ -44,7 +46,7 @@ const optionCheckboxes = [
   { key: "canEscalate", label: "Can escalate" },
 ] as const;
 
-export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; onChange: (value: FmsStageDefinition) => void; onDelete: () => void }) {
+export function FmsStageEditor({ stage, stages, data, onChange, onDelete, assignmentVersion = 1 }: { assignmentVersion?: 1 | 2 | undefined; stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; onChange: (value: FmsStageDefinition) => void; onDelete: () => void }) {
   const update = (patch: Partial<FmsStageDefinition>) => onChange({ ...stage, ...patch });
   const updateSla = (patch: Partial<FmsSlaRule>) => update({ sla: { ...stage.sla, ...patch } });
   const stageIndex = stages.findIndex((item) => item.key === stage.key);
@@ -91,13 +93,15 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { st
     {human ? <section className="space-y-3 border-t border-gold/15 pt-4">
       <div><h4 className="text-xs font-semibold uppercase tracking-[0.15em] text-gold-secondary">Linked form</h4><p className="mt-1 text-xs text-soft-grey">{firstStage ? "The first step uses this form to collect the workflow’s initial details." : "Attach a Form the doer fills in when completing this step. Its answers can also drive the routing below."}</p></div>
       <LinkedForm data={data} firstStage={firstStage} stage={stage} update={update} />
-      <Field label="User question that assigns later steps"><select aria-invalid={invalidAssignment} className="field" data-fms-focus="assignment" onChange={(event) => updateSla({ assignmentFieldKey: event.target.value || undefined })} value={stage.sla.assignmentFieldKey ?? ""}>
+      {assignmentVersion !== 2 ? <>      <Field label="User question that assigns later steps"><select aria-invalid={invalidAssignment} className="field" data-fms-focus="assignment" onChange={(event) => updateSla({ assignmentFieldKey: event.target.value || undefined })} value={stage.sla.assignmentFieldKey ?? ""}>
         <option value="">Use workflow default assignees</option>
         {invalidAssignment ? <option disabled value={stage.sla.assignmentFieldKey}>Unavailable question: {stage.sla.assignmentFieldKey}</option> : null}
         {assignmentFields.map((field) => <option key={field.key} value={field.key}>{field.label}</option>)}
       </select></Field>
-      <p className="text-xs text-soft-grey">Choose a required, always visible User question in the linked form. Its answer sets the default for later steps; explicit step assignments take priority.</p>
+      <p className="text-xs text-soft-grey">Choose a required, always visible User question in the linked form. Its answer sets the default for later steps; explicit step assignments take priority.</p></> : null}
     </section> : null}
+
+    {human && fmsStageNeedsAssignment(stages, stage.key) && assignmentVersion === 2 ? <FmsAssignmentEditor stage={stage} stages={stages} data={data} onChange={onChange} /> : null}
 
     {canChooseNext ? <StageRouting decision={decision} fields={formFields} others={others} stage={stage} changeRule={changeBranchRule} moveRule={moveBranchRule} update={update} /> : null}
 
@@ -115,7 +119,7 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete }: { st
       </details>
       <details className="rounded-xl border border-gold/15" open={optionCheckboxes.some(({ key }) => stage[key])}>
         <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-champagne">Completion controls</summary>
-        <div className="grid gap-2 px-3 pb-3 text-sm sm:grid-cols-2">{optionCheckboxes.map(({ key, label }) => <label className="rounded-lg border border-gold/15 p-2" key={key}><input checked={stage[key]} onChange={(event) => update({ [key]: event.target.checked })} type="checkbox" /> {label}</label>)}</div>
+        <div className="grid gap-2 px-3 pb-3 text-sm sm:grid-cols-2">{optionCheckboxes.filter(option => assignmentVersion !== 2 || option.key !== "requiresNextDoerHandoff").map(({ key, label }) => <label className="rounded-lg border border-gold/15 p-2" key={key}><input checked={stage[key]} onChange={(event) => update({ [key]: event.target.checked })} type="checkbox" /> {label}</label>)}</div>
       </details>
       <details className="rounded-xl border border-gold/15">
         <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-soft-grey">Technical details</summary>

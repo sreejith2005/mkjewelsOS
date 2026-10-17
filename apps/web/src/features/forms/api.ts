@@ -1,3 +1,4 @@
+import { submitFmsStartingWork, submitLibraryForm, readFmsStartConfirmation, type FmsStartConfirmation } from "@jewelos/data/fms/work";
 import { supabase } from "@jewelos/api-client";
 import type { FormUsageImpact, Json, Tables } from "@jewelos/core";
 import { normalizeFormDefinition, parseFormOptions, type FormBranch, type FormFieldDefinition, type FormRule, type FormSectionDefinition, type FormTemplateDefinition } from "@jewelos/core";
@@ -179,11 +180,8 @@ export async function startFmsFromFormSubmission(submissionId: string): Promise<
   return row ? { instanceId: row.instance_id as string, referenceNumber: row.reference_number as string } : null;
 }
 /** Submit a Forms Library form and start its linked workflow in one transaction. */
-export async function submitStandaloneFormAndStartFms(formTemplateId: string, answers: object): Promise<FmsStarterResult> {
-  const { data, error } = await supabase.rpc("submit_form_and_start_fms_with_audit",
-    { p_form_template_id: formTemplateId, p_answers: answers as Json });
-  fail("Submit form and start linked FMS", error);
-  return readFmsStarterResult(data);
+export async function submitStandaloneFormAndStartFms(formTemplateId: string, answers: object, flowId?: string): Promise<FmsStarterResult> {
+  return submitLibraryForm(formTemplateId, answers, flowId);
 }
 /** Submits the Home-selected starter assignment atomically, retaining its exact flow identity. */
 /**
@@ -195,23 +193,14 @@ export async function submitStandaloneFormAndStartFms(formTemplateId: string, an
  * happened to come from once the form was accepted.
  */
 export async function submitFmsStarterAssignment(formTemplateId: string, starterAssignmentId: string, answers: object): Promise<FmsStarterResult> {
-  const { data, error } = await supabase.rpc("submit_fms_form_and_progress_with_audit" as never, {
-    p_form_template_id: formTemplateId, p_answers: answers as Json, p_linked_module: "fms_entry", p_linked_record_id: starterAssignmentId,
-    p_idempotency_key: crypto.randomUUID(),
-  } as never);
-  fail("Start linked FMS", error);
-  return readFmsStarterResult(data);
+  return submitFmsStartingWork(formTemplateId, starterAssignmentId, answers);
 }
 
-export type FmsStarterResult = { instanceId: string | null; referenceNumber: string | null };
+export type FmsStarterResult = FmsStartConfirmation;
 
 /** A replayed idempotent submission returns its original response, so tolerate a missing instance. */
 export function readFmsStarterResult(data: unknown): FmsStarterResult {
-  const payload = (data ?? {}) as Record<string, unknown>;
-  return {
-    instanceId: typeof payload.instance_id === "string" ? payload.instance_id : null,
-    referenceNumber: typeof payload.reference_number === "string" ? payload.reference_number : null,
-  };
+  return readFmsStartConfirmation(data);
 }
 export const reviewSubmission = async (id: string, decision: "approved" | "rejected", notes: string) => { const { error } = await supabase.rpc("review_form_submission_with_audit", { p_submission_id: id, p_decision: decision, p_review_notes: notes }); fail("Review submission", error); };
 

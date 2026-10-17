@@ -46,21 +46,14 @@ const runtime = { instances: [], stages: [], definitions: [], flows: [flow], che
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("unified FMS console", () => {
-  it("starts a live flow in one click and opens the new instance", async () => {
+  it("keeps published workflows form-triggered instead of exposing a manual instance start", async () => {
     mocks.loadFmsBuilderData.mockResolvedValue(data);
     mocks.loadFmsRuntime.mockResolvedValue(runtime);
-    mocks.startFmsInstance.mockResolvedValue({ instance_id: "instance-1", reference_number: "FMS-1" });
-    const user = userEvent.setup();
     render(<FMSBuilderPage />);
-
     await screen.findByText("Sales intake");
-    expect(screen.queryByRole("button", { name: "Flow library" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Start instance" })).toBeNull();
+    expect(mocks.startFmsInstance).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "My workflow tasks" })).toBeNull();
-    mocks.loadFmsRuntime.mockResolvedValue({ ...runtime, instances: [{ id: "instance-1", fms_flow_id: "flow", status: "active" }] });
-    await user.click(screen.getByRole("button", { name: "Start instance" }));
-
-    await waitFor(() => expect(mocks.startFmsInstance).toHaveBeenCalledWith(expect.objectContaining({ flowId: "flow", title: "Sales intake", branchId: "andheri", departmentId: "sales", firstAssigneeId: "owner", context: {} })));
-    expect(await screen.findByText("Live instance instance-1")).toBeTruthy();
   });
 
   it("pauses a published flow from the same card", async () => {

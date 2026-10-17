@@ -1,3 +1,5 @@
+import { loadFmsTaskContexts } from "../fms/work";
+import type { FmsWorkContext } from "@jewelos/core";
 import { decodeTaskPage, TASK_PAGE_SIZE, taskEvidenceContentType, taskFormSubmissionKey, taskAdminEditPayload, taskAdminInitialEdit, type TaskAdminEdit, type TaskPageScope, type TaskFeedStatusFilter, type TaskWorkspaceView } from "@jewelos/core";
 import { getSupabase as db } from "@jewelos/api-client/client";
 import { groupTaskFeedRows, isTaskFeedItemInCurrentDayOrOverdue, taskFeedCurrentOrOverdueFilter as coreTaskFeedCurrentOrOverdueFilter, type Database, type Enums, type Json, type Tables } from "@jewelos/core";
@@ -17,6 +19,8 @@ export type AvailabilityEntry = Pick<Tables<"user_availability">, "user_profile_
 const VERIFIER_FALLBACK_NAME = "Verifier unavailable";
 
 export type TaskBundle = TaskFeedRow & {
+  fmsWorkContext?: FmsWorkContext | undefined;
+  fmsContextUnavailable?: boolean | undefined;
   assignees: Array<{ id: string; name: string }>;
   assigneeName: string;
   coverageOriginalAssigneeName: string | null;
@@ -352,10 +356,11 @@ export async function loadTaskFeed(
   const detailBatches = taskFeedIdBatches(taskIds, TASK_DETAIL_ID_BATCH_SIZE);
   const formTaskIds = groupedRows.flatMap(({ row }) => row.id && row.requires_form && row.form_template_id ? [row.id] : []);
   const submissionBatches = taskFeedIdBatches(formTaskIds, TASK_DETAIL_ID_BATCH_SIZE);
-  const [checklistResults, attachmentResults, submissionResults] = await Promise.all([
+  const [checklistResults, attachmentResults, submissionResults, fmsContexts] = await Promise.all([
     Promise.all(detailBatches.map((ids) => db().from("task_checklists").select("*").in("task_instance_id", ids).order("sort_order"))),
     Promise.all(detailBatches.map((ids) => db().from("task_attachments").select("task_instance_id").in("task_instance_id", ids))),
     Promise.all(submissionBatches.map((ids) => db().from("form_submissions").select("linked_record_id,linked_module,form_template_id").in("linked_record_id", ids))),
+    loadFmsTaskContexts(groupedRows.flatMap(({ row }) => row.fms_instance_stage_id ? [row.fms_instance_stage_id] : [])).then(contexts => ({ contexts, unavailable: false })).catch(() => ({ contexts: new Map<string, FmsWorkContext>(), unavailable: true })),
   ]);
   for (const result of checklistResults) fail("Load task checklists", result.error);
   for (const result of attachmentResults) fail("Load task attachments", result.error);
@@ -379,6 +384,7 @@ export async function loadTaskFeed(
     const assignees = assigneeIds.map((id) => ({ id, name: userNames.get(id) ?? "Assigned user" }));
     return {
       ...row,
+      ...(row.fms_instance_stage_id ? { fmsWorkContext: fmsContexts.contexts.get(row.fms_instance_stage_id), fmsContextUnavailable: fmsContexts.unavailable } : {}),
       assignees,
       assigneeName: assignees.length ? assignees.map((assignee) => assignee.name).join(", ") : "Unassigned",
       coverageOriginalAssigneeName: row.coverage_original_assignee_id

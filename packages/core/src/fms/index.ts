@@ -5,3 +5,14 @@ export * from "./canvas";
 export * from "./graphRouting";
 export * from "./visits";
 export * from "./routeAnswers";
+export * from "./workContracts";
+export * from "./assignmentConfig";
+export * from "./workPresentation";
+
+export * from "./assignmentAuthoring";
+
+export * from "./simulation";
+
+export * from "./assignmentUpgrade";
+
+export { fmsStageNeedsAssignment } from "./assignmentAuthoring";
