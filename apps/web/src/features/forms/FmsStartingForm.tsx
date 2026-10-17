@@ -38,8 +38,8 @@ export function FmsStartingForm({ formId, starterAssignmentId, onSaved, ...rende
   }, [formId, starterAssignmentId, flows, flowId]);
   if (started) return <div className="space-y-4">
     <Notice tone="success">Form submitted successfully. {started.workflowName ? `${started.workflowName} has started.` : started.instanceId ? "The workflow has started." : "Your answers have been saved."} {started.referenceNumber}</Notice>
-    {started.assignmentSummary?.map((item, index) => <p className="text-sm text-champagne" key={index}>{item.stageName}: {item.employeeName}</p>)}
-    {started.ownWorkTargets?.[0] ? <a className="text-gold underline" href={fmsAssignedWorkPath(started.ownWorkTargets[0])}>Open my next work</a> : null}
+    {started.assignmentSummary?.map((item, index) => <p className="text-sm text-champagne" key={index}>{item.stageName} has been assigned to {item.employeeName} successfully.</p>)}
+    {started.ownWorkTargets?.[0] ? <a className="text-gold underline" href={fmsAssignedWorkPath(started.ownWorkTargets[0])}>Continue to my next stage</a> : null}
     {!starterAssignmentId ? <Button onClick={() => { void (selectedFlow ? beginNewFmsStartingFlow(selectedFlow.flowId) : beginNewLibrarySubmission(formId)).then(() => { setStarted(null); setGeneration(n => n + 1); }).catch((e: unknown) => setError(e instanceof Error ? e.message : "Could not start another submission")); }} variant="secondary">Start another submission</Button> : null}
     {error ? <Notice tone="danger">{error}</Notice> : null}
   </div>;

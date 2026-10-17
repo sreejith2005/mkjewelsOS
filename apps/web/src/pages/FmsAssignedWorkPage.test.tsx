@@ -34,9 +34,9 @@ vi.mock("@/features/forms/FormRenderer", () => ({
   ),
 }));
 vi.mock("@/features/fms/FmsStageRunner", () => ({
-  FmsStageRunner: (props: { stage: { id: string }; requestedFormTemplateId?: string }) => {
+  FmsStageRunner: (props: { stage: { id: string }; requestedFormTemplateId?: string; onResult?: (result: import("@jewelos/core").FmsWorkResult) => void }) => {
     mocks.runner(props);
-    return <div>Running {props.stage.id} form {props.requestedFormTemplateId ?? "none"}</div>;
+    return <div>Running {props.stage.id} form {props.requestedFormTemplateId ?? "none"}<button onClick={() => props.onResult?.({ state: "successors_activated", submissionId: "saved", instanceId: "instance-5", referenceNumber: "FMS-9", sourceInstanceStageId: props.stage.id, destinations: [{ targetStageId: "next-def", stageName: "Follow up", formTemplateId: "form-next", selectedUserId: "user-1", effectiveUserId: "user-1", employeeName: "Current employee", assignmentMethod: "previous_form", locked: false, allowHandoff: true, issue: null }], ownWorkTargets: [{ kind: "stage_form", instanceId: "instance-5", instanceStageId: "next-visit", formTemplateId: "form-next" }] })}>Finish synthetic stage</button></div>;
   },
 }));
 
@@ -185,4 +185,17 @@ describe("focused FMS assigned work", () => {
     expect(screen.getByText("This FMS assignment link is incomplete or no longer valid.")).toBeTruthy();
     expect(screen.queryByText("Dashboard")).toBeNull();
   });
+});
+
+it("replaces completed stage controls with a clear outcome and exact next-work link", async () => {
+  window.history.replaceState({}, "", "/tasks/fms?instance=instance-5&stage=stage-3&form=form-7");
+  mocks.loadFmsAssignedStage.mockResolvedValue(stageBundle());
+  mocks.loadFormDynamicOptions.mockResolvedValue(OPTIONS);
+  render(<FmsAssignedWorkPage onNavigate={vi.fn()} />);
+  await userEvent.setup().click(await screen.findByRole("button", { name: "Continue to stage form" }));
+  await userEvent.setup().click(screen.getByRole("button", { name: "Finish synthetic stage" }));
+  expect(await screen.findByRole("heading", { name: "Form submitted successfully" })).toBeTruthy();
+  expect(screen.queryByText("Running stage-3 form form-7")).toBeNull();
+  expect(screen.queryByRole("region", { name: "Previous form answers" })).toBeNull();
+  expect(screen.getByRole("link", { name: "Continue to Follow up" }).getAttribute("href")).toContain("stage=next-visit");
 });

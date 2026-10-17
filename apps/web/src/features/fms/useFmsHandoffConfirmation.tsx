@@ -9,7 +9,7 @@ export function useFmsHandoffConfirmation(identity?: string) {
   const resolveChoice = useRef<((decision: FmsHandoffDecision | null) => void) | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
-    mounted.current = true; setPending(null);
+    mounted.current = true; setPending(null); setResult(null);
     return () => { mounted.current = false; resolveChoice.current?.(null); resolveChoice.current = null; };
   }, [identity]);
   const close = (decision: FmsHandoffDecision | null) => { resolveChoice.current?.(decision); resolveChoice.current = null; setPending(null); };

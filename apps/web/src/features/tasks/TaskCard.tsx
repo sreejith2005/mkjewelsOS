@@ -1,4 +1,4 @@
-import { presentFmsWorkContext } from "@jewelos/core";
+import { fmsWorkTitle, presentFmsWorkContext } from "@jewelos/core";
 import { useEffect, useRef, useState, type ReactNode, type ChangeEvent } from "react";
 import { AlertTriangle, Check, CheckCircle2, ChevronDown, Clock, Eye, FileUp, PauseCircle, Users } from "lucide-react";
 import { calculateTaskChecklistProgress, effectiveTaskDeadline, isTaskFeedItemOverdue, TASK_EVIDENCE_ACCEPT, taskEvidenceFileError, taskNeedsCompletionRemark, type Enums, type TaskMutationCapability } from "@jewelos/core";
@@ -111,7 +111,7 @@ export function TaskCard({ management, capability, categoryLabel, onAction, task
         <StatusIcon className={cn("mt-0.5 size-5 shrink-0", completed ? "text-success" : blocked ? "text-task-warning" : overdue ? "text-task-overdue" : "text-task-accent")} />
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
-            <span className={cn("text-[15px] font-semibold leading-snug text-task-text sm:text-sm", completed && "line-through text-task-text-muted")}>{fmsWork?.title ?? task.title}</span>
+            <span className={cn("text-[15px] font-semibold leading-snug text-task-text sm:text-sm", completed && "line-through text-task-text-muted")}>{fmsWork && task.fmsWorkContext ? fmsWorkTitle(fmsWork.title, task.fmsWorkContext.reference) : task.title}</span>
             <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-semibold", completed ? "border-success/40 bg-success/10 text-success" : blocked ? "border-task-warning/50 bg-task-warning/10 text-task-text" : overdue ? "border-task-overdue/40 bg-task-overdue/10 text-task-overdue" : "border-task-border bg-task-muted text-task-text-muted")}>{statusLabel}</span>
             {capability.watcherLabel ? <span className="inline-flex items-center gap-1 rounded-full bg-task-accent-soft px-2 py-0.5 text-[10px] font-semibold text-task-text"><Eye className="size-3" />{capability.watcherLabel}</span> : null}
             {task.task_type === "fms" ? <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-semibold text-gold-secondary">FMS</span> : null}
@@ -123,7 +123,7 @@ export function TaskCard({ management, capability, categoryLabel, onAction, task
             {task.priority ? <span className={cn("rounded-full border px-2 py-0.5 capitalize", PRIORITY_CLASS[task.priority])}>{task.priority}</span> : null}
             <span>{categoryLabel}</span>
           </span>
-          {fmsWork ? <span className="mt-2 block space-y-1 text-xs text-task-text-muted"><span className="block text-gold">{task.fmsWorkContext?.workflowName} ? {task.fmsWorkContext?.stageName}</span>{fmsWork.answers.slice(0, 3).map((answer, index) => <span className="block break-words" key={index}><b>{answer.label}:</b> {answer.display}</span>)}<span className="block">{fmsWork.shortDescription || fmsWork.instructions}</span></span> : task.fmsContextUnavailable ? <span className="mt-2 block text-xs text-task-text-muted">Work information is temporarily unavailable. Open the step to retry.</span> : null}
+          {fmsWork ? <span className="mt-2 block space-y-1 text-xs text-task-text-muted"><span className="block text-gold">{task.fmsWorkContext?.workflowName} | {task.fmsWorkContext?.stageName}</span>{fmsWork.answers.slice(0, 3).map((answer, index) => <span className="block break-words" key={index}><b>{answer.label}:</b> {answer.display}</span>)}<span className="block">{fmsWork.shortDescription || fmsWork.instructions}</span></span> : task.fmsContextUnavailable ? <span className="mt-2 block text-xs text-task-text-muted">Work information is temporarily unavailable. Open the step to retry.</span> : null}
           {!formOnlyAction && task.checklists.length > 0 ? <span className="mt-3 flex items-center gap-2"><span className="h-1.5 flex-1 overflow-hidden rounded-full bg-task-muted"><span className="block h-full rounded-full bg-task-accent" style={{ width: `${checklistProgress.displayPercent}%` }} /></span><span className="text-xs tabular-nums text-task-text-muted">{checklistProgress.completedItems}/{checklistProgress.totalItems}</span></span> : null}
         </span>
         <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-task-text-muted"><span className="sr-only sm:not-sr-only">{expanded ? "Hide details" : "View details"}</span><ChevronDown className={cn("size-4 transition-transform", expanded && "rotate-180")} /></span>

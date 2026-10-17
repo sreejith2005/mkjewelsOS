@@ -1,4 +1,5 @@
 import { presentFormSubmission } from "../forms/submissionPresentation";
+import type { FmsWorkState } from "./workContracts";
 import type { FormAnswer, FormFieldDefinition } from "../forms/types";
 
 export type FmsReceivedField = Readonly<{ sourceStageKey: string; submissionId: string; formTemplateId: string;
@@ -42,4 +43,15 @@ export function presentFmsWorkContext(context: FmsWorkContext) {
     reference, answers, instructions: context.instructions, expectedResult: context.expectedResult, shortDescription: context.shortDescription,
     dueAt: context.dueAt, dueLabel: context.dueLabel || "Due", assignedNames: context.assignedNames,
     journey: context.journey, nextCursor: context.nextCursor };
+}
+
+/** Keep configured wording, with a durable identifier for otherwise identical work. */
+export function fmsWorkTitle(title: string, reference: string): string {
+  const identifier = reference.trim();
+  return !identifier || title.includes(identifier) ? title : `${title} | ${identifier}`;
+}
+
+/** Approval and deferred forms still need their server-authorized stage controls. */
+export function fmsOutcomeReplacesStage(state: FmsWorkState): boolean {
+  return state !== "form_saved_pending_completion" && state !== "awaiting_approval" && state !== "awaiting_other_doers";
 }

@@ -1,11 +1,13 @@
+import { fmsOutcomeReplacesStage } from "@jewelos/core";
 import { useCallback, useEffect, useState } from "react";
-import { fmsAssignedWorkPath, parseFmsAssignedWorkPath, type FmsAssignedWorkTarget } from "@jewelos/core";
+import { fmsAssignedWorkPath, parseFmsAssignedWorkPath, type FmsAssignedWorkTarget, type FmsWorkResult, fmsWorkTitle } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
 import { loadFormDynamicOptions, loadTaskForms, type FormBundle, type FmsStarterResult } from "@/features/forms/api";
 import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer";
 import { FmsStageRunner } from "@/features/fms/FmsStageRunner";
 import { loadFmsAssignedStage, type FmsAssignedStageBundle } from "@/features/fms/api";
+import { FmsWorkOutcome } from "@/features/fms/FmsWorkOutcome";
 import { FmsContextFirst } from "@/features/fms/FmsContextFirst";
 import { fmsStartConfirmationFromWork, recoverFmsStartingWork } from "@jewelos/data/fms/work";
 import { useFmsHandoffConfirmation } from "@/features/fms/useFmsHandoffConfirmation";
@@ -78,7 +80,7 @@ function StarterForm({ onNavigate, target }: {
 
   if (started) return <Frame subtitle={started.referenceNumber ?? "Submission saved"} title="Form submitted successfully">
     <Notice tone="success">Form submitted successfully.{started.instanceId ? ` ${started.workflowName ?? "The workflow"} has started.` : ""} {started.assignmentSummary?.map(item => `${item.stageName} has been assigned to ${item.employeeName}.`).join(" ")}</Notice>
-    {started.ownWorkTargets?.[0] ? <Button onClick={() => onNavigate(fmsAssignedWorkPath(started.ownWorkTargets![0]!))}>Open my next work</Button> : null}
+    {started.ownWorkTargets?.[0] ? <Button onClick={() => onNavigate(fmsAssignedWorkPath(started.ownWorkTargets![0]!))}>Continue to my next stage</Button> : null}
     <Button onClick={() => onNavigate("/tasks")} variant="secondary">Back to my work</Button>
   </Frame>;
   if (error) return <Notice tone="danger">{error}</Notice>;
@@ -109,6 +111,7 @@ function AssignedStage({ onNavigate, target }: {
   target: Extract<FmsAssignedWorkTarget, { kind: "stage_form" | "stage" }>;
 }) {
   const { profile } = useAuth();
+  const [completed, setCompleted] = useState<FmsWorkResult | null>(null);
   const [bundle, setBundle] = useState<FmsAssignedStageBundle | null>();
   const [forms, setForms] = useState<FormBundle[]>([]);
   const [options, setOptions] = useState<DynamicOptions>(EMPTY_OPTIONS);
@@ -130,7 +133,7 @@ function AssignedStage({ onNavigate, target }: {
 
   useEffect(() => {
     let active = true;
-    setBundle(undefined);
+    setBundle(undefined); setCompleted(null);
     setError(null);
     void refresh().catch((caught: unknown) => {
       if (active) setError(caught instanceof Error ? caught.message : "Unable to load this FMS step");
@@ -139,6 +142,7 @@ function AssignedStage({ onNavigate, target }: {
   }, [refresh]);
 
   if (!profile) return null;
+  if (completed && fmsOutcomeReplacesStage(completed.state)) return <section className="mx-auto w-full max-w-3xl space-y-4"><FmsWorkOutcome result={completed} viewerId={profile.id} /><Button onClick={() => onNavigate("/tasks")} variant="secondary">Back to my work</Button></section>;
   if (error) return <Notice tone="danger">{error}</Notice>;
   if (bundle === undefined) return <Loading />;
   if (bundle === null) return <Notice>This FMS step is complete, cancelled, or no longer visible to your account.</Notice>;
@@ -161,7 +165,7 @@ function AssignedStage({ onNavigate, target }: {
 
   const requested = target.kind === "stage_form" ? target.formTemplateId : definition.form_template_id;
 
-  return <Frame subtitle={`${bundle.instance.title} · ${bundle.instance.reference_number}`} title={definition.name}>
+  return <Frame subtitle={`${bundle.instance.title} · ${bundle.instance.reference_number}`} title={fmsWorkTitle(definition.name, bundle.instance.reference_number)}>
     <FmsContextFirst key={stage.id} instanceId={bundle.instance.id} instanceStageId={stage.id} hasForm={!!requested}>
     <FmsStageRunner
       branches={options.branches}
@@ -175,6 +179,7 @@ function AssignedStage({ onNavigate, target }: {
       instance={bundle.instance}
       instanceStages={bundle.instanceStages}
       onRefresh={refresh}
+      onResult={setCompleted}
       profile={profile}
       stage={stage}
       users={bundle.users}

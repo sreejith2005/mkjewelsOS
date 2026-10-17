@@ -93,7 +93,7 @@ try {
   page.on("response", response => { const item = requests.findLast(item => item.path === new URL(response.url()).pathname && item.status === "pending"); if (item) { item.status = response.status(); item.elapsedMs = Date.now() - item.startedAt; } });
   const contextResponse = await client.rpc("get_fms_assigned_work_context", { p_instance_id: ids.instance, p_instance_stage_id: visit });
   if (contextResponse.error) throw new Error("Synthetic task summary could not load");
-  const taskTitle = core.presentFmsWorkContext(contextResponse.data).title;
+  const taskTitle = core.fmsWorkTitle(core.presentFmsWorkContext(contextResponse.data).title, contextResponse.data.reference);
   await page.goto(`${origin}/tasks`);
   const card = page.locator("article").filter({ hasText: taskTitle });
   await card.getByRole("button", { name: /View details/ }).click({ timeout: 60000 });
@@ -150,6 +150,14 @@ try {
   await page.screenshot({ path: path.join(output, "handoff-desktop.png"), fullPage: true });
   await page.getByRole("button", { name: "Confirm Next Work", exact: true }).click();
   await page.waitForFunction(() => !document.querySelector('[role="dialog"]'), { timeout: 30000 });
+  await page.getByRole("heading", { name: "Form submitted successfully", exact: true }).waitFor({ timeout: 30000 });
+  const nextName = (await db.query("select name from public.fms_stages where id=$1", [ids.demo])).rows[0].name;
+  await page.getByText(`${nextName} has been assigned to Employee D successfully.`, { exact: true }).waitFor();
+  assert.equal(await page.getByText("Stage is not actionable for this user", { exact: true }).count(), 0);
+  assert.equal(await page.getByRole("link", { name: /Continue to/ }).count(), 0, "Another employee's work must have no continuation link");
+  await page.screenshot({ path: path.join(output, "submission-outcome-desktop.png"), fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: path.join(output, "submission-outcome-phone.png"), fullPage: true, animations: "disabled" });
   const successor = (await db.query("select assigned_to from public.fms_instance_stages where fms_instance_id=$1 and fms_stage_id=$2", [ids.instance, ids.demo])).rows[0];
   assert.deepEqual(successor.assigned_to, [ids.d]);
   const replayResults = await concurrentReplays;
@@ -160,6 +168,37 @@ try {
   assert.equal(Number((await db.query("select count(*) from public.form_submissions where linked_record_id=$1", [visit])).rows[0].count), before + 1);
   assert.ok(page.url().includes(visit), "Submitter was redirected into another employee's work");
   assert.deepEqual(errors, [], "Browser runtime errors");
+  // The recipient now completes the next stage and retains ownership of its successor.
+  const recipient = createClient(api, anon, { auth: { persistSession: false, autoRefreshToken: false } });
+  const recipientLogin = await recipient.auth.signInWithPassword({ email: `d-e2e-${suffix}@test.local`, password });
+  assert.ok(recipientLogin.data.session, "Synthetic recipient session missing");
+  const ownContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await ownContext.route("**/*", route => ["127.0.0.1", "localhost"].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
+  await ownContext.addInitScript(([key, session]) => localStorage.setItem(key, JSON.stringify(session)), ["sb-127-auth-token", recipientLogin.data.session]);
+  const ownPage = await ownContext.newPage(); currentPage = ownPage;
+  ownPage.on("pageerror", error => errors.push(error.message));
+  const recipientVisit = (await db.query("select id from public.fms_instance_stages where fms_instance_id=$1 and fms_stage_id=$2", [ids.instance, ids.demo])).rows[0].id;
+  await ownPage.goto(`${origin}${core.fmsAssignedWorkPath({ kind: "stage_form", instanceId: ids.instance, instanceStageId: recipientVisit, formTemplateId: ids.form })}`);
+  await ownPage.getByRole("button", { name: "Continue to stage form", exact: true }).click({ timeout: 60000 });
+  await ownPage.getByLabel(/Next employee/).selectOption(ids.d);
+  await ownPage.getByLabel(/Client name/).fill("Self-assigned follow-up context");
+  await ownPage.getByRole("button", { name: "Submit form", exact: true }).click();
+  await ownPage.getByRole("button", { name: "Continue with Selected Employee", exact: true }).click({ timeout: 30000 });
+  await ownPage.getByRole("heading", { name: "Form submitted successfully", exact: true }).waitFor({ timeout: 30000 });
+  const continueNext = ownPage.getByRole("link", { name: "Continue to Negotiation", exact: true });
+  await continueNext.waitFor();
+  const ownNextVisit = (await db.query("select id,assigned_to from public.fms_instance_stages where fms_instance_id=$1 and fms_stage_id=$2", [ids.instance, ids.negotiation])).rows[0];
+  assert.deepEqual(ownNextVisit.assigned_to, [ids.d]);
+  assert.ok((await continueNext.getAttribute("href")).includes(ownNextVisit.id));
+  await ownPage.screenshot({ path: path.join(output, "same-person-outcome-phone.png"), fullPage: true, animations: "disabled" });
+  await continueNext.click();
+  await ownPage.getByRole("heading", { name: "Previous form answers", exact: true }).waitFor({ timeout: 60000 });
+  await ownPage.getByText("Self-assigned follow-up context", { exact: true }).waitFor();
+  assert.equal(await ownPage.getByLabel(/Next employee/).count(), 0, "Own next stage still requires previous context first");
+  await ownPage.getByRole("button", { name: "Continue to stage form", exact: true }).click();
+  await ownPage.getByLabel(/Next employee/).waitFor();
+  assert.deepEqual(errors, [], "Browser runtime errors after same-person continuation");
+  console.log("Same-person continuation and previous answers verified.");
   const adminContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   await adminContext.route("**/*", route => ["127.0.0.1", "localhost"].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
   await adminContext.addInitScript(([key, session]) => localStorage.setItem(key, JSON.stringify(session)), ["sb-127-auth-token", uploadLogin.data.session]);
@@ -196,7 +235,7 @@ try {
   assert.deepEqual((await db.query("select (select count(*) from public.fms_instances where tenant_id=$1)::integer as instances,(select count(*) from public.form_submissions where tenant_id=$1)::integer as forms", [ids.tenant])).rows[0], simulationBefore);
   assert.deepEqual(errors, [], "Browser runtime errors including builder");
   console.log("Local guided builder, canvas and non-writing simulation verified.");
-  await writeFile(path.join(output, "results.json"), JSON.stringify({ synthetic: true, localOnly: true, checks: ["task card replaces generic metadata with previous answers", "Home and notification links open details first", "viewing details does not complete stage", "complete initial form questions and answers", "direct link opens details before current form", "context desktop and phone rendering", "private mapped attachment upload/sign/download", "phone preview writes nothing", "cancel preserves answers", "eligible replacement", "atomic successor ownership", "one saved submission", "concurrent idempotent retry race", "guided builder and canvas phone/desktop", "simulation writes no work", "no other-owner redirect", "phone overflow", "no runtime errors"], viewports: ["390x844", "1440x900"] }, null, 2));
+  await writeFile(path.join(output, "results.json"), JSON.stringify({ synthetic: true, localOnly: true, checks: ["task card replaces generic metadata with previous answers", "Home and notification links open details first", "viewing details does not complete stage", "complete initial form questions and answers", "direct link opens details before current form", "context desktop and phone rendering", "private mapped attachment upload/sign/download", "phone preview writes nothing", "cancel preserves answers", "eligible replacement", "atomic successor ownership", "one saved submission", "concurrent idempotent retry race", "guided builder and canvas phone/desktop", "simulation writes no work", "clear committed outcome and next employee", "same-person exact next-stage continuation with previous answers", "no other-owner redirect", "phone overflow", "no runtime errors"], viewports: ["390x844", "1440x900"] }, null, 2));
   console.log("Local browser checks passed at phone and desktop widths.");
 } catch (error) {
   if (currentPage) {

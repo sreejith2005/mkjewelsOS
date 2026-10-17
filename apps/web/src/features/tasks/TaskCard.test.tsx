@@ -30,7 +30,7 @@ it("shows configured FMS context without replacing ordinary task content", () =>
       field: { key: "client_name", label: "Client", type: "text" as const, sortOrder: 0 }, value: "Synthetic client" }], journey: [], nextCursor: null,
   } };
   render(<TaskCard task={contextual} capability={capability} categoryLabel="FMS" onAction={async () => undefined} />);
-  expect(screen.getByText("Call Synthetic client")).toBeTruthy();
+  expect(screen.getByText("Call Synthetic client | FMS-local")).toBeTruthy();
   expect(screen.getByText("Client:")).toBeTruthy();
   expect(screen.getByText("Follow up on the enquiry")).toBeTruthy();
 });

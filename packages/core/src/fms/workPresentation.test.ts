@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { presentFmsWorkContext, type FmsWorkContext } from "./workPresentation";
+import { fmsOutcomeReplacesStage, fmsWorkTitle, presentFmsWorkContext, type FmsWorkContext } from "./workPresentation";
 
 const context: FmsWorkContext = { workflowName: "Jewellery enquiry", stageName: "Introduction Call", reference: "FMS-TEST",
   instructions: "Call the client", expectedResult: "Record response", dueAt: null, assignedNames: ["Employee B"],
@@ -35,4 +35,17 @@ describe("FMS work presentation", () => {
     expect(presentFmsWorkContext({ ...context, referenceKey: "hidden.secret" }).reference).toBe("FMS-TEST");
   });
 
+});
+
+it("distinguishes identical stage titles using the durable workflow reference", () => {
+  expect(fmsWorkTitle("Instagram leads - Introduction call", "FMS-000041")).toBe("Instagram leads - Introduction call | FMS-000041");
+  expect(fmsWorkTitle("Instagram leads - Introduction call", "FMS-000042")).not.toBe(fmsWorkTitle("Instagram leads - Introduction call", "FMS-000041"));
+  expect(fmsWorkTitle("Call FMS-000041", "FMS-000041")).toBe("Call FMS-000041");
+});
+
+it("retains deferred requirements and approval controls", () => {
+  expect(fmsOutcomeReplacesStage("form_saved_pending_completion")).toBe(false);
+  expect(fmsOutcomeReplacesStage("awaiting_approval")).toBe(false);
+  expect(fmsOutcomeReplacesStage("awaiting_other_doers")).toBe(false);
+  expect(fmsOutcomeReplacesStage("successors_activated")).toBe(true);
 });
