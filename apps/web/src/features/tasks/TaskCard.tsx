@@ -5,6 +5,7 @@ import { calculateTaskChecklistProgress, effectiveTaskDeadline, isTaskFeedItemOv
 import { Button, Field, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import type { TaskBundle } from "./api";
+import { FmsWorkContext } from "@/features/fms/FmsWorkContext";
 import { TaskDetails } from "./TaskDetails";
 import { TaskRemarks } from "./TaskRemarks";
 
@@ -132,13 +133,12 @@ export function TaskCard({ management, capability, categoryLabel, onAction, task
     {expanded ? <section aria-label={detailsLabel} className="flex flex-col gap-4 border-t border-task-border bg-task-muted p-4" id={detailsId}>
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {management}
-      <TaskDetails statusLabel={statusLabel} task={taskInput} />
+      {task.task_type === "fms" ? task.fms_instance_id && task.fms_instance_stage_id ? <FmsWorkContext instanceId={task.fms_instance_id} instanceStageId={task.fms_instance_stage_id} /> : <Notice tone="task">Complete the initial form to start this workflow.</Notice> : <TaskDetails statusLabel={statusLabel} task={taskInput} />}
       {blocked ? <Notice tone="task">Coverage required. An authorized manager must resolve coverage through a future database-backed workflow; no simulated resolution is available here.</Notice> : null}
       {!formOnlyAction ? task.checklists.map((item) => <div className="flex items-start gap-3 text-sm text-task-text" key={item.id}><button aria-label={item.is_completed ? "Mark incomplete" : "Mark complete"} className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded border", item.is_completed ? "border-task-accent bg-task-accent text-task-text" : "border-task-border bg-task-bg")} disabled={busy || completed || readOnly || blocked} onClick={() => void act({ kind: "checklist", checklistId: item.id, completed: !item.is_completed })} type="button">{item.is_completed ? <Check className="size-3" /> : null}</button><span className={cn(item.is_completed && "line-through text-task-text-muted")}>{item.item_text}{item.is_required ? <span className="ml-1 text-task-overdue">*</span> : null}</span></div>) : null}
       {fmsFormAction && !blocked ? <Button disabled={busy || !task.form_template_id} onClick={() => void act({ kind: "fill_fms_form" })} type="button"><CheckCircle2 />Complete FMS form</Button> : fmsStageAction && !blocked ? <Button disabled={busy} onClick={() => void act({ kind: "open_fms_stage" })} type="button"><CheckCircle2 />Open FMS workflow</Button> : formOnlyAction && !readOnly && !blocked ? <Button disabled={busy || !task.form_template_id} onClick={() => void act({ kind: "fill_form" })} type="button"><CheckCircle2 />Complete form</Button> : null}
       {!readOnly && requiresEvidence && !completed ? <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-task-border bg-task-bg p-3 text-sm text-task-text"><FileUp className="size-4" /><span>{task.hasAttachment ? "Evidence uploaded · add another" : "Upload required evidence"}</span><input accept={TASK_EVIDENCE_ACCEPT} className="sr-only" disabled={busy} onChange={(event) => void upload(event)} type="file" /></label> : null}
       {!formOnlyAction && !readOnly && needsRemark && !completed ? <Field label="Completion remark"><textarea ref={remarkInput} required className="task-field min-h-16" onChange={(event) => setRemark(event.target.value)} value={remark} /></Field> : null}
-      {task.task_type === "fms" ? <Notice tone="task">FMS work is completed in its protected workflow runner.</Notice> : null}
       {task.task_type !== "fms" && task.id ? <TaskRemarks taskId={task.id} /> : null}
       {!formOnlyAction && capability.canUseElevatedActions && task.task_type === "delegation" && !completed && !blocked ? <form className="grid gap-3 rounded-xl border border-task-border bg-task-bg p-3 sm:grid-cols-[1fr_1fr_auto]" onSubmit={(event) => { event.preventDefault(); void act({ kind: "revise", datetime: new Date(revision).toISOString(), reason: revisionReason }); }}><Field label="Revised date"><input className="task-field" onChange={(event) => setRevision(event.target.value)} required type="datetime-local" value={revision} /></Field><Field label="Reason"><input className="task-field" onChange={(event) => setRevisionReason(event.target.value)} required value={revisionReason} /></Field><Button className="self-end bg-task-accent text-task-text hover:bg-task-accent/90" disabled={busy} type="submit">Revise</Button></form> : null}
     </section> : null}

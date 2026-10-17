@@ -6,7 +6,7 @@ import { loadFormDynamicOptions, loadTaskForms, type FormBundle, type FmsStarter
 import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer";
 import { FmsStageRunner } from "@/features/fms/FmsStageRunner";
 import { loadFmsAssignedStage, type FmsAssignedStageBundle } from "@/features/fms/api";
-import { FmsWorkContext } from "@/features/fms/FmsWorkContext";
+import { FmsContextFirst } from "@/features/fms/FmsContextFirst";
 import { fmsStartConfirmationFromWork, recoverFmsStartingWork } from "@jewelos/data/fms/work";
 import { useFmsHandoffConfirmation } from "@/features/fms/useFmsHandoffConfirmation";
 
@@ -162,7 +162,7 @@ function AssignedStage({ onNavigate, target }: {
   const requested = target.kind === "stage_form" ? target.formTemplateId : definition.form_template_id;
 
   return <Frame subtitle={`${bundle.instance.title} · ${bundle.instance.reference_number}`} title={definition.name}>
-    <FmsWorkContext instanceId={bundle.instance.id} instanceStageId={stage.id} />
+    <FmsContextFirst key={stage.id} instanceId={bundle.instance.id} instanceStageId={stage.id} hasForm={!!requested}>
     <FmsStageRunner
       branches={options.branches}
       checklist={bundle.checklist.filter((item) => item.fms_instance_stage_id === stage.id)}
@@ -180,6 +180,7 @@ function AssignedStage({ onNavigate, target }: {
       users={bundle.users}
       {...(requested ? { requestedFormTemplateId: requested } : {})}
     />
+    </FmsContextFirst>
     <Button onClick={() => onNavigate("/tasks")} variant="ghost">← Back to my work</Button>
   </Frame>;
 }

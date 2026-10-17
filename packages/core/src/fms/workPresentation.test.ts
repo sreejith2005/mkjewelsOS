@@ -8,6 +8,12 @@ const context: FmsWorkContext = { workflowName: "Jewellery enquiry", stageName: 
     field: { key: "client_name", label: "Client name", type: "text", sortOrder: 0 }, value: "Synthetic client", userName: null }], journey: [] };
 
 describe("FMS work presentation", () => {
+  it("uses resolved branch names and does not invent an unanswered attachment", () => {
+    const branch = { ...context.receivedFields[0]!, field: { key: "branch", label: "Branch", type: "branch_dropdown" as const, sortOrder: 0 }, value: "00000000-0000-4000-8000-000000000001", valueLabel: "Bandra" };
+    expect(presentFmsWorkContext({ ...context, receivedFields: [branch] }).answers[0]?.display).toBe("Bandra");
+    const absentFile = { ...branch, field: { key: "file", label: "Attachment", type: "file" as const, sortOrder: 1 }, value: null, valueLabel: null };
+    expect(presentFmsWorkContext({ ...context, receivedFields: [absentFile] }).answers[0]?.display).not.toBe("Attachment provided");
+  });
   it("builds the configured task title from authorized fields", () => {
     expect(presentFmsWorkContext(context).title).toBe("Synthetic client — Introduction Call");
     expect(presentFmsWorkContext(context).answers).toEqual([{ label: "Client name", display: "Synthetic client", source: "Enquiry · v1" }]);

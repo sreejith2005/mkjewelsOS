@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { useEffect } from "react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -19,6 +20,10 @@ vi.mock("@/features/forms/api", () => ({
   loadForms: mocks.loadForms,
   loadTaskForms: mocks.loadTaskForms,
 }));
+vi.mock("@/features/fms/FmsWorkContext", () => ({ FmsWorkContext: ({ onReady }: { onReady?: (ready: boolean) => void }) => {
+  useEffect(() => { onReady?.(true); }, [onReady]);
+  return <section aria-label="Previous form answers">Client name: Synthetic client</section>;
+} }));
 vi.mock("@/features/fms/api", () => ({ loadFmsAssignedStage: mocks.loadFmsAssignedStage }));
 vi.mock("@jewelos/data/fms/work", async () => ({ ...(await vi.importActual<typeof import("@jewelos/data/fms/work")>("@jewelos/data/fms/work")), recoverFmsStartingWork: mocks.recoverFmsStartingWork, loadFmsWorkContext: vi.fn().mockRejectedValue(new Error("Optional context unavailable")), signedFmsContextFileUrl: vi.fn() }));
 vi.mock("@/features/fms/useFmsHandoffConfirmation", () => ({ useFmsHandoffConfirmation: () => ({ confirmWork: mocks.confirmWork, result: null, confirmation: null }) }));
@@ -118,6 +123,9 @@ describe("focused FMS assigned work", () => {
 
     render(<FmsAssignedWorkPage onNavigate={vi.fn()} />);
 
+    expect(await screen.findByRole("region", { name: "Previous form answers" })).toBeTruthy();
+    expect(screen.queryByText("Running stage-3 form form-7")).toBeNull();
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Continue to stage form" }));
     expect(await screen.findByText("Running stage-3 form form-7")).toBeTruthy();
     // Scoped by id — never the whole-workspace loader that caps its results.
     expect(mocks.loadFmsAssignedStage).toHaveBeenCalledWith("instance-5", "stage-3");
@@ -140,6 +148,9 @@ describe("focused FMS assigned work", () => {
 
     render(<FmsAssignedWorkPage onNavigate={vi.fn()} />);
 
+    expect(await screen.findByRole("region", { name: "Previous form answers" })).toBeTruthy();
+    expect(screen.queryByText("Running stage-3 form form-7")).toBeNull();
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Continue to stage form" }));
     expect(await screen.findByText("Running stage-3 form form-7")).toBeTruthy();
   });
 

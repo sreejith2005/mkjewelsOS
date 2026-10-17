@@ -11975,6 +11975,7 @@ export type Database = {
       get_fms_work_file_path: { Args: { p_instance_id: string; p_instance_stage_id: string; p_file_id: string }; Returns: string }
       get_fms_task_contexts: { Args: { p_visit_ids: string[] }; Returns: Json }
       get_fms_assigned_stage: { Args: { p_instance_id: string; p_instance_stage_id?: string }; Returns: Json }
+      get_fms_work_form_context: { Args: { p_instance_id: string; p_instance_stage_id: string; p_offset?: number; p_limit?: number }; Returns: Json }
       get_fms_assigned_work_context: { Args: { p_instance_id: string; p_instance_stage_id: string; p_cursor?: string; p_limit?: number }; Returns: Json }
 
       assert_task_assignment_targets: {

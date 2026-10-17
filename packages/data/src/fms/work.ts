@@ -1,7 +1,7 @@
 import { getSupabase } from "@jewelos/api-client/client";
 import { beginNewFmsMutation, getFmsMutationIdentity, getFmsMutationStorage, markFmsMutationComplete } from "./mutationIdentity";
 import { parseFormOptions, FORM_DRAFT_FIELD_TYPES, type FormAnswer, type FormFieldType, type FmsHandoffChoice, type FmsTransitionRequest,
-  type FmsWorkDestination, type FmsWorkPreview, type FmsWorkResult, type FmsAssignedWorkTarget, type FmsWorkContext, type Json } from "@jewelos/core";
+  type FmsWorkDestination, type FmsWorkPreview, type FmsWorkResult, type FmsAssignedWorkTarget, type FmsWorkContext, type FmsReceivedField, type FmsPreviousFormsPage, type Json } from "@jewelos/core";
 
 const invalid = () => new Error("Workflow service returned an invalid response. Refresh this work item.");
 function record(value: unknown): Record<string, unknown> { if (!value || typeof value !== "object" || Array.isArray(value)) throw invalid(); return value as Record<string, unknown>; }
@@ -70,18 +70,20 @@ function formAnswer(value: unknown): FormAnswer | null {
   throw invalid();
 }
 function fieldType(value: unknown): FormFieldType { const found = FORM_DRAFT_FIELD_TYPES.find(type => type === value); if (!found) throw invalid(); return found; }
+function receivedField(raw: unknown): FmsReceivedField {
+      const received = record(raw); const field = record(received.field);
+      const attachment = received.attachment == null ? null : record(received.attachment);
+      return { sourceStageKey: string(received.sourceStageKey), submissionId: string(received.submissionId), formTemplateId: string(received.formTemplateId),
+        formName: string(received.formName), formVersion: integer(received.formVersion), value: formAnswer(received.value), userName: nullable(received.userName), valueLabel: received.valueLabel == null ? null : string(received.valueLabel),
+        attachment: attachment ? { id: string(attachment.id), name: string(attachment.name), mimeType: string(attachment.mimeType), sizeBytes: integer(attachment.sizeBytes) } : null,
+        field: { key: string(field.key), label: string(field.label), type: fieldType(field.type), sortOrder: integer(field.sortOrder), options: parseFormOptions(field.options) } };
+
+}
 export function parseFmsWorkContext(raw: unknown): FmsWorkContext {
   const v = record(raw);
   return { workflowName: string(v.workflowName), stageName: string(v.stageName), reference: string(v.reference), referenceKey: nullable(v.referenceKey), instructions: string(v.instructions),
     expectedResult: string(v.expectedResult), dueAt: nullable(v.dueAt), assignedNames: array(v.assignedNames).map(string), titleTemplate: string(v.titleTemplate),
-    shortDescription: string(v.shortDescription), dueLabel: string(v.dueLabel), nextCursor: nullable(v.nextCursor), receivedFields: array(v.receivedFields).map(raw => {
-      const received = record(raw); const field = record(received.field);
-      const attachment = received.attachment == null ? null : record(received.attachment);
-      return { sourceStageKey: string(received.sourceStageKey), submissionId: string(received.submissionId), formTemplateId: string(received.formTemplateId),
-        formName: string(received.formName), formVersion: integer(received.formVersion), value: formAnswer(received.value), userName: nullable(received.userName),
-        attachment: attachment ? { id: string(attachment.id), name: string(attachment.name), mimeType: string(attachment.mimeType), sizeBytes: integer(attachment.sizeBytes) } : null,
-        field: { key: string(field.key), label: string(field.label), type: fieldType(field.type), sortOrder: integer(field.sortOrder), options: parseFormOptions(field.options) } };
-    }), journey: array(v.journey).map(raw => { const item = record(raw); return { id: string(item.id), stageName: string(item.stageName), status: string(item.status),
+    shortDescription: string(v.shortDescription), dueLabel: string(v.dueLabel), nextCursor: nullable(v.nextCursor), receivedFields: array(v.receivedFields).map(receivedField), journey: array(v.journey).map(raw => { const item = record(raw); return { id: string(item.id), stageName: string(item.stageName), status: string(item.status),
       employeeName: nullable(item.employeeName), visitNumber: integer(item.visitNumber), completedAt: nullable(item.completedAt) }; }) };
 }
 export async function loadFmsWorkContext(instanceId: string, instanceStageId: string, cursor: string | null = null): Promise<FmsWorkContext> {
@@ -207,4 +209,20 @@ export async function recoverLibrarySubmission(formTemplateId: string, flowId?: 
   if (result.error) throw new Error(result.error.message);
   if (result.data !== null) await markFmsMutationComplete(getFmsMutationStorage(), await actorId(), "library_form", `${formTemplateId}:${flowId ?? "library"}`);
   return result.data === null ? null : readFmsStartConfirmation(result.data);
+}
+
+export function parseFmsPreviousForms(raw: unknown): FmsPreviousFormsPage {
+  const value = record(raw);
+  return { nextCursor: nullable(value.nextCursor), forms: array(value.forms).map(rawForm => {
+    const form = record(rawForm);
+    return { id: string(form.id), stageName: string(form.stageName), visitNumber: integer(form.visitNumber),
+      isInitial: boolean(form.isInitial), submittedAt: nullable(form.submittedAt), submittedBy: nullable(form.submittedBy), fields: array(form.fields).map(receivedField) };
+  }) };
+}
+export async function loadFmsPreviousForms(instanceId: string, instanceStageId: string, cursor: string | null = null): Promise<FmsPreviousFormsPage> {
+  const offset = cursor === null ? 0 : Number(cursor);
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100000) throw new Error("Invalid previous-form cursor");
+  const result = await getSupabase().rpc("get_fms_work_form_context", { p_instance_id: instanceId, p_instance_stage_id: instanceStageId, p_offset: offset, p_limit: 10 });
+  if (result.error) throw new Error(result.error.message);
+  return parseFmsPreviousForms(result.data);
 }

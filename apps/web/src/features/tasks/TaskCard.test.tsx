@@ -4,6 +4,21 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { deriveTaskMutationCapability, type TaskMutationCapability } from "@jewelos/core";
 import type { TaskBundle } from "./api";
 import { TaskCard } from "./TaskCard";
+const contextView = vi.hoisted(() => vi.fn());
+vi.mock("@/features/fms/FmsWorkContext", () => ({ FmsWorkContext: (props: { instanceId: string; instanceStageId: string }) => {
+  contextView(props); return <p>Client name: Synthetic client from the previous form</p>;
+} }));
+
+it("loads full previous-form details only when an FMS task is expanded", () => {
+  contextView.mockClear();
+  render(<TaskCard task={{ ...task, task_type: "fms", fms_instance_id: "instance-5", fms_instance_stage_id: "stage-3" }} capability={capability} categoryLabel="FMS" onAction={async () => undefined} />);
+  expect(contextView).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: /View details/i }));
+  expect(screen.getByText("Client name: Synthetic client from the previous form")).toBeTruthy();
+  expect(contextView).toHaveBeenCalledWith({ instanceId: "instance-5", instanceStageId: "stage-3" });
+  expect(screen.queryByText("Frequency")).toBeNull();
+  expect(screen.queryByText("No description provided")).toBeNull();
+});
 
 afterEach(cleanup);
 
