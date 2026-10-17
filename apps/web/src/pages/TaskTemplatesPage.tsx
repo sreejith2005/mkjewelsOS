@@ -5,7 +5,7 @@ import {
   canManageTaskTemplates, canSelectTaskControlBranch, canViewTaskControl,
   taskControlShowsSearch, taskControlTabsFor,
   TASK_CONTROL_TAB_DESCRIPTIONS,
-  type Json, hasPermission,
+  type Json, type TaskWorkKindFilter, hasPermission,
 } from "@jewelos/core";
 import { supabase } from "@jewelos/api-client";
 import { useAuth } from "@/auth/AuthContext";
@@ -70,6 +70,7 @@ export function TaskTemplatesPage() {
   const [tab, setTab] = useState<TaskControlTab>(() => initialTab(tabs));
   const [filters, setFilters] = useState<TaskControlFilters>(() => defaultFilters());
   const [view, setView] = useState<TaskView>("all");
+  const [kind, setKind] = useState<TaskWorkKindFilter>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
@@ -91,7 +92,7 @@ export function TaskTemplatesPage() {
   const [managedTaskId, setManagedTaskId] = useState<string | null>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [bulkDelete, setBulkDelete] = useState<BulkDeleteRequest | null>(null);
-  useEffect(() => { setSelectedTaskIds([]); }, [filters, view, profile?.id, canAdministerTasks]);
+  useEffect(() => { setSelectedTaskIds([]); }, [filters, view, kind, profile?.id, canAdministerTasks]);
 
   useEffect(() => {
     if (!authorized) return;
@@ -109,13 +110,13 @@ export function TaskTemplatesPage() {
     setSnapshotLoading(true);
     setSnapshotError(null);
     try {
-      setSnapshot(await fetchTaskControlSnapshot(filters, view, page, pageSize));
+      setSnapshot(await fetchTaskControlSnapshot(filters, view, page, pageSize, kind));
     } catch (caught) {
       setSnapshotError(errorMessage(caught));
     } finally {
       setSnapshotLoading(false);
     }
-  }, [authorized, filters, page, pageSize, view]);
+  }, [authorized, filters, kind, page, pageSize, view]);
 
   const loadTemplates = useCallback(async () => {
     if (!canManageTemplates) return;
@@ -321,12 +322,14 @@ export function TaskTemplatesPage() {
             ) : (
               <TasksTab
                 selection={canAdministerTasks ? { ids: selectedTaskIds, onChange: setSelectedTaskIds } : undefined}
-                onBulkDelete={canAdministerTasks ? (selected) => setBulkDelete({ filter: evidenceFilter(filters, view, 1, 100), selected, scopeLabel: filters.user_profile_id ? (users.find((user) => user.id === filters.user_profile_id)?.employee_name ?? "Selected employee") : "All employees matching these filters" }) : undefined}
+                onBulkDelete={canAdministerTasks ? (selected) => setBulkDelete({ filter: evidenceFilter(filters, view, 1, 100, kind), selected, scopeLabel: filters.user_profile_id ? (users.find((user) => user.id === filters.user_profile_id)?.employee_name ?? "Selected employee") : "All employees matching these filters" }) : undefined}
                 onManage={canAdministerTasks ? setManagedTaskId : undefined}
                 evidence={snapshot.evidence}
                 onPage={setPage}
                 onPageSize={(size) => { setPageSize(size); setPage(1); }}
                 onView={(next) => { setView(next); setPage(1); }}
+                kind={kind}
+                onKind={(next) => { setKind(next); setPage(1); }}
                 page={page}
                 pageSize={pageSize}
                 view={view}

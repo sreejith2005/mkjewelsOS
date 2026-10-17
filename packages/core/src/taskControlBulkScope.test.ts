@@ -12,3 +12,8 @@ it("uses the employee, branch, department and work type for complete schedule de
 it("does not invent occurrence dates or statuses for inactive/future/undated schedules", () => {
   expect(taskControlScheduleMatchesBulkScope(row, { from: "2026-10-01", to: "2026-10-12", view: "remaining" })).toBe(true);
 });
+it("keeps schedules out of deletion when the list is narrowed to non-recurring work", () => {
+  expect(taskControlScheduleMatchesBulkScope(row, { kind: "all" })).toBe(true);
+  expect(taskControlScheduleMatchesBulkScope(row, { kind: "recurring" })).toBe(true);
+  for (const kind of ["one_time", "crm", "fms"]) expect(taskControlScheduleMatchesBulkScope(row, { kind })).toBe(false);
+});

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildManualTaskCreateRequest, type ManualTaskDraftInput } from "./manualTaskDraft";
+import { buildManualTaskCreateRequest, taskPriorityChoices, type ManualTaskDraftInput } from "./manualTaskDraft";
 
 const people = [
   { id: "doer-1", branchId: "branch-1", departmentId: "department-1", eligible: true },
@@ -76,5 +76,28 @@ describe("buildManualTaskCreateRequest", () => {
     ["empty checklist", { mode: "checklist", checklistItems: [" "] }, "Add at least one checklist item."],
   ] as const)("rejects %s", (_label, overrides, message) => {
     expect(buildManualTaskCreateRequest(draft(overrides))).toEqual({ error: { message } });
+  });
+});
+
+describe("taskPriorityChoices", () => {
+  it("always offers all three fixed priorities, high first", () => {
+    expect(taskPriorityChoices([{ value: "high", label: "High" }])).toEqual([
+      { value: "high", label: "High" },
+      { value: "medium", label: "Medium" },
+      { value: "low", label: "Low" },
+    ]);
+    expect(taskPriorityChoices([]).map((choice) => choice.value)).toEqual(["high", "medium", "low"]);
+  });
+
+  it("uses Dropdown Master labels and ignores codes the database does not accept", () => {
+    expect(taskPriorityChoices([
+      { value: "low", label: "Can wait" },
+      { value: "urgent", label: "Urgent" },
+      { value: "medium", label: "  " },
+    ])).toEqual([
+      { value: "high", label: "High" },
+      { value: "medium", label: "Medium" },
+      { value: "low", label: "Can wait" },
+    ]);
   });
 });

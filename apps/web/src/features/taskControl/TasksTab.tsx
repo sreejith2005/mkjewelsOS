@@ -1,11 +1,16 @@
-import { useState } from "react";
-import { FileText, Image as ImageIcon, Paperclip, Video } from "lucide-react";
+import { useState, type ComponentType } from "react";
+import { CircleDot, Contact, FileText, Image as ImageIcon, Paperclip, Repeat, Video, Workflow } from "lucide-react";
 import { Button } from "@/components/ui";
 import { EmptyMessage, Panel, StatusDot } from "@/features/analytics/components";
 import { signedTaskEvidenceUrl } from "@/features/taskEvidence/api";
 import type { EvidenceWorkspace, TaskAttachmentSummary, TaskRow, TaskView } from "@/features/taskEvidence/types";
-import { evidenceFileSize, taskRowTone, TASK_VIEW_LABELS as CORE_TASK_VIEW_LABELS } from "@jewelos/core";
+import {
+  evidenceFileSize, isFmsWorkKind, taskRowTone, taskWorkKind,
+  TASK_VIEW_LABELS as CORE_TASK_VIEW_LABELS, TASK_WORK_KIND_FILTERS, TASK_WORK_KIND_LABELS,
+  type TaskWorkKind, type TaskWorkKindFilter,
+} from "@jewelos/core";
 import { titleCase } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 const dateTime = (value: string | null) =>
   value ? new Date(value).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "—";
@@ -16,6 +21,29 @@ export const TASK_VIEW_LABELS = CORE_TASK_VIEW_LABELS as ReadonlyArray<readonly 
 
 const statusTone = taskRowTone;
 type TaskSelection = Readonly<{ ids: readonly string[]; onChange: (ids: string[]) => void }>;
+
+/**
+ * Each kind of work has its own icon, label and tone, so a row reads as
+ * one-time, recurring, FMS or CRM at a glance -- the label carries the meaning,
+ * the colour only speeds up scanning.
+ */
+const KIND_STYLE: Readonly<Record<TaskWorkKind, { Icon: ComponentType<{ className?: string }>; badge: string; edge: string }>> = {
+  one_time: { Icon: CircleDot, badge: "border border-task-border bg-task-muted text-task-text", edge: "border-l-task-text-muted/50" },
+  recurring: { Icon: Repeat, badge: "bg-gold/15 text-gold-secondary", edge: "border-l-gold" },
+  fms_step: { Icon: Workflow, badge: "bg-task-accent-soft text-task-text", edge: "border-l-task-accent" },
+  fms_start: { Icon: Workflow, badge: "bg-task-accent-soft text-task-text", edge: "border-l-task-accent" },
+  crm: { Icon: Contact, badge: "bg-champagne/40 text-task-text", edge: "border-l-champagne" },
+};
+
+function KindBadge({ kind }: { kind: TaskWorkKind }) {
+  const { Icon, badge } = KIND_STYLE[kind];
+  return (
+    <span className={cn("inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold", badge)} data-testid="work-kind">
+      <Icon className="size-3.5 shrink-0" />
+      {TASK_WORK_KIND_LABELS[kind]}
+    </span>
+  );
+}
 
 function WorkTypeChip({ row }: { row: TaskRow }) {
   return (
@@ -70,31 +98,34 @@ function EvidenceCell({ row, onOpen }: { row: TaskRow; onOpen: (file: TaskAttach
 }
 
 function TaskCard({ row, onOpen, onManage, selection }: { row: TaskRow; onOpen: (file: TaskAttachmentSummary) => void; onManage?: ((id: string) => void) | undefined; selection?: TaskSelection | undefined }) {
+  const kind = taskWorkKind(row);
+  const fms = isFmsWorkKind(kind);
+  const late = row.overdue && row.task_status !== "completed";
   return (
-    <article className="rounded-lg border border-task-border p-3">
+    <article className={cn("rounded-lg border border-l-4 border-task-border p-3", KIND_STYLE[kind].edge)}>
       {selection && row.task_type !== "fms" ? <label className="mb-2 flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={selection.ids.includes(row.task_id)} onChange={(event) => selection.onChange(event.target.checked ? [...selection.ids, row.task_id] : selection.ids.filter((id) => id !== row.task_id))} />Select {row.task_title}</label> : null}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{row.task_title}</p>
-          <p className="mt-0.5 truncate text-xs text-task-text-muted">
-            {row.assignee_names ?? "Unassigned"} · {row.branch_name ?? "No branch"}
-            {row.department_name ? ` · ${row.department_name}` : ""}
-          </p>
-          <p className="mt-0.5 text-xs text-task-text-muted">
-            Due {dateTime(row.due_datetime ?? row.planned_datetime)}
-            {row.actual_datetime ? ` · Completed ${dateTime(row.actual_datetime)}` : ""}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <WorkTypeChip row={row} />
-          <span className="inline-flex items-center gap-1.5 text-xs text-task-text-muted">
-            <StatusDot tone={statusTone(row)} />
-            {row.overdue && row.task_status !== "completed" ? "Overdue" : titleCase(row.task_status)}
-          </span>
-        </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <KindBadge kind={kind} />
+        {fms ? null : <WorkTypeChip row={row} />}
+        <span className={cn("ml-auto inline-flex items-center gap-1.5 text-xs", late ? "font-semibold text-task-overdue" : "text-task-text-muted")}>
+          <StatusDot tone={statusTone(row)} />
+          {late ? "Overdue" : titleCase(row.task_status)}
+        </span>
       </div>
+      <p className="mt-2 line-clamp-2 break-words text-sm font-medium">{row.task_title}</p>
+      {row.work_context ? <p className="mt-0.5 break-words text-xs font-medium text-task-text">{row.work_context}</p> : null}
+      <p className="mt-0.5 break-words text-xs text-task-text-muted">
+        {row.assignee_names ?? "Unassigned"} · {row.branch_name ?? "No branch"}
+        {row.department_name ? ` · ${row.department_name}` : ""}
+      </p>
+      <p className="mt-0.5 text-xs text-task-text-muted">
+        {kind === "fms_start" ? `Assigned ${dateTime(row.planned_datetime)} · not started yet` : `Due ${dateTime(row.due_datetime ?? row.planned_datetime)}`}
+        {row.actual_datetime ? ` · Completed ${dateTime(row.actual_datetime)}` : ""}
+      </p>
       <div className="mt-2 border-t border-task-border pt-2">
-        <EvidenceCell onOpen={onOpen} row={row} />
+        {fms
+          ? <span className="text-xs text-task-text-muted">Forms and files for FMS work stay on the FMS step.</span>
+          : <EvidenceCell onOpen={onOpen} row={row} />}
         {onManage && row.task_type !== "fms" ? <Button className="mt-2" variant="secondary" onClick={() => onManage(row.task_id)}>Edit / delete task</Button> : null}
       </div>
     </article>
@@ -102,16 +133,18 @@ function TaskCard({ row, onOpen, onManage, selection }: { row: TaskRow; onOpen: 
 }
 
 /**
- * Every task assigned in the current scope, checklist and upload together. The
- * view chips narrow the same server-paginated list, so the counts on screen and
- * the rows on screen always describe the same set.
+ * Every piece of work assigned in the current scope -- one-time, recurring, FMS
+ * and CRM together. The view and type chips narrow the same server-paginated
+ * list, so the counts on screen and the rows on screen describe the same set.
  */
 export function TasksTab({
   evidence,
   view,
+  kind = "all",
   page,
   pageSize,
   onView,
+  onKind,
   onPage,
   onPageSize,
   onManage,
@@ -120,9 +153,11 @@ export function TasksTab({
 }: {
   evidence: EvidenceWorkspace;
   view: TaskView;
+  kind?: TaskWorkKindFilter;
   page: number;
   pageSize: number;
   onView: (view: TaskView) => void;
+  onKind?: ((kind: TaskWorkKindFilter) => void) | undefined;
   onPage: (page: number) => void;
   onPageSize: (size: number) => void;
   onManage?: ((id: string) => void) | undefined;
@@ -165,12 +200,36 @@ export function TasksTab({
         ))}
       </div>
 
+      {onKind ? (
+        <div className="scroll-x no-scrollbar flex items-center gap-2 pb-1" role="group" aria-label="Work type">
+          <span className="shrink-0 text-xs font-semibold text-task-text-muted">Type</span>
+          {TASK_WORK_KIND_FILTERS.map(([value, label]) => {
+            const count = evidence.kind_counts?.[value];
+            return (
+              <button
+                aria-pressed={kind === value}
+                className={
+                  kind === value
+                    ? "min-h-9 shrink-0 rounded-full border border-task-accent bg-task-accent-soft px-3 text-xs font-semibold text-task-text"
+                    : "min-h-9 shrink-0 rounded-full border border-task-border px-3 text-xs font-medium text-task-text hover:bg-task-muted"
+                }
+                key={value}
+                onClick={() => onKind(value)}
+                type="button"
+              >
+                {label}{count === undefined ? "" : ` · ${count.toLocaleString("en-IN")}`}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
       {openError ? (
         <p aria-live="polite" className="rounded-lg border border-task-overdue/40 bg-task-bg p-3 text-sm text-task-overdue" role="alert">{openError}</p>
       ) : null}
 
       <Panel
-        description={`${evidence.tasks_total.toLocaleString("en-IN")} task${evidence.tasks_total === 1 ? "" : "s"} in this view, of ${evidence.stats.tasks_total.toLocaleString("en-IN")} in scope. ${evidence.stats.evidence_files.toLocaleString("en-IN")} file${evidence.stats.evidence_files === 1 ? "" : "s"} uploaded, ${fileSize(evidence.stats.evidence_bytes)} total. Files open in a new tab through a 60-second signed link.`}
+        description={`${evidence.tasks_total.toLocaleString("en-IN")} task${evidence.tasks_total === 1 ? "" : "s"} in this view, of ${(evidence.kind_counts?.all ?? evidence.stats.tasks_total).toLocaleString("en-IN")} in scope. ${evidence.stats.evidence_files.toLocaleString("en-IN")} file${evidence.stats.evidence_files === 1 ? "" : "s"} uploaded, ${fileSize(evidence.stats.evidence_bytes)} total. Files open in a new tab through a 60-second signed link.`}
         title="Assigned tasks"
       >
         {evidence.tasks.length === 0 ? (

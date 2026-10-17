@@ -13,6 +13,9 @@ import {
   formatTaskPerformanceScore,
   taskControlTabsFor,
   taskRowTone,
+  taskWorkKind,
+  isFmsWorkKind,
+  TASK_WORK_KIND_FILTERS,
   TASK_VIEW_LABELS,
 } from "./taskControlView.ts";
 
@@ -119,5 +122,22 @@ describe("evidenceCellState", () => {
     expect(evidenceCellState({ attachments: [{}], requires_upload: true })).toBe("files");
     expect(evidenceCellState({ attachments: [], requires_upload: true })).toBe("missing");
     expect(evidenceCellState({ attachments: [], requires_upload: false })).toBe("not-required");
+  });
+});
+
+describe("taskWorkKind", () => {
+  it("trusts the server's kind and falls back safely for an older server", () => {
+    expect(taskWorkKind({ work_kind: "recurring", task_type: "checklist" })).toBe("recurring");
+    expect(taskWorkKind({ work_kind: "fms_start", task_type: "fms" })).toBe("fms_start");
+    expect(taskWorkKind({ task_type: "fms" })).toBe("fms_step");
+    expect(taskWorkKind({ task_type: "delegation" })).toBe("one_time");
+    expect(taskWorkKind({ work_kind: "toString", task_type: "delegation" })).toBe("one_time");
+  });
+
+  it("groups both FMS kinds under the FMS filter", () => {
+    expect(isFmsWorkKind("fms_step")).toBe(true);
+    expect(isFmsWorkKind("fms_start")).toBe(true);
+    expect(isFmsWorkKind("crm")).toBe(false);
+    expect(TASK_WORK_KIND_FILTERS.map(([value]) => value)).toEqual(["all", "one_time", "recurring", "fms", "crm"]);
   });
 });

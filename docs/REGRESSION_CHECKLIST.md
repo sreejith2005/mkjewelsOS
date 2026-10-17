@@ -75,6 +75,13 @@ devtools: `supabase.rpc(...)` / `supabase.from(...)` with the user's session).
 - [ ] Recurring tasks generate on schedule; overdue tasks show as overdue.
 - [ ] Staff see own/department tasks; managers see branch; admins see all (task visibility follows dashboard authority).
 - [ ] CSV import and Assigning Left still work for ADM/SA.
+- [ ] Task Control → Tasks for one employee lists one-time, recurring, CRM walk-in tasks and their
+      FMS steps and pending FMS start forms (migration 0285), each with its type badge; open FMS work
+      shows even when dated before the range. The Type chips narrow the list and show counts; with
+      Type = FMS, "Delete all matching" selects nothing (no tasks, no schedules). Overview tiles are
+      unchanged by the new rows. A manager sees only their own branch's FMS work.
+- [ ] On a phone (or the Android app), Assign New Task → Priority shows High, Medium and Low and the
+      open panel scrolls into view above the Assign Task bar; Task type buttons stack on one column.
 - [ ] Voice assignment (`tasks.voice_assign`; SA/ADM/MGR/HR by default) behaves exactly as before
       Ask Kiara Phase 7 moved its recorder and transcription into shared code
       (`apps/web/src/features/voice/useVoiceRecorder.ts`, `supabase/functions/_shared/voice/transcribe.ts`):

@@ -57,7 +57,7 @@ export const TASK_CONTROL_TAB_LABELS: ReadonlyArray<readonly ["overview" | "peop
 export const TASK_CONTROL_TAB_DESCRIPTIONS: Readonly<Record<string, string>> = {
   overview: "Who is behind, what is overdue, and which evidence is still missing.",
   people: "Assigned, completed, remaining and overdue work for every person in scope.",
-  tasks: "Every task assigned in scope — checklist and upload alike — with its evidence on the row.",
+  tasks: "Every piece of work assigned in scope — one-time, recurring, FMS and CRM — each labelled with its type.",
   templates: "Recurring rules, schedules and source-linked task templates.",
 };
 
@@ -96,6 +96,45 @@ export const TASK_VIEW_LABELS: ReadonlyArray<readonly [string, string]> = [
   ["upload", "Upload"],
   ["awaiting_evidence", "Awaiting evidence"],
 ];
+
+/**
+ * What a Task Control row is. The server derives it once
+ * (`get_task_evidence_workspace`, migration 0285): FMS steps and start forms
+ * come from the FMS tables, CRM from the task's source, recurring from its
+ * template link, and everything else is one-time work.
+ */
+export type TaskWorkKind = "one_time" | "recurring" | "crm" | "fms_step" | "fms_start";
+export type TaskWorkKindFilter = "all" | "one_time" | "recurring" | "crm" | "fms";
+
+/** The type chips over the list, in display order. */
+export const TASK_WORK_KIND_FILTERS: ReadonlyArray<readonly [TaskWorkKindFilter, string]> = [
+  ["all", "All types"],
+  ["one_time", "One-time"],
+  ["recurring", "Recurring"],
+  ["fms", "FMS"],
+  ["crm", "CRM"],
+];
+
+export const TASK_WORK_KIND_LABELS: Readonly<Record<TaskWorkKind, string>> = {
+  one_time: "One-time",
+  recurring: "Recurring",
+  crm: "CRM",
+  fms_step: "FMS step",
+  fms_start: "FMS start",
+};
+
+/**
+ * A row's kind. A server that predates 0285 sends no `work_kind`; its FMS rows
+ * are still typed `fms`, and the rest cannot be told apart, so they read as
+ * one-time rather than as a guess.
+ */
+export function taskWorkKind(row: Readonly<{ work_kind?: string | null; task_type: string }>): TaskWorkKind {
+  const kind = row.work_kind;
+  if (kind && Object.prototype.hasOwnProperty.call(TASK_WORK_KIND_LABELS, kind)) return kind as TaskWorkKind;
+  return row.task_type === "fms" ? "fms_step" : "one_time";
+}
+
+export const isFmsWorkKind = (kind: TaskWorkKind): boolean => kind === "fms_step" || kind === "fms_start";
 
 /** Byte counts as the evidence panels print them. */
 export function evidenceFileSize(bytes: number | null): string {
@@ -148,13 +187,18 @@ export function evidenceCellState(row: {
   return row.requires_upload ? "missing" : "not-required";
 }
 
-/** Schedules have no occurrence date/status; full deletion scopes their owner and work type. */
+/**
+ * Schedules have no occurrence date/status; full deletion scopes their owner and work type.
+ * A schedule is recurring work, so a list narrowed to another kind (one-time, CRM, FMS)
+ * never pulls schedules into "Delete all matching".
+ */
 export function taskControlScheduleMatchesBulkScope(
   row: Readonly<{ branch_id: string | null; department_id: string | null; assignee_user_id: string | null; task_type: string; requires_upload: boolean }>,
   filter: Readonly<Record<string, string | number | undefined>>,
 ): boolean {
   const upload = row.task_type === "delegation" || row.requires_upload;
-  return (!filter.branch_id || row.branch_id === filter.branch_id)
+  return (!filter.kind || filter.kind === "all" || filter.kind === "recurring")
+    && (!filter.branch_id || row.branch_id === filter.branch_id)
     && (!filter.department_id || row.department_id === filter.department_id)
     && (!filter.user_profile_id || row.assignee_user_id === filter.user_profile_id)
     && (filter.view !== "checklist" || !upload)

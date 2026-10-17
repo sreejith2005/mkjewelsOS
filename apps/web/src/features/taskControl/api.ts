@@ -2,6 +2,7 @@ import { fetchEmployeeTaskProgress, fetchReportingOptions, type ReportingOptions
 import type { EmployeeProgress, ProgressCounts } from "@/features/analytics/types";
 import { fetchTaskEvidenceWorkspace } from "@/features/taskEvidence/api";
 import type { EvidenceWorkspace, TaskView } from "@/features/taskEvidence/types";
+import type { TaskWorkKindFilter } from "@jewelos/core";
 import { evidenceFilter, progressContext, type TaskControlFilters } from "./filters";
 
 /**
@@ -25,10 +26,11 @@ export async function fetchTaskControlSnapshot(
   view: TaskView,
   page: number,
   pageSize: number,
+  kind: TaskWorkKindFilter = "all",
 ): Promise<TaskControlSnapshot> {
   const [progress, evidence] = await Promise.all([
     fetchEmployeeTaskProgress(progressContext(filters)),
-    fetchTaskEvidenceWorkspace(evidenceFilter(filters, view, page, pageSize)),
+    fetchTaskEvidenceWorkspace(evidenceFilter(filters, view, page, pageSize, kind)),
   ]);
   return {
     progress: { employees: counts(progress.employees), departments: counts(progress.departments), branches: counts(progress.branches) },

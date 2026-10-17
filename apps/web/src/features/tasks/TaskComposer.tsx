@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { AlertTriangle, CalendarDays, Check, ChevronDown, FileText, Flag, Paperclip, Plus, Rocket, Users, UserRoundCheck, X } from "lucide-react";
-import { buildManualTaskCreateRequest, voiceDraftGapMessage, voiceDraftGaps, type Enums, type Json, type VoiceDeadline, type VoiceDraftGap } from "@jewelos/core";
+import { buildManualTaskCreateRequest, taskPriorityChoices, voiceDraftGapMessage, voiceDraftGaps, type Enums, type Json, type VoiceDeadline, type VoiceDraftGap } from "@jewelos/core";
 import type { UserProfile } from "@/types";
 import { Button, Modal, Notice } from "@/components/ui";
 import { toast } from "sonner";
@@ -33,11 +33,19 @@ function toDateTimeLocal(iso: string): string {
 }
 
 function TaskSelector({ children, id, open, panel }: { children: ReactNode; id: Exclude<Panel, null>; open: boolean; panel: ReactNode }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  // On a phone the composer is a bottom sheet with a sticky Assign bar and,
+  // often, the keyboard up: a panel opening below the fold looked like a
+  // selector with nothing in it. It scrolls itself fully into view instead;
+  // the bottom scroll margin keeps it clear of the sticky bar.
+  useEffect(() => {
+    if (open) panelRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  }, [open]);
   // An open panel takes the whole row: squeezed into a half-width grid cell, the
   // people picker clipped its search field and names at phone width.
   return <div className={cn("min-w-0", open && "col-span-2")} data-testid={`task-selector-${id}`}>
     {children}
-    {open ? <div className="mt-2 max-h-[min(26rem,50dvh)] overflow-y-auto rounded-xl border border-task-border bg-task-muted p-3" data-testid={`task-panel-${id}`}>{panel}</div> : null}
+    {open ? <div className="mt-2 max-h-[min(26rem,50dvh)] scroll-mb-24 overflow-y-auto rounded-xl border border-task-border bg-task-muted p-3" data-testid={`task-panel-${id}`} ref={panelRef}>{panel}</div> : null}
   </div>;
 }
 
@@ -75,18 +83,13 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
 
   const branchNames = useMemo(() => new Map(data.branches.map((branch) => [branch.id, branch.name])), [data.branches]);
   const departmentNames = useMemo(() => new Map(data.departments.map((department) => [department.id, department.name])), [data.departments]);
-  const priorityOptions = useMemo(() => data.priorities.flatMap((option) => option.value === "high" || option.value === "medium" || option.value === "low"
-    ? [{ ...option, value: option.value as Enums<"task_priority"> }]
-    : []), [data.priorities]);
+  // All three enum-backed priorities, labelled from Dropdown Master.
+  const priorityOptions = useMemo(() => taskPriorityChoices(data.priorities), [data.priorities]);
   // The assignment RPC resolves effective authority, overrides and scope.
   const eligiblePeople = useMemo(() => data.users.filter(user => user.id && user.tenant_id === profile.tenant_id), [data.users, profile.tenant_id]);
   const priorityLabel = priorityOptions.find((option) => option.value === priority)?.label ?? priority;
   const selectedDoerName = eligiblePeople.find((person) => person.id === doers[0])?.employee_name;
   const attachedForm = data.forms.find((form) => form.id === formTemplateId);
-
-  useEffect(() => {
-    if (!priorityOptions.some((option) => option.value === priority)) setPriority(priorityOptions[0]?.value ?? "high");
-  }, [priority, priorityOptions]);
 
   const togglePanel = (next: Exclude<Panel, null>) => setPanel((current) => current === next ? null : next);
   const updateDoers = (nextDoers: string[]) => {
@@ -203,7 +206,7 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
 
   const usersPanel = <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} label="Assign user" multiple={false} onChange={updateDoers} people={eligiblePeople.flatMap((person) => person.id ? [{ ...person, id: person.id }] : [])} selectedIds={doers} />;
   const duePanel = <label><span className="mb-1 block text-xs font-semibold text-task-text">Due date and time</span><input className="task-field" min={new Date().toISOString().slice(0, 16)} onChange={(event) => { setPlanned(event.target.value); setDeadlineNote(null); setPanel(null); }} type="datetime-local" value={planned} /></label>;
-  const priorityPanel = <fieldset className="grid grid-cols-3 gap-2"><legend className="sr-only">Priority</legend>{priorityOptions.map((option) => <button className={cn("min-h-11 rounded-lg border text-sm", priority === option.value ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border text-task-text-muted")} key={option.id} onClick={() => { setPriority(option.value); setPanel(null); }} type="button">{priority === option.value ? <Check className="mr-1 inline size-4" /> : null}{option.label}</button>)}</fieldset>;
+  const priorityPanel = <fieldset className="grid grid-cols-3 gap-2"><legend className="sr-only">Priority</legend>{priorityOptions.map((option) => <button aria-pressed={priority === option.value} className={cn("min-h-11 min-w-0 rounded-lg border px-2 text-sm", priority === option.value ? "border-task-accent bg-task-accent-soft font-semibold text-task-text" : "border-task-border bg-task-bg text-task-text-muted")} key={option.value} onClick={() => { setPriority(option.value); setPanel(null); }} type="button">{priority === option.value ? <Check className="mr-1 inline size-4" /> : null}{option.label}</button>)}</fieldset>;
   const formPanel = <div><label><span className="mb-1 block text-xs font-semibold text-task-text">Required form</span><select className="task-field" onChange={(event) => { setFormTemplateId(event.target.value); setPanel(null); }} value={formTemplateId}><option value="">No form required</option>{data.forms.filter((form) => form.lifecycle === "published").map((form) => <option key={form.id} value={form.id}>{form.name} v{form.version}</option>)}</select></label><p className="mt-2 text-xs text-task-text-muted">The selected form must be completed before this task can be finished.</p></div>;
   const watchersPanel = <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} disabledIds={doers} label="In Loop · view and comment" multiple onChange={setWatchers} people={eligiblePeople.flatMap((person) => person.id ? [{ ...person, id: person.id }] : [])} selectedIds={watchers} />;
 
@@ -240,7 +243,7 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
             <span className="sr-only">Task description</span>
             <textarea className="min-h-24 w-full resize-y rounded-xl bg-task-muted p-3 text-base md:text-sm text-task-text placeholder:text-task-text-muted focus-visible:ring-task-accent" onChange={(event) => setDescription(event.target.value)} placeholder="Add Description" value={description} />
           </label>
-          <fieldset className="border-b border-task-border py-3"><legend className="mb-2 text-sm font-semibold text-task-text">Task type</legend><div className="grid grid-cols-2 gap-2"><button aria-pressed={taskMode === "task"} className={cn("min-h-11 rounded-lg border px-3 text-sm", taskMode === "task" ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border text-task-text-muted")} onClick={() => { setTaskMode("task"); setChecklist([]); setChecklistOpen(false); }} type="button">Task — upload to complete</button><button aria-pressed={taskMode === "checklist"} className={cn("min-h-11 rounded-lg border px-3 text-sm", taskMode === "checklist" ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border text-task-text-muted")} onClick={() => setTaskMode("checklist")} type="button">Checklist — tick every item</button></div></fieldset>
+          <fieldset className="border-b border-task-border py-3"><legend className="mb-2 text-sm font-semibold text-task-text">Task type</legend><div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2"><button aria-pressed={taskMode === "task"} className={cn("min-h-11 rounded-lg border px-3 text-sm", taskMode === "task" ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border text-task-text-muted")} onClick={() => { setTaskMode("task"); setChecklist([]); setChecklistOpen(false); }} type="button">Task — upload to complete</button><button aria-pressed={taskMode === "checklist"} className={cn("min-h-11 rounded-lg border px-3 text-sm", taskMode === "checklist" ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border text-task-text-muted")} onClick={() => setTaskMode("checklist")} type="button">Checklist — tick every item</button></div></fieldset>
           {taskMode === "checklist" ? <section className="border-b border-task-border py-3">
             <button aria-expanded={checklistOpen} className="flex min-h-11 w-full items-center justify-between text-sm font-semibold text-task-text" onClick={() => setChecklistOpen((current) => !current)} type="button"><span className="flex items-center gap-2"><Plus className="size-4" />Add Checklist</span><ChevronDown className={cn("size-4 transition-transform", checklistOpen ? "rotate-180" : "")} /></button>
             {checklistOpen ? <div className="mt-2 space-y-2"><input className="task-field" onChange={(event) => setChecklistDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addChecklistItem(); } }} placeholder="Type and hit Enter" value={checklistDraft} />{checklist.map((item, index) => <div className="flex items-center gap-3 rounded-xl border border-task-border bg-task-muted px-3 py-2 text-sm text-task-text" key={`${item}-${index}`}><input aria-label={`Required checklist item ${index + 1}`} checked readOnly type="checkbox" /><span className="min-w-0 flex-1 truncate">{item}</span><button aria-label={`Remove checklist item ${index + 1}`} className="text-task-text-muted hover:text-task-text" onClick={() => setChecklist((current) => current.filter((_, itemIndex) => itemIndex !== index))} type="button"><X className="size-4" /></button></div>)}</div> : null}

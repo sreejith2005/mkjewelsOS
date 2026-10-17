@@ -3,6 +3,25 @@ import { normalizeTaskParticipants } from "./taskParticipants";
 export type ManualTaskMode = "task" | "checklist";
 export type ManualTaskPriority = "low" | "medium" | "high";
 
+const PRIORITY_CODES: readonly ManualTaskPriority[] = ["high", "medium", "low"];
+const PRIORITY_DEFAULT_LABELS: Readonly<Record<ManualTaskPriority, string>> = { high: "High", medium: "Medium", low: "Low" };
+
+/**
+ * The priority choices a task author sees. The database fixes the three codes
+ * (enum `task_priority`; migration 0021 forbids changing them), so all three
+ * are always offered, high first. Dropdown Master only renames them: a label
+ * from an active master row wins, and a missing or switched-off row falls back
+ * to the plain name instead of hiding a valid priority.
+ */
+export function taskPriorityChoices(
+  masterRows: readonly Readonly<{ value: string; label: string }>[],
+): Array<{ value: ManualTaskPriority; label: string }> {
+  return PRIORITY_CODES.map((value) => ({
+    value,
+    label: masterRows.find((row) => row.value === value)?.label.trim() || PRIORITY_DEFAULT_LABELS[value],
+  }));
+}
+
 export type ManualTaskEligiblePerson = Readonly<{
   id: string;
   branchId: string | null;

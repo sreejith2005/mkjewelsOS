@@ -134,3 +134,28 @@ describe("TaskComposer selector panels", () => {
     expect(screen.queryByLabelText("Repeat")).toBeNull();
   });
 });
+
+describe("TaskComposer priority on a phone", () => {
+  it("offers High, Medium and Low even when Dropdown Master lists only High", () => {
+    renderComposer();
+    fireEvent.click(screen.getByRole("button", { name: /High/i }));
+    const panel = screen.getByTestId("task-panel-priority");
+    expect(within(panel).getAllByRole("button").map((button) => button.textContent)).toEqual(["High", "Medium", "Low"]);
+    fireEvent.click(within(panel).getByRole("button", { name: "Low" }));
+    expect(screen.queryByTestId("task-panel-priority")).toBeNull();
+    expect(screen.getByRole("button", { name: /Low/i }).getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("scrolls an opened panel into view so it is not hidden below the fold", () => {
+    const scrollIntoView = vi.fn();
+    const original = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    try {
+      renderComposer();
+      fireEvent.click(screen.getByRole("button", { name: /High/i }));
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", behavior: "smooth" });
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original;
+    }
+  });
+});

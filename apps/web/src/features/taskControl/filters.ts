@@ -1,4 +1,4 @@
-import { taskDelayedScore, taskPendingScore } from "@jewelos/core";
+import { taskDelayedScore, taskPendingScore, type TaskWorkKindFilter } from "@jewelos/core";
 import type { TaskView } from "@/features/taskEvidence/types";
 
 /**
@@ -81,9 +81,12 @@ export function evidenceFilter(
   view: TaskView,
   page: number,
   pageSize: number,
+  kind: TaskWorkKindFilter = "all",
 ): Record<string, string | number> {
   const filter: Record<string, string | number> = { ...scopeKeys(filters), view, page, page_size: pageSize };
   if (filters.search.trim()) filter.search = filters.search.trim();
+  // Sent only when narrowed, so the request is unchanged for the default list.
+  if (kind !== "all") filter.kind = kind;
   return filter;
 }
 

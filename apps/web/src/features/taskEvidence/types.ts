@@ -9,6 +9,8 @@ export type EvidenceFilters = Readonly<{
   user_profile_id?: string;
   search?: string;
   view: TaskView;
+  /** Echoed back once migration 0285 is applied. */
+  kind?: string;
   page: number;
   page_size: number;
 }>;
@@ -37,7 +39,10 @@ export type TaskAttachmentSummary = Readonly<{
 /**
  * One assigned task, whatever kind it is. A checklist task and an upload task
  * are the same row here; `is_upload_work` says which the doer sees, and
- * `attachments` carries whatever came back against it.
+ * `attachments` carries whatever came back against it. Since migration 0285
+ * the list also holds FMS steps and start forms (`task_type` 'fms', no
+ * evidence); `work_kind` names the kind and `work_context` says where it came
+ * from. Both are absent from an older server.
  */
 export type TaskRow = Readonly<{
   task_id: string;
@@ -53,6 +58,8 @@ export type TaskRow = Readonly<{
   planned_datetime: string;
   due_datetime: string | null;
   actual_datetime: string | null;
+  work_kind?: string | null;
+  work_context?: string | null;
   attachments: readonly TaskAttachmentSummary[];
 }>;
 
@@ -73,6 +80,8 @@ export type EvidenceWorkspace = Readonly<{
   stats: EvidenceStats;
   tasks: readonly TaskRow[];
   tasks_total: number;
+  /** Per-kind totals of the whole scope (0285); `stats` stays Tasks-section only. */
+  kind_counts?: Readonly<Record<"all" | "one_time" | "recurring" | "crm" | "fms", number>>;
   missing: readonly OutstandingRow[];
   missing_total: number;
 }>;
