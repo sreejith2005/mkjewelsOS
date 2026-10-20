@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { AlertTriangle, CalendarDays, Check, ChevronDown, FileText, Flag, Paperclip, Plus, Rocket, Users, UserRoundCheck, X } from "lucide-react";
-import { buildManualTaskCreateRequest, taskPriorityChoices, voiceDraftGapMessage, voiceDraftGaps, type Enums, type Json, type VoiceDeadline, type VoiceDraftGap } from "@jewelos/core";
+import { buildManualTaskCreateRequests, canShareManualTask, taskPriorityChoices, voiceDraftGapMessage, voiceDraftGaps, type Enums, type Json, type ManualTaskAssignmentMode, type ManualTaskCreateRequest, type VoiceDeadline, type VoiceDraftGap } from "@jewelos/core";
 import type { UserProfile } from "@/types";
 import { Button, Modal, Notice } from "@/components/ui";
 import { toast } from "sonner";
@@ -31,6 +31,13 @@ function toDateTimeLocal(iso: string): string {
   const offset = parsed.getTimezoneOffset() * 60_000;
   return new Date(parsed.getTime() - offset).toISOString().slice(0, 16);
 }
+
+/**
+ * A submission in progress. Once a task is saved the requests are frozen, so a
+ * retry after a partial failure creates only the remaining tasks and uploads
+ * only the missing attachments; nothing saved is created twice.
+ */
+type Submission = Readonly<{ requests: readonly ManualTaskCreateRequest[]; taskIds: readonly string[]; uploadedTaskIds: readonly string[] }>;
 
 function TaskSelector({ children, id, open, panel }: { children: ReactNode; id: Exclude<Panel, null>; open: boolean; panel: ReactNode }) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -66,6 +73,7 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
   const [planned, setPlanned] = useState("");
   const [priority, setPriority] = useState<Enums<"task_priority">>("high");
   const [doers, setDoers] = useState<string[]>([]);
+  const [assignmentMode, setAssignmentMode] = useState<ManualTaskAssignmentMode>("separate");
   const [watchers, setWatchers] = useState<string[]>([]);
   const [formTemplateId, setFormTemplateId] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
@@ -75,7 +83,7 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const submitting = useRef(false);
-  const [createdTask, setCreatedTask] = useState<{ id: string; doerCount: number; attachment: File | null } | null>(null);
+  const [submission, setSubmission] = useState<Submission | null>(null);
   const [voiceGaps, setVoiceGaps] = useState<readonly VoiceDraftGap[]>([]);
   const [gapAlertOpen, setGapAlertOpen] = useState(false);
   const [assignmentReason, setAssignmentReason] = useState<string | null>(null);
@@ -88,16 +96,21 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
   // The assignment RPC resolves effective authority, overrides and scope.
   const eligiblePeople = useMemo(() => data.users.filter(user => user.id && user.tenant_id === profile.tenant_id), [data.users, profile.tenant_id]);
   const priorityLabel = priorityOptions.find((option) => option.value === priority)?.label ?? priority;
-  const selectedDoerName = eligiblePeople.find((person) => person.id === doers[0])?.employee_name;
+  const selectedDoers = useMemo(() => doers.flatMap((id) => eligiblePeople.filter((person) => person.id === id)), [doers, eligiblePeople]);
+  // The server requires every doer of one task to share its branch and department.
+  const canShare = canShareManualTask(selectedDoers.map((person) => ({ branchId: person.branch_id, departmentId: person.department_id })));
+  const effectiveAssignmentMode: ManualTaskAssignmentMode = canShare ? assignmentMode : "separate";
+  const doerSummary = doers.length > 1
+    ? `${doers.length} users · ${effectiveAssignmentMode === "shared" ? "shared" : "separate"}`
+    : selectedDoers[0]?.employee_name ?? undefined;
+  const allSaved = submission !== null && submission.taskIds.length === submission.requests.length;
   const attachedForm = data.forms.find((form) => form.id === formTemplateId);
 
   const togglePanel = (next: Exclude<Panel, null>) => setPanel((current) => current === next ? null : next);
   const updateDoers = (nextDoers: string[]) => {
-    const nextDoer = nextDoers.slice(0, 1);
-    setDoers(nextDoer);
-    setWatchers((current) => current.filter((id) => !nextDoer.includes(id)));
+    setDoers(nextDoers);
+    setWatchers((current) => current.filter((id) => !nextDoers.includes(id)));
     setAssignmentReason(null);
-    setPanel(null);
   };
   /**
    * Prefills the composer from an interpreted note. Only fields the note
@@ -168,28 +181,36 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
     event.preventDefault();
     if (submitting.current) return;
     setError(null);
-    if (createdTask) {
-      submitting.current = true; setSaving(true);
-      try {
-        if (createdTask.attachment) await onUploadAttachment(createdTask.id, createdTask.attachment);
-        toast.success("Task assigned", { description: `Sent to ${createdTask.doerCount} user${createdTask.doerCount === 1 ? "" : "s"}.` });
-        onCreated();
-      } catch (caught) { setError(caught instanceof Error ? caught.message : "The attachment could not be uploaded. Try again."); }
-      finally { submitting.current = false; setSaving(false); }
-      return;
+    let current = submission;
+    if (!current) {
+      const built = buildManualTaskCreateRequests({ title, description, plannedDatetime: planned, priority, mode: taskMode, selectedDoerIds: doers, selectedWatcherIds: watchers, assignmentMode: effectiveAssignmentMode, formTemplateId, checklistItems: checklist, eligiblePeople: eligiblePeople.flatMap((person) => person.id ? [{ id: person.id, branchId: person.branch_id, departmentId: person.department_id, eligible: true }] : []) });
+      if ("error" in built) return setError(built.error.message);
+      current = { requests: built.requests, taskIds: [], uploadedTaskIds: [] };
     }
-    const request = buildManualTaskCreateRequest({ title, description, plannedDatetime: planned, priority, mode: taskMode, selectedDoerIds: doers, selectedWatcherIds: watchers, formTemplateId, checklistItems: checklist, eligiblePeople: eligiblePeople.flatMap((person) => person.id ? [{ id: person.id, branchId: person.branch_id, departmentId: person.department_id, eligible: true }] : []) });
-    if ("error" in request) return setError(request.error.message);
+    const requests = current.requests;
+    const taskIds = [...current.taskIds];
+    const uploadedTaskIds = [...current.uploadedTaskIds];
     submitting.current = true; setSaving(true);
     try {
-      const taskId = await onSave(request.payload, [...request.doerIds], [...request.watcherIds], [...request.checklist]);
-      setCreatedTask({ id: taskId, doerCount: request.doerIds.length, attachment });
-      if (attachment) await onUploadAttachment(taskId, attachment);
-      toast.success("Task assigned", { description: `Sent to ${request.doerIds.length} user${request.doerIds.length === 1 ? "" : "s"}.` });
+      for (const request of requests.slice(taskIds.length)) {
+        taskIds.push(await onSave(request.payload, [...request.doerIds], [...request.watcherIds], [...request.checklist]));
+      }
+      if (attachment) {
+        for (const taskId of taskIds) {
+          if (uploadedTaskIds.includes(taskId)) continue;
+          await onUploadAttachment(taskId, attachment);
+          uploadedTaskIds.push(taskId);
+        }
+      }
+      const doerCount = requests.reduce((count, request) => count + request.doerIds.length, 0);
+      toast.success(requests.length === 1 ? "Task assigned" : `${requests.length} tasks assigned`, { description: `Sent to ${doerCount} user${doerCount === 1 ? "" : "s"}.` });
       onCreated();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to create task");
+      const fallback = taskIds.length < requests.length ? "Unable to create task" : "The attachment could not be uploaded. Try again.";
+      setError(caught instanceof Error ? caught.message : fallback);
     } finally {
+      // Nothing saved yet leaves the composer editable; anything saved freezes it.
+      setSubmission(taskIds.length > 0 ? { requests, taskIds, uploadedTaskIds } : null);
       submitting.current = false;
       setSaving(false);
     }
@@ -204,18 +225,27 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
         ? !planned
         : checklist.length === 0), [checklist.length, doers.length, planned, title, voiceGaps]);
 
-  const usersPanel = <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} label="Assign user" multiple={false} onChange={updateDoers} people={eligiblePeople.flatMap((person) => person.id ? [{ ...person, id: person.id }] : [])} selectedIds={doers} />;
+  const assignmentChoice = (mode: ManualTaskAssignmentMode, label: string, hint: string, disabled = false) => <label className={cn("flex min-h-11 items-start gap-3 rounded-lg border px-3 py-2 text-sm", effectiveAssignmentMode === mode ? "border-task-accent bg-task-accent-soft" : "border-task-border bg-task-bg", disabled && "opacity-60")}><input checked={effectiveAssignmentMode === mode} className="mt-0.5 size-4 accent-task-accent" disabled={disabled} name="task-assignment-mode" onChange={() => setAssignmentMode(mode)} type="radio" /><span className="min-w-0"><span className="block font-medium text-task-text">{label}</span><span className="block text-xs text-task-text-muted">{hint}</span></span></label>;
+  const usersPanel = <div className="space-y-3">
+    <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} label="Assign users" multiple onChange={updateDoers} people={eligiblePeople.flatMap((person) => person.id ? [{ ...person, id: person.id }] : [])} selectedIds={doers} />
+    {doers.length > 1 ? <fieldset className="space-y-2" data-testid="task-assignment-mode"><legend className="mb-1 text-xs font-semibold text-task-text">How should {doers.length} users get this task?</legend>
+      {assignmentChoice("separate", "Separate task for each user", "Everyone gets their own copy and completes it themselves.")}
+      {assignmentChoice("shared", "One shared task", canShare ? "Any one of them can complete it for everyone." : "Needs every user in the same branch and department.", !canShare)}
+    </fieldset> : null}
+  </div>;
   const duePanel = <label><span className="mb-1 block text-xs font-semibold text-task-text">Due date and time</span><input className="task-field" min={new Date().toISOString().slice(0, 16)} onChange={(event) => { setPlanned(event.target.value); setDeadlineNote(null); setPanel(null); }} type="datetime-local" value={planned} /></label>;
   const priorityPanel = <fieldset className="grid grid-cols-3 gap-2"><legend className="sr-only">Priority</legend>{priorityOptions.map((option) => <button aria-pressed={priority === option.value} className={cn("min-h-11 min-w-0 rounded-lg border px-2 text-sm", priority === option.value ? "border-task-accent bg-task-accent-soft font-semibold text-task-text" : "border-task-border bg-task-bg text-task-text-muted")} key={option.value} onClick={() => { setPriority(option.value); setPanel(null); }} type="button">{priority === option.value ? <Check className="mr-1 inline size-4" /> : null}{option.label}</button>)}</fieldset>;
   const formPanel = <div><label><span className="mb-1 block text-xs font-semibold text-task-text">Required form</span><select className="task-field" onChange={(event) => { setFormTemplateId(event.target.value); setPanel(null); }} value={formTemplateId}><option value="">No form required</option>{data.forms.filter((form) => form.lifecycle === "published").map((form) => <option key={form.id} value={form.id}>{form.name} v{form.version}</option>)}</select></label><p className="mt-2 text-xs text-task-text-muted">The selected form must be completed before this task can be finished.</p></div>;
   const watchersPanel = <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} disabledIds={doers} label="In Loop · view and comment" multiple onChange={setWatchers} people={eligiblePeople.flatMap((person) => person.id ? [{ ...person, id: person.id }] : [])} selectedIds={watchers} />;
 
   return (
-    <Modal onClose={createdTask ? onCreated : onClose} title="Assign New Task" tone="light" wide>
+    <Modal onClose={submission ? onCreated : onClose} title="Assign New Task" tone="light" wide>
       {error ? <div className="mb-4"><Notice tone="danger">{error}</Notice></div> : null}
-      {createdTask ? <div className="mb-4"><Notice>The task is saved. Retry uploads against this task; its assignment details are already committed.</Notice></div> : null}
+      {submission ? <div className="mb-4"><Notice>{allSaved
+        ? submission.requests.length === 1 ? "The task is saved. Retry uploads against this task; its assignment details are already committed." : `All ${submission.requests.length} tasks are saved. Retry uploads against them; their assignment details are already committed.`
+        : `${submission.taskIds.length} of ${submission.requests.length} tasks are saved. Assign again to create the rest; saved tasks are not created twice.`}</Notice></div> : null}
 
-      {canUseVoice && !createdTask ? <VoiceTaskCapture onInterpreted={applyVoiceDraft} /> : null}
+      {canUseVoice && !submission ? <VoiceTaskCapture onInterpreted={applyVoiceDraft} /> : null}
 
       {gapAlertOpen ? <div className="mb-4 rounded-xl border border-danger/40 bg-danger/10 p-4" data-testid="voice-gap-alert" role="alertdialog" aria-labelledby="voice-gap-alert-title">
         <div className="flex items-start gap-3">
@@ -234,7 +264,7 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
       {deadlineNote ? <p className={cn("mb-3 text-xs", deadlineNote.resolved ? "text-task-text-muted" : "text-danger")} data-testid="voice-deadline-note">Deadline from your voice note · {deadlineNote.text}</p> : null}
 
       <form className="flex flex-col" onSubmit={(event) => void submitManual(event)}>
-        <fieldset className="min-w-0" disabled={saving || createdTask !== null}>
+        <fieldset className="min-w-0" disabled={saving || submission !== null}>
           <label className="border-b border-task-border px-1 pb-3">
             <span className="sr-only">Task title</span>
             <input autoFocus className="w-full bg-transparent text-base font-medium text-task-text placeholder:text-task-text-muted/80 focus-visible:ring-0" data-autofocus maxLength={200} onChange={(event) => setTitle(event.target.value)} placeholder="Add Title" value={title} />
@@ -250,7 +280,7 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
           </section> : null}
 
           <div className="grid grid-cols-2 gap-2 border-b border-task-border py-3">
-            <TaskSelector id="users" open={panel === "users"} panel={usersPanel}><ChipSelector active={panel === "users"} Icon={Users} label="Users" onClick={() => togglePanel("users")} summary={selectedDoerName || undefined} /></TaskSelector>
+            <TaskSelector id="users" open={panel === "users"} panel={usersPanel}><ChipSelector active={panel === "users"} Icon={Users} label="Users" onClick={() => togglePanel("users")} summary={doerSummary || undefined} /></TaskSelector>
             <TaskSelector id="due" open={panel === "due"} panel={duePanel}><ChipSelector active={panel === "due"} Icon={CalendarDays} label="Due Date" onClick={() => togglePanel("due")} summary={planned ? new Date(planned).toLocaleString("en-IN", { day: "numeric", hour: "numeric", minute: "2-digit", month: "short" }) : undefined} /></TaskSelector>
             <TaskSelector id="priority" open={panel === "priority"} panel={priorityPanel}><ChipSelector active={panel === "priority"} Icon={Flag} label="Priority" onClick={() => togglePanel("priority")} summary={priorityLabel} /></TaskSelector>
             <TaskSelector id="form" open={panel === "form"} panel={formPanel}><ChipSelector active={panel === "form"} Icon={FileText} label="Attach Form" onClick={() => togglePanel("form")} summary={attachedForm?.name} /></TaskSelector>
@@ -260,9 +290,9 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
 
         </fieldset>
           <div className="sticky -bottom-5 -mx-5 mt-4 flex items-center gap-3 border-t border-task-border bg-task-bg px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-            <label className="flex size-11 cursor-pointer items-center justify-center rounded-lg text-task-text-muted hover:bg-task-muted"><Paperclip className="size-5" /><span className="sr-only">Attach image or document</span><input accept="image/jpeg,image/png,image/webp,application/pdf" className="sr-only" disabled={saving} onChange={(event) => { const file = event.target.files?.[0] ?? null; setAttachment(file); setCreatedTask((current) => current ? { ...current, attachment: file } : current); }} type="file" /></label>
-            {attachment ? <Button aria-label="Remove attachment" className="size-11 shrink-0 p-0" disabled={saving} onClick={() => { setAttachment(null); setCreatedTask((current) => current ? { ...current, attachment: null } : current); }} type="button" variant="ghost"><X /></Button> : null}
-            <Button className="ml-auto bg-task-accent text-task-text hover:bg-task-accent/90" disabled={saving} type="submit"><Rocket />{saving ? createdTask ? "Uploading…" : "Assigning…" : createdTask ? createdTask.attachment ? "Retry attachment" : "Finish without attachment" : "Assign Task"}</Button>
+            <label className="flex size-11 cursor-pointer items-center justify-center rounded-lg text-task-text-muted hover:bg-task-muted"><Paperclip className="size-5" /><span className="sr-only">Attach image or document</span><input accept="image/jpeg,image/png,image/webp,application/pdf" className="sr-only" disabled={saving} onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} type="file" /></label>
+            {attachment ? <Button aria-label="Remove attachment" className="size-11 shrink-0 p-0" disabled={saving} onClick={() => setAttachment(null)} type="button" variant="ghost"><X /></Button> : null}
+            <Button className="ml-auto bg-task-accent text-task-text hover:bg-task-accent/90" disabled={saving} type="submit"><Rocket />{saving ? allSaved ? "Uploading…" : "Assigning…" : allSaved ? attachment ? "Retry attachment" : "Finish without attachment" : submission ? "Assign remaining" : "Assign Task"}</Button>
           </div>
       </form>
     </Modal>

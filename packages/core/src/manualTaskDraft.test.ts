@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { buildManualTaskCreateRequest, taskPriorityChoices, type ManualTaskDraftInput } from "./manualTaskDraft";
+import { buildManualTaskCreateRequests, canShareManualTask, taskPriorityChoices, type ManualTaskDraftInput } from "./manualTaskDraft";
 
 const people = [
   { id: "doer-1", branchId: "branch-1", departmentId: "department-1", eligible: true },
   { id: "watcher-1", branchId: "branch-1", departmentId: "department-1", eligible: true },
   { id: "outside-1", branchId: "branch-2", departmentId: "department-2", eligible: false },
+  { id: "doer-2", branchId: "branch-1", departmentId: "department-1", eligible: true },
+  { id: "doer-other-department", branchId: "branch-1", departmentId: "department-2", eligible: true },
 ] as const;
 
 function draft(overrides: Partial<ManualTaskDraftInput> = {}): ManualTaskDraftInput {
@@ -23,9 +25,9 @@ function draft(overrides: Partial<ManualTaskDraftInput> = {}): ManualTaskDraftIn
   };
 }
 
-describe("buildManualTaskCreateRequest", () => {
+describe("buildManualTaskCreateRequests", () => {
   it("builds the server request from the selected eligible doer's organization", () => {
-    expect(buildManualTaskCreateRequest(draft())).toEqual({
+    expect(buildManualTaskCreateRequests(draft())).toEqual({ requests: [{
       payload: {
         title: "Photograph the counter",
         description: "Before opening",
@@ -42,15 +44,40 @@ describe("buildManualTaskCreateRequest", () => {
       doerIds: ["doer-1"],
       watcherIds: ["watcher-1"],
       checklist: [],
-    });
+    }] });
+  });
+
+  it("creates one task per selected user by default, each in that user's organization", () => {
+    const result = buildManualTaskCreateRequests(draft({ selectedDoerIds: ["doer-1", "doer-other-department"] }));
+    if ("error" in result) throw new Error(result.error.message);
+    expect(result.requests.map((request) => [request.doerIds, request.payload.department_id, request.watcherIds])).toEqual([
+      [["doer-1"], "department-1", ["watcher-1"]],
+      [["doer-other-department"], "department-2", ["watcher-1"]],
+    ]);
+  });
+
+  it("creates one shared task for users in the same branch and department", () => {
+    const result = buildManualTaskCreateRequests(draft({ assignmentMode: "shared", selectedDoerIds: ["doer-1", "doer-2"] }));
+    if ("error" in result) throw new Error(result.error.message);
+    expect(result.requests).toHaveLength(1);
+    expect(result.requests[0]).toEqual(expect.objectContaining({
+      doerIds: ["doer-1", "doer-2"],
+      watcherIds: ["watcher-1"],
+      payload: expect.objectContaining({ branch_id: "branch-1", department_id: "department-1" }),
+    }));
+  });
+
+  it("checks whether a group can share one task", () => {
+    expect(canShareManualTask([people[0], people[3]])).toBe(true);
+    expect(canShareManualTask([people[0], people[4]])).toBe(false);
   });
 
   it("builds a required-form checklist with trimmed non-empty items", () => {
-    expect(buildManualTaskCreateRequest(draft({
+    expect(buildManualTaskCreateRequests(draft({
       mode: "checklist",
       formTemplateId: "form-1",
       checklistItems: [" First ", "", "Second"],
-    }))).toEqual(expect.objectContaining({
+    }))).toEqual({ requests: [expect.objectContaining({
       payload: expect.objectContaining({
         task_type: "checklist",
         requires_upload: false,
@@ -61,13 +88,14 @@ describe("buildManualTaskCreateRequest", () => {
         { item_text: "First", is_required: true, sort_order: 0 },
         { item_text: "Second", is_required: true, sort_order: 1 },
       ],
-    }));
+    })] });
   });
 
   it.each([
     ["blank title", { title: " " }, "Add a task title."],
     ["missing doer", { selectedDoerIds: [] }, "Select at least one user."],
-    ["multiple doers", { selectedDoerIds: ["doer-1", "watcher-1"] }, "Select at least one user."],
+    ["shared task across departments", { assignmentMode: "shared", selectedDoerIds: ["doer-1", "doer-other-department"] }, "A shared task needs every user in the same branch and department. Choose a separate task for each user instead."],
+    ["one ineligible user among several", { selectedDoerIds: ["doer-1", "outside-1"] }, "The selected user is outside your task authoring scope."],
     ["ineligible doer", { selectedDoerIds: ["outside-1"] }, "The selected user is outside your task authoring scope."],
     ["unknown doer", { selectedDoerIds: ["missing"] }, "The selected user is no longer available."],
     ["missing organization", { eligiblePeople: [{ id: "doer-1", branchId: null, departmentId: null, eligible: true }] }, "The selected user needs an active branch and department."],
@@ -75,7 +103,7 @@ describe("buildManualTaskCreateRequest", () => {
     ["invalid due date", { plannedDatetime: "not-a-date" }, "Choose a valid due date and time."],
     ["empty checklist", { mode: "checklist", checklistItems: [" "] }, "Add at least one checklist item."],
   ] as const)("rejects %s", (_label, overrides, message) => {
-    expect(buildManualTaskCreateRequest(draft(overrides))).toEqual({ error: { message } });
+    expect(buildManualTaskCreateRequests(draft(overrides))).toEqual({ error: { message } });
   });
 });
 
