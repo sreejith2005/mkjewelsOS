@@ -2,7 +2,7 @@ import { ListChecks } from "lucide-react";
 import { prettyTemplateDate, prettyTemplateTime } from "@jewelos/core";
 import { Button } from "@/components/ui";
 import {
-  templateCanActivate, templateFrequencyLabel, templateSourceLabel, templateStatusLabel, templateWorkTypeLabel,
+  templateCanActivate, templateCanAssignNow, templateFrequencyLabel, templateSourceLabel, templateStatusLabel, templateWorkTypeLabel,
   type TaskTemplateDirectoryRow,
 } from "@/features/taskTemplates/api";
 
@@ -52,6 +52,7 @@ function RowActions({
   onEdit,
   onSchedule,
   onToggle,
+  onAssignNow,
   onDelete,
 }: {
   row: TaskTemplateDirectoryRow;
@@ -60,6 +61,7 @@ function RowActions({
   onEdit: () => void;
   onSchedule: () => void;
   onToggle: () => void;
+  onAssignNow: () => void;
   onDelete: () => void;
 }) {
   const activateBlocked = !row.is_active && !templateCanActivate(row);
@@ -72,15 +74,27 @@ function RowActions({
       <Button className={style} disabled={busy} onClick={onSchedule} variant="secondary">
         Schedule
       </Button>
-      <Button
-        className={style}
-        disabled={busy || activateBlocked}
-        onClick={onToggle}
-        title={activateBlocked ? "Set a task start date before activating this schedule." : undefined}
-        variant="secondary"
-      >
-        {row.is_active ? "Deactivate" : "Activate"}
-      </Button>
+      {row.schedule_kind === "as_required" ? (
+        <Button
+          className={style}
+          disabled={busy || !templateCanAssignNow(row)}
+          onClick={onAssignNow}
+          title={templateCanAssignNow(row) ? "Give the employee one occurrence of this duty now." : "Assign this duty to an employee first."}
+          variant="secondary"
+        >
+          Assign now
+        </Button>
+      ) : (
+        <Button
+          className={style}
+          disabled={busy || activateBlocked}
+          onClick={onToggle}
+          title={activateBlocked ? "Set a task start date before activating this schedule." : undefined}
+          variant="secondary"
+        >
+          {row.is_active ? "Deactivate" : "Activate"}
+        </Button>
+      )}
       <Button className={style} disabled={busy} onClick={onDelete} variant="danger">
         Delete
       </Button>
@@ -98,6 +112,7 @@ export function TemplatesTab({
   onEdit,
   onSchedule,
   onToggle,
+  onAssignNow,
   onDelete,
 }: {
   rows: readonly TaskTemplateDirectoryRow[];
@@ -105,6 +120,7 @@ export function TemplatesTab({
   onEdit: (row: TaskTemplateDirectoryRow) => void;
   onSchedule: (row: TaskTemplateDirectoryRow) => void;
   onToggle: (row: TaskTemplateDirectoryRow) => void;
+  onAssignNow: (row: TaskTemplateDirectoryRow) => void;
   onDelete: (row: TaskTemplateDirectoryRow) => void;
 }) {
   const actions = (row: TaskTemplateDirectoryRow, compact = false) => (
@@ -115,6 +131,7 @@ export function TemplatesTab({
       onEdit={() => onEdit(row)}
       onSchedule={() => onSchedule(row)}
       onToggle={() => onToggle(row)}
+      onAssignNow={() => onAssignNow(row)}
       row={row}
     />
   );

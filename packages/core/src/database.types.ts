@@ -10013,6 +10013,7 @@ export type Database = {
       }
       task_instances: {
         Row: {
+          on_demand: boolean
           upload_requirement_overridden: boolean
           deleted_at: string | null
           actual_datetime: string | null
@@ -10063,6 +10064,7 @@ export type Database = {
           verifier_user_profile_id: string | null
         }
         Insert: {
+          on_demand?: boolean
           upload_requirement_overridden?: boolean
           deleted_at?: string | null
           actual_datetime?: string | null
@@ -10113,6 +10115,7 @@ export type Database = {
           verifier_user_profile_id?: string | null
         }
         Update: {
+          on_demand?: boolean
           upload_requirement_overridden?: boolean
           deleted_at?: string | null
           actual_datetime?: string | null
@@ -10348,6 +10351,7 @@ export type Database = {
           task_type: Database["public"]["Enums"]["task_type"]
           tenant_id: string
           title: string
+          trigger_label: string | null
           updated_at: string | null
           updated_by: string | null
           verification_required: boolean
@@ -10387,6 +10391,7 @@ export type Database = {
           task_type?: Database["public"]["Enums"]["task_type"]
           tenant_id: string
           title: string
+          trigger_label?: string | null
           updated_at?: string | null
           updated_by?: string | null
           verification_required?: boolean
@@ -10426,6 +10431,7 @@ export type Database = {
           task_type?: Database["public"]["Enums"]["task_type"]
           tenant_id?: string
           title?: string
+          trigger_label?: string | null
           updated_at?: string | null
           updated_by?: string | null
           verification_required?: boolean
@@ -11761,6 +11767,7 @@ export type Database = {
           task_type: Database["public"]["Enums"]["task_type"] | null
           tenant_id: string | null
           title: string | null
+          trigger_label: string | null
           updated_at: string | null
           updated_by: string | null
           verification_required: boolean | null
@@ -11800,6 +11807,7 @@ export type Database = {
           task_type?: Database["public"]["Enums"]["task_type"] | null
           tenant_id?: string | null
           title?: string | null
+          trigger_label?: string | null
           updated_at?: string | null
           updated_by?: string | null
           verification_required?: boolean | null
@@ -11839,6 +11847,7 @@ export type Database = {
           task_type?: Database["public"]["Enums"]["task_type"] | null
           tenant_id?: string | null
           title?: string | null
+          trigger_label?: string | null
           updated_at?: string | null
           updated_by?: string | null
           verification_required?: boolean | null
@@ -11940,6 +11949,7 @@ export type Database = {
       }
       task_instances_live: {
         Row: {
+          on_demand: boolean | null
           upload_requirement_overridden: boolean | null
           actual_datetime: string | null
           assignment_status: string | null
@@ -11990,6 +12000,7 @@ export type Database = {
           verifier_user_profile_id: string | null
         }
         Insert: {
+          on_demand?: boolean | null
           upload_requirement_overridden?: boolean | null
           actual_datetime?: string | null
           assignment_status?: string | null
@@ -12040,6 +12051,7 @@ export type Database = {
           verifier_user_profile_id?: string | null
         }
         Update: {
+          on_demand?: boolean | null
           upload_requirement_overridden?: boolean | null
           actual_datetime?: string | null
           assignment_status?: string | null
@@ -13766,6 +13778,7 @@ export type Database = {
       }
       get_my_kiara_conversation: { Args: { p_id: string }; Returns: Json }
       get_my_kiara_quota: { Args: never; Returns: Json }
+      get_my_on_demand_duties: { Args: never; Returns: Json }
       get_notification_provider_availability: {
         Args: never
         Returns: {
@@ -15006,6 +15019,10 @@ export type Database = {
           instance_id: string
           reference_number: string
         }[]
+      }
+      start_on_demand_task_with_audit: {
+        Args: { p_template_id: string }
+        Returns: string
       }
       start_kiara_turn: {
         Args: {

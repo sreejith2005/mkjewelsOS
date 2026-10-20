@@ -1,5 +1,6 @@
 import { loadFmsTaskContexts } from "@jewelos/data/fms/work";
 import type { FmsWorkContext } from "@jewelos/core";
+import { parseOnDemandDuties, type OnDemandDuty } from "@jewelos/core";
 import { decodeTaskPage, TASK_PAGE_SIZE, taskEvidenceContentType, taskFormSubmissionKey, taskAdminEditPayload, type TaskAdminEdit, type TaskPageScope, type TaskFeedStatusFilter, type TaskWorkspaceView } from "@jewelos/core";
 import { supabase } from "@jewelos/api-client";
 import { groupTaskFeedRows, isTaskFeedItemInCurrentDayOrOverdue, taskFeedCurrentOrOverdueFilter as coreTaskFeedCurrentOrOverdueFilter, type Database, type Enums, type Json, type Tables } from "@jewelos/core";
@@ -65,6 +66,24 @@ export async function ensureMyRecurringTasks(): Promise<RecurringTaskPreparation
 
 function fail(message: string, error: { message: string } | null): asserts error is null {
   if (error) throw new Error(`${message}: ${error.message}`);
+}
+
+/** The viewer's own standing as-needed duties (As Required, Per Customer, ...). */
+export async function loadMyOnDemandDuties(): Promise<OnDemandDuty[]> {
+  const { data, error } = await supabase.rpc("get_my_on_demand_duties");
+  fail("Load as-needed duties", error);
+  return parseOnDemandDuties(data);
+}
+
+/**
+ * Creates one occurrence of an as-needed duty: for the viewer when it is their
+ * own duty, otherwise for the duty's employee (authorized and audited in SQL).
+ */
+export async function startOnDemandDuty(templateId: string): Promise<string> {
+  const { data, error } = await supabase.rpc("start_on_demand_task_with_audit", { p_template_id: templateId });
+  fail("Start as-needed duty", error);
+  if (!data) throw new Error("Start as-needed duty did not return a task");
+  return data;
 }
 
 export async function loadTaskCategoryOptions(): Promise<TaskReferenceData["categories"]> {

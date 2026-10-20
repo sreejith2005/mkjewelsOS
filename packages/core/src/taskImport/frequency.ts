@@ -103,7 +103,7 @@ function dateParts(value: string) {
   return { date, month, day };
 }
 
-export function normalizeTaskFrequencyLabel(raw: string): string {
+function readableFrequencyLabel(raw: string): string {
   return raw
     .replace(/\u00e2\u0080\u0093/g, "\u2013")
     .replace(/\u00e2\u0080\u0094/g, "\u2014")
@@ -114,8 +114,24 @@ export function normalizeTaskFrequencyLabel(raw: string): string {
     .trim()
     .replace(/\s*\/\s*/g, "/")
     .replace(/\s+-\s+/g, " - ")
-    .replace(/\s+/g, " ")
-    .toLocaleLowerCase("en-IN");
+    .replace(/\s+/g, " ");
+}
+
+export function normalizeTaskFrequencyLabel(raw: string): string {
+  return readableFrequencyLabel(raw).toLocaleLowerCase("en-IN");
+}
+
+/** Longest trigger label `task_templates.trigger_label` accepts. */
+export const TASK_TRIGGER_LABEL_MAX = 80;
+
+/**
+ * The sheet's own wording for event-driven work ("Per Customer", "After Visit"),
+ * kept so an employee knows when an on-demand duty applies. Scheduled work and
+ * a blank frequency cell have no trigger label.
+ */
+export function taskImportTriggerLabel(raw: string, scheduleKind: ImportScheduleKind): string {
+  if (scheduleKind !== "as_required") return "";
+  return readableFrequencyLabel(raw).slice(0, TASK_TRIGGER_LABEL_MAX).trim();
 }
 
 export function buildImportSchedule(kind: ImportScheduleKind, startsOn: string) {

@@ -16,7 +16,7 @@ How it works:
 The source is `packages/core/src/assistant/appHelp.ts`. Keep this file and that one in step
 (AGENTS.md, "Keeping Ask Kiara current").
 
-Tasks entry updated against the screens: 2026-10-17. Other entries last checked: 2026-10-14.
+Tasks entry updated against the screens: 2026-10-20 (As needed duties). Recurring / To-Do and Task Control: 2026-10-20 (Assign now). Other entries last checked: 2026-10-14.
 
 ---
 
@@ -36,6 +36,7 @@ the formula behind each number.
 ## Tasks
 **What it is:** work given to you, tasks you gave to others, and tasks you are watching.
 - [ ] See my tasks: open Tasks. **My Tasks** lists recurring and FMS work; **Delegated** lists one-time assigned work for employees; **In Loop** lists watched work. Subsection counts load when Tasks opens.
+- [ ] Do an as-needed duty: duties without a fixed time (As Required, Per Customer, After Visit...) are under **As needed** at the top of My Tasks. Press **Start** when one happens; it becomes a task due today. You can start it several times a day; it is never overdue until started.
 - [ ] Complete a task: finish the required form or upload, then press **Complete**. If a remark is required, the button opens and focuses the remark field; enter it and press **Complete** again. FMS work opens its protected workflow runner.
 - [ ] Create a task: in Tasks press **Create Task**, fill in the title, the person and the due date, then save.
 - [ ] See tasks I gave to others: **Delegated** in Tasks.
@@ -47,6 +48,7 @@ the formula behind each number.
 - [ ] Filter the list: branch, department, frequency, priority and status filters at the top.
 - [ ] Check finished work: open the **Verification** view and review each item.
 - [ ] Chase a late item: use **Follow-ups**.
+- [ ] Give an as-needed duty now: on an As Required schedule press **Assign now**. The employee gets a task due today and an alert.
 
 ## Task Control (for managers)
 **What it is:** team progress, overdue work, evidence review and task templates.
@@ -54,6 +56,7 @@ the formula behind each number.
 - [ ] Review evidence: open the evidence panel in Task Control.
 - [ ] Edit one task: **Edit task** changes Task/Checklist type, requirements, participants, dates, categorization and checklist items. Press **Save changes**. History is retained; future schedules have their own editor.
 - [ ] Change a schedule: edit the template and press **Save schedule**.
+- [ ] As-needed duties: Templates rows with status **ON DEMAND** (frequency such as PER CUSTOMER) have no date. **Assign now** gives the employee one occurrence due today.
 
 ## FMS (workflows)
 **What it is:** company workflows: live workflows, the stages given to you, and, for people

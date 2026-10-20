@@ -13,7 +13,7 @@ import { Button, Field, Modal, Notice } from "@/components/ui";
 import { ErrorPanel, LoadingPanels } from "@/features/analytics/components";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { TaskTemplateForm } from "@/features/tasks/TaskForms";
-import { loadAvailabilityUsers, loadTaskAuthoringReferenceData, type TaskReferenceData, type TaskTemplate, type TaskUser } from "@/features/tasks/api";
+import { loadAvailabilityUsers, loadTaskAuthoringReferenceData, startOnDemandDuty, type TaskReferenceData, type TaskTemplate, type TaskUser } from "@/features/tasks/api";
 import { materializeRecurringTemplate, saveRecurringTemplate, setRecurringTemplateActive } from "@/features/recurringTodo/api";
 import {
   deleteTaskTemplate, loadTaskTemplateDirectory, setTaskTemplateSchedule, templateFrequencyLabel,
@@ -202,6 +202,12 @@ export function TaskTemplatesPage() {
       toast.success(row.is_active ? "Template deactivated" : "Template activated");
     });
 
+  const assignNow = (row: TaskTemplateDirectoryRow) =>
+    void run(row, async () => {
+      await startOnDemandDuty(row.id);
+      toast.success(`Assigned now${row.assignee_name ? ` to ${row.assignee_name}` : ""}: ${row.title}`);
+    });
+
   const remove = (row: TaskTemplateDirectoryRow) => {
     const confirmed = window.confirm(
       `Delete this task template: ${row.title}?\n\nPending, in-progress and overdue occurrences will also be removed. Completed work and history will be preserved.`,
@@ -307,6 +313,7 @@ export function TaskTemplatesPage() {
               onEdit={(row) => void openEdit(row)}
               onSchedule={openSchedule}
               onToggle={toggle}
+              onAssignNow={assignNow}
               rows={visibleTemplates}
             />
           ) : snapshot ? (

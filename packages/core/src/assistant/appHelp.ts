@@ -50,6 +50,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     summary: "Tasks lists the work assigned to the user, the tasks they delegated, and tasks they are watching.",
     recipes: [
       "See my tasks: open Tasks. My Tasks lists recurring and FMS work; Delegated lists one-time assigned work for employees; In Loop lists watched work. Subsection counts load when Tasks opens.",
+      "Do an as-needed duty: work without a fixed time (As Required, Per Customer, After Visit and similar) is listed under \"As needed\" at the top of My Tasks. When it happens, press \"Start\" on that duty; it becomes a task due today in My Tasks, and you complete it like any other task. You can start the same duty several times a day. As-needed duties are never overdue until started.",
       "Find any of my tasks: use Search all tasks above the subsections. Search includes earlier and completed work, task descriptions and FMS references. Results show their subsection. Clear search and filters to return to the board.",
       "Narrow tasks: press Filter, combine work kind (FMS, CRM, recurring or other tasks), status, priority, due dates, subsection and requirements, then Apply filters. Due today and This week use the business timezone; sort by due date, newest or priority.",
       "Complete a task: finish the required form or upload, then press Complete. If a completion remark is required, Complete opens and focuses the remark field; enter the remark and press Complete again. FMS work opens its protected workflow runner.",
@@ -68,6 +69,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
       "Filter the list: use the branch, department, frequency, priority, and status filters at the top.",
       "Verify completed work: open the Verification view and review each completed item.",
       "Send a follow-up: use Follow-ups for an item that is delayed.",
+      "Give an employee an as-needed duty now: on an As Required schedule press \"Assign now\". The employee gets it as a task due today and is alerted; you can assign it again later the same day.",
     ],
   },
   task_templates: {
@@ -80,6 +82,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
       "Review evidence: open the evidence panel inside Task Control.",
       "Edit one task: choose \"Edit task\" to change Task or Checklist type, upload/remark/form requirements, verification, buddy assignment, Assignees, In Loop, dates, categorization and checklist items; then press \"Save changes\". Existing history stays intact; future schedules are edited separately.",
       "Change a schedule: edit the template and press \"Save schedule\".",
+      "As-needed duties: in Templates, rows with status ON DEMAND (frequency such as PER CUSTOMER) have no date. Press \"Assign now\" to give the employee one occurrence due today; employees can also start them from \"As needed\" in My Tasks.",
     ],
   },
   fms_builder: {

@@ -4,6 +4,7 @@ import {
   canManageRecurringWorkspace,
   canPauseRecurringTemplate,
   canRunRecurringTemplateNow,
+  isOnDemandSchedule,
   deriveRecurringWorkCardState,
   formatTaskPerformanceScore,
   isRecurringInstanceInTab,
@@ -44,6 +45,7 @@ import {
   completeRecurringTaskWithImage,
   uploadTaskAttachment,
   updateTask,
+  startOnDemandDuty,
   type TaskReferenceData,
 } from "@/features/tasks/api";
 import {
@@ -66,7 +68,8 @@ import {
   type RecurringTemplate,
   type RecurringWorkspace,
 } from "@/features/recurringTodo/api";
-import { titleCase } from "@/lib/format";
+import { errorMessage, titleCase } from "@/lib/format";
+import { toast } from "sonner";
 
 type Tab = RecurringTodoTab;
 const EMPTY: RecurringWorkspace = {
@@ -435,6 +438,16 @@ export function RecurringTodoPage() {
     await runRecurringTemplateNow(template.id, dateKey(new Date()));
     await load();
   };
+  // An as-needed duty can be assigned several times a day (once per customer).
+  const assignNow = async (template: RecurringTemplate) => {
+    try {
+      await startOnDemandDuty(template.id);
+      toast.success(`Assigned now: ${template.title}`);
+      await load();
+    } catch (caught) {
+      toast.error(errorMessage(caught));
+    }
+  };
   const toggleActive = async (template: RecurringTemplate) => {
     await setRecurringTemplateActive(template.id, !template.is_active);
     await load();
@@ -679,13 +692,20 @@ export function RecurringTodoPage() {
                         {template.is_active ? "Pause" : "Activate"}
                       </Button>
                     ) : null}
-                    <Button
-                      disabled={!canRunRecurringTemplateNow(template)}
-                      onClick={() => void runNow(template)}
-                    >
-                      <Play className="size-4" />
-                      Run now
-                    </Button>
+                    {isOnDemandSchedule(template) ? (
+                      <Button onClick={() => void assignNow(template)}>
+                        <Play className="size-4" />
+                        Assign now
+                      </Button>
+                    ) : (
+                      <Button
+                        disabled={!canRunRecurringTemplateNow(template)}
+                        onClick={() => void runNow(template)}
+                      >
+                        <Play className="size-4" />
+                        Run now
+                      </Button>
+                    )}
                     <Button
                       onClick={() => void remove(template)}
                       variant="danger"

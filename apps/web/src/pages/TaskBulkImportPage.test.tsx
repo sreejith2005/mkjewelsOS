@@ -36,7 +36,7 @@ const draft: TaskImportDraftRow = {
   branch: "", department: "", category: "", assignee_email: "", assignee_name: "", verifier_label: "",
   starts_on: "2026-09-22", start_time: "11:00", due_time: "13:00", planned_at: "", due_at: "",
   recurrence_rule: "FREQ=DAILY", requires_upload: false, verification_required: false,
-  buddy_assignment_allowed: true, is_active: true, assignment_status: "assigning_left", checklist: [],
+  buddy_assignment_allowed: true, is_active: true, assignment_status: "assigning_left", checklist: [], trigger_label: "",
 };
 
 const parsed = (

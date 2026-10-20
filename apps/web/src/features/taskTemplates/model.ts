@@ -1,3 +1,5 @@
+import { isOnDemandSchedule, onDemandTriggerLabel } from "@jewelos/core";
+
 /**
  * Task Templates directory row.
  *
@@ -19,6 +21,8 @@ export type TaskTemplateDirectoryRow = Readonly<{
   branch_name: string;
   task_type: "checklist" | "delegation";
   schedule_kind: string;
+  /** Sheet wording for an as-needed duty ("Per Customer"); null otherwise. */
+  trigger_label?: string | null;
   recurrence_rule: string | null;
   starts_on: string | null;
   planned_time: string | null;
@@ -75,13 +79,21 @@ export function templateWorkTypeLabel(row: TaskTemplateDirectoryRow): "CHECKBOX"
 }
 
 export function templateFrequencyLabel(row: TaskTemplateDirectoryRow): string {
+  if (isOnDemandSchedule(row)) return onDemandTriggerLabel(row.trigger_label).toUpperCase();
   return row.schedule_kind.replaceAll("_", " ").toUpperCase();
 }
 
 export function templateStatusLabel(row: TaskTemplateDirectoryRow): string {
   if (row.schedule_status === "assigning_left") return "ASSIGNING LEFT";
   if (row.schedule_status === "needs_start_date") return "NEEDS START DATE";
+  // An as-needed duty is never "active": it runs when started or assigned now.
+  if (isOnDemandSchedule(row)) return "ON DEMAND";
   return row.is_active ? "ACTIVE" : "INACTIVE";
+}
+
+/** Assign now creates one occurrence of an assigned as-needed duty. */
+export function templateCanAssignNow(row: TaskTemplateDirectoryRow): boolean {
+  return isOnDemandSchedule(row) && row.schedule_status !== "assigning_left";
 }
 
 export function templateSourceLabel(row: TaskTemplateDirectoryRow): string {

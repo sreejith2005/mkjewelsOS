@@ -11,6 +11,20 @@ const corsHeaders = {
 };
 
 type RequestBody = { date?: unknown };
+type TemplateRow = {
+  id: string;
+  tenant_id: string;
+  branch_id: string | null;
+  department_id: string | null;
+  recurrence_rule: string | null;
+  schedule_kind: string;
+  starts_on: string | null;
+  default_assignee_type: string;
+  default_assignee_user_id: string | null;
+  default_assignee_role: string | null;
+};
+// PostgREST's hosted max_rows is 1,000; a full page means another may follow.
+const TEMPLATE_PAGE_SIZE = 1000;
 function json(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), { status, headers: corsHeaders });
 }
@@ -63,19 +77,28 @@ Deno.serve(async (request: Request) => {
   const admin = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-  const { data: templates, error: templatesError } = await admin
-    .from("task_templates")
-    .select("id,tenant_id,branch_id,department_id,recurrence_rule,schedule_kind,starts_on,default_assignee_type,default_assignee_user_id,default_assignee_role")
-    .in("task_type", ["checklist", "delegation"])
-    .eq("is_active", true);
-  if (templatesError) return json(500, { error: "Unable to load task templates" });
+  // PostgREST caps one response at 1,000 rows, so read every active template in
+  // ordered pages; an unpaged read silently skipped the schedules past the cap.
+  const templates: TemplateRow[] = [];
+  for (let from = 0; ; from += TEMPLATE_PAGE_SIZE) {
+    const { data: page, error: templatesError } = await admin
+      .from("task_templates")
+      .select("id,tenant_id,branch_id,department_id,recurrence_rule,schedule_kind,starts_on,default_assignee_type,default_assignee_user_id,default_assignee_role")
+      .in("task_type", ["checklist", "delegation"])
+      .eq("is_active", true)
+      .order("id")
+      .range(from, from + TEMPLATE_PAGE_SIZE - 1);
+    if (templatesError) return json(500, { error: "Unable to load task templates" });
+    templates.push(...(page ?? []) as TemplateRow[]);
+    if ((page?.length ?? 0) < TEMPLATE_PAGE_SIZE) break;
+  }
 
   let eligible = 0;
   let created = 0;
   let alreadyExists = 0;
   const failures: Array<{ template_id: string; error: string }> = [];
 
-  for (const template of templates ?? []) {
+  for (const template of templates) {
     if (template.schedule_kind === "as_required") continue;
     if (template.starts_on && targetDate < template.starts_on) continue;
     if (template.schedule_kind === "one_time" && template.starts_on !== targetDate) continue;
@@ -117,7 +140,7 @@ Deno.serve(async (request: Request) => {
 
   return json(failures.length > 0 ? 207 : 200, {
     target_date: targetDate,
-    templates_checked: templates?.length ?? 0,
+    templates_checked: templates.length,
     templates_eligible: eligible,
     instances_created: created,
     instances_already_existed: alreadyExists,

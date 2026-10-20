@@ -191,6 +191,7 @@ describe("business task sheets", () => {
       task_type: "delegation",
       schedule_kind: "as_required",
       category: "Customer Experience",
+      trigger_label: "Per Customer",
     });
     expect(JSON.stringify(result.draftRows[0])).not.toContain("Sales Executive");
   });

@@ -19,6 +19,8 @@ export type TaskImportCanonicalRow = Readonly<{
   verification_required: boolean; buddy_assignment_allowed: boolean; is_active: boolean;
   assignment_status: TaskImportAssignmentStatus;
   checklist: readonly TaskImportChecklist[];
+  /** Sheet wording for event-driven (as_required) work; "" otherwise. */
+  trigger_label: string;
 }>;
 export type TaskImportDraftRow = Omit<TaskImportCanonicalRow, "assignee_profile_id" | "verifier_profile_id">;
 export type TaskImportIdentityRequirement = Readonly<{ key: string; kind: "assignee" | "verifier"; label: string; source_rows: readonly number[] }>;
@@ -38,6 +40,8 @@ export {
   buildImportSchedule,
   normalizeTaskFrequencyLabel,
   planTaskImportFrequency,
+  taskImportTriggerLabel,
+  TASK_TRIGGER_LABEL_MAX,
 } from "./taskImport/frequency";
 export type {
   TaskImportFrequencyPlan,

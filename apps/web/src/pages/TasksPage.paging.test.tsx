@@ -17,6 +17,7 @@ vi.mock("@/features/tasks/api", () => ({
   loadTaskAuthoringReferenceData: vi.fn(), createDelegationTask: vi.fn(),
   reviseTask: vi.fn(), updateTask: vi.fn(), uploadAndCompleteTask: vi.fn(),
   uploadTaskAttachment: vi.fn(), loadFmsTaskDeepLink: vi.fn(),
+  loadMyOnDemandDuties: async () => [], startOnDemandDuty: vi.fn(),
 }));
 vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealtimeRefresh: vi.fn() }));
 vi.mock("@/features/tasks/TaskCard", () => ({ TaskCard: ({ task }: { task: { title: string } }) => <div>{task.title}</div> }));

@@ -131,6 +131,7 @@ export * from "./taskPage";
 export * from "./taskDetails";
 export * from "./availability";
 export * from "./recurringTodo";
+export * from "./onDemandDuties";
 export * from "./dropdownMaster.ts";
 export * from "./taskControlView.ts";
 export { createRefreshCoordinator } from "./realtime/refreshCoordinator";

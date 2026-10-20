@@ -122,6 +122,33 @@ Android Expo export (3,650 modules). This remains local evidence: no hosted
 migration or deployment was required or performed, and no authenticated
 browser or installed-device walkthrough was performed.
 
+## October 2026 on-demand duties and complete schedule generation
+
+Production on 2026-10-20 held 1,140 live `as_required` templates (As Required,
+Per Customer, As Applicable, Per Not-Bought Customer, After ...). None had ever
+reached an employee: they were inactive Run Now templates with no date, and Run
+Now allowed one occurrence per day. Separately, `generate-recurring-tasks` read
+active templates without paging, so PostgREST's 1,000-row cap silently skipped
+about 87 of the 1,087 active schedules each day.
+
+Migration `0293_on_demand_duties.sql` makes an assigned `as_required` template a
+standing **on-demand duty**:
+
+- Tasks > My Tasks shows an **As needed** panel with the viewer's duties, the
+  sheet's trigger label, and today's progress. **Start** creates one task due
+  today for the employee (no self-alert).
+- Task Control > Templates shows these rows as **ON DEMAND** with the trigger
+  label as the frequency; **Assign now** replaces Activate. Recurring / To-Do
+  shows **Assign now** in place of Run now. The employee is alerted.
+- Several occurrences per day are allowed (`task_instances.on_demand` rows are
+  excluded from the one-per-day index), capped at 50 per duty per day.
+- `task_templates.trigger_label` keeps the sheet wording. New imports send it;
+  re-uploading the same sheet replays the rows (no duplicates) and fills a
+  missing label, which is how the existing 1,140 duties get their labels.
+- `generate-recurring-tasks` now reads templates in ordered 1,000-row pages.
+
+Design: `docs/superpowers/specs/2026-10-20-on-demand-duties-design.md`.
+
 ## 1. Why this document exists
 
 This is the durable context document for future work on the JewelOS **Tasks**, **Recurring / To-Do**, **Task Bulk Import**, and **Assigning Left** surfaces. It records:
@@ -221,7 +248,7 @@ The importer normalizes frequencies case-insensitively:
 | `Monthly` | Monthly template anchored to the start-date day |
 | `Quarterly` | Three-month recurrence anchored to the start date |
 | `Yearly` | Yearly recurrence anchored to the start month/day |
-| `As Required` | Create an inactive manual template; create no occurrence until Run Now |
+| `As Required` | Create an on-demand duty: no dated occurrence; the employee presses Start (or a manager Assign now) each time it happens (0293) |
 
 The deterministic recurrence mappings are:
 
