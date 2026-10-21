@@ -136,6 +136,17 @@ export function taskWorkKind(row: Readonly<{ work_kind?: string | null; task_typ
 
 export const isFmsWorkKind = (kind: TaskWorkKind): boolean => kind === "fms_step" || kind === "fms_start";
 
+/** FMS work Task Control can still cancel: finished FMS history is never removed. */
+export const OPEN_FMS_WORK_STATUSES: ReadonlySet<string> = new Set(["pending", "in_progress", "in_review", "overdue"]);
+
+/**
+ * Whether a Task Control row can be deleted (singly or in bulk): every Tasks-section
+ * row, and FMS work only while it is still open.
+ */
+export function canDeleteTaskControlRow(row: Readonly<{ work_kind?: string | null; task_type: string; task_status: string }>): boolean {
+  return !isFmsWorkKind(taskWorkKind(row)) || OPEN_FMS_WORK_STATUSES.has(row.task_status);
+}
+
 /** Byte counts as the evidence panels print them. */
 export function evidenceFileSize(bytes: number | null): string {
   if (bytes === null) return "—";

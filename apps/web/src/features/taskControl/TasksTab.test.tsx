@@ -94,3 +94,19 @@ it("deletes CRM tasks directly and FMS work through its own action", () => {
   fireEvent.click(screen.getByRole("button", { name: "Delete start form" }));
   expect(remove).toHaveBeenLastCalledWith(expect.objectContaining({ task_id: "start" }));
 });
+it("lets open FMS work be selected in bulk but never finished FMS history", () => {
+  const base = evidence.tasks[0]!;
+  const rows = [
+    { ...base, task_id: "task", task_title: "Normal task" },
+    { ...base, task_id: "step", task_title: "Open step", task_type: "fms", work_kind: "fms_step", task_status: "in_progress" },
+    { ...base, task_id: "start", task_title: "Start form", task_type: "fms", work_kind: "fms_start", task_status: "pending" },
+    { ...base, task_id: "done", task_title: "Done step", task_type: "fms", work_kind: "fms_step", task_status: "completed" },
+  ];
+  const onChange = vi.fn();
+  render(<TasksTab {...props} selection={{ ids: [], onChange }} onBulkDelete={vi.fn()} evidence={{ ...evidence, tasks: rows, tasks_total: 4 }} />);
+  expect(screen.getByLabelText("Select Open step")).toBeTruthy();
+  expect(screen.getByLabelText("Select Start form")).toBeTruthy();
+  expect(screen.queryByLabelText("Select Done step")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Select this page" }));
+  expect(onChange).toHaveBeenCalledWith(["task", "step", "start"]);
+});

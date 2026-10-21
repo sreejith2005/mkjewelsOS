@@ -57,7 +57,7 @@ the formula behind each number.
 - [ ] Review evidence: open the evidence panel in Task Control.
 - [ ] Edit one task: **Edit task** changes Task/Checklist type, requirements, participants, dates, categorization and checklist items. Press **Save changes**. History is retained; future schedules have their own editor.
 - [ ] Change a schedule: edit the template and press **Save schedule**.
-- [ ] Delete work: in Tasks press **Delete** (also for CRM tasks), then **Confirm deletion**. FMS work: **Delete FMS task** cancels that whole FMS run (completed steps and history kept); **Delete start form** removes one person's pending start form. A reason is required.
+- [ ] Delete work: in Tasks press **Delete** (also for CRM tasks), then **Confirm deletion**. FMS work: **Delete FMS task** cancels that whole FMS run (completed steps and history kept); **Delete start form** removes one person's pending start form. A reason is required. Several at once: tick rows (open FMS work included) or **Select this page**, then **Delete selected** or **Delete all matching**, then **Confirm deletion**.
 - [ ] As-needed duties: Templates rows with status **ON DEMAND** (frequency such as PER CUSTOMER) have no date. **Assign now** gives the employee one occurrence due today.
 
 ## FMS (workflows)

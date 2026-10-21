@@ -83,7 +83,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
       "Review evidence: open the evidence panel inside Task Control.",
       "Edit one task: choose \"Edit task\" to change Task or Checklist type, upload/remark/form requirements, verification, buddy assignment, Assignees, In Loop, dates, categorization and checklist items; then press \"Save changes\". Existing history stays intact; future schedules are edited separately.",
       "Change a schedule: edit the template and press \"Save schedule\".",
-      "Delete work: in the Tasks tab press \"Delete\" on a task (including CRM tasks), then \"Confirm deletion\". For FMS work press \"Delete FMS task\" (cancels that whole FMS run; completed steps and history are kept) or \"Delete start form\" (removes one person's pending start form); a reason is required.",
+      "Delete work: in the Tasks tab press \"Delete\" on a task (including CRM tasks), then \"Confirm deletion\". For FMS work press \"Delete FMS task\" (cancels that whole FMS run; completed steps and history are kept) or \"Delete start form\" (removes one person's pending start form); a reason is required. To delete several at once, tick the rows (open FMS work included) or press \"Select this page\", then \"Delete selected\" (or \"Delete all matching\") and \"Confirm deletion\".",
       "As-needed duties: in Templates, rows with status ON DEMAND (frequency such as PER CUSTOMER) have no date. Press \"Assign now\" to give the employee one occurrence due today; employees can also start them from \"As needed\" in My Tasks.",
     ],
   },
