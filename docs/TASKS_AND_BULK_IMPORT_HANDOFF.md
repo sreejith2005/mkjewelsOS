@@ -151,8 +151,10 @@ Design: `docs/superpowers/specs/2026-10-20-on-demand-duties-design.md`.
 
 ### 2026-10-21 update: anytime duties and deadline-first order (0297)
 
-- The panel is now **Anytime duties**, at the bottom of My Tasks > Pending (last
-  page), after every dated task, labelled low priority. It lists every assigned
+- The panel is now **Anytime duties**: a bar at the top of My Tasks > Pending
+  (every page, desktop and phone), closed until tapped, labelled low priority.
+  A started duty is an ordinary task in the list, marked "Anytime duty · label"
+  (matched by its template), and the closed bar says how many are started. It lists every assigned
   duty every day, so no manager action is needed for employees to see them.
 - **Start** by the employee creates a **low**-priority occurrence due 23:59
   today and opens it to finish (upload, checklist, form). **Continue** opens an

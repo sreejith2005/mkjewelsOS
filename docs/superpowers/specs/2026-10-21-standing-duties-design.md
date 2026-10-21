@@ -26,8 +26,11 @@ Duties are not generated as daily task rows. 1,140 rows a day would flood
 Task Control, reports, scores and Ask Kiara with work that may never happen,
 and every unfinished row would turn into a missed task overnight. Instead:
 
-- **Anytime duties** panel: at the bottom of My Tasks > Pending, on the last
-  page, after every dated task (undated work sorts last). It is labelled
+- **Anytime duties** panel: a bar at the top of My Tasks > Pending on every
+  page, closed by default (owner feedback 2026-10-21: the bottom of the list
+  meant long scrolling on desktop, and an open list pushed tasks down on phones).
+  A started occurrence is an ordinary task in the list, marked "Anytime duty"
+  by matching its template to the viewer's duties; the closed bar counts them. It is labelled
   "Low priority" and says there is no deadline. It is the same list every day,
   showing what was done today, so it "comes back" each day with no job.
 - **Start (employee)** creates a **low**-priority occurrence due 23:59 today

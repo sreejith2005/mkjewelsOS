@@ -27,11 +27,16 @@ it("lists duties as low-priority anytime work, starts one and opens it", async (
   const open = vi.fn();
   const loaded = vi.fn();
   render(<OnDemandDutiesPanel onLoaded={loaded} onOpenTask={open} reloadKey={0} />);
-  expect(await screen.findByText("Duty 1")).toBeTruthy();
+  const bar = await screen.findByRole("button", { name: /Anytime duties \(2\)/ });
+  expect(bar.getAttribute("aria-expanded")).toBe("false");
+  expect(screen.queryByText("Duty 1")).toBeNull();
   expect(screen.getByText("Low priority")).toBeTruthy();
+  fireEvent.click(bar);
+  expect(bar.getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByText("Duty 1")).toBeTruthy();
   expect(screen.getByText("Done 2 today")).toBeTruthy();
   expect(screen.getByText("Upload needed")).toBeTruthy();
-  expect(loaded).toHaveBeenCalledWith(2);
+  expect(loaded).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ templateId: "t1" })]));
   fireEvent.click(screen.getByRole("button", { name: "Start Duty 1" }));
   await waitFor(() => expect(api.start).toHaveBeenCalledWith("t1"));
   await waitFor(() => expect(open).toHaveBeenCalledWith("task-1"));
@@ -41,7 +46,9 @@ it("continues an open occurrence instead of starting another", async () => {
   api.load.mockResolvedValue([duty(1, { openCount: 1, openTaskId: "task-open" })]);
   const open = vi.fn();
   render(<OnDemandDutiesPanel onOpenTask={open} reloadKey={0} />);
-  expect(await screen.findByText("1 open")).toBeTruthy();
+  expect(await screen.findByText("1 started · listed in your tasks below")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /Anytime duties/ }));
+  expect(screen.getByText("1 open")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Continue Duty 1" }));
   expect(open).toHaveBeenCalledWith("task-open");
   expect(api.start).not.toHaveBeenCalled();
@@ -50,7 +57,8 @@ it("continues an open occurrence instead of starting another", async () => {
 it("collapses a long list and searches it", async () => {
   api.load.mockResolvedValue(Array.from({ length: 9 }, (_, index) => duty(index + 1)));
   render(<OnDemandDutiesPanel onOpenTask={vi.fn()} reloadKey={0} />);
-  await screen.findByText("Duty 1");
+  fireEvent.click(await screen.findByRole("button", { name: /Anytime duties/ }));
+  expect(screen.getByText("Duty 1")).toBeTruthy();
   expect(screen.queryByText("Duty 9")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Show all 9" }));
   expect(screen.getByText("Duty 9")).toBeTruthy();
