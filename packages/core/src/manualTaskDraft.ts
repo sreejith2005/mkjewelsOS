@@ -1,6 +1,12 @@
 import { normalizeTaskParticipants } from "./taskParticipants";
 
 export type ManualTaskMode = "task" | "checklist";
+/**
+ * How several selected users receive one composed task: `separate` creates one
+ * task per user (each completes their own), `shared` creates one task every
+ * user can complete for all. One selected user always gets one task.
+ */
+export type ManualTaskAssignmentMode = "separate" | "shared";
 export type ManualTaskPriority = "low" | "medium" | "high";
 
 const PRIORITY_CODES: readonly ManualTaskPriority[] = ["high", "medium", "low"];
@@ -37,6 +43,8 @@ export type ManualTaskDraftInput = Readonly<{
   mode: ManualTaskMode;
   selectedDoerIds: readonly string[];
   selectedWatcherIds: readonly string[];
+  /** Applies only when several users are selected; defaults to `separate`. */
+  assignmentMode?: ManualTaskAssignmentMode;
   formTemplateId: string;
   checklistItems: readonly string[];
   eligiblePeople: readonly ManualTaskEligiblePerson[];
@@ -70,26 +78,31 @@ export type ManualTaskCreateRequest = Readonly<{
 }>;
 
 export type ManualTaskDraftError = Readonly<{ message: string }>;
-export type ManualTaskDraftResult = ManualTaskCreateRequest | Readonly<{ error: ManualTaskDraftError }>;
+export type ManualTaskDraftResult =
+  | Readonly<{ requests: readonly ManualTaskCreateRequest[] }>
+  | Readonly<{ error: ManualTaskDraftError }>;
 
 /**
- * Builds the one audited RPC request shared by web and native task composers.
- * Organization identifiers always come from the eligible roster record, never
- * from editable form state.
+ * Builds the audited RPC requests for one composed task. Organization
+ * identifiers always come from the eligible roster record, never from editable
+ * form state. The server requires every doer of a task to share its branch and
+ * department, so a shared task is offered only for such a group; separate
+ * tasks each take their own doer's organization.
  */
-export function buildManualTaskCreateRequest(input: ManualTaskDraftInput): ManualTaskDraftResult {
+export function buildManualTaskCreateRequests(input: ManualTaskDraftInput): ManualTaskDraftResult {
   const title = input.title.trim();
   if (!title) return error("Add a task title.");
 
   const participants = normalizeTaskParticipants(input.selectedDoerIds, input.selectedWatcherIds);
-  if (participants.doerIds.length !== 1) return error("Select at least one user.");
+  if (participants.doerIds.length === 0) return error("Select at least one user.");
 
-  const selectedId = participants.doerIds[0];
-  const selectedPerson = input.eligiblePeople.find((person) => person.id === selectedId);
-  if (!selectedPerson) return error("The selected user is no longer available.");
-  if (!selectedPerson.eligible) return error("The selected user is outside your task authoring scope.");
-  if (!selectedPerson.branchId || !selectedPerson.departmentId) {
-    return error("The selected user needs an active branch and department.");
+  const doers: ManualTaskEligiblePerson[] = [];
+  for (const doerId of participants.doerIds) {
+    const person = input.eligiblePeople.find((candidate) => candidate.id === doerId);
+    if (!person) return error("The selected user is no longer available.");
+    if (!person.eligible) return error("The selected user is outside your task authoring scope.");
+    if (!person.branchId || !person.departmentId) return error("The selected user needs an active branch and department.");
+    doers.push(person);
   }
 
   if (!input.plannedDatetime.trim()) return error("Choose a due date and time.");
@@ -103,24 +116,38 @@ export function buildManualTaskCreateRequest(input: ManualTaskDraftInput): Manua
   if (input.mode === "checklist" && checklist.length === 0) return error("Add at least one checklist item.");
 
   const formTemplateId = input.formTemplateId.trim();
-  return {
+  const request = (organization: ManualTaskEligiblePerson, doerIds: readonly string[]): ManualTaskCreateRequest => ({
     payload: {
       title,
       description: input.description.trim(),
       planned_datetime: planned.toISOString(),
       priority: input.priority,
-      branch_id: selectedPerson.branchId,
-      department_id: selectedPerson.departmentId,
+      branch_id: organization.branchId ?? "",
+      department_id: organization.departmentId ?? "",
       task_type: input.mode === "task" ? "delegation" : "checklist",
       requires_upload: input.mode === "task",
       requires_remark: false,
       requires_form: Boolean(formTemplateId),
       form_template_id: formTemplateId,
     },
-    doerIds: participants.doerIds,
+    doerIds,
     watcherIds: participants.watcherIds,
     checklist: input.mode === "checklist" ? checklist : [],
-  };
+  });
+
+  const [firstDoer] = doers;
+  if (firstDoer && (input.assignmentMode === "shared" || doers.length === 1)) {
+    if (!canShareManualTask(doers)) {
+      return error("A shared task needs every user in the same branch and department. Choose a separate task for each user instead.");
+    }
+    return { requests: [request(firstDoer, participants.doerIds)] };
+  }
+  return { requests: doers.map((doer) => request(doer, [doer.id])) };
+}
+
+/** True when the people can be doers of one task: one branch and one department. */
+export function canShareManualTask(people: readonly Pick<ManualTaskEligiblePerson, "branchId" | "departmentId">[]): boolean {
+  return people.every((person) => person.branchId === people[0]?.branchId && person.departmentId === people[0]?.departmentId);
 }
 
 function error(message: string): Readonly<{ error: ManualTaskDraftError }> {

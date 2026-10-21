@@ -54,7 +54,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
       "Narrow tasks: press Filter, combine work kind (FMS, CRM, recurring or other tasks), status, priority, due dates, subsection and requirements, then Apply filters. Due today and This week use the business timezone; sort by due date, newest or priority.",
       "Work on FMS: open Tasks, then FMS. Expand a workflow family, expand a stage, and choose Open Work on the record. Active counts your pending and overdue actions; Waiting shows work awaiting other doers or approvals. Search record names or references; open Workflow and date filters to choose workflow, stage or due dates. Only your authorized work is shown.",
       "Complete a task: finish the required form or upload, then press Complete. If a completion remark is required, Complete opens and focuses the remark field; enter the remark and press Complete again. FMS work opens its protected workflow runner.",
-      "Create a task: in Tasks press \"Create Task\", fill in the title, assignee, and due date, then save.",
+      "Create a task: in Tasks press \"Create Task\", fill in the title, pick one or more people under \"Users\", set the due date, optionally add several people under \"In Loop\", then press \"Assign Task\". With several users, choose \"Separate task for each user\" (everyone completes their own copy) or \"One shared task\" (any one of them completes it for all; only for people in the same branch and department).",
       "See tasks I gave to others: use \"Delegated\" in Tasks.",
       "Import many tasks at once: use \"Bulk Import\" in Tasks (only for roles that can assign work).",
       "See people with no work assigned: \"Assigning Left\" in Tasks (only for roles that can assign work).",

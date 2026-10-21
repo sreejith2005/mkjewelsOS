@@ -38,7 +38,7 @@ the formula behind each number.
 - [ ] See my tasks: open Tasks. **My Tasks** lists recurring work; **FMS** lists your assigned workflow work by family and published stage; **Delegated** lists one-time assigned work for employees; **In Loop** lists watched work. Subsection counts load when Tasks opens.
 - [ ] Work on FMS: Tasks -> **FMS** -> expand a workflow family -> expand a stage -> **Open Work** on the record. **Active** counts pending and overdue actions. **Waiting** separates work awaiting other employees/approvals. Use name/reference search, workflow/stage/status/due filters and **Clear all**. Counts cover all assignments, not just a page. Access remains the current employee's existing scope.
 - [ ] Complete a task: finish the required form or upload, then press **Complete**. If a remark is required, the button opens and focuses the remark field; enter it and press **Complete** again. FMS work opens its protected workflow runner.
-- [ ] Create a task: in Tasks press **Create Task**, fill in the title, the person and the due date, then save.
+- [ ] Create a task: in Tasks press **Create Task**, fill in the title, pick one or more people under **Users**, set the due date, optionally add several people under **In Loop**, then press **Assign Task**. With several users, choose **Separate task for each user** (everyone completes their own copy) or **One shared task** (any one of them completes it for all; same branch and department only).
 - [ ] See tasks I gave to others: **Delegated** in Tasks.
 - [ ] Add many tasks at once: **Bulk Import** in Tasks (only roles that can assign work).
 - [ ] See people with no work given: **Assigning Left** in Tasks (only roles that can assign work).
