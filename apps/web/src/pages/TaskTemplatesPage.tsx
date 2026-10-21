@@ -5,7 +5,7 @@ import {
   canManageTaskTemplates, canSelectTaskControlBranch, canViewTaskControl,
   taskControlShowsSearch, taskControlTabsFor,
   TASK_CONTROL_TAB_DESCRIPTIONS,
-  type Json, type TaskWorkKindFilter, hasPermission,
+  type Json, type TaskWorkKindFilter, hasPermission, taskWorkKind,
 } from "@jewelos/core";
 import { supabase } from "@jewelos/api-client";
 import { useAuth } from "@/auth/AuthContext";
@@ -23,15 +23,16 @@ import { fetchReportingOptions, fetchTaskControlSnapshot, type ReportingOptions,
 import { TaskControlFilterBar } from "@/features/taskControl/FilterBar";
 import { TasksTab } from "@/features/taskControl/TasksTab";
 import { TaskManagement } from "@/features/taskControl/TaskManagement";
+import { FmsWorkCancelDialog } from "@/features/taskControl/FmsWorkCancelDialog";
 import { BulkDeleteDialog, type BulkDeleteRequest } from "@/features/taskControl/BulkDeleteDialog";
 import { OverviewTab } from "@/features/taskControl/OverviewTab";
 import { PeopleTab } from "@/features/taskControl/PeopleTab";
 import { TemplatesTab } from "@/features/taskControl/TemplatesTab";
 import {
-  defaultFilters, evidenceFilter, rangeIsValid, tenantToday,
+  defaultFilters, evidenceFilter, initialFiltersFromSearch, rangeIsValid, tenantToday,
   type TaskControlFilters, type TaskControlTab,
 } from "@/features/taskControl/filters";
-import type { TaskView } from "@/features/taskEvidence/types";
+import type { TaskRow, TaskView } from "@/features/taskEvidence/types";
 import { errorMessage } from "@/lib/format";
 
 const TAB_LABELS: Readonly<Record<TaskControlTab, string>> = {
@@ -68,7 +69,7 @@ export function TaskTemplatesPage() {
   const tabs = useMemo<TaskControlTab[]>(() => [...taskControlTabsFor(role)], [role]);
 
   const [tab, setTab] = useState<TaskControlTab>(() => initialTab(tabs));
-  const [filters, setFilters] = useState<TaskControlFilters>(() => defaultFilters());
+  const [filters, setFilters] = useState<TaskControlFilters>(() => initialFiltersFromSearch(window.location.search));
   const [view, setView] = useState<TaskView>("all");
   const [kind, setKind] = useState<TaskWorkKindFilter>("all");
   const [page, setPage] = useState(1);
@@ -90,6 +91,7 @@ export function TaskTemplatesPage() {
   const [scheduling, setScheduling] = useState<TaskTemplateDirectoryRow | null>(null);
   const [scheduleDate, setScheduleDate] = useState(tenantToday());
   const [managedTaskId, setManagedTaskId] = useState<string | null>(null);
+  const [deletingRow, setDeletingRow] = useState<TaskRow | null>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [bulkDelete, setBulkDelete] = useState<BulkDeleteRequest | null>(null);
   useEffect(() => { setSelectedTaskIds([]); }, [filters, view, kind, profile?.id, canAdministerTasks]);
@@ -331,6 +333,7 @@ export function TaskTemplatesPage() {
                 selection={canAdministerTasks ? { ids: selectedTaskIds, onChange: setSelectedTaskIds } : undefined}
                 onBulkDelete={canAdministerTasks ? (selected) => setBulkDelete({ filter: evidenceFilter(filters, view, 1, 100, kind), selected, scopeLabel: filters.user_profile_id ? (users.find((user) => user.id === filters.user_profile_id)?.employee_name ?? "Selected employee") : "All employees matching these filters" }) : undefined}
                 onManage={canAdministerTasks ? setManagedTaskId : undefined}
+                onDelete={canAdministerTasks ? setDeletingRow : undefined}
                 evidence={snapshot.evidence}
                 onPage={setPage}
                 onPageSize={(size) => { setPageSize(size); setPage(1); }}
@@ -356,6 +359,14 @@ export function TaskTemplatesPage() {
           <TaskTemplateForm data={references} initialAssigneeId={filters.user_profile_id} onCancel={() => setEditing(undefined)} onSave={save} template={editing} />
         </Modal>
       ) : null}
+
+      {deletingRow && canAdministerTasks ? (() => {
+        const kind = taskWorkKind(deletingRow);
+        const done = async () => { setDeletingRow(null); if (page === 1) await refresh(); else { setPage(1); await loadTemplates(); } };
+        return kind === "fms_step" || kind === "fms_start"
+          ? <FmsWorkCancelDialog kind={kind} row={deletingRow} onClose={() => setDeletingRow(null)} onDone={done} />
+          : <Modal title="Delete task" onClose={() => setDeletingRow(null)}><TaskManagement initialMode="delete" taskId={deletingRow.task_id} onChanged={done} /></Modal>;
+      })() : null}
 
       {managedTaskId && canAdministerTasks ? <Modal title="Manage assigned task" onClose={() => setManagedTaskId(null)}>
         <TaskManagement taskId={managedTaskId} onChanged={async () => { setManagedTaskId(null); if (page === 1) await refresh(); else { setPage(1); await loadTemplates(); } }} />

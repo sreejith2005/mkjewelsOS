@@ -15,15 +15,16 @@ const props = { evidence, view: "all" as const, page: 1, pageSize: 25, onView: v
 it("opens management for the exact filtered task without changing the view", () => {
   const manage = vi.fn();
   render(<TasksTab {...props} onManage={manage} />);
-  fireEvent.click(screen.getByRole("button", { name: "Edit / delete task" }));
+  fireEvent.click(screen.getByRole("button", { name: "Edit task" }));
   expect(manage).toHaveBeenCalledWith("employee-task");
   expect(props.onView).not.toHaveBeenCalled();
 });
 it("keeps management unavailable to readers and to FMS work", () => {
   const { rerender } = render(<TasksTab {...props} />);
-  expect(screen.queryByRole("button", { name: "Edit / delete task" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Edit task" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
   rerender(<TasksTab {...props} onManage={vi.fn()} evidence={{ ...evidence, tasks: evidence.tasks.map((row) => ({ ...row, task_type: "fms" })) }} />);
-  expect(screen.queryByRole("button", { name: "Edit / delete task" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Edit task" })).toBeNull();
 });
 it("selects a page without losing tasks selected on another page", () => {
   const selection = { ids: ["earlier-page"], onChange: vi.fn() };
@@ -62,7 +63,7 @@ it("labels every kind of work and keeps FMS rows out of task management and evid
   expect(screen.getAllByTestId("work-kind").map((node) => node.textContent)).toEqual(["One-time", "Recurring", "CRM", "FMS step", "FMS start"]);
   expect(screen.getByText("Repair flow · FMS-1")).toBeTruthy();
   expect(screen.getByText("CRM walk-in")).toBeTruthy();
-  expect(screen.getAllByRole("button", { name: "Edit / delete task" })).toHaveLength(3);
+  expect(screen.getAllByRole("button", { name: "Edit task" })).toHaveLength(3);
   expect(screen.queryByText("Required, no file yet")).toBeNull();
   expect(screen.getAllByText("Forms and files for FMS work stay on the FMS step.")).toHaveLength(2);
 });
@@ -74,4 +75,22 @@ it("filters by work type and shows each type's count", () => {
   fireEvent.click(screen.getByRole("button", { name: "FMS · 3" }));
   expect(onKind).toHaveBeenCalledWith("fms");
   expect(screen.getByText(/of 9 in scope/)).toBeTruthy();
+});
+it("deletes CRM tasks directly and FMS work through its own action", () => {
+  const base = evidence.tasks[0]!;
+  const rows = [
+    { ...base, task_id: "crm", task_title: "Walk-in form", work_kind: "crm" },
+    { ...base, task_id: "fms", task_title: "Inspect piece", task_type: "fms", work_kind: "fms_step", task_status: "in_progress" },
+    { ...base, task_id: "done", task_title: "Closed step", task_type: "fms", work_kind: "fms_step", task_status: "completed" },
+    { ...base, task_id: "start", task_title: "Repair flow", task_type: "fms", work_kind: "fms_start" },
+  ];
+  const remove = vi.fn();
+  render(<TasksTab {...props} onManage={vi.fn()} onDelete={remove} evidence={{ ...evidence, tasks: rows, tasks_total: 4 }} />);
+  fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+  expect(remove).toHaveBeenLastCalledWith(expect.objectContaining({ task_id: "crm" }));
+  expect(screen.getAllByRole("button", { name: "Delete FMS task" })).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "Delete FMS task" }));
+  expect(remove).toHaveBeenLastCalledWith(expect.objectContaining({ task_id: "fms" }));
+  fireEvent.click(screen.getByRole("button", { name: "Delete start form" }));
+  expect(remove).toHaveBeenLastCalledWith(expect.objectContaining({ task_id: "start" }));
 });

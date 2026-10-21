@@ -97,7 +97,10 @@ function EvidenceCell({ row, onOpen }: { row: TaskRow; onOpen: (file: TaskAttach
   return <span className="text-xs text-task-text-muted">No file required</span>;
 }
 
-function TaskCard({ row, onOpen, onManage, selection }: { row: TaskRow; onOpen: (file: TaskAttachmentSummary) => void; onManage?: ((id: string) => void) | undefined; selection?: TaskSelection | undefined }) {
+/** FMS work that is still open can be removed; finished FMS history stays. */
+const OPEN_FMS_STATUSES = new Set(["pending", "in_progress", "in_review", "overdue"]);
+
+function TaskCard({ row, onOpen, onManage, onDelete, selection }: { row: TaskRow; onOpen: (file: TaskAttachmentSummary) => void; onManage?: ((id: string) => void) | undefined; onDelete?: ((row: TaskRow) => void) | undefined; selection?: TaskSelection | undefined }) {
   const kind = taskWorkKind(row);
   const fms = isFmsWorkKind(kind);
   const late = row.overdue && row.task_status !== "completed";
@@ -126,7 +129,15 @@ function TaskCard({ row, onOpen, onManage, selection }: { row: TaskRow; onOpen: 
         {fms
           ? <span className="text-xs text-task-text-muted">Forms and files for FMS work stay on the FMS step.</span>
           : <EvidenceCell onOpen={onOpen} row={row} />}
-        {onManage && row.task_type !== "fms" ? <Button className="mt-2" variant="secondary" onClick={() => onManage(row.task_id)}>Edit / delete task</Button> : null}
+        {!fms && (onManage || onDelete) ? (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {onManage ? <Button variant="secondary" onClick={() => onManage(row.task_id)}>Edit task</Button> : null}
+            {onDelete ? <Button variant="danger" onClick={() => onDelete(row)}>Delete</Button> : null}
+          </div>
+        ) : null}
+        {fms && onDelete && OPEN_FMS_STATUSES.has(row.task_status) ? (
+          <Button className="mt-2" variant="danger" onClick={() => onDelete(row)}>{kind === "fms_start" ? "Delete start form" : "Delete FMS task"}</Button>
+        ) : null}
       </div>
     </article>
   );
@@ -148,6 +159,7 @@ export function TasksTab({
   onPage,
   onPageSize,
   onManage,
+  onDelete,
   selection,
   onBulkDelete,
 }: {
@@ -161,6 +173,7 @@ export function TasksTab({
   onPage: (page: number) => void;
   onPageSize: (size: number) => void;
   onManage?: ((id: string) => void) | undefined;
+  onDelete?: ((row: TaskRow) => void) | undefined;
   selection?: TaskSelection | undefined;
   onBulkDelete?: ((ids: readonly string[] | null) => void) | undefined;
 }) {
@@ -237,7 +250,7 @@ export function TasksTab({
         ) : (
           <>
             <div className="flex flex-col gap-2">
-              {evidence.tasks.map((row) => <TaskCard key={row.task_id} onOpen={(file) => void openFile(file)} onManage={onManage} selection={selection} row={row} />)}
+              {evidence.tasks.map((row) => <TaskCard key={row.task_id} onOpen={(file) => void openFile(file)} onManage={onManage} onDelete={onDelete} selection={selection} row={row} />)}
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
               <Button className="border-task-border bg-task-bg text-task-text hover:bg-task-muted" disabled={page <= 1} onClick={() => onPage(page - 1)} variant="secondary">Previous</Button>

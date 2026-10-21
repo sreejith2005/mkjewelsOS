@@ -54,6 +54,19 @@ export function defaultFilters(today: string = tenantToday()): TaskControlFilter
   return { preset: "last_30_days", ...presetRange("last_30_days", today), branch_id: "", department_id: "", user_profile_id: "", search: "" };
 }
 
+const PROFILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * A deep link from Home (`?user=<profile id>`) opens one person's work for today.
+ * Anything else starts from the default filters. The server still authorizes the
+ * person and scope, so the parameter only pre-fills the filter.
+ */
+export function initialFiltersFromSearch(search: string, today: string = tenantToday()): TaskControlFilters {
+  const user = new URLSearchParams(search).get("user") ?? "";
+  if (!PROFILE_ID.test(user)) return defaultFilters(today);
+  return { ...defaultFilters(today), preset: "today", ...presetRange("today", today), user_profile_id: user };
+}
+
 /** Switching preset rewrites the dates; `custom` keeps whatever dates are set. */
 export function applyPreset(filters: TaskControlFilters, preset: RangePreset, today: string = tenantToday()): TaskControlFilters {
   return preset === "custom" ? { ...filters, preset } : { ...filters, preset, ...presetRange(preset, today) };

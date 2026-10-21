@@ -12544,6 +12544,10 @@ export type Database = {
         Args: { p_instance_id: string; p_reason: string }
         Returns: undefined
       }
+      cancel_fms_starter_assignment_with_audit: {
+        Args: { p_assignment_id: string; p_reason: string }
+        Returns: undefined
+      }
       cancel_report_export_with_audit: {
         Args: { p_export_id: string; p_request_key: string }
         Returns: {
@@ -14508,6 +14512,10 @@ export type Database = {
         }
       }
       schedule_kiara_jobs: { Args: { p_function_url: string }; Returns: Json }
+      schedule_report_export_jobs: {
+        Args: { p_function_url: string }
+        Returns: Json
+      }
       search_crm_clients: { Args: { p_filter?: Json }; Returns: Json[] }
       search_kiara_knowledge: {
         Args: { p_limit?: number; p_original_terms?: string; p_query: string }

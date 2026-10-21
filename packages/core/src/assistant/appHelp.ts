@@ -26,9 +26,10 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     section: "home",
     title: "Home",
     path: "/",
-    summary: "Home shows the user's own work for today: open and overdue tasks, assigned FMS stages, forms to fill, and recent activity.",
+    summary: "Home shows the user's own work for today: open and overdue tasks, assigned FMS stages, forms to fill, and recent activity. Managers, HR, Admins and Super Admins also see \"Team today\": today's team tasks, who needs follow-up, and progress by department.",
     recipes: [
       "See today's work: open Home from the menu. Overdue items are listed first.",
+      "See the team's day (leaders): the \"Team today\" section shows Assigned, Done, Pending and Overdue for today. With no tasks of your own, the top card shows \"Team completion today\". Tap a person under \"Needs follow-up\" to open their tasks in Task Control.",
       "Open a task or stage: tap it on Home to go straight to that work item.",
       "Fill a form linked to a task: use the form item on Home; it opens the exact form for that task.",
     ],
@@ -82,6 +83,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
       "Review evidence: open the evidence panel inside Task Control.",
       "Edit one task: choose \"Edit task\" to change Task or Checklist type, upload/remark/form requirements, verification, buddy assignment, Assignees, In Loop, dates, categorization and checklist items; then press \"Save changes\". Existing history stays intact; future schedules are edited separately.",
       "Change a schedule: edit the template and press \"Save schedule\".",
+      "Delete work: in the Tasks tab press \"Delete\" on a task (including CRM tasks), then \"Confirm deletion\". For FMS work press \"Delete FMS task\" (cancels that whole FMS run; completed steps and history are kept) or \"Delete start form\" (removes one person's pending start form); a reason is required.",
       "As-needed duties: in Templates, rows with status ON DEMAND (frequency such as PER CUSTOMER) have no date. Press \"Assign now\" to give the employee one occurrence due today; employees can also start them from \"As needed\" in My Tasks.",
     ],
   },
@@ -153,10 +155,10 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     section: "reports",
     title: "Reports",
     path: "/reports",
-    summary: "Reports previews fixed reports for the user's level and lets them request private CSV exports.",
+    summary: "Reports previews fixed reports for the user's level and lets them export private CSV files.",
     recipes: [
-      "Preview a report: open Reports, pick the report and the date range.",
-      "Export a report: request a CSV export from the report; it is prepared privately for you to download.",
+      "Preview a report: open Reports, tap the report, then pick dates (Today, Last 7 days, Last 30 days, This month, or From/To) and any Branch, Department or Status filter.",
+      "Export a report: press \"Export CSV\". The file appears under \"Your exports\" (Waiting, then Preparing), usually within a minute; press \"Download\" when it is Completed. Files expire automatically.",
     ],
   },
   crm: {

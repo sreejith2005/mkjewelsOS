@@ -16,7 +16,7 @@ How it works:
 The source is `packages/core/src/assistant/appHelp.ts`. Keep this file and that one in step
 (AGENTS.md, "Keeping Ask Kiara current").
 
-Tasks entry updated against the screens: 2026-10-20 (As needed duties). Recurring / To-Do and Task Control: 2026-10-20 (Assign now). Other entries last checked: 2026-10-14.
+Tasks entry updated against the screens: 2026-10-20 (As needed duties). Recurring / To-Do and Task Control: 2026-10-20 (Assign now). Home, Task Control (Delete) and Reports: 2026-10-21. Other entries last checked: 2026-10-14.
 
 ---
 
@@ -24,6 +24,7 @@ Tasks entry updated against the screens: 2026-10-20 (As needed duties). Recurrin
 **What it is:** your own work for today: open and overdue tasks, your FMS stages, forms to
 fill, and recent activity.
 - [ ] See today's work: open Home from the menu. Overdue items are listed first.
+- [ ] Leaders: **Team today** shows Assigned, Done, Pending and Overdue for today; with no tasks of your own the top card shows **Team completion today**. Tap a person under **Needs follow-up** to open their tasks in Task Control.
 - [ ] Open a task or stage: tap it on Home to go straight to that work.
 - [ ] Fill a form linked to a task: use the form item on Home. It opens the exact form for that task.
 
@@ -56,6 +57,7 @@ the formula behind each number.
 - [ ] Review evidence: open the evidence panel in Task Control.
 - [ ] Edit one task: **Edit task** changes Task/Checklist type, requirements, participants, dates, categorization and checklist items. Press **Save changes**. History is retained; future schedules have their own editor.
 - [ ] Change a schedule: edit the template and press **Save schedule**.
+- [ ] Delete work: in Tasks press **Delete** (also for CRM tasks), then **Confirm deletion**. FMS work: **Delete FMS task** cancels that whole FMS run (completed steps and history kept); **Delete start form** removes one person's pending start form. A reason is required.
 - [ ] As-needed duties: Templates rows with status **ON DEMAND** (frequency such as PER CUSTOMER) have no date. **Assign now** gives the employee one occurrence due today.
 
 ## FMS (workflows)
@@ -95,8 +97,8 @@ who build workflows, the designs.
 
 ## Reports
 **What it is:** fixed reports for your level, and private CSV downloads.
-- [ ] See a report: open Reports, pick the report and the dates.
-- [ ] Download a report: request a CSV export. It is prepared privately for you to download.
+- [ ] See a report: open Reports, tap the report, pick dates (Today, Last 7 days, Last 30 days, This month, or From/To) and any Branch, Department or Status filter.
+- [ ] Download a report: press **Export CSV**. It appears under **Your exports** (Waiting, then Preparing), usually within a minute; press **Download** when Completed.
 
 ## CRM
 **What it is:** client records, walk-ins, interactions and follow-ups, for CRM users.

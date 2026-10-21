@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  applyBranch, applyPreset, defaultFilters, delayedScore, evidenceFilter, needsAttention, pendingScore,
+  applyBranch, applyPreset, defaultFilters, delayedScore, evidenceFilter, initialFiltersFromSearch, needsAttention, pendingScore,
   presetRange, progressContext, rangeIsValid, totals,
 } from "./filters";
 
@@ -70,5 +70,16 @@ describe("task control filters", () => {
       person("Overdue many", 5, 1, 4, 3),
     ]);
     expect(ranked.map((row) => row.employee_name)).toEqual(["Overdue many", "Overdue few", "Backlog"]);
+  });
+});
+
+describe("Task Control deep link", () => {
+  it("opens one person's work for today from Home", () => {
+    const id = "4d130000-0000-0000-0000-000000000006";
+    expect(initialFiltersFromSearch(`?tab=tasks&user=${id}`, "2026-03-18")).toEqual({ ...defaultFilters("2026-03-18"), preset: "today", from: "2026-03-18", to: "2026-03-18", user_profile_id: id });
+  });
+  it("ignores a missing or malformed person", () => {
+    expect(initialFiltersFromSearch("?tab=tasks", "2026-03-18")).toEqual(defaultFilters("2026-03-18"));
+    expect(initialFiltersFromSearch("?user=not-a-profile", "2026-03-18")).toEqual(defaultFilters("2026-03-18"));
   });
 });
