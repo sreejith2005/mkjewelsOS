@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TasksPage } from "./TasksPage";
 
-const mocks = vi.hoisted(() => ({ page: vi.fn(), feed: vi.fn(), tabs: vi.fn(), search: vi.fn(), prepare: vi.fn() }));
+const mocks = vi.hoisted(() => ({ page: vi.fn(), feed: vi.fn(), tabs: vi.fn(), search: vi.fn(), prepare: vi.fn(), duties: vi.fn() }));
 vi.mock("@/auth/AuthContext", async () => {
   const { builtinAccessContext } = await vi.importActual<typeof import("@jewelos/core")>("@jewelos/core");
   const profile = { id: "admin", tenant_id: "tenant", user_role: "admin" as const };
@@ -17,7 +17,7 @@ vi.mock("@/features/tasks/api", () => ({
   loadTaskAuthoringReferenceData: vi.fn(), createDelegationTask: vi.fn(),
   reviseTask: vi.fn(), updateTask: vi.fn(), uploadAndCompleteTask: vi.fn(),
   uploadTaskAttachment: vi.fn(), loadFmsTaskDeepLink: vi.fn(),
-  loadMyOnDemandDuties: async () => [], startOnDemandDuty: vi.fn(),
+  loadMyOnDemandDuties: mocks.duties, startOnDemandDuty: vi.fn(),
 }));
 vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealtimeRefresh: vi.fn() }));
 vi.mock("@/features/tasks/TaskCard", () => ({ TaskCard: ({ task }: { task: { title: string } }) => <div>{task.title}</div> }));
@@ -27,10 +27,30 @@ const page = (title: string, total = 12000) => ({
   tasks: [{ id: title, title, task_type: "delegation", assignees: [], isWatchedByViewer: false }],
   total, counts: { pending: total, overdue: 20, completed: 10, open: total + 20 },
 });
-beforeEach(() => { mocks.search.mockReset(); mocks.page.mockReset(); mocks.feed.mockReset(); mocks.tabs.mockReset(); mocks.prepare.mockReset(); mocks.prepare.mockResolvedValue({ created: 0 }); mocks.tabs.mockResolvedValue({ mine: 4, delegated: 7, inLoop: 2, all: 13 }); window.history.replaceState({}, "", "/tasks"); });
+beforeEach(() => { mocks.search.mockReset(); mocks.page.mockReset(); mocks.feed.mockReset(); mocks.tabs.mockReset(); mocks.prepare.mockReset(); mocks.prepare.mockResolvedValue({ created: 0 }); mocks.duties.mockReset(); mocks.duties.mockResolvedValue([]); mocks.tabs.mockResolvedValue({ mine: 4, delegated: 7, inLoop: 2, all: 13 }); window.history.replaceState({}, "", "/tasks"); });
 afterEach(cleanup);
 
 describe("task workspace paging", () => {
+  it("lists anytime duties below the dated tasks on the last Pending page only", async () => {
+    mocks.duties.mockResolvedValue([{ templateId: "d1", title: "Greet customer", description: null, triggerLabel: "Per Customer", taskType: "delegation",
+      priority: "medium", dueTime: null, requiresUpload: true, startedToday: 0, completedToday: 0, openCount: 0, openTaskId: null }]);
+    mocks.page.mockResolvedValue(page("Dated task", 1));
+    render(<TasksPage />);
+    const heading = await screen.findByRole("heading", { name: /Anytime duties/ });
+    expect(screen.getByText("Dated task").compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Overdue/ }));
+    await waitFor(() => expect(screen.queryByRole("heading", { name: /Anytime duties/ })).toBeNull());
+  });
+
+  it("keeps anytime duties off a page that has more dated tasks after it", async () => {
+    mocks.duties.mockResolvedValue([{ templateId: "d1", title: "Greet customer", description: null, triggerLabel: "Per Customer", taskType: "delegation",
+      priority: "medium", dueTime: null, requiresUpload: true, startedToday: 0, completedToday: 0, openCount: 0, openTaskId: null }]);
+    mocks.page.mockResolvedValue(page("First of many"));
+    render(<TasksPage />);
+    await screen.findByText("First of many");
+    expect(screen.queryByRole("heading", { name: /Anytime duties/ })).toBeNull();
+  });
+
   it("searches unopened subsections and restores the board on clear", async () => {
     mocks.page.mockResolvedValue(page("Board task"));
     mocks.search.mockResolvedValue({ ...page("Matching watched task", 1), sections: { "Matching watched task": "inLoop" } });

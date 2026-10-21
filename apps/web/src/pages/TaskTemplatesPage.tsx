@@ -207,7 +207,7 @@ export function TaskTemplatesPage() {
   const assignNow = (row: TaskTemplateDirectoryRow) =>
     void run(row, async () => {
       await startOnDemandDuty(row.id);
-      toast.success(`Assigned now${row.assignee_name ? ` to ${row.assignee_name}` : ""}: ${row.title}`);
+      toast.success(`Assigned now as high priority${row.assignee_name ? ` to ${row.assignee_name}` : ""}: ${row.title}`);
     });
 
   const remove = (row: TaskTemplateDirectoryRow) => {

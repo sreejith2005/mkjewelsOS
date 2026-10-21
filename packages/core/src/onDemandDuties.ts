@@ -1,9 +1,11 @@
 /**
  * On-demand duties: assigned `as_required` templates (As Required, Per Customer,
- * After Visit, ...). They have no calendar date; the employee starts an
- * occurrence when the event happens, or a manager assigns one now. The database
- * (`get_my_on_demand_duties`, `start_on_demand_task_with_audit`) is the source
- * of truth; this module only parses and labels its answers.
+ * After Visit, ...). They have no calendar date, so they are standing,
+ * low-priority work listed below the employee's dated tasks every day. The
+ * employee starts an occurrence whenever they like (low priority, due tonight);
+ * a manager who enforces one with Assign now creates a high-priority occurrence.
+ * The database (`get_my_on_demand_duties`, `start_on_demand_task_with_audit`) is
+ * the source of truth; this module only parses and labels its answers.
  */
 
 export type OnDemandDuty = Readonly<{
@@ -16,7 +18,10 @@ export type OnDemandDuty = Readonly<{
   dueTime: string | null;
   requiresUpload: boolean;
   startedToday: number;
+  completedToday: number;
   openCount: number;
+  /** The open occurrence Start should continue (an enforced one first), if any. */
+  openTaskId: string | null;
 }>;
 
 /** Shown when an imported duty has no sheet wording (older imports). */
@@ -31,10 +36,10 @@ export function onDemandTriggerLabel(label: string | null | undefined): string {
   return trimmed ? trimmed : ON_DEMAND_FALLBACK_TRIGGER;
 }
 
-/** "Done 2 today · 1 open", or "Not started today". */
-export function onDemandDutyProgress(duty: Pick<OnDemandDuty, "startedToday" | "openCount">): string {
-  if (duty.startedToday === 0 && duty.openCount === 0) return "Not started today";
-  const parts = [`Done ${duty.startedToday} today`];
+/** "Done 2 today · 1 open", or "Not done today". */
+export function onDemandDutyProgress(duty: Pick<OnDemandDuty, "completedToday" | "openCount">): string {
+  if (duty.completedToday === 0 && duty.openCount === 0) return "Not done today";
+  const parts = duty.completedToday > 0 ? [`Done ${duty.completedToday} today`] : [];
   if (duty.openCount > 0) parts.push(`${duty.openCount} open`);
   return parts.join(" · ");
 }
@@ -69,7 +74,9 @@ export function parseOnDemandDuties(value: unknown): OnDemandDuty[] {
       dueTime: text(row.due_time),
       requiresUpload: row.requires_upload === true,
       startedToday: count(row.started_today),
+      completedToday: count(row.completed_today),
       openCount: count(row.open_count),
+      openTaskId: text(row.open_task_id),
     }];
   });
 }

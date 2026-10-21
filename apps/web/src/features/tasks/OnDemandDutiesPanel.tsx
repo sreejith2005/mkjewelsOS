@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, Hand, Play } from "lucide-react";
+import { ArrowRight, ChevronDown, Hand, Play } from "lucide-react";
 import { toast } from "sonner";
 import { onDemandDutyProgress, type OnDemandDuty } from "@jewelos/core";
 import { Button, Notice } from "@/components/ui";
@@ -10,12 +10,18 @@ const COLLAPSED_COUNT = 4;
 const SEARCH_FROM = 8;
 
 /**
- * The viewer's standing as-needed duties (As Required, Per Customer, After
- * Visit, ...). They have no date, so they never appear in the dated feed until
- * the employee taps Start when the event happens; the started occurrence then
- * behaves like any other task in My Tasks.
+ * The viewer's standing duties without a fixed time (As Required, Per Customer,
+ * After Visit, ...). They have no deadline, so they sit below every dated task
+ * as low-priority work and come back every day. Start creates today's
+ * occurrence (low priority, due tonight) and opens it so the employee can
+ * finish it; Continue opens one that is already open, including one a manager
+ * enforced with Assign now (high priority, already in the dated list).
  */
-export function OnDemandDutiesPanel({ reloadKey, onStarted }: Readonly<{ reloadKey: number; onStarted: () => Promise<void> | void }>) {
+export function OnDemandDutiesPanel({ reloadKey, onOpenTask, onLoaded }: Readonly<{
+  reloadKey: number;
+  onOpenTask: (taskId: string) => void;
+  onLoaded?: (count: number) => void;
+}>) {
   const [duties, setDuties] = useState<OnDemandDuty[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -23,9 +29,11 @@ export function OnDemandDutiesPanel({ reloadKey, onStarted }: Readonly<{ reloadK
   const [startingId, setStartingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    try { setDuties(await loadMyOnDemandDuties()); setError(null); }
-    catch (caught) { setError(errorMessage(caught)); }
-  }, []);
+    try {
+      const loaded = await loadMyOnDemandDuties();
+      setDuties(loaded); setError(null); onLoaded?.(loaded.length);
+    } catch (caught) { setError(errorMessage(caught)); onLoaded?.(0); }
+  }, [onLoaded]);
   useEffect(() => { void load(); }, [load, reloadKey]);
 
   const matching = useMemo(() => {
@@ -35,11 +43,12 @@ export function OnDemandDutiesPanel({ reloadKey, onStarted }: Readonly<{ reloadK
   const visible = expanded || search.trim() ? matching : matching.slice(0, COLLAPSED_COUNT);
 
   const start = async (duty: OnDemandDuty) => {
+    if (duty.openTaskId) { onOpenTask(duty.openTaskId); return; }
     setStartingId(duty.templateId);
     try {
-      await startOnDemandDuty(duty.templateId);
-      toast.success(`Started: ${duty.title}. Complete it in My Tasks.`);
-      await onStarted();
+      const taskId = await startOnDemandDuty(duty.templateId);
+      toast.success(`Started: ${duty.title}`);
+      onOpenTask(taskId);
     } catch (caught) {
       toast.error(errorMessage(caught));
     } finally {
@@ -47,20 +56,23 @@ export function OnDemandDutiesPanel({ reloadKey, onStarted }: Readonly<{ reloadK
     }
   };
 
-  if (error) return <div className="mb-3"><Notice tone="danger">{error}</Notice></div>;
+  if (error) return <div className="mt-4"><Notice tone="danger">{error}</Notice></div>;
   if (duties.length === 0) return null;
 
   return (
-    <section aria-labelledby="on-demand-duties-heading" className="mb-4 rounded-2xl border border-task-border bg-task-muted/40 p-3 sm:p-4">
+    <section aria-labelledby="on-demand-duties-heading" className="mt-4 rounded-2xl border border-dashed border-task-border bg-task-muted/40 p-3 sm:p-4">
       <div className="flex items-start gap-3">
         <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-task-accent-soft text-task-accent"><Hand className="size-5" /></span>
         <div className="min-w-0 flex-1">
-          <h2 className="text-base font-semibold text-task-text" id="on-demand-duties-heading">As needed <span className="tabular-nums text-task-text-muted">({duties.length})</span></h2>
-          <p className="text-xs text-task-text-muted">Your duties without a fixed time. Tap Start when one happens; it is never overdue until you start it.</p>
+          <h2 className="flex flex-wrap items-center gap-2 text-base font-semibold text-task-text" id="on-demand-duties-heading">
+            <span>Anytime duties <span className="tabular-nums text-task-text-muted">({duties.length})</span></span>
+            <span className="rounded-full bg-task-bg px-2 py-0.5 text-xs font-medium text-task-text-muted">Low priority</span>
+          </h2>
+          <p className="text-xs text-task-text-muted">No deadline. Do them whenever you can; they come back every day. If a manager assigns one, it moves up your list as high priority.</p>
         </div>
       </div>
       {duties.length >= SEARCH_FROM ? <input
-        aria-label="Search as-needed duties"
+        aria-label="Search anytime duties"
         className="mt-3 min-h-11 w-full rounded-lg border border-task-border bg-task-bg px-3 text-sm text-task-text placeholder:text-task-text-muted"
         onChange={(event) => setSearch(event.target.value)}
         placeholder="Search duties"
@@ -77,9 +89,13 @@ export function OnDemandDutiesPanel({ reloadKey, onStarted }: Readonly<{ reloadK
               {duty.requiresUpload || duty.taskType === "delegation" ? <span>Upload needed</span> : null}
             </div>
           </div>
-          <Button aria-label={`Start ${duty.title}`} className="min-h-11 self-start sm:self-center" disabled={startingId !== null} onClick={() => void start(duty)}>
-            <Play className="size-4" />{startingId === duty.templateId ? "Starting..." : "Start"}
-          </Button>
+          {duty.openTaskId
+            ? <Button aria-label={`Continue ${duty.title}`} className="min-h-11 self-start sm:self-center" disabled={startingId !== null} onClick={() => void start(duty)} variant="secondary">
+              <ArrowRight className="size-4" />Continue
+            </Button>
+            : <Button aria-label={`Start ${duty.title}`} className="min-h-11 self-start sm:self-center" disabled={startingId !== null} onClick={() => void start(duty)}>
+              <Play className="size-4" />{startingId === duty.templateId ? "Starting..." : "Start"}
+            </Button>}
         </li>)}
         {visible.length === 0 ? <li className="py-3 text-sm text-task-text-muted">No duty matches this search.</li> : null}
       </ul>
