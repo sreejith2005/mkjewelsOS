@@ -31,24 +31,22 @@ beforeEach(() => { mocks.search.mockReset(); mocks.page.mockReset(); mocks.feed.
 afterEach(cleanup);
 
 describe("task workspace paging", () => {
-  it("lists anytime duties below the dated tasks on the last Pending page only", async () => {
+  it("shows anytime duties as a closed bar above the tasks on every Pending page", async () => {
     mocks.duties.mockResolvedValue([{ templateId: "d1", title: "Greet customer", description: null, triggerLabel: "Per Customer", taskType: "delegation",
-      priority: "medium", dueTime: null, requiresUpload: true, startedToday: 0, completedToday: 0, openCount: 0, openTaskId: null }]);
-    mocks.page.mockResolvedValue(page("Dated task", 1));
+      priority: "medium", dueTime: null, requiresUpload: true, startedToday: 1, completedToday: 0, openCount: 1, openTaskId: "Started greeting" }]);
+    mocks.page.mockResolvedValue({ ...page("First of many"), tasks: [
+      { id: "First of many", title: "First of many", task_type: "delegation", assignees: [], isWatchedByViewer: false },
+      { id: "Started greeting", title: "Started greeting", task_type: "delegation", task_template_id: "d1", assignees: [], isWatchedByViewer: false },
+    ] });
     render(<TasksPage />);
-    const heading = await screen.findByRole("heading", { name: /Anytime duties/ });
-    expect(screen.getByText("Dated task").compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Overdue/ }));
-    await waitFor(() => expect(screen.queryByRole("heading", { name: /Anytime duties/ })).toBeNull());
-  });
-
-  it("keeps anytime duties off a page that has more dated tasks after it", async () => {
-    mocks.duties.mockResolvedValue([{ templateId: "d1", title: "Greet customer", description: null, triggerLabel: "Per Customer", taskType: "delegation",
-      priority: "medium", dueTime: null, requiresUpload: true, startedToday: 0, completedToday: 0, openCount: 0, openTaskId: null }]);
-    mocks.page.mockResolvedValue(page("First of many"));
-    render(<TasksPage />);
+    const bar = await screen.findByRole("button", { name: /Anytime duties \(1\)/ });
     await screen.findByText("First of many");
-    expect(screen.queryByRole("heading", { name: /Anytime duties/ })).toBeNull();
+    expect(bar.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("Greet customer")).toBeNull();
+    expect(bar.compareDocumentPosition(screen.getByText("First of many")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText("Anytime duty · Per Customer")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Overdue/ }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Anytime duties/ })).toBeNull());
   });
 
   it("searches unopened subsections and restores the board on clear", async () => {
