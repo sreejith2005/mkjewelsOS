@@ -79,7 +79,7 @@ function RowActions({
           className={style}
           disabled={busy || !templateCanAssignNow(row)}
           onClick={onAssignNow}
-          title={templateCanAssignNow(row) ? "Give the employee one occurrence of this duty now." : "Assign this duty to an employee first."}
+          title={templateCanAssignNow(row) ? "Give the employee one high-priority occurrence of this duty now." : "Assign this duty to an employee first."}
           variant="secondary"
         >
           Assign now

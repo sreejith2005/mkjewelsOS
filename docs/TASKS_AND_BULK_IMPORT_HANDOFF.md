@@ -149,6 +149,22 @@ standing **on-demand duty**:
 
 Design: `docs/superpowers/specs/2026-10-20-on-demand-duties-design.md`.
 
+### 2026-10-21 update: anytime duties and deadline-first order (0297)
+
+- The panel is now **Anytime duties**, at the bottom of My Tasks > Pending (last
+  page), after every dated task, labelled low priority. It lists every assigned
+  duty every day, so no manager action is needed for employees to see them.
+- **Start** by the employee creates a **low**-priority occurrence due 23:59
+  today and opens it to finish (upload, checklist, form). **Continue** opens an
+  occurrence that is already open instead of creating another.
+- **Assign now** by a manager or admin creates a **high**-priority occurrence
+  with the duty's due time, so it moves up the employee's dated list.
+- `task_workspace_page` (My Tasks, Delegated, In Loop, All Tasks, search) now
+  sorts by earliest deadline first, then priority. The Completed tab keeps
+  newest first. Search sorted by priority is unchanged.
+
+Design: `docs/superpowers/specs/2026-10-21-standing-duties-design.md`.
+
 ## 1. Why this document exists
 
 This is the durable context document for future work on the JewelOS **Tasks**, **Recurring / To-Do**, **Task Bulk Import**, and **Assigning Left** surfaces. It records:
@@ -248,7 +264,7 @@ The importer normalizes frequencies case-insensitively:
 | `Monthly` | Monthly template anchored to the start-date day |
 | `Quarterly` | Three-month recurrence anchored to the start date |
 | `Yearly` | Yearly recurrence anchored to the start month/day |
-| `As Required` | Create an on-demand duty: no dated occurrence; the employee presses Start (or a manager Assign now) each time it happens (0293) |
+| `As Required` | Create an on-demand duty: no dated occurrence; listed every day under Anytime duties as low priority; the employee presses Start (low priority) or a manager Assign now (high priority) each time it happens (0293, 0297) |
 
 The deterministic recurrence mappings are:
 

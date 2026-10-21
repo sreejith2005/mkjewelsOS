@@ -442,7 +442,7 @@ export function RecurringTodoPage() {
   const assignNow = async (template: RecurringTemplate) => {
     try {
       await startOnDemandDuty(template.id);
-      toast.success(`Assigned now: ${template.title}`);
+      toast.success(`Assigned now as high priority: ${template.title}`);
       await load();
     } catch (caught) {
       toast.error(errorMessage(caught));
