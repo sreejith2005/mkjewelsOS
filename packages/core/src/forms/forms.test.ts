@@ -18,6 +18,13 @@ import {
 
 const opts = (...labels: readonly string[]) => labels.map((label) => ({ value: label.trim(), label: label.trim() }));
 
+it("preserves one stable form record-name key and rejects missing or unsafe questions", () => {
+  const form: FormTemplateDefinition = { name: "Enquiry", recordNameFieldKey: " customer_name ", fields: [{ key: "customer_name", label: "Customer Name", type: "text", sortOrder: 0 }] };
+  expect(normalizeFormDefinition(form).recordNameFieldKey).toBe("customer_name");
+  expect(validateFormDefinition(normalizeFormDefinition(form))).toEqual([]);
+  expect(validateFormDefinition({ ...form, recordNameFieldKey: "missing" })).toEqual(expect.arrayContaining([expect.objectContaining({ code: "invalid_record_name" })]));
+});
+
 const field = (type: FormFieldDefinition["type"], overrides: Partial<FormFieldDefinition> = {}): FormFieldDefinition => ({
   key: `field_${type}`,
   label: type,

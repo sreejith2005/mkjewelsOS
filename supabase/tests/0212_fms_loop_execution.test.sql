@@ -87,7 +87,7 @@ begin
  insert into fms_stages(fms_flow_id,stage_key,name,step_type,sort_order,is_required,planned_time_rule) values(f,'decide','Decide','task',5,true,'{"deadlineEnabled":false,"decisionMode":"yes_no","decisionOptions":[{"key":"repeat","label":"Repeat"},{"key":"finish","label":"Finish"}]}') returning id into decide;
  insert into fms_stages(fms_flow_id,stage_key,name,step_type,sort_order,is_required,planned_time_rule) values(f,'finish','Finish','task',6,true,'{"deadlineEnabled":false}') returning id into finish;
  update fms_stages set default_next_stage_id=split where id=s;
- update fms_stages set parallel_target_stage_ids=array[a,b] where id=split;
+ update fms_stages set parallel_target_stage_ids=array[greatest(a,b),least(a,b)] where id=split;
  update fms_stages set default_next_stage_id=j where id in(a,b);
  update fms_stages set default_next_stage_id=decide where id=j;
  update fms_stages set default_next_stage_id=finish where id=decide;
@@ -100,6 +100,16 @@ select lives_ok($$select publish_fms_flow_with_audit((select id from loop_fixtur
 insert into loop_fixture select 'parallel_instance',instance_id from start_fms_instance_with_audit((select id from loop_fixture where name='parallel_flow'),'Parallel replay');
 create function pg_temp.parallel_work(p_key text) returns uuid language sql as $$select id from fms_instance_stages where fms_instance_id=(select id from loop_fixture where name='parallel_instance') and fms_stage_id=(select id from loop_fixture where name=p_key) and status in('in_progress','in_review') order by visit_number desc limit 1$$;
 select lives_ok($$select submit_fms_form_and_progress_with_audit((select id from loop_fixture where name='form'),'{"note":"parallel"}','fms_stage',pg_temp.parallel_work('parallel_start'),gen_random_uuid())$$,'entry activates both branches');
+select is((select stage->'nextStageIds' from jsonb_array_elements(get_fms_task_stages(
+ (select family_id from fms_flows where id=(select id from loop_fixture where name='parallel_flow')))) stage
+ where stage->>'stageId'=(select id::text from loop_fixture where name='parallel_split')),
+ (select to_jsonb(parallel_target_stage_ids) from fms_stages where id=(select id from loop_fixture where name='parallel_split')),
+ 'workspace preserves the builder parallel target order');
+select is((select stage->'nextStageIds' from jsonb_array_elements(get_fms_task_stages(
+ (select family_id from fms_flows where id=(select id from loop_fixture where name='parallel_flow')))) stage
+ where stage->>'stageId'=(select id::text from loop_fixture where name='parallel_a')),
+ (select jsonb_build_array((select id from loop_fixture where name='parallel_a'),(select id from loop_fixture where name='parallel_join'))),
+ 'workspace places conditional routes before the ordinary default fallback');
 insert into loop_fixture values('parallel_b_original',pg_temp.parallel_work('parallel_b'));
 select lives_ok($$select complete_fms_stage_with_audit(pg_temp.parallel_work('parallel_a'),'repeat')$$,'a local branch can repeat itself');
 select is(pg_temp.parallel_work('parallel_b'),(select id from loop_fixture where name='parallel_b_original'),'local loop preserves sibling work');

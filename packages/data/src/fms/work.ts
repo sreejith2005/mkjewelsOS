@@ -81,7 +81,7 @@ function receivedField(raw: unknown): FmsReceivedField {
 }
 export function parseFmsWorkContext(raw: unknown): FmsWorkContext {
   const v = record(raw);
-  return { workflowName: string(v.workflowName), stageName: string(v.stageName), reference: string(v.reference), referenceKey: nullable(v.referenceKey), instructions: string(v.instructions),
+  return { recordName: v.recordName == null ? null : string(v.recordName), workflowName: string(v.workflowName), stageName: string(v.stageName), reference: string(v.reference), referenceKey: nullable(v.referenceKey), instructions: string(v.instructions),
     expectedResult: string(v.expectedResult), dueAt: nullable(v.dueAt), assignedNames: array(v.assignedNames).map(string), titleTemplate: string(v.titleTemplate),
     shortDescription: string(v.shortDescription), dueLabel: string(v.dueLabel), nextCursor: nullable(v.nextCursor), receivedFields: array(v.receivedFields).map(receivedField), journey: array(v.journey).map(raw => { const item = record(raw); return { id: string(item.id), stageName: string(item.stageName), status: string(item.status),
       employeeName: nullable(item.employeeName), visitNumber: integer(item.visitNumber), completedAt: nullable(item.completedAt) }; }) };

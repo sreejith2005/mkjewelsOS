@@ -52,7 +52,7 @@ const parseOptionSource = (source: string | null, masterType: string | null) =>
 
 export function toDefinition(template: FormTemplate, fields: FormField[]): FormTemplateDefinition {
   const sections = parseSections(template.sections);
-  return normalizeFormDefinition({ name: template.name, description: template.description ?? undefined,
+  return normalizeFormDefinition({ name: template.name, description: template.description ?? undefined, recordNameFieldKey: template.record_name_field_key ?? undefined,
     ...(sections.length ? { sections } : {}),
     permissions: { roles: ((object(template.permissions).roles ?? []) as string[]).filter((role): role is import("@jewelos/core").UserRole => ["super_admin","admin","manager","hr","crm","staff","doer","housekeeping"].includes(role)) },
     fields: fields.map((field) => {

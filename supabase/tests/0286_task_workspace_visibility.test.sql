@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions;
-select plan(17);
+select plan(24);
 insert into auth.users(id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
 select auth_id,'authenticated','authenticated',email,crypt('synthetic-test-value',gen_salt('bf')),now(),'{}','{}',now(),now() from (values
  ('a5951000-0000-4000-8000-000000000001'::uuid,'awc-assignee@example.invalid'),
@@ -75,12 +75,18 @@ select is((select count(*)::integer from v_all_tasks where id='15951000-0000-400
   'assigned archived-version starter remains hydratable');
 select is((select count(*)::integer from fms_stages where id='85952000-0000-4000-8000-000000000001'),1,
   'assigned employee can read the pinned work definition');
-select is((task_feed_page('mine','overdue')->>'total')::integer,2,'page count includes the persisted starter');
+select is((task_feed_page('fms','overdue')->>'total')::integer,1,'only the dated runtime is overdue');
 select is((select count(*)::integer from v_all_tasks where id in
-  (select jsonb_array_elements_text(task_feed_page('mine','overdue')->'ids')::uuid)),2,
-  'counted starter has a visible card');
+  (select jsonb_array_elements_text(task_feed_page('fms','overdue')->'ids')::uuid)),1,
+  'counted runtime has a visible card');
 select is((select count(*)::integer from v_all_tasks where id='97952000-0000-4000-8000-000000000001'),1,
   'archived runtime version remains hydratable');
+select is((get_fms_task_workspace('{}')->>'total')::integer,2,
+  'hierarchy preserves exact cross-branch archived assignments');
+select is((get_fms_task_stage_page(
+  (select coalesce(family_id,id) from fms_flows where id='75952000-0000-4000-8000-000000000001'),
+  '75952000-0000-4000-8000-000000000001','85952000-0000-4000-8000-000000000001')->>'total')::integer,1,
+  'hierarchy opens the exact cross-branch assigned runtime');
 select throws_ok($$select task_feed_page('all','pending')$$,'42501','All tasks access denied','ordinary user cannot access admin counts');
 reset role;
 set local role authenticated;
@@ -94,7 +100,24 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub','a5951000-0000-4000-8000-000000000003',true);
 select is((select count(*)::integer from fms_flows where id='75952000-0000-4000-8000-000000000001'),0,
   'cross-tenant definition read denied');
+select is((get_fms_task_workspace('{"query":"AWC"}')->>'total')::integer,0,
+  'cross-tenant search reveals no assignment names or counts');
+select is((get_fms_task_stage_page('75952000-0000-4000-8000-000000000001',
+  '75952000-0000-4000-8000-000000000001','85952000-0000-4000-8000-000000000001')->>'total')::integer,0,
+  'direct family and stage parameters cannot bypass tenant scope');
 reset role;
+insert into user_permission_overrides(user_profile_id,tenant_id,permission_key,effect)
+values('45952000-0000-4000-8000-000000000002','15952000-0000-4000-8000-000000000001','tasks.view','deny');
+set local role authenticated;
+select set_config('request.jwt.claim.sub','a5951000-0000-4000-8000-000000000002',true);
+select throws_ok($$select get_fms_task_workspace('{}')$$,'42501',null,
+  'direct hierarchy RPC cannot bypass denied Tasks access');
+select throws_ok($$select task_feed_page('fms','pending')$$,'42501',null,
+  'legacy FMS tab cannot bypass denied Tasks access');
+select throws_ok($$select task_workspace_page('{"subsection":"fms"}')$$,'42501',null,
+  'global FMS search cannot bypass denied Tasks access');
+reset role;
+delete from user_permission_overrides where user_profile_id='45952000-0000-4000-8000-000000000002' and permission_key='tasks.view';
 update user_profiles set is_login_enabled=false where id='45952000-0000-4000-8000-000000000001';
 set local role authenticated;
 select set_config('request.jwt.claim.sub','a5951000-0000-4000-8000-000000000001',true);

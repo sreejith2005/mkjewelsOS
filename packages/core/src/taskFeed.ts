@@ -61,22 +61,28 @@ export function groupTaskFeedRows<T extends TaskFeedLike>(rows: readonly T[]): G
 export type SplittableAssignedTask = Readonly<{
   task_template_id?: string | null;
   task_type: string | null;
+  fms_starter_assignment_id?: string | null;
+  fms_instance_stage_id?: string | null;
 }>;
 
 /**
  * My Tasks holds recurring work of any schedule (occurrences generated from a task template)
- * plus FMS stage work. Everything else assigned from the Tasks section is one-time work and
+ * FMS has its own workspace. Everything else assigned from the Tasks section is one-time work and
  * belongs in Delegated.
  */
 export function isRecurringOrWorkflowTask(task: SplittableAssignedTask): boolean {
-  return Boolean(task.task_template_id) || task.task_type === "fms";
+  return !isFmsAssignedTask(task) && Boolean(task.task_template_id);
+}
+
+export function isFmsAssignedTask(task: SplittableAssignedTask): boolean {
+  return task.task_type === "fms" || Boolean(task.fms_starter_assignment_id || task.fms_instance_stage_id);
 }
 
 export function splitAssignedTaskFeed<T extends SplittableAssignedTask>(tasks: readonly T[]) {
-  return tasks.reduce<{ delegatedTasks: T[]; myTasks: T[] }>((result, task) => {
-    (isRecurringOrWorkflowTask(task) ? result.myTasks : result.delegatedTasks).push(task);
+  return tasks.reduce<{ delegatedTasks: T[]; myTasks: T[]; fmsTasks: T[] }>((result, task) => {
+    (isFmsAssignedTask(task) ? result.fmsTasks : isRecurringOrWorkflowTask(task) ? result.myTasks : result.delegatedTasks).push(task);
     return result;
-  }, { delegatedTasks: [], myTasks: [] });
+  }, { delegatedTasks: [], myTasks: [], fmsTasks: [] });
 }
 
 /** Keeps a viewer's looped-in work out of their actionable task lists. */

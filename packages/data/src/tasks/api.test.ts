@@ -54,8 +54,8 @@ describe("server-authorized task assignment roster", () => {
     pageRpc.mockImplementation(async (_name: string, args: { p_view: string }) => ({
       data: { ids: [], total: 0, counts: { pending: args.p_view === "mine" ? 5 : 2, overdue: 1, completed: 0, open: args.p_view === "mine" ? 6 : 3 } }, error: null,
     }));
-    expect(await loadTaskTabCounts(false)).toEqual({ mine: 6, delegated: 3, inLoop: 3 });
-    expect(pageRpc.mock.calls.map(call => call[1].p_view)).toEqual(["mine", "delegated", "inLoop"]);
+    expect(await loadTaskTabCounts(false)).toEqual({ mine: 6, delegated: 3, inLoop: 3, fms: 3 });
+    expect(pageRpc.mock.calls.map(call => call[1].p_view)).toEqual(["mine", "delegated", "inLoop", "fms"]);
     expect(selectedTables).toEqual([]);
   });
   it("requests the admin count only when offered, and propagates server denial", async () => {

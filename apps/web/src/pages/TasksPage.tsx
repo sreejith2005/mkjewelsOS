@@ -1,5 +1,6 @@
 import { defaultTaskSearch, taskSearchActive, TASK_SUBSECTION_LABELS, type TaskSearchFilters } from "@jewelos/core";
 import { TaskSearchControls } from "@/features/tasks/TaskSearchControls";
+import { FmsTaskWorkspace } from "@/features/tasks/fms/FmsTaskWorkspace";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Plus, RefreshCw, Upload, UserRoundPlus } from "lucide-react";
 import { TASK_IN_LOOP_PATH, deriveTaskMutationCapability, taskNeedsCompletionRemark, hasPermission, type TaskFeedStatusFilter } from "@jewelos/core";
@@ -76,6 +77,7 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const canUseVoice = access ? hasPermission(access, "tasks.voice_assign") : false;
 
   const pageIdentity = `${profile?.id}|${workspaceView}|${statusFilter}|${offset}|${focusedTaskId}|${searchIdentity}`;
+  const updateFmsCount = useCallback((count: number) => setTabCounts(previous => ({ ...previous, fms: count })), []);
 
   const refresh = useCallback(async () => {
     if (!profile) return;
@@ -87,6 +89,11 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
         const rows = await loadTaskFeed(profile.id, "", "", { tenantId: profile.tenant_id, recordId: focusedTaskId });
         const referenceData = await loadTaskFeedReferenceData().catch(() => ({ categories: [] }));
         if (generation === refreshGeneration.current) { setFocusedTasks(rows); setCategories(referenceData.categories); setLoadedIdentity(pageIdentity); }
+        return;
+      }
+      if (workspaceView === "fms") {
+        const tabs = await loadTaskTabCounts(hasAdminTaskView);
+        if (generation === refreshGeneration.current) { setTabCounts(tabs); setLoadedIdentity(pageIdentity); }
         return;
       }
       if (exploring) {
@@ -148,7 +155,7 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const categoryNames = useMemo(() => new Map(categories.map((category) => [category.id, category.label])), [categories]);
   const counts = loadedIdentity === pageIdentity ? serverCounts : { pending: 0, overdue: 0, completed: 0, open: 0 };
   const scopedTasks = focusedTaskId ? focusedTasks : pageTasks;
-  const changeView = (view: TaskWorkspaceView) => { setWorkspaceView(view); setOffset(0); };
+  const changeView = (view: TaskWorkspaceView) => { setWorkspaceView(view); setOffset(0); if (view === "fms") { setFilters(defaultTaskSearch()); setQuery(""); } };
   const changeStatus = (status: TaskFeedStatusFilter) => { setStatusFilter(status); setOffset(0); };
 
   const navigateTo = (path: string) => {
@@ -205,12 +212,13 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
         <div><h2 className="font-display text-[2rem] font-semibold leading-tight text-task-text">Tasks</h2><p className="text-sm text-task-text-muted">Assigned, watched, coverage-blocked, and delegated work in one place.</p></div>
       </div>
 
-      {!focusedTaskId ? <TaskSearchControls value={filters} onChange={changeSearch} canViewAll={hasAdminTaskView} /> : null}
+      {!focusedTaskId && workspaceView !== "fms" ? <TaskSearchControls value={filters} onChange={changeSearch} canViewAll={hasAdminTaskView} /> : null}
       {!exploring ? <div className="scroll-x no-scrollbar flex items-stretch gap-2 border-b border-task-border bg-task-bg px-3 pt-3 sm:px-5">
         {([
           ["mine", "My Tasks", tabCounts.mine],
           ["delegated", "Delegated", tabCounts.delegated],
           ["inLoop", "In Loop", tabCounts.inLoop],
+          ["fms", "FMS", tabCounts.fms],
           ...(hasAdminTaskView ? [["all", "All Tasks", tabCounts.all] as const] : []),
         ] as const).map(([view, label, count]) => <button
           aria-pressed={workspaceView === view}
@@ -228,14 +236,14 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
       </div>
 
       : <div className="px-4 py-2 text-xs text-task-text-muted" role="status">{loadedIdentity === pageIdentity ? `${total} results` : "Searching..."} | {effectiveFilters.subsection === "any" ? "All subsections" : TASK_SUBSECTION_LABELS[effectiveFilters.subsection]} | Includes earlier and completed work</div>}
-      <>{focusedTaskId?<div className="px-4 py-3 text-sm text-task-text-muted">Selected task | <button className="min-h-11 text-task-accent" onClick={()=>navigateTo("/tasks")}>Return to task feed</button></div>:null}</>{!exploring ? <TaskFilterBar counts={counts} onStatusChange={changeStatus} status={statusFilter} /> : null}
+      <>{focusedTaskId?<div className="px-4 py-3 text-sm text-task-text-muted">Selected task | <button className="min-h-11 text-task-accent" onClick={()=>navigateTo("/tasks")}>Return to task feed</button></div>:null}</>{!exploring && workspaceView !== "fms" ? <TaskFilterBar counts={counts} onStatusChange={changeStatus} status={statusFilter} /> : null}
 
       <div className="w-full p-3 sm:p-5">
         {countsError && !exploring ? <Notice tone="danger">Unable to refresh subsection counts. Reopen Tasks to retry.</Notice> : null}
-        {error ? <div className="flex flex-col gap-3 rounded-xl border border-danger/40 bg-danger/10 p-4"><Notice tone="danger">{error}</Notice><Button className="self-start border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={() => void refresh()} variant="secondary"><RefreshCw />Retry</Button></div> : shouldShowTaskLoading(loading || loadedIdentity !== pageIdentity, hasCompletedInitialLoad.current && loadedIdentity === pageIdentity) ? <div aria-label="Loading tasks" className="flex flex-col gap-3">{[0, 1, 2].map((item) => <div className="h-28 animate-pulse rounded-2xl border border-task-border bg-task-muted" key={item} />)}</div> : scopedTasks.length === 0 ? <div className="flex min-h-[48dvh] flex-col items-center justify-center px-5 text-center"><span className="mb-5 flex size-20 items-center justify-center rounded-[1.75rem] bg-task-muted text-task-accent"><CheckCircle2 className="size-10" /></span><h2 className="text-2xl font-semibold text-task-text">No Tasks Here</h2><p className="mt-1 max-w-sm text-sm text-task-text-muted">It seems that you don’t have any tasks in this list.</p></div> : <div className="flex flex-col gap-3">{profile ? scopedTasks.map((task) => <div key={task.id}>{exploring && task.id && sections[task.id] ? <span className="mb-1 inline-block rounded-full bg-task-accent-soft px-2 py-0.5 text-xs font-medium text-task-text">{TASK_SUBSECTION_LABELS[sections[task.id] ?? "mine"]}</span> : null}<TaskCard viewerId={profile.id} management={hasAdminTaskView && task.task_type !== "fms" ? <TaskAdminControls task={task} onChanged={refresh} /> : undefined} capability={deriveTaskMutationCapability({ assigneeIds: task.assignees.map((assignee) => assignee.id), isWatcher: task.isWatchedByViewer, viewerId: profile.id, viewerRole: profile.user_role })} categoryLabel={task.category_id ? categoryNames.get(task.category_id) ?? "Uncategorized" : "Uncategorized"} key={task.id} onAction={(action) => handleAction(task, action)} task={task} /></div>) : null}</div>}
+        {workspaceView === "fms" && !focusedTaskId && profile ? <FmsTaskWorkspace key={`${profile.tenant_id}:${profile.id}`} actorId={profile.id} tenantId={profile.tenant_id} onNavigate={navigateTo} onCount={updateFmsCount} /> : error ? <div className="flex flex-col gap-3 rounded-xl border border-danger/40 bg-danger/10 p-4"><Notice tone="danger">{error}</Notice><Button className="self-start border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={() => void refresh()} variant="secondary"><RefreshCw />Retry</Button></div> : shouldShowTaskLoading(loading || loadedIdentity !== pageIdentity, hasCompletedInitialLoad.current && loadedIdentity === pageIdentity) ? <div aria-label="Loading tasks" className="flex flex-col gap-3">{[0, 1, 2].map((item) => <div className="h-28 animate-pulse rounded-2xl border border-task-border bg-task-muted" key={item} />)}</div> : scopedTasks.length === 0 ? <div className="flex min-h-[48dvh] flex-col items-center justify-center px-5 text-center"><span className="mb-5 flex size-20 items-center justify-center rounded-[1.75rem] bg-task-muted text-task-accent"><CheckCircle2 className="size-10" /></span><h2 className="text-2xl font-semibold text-task-text">No Tasks Here</h2><p className="mt-1 max-w-sm text-sm text-task-text-muted">It seems that you don’t have any tasks in this list.</p></div> : <div className="flex flex-col gap-3">{profile ? scopedTasks.map((task) => <div key={task.id}>{exploring && task.id && sections[task.id] ? <span className="mb-1 inline-block rounded-full bg-task-accent-soft px-2 py-0.5 text-xs font-medium text-task-text">{TASK_SUBSECTION_LABELS[sections[task.id] ?? "mine"]}</span> : null}<TaskCard viewerId={profile.id} management={hasAdminTaskView && task.task_type !== "fms" ? <TaskAdminControls task={task} onChanged={refresh} /> : undefined} capability={deriveTaskMutationCapability({ assigneeIds: task.assignees.map((assignee) => assignee.id), isWatcher: task.isWatchedByViewer, viewerId: profile.id, viewerRole: profile.user_role })} categoryLabel={task.category_id ? categoryNames.get(task.category_id) ?? "Uncategorized" : "Uncategorized"} key={task.id} onAction={(action) => handleAction(task, action)} task={task} /></div>) : null}</div>}
       </div>
 
-      {!focusedTaskId && loadedIdentity === pageIdentity ? <nav aria-label="Task pages" className="flex items-center justify-center gap-3 px-4 pb-5">
+      {!focusedTaskId && workspaceView !== "fms" && loadedIdentity === pageIdentity ? <nav aria-label="Task pages" className="flex items-center justify-center gap-3 px-4 pb-5">
         <Button variant="secondary" disabled={loading || offset === 0} onClick={() => setOffset(Math.max(0, offset - TASK_PAGE_SIZE))}>Previous</Button>
         <span className="text-sm text-task-text-muted">{total === 0 ? "0 tasks" : `${offset + 1} - ${Math.min(offset + TASK_PAGE_SIZE, total)} of ${total}`}</span>
         <Button variant="secondary" disabled={loading || offset + TASK_PAGE_SIZE >= total} onClick={() => setOffset(offset + TASK_PAGE_SIZE)}>Next</Button>

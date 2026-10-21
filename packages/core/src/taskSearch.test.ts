@@ -26,5 +26,7 @@ describe("task search contract", () => {
     expect(decodeTaskSearchPage(page).sections[id]).toBe("inLoop");
     expect(() => decodeTaskSearchPage({ ...page, sections: {} })).toThrow();
     expect(() => decodeTaskSearchPage({ ...page, sections: { [id]: "tenant" } })).toThrow();
+    expect(decodeTaskSearchPage({ ...page, sections: { [id]: "fms" } }).sections[id]).toBe("fms");
+    expect(taskSearchPayload({ ...defaultTaskSearch(), subsection: "fms" })).toMatchObject({ subsection: "fms" });
   });
 });

@@ -7029,6 +7029,7 @@ export type Database = {
       }
       form_templates: {
         Row: {
+          record_name_field_key: string | null
           archived_at: string | null
           archived_by: string | null
           branch_id: string | null
@@ -7062,6 +7063,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           lifecycle?: Database["public"]["Enums"]["form_template_lifecycle"]
+          record_name_field_key?: string | null
           name: string
           permissions?: Json
           published_at?: string | null
@@ -7084,6 +7086,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           lifecycle?: Database["public"]["Enums"]["form_template_lifecycle"]
+          record_name_field_key?: string | null
           name?: string
           permissions?: Json
           published_at?: string | null
@@ -12412,6 +12415,9 @@ export type Database = {
       list_fms_handoff_recipients: { Args: { p_request: Json; p_target_stage_id: string; p_query?: string; p_cursor?: string; p_limit?: number }; Returns: Json }
       get_fms_work_file_path: { Args: { p_instance_id: string; p_instance_stage_id: string; p_file_id: string }; Returns: string }
       get_fms_task_contexts: { Args: { p_visit_ids: string[] }; Returns: Json }
+      get_fms_task_workspace: { Args: { p_filter?: Json; p_offset?: number; p_limit?: number }; Returns: Json }
+      get_fms_task_stages: { Args: { p_family_id: string; p_filter?: Json }; Returns: Json }
+      get_fms_task_stage_page: { Args: { p_family_id: string; p_flow_id: string; p_stage_id: string; p_starting?: boolean; p_filter?: Json; p_offset?: number; p_limit?: number }; Returns: Json }
       get_fms_assigned_stage: { Args: { p_instance_id: string; p_instance_stage_id?: string }; Returns: Json }
       get_fms_work_form_context: { Args: { p_instance_id: string; p_instance_stage_id: string; p_offset?: number; p_limit?: number }; Returns: Json }
       get_fms_assigned_work_context: { Args: { p_instance_id: string; p_instance_stage_id: string; p_cursor?: string; p_limit?: number }; Returns: Json }

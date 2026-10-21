@@ -16,7 +16,7 @@ How it works:
 The source is `packages/core/src/assistant/appHelp.ts`. Keep this file and that one in step
 (AGENTS.md, "Keeping Ask Kiara current").
 
-Tasks entry updated against the screens: 2026-10-17. Other entries last checked: 2026-10-14.
+Tasks entry updated for the FMS workspace implementation: 2026-10-20; local validation is recorded in the feature plan, not proof of production deployment. Other entries last checked: 2026-10-14.
 
 ---
 
@@ -35,7 +35,8 @@ the formula behind each number.
 
 ## Tasks
 **What it is:** work given to you, tasks you gave to others, and tasks you are watching.
-- [ ] See my tasks: open Tasks. **My Tasks** lists recurring and FMS work; **Delegated** lists one-time assigned work for employees; **In Loop** lists watched work. Subsection counts load when Tasks opens.
+- [ ] See my tasks: open Tasks. **My Tasks** lists recurring work; **FMS** lists your assigned workflow work by family and published stage; **Delegated** lists one-time assigned work for employees; **In Loop** lists watched work. Subsection counts load when Tasks opens.
+- [ ] Work on FMS: Tasks -> **FMS** -> expand a workflow family -> expand a stage -> **Open Work** on the record. **Active** counts pending and overdue actions. **Waiting** separates work awaiting other employees/approvals. Use name/reference search, workflow/stage/status/due filters and **Clear all**. Counts cover all assignments, not just a page. Access remains the current employee's existing scope.
 - [ ] Complete a task: finish the required form or upload, then press **Complete**. If a remark is required, the button opens and focuses the remark field; enter it and press **Complete** again. FMS work opens its protected workflow runner.
 - [ ] Create a task: in Tasks press **Create Task**, fill in the title, the person and the due date, then save.
 - [ ] See tasks I gave to others: **Delegated** in Tasks.
@@ -61,6 +62,7 @@ who build workflows, the designs.
 - [ ] Do my stage: open it from Home or Tasks, complete its form or evidence, and submit.
 - [ ] Start a workflow: open FMS, choose the workflow, press **Start instance** (if your role may start it).
 - [ ] Design a workflow: **New workflow** in FMS (workflow builders only).
+- [ ] Name workflow work: in the initial form's **Task Naming**, use **Task name from** to choose an eligible question from the linked form or its selected record-name question. Later stages inherit the original name unless overridden; changes use the usual revision/publication lifecycle.
 
 ## FMS work (my assigned stages)
 **What it is:** the workflow stages and starting forms waiting for you.
@@ -71,6 +73,7 @@ who build workflows, the designs.
 - [ ] Fill a form: open Forms Library, find the form under **Forms to fill**, press **Fill**.
 - [ ] See what I sent: **My submissions** shows each one and whether it was reviewed.
 - [ ] Make a form: **New form** (form makers only), then **Publish** when ready.
+- [ ] Set its naming default: in Form Builder use **Use this question as the record name**, or leave **Automatic**. A used published form needs a new revision to change its default; each workflow can override it in **Task Naming**.
 
 ## Notifications
 **What it is:** your inbox of alerts about your work, such as new tasks.

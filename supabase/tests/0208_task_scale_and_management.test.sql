@@ -162,9 +162,9 @@ insert into fms_instance_stages(id,fms_instance_id,fms_stage_id,status,planned_d
 ('20880000-0000-4000-8000-000000000006','20880000-0000-4000-8000-000000000004','20880000-0000-4000-8000-000000000003','pending',now()+interval '30 days',array['20840000-0000-4000-8000-000000000002'::uuid]);
 set local role authenticated;
 select set_config('request.jwt.claim.sub','20800000-0000-4000-8000-000000000002',true);
-select is((task_feed_page('mine','pending')->>'total')::integer,2,'staff My Tasks preserves open FMS regardless of date');
-select ok(task_feed_page('mine','pending')->'ids' ? '20880000-0000-4000-8000-000000000005','undated FMS assignment remains visible');
-select ok(task_feed_page('mine','pending')->'ids' ? '20880000-0000-4000-8000-000000000006','future FMS assignment remains visible');
+select is((task_feed_page('fms','pending')->>'total')::integer,2,'staff FMS workspace preserves open FMS regardless of date');
+select ok(task_feed_page('fms','pending')->'ids' ? '20880000-0000-4000-8000-000000000005','undated FMS assignment remains visible');
+select ok(task_feed_page('fms','pending')->'ids' ? '20880000-0000-4000-8000-000000000006','future FMS assignment remains visible');
 reset role;
 select function_privs_are('public','task_feed_page',array['text','text','integer','integer'],'anon',array[]::text[],'anon has no page grant');
 select function_privs_are('public','admin_delete_task_with_audit',array['uuid','boolean','text'],'service_role',array[]::text[],'service role has no browser deletion grant');

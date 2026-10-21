@@ -40,7 +40,7 @@ export function TaskSearchControls({ value, onChange, canViewAll }: {
           {select("kind", "Work kind", [["all", "Any kind"], ["fms", "FMS"], ["crm", "CRM"], ["recurring", "Recurring"], ["one_time", "Other tasks"]])}
           {select("status", "Status", [["all", "Any status"], ["pending", "Pending"], ["overdue", "Overdue"], ["completed", "Completed"]])}
           {select("priority", "Priority", [["all", "Any priority"], ["high", "High"], ["medium", "Medium"], ["low", "Low"]])}
-          {select("subsection", "Subsection", [["any", "All subsections"], ["mine", "My Tasks"], ["delegated", "Delegated"], ["inLoop", "In Loop"], ...(canViewAll ? [["all", "All Tasks"] as const] : [])])}
+          {select("subsection", "Subsection", [["any", "All subsections"], ["mine", "My Tasks"], ["delegated", "Delegated"], ["inLoop", "In Loop"], ["fms", "FMS"], ...(canViewAll ? [["all", "All Tasks"] as const] : [])])}
           <Field label="Due from"><input type="date" className="task-field min-w-0" value={draft.from} max={draft.to || undefined} onChange={event => { const from = event.currentTarget.value; setDraft(previous => ({ ...previous, from })); }} /></Field>
           <Field label="Due to"><input type="date" className="task-field min-w-0" value={draft.to} min={draft.from || undefined} onChange={event => { const to = event.currentTarget.value; setDraft(previous => ({ ...previous, to })); }} /></Field>
           {select("requirement", "Requirement", [["all", "Any requirement"], ["upload", "Upload required"], ["form", "Form required"], ["remark", "Remark required"]])}

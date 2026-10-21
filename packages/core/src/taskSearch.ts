@@ -9,7 +9,7 @@ export type TaskSearchFilters = Readonly<{
   subsection: "any" | TaskWorkspaceView; requirement: "all" | "upload" | "form" | "remark";
   sort: "due" | "newest" | "priority";
 }>;
-export const TASK_SUBSECTION_LABELS: Readonly<Record<TaskWorkspaceView, string>> = { mine: "My Tasks", delegated: "Delegated", inLoop: "In Loop", all: "All Tasks" };
+export const TASK_SUBSECTION_LABELS: Readonly<Record<TaskWorkspaceView, string>> = { mine: "My Tasks", delegated: "Delegated", inLoop: "In Loop", fms: "FMS", all: "All Tasks" };
 export const defaultTaskSearch = (): TaskSearchFilters => ({ query: "", kind: "all", status: "all", priority: "all", from: "", to: "", subsection: "any", requirement: "all", sort: "due" });
 export function taskSearchDateRange(preset: "today" | "week", now = new Date()): { from: string; to: string } {
   const today = kolkataDateKey(now);
@@ -32,7 +32,7 @@ export function taskSearchPayload(value: TaskSearchFilters): Json {
   if (!["all", "one_time", "recurring", "crm", "fms"].includes(value.kind)
     || !["all", "pending", "overdue", "completed"].includes(value.status)
     || !["all", "high", "medium", "low"].includes(value.priority)
-    || !["any", "mine", "delegated", "inLoop", "all"].includes(value.subsection)
+    || !["any", "mine", "delegated", "inLoop", "fms", "all"].includes(value.subsection)
     || !["all", "upload", "form", "remark"].includes(value.requirement)
     || !["due", "newest", "priority"].includes(value.sort)) throw new Error("Invalid task filter.");
   return { ...value, query: value.query.trim() };
@@ -42,7 +42,7 @@ export function decodeTaskSearchPage(value: unknown): TaskPageScope & { sections
   if (typeof value !== "object" || value === null || !("sections" in value) || typeof value.sections !== "object" || value.sections === null || Array.isArray(value.sections)) throw new Error("Invalid task search sections");
   const sections: Record<string, TaskWorkspaceView> = {};
   for (const [id, section] of Object.entries(value.sections)) {
-    if (!page.ids.includes(id) || (section !== "mine" && section !== "delegated" && section !== "inLoop" && section !== "all")) throw new Error("Invalid task search sections");
+    if (!page.ids.includes(id) || (section !== "mine" && section !== "delegated" && section !== "inLoop" && section !== "fms" && section !== "all")) throw new Error("Invalid task search sections");
     sections[id] = section;
   }
   if (page.ids.some(id => !sections[id])) throw new Error("Invalid task search sections");

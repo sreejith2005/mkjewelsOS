@@ -191,3 +191,17 @@ Automated proof: `supabase/functions/ask-kiara/eval.local.ts` (per-role eval on 
 - [ ] Filter Dropdown Master by all/active/inactive and deactivate/reactivate an item without changing its stable value.
 - [ ] Switch Users between list and organization views; apply search/status/branch/department filters and confirm missing-manager/cycle warnings do not freeze the UI.
 - [ ] Repeat portrait, landscape, compact height, keyboard-open, large-font, light/dark, safe-area, Android Back, offline/retry, and pull-to-refresh checks for every row in `MOBILE_PARITY_MATRIX.md`.
+# Tasks -> FMS workspace (2026-10-20)
+
+- Verify ordinary recurring, delegated and watched tasks retain their sections;
+  assigned FMS appears only under FMS, plus explicitly authorized All Tasks.
+- Check initial FMS badges, collapsed families/stages, full totals beyond 50 rows,
+  server name/reference search, filters, retry and realtime page clamping.
+- Check exact starter/runtime links from Tasks, Home, notifications and direct
+  URLs; keep previous answers, pinned forms, evidence, approvals and handoffs.
+- Check family identity across versions, archived live work, skipped branches,
+  parallel assignments, repeated visits and completed multi-doer contributions.
+- Check form default/workflow override/stage override, snapshot names, missing
+  values, hidden answers and denied cross-account/direct API access.
+- Check desktop/phone widths, keyboard disclosure and current Android shell;
+  report physical-device evidence separately.

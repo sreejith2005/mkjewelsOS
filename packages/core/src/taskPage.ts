@@ -2,7 +2,7 @@ import type { Json } from "./database.types";
 import type { TaskFeedStatusFilter } from "./taskFeed";
 
 export const TASK_PAGE_SIZE = 50;
-export type TaskWorkspaceView = "mine" | "delegated" | "inLoop" | "all";
+export type TaskWorkspaceView = "mine" | "delegated" | "inLoop" | "fms" | "all";
 export type TaskPageCounts = Record<TaskFeedStatusFilter | "open", number>;
 export type TaskPageScope = Readonly<{ ids: string[]; total: number; counts: TaskPageCounts }>;
 export type TaskAdminChecklistEdit = Readonly<{ id?: string; itemText: string; required: boolean; completed?: boolean }>;

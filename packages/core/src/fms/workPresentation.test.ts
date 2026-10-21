@@ -8,6 +8,10 @@ const context: FmsWorkContext = { workflowName: "Jewellery enquiry", stageName: 
     field: { key: "client_name", label: "Client name", type: "text", sortOrder: 0 }, value: "Synthetic client", userName: null }], journey: [] };
 
 describe("FMS work presentation", () => {
+  it("uses the server-authorized record name consistently and keeps durable identity", () => {
+    expect(presentFmsWorkContext({ ...context, recordName: "  Rahul\nShah  " }).title).toBe("Rahul Shah");
+    expect(presentFmsWorkContext({ ...context, recordName: "Rahul Shah" }).reference).toBe("FMS-TEST");
+  });
   it("uses resolved branch names and does not invent an unanswered attachment", () => {
     const branch = { ...context.receivedFields[0]!, field: { key: "branch", label: "Branch", type: "branch_dropdown" as const, sortOrder: 0 }, value: "00000000-0000-4000-8000-000000000001", valueLabel: "Bandra" };
     expect(presentFmsWorkContext({ ...context, receivedFields: [branch] }).answers[0]?.display).toBe("Bandra");

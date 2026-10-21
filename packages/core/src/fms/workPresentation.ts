@@ -1,11 +1,13 @@
 import { presentFormSubmission } from "../forms/submissionPresentation";
 import type { FmsWorkState } from "./workContracts";
 import type { FormAnswer, FormFieldDefinition } from "../forms/types";
+import { normalizeRecordName } from "./recordNaming";
 
 export type FmsReceivedField = Readonly<{ sourceStageKey: string; submissionId: string; formTemplateId: string;
   formName: string; formVersion: number; field: FormFieldDefinition; value: FormAnswer | null; userName?: string | null; valueLabel?: string | null | undefined;
   attachment?: Readonly<{ id: string; name: string; mimeType: string; sizeBytes: number }> | null | undefined }>;
 export type FmsWorkContext = Readonly<{
+  recordName?: string | null | undefined;
   workflowName: string; stageName: string; reference: string; referenceKey?: string | null | undefined; instructions: string; expectedResult: string;
   dueAt: string | null; assignedNames: readonly string[]; titleTemplate: string; shortDescription: string; dueLabel: string;
   receivedFields: readonly FmsReceivedField[]; journey: readonly Readonly<{ id: string; stageName: string; status: string;
@@ -39,7 +41,7 @@ export function presentFmsWorkContext(context: FmsWorkContext) {
     if (value === undefined) { unresolved = true; return ""; }
     return value;
   }).trim();
-  return { title: !unresolved && substituted ? substituted.slice(0, 250) : `${context.workflowName} — ${context.stageName}`,
+  return { title: normalizeRecordName(context.recordName) ?? (!unresolved && substituted ? substituted.slice(0, 250) : `${context.workflowName} — ${context.stageName}`),
     reference, answers, instructions: context.instructions, expectedResult: context.expectedResult, shortDescription: context.shortDescription,
     dueAt: context.dueAt, dueLabel: context.dueLabel || "Due", assignedNames: context.assignedNames,
     journey: context.journey, nextCursor: context.nextCursor };

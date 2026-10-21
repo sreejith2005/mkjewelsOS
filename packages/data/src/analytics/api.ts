@@ -1,4 +1,6 @@
 import { getSupabase as db } from "@jewelos/api-client/client";
+import { presentFmsWorkContext, type FmsWorkContext } from "@jewelos/core";
+import { loadFmsTaskContexts } from "../fms/work";
 import type {DashboardPayload,EmployeeProgress,HomeSummary} from "./types";
 
 /**
@@ -15,6 +17,8 @@ export async function fetchHomeSummary():Promise<HomeSummary>{
   const starterRows=(starters.data??[]) as Array<{id:string;form_template_id:string}>;
 
   const runtimeStageIds=base.fms_stages.map((stage)=>stage.stage_id);
+  const displayContextsPromise=loadFmsTaskContexts(runtimeStageIds.slice(0,Math.max(0,4-starterRows.length)))
+    .catch(()=>new Map<string,FmsWorkContext>());
   const runtime=runtimeStageIds.length
     ? await db().from("fms_instance_stages").select("id,fms_stage_id").in("id",runtimeStageIds)
     : {data:[],error:null};
@@ -41,11 +45,13 @@ export async function fetchHomeSummary():Promise<HomeSummary>{
   if(forms.error)throw forms.error;
   const nameByForm=new Map((forms.data??[]).map((form)=>[form.id,form.name]));
 
+  const displayContexts=await displayContextsPromise;
   return {
     ...base,
     fms_stages:base.fms_stages.map((stage)=>{
       const formTemplateId=formByDefinition.get(definitionByRuntime.get(stage.stage_id)??"")??null;
-      return {...stage,form_template_id:formTemplateId,form_name:formTemplateId?nameByForm.get(formTemplateId)??null:null};
+      const context=displayContexts.get(stage.stage_id);
+      return {...stage,record_name:context?.recordName?presentFmsWorkContext(context).title:null,form_template_id:formTemplateId,form_name:formTemplateId?nameByForm.get(formTemplateId)??null:null};
     }),
     fms_starters:starterRows.map((starter)=>({
       ...starter,

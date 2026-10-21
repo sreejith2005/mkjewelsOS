@@ -1,4 +1,5 @@
 import { FmsAssignmentEditor } from "./FmsAssignmentEditor";
+import { FmsTaskNaming } from "./FmsTaskNaming";
 import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, GitBranch, Plus, Trash2 } from "lucide-react";
 import {
@@ -101,6 +102,7 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete, assign
       <p className="text-xs text-soft-grey">Choose a required, always visible User question in the linked form. Its answer sets the default for later steps; explicit step assignments take priority.</p></> : null}
     </section> : null}
 
+    {human ? <FmsTaskNaming stage={stage} stages={stages} fields={data.formFields} onChange={onChange} /> : null}
     {human && fmsStageNeedsAssignment(stages, stage.key) && assignmentVersion === 2 ? <FmsAssignmentEditor stage={stage} stages={stages} data={data} onChange={onChange} /> : null}
 
     {canChooseNext ? <StageRouting decision={decision} fields={formFields} others={others} stage={stage} changeRule={changeBranchRule} moveRule={moveBranchRule} update={update} /> : null}

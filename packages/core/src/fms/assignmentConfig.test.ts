@@ -20,6 +20,11 @@ function flow(): FmsFlowDefinition {
 const fields = { formFields: { [formId]: [{ key: "Assigned_To", label: "Owner", type: "user_dropdown", required: true, shown: true }] } };
 
 describe("versioned FMS assignment authoring", () => {
+  it("validates naming on the initial form independently of incoming assignment", () => {
+    const configured = flow(); const initial = configured.stages[0]!;
+    const invalid = { ...initial, sla: { ...initial.sla, taskDisplay: { fields: [], recordNaming: { mode: "field" as const, source: { sourceStageKey: "intake", formTemplateId: formId, fieldKey: "missing" } } } } };
+    expect(validateFmsDefinition({ ...configured, stages: [invalid, ...configured.stages.slice(1)] }, fields).some(issue => issue.code === "invalid_record_name")).toBe(true);
+  });
   it("rejects a source route that does not belong to the pinned source step", () => {
     const original = flow();
     const configured = { ...original, stages: original.stages.map(stage => stage.key === "call" ? { ...stage, sla: { ...stage.sla, assignment: { ...stage.sla.assignment!, sources: [{ sourceStageKey: "intake", formTemplateId: formId, fieldKey: "Assigned_To", routeRuleId: "foreign-route" }] } } } : stage) };

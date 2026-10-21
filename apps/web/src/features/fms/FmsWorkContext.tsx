@@ -3,8 +3,9 @@ import { presentFmsWorkContext, type FmsWorkContext as WorkContext, type FmsPrev
 import { loadFmsWorkContext, loadFmsPreviousForms, signedFmsContextFileUrl } from "@jewelos/data/fms/work";
 import { Button, Notice } from "@/components/ui";
 
-export function FmsWorkContext({ instanceId, instanceStageId, onReady }: { instanceId: string; instanceStageId: string; onReady?: (ready: boolean) => void }) {
+export function FmsWorkContext({ instanceId, instanceStageId, onReady, onRecordName }: { instanceId: string; instanceStageId: string; onReady?: (ready: boolean) => void; onRecordName?: ((name: string | null) => void) | undefined }) {
   const readyCallback = useRef(onReady); readyCallback.current = onReady;
+  const nameCallback = useRef(onRecordName); nameCallback.current = onRecordName;
   const [context, setContext] = useState<WorkContext | null>(null);
   const [previous, setPrevious] = useState<FmsPreviousFormsPage | null>(null);
   const [failed, setFailed] = useState(false);
@@ -21,9 +22,9 @@ export function FmsWorkContext({ instanceId, instanceStageId, onReady }: { insta
     finally { setOpeningFile(null); }
   };
   useEffect(() => {
-    let active = true; setContext(null); setPrevious(null); setFailed(false); readyCallback.current?.(false);
+    let active = true; setContext(null); setPrevious(null); setFailed(false); readyCallback.current?.(false); nameCallback.current?.(null);
     void Promise.all([loadFmsWorkContext(instanceId, instanceStageId), loadFmsPreviousForms(instanceId, instanceStageId)])
-      .then(([work, forms]) => { if (active) { setContext(work); setPrevious(forms); readyCallback.current?.(true); } })
+      .then(([work, forms]) => { if (active) { setContext(work); setPrevious(forms); readyCallback.current?.(true); if (work.recordName) nameCallback.current?.(presentFmsWorkContext(work).title); } })
       .catch(() => { if (active) { setFailed(true); readyCallback.current?.(false); } });
     return () => { active = false; };
   }, [instanceId, instanceStageId, attempt]);

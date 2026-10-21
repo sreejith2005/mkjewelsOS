@@ -91,6 +91,7 @@ export type FormFieldDefinition = Readonly<{
 
 export type FormTemplateDefinition = Readonly<{
   name: string;
+  recordNameFieldKey?: string | undefined;
   description?: string | undefined;
   sections?: readonly FormSectionDefinition[] | undefined;
   fields: readonly FormFieldDefinition[];

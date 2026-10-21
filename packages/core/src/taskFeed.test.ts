@@ -70,7 +70,14 @@ describe("task feed presentation", () => {
       { ...task("one-time-checklist", "viewer"), task_type: "checklist", task_template_id: null },
       { ...task("one-time-delegation", "viewer"), task_type: "delegation", task_template_id: null },
     ];
-    expect(splitAssignedTaskFeed(assigned)).toEqual({ myTasks: assigned.slice(0, 3), delegatedTasks: assigned.slice(3) });
+    expect(splitAssignedTaskFeed(assigned)).toEqual({ myTasks: assigned.slice(0, 2), fmsTasks: [assigned[2]], delegatedTasks: assigned.slice(3) });
+  });
+
+  it("recognizes persisted starter and runtime origins independently of task labels", () => {
+    const starter = { task_type: "delegation", fms_starter_assignment_id: "starter" };
+    const runtime = { task_type: "delegation", fms_instance_stage_id: "visit" };
+    const ordinary = { task_type: "delegation", title: "FMS discussion" };
+    expect(splitAssignedTaskFeed([starter, runtime, ordinary])).toEqual({ myTasks: [], delegatedTasks: [ordinary], fmsTasks: [starter, runtime] });
   });
 
   it("separates watched tasks before ordinary task grouping", () => {
@@ -85,5 +92,21 @@ describe("task feed presentation", () => {
   it("uses revised, then independent due, then planned datetime", () => {
     expect(effectiveTaskDeadline({ planned_datetime: "planned", due_datetime: "due", revised_datetime: null })).toBe("due");
     expect(effectiveTaskDeadline({ planned_datetime: "planned", due_datetime: "due", revised_datetime: "revised" })).toBe("revised");
+  });
+});
+
+
+describe("exclusive employee workspace business totals", () => {
+  it("keeps 5 recurring, 3 delegated, 2 watched and 7 FMS assignments separate", () => {
+    const rows = [
+      ...Array.from({ length: 5 }, (_, i) => ({ id: `recurring-${i}`, task_type: "task", task_template_id: "recurring" })),
+      ...Array.from({ length: 3 }, (_, i) => ({ id: `delegated-${i}`, task_type: "task", task_template_id: null })),
+      ...Array.from({ length: 7 }, (_, i) => ({ id: `fms-${i}`, task_type: "fms", task_template_id: null })),
+    ].map(row => ({ ...row, isWatchedByViewer: false }));
+    const watched = Array.from({ length: 2 }, (_, i) => ({ id: `watched-${i}`, task_type: "task", task_template_id: null, isWatchedByViewer: true }));
+    const partition = splitWatchedTaskFeed([...rows, ...watched]);
+    const assigned = splitAssignedTaskFeed(partition.tasks);
+    expect([assigned.myTasks.length, assigned.delegatedTasks.length, partition.inLoop.length, assigned.fmsTasks.length]).toEqual([5, 3, 2, 7]);
+    expect(new Set([...assigned.myTasks, ...assigned.delegatedTasks, ...assigned.fmsTasks, ...partition.inLoop].map(row => row.id)).size).toBe(17);
   });
 });

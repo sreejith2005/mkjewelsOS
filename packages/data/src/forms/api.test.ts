@@ -14,7 +14,7 @@ import { loadFormSubmissionDetail, deletedFormBundle, deleteForm, publishAsNewFo
 
 describe("toDefinition", () => {
   it("does not turn a NULL database condition into a conditional field", () => {
-    const template = { name: "Walk-in", description: null, permissions: { roles: ["staff"] } } as unknown as FormTemplate;
+    const template = { name: "Walk-in", description: null, record_name_field_key: "customer_name", permissions: { roles: ["staff"] } } as unknown as FormTemplate;
     const field = {
       id: "field-1", field_key: "customer_name", field_name: "Customer name", field_type: "text", sort_order: 0,
       is_required: false, is_shown: true, is_editable: true, placeholder: null, helper_text: null,
@@ -24,6 +24,7 @@ describe("toDefinition", () => {
     const definition = toDefinition(template, [field]);
 
     expect(definition.fields[0]).not.toHaveProperty("condition");
+    expect(definition.recordNameFieldKey).toBe("customer_name");
     expect(isFormFieldVisible(definition.fields[0]!, {})).toBe(true);
   });
 });

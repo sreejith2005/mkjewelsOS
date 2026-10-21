@@ -1,11 +1,22 @@
 import { fmsStageNeedsAssignment } from "./assignmentAuthoring";
 import { FMS_ASSIGNMENT_MODES } from "./workContracts";
+import { eligibleRecordNameFields } from "./recordNaming";
 import type { FmsFlowDefinition, FmsValidationContext, FmsValidationIssue } from "./types";
 
 /** The server repeats these publication checks; this copy makes errors actionable in both editors. */
 export function validateFmsAssignmentConfig(flow: FmsFlowDefinition, context: FmsValidationContext): readonly FmsValidationIssue[] {
-  if (flow.assignmentVersion !== 2) return [];
   const issues: FmsValidationIssue[] = [];
+  for (const stage of flow.stages) {
+    const naming = stage.sla.taskDisplay?.recordNaming;
+    if (!naming) continue;
+    const source = naming.source;
+    if (!["automatic", "form_default", "field"].includes(naming.mode) || naming.mode === "field" && (!source
+      || !flow.stages.some(previous => previous.key === source.sourceStageKey && previous.formTemplateId === source.formTemplateId)
+      || context.formFields && !eligibleRecordNameFields(context.formFields[source.formTemplateId] ?? []).some(field => field.key === source.fieldKey))) {
+      issues.push({ code: "invalid_record_name", stageKey: stage.key, message: "Choose an eligible naming question from the exact linked form." });
+    }
+  }
+  if (flow.assignmentVersion !== 2) return issues;
   const automatic = new Set(["branch", "parallel_start", "parallel_join", "notification", "end"]);
   for (const stage of flow.stages) {
     if (automatic.has(stage.type) || !fmsStageNeedsAssignment(flow.stages, stage.key)) continue;

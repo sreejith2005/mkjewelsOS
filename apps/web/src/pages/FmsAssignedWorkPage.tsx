@@ -110,6 +110,7 @@ function AssignedStage({ onNavigate, target }: {
   onNavigate: (path: string) => void;
   target: Extract<FmsAssignedWorkTarget, { kind: "stage_form" | "stage" }>;
 }) {
+  const [workName, setWorkName] = useState<{ id: string; name: string } | null>(null);
   const { profile } = useAuth();
   const [completed, setCompleted] = useState<FmsWorkResult | null>(null);
   const [bundle, setBundle] = useState<FmsAssignedStageBundle | null>();
@@ -165,8 +166,8 @@ function AssignedStage({ onNavigate, target }: {
 
   const requested = target.kind === "stage_form" ? target.formTemplateId : definition.form_template_id;
 
-  return <Frame subtitle={`${bundle.instance.title} · ${bundle.instance.reference_number}`} title={fmsWorkTitle(definition.name, bundle.instance.reference_number)}>
-    <FmsContextFirst key={stage.id} instanceId={bundle.instance.id} instanceStageId={stage.id} hasForm={!!requested}>
+  return <Frame subtitle={`${bundle.instance.title} · ${definition.name} · ${bundle.instance.reference_number}`} title={workName?.id === stage.id ? workName.name : fmsWorkTitle(definition.name, bundle.instance.reference_number)}>
+    <FmsContextFirst key={stage.id} instanceId={bundle.instance.id} instanceStageId={stage.id} hasForm={!!requested} onRecordName={name => setWorkName(name ? { id: stage.id, name } : null)}>
     <FmsStageRunner
       branches={options.branches}
       checklist={bundle.checklist.filter((item) => item.fms_instance_stage_id === stage.id)}

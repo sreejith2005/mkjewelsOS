@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { eligibleRecordNameFields } from "@jewelos/core";
 import { ArrowLeft, Banknote, CalendarDays, CheckSquare, ChevronDown, ChevronUp, CircleDot, Copy, Eye, FileUp, Filter, GitBranch, Hash, ListChecks, Mail, Minus, Pencil, Phone, Plus, Split, Star, Trash2, Type, UserRound, X } from "lucide-react";
 import { createFormField, formAnswerOptions, setQuestionAnswerCondition, describeFormRule, describePublishedFormEdit, FORM_LIST_OPERATORS, formRuleHasIncompletePredicate, FORM_OPERATOR_LABELS, FORM_SUBMIT_TARGET, FORM_VALUELESS_OPERATORS, nextFormFieldKey as sharedNextFormFieldKey, normalizeFormDefinition, operatorsForFieldType, pruneFormRules, renameFormRuleField, validateFormDefinition, type FormAnswer, type FormBranch, type FormFieldDefinition, type FormOption, type FormRule, type FormRuleOperator, type FormRulePredicate, type FormSectionDefinition, type FormTemplateDefinition, type Json, type UserRole } from "@jewelos/core";
 import { Button, Field, Notice } from "@/components/ui";
@@ -46,6 +47,7 @@ const newField = (type: FormFieldDefinition["type"], fields: readonly FormFieldD
 });
 const initial = (bundle?: FormBundle): FormTemplateDefinition => ({
   name: bundle?.name ?? "", description: bundle?.description ?? "",
+  recordNameFieldKey: bundle?.record_name_field_key ?? undefined,
   sections: bundle?.sections?.length ? bundle.sections : [DEFAULT_SECTION],
   fields: (bundle?.fields ?? []).map((field) => ({ ...field, sectionKey: field.sectionKey ?? DEFAULT_SECTION.key })),
   permissions: { roles: ((bundle?.permissions as { roles?: UserRole[] } | null)?.roles) ?? ["staff"] },
@@ -186,7 +188,7 @@ export function FormBuilder({ bundle, dynamicOptions, onClose, onSaved }: { bund
     setSaving(true); setError(null);
     try {
       const normalized = normalizeFormDefinition(form);
-      const payload = { name: normalized.name, description: normalized.description ?? "", sections: normalized.sections ?? [], permissions: { roles: normalized.permissions?.roles ?? [] } } as unknown as Json;
+      const payload = { name: normalized.name, description: normalized.description ?? "", record_name_field_key: normalized.recordNameFieldKey ?? null, sections: normalized.sections ?? [], permissions: { roles: normalized.permissions?.roles ?? [] } } as unknown as Json;
       const fields = toDraftFields(normalized.fields) as unknown as Json;
       if (bundle?.lifecycle === "published") {
         const impact = await formUsageImpact(bundle.id);
@@ -215,6 +217,7 @@ export function FormBuilder({ bundle, dynamicOptions, onClose, onSaved }: { bund
       </article>)}</div>
     </section></details>
 
+    <section className="space-y-2 rounded-xl border border-gold/20 p-4"><Field label="Use this question as the record name"><select className="field" value={form.recordNameFieldKey ?? ""} onChange={event => setForm(current => ({ ...current, recordNameFieldKey: event.target.value || undefined }))}><option value="">Automatic</option>{eligibleRecordNameFields(form.fields).map(field => <option key={field.key} value={field.key}>{field.label || field.key}</option>)}</select></Field><p className="text-xs text-soft-grey">An optional default for FMS work using this form. Each workflow can select its own question. Changing a used published form's default requires a new revision.</p></section>
     <div className="grid items-start gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]"><FormOutline {...(editing !== null && form.fields[editing]?.key ? { activeKey: form.fields[editing].key } : {})} fields={form.fields} onSelect={selectField} sections={sections} />
     <section aria-label="Fields"><div className="mb-3 flex items-center justify-between gap-3"><div className="flex items-center gap-2"><ListChecks className="size-5 text-gold-secondary" /><h3 className="text-xl font-semibold text-gold-secondary">Questions</h3></div><span className="rounded-full bg-gold/10 px-3 py-1 text-xs font-semibold text-gold-secondary">{form.fields.length} added</span></div>
       {form.fields.length === 0 ? <Notice>Use Add question below to begin your form.</Notice> : null}<div className="space-y-5">{sections.map((section) => <div key={section.key}>

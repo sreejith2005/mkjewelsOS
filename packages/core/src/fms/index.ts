@@ -8,6 +8,8 @@ export * from "./routeAnswers";
 export * from "./workContracts";
 export * from "./assignmentConfig";
 export * from "./workPresentation";
+export * from "./recordNaming";
+export * from "./taskWorkspace";
 
 export * from "./assignmentAuthoring";
 

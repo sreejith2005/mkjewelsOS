@@ -49,9 +49,10 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     path: "/tasks",
     summary: "Tasks lists the work assigned to the user, the tasks they delegated, and tasks they are watching.",
     recipes: [
-      "See my tasks: open Tasks. My Tasks lists recurring and FMS work; Delegated lists one-time assigned work for employees; In Loop lists watched work. Subsection counts load when Tasks opens.",
+      "See my tasks: open Tasks. My Tasks lists recurring work; Delegated lists one-time assigned work for employees; In Loop lists watched work. Open the FMS subsection for your assigned workflow work, grouped by workflow family and published stage. Subsection counts load when Tasks opens.",
       "Find any of my tasks: use Search all tasks above the subsections. Search includes earlier and completed work, task descriptions and FMS references. Results show their subsection. Clear search and filters to return to the board.",
       "Narrow tasks: press Filter, combine work kind (FMS, CRM, recurring or other tasks), status, priority, due dates, subsection and requirements, then Apply filters. Due today and This week use the business timezone; sort by due date, newest or priority.",
+      "Work on FMS: open Tasks, then FMS. Expand a workflow family, expand a stage, and choose Open Work on the record. Active counts your pending and overdue actions; Waiting shows work awaiting other doers or approvals. Search record names or references; open Workflow and date filters to choose workflow, stage or due dates. Only your authorized work is shown.",
       "Complete a task: finish the required form or upload, then press Complete. If a completion remark is required, Complete opens and focuses the remark field; enter the remark and press Complete again. FMS work opens its protected workflow runner.",
       "Create a task: in Tasks press \"Create Task\", fill in the title, assignee, and due date, then save.",
       "See tasks I gave to others: use \"Delegated\" in Tasks.",
@@ -91,13 +92,14 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
       "Do my assigned stage: open the stage from Home or Tasks, complete its form or evidence, and submit.",
       "Start a workflow: open FMS, choose the workflow, and press \"Start instance\" (when your role may start it).",
       "Design a workflow: \"New workflow\" in FMS (workflow builders only).",
+      "Name workflow work: in the initial form's Task Naming settings, use Task name from to select an eligible question from its linked form or the form's selected record-name question. Later stages inherit that original name unless a stage override selects another question. Use the normal workflow revision and publication lifecycle for changes.",
     ],
   },
   fms_tasks: {
     section: "fms_tasks",
     title: "FMS work",
     path: "/tasks/fms",
-    summary: "Assigned FMS work lists the workflow stages and starter forms waiting for the user.",
+    summary: "Tasks -> FMS groups the user's assigned starter forms and stage visits by workflow family and published stage; Open Work uses the existing protected runner.",
     recipes: [
       "Open an assigned stage: tap it from Home or Tasks; it opens that exact stage.",
     ],
@@ -111,6 +113,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
       "Fill a form: open Forms Library, find the form under \"Forms to fill\", and press \"Fill\".",
       "See what I submitted: \"My submissions\" in Forms Library shows each submission and its review status.",
       "Create a form: \"New form\" in Forms Library (form authors only), then \"Publish\" when ready.",
+      "Set a record name: in Form Builder, use Use this question as the record name to choose an identifying question, or leave Automatic. A used published form requires a new revision to change its default. Each FMS workflow can select its own naming question in Task Naming.",
     ],
   },
   notifications: {

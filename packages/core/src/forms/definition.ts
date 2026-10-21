@@ -1,6 +1,7 @@
 import { FORM_OPTION_TYPES, parseFormOptions } from "./options";
 import { normalizeFormRule, validateFormRule } from "./rules";
 import { fieldSectionKey, formSections } from "./sections";
+import { eligibleRecordNameFields } from "../fms/recordNaming";
 import { FORM_DRAFT_FIELD_TYPES, FORM_SUBMIT_TARGET, type FormBranch, type FormFieldDefinition, type FormSectionDefinition, type FormTemplateDefinition, type FormValidationIssue } from "./types";
 
 const BRANCH_TYPES = new Set(["select", "radio"]);
@@ -71,6 +72,7 @@ export function normalizeFormDefinition(template: FormTemplateDefinition): FormT
   return Object.freeze({
     ...template,
     name: requiredText(template.name),
+    ...(text(template.recordNameFieldKey) ? { recordNameFieldKey: requiredText(template.recordNameFieldKey).toLowerCase() } : {}),
     ...(text(template.description) ? { description: text(template.description) } : {}),
     sections,
     fields: Object.freeze(fields),
@@ -130,6 +132,7 @@ function validateBranches(template: FormTemplateDefinition, field: FormFieldDefi
 
 export function validateFormDefinition(template: FormTemplateDefinition): readonly FormValidationIssue[] {
   const issues: FormValidationIssue[] = [];
+  if (template.recordNameFieldKey && !eligibleRecordNameFields(template.fields).some(field => field.key === template.recordNameFieldKey)) issues.push({ code: "invalid_record_name", message: "Choose a visible identifying question as the record name." });
   if (!template.name.trim() || template.name.trim().length > 150) issues.push({ code: "invalid_name", message: "Form name must contain 1 to 150 characters" });
   if ((template.description?.length ?? 0) > 2000) issues.push({ code: "invalid_description", message: "Form description is too long" });
   if (template.fields.length > 100) issues.push({ code: "too_many_fields", message: "A form can contain at most 100 fields" });
