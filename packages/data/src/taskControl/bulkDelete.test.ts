@@ -83,4 +83,39 @@ describe("bulk task deletion", () => {
     await executeTaskBulkDelete([{ id: "ordinary", task_template_id: null }], true, "Correcting assignments", remove, vi.fn());
     expect(remove).toHaveBeenCalledWith("ordinary", false, "Correcting assignments");
   });
+  it("resolves selected FMS work and cancels each FMS run once", async () => {
+    const tables: Record<string, Array<Record<string, unknown>>> = {
+      task_instances: [{ id: "task", task_template_id: null }],
+      fms_instance_stages: [{ id: "step-a", fms_instance_id: "run-1", status: "in_progress" }, { id: "step-b", fms_instance_id: "run-1", status: "pending" }, { id: "done", fms_instance_id: "run-2", status: "completed" }],
+      fms_starter_assignments: [{ id: "start", status: "pending" }],
+    };
+    const query = (table: string) => {
+      let ids: string[] = [];
+      const chain = { select: () => chain, neq: () => chain, in: (_: string, values: string[]) => { ids = values; return chain; },
+        then: (resolve: (value: unknown) => void) => resolve({ data: (tables[table] ?? []).filter((row) => ids.includes(String(row.id))), error: null }) };
+      return chain;
+    };
+    const client = { from: query } as unknown as Parameters<typeof readTaskDeleteTargets>[0];
+    const targets = await readTaskDeleteTargets(client, ["task", "step-a", "step-b", "start"]);
+    expect(targets).toEqual([
+      { id: "task", task_template_id: null },
+      { id: "step-a", task_template_id: null, kind: "fms_step", fms_instance_id: "run-1" },
+      { id: "step-b", task_template_id: null, kind: "fms_step", fms_instance_id: "run-1" },
+      { id: "start", task_template_id: null, kind: "fms_start" },
+    ]);
+    await expect(prepareTaskBulkDelete({}, ["done"], vi.fn(), (ids) => readTaskDeleteTargets(client, ids))).rejects.toThrow("no longer available");
+    const remove = vi.fn().mockResolvedValue(undefined), cancel = vi.fn().mockResolvedValue(undefined);
+    const outcome = await executeTaskBulkDelete(targets, false, "Duplicate run", remove, vi.fn(), undefined, cancel);
+    expect(remove.mock.calls).toEqual([["task", false, "Duplicate run"]]);
+    expect(cancel).toHaveBeenCalledTimes(2);
+    expect(cancel.mock.calls.map(([target]) => target.kind)).toEqual(["fms_step", "fms_start"]);
+    expect(outcome.succeeded).toEqual(expect.arrayContaining(["task", "step-a", "step-b", "start"]));
+  });
+  it("includes open FMS work, never finished FMS history, in delete-all", async () => {
+    const page = workspace(["task", "open-step", "closed-step"], 3);
+    const rows = page.tasks.map((row) => row.task_id === "task" ? row : { ...row, task_type: "fms", work_kind: "fms_step", task_status: row.task_id === "open-step" ? "in_progress" : "completed" });
+    const targets = vi.fn(async (ids: readonly string[]) => ids.map((id) => ({ id, task_template_id: null })));
+    await prepareTaskBulkDelete({}, null, vi.fn().mockResolvedValue({ ...page, tasks: rows }), targets);
+    expect(targets).toHaveBeenCalledWith(["task", "open-step"]);
+  });
 });

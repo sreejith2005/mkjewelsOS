@@ -2,6 +2,7 @@ import {
   identityRequirementKey,
   normalizeImportBoolean,
   planTaskImportFrequency,
+  taskImportTriggerLabel,
   TASK_IMPORT_MAX_ROWS,
   type TaskImportDraftRow,
   type TaskImportIdentityRequirement,
@@ -86,7 +87,8 @@ export function normalizeLegacyTaskSheet(rows: readonly Row[], options: LegacyTa
       planned_at: plannedAt, due_at: dueAt, recurrence_rule: plan.recurrenceRule, requires_upload: evidenceRequired,
       verification_required: verification, buddy_assignment_allowed: boolean("BUDDY ALLOWED"), is_active: scheduleKind === "as_required" ? false : active,
       assignment_status: "assigning_left",
-      checklist: (plan.generatedCheckpoints.length ? plan.generatedCheckpoints : taskType === "checklist" && task ? [task] : []).map((item_text) => ({ item_text, required: true })) });
+      checklist: (plan.generatedCheckpoints.length ? plan.generatedCheckpoints : taskType === "checklist" && task ? [task] : []).map((item_text) => ({ item_text, required: true })),
+      trigger_label: taskImportTriggerLabel(value(row, "FREQUENCY"), scheduleKind) });
   });
   return { draftRows: drafts, identityRequirements: [...requirements.values()], issues, requiredTimingPresets: [...requiredPresets].sort() };
 }

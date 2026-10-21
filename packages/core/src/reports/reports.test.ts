@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canExportReport, csvCell, encodeCsv, escapeSpreadsheetFormula, filtersToSearchParams, parseReportFilters, REPORT_CATALOG, reportFor, reportsForRole, safeExportFilename } from "./index";
+import { canExportReport, REPORT_STATUS_OPTIONS, reportStatusOptions, csvCell, encodeCsv, escapeSpreadsheetFormula, filtersToSearchParams, parseReportFilters, REPORT_CATALOG, reportFor, reportsForRole, safeExportFilename } from "./index";
 
 describe("fixed report catalog",()=>{
   it("contains the required unique fixed reports",()=>{expect(REPORT_CATALOG).toHaveLength(9);expect(new Set(REPORT_CATALOG.map((item)=>item.key)).size).toBe(9);});
@@ -19,4 +19,15 @@ describe("safe CSV",()=>{
   it("quotes commas, quotes, CRLF, and newlines",()=>{expect(csvCell("a,b")).toBe('"a,b"');expect(csvCell('a"b')).toBe('"a""b"');expect(csvCell("a\nb")).toBe('"a\nb"');});
   it("emits UTF-8 BOM and CRLF rows",()=>expect(encodeCsv(["name","value"],[{name:"Synthetic",value:"=1"}])).toBe("\uFEFFname,value\r\nSynthetic,'=1\r\n"));
   it("creates bounded safe filenames",()=>expect(safeExportFilename("CRM Followups / Unsafe",new Date("2026-08-10T00:00:00Z"))).toBe("crm-followups-unsafe-2026-08-10.csv"));
+});
+
+describe("report status options",()=>{
+  it("covers only catalog reports that filter on status, with valid filter values",()=>{
+    for(const [key,values] of Object.entries(REPORT_STATUS_OPTIONS)){
+      expect(reportFor(key)?.filters).toContain("status");
+      for(const value of values)expect(value).toMatch(/^[a-z_]{1,40}$/);
+    }
+    expect(reportStatusOptions("task_operations")).toContain("overdue");
+    expect(reportStatusOptions("notification_delivery_health")).toBeNull();
+  });
 });

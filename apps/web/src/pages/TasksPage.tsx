@@ -28,6 +28,8 @@ import { TASK_PAGE_SIZE, type TaskPageCounts, type TaskWorkspaceView } from "@je
 import { TaskCard, type TaskCardAction } from "@/features/tasks/TaskCard";
 import { TaskComposer } from "@/features/tasks/TaskComposer";
 import { TaskFilterBar } from "@/features/tasks/TaskFilterBar";
+import { OnDemandDutiesPanel } from "@/features/tasks/OnDemandDutiesPanel";
+import type { OnDemandDuty } from "@jewelos/core";
 import { prepareRecurringTasksThenLoad } from "@/features/tasks/taskRefresh";
 import { shouldShowTaskLoading } from "@/features/tasks/taskLoading";
 import { loadFormDynamicOptions, loadTaskForms, type FormBundle } from "@/features/forms/api";
@@ -69,6 +71,8 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const [formDynamicOptions, setFormDynamicOptions] = useState<DynamicOptions>({ users: [], branches: [], departments: [], masters: [] });
   const [formTarget, setFormTarget] = useState<TaskBundle | null>(null);
   const refreshGeneration = useRef(0);
+  const [dutiesVersion, setDutiesVersion] = useState(0);
+  const [duties, setDuties] = useState<readonly OnDemandDuty[]>([]);
   const hasCompletedInitialLoad = useRef(false);
   const canManage = access ? hasPermission(access, "tasks.manage_team") : false;
   const canCreateTasks = Boolean(profile);
@@ -82,6 +86,7 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const refresh = useCallback(async () => {
     if (!profile) return;
     const generation = ++refreshGeneration.current;
+    setDutiesVersion((version) => version + 1);
     setLoading(true);
     setError(null);
     try {
@@ -155,6 +160,9 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const categoryNames = useMemo(() => new Map(categories.map((category) => [category.id, category.label])), [categories]);
   const counts = loadedIdentity === pageIdentity ? serverCounts : { pending: 0, overdue: 0, completed: 0, open: 0 };
   const scopedTasks = focusedTaskId ? focusedTasks : pageTasks;
+  const showDuties = !focusedTaskId && !exploring && workspaceView === "mine" && statusFilter === "pending";
+  // A started anytime duty is an ordinary task in the list; label it so the employee recognises it.
+  const dutyLabels = useMemo(() => new Map(showDuties ? duties.map((duty) => [duty.templateId, duty.triggerLabel]) : []), [duties, showDuties]);
   const changeView = (view: TaskWorkspaceView) => { setWorkspaceView(view); setOffset(0); if (view === "fms") { setFilters(defaultTaskSearch()); setQuery(""); } };
   const changeStatus = (status: TaskFeedStatusFilter) => { setStatusFilter(status); setOffset(0); };
 
@@ -162,6 +170,7 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
     window.history.pushState({}, "", path);
     window.dispatchEvent(new PopStateEvent("popstate"));
   };
+  const openTask = (taskId: string) => navigateTo(`/tasks?task_id=${encodeURIComponent(taskId)}`);
 
   const handleAction = async (task: TaskBundle, action: TaskCardAction) => {
     if (!task.id || !profile) throw new Error("Task identifier is missing");
@@ -239,8 +248,9 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
       <>{focusedTaskId?<div className="px-4 py-3 text-sm text-task-text-muted">Selected task | <button className="min-h-11 text-task-accent" onClick={()=>navigateTo("/tasks")}>Return to task feed</button></div>:null}</>{!exploring && workspaceView !== "fms" ? <TaskFilterBar counts={counts} onStatusChange={changeStatus} status={statusFilter} /> : null}
 
       <div className="w-full p-3 sm:p-5">
+        {showDuties ? <OnDemandDutiesPanel onLoaded={setDuties} onOpenTask={openTask} reloadKey={dutiesVersion} /> : null}
         {countsError && !exploring ? <Notice tone="danger">Unable to refresh subsection counts. Reopen Tasks to retry.</Notice> : null}
-        {workspaceView === "fms" && !focusedTaskId && profile ? <FmsTaskWorkspace key={`${profile.tenant_id}:${profile.id}`} actorId={profile.id} tenantId={profile.tenant_id} onNavigate={navigateTo} onCount={updateFmsCount} /> : error ? <div className="flex flex-col gap-3 rounded-xl border border-danger/40 bg-danger/10 p-4"><Notice tone="danger">{error}</Notice><Button className="self-start border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={() => void refresh()} variant="secondary"><RefreshCw />Retry</Button></div> : shouldShowTaskLoading(loading || loadedIdentity !== pageIdentity, hasCompletedInitialLoad.current && loadedIdentity === pageIdentity) ? <div aria-label="Loading tasks" className="flex flex-col gap-3">{[0, 1, 2].map((item) => <div className="h-28 animate-pulse rounded-2xl border border-task-border bg-task-muted" key={item} />)}</div> : scopedTasks.length === 0 ? <div className="flex min-h-[48dvh] flex-col items-center justify-center px-5 text-center"><span className="mb-5 flex size-20 items-center justify-center rounded-[1.75rem] bg-task-muted text-task-accent"><CheckCircle2 className="size-10" /></span><h2 className="text-2xl font-semibold text-task-text">No Tasks Here</h2><p className="mt-1 max-w-sm text-sm text-task-text-muted">It seems that you don’t have any tasks in this list.</p></div> : <div className="flex flex-col gap-3">{profile ? scopedTasks.map((task) => <div key={task.id}>{exploring && task.id && sections[task.id] ? <span className="mb-1 inline-block rounded-full bg-task-accent-soft px-2 py-0.5 text-xs font-medium text-task-text">{TASK_SUBSECTION_LABELS[sections[task.id] ?? "mine"]}</span> : null}<TaskCard viewerId={profile.id} management={hasAdminTaskView && task.task_type !== "fms" ? <TaskAdminControls task={task} onChanged={refresh} /> : undefined} capability={deriveTaskMutationCapability({ assigneeIds: task.assignees.map((assignee) => assignee.id), isWatcher: task.isWatchedByViewer, viewerId: profile.id, viewerRole: profile.user_role })} categoryLabel={task.category_id ? categoryNames.get(task.category_id) ?? "Uncategorized" : "Uncategorized"} key={task.id} onAction={(action) => handleAction(task, action)} task={task} /></div>) : null}</div>}
+        {workspaceView === "fms" && !focusedTaskId && profile ? <FmsTaskWorkspace key={`${profile.tenant_id}:${profile.id}`} actorId={profile.id} tenantId={profile.tenant_id} onNavigate={navigateTo} onCount={updateFmsCount} /> : error ? <div className="flex flex-col gap-3 rounded-xl border border-danger/40 bg-danger/10 p-4"><Notice tone="danger">{error}</Notice><Button className="self-start border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={() => void refresh()} variant="secondary"><RefreshCw />Retry</Button></div> : shouldShowTaskLoading(loading || loadedIdentity !== pageIdentity, hasCompletedInitialLoad.current && loadedIdentity === pageIdentity) ? <div aria-label="Loading tasks" className="flex flex-col gap-3">{[0, 1, 2].map((item) => <div className="h-28 animate-pulse rounded-2xl border border-task-border bg-task-muted" key={item} />)}</div> : scopedTasks.length === 0 ? <div className="flex min-h-[48dvh] flex-col items-center justify-center px-5 text-center"><span className="mb-5 flex size-20 items-center justify-center rounded-[1.75rem] bg-task-muted text-task-accent"><CheckCircle2 className="size-10" /></span><h2 className="text-2xl font-semibold text-task-text">No Tasks Here</h2><p className="mt-1 max-w-sm text-sm text-task-text-muted">It seems that you don’t have any tasks in this list.</p></div> : <div className="flex flex-col gap-3">{profile ? scopedTasks.map((task) => <div key={task.id}>{exploring && task.id && sections[task.id] ? <span className="mb-1 inline-block rounded-full bg-task-accent-soft px-2 py-0.5 text-xs font-medium text-task-text">{TASK_SUBSECTION_LABELS[sections[task.id] ?? "mine"]}</span> : null}{task.task_template_id && dutyLabels.has(task.task_template_id) ? <span className="mb-1 inline-block rounded-full bg-task-accent-soft px-2 py-0.5 text-xs font-medium text-task-text">Anytime duty · {dutyLabels.get(task.task_template_id)}</span> : null}<TaskCard viewerId={profile.id} management={hasAdminTaskView && task.task_type !== "fms" ? <TaskAdminControls task={task} onChanged={refresh} /> : undefined} capability={deriveTaskMutationCapability({ assigneeIds: task.assignees.map((assignee) => assignee.id), isWatcher: task.isWatchedByViewer, viewerId: profile.id, viewerRole: profile.user_role })} categoryLabel={task.category_id ? categoryNames.get(task.category_id) ?? "Uncategorized" : "Uncategorized"} key={task.id} onAction={(action) => handleAction(task, action)} task={task} /></div>) : null}</div>}
       </div>
 
       {!focusedTaskId && workspaceView !== "fms" && loadedIdentity === pageIdentity ? <nav aria-label="Task pages" className="flex items-center justify-center gap-3 px-4 pb-5">

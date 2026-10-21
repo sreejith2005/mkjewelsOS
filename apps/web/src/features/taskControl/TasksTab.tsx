@@ -5,7 +5,7 @@ import { EmptyMessage, Panel, StatusDot } from "@/features/analytics/components"
 import { signedTaskEvidenceUrl } from "@/features/taskEvidence/api";
 import type { EvidenceWorkspace, TaskAttachmentSummary, TaskRow, TaskView } from "@/features/taskEvidence/types";
 import {
-  evidenceFileSize, isFmsWorkKind, taskRowTone, taskWorkKind,
+  canDeleteTaskControlRow, evidenceFileSize, isFmsWorkKind, taskRowTone, taskWorkKind,
   TASK_VIEW_LABELS as CORE_TASK_VIEW_LABELS, TASK_WORK_KIND_FILTERS, TASK_WORK_KIND_LABELS,
   type TaskWorkKind, type TaskWorkKindFilter,
 } from "@jewelos/core";
@@ -97,13 +97,13 @@ function EvidenceCell({ row, onOpen }: { row: TaskRow; onOpen: (file: TaskAttach
   return <span className="text-xs text-task-text-muted">No file required</span>;
 }
 
-function TaskCard({ row, onOpen, onManage, selection }: { row: TaskRow; onOpen: (file: TaskAttachmentSummary) => void; onManage?: ((id: string) => void) | undefined; selection?: TaskSelection | undefined }) {
+function TaskCard({ row, onOpen, onManage, onDelete, selection }: { row: TaskRow; onOpen: (file: TaskAttachmentSummary) => void; onManage?: ((id: string) => void) | undefined; onDelete?: ((row: TaskRow) => void) | undefined; selection?: TaskSelection | undefined }) {
   const kind = taskWorkKind(row);
   const fms = isFmsWorkKind(kind);
   const late = row.overdue && row.task_status !== "completed";
   return (
     <article className={cn("rounded-lg border border-l-4 border-task-border p-3", KIND_STYLE[kind].edge)}>
-      {selection && row.task_type !== "fms" ? <label className="mb-2 flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={selection.ids.includes(row.task_id)} onChange={(event) => selection.onChange(event.target.checked ? [...selection.ids, row.task_id] : selection.ids.filter((id) => id !== row.task_id))} />Select {row.task_title}</label> : null}
+      {selection && canDeleteTaskControlRow(row) ? <label className="mb-2 flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={selection.ids.includes(row.task_id)} onChange={(event) => selection.onChange(event.target.checked ? [...selection.ids, row.task_id] : selection.ids.filter((id) => id !== row.task_id))} />Select {row.task_title}</label> : null}
       <div className="flex flex-wrap items-center gap-2">
         <KindBadge kind={kind} />
         {fms ? null : <WorkTypeChip row={row} />}
@@ -126,7 +126,15 @@ function TaskCard({ row, onOpen, onManage, selection }: { row: TaskRow; onOpen: 
         {fms
           ? <span className="text-xs text-task-text-muted">Forms and files for FMS work stay on the FMS step.</span>
           : <EvidenceCell onOpen={onOpen} row={row} />}
-        {onManage && row.task_type !== "fms" ? <Button className="mt-2" variant="secondary" onClick={() => onManage(row.task_id)}>Edit / delete task</Button> : null}
+        {!fms && (onManage || onDelete) ? (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {onManage ? <Button variant="secondary" onClick={() => onManage(row.task_id)}>Edit task</Button> : null}
+            {onDelete ? <Button variant="danger" onClick={() => onDelete(row)}>Delete</Button> : null}
+          </div>
+        ) : null}
+        {fms && onDelete && canDeleteTaskControlRow(row) ? (
+          <Button className="mt-2" variant="danger" onClick={() => onDelete(row)}>{kind === "fms_start" ? "Delete start form" : "Delete FMS task"}</Button>
+        ) : null}
       </div>
     </article>
   );
@@ -148,6 +156,7 @@ export function TasksTab({
   onPage,
   onPageSize,
   onManage,
+  onDelete,
   selection,
   onBulkDelete,
 }: {
@@ -161,6 +170,7 @@ export function TasksTab({
   onPage: (page: number) => void;
   onPageSize: (size: number) => void;
   onManage?: ((id: string) => void) | undefined;
+  onDelete?: ((row: TaskRow) => void) | undefined;
   selection?: TaskSelection | undefined;
   onBulkDelete?: ((ids: readonly string[] | null) => void) | undefined;
 }) {
@@ -176,7 +186,7 @@ export function TasksTab({
   return (
     <div className="space-y-4">
       {selection && onBulkDelete ? <div className="flex flex-wrap items-center gap-2">
-        <Button variant="secondary" onClick={() => selection.onChange([...new Set([...selection.ids, ...evidence.tasks.filter((row) => row.task_type !== "fms").map((row) => row.task_id)])])}>Select this page</Button>
+        <Button variant="secondary" onClick={() => selection.onChange([...new Set([...selection.ids, ...evidence.tasks.filter(canDeleteTaskControlRow).map((row) => row.task_id)])])}>Select this page</Button>
         <Button variant="secondary" disabled={!selection.ids.length} onClick={() => selection.onChange([])}>Clear selection</Button>
         <span className="text-sm">{selection.ids.length} selected</span>
         <Button variant="danger" disabled={!selection.ids.length} onClick={() => onBulkDelete(selection.ids)}>Delete selected</Button>
@@ -237,7 +247,7 @@ export function TasksTab({
         ) : (
           <>
             <div className="flex flex-col gap-2">
-              {evidence.tasks.map((row) => <TaskCard key={row.task_id} onOpen={(file) => void openFile(file)} onManage={onManage} selection={selection} row={row} />)}
+              {evidence.tasks.map((row) => <TaskCard key={row.task_id} onOpen={(file) => void openFile(file)} onManage={onManage} onDelete={onDelete} selection={selection} row={row} />)}
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
               <Button className="border-task-border bg-task-bg text-task-text hover:bg-task-muted" disabled={page <= 1} onClick={() => onPage(page - 1)} variant="secondary">Previous</Button>

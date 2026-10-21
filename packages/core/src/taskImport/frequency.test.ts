@@ -3,6 +3,7 @@ import {
   createDefaultTaskImportTimingPresets,
   normalizeTaskFrequencyLabel,
   planTaskImportFrequency,
+  taskImportTriggerLabel,
 } from "./frequency";
 
 const OBSERVED_TIMING_CASES = [
@@ -278,5 +279,14 @@ describe("task import frequency planning", () => {
     expect(planTaskImportFrequency("", "", "Task").scheduleKind).toBe("as_required");
     expect(() => planTaskImportFrequency("Whenever possible", "2026-09-22", "Task"))
       .toThrow(/unsupported frequency/i);
+  });
+
+  it("keeps the sheet wording only for event-driven work", () => {
+    expect(taskImportTriggerLabel(" Per  Customer ", "as_required")).toBe("Per Customer");
+    expect(taskImportTriggerLabel("Per Customer / As Applicable", "as_required")).toBe("Per Customer/As Applicable");
+    expect(taskImportTriggerLabel("Per Not-Bought Customer", "as_required")).toBe("Per Not-Bought Customer");
+    expect(taskImportTriggerLabel("", "as_required")).toBe("");
+    expect(taskImportTriggerLabel("Daily – Opening", "daily")).toBe("");
+    expect(taskImportTriggerLabel("x".repeat(120), "as_required")).toHaveLength(80);
   });
 });

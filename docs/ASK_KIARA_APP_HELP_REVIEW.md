@@ -16,7 +16,7 @@ How it works:
 The source is `packages/core/src/assistant/appHelp.ts`. Keep this file and that one in step
 (AGENTS.md, "Keeping Ask Kiara current").
 
-Tasks entry updated for the FMS workspace implementation: 2026-10-20; local validation is recorded in the feature plan, not proof of production deployment. Other entries last checked: 2026-10-14.
+Tasks entry updated against the screens: 2026-10-21 (Anytime duties, task order). Recurring / To-Do and Task Control: 2026-10-21 (Assign now is high priority). Home, Task Control (Delete) and Reports: 2026-10-21. Other entries last checked: 2026-10-14. FMS workspace implementation: 2026-10-21; local evidence is in the feature plan, not proof of deployment.
 
 ---
 
@@ -24,6 +24,7 @@ Tasks entry updated for the FMS workspace implementation: 2026-10-20; local vali
 **What it is:** your own work for today: open and overdue tasks, your FMS stages, forms to
 fill, and recent activity.
 - [ ] See today's work: open Home from the menu. Overdue items are listed first.
+- [ ] Leaders: **Team today** shows Assigned, Done, Pending and Overdue for today; with no tasks of your own the top card shows **Team completion today**. Tap a person under **Needs follow-up** to open their tasks in Task Control.
 - [ ] Open a task or stage: tap it on Home to go straight to that work.
 - [ ] Fill a form linked to a task: use the form item on Home. It opens the exact form for that task.
 
@@ -37,8 +38,10 @@ the formula behind each number.
 **What it is:** work given to you, tasks you gave to others, and tasks you are watching.
 - [ ] See my tasks: open Tasks. **My Tasks** lists recurring work; **FMS** lists your assigned workflow work by family and published stage; **Delegated** lists one-time assigned work for employees; **In Loop** lists watched work. Subsection counts load when Tasks opens.
 - [ ] Work on FMS: Tasks -> **FMS** -> expand a workflow family -> expand a stage -> **Open Work** on the record. **Active** counts pending and overdue actions. **Waiting** separates work awaiting other employees/approvals. Use name/reference search, workflow/stage/status/due filters and **Clear all**. Counts cover all assignments, not just a page. Access remains the current employee's existing scope.
+- [ ] Do an anytime duty: duties without a fixed time (As Required, Per Customer, After Visit...) are under the **Anytime duties** bar at the top of My Tasks (Pending), closed until tapped; low priority with no deadline; they come back every day. Press **Start** whenever you do one; it opens as a low-priority task due tonight and also appears in the task list marked **Anytime duty**. **Continue** opens one already open. A duty a manager assigns appears as a high-priority task.
+- [ ] Task order: earliest due date first; at the same due time, high before medium before low. Overdue: longest overdue first. Completed: most recent first.
 - [ ] Complete a task: finish the required form or upload, then press **Complete**. If a remark is required, the button opens and focuses the remark field; enter it and press **Complete** again. FMS work opens its protected workflow runner.
-- [ ] Create a task: in Tasks press **Create Task**, fill in the title, the person and the due date, then save.
+- [ ] Create a task: in Tasks press **Create Task**, fill in the title, pick one or more people under **Users**, set the due date, optionally add several people under **In Loop**, then press **Assign Task**. With several users, choose **Separate task for each user** (everyone completes their own copy) or **One shared task** (any one of them completes it for all; same branch and department only).
 - [ ] See tasks I gave to others: **Delegated** in Tasks.
 - [ ] Add many tasks at once: **Bulk Import** in Tasks (only roles that can assign work).
 - [ ] See people with no work given: **Assigning Left** in Tasks (only roles that can assign work).
@@ -48,6 +51,7 @@ the formula behind each number.
 - [ ] Filter the list: branch, department, frequency, priority and status filters at the top.
 - [ ] Check finished work: open the **Verification** view and review each item.
 - [ ] Chase a late item: use **Follow-ups**.
+- [ ] Give an anytime duty now: on an As Required schedule press **Assign now**. The employee gets a high-priority task due today and an alert.
 
 ## Task Control (for managers)
 **What it is:** team progress, overdue work, evidence review and task templates.
@@ -55,6 +59,8 @@ the formula behind each number.
 - [ ] Review evidence: open the evidence panel in Task Control.
 - [ ] Edit one task: **Edit task** changes Task/Checklist type, requirements, participants, dates, categorization and checklist items. Press **Save changes**. History is retained; future schedules have their own editor.
 - [ ] Change a schedule: edit the template and press **Save schedule**.
+- [ ] Delete work: in Tasks press **Delete** (also for CRM tasks), then **Confirm deletion**. FMS work: **Delete FMS task** cancels that whole FMS run (completed steps and history kept); **Delete start form** removes one person's pending start form. A reason is required. Several at once: tick rows (open FMS work included) or **Select this page**, then **Delete selected** or **Delete all matching**, then **Confirm deletion**.
+- [ ] Anytime duties: Templates rows with status **ON DEMAND** (frequency such as PER CUSTOMER) have no date; employees always see them as low priority under **Anytime duties**. **Assign now** enforces one as a high-priority occurrence due today.
 
 ## FMS (workflows)
 **What it is:** company workflows: live workflows, the stages given to you, and, for people
@@ -95,8 +101,8 @@ who build workflows, the designs.
 
 ## Reports
 **What it is:** fixed reports for your level, and private CSV downloads.
-- [ ] See a report: open Reports, pick the report and the dates.
-- [ ] Download a report: request a CSV export. It is prepared privately for you to download.
+- [ ] See a report: open Reports, tap the report, pick dates (Today, Last 7 days, Last 30 days, This month, or From/To) and any Branch, Department or Status filter.
+- [ ] Download a report: press **Export CSV**. It appears under **Your exports** (Waiting, then Preparing), usually within a minute; press **Download** when Completed.
 
 ## CRM
 **What it is:** client records, walk-ins, interactions and follow-ups, for CRM users.

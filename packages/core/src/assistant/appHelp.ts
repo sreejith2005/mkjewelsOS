@@ -26,9 +26,10 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     section: "home",
     title: "Home",
     path: "/",
-    summary: "Home shows the user's own work for today: open and overdue tasks, assigned FMS stages, forms to fill, and recent activity.",
+    summary: "Home shows the user's own work for today: open and overdue tasks, assigned FMS stages, forms to fill, and recent activity. Managers, HR, Admins and Super Admins also see \"Team today\": today's team tasks, who needs follow-up, and progress by department.",
     recipes: [
       "See today's work: open Home from the menu. Overdue items are listed first.",
+      "See the team's day (leaders): the \"Team today\" section shows Assigned, Done, Pending and Overdue for today. With no tasks of your own, the top card shows \"Team completion today\". Tap a person under \"Needs follow-up\" to open their tasks in Task Control.",
       "Open a task or stage: tap it on Home to go straight to that work item.",
       "Fill a form linked to a task: use the form item on Home; it opens the exact form for that task.",
     ],
@@ -50,11 +51,13 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     summary: "Tasks lists the work assigned to the user, the tasks they delegated, and tasks they are watching.",
     recipes: [
       "See my tasks: open Tasks. My Tasks lists recurring work; Delegated lists one-time assigned work for employees; In Loop lists watched work. Open the FMS subsection for your assigned workflow work, grouped by workflow family and published stage. Subsection counts load when Tasks opens.",
+      "Do an anytime duty: work without a fixed time (As Required, Per Customer, After Visit and similar) is under the \"Anytime duties\" bar at the top of My Tasks (Pending); the bar is closed until you tap it. They are low priority with no deadline and come back every day. Press \"Start\" whenever you do one; it opens as a low-priority task due tonight, and it also appears in your task list (marked \"Anytime duty\") so you can finish it later. Complete it like any other task (upload, checklist, form). Press \"Continue\" to finish one already open. You can do the same duty several times a day. If a manager assigns one, it appears in your list as a high-priority task.",
+      "Task order: My Tasks shows the earliest due date first; tasks due at the same time show high priority before medium and low. Overdue shows the longest overdue first; Completed shows the most recent first.",
       "Find any of my tasks: use Search all tasks above the subsections. Search includes earlier and completed work, task descriptions and FMS references. Results show their subsection. Clear search and filters to return to the board.",
       "Narrow tasks: press Filter, combine work kind (FMS, CRM, recurring or other tasks), status, priority, due dates, subsection and requirements, then Apply filters. Due today and This week use the business timezone; sort by due date, newest or priority.",
       "Work on FMS: open Tasks, then FMS. Expand a workflow family, expand a stage, and choose Open Work on the record. Active counts your pending and overdue actions; Waiting shows work awaiting other doers or approvals. Search record names or references; open Workflow and date filters to choose workflow, stage or due dates. Only your authorized work is shown.",
       "Complete a task: finish the required form or upload, then press Complete. If a completion remark is required, Complete opens and focuses the remark field; enter the remark and press Complete again. FMS work opens its protected workflow runner.",
-      "Create a task: in Tasks press \"Create Task\", fill in the title, assignee, and due date, then save.",
+      "Create a task: in Tasks press \"Create Task\", fill in the title, pick one or more people under \"Users\", set the due date, optionally add several people under \"In Loop\", then press \"Assign Task\". With several users, choose \"Separate task for each user\" (everyone completes their own copy) or \"One shared task\" (any one of them completes it for all; only for people in the same branch and department).",
       "See tasks I gave to others: use \"Delegated\" in Tasks.",
       "Import many tasks at once: use \"Bulk Import\" in Tasks (only for roles that can assign work).",
       "See people with no work assigned: \"Assigning Left\" in Tasks (only for roles that can assign work).",
@@ -69,6 +72,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
       "Filter the list: use the branch, department, frequency, priority, and status filters at the top.",
       "Verify completed work: open the Verification view and review each completed item.",
       "Send a follow-up: use Follow-ups for an item that is delayed.",
+      "Give an employee an anytime duty now: on an As Required schedule press \"Assign now\". The employee gets it as a high-priority task due today and is alerted; you can assign it again later the same day. Without Assign now, employees still see the duty every day under \"Anytime duties\" as low priority.",
     ],
   },
   task_templates: {
@@ -81,6 +85,8 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
       "Review evidence: open the evidence panel inside Task Control.",
       "Edit one task: choose \"Edit task\" to change Task or Checklist type, upload/remark/form requirements, verification, buddy assignment, Assignees, In Loop, dates, categorization and checklist items; then press \"Save changes\". Existing history stays intact; future schedules are edited separately.",
       "Change a schedule: edit the template and press \"Save schedule\".",
+      "Delete work: in the Tasks tab press \"Delete\" on a task (including CRM tasks), then \"Confirm deletion\". For FMS work press \"Delete FMS task\" (cancels that whole FMS run; completed steps and history are kept) or \"Delete start form\" (removes one person's pending start form); a reason is required. To delete several at once, tick the rows (open FMS work included) or press \"Select this page\", then \"Delete selected\" (or \"Delete all matching\") and \"Confirm deletion\".",
+      "Anytime duties: in Templates, rows with status ON DEMAND (frequency such as PER CUSTOMER) have no date. Employees always see them under \"Anytime duties\" in My Tasks as low priority. Press \"Assign now\" to enforce one: the employee gets a high-priority occurrence due today.",
     ],
   },
   fms_builder: {
@@ -153,10 +159,10 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     section: "reports",
     title: "Reports",
     path: "/reports",
-    summary: "Reports previews fixed reports for the user's level and lets them request private CSV exports.",
+    summary: "Reports previews fixed reports for the user's level and lets them export private CSV files.",
     recipes: [
-      "Preview a report: open Reports, pick the report and the date range.",
-      "Export a report: request a CSV export from the report; it is prepared privately for you to download.",
+      "Preview a report: open Reports, tap the report, then pick dates (Today, Last 7 days, Last 30 days, This month, or From/To) and any Branch, Department or Status filter.",
+      "Export a report: press \"Export CSV\". The file appears under \"Your exports\" (Waiting, then Preparing), usually within a minute; press \"Download\" when it is Completed. Files expire automatically.",
     ],
   },
   crm: {

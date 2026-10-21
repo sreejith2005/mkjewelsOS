@@ -96,8 +96,9 @@ export { deriveTaskMutationCapability } from "./taskCapabilities";
 export type { TaskMutationCapability } from "./taskCapabilities";
 export { deriveTaskAuthoringCapability } from "./taskAuthoringCapabilities";
 export type { TaskAuthoringCapability, TaskAuthoringScope } from "./taskAuthoringCapabilities";
-export { buildManualTaskCreateRequest, taskPriorityChoices } from "./manualTaskDraft";
+export { buildManualTaskCreateRequests, canShareManualTask, taskPriorityChoices } from "./manualTaskDraft";
 export type {
+  ManualTaskAssignmentMode,
   ManualTaskChecklistItem,
   ManualTaskCreateRequest,
   ManualTaskDraftError,
@@ -131,6 +132,7 @@ export * from "./taskPage";
 export * from "./taskDetails";
 export * from "./availability";
 export * from "./recurringTodo";
+export * from "./onDemandDuties";
 export * from "./dropdownMaster.ts";
 export * from "./taskControlView.ts";
 export { createRefreshCoordinator } from "./realtime/refreshCoordinator";

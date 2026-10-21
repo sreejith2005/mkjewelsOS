@@ -10,9 +10,9 @@ function InlineDialog({ title, children }: Readonly<{ title: string; children: R
   return <section className="mt-4"><h2 className="mb-3 font-semibold">{title}</h2>{children}</section>;
 }
 
-export function TaskAdminControls({ task, onChanged, embedded = false }: Readonly<{ task: ManagedTask; onChanged: () => Promise<void>; embedded?: boolean }>) {
+export function TaskAdminControls({ task, onChanged, embedded = false, initialMode = null }: Readonly<{ task: ManagedTask; onChanged: () => Promise<void>; embedded?: boolean; initialMode?: "delete" | null }>) {
   const Dialog = embedded ? InlineDialog : Modal;
-  const [mode, setMode] = useState<"edit" | "delete" | null>(null);
+  const [mode, setMode] = useState<"edit" | "delete" | null>(initialMode);
   const [edit, setEdit] = useState<TaskAdminEdit>(() => taskAdminInitialEdit(task));
   const [series, setSeries] = useState(false);
   const [reason, setReason] = useState("");

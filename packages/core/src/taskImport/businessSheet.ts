@@ -2,6 +2,7 @@ import {
   identityRequirementKey,
   normalizeImportBoolean,
   planTaskImportFrequency,
+  taskImportTriggerLabel,
   TASK_IMPORT_MAX_ROWS,
   type TaskImportDraftRow,
   type TaskImportIdentityRequirement,
@@ -208,6 +209,7 @@ export function normalizeBusinessTaskSheet(rows: readonly Row[], options: Busine
       is_active: plan.scheduleKind === "as_required" ? false : active,
       assignment_status: "assigning_left",
       checklist,
+      trigger_label: taskImportTriggerLabel(value(row, "TASK FREQUENCY"), plan.scheduleKind),
     });
   });
 

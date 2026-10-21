@@ -14,7 +14,7 @@ import {
   taskControlTabsFor,
   taskRowTone,
   taskWorkKind,
-  isFmsWorkKind,
+  isFmsWorkKind, canDeleteTaskControlRow,
   TASK_WORK_KIND_FILTERS,
   TASK_VIEW_LABELS,
 } from "./taskControlView.ts";
@@ -139,5 +139,16 @@ describe("taskWorkKind", () => {
     expect(isFmsWorkKind("fms_start")).toBe(true);
     expect(isFmsWorkKind("crm")).toBe(false);
     expect(TASK_WORK_KIND_FILTERS.map(([value]) => value)).toEqual(["all", "one_time", "recurring", "fms", "crm"]);
+  });
+});
+
+describe("deletable Task Control rows", () => {
+  it("allows every task row and only open FMS work", () => {
+    expect(canDeleteTaskControlRow({ task_type: "checklist", task_status: "completed" })).toBe(true);
+    expect(canDeleteTaskControlRow({ task_type: "delegation", work_kind: "crm", task_status: "pending" })).toBe(true);
+    expect(canDeleteTaskControlRow({ task_type: "fms", work_kind: "fms_step", task_status: "in_progress" })).toBe(true);
+    expect(canDeleteTaskControlRow({ task_type: "fms", work_kind: "fms_start", task_status: "pending" })).toBe(true);
+    expect(canDeleteTaskControlRow({ task_type: "fms", work_kind: "fms_step", task_status: "completed" })).toBe(false);
+    expect(canDeleteTaskControlRow({ task_type: "fms", task_status: "blocked" })).toBe(false);
   });
 });
