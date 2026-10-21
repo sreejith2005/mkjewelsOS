@@ -83,8 +83,73 @@ describe("TaskComposer selector panels", () => {
     renderComposer();
     fireEvent.click(screen.getByRole("button", { name: /Users/i }));
     fireEvent.click(screen.getByLabelText("Teammate"));
+    expect(screen.getByTestId("task-panel-users")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Due Date/i }));
     expect(screen.getByTestId("task-selector-users").textContent).toContain("Teammate");
     expect(screen.queryByTestId("task-panel-users")).toBeNull();
+  });
+
+  function fillTitleAndDue() {
+    fireEvent.change(screen.getByLabelText("Task title"), { target: { value: "Counter review" } });
+    fireEvent.click(screen.getByRole("button", { name: /Due Date/i }));
+    fireEvent.change(screen.getByLabelText("Due date and time"), { target: { value: "2030-10-06T18:00" } });
+  }
+
+  it("creates a separate task for each selected user by default, keeping every In Loop pick", async () => {
+    const onSave = vi.fn().mockResolvedValueOnce("task-a").mockResolvedValueOnce("task-b");
+    const onCreated = vi.fn();
+    renderComposer({ onSave, onCreated });
+    fireEvent.click(screen.getByRole("button", { name: /Users/i }));
+    fireEvent.click(screen.getByLabelText("Teammate"));
+    fireEvent.click(screen.getByLabelText("Other department"));
+    expect((screen.getByLabelText(/Separate task for each user/) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText(/One shared task/) as HTMLInputElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: /In Loop/i }));
+    fireEvent.click(screen.getByLabelText("Ashwini"));
+    fireEvent.click(screen.getByLabelText("Cross-branch teammate"));
+    expect(screen.getByTestId("task-selector-watchers").textContent).toContain("2 in loop");
+    fillTitleAndDue();
+    fireEvent.click(screen.getByRole("button", { name: "Assign Task" }));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledOnce());
+    expect(onSave).toHaveBeenCalledTimes(2);
+    expect(onSave.mock.calls.map((call) => [call[1], (call[0] as { department_id: string }).department_id, call[2]])).toEqual([
+      [["doer-1"], "department-1", ["user-1", "doer-3"]],
+      [["doer-2"], "department-2", ["user-1", "doer-3"]],
+    ]);
+    expect(toastSuccess).toHaveBeenCalledWith("2 tasks assigned", { description: "Sent to 2 users." });
+  });
+
+  it("creates one shared task when chosen for users in the same branch and department", async () => {
+    const onSave = vi.fn().mockResolvedValue("shared-task");
+    const onCreated = vi.fn();
+    renderComposer({ onSave, onCreated });
+    fireEvent.click(screen.getByRole("button", { name: /Users/i }));
+    fireEvent.click(screen.getByLabelText("Ashwini"));
+    fireEvent.click(screen.getByLabelText("Teammate"));
+    fireEvent.click(screen.getByLabelText(/One shared task/));
+    expect(screen.getByTestId("task-selector-users").textContent).toContain("2 users · shared");
+    fillTitleAndDue();
+    fireEvent.click(screen.getByRole("button", { name: "Assign Task" }));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledOnce());
+    expect(onSave).toHaveBeenCalledOnce();
+    expect(onSave.mock.calls[0]?.[1]).toEqual(["user-1", "doer-1"]);
+    expect(toastSuccess).toHaveBeenCalledWith("Task assigned", { description: "Sent to 2 users." });
+  });
+
+  it("resumes after a partial failure without creating a saved task twice", async () => {
+    const onSave = vi.fn().mockResolvedValueOnce("task-a").mockRejectedValueOnce(new Error("Network lost")).mockResolvedValueOnce("task-b");
+    const onCreated = vi.fn();
+    renderComposer({ onSave, onCreated });
+    fireEvent.click(screen.getByRole("button", { name: /Users/i }));
+    fireEvent.click(screen.getByLabelText("Teammate"));
+    fireEvent.click(screen.getByLabelText("Other department"));
+    fillTitleAndDue();
+    fireEvent.click(screen.getByRole("button", { name: "Assign Task" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Assign remaining" })).toBeTruthy());
+    expect(screen.getByText(/1 of 2 tasks are saved/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Assign remaining" }));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledOnce());
+    expect(onSave.mock.calls.map((call) => call[1])).toEqual([["doer-1"], ["doer-2"], ["doer-2"]]);
   });
   it("limits normal staff to themselves and colleagues in their department", () => {
     renderComposer({ profile: { ...profile, user_role: "staff" }, data: { ...data, users: data.users.filter(user => user.department_id === "department-1") } });
