@@ -46,8 +46,10 @@ begin
 
   -- 3: trigger wording on a hand-made as-needed duty.
   v_def := pg_get_functiondef('public.save_recurring_todo_template_with_audit(uuid,jsonb)'::regprocedure);
-  if position($q$'verifier_user_profile_id'];$q$ in v_def) = 0
-     or position(E'    due_time=v_due_time,\n' in v_def) = 0
+  -- Matches avoid line endings: production holds some of these bodies with
+  -- CRLF line ends (applied from a Windows checkout), others with LF.
+  if (length(v_def) - length(replace(v_def, $q$'verifier_user_profile_id'];$q$, ''))) <> length($q$'verifier_user_profile_id'];$q$)
+     or (length(v_def) - length(replace(v_def, 'due_time=v_due_time,', ''))) <> length('due_time=v_due_time,')
      or position('trigger_label' in v_def) > 0 then
     raise exception '0340: save_recurring_todo_template_with_audit is not the expected function body';
   end if;
@@ -56,11 +58,8 @@ begin
   v_new := replace(v_def, $q$'verifier_user_profile_id'];$q$, $q$'verifier_user_profile_id','trigger_label'];$q$);
   -- Only an as-needed duty has trigger wording. An edit that does not send the
   -- key keeps the wording it has (older clients); a calendar schedule has none.
-  v_new := replace(v_new, E'    due_time=v_due_time,\n',
-    E'    due_time=v_due_time,\n'
-    || E'    trigger_label=case when v_kind<>''as_required'' then null\n'
-    || E'      when p_payload ? ''trigger_label'' then left(nullif(btrim(p_payload->>''trigger_label''),''''),80)\n'
-    || E'      else trigger_label end,\n');
+  v_new := replace(v_new, 'due_time=v_due_time,',
+    $q$due_time=v_due_time, trigger_label=case when v_kind<>'as_required' then null when p_payload ? 'trigger_label' then left(nullif(btrim(p_payload->>'trigger_label'),''),80) else trigger_label end,$q$);
   execute v_new;
 
   -- 4: a new template saved inactive gets no first occurrence. Only an
@@ -70,13 +69,12 @@ begin
   v_def := pg_get_functiondef('public.save_task_template_with_audit(uuid,jsonb)'::regprocedure);
   -- The guard sits on the insert itself, so the default-datetime branch that
   -- test 0069 checks keeps its text.
-  if (length(v_def) - length(replace(v_def, E'    if v_initial_planned_datetime is not null then\n', '')))
-     <> length(E'    if v_initial_planned_datetime is not null then\n') then
+  if (length(v_def) - length(replace(v_def, 'if v_initial_planned_datetime is not null then', '')))
+     <> length('if v_initial_planned_datetime is not null then') then
     raise exception '0340: save_task_template_with_audit is not the expected function body';
   end if;
-  v_new := replace(v_def, E'    if v_initial_planned_datetime is not null then\n',
-    E'    if v_initial_planned_datetime is not null\n'
-    || E'       and coalesce((p_payload->>''is_active'')::boolean, true) then\n');
+  v_new := replace(v_def, 'if v_initial_planned_datetime is not null then',
+    $q$if v_initial_planned_datetime is not null and coalesce((p_payload->>'is_active')::boolean, true) then$q$);
   execute v_new;
 end
 $migration$;
