@@ -54,12 +54,14 @@ describe("task workspace navigation", () => {
     expect(ids.indexOf("ask_kiara")).toBe(ids.indexOf("settings") - 1);
   });
 
-  it("reserves recurring schedule management for admin roles", () => {
-    expect(getPageForPath("/recurring-todo")).toBe("recurring_todo");
-    expect(getMenuForRole("admin")).toContainEqual({ id: "recurring_todo", label: "Recurring / To-Do", path: "/recurring-todo" });
-    expect(getMenuForRole("manager")).not.toContainEqual(expect.objectContaining({ id: "recurring_todo" }));
-    expect(canAccessPage("staff", "recurring_todo")).toBe(false);
-    expect(canAccessPage("super_admin", "recurring_todo")).toBe(true);
+  it("retires Recurring / To-Do as a destination while old links still open", () => {
+    for (const role of USER_ROLES) {
+      expect(getMenuForRole(role)).not.toContainEqual(expect.objectContaining({ id: "recurring_todo" }));
+      // Every role can open Tasks, so the old address never lands on a denial.
+      expect(canAccessPage(role, getPageForPath("/recurring-todo")!)).toBe(true);
+    }
+    expect(isImplementedPage("recurring_todo")).toBe(false);
+    expect(getPageForPath("/recurring-todo")).toBe("checklist_tasks");
   });
 
   it("gives leaders one Task Control destination for templates, progress and evidence", () => {

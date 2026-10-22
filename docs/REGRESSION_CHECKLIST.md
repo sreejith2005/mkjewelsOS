@@ -73,6 +73,18 @@ devtools: `supabase.rpc(...)` / `supabase.from(...)` with the user's session).
 - [ ] Create manual task, delegate, edit, complete, attach evidence, required-form completion.
 - [ ] Task evidence accepts a photo, a PDF (10 MB) and a phone video (MP4/MOV, 50 MB); a longer clip shows the 50 MB message. In the Android app, Upload always offers Take photo / Record video / Choose from gallery or files, and other upload fields (forms, FMS) still offer the camera.
 - [ ] Recurring tasks generate on schedule; overdue tasks show as overdue.
+- [ ] Recurring / To-Do consolidation (migration 0340): the menu has no Recurring / To-Do; /recurring-todo opens
+      Task Control → Review (SA/ADM), Task Control → Tasks (MGR/HR) or Tasks (others). As SA/ADM, Create Task
+      shows Schedule (One-time default · Recurring · As needed); other roles see the unchanged one-time composer.
+      Recurring "3rd Saturday of every month" previews the real 3rd Saturdays and saves one template per selected
+      person, its first occurrence on the first 3rd Saturday. As needed saves a duty with its wording and creates no
+      task that day. Task Control → Review: Verify, Reject (reason required; the doer's alert opens that task in
+      Tasks), Follow up, complete on behalf (remark asked), required form, Performance; tiles open the matching
+      list. Templates: Next date or Ended, Run now; Edit keeps priority, verification, verifier, follow-ups, remark
+      rule, checklist and a paused state. Turning Task Control off in Developer Mode pauses Verify and Follow up.
+- [ ] Bulk Import: a workbook imported before 2026-10-21 replays as "replayed", never "created"; the new
+      frequencies (3rd Saturday, Last Friday, Every 2 Weeks, Half Yearly, Month End, weekday lists) import; an
+      unknown frequency is still a row error.
 - [ ] Staff see own/department tasks; managers see branch; admins see all (task visibility follows dashboard authority).
 - [ ] CSV import and Assigning Left still work for ADM/SA.
 - [ ] Task Control → Tasks for one employee lists one-time, recurring, CRM walk-in tasks and their

@@ -16,7 +16,7 @@ How it works:
 The source is `packages/core/src/assistant/appHelp.ts`. Keep this file and that one in step
 (AGENTS.md, "Keeping Ask Kiara current").
 
-Tasks entry updated against the screens: 2026-10-21 (Anytime duties, task order). Recurring / To-Do and Task Control: 2026-10-21 (Assign now is high priority). Home, Task Control (Delete) and Reports: 2026-10-21. Other entries last checked: 2026-10-14. FMS workspace implementation: 2026-10-21; local evidence is in the feature plan, not proof of deployment.
+Tasks entry updated against the screens: 2026-10-21 (Anytime duties, task order). Recurring / To-Do retired; its work moved to Tasks (Create Task scheduling) and Task Control (Review tab, Templates Next and Run now): 2026-10-21. Task Control: 2026-10-21 (Assign now is high priority). Home, Task Control (Delete) and Reports: 2026-10-21. Other entries last checked: 2026-10-14. FMS workspace implementation: 2026-10-21; local evidence is in the feature plan, not proof of deployment.
 
 ---
 
@@ -43,15 +43,13 @@ the formula behind each number.
 - [ ] Complete a task: finish the required form or upload, then press **Complete**. If a remark is required, the button opens and focuses the remark field; enter it and press **Complete** again. FMS work opens its protected workflow runner.
 - [ ] Create a task: in Tasks press **Create Task**, fill in the title, pick one or more people under **Users**, set the due date, optionally add several people under **In Loop**, then press **Assign Task**. With several users, choose **Separate task for each user** (everyone completes their own copy) or **One shared task** (any one of them completes it for all; same branch and department only).
 - [ ] See tasks I gave to others: **Delegated** in Tasks.
+- [ ] Make a recurring task (admins): **Create Task** → **Schedule** → **Recurring**, pick a ready pattern (for example **3rd Saturday of every month**) or **Custom…**, set **Starts on**, **Start time**, **Due time** and **Ends**; the preview lists the next 10 dates. Press **Create schedule**; each chosen person gets their own schedule.
+- [ ] Make an anytime duty (admins): **Create Task** → **Schedule** → **As needed**, enter when it applies (for example Per Customer), press **Create duty**.
 - [ ] Add many tasks at once: **Bulk Import** in Tasks (only roles that can assign work).
 - [ ] See people with no work given: **Assigning Left** in Tasks (only roles that can assign work).
 
-## Recurring / To-Do
-**What it is:** repeating schedules, personal to-dos, checking finished work, follow-ups and coverage.
-- [ ] Filter the list: branch, department, frequency, priority and status filters at the top.
-- [ ] Check finished work: open the **Verification** view and review each item.
-- [ ] Chase a late item: use **Follow-ups**.
-- [ ] Give an anytime duty now: on an As Required schedule press **Assign now**. The employee gets a high-priority task due today and an alert.
+## Recurring / To-Do (retired 2026-10-21)
+The page is gone. Recurring work is created from **Create Task** and managed in **Task Control**. Old /recurring-todo links open Task Control → Review for admins, Task Control → Tasks for managers and HR, and Tasks for everyone else. Kiara no longer offers this section.
 
 ## Task Control (for managers)
 **What it is:** team progress, overdue work, evidence review and task templates.
@@ -60,6 +58,8 @@ the formula behind each number.
 - [ ] Edit one task: **Edit task** changes Task/Checklist type, requirements, participants, dates, categorization and checklist items. Press **Save changes**. History is retained; future schedules have their own editor.
 - [ ] Change a schedule: edit the template and press **Save schedule**.
 - [ ] Delete work: in Tasks press **Delete** (also for CRM tasks), then **Confirm deletion**. FMS work: **Delete FMS task** cancels that whole FMS run (completed steps and history kept); **Delete start form** removes one person's pending start form. A reason is required. Several at once: tick rows (open FMS work included) or **Select this page**, then **Delete selected** or **Delete all matching**, then **Confirm deletion**.
+- [ ] Check recurring work (admins): **Review** tab. **Verification** (Verify / Reject with a reason), **Rejected**, **Overdue**, **Coverage Required**, **Manager Review**, **Follow-ups** (Follow up) and **Performance**; the tiles at the top open the matching list.
+- [ ] Manage schedules (admins): **Templates** rows show how often each repeats and its **Next** date (or Ended). **Edit** (future occurrences only), **Run now**, **Deactivate**/**Activate**, **Delete**.
 - [ ] Anytime duties: Templates rows with status **ON DEMAND** (frequency such as PER CUSTOMER) have no date; employees always see them as low priority under **Anytime duties**. **Assign now** enforces one as a high-priority occurrence due today.
 
 ## FMS (workflows)

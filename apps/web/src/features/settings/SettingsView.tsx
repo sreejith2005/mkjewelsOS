@@ -11,7 +11,9 @@ import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeR
 import { DataPurgeCard } from "./DataPurgeCard";
 import { fetchDemoDataPurgeCounts, fetchSettings, purgeDemoData, saveBranch, savePreferences, saveSectionControls, saveTenant, type SettingsData } from "./api";
 
-const CONTROLLED_PAGES = PAGE_IDS.filter((page) => page !== "meeting_ai" && page !== "delegation_tasks");
+// recurring_todo is retired as a page (2026-10-21): its review work follows Task
+// Control's switch since migration 0340, so its own switch would control nothing visible.
+const CONTROLLED_PAGES = PAGE_IDS.filter((page) => page !== "meeting_ai" && page !== "delegation_tasks" && page !== "recurring_todo");
 
 export function SettingsView() {
   const { access, profile, branch, logout } = useAuth();

@@ -47,10 +47,13 @@ export function formatTaskPerformanceScore(value: number | null | undefined): st
 export const TASK_PENDING_SCORE_LABEL = "Work not done";
 export const TASK_DELAYED_SCORE_LABEL = "Work not done on time";
 
-export const TASK_CONTROL_TAB_LABELS: ReadonlyArray<readonly ["overview" | "people" | "tasks" | "templates", string]> = [
+export type TaskControlTabId = "overview" | "people" | "tasks" | "review" | "templates";
+
+export const TASK_CONTROL_TAB_LABELS: ReadonlyArray<readonly [TaskControlTabId, string]> = [
   ["overview", "Overview"],
   ["people", "People"],
   ["tasks", "Tasks"],
+  ["review", "Review"],
   ["templates", "Templates"],
 ];
 
@@ -58,6 +61,7 @@ export const TASK_CONTROL_TAB_DESCRIPTIONS: Readonly<Record<string, string>> = {
   overview: "Who is behind, what is overdue, and which evidence is still missing.",
   people: "Assigned, completed, remaining and overdue work for every person in scope.",
   tasks: "Every piece of work assigned in scope — one-time, recurring, FMS and CRM — each labelled with its type.",
+  review: "Recurring work to verify, rejected work, coverage, follow-ups and recurring performance.",
   templates: "Recurring rules, schedules and source-linked task templates.",
 };
 
@@ -76,15 +80,30 @@ export const canManageTaskTemplates = (role: string): boolean =>
 export const canSelectTaskControlBranch = (role: string): boolean =>
   (TASK_CONTROL_BRANCH_SELECT_ROLES as readonly string[]).includes(role);
 
-/** Templates is the one tab that depends on the viewer's role. */
-export function taskControlTabsFor(role: string): readonly ("overview" | "people" | "tasks" | "templates")[] {
+/**
+ * Templates and Review depend on the viewer's role. Review reads
+ * `get_recurring_todo_workspace`, which admits super_admin and admin only, the
+ * same roles that manage templates.
+ */
+export function taskControlTabsFor(role: string): readonly TaskControlTabId[] {
   return TASK_CONTROL_TAB_LABELS.map(([value]) => value).filter(
-    (tab) => tab !== "templates" || canManageTaskTemplates(role),
+    (tab) => (tab !== "templates" && tab !== "review") || canManageTaskTemplates(role),
   );
 }
 
+/**
+ * Where the retired Recurring / To-Do address now leads. Its review buckets
+ * moved to Task Control (admins), oversight lives in Task Control's task list
+ * (managers, HR), and everyone else's recurring work is in Tasks.
+ */
+export function legacyRecurringTodoDestination(role: string | null | undefined): string {
+  if (role && canManageTaskTemplates(role)) return "/task-templates?tab=review";
+  if (role && canViewTaskControl(role)) return "/task-templates?tab=tasks";
+  return "/tasks";
+}
+
 /** The search box appears only where the server-side search actually applies. */
-export const taskControlShowsSearch = (tab: string): boolean => tab === "tasks" || tab === "templates";
+export const taskControlShowsSearch = (tab: string): boolean => tab === "tasks" || tab === "review" || tab === "templates";
 
 /** The seven chips over the evidence list, in the web page's order and wording. */
 export const TASK_VIEW_LABELS: ReadonlyArray<readonly [string, string]> = [

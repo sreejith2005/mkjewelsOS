@@ -1,8 +1,8 @@
 import { ListChecks } from "lucide-react";
-import { prettyTemplateDate, prettyTemplateTime } from "@jewelos/core";
+import { kolkataDateKey, prettyTemplateDate, prettyTemplateTime } from "@jewelos/core";
 import { Button } from "@/components/ui";
 import {
-  templateCanActivate, templateCanAssignNow, templateFrequencyLabel, templateSourceLabel, templateStatusLabel, templateWorkTypeLabel,
+  templateCanActivate, templateCanAssignNow, templateCanRunNow, templateFrequencyLabel, templateNextDate, templateScheduleDescription, templateSourceLabel, templateStatusLabel, templateWorkTypeLabel,
   type TaskTemplateDirectoryRow,
 } from "@/features/taskTemplates/api";
 
@@ -53,6 +53,7 @@ function RowActions({
   onSchedule,
   onToggle,
   onAssignNow,
+  onRunNow,
   onDelete,
 }: {
   row: TaskTemplateDirectoryRow;
@@ -62,6 +63,7 @@ function RowActions({
   onSchedule: () => void;
   onToggle: () => void;
   onAssignNow: () => void;
+  onRunNow: () => void;
   onDelete: () => void;
 }) {
   const activateBlocked = !row.is_active && !templateCanActivate(row);
@@ -95,6 +97,17 @@ function RowActions({
           {row.is_active ? "Deactivate" : "Activate"}
         </Button>
       )}
+      {row.schedule_kind !== "as_required" ? (
+        <Button
+          className={style}
+          disabled={busy || !templateCanRunNow(row)}
+          onClick={onRunNow}
+          title={templateCanRunNow(row) ? "Create today's occurrence now, if the schedule falls today and it does not exist yet." : "Only an active schedule with a start date can run."}
+          variant="secondary"
+        >
+          Run now
+        </Button>
+      ) : null}
       <Button className={style} disabled={busy} onClick={onDelete} variant="danger">
         Delete
       </Button>
@@ -103,7 +116,7 @@ function RowActions({
 }
 
 const HEADERS = [
-  "User", "Department", "Task", "Task Type", "Frequency", "Start Date", "Start", "Due", "Evidence", "Source", "Status", "Action",
+  "User", "Department", "Task", "Task Type", "Frequency", "Start Date", "Start", "Due", "Next", "Evidence", "Source", "Status", "Action",
 ] as const;
 
 export function TemplatesTab({
@@ -113,6 +126,7 @@ export function TemplatesTab({
   onSchedule,
   onToggle,
   onAssignNow,
+  onRunNow,
   onDelete,
 }: {
   rows: readonly TaskTemplateDirectoryRow[];
@@ -121,8 +135,14 @@ export function TemplatesTab({
   onSchedule: (row: TaskTemplateDirectoryRow) => void;
   onToggle: (row: TaskTemplateDirectoryRow) => void;
   onAssignNow: (row: TaskTemplateDirectoryRow) => void;
+  onRunNow: (row: TaskTemplateDirectoryRow) => void;
   onDelete: (row: TaskTemplateDirectoryRow) => void;
 }) {
+  const today = kolkataDateKey(new Date());
+  const nextLabel = (row: TaskTemplateDirectoryRow) => {
+    const next = templateNextDate(row, today);
+    return next === "ended" ? "Ended" : next ? prettyDate(next) : "—";
+  };
   const actions = (row: TaskTemplateDirectoryRow, compact = false) => (
     <RowActions
       busy={busyId === row.id}
@@ -132,6 +152,7 @@ export function TemplatesTab({
       onSchedule={() => onSchedule(row)}
       onToggle={() => onToggle(row)}
       onAssignNow={() => onAssignNow(row)}
+      onRunNow={() => onRunNow(row)}
       row={row}
     />
   );
@@ -154,7 +175,7 @@ export function TemplatesTab({
               <tr className="border-t border-task-border align-middle hover:bg-gold/5" key={row.id}>
                 <td className="whitespace-nowrap px-2 py-2 uppercase text-task-text">{row.assignee_name || "—"}</td>
                 <td className="whitespace-nowrap px-2 py-2 uppercase text-task-text-muted">{row.department_name || "—"}</td>
-                <td className="w-full min-w-64 px-2 py-2 font-semibold text-white">{row.title}</td>
+                <td className="w-full min-w-64 px-2 py-2"><span className="font-semibold text-white">{row.title}</span>{templateScheduleDescription(row) ? <span className="block text-[11px] text-task-text-muted">{templateScheduleDescription(row)}</span> : null}</td>
                 <td className="px-2 py-2">
                   <Chip tone={templateWorkTypeLabel(row) === "UPLOAD" ? "muted" : "gold"}>{templateWorkTypeLabel(row)}</Chip>
                 </td>
@@ -162,6 +183,7 @@ export function TemplatesTab({
                 <td className="whitespace-nowrap px-2 py-2 text-task-text-muted">{prettyDate(row.starts_on)}</td>
                 <td className="whitespace-nowrap px-2 py-2 text-task-text-muted">{prettyTime(row.planned_time)}</td>
                 <td className="whitespace-nowrap px-2 py-2 text-task-text-muted">{prettyTime(row.due_time ?? row.planned_time)}</td>
+                <td className="whitespace-nowrap px-2 py-2 text-task-text-muted">{nextLabel(row)}</td>
                 <td className="px-2 py-2"><EvidenceFlag required={row.requires_upload} /></td>
                 <td className="whitespace-nowrap px-2 py-2 text-[10px] uppercase tracking-wider text-task-text-muted">{templateSourceLabel(row)}</td>
                 <td className="whitespace-nowrap px-2 py-2"><StatusText row={row} /></td>
@@ -194,6 +216,7 @@ export function TemplatesTab({
             <p className="mt-3 text-xs text-task-text-muted">
               Starts {prettyDate(row.starts_on)} · {prettyTime(row.planned_time)} → {prettyTime(row.due_time ?? row.planned_time)}
             </p>
+            {templateScheduleDescription(row) ? <p className="mt-1 text-xs text-task-text-muted">{templateScheduleDescription(row)} · Next: {nextLabel(row)}</p> : null}
             <div className="mt-4">{actions(row, true)}</div>
           </article>
         ))}

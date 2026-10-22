@@ -14,7 +14,7 @@ import { ErrorPanel, LoadingPanels } from "@/features/analytics/components";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { TaskTemplateForm } from "@/features/tasks/TaskForms";
 import { loadAvailabilityUsers, loadTaskAuthoringReferenceData, startOnDemandDuty, type TaskReferenceData, type TaskTemplate, type TaskUser } from "@/features/tasks/api";
-import { materializeRecurringTemplate, saveRecurringTemplate, setRecurringTemplateActive } from "@/features/recurringTodo/api";
+import { materializeRecurringTemplate, runRecurringTemplateNow, saveRecurringTemplate, setRecurringTemplateActive } from "@/features/recurringTodo/api";
 import {
   deleteTaskTemplate, loadTaskTemplateDirectory, setTaskTemplateSchedule, templateFrequencyLabel,
   type TaskTemplateDirectoryRow,
@@ -28,6 +28,7 @@ import { BulkDeleteDialog, type BulkDeleteRequest } from "@/features/taskControl
 import { OverviewTab } from "@/features/taskControl/OverviewTab";
 import { PeopleTab } from "@/features/taskControl/PeopleTab";
 import { TemplatesTab } from "@/features/taskControl/TemplatesTab";
+import { ReviewTab } from "@/features/taskControl/ReviewTab";
 import {
   defaultFilters, evidenceFilter, initialFiltersFromSearch, rangeIsValid, tenantToday,
   type TaskControlFilters, type TaskControlTab,
@@ -39,6 +40,7 @@ const TAB_LABELS: Readonly<Record<TaskControlTab, string>> = {
   overview: "Overview",
   people: "People",
   tasks: "Tasks",
+  review: "Review",
   templates: "Templates",
 };
 
@@ -94,6 +96,7 @@ export function TaskTemplatesPage() {
   const [deletingRow, setDeletingRow] = useState<TaskRow | null>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [bulkDelete, setBulkDelete] = useState<BulkDeleteRequest | null>(null);
+  const [reviewReload, setReviewReload] = useState(0);
   useEffect(() => { setSelectedTaskIds([]); }, [filters, view, kind, profile?.id, canAdministerTasks]);
 
   useEffect(() => {
@@ -141,7 +144,7 @@ export function TaskTemplatesPage() {
   useEffect(() => { void loadSnapshot(); }, [loadSnapshot]);
   useEffect(() => { void loadTemplates(); }, [loadTemplates]);
 
-  const refresh = useCallback(async () => { await Promise.all([loadSnapshot(), loadTemplates()]); }, [loadSnapshot, loadTemplates]);
+  const refresh = useCallback(async () => { setReviewReload((value) => value + 1); await Promise.all([loadSnapshot(), loadTemplates()]); }, [loadSnapshot, loadTemplates]);
   useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["tasks", "organization"], refresh });
 
   const changeTab = (next: TaskControlTab) => { setTab(next); rememberTab(next); };
@@ -210,6 +213,20 @@ export function TaskTemplatesPage() {
       toast.success(`Assigned now as high priority${row.assignee_name ? ` to ${row.assignee_name}` : ""}: ${row.title}`);
     });
 
+  const runNow = (row: TaskTemplateDirectoryRow) =>
+    void run(row, async () => {
+      await runRecurringTemplateNow(row.id, tenantToday());
+      toast.success(`Run now finished for ${row.title}. Today's occurrence exists if the schedule falls today.`);
+    });
+
+  /** A Review tile opens the matching recurring work in the Tasks tab. */
+  const openRecurringTasks = (next: TaskView) => {
+    setKind("recurring");
+    setView(next);
+    setPage(1);
+    changeTab("tasks");
+  };
+
   const remove = (row: TaskTemplateDirectoryRow) => {
     const confirmed = window.confirm(
       `Delete this task template: ${row.title}?\n\nPending, in-progress and overdue occurrences will also be removed. Completed work and history will be preserved.`,
@@ -247,8 +264,9 @@ export function TaskTemplatesPage() {
 
   if (!authorized) return <Notice tone="danger">Task Control is available only to authorized leaders.</Notice>;
 
-  const loading = tab === "templates" ? templatesLoading : snapshotLoading;
-  const error = tab === "templates" ? templatesError : snapshotError;
+  // Review loads and reports its own data.
+  const loading = tab === "templates" ? templatesLoading : tab === "review" ? false : snapshotLoading;
+  const error = tab === "templates" ? templatesError : tab === "review" ? null : snapshotError;
 
   return (
     <section className="-m-4 min-h-[calc(100dvh-7.875rem)] bg-task-bg pb-24 text-task-text sm:-m-6 md:min-h-[calc(100vh-4rem)] md:pb-10">
@@ -316,8 +334,11 @@ export function TaskTemplatesPage() {
               onSchedule={openSchedule}
               onToggle={toggle}
               onAssignNow={assignNow}
+              onRunNow={runNow}
               rows={visibleTemplates}
             />
+          ) : tab === "review" ? (
+            <ReviewTab filters={filters} onOpenRecurringTasks={openRecurringTasks} reloadKey={reviewReload} />
           ) : snapshot ? (
             tab === "overview" ? (
               <OverviewTab

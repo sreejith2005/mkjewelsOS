@@ -29,6 +29,7 @@ import {
   isImplementedPage,
   resolvePageAccess,
   type PageId,
+  LEGACY_RECURRING_TODO_PATH, legacyRecurringTodoDestination,
 } from "@jewelos/core";
 import { AuthProvider, useAuth } from "@/auth/AuthContext";
 import { supabase } from "@jewelos/api-client";
@@ -64,7 +65,6 @@ const NotificationsPage = lazyPage("notifications", () => import("@/pages/Notifi
 const CrmApp = lazyPage("crm", () => import("@jewelos/crm-ui").then((module) => ({ default: module.CrmApp })));
 const TasksPage = lazyPage("tasks", () => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
 const FmsAssignedWorkPage = lazyPage("fms-assigned-work", () => import("@/pages/FmsAssignedWorkPage").then((module) => ({ default: module.FmsAssignedWorkPage })));
-const RecurringTodoPage = lazyPage("recurring-todo", () => import("@/pages/RecurringTodoPage").then((module) => ({ default: module.RecurringTodoPage })));
 const TaskTemplatesPage = lazyPage("task-templates", () => import("@/pages/TaskTemplatesPage").then((module) => ({ default: module.TaskTemplatesPage })));
 const TaskBulkImportPage = lazyPage("task-bulk-import", () => import("@/pages/TaskBulkImportPage").then((module) => ({ default: module.TaskBulkImportPage })));
 const AssigningLeftPage = lazyPage("assigning-left", () => import("@/pages/AssigningLeftPage").then((module) => ({ default: module.AssigningLeftPage })));
@@ -101,7 +101,6 @@ const FULL_WIDTH_PAGES = new Set<PageId>([
   "dashboard",
   "crm",
   "checklist_tasks",
-  "recurring_todo",
   "task_templates",
   "reports",
   "settings",
@@ -271,6 +270,14 @@ function AppShell() {
     document.documentElement.dataset.tableDensity = preferences.table_density;
     return () => { delete document.documentElement.dataset.tableDensity; };
   }, [preferences.table_density]);
+  // Recurring / To-Do retired (2026-10-21). Notifications and bookmarks still
+  // carry its address, so it is replaced, not pushed, with where that work now is.
+  useEffect(() => {
+    if (path !== LEGACY_RECURRING_TODO_PATH || !profile) return;
+    const target = legacyRecurringTodoDestination(profile.user_role);
+    window.history.replaceState({}, "", target);
+    navigate(target);
+  }, [navigate, path, profile]);
   // Navigation, route guard, and maintenance overlay all come from one
   // decision: feature availability first, then the user's permission.
   const effectiveAccess = useMemo(() => access ?? (profile ? builtinAccessContext(profile) : null), [access, profile]);
@@ -332,7 +339,6 @@ function AppShell() {
     : currentPage === "users" ? <TeamDirectoryPage />
     : currentPage === "dropdown_master" ? <DropdownMasterPage />
       : currentPage === "checklist_tasks" ? path === "/tasks/import" ? <TaskBulkImportPage onBack={() => navigate("/tasks")} /> : path === "/tasks/assigning-left" ? <AssigningLeftPage /> : path === "/tasks/fms" ? <FmsAssignedWorkPage key={search} onNavigate={navigate} /> : <TasksPage path={path} />
-      : currentPage === "recurring_todo" ? <RecurringTodoPage />
       : currentPage === "task_templates" ? <TaskTemplatesPage />
       : currentPage === "availability" ? <AvailabilityPage />
           : currentPage === "forms_library" ? <FormsPage />

@@ -1,4 +1,4 @@
-import { isOnDemandSchedule, onDemandTriggerLabel } from "@jewelos/core";
+import { describeScheduleRule, isOnDemandSchedule, onDemandTriggerLabel, upcomingScheduleDates } from "@jewelos/core";
 
 /**
  * Task Templates directory row.
@@ -103,4 +103,27 @@ export function templateSourceLabel(row: TaskTemplateDirectoryRow): string {
 /** A template can go live only once it has a start date and a named owner. */
 export function templateCanActivate(row: TaskTemplateDirectoryRow): boolean {
   return row.schedule_kind !== "as_required" && row.schedule_status !== "assigning_left" && Boolean(row.starts_on);
+}
+
+/** The schedule in words ("Every month on the 3rd Saturday"), or null for an as-needed duty. */
+export function templateScheduleDescription(row: TaskTemplateDirectoryRow): string | null {
+  if (isOnDemandSchedule(row) || !row.recurrence_rule) return null;
+  if (row.schedule_kind === "one_time") return row.starts_on ? `Once on ${row.starts_on}` : "Once";
+  return describeScheduleRule(row.recurrence_rule, row.starts_on);
+}
+
+/**
+ * The next business date the scheduler will create, read through the same
+ * engine. "ended" when the end date or count is used up, null when the row
+ * has no calendar (an as-needed duty, or no start date yet).
+ */
+export function templateNextDate(row: TaskTemplateDirectoryRow, today: string): string | "ended" | null {
+  if (isOnDemandSchedule(row) || !row.recurrence_rule || !row.starts_on) return null;
+  if (row.schedule_kind === "one_time") return row.starts_on >= today ? row.starts_on : "ended";
+  return upcomingScheduleDates(row.recurrence_rule, row.starts_on, 1, today)[0] ?? "ended";
+}
+
+/** Run now creates today's occurrence of an active calendar schedule. */
+export function templateCanRunNow(row: TaskTemplateDirectoryRow): boolean {
+  return !isOnDemandSchedule(row) && row.is_active && row.schedule_status === "ready";
 }

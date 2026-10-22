@@ -16,6 +16,9 @@ export const PAGE_IDS = [
   "dashboard",
   "crm",
   "checklist_tasks",
+  // Retired as a destination (2026-10-21): recurring work is created in Tasks and
+  // managed in Task Control. The id stays because the database section-availability
+  // and permission contracts still declare it.
   "recurring_todo",
   "task_templates",
   // Retired as a destination: evidence is now a panel inside Task Control. The id
@@ -50,7 +53,6 @@ export const ALL_MENU_ITEMS: readonly MenuItem[] = [
   { id: "dashboard", label: "Dashboard", path: "/dashboard" },
   { id: "crm", label: "CRM", path: "/crm" },
   { id: "checklist_tasks", label: "Tasks", path: "/tasks" },
-  { id: "recurring_todo", label: "Recurring / To-Do", path: "/recurring-todo" },
   { id: "task_templates", label: "Task Control", path: "/task-templates" },
   { id: "fms_builder", label: "FMS", path: "/fms" },
   { id: "forms_library", label: "Forms Library", path: "/forms" },
@@ -68,7 +70,6 @@ export const IMPLEMENTED_PAGE_IDS: readonly PageId[] = [
   "home",
   "dashboard",
   "checklist_tasks",
-  "recurring_todo",
   "task_templates",
   "users",
   "availability",
@@ -94,7 +95,6 @@ const APP_DESCRIPTIONS: Partial<Readonly<Record<PageId, string>>> = {
   forms_library: "Browse, fill, and manage authorized forms and submissions.",
   users: "Browse employees by department and manage authorized accounts.",
   availability: "Record real working availability.",
-  recurring_todo: "Manage recurring schedules, personal work, verification, follow-ups, and coverage.",
   task_templates: "Track progress, chase overdue work, review evidence, and manage every task template in one place.",
   dropdown_master: "Maintain active master values.",
   reports: "Preview fixed reports and manage private CSV exports.",
@@ -177,11 +177,20 @@ export function canAccessPage(role: UserRole, page: PageId): boolean {
 
 export const TASK_IN_LOOP_PATH = "/tasks/in-loop";
 
+/**
+ * The retired Recurring / To-Do address. Notifications and bookmarks still carry
+ * it; it is authorized as Tasks (every role has Tasks) and the shell then
+ * replaces it with the destination for the viewer's role
+ * (`legacyRecurringTodoDestination`).
+ */
+export const LEGACY_RECURRING_TODO_PATH = "/recurring-todo";
+
 export function getPageForPath(path: string): PageId | undefined {
   path = path.split(/[?#]/, 1)[0] ?? path;
   // Task evidence used to be its own destination; it is now a panel inside Task
   // Control, so old links and bookmarks land on the workspace that absorbed it.
   if (path === "/task-evidence") return "task_templates";
+  if (path === LEGACY_RECURRING_TODO_PATH) return "checklist_tasks";
   if (path === "/tasks/checklist" || path === "/tasks/delegation" || path === TASK_IN_LOOP_PATH || path === "/tasks/import" || path === "/tasks/assigning-left") return "checklist_tasks";
   // Permission management lives inside Settings; the page itself additionally
   // requires the protected permissions.manage permission.

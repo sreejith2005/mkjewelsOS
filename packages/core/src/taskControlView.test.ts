@@ -12,6 +12,7 @@ import {
   taskPendingScore,
   formatTaskPerformanceScore,
   taskControlTabsFor,
+  legacyRecurringTodoDestination,
   taskRowTone,
   taskWorkKind,
   isFmsWorkKind, canDeleteTaskControlRow,
@@ -61,9 +62,20 @@ describe("task control access", () => {
     expect(canSelectTaskControlBranch("manager")).toBe(false);
   });
 
-  it("drops the Templates tab for a role that cannot manage them", () => {
-    expect(taskControlTabsFor("admin")).toEqual(["overview", "people", "tasks", "templates"]);
+  it("drops the Review and Templates tabs for a role that cannot manage them", () => {
+    expect(taskControlTabsFor("super_admin")).toEqual(["overview", "people", "tasks", "review", "templates"]);
+    expect(taskControlTabsFor("admin")).toEqual(["overview", "people", "tasks", "review", "templates"]);
     expect(taskControlTabsFor("manager")).toEqual(["overview", "people", "tasks"]);
+    expect(taskControlTabsFor("hr")).toEqual(["overview", "people", "tasks"]);
+  });
+
+  it("sends the retired Recurring / To-Do address where each role's work now is", () => {
+    expect(legacyRecurringTodoDestination("super_admin")).toBe("/task-templates?tab=review");
+    expect(legacyRecurringTodoDestination("admin")).toBe("/task-templates?tab=review");
+    expect(legacyRecurringTodoDestination("manager")).toBe("/task-templates?tab=tasks");
+    expect(legacyRecurringTodoDestination("hr")).toBe("/task-templates?tab=tasks");
+    expect(legacyRecurringTodoDestination("staff")).toBe("/tasks");
+    expect(legacyRecurringTodoDestination(undefined)).toBe("/tasks");
   });
 
   it("shows the search box only where the server searches", () => {

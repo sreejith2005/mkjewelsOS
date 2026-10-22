@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { templateCanActivate, templateCanAssignNow, templateFrequencyLabel, templateStatusLabel, type TaskTemplateDirectoryRow } from "./model";
+import { templateCanActivate, templateCanAssignNow, templateCanRunNow, templateFrequencyLabel, templateNextDate, templateScheduleDescription, templateStatusLabel, type TaskTemplateDirectoryRow } from "./model";
 
 function row(overrides: Partial<TaskTemplateDirectoryRow>): TaskTemplateDirectoryRow {
   return {
@@ -27,4 +27,19 @@ it("keeps unassigned duties and dated schedules on their existing labels", () =>
   expect(templateStatusLabel(row({}))).toBe("ACTIVE");
   expect(templateFrequencyLabel(row({}))).toBe("DAILY");
   expect(templateCanAssignNow(row({}))).toBe(false);
+});
+
+it("describes a schedule and its next date through the scheduler's own engine", () => {
+  const third = row({ schedule_kind: "monthly", recurrence_rule: "FREQ=MONTHLY;BYDAY=3SA", starts_on: "2026-10-17" });
+  expect(templateScheduleDescription(third)).toBe("Every month on the 3rd Saturday");
+  expect(templateNextDate(third, "2026-10-21")).toBe("2026-11-21");
+  expect(templateNextDate(row({ schedule_kind: "daily", recurrence_rule: "FREQ=DAILY;COUNT=2", starts_on: "2026-10-01" }), "2026-10-21")).toBe("ended");
+  expect(templateNextDate(row({ schedule_kind: "as_required", recurrence_rule: "FREQ=DAILY", starts_on: null }), "2026-10-21")).toBeNull();
+  expect(templateScheduleDescription(row({ schedule_kind: "as_required", recurrence_rule: "FREQ=DAILY" }))).toBeNull();
+});
+
+it("runs now only an active, ready calendar schedule", () => {
+  expect(templateCanRunNow(row({ schedule_kind: "daily", is_active: true, schedule_status: "ready" }))).toBe(true);
+  expect(templateCanRunNow(row({ schedule_kind: "daily", is_active: false, schedule_status: "paused" }))).toBe(false);
+  expect(templateCanRunNow(row({ schedule_kind: "as_required", is_active: false }))).toBe(false);
 });

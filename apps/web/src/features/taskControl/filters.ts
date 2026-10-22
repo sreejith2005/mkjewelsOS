@@ -8,7 +8,7 @@ import type { TaskView } from "@/features/taskEvidence/types";
  * same keys, so the translation below is a projection, never a re-interpretation.
  */
 
-export const TASK_CONTROL_TABS = ["overview", "people", "tasks", "templates"] as const;
+export const TASK_CONTROL_TABS = ["overview", "people", "tasks", "review", "templates"] as const;
 export type TaskControlTab = (typeof TASK_CONTROL_TABS)[number];
 
 export const RANGE_PRESETS = ["today", "last_7_days", "last_30_days", "this_month", "custom"] as const;
