@@ -37,6 +37,8 @@ import type { DynamicOptions } from "@/features/forms/FormRenderer";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { fmsAssignedWorkPath } from "@jewelos/core";
 import { loadFmsTaskDeepLink } from "@/features/tasks/api";
+import { canManageTaskTemplates } from "@jewelos/core";
+import { createScheduledTask } from "@/features/recurringTodo/api";
 
 const TASK_TOPICS = ["tasks", "forms", "fms", "organization"] as const;
 
@@ -263,7 +265,7 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
         <Button aria-label="Create task" className="size-14 rounded-full p-0 shadow-lift ring-4 ring-task-bg/60 md:h-14 md:w-auto md:rounded-2xl md:px-5" onClick={() => void openComposer()}><Plus className="size-6" /><span className="hidden md:inline">Create Task</span></Button>
       </div> : null}
 
-      {composerOpen && canCreateTasks && references && profile ? <TaskComposer canUseVoice={canUseVoice} data={references} onClose={() => setComposerOpen(false)} onCreated={() => { setComposerOpen(false); void refresh(); }} onSave={createDelegationTask} onUploadAttachment={(taskId, file) => uploadTaskAttachment(profile.tenant_id, taskId, file)} profile={profile} /> : null}
+      {composerOpen && canCreateTasks && references && profile ? <TaskComposer canSchedule={canManageTaskTemplates(profile.user_role)} canUseVoice={canUseVoice} data={references} onClose={() => setComposerOpen(false)} onCreated={() => { setComposerOpen(false); void refresh(); }} onSave={createDelegationTask} onSaveSchedule={createScheduledTask} onUploadAttachment={(taskId, file) => uploadTaskAttachment(profile.tenant_id, taskId, file)} profile={profile} /> : null}
       {formTarget?.id && formTarget.form_template_id ? (() => { const form = formBundles.find((item) => item.id === formTarget.form_template_id); return form ? <Modal onClose={() => setFormTarget(null)} title={`Required form: ${form.name}`} wide><TaskRequiredForm taskId={formTarget.id ?? ""} requiresRemark={taskNeedsCompletionRemark(formTarget, profile?.id)} requiresUpload={Boolean(formTarget.requires_upload)} definition={{ name: form.name, description: form.description ?? undefined, sections: form.sections, fields: form.fields }} dynamicOptions={formDynamicOptions} templateId={form.id} onCompleted={async () => { setFormTarget(null); await refresh(); }} /></Modal> : <Modal onClose={() => setFormTarget(null)} title="Required form"><Notice tone="danger">The exact required form version is not available to this account.</Notice></Modal>; })() : null}
     </section>
   );
