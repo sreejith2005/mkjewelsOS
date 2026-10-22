@@ -62,17 +62,11 @@ function TaskSelector({ children, id, open, panel }: { children: ReactNode; id: 
   // people picker clipped its search field and names at phone width.
   return <div className={cn("min-w-0", open && "col-span-2")} data-testid={`task-selector-${id}`}>
     {children}
-    {open ? <div className="mt-2 max-h-[min(26rem,50dvh)] scroll-mb-24 overflow-y-auto rounded-xl border border-task-border bg-task-muted p-3" data-testid={`task-panel-${id}`} ref={panelRef}>{panel}</div> : null}
+    {open ? <div className="mt-2 scroll-mb-24 rounded-xl border border-task-border bg-task-muted p-3" data-testid={`task-panel-${id}`} ref={panelRef}>{panel}</div> : null}
   </div>;
 }
 
-export function TaskComposer({ canSchedule = false, canUseVoice = false, data, onClose, onCreated, onSave, onSaveSchedule, onUploadAttachment, profile }: {
-  /**
-   * Recurring and as-needed scheduling is offered to the roles that manage
-   * schedules in Task Control; `save_recurring_todo_template_with_audit`
-   * re-checks the caller.
-   */
-  canSchedule?: boolean;
+export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, onSave, onSaveSchedule, onUploadAttachment, profile }: {
   /** Saves one schedule template (and creates a due first occurrence); returns its id. */
   onSaveSchedule?: (payload: Json) => Promise<string>;
   /** Voice capture is offered only to authors the database grants `tasks.voice_assign`. */
@@ -99,6 +93,9 @@ export function TaskComposer({ canSchedule = false, canUseVoice = false, data, o
   const [checklistDraft, setChecklistDraft] = useState("");
   const [checklist, setChecklist] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+  // The error sits above the fields; on a phone the Assign button is far below it, so bring it into view.
+  useEffect(() => { if (error) errorRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" }); }, [error]);
   const [saving, setSaving] = useState(false);
   const submitting = useRef(false);
   const [submission, setSubmission] = useState<Submission | null>(null);
@@ -119,7 +116,9 @@ export function TaskComposer({ canSchedule = false, canUseVoice = false, data, o
   /** People whose schedule is already saved, so a retry never creates a second one. */
   const [savedScheduleFor, setSavedScheduleFor] = useState<readonly string[] | null>(null);
   const priorityTouched = useRef(false);
-  const scheduling = canSchedule && scheduleType !== "once";
+  // Any task author can create a schedule. The save RPC enforces the same
+  // assignment boundary as one-time work; template management stays separate.
+  const scheduling = Boolean(onSaveSchedule) && scheduleType !== "once";
 
   const branchNames = useMemo(() => new Map(data.branches.map((branch) => [branch.id, branch.name])), [data.branches]);
   const departmentNames = useMemo(() => new Map(data.departments.map((department) => [department.id, department.name])), [data.departments]);
@@ -232,7 +231,7 @@ export function TaskComposer({ canSchedule = false, canUseVoice = false, data, o
         saved.push(person.id);
       }
       const noun = scheduleType === "as_needed" ? "duty" : "schedule";
-      toast.success(people.length === 1 ? `${noun === "duty" ? "Duty" : "Schedule"} created` : `${people.length} ${noun === "duty" ? "duties" : "schedules"} created`, { description: `For ${people.length} user${people.length === 1 ? "" : "s"}. Manage ${people.length === 1 ? "it" : "them"} in Task Control → Templates.` });
+      toast.success(people.length === 1 ? `${noun === "duty" ? "Duty" : "Schedule"} created` : `${people.length} ${noun === "duty" ? "duties" : "schedules"} created`, { description: `For ${people.length} user${people.length === 1 ? "" : "s"}.` });
       onCreated();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to create the schedule");
@@ -304,21 +303,30 @@ export function TaskComposer({ canSchedule = false, canUseVoice = false, data, o
 
   const assignmentChoice = (mode: ManualTaskAssignmentMode, label: string, hint: string, disabled = false) => <label className={cn("flex min-h-11 items-start gap-3 rounded-lg border px-3 py-2 text-sm", effectiveAssignmentMode === mode ? "border-task-accent bg-task-accent-soft" : "border-task-border bg-task-bg", disabled && "opacity-60")}><input checked={effectiveAssignmentMode === mode} className="mt-0.5 size-4 accent-task-accent" disabled={disabled} name="task-assignment-mode" onChange={() => setAssignmentMode(mode)} type="radio" /><span className="min-w-0"><span className="block font-medium text-task-text">{label}</span><span className="block text-xs text-task-text-muted">{hint}</span></span></label>;
   const usersPanel = <div className="space-y-3">
+    {selectedDoers.length ? <div aria-label="Selected users" className="flex flex-wrap gap-2">{selectedDoers.map((person) => <button aria-label={`Remove ${person.employee_name ?? "user"}`} className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg border border-task-border bg-task-bg px-3 text-sm" key={person.id} onClick={() => updateDoers(doers.filter((id) => id !== person.id))} type="button"><span className="break-words">{person.employee_name}</span><X className="size-4 shrink-0" /></button>)}</div> : null}
     <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} label="Assign users" multiple onChange={updateDoers} people={eligiblePeople.flatMap((person) => person.id ? [{ ...person, id: person.id }] : [])} selectedIds={doers} />
     {scheduling && doers.length > 1 ? <p className="text-xs text-task-text-muted" data-testid="schedule-separate-note">Each selected user gets their own {scheduleType === "as_needed" ? "duty" : "schedule"}. A shared schedule is not available: a schedule has one owner.</p> : null}
     {!scheduling && doers.length > 1 ? <fieldset className="space-y-2" data-testid="task-assignment-mode"><legend className="mb-1 text-xs font-semibold text-task-text">How should {doers.length} users get this task?</legend>
       {assignmentChoice("separate", "Separate task for each user", "Everyone gets their own copy and completes it themselves.")}
       {assignmentChoice("shared", "One shared task", canShare ? "Any one of them can complete it for everyone." : "Needs every user in the same branch and department.", !canShare)}
     </fieldset> : null}
+    <Button className="w-full" onClick={() => setPanel(null)} type="button">Done</Button>
   </div>;
-  const duePanel = <label><span className="mb-1 block text-xs font-semibold text-task-text">Due date and time</span><input className="task-field" min={new Date().toISOString().slice(0, 16)} onChange={(event) => { setPlanned(event.target.value); setDeadlineNote(null); setPanel(null); }} type="datetime-local" value={planned} /></label>;
+  const today = toDateTimeLocal(new Date().toISOString()).slice(0, 10);
+  const chooseDueDate = (date: string) => { setPlanned(date ? `${date}T${planned.split("T")[1] || "18:00"}` : ""); setDeadlineNote(null); };
+  const duePanel = <div className="space-y-3">
+    <div className="grid grid-cols-2 gap-2">{["Today", "Tomorrow"].map((label, index) => <button className="min-h-11 rounded-lg border border-task-border bg-task-bg text-sm" key={label} onClick={() => { const day = new Date(); day.setDate(day.getDate() + index); chooseDueDate(toDateTimeLocal(day.toISOString()).slice(0, 10)); }} type="button">{label}</button>)}</div>
+    <label className="block"><span className="mb-1 block text-sm font-semibold text-task-text">Due date</span><input className="task-field min-w-0 max-w-full" min={today} onChange={(event) => chooseDueDate(event.target.value)} type="date" value={planned.split("T")[0] ?? ""} /></label>
+    <label className="block"><span className="mb-1 block text-sm font-semibold text-task-text">Due time</span><input className="task-field min-w-0 max-w-full" onChange={(event) => { setPlanned(event.target.value ? `${planned.split("T")[0] || today}T${event.target.value}` : ""); setDeadlineNote(null); }} type="time" value={planned.split("T")[1] ?? "18:00"} /></label>
+    <Button className="w-full" disabled={!planned} onClick={() => setPanel(null)} type="button">Done</Button>
+  </div>;
   const priorityPanel = <fieldset className="grid grid-cols-3 gap-2"><legend className="sr-only">Priority</legend>{priorityOptions.map((option) => <button aria-pressed={priority === option.value} className={cn("min-h-11 min-w-0 rounded-lg border px-2 text-sm", priority === option.value ? "border-task-accent bg-task-accent-soft font-semibold text-task-text" : "border-task-border bg-task-bg text-task-text-muted")} key={option.value} onClick={() => { priorityTouched.current = true; setPriority(option.value); setPanel(null); }} type="button">{priority === option.value ? <Check className="mr-1 inline size-4" /> : null}{option.label}</button>)}</fieldset>;
   const formPanel = <div><label><span className="mb-1 block text-xs font-semibold text-task-text">Required form</span><select className="task-field" onChange={(event) => { setFormTemplateId(event.target.value); setPanel(null); }} value={formTemplateId}><option value="">No form required</option>{data.forms.filter((form) => form.lifecycle === "published").map((form) => <option key={form.id} value={form.id}>{form.name} v{form.version}</option>)}</select></label><p className="mt-2 text-xs text-task-text-muted">The selected form must be completed before this task can be finished.</p></div>;
   const watchersPanel = <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} disabledIds={doers} label="In Loop · view and comment" multiple onChange={setWatchers} people={eligiblePeople.flatMap((person) => person.id ? [{ ...person, id: person.id }] : [])} selectedIds={watchers} />;
 
   return (
-    <Modal onClose={submission ? onCreated : onClose} title="Assign New Task" tone="light" wide>
-      {error ? <div className="mb-4"><Notice tone="danger">{error}</Notice></div> : null}
+    <Modal mobileFullscreen onClose={submission || savedScheduleFor ? onCreated : onClose} title="Assign New Task" tone="light" wide>
+      {error ? <div aria-live="assertive" className="mb-4 scroll-mt-20" ref={errorRef} role="alert"><Notice tone="danger">{error}</Notice></div> : null}
       {submission ? <div className="mb-4"><Notice>{allSaved
         ? submission.requests.length === 1 ? "The task is saved. Retry uploads against this task; its assignment details are already committed." : `All ${submission.requests.length} tasks are saved. Retry uploads against them; their assignment details are already committed.`
         : `${submission.taskIds.length} of ${submission.requests.length} tasks are saved. Assign again to create the rest; saved tasks are not created twice.`}</Notice></div> : null}
@@ -344,12 +352,12 @@ export function TaskComposer({ canSchedule = false, canUseVoice = false, data, o
 
       <form className="flex flex-col" onSubmit={(event) => void submitManual(event)}>
         <fieldset className="min-w-0" disabled={saving || submission !== null || savedScheduleFor !== null}>
-          <label className="border-b border-task-border px-1 pb-3">
-            <span className="sr-only">Task title</span>
-            <input autoFocus className="w-full bg-transparent text-base font-medium text-task-text placeholder:text-task-text-muted/80 focus-visible:ring-0" data-autofocus maxLength={200} onChange={(event) => setTitle(event.target.value)} placeholder="Add Title" value={title} />
+          <label className="block border-b border-task-border px-1 pb-3">
+            <span className="mb-1 block text-sm font-semibold text-task-text">Task title</span>
+            <input className="task-field" maxLength={200} onChange={(event) => setTitle(event.target.value)} placeholder="Add Title" value={title} />
           </label>
-          <label className="border-b border-task-border px-1 py-3">
-            <span className="sr-only">Task description</span>
+          <label className="block border-b border-task-border px-1 py-3">
+            <span className="mb-1 block text-sm font-semibold text-task-text">Task description</span>
             <textarea className="min-h-24 w-full resize-y rounded-xl bg-task-muted p-3 text-base md:text-sm text-task-text placeholder:text-task-text-muted focus-visible:ring-task-accent" onChange={(event) => setDescription(event.target.value)} placeholder="Add Description" value={description} />
           </label>
           <fieldset className="border-b border-task-border py-3"><legend className="mb-2 text-sm font-semibold text-task-text">Task type</legend><div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2"><button aria-pressed={taskMode === "task"} className={cn("min-h-11 rounded-lg border px-3 text-sm", taskMode === "task" ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border text-task-text-muted")} onClick={() => { setTaskMode("task"); setChecklist([]); setChecklistOpen(false); }} type="button">Task — upload to complete</button><button aria-pressed={taskMode === "checklist"} className={cn("min-h-11 rounded-lg border px-3 text-sm", taskMode === "checklist" ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border text-task-text-muted")} onClick={() => setTaskMode("checklist")} type="button">Checklist — tick every item</button></div></fieldset>
@@ -358,7 +366,7 @@ export function TaskComposer({ canSchedule = false, canUseVoice = false, data, o
             {checklistOpen ? <div className="mt-2 space-y-2"><input className="task-field" onChange={(event) => setChecklistDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addChecklistItem(); } }} placeholder="Type and hit Enter" value={checklistDraft} />{checklist.map((item, index) => <div className="flex items-center gap-3 rounded-xl border border-task-border bg-task-muted px-3 py-2 text-sm text-task-text" key={`${item}-${index}`}><input aria-label={`Required checklist item ${index + 1}`} checked readOnly type="checkbox" /><span className="min-w-0 flex-1 truncate">{item}</span><button aria-label={`Remove checklist item ${index + 1}`} className="text-task-text-muted hover:text-task-text" onClick={() => setChecklist((current) => current.filter((_, itemIndex) => itemIndex !== index))} type="button"><X className="size-4" /></button></div>)}</div> : null}
           </section> : null}
 
-          {canSchedule ? <fieldset className="border-b border-task-border py-3" data-testid="task-schedule-type">
+          {onSaveSchedule ? <fieldset className="border-b border-task-border py-3" data-testid="task-schedule-type">
             <legend className="mb-2 text-sm font-semibold text-task-text">Schedule</legend>
             <div className="grid grid-cols-3 gap-2">{SCHEDULE_TYPES.map(([value, label]) => <button aria-pressed={scheduleType === value} className={cn("min-h-11 rounded-lg border px-2 text-sm", scheduleType === value ? "border-task-accent bg-task-accent-soft font-semibold text-task-text" : "border-task-border text-task-text-muted")} key={value} onClick={() => chooseScheduleType(value)} type="button">{label}</button>)}</div>
             <p className="mt-2 text-xs text-task-text-muted">{SCHEDULE_TYPES.find(([value]) => value === scheduleType)?.[2]}</p>

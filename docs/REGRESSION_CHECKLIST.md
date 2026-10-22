@@ -74,14 +74,21 @@ devtools: `supabase.rpc(...)` / `supabase.from(...)` with the user's session).
 - [ ] Task evidence accepts a photo, a PDF (10 MB) and a phone video (MP4/MOV, 50 MB); a longer clip shows the 50 MB message. In the Android app, Upload always offers Take photo / Record video / Choose from gallery or files, and other upload fields (forms, FMS) still offer the camera.
 - [ ] Recurring tasks generate on schedule; overdue tasks show as overdue.
 - [ ] Recurring / To-Do consolidation (migration 0340): the menu has no Recurring / To-Do; /recurring-todo opens
-      Task Control → Review (SA/ADM), Task Control → Tasks (MGR/HR) or Tasks (others). As SA/ADM, Create Task
-      shows Schedule (One-time default · Recurring · As needed); other roles see the unchanged one-time composer.
-      Recurring "3rd Saturday of every month" previews the real 3rd Saturdays and saves one template per selected
+      Task Control → Review (SA/ADM), Task Control → Tasks (MGR/HR) or Tasks (others). After migration 0341,
+      all active task authors see Schedule (One-time default · Recurring · As needed), with assignment scope,
+      denied permissions and protected recipients enforced by both save RPCs. Template editing remains restricted.
+      Repeats offers Daily, Weekly, Monthly, Quarterly, Annually and Custom. Custom monthly weekday
+      "3rd Saturday" previews the real 3rd Saturdays and saves one template per selected
       person, its first occurrence on the first 3rd Saturday. As needed saves a duty with its wording and creates no
       task that day. Task Control → Review: Verify, Reject (reason required; the doer's alert opens that task in
       Tasks), Follow up, complete on behalf (remark asked), required form, Performance; tiles open the matching
       list. Templates: Next date or Ended, Run now; Edit keeps priority, verification, verifier, follow-ups, remark
       rule, checklist and a paused state. Turning Task Control off in Developer Mode pauses Verify and Follow up.
+- [ ] Create Task on phone widths 320/390/430: no horizontal overflow; header/actions remain reachable;
+      keyboard opening/closing retains title and search text and keeps the focused field visible above the
+      keyboard/action bar. Users shows selected names and Done. Due Date
+      has Today/Tomorrow, separate date/time and Done without closing mid-selection. Desktop layout remains usable.
+      Voice guidance has readable headings, Required/Optional labels and its example, without per-field descriptions.
 - [ ] Bulk Import: a workbook imported before 2026-10-21 replays as "replayed", never "created"; the new
       frequencies (3rd Saturday, Last Friday, Every 2 Weeks, Half Yearly, Month End, weekday lists) import; an
       unknown frequency is still a row error.

@@ -160,6 +160,9 @@ describe("VoiceTaskCapture", () => {
     expect(labels[1]).toMatch(/^2Details.*Optional/);
     expect(labels[2]).toMatch(/^3Assign to.*Required/);
     expect(labels[3]).toMatch(/^4Deadline.*Required/);
+    expect(guide()?.textContent).not.toContain("What needs to be done");
+    expect(guide()?.textContent).not.toContain("Any extra instructions");
+    expect(guide()?.textContent).toContain("Example:");
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Record a task instruction" })); });
     expect(guide()?.textContent).toContain("Speak in this order");
     await act(async () => { vi.advanceTimersByTime(2_000); });

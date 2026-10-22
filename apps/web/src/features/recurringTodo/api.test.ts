@@ -2,7 +2,17 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@jewelos/api-client", () => ({ supabase: {} }));
 
-import { materializeRecurringTemplate } from "./api";
+import { createScheduledTask, materializeRecurringTemplate } from "./api";
+
+it("creates through the atomic schedule RPC without a second management-only materialization call", async () => {
+  const rpc = vi.fn().mockResolvedValue({ data: "new-schedule", error: null });
+  const invoke = vi.fn().mockResolvedValue({ data: null, error: { message: "Management only" } });
+  const { supabase } = await import("@jewelos/api-client");
+  Object.assign(supabase, { rpc, functions: { invoke } });
+  await expect(createScheduledTask({ recurrence_rule: "FREQ=DAILY", schedule_kind: "daily" })).resolves.toBe("new-schedule");
+  expect(rpc.mock.calls.map(([name]) => name)).toEqual(["save_recurring_todo_template_with_audit"]);
+  expect(invoke).not.toHaveBeenCalled();
+});
 
 describe("materializeRecurringTemplate", () => {
   it("invokes the authenticated immediate-materialization function", async () => {

@@ -33,6 +33,7 @@ export function Modal({
   tone = "dark",
   wide = false,
   stickyHeader = true,
+  mobileFullscreen = false,
 }: {
   title: string;
   children: ReactNode;
@@ -40,12 +41,45 @@ export function Modal({
   tone?: "dark" | "light";
   wide?: boolean;
   stickyHeader?: boolean;
+  /** A keyboard-aware full-screen form on phones; desktop dialogs keep their size. */
+  mobileFullscreen?: boolean;
 }) {
   const titleId = useId();
   const dialogRef = useRef<HTMLElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   onCloseRef.current = onClose;
+
+  useEffect(() => {
+    if (!mobileFullscreen || !window.visualViewport) return;
+    const viewport = window.visualViewport;
+    let focusFrame = 0;
+    const fitViewport = () => {
+      if (!backdropRef.current) return;
+      backdropRef.current.style.height = `${viewport.height}px`;
+      backdropRef.current.style.top = `${viewport.offsetTop}px`;
+      // Keyboard opening can also pan the visual viewport. Keep the input in
+      // the dialog's own scroll area, clear of its header and action bar.
+      // Scroll after applying the new viewport height, so a field that fitted
+      // before the keyboard opened is brought into the remaining space.
+      window.cancelAnimationFrame(focusFrame);
+      focusFrame = window.requestAnimationFrame(() => {
+        const focused = document.activeElement;
+        if (focused instanceof HTMLElement && focused !== dialogRef.current && dialogRef.current?.contains(focused)) {
+          focused.scrollIntoView?.({ block: "nearest", behavior: "instant" });
+        }
+      });
+    };
+    fitViewport();
+    viewport.addEventListener("resize", fitViewport);
+    viewport.addEventListener("scroll", fitViewport);
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      viewport.removeEventListener("resize", fitViewport);
+      viewport.removeEventListener("scroll", fitViewport);
+    };
+  }, [mobileFullscreen]);
 
   useEffect(() => {
     restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -89,7 +123,8 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-obsidian/70 p-0 backdrop-blur-sm duration-200 animate-in fade-in sm:items-center sm:p-4"
+      ref={backdropRef}
+      className={cn("fixed inset-0 z-50 flex items-end justify-center bg-obsidian/70 p-0 backdrop-blur-sm duration-200 animate-in fade-in sm:items-center sm:p-4", mobileFullscreen && "transition-none")}
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
     >
       <section
@@ -103,6 +138,9 @@ export function Modal({
           "max-h-[92dvh] w-full overflow-y-auto overscroll-contain rounded-t-3xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl duration-300 ease-out animate-in slide-in-from-bottom-8 sm:max-h-[90dvh] sm:rounded-2xl sm:duration-200 sm:slide-in-from-bottom-0 sm:zoom-in-95",
           tone === "light" ? "border border-task-border bg-task-bg text-task-text" : "glass-card",
           wide ? "sm:max-w-4xl" : "sm:max-w-lg",
+          // Duration utilities otherwise transition every property, including
+          // height: that delay hides the focused field during keyboard resize.
+          mobileFullscreen && "h-full max-h-full rounded-none pt-0 scroll-pb-24 scroll-pt-20 transition-none sm:h-auto sm:max-h-[90dvh] sm:rounded-2xl",
         )}
       >
         {/* Filling forms can let the title scroll with the questions. */}
@@ -110,6 +148,9 @@ export function Modal({
           className={cn(
             "-mx-5 -mt-5 mb-5 flex items-center justify-between gap-3 px-5 pb-3 pt-2 sm:pt-5",
             stickyHeader && "sticky top-0 z-10",
+            // Full-screen forms start at the scrollport edge. Avoid a negative
+            // vertical margin on this sticky header, including its paint area.
+            mobileFullscreen && "mt-0",
             tone === "light" ? "bg-task-bg" : "bg-charcoal",
           )}
         >

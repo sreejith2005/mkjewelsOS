@@ -56,7 +56,7 @@ export function VoiceTaskCapture({ onInterpreted }: { onInterpreted: (interpreta
           <p className="text-sm font-semibold text-task-text">
             {state === "recording" ? `Recording · ${secondsLeft}s left` : state === "interpreting" ? "Interpreting…" : state === "starting" ? "Starting microphone…" : "Assign by voice"}
           </p>
-          <p className="truncate text-xs text-task-text-muted">
+          <p className="text-sm text-task-text-muted">
             {state === "recording"
               ? "Say the task, who it is for, and when it is due. Tap stop when done."
               : state === "interpreting"
@@ -86,20 +86,19 @@ export function VoiceTaskCapture({ onInterpreted }: { onInterpreted: (interpreta
 function VoiceSpeakingGuide({ active }: { active: boolean }) {
   return (
     <div className="mt-3 rounded-lg bg-task-bg p-3" data-testid="voice-speaking-guide">
-      <p className="mb-2 text-xs font-semibold text-task-text">{active ? "Speak in this order" : "What to say"}</p>
-      <ol className="grid gap-1.5 sm:grid-cols-2">
+      <p className="mb-3 text-base font-semibold text-task-text">{active ? "Speak in this order" : "What to say"}</p>
+      <ol className="grid gap-3 sm:grid-cols-2">
         {VOICE_TASK_SPEAKING_GUIDE.map((step, index) => (
-          <li className="flex items-start gap-2 text-xs" key={step.id}>
-            <span className={cn("flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold", step.required ? "bg-task-accent text-task-text" : "bg-task-muted text-task-text-muted")}>{index + 1}</span>
-            <span className="min-w-0">
+          <li className="flex items-center gap-3 text-base" key={step.id}>
+            <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold", step.required ? "bg-task-accent text-task-text" : "bg-task-muted text-task-text-muted")}>{index + 1}</span>
+            <span className="min-w-0 flex flex-wrap items-baseline gap-x-2">
               <span className="font-semibold text-task-text">{step.label}</span>
-              <span className={cn("ml-1 text-[10px] font-semibold uppercase", step.required ? "text-danger" : "text-task-text-muted")}>{step.required ? "Required" : "Optional"}</span>
-              <span className="block text-task-text-muted">{step.hint}</span>
+              <span className={cn("text-sm", step.required ? "text-danger" : "text-task-text-muted")}>{step.required ? "Required" : "Optional"}</span>
             </span>
           </li>
         ))}
       </ol>
-      <p className="mt-2 text-[11px] italic text-task-text-muted">Example: {VOICE_TASK_SPEAKING_EXAMPLE}</p>
+      <p className="mt-4 text-base leading-relaxed text-task-text-muted">Example: {VOICE_TASK_SPEAKING_EXAMPLE}</p>
     </div>
   );
 }
