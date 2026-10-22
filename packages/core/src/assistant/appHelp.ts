@@ -96,6 +96,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     summary: "FMS runs company workflows (Flow Management System): live workflow instances, assigned stages, and, for builders, versioned workflow designs.",
     recipes: [
       "Do my assigned stage: open the stage from Home or Tasks, complete its form or evidence, and submit.",
+        "Choose the next employee: in the FMS confirmation, press Assign to a Different Employee. Search any active, login-enabled company user across departments and branches, including management. Fixed employee steps stay locked; availability coverage still applies.",
       "Start a workflow: open FMS, choose the workflow, and press \"Start instance\" (when your role may start it).",
       "Design a workflow: \"New workflow\" in FMS (workflow builders only).",
       "Name workflow work: in the initial form's Task Naming settings, use Task name from to select an eligible question from its linked form or the form's selected record-name question. Later stages inherit that original name unless a stage override selects another question. Use the normal workflow revision and publication lifecycle for changes.",

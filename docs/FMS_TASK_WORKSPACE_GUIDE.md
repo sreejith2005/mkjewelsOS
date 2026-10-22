@@ -2,6 +2,13 @@
 
 This describes the new implementation; deployment is a separate release gate.
 
+When the confirmation offers **Assign to a Different Employee**, you can search
+all active, login-enabled users in your company across departments and branches,
+including management. The same rule applies to an employee selected in the
+workflow form. Fixed employee steps stay locked and availability coverage still
+applies. Ordinary task-assignment permissions are separate from an authorized
+FMS handoff.
+
 ## For employees
 
 1. Open Tasks and select FMS. My Tasks and Delegated keep ordinary tasks; In Loop

@@ -140,6 +140,15 @@ it never does anything in JewelOS.
 - Anything that is a company rule rather than a button: that comes from the SOPs.
 
 
+## FMS handoffs - 2026-10-22
+
+FMS handoff update (2026-10-22): **Assign to a Different Employee** searches all
+active, login-enabled users in the company, including management, across branches
+and departments. Published fixed employees remain locked and availability
+coverage still applies. This changes FMS recipients only. Ordinary Tasks scope
+and management restrictions remain unchanged. No Kiara data tool is needed:
+this explains the existing protected confirmation flow; Kiara remains read-only.
+
 ## Task editing - 2026-10-15
 
 Task Control help now describes Edit task, Task/Checklist conversion, all authoring
