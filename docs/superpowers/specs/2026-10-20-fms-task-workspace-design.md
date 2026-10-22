@@ -1,8 +1,9 @@
 # FMS employee task workspace and record naming
 
-Status: owner-approved design; implementation and local verification in progress.
+Status: owner-approved design implemented; local verification recorded in the plan.
 Date: 2026-10-20 (Asia/Kolkata).
 Source baseline: refreshed `origin/main`, `b844a67`, migrations through `0290`.
+Combined integration baseline: `origin/main` `adef660`; feature migrations 0300-0317.
 Final integration target: `main`, per the owner's instruction in this session.
 
 ## Intent and protected boundaries
@@ -279,10 +280,10 @@ that production not be deployed without required approval/release procedures.
 Before hosted writes, check the actual linked project, migration ledger and dry
 run; do not infer hosted migration availability from this local spec.
 
-On main's current Android shell, this UI reaches phones through the web deployment;
-avoid unrelated shell changes. Follow the owner's supplied standing release rules
-if actual native/shared mobile-consumed runtime changes require an APK. No APK,
-hosted migration, merge or production deployment has been performed for this design.
+On main's current Android shell, web/shared UI changes reach phones through the
+web deployment and require no APK. No native source, APK, hosted migration,
+Git publication or production deployment is part of the completed local evidence.
+The plan records local main integration separately.
 
 Release the backward-compatible database reads/configuration first and matching
 clients together after validation. Existing RPC signatures remain. A UI rollback

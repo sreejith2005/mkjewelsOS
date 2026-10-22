@@ -13,7 +13,9 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub',(select id::text from visit_assignment_fixture where name='b_auth'),true);
 select is((get_fms_task_workspace('{}')->>'total')::integer,250,'summary counts all 250 actual visits');
 select is((task_feed_page('fms','pending')->'counts'->>'open')::integer,250,'tab reconciles beyond first 50');
-select is((get_fms_task_workspace('{"query":"Synthetic client"}')->>'total')::integer,250,'form-answer search covers all visits');
+set local statement_timeout='8s';
+select is((get_fms_task_workspace('{"query":"Synthetic client"}')->>'total')::integer,250,'form-answer search covers all visits within the authenticated request budget');
+set local statement_timeout=0;
 select is(jsonb_array_length(get_fms_task_stage_page((select family_id from fms_flows where id=(select id from visit_assignment_fixture where name='flow')),
  (select id from visit_assignment_fixture where name='flow'),(select id from visit_assignment_fixture where name='call'))->'records'),50,'expanded stage is bounded');
 select is((select sum((entry->>'count')::integer)::integer from jsonb_array_elements(get_fms_task_stages((select family_id from fms_flows where id=(select id from visit_assignment_fixture where name='flow')))) entry),250,'stage counts reconcile');

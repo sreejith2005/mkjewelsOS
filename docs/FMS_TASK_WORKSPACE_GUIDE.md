@@ -84,6 +84,12 @@ New forward migrations:
 | `0309_fms_cancelled_workflow_history.sql` | Retain completed visits after later workflow cancellation |
 | `0310_fms_starting_form_history_identity.sql` | Count a submitted starting form once using its canonical completed runtime history; preserve repeat visits |
 | `0311_fms_workspace_builder_edge_order.sql` | Preserve saved parallel/branch order and conditional-before-default graph traversal |
+| `0312_fms_workspace_naming_projection_reuse.sql` | Reuse exact causal naming sources and fields behind materialized authorized assignments; keep unchecked helpers private |
+| `0313_fms_workspace_actor_snapshot.sql` | Resolve stable actor/module checks once per query while retaining exact-work authorization |
+| `0314_fms_name_candidate_volatility.sql` | Declare candidate selection STABLE to match its PostgreSQL text helpers |
+| `0315_fms_global_search_module_snapshot.sql` | Resolve the same stable FMS module check once in global task search while preserving instance/work authorization |
+| `0316_fms_batch_equivalent_record_names.sql` | Batch identical naming inputs within one authorized read; keep submitted visits and differing ancestry separate |
+| `0317_fms_global_search_filter_before_names.sql` | Apply existing non-name search filters before projecting historical names, preserving cross-status counts |
 
 The only added table column is `form_templates.record_name_field_key`; its
 Row/Insert/Update types and the three public RPC types are checked against local

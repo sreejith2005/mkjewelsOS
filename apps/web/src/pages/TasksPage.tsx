@@ -222,7 +222,7 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
       </div>
 
       {!focusedTaskId && workspaceView !== "fms" ? <TaskSearchControls value={filters} onChange={changeSearch} canViewAll={hasAdminTaskView} /> : null}
-      {!exploring ? <div className="scroll-x no-scrollbar flex items-stretch gap-2 border-b border-task-border bg-task-bg px-3 pt-3 sm:px-5">
+      {!exploring ? <div className="no-scrollbar grid grid-cols-2 items-stretch gap-2 border-b border-task-border bg-task-bg px-3 pt-3 sm:flex sm:overflow-x-auto sm:px-5">
         {([
           ["mine", "My Tasks", tabCounts.mine],
           ["delegated", "Delegated", tabCounts.delegated],

@@ -31,5 +31,9 @@ select set_config('request.jwt.claim.sub',(select id::text from visit_assignment
 select is((get_fms_assigned_work_context((select id from visit_assignment_fixture where name='instance'),
  (select id from fms_instance_stages where fms_instance_id=(select id from visit_assignment_fixture where name='instance') and fms_stage_id=(select id from visit_assignment_fixture where name='call')))->>'recordName'),'Synthetic client - Call','legacy template uses safe historical values');
 reset role;
+select is((select record_name from fms_work_record_names_authorized(array[(select id from fms_instance_stages
+ where fms_instance_id=(select id from visit_assignment_fixture where name='instance') and fms_stage_id=(select id from visit_assignment_fixture where name='call'))])),
+ fms_work_record_name((select id from fms_instance_stages where fms_instance_id=(select id from visit_assignment_fixture where name='instance')
+ and fms_stage_id=(select id from visit_assignment_fixture where name='call'))),'batched legacy name matches the checked historical resolver');
 select * from finish();
 rollback;
