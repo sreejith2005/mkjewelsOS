@@ -186,6 +186,32 @@
     @apply mb-1.5 block text-xs font-semibold uppercase tracking-wider text-task-text-muted;
   }
 
+  /* A form question: sentence case and body size, so long questions stay readable on a phone. */
+  .question-label {
+    @apply text-[15px] font-semibold leading-snug text-task-text sm:text-sm;
+  }
+
+  .field[aria-invalid="true"],
+  .task-field[aria-invalid="true"] {
+    @apply border-danger;
+  }
+
+  /* A form's sticky Submit bar sits above the phone's bottom navigation; inside a
+     dialog (which covers the navigation) it sits on the screen edge. */
+  .form-actions {
+    bottom: var(--sticky-bottom, 0px);
+  }
+
+  @media (max-width: 767px) {
+    main {
+      --sticky-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+    }
+
+    [role="dialog"] {
+      --sticky-bottom: 0px;
+    }
+  }
+
   .task-field {
     @apply min-h-11 w-full rounded-lg border border-task-border bg-task-bg px-3 py-2 text-base text-task-text transition-[border-color,box-shadow] duration-150 placeholder:text-task-text-muted/80 hover:border-task-accent/45 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-task-accent focus-visible:ring-offset-task-bg md:text-sm;
   }

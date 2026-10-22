@@ -1,4 +1,4 @@
-import { presentFormSubmission } from "../forms/submissionPresentation";
+import { displayFormAnswer } from "../forms/answerDisplay";
 import type { FmsWorkState } from "./workContracts";
 import type { FormAnswer, FormFieldDefinition } from "../forms/types";
 import { normalizeRecordName } from "./recordNaming";
@@ -21,17 +21,14 @@ export type FmsPreviousFormsPage = Readonly<{ forms: readonly FmsPreviousForm[];
 export function presentFmsWorkContext(context: FmsWorkContext) {
   const substitutions = new Map<string, string>([["stage", context.stageName], ["workflow", context.workflowName], ["reference", context.reference]]);
   const answers = context.receivedFields.map(received => {
-    const userLabel = received.userName || "Historical employee";
     const value = received.field.type === "file" && received.value !== null ? "Attachment provided" : received.value;
-    const presented = presentFormSubmission({ id: received.submissionId, formTemplateId: received.formTemplateId,
-      status: "submitted", submittedAt: null, submittedBy: null, linkedModule: null, linkedRecordId: null,
-      reviewedBy: null, reviewedAt: null, reviewNotes: null, answers: { [received.field.key]: value } },
-    { id: received.formTemplateId, familyId: received.formTemplateId, name: received.formName, version: received.formVersion,
-      fields: [{ ...received.field, ...(received.field.type === "file" ? { type: "text" as const } : {}) }] }, null, [],
-    received.field.type === "user_dropdown" && typeof received.value === "string" ? [{ id: received.value, label: userLabel }] : []);
-    const display = received.valueLabel || presented.answers[0]?.display || "Not provided";
+    const field = received.field.type === "file" ? { ...received.field, type: "text" as const } : received.field;
+    const lookups = received.field.type === "user_dropdown" && typeof received.value === "string"
+      ? { users: new Map([[received.value, received.userName || "Historical employee"]]) } : {};
+    const shown = received.valueLabel || displayFormAnswer(field, value, lookups);
+    const display = shown || "Not provided";
     substitutions.set(`${received.sourceStageKey}.${received.field.key}`, display);
-    return { label: received.field.label, display, source: `${received.formName} · v${received.formVersion}` };
+    return { label: received.field.label, display, answered: !!shown, source: `${received.formName} · v${received.formVersion}` };
   });
   const reference = context.referenceKey ? substitutions.get(context.referenceKey) || context.reference : context.reference;
   substitutions.set("reference", reference);

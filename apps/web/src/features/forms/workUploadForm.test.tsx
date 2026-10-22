@@ -13,7 +13,7 @@ describe("work and upload form on the web", () => {
     const submitted: FormAnswers[] = [];
     render(<FormRenderer definition={workUploadFormDefinition} onSubmit={async (answers) => { submitted.push(answers); }} />);
 
-    expect(screen.getByRole("status").textContent).toContain("Step 1 of 1");
+    expect(screen.getByRole("status").textContent).toBe("Step 1");
     await user.type(screen.getByRole("textbox", { name: /REFERENCE NUMBER/ }), "REF 123");
     await user.selectOptions(screen.getByRole("combobox", { name: /WORK STAGE/ }), "closer");
     expect(screen.queryByText("INTERACTION MEETING")).toBeNull();

@@ -136,7 +136,7 @@ try {
   const before = Number((await db.query("select count(*) from public.form_submissions where linked_record_id=$1", [visit])).rows[0].count);
   await page.getByRole("button", { name: "Submit form", exact: true }).click();
   await page.getByRole("heading", { name: "Complete Stage and Assign Next Work" }).waitFor();
-  await page.getByText("Selected Employee: Employee C", { exact: false }).waitFor();
+  await page.getByRole("article").filter({ hasText: "Will be assigned to" }).getByText("Employee C", { exact: true }).waitFor();
   assert.equal(Number((await db.query("select count(*) from public.form_submissions where linked_record_id=$1", [visit])).rows[0].count), before);
   await page.screenshot({ path: path.join(output, "handoff-phone.png"), fullPage: true });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "Phone has horizontal overflow");

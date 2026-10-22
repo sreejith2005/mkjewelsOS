@@ -131,6 +131,7 @@ export * from "./identity";
 export * from "./taskImport";
 export * from "./taskImport/index";
 export * from "./taskCardState";
+export * from "./dueLabel";
 export * from "./taskPage";
 export * from "./taskDetails";
 export * from "./availability";

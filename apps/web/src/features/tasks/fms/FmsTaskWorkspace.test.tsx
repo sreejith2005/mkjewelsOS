@@ -16,6 +16,7 @@ beforeEach(() => {
  api.loadFmsTaskStagePage.mockResolvedValue({ total: 250, records: [{ id, name: "Rahul Shah", reference: "FMS-1", dueAt: null, status: "pending", visitNumber: 2, description: "Call the client", target: { kind: "stage", instanceId: id, instanceStageId: id } }] });
 });
 it("loads exact family counts first and lazily opens stages, records and existing work", async () => {
+ api.loadFmsTaskWorkspace.mockResolvedValue({ families: [{ id, name: "Enquiries", count: 250 }, { id: "00000000-0000-4000-8000-000000000002", name: "Repairs", count: 3 }], total: 253, activeTotal: 253, familyTotal: 2, counts: { active: 253, pending: 243, overdue: 10, waiting: 0, completed: 0 } });
  const user = userEvent.setup(); const navigate = vi.fn();
  render(<FmsTaskWorkspace actorId={id} tenantId={id} onNavigate={navigate} onCount={vi.fn()} />);
  await screen.findByRole("button", { name: /Enquiries.*250/ });
@@ -28,7 +29,7 @@ it("loads exact family counts first and lazily opens stages, records and existin
  expect(screen.getByText(/1 - 50 of 250/)).toBeTruthy();
 });
 it("has a retry action after a failed summary without fetching records", async () => {
- api.loadFmsTaskWorkspace.mockRejectedValueOnce(new Error("Try again"));
+ api.loadFmsTaskWorkspace.mockRejectedValueOnce(new Error("Try again")).mockResolvedValueOnce({ families: [{ id, name: "Enquiries", count: 250 }, { id: "00000000-0000-4000-8000-000000000002", name: "Repairs", count: 3 }], total: 253, activeTotal: 253, familyTotal: 2, counts: { active: 253, pending: 243, overdue: 10, waiting: 0, completed: 0 } });
  render(<FmsTaskWorkspace actorId={id} tenantId={id} onNavigate={vi.fn()} onCount={vi.fn()} />);
  await screen.findByText("Try again");
  await userEvent.click(screen.getByRole("button", { name: "Retry" }));
@@ -36,10 +37,7 @@ it("has a retry action after a failed summary without fetching records", async (
  expect(api.loadFmsTaskStagePage).not.toHaveBeenCalled();
 });
 it("preserves expanded work across realtime refreshes", async () => {
- const user = userEvent.setup();
  render(<FmsTaskWorkspace actorId={id} tenantId={id} onNavigate={vi.fn()} onCount={vi.fn()} />);
- await user.click(await screen.findByRole("button", { name: /Enquiries.*250/ }));
- await user.click(await screen.findByRole("button", { name: /Introduction Call.*250/ }));
  await screen.findByText("Rahul Shah");
  act(() => { void vi.mocked(useTenantRealtimeRefresh).mock.calls[0]?.[0].refresh(); });
  await waitFor(() => expect(api.loadFmsTaskWorkspace).toHaveBeenCalledTimes(2));
@@ -51,8 +49,6 @@ it("preserves expanded work across realtime refreshes", async () => {
 it("restores expanded groups after a search filter reload", async () => {
  const user = userEvent.setup();
  render(<FmsTaskWorkspace actorId={id} tenantId={id} onNavigate={vi.fn()} onCount={vi.fn()} />);
- await user.click(await screen.findByRole("button", { name: /Enquiries.*250/ }));
- await user.click(await screen.findByRole("button", { name: /Introduction Call.*250/ }));
  await screen.findByText("Rahul Shah");
  await user.type(screen.getByRole("searchbox"), "Rahul");
  await waitFor(() => expect(api.loadFmsTaskWorkspace).toHaveBeenCalledTimes(2));
@@ -66,7 +62,7 @@ it.each(["summary-first", "records-first"])("hides records when an expanded stag
  const stages = await api.loadFmsTaskStages();
  api.loadFmsTaskStages.mockResolvedValue([...stages, { ...stages[0], id: "other", stageId: "other", name: "Other stage", count: 1 }]);
  render(<FmsTaskWorkspace actorId={id} tenantId={id} onNavigate={vi.fn()} onCount={vi.fn()} />);
- await user.click(await screen.findByRole("button", { name: /Enquiries.*250/ }));
+ // Two stages have work, so only the single workflow opens by itself.
  await user.click(await screen.findByRole("button", { name: /Introduction Call.*250/ }));
  await screen.findByText("Rahul Shah");
  let resolveStages!: (value: unknown) => void;
@@ -82,4 +78,25 @@ it.each(["summary-first", "records-first"])("hides records when an expanded stag
  expect(screen.queryByText("Rahul Shah")).toBeNull();
  if (order === "summary-first") await act(async () => resolvePage({ total: 250, records: [{ id, name: "Rahul Shah" }] }));
  expect(screen.queryByText("Rahul Shah")).toBeNull();
+});
+
+it("opens the only workflow and its only stage with work, and names the action", async () => {
+ const navigate = vi.fn();
+ render(<FmsTaskWorkspace actorId={id} tenantId={id} onNavigate={navigate} onCount={vi.fn()} />);
+ const link = await screen.findByRole("link", { name: "Open work — Rahul Shah" });
+ expect(screen.getByRole("button", { name: /Enquiries.*250/ }).getAttribute("aria-expanded")).toBe("true");
+ expect(link.textContent).toContain("Introduction Call");
+ expect(link.textContent).toContain("Visit 2");
+ expect(screen.getByText("Work you can do now: to do and overdue.")).toBeTruthy();
+ await userEvent.setup().click(screen.getByRole("button", { name: /Enquiries.*250/ }));
+ expect(screen.queryByText("Rahul Shah")).toBeNull();
+});
+it("names each record's action for the work that is waiting", async () => {
+ const { fmsRecordAction } = await import("./FmsTaskGroups");
+ const stage = { kind: "stage", instanceId: id, instanceStageId: id } as const;
+ expect(fmsRecordAction({ status: "pending", target: { kind: "stage_form", instanceId: id, instanceStageId: id, formTemplateId: id } })).toBe("Fill form");
+ expect(fmsRecordAction({ status: "overdue", target: { kind: "starter_form", starterAssignmentId: id, formTemplateId: id } })).toBe("Start form");
+ expect(fmsRecordAction({ status: "pending", target: stage })).toBe("Open work");
+ expect(fmsRecordAction({ status: "waiting", target: stage })).toBe("View details");
+ expect(fmsRecordAction({ status: "completed", target: stage })).toBe("View");
 });

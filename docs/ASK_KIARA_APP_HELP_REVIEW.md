@@ -37,10 +37,10 @@ the formula behind each number.
 ## Tasks
 **What it is:** work given to you, tasks you gave to others, and tasks you are watching.
 - [ ] See my tasks: open Tasks. **My Tasks** lists recurring work; **FMS** lists your assigned workflow work by family and published stage; **Delegated** lists one-time assigned work for employees; **In Loop** lists watched work. Subsection counts load when Tasks opens.
-- [ ] Work on FMS: Tasks -> **FMS** -> expand a workflow family -> expand a stage -> **Open Work** on the record. **Active** counts pending and overdue actions. **Waiting** separates work awaiting other employees/approvals. Use name/reference search, workflow/stage/status/due filters and **Clear all**. Counts cover all assignments, not just a page. Access remains the current employee's existing scope.
+- [ ] Work on FMS: Tasks -> **FMS** -> expand a workflow family -> expand a stage -> press the record's action: **Fill form**, **Start form** or **Open work** (**View** / **View details** for finished or waiting work). With only one workflow it opens by itself, and so does its stage when only one stage has work. **Active** counts pending and overdue actions. **Waiting** separates work awaiting other employees/approvals. Use name/reference search, workflow/stage/status/due filters and **Clear all**. Counts cover all assignments, not just a page. Access remains the current employee's existing scope.
 - [ ] Do an anytime duty: duties without a fixed time (As Required, Per Customer, After Visit...) are under the **Anytime duties** bar at the top of My Tasks (Pending), closed until tapped; low priority with no deadline; they come back every day. Press **Start** whenever you do one; it opens as a low-priority task due tonight and also appears in the task list marked **Anytime duty**. **Continue** opens one already open. A duty a manager assigns appears as a high-priority task.
 - [ ] Task order: earliest due date first; at the same due time, high before medium before low. Overdue: longest overdue first. Completed: most recent first.
-- [ ] Complete a task: finish the required form or upload, then press **Complete**. If a remark is required, the button opens and focuses the remark field; enter it and press **Complete** again. FMS work opens its protected workflow runner.
+- [ ] Complete a task: finish the required form or upload, then press **Complete**. If a remark is required, the button opens and focuses the remark field; enter it and press **Complete** again. Tasks that need a form show **Fill form** on the card; FMS stages without a form show **Open work**. FMS work opens its protected workflow runner.
 - [ ] Create a task: in Tasks press **Create Task**, fill in the title, pick one or more people under **Users**, set the due date, optionally add several people under **In Loop**, then press **Assign Task**. With several users, choose **Separate task for each user** (everyone completes their own copy) or **One shared task** (any one of them completes it for all; same branch and department only).
 - [ ] See tasks I gave to others: **Delegated** in Tasks.
 - [ ] Make a recurring task (admins): **Create Task** → **Schedule** → **Recurring**, pick a ready pattern (for example **3rd Saturday of every month**) or **Custom…**, set **Starts on**, **Start time**, **Due time** and **Ends**; the preview lists the next 10 dates. Press **Create schedule**; each chosen person gets their own schedule.
@@ -65,18 +65,18 @@ The page is gone. Recurring work is created from **Create Task** and managed in 
 ## FMS (workflows)
 **What it is:** company workflows: live workflows, the stages given to you, and, for people
 who build workflows, the designs.
-- [ ] Do my stage: open it from Home or Tasks, complete its form or evidence, and submit.
+- [ ] Do my stage: open it from Home or Tasks. The steps at the top are **Read previous details**, **Complete your work**, **Review next assignment** and **Confirm**. Read **Your step** (what to do, when it is due) and **Previous form answers**, press **Continue to stage form** (or **Continue to stage**). **Before you complete this step** lists anything missing. Press **Fill the form** to fill and submit it; submitting also completes the step. Then check who receives the next step and confirm.
 - [ ] Start a workflow: open FMS, choose the workflow, press **Start instance** (if your role may start it).
 - [ ] Design a workflow: **New workflow** in FMS (workflow builders only).
 - [ ] Name workflow work: in the initial form's **Task Naming**, use **Task name from** to choose an eligible question from the linked form or its selected record-name question. Later stages inherit the original name unless overridden; changes use the usual revision/publication lifecycle.
 
 ## FMS work (my assigned stages)
 **What it is:** the workflow stages and starting forms waiting for you.
-- [ ] Open a stage: tap it from Home or Tasks. It opens that exact stage.
+- [ ] Open a stage: tap it from Home or Tasks. It opens that exact stage. **My work** at the top goes back to Tasks.
 
 ## Forms Library
 **What it is:** published forms you can fill, and forms you sent.
-- [ ] Fill a form: open Forms Library, find the form under **Forms to fill**, press **Fill**.
+- [ ] Fill a form: open Forms Library, find the form under **Forms to fill**, press **Fill**. Questions marked * must be answered (the bar at the top counts them). Long forms go one step at a time with **Next** / **Back**; tap an earlier step to change it, and open **Check your answers before submitting** on the last step before **Submit form**. A missing answer is marked in red under its question.
 - [ ] See what I sent: **My submissions** shows each one and whether it was reviewed.
 - [ ] Make a form: **New form** (form makers only), then **Publish** when ready.
 - [ ] Set its naming default: in Form Builder use **Use this question as the record name**, or leave **Automatic**. A used published form needs a new revision to change its default; each workflow can override it in **Task Naming**.

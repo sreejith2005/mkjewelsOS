@@ -1,6 +1,7 @@
 import { fmsOutcomeReplacesStage } from "@jewelos/core";
 import { useMemo, useState } from "react";
-import { deriveFmsTransitionCapability, hasFmsFormAssignmentSource, type FmsStageDefinition, type FmsWorkResult, type FmsTransitionRequest } from "@jewelos/core";
+import { CheckCircle2, Circle, FileText, Paperclip } from "lucide-react";
+import { deriveFmsTransitionCapability, describeDue, fmsStageCompletionChecklist, fmsEmployeeStatusLabel, hasFmsFormAssignmentSource, type FmsStageDefinition, type FmsWorkResult, type FmsTransitionRequest } from "@jewelos/core";
 import { FmsWorkOutcome } from "./FmsWorkOutcome";
 import { useFmsHandoffConfirmation } from "./useFmsHandoffConfirmation";
 import { Button, Field, Modal, Notice } from "@/components/ui";
@@ -128,30 +129,71 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
 
   if (result && fmsOutcomeReplacesStage(result.state)) return <FmsWorkOutcome result={result} viewerId={profile.id} />;
 
-  return <section className="space-y-3 rounded-2xl border border-gold/20 p-4">
+  const canAct = capability.canComplete || capability.canApprove;
+  const legacyNextAssignee = !!definition.requires_next_doer_handoff && instance.assignment_version !== 2;
+  const requiredChecklist = checklist.filter((item) => item.is_required);
+  const requirements = fmsStageCompletionChecklist({
+    formRequired: !!definition.form_template_id && requiresLinkedForm, formSubmitted: !!stage.form_submission_id, formName: linkedForm?.name,
+    decisionRequired: isDecision, decisionChosen: !!outcome,
+    requiredChecklistOpen: requiredChecklist.filter((item) => !item.is_completed).length, requiredChecklistTotal: requiredChecklist.length,
+    evidenceRequired: !!definition.requires_upload, evidenceCount: evidence.length,
+    remarkRequired: !!definition.requires_remark, remarkProvided: !!remark.trim(),
+    nextAssigneeRequired: legacyNextAssignee, nextAssigneeChosen: !!nextAssignee,
+  });
+  const formPending = !!definition.form_template_id && !stage.form_submission_id && !!linkedForm;
+  const due = describeDue(stage.planned_datetime, undefined, { completed: stage.status === "completed" });
+  const assignedNames = (stage.assigned_to ?? []).map((id) => users.find((user) => user.id === id)?.employee_name ?? "Historical user").join(", ") || "Automatic";
+
+  return <section aria-label={`Your work: ${definition.name}`} className="space-y-4 rounded-2xl border border-gold/20 bg-task-bg p-4 sm:p-5">
     {error ? <Notice tone="danger">{error}</Notice> : null}
     {instance.status === "on_hold" ? <Notice>The workflow is on hold for manager review. Your saved form and assigned work are preserved.</Notice> : null}
     {result ? <FmsWorkOutcome result={result} viewerId={profile.id} /> : null}
-    <div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-semibold text-white">{definition.name}{stage.visit_number && stage.visit_number > 1 ? ` (visit ${stage.visit_number})` : ""}</h3><p className="text-sm text-soft-grey">{definition.method}</p></div><span className="rounded-full bg-gold/10 px-3 py-1 text-xs text-gold-secondary">{stage.status.replaceAll("_", " ")}</span></div>
-    <p className="text-xs text-soft-grey">Assigned: {(stage.assigned_to ?? []).map((id) => users.find((user) => user.id === id)?.employee_name ?? "Historical user").join(", ") || "Automatic"} · Due {stage.planned_datetime ? new Date(stage.planned_datetime).toLocaleDateString("en-IN") : "—"}{stage.delay_minutes && stage.delay_minutes > 0 ? " · overdue" : ""}</p>
+    <header className="space-y-1">
+      <div className="flex flex-wrap items-start justify-between gap-2"><h3 className="min-w-0 break-words text-lg font-semibold text-task-text">{definition.name}{stage.visit_number && stage.visit_number > 1 ? ` (visit ${stage.visit_number})` : ""}</h3><span className="rounded-full bg-gold/10 px-3 py-1 text-xs font-semibold text-gold-secondary">{fmsEmployeeStatusLabel(stage.status)}</span></div>
+      {definition.method ? <p className="text-sm text-task-text-muted">{definition.method}</p> : null}
+      <p className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-task-text-muted"><span>Assigned to {assignedNames}</span><span className={due.tone === "overdue" || (stage.delay_minutes ?? 0) > 0 ? "font-semibold text-danger" : undefined}>{due.label}{(stage.delay_minutes ?? 0) > 0 && due.tone !== "overdue" ? " · Overdue" : ""}</span></p>
+    </header>
     {canClaim ? <Button disabled={busy} onClick={() => void work(() => claimFmsStage(stage.id))} variant="secondary">Claim stage</Button> : null}
-    {checklist.length ? <fieldset><legend className="mb-2 text-sm text-champagne">Checklist</legend>{checklist.map((item) => <label className="flex min-h-11 items-center gap-3 text-sm" key={item.id}><input checked={item.is_completed} disabled={(!capability.canComplete && !capability.canApprove) || busy} onChange={(event) => void work(() => updateFmsChecklistItem(item.id, event.target.checked))} type="checkbox" /><span>{item.label}{item.is_required ? " *" : ""}</span></label>)}</fieldset> : null}
-    {evidence.length ? <div className="flex flex-wrap gap-2">{evidence.map((item) => <Button key={item.id} onClick={() => void signedFmsEvidenceUrl(item.storage_path).then((url) => window.open(url, "_blank", "noopener,noreferrer"))} variant="secondary">View {item.original_filename}</Button>)}</div> : null}
-    {definition.requires_upload ? <Field label="Evidence (JPG, PNG, WebP, PDF; max 10 MB)"><input accept=".jpg,.jpeg,.png,.webp,.pdf" className="field" disabled={busy} onChange={(event) => { const file = event.target.files?.[0]; if (file) void work(() => uploadFmsEvidence(stage.id, profile.tenant_id, file)); }} type="file" /></Field> : null}
-    {definition.form_template_id ? stage.form_submission_id ? <Notice tone="success">Linked form version submitted and locked.</Notice> : linkedForm ? <Button onClick={() => setShowForm(true)} variant="secondary">Fill {requiresLinkedForm ? "required" : "optional"} form · {linkedForm.name} v{linkedForm.version}</Button> : requiresLinkedForm ? <Notice tone="danger">The exact pinned form version is not visible.</Notice> : <Notice>Optional linked form is not currently visible. You can still complete this step.</Notice> : null}
-    {(capability.canComplete || capability.canApprove) ? <>
-      <div className="grid gap-2 sm:grid-cols-2">{isDecision ? <Field label="Decision *"><div className="grid gap-2">{decisionOptions.map((option) => <button className={`min-h-12 rounded-lg border px-3 py-2 text-left ${outcome === option.key ? "border-gold bg-gold/10 text-white" : "border-gold/20 text-soft-grey"}`} key={option.key} onClick={() => setOutcome(option.key)} type="button">{option.label}</button>)}</div></Field> : <Field label="Outcome"><input className="field" maxLength={500} onChange={(event) => setOutcome(event.target.value)} value={outcome} /></Field>}<Field label={definition.requires_remark ? "Remark *" : "Remark"}><textarea className="field" maxLength={4000} onChange={(event) => setRemark(event.target.value)} value={remark} /></Field></div>
-      {definition.requires_next_doer_handoff && instance.assignment_version !== 2 ? <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} label="Next-stage assignee" multiple={false} onChange={(ids) => setNextAssignee(ids[0] ?? "")} people={pickerPeople} selectedIds={nextAssignee ? [nextAssignee] : []}/> : null}
-      <div className="flex flex-wrap gap-2">
-        {capability.canComplete ? <Button disabled={busy || (isDecision && !outcome) || (requiresLinkedForm && !stage.form_submission_id)} onClick={() => void work(() => completeWork({ kind: "complete", instanceStageId: stage.id, outcome, remark, checklist: checklistPayload, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) }))}>{isDecision ? "Submit decision" : "Complete stage"}</Button> : null}
-        {capability.canApprove ? <Button disabled={busy} onClick={() => void work(() => completeWork({ kind: "review", instanceStageId: stage.id, decision: "approved", remark, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) }))}>Approve</Button> : null}
-        {capability.canReject ? <Button disabled={busy} onClick={() => void work(() => completeWork({ kind: "review", instanceStageId: stage.id, decision: "rejected", remark, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) }))} variant="danger">Reject</Button> : null}
-        {capability.canRequestRevision && priorStages.length ? <Button disabled={busy} onClick={() => openManagedAction("revision")} variant="secondary">Request revision</Button> : null}
-        {capability.canMoveBackward && priorStages.length ? <Button disabled={busy} onClick={() => openManagedAction("backward")} variant="secondary">Move backward</Button> : null}
-        {capability.canEscalate ? <Button disabled={busy} onClick={() => openManagedAction("escalate")} variant="secondary">Escalate</Button> : null}
+    {canAct && requirements.length ? <div className="rounded-xl border border-task-border bg-task-muted/50 p-3">
+      <p className="text-sm font-semibold text-task-text">Before you complete this step</p>
+      <ul className="mt-2 space-y-1.5">{requirements.map((item) => <li className="flex items-start gap-2 text-sm" key={item.key}>
+        {item.done ? <CheckCircle2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-success" /> : <Circle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-task-text-muted" />}
+        <span className={item.done ? "text-task-text-muted line-through" : "text-task-text"}>{item.label}<span className="sr-only">{item.done ? " (done)" : " (still to do)"}</span></span>
+      </li>)}</ul>
+    </div> : null}
+    {checklist.length ? <fieldset className="space-y-2"><legend className="mb-1 text-sm font-semibold text-task-text">Checklist</legend>{checklist.map((item) => <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-task-border px-3 py-2 text-sm text-task-text has-[:checked]:border-gold has-[:checked]:bg-gold/10" key={item.id}><input checked={item.is_completed} disabled={!canAct || busy} onChange={(event) => void work(() => updateFmsChecklistItem(item.id, event.target.checked))} type="checkbox" /><span className="min-w-0 break-words">{item.label}{item.is_required ? <span aria-hidden="true" className="ml-1 text-danger">*</span> : null}</span></label>)}</fieldset> : null}
+    {definition.requires_upload || evidence.length ? <div className="space-y-2">
+      <p className="text-sm font-semibold text-task-text">Evidence</p>
+      {evidence.length ? <div className="flex flex-wrap gap-2">{evidence.map((item) => <Button className="max-w-full whitespace-normal break-words text-left" key={item.id} onClick={() => void signedFmsEvidenceUrl(item.storage_path).then((url) => window.open(url, "_blank", "noopener,noreferrer"))} variant="secondary"><Paperclip aria-hidden="true" className="size-4" />View {item.original_filename}</Button>)}</div> : null}
+      {definition.requires_upload ? <Field label={evidence.length ? "Add another file (JPG, PNG, WebP or PDF, up to 10 MB)" : "Upload evidence (JPG, PNG, WebP or PDF, up to 10 MB)"}><input accept=".jpg,.jpeg,.png,.webp,.pdf" className="field" disabled={busy} onChange={(event) => { const file = event.target.files?.[0]; if (file) void work(() => uploadFmsEvidence(stage.id, profile.tenant_id, file)); }} type="file" /></Field> : null}
+    </div> : null}
+    {canAct ? <div className="grid gap-3 sm:grid-cols-2">
+      {isDecision ? <fieldset className="space-y-2 sm:col-span-2"><legend className="label">Decision *</legend><div className="grid gap-2 sm:grid-cols-2">{decisionOptions.map((option) => <button aria-pressed={outcome === option.key} className={`min-h-12 rounded-lg border px-3 py-2 text-left text-sm ${outcome === option.key ? "border-gold bg-gold/10 font-semibold text-task-text" : "border-task-border text-task-text-muted hover:border-gold/50"}`} key={option.key} onClick={() => setOutcome(option.key)} type="button">{option.label}</button>)}</div></fieldset>
+        : <Field label="Outcome (optional)"><input className="field" maxLength={500} onChange={(event) => setOutcome(event.target.value)} value={outcome} /></Field>}
+      <Field label={definition.requires_remark ? "Remark *" : "Remark (optional)"}><textarea className="field" maxLength={4000} onChange={(event) => setRemark(event.target.value)} value={remark} /></Field>
+    </div> : null}
+    {canAct && legacyNextAssignee ? <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} label="Next-stage assignee" multiple={false} onChange={(ids) => setNextAssignee(ids[0] ?? "")} people={pickerPeople} selectedIds={nextAssignee ? [nextAssignee] : []}/> : null}
+    {definition.form_template_id ? stage.form_submission_id ? <Notice tone="success">The form has been submitted and saved.</Notice>
+      : !linkedForm ? requiresLinkedForm ? <Notice tone="danger">This step's form is not available to your account. Ask your manager to check the workflow.</Notice> : <Notice>The optional form is not available right now. You can still complete this step.</Notice> : null : null}
+    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+      {formPending && linkedForm ? <Button className="min-h-12" onClick={() => setShowForm(true)} variant={requiresLinkedForm ? "primary" : "secondary"}><FileText aria-hidden="true" className="size-4" />{requiresLinkedForm ? `Fill the form: ${linkedForm.name}` : `Fill the optional form: ${linkedForm.name}`}</Button> : null}
+      {canAct ? <>
+        {capability.canComplete && !(formPending && requiresLinkedForm) ? <Button className="min-h-12" disabled={busy || (isDecision && !outcome) || (requiresLinkedForm && !stage.form_submission_id)} onClick={() => void work(() => completeWork({ kind: "complete", instanceStageId: stage.id, outcome, remark, checklist: checklistPayload, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) }))}>{isDecision ? "Submit decision" : "Complete stage"}</Button> : null}
+        {capability.canApprove ? <Button className="min-h-12" disabled={busy} onClick={() => void work(() => completeWork({ kind: "review", instanceStageId: stage.id, decision: "approved", remark, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) }))}>Approve</Button> : null}
+        {capability.canReject ? <Button className="min-h-12" disabled={busy} onClick={() => void work(() => completeWork({ kind: "review", instanceStageId: stage.id, decision: "rejected", remark, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) }))} variant="danger">Reject</Button> : null}
+      </> : null}
+    </div>
+    {formPending && requiresLinkedForm && capability.canComplete ? <p className="text-xs text-task-text-muted">Submitting the form also completes this step, using the details above.</p> : null}
+    {!canAct ? <p className="text-sm text-task-text-muted">{capability.reason}</p> : null}
+    {(canAct && ((capability.canRequestRevision || capability.canMoveBackward) && priorStages.length || capability.canEscalate)) || (capability.canReassign && (stage.assigned_to?.length ?? 0) > 0) ? <details className="rounded-xl border border-task-border px-3">
+      <summary className="min-h-11 cursor-pointer content-center text-sm font-medium text-task-text-muted">More actions</summary>
+      <div className="flex flex-wrap gap-2 pb-3">
+        {canAct && capability.canRequestRevision && priorStages.length ? <Button disabled={busy} onClick={() => openManagedAction("revision")} variant="secondary">Request revision</Button> : null}
+        {canAct && capability.canMoveBackward && priorStages.length ? <Button disabled={busy} onClick={() => openManagedAction("backward")} variant="secondary">Move backward</Button> : null}
+        {canAct && capability.canEscalate ? <Button disabled={busy} onClick={() => openManagedAction("escalate")} variant="secondary">Escalate</Button> : null}
+        {capability.canReassign && (stage.assigned_to?.length ?? 0) > 0 ? <Button disabled={busy} onClick={() => openManagedAction("reassign")} variant="secondary">Reassign</Button> : null}
       </div>
-    </> : <p className="text-xs text-soft-grey">{capability.reason}</p>}
-    {capability.canReassign && (stage.assigned_to?.length ?? 0) > 0 ? <Button disabled={busy} onClick={() => openManagedAction("reassign")} variant="secondary">Reassign</Button> : null}
+    </details> : null}
     {showForm && linkedForm ? <Modal onClose={() => setShowForm(false)} title={`${requiresLinkedForm ? "Required" : "Optional"} form: ${linkedForm.name} v${linkedForm.version}`} wide><FormRenderer definition={{ name: linkedForm.name, description: linkedForm.description ?? undefined, sections: linkedForm.sections, fields: linkedForm.fields }} dynamicOptions={formOptions} templateId={linkedForm.id} onSubmit={async (answers) => {
       if (!await completeWork({ kind: "stage_form", formTemplateId: linkedForm.id, answers, instanceStageId: stage.id, outcome, remark, checklist: checklistPayload, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) })) return false;
       setShowForm(false); await onRefresh(); return true;

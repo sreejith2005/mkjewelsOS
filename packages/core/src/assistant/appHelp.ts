@@ -55,8 +55,8 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
       "Task order: My Tasks shows the earliest due date first; tasks due at the same time show high priority before medium and low. Overdue shows the longest overdue first; Completed shows the most recent first.",
       "Find any of my tasks: use Search all tasks above the subsections. Search includes earlier and completed work, task descriptions and FMS references. Results show their subsection. Clear search and filters to return to the board.",
       "Narrow tasks: press Filter, combine work kind (FMS, CRM, recurring or other tasks), status, priority, due dates, subsection and requirements, then Apply filters. Due today and This week use the business timezone; sort by due date, newest or priority.",
-      "Work on FMS: open Tasks, then FMS. Expand a workflow family, expand a stage, and choose Open Work on the record. Active counts your pending and overdue actions; Waiting shows work awaiting other doers or approvals. Search record names or references; open Workflow and date filters to choose workflow, stage or due dates. Only your authorized work is shown.",
-      "Complete a task: finish the required form or upload, then press Complete. If a completion remark is required, Complete opens and focuses the remark field; enter the remark and press Complete again. FMS work opens its protected workflow runner.",
+      "Work on FMS: open Tasks, then FMS. Expand a workflow family, expand a stage, and press the record's action button: Fill form, Start form or Open work (View or View details for finished or waiting work). With only one workflow, it opens by itself, and so does its stage when only one stage has work. Each record shows its stage, status and when it is due. Active counts your pending and overdue actions; Waiting shows work awaiting other doers or approvals. Search record names or references; open Workflow and date filters to choose workflow, stage or due dates. Only your authorized work is shown.",
+      "Complete a task: finish the required form or upload, then press Complete. If a completion remark is required, Complete opens and focuses the remark field; enter the remark and press Complete again. Tasks that need a form show Fill form on the card; FMS stages without a form show Open work. Both open the protected workflow runner for FMS work.",
       "Create a task: in Tasks press \"Create Task\", fill in the title, pick one or more people under \"Users\", set the due date, optionally add several people under \"In Loop\", then press \"Assign Task\". With several users, choose \"Separate task for each user\" (everyone completes their own copy) or \"One shared task\" (any one of them completes it for all; only for people in the same branch and department).",
       "See tasks I gave to others: use \"Delegated\" in Tasks.",
       "Create a recurring task (admins): press \"Create Task\" and under \"Schedule\" choose \"Recurring\". Pick a ready pattern (Every day, Monday to Saturday, 3rd Saturday of every month, Last day of every month and more) or build your own under \"Repeats\": every N days, weeks on chosen weekdays, months on chosen dates or on the 1st to 4th or last weekday, or years in chosen months. Set the start date, Start time and Due time, and optionally an end date or a number of times. The preview lists the next 10 dates exactly as they will be created (Asia/Kolkata). Each selected user gets their own schedule. Then press \"Create schedule\".",
@@ -87,7 +87,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     path: "/fms",
     summary: "FMS runs company workflows (Flow Management System): live workflow instances, assigned stages, and, for builders, versioned workflow designs.",
     recipes: [
-      "Do my assigned stage: open the stage from Home or Tasks, complete its form or evidence, and submit.",
+      "Do my assigned stage: open the stage from Home or Tasks. The steps at the top are Read previous details, Complete your work, Review next assignment and Confirm. First read \"Your step\" (what you need to do and when it is due) and \"Previous form answers\" from earlier stages, then press \"Continue to stage form\" (or \"Continue to stage\"). \"Before you complete this step\" lists anything still missing (form, checklist, evidence, decision, remark). Press \"Fill the form\" to fill and submit it; submitting also completes the step. Then check who will receive the next step and confirm.",
         "Choose the next employee: in the FMS confirmation, press Assign to a Different Employee. Search any active, login-enabled company user across departments and branches, including management. Fixed employee steps stay locked; availability coverage still applies.",
       "Start a workflow: open FMS, choose the workflow, and press \"Start instance\" (when your role may start it).",
       "Design a workflow: \"New workflow\" in FMS (workflow builders only).",
@@ -98,9 +98,9 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     section: "fms_tasks",
     title: "FMS work",
     path: "/tasks/fms",
-    summary: "Tasks -> FMS groups the user's assigned starter forms and stage visits by workflow family and published stage; Open Work uses the existing protected runner.",
+    summary: "Tasks -> FMS groups the user's assigned starter forms and stage visits by workflow family and published stage; each record's action (Fill form, Start form, Open work) uses the existing protected runner.",
     recipes: [
-      "Open an assigned stage: tap it from Home or Tasks; it opens that exact stage.",
+      "Open an assigned stage: tap it from Home or Tasks; it opens that exact stage. Use \"My work\" at the top to go back to Tasks.",
     ],
   },
   forms_library: {
@@ -109,7 +109,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     path: "/forms",
     summary: "Forms Library lists the published forms the user can fill and the forms they submitted.",
     recipes: [
-      "Fill a form: open Forms Library, find the form under \"Forms to fill\", and press \"Fill\".",
+      "Fill a form: open Forms Library, find the form under \"Forms to fill\", and press \"Fill\". Questions marked * must be answered, and the bar at the top counts them. Long forms are filled one step at a time with \"Next\" and \"Back\"; tap an earlier step to change it, and open \"Check your answers before submitting\" on the last step before pressing \"Submit form\". A missing answer is marked in red under the question.",
       "See what I submitted: \"My submissions\" in Forms Library shows each submission and its review status.",
       "Create a form: \"New form\" in Forms Library (form authors only), then \"Publish\" when ready.",
       "Set a record name: in Form Builder, use Use this question as the record name to choose an identifying question, or leave Automatic. A used published form requires a new revision to change its default. Each FMS workflow can select its own naming question in Task Naming.",

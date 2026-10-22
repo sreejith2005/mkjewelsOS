@@ -36,3 +36,15 @@ describe("form submission presentation", () => {
     expect(groups[0]?.items.map((item) => item.id)).toEqual(["submission-1", "older"]);
   });
 });
+
+describe("readable submission answers", () => {
+  it("names branches, formats dates and never shows identifiers or raw objects", () => {
+    const branch = "00000000-0000-4000-8000-000000000001";
+    const form = { ...current, fields: [
+      { key: "branch", label: "Branch", type: "branch_dropdown" as const }, { key: "owner", label: "Owner", type: "user_dropdown" as const },
+      { key: "visit", label: "Visit", type: "date" as const }, { key: "legacy", label: "Legacy", type: "text" as const },
+    ] };
+    const result = presentFormSubmission({ ...base, answers: { branch, owner: "00000000-0000-4000-8000-000000000002", visit: "2026-10-21", legacy: { odd: true } } }, form, null, [], [], { branches: new Map([[branch, "Bandra"]]) });
+    expect(result.answers.map((answer) => answer.display)).toEqual(["Bandra", "No longer available", "21 Oct 2026", "Provided"]);
+  });
+});

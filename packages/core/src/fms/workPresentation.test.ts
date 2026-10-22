@@ -20,7 +20,7 @@ describe("FMS work presentation", () => {
   });
   it("builds the configured task title from authorized fields", () => {
     expect(presentFmsWorkContext(context).title).toBe("Synthetic client — Introduction Call");
-    expect(presentFmsWorkContext(context).answers).toEqual([{ label: "Client name", display: "Synthetic client", source: "Enquiry · v1" }]);
+    expect(presentFmsWorkContext(context).answers).toEqual([{ label: "Client name", display: "Synthetic client", answered: true, source: "Enquiry · v1" }]);
   });
   it("keeps historical employee identifiers out of work summaries", () => {
     const value = presentFmsWorkContext({ ...context, receivedFields: [{ ...context.receivedFields[0]!,

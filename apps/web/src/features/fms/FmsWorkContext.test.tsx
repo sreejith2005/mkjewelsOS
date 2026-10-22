@@ -34,4 +34,29 @@ describe("previous form details", () => {
     expect(await screen.findByText("Synthetic client")).toBeTruthy();
     await waitFor(() => expect(ready).toHaveBeenLastCalledWith(true));
   });
+  it("puts the employee's task first and shows every answer in plain words", async () => {
+    const id = "00000000-0000-4000-8000-000000000009";
+    const at = (key: string, label: string, type: string, value: unknown, extra: Record<string, unknown> = {}) => ({ ...field, field: { key, label, type, sortOrder: 0 }, value, ...extra });
+    mocks.forms.mockResolvedValue({ nextCursor: null, forms: [{ ...group, submittedAt: "2026-10-22T09:00:00Z", fields: [
+      field, at("visit", "Visit date", "date", "2026-10-21"), at("branch", "Branch", "branch_dropdown", id, { valueLabel: null }),
+      at("a", "Budget", "text", null), at("b", "Occasion", "text", null), at("c", "Referral", "text", null),
+    ] }] });
+    render(<FmsWorkContext instanceId="instance" instanceStageId="stage" />);
+    expect(await screen.findByRole("heading", { name: /What you need to do/ })).toBeTruthy();
+    expect(screen.getByText("Call the client")).toBeTruthy();
+    expect(screen.getByText("21 Oct 2026")).toBeTruthy();
+    expect(screen.getByText("No longer available")).toBeTruthy();
+    expect(screen.getByText(/22 Oct 2026, 2:30 pm/)).toBeTruthy();
+    expect(screen.getByText("3 questions were not answered")).toBeTruthy();
+    const text = document.body.textContent ?? "";
+    expect(text).not.toContain(id);
+    expect(text).not.toContain("[object Object]");
+  });
+  it("folds the previous answers away once the employee continues to their work", async () => {
+    const { rerender } = render(<FmsWorkContext instanceId="instance" instanceStageId="stage" />);
+    const answers = (await screen.findByText("Previous form answers")).closest("details")!;
+    expect(answers.open).toBe(true);
+    rerender(<FmsWorkContext collapsed instanceId="instance" instanceStageId="stage" />);
+    expect(answers.open).toBe(false);
+  });
 });

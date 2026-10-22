@@ -1,6 +1,6 @@
 import { getSupabase } from "@jewelos/api-client/client";
 import { beginNewFmsMutation, getFmsMutationIdentity, getFmsMutationStorage, markFmsMutationComplete } from "./mutationIdentity";
-import { parseFormOptions, FORM_DRAFT_FIELD_TYPES, type FormAnswer, type FormFieldType, type FmsHandoffChoice, type FmsTransitionRequest,
+import { coerceFormAnswer, parseFormOptions, FORM_DRAFT_FIELD_TYPES, type FormAnswer, type FormFieldType, type FmsHandoffChoice, type FmsTransitionRequest,
   type FmsWorkDestination, type FmsWorkPreview, type FmsWorkResult, type FmsAssignedWorkTarget, type FmsWorkContext, type FmsReceivedField, type FmsPreviousFormsPage, type Json } from "@jewelos/core";
 
 const invalid = () => new Error("Workflow service returned an invalid response. Refresh this work item.");
@@ -69,14 +69,15 @@ function formAnswer(value: unknown): FormAnswer | null {
   if (Array.isArray(value) && value.every(item => typeof item === "string")) return value.map(string);
   throw invalid();
 }
-function fieldType(value: unknown): FormFieldType { const found = FORM_DRAFT_FIELD_TYPES.find(type => type === value); if (!found) throw invalid(); return found; }
+/** A question type this client does not know yet is still shown, as text, rather than hiding every earlier answer. */
+function receivedFieldType(value: unknown): FormFieldType { string(value); return FORM_DRAFT_FIELD_TYPES.find(type => type === value) ?? "text"; }
 function receivedField(raw: unknown): FmsReceivedField {
       const received = record(raw); const field = record(received.field);
       const attachment = received.attachment == null ? null : record(received.attachment);
       return { sourceStageKey: string(received.sourceStageKey), submissionId: string(received.submissionId), formTemplateId: string(received.formTemplateId),
-        formName: string(received.formName), formVersion: integer(received.formVersion), value: formAnswer(received.value), userName: nullable(received.userName), valueLabel: received.valueLabel == null ? null : string(received.valueLabel),
+        formName: string(received.formName), formVersion: integer(received.formVersion), value: coerceFormAnswer(received.value), userName: nullable(received.userName), valueLabel: received.valueLabel == null ? null : string(received.valueLabel),
         attachment: attachment ? { id: string(attachment.id), name: string(attachment.name), mimeType: string(attachment.mimeType), sizeBytes: integer(attachment.sizeBytes) } : null,
-        field: { key: string(field.key), label: string(field.label), type: fieldType(field.type), sortOrder: integer(field.sortOrder), options: parseFormOptions(field.options) } };
+        field: { key: string(field.key), label: string(field.label), type: receivedFieldType(field.type), sortOrder: integer(field.sortOrder), options: parseFormOptions(field.options) } };
 
 }
 export function parseFmsWorkContext(raw: unknown): FmsWorkContext {

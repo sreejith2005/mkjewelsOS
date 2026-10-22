@@ -1,6 +1,6 @@
-import { fmsWorkTitle, presentFmsWorkContext } from "@jewelos/core";
+import { describeDue, fmsWorkTitle, presentFmsWorkContext } from "@jewelos/core";
 import { useEffect, useRef, useState, type ReactNode, type ChangeEvent } from "react";
-import { AlertTriangle, Check, CheckCircle2, ChevronDown, Clock, Eye, FileUp, PauseCircle, Users } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, CheckCircle2, ChevronDown, Clock, Eye, FileText, FileUp, PauseCircle, Users } from "lucide-react";
 import { calculateTaskChecklistProgress, effectiveTaskDeadline, isTaskFeedItemOverdue, TASK_EVIDENCE_ACCEPT, taskEvidenceFileError, taskNeedsCompletionRemark, type Enums, type TaskMutationCapability } from "@jewelos/core";
 import { Button, Field, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -103,6 +103,15 @@ export function TaskCard({ management, capability, categoryLabel, onAction, task
     }
   };
   const statusLabel = completed ? "Completed" : blocked ? "Coverage required" : overdue ? "Overdue" : task.status === "in_progress" ? "In Progress" : "Pending";
+  const dueAt = task.planned_datetime ? task.revised_datetime ?? task.planned_datetime : null;
+  const due = describeDue(dueAt, undefined, { completed });
+  const titleText = task.title ?? "task";
+  // Work that needs a form or the workflow runner gets its action on the card itself, not hidden in the details.
+  const faceAction = completed || blocked ? null
+    : fmsFormAction ? { label: "Fill form", name: `Fill FMS form: ${titleText}`, action: { kind: "fill_fms_form" } as const, disabled: !task.form_template_id, Icon: FileText }
+    : fmsStageAction ? { label: "Open work", name: `Open FMS work: ${titleText}`, action: { kind: "open_fms_stage" } as const, disabled: false, Icon: ArrowRight }
+    : formOnlyAction && !readOnly ? { label: "Fill form", name: `Fill form: ${titleText}`, action: { kind: "fill_form" } as const, disabled: !task.form_template_id, Icon: FileText }
+    : null;
   const StatusIcon = completed ? CheckCircle2 : blocked ? PauseCircle : overdue ? AlertTriangle : Clock;
 
   return <article className={cn("overflow-hidden rounded-2xl border bg-task-bg shadow-card transition-shadow duration-200 hover:shadow-lift", completed ? "border-success/40 opacity-80" : blocked ? "border-task-warning/60" : overdue ? "border-task-overdue/50" : task.isWatchedByViewer ? "border-task-accent/50" : "border-task-border")}>
@@ -119,7 +128,7 @@ export function TaskCard({ management, capability, categoryLabel, onAction, task
           </span>
           <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-task-text-muted">
             <span className="inline-flex min-w-0 items-center gap-1"><Users className="size-3" /><span className="truncate">{task.assigneeName}</span></span>
-            <span>{task.planned_datetime ? new Date(task.revised_datetime ?? task.planned_datetime).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "Unscheduled"}</span>
+            <span className={cn(due.tone === "overdue" ? "font-semibold text-task-overdue" : due.tone === "today" ? "font-medium text-task-text" : undefined)} title={dueAt ? new Date(dueAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : undefined}>{due.label}</span>
             {task.priority ? <span className={cn("rounded-full border px-2 py-0.5 capitalize", PRIORITY_CLASS[task.priority])}>{task.priority}</span> : null}
             <span>{categoryLabel}</span>
           </span>
@@ -128,13 +137,14 @@ export function TaskCard({ management, capability, categoryLabel, onAction, task
         </span>
         <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-task-text-muted"><span className="sr-only sm:not-sr-only">{expanded ? "Hide details" : "View details"}</span><ChevronDown className={cn("size-4 transition-transform", expanded && "rotate-180")} /></span>
       </button>
-      {canShowDirectUpload ? <label className="inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-task-accent px-4 py-2 text-sm font-semibold text-task-text transition hover:bg-task-accent/90"><FileUp className="size-4" />Upload<input accept={TASK_EVIDENCE_ACCEPT} aria-label={`Upload task: ${task.title ?? "task"}`} className="sr-only" disabled={busy} onChange={(event) => void upload(event, needsRemark ? "upload" : "upload_and_complete")} type="file" /></label> : canShowDirectComplete ? <Button aria-label={`Complete task: ${task.title ?? "task"}`} className="shrink-0 bg-task-accent text-task-text hover:bg-task-accent/90" disabled={busy || !canComplete} onClick={() => { if (needsRemark && !remark.trim()) { setExpanded(true); setRemarkRequested(true); } else void act({ kind: "complete", remark }); }} type="button"><CheckCircle2 />Complete</Button> : null}
+      {canShowDirectUpload ? <label className="inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-task-accent px-4 py-2 text-sm font-semibold text-task-text transition hover:bg-task-accent/90"><FileUp className="size-4" />Upload<input accept={TASK_EVIDENCE_ACCEPT} aria-label={`Upload task: ${task.title ?? "task"}`} className="sr-only" disabled={busy} onChange={(event) => void upload(event, needsRemark ? "upload" : "upload_and_complete")} type="file" /></label> : canShowDirectComplete ? <Button aria-label={`Complete task: ${task.title ?? "task"}`} className="shrink-0 bg-task-accent text-task-text hover:bg-task-accent/90" disabled={busy || !canComplete} onClick={() => { if (needsRemark && !remark.trim()) { setExpanded(true); setRemarkRequested(true); } else void act({ kind: "complete", remark }); }} type="button"><CheckCircle2 />Complete</Button>
+        : faceAction ? <Button aria-label={faceAction.name} className="shrink-0 bg-task-accent text-task-text hover:bg-task-accent/90" disabled={busy || faceAction.disabled} onClick={() => void act(faceAction.action)} type="button"><faceAction.Icon />{faceAction.label}</Button> : null}
     </div>
     {expanded ? <section aria-label={detailsLabel} className="flex flex-col gap-4 border-t border-task-border bg-task-muted p-4" id={detailsId}>
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {management}
       {task.task_type === "fms" ? task.fms_instance_id && task.fms_instance_stage_id ? <FmsWorkContext instanceId={task.fms_instance_id} instanceStageId={task.fms_instance_stage_id} /> : <Notice tone="task">Complete the initial form to start this workflow.</Notice> : <TaskDetails statusLabel={statusLabel} task={taskInput} />}
-      {blocked ? <Notice tone="task">Coverage required. An authorized manager must resolve coverage through a future database-backed workflow; no simulated resolution is available here.</Notice> : null}
+      {blocked ? <Notice tone="task">Coverage required. This task is waiting for a manager to arrange cover, so it cannot be completed yet. Ask your manager if it is urgent.</Notice> : null}
       {!formOnlyAction ? task.checklists.map((item) => <div className="flex items-start gap-3 text-sm text-task-text" key={item.id}><button aria-label={item.is_completed ? "Mark incomplete" : "Mark complete"} className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded border", item.is_completed ? "border-task-accent bg-task-accent text-task-text" : "border-task-border bg-task-bg")} disabled={busy || completed || readOnly || blocked} onClick={() => void act({ kind: "checklist", checklistId: item.id, completed: !item.is_completed })} type="button">{item.is_completed ? <Check className="size-3" /> : null}</button><span className={cn(item.is_completed && "line-through text-task-text-muted")}>{item.item_text}{item.is_required ? <span className="ml-1 text-task-overdue">*</span> : null}</span></div>) : null}
       {fmsFormAction && !blocked ? <Button disabled={busy || !task.form_template_id} onClick={() => void act({ kind: "fill_fms_form" })} type="button"><CheckCircle2 />Complete FMS form</Button> : fmsStageAction && !blocked ? <Button disabled={busy} onClick={() => void act({ kind: "open_fms_stage" })} type="button"><CheckCircle2 />Open FMS workflow</Button> : formOnlyAction && !readOnly && !blocked ? <Button disabled={busy || !task.form_template_id} onClick={() => void act({ kind: "fill_form" })} type="button"><CheckCircle2 />Complete form</Button> : null}
       {!readOnly && requiresEvidence && !completed ? <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-task-border bg-task-bg p-3 text-sm text-task-text"><FileUp className="size-4" /><span>{task.hasAttachment ? "Evidence uploaded · add another" : "Upload required evidence"}</span><input accept={TASK_EVIDENCE_ACCEPT} className="sr-only" disabled={busy} onChange={(event) => void upload(event)} type="file" /></label> : null}

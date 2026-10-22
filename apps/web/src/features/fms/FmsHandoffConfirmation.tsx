@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FmsHandoffDecision, FmsTransitionRequest, FmsWorkPreview } from "@jewelos/core";
 import { listFmsHandoffRecipients, previewFmsWork, type FmsHandoffRecipient } from "@jewelos/data/fms/work";
+import { UserRound } from "lucide-react";
 import { Button, Field, Modal, Notice } from "@/components/ui";
+import { FmsWorkSteps } from "./FmsWorkSteps";
 
 export function FmsHandoffConfirmation({ request, preview, onConfirm, onCancel }: {
   request: FmsTransitionRequest; preview: FmsWorkPreview;
@@ -56,17 +58,21 @@ export function FmsHandoffConfirmation({ request, preview, onConfirm, onCancel }
   const needsChoice = currentPreview.destinations.some(destination => !choices[destination.targetStageId] && (destination.issue || !destination.effectiveUserId));
   return <Modal onClose={onCancel} title={preview.destinations.length ? "Complete Stage and Assign Next Work" : "Confirm Stage Completion"} wide>
     <div className="space-y-4">
-      <p className="text-sm text-soft-grey">Current Stage: <strong className="text-white">{preview.currentStageName}</strong></p>
+      <FmsWorkSteps current={3} />
+      <p className="text-sm text-task-text-muted">You are completing: <strong className="text-task-text">{preview.currentStageName}</strong></p>
+      {preview.destinations.length ? <p className="text-sm text-task-text">Check who will do the next step. Choose someone else only if this person should not receive it.</p> : null}
       {currentPreview.wouldDefer ? <Notice>Your form and handoff will be saved. Next work starts after the remaining requirements are met.<ul className="mt-2 list-disc pl-5">{currentPreview.requirements.map(requirement => <li key={requirement}>{requirement}</li>)}</ul></Notice> : null}
-      {currentPreview.destinations.map(destination => <article className="space-y-2 rounded-xl border border-gold/20 p-3" key={destination.targetStageId}>
-        <p className="font-semibold text-white">Next Stage: {destination.stageName}</p>
-        <p className="text-sm text-soft-grey">Selected Employee: {choices[destination.targetStageId]
-          ? names[destination.targetStageId] ?? destination.selectedEmployeeName ?? "Selected replacement" : destination.selectedEmployeeName ?? destination.employeeName ?? "Select an employee"}</p>
-        {destination.selectedUserId && destination.effectiveUserId && destination.selectedUserId !== destination.effectiveUserId ? <Notice>Assigned employee through availability coverage: {destination.employeeName}</Notice> : null}
-        {destination.locked ? <Notice>Fixed employee — locked by the workflow administrator. The form's employee choice does not replace this owner.</Notice> : null}
-        {destination.issue ? <Notice tone="danger">{destination.issue}</Notice> : null}
-        {destination.allowHandoff && !destination.locked ? <Button onClick={() => { setPicking(destination.targetStageId); setQuery(""); }} variant="secondary">{preview.destinations.length > 1 ? `Assign a Different Employee for ${destination.stageName}` : "Assign to a Different Employee"}</Button> : null}
-      </article>)}
+      {currentPreview.destinations.map(destination => {
+        const chosen = choices[destination.targetStageId] ? names[destination.targetStageId] ?? destination.selectedEmployeeName ?? "Selected replacement" : destination.selectedEmployeeName ?? destination.employeeName ?? null;
+        return <article className="space-y-3 rounded-xl border border-task-border bg-task-bg p-3" key={destination.targetStageId}>
+          <div><p className="text-xs font-semibold uppercase tracking-wider text-task-text-muted">Next step</p><p className="break-words font-semibold text-task-text">{destination.stageName}</p></div>
+          <div className="flex items-center gap-3 rounded-lg bg-task-muted p-3"><UserRound aria-hidden="true" className="size-5 shrink-0 text-gold-secondary" /><div className="min-w-0"><p className="text-xs text-task-text-muted">Will be assigned to</p><p className={chosen ? "break-words font-semibold text-task-text" : "font-semibold text-danger"}>{chosen ?? "Nobody yet — choose an employee"}</p></div></div>
+          {destination.selectedUserId && destination.effectiveUserId && destination.selectedUserId !== destination.effectiveUserId ? <Notice>Assigned employee through availability coverage: {destination.employeeName}<span className="mt-1 block text-xs">The chosen employee is unavailable, so the person covering for them receives this step.</span></Notice> : null}
+          {destination.locked ? <Notice>Fixed employee — locked by the workflow administrator. The form's employee choice does not replace this owner.</Notice> : null}
+          {destination.issue ? <Notice tone="danger">{destination.issue}</Notice> : null}
+          {destination.allowHandoff && !destination.locked ? <Button className="w-full sm:w-auto" onClick={() => { setPicking(destination.targetStageId); setQuery(""); }} variant="secondary">{preview.destinations.length > 1 ? `Assign a Different Employee for ${destination.stageName}` : "Assign to a Different Employee"}</Button> : null}
+        </article>;
+      })}
       {picking ? <section aria-label="Eligible employee picker" className="space-y-3 rounded-xl border border-gold/20 p-3">
         <Field label="Search eligible employees"><input className="field" value={query} onChange={event => setQuery(event.target.value)} /></Field>
         {loading ? <p role="status" className="text-sm text-soft-grey">Loading eligible employees...</p> : null}
@@ -80,10 +86,11 @@ export function FmsHandoffConfirmation({ request, preview, onConfirm, onCancel }
       </section> : null}
       {checkedChoices !== choiceKey && !choiceError ? <p className="text-sm text-soft-grey" role="status">Checking the selected employee and availability coverage…</p> : null}
       {choiceError ? <Notice tone="danger">{choiceError}</Notice> : null}
-      {!preview.destinations.length ? <p className="text-sm text-soft-grey">Confirm this step's completion. The workflow finishes after all required work and approvals are complete.</p> : <p className="text-sm text-soft-grey">How would you like to continue?</p>}
-      <div className="flex flex-wrap gap-2">
-        <Button disabled={!!needsChoice || checkedChoices !== choiceKey || !!choiceError} onClick={() => onConfirm({ handoffs: replacements, preview: currentPreview })}>{!preview.destinations.length ? "Confirm Completion" : replacements.length ? "Confirm Next Work" : "Continue with Selected Employee"}</Button>
-        <Button onClick={onCancel} variant="ghost">Cancel and Return to Form</Button>
+      {!preview.destinations.length ? <p className="text-sm text-task-text-muted">Confirm this step's completion. The workflow finishes after all required work and approvals are complete.</p> : null}
+      {needsChoice ? <p className="text-sm font-medium text-danger">Choose an employee for every next step before you confirm.</p> : null}
+      <div className="sticky bottom-0 -mx-5 flex flex-col gap-2 border-t border-task-border bg-charcoal px-5 py-3 sm:static sm:mx-0 sm:flex-row sm:border-0 sm:bg-transparent sm:p-0">
+        <Button className="min-h-12" disabled={!!needsChoice || checkedChoices !== choiceKey || !!choiceError} onClick={() => onConfirm({ handoffs: replacements, preview: currentPreview })}>{!preview.destinations.length ? "Confirm Completion" : replacements.length ? "Confirm Next Work" : "Continue with Selected Employee"}</Button>
+        <Button className="min-h-12" onClick={onCancel} variant="ghost">Cancel and Return to Form</Button>
       </div>
     </div>
   </Modal>;
