@@ -64,3 +64,22 @@ separately; this change does not claim to resolve them.
   replace the original full-suite baseline limitation. Local and hosted pre-apply
   lint at error level both returned no errors. Named staging, whitespace and
   credential-safe scans passed with 10 reviewed paths and zero findings.
+
+## Hosted outcome
+
+Implementation `3706d01` was fast-forwarded into local main. The owner-authorized
+linked push successfully applied exactly 0318 and 0319 to `jewelos-prod`.
+Post-apply dry run reports up to date with nothing pending. Hosted error-level
+lint returns no errors. Read-only metadata confirms both ledger versions,
+the absence of Tasks scope checks in the runtime guard/picker, the retained
+publication guard and denied anon/authenticated/service-role execution of the
+private publication helper. The anonymous handoff-picker HTTP probe returns
+401 / SQLSTATE 42501. No customer records or credentials were printed.
+
+The matching code and this release evidence are published to main; publication
+is verified against the remote SHA. Hosted signed-in employee behavior remains
+unverified: successful persisted cross-branch/management handoffs were tested
+with synthetic local users. No production test work item or employee data was
+created. The database fix takes effect for existing deployed clients, and a
+refresh/retry reloads the employee choices. Automated CI/web-host results are
+reported separately at handoff.
