@@ -2,6 +2,7 @@ import {
   identityRequirementKey,
   normalizeImportBoolean,
   planTaskImportFrequency,
+  taskImportScheduledStart,
   taskImportTriggerLabel,
   TASK_IMPORT_MAX_ROWS,
   type TaskImportDraftRow,
@@ -179,7 +180,7 @@ export function normalizeBusinessTaskSheet(rows: readonly Row[], options: Busine
     const checkpointLabels = explicitCheckpoints.length ? explicitCheckpoints : plan.generatedCheckpoints;
     const checklist = (checkpointLabels.length ? checkpointLabels : taskType === "checklist" && title ? [title] : [])
       .map((item_text) => ({ item_text, required: true }));
-    const scheduledDate = startsOn && validDate(startsOn) ? startsOn : "";
+    const scheduledDate = startsOn && validDate(startsOn) ? taskImportScheduledStart(plan, startsOn) : "";
 
     drafts.push({
       source_row: sourceRow,

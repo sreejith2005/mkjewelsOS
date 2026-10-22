@@ -21,15 +21,18 @@ export {
   getPageForPath,
   isImplementedPage,
 } from "./roleMenu";
-export { TASK_IN_LOOP_PATH } from "./roleMenu";
+export { LEGACY_RECURRING_TODO_PATH, TASK_IN_LOOP_PATH } from "./roleMenu";
 export type { LauncherMenuItem, MenuItem, PageId, UserRole } from "./roleMenu";
 export {
   isUserAvailableForRecurringTask,
   kolkataDateKey,
   materializeRecurringSchedule,
+  recurrenceOccurrenceDates,
   resolveRecurringAssignment,
   shouldGenerateRecurringTask,
 } from "./recurrence";
+export * from "./recurrenceBuilder";
+export * from "./scheduledTask";
 export type {
   RecurringAssignment,
   RecurringAvailabilityProfile,

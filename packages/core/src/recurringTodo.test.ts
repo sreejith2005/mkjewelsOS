@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildRecurringTemplatePayload,
   canManageRecurringWorkspace,
   canPauseRecurringTemplate,
   canRunRecurringTemplateNow,
@@ -10,14 +9,10 @@ import {
   recurringInstanceNeedsWork,
   recurringPerformanceScores,
   recurringPerformanceRows,
-  recurringRecurrenceRule,
   recurringStatusPill,
   recurringTemplateDeletePrompt,
-  recurringTemplateFrequency,
-  validateRecurringTemplateDraft,
   RECURRING_TODO_TABS,
   type RecurringInstanceLike,
-  type RecurringTemplateDraft,
 } from "./recurringTodo";
 
 function instance(overrides: Partial<RecurringInstanceLike> = {}): RecurringInstanceLike {
@@ -352,78 +347,6 @@ describe("deriveRecurringWorkCardState", () => {
     expect(view(task, { canManage: false, followupEnabled: true }).showFollowup).toBe(false);
     expect(view(task, { canManage: true, followupEnabled: false }).showFollowup).toBe(false);
     expect(view(instance({ status: "completed" }), { canManage: true, followupEnabled: true }).showFollowup).toBe(false);
-  });
-});
-
-describe("schedule authoring", () => {
-  const draft: RecurringTemplateDraft = {
-    title: "Open the safe",
-    description: "",
-    frequency: "daily",
-    start: "2026-09-01",
-    startTime: "09:00",
-    dueTime: "10:00",
-    mode: "checklist",
-    buddy: true,
-  };
-  const assignee = { id: "user-1", branch_id: "branch-1", department_id: "dept-1" };
-
-  it("keeps the frequency the template was saved with, and falls back to daily", () => {
-    expect(recurringTemplateFrequency({ schedule_kind: "quarterly" })).toBe("quarterly");
-    expect(recurringTemplateFrequency({ schedule_kind: "fortnightly" })).toBe("daily");
-    expect(recurringTemplateFrequency(null)).toBe("daily");
-  });
-
-  it("maps each frequency to its recurrence rule", () => {
-    expect(recurringRecurrenceRule("quarterly")).toBe("FREQ=MONTHLY;INTERVAL=3");
-    expect(recurringRecurrenceRule("one_time")).toBe("FREQ=DAILY;COUNT=1");
-    expect(recurringRecurrenceRule("nonsense")).toBe("FREQ=DAILY");
-  });
-
-  it("requires every detail before saving", () => {
-    expect(validateRecurringTemplateDraft(draft, assignee)).toBeNull();
-    expect(validateRecurringTemplateDraft(draft, null)).toBe("Complete all required task details.");
-    expect(validateRecurringTemplateDraft({ ...draft, title: "" }, assignee)).toBe("Complete all required task details.");
-    expect(validateRecurringTemplateDraft({ ...draft, startTime: "" }, assignee)).toBe("Complete all required task details.");
-  });
-
-  it("refuses a due time that is not after the start time", () => {
-    expect(validateRecurringTemplateDraft({ ...draft, dueTime: "09:00" }, assignee)).toBe(
-      "Due Time must be later than the Scheduled Start Time.",
-    );
-    expect(validateRecurringTemplateDraft({ ...draft, dueTime: "08:00" }, assignee)).toBe(
-      "Due Time must be later than the Scheduled Start Time.",
-    );
-  });
-
-  it("takes the branch and department from the assignee's profile", () => {
-    const payload = buildRecurringTemplatePayload(draft, assignee);
-    expect(payload).toMatchObject({
-      branch_id: "branch-1",
-      department_id: "dept-1",
-      default_assignee_type: "specific_user",
-      default_assignee_user_id: "user-1",
-      recurrence_rule: "FREQ=DAILY",
-      schedule_kind: "daily",
-      task_type: "checklist",
-      requires_upload: false,
-      is_active: true,
-      personal_performance_enabled: true,
-    });
-  });
-
-  it("makes a task-mode schedule a delegation task that owes an image", () => {
-    expect(buildRecurringTemplatePayload({ ...draft, mode: "task" }, assignee)).toMatchObject({
-      task_type: "delegation",
-      requires_upload: true,
-    });
-  });
-
-  it("pins the chosen form version on future recurring tasks", () => {
-    expect(buildRecurringTemplatePayload({ ...draft, formTemplateId: "form-v2" }, assignee)).toMatchObject({
-      requires_form: true,
-      form_template_id: "form-v2",
-    });
   });
 });
 

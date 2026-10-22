@@ -102,6 +102,36 @@ export function shouldGenerateRecurringTask(
   return recurrence.between(start, end, true).length > 0;
 }
 
+/**
+ * The business dates on which a rule generates work, on or after `fromDate`.
+ *
+ * It parses the rule exactly as `shouldGenerateRecurringTask` does (same
+ * DTSTART anchor, same Kolkata day), so a schedule preview lists the days the
+ * scheduler will actually create — not an independent interpretation.
+ */
+export function recurrenceOccurrenceDates(
+  recurrenceRule: string,
+  startsOn: string | undefined,
+  fromDate: Date | string,
+  limit: number,
+): string[] {
+  if (limit <= 0) return [];
+  const fromKey = kolkataDateKey(fromDate);
+  const floorKey = startsOn && assertDateOnly(startsOn) > fromKey ? startsOn : fromKey;
+  const recurrence = rrulestr(normalizeRule(recurrenceRule, startsOn), { forceset: true });
+  const { start } = recurrenceDayBounds(floorKey);
+  // A century bounds a rule that never matches (for example day 31 of February
+  // only), so the search always terminates; `limit` stops it far sooner.
+  const horizon = new Date(start.getTime() + 36_525 * 86_400_000);
+  const keys: string[] = [];
+  recurrence.between(start, horizon, true, (date) => {
+    const key = kolkataDateKey(date);
+    if (!keys.includes(key)) keys.push(key);
+    return keys.length < limit;
+  });
+  return keys.slice(0, limit);
+}
+
 export type DueRecurringTemplate = Readonly<{
   id: string;
   recurrenceRule: string;

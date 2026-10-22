@@ -2,6 +2,7 @@ import {
   identityRequirementKey,
   normalizeImportBoolean,
   planTaskImportFrequency,
+  taskImportScheduledStart,
   taskImportTriggerLabel,
   TASK_IMPORT_MAX_ROWS,
   type TaskImportDraftRow,
@@ -65,7 +66,8 @@ export function normalizeLegacyTaskSheet(rows: readonly Row[], options: LegacyTa
     try { plan = planTaskImportFrequency(value(row, "FREQUENCY"), validDate(startsOnCandidate) ? startsOnCandidate : "2000-01-01", task || "Task"); }
     catch { issues.push(issue(sourceRow, "FREQUENCY", "Frequency is unsupported", "Use a supported frequency from the downloaded format.")); plan = planTaskImportFrequency("", "", task || "Task"); }
     const scheduleKind = plan.scheduleKind;
-    const startsOn = sourceStartsOn || (scheduleKind === "as_required" ? "" : options.defaultStartsOn ?? "");
+    const chosenStart = sourceStartsOn || (scheduleKind === "as_required" ? "" : options.defaultStartsOn ?? "");
+    const startsOn = scheduleKind === "as_required" ? chosenStart : taskImportScheduledStart(plan, chosenStart);
     const groupedStartTime = groupedValue("START TIME"); const groupedDueTime = groupedValue("DUE TIME");
     const startPreset = options.timingPresets?.[plan.startTimingPreset]; const duePreset = options.timingPresets?.[plan.dueTimingPreset];
     if (!groupedStartTime) requiredPresets.add(plan.startTimingPreset);

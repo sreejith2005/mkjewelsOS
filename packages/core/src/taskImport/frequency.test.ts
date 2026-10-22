@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { buildScheduleRule } from "../recurrenceBuilder";
 import {
   createDefaultTaskImportTimingPresets,
   normalizeTaskFrequencyLabel,
   planTaskImportFrequency,
+  taskImportScheduledStart,
   taskImportTriggerLabel,
 } from "./frequency";
 
@@ -289,4 +291,64 @@ describe("task import frequency planning", () => {
     expect(taskImportTriggerLabel("Daily – Opening", "daily")).toBe("");
     expect(taskImportTriggerLabel("x".repeat(120), "as_required")).toHaveLength(80);
   });
+});
+
+describe("calendar frequencies read by the shared schedule builder", () => {
+  // 2026-10-21 is a Wednesday.
+  it.each([
+    ["3rd Saturday", "monthly", "FREQ=MONTHLY;BYDAY=3SA", "2026-11-21"],
+    ["Third Saturday of every month", "monthly", "FREQ=MONTHLY;BYDAY=3SA", "2026-11-21"],
+    ["Last Friday", "monthly", "FREQ=MONTHLY;BYDAY=-1FR", "2026-10-30"],
+    ["Last Friday Monthly", "monthly", "FREQ=MONTHLY;BYDAY=-1FR", "2026-10-30"],
+    ["2nd Saturday", "monthly", "FREQ=MONTHLY;BYDAY=2SA", "2026-11-14"],
+    ["First Monday", "monthly", "FREQ=MONTHLY;BYDAY=1MO", "2026-11-02"],
+    ["Every Saturday", "weekly", "FREQ=WEEKLY;BYDAY=SA", "2026-10-24"],
+    ["Tuesday & Friday", "weekly", "FREQ=WEEKLY;BYDAY=TU,FR", "2026-10-23"],
+    ["Mon, Wed & Fri", "weekly", "FREQ=WEEKLY;BYDAY=MO,WE,FR", "2026-10-21"],
+    ["Monday to Saturday", "weekly", "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR,SA", "2026-10-21"],
+    ["Every 2 Days", "daily", "FREQ=DAILY;INTERVAL=2", "2026-10-21"],
+    ["Every 7 Days", "daily", "FREQ=DAILY;INTERVAL=7", "2026-10-21"],
+    ["Every 30 Days", "daily", "FREQ=DAILY;INTERVAL=30", "2026-10-21"],
+    ["Every 2 Weeks", "weekly", "FREQ=WEEKLY;INTERVAL=2;BYDAY=WE", "2026-10-21"],
+    ["Fortnightly", "weekly", "FREQ=WEEKLY;INTERVAL=2;BYDAY=WE", "2026-10-21"],
+    ["Every 2 Months", "monthly", "FREQ=MONTHLY;INTERVAL=2;BYMONTHDAY=21", "2026-10-21"],
+    ["Half Yearly", "monthly", "FREQ=MONTHLY;INTERVAL=6;BYMONTHDAY=21", "2026-10-21"],
+    ["Every 2 Years", "yearly", "FREQ=YEARLY;INTERVAL=2;BYMONTH=10;BYMONTHDAY=21", "2026-10-21"],
+    ["25th Monthly", "monthly", "FREQ=MONTHLY;BYMONTHDAY=25", "2026-10-25"],
+    ["Last Day of Month", "monthly", "FREQ=MONTHLY;BYMONTHDAY=-1", "2026-10-31"],
+    ["Month End", "monthly", "FREQ=MONTHLY;BYMONTHDAY=-1", "2026-10-31"],
+  ])("plans %s and starts it on its first real date", (label, kind, rule, firstDate) => {
+    const plan = planTaskImportFrequency(label, "2026-10-21", "Task");
+    expect(plan).toMatchObject({ scheduleKind: kind, recurrenceRule: rule, destination: "recurring_todo", anchorStart: true });
+    expect(taskImportScheduledStart(plan, "2026-10-21")).toBe(firstDate);
+  });
+
+  it("builds the same rule as Create Task for the same schedule", () => {
+    expect(planTaskImportFrequency("3rd Saturday", "2026-10-21", "Task").recurrenceRule)
+      .toBe(buildScheduleRule({ pattern: "monthly_weekday", interval: 1, ordinal: 3, weekday: "SA", end: { type: "never" } }).recurrenceRule);
+    expect(planTaskImportFrequency("Every Monday", "2026-10-21", "Task").recurrenceRule)
+      .toBe(buildScheduleRule({ pattern: "weekly", interval: 1, weekdays: ["MO"], end: { type: "never" } }).recurrenceRule);
+    expect(planTaskImportFrequency("Quarterly", "2026-10-21", "Task").recurrenceRule)
+      .toBe(buildScheduleRule({ pattern: "monthly_dates", interval: 3, days: [21], end: { type: "never" } }).recurrenceRule);
+    expect(planTaskImportFrequency("Annual", "2026-10-21", "Task").recurrenceRule)
+      .toBe(buildScheduleRule({ pattern: "yearly", interval: 1, months: [10], day: 21, end: { type: "never" } }).recurrenceRule);
+  });
+
+  it("keeps older labels on the date the sheet gave them", () => {
+    const plan = planTaskImportFrequency("Every Monday", "2026-10-21", "Task");
+    expect(plan.anchorStart).toBeUndefined();
+    expect(taskImportScheduledStart(plan, "2026-10-21")).toBe("2026-10-21");
+  });
+
+  it.each(["Per Order", "As Needed", "On Demand"])("treats %s as an anytime duty", (label) => {
+    expect(planTaskImportFrequency(label, "2026-10-21", "Task")).toMatchObject({ scheduleKind: "as_required", recurrenceRule: "FREQ=DAILY" });
+    expect(taskImportTriggerLabel(label, "as_required")).toBe(label);
+  });
+
+  it.each(["Saturday to Monday", "5th Saturday", "Every 0 Days", "Every 100 Days", "32nd Monthly", "Bi-annual", "Whenever", "Per Whatever"])(
+    "still rejects %s instead of guessing",
+    (label) => {
+      expect(() => planTaskImportFrequency(label, "2026-10-21", "Task")).toThrow(/unsupported frequency/i);
+    },
+  );
 });
