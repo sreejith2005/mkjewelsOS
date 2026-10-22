@@ -78,7 +78,9 @@ Independent review covered the feature and naming boundaries through 0316. Its
 requested submitted/unsubmitted self-exclusion test was strengthened and passed.
 The final filter-order refinement was checked against the search/denial suites.
 Database, Git publication, web deployment and physical Android evidence are separate.
-No production migration, push or deployment has been performed for this feature.
+At the initial handoff no production migration, push or deployment had been
+performed. The later owner-authorized hosted migration and publication evidence
+is recorded in the [2026-10-22 release record](FMS_TASK_WORKSPACE_RELEASE_2026-10-22.md).
 
 Before release, resolve or explicitly disposition the database regression/lint
 gate, inspect the linked project and migration ledger, then review
