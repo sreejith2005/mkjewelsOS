@@ -104,14 +104,14 @@
 - [x] Run focused tests, clean local DB rebuild/full pgTAP/lint, core/data/web suites, serial typecheck/build, rendered phone/desktop and applicable shell checks. Record exact commands/results and distinguish blockers.
 - [x] Review complete diff for permission scope, duplicate logic, historical compatibility, legacy RPC callers, ordinary tasks and credential/customer data. Request an independent review using the approved execution method.
 - [x] Resolve review findings and rerun affected checks. Stage named paths, inspect staged diff, run `git diff --cached --check` and credential-safe staged scan.
-- [ ] Integrate validated work into main as the final target; do not overwrite unrelated branch changes. Follow the publication skill/playbook for an authorized push.
+- [x] Integrate validated work into main as the final target; do not overwrite unrelated branch changes. Follow the publication skill/playbook for an authorized push.
 - [x] Prepare concrete hosted migration dry-run/release steps; do not deploy without the required approval. Report local, Git, hosted, web and physical Android evidence separately.
 
 ## Execution evidence (local, 2026-10-20/21)
 
 Owner approved the design and this plan, choosing direct implementation. The
 implementation, independent review and rendered verification are complete.
-Local main integration is the remaining Git step. The full database gate has
+Local main integration completed by fast-forward to `9a73a3a`. The full database gate has
 the explicitly recorded baseline failures below. No hosted writes or publication
 have been performed.
 

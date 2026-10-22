@@ -127,12 +127,21 @@ links and execution ownership are never replaced by the naming representative.
 Earlier runs exceeded the request budget during shared-container contention.
 For the final gates, the owner approved temporarily stopping 61 containers from
 13 other local Supabase stacks. Only the dedicated four-container FMS stack ran
-during verification; the recorded containers were then scheduled for restoration.
+during verification. Restoration restarted 57 of the 61 recorded containers.
+Windows excluded TCP port ranges 58233-58332 and 58333-58432 blocked the
+database and Kong containers for `crm-workflow-perf` (58421/58422) and
+`jewelos-crm-parity-original` (58321/58322), including on retry. Those four
+containers remain stopped; their volumes and configuration are intact. Completing
+restoration requires resolving the host port reservations. No global Windows
+networking restart or unrelated container reconfiguration was attempted.
 Measurements use synthetic local data and do not establish hosted latency,
 concurrent-stack capacity or larger tenant-wide administrator search capacity.
 The excluded local Edge runtime
 returns 503 for recurring-task preparation and realtime sockets are unavailable;
 real hosted realtime/Edge behavior and physical Android behavior are unverified.
+
+The validated implementation was fast-forwarded into local `main` at `9a73a3a`.
+No GitHub push, hosted migration or deployment was performed.
 
 ## Exact changed file manifest
 
