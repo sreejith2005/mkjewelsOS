@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { decodeTaskPage, taskAdminInitialEdit, taskAdminEditPayload, taskFormSubmissionKey, taskNeedsCompletionRemark } from "./taskPage";
+import { decodeTaskPage, taskAdminInitialEdit, taskAdminEditPayload, taskFormSubmissionKey } from "./taskPage";
 
 describe("task page contracts", () => {
-  it("requires a completion remark for explicit requirements and on-behalf work", () => {
-    const task = { requires_remark: false, assignees: [{ id: "doer" }] };
-    expect(taskNeedsCompletionRemark(task, "doer")).toBe(false);
-    expect(taskNeedsCompletionRemark(task, "admin")).toBe(true);
-    expect(taskNeedsCompletionRemark({ ...task, requires_remark: true }, "doer")).toBe(true);
-  });
   it("retains exact-task form proof across task/checklist conversion", () => {
     expect(taskFormSubmissionKey("task-1", "delegation_task", "form-1")).toBe(taskFormSubmissionKey("task-1", "checklist_task", "form-1"));
     expect(taskFormSubmissionKey("task-2", "checklist_task", "form-1")).not.toBe(taskFormSubmissionKey("task-1", "checklist_task", "form-1"));

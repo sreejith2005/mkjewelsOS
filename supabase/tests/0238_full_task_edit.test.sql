@@ -79,7 +79,9 @@ select throws_ok($$select admin_edit_task_with_audit('23550000-0000-4000-8000-00
 select lives_ok($$select update_task_with_audit('23550000-0000-4000-8000-000000000002','complete')$$,'doer can complete imported task after upload requirement removed');
 select throws_ok($$select update_task_with_audit('23550000-0000-4000-8000-000000000003','complete')$$,'23514','A required upload is missing','unchanged task still enforces upload');
 select set_config('request.jwt.claim.sub','23500000-0000-4000-8000-000000000001',true);
-select throws_ok($$select update_task_with_audit('23550000-0000-4000-8000-000000000001','complete',p_remark=>'Not a doer')$$,'42501','In Loop participants may only view and comment on this task','admin watcher still cannot complete');
+-- The task's required checklist item is open, so the 0342 gate may refuse first; either refusal keeps it open.
+select throws_ok($$select update_task_with_audit('23550000-0000-4000-8000-000000000001','complete',p_remark=>'Not a doer')$$,null,null,'admin watcher still cannot complete');
+select isnt((select status::text from task_instances where id='23550000-0000-4000-8000-000000000001'),'completed','the watcher attempt leaves the task open');
 reset role;
 select ok((select deleted_at is not null and not is_completed from task_checklists where id='23560000-0000-4000-8000-000000000002'),'removed checklist data retained in database');
 select set_config('request.jwt.claim.sub','',true);
@@ -106,8 +108,11 @@ update task_instances set task_template_id='23570000-0000-4000-8000-000000000001
 set local role authenticated;
 select set_config('request.jwt.claim.sub','23500000-0000-4000-8000-000000000002',true);
 select throws_ok($$select complete_recurring_task_with_image_with_audit('23550000-0000-4000-8000-000000000003','evidence')$$,'23514','Complete the required form after uploading evidence','direct recurring image completion cannot bypass a required form');
-select throws_ok($$select complete_uploaded_task_with_audit('23550000-0000-4000-8000-000000000003','evidence')$$,'23514','Upload evidence, then complete with a remark','direct upload completion cannot bypass a required remark');
-select throws_ok($$select submit_task_form_with_audit('23550000-0000-4000-8000-000000000003',(select id from form_templates where name='Edit completion 235'),'{"answer":"Done"}')$$,'23514','A completion remark is required','form cannot bypass required remark');
+select throws_ok($$select complete_uploaded_task_with_audit('23550000-0000-4000-8000-000000000003','evidence')$$,'23514','The required task form submission is missing','direct upload completion cannot bypass a required form');
+-- 0342: the form path is refused while a required checklist item is unticked, and rolls back.
+select throws_ok($$select submit_task_form_with_audit('23550000-0000-4000-8000-000000000003',(select id from form_templates where name='Edit completion 235'),'{"answer":"Done"}')$$,'23514','Tick every required checklist item before completing this task','form cannot bypass the checklist');
+select is((select count(*)::integer from form_submissions where linked_record_id='23550000-0000-4000-8000-000000000003'),0,'checklist refusal rolls back the form submission');
+select lives_ok($$select update_task_with_audit('23550000-0000-4000-8000-000000000003','checklist','23560000-0000-4000-8000-000000000003',true)$$,'doer ticks the required item');
 select lives_ok($$select submit_task_form_with_audit('23550000-0000-4000-8000-000000000003',(select id from form_templates where name='Edit completion 235'),'{"answer":"Done"}','Completed safely')$$,'submission and completion succeed together with all requirements');
 select ok((select status='completed' and completion_remark='Completed safely' and completed_by='23540000-0000-4000-8000-000000000002' and actual_datetime is not null from task_instances where id='23550000-0000-4000-8000-000000000003'),'atomic form completion records actor and remark');
 select is((select count(*)::integer from form_submissions where linked_record_id='23550000-0000-4000-8000-000000000003'),1,'exactly one successful submission retained');

@@ -7,8 +7,12 @@ import { formatIndiaDateTime } from "./TaskDetails";
 /**
  * Follow-up remarks for one task. Mounted only inside an expanded card, so a collapsed feed
  * issues no remark requests. `list_task_comments` / `add_task_comment_with_audit` decide access.
+ *
+ * Remarks are how someone kept In Loop speaks up about a task; tasks carry no completion
+ * remark. So the thread opens with an In Loop viewer, and anyone else sees it (and can
+ * reply) only once a remark exists. Otherwise it stays out of the way.
  */
-export function TaskRemarks({ taskId }: Readonly<{ taskId: string }>) {
+export function TaskRemarks({ canComment, taskId }: Readonly<{ canComment: boolean; taskId: string }>) {
   const [comments, setComments] = useState<TaskComment[] | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -40,11 +44,13 @@ export function TaskRemarks({ taskId }: Readonly<{ taskId: string }>) {
     }
   };
 
+  if (!canComment && !error && !comments?.length) return null;
+
   return <section aria-label="Remarks" className="flex flex-col gap-3 rounded-xl border border-task-border bg-task-bg p-3">
     <h3 className="flex items-center gap-2 text-sm font-semibold text-task-text"><MessageSquare className="size-4 text-gold-secondary" />Remarks</h3>
     {error ? <Notice tone="danger">{error}</Notice> : null}
     {comments === null && !error ? <p className="text-sm text-task-text-muted">Loading remarks…</p> : null}
-    {comments?.length === 0 ? <p className="text-center text-sm text-task-text-muted">No remarks yet. Looped-in users and participants can add follow-up comments here.</p> : null}
+    {comments?.length === 0 ? <p className="text-center text-sm text-task-text-muted">No remarks yet. Add a remark for the person doing this task.</p> : null}
     {comments?.length ? <ul className="flex flex-col gap-2">
       {comments.map((item) => <li className="rounded-lg bg-task-muted p-2" key={item.id}>
         <div className="flex items-center justify-between gap-2 text-xs"><span className="font-semibold text-task-text">{item.authorName}</span><span className="text-task-text-muted">{formatIndiaDateTime(item.createdAt)}</span></div>

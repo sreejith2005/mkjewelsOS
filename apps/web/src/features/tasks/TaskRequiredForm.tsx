@@ -6,12 +6,11 @@ import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer
 import { submitTaskForm, uploadTaskAttachment } from "./api";
 
 /** Task requirements accompany the pinned form without modifying its definition. */
-export function TaskRequiredForm({ definition, dynamicOptions, templateId, taskId, requiresRemark, requiresUpload, onCompleted }: Readonly<{
+export function TaskRequiredForm({ definition, dynamicOptions, templateId, taskId, requiresUpload, onCompleted }: Readonly<{
   definition: FormTemplateDefinition; dynamicOptions: DynamicOptions; templateId: string; taskId: string;
-  requiresRemark: boolean; requiresUpload: boolean; onCompleted: () => Promise<void>;
+  requiresUpload: boolean; onCompleted: () => Promise<void>;
 }>) {
   const { profile } = useAuth();
-  const [remark, setRemark] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadName, setUploadName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -27,11 +26,9 @@ export function TaskRequiredForm({ definition, dynamicOptions, templateId, taskI
         .catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Upload failed"))
         .finally(() => setUploading(false));
     }} />{uploadName ? <span>{uploadName} uploaded</span> : <span>Upload evidence here if it has not already been attached.</span>}</Field> : null}
-    <Field label="Completion remark"><textarea required={requiresRemark} maxLength={2000} className="task-field" value={remark} onChange={event => setRemark(event.target.value)} /></Field>
     <FormRenderer definition={definition} dynamicOptions={dynamicOptions} templateId={templateId} onSubmit={async answers => {
       if (uploading) throw new Error("Wait for the evidence upload to finish.");
-      if (requiresRemark && !remark.trim()) throw new Error("A completion remark is required");
-      await submitTaskForm(taskId, templateId, answers, remark);
+      await submitTaskForm(taskId, templateId, answers);
       await onCompleted();
     }} />
   </div>;

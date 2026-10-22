@@ -25,8 +25,9 @@ function StatusPill({ task }: { task: RecurringInstance }) {
 
 /**
  * One recurring occurrence in Task Control → Review, with the actions the
- * retired Recurring / To-Do page offered: complete (on behalf, with a remark),
- * checklist, evidence upload, required form, follow-up, verify and reject.
+ * retired Recurring / To-Do page offered: complete (on behalf too), checklist,
+ * evidence upload, required form, follow-up, verify and reject. No completion
+ * remark is asked for: tasks no longer carry one.
  * Every decision is `deriveRecurringWorkCardState`'s, and every action is the
  * same audited RPC as before.
  */
@@ -56,13 +57,7 @@ export function RecurringWorkCard({
       setActionError(caught instanceof Error ? caught.message : "The action failed");
     }
   };
-  const act = () => guarded(async () => {
-    // The doer's own remark, never a placeholder: a template that requires a
-    // remark and an on-behalf completion both have to be explained.
-    const entered = state.needsRemark ? window.prompt(state.remarkPrompt) : null;
-    if (state.needsRemark && !entered?.trim()) return;
-    await updateTask(task.id, "complete", entered?.trim() ? { remark: entered.trim() } : undefined);
-  });
+  const act = () => guarded(() => updateTask(task.id, "complete"));
   const checklist = (id: string, completed: boolean) => guarded(() => updateTask(task.id, "checklist", { checklistId: id, completed }));
   const followup = () => guarded(async () => {
     const message = window.prompt("Follow-up message");
@@ -80,7 +75,8 @@ export function RecurringWorkCard({
     if (!file || !profile) return;
     setUploading(true);
     await guarded(async () => {
-      if (task.requires_form || state.needsRemark) await uploadTaskAttachment(profile.tenant_id, task.id, file);
+      // An open checklist or a pending form still has to finish the task, so the upload only attaches.
+      if (task.requires_form || !state.checklistDone) await uploadTaskAttachment(profile.tenant_id, task.id, file);
       else await completeRecurringTaskWithImage(profile.tenant_id, task.id, file);
     });
     setUploading(false);
@@ -147,7 +143,7 @@ export function RecurringWorkCard({
         {state.showUpload ? (
           <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-gold/30 px-4 py-2 text-sm font-semibold text-gold-secondary">
             <Upload className="size-4" />
-            {uploading ? "Uploading…" : task.requires_form || state.needsRemark ? "Upload evidence" : "Upload image to complete"}
+            {uploading ? "Uploading…" : task.requires_form || !state.checklistDone ? "Upload evidence" : "Upload image to complete"}
             <input accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" className="sr-only" disabled={uploading} onChange={(event) => void uploadImage(event)} type="file" />
           </label>
         ) : null}

@@ -29,8 +29,8 @@ select ok(
 
 -- Completion and verification rules -------------------------------------------
 select ok(
-  position('on behalf of the doer' in pg_get_functiondef('public.update_task_with_audit(uuid,text,uuid,boolean,text)'::regprocedure)) > 0,
-  'completing another user''s task demands a remark');
+  position('on behalf of the doer' in pg_get_functiondef('public.update_task_with_audit(uuid,text,uuid,boolean,text)'::regprocedure)) = 0,
+  'completing another user''s task no longer demands a remark (0342)');
 select ok(
   position('on_time_status' in pg_get_functiondef('public.update_task_with_audit(uuid,text,uuid,boolean,text)'::regprocedure)) > 0,
   'completion records whether the work landed on time');

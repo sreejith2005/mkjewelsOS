@@ -277,19 +277,24 @@ describe("deriveRecurringWorkCardState", () => {
       ...overrides,
     });
 
-  it("asks the doer for a plain remark and anyone else why they are acting on their behalf", () => {
-    const mine = view(instance({ assignees: [{ id: "me", name: "Me" }] }));
+  it("never asks for a completion remark, on behalf or not", () => {
+    const mine = view(instance({ assignees: [{ id: "me", name: "Me" }], requires_remark: true }));
     expect(mine.isOwnWork).toBe(true);
-    expect(mine.needsRemark).toBe(false);
-    expect(mine.remarkPrompt).toBe("Completion remark");
-
-    const theirs = view(instance({ assignees: [{ id: "other", name: "Other" }] }));
-    expect(theirs.needsRemark).toBe(true);
-    expect(theirs.remarkPrompt).toBe("Why are you completing this on behalf of the doer?");
+    expect(mine).not.toHaveProperty("needsRemark");
+    expect(view(instance({ assignees: [{ id: "other", name: "Other" }] }))).not.toHaveProperty("remarkPrompt");
   });
 
-  it("still demands a remark from the doer when the schedule requires one", () => {
-    expect(view(instance({ assignees: [{ id: "me", name: "Me" }], requires_remark: true })).needsRemark).toBe(true);
+  it("offers Complete checklist only once every required item is ticked", () => {
+    const open = view(instance({ task_type: "checklist", checklist: [{ is_required: true, is_completed: false }] }));
+    expect(open.checklistDone).toBe(false);
+    expect(open.showCompleteChecklist).toBe(false);
+    expect(view(instance({ task_type: "checklist", checklist: [{ is_required: true, is_completed: true }] })).showCompleteChecklist).toBe(true);
+  });
+
+  it("keeps a form task's checklist visible and its form action waiting on it", () => {
+    const state = view(instance({ requires_form: true, form_template_id: "form-1", checklist: [{ is_required: true, is_completed: false }] }));
+    expect(state.showChecklist).toBe(true);
+    expect(state.completeFormDisabled).toBe(true);
   });
 
   it("offers verification to the named verifier as well as an administrator", () => {

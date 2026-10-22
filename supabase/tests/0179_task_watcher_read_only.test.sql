@@ -23,8 +23,9 @@ insert into public.task_assignees(task_instance_id,user_profile_id,role_at_task,
 values ('18650000-0000-4000-8000-000000000001','18640000-0000-4000-8000-000000000001','doer',true,true);
 insert into public.task_watchers(tenant_id,task_instance_id,user_profile_id,created_by)
 values ('18610000-0000-4000-8000-000000000001','18650000-0000-4000-8000-000000000001','18640000-0000-4000-8000-000000000002','18640000-0000-4000-8000-000000000001');
+-- Optional, so a watcher's completion attempt reaches the watcher rule rather than the 0342 checklist gate.
 insert into public.task_checklists(id,task_instance_id,item_text,sort_order,is_required,is_completed)
-values ('18660000-0000-4000-8000-000000000001','18650000-0000-4000-8000-000000000001','Check 186',0,true,false);
+values ('18660000-0000-4000-8000-000000000001','18650000-0000-4000-8000-000000000001','Check 186',0,false,false);
 
 set local role authenticated;
 select set_config('request.jwt.claim.role','authenticated',true);

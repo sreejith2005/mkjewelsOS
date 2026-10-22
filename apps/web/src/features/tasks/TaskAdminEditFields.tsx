@@ -16,7 +16,7 @@ function ReferenceSelect({ label, value, options, onChange }: Readonly<{
 export function TaskAdminEditFields({ edit, onChange, reference }: Readonly<{
   edit: TaskAdminEdit; onChange: (edit: TaskAdminEdit) => void; reference: TaskAdminEditData["reference"];
 }>) {
-  const toggle = (label: string, key: "requiresUpload" | "requiresRemark" | "requiresForm" | "verificationRequired" | "buddyAssignmentAllowed") =>
+  const toggle = (label: string, key: "requiresUpload" | "requiresForm" | "verificationRequired" | "buddyAssignmentAllowed") =>
     <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={edit[key] ?? false} onChange={event => onChange({ ...edit, [key]: event.target.checked })} />{label}</label>;
   const people = reference.users.map(user => ({ ...user, employee_name: user.employee_name || user.employee_code || "Unnamed user" }));
   const branchNames = new Map(reference.branches.map(branch => [branch.id, branch.name]));
@@ -27,7 +27,6 @@ export function TaskAdminEditFields({ edit, onChange, reference }: Readonly<{
     }}><option value="delegation">Task</option><option value="checklist">Checklist</option></select></Field>
     <fieldset className="grid gap-1 rounded-xl border border-task-border p-3"><legend className="px-1 font-semibold">Completion requirements</legend>
       {toggle("Upload required", "requiresUpload")}
-      {toggle("Completion remark required", "requiresRemark")}
       {toggle("Form required", "requiresForm")}
       <ReferenceSelect label="Linked form" value={edit.formTemplateId ?? ""} options={reference.forms.map(form => ({ id: form.id, label: form.name + " (v" + form.version + ")" }))} onChange={formTemplateId => onChange({ ...edit, formTemplateId })} />
       {toggle("Verification required", "verificationRequired")}

@@ -79,6 +79,9 @@ select is((select requires_upload from task_templates where title='Upload requir
 select is((select requires_upload from task_instances where title='Upload required'),true,'initial occurrence requires proof');
 select is((select requires_upload from task_instances where title='Click complete'),false,'imported Checklist remains click completion');
 select throws_ok($$select update_task_with_audit((select id from task_instances where title='Upload required'),'complete')$$,'23514','A required upload is missing','import cannot complete without proof');
+-- 0342: the imported item is ticked by hand before the checklist completes.
+select throws_ok($$select update_task_with_audit((select id from task_instances where title='Click complete'),'complete')$$,'23514','Tick every required checklist item before completing this task','imported checklist waits for its item');
+select lives_ok($$select update_task_with_audit((select id from task_instances where title='Click complete'),'checklist',(select c.id from task_checklists c join task_instances t on t.id=c.task_instance_id where t.title='Click complete'),true)$$,'doer ticks the imported item');
 select lives_ok($$select update_task_with_audit((select id from task_instances where title='Click complete'),'complete')$$,'checklist completes without proof');
 select lives_ok($$select admin_delete_task_with_audit((select id from task_instances where title='Upload required'),true,'Wrong schedule')$$,'series deletion succeeds');
 select ok(not exists(select 1 from task_templates where title='Upload required'),'series is absent from active template reads');
