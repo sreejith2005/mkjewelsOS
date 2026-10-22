@@ -84,42 +84,53 @@ function renderExpanded(task: TaskBundle = fullTask) {
 }
 
 describe("TaskDetails", () => {
-  it("renders plain-language operational context without raw recurrence data", () => {
+  it("shows only what the header does not already say, in plain words", () => {
     const details = renderExpanded();
 
     expect(details.getByText("Inspect every showcase before opening.")).not.toBeNull();
-    for (const label of ["Assigned to", "Branch", "Department", "Task type", "Core task", "Frequency", "Start", "Due", "Priority", "Evidence", "Verification", "Verifier", "Buddy coverage", "Schedule state", "Status", "Checklist"]) {
-      expect(details.getAllByText(label).length).toBeGreaterThan(0);
+    for (const [label, value] of [
+      ["Repeats", "Daily · paused"],
+      ["Evidence", "Evidence required · Uploaded"],
+      ["Verification", "Verification pending · Nikita Patil"],
+      ["Core task", "Showroom opening"],
+    ] as const) {
+      expect(details.getByText(label).parentElement?.textContent).toBe(label + value);
     }
-    for (const value of ["Ashwini Kamble", "Pune Camp", "Retail Operations", "Checklist", "Showroom opening", "Daily", "Evidence required · Uploaded", "Verification pending", "Nikita Patil", "Buddy coverage allowed", "Schedule paused", "Pending"]) {
-      expect(details.getAllByText(value).length).toBeGreaterThan(0);
+    expect(details.getByText(/2 Sept 2026, 10:30 am \(was 2 Sept 2026, 10:00 am\)/i)).not.toBeNull();
+    // Already on the card face, obvious to the doer, or shown by the checklist itself.
+    for (const label of ["Assigned to", "Branch", "Department", "Task type", "Start", "Priority", "Buddy coverage", "Schedule state", "Status"]) {
+      expect(details.queryByText(label)).toBeNull();
     }
-    expect(details.getByText(/2 Sept 2026, 9:00 am/i)).not.toBeNull();
-    expect(details.getByText(/Revised deadline: 2 Sept 2026, 10:30 am/i)).not.toBeNull();
-    expect(details.getByText(/Original due: 2 Sept 2026, 10:00 am/i)).not.toBeNull();
     expect(screen.queryByText(/FREQ=/i)).toBeNull();
     expect(screen.queryByText("template-1")).toBeNull();
   });
 
-  it("shows the required description fallback and omits blank optional details", () => {
+  it("puts the checklist first, ahead of the details", () => {
+    const details = renderExpanded();
+    const checklist = details.getByRole("region", { name: "Checklist" });
+    const description = details.getByText("Inspect every showcase before opening.");
+    expect(checklist.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("adds nothing when a task has no description and no special requirements", () => {
     const details = renderExpanded({
       ...fullTask,
-      branch_name: null,
       core_task_label: null,
-      department_name: null,
       description: null,
+      hasAttachment: false,
+      requires_upload: false,
+      revised_datetime: null,
       schedule_kind: null,
       task_template_id: null,
+      verification_required: false,
+      verification_status: "not_required",
       verifierName: null,
       verifier_user_profile_id: null,
     } as TaskBundle);
 
-    expect(details.getByText("No description provided")).not.toBeNull();
-    expect(details.queryByText("Branch")).toBeNull();
-    expect(details.queryByText("Department")).toBeNull();
-    expect(details.queryByText("Core task")).toBeNull();
-    expect(details.queryByText("Verifier")).toBeNull();
-    expect(details.queryByText("Schedule state")).toBeNull();
-    expect(details.getByText("One Time")).not.toBeNull();
+    expect(details.queryByText("No description provided")).toBeNull();
+    for (const label of ["Repeats", "Deadline moved", "Evidence", "Verification", "Core task"]) {
+      expect(details.queryByText(label)).toBeNull();
+    }
   });
 });

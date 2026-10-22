@@ -7,7 +7,6 @@ import {
   kolkataDateKey,
   recurringPerformanceRows,
   recurringPerformanceScores,
-  taskNeedsCompletionRemark,
   RECURRING_FREQUENCY_FILTERS,
   RECURRING_PRIORITY_FILTERS,
   TASK_DELAYED_SCORE_LABEL,
@@ -250,7 +249,6 @@ export function ReviewTab({ filters, reloadKey, onOpenRecurringTasks }: {
               definition={{ name: form.name, description: form.description ?? undefined, sections: form.sections, fields: form.fields }}
               dynamicOptions={formOptions}
               onCompleted={async () => { setFormTarget(null); await load(); }}
-              requiresRemark={taskNeedsCompletionRemark(formTarget, profile?.id)}
               requiresUpload={Boolean(formTarget.requires_upload)}
               taskId={formTarget.id}
               templateId={form.id}

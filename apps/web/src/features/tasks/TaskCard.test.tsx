@@ -99,19 +99,47 @@ const task = {
 } as TaskBundle;
 
 describe("TaskCard direct completion", () => {
-  it("opens and focuses the required remark when completing a collapsed checklist", async () => {
+  it("opens the checklist instead of completing while a required item is unticked", async () => {
     const onAction = vi.fn().mockResolvedValue(undefined);
-    render(<TaskCard viewerId="doer-1" capability={capability} categoryLabel="Uncategorized" onAction={onAction}
-      task={{ ...task, task_type: "checklist", requires_remark: true }} />);
-    const complete = screen.getByRole("button", { name: "Complete task: Direct completion task" });
-    expect(complete).toHaveProperty("disabled", false);
-    fireEvent.click(complete);
-    const input = await screen.findByRole("textbox", { name: "Completion remark" });
-    await waitFor(() => expect(document.activeElement).toBe(input));
+    const checklists = [{ deleted_at: null, completed_at: null, completed_by: null, id: "item-1", is_completed: false, is_required: true, item_text: "Photograph the tray", sort_order: 1, task_instance_id: "task-1" }];
+    render(<TaskCard viewerId="doer-1" capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, checklists, task_type: "checklist", title: "Checklist task" }} />);
+    expect(screen.queryByRole("button", { name: "Complete task: Checklist task" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Open checklist: Checklist task" }));
+    const panel = await screen.findByRole("region", { name: "Checklist" });
+    await waitFor(() => expect(document.activeElement).toBe(panel));
+    expect(screen.getByRole("checkbox", { name: /Photograph the tray/ })).toBeTruthy();
     expect(onAction).not.toHaveBeenCalled();
-    fireEvent.change(input, { target: { value: "Opening checks finished" } });
-    fireEvent.click(complete);
-    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ kind: "complete", remark: "Opening checks finished" }));
+  });
+
+  it("never asks anyone for a completion remark, including on-behalf completion", async () => {
+    const onAction = vi.fn().mockResolvedValue(undefined);
+    const manager = deriveTaskMutationCapability({ assigneeIds: ["doer-1"], isWatcher: false, viewerId: "manager-1", viewerRole: "manager" });
+    render(<TaskCard viewerId="manager-1" capability={manager} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, requires_remark: true }} />);
+    fireEvent.click(screen.getByRole("button", { name: /View details/i }));
+    expect(screen.queryByRole("textbox", { name: "Completion remark" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Complete task: Direct completion task" }));
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ kind: "complete" }));
+  });
+
+  it("unlocks checklist items in order and finishes from the checklist once all are ticked", async () => {
+    const onAction = vi.fn().mockResolvedValue(undefined);
+    const second = { ...{ deleted_at: null, completed_at: null, completed_by: null, id: "item-1", is_completed: false, is_required: true, item_text: "Photograph the tray", sort_order: 1, task_instance_id: "task-1" }, id: "item-2", item_text: "Lock the safe", sort_order: 2 };
+    const { rerender } = render(<TaskCard viewerId="doer-1" capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, checklists: [{ deleted_at: null, completed_at: null, completed_by: null, id: "item-1", is_completed: false, is_required: true, item_text: "Photograph the tray", sort_order: 1, task_instance_id: "task-1" }, second], title: "Two steps" }} />);
+    fireEvent.click(screen.getByRole("button", { name: /View details/i }));
+    expect(screen.getByRole("checkbox", { name: /Photograph the tray/ })).toHaveProperty("disabled", false);
+    expect(screen.getByRole("checkbox", { name: /Lock the safe/ })).toHaveProperty("disabled", true);
+    expect(screen.queryByRole("button", { name: "Complete checklist: Two steps" })).toBeNull();
+
+    const ticked = [{ ...{ deleted_at: null, completed_at: null, completed_by: null, id: "item-1", is_completed: false, is_required: true, item_text: "Photograph the tray", sort_order: 1, task_instance_id: "task-1" }, is_completed: true }, { ...second, is_completed: true }];
+    rerender(<TaskCard viewerId="doer-1" capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, checklists: ticked, title: "Two steps" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Complete checklist: Two steps" }));
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ kind: "complete" }));
+  });
+
+  it("keeps the doer's own name off their own task", () => {
+    render(<TaskCard viewerId="doer-1" capability={capability} categoryLabel="Uncategorized" onAction={vi.fn()} task={task} />);
+    expect(screen.queryByText("Ashwini Kamble")).toBeNull();
+    expect(screen.queryByText("Uncategorized")).toBeNull();
   });
 
   it("offers the required upload on an edited checklist", () => {
@@ -199,7 +227,7 @@ describe("TaskCard direct completion", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Complete task: Direct completion task" }));
 
-    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ kind: "complete", remark: "" }));
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ kind: "complete" }));
   });
 
   it("uses a header Upload action that requests upload and completion for evidence tasks", async () => {
@@ -242,29 +270,19 @@ describe("TaskCard direct completion", () => {
     expect(onAction).not.toHaveBeenCalled();
   });
 
-  it("keeps the completion action available while a required checklist item is outstanding", async () => {
-    const onAction = vi.fn().mockResolvedValue(undefined);
+  it("withholds completion while a required checklist item is outstanding", () => {
     const checklists = [{ deleted_at: null, completed_at: null, completed_by: null, id: "item-1", is_completed: false, is_required: true, item_text: "Photograph the tray", sort_order: 1, task_instance_id: "task-1" }];
-
-    render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, checklists, title: "Checklist task" }} />);
-
-    const complete = screen.getByRole("button", { name: "Complete task: Checklist task" });
-    expect(complete).toHaveProperty("disabled", false);
-
-    fireEvent.click(complete);
-    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ kind: "complete", remark: "" }));
+    render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={vi.fn()} task={{ ...task, checklists, title: "Checklist task" }} />);
+    expect(screen.queryByRole("button", { name: "Complete task: Checklist task" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Open checklist: Checklist task" })).toBeTruthy();
   });
 
-  it("offers the one-shot upload while a required checklist item is outstanding", async () => {
-    const onAction = vi.fn().mockResolvedValue(undefined);
-    const file = new File(["evidence"], "evidence.png", { type: "image/png" });
+  it("withholds the one-shot upload until the checklist is ticked", () => {
     const checklists = [{ deleted_at: null, completed_at: null, completed_by: null, id: "item-1", is_completed: false, is_required: true, item_text: "Photograph the tray", sort_order: 1, task_instance_id: "task-1" }];
-
-    render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, checklists, requires_upload: true, title: "Checklist upload task" }} />);
-
-    fireEvent.change(screen.getByLabelText("Upload task: Checklist upload task"), { target: { files: [file] } });
-
-    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ file, kind: "upload_and_complete" }));
+    const { rerender } = render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={vi.fn()} task={{ ...task, checklists, requires_upload: true, title: "Checklist upload task" }} />);
+    expect(screen.queryByLabelText("Upload task: Checklist upload task")).toBeNull();
+    rerender(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={vi.fn()} task={{ ...task, checklists: [{ ...checklists[0]!, is_completed: true }], requires_upload: true, title: "Checklist upload task" }} />);
+    expect(screen.getByLabelText("Upload task: Checklist upload task")).toBeTruthy();
   });
 
   it("keeps an imported checklist without an upload requirement click-to-complete", async () => {
@@ -282,11 +300,11 @@ describe("TaskCard direct completion", () => {
     expect(complete).toHaveProperty("disabled", false);
 
     fireEvent.click(screen.getByRole("button", { name: /View details/i }));
-    expect(screen.getByText("Evidence").parentElement?.textContent).toBe("EvidenceNot required");
+    expect(screen.queryByText("Evidence")).toBeNull();
     expect(screen.queryByText("Upload required evidence")).toBeNull();
 
     fireEvent.click(complete);
-    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ kind: "complete", remark: "" }));
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ kind: "complete" }));
   });
 
   it("still lets a doer tick an individual checklist item", async () => {
@@ -296,7 +314,7 @@ describe("TaskCard direct completion", () => {
     render(<TaskCard capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, checklists, title: "Checklist task" }} />);
 
     fireEvent.click(screen.getByRole("button", { name: /View details/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Mark complete" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Photograph the tray/ }));
 
     await waitFor(() => expect(onAction).toHaveBeenCalledWith({ checklistId: "item-1", completed: true, kind: "checklist" }));
   });

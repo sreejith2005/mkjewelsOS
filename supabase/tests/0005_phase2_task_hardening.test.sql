@@ -445,9 +445,7 @@ select throws_ok(format(
   '40000000-0000-0000-0000-000000000005',
   '40000000-0000-0000-0000-000000000005', 'Self transfer'
 ), '22023', 'Self-delegation is not allowed', 'self-transfer fails');
--- Migration 0109 adopted the reference rule that completing another user's work
--- is an exception which has to be explained, so this manager-driven completion
--- now carries the on-behalf remark.
+-- An on-behalf remark is optional since 0342; one given is still stored.
 select lives_ok(format(
   'select update_task_with_audit(%L::uuid,%L,null,null,%L)',
   (select id from task_instances where title = 'Manager own branch task'), 'complete',
@@ -481,13 +479,13 @@ select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000004
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select lives_ok($$select update_task_with_audit('71000000-0000-0000-0000-000000000001','checklist','72000000-0000-0000-0000-000000000001',true)$$, 'authorized doer can complete required checklist item');
 select lives_ok($$select update_task_with_audit('71000000-0000-0000-0000-000000000001','complete')$$, 'completed required checklist permits completion');
--- An outstanding checklist never blocks completion; completing closes it.
-select lives_ok($$select update_task_with_audit('71000000-0000-0000-0000-000000000005','complete')$$, 'outstanding required checklist does not block completion');
-select is((select is_completed from task_checklists where id='72000000-0000-0000-0000-000000000002'), true, 'completion closes the outstanding checklist item');
-select is((select completed_by from task_checklists where id='72000000-0000-0000-0000-000000000002'), '40000000-0000-0000-0000-000000000004'::uuid, 'the completing actor is recorded on the closed checklist item');
+-- 0342: an outstanding required checklist item blocks completion again and is never closed for the doer.
+select throws_ok($$select update_task_with_audit('71000000-0000-0000-0000-000000000005','complete')$$, '23514', 'Tick every required checklist item before completing this task', 'outstanding required checklist blocks completion');
+select is((select is_completed from task_checklists where id='72000000-0000-0000-0000-000000000002'), false, 'the outstanding checklist item stays unticked');
 select throws_ok($$select update_task_with_audit('71000000-0000-0000-0000-000000000002','complete')$$, '23514', 'A required upload is missing', 'required upload is enforced');
 select throws_ok($$select update_task_with_audit('71000000-0000-0000-0000-000000000003','complete')$$, '23514', 'The required task form submission is missing', 'required form is enforced');
-select throws_ok($$select update_task_with_audit('71000000-0000-0000-0000-000000000004','complete')$$, '23514', 'A completion remark is required', 'required remark is enforced');
+-- 0342: tasks no longer ask for a completion remark, even with requires_remark set.
+select lives_ok($$select update_task_with_audit('71000000-0000-0000-0000-000000000004','complete')$$, 'a requires_remark task completes without a remark');
 reset role;
 
 insert into task_attachments(task_instance_id,file_url,uploaded_by)
@@ -517,7 +515,6 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000004', true);
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select lives_ok($$select update_task_with_audit('71000000-0000-0000-0000-000000000003','complete')$$, 'matching form submission permits completion');
-select lives_ok($$select update_task_with_audit('71000000-0000-0000-0000-000000000004','complete',null,null,'Synthetic completion remark')$$, 'non-empty required remark permits completion');
 reset role;
 
 -- Availability, recurrence, buddy coverage, escalation, timezone, and idempotency.

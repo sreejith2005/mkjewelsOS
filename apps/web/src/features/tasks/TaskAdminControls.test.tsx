@@ -42,12 +42,12 @@ describe("task administration", () => {
     expect(screen.getByLabelText<HTMLInputElement>("Upload required").checked).toBe(true);
     fireEvent.change(type, { target: { value: "checklist" } });
     fireEvent.click(screen.getByLabelText("Upload required"));
-    fireEvent.click(screen.getByLabelText("Completion remark required"));
+    expect(screen.queryByLabelText("Completion remark required")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Add checklist item" }));
     fireEvent.change(screen.getByLabelText("Checklist item 1"), { target: { value: "Lock the safe" } });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(changed).toHaveBeenCalled());
-    expect(api.edit).toHaveBeenCalledWith("task-1", expect.objectContaining({ taskType: "checklist", requiresUpload: false, requiresRemark: true,
+    expect(api.edit).toHaveBeenCalledWith("task-1", expect.objectContaining({ taskType: "checklist", requiresUpload: false,
       checklist: [{ itemText: "Lock the safe", required: true }] }));
   });
   it("blocks saving when current task details cannot be loaded", async () => {

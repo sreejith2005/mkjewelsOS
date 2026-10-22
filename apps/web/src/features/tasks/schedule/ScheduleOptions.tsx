@@ -24,7 +24,8 @@ function Check({ checked, onChange, title, hint }: { checked: boolean; onChange:
  * The review and completion rules a schedule can carry beyond what a one-time
  * task has. Each maps to one `task_templates` column the save RPC already
  * validates (`verification_required` with an active verifier,
- * `followup_enabled`, `requires_remark`, `buddy_assignment_allowed`).
+ * `followup_enabled`, `buddy_assignment_allowed`). `requiresRemark` stays
+ * false: tasks no longer ask for a completion remark (migration 0342).
  */
 export function ScheduleOptions({
   values,
@@ -56,7 +57,6 @@ export function ScheduleOptions({
         </label>
       ) : null}
       <Check checked={values.followupEnabled} hint="Admins can send reminders on open occurrences from Task Control → Review." onChange={(followupEnabled) => set({ followupEnabled })} title="Allow follow-ups" />
-      <Check checked={values.requiresRemark} hint="The doer must write a remark when completing each occurrence." onChange={(requiresRemark) => set({ requiresRemark })} title="Require a completion remark" />
       <Check checked={values.buddy} hint="If the doer is on leave or a week-off, the buddy gets that day's occurrence." onChange={(buddy) => set({ buddy })} title="Buddy can cover" />
     </div>
   );

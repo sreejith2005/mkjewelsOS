@@ -208,21 +208,19 @@ export type RecurringWorkCardState = Readonly<{
   /** Every required checklist item done, and any owed evidence supplied. */
   canComplete: boolean;
   /**
-   * A template that requires a remark and an on-behalf completion both have to
-   * be explained, so neither may be completed silently.
+   * Every required checklist item is ticked. Completion through any path waits
+   * for it (migration 0342), so an upload alone does not complete the task yet.
    */
-  needsRemark: boolean;
-  /** The question to ask for that remark. */
-  remarkPrompt: string;
+  checklistDone: boolean;
   showCompleteForm: boolean;
-  /** The form action is offered but the version is not readable by this account. */
+  /** The form action is offered but the version is not readable by this account, or the checklist is still open. */
   completeFormDisabled: boolean;
   showCompleteChecklist: boolean;
   showComplete: boolean;
   showUpload: boolean;
   showFollowup: boolean;
   showVerify: boolean;
-  /** Checklist items are hidden when a form carries the work instead. */
+  /** Any checklist shows, a form task's included: it is ticked before the form completes the task. */
   showChecklist: boolean;
 }>;
 
@@ -236,29 +234,28 @@ export function deriveRecurringWorkCardState(input: {
   const { task, viewerId, canManage, followupEnabled } = input;
   const isOwnWork = assigneeIds(task).some((id) => id === viewerId);
   const canVerify = canManage || task.verifier_user_profile_id === viewerId;
-  const needsRemark = Boolean(task.requires_remark) || !isOwnWork;
   const requiresForm = Boolean(task.requires_form);
   const completed = task.status === "completed";
   const coverageRequired = task.coverage_status === "coverage_required";
+  const checklistDone = (task.checklist ?? []).filter((item) => item.is_required).every((item) => item.is_completed);
   const canComplete =
-    (task.checklist ?? []).filter((item) => item.is_required).every((item) => item.is_completed) &&
+    checklistDone &&
     (!task.requires_upload || Boolean(task.has_attachment)) &&
     (!task.requires_form || Boolean(task.has_form_submission));
   return {
     isOwnWork,
     canVerify,
     canComplete,
-    needsRemark,
-    remarkPrompt: isOwnWork ? "Completion remark" : "Why are you completing this on behalf of the doer?",
+    checklistDone,
     showCompleteForm: requiresForm && !completed && !coverageRequired,
-    completeFormDisabled: !task.form_template_id,
-    showCompleteChecklist: !requiresForm && task.task_type === "checklist" && !completed && (!task.requires_upload || Boolean(task.has_attachment)),
+    completeFormDisabled: !task.form_template_id || !checklistDone,
+    showCompleteChecklist: !requiresForm && task.task_type === "checklist" && !completed && checklistDone && (!task.requires_upload || Boolean(task.has_attachment)),
     showComplete: !requiresForm && task.task_type !== "checklist" && !completed && !coverageRequired && canComplete,
     showUpload:
       !completed && !coverageRequired && Boolean(task.requires_upload) && !task.has_attachment,
     showFollowup: !requiresForm && followupEnabled && canManage && !completed,
     showVerify: !requiresForm && canVerify && completed && task.verification_status === "pending",
-    showChecklist: !requiresForm && (task.checklist ?? []).length > 0,
+    showChecklist: (task.checklist ?? []).length > 0,
   };
 }
 

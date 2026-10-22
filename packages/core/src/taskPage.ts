@@ -20,10 +20,6 @@ export function taskFormSubmissionKey(taskId: string, module: string, formId: st
   return [taskId, scope, formId].join("|");
 }
 
-export function taskNeedsCompletionRemark(task: Readonly<{ requires_remark?: boolean | null; assignees?: readonly Readonly<{ id: string }>[] }>, viewerId?: string | null): boolean {
-  return Boolean(task.requires_remark) || (viewerId != null && !(task.assignees ?? []).some(person => person.id === viewerId));
-}
-
 /** Controls edit in the application's scheduling zone, independently of device timezone. */
 export function taskAdminInitialEdit(task: Readonly<{
   title: string | null; description: string | null; priority: string | null; planned_datetime: string | null; due_datetime: string | null; revised_datetime: string | null;

@@ -73,6 +73,13 @@ devtools: `supabase.rpc(...)` / `supabase.from(...)` with the user's session).
 - [ ] Create manual task, delegate, edit, complete, attach evidence, required-form completion.
 - [ ] Task evidence accepts a photo, a PDF (10 MB) and a phone video (MP4/MOV, 50 MB); a longer clip shows the 50 MB message. In the Android app, Upload always offers Take photo / Record video / Choose from gallery or files, and other upload fields (forms, FMS) still offer the camera.
 - [ ] Recurring tasks generate on schedule; overdue tasks show as overdue.
+- [ ] Checklist-first task card (migration 0342): a task with an unticked required item shows **Checklist**
+      (not Complete/Upload/Fill form); it opens the checklist as the first block of the task. Items are large,
+      numbered, tick by tapping the text, and unlock top to bottom. **Complete task** appears under the checklist
+      once required items are ticked. The server refuses completion while a required item is open (Complete,
+      upload-and-complete, Review tab, required form). No completion remark anywhere; the details panel
+      shows only description, Repeats, Deadline moved, Evidence/Verification when required, Core task. Remarks
+      appear for an In Loop viewer, and for others only once a remark exists. Check at phone width.
 - [ ] Recurring / To-Do consolidation (migration 0340): the menu has no Recurring / To-Do; /recurring-todo opens
       Task Control → Review (SA/ADM), Task Control → Tasks (MGR/HR) or Tasks (others). After migration 0341,
       all active task authors see Schedule (One-time default · Recurring · As needed), with assignment scope,
@@ -81,7 +88,7 @@ devtools: `supabase.rpc(...)` / `supabase.from(...)` with the user's session).
       "3rd Saturday" previews the real 3rd Saturdays and saves one template per selected
       person, its first occurrence on the first 3rd Saturday. As needed saves a duty with its wording and creates no
       task that day. Task Control → Review: Verify, Reject (reason required; the doer's alert opens that task in
-      Tasks), Follow up, complete on behalf (remark asked), required form, Performance; tiles open the matching
+      Tasks), Follow up, complete on behalf (no remark since 0342), required form, Performance; tiles open the matching
       list. Templates: Next date or Ended, Run now; Edit keeps priority, verification, verifier, follow-ups, remark
       rule, checklist and a paused state. Turning Task Control off in Developer Mode pauses Verify and Follow up.
 - [ ] Create Task on phone widths 320/390/430: no horizontal overflow; header/actions remain reachable;

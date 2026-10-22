@@ -19,7 +19,7 @@ describe("TaskRemarks", () => {
     ]);
     api.addTaskComment.mockResolvedValue("c1");
 
-    await act(async () => { render(<TaskRemarks taskId="task-1" />); });
+    await act(async () => { render(<TaskRemarks canComment taskId="task-1" />); });
     expect(screen.getByText(/No remarks yet/)).toBeTruthy();
     expect((screen.getByRole("button", { name: "Send remark" }) as HTMLButtonElement).disabled).toBe(true);
 
@@ -36,11 +36,26 @@ describe("TaskRemarks", () => {
     api.loadTaskComments.mockResolvedValue([]);
     api.addTaskComment.mockRejectedValue(new Error("Add remark: Task remark denied"));
 
-    await act(async () => { render(<TaskRemarks taskId="task-1" />); });
+    await act(async () => { render(<TaskRemarks canComment taskId="task-1" />); });
     fireEvent.change(screen.getByRole("textbox", { name: "Add your comment" }), { target: { value: "Hello" } });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Send remark" })); });
 
     expect(screen.getByText("Add remark: Task remark denied")).toBeTruthy();
     expect((screen.getByRole("textbox", { name: "Add your comment" }) as HTMLTextAreaElement).value).toBe("Hello");
+  });
+
+  it("stays hidden from someone not In Loop until a remark exists, then lets them reply", async () => {
+    api.loadTaskComments.mockResolvedValueOnce([]);
+    let view!: ReturnType<typeof render>;
+    await act(async () => { view = render(<TaskRemarks canComment={false} taskId="task-1" />); });
+    expect(screen.queryByRole("region", { name: "Remarks" })).toBeNull();
+    view.unmount();
+
+    api.loadTaskComments.mockResolvedValueOnce([
+      { id: "c1", comment: "Check the left screen first", createdAt: "2026-09-23T09:30:00.000Z", authorId: "u2", authorName: "Watcher" },
+    ]);
+    await act(async () => { render(<TaskRemarks canComment={false} taskId="task-1" />); });
+    expect(screen.getByText("Check the left screen first")).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Add your comment" })).toBeTruthy();
   });
 });
