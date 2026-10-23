@@ -231,3 +231,13 @@ Automated proof: `supabase/functions/ask-kiara/eval.local.ts` (per-role eval on 
   values, hidden answers and denied cross-account/direct API access.
 - Check desktop/phone widths, keyboard disclosure and current Android shell;
   report physical-device evidence separately.
+- (2026-10-23) A workflow lists only stages that hold your work; the start form is
+  never a stage, and a pending start form you were asked to fill shows as
+  **Form to start**. The Stage filter offers only stages with work.
+- (2026-10-23) Finish a stage whose next step has no employee question: the
+  confirmation shows you as the next owner ("(you)") with no red warning, Confirm
+  unlocks after the server check, and the next step lands on you. **Assign to a
+  Different Employee** opens the list inside that step card, a pick closes it, and
+  **Keep it with me** restores you. A fixed-employee step still shows locked.
+- (2026-10-23) On a phone the stage form and the confirmation open full screen;
+  no form text shows above the title or below the bottom buttons while scrolling.

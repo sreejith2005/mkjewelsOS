@@ -74,7 +74,8 @@ it.each(["summary-first", "records-first"])("hides records when an expanded stag
  const emptyStage = [...stages.map((stage: { count: number }) => ({ ...stage, count: 0 })), { ...stages[0], id: "other", stageId: "other", name: "Other stage", count: 1 }];
  if (order === "records-first") await act(async () => resolvePage({ total: 0, records: [] }));
  await act(async () => resolveStages(emptyStage));
- await screen.findByText("No work in this stage for these filters.");
+ // A stage without work is not listed at all, so its stale records go with it.
+ await waitFor(() => expect(screen.queryByRole("button", { name: /Introduction Call/ })).toBeNull());
  expect(screen.queryByText("Rahul Shah")).toBeNull();
  if (order === "summary-first") await act(async () => resolvePage({ total: 250, records: [{ id, name: "Rahul Shah" }] }));
  expect(screen.queryByText("Rahul Shah")).toBeNull();
@@ -90,6 +91,28 @@ it("opens the only workflow and its only stage with work, and names the action",
  expect(screen.getByText("Work you can do now: to do and overdue.")).toBeTruthy();
  await userEvent.setup().click(screen.getByRole("button", { name: /Enquiries.*250/ }));
  expect(screen.queryByText("Rahul Shah")).toBeNull();
+});
+it("lists only stages with work and never shows the starting form as a stage", async () => {
+ const stages = await api.loadFmsTaskStages();
+ api.loadFmsTaskStages.mockResolvedValue([
+  { ...stages[0], id: "start", stageId: "11111111-1111-4111-8111-111111111111", name: "Start form", count: 0, starting: true },
+  ...stages,
+  { ...stages[0], id: "empty", stageId: "22222222-2222-4222-8222-222222222222", name: "Follow Up 1", count: 0, order: 1 },
+ ]);
+ render(<FmsTaskWorkspace actorId={id} tenantId={id} onNavigate={vi.fn()} onCount={vi.fn()} />);
+ await screen.findByRole("link", { name: "Open work — Rahul Shah" });
+ expect(screen.getByRole("button", { name: /Introduction Call.*250/ })).toBeTruthy();
+ expect(screen.queryByRole("button", { name: /Start form/ })).toBeNull();
+ expect(screen.queryByRole("button", { name: /Follow Up 1/ })).toBeNull();
+});
+it("keeps a pending starter assignment reachable, labelled as a form to start", async () => {
+ const { visibleFmsWorkspaceStages } = await import("./FmsTaskGroups");
+ const stages = await api.loadFmsTaskStages();
+ const visible = visibleFmsWorkspaceStages([{ ...stages[0], id: "start", stageId: "11111111-1111-4111-8111-111111111111", name: "Start form", count: 1, starting: true }, { ...stages[0], count: 0 }]);
+ expect(visible.map((stage: { name: string }) => stage.name)).toEqual(["Start form"]);
+ api.loadFmsTaskStages.mockResolvedValue(visible);
+ render(<FmsTaskWorkspace actorId={id} tenantId={id} onNavigate={vi.fn()} onCount={vi.fn()} />);
+ expect((await screen.findByRole("button", { name: /Start form/ })).textContent).toContain("Form to start");
 });
 it("names each record's action for the work that is waiting", async () => {
  const { fmsRecordAction } = await import("./FmsTaskGroups");

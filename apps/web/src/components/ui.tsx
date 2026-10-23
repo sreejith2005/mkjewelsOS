@@ -147,7 +147,9 @@ export function Modal({
         <header
           className={cn(
             "-mx-5 -mt-5 mb-5 flex items-center justify-between gap-3 px-5 pb-3 pt-2 sm:pt-5",
-            stickyHeader && "sticky top-0 z-10",
+            // A sticky edge sits inside the dialog's p-5 padding; -top-5 pins the
+            // header to the real top edge so scrolled content cannot show above it.
+            stickyHeader && (mobileFullscreen ? "sticky top-0 z-10" : "sticky -top-5 z-10"),
             // Full-screen forms start at the scrollport edge. Avoid a negative
             // vertical margin on this sticky header, including its paint area.
             mobileFullscreen && "mt-0",

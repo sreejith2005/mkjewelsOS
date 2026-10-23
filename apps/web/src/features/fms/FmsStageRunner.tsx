@@ -71,7 +71,8 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(shouldOpenInitialForm);
-  const { confirmWork, result, confirmation } = useFmsHandoffConfirmation(stage.id);
+  const actor = useMemo(() => ({ id: profile.id, name: profile.employee_name }), [profile.id, profile.employee_name]);
+  const { confirmWork, result, confirmation } = useFmsHandoffConfirmation(stage.id, actor);
   const completeWork = async (request: FmsTransitionRequest) => {
     const saved = await confirmWork(request);
     if (saved) onResult?.(saved);
@@ -194,7 +195,7 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
         {capability.canReassign && (stage.assigned_to?.length ?? 0) > 0 ? <Button disabled={busy} onClick={() => openManagedAction("reassign")} variant="secondary">Reassign</Button> : null}
       </div>
     </details> : null}
-    {showForm && linkedForm ? <Modal onClose={() => setShowForm(false)} title={`${requiresLinkedForm ? "Required" : "Optional"} form: ${linkedForm.name} v${linkedForm.version}`} wide><FormRenderer definition={{ name: linkedForm.name, description: linkedForm.description ?? undefined, sections: linkedForm.sections, fields: linkedForm.fields }} dynamicOptions={formOptions} templateId={linkedForm.id} onSubmit={async (answers) => {
+    {showForm && linkedForm ? <Modal onClose={() => setShowForm(false)} title={`${requiresLinkedForm ? "Required" : "Optional"} form: ${linkedForm.name} v${linkedForm.version}`} mobileFullscreen wide><FormRenderer definition={{ name: linkedForm.name, description: linkedForm.description ?? undefined, sections: linkedForm.sections, fields: linkedForm.fields }} dynamicOptions={formOptions} templateId={linkedForm.id} onSubmit={async (answers) => {
       if (!await completeWork({ kind: "stage_form", formTemplateId: linkedForm.id, answers, instanceStageId: stage.id, outcome, remark, checklist: checklistPayload, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) })) return false;
       setShowForm(false); await onRefresh(); return true;
     }} workflowHint /></Modal> : null}

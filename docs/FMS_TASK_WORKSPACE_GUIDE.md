@@ -14,10 +14,16 @@ FMS handoff.
 1. Open Tasks and select FMS. My Tasks and Delegated keep ordinary tasks; In Loop
    keeps watched work. Managers retain their existing All Tasks overview.
 2. Expand a workflow family, then a published stage. Groups start collapsed.
-   Counts include all matching assignments, even when records span several pages.
+   Only stages holding your work are listed. The start form is filled from the
+   Forms Library and is not a stage; a pending start form you were asked to fill
+   is listed as **Form to start**. Counts include all matching assignments, even
+   when records span several pages.
 3. Choose Open Work on the named record. Review previous answers, continue to the
    exact stage form and complete the existing evidence/approval/handoff steps.
-4. Follow the confirmation from the existing runner. Newly assigned work appears
+4. Follow the confirmation from the existing runner. When no employee is set for
+   the next step, it stays with you by default; press **Assign to a Different
+   Employee** under the step to choose someone from the list that opens there, or
+   **Keep it with me** to undo. The server checks the choice before Confirm unlocks. Newly assigned work appears
    under its destination stage for the employee who receives it.
 
 Active includes your pending and overdue actions. Waiting separates a contribution
