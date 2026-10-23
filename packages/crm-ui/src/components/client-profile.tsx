@@ -1,4 +1,5 @@
 "use client";
+import { ProfileEditLog } from '@/components/profile-edit-log';
 import { ResponsiveDisclosure } from '@/components/responsive-disclosure';
 import { ClientHistoryPager,type ClientHistoryPaging } from "@/components/client-history-pager";
 import { ClientActivity, type ClientActivityRow } from "@/components/client-activity";
@@ -330,7 +331,8 @@ export function ClientProfile({
 
           {historyPaging&&<ClientHistoryPager clientId={client.client_id} section="activity" paging={historyPaging}/>}
           <WalkinHistory visits={savedWalkins} />
-          <section className="legacy-audit-card">{historyPaging&&<ClientHistoryPager clientId={client.client_id} section="audit" paging={historyPaging}/>}<h2>PROFILE EDIT LOG</h2>{audit.length ? <div className="overflow-x-auto"><table className="crm-record-table"><thead><tr><th>FIELD</th><th>OLD VALUE</th><th>NEW VALUE</th><th>UPDATED BY</th><th>UPDATED ON</th></tr></thead><tbody>{audit.map((item) => <tr key={item.id}><td data-label="Field">{label(item.field_name)}</td><td data-label="Old value">{JSON.stringify(item.old_value)}</td><td data-label="New value">{JSON.stringify(item.new_value)}</td><td data-label="Updated by">{item.editor ?? "SYSTEM"}</td><td data-label="Updated on">{displayDate(item.created_at)}</td></tr>)}</tbody></table></div> : <p>NO PROFILE EDITS YET.</p>}</section>
+          <ProfileEditLog key={client.client_id} edits={audit}/>
+          {historyPaging&&<ClientHistoryPager clientId={client.client_id} section="audit" paging={historyPaging}/>}
         </section>
       </div>
     </main>;
@@ -595,32 +597,10 @@ export function ClientProfile({
         </section>
       )}
       {tab === "audit" && (
-        <section className="mt-6 overflow-hidden rounded-xl border bg-white">
-          {audit.length ? (
-            audit.map((item) => (
-              <article
-                className="grid gap-1 border-b p-4 text-sm md:grid-cols-[180px_1fr_1fr_160px]"
-                key={item.id}
-              >
-                <b>{label(item.field_name)}</b>
-                <span className="break-all text-stone-600">
-                  {JSON.stringify(item.old_value)}
-                </span>
-                <span className="break-all text-stone-900">
-                  {JSON.stringify(item.new_value)}
-                </span>
-                <span className="text-stone-500">
-                  {item.editor ?? "System"}
-                  <br />
-                  {displayDate(item.created_at)}
-                </span>
-              </article>
-            ))
-          ) : (
-            <p className="p-5 text-stone-600">No profile edits yet.</p>
-          )}
+        <>
+          <ProfileEditLog key={client.client_id} edits={audit}/>
           {historyPaging&&<ClientHistoryPager clientId={client.client_id} section="audit" paging={historyPaging}/>}
-        </section>
+        </>
       )}
     </main>
   );

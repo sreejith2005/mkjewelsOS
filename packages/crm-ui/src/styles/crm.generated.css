@@ -411,10 +411,6 @@
     margin-inline: auto;
   }
 
-.crm-root#crm-root#crm-root#crm-root .my-3 {
-    margin-block: calc(var(--spacing) * 3);
-  }
-
 .crm-root#crm-root#crm-root#crm-root .mt-1 {
     margin-top: var(--spacing);
   }
@@ -1010,14 +1006,6 @@
     letter-spacing: var(--tracking-widest);
   }
 
-.crm-root#crm-root#crm-root#crm-root .break-words {
-    overflow-wrap: break-word;
-  }
-
-.crm-root#crm-root#crm-root#crm-root .break-all {
-    word-break: break-all;
-  }
-
 .crm-root#crm-root#crm-root#crm-root .whitespace-pre-wrap {
     white-space: pre-wrap;
   }
@@ -1064,10 +1052,6 @@
 
 .crm-root#crm-root#crm-root#crm-root .text-stone-700 {
     color: var(--color-stone-700);
-  }
-
-.crm-root#crm-root#crm-root#crm-root .text-stone-900 {
-    color: var(--color-stone-900);
   }
 
 .crm-root#crm-root#crm-root#crm-root .text-violet-800 {
@@ -1153,10 +1137,6 @@
 
     .crm-root#crm-root#crm-root#crm-root .md\:grid-cols-\[1fr_1fr_1fr_auto\] {
       grid-template-columns: 1fr 1fr 1fr auto;
-    }
-
-    .crm-root#crm-root#crm-root#crm-root .md\:grid-cols-\[180px_1fr_1fr_160px\] {
-      grid-template-columns: 180px 1fr 1fr 160px;
     }
 
     .crm-root#crm-root#crm-root#crm-root .md\:grid-cols-\[220px_160px_1fr\] {

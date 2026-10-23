@@ -110,7 +110,7 @@ export default async function ClientPage({ params,searchParams=Promise.resolve({
     lastBranchName={clientResult.data.last_branch_id ? branchNames.get(clientResult.data.last_branch_id) ?? null : null}
     identity={identity}
     family={family ?? []}
-    savedWalkins={(timelineResult.data ?? []).map(item=>({timelineId:item.id,reference:item.reference_number,form:formsByTimeline.get(item.id) ?? null,documents:(documents ?? []).filter(doc=>doc.client_timeline_id===item.id).map(doc=>({...doc,purpose:mediaPurpose(formsByTimeline.get(item.id),doc.storage_path)}))}))}
+    savedWalkins={(timelineResult.data ?? []).map(item=>({timelineId:item.id,reference:item.reference_number,date:item.event_date,outcome:item.buy_status ?? item.event_type,form:formsByTimeline.get(item.id) ?? null,documents:(documents ?? []).filter(doc=>doc.client_timeline_id===item.id).map(doc=>({...doc,purpose:mediaPurpose(formsByTimeline.get(item.id),doc.storage_path)}))}))}
     lastSalespersonName={savedSalespersonName(formsByTimeline.get(latestVisit?.[0]?.id??'')?.additional_fields,clientResult.data.last_salesperson_id ? userNames.get(clientResult.data.last_salesperson_id) ?? null : null)}
     walkinContext={{ role: profileResult.data?.[0]?.role ?? "", branchId: currentUser?.branch_id ?? null, branches: branchesResult.data ?? [] }}
     lookups={{masterFields:await masterOptionsPromise,

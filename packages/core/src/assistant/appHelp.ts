@@ -173,6 +173,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     recipes: [
       "Find a client: open CRM and search by name or client id.",
       "Record a walk-in or follow-up: use the walk-in and follow-up screens in CRM.",
+      "Read a client’s history: open Complete contact history, SAVED WALK-IN DETAILS & MEDIA or PROFILE EDIT LOG on their profile. Expand an entry for full notes, grouped answers, Media or Before and After values. Show more reveals older entries on the current page; the history page links open earlier pages. Use Add a contact to record a contact.",
       "Returning client: enter the phone number in REGISTER CLIENT ENTRY. CRM uses the most recently visited profile for that full phone number and prefills saved details. Older nonblank answers remain available when newer visits leave a field blank. Changed answers use the latest saved value. Client profiles use the same accumulated details; original visit records remain in their history.",
     ],
   },

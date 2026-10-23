@@ -114,6 +114,7 @@ who build workflows, the designs.
 
 - [ ] Returning-client prefill (2026-10-23): **REGISTER CLIENT ENTRY** uses the most recently visited profile for the full phone number. Profile details accumulate from saved answers; newer nonblank answers win conflicts, while blanks preserve known details. Client profiles use the same details. Original client records and visit histories are retained. This repairs existing CRM reads; Kiara needs no new read tool.
 **What it is:** client records, walk-ins, interactions and follow-ups, for CRM users.
+- [ ] Read profile histories: **Complete contact history**, **SAVED WALK-IN DETAILS & MEDIA** and **PROFILE EDIT LOG** show five expandable entries initially. **Show more** reveals more loaded entries; existing history page links reach older pages. Walk-ins have grouped saved answers and **Media**. Edit entries compare **Before** and **After**. **Add a contact** opens the existing contact form. No new Kiara data tool is needed: this changes the presentation of existing CRM reads only.
 - [ ] Find a client: open CRM and search by name or client id.
 - [ ] Record a walk-in or follow-up: use the walk-in and follow-up screens in CRM.
 

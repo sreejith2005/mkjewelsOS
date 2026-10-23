@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const push = vi.fn();
@@ -56,8 +56,9 @@ describe("ClientProfile legacy parity", () => {
     expect(screen.getByText("Ring")).toBeTruthy();
     expect(screen.getByText("Bridal")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "PROFILE EDIT LOG" })).toBeTruthy();
-    expect(screen.getByText("city")).toBeTruthy();
-    expect(screen.getByText('"Old city"')).toBeTruthy();
-    expect(screen.getByText('"Kochi"')).toBeTruthy();
+    expect(screen.getAllByText("City").length).toBeGreaterThan(0);
+    const edit = within(screen.getByTestId('profile-edit-entry'));
+    expect(edit.getByText('Old city')).toBeTruthy();
+    expect(edit.getByText('Kochi')).toBeTruthy();
   });
 });
