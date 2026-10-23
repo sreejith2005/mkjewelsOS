@@ -7,6 +7,11 @@ import { loadMasterOptions, toFormMasterOptions } from "@/features/dropdowns/api
 export type FormTemplate = Tables<"form_templates">;
 export type FormField = Tables<"form_fields">;
 export type FormSubmission = Tables<"form_submissions">;
+export const setFormLibraryVisibility = async (id: string, visible: boolean): Promise<void> => {
+  const { data, error } = await supabase.rpc("set_form_library_visibility_with_audit", { p_template_id: id, p_visible: visible });
+  fail("Change form visibility", error);
+  if (data !== id) throw new Error("Change form visibility: the server did not confirm the change");
+};
 export type FormBundle = FormTemplate & { fields: FormFieldDefinition[]; sections: FormSectionDefinition[]; submissionCount: number };
 const fail = (label: string, error: { message: string } | null) => { if (error) throw new Error(`${label}: ${error.message}`); };
 const object = (value: Json | null): Record<string, Json> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, Json> : {};

@@ -155,3 +155,8 @@ Task Control help now describes Edit task, Task/Checklist conversion, all author
 requirements and participants, Save changes, retained history, and the separate
 future schedule editor. No new read tool is needed: this is authoring guidance
 for existing work; Kiara remains read-only through existing section tools.
+
+### Forms Library visibility (2026-10-23)
+
+- [ ] Authors can use **Visible in Forms Library** on each form version. Hidden forms stay available in assigned Tasks/FMS and existing submission history, while staff cannot browse or fill them independently. Authors retain management access. Existing forms start visible; revisions and duplicates inherit visibility.
+- No additional Kiara read tool: existing app help explains this setting without a new data source. Local implementation is not evidence of production deployment.

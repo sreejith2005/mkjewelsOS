@@ -6601,6 +6601,7 @@ export type Database = {
           family_id: string
           id: string
           is_active: boolean | null
+          library_visible: boolean
           lifecycle: Database["public"]["Enums"]["form_template_lifecycle"]
           name: string
           permissions: Json
@@ -6623,6 +6624,7 @@ export type Database = {
           family_id?: string
           id?: string
           is_active?: boolean | null
+          library_visible?: boolean
           lifecycle?: Database["public"]["Enums"]["form_template_lifecycle"]
           name: string
           permissions?: Json
@@ -6645,6 +6647,7 @@ export type Database = {
           family_id?: string
           id?: string
           is_active?: boolean | null
+          library_visible?: boolean
           lifecycle?: Database["public"]["Enums"]["form_template_lifecycle"]
           name?: string
           permissions?: Json
@@ -12459,6 +12462,14 @@ export type Database = {
           p_visibility: string
         }
         Returns: Json
+      }
+      can_open_form_from_library: {
+        Args: { p_template_id: string }
+        Returns: boolean
+      }
+      set_form_library_visibility_with_audit: {
+        Args: { p_template_id: string; p_visible: boolean }
+        Returns: string
       }
       can_access_form_template: {
         Args: { p_template_id: string }

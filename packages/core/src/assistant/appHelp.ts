@@ -107,11 +107,12 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     section: "forms_library",
     title: "Forms Library",
     path: "/forms",
-    summary: "Forms Library lists the published forms the user can fill and the forms they submitted.",
+    summary: "Forms Library lists visible published forms the user can fill and the forms they submitted. Hidden forms remain accessible through assigned Tasks and FMS work.",
     recipes: [
       "Fill a form: open Forms Library, find the form under \"Forms to fill\", and press \"Fill\".",
       "See what I submitted: \"My submissions\" in Forms Library shows each submission and its review status.",
       "Create a form: \"New form\" in Forms Library (form authors only), then \"Publish\" when ready.",
+      "Control library visibility: form authors use Visible in Forms Library on each form version. Turning it off hides the form from staff browsing and standalone filling; assigned Tasks/FMS work and submission history remain available. Form authors can still see and manage it.",
       "Set a record name: in Form Builder, use Use this question as the record name to choose an identifying question, or leave Automatic. A used published form requires a new revision to change its default. Each FMS workflow can select its own naming question in Task Naming.",
     ],
   },
