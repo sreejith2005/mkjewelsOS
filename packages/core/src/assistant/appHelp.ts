@@ -95,6 +95,9 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
       "Start a workflow: open FMS, choose the workflow, and press \"Start instance\" (when your role may start it).",
       "Design a workflow: \"New workflow\" in FMS (workflow builders only).",
       "Name workflow work: in the initial form's Task Naming settings, use Task name from to select an eligible question from its linked form or the form's selected record-name question. Later stages inherit that original name unless a stage override selects another question. Use the normal workflow revision and publication lifecycle for changes.",
+      "Check or debug a workflow with the FMS assistant (workflow builders, when an administrator has switched it on): in the workflow builder press \"AI assistant\". \"Check\" lists problems found by the app's own rules with \"Go to step\" and a \"What happens if…\" route preview; \"Ask\" answers questions such as why a step is blocked; \"Run\" diagnoses one live run after you tick the box to include its records. On a live workflow's card press \"Ask AI\" for a read-only view; fixes there are applied in a new draft version.",
+      "Build a workflow with AI: press \"New workflow\", choose \"Build with AI\", describe the process, answer any questions, review the proposed steps, and press \"Apply to editor\". Nothing is saved until you press \"Save draft\" and \"Publish\"; \"Undo\" reverts the applied changes. Proposed Forms must be created (\"Create Form draft\") and published in Forms first.",
+      "Turn the FMS assistant on or off: administrators press \"Assistant\" in FMS and switch Debug workflows, Build with AI and Diagnose runs separately, with a daily request limit per author. Manual workflow editing never depends on it.",
     ],
   },
   fms_tasks: {

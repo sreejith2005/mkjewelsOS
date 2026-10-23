@@ -1,5 +1,5 @@
-import type { UserRole } from "../roleMenu";
-import type { FmsAssignmentConfig, FmsTaskDisplay, FmsFollowUp } from "./workContracts";
+import type { UserRole } from "../roleMenu.ts";
+import type { FmsAssignmentConfig, FmsTaskDisplay, FmsFollowUp } from "./workContracts.ts";
 
 export const FMS_STAGE_TYPES = ["task", "approval", "form", "notification", "branch", "parallel_start", "parallel_join", "end"] as const;
 /** New workflows use implicit entry/exit. `end` remains readable for legacy versions only. */

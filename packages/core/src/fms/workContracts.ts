@@ -1,6 +1,6 @@
-import type { FormAnswers } from "../forms/types";
-import type { FmsAssignedWorkTarget } from "./assignedWork";
-import type { FmsAssigneeRule } from "./types";
+import type { FormAnswers } from "../forms/types.ts";
+import type { FmsAssignedWorkTarget } from "./assignedWork.ts";
+import type { FmsAssigneeRule } from "./types.ts";
 
 export const FMS_ASSIGNMENT_MODES = ["previous_form", "fixed_employee", "hierarchy", "previous_stage_employee", "manual_handoff", "configured_fallback"] as const;
 export type FmsAssignmentMode = typeof FMS_ASSIGNMENT_MODES[number];

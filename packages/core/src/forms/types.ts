@@ -1,4 +1,4 @@
-import type { UserRole } from "../roleMenu";
+import type { UserRole } from "../roleMenu.ts";
 
 export const FORM_FIELD_TYPES = [
   "text", "textarea", "number", "currency", "email", "phone", "date",

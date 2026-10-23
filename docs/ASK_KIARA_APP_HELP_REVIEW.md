@@ -72,6 +72,9 @@ who build workflows, the designs.
 - [ ] Start a workflow: open FMS, choose the workflow, press **Start instance** (if your role may start it).
 - [ ] Design a workflow: **New workflow** in FMS (workflow builders only).
 - [ ] Name workflow work: in the initial form's **Task Naming**, use **Task name from** to choose an eligible question from the linked form or its selected record-name question. Later stages inherit the original name unless overridden; changes use the usual revision/publication lifecycle.
+- [ ] Check or debug a workflow (FMS assistant, added 2026-10-23, off until an administrator switches it on): in the builder press **AI assistant**. **Check** lists the app's own findings with **Go to step** and a **What happens if…** preview; **Ask** answers questions; **Run** diagnoses one live run after ticking **Include this run's records**. On a live workflow card, **Ask AI** opens a read-only view; fixes there go into a new draft version.
+- [ ] Build with AI: **New workflow** -> **Build with AI**, describe the process, answer questions, review, press **Apply to editor**. Nothing is saved until **Save draft** / **Publish**; **Undo** reverts. Proposed Forms need **Create Form draft** and publishing in Forms first.
+- [ ] Switch the assistant: administrators press **Assistant** in FMS (Debug workflows, Build with AI, Diagnose runs, daily limit). Kiara only describes it; Kiara has no tool for the FMS assistant and stays read-only.
 
 ## FMS work (my assigned stages)
 **What it is:** the workflow stages and starting forms waiting for you.

@@ -20,3 +20,11 @@ export * from "./simulation";
 export * from "./assignmentUpgrade";
 
 export { fmsStageNeedsAssignment } from "./assignmentAuthoring";
+
+export * from "./stageTemplate";
+export * from "./definitionDiff";
+export * from "./diagnostics";
+export * from "./runDiagnosis";
+export * from "./aiContract";
+export * from "./aiOperations";
+export * from "./aiContext";

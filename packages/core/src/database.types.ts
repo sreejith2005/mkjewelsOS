@@ -12427,6 +12427,12 @@ export type Database = {
 
       preview_fms_work_transition: { Args: { p_request: Json; p_handoffs?: Json }; Returns: Json }
       transition_fms_work_with_audit: { Args: { p_request: Json; p_idempotency_key: string; p_handoffs: Json; p_preview_fingerprint: string }; Returns: Json }
+      get_fms_ai_settings: { Args: never; Returns: Json }
+      set_fms_ai_settings_with_audit: { Args: { p_debugger: boolean; p_builder: boolean; p_run_diagnosis: boolean; p_user_daily_limit: number }; Returns: Json }
+      start_fms_ai_request: { Args: { p_request_id: string; p_mode: string; p_include_run: boolean }; Returns: Json }
+      finish_fms_ai_request: { Args: { p_request_id: string; p_status: string; p_model: string | null; p_input_tokens: number; p_output_tokens: number; p_cache_read_tokens: number; p_cache_write_tokens: number }; Returns: undefined }
+      record_fms_diagnostic_event: { Args: { p_operation: string; p_instance_stage_id: string; p_sqlstate: string | null; p_correlation_id: string }; Returns: string }
+      get_fms_run_diagnostic_snapshot: { Args: { p_instance_id: string }; Returns: Json }
       list_fms_handoff_recipients: { Args: { p_request: Json; p_target_stage_id: string; p_query?: string; p_cursor?: string; p_limit?: number }; Returns: Json }
       get_fms_work_file_path: { Args: { p_instance_id: string; p_instance_stage_id: string; p_file_id: string }; Returns: string }
       get_fms_task_contexts: { Args: { p_visit_ids: string[] }; Returns: Json }

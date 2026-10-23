@@ -1,4 +1,4 @@
-import type { FormAnswer, FormFieldDefinition, FormRule, FormRuleOperator, FormRulePredicate, FormValidationIssue } from "./types";
+import type { FormAnswer, FormFieldDefinition, FormRule, FormRuleOperator, FormRulePredicate, FormValidationIssue } from "./types.ts";
 
 /** Every operator a visibility rule may use, in the order the builder offers them. */
 export const FORM_RULE_OPERATORS = [

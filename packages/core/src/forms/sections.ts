@@ -1,5 +1,5 @@
-import { FORM_SUBMIT_TARGET, type FormAnswers, type FormBranch, type FormFieldDefinition, type FormSectionDefinition, type FormTemplateDefinition } from "./types";
-import { evaluateFormCondition, isEmptyFormValue, isFormFieldVisible } from "./visibility";
+import { FORM_SUBMIT_TARGET, type FormAnswers, type FormBranch, type FormFieldDefinition, type FormSectionDefinition, type FormTemplateDefinition } from "./types.ts";
+import { evaluateFormCondition, isEmptyFormValue, isFormFieldVisible } from "./visibility.ts";
 
 /** Section every field belongs to when a form was authored before sections existed. */
 export const DEFAULT_SECTION_KEY = "section_1";

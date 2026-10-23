@@ -1,4 +1,4 @@
-import type { FormFieldDefinition } from "../forms/types";
+import type { FormFieldDefinition } from "../forms/types.ts";
 
 const SCALAR = new Set(["text", "number", "select", "radio", "date", "datetime", "user_dropdown"]);
 const PRIVATE = /(?:password|secret|token|credential|private|remarks?|notes?|email|phone|mobile)/i;

@@ -1,9 +1,9 @@
-import { validateFormDefinition } from "./definition";
-import { normalizeFormAnswer } from "./answers";
-import { formOptionValues } from "./options";
-import { fieldSectionKey, formSections, reachableSectionKeys } from "./sections";
-import type { FormAnswer, FormAnswers, FormFieldDefinition, FormTemplateDefinition, FormValidationIssue, FormValidationResult } from "./types";
-import { isEmptyFormValue, isFormFieldVisible } from "./visibility";
+import { validateFormDefinition } from "./definition.ts";
+import { normalizeFormAnswer } from "./answers.ts";
+import { formOptionValues } from "./options.ts";
+import { fieldSectionKey, formSections, reachableSectionKeys } from "./sections.ts";
+import type { FormAnswer, FormAnswers, FormFieldDefinition, FormTemplateDefinition, FormValidationIssue, FormValidationResult } from "./types.ts";
+import { isEmptyFormValue, isFormFieldVisible } from "./visibility.ts";
 
 const LAYOUT_TYPES = new Set(["section_header", "divider"]);
 const STRING_TYPES = new Set(["text", "textarea", "email", "phone", "date", "datetime", "select", "radio", "user_dropdown", "branch_dropdown", "department_dropdown"]);

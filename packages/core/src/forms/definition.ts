@@ -1,8 +1,8 @@
-import { FORM_OPTION_TYPES, parseFormOptions } from "./options";
-import { normalizeFormRule, validateFormRule } from "./rules";
-import { fieldSectionKey, formSections } from "./sections";
-import { eligibleRecordNameFields } from "../fms/recordNaming";
-import { FORM_DRAFT_FIELD_TYPES, FORM_SUBMIT_TARGET, type FormBranch, type FormFieldDefinition, type FormSectionDefinition, type FormTemplateDefinition, type FormValidationIssue } from "./types";
+import { FORM_OPTION_TYPES, parseFormOptions } from "./options.ts";
+import { normalizeFormRule, validateFormRule } from "./rules.ts";
+import { fieldSectionKey, formSections } from "./sections.ts";
+import { eligibleRecordNameFields } from "../fms/recordNaming.ts";
+import { FORM_DRAFT_FIELD_TYPES, FORM_SUBMIT_TARGET, type FormBranch, type FormFieldDefinition, type FormSectionDefinition, type FormTemplateDefinition, type FormValidationIssue } from "./types.ts";
 
 const BRANCH_TYPES = new Set(["select", "radio"]);
 const LAYOUT_TYPES = new Set(["section_header", "divider"]);

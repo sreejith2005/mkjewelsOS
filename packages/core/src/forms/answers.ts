@@ -1,6 +1,6 @@
-import { fieldSectionKey, formSections, reachableSectionKeys } from "./sections";
-import type { FormAnswer, FormAnswers, FormFieldDefinition, FormTemplateDefinition } from "./types";
-import { isEmptyFormValue, isFormFieldVisible } from "./visibility";
+import { fieldSectionKey, formSections, reachableSectionKeys } from "./sections.ts";
+import type { FormAnswer, FormAnswers, FormFieldDefinition, FormTemplateDefinition } from "./types.ts";
+import { isEmptyFormValue, isFormFieldVisible } from "./visibility.ts";
 
 export function normalizeFormAnswer(field: FormFieldDefinition, value: FormAnswer): FormAnswer {
   if (typeof value === "string") {

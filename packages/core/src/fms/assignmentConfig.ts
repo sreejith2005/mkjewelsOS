@@ -1,7 +1,7 @@
-import { fmsStageNeedsAssignment } from "./assignmentAuthoring";
-import { FMS_ASSIGNMENT_MODES } from "./workContracts";
-import { eligibleRecordNameFields } from "./recordNaming";
-import type { FmsFlowDefinition, FmsValidationContext, FmsValidationIssue } from "./types";
+import { fmsStageNeedsAssignment } from "./assignmentAuthoring.ts";
+import { FMS_ASSIGNMENT_MODES } from "./workContracts.ts";
+import { eligibleRecordNameFields } from "./recordNaming.ts";
+import type { FmsFlowDefinition, FmsValidationContext, FmsValidationIssue } from "./types.ts";
 
 /** The server repeats these publication checks; this copy makes errors actionable in both editors. */
 export function validateFmsAssignmentConfig(flow: FmsFlowDefinition, context: FmsValidationContext): readonly FmsValidationIssue[] {

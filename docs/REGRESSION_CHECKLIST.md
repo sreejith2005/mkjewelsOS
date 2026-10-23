@@ -132,6 +132,39 @@ devtools: `supabase.rpc(...)` / `supabase.from(...)` with the user's session).
       moving, the stage editor scrolls separately, and rotation/resume does not
       crash or lose the persisted node position.
 
+### FMS assistant (AI debugger and builder) - 2026-10-23
+
+Ships dark: every switch is off until an administrator turns it on under FMS ->
+**Assistant**. Design and threat model: `docs/FMS_AI_ASSISTANT.md`.
+
+- [ ] With all switches off (default), FMS looks and works exactly as before:
+      no **AI assistant** button, **New workflow** opens the name/purpose step.
+- [ ] ADM switches **Debug workflows** on. In a draft, **AI assistant** ->
+      **Check** lists the same errors as Publish readiness; **Go to step**
+      focuses the same control; **What happens if…** follows the routes.
+- [ ] **Ask** on an unsaved draft answers from the current, unsaved edits and
+      marks evidence as From the workflow / Simulated / Observed / Not enough
+      evidence. It never saves, publishes or assigns anything.
+- [ ] **Build with AI** (switch on): **New workflow** -> **Build with AI**,
+      describe a process, review, **Apply to editor** once. One **Undo**
+      removes all applied changes; **Redo** restores them. Save draft and
+      Publish behave exactly as for a manual workflow (same RPCs and checks).
+- [ ] Edit the draft while the assistant is answering: the preview says it is
+      out of date and **Apply to editor** is disabled.
+- [ ] Live workflow card -> **Ask AI**: read-only. A suggested fix offers
+      **Create a new version to apply this** (normal revision RPC).
+- [ ] **Diagnose runs** (switch on): **Run** tab, pick a run, observations
+      load without AI; nothing is sent to AI until **Include this run's
+      records** is ticked.
+- [ ] Denied: a user without `fms.manage` sees no assistant and a direct
+      `fms-ai` call returns 403; with FMS disabled in Developer Mode it returns
+      403; another tenant's run id returns "not one you can inspect".
+- [ ] Daily limit: after the limit the assistant says so; manual editing works.
+- [ ] Phone width: the assistant opens as a bottom sheet; the header with
+      **Save draft** and **Publish** stays visible; Escape/close works.
+- [ ] A failed FMS step submission (e.g. revoked permission) still shows its
+      original error; the run's **Run** tab then lists the failed attempt.
+
 ### Assigned FMS work (one work item, many entry surfaces)
 
 Run signed in as the assignee, and repeat the whole block on web and on an

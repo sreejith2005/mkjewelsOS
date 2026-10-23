@@ -1,6 +1,6 @@
-import { fmsOutgoingStageKeys } from "./engine";
-import type { FmsAssignmentConfig, FmsAssignmentSource } from "./workContracts";
-import type { FmsFlowDefinition, FmsFormFieldRef, FmsStageDefinition } from "./types";
+import { fmsOutgoingStageKeys } from "./engine.ts";
+import type { FmsAssignmentConfig, FmsAssignmentSource } from "./workContracts.ts";
+import type { FmsFlowDefinition, FmsFormFieldRef, FmsStageDefinition } from "./types.ts";
 
 export const FMS_ASSIGNMENT_LABELS: Readonly<Record<FmsAssignmentConfig["mode"], string>> = {
   previous_form: "Previous Form User Answer", fixed_employee: "Fixed Employee", hierarchy: "Role / Hierarchy Rule",

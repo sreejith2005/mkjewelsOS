@@ -1,5 +1,6 @@
 import { getSupabase } from "@jewelos/api-client/client";
 import { beginNewFmsMutation, getFmsMutationIdentity, getFmsMutationStorage, markFmsMutationComplete } from "./mutationIdentity";
+import { newRequestKey } from "../runtime";
 import { coerceFormAnswer, parseFormOptions, FORM_DRAFT_FIELD_TYPES, type FormAnswer, type FormFieldType, type FmsHandoffChoice, type FmsTransitionRequest,
   type FmsWorkDestination, type FmsWorkPreview, type FmsWorkResult, type FmsAssignedWorkTarget, type FmsWorkContext, type FmsReceivedField, type FmsPreviousFormsPage, type Json } from "@jewelos/core";
 
@@ -52,8 +53,28 @@ export async function previewFmsWork(request: FmsTransitionRequest, handoffs: re
 export async function transitionFmsWork(input: { request: FmsTransitionRequest; idempotencyKey: string; handoffs: readonly FmsHandoffChoice[]; previewFingerprint: string }): Promise<FmsWorkResult> {
   const result = await getSupabase().rpc("transition_fms_work_with_audit", { p_request: fmsWorkJson(input.request), p_idempotency_key: input.idempotencyKey,
     p_handoffs: fmsWorkJson(input.handoffs), p_preview_fingerprint: input.previewFingerprint });
-  if (result.error) throw new Error(result.error.message);
+  if (result.error) {
+    void reportFmsWorkFailure(input.request, result.error.code);
+    throw new Error(result.error.message);
+  }
   return parseFmsWorkResult(result.data);
+}
+/**
+ * After a work transition has failed (and its transaction rolled back), record
+ * a sanitized event so "Diagnose run" can see that an attempt failed: the step,
+ * the SQLSTATE and a fresh correlation id, nothing else. It is a separate call
+ * that never retries, delays or changes the failed work, and its own failure is
+ * ignored. Starter and flow-start submissions have no run step yet and are not reported.
+ */
+export type FmsDiagnosticEventClient = Readonly<{ rpc(fn: "record_fms_diagnostic_event", args: Readonly<{ p_operation: string; p_instance_stage_id: string; p_sqlstate: string | null; p_correlation_id: string }>): PromiseLike<unknown> }>;
+export async function reportFmsWorkFailure(request: FmsTransitionRequest, sqlstate: string | undefined, client: FmsDiagnosticEventClient = getSupabase()): Promise<void> {
+  if (request.kind === "starter_form" || request.kind === "flow_form") return;
+  try {
+    await client.rpc("record_fms_diagnostic_event", { p_operation: request.kind === "review" ? "fms_stage_review" : "fms_stage_transition", p_instance_stage_id: request.instanceStageId,
+      p_sqlstate: sqlstate && /^[0-9A-Za-z]{5}$/.test(sqlstate) ? sqlstate : null, p_correlation_id: newRequestKey() });
+  } catch {
+    // Diagnostics are best effort; the user already sees the original error.
+  }
 }
 export type FmsHandoffRecipient = Readonly<{ id: string; employeeName: string; designation: string | null; branch: string | null; department: string | null }>;
 export async function listFmsHandoffRecipients(request: FmsTransitionRequest, targetStageId: string, query = "", cursor: string | null = null) {

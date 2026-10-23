@@ -1,8 +1,9 @@
-import { FMS_ASSIGNEE_TYPES, USER_ROLES, suggestFmsAssignment } from "@jewelos/core";
+import { FMS_ASSIGNEE_TYPES, USER_ROLES, fmsStageTemplate } from "@jewelos/core";
 import { normalizeFmsDefinition, type FmsFlowDefinition, type FmsStageDefinition } from "@jewelos/core";
 import type { FmsData, FmsFlowRow } from "./api";
 
-export const newFmsStage = (type: FmsStageDefinition["type"], order: number): FmsStageDefinition => ({ key: `stage_${order + 1}`, name: type.split("_").map((part) => part[0]!.toUpperCase() + part.slice(1)).join(" "), type, order, required: true, completionRule: type === "approval" ? "manager_approval" : "any_doer", allowMultipleDoers: false, requiresUpload: false, requiresRemark: false, checklist: [], assigneeRules: [], requiresNextDoerHandoff: false, canMoveBackward: false, canReject: type === "approval", canRequestRevision: type === "approval", canEscalate: false, branchRules: type === "branch" ? [{ id: crypto.randomUUID(), source: "outcome", operator: "default", order: 0 }] : [], parallelTargetStageKeys: [], joinRequiredStageKeys: [], sla: { assignment: suggestFmsAssignment(undefined, {}), timingMethod: "completion_date", deadlineEnabled: !(type === "form" && order === 0), dueDate: "", decisionMode: "normal" } });
+/** Manual and AI-built stages share one factory in @jewelos/core. */
+export const newFmsStage = (type: FmsStageDefinition["type"], order: number): FmsStageDefinition => fmsStageTemplate(type, order, () => crypto.randomUUID());
 
 export function removeFmsStage(stages: readonly FmsStageDefinition[], key: string): readonly FmsStageDefinition[] {
   const removed = stages.find((stage) => stage.key === key);

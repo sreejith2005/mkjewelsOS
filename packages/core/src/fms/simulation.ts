@@ -1,8 +1,8 @@
-import { fmsFallbackStageKey, normalizeFmsDefinition, resolveFmsBranch } from "./engine";
-import type { FmsFlowDefinition, FmsStageDefinition } from "./types";
-import { normalizeFormAnswers } from "../forms/answers";
-import { validateCompleteForm } from "../forms/validation";
-import type { FormAnswers, FormTemplateDefinition } from "../forms/types";
+import { fmsFallbackStageKey, normalizeFmsDefinition, resolveFmsBranch } from "./engine.ts";
+import type { FmsFlowDefinition, FmsStageDefinition } from "./types.ts";
+import { normalizeFormAnswers } from "../forms/answers.ts";
+import { validateCompleteForm } from "../forms/validation.ts";
+import type { FormAnswers, FormTemplateDefinition } from "../forms/types.ts";
 
 export type FmsSimulationInput = Readonly<{
   answers: Readonly<Record<string, readonly FormAnswers[]>>;

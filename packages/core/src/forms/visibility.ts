@@ -1,4 +1,4 @@
-import type { FormAnswers, FormCondition, FormFieldDefinition, FormRule, FormRulePredicate } from "./types";
+import type { FormAnswers, FormCondition, FormFieldDefinition, FormRule, FormRulePredicate } from "./types.ts";
 
 export function isEmptyFormValue(value: unknown): boolean {
   return value === undefined || value === null || value === "" ||

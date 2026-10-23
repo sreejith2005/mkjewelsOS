@@ -1,4 +1,4 @@
-import type { FormFieldDefinition, FormOption, FormTemplateDefinition } from "./types";
+import type { FormFieldDefinition, FormOption, FormTemplateDefinition } from "./types.ts";
 
 /** Field types whose answers must be one of a configured option list. */
 export const FORM_OPTION_TYPES: ReadonlySet<string> = new Set(["select", "multiselect", "radio", "checkbox"]);
