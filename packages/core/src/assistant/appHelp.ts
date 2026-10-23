@@ -30,7 +30,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     recipes: [
       "See today's work: open Home from the menu. Overdue items are listed first.",
       "See the team's day (leaders): the \"Team today\" section shows Assigned, Done, Pending and Overdue for today. With no tasks of your own, the top card shows \"Team completion today\". Tap a person under \"Needs follow-up\" to open their tasks in Task Control.",
-      "Open a task or stage: tap it on Home to go straight to that work item.",
+      "On mobile, My Tasks and FMS Tasks start collapsed with a pending count. Tap either heading to expand its work, then tap a task or stage to open it. Desktop starts expanded.",
       "Fill a form linked to a task: use the form item on Home; it opens the exact form for that task.",
     ],
   },

@@ -26,14 +26,14 @@ vi.mock("@/features/analytics/api", () => ({ fetchHomeSummary: vi.fn() }));
 vi.mock("@/features/notifications/api", () => ({ subscribeToInbox: () => () => undefined }));
 vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealtimeRefresh: () => undefined }));
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("HomeView collapsible work groups", () => {
   it("opens every group by default and collapses each one independently", () => {
     render(<HomeView onNavigate={vi.fn()} />);
 
-    const tasks = screen.getByRole("button", { name: "My Tasks" });
-    const fms = screen.getByRole("button", { name: "FMS Tasks" });
+    const tasks = screen.getByRole("button", { name: /My Tasks/ });
+    const fms = screen.getByRole("button", { name: /FMS Tasks/ });
     for (const toggle of [tasks, fms]) expect(toggle.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByRole("button", { name: /Polish display tray/ })).toBeTruthy();
 
@@ -48,6 +48,24 @@ describe("HomeView collapsible work groups", () => {
 
     expect(tasks.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByRole("button", { name: /Polish display tray/ })).toBeTruthy();
+  });
+
+  it("starts closed on mobile, shows pending counts, and opens work independently", () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: true, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    const onNavigate = vi.fn();
+    render(<HomeView onNavigate={onNavigate} />);
+    const tasks = screen.getByRole("button", { name: /My Tasks.*1 pending/ });
+    const fms = screen.getByRole("button", { name: /FMS Tasks.*0 pending/ });
+    expect(tasks.getAttribute("aria-expanded")).toBe("false");
+    expect(fms.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByRole("button", { name: /Polish display tray/ })).toBeNull();
+    fireEvent.click(tasks);
+    expect(tasks.getAttribute("aria-expanded")).toBe("true");
+    expect(fms.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(screen.getByRole("button", { name: /Polish display tray/ }));
+    expect(onNavigate).toHaveBeenCalledWith("/tasks");
+    fireEvent.click(tasks);
+    expect(tasks.getAttribute("aria-expanded")).toBe("false");
   });
 
   it("hides the old CRM follow-ups since the CRM cutover", () => {

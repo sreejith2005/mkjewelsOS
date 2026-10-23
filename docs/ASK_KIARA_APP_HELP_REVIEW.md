@@ -25,7 +25,7 @@ Tasks entry updated against the screens: 2026-10-21 (Anytime duties, task order)
 fill, and recent activity.
 - [ ] See today's work: open Home from the menu. Overdue items are listed first.
 - [ ] Leaders: **Team today** shows Assigned, Done, Pending and Overdue for today; with no tasks of your own the top card shows **Team completion today**. Tap a person under **Needs follow-up** to open their tasks in Task Control.
-- [ ] Open a task or stage: tap it on Home to go straight to that work.
+- [ ] On mobile, **My Tasks** and **FMS Tasks** start collapsed with pending counts. Tap a heading to expand its work, then tap a task or stage to open it. Desktop starts expanded. No new Kiara read tool is needed; the counts use the existing Home summary.
 - [ ] Fill a form linked to a task: use the form item on Home. It opens the exact form for that task.
 
 ## Dashboard
