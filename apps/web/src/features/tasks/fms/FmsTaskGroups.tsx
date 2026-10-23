@@ -10,24 +10,26 @@ export function FmsReadState({ loading, error, retry }: { loading: boolean; erro
  if (error) return <div className="space-y-2 p-3"><Notice tone="danger">{error}</Notice><Button variant="secondary" onClick={retry}>Retry</Button></div>;
  return loading ? <div aria-label="Loading FMS work" className="m-3 h-14 animate-pulse rounded-xl bg-task-muted" /> : null;
 }
-function Disclosure({ name, count, open, onClick, controls, detail, level }: { name: string; count: number; open: boolean; onClick: () => void; controls: string; detail?: string | undefined; level: "workflow" | "stage" }) {
+const LEVEL_LABEL = { workflow: "Workflow", stage: "Stage", starter: "Form to start" } as const;
+function Disclosure({ name, count, open, onClick, controls, detail, level }: { name: string; count: number; open: boolean; onClick: () => void; controls: string; detail?: string | undefined; level: keyof typeof LEVEL_LABEL }) {
  const Icon = open ? ChevronDown : ChevronRight;
  return <button type="button" aria-expanded={open} aria-controls={controls} onClick={onClick} className={`flex min-h-14 w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors hover:bg-task-muted ${count ? "text-task-text" : "text-task-text-muted"}`}>
-  <Icon className="size-4 shrink-0" aria-hidden="true" /><span className="min-w-0 flex-1 break-words"><span className="block text-[11px] font-medium uppercase tracking-wider text-task-text-muted">{level === "workflow" ? "Workflow" : "Stage"}</span><span className="font-semibold">{name}</span>{detail ? <span className="ml-2 text-xs font-normal text-task-text-muted">{detail}</span> : null}</span>
+  <Icon className="size-4 shrink-0" aria-hidden="true" /><span className="min-w-0 flex-1 break-words"><span className="block text-[11px] font-medium uppercase tracking-wider text-task-text-muted">{LEVEL_LABEL[level]}</span><span className="font-semibold">{name}</span>{detail ? <span className="ml-2 text-xs font-normal text-task-text-muted">{detail}</span> : null}</span>
   <span className={cn("rounded-full px-2.5 py-1 text-xs tabular-nums", count ? "bg-task-accent-soft font-semibold text-task-text" : "bg-task-muted")}>{count}</span>
  </button>;
 }
 export function FmsWorkflowGroup({ family, filters, epoch, onNavigate, open, onToggle, expandedStages, onToggleStage, onStagesLoaded }: { open: boolean; onToggle: () => void; expandedStages: ReadonlySet<string>; onToggleStage: (id: string) => void; family: FmsFamilySummary; filters: FmsWorkspaceFilters; epoch: number; onNavigate: (path: string) => void; onStagesLoaded?: ((stages: readonly FmsStageSummary[]) => void) | undefined }) {
  const id = useId();
  const result = useFmsRead(open, `${family.id}|${JSON.stringify(filters)}`, () => loadFmsTaskStages(family.id, filters), epoch);
- const stages = result.data ? orderFmsWorkspaceStages(result.data) : [];
+ const stages = result.data ? visibleFmsWorkspaceStages(result.data) : [];
  const versions = new Set(stages.map(stage => stage.flowId)).size;
  const loaded = useRef(onStagesLoaded); loaded.current = onStagesLoaded;
- useEffect(() => { if (result.data) loaded.current?.(orderFmsWorkspaceStages(result.data)); }, [result.data]);
+ useEffect(() => { if (result.data) loaded.current?.(visibleFmsWorkspaceStages(result.data)); }, [result.data]);
  return <section className="rounded-2xl border border-task-border bg-task-bg">
   <Disclosure name={family.name} count={family.count} open={open} onClick={onToggle} controls={id} level="workflow" />
   {open ? <div id={id} className="space-y-1 border-t border-task-border p-2 sm:px-4">
    <FmsReadState {...result} />
+   {result.data && !stages.length ? <p className="px-4 py-3 text-sm text-task-text-muted">No work in this workflow for these filters.</p> : null}
    {stages.map((stage, index) => <div key={stage.id}>
     {stage.pipeline && (index === 0 || stages[index - 1]?.pipeline !== stage.pipeline || stages[index - 1]?.flowId !== stage.flowId) ? <p className="px-4 pt-3 text-xs font-semibold text-task-text-muted">{stage.pipeline}</p> : null}
     <FmsStageGroup familyId={family.id} stage={stage} open={expandedStages.has(stage.id)} onToggle={() => onToggleStage(stage.id)} filters={filters} epoch={epoch} showVersion={versions > 1} onNavigate={onNavigate} />
@@ -66,6 +68,14 @@ function FmsRecordCard({ record, stageName, onNavigate }: { record: FmsWorkspace
   </div>
  </a>;
 }
+/**
+ * Only stages holding the employee's work are listed. The starting form is filled
+ * from the Forms Library, so it is never a stage; a pending starter assignment is
+ * still open work and stays reachable, labelled as a form to start.
+ */
+export function visibleFmsWorkspaceStages(stages: readonly FmsStageSummary[]): FmsStageSummary[] {
+ return orderFmsWorkspaceStages(stages).filter(stage => stage.count > 0);
+}
 function FmsStageGroup({ familyId, stage, filters, epoch, showVersion, onNavigate, open, onToggle }: { open: boolean; onToggle: () => void; familyId: string; stage: FmsStageSummary; filters: FmsWorkspaceFilters; epoch: number; showVersion: boolean; onNavigate: (path: string) => void }) {
  const [offset, setOffset] = useState(0); const id = useId();
  const filterKey = JSON.stringify(filters);
@@ -74,7 +84,7 @@ function FmsStageGroup({ familyId, stage, filters, epoch, showVersion, onNavigat
  useEffect(() => { if (result.data && offset > 0 && offset >= result.data.total) setOffset(Math.max(0, Math.floor((result.data.total - 1) / 50) * 50)); }, [result.data, offset]);
  const page = stage.count > 0 ? result.data : undefined;
  return <section>
-  <Disclosure name={stage.name} detail={showVersion ? `v${stage.version}` : undefined} count={stage.count} open={open} onClick={onToggle} controls={id} level="stage" />
+  <Disclosure name={stage.name} detail={showVersion ? `v${stage.version}` : undefined} count={stage.count} open={open} onClick={onToggle} controls={id} level={stage.starting ? "starter" : "stage"} />
   {open ? <div id={id} className="space-y-2 px-2 pb-3 sm:pl-8">
    <FmsReadState {...result} />
    {stage.count === 0 || page?.total === 0 ? <p className="px-3 py-2 text-sm text-task-text-muted">No work in this stage for these filters.</p> : null}

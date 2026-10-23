@@ -158,3 +158,12 @@ Task Control help now describes Edit task, Task/Checklist conversion, all author
 requirements and participants, Save changes, retained history, and the separate
 future schedule editor. No new read tool is needed: this is authoring guidance
 for existing work; Kiara remains read-only through existing section tools.
+
+## FMS tab and handoff default - 2026-10-23
+
+Tasks -> FMS lists only stages that hold the user's work; the start form is not a
+stage (a pending starter assignment shows as **Form to start**). When no employee
+is set for the next step, the confirmation keeps it with the person completing the
+work (shown with "(you)"); **Assign to a Different Employee** opens the list inside
+that step and **Keep it with me** undoes a change. The server still validates the
+recipient. No new Kiara read tool: the data shown is unchanged.

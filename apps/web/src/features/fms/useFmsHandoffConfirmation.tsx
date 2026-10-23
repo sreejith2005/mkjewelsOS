@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { FmsHandoffDecision, FmsTransitionRequest, FmsWorkPreview, FmsWorkResult } from "@jewelos/core";
 import { runFmsHandoff } from "@jewelos/data/fms/confirmation";
-import { FmsHandoffConfirmation } from "./FmsHandoffConfirmation";
+import { FmsHandoffConfirmation, type FmsHandoffActor } from "./FmsHandoffConfirmation";
 
-export function useFmsHandoffConfirmation(identity?: string) {
+export function useFmsHandoffConfirmation(identity?: string, actor?: FmsHandoffActor | null) {
   const [pending, setPending] = useState<{ request: FmsTransitionRequest; preview: FmsWorkPreview } | null>(null);
   const [result, setResult] = useState<FmsWorkResult | null>(null);
   const resolveChoice = useRef<((decision: FmsHandoffDecision | null) => void) | null>(null);
@@ -22,5 +22,5 @@ export function useFmsHandoffConfirmation(identity?: string) {
     if (completed && mounted.current) setResult(completed);
     return completed;
   };
-  return { confirmWork, result, confirmation: pending ? <FmsHandoffConfirmation request={pending.request} preview={pending.preview} onConfirm={close} onCancel={() => close(null)} /> : null };
+  return { confirmWork, result, confirmation: pending ? <FmsHandoffConfirmation actor={actor ?? null} request={pending.request} preview={pending.preview} onConfirm={close} onCancel={() => close(null)} /> : null };
 }
