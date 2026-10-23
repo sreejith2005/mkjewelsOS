@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type WheelEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { CheckSquare, CircleHelp, Copy, FileText, Flag, GitBranch, Layers, Maximize, Merge, Minus, MousePointer2, Plus, ShieldCheck, Trash2, Zap, LayoutGrid } from "lucide-react";
-import { FMS_MIN_ZOOM as MIN_ZOOM, FMS_MAX_ZOOM as MAX_ZOOM, routeFmsGraphEdges, fmsOutgoingStageKeys, hasFmsStageRouting, type FmsFlowDefinition, type FmsFormFieldRef, type FmsStageDefinition } from "@jewelos/core";
+import { FMS_MIN_ZOOM as MIN_ZOOM, FMS_MAX_ZOOM as MAX_ZOOM, fmsWheelZoomFactor, routeFmsGraphEdges, fmsOutgoingStageKeys, hasFmsStageRouting, zoomFmsViewport, type FmsFlowDefinition, type FmsFormFieldRef, type FmsStageDefinition, type FmsViewport } from "@jewelos/core";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { fmsGraphEdges, fmsStageSummary, fmsTimingSummary, layoutFmsDefinition, type FmsGraphEdge, type FmsGraphPosition } from "./graph";
@@ -38,7 +38,10 @@ type Drag =
 const overlaps = (point: FmsGraphPosition, box: Readonly<{ x: number; y: number; width: number; height: number }>) =>
   point.x < box.x + box.width && point.x + NODE_WIDTH > box.x && point.y < box.y + box.height && point.y + NODE_HEIGHT > box.y;
 
-export function FmsGraphCanvas({ definition, formFields, selectedKey, focusRequest, invalidKeys, onSelect, onDelete, onDuplicate, onAddAfter, onConnect, onDisconnect, onReconnect, onMove }: {
+/** Elements whose own wheel scrolling must keep working inside the canvas. */
+const WHEEL_EXEMPT = "input, select, textarea, [data-canvas-scroll]";
+
+export function FmsGraphCanvas({ definition, formFields, selectedKey, focusRequest, invalidKeys, onSelect, onDelete, onDuplicate, onAddAfter, onConnect, onDisconnect, onReconnect, onMove, fill = false }: {
   definition: FmsFlowDefinition;
   /** The linked Forms' questions, so a route edge reads as its question and answer labels. */
   formFields: Readonly<Record<string, readonly FmsFormFieldRef[]>>;
@@ -53,6 +56,8 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
   onDisconnect: (from: string, to: string, ruleId?: string) => void;
   onReconnect: (from: string, previousTo: string, nextTo: string, ruleId?: string) => void;
   onMove: (positions: Readonly<Record<string, FmsGraphPosition>>) => void;
+  /** Fill the parent workspace edge to edge (desktop builder) instead of the bounded card used on phones. */
+  fill?: boolean;
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<Drag | null>(null);
@@ -60,8 +65,10 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
   const layout = useMemo(() => layoutFmsDefinition(definition), [definition]);
   const edges = useMemo(() => fmsGraphEdges(definition.stages, formFields), [definition.stages, formFields]);
   const [offsets, setOffsets] = useState<Record<string, FmsGraphPosition>>({});
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
+  /** Pan and zoom live together so a pointer-anchored zoom is one consistent update. */
+  const [camera, setCamera] = useState<FmsViewport>({ x: 0, y: 0, zoom: 1 });
+  const pan = camera;
+  const zoom = camera.zoom;
   const [selection, setSelection] = useState<readonly string[]>(selectedKey ? [selectedKey] : []);
   const [connecting, setConnecting] = useState<Readonly<{ from: string; x: number; y: number }> | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
@@ -111,19 +118,33 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
     const right = Math.max(...points.map((point) => point.x + NODE_WIDTH), ...routedEdges.map((edge) => edge.bounds.right));
     const top = Math.min(...points.map((point) => point.y), ...routedEdges.map((edge) => edge.bounds.top));
     const bottom = Math.max(...points.map((point) => point.y + NODE_HEIGHT), ...routedEdges.map((edge) => edge.bounds.bottom));
+    if (!viewport.clientWidth || !viewport.clientHeight) return false;
     const next = clamp(Math.min((viewport.clientWidth - FIT_PADDING) / Math.max(1, right - left), (viewport.clientHeight - FIT_PADDING) / Math.max(1, bottom - top)), MIN_ZOOM, 1);
-    setZoom(next);
-    setPan({ x: viewport.clientWidth / 2 - ((left + right) / 2) * next, y: viewport.clientHeight / 2 - ((top + bottom) / 2) * next });
+    setCamera({ x: viewport.clientWidth / 2 - ((left + right) / 2) * next, y: viewport.clientHeight / 2 - ((top + bottom) / 2) * next, zoom: next });
+    return true;
   }, [definition.stages, position, routedEdges]);
 
-  useLayoutEffect(() => { if (!hasCenteredRef.current && definition.stages.length) { fitView(); hasCenteredRef.current = true; } }, [definition.stages.length, fitView]);
+  /**
+   * Fit once, when the workflow first has a size to fit into. The workspace is
+   * sized after mount, so the first fit waits for a real viewport; later
+   * resizes (a drawer, the inspector, the app sidebar) never move the camera.
+   */
+  const fitOnce = useCallback(() => { if (!hasCenteredRef.current && definition.stages.length && fitView()) hasCenteredRef.current = true; }, [definition.stages.length, fitView]);
+  useLayoutEffect(fitOnce, [fitOnce]);
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => fitOnce());
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, [fitOnce]);
 
   useEffect(() => {
     if (!focusRequest || lastFocusedIssueId.current === focusRequest.id || !definition.stages.some((stage) => stage.key === focusRequest.key)) return;
     const viewport = viewportRef.current;
     if (!viewport) return;
     const point = position(focusRequest.key);
-    setPan({ x: viewport.clientWidth / 2 - (point.x + NODE_WIDTH / 2) * zoom, y: viewport.clientHeight / 2 - (point.y + NODE_HEIGHT / 2) * zoom });
+    setCamera((current) => ({ ...current, x: viewport.clientWidth / 2 - (point.x + NODE_WIDTH / 2) * current.zoom, y: viewport.clientHeight / 2 - (point.y + NODE_HEIGHT / 2) * current.zoom }));
     lastFocusedIssueId.current = focusRequest.id;
   }, [focusRequest, definition.stages, position, zoom]);
 
@@ -134,18 +155,35 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
     const rect = viewport.getBoundingClientRect();
     const anchorX = clientX === undefined ? rect.width / 2 : clientX - rect.left;
     const anchorY = clientY === undefined ? rect.height / 2 : clientY - rect.top;
-    setZoom((current) => {
-      const next = clamp(current * factor, MIN_ZOOM, MAX_ZOOM);
-      setPan((currentPan) => ({ x: anchorX - (anchorX - currentPan.x) * (next / current), y: anchorY - (anchorY - currentPan.y) * (next / current) }));
-      return next;
-    });
+    setCamera((current) => zoomFmsViewport(current, { x: anchorX, y: anchorY }, current.zoom * factor));
   }, []);
 
-  const onWheel = (event: WheelEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    if (event.ctrlKey || event.metaKey) { zoomAt(event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP, event.clientX, event.clientY); return; }
-    setPan((current) => ({ x: current.x - (event.shiftKey ? event.deltaY : event.deltaX), y: current.y - (event.shiftKey ? 0 : event.deltaY) }));
-  };
+  /**
+   * Scroll up zooms in and scroll down zooms out, around the pointer, with no
+   * modifier. Events within one animation frame fold into one update, so a fast
+   * trackpad never queues a render per event. The listener is native and
+   * non-passive because a React wheel handler cannot stop the page scrolling.
+   */
+  const wheelRef = useRef<{ factor: number; clientX: number; clientY: number; frame: number | null }>({ factor: 1, clientX: 0, clientY: 0, frame: null });
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const pending = wheelRef.current;
+    const onWheel = (event: WheelEvent) => {
+      if ((event.target as HTMLElement | null)?.closest?.(WHEEL_EXEMPT)) return;
+      event.preventDefault();
+      pending.factor *= fmsWheelZoomFactor(event, viewport.clientHeight);
+      pending.clientX = event.clientX; pending.clientY = event.clientY;
+      if (pending.frame !== null) return;
+      pending.frame = requestAnimationFrame(() => {
+        pending.frame = null;
+        const factor = pending.factor; pending.factor = 1;
+        if (factor !== 1) zoomAt(factor, pending.clientX, pending.clientY);
+      });
+    };
+    viewport.addEventListener("wheel", onWheel, { passive: false });
+    return () => { viewport.removeEventListener("wheel", onWheel); if (pending.frame !== null) cancelAnimationFrame(pending.frame); pending.frame = null; pending.factor = 1; };
+  }, [zoomAt]);
 
   const nodeKeyAt = (clientX: number, clientY: number) =>
     (document.elementFromPoint(clientX, clientY) as HTMLElement | null)?.closest<HTMLElement>("[data-node-key]")?.dataset.nodeKey ?? null;
@@ -220,12 +258,12 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
       if (!first || !second || !rect) return;
       const next = clamp(pinch.zoom * (Math.hypot(first.x - second.x, first.y - second.y) / pinch.distance), MIN_ZOOM, MAX_ZOOM);
       const midX = (first.x + second.x) / 2 - rect.left; const midY = (first.y + second.y) / 2 - rect.top;
-      setZoom(next); setPan({ x: midX - pinch.worldX * next, y: midY - pinch.worldY * next });
+      setCamera({ x: midX - pinch.worldX * next, y: midY - pinch.worldY * next, zoom: next });
       return;
     }
     const drag = dragRef.current;
     if (!drag) return;
-    if (drag.kind === "pan") { setPan({ x: drag.panX + (event.clientX - drag.pointerX), y: drag.panY + (event.clientY - drag.pointerY) }); return; }
+    if (drag.kind === "pan") { setCamera((current) => ({ ...current, x: drag.panX + (event.clientX - drag.pointerX), y: drag.panY + (event.clientY - drag.pointerY) })); return; }
     const world = toWorld(event.clientX, event.clientY);
     if (drag.kind === "marquee") {
       const start = marqueeStart.current;
@@ -283,7 +321,7 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
     if (event.target !== event.currentTarget) return;
     if (event.key === "+" || event.key === "=") { event.preventDefault(); zoomAt(ZOOM_STEP); }
     else if (event.key === "-" || event.key === "_") { event.preventDefault(); zoomAt(1 / ZOOM_STEP); }
-    else if (event.key === "0") { event.preventDefault(); setZoom(1); }
+    else if (event.key === "0") { event.preventDefault(); zoomAt(1 / zoom); }
     else if (event.key === "1") { event.preventDefault(); fitView(); }
     else if (event.key === "Escape") setSelection([]);
     else if ((event.key === "Delete" || event.key === "Backspace") && selection.length === 1) { event.preventDefault(); onDelete(selection[0]!); }
@@ -296,13 +334,12 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
 
   return <div
     aria-label="Workflow canvas"
-    className="relative h-[calc(100dvh-17rem)] min-h-[20rem] touch-none overflow-hidden rounded-2xl border border-gold/20 bg-obsidian outline-none focus-visible:ring-1 focus-visible:ring-gold md:h-[calc(100dvh-19rem)] md:min-h-[34rem]"
+    className={cn("relative touch-none overflow-hidden bg-obsidian outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-gold", fill ? "h-full min-h-0 w-full" : "h-[calc(100dvh-17rem)] min-h-[20rem] rounded-2xl border border-gold/20 md:h-[calc(100dvh-19rem)] md:min-h-[34rem]")}
     onKeyDown={onKeyDown}
     onPointerCancel={(event) => { pointersRef.current.delete(event.pointerId); if (pointersRef.current.size === 0) pinchRef.current = null; dragRef.current = null; setConnecting(null); setDropTarget(null); }}
     onPointerDown={beginPointer}
     onPointerMove={movePointer}
     onPointerUp={endPointer}
-    onWheel={onWheel}
     ref={viewportRef}
     role="application"
     tabIndex={0}
@@ -318,7 +355,7 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
     {isPhone ? (hintOpen ? <p className="pointer-events-none absolute inset-x-3 top-16 z-30 rounded-2xl border border-gold/20 bg-charcoal/95 px-3 py-2 text-xs leading-relaxed text-soft-grey">
       Tap a card to edit it · drag a card to move it · drag empty space to pan · pinch to zoom · drag a card&rsquo;s right dot onto another card to connect · tap a connection, then its &times; to remove it
     </p> : null) : <p className="pointer-events-none absolute left-4 top-4 z-30 flex max-w-[min(30rem,60%)] items-center gap-2 rounded-2xl border border-gold/20 bg-charcoal/95 px-3 py-1.5 text-xs text-soft-grey">
-      <MousePointer2 className="size-3 shrink-0 text-gold-secondary" />Drag a card to move it · drag empty space to pan · Shift+drag to select several · scroll to move, Ctrl+scroll to zoom · drag a card&rsquo;s right dot onto another card to connect, or drag a connection&rsquo;s arrow end to move it
+      <MousePointer2 className="size-3 shrink-0 text-gold-secondary" />Scroll to zoom · drag empty space to pan · drag a card to move it · Shift+drag to select several · drag a card&rsquo;s right dot onto another card to connect, or a connection&rsquo;s arrow end to move it
     </p>}
 
     <div className={cn("absolute inset-0 overflow-hidden", connecting ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing")}>
@@ -397,8 +434,8 @@ export function FmsGraphCanvas({ definition, formFields, selectedKey, focusReque
       </div>
     </div>
 
-    {edgeDetails ? <div className="absolute bottom-3 left-3 right-3 z-30 rounded-xl border border-gold/30 bg-charcoal p-3 text-sm text-champagne" data-canvas-control><p className="font-semibold">{nameOf(edgeDetails.from)} → {nameOf(edgeDetails.to)}</p><p className="text-xs text-soft-grey">{edgeDetails.label || "Continue to next step"}</p><button className="mt-2 text-xs text-danger" onClick={() => { onDisconnect(edgeDetails.from, edgeDetails.to, edgeDetails.ruleId); setSelectedEdge(null); }} type="button">Remove connection</button></div> : null}
-    {selection.length > 1 ? <p className="pointer-events-none absolute bottom-3 left-4 z-30 rounded-full border border-gold/20 bg-charcoal/95 px-3 py-1 text-xs text-champagne">{selection.length} steps selected &middot; drag to move them together</p> : null}
-    {connecting ? <p className="pointer-events-none absolute bottom-3 right-4 z-30 rounded-full border border-gold/40 bg-charcoal px-3 py-1 text-xs text-gold-secondary">Drop on a step to connect &middot; release on empty space to cancel</p> : null}
+    {edgeDetails ? <div className="absolute bottom-[var(--fms-canvas-overlay-bottom,0.75rem)] left-3 right-3 z-30 mx-auto max-w-xl rounded-xl border border-gold/30 bg-charcoal p-3 text-sm text-champagne" data-canvas-control><p className="font-semibold">{nameOf(edgeDetails.from)} → {nameOf(edgeDetails.to)}</p><p className="text-xs text-soft-grey">{edgeDetails.label || "Continue to next step"}</p><button className="mt-2 text-xs text-danger" onClick={() => { onDisconnect(edgeDetails.from, edgeDetails.to, edgeDetails.ruleId); setSelectedEdge(null); }} type="button">Remove connection</button></div> : null}
+    {selection.length > 1 ? <p className="pointer-events-none absolute bottom-[var(--fms-canvas-overlay-bottom,0.75rem)] left-4 z-30 rounded-full border border-gold/20 bg-charcoal/95 px-3 py-1 text-xs text-champagne">{selection.length} steps selected &middot; drag to move them together</p> : null}
+    {connecting ? <p className="pointer-events-none absolute bottom-[var(--fms-canvas-overlay-bottom,0.75rem)] right-4 z-30 rounded-full border border-gold/40 bg-charcoal px-3 py-1 text-xs text-gold-secondary">Drop on a step to connect &middot; release on empty space to cancel</p> : null}
   </div>;
 }

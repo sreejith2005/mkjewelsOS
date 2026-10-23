@@ -1,6 +1,7 @@
 import { requireFmsAssignmentSourceForms } from "./assignmentAuthoring.ts";
 import type { UserRole } from "../roleMenu.ts";
 import { validateFmsAssignmentConfig } from "./assignmentConfig.ts";
+import { validateFmsFormSections } from "./formSections.ts";
 import { FMS_ASSIGNEE_TYPES, FMS_BRANCH_OPERATORS, FMS_STAGE_TYPES, type FmsAssignmentCandidate, type FmsAssigneeRule, type FmsBranchRule, type FmsChecklistItemDefinition, type FmsDecisionOption, type FmsFlowDefinition, type FmsFormFieldOption, type FmsFormFieldRef, type FmsInstanceStatus, type FmsStageActorState, type FmsStageDefinition, type FmsStageStatus, type FmsTimingMethod, type FmsTransitionCapability, type FmsValidationContext, type FmsValidationIssue } from "./types.ts";
 
 const KEY = /^[a-z][a-z0-9_]{0,63}$/;
@@ -56,6 +57,7 @@ export function normalizeFmsDefinition(input: FmsFlowDefinition): FmsFlowDefinit
       ...(stage.sla?.taskDisplay ? { taskDisplay: stage.sla.taskDisplay } : {}),
       ...(stage.sla?.followUp ? { followUp: stage.sla.followUp } : {}),
       ...(text(stage.sla?.assignmentFieldKey) ? { assignmentFieldKey: text(stage.sla.assignmentFieldKey).toLowerCase() } : {}),
+      ...(text(stage.sla?.formSectionKey) ? { formSectionKey: text(stage.sla.formSectionKey) } : {}),
       timingMethod: TIMING_METHODS.has(stage.sla?.timingMethod as FmsTimingMethod) ? stage.sla.timingMethod as FmsTimingMethod : "completion_date",
       dueDate: text(stage.sla?.dueDate), deadlineEnabled: stage.sla?.deadlineEnabled !== false,
       decisionMode: stage.sla?.decisionMode === "yes_no" || stage.sla?.decisionMode === "decision" ? "yes_no" as const : "normal" as const,
@@ -256,7 +258,7 @@ export function validateFmsDefinition(raw: FmsFlowDefinition, context: FmsValida
   }
   const reached = reachableFmsStageKeys(definition); for (const stage of definition.stages) if (!reached.has(stage.key)) issues.push({ code: "unreachable_stage", message: `Stage ${stage.key} is unreachable`, stageKey: stage.key });
   issues.push(...validateFmsRoutingGraph(definition.stages));
-  return [...issues, ...validateFmsAssignmentConfig(definition, context)];
+  return [...issues, ...validateFmsAssignmentConfig(definition, context), ...validateFmsFormSections(definition, context)];
 }
 
 function comparable(value: unknown): string | number | boolean | null { return value === undefined ? null : typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? value : JSON.stringify(value); }

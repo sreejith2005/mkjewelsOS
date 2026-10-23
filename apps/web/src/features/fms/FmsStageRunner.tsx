@@ -1,7 +1,7 @@
 import { fmsOutcomeReplacesStage } from "@jewelos/core";
 import { useMemo, useState } from "react";
 import { CheckCircle2, Circle, FileText, Paperclip } from "lucide-react";
-import { deriveFmsTransitionCapability, describeDue, fmsStageCompletionChecklist, fmsEmployeeStatusLabel, hasFmsFormAssignmentSource, type FmsStageDefinition, type FmsWorkResult, type FmsTransitionRequest } from "@jewelos/core";
+import { deriveFmsTransitionCapability, describeDue, fmsPlannedRuleFormSectionKey, fmsStageFormDefinition, fmsStageCompletionChecklist, fmsEmployeeStatusLabel, hasFmsFormAssignmentSource, type FmsStageDefinition, type FmsWorkResult, type FmsTransitionRequest } from "@jewelos/core";
 import { FmsWorkOutcome } from "./FmsWorkOutcome";
 import { useFmsHandoffConfirmation } from "./useFmsHandoffConfirmation";
 import { Button, Field, Modal, Notice } from "@/components/ui";
@@ -98,6 +98,11 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
   }) as Pick<FmsStageDefinition, "type" | "canReject" | "canRequestRevision" | "canMoveBackward" | "canEscalate">, [definition]);
   const capability = deriveFmsTransitionCapability({ viewerId: profile.id, viewerRole: profile.user_role, assignedIds: stage.assigned_to ?? [], instanceStatus: instance.status, stageStatus: stage.status as never, stage: stageContract });
   const linkedForm = forms.find((form) => form.id === definition.form_template_id);
+  /** The doer answers only the stage's linked section; the server enforces the same scope. */
+  const stageForm = useMemo(() => linkedForm ? fmsStageFormDefinition({ sla: { dueDate: "", formSectionKey: fmsPlannedRuleFormSectionKey(definition.planned_time_rule) } }, { name: linkedForm.name, description: linkedForm.description ?? undefined, sections: linkedForm.sections, fields: linkedForm.fields }) : undefined, [definition.planned_time_rule, linkedForm]);
+  const sectionUnavailable = !!linkedForm && !stageForm;
+  const sectionTitle = fmsPlannedRuleFormSectionKey(definition.planned_time_rule) ? stageForm?.sections?.[0]?.title : undefined;
+  const formTitle = linkedForm ? `${linkedForm.name}${sectionTitle ? ` · ${sectionTitle}` : ""}` : "";
   const eligible = eligibleFmsUsers(users, instance);
   const branchNames = useMemo(() => new Map(branches.map((branch) => [branch.id, branch.label])), [branches]);
   const departmentNames = useMemo(() => new Map(departments.map((department) => [department.id, department.label])), [departments]);
@@ -177,9 +182,10 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
     </div> : null}
     {canAct && legacyNextAssignee ? <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} label="Next-stage assignee" multiple={false} onChange={(ids) => setNextAssignee(ids[0] ?? "")} people={pickerPeople} selectedIds={nextAssignee ? [nextAssignee] : []}/> : null}
     {definition.form_template_id ? stage.form_submission_id ? <Notice tone="success">The form has been submitted and saved.</Notice>
+      : sectionUnavailable ? <Notice tone="danger">This step's form section is no longer in the linked form. Ask your manager to check the workflow.</Notice>
       : !linkedForm ? requiresLinkedForm ? <Notice tone="danger">This step's form is not available to your account. Ask your manager to check the workflow.</Notice> : <Notice>The optional form is not available right now. You can still complete this step.</Notice> : null : null}
     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-      {formPending && linkedForm ? <Button className="min-h-12" onClick={() => setShowForm(true)} variant={requiresLinkedForm ? "primary" : "secondary"}><FileText aria-hidden="true" className="size-4" />{requiresLinkedForm ? `Fill the form: ${linkedForm.name}` : `Fill the optional form: ${linkedForm.name}`}</Button> : null}
+      {formPending && linkedForm && stageForm ? <Button className="min-h-12" onClick={() => setShowForm(true)} variant={requiresLinkedForm ? "primary" : "secondary"}><FileText aria-hidden="true" className="size-4" />{requiresLinkedForm ? `Fill the form: ${formTitle}` : `Fill the optional form: ${formTitle}`}</Button> : null}
       {canAct ? <>
         {capability.canComplete && !(formPending && requiresLinkedForm) ? <Button className="min-h-12" disabled={busy || (isDecision && !outcome) || (requiresLinkedForm && !stage.form_submission_id)} onClick={() => void work(() => completeWork({ kind: "complete", instanceStageId: stage.id, outcome, remark, checklist: checklistPayload, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) }))}>{isDecision ? "Submit decision" : "Complete stage"}</Button> : null}
         {capability.canApprove ? <Button className="min-h-12" disabled={busy} onClick={() => void work(() => completeWork({ kind: "review", instanceStageId: stage.id, decision: "approved", remark, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) }))}>Approve</Button> : null}
@@ -197,7 +203,7 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
         {capability.canReassign && (stage.assigned_to?.length ?? 0) > 0 ? <Button disabled={busy} onClick={() => openManagedAction("reassign")} variant="secondary">Reassign</Button> : null}
       </div>
     </details> : null}
-    {showForm && linkedForm ? <Modal onClose={() => setShowForm(false)} title={requiresLinkedForm ? linkedForm.name : `Optional form: ${linkedForm.name}`} mobileFullscreen wide><FormRenderer definition={{ name: linkedForm.name, description: linkedForm.description ?? undefined, sections: linkedForm.sections, fields: linkedForm.fields }} dynamicOptions={formOptions} templateId={linkedForm.id} onSubmit={async (answers) => {
+    {showForm && linkedForm && stageForm ? <Modal onClose={() => setShowForm(false)} title={requiresLinkedForm ? formTitle : `Optional form: ${formTitle}`} mobileFullscreen wide><FormRenderer definition={stageForm} dynamicOptions={formOptions} templateId={linkedForm.id} onSubmit={async (answers) => {
       if (!await completeWork({ kind: "stage_form", formTemplateId: linkedForm.id, answers, instanceStageId: stage.id, outcome, remark, checklist: checklistPayload, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) })) return false;
       setShowForm(false); await onRefresh(); return true;
     }} workflowHint /></Modal> : null}

@@ -2,6 +2,7 @@ import { fmsFallbackStageKey, normalizeFmsDefinition, resolveFmsBranch } from ".
 import type { FmsFlowDefinition, FmsStageDefinition } from "./types.ts";
 import { normalizeFormAnswers } from "../forms/answers.ts";
 import { validateCompleteForm } from "../forms/validation.ts";
+import { fmsStageFormDefinition } from "./formSections.ts";
 import type { FormAnswers, FormTemplateDefinition } from "../forms/types.ts";
 
 export type FmsSimulationInput = Readonly<{
@@ -43,7 +44,9 @@ export function simulateFmsDefinition(raw: FmsFlowDefinition, input: FmsSimulati
     if (!stage) throw new Error(`Simulation route points to missing step ${token.key}`);
     const visit = (visits.get(stage.key) ?? 0) + 1;
     const supplied = input.answers[stage.key]?.[visit - 1] ?? input.answers[stage.key]?.[0] ?? {};
-    const form = stage.formTemplateId ? input.forms?.[stage.formTemplateId] : undefined;
+    // A section-scoped stage is simulated with exactly the section its doer answers.
+    const linkedForm = stage.formTemplateId ? input.forms?.[stage.formTemplateId] : undefined;
+    const form = linkedForm ? fmsStageFormDefinition(stage, linkedForm) : undefined;
     const answers = form ? normalizeFormAnswers(form, supplied) : supplied;
     const outcome = input.outcomes?.[stage.key]?.[visit - 1] ?? input.outcomes?.[stage.key]?.[0] ?? null;
     const condition = stage.sla.conditional;

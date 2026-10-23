@@ -1,4 +1,5 @@
 import { fmsOutgoingStageKeys } from "./engine.ts";
+import { fmsStageFormFields } from "./formSections.ts";
 import type { FmsAssignmentConfig, FmsAssignmentSource } from "./workContracts.ts";
 import type { FmsFlowDefinition, FmsFormFieldRef, FmsStageDefinition } from "./types.ts";
 
@@ -7,13 +8,13 @@ export const FMS_ASSIGNMENT_LABELS: Readonly<Record<FmsAssignmentConfig["mode"],
   previous_stage_employee: "Previous Stage Employee", manual_handoff: "Manual Handoff", configured_fallback: "Configured Fallback",
 };
 export function fmsSourceQuestions(stages: readonly FmsStageDefinition[], fields: Readonly<Record<string, readonly FmsFormFieldRef[]>>, _targetKey: string, usersOnly = true) {
-  return stages.flatMap(stage => !stage.formTemplateId ? [] : (fields[stage.formTemplateId] ?? [])
+  return stages.flatMap(stage => !stage.formTemplateId ? [] : fmsStageFormFields(stage, fields)
     .filter(field => usersOnly ? field.type === "user_dropdown" : !["section_header", "divider"].includes(field.type ?? "text"))
     .map(field => ({ label: `${stage.name} · ${field.label}`, key: `${stage.key}:${field.key}`,
       source: { sourceStageKey: stage.key, formTemplateId: stage.formTemplateId!, fieldKey: field.key } satisfies FmsAssignmentSource })));
 }
 export function suggestFmsAssignment(previous: FmsStageDefinition | undefined, fields: Readonly<Record<string, readonly FmsFormFieldRef[]>>): FmsAssignmentConfig {
-  const questions = previous?.formTemplateId ? (fields[previous.formTemplateId] ?? []).filter(field => field.type === "user_dropdown" && field.required && field.shown !== false && !field.hasCondition) : [];
+  const questions = previous?.formTemplateId ? fmsStageFormFields(previous, fields).filter(field => field.type === "user_dropdown" && field.required && field.shown !== false && !field.hasCondition) : [];
   return { mode: "previous_form", allowHandoff: false, followFormAssignee: true,
     fallbackRule: { type: "previous_step_doer" },
     sources: previous?.formTemplateId && questions.length === 1

@@ -71,12 +71,25 @@ async function openBuilder(builderData: FmsData = data) {
   return { user, start, a, b };
 }
 
+/** The Building blocks palette now lives in the Workflow tools drawer, closed by default. */
+async function openTools(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: "Open workflow tools" }));
+}
+
+const flowId = "00000000-0000-4000-8000-0000000000f1";
+const savedFlowData = {
+  ...data,
+  flows: [{ id: flowId, family_id: "fam-saved", version: 1, assignment_version: 2, name: "Saved sales flow", description: "Existing", status: "draft", scope_type: "tenant", branch_id: null, department_id: null, is_active: true, usage_count: 0 }],
+  stages: ["start_form", "follow_up"].map((stage_key, sort_order) => ({ id: `00000000-0000-4000-8000-00000000000${sort_order + 1}`, fms_flow_id: flowId, stage_key, name: stage_key === "start_form" ? "Start form" : "Follow up", method: null, step_type: sort_order === 0 ? "form" : "task", sort_order, is_required: true, planned_time_rule: { deadlineEnabled: false }, completion_rule: "any_doer", allow_multiple_doers: false, requires_upload: false, requires_remark: false, checklist_definition: [], form_template_id: sort_order === 0 ? formId : null, requires_next_doer_handoff: false, can_move_backward: false, can_reject: false, can_request_revision: false, can_escalate: false, default_next_stage_id: null, parallel_target_stage_ids: [], join_rule: null, join_required_stage_ids: [], split_to_flow_id: null, canvas_position: { x: 80 + sort_order * 320, y: 120 } })),
+} as unknown as FmsData;
+
 afterEach(() => { cleanup(); vi.clearAllMocks(); latest = null; latestFocusRequest = null; });
 
 describe("FMS builder graph wiring", () => {
   it("saves before opening Forms and returns to the same step with its version intact", async () => {
     mocks.saveFmsDraft.mockResolvedValue("saved-flow");
     const { user, start } = await openBuilder();
+    await openTools(user);
     await user.click(screen.getByRole("button", { name: /Configure the initial details form/ }));
     await user.selectOptions(screen.getByLabelText("Initial details form"), formId);
     await user.click(screen.getByRole("button", { name: "Preview Form" }));
@@ -114,6 +127,7 @@ describe("FMS builder graph wiring", () => {
 
   it("seeds an extra connection from the linked form's first question once a Form is attached", async () => {
     const { user, start, b } = await openBuilder();
+    await openTools(user);
     await user.click(screen.getByRole("button", { name: /Configure the initial details form/ }));
     await user.selectOptions(screen.getByLabelText("Initial details form"), formId);
     expect(stage(start).formTemplateId).toBe(formId);
@@ -214,6 +228,7 @@ describe("FMS builder graph wiring", () => {
     const personId = "00000000-0000-4000-8000-000000000023";
     const builderData = { ...data, users: [{ id: personId, employee_name: "Asha", employee_code: "A1", account_status: "active", user_role: "staff", branch_id: "", department_id: "", working_status: "active", is_login_enabled: true }] } as FmsData;
     const { user } = await openBuilder(builderData);
+    await openTools(user);
     await user.click(screen.getByRole("button", { name: /Pre-assign users after building the flow/ }));
     await user.click(screen.getAllByRole("radio", { name: "Asha" })[0]!);
     await user.click(screen.getByRole("checkbox", { name: "Use the first step's person for all steps" }));
@@ -224,49 +239,83 @@ describe("FMS builder graph wiring", () => {
   });
 
   /**
-   * Compact-screen containment. jsdom does not lay anything out, so these lock
-   * in the structural choices that keep the builder inside a narrow viewport
-   * rather than measuring pixels: a stacking grid whose columns may shrink, a
-   * palette that scrolls inside itself, and named icon-only controls.
+   * Full-screen workspace. jsdom does not lay anything out, so these lock in
+   * the structure: the canvas is the default view, the palette is an overlay
+   * drawer that starts closed, and the inspector opens only for a chosen step.
    */
-  describe("compact layout", () => {
-    it("stacks the palette above the canvas until xl and lets both columns shrink", async () => {
-      await openBuilder();
-      const grid = document.querySelector("[class*='xl:grid-cols-']");
-      expect(grid).toBeTruthy();
-      // `minmax(0,1fr)` is what stops a wide canvas forcing document-level
-      // horizontal scroll; `1fr` alone would blow the grid out.
-      expect(grid!.className).toContain("minmax(0,1fr)");
-      // No column template below xl means one stacked column on a phone.
-      expect(grid!.className).not.toMatch(/(?<!xl:)grid-cols-\[/);
+  describe("full-screen workspace", () => {
+    it("opens a saved workflow directly on the canvas with no inspector or drawer covering it", () => {
+      render(<FmsFlowBuilder data={savedFlowData} flow={savedFlowData.flows[0]!} onClose={() => undefined} onSaved={async () => undefined} />);
+      expect(screen.getByRole("button", { name: "Canvas Mode" }).getAttribute("aria-pressed")).toBe("true");
+      expect(screen.getByRole("button", { name: "connect a" })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Close inspector" })).toBeNull();
+      expect(screen.queryByText("Building blocks")).toBeNull();
+      const toggle = screen.getByRole("button", { name: "Open workflow tools" });
+      expect(toggle.getAttribute("aria-expanded")).toBe("false");
+      expect(latest!.stages.map((item) => item.position)).toEqual([{ x: 80, y: 120 }, { x: 400, y: 120 }]);
     });
 
-    it("scrolls the building-block palette inside its own bounded height", async () => {
-      await openBuilder();
-      const palette = screen.getByText("Building blocks").closest("aside");
-      expect(palette).toBeTruthy();
-      expect(palette!.className).toContain("overflow-y-auto");
-      expect(palette!.className).toMatch(/max-h-/);
+    it("sizes the workspace to the window below its own top edge", () => {
+      const { container } = render(<FmsFlowBuilder data={savedFlowData} flow={savedFlowData.flows[0]!} onClose={() => undefined} onSaved={async () => undefined} />);
+      const workspace = container.firstElementChild as HTMLElement;
+      expect(workspace.style.height).toBe(`${window.innerHeight}px`);
+      expect(workspace.className).toContain("overflow-hidden");
+      expect(workspace.className).not.toMatch(/md:pr-/);
     });
 
-    it("keeps the header actions reachable without widening the page", async () => {
+    it("opens and closes the Workflow tools drawer from its rail, its Close button, Escape, and outside clicks", async () => {
+      const user = userEvent.setup();
+      render(<FmsFlowBuilder data={savedFlowData} flow={savedFlowData.flows[0]!} onClose={() => undefined} onSaved={async () => undefined} />);
+      await openTools(user);
+      expect(screen.getByText("Building blocks")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Open workflow tools" }).getAttribute("aria-expanded")).toBe("true");
+      await user.click(screen.getByRole("button", { name: "Close workflow tools" }));
+      expect(screen.queryByText("Building blocks")).toBeNull();
+      await openTools(user);
+      await user.keyboard("{Escape}");
+      expect(screen.queryByText("Building blocks")).toBeNull();
+      expect(document.activeElement).toBe(screen.getByRole("button", { name: "Open workflow tools" }));
+      await openTools(user);
+      await user.pointer({ keys: "[MouseLeft>]", target: screen.getByRole("complementary", { name: "Workflow tools drawer" }).previousElementSibling! });
+      expect(screen.queryByText("Building blocks")).toBeNull();
+    });
+
+    it("selects a new step and opens its inspector, then closing it restores the bare canvas", async () => {
+      const user = userEvent.setup();
+      render(<FmsFlowBuilder data={savedFlowData} flow={savedFlowData.flows[0]!} onClose={() => undefined} onSaved={async () => undefined} />);
+      await user.click(screen.getByRole("button", { name: "Add Step" }));
+      const inspector = screen.getByRole("complementary", { name: "Configure Step" });
+      expect(inspector.className).toContain("absolute");
+      expect(within(inspector).getByLabelText("Step name")).toBeTruthy();
+      expect(latest!.stages).toHaveLength(3);
+      await user.click(screen.getByRole("button", { name: "Close inspector" }));
+      expect(screen.queryByRole("complementary", { name: /Configure/ })).toBeNull();
+      expect(screen.getByRole("button", { name: "connect a" })).toBeTruthy();
+    });
+
+    it("keeps Guided Mode available as an optional view", async () => {
+      const user = userEvent.setup();
+      render(<FmsFlowBuilder data={savedFlowData} flow={savedFlowData.flows[0]!} onClose={() => undefined} onSaved={async () => undefined} />);
+      await user.click(screen.getByRole("button", { name: "Guided Mode" }));
+      expect(screen.getByRole("list", { name: "Workflow steps" })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "connect a" })).toBeNull();
+      await user.click(screen.getByRole("button", { name: "Canvas Mode" }));
+      expect(screen.getByRole("button", { name: "connect a" })).toBeTruthy();
+    });
+
+    it("keeps the toolbar reachable without widening the page and names every icon-only control", async () => {
       await openBuilder();
       const header = document.querySelector("header");
-      expect(header).toBeTruthy();
       expect(header!.className).toMatch(/scroll-x|overflow-x-auto/);
-    });
-
-    it("gives every icon-only control an accessible name", async () => {
-      await openBuilder();
-      for (const name of ["Undo", "Redo", "Check workflow"]) {
+      for (const name of ["Back to FMS", "Undo", "Redo", "Check workflow", "Simulate workflow", "Save draft", "Open workflow tools", "Add Step"]) {
         expect(screen.getByRole("button", { name })).toBeTruthy();
       }
     });
 
-    it("lets the publish-readiness bar wrap instead of overflowing", async () => {
+    it("lets the floating publish-readiness bar wrap instead of overflowing", async () => {
       await openBuilder();
       const bar = screen.getByText("Publish readiness").closest("section");
-      expect(bar).toBeTruthy();
+      expect(bar!.className).toContain("absolute");
       expect(bar!.querySelector(".flex-wrap")).toBeTruthy();
     });
   });

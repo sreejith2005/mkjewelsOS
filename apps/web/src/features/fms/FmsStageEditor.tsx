@@ -8,6 +8,8 @@ import {
   fmsFieldOptions,
   fmsRouteAnswerSelection,
   fmsAssignmentFields,
+  fmsStageFormFields,
+  fmsStageFormSectionKey,
   hasFmsStageFallback,
   hasFmsStageRouting,
   type FmsBranchOperator,
@@ -58,7 +60,9 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete, assign
   const human = humanTypes.includes(stage.type);
   const canChooseNext = !["branch", "parallel_start", "end"].includes(stage.type);
   const decision = stage.sla.decisionMode === "decision" || stage.sla.decisionMode === "yes_no";
-  const formFields = stage.formTemplateId ? data.formFields[stage.formTemplateId] ?? [] : [];
+  /** Route and assignment questions come from the linked section only; the full list explains removed ones. */
+  const formFields = fmsStageFormFields(stage, data.formFields);
+  const allFormFields = stage.formTemplateId ? data.formFields[stage.formTemplateId] ?? [] : [];
   const assignmentFields = fmsAssignmentFields(formFields);
   const invalidAssignment = !!stage.sla.assignmentFieldKey && !assignmentFields.some((field) => field.key === stage.sla.assignmentFieldKey);
   const [showConditional, setShowConditional] = useState(!!stage.sla.conditional && "decisionStageKey" in stage.sla.conditional);
@@ -94,6 +98,7 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete, assign
     {human ? <section className="space-y-3 border-t border-gold/15 pt-4">
       <div><h4 className="text-xs font-semibold uppercase tracking-[0.15em] text-gold-secondary">Linked form</h4><p className="mt-1 text-xs text-soft-grey">{firstStage ? "The first step uses this form to collect the workflow’s initial details." : "Attach a Form the doer fills in when completing this step. Its answers can also drive the routing below."}</p></div>
       <LinkedForm data={data} firstStage={firstStage} stage={stage} update={update} />
+      {!firstStage ? <FormScope data={data} stage={stage} updateSla={updateSla} /> : null}
       {assignmentVersion !== 2 ? <>      <Field label="User question that assigns later steps"><select aria-invalid={invalidAssignment} className="field" data-fms-focus="assignment" onChange={(event) => updateSla({ assignmentFieldKey: event.target.value || undefined })} value={stage.sla.assignmentFieldKey ?? ""}>
         <option value="">Use workflow default assignees</option>
         {invalidAssignment ? <option disabled value={stage.sla.assignmentFieldKey}>Unavailable question: {stage.sla.assignmentFieldKey}</option> : null}
@@ -105,7 +110,7 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete, assign
     {human ? <FmsTaskNaming stage={stage} stages={stages} fields={data.formFields} onChange={onChange} /> : null}
     {human && fmsStageNeedsAssignment(stages, stage.key) && assignmentVersion === 2 ? <FmsAssignmentEditor stage={stage} stages={stages} data={data} onChange={onChange} /> : null}
 
-    {canChooseNext ? <StageRouting decision={decision} fields={formFields} others={others} stage={stage} changeRule={changeBranchRule} moveRule={moveBranchRule} update={update} /> : null}
+    {canChooseNext ? <StageRouting allFields={allFormFields} decision={decision} fields={formFields} others={others} stage={stage} changeRule={changeBranchRule} moveRule={moveBranchRule} update={update} /> : null}
 
     <section className="space-y-3 border-t border-gold/15 pt-4">
       <div><h4 className="text-xs font-semibold uppercase tracking-[0.15em] text-gold-secondary">When</h4><p className="mt-1 text-xs text-soft-grey">Choose how this step’s deadline is calculated.</p></div>
@@ -146,7 +151,7 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete, assign
  * historical single successor; adding rules turns it into an ordered switch
  * whose fallback stays `defaultNextStageKey`, so published flows are unaffected.
  */
-function StageRouting({ stage, others, fields, decision, update, changeRule, moveRule }: { stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; fields: readonly FmsFormFieldRef[]; decision: boolean; update: (patch: Partial<FmsStageDefinition>) => void; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void }) {
+function StageRouting({ stage, others, fields, allFields, decision, update, changeRule, moveRule }: { stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; fields: readonly FmsFormFieldRef[]; allFields: readonly FmsFormFieldRef[]; decision: boolean; update: (patch: Partial<FmsStageDefinition>) => void; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void }) {
   const routed = hasFmsStageRouting(stage);
   const addRoute = () => {
     const source = stage.formTemplateId && fields.length ? "form_answer" as const : decision ? "outcome" as const : "context" as const;
@@ -159,17 +164,19 @@ function StageRouting({ stage, others, fields, decision, update, changeRule, mov
       <Button aria-label="Add conditional route" className="shrink-0" onClick={addRoute} type="button" variant="secondary"><GitBranch className="size-4" />Add route</Button>
     </div>
 
-    {stage.branchRules.map((rule, index) => <RouteRow decision={decision} fields={fields} index={index} key={rule.id} others={others} rule={rule} stage={stage} changeRule={changeRule} moveRule={moveRule} remove={() => update({ branchRules: stage.branchRules.filter((_, ruleIndex) => ruleIndex !== index).map((item, order) => ({ ...item, order })) })} />)}
+    {stage.branchRules.map((rule, index) => <RouteRow allFields={allFields} decision={decision} fields={fields} index={index} key={rule.id} others={others} rule={rule} stage={stage} changeRule={changeRule} moveRule={moveRule} remove={() => update({ branchRules: stage.branchRules.filter((_, ruleIndex) => ruleIndex !== index).map((item, order) => ({ ...item, order })) })} />)}
 
     <Field label={routed ? "Otherwise (fallback) go to" : "Continue to"}><StageSelect label={routed ? "Otherwise (fallback) go to" : "Continue to"} others={others} value={stage.defaultNextStageKey} onChange={(value) => update({ defaultNextStageKey: value })} /></Field>
     {routed && !hasFmsStageFallback(stage) ? <p className="rounded-lg border border-danger/40 bg-danger/5 p-2 text-xs text-danger">Choose an Otherwise destination. An answer that matches no route must still have somewhere to go.</p> : null}
     {routed && !stage.formTemplateId && stage.branchRules.some((rule) => rule.source === "form_answer") ? <p className="rounded-lg border border-danger/40 bg-danger/5 p-2 text-xs text-danger">Link a Form above so these answers exist at run time.</p> : null}
-    {stage.formTemplateId && !fields.length ? <p className="rounded-lg border border-gold/25 bg-gold/5 p-2 text-xs text-champagne">No branchable fields available in this form.</p> : null}
+    {stage.formTemplateId && !fields.length ? <p className="rounded-lg border border-gold/25 bg-gold/5 p-2 text-xs text-champagne">{fmsStageFormSectionKey(stage) ? "No branchable questions in the selected section." : "No branchable fields available in this form."}</p> : null}
   </section>;
 }
 
-function RouteRow({ rule, index, stage, others, fields, decision, changeRule, moveRule, remove }: { rule: FmsBranchRule; index: number; stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; fields: readonly FmsFormFieldRef[]; decision: boolean; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void; remove: () => void }) {
+function RouteRow({ rule, index, stage, others, fields, allFields, decision, changeRule, moveRule, remove }: { rule: FmsBranchRule; index: number; stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; fields: readonly FmsFormFieldRef[]; allFields: readonly FmsFormFieldRef[]; decision: boolean; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void; remove: () => void }) {
   const field = rule.source === "form_answer" ? fields.find((item) => item.key === rule.sourceKey) : undefined;
+  /** A saved question outside the section stays selected and flagged until the author picks another. */
+  const outside = rule.source === "form_answer" && !field ? allFields.find((item) => item.key === rule.sourceKey) : undefined;
   const options = rule.source === "outcome" ? (stage.sla.decisionOptions ?? []).map((option) => ({ value: option.key, label: option.label })) : fmsFieldOptions(field);
   const selected = Array.isArray(rule.value) ? rule.value.map(String) : [String(rule.value ?? "")].filter(Boolean);
   return <article className="space-y-2 rounded-xl border border-gold/20 bg-white/[0.02] p-3" key={rule.id}>
@@ -186,7 +193,7 @@ function RouteRow({ rule, index, stage, others, fields, decision, changeRule, mo
         <option disabled={!decision} value="outcome">This step’s decision outcome</option>
         <option value="context">Process data field</option>
       </select></label>
-      {rule.source === "form_answer" ? <label className="block"><span className="label">Question</span><select aria-label={`Route ${index + 1} question`} className="field" onChange={(event) => changeRule(index, { sourceKey: event.target.value, value: "" })} value={rule.sourceKey ?? ""}><option value="">Select a question</option>{fields.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}{rule.sourceKey && !fields.some((item) => item.key === rule.sourceKey) ? <option value={rule.sourceKey}>{rule.sourceKey} (removed)</option> : null}</select></label>
+      {rule.source === "form_answer" ? <label className="block"><span className="label">Question</span><select aria-label={`Route ${index + 1} question`} className="field" onChange={(event) => changeRule(index, { sourceKey: event.target.value, value: "" })} value={rule.sourceKey ?? ""}><option value="">Select a question</option>{fields.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}{rule.sourceKey && !fields.some((item) => item.key === rule.sourceKey) ? <option value={rule.sourceKey}>{outside ? `${outside.label} (not in this section)` : `${rule.sourceKey} (removed)`}</option> : null}</select></label>
         : rule.source === "context" ? <label className="block"><span className="label">Field key</span><input aria-label={`Route ${index + 1} field key`} className="field" onChange={(event) => changeRule(index, { sourceKey: event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_") })} placeholder="e.g. status" value={rule.sourceKey ?? ""} /></label>
         : <p className="self-end text-xs text-soft-grey">Uses the outcome the doer selects on this step.</p>}
       <label className="block"><span className="label">Condition</span><select aria-label={`Route ${index + 1} condition`} className="field" onChange={(event) => changeRule(index, { operator: event.target.value as FmsBranchOperator, value: event.target.value === "in" ? [] : "" })} value={rule.operator}>{routeOperators.map((operator) => <option key={operator.value} value={operator.value}>{operator.label}</option>)}</select></label>
@@ -233,10 +240,37 @@ function LinkedForm({ data, firstStage, stage, update }: { data: FmsData; firstS
     {upgrade}
   </div>;
   return <div className="space-y-2">
-    <select aria-label="Linked form" className="field" data-fms-focus="form" onChange={(event) => update({ formTemplateId: event.target.value || undefined })} value={stage.formTemplateId ?? ""}><option value="">No form — complete this step without one</option>{options}</select>
+    <select aria-label="Linked form" className="field" data-fms-focus="form" onChange={(event) => update({ formTemplateId: event.target.value || undefined, ...(event.target.value ? {} : { sla: { ...stage.sla, formSectionKey: undefined } }) })} value={stage.formTemplateId ?? ""}><option value="">No form — complete this step without one</option>{options}</select>
     {missing ? <p className="rounded-lg border border-danger/40 bg-danger/5 p-2 text-xs text-danger">This Form is no longer an available published version. Choose another before publishing.</p> : null}
     {upgrade}
   </div>;
+}
+
+/**
+ * Entire Form keeps the historical behaviour. Specific Section stores the stable
+ * section key, so the doer answers only that section and its routes use only
+ * its questions. A saved key the current version lacks stays visible and
+ * flagged until the author chooses again.
+ */
+function FormScope({ data, stage, updateSla }: { data: FmsData; stage: FmsStageDefinition; updateSla: (patch: Partial<FmsSlaRule>) => void }) {
+  if (!stage.formTemplateId) return null;
+  const sections = data.formSections?.[stage.formTemplateId] ?? [];
+  const sectionKey = fmsStageFormSectionKey(stage);
+  if (!sections.length && !sectionKey) return null;
+  const known = sections.find((section) => section.key === sectionKey);
+  const choice = (selected: boolean) => `min-h-11 rounded-xl border p-3 text-left ${selected ? "border-gold bg-gold/10 text-white" : "border-gold/20 text-soft-grey"}`;
+  return <fieldset className="space-y-2" data-fms-focus="section">
+    <legend className="label">Form scope</legend>
+    <div className="grid gap-2 sm:grid-cols-2">
+      <button aria-pressed={!sectionKey} className={choice(!sectionKey)} onClick={() => updateSla({ formSectionKey: undefined })} type="button"><b className="block text-sm">Entire Form</b><span className="text-xs">The doer completes every section</span></button>
+      <button aria-pressed={!!sectionKey} className={choice(!!sectionKey)} disabled={!sections.length} onClick={() => { if (!sectionKey && sections[0]) updateSla({ formSectionKey: sections[0].key }); }} type="button"><b className="block text-sm">Specific Section</b><span className="text-xs">The doer completes one section only</span></button>
+    </div>
+    {sectionKey ? <label className="block"><span className="label">Section</span><select aria-invalid={!known} aria-label="Form section" className="field" onChange={(event) => updateSla({ formSectionKey: event.target.value })} value={sectionKey}>
+      {known ? null : <option value={sectionKey}>Unavailable section (not in this Form version)</option>}
+      {sections.map((section) => <option key={section.key} value={section.key}>{section.title} · {section.questionCount} question{section.questionCount === 1 ? "" : "s"}</option>)}
+    </select></label> : null}
+    {sectionKey && !known ? <p className="rounded-lg border border-danger/40 bg-danger/5 p-2 text-xs text-danger">This section is not in the linked Form version. Choose another section, or Entire Form.</p> : null}
+  </fieldset>;
 }
 
 function BranchEditor({ stage, others, update, changeRule, moveRule }: { stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; update: (patch: Partial<FmsStageDefinition>) => void; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void }) {

@@ -165,6 +165,45 @@ Ships dark: every switch is off until an administrator turns it on under FMS ->
 - [ ] A failed FMS step submission (e.g. revoked permission) still shows its
       original error; the run's **Run** tab then lists the failed attempt.
 
+### FMS form sections and full-screen canvas - 2026-10-23
+
+Migration `0345_fms_stage_form_sections.sql`; design:
+`docs/superpowers/specs/2026-10-23-fms-form-sections-canvas-design.md`.
+
+- [ ] Existing workflows: open, run and finish a workflow published before
+      0345. Every stage still shows its entire Form; routes, fallbacks,
+      assignments, deadlines and notifications behave exactly as before.
+- [ ] Section scope: in a draft, link a multi-section Form to a later step ->
+      **Form scope** -> **Specific Section** -> choose a section. The section
+      list keeps the Form's order and shows question counts. **Add route**
+      offers only that section's questions and their answers.
+- [ ] Change the section with a route already saved: the route stays, its
+      question shows "(not in this section)" and Publish readiness names it.
+- [ ] Reuse one Form on four steps with four sections; save, reload, create a
+      revision and duplicate: every step keeps its own section.
+- [ ] Run it: the employee on each step sees only that step's section (the
+      title reads "Form · Section"), required questions apply only inside it,
+      and the chosen route activates the right next step and employee.
+- [ ] A route back (Follow-up -> Introduction) opens a fresh Introduction
+      visit with an empty form.
+- [ ] Upgrade a step to a newer Form version that renamed the section:
+      Publish readiness reports the missing section until it is chosen again.
+- [ ] Standalone Forms Library submission of the same Form still requires
+      every section the respondent reaches.
+- [ ] Canvas (desktop and tablet): the builder opens full screen on Canvas
+      Mode with no inspector and the **Open workflow tools** rail closed.
+      Wheel up zooms in and down zooms out around the pointer, without page
+      scroll; dragging empty space pans; dragging a card moves only the card;
+      dragging an output dot still connects. Opening/closing the drawer, the
+      inspector, the assistant and the app sidebar never moves the camera.
+- [ ] **Add Step** selects the new step and opens its inspector; **Close
+      inspector** returns the bare canvas. The inspector scrolls inside itself.
+- [ ] With the AI assistant open, clicking a step shows the inspector; closing
+      it (or pressing **AI assistant**) brings the same conversation back.
+- [ ] Phone width (also the Android app): Steps/Map views, pinch and pan on
+      the Map, and the section controls in the step sheet all fit without
+      horizontal scroll.
+
 ### Assigned FMS work (one work item, many entry surfaces)
 
 Run signed in as the assignee, and repeat the whole block on web and on an

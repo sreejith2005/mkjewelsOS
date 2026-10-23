@@ -107,3 +107,21 @@ export function fitFmsViewport(bounds: FmsBounds | null, viewport: FmsSize, padd
     zoom,
   };
 }
+
+/** Wheel input as the browser reports it: `deltaMode` 0 pixels, 1 lines, 2 pages. */
+export type FmsWheelInput = Readonly<{ deltaY: number; deltaMode: number; ctrlKey: boolean }>;
+
+/**
+ * Turns one wheel event into a zoom factor: scrolling up zooms in, down zooms
+ * out. A mouse notch (about 100px) moves one familiar zoom step, a trackpad's
+ * small continuous deltas move proportionally, and a trackpad pinch (reported
+ * as Ctrl + wheel with tiny deltas) gets a higher gain so it still feels
+ * direct. Large or line/page deltas are capped so one flick cannot jump the
+ * whole zoom range.
+ */
+export function fmsWheelZoomFactor(input: FmsWheelInput, pageHeight = 800): number {
+  if (!Number.isFinite(input.deltaY) || input.deltaY === 0) return 1;
+  const pixels = input.deltaY * (input.deltaMode === 1 ? 16 : input.deltaMode === 2 ? Math.max(1, pageHeight) : 1);
+  const capped = Math.max(-120, Math.min(120, pixels));
+  return Math.exp(-capped * (input.ctrlKey ? 0.01 : 0.0014));
+}

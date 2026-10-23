@@ -38,6 +38,12 @@ export type FmsSlaRule = Readonly<{
   followUp?: FmsFollowUp | undefined;
   /** User question on this stage's linked Form that sets the default for later steps. */
   assignmentFieldKey?: string | undefined;
+  /**
+   * Stable key of the one Section of the linked Form this stage asks for. Absent
+   * means the Entire Form (every workflow published before sections existed).
+   * The server validates a stage submission against exactly this section.
+   */
+  formSectionKey?: string | undefined;
   timingMethod?: FmsTimingMethod | undefined;
   deadlineEnabled?: boolean | undefined;
   dueDate: string;
@@ -123,10 +129,18 @@ export type FmsFormFieldOption = Readonly<{ value: string; label: string }>;
  * need. `optionValues` stays the matched identity; `options` adds the labels the
  * builder and the canvas display, so a renamed option never changes a route.
  */
-export type FmsFormFieldRef = Readonly<{ key: string; label: string; type?: string | undefined; required?: boolean | undefined; shown?: boolean | undefined; hasCondition?: boolean | undefined; optionValues?: readonly string[] | undefined; options?: readonly FmsFormFieldOption[] | undefined }>;
+export type FmsFormFieldRef = Readonly<{ key: string; label: string; type?: string | undefined; required?: boolean | undefined; shown?: boolean | undefined; hasCondition?: boolean | undefined; optionValues?: readonly string[] | undefined; options?: readonly FmsFormFieldOption[] | undefined;
+  /** Section the question belongs to. Absent when the Form defines no sections. */
+  sectionKey?: string | undefined;
+  /** Question keys its visibility condition reads, so a section that cannot resolve them is reported. */
+  dependsOn?: readonly string[] | undefined }>;
+/** A Section of a linked Form, in the Form's own order, for stage scoping. */
+export type FmsFormSectionRef = Readonly<{ key: string; title: string; questionCount: number }>;
 /** Optional Forms knowledge so route validation can catch a removed form, question, or option. */
 export type FmsValidationContext = Readonly<{
   formFields?: Readonly<Record<string, readonly FmsFormFieldRef[]>> | undefined;
+  /** Sections per Form version. Absent skips the section checks that need it. */
+  formSections?: Readonly<Record<string, readonly FmsFormSectionRef[]>> | undefined;
   availableFormIds?: readonly string[] | undefined;
 }>;
 

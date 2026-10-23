@@ -1,5 +1,6 @@
 export * from "./types";
 export * from "./engine";
+export * from "./formSections";
 export * from "./assignedWork";
 export * from "./canvas";
 export * from "./graphRouting";

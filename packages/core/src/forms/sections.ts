@@ -74,3 +74,21 @@ export function visibleFormSections(definition: FormTemplateDefinition, answers:
     .filter((section) => reachable.has(section.key))
     .map((section) => ({ section, fields: fieldsInSection(definition, section.key).filter((field) => isFormFieldVisible(field, answers)) }));
 }
+
+/**
+ * The Form reduced to one section, for an FMS stage that asks only that part.
+ * The section is the whole form here: no section navigation leads elsewhere, so
+ * its questions keep their own visibility rules but never branch into the rest.
+ * Returns undefined when the section is not part of this Form version.
+ */
+export function formDefinitionForSection(definition: FormTemplateDefinition, sectionKey: string): FormTemplateDefinition | undefined {
+  const section = (definition.sections ?? []).find((item) => item.key === sectionKey);
+  if (!section) return undefined;
+  const { next: _next, ...only } = section;
+  return {
+    ...definition,
+    sections: [only],
+    // Order stays the Form's own; numbering restarts so the section validates as a form.
+    fields: fieldsInSection(definition, sectionKey).map(({ branches: _branches, ...field }, sortOrder) => ({ ...field, sortOrder })),
+  };
+}

@@ -1,8 +1,8 @@
-import { eligibleRecordNameFields, type FmsStageDefinition, type FmsFormFieldRef, type FmsTaskDisplay } from "@jewelos/core";
+import { eligibleRecordNameFields, fmsStageFormFields, type FmsStageDefinition, type FmsFormFieldRef, type FmsTaskDisplay } from "@jewelos/core";
 import { Field } from "@/components/ui";
 export function FmsTaskNaming({ stage, stages, fields, onChange }: { stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; fields: Readonly<Record<string, readonly FmsFormFieldRef[]>>; onChange: (stage: FmsStageDefinition) => void }) {
  const initial = stages[0]?.key === stage.key; const naming = stage.sla.taskDisplay?.recordNaming;
- const options = (initial ? [stage] : stages).flatMap(source => source.formTemplateId ? eligibleRecordNameFields(fields[source.formTemplateId] ?? []).map(field => ({ key: `${source.key}:${field.key}`, label: initial ? field.label : `${source.name} · ${field.label}`, source: { sourceStageKey: source.key, formTemplateId: source.formTemplateId!, fieldKey: field.key } })) : []);
+ const options = (initial ? [stage] : stages).flatMap(source => source.formTemplateId ? eligibleRecordNameFields(fmsStageFormFields(source, fields)).map(field => ({ key: `${source.key}:${field.key}`, label: initial ? field.label : `${source.name} · ${field.label}`, source: { sourceStageKey: source.key, formTemplateId: source.formTemplateId!, fieldKey: field.key } })) : []);
  const value = naming?.mode === "field" && naming.source ? `${naming.source.sourceStageKey}:${naming.source.fieldKey}` : naming?.mode ?? (initial ? "automatic" : "");
  return <section className="space-y-2 rounded-xl border border-gold/15 p-3">
   <h4 className="text-sm font-semibold text-champagne">Task Naming</h4>

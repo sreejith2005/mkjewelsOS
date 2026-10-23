@@ -34,6 +34,8 @@ export type FmsAiPanelProps = Readonly<{
   onGoToStage: (stageKey: string, finding?: FmsDiagnosticFinding) => void;
   onApply?: ((next: FmsFlowDefinition) => void) | undefined;
   onCreateRevision?: (() => void) | undefined;
+  /** Inside the desktop builder workspace: anchored to its right edge below the toolbar, not to the window. */
+  embedded?: boolean | undefined;
 }>;
 
 export function FmsAiPanel(props: FmsAiPanelProps) {
@@ -65,7 +67,7 @@ export function FmsAiPanel(props: FmsAiPanelProps) {
 
   // No backdrop: on phones the builder header (Save draft, Publish, Undo) stays usable above the sheet.
   return <>
-    <aside aria-labelledby="fms-ai-title" aria-modal="false" className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 flex max-h-[78dvh] flex-col rounded-t-2xl border border-gold/30 bg-obsidian shadow-2xl md:bottom-0 md:left-auto md:top-16 md:max-h-none md:w-[min(34rem,45vw)] md:rounded-none md:border-y-0 md:border-r-0" role="dialog">
+    <aside aria-labelledby="fms-ai-title" aria-modal="false" className={props.embedded ? "absolute inset-y-0 right-0 z-40 flex w-[min(34rem,calc(100%-3.5rem))] flex-col border-l border-gold/30 bg-obsidian shadow-2xl" : "fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 flex max-h-[78dvh] flex-col rounded-t-2xl border border-gold/30 bg-obsidian shadow-2xl md:bottom-0 md:left-auto md:top-16 md:max-h-none md:w-[min(34rem,45vw)] md:rounded-none md:border-y-0 md:border-r-0"} role="dialog">
       <header className="border-b border-gold/15 px-4 pb-2 pt-3">
         <div className="flex items-center gap-2">
           <Sparkles aria-hidden className="size-5 text-gold-secondary" />

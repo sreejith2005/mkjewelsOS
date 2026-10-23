@@ -151,7 +151,7 @@ export function FMSBuilderPage() {
 
   if (edit !== undefined && data) return (
     <section>
-      <header className="mb-5 flex justify-between"><Button onClick={() => { setEdit(undefined); setStartWithAi(false); }} variant="ghost"><ArrowLeft className="size-4" />Back to FMS</Button></header>
+      {/* The builder carries its own Back to FMS control in its toolbar and details screen. */}
       <FmsFlowBuilder data={data} flow={edit} canManageForms={hasPermission(access, "forms.manage")} onClose={() => { setEdit(undefined); setStartWithAi(false); }} onSaved={refresh}
         {...(aiSettings && aiEnabled ? { ai: { settings: aiSettings, startWithAi, published: publishedFor(edit), runCandidates: edit ? runCandidatesFor(families.find((family) => family.key === edit.family_id)?.flowIds ?? [edit.id]) : [] } } : {})} />
     </section>

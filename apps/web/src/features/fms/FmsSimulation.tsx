@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { isFormFieldActive, simulateFmsDefinition, type FormAnswer, type FormFieldDefinition, type FormTemplateDefinition, type FmsFlowDefinition, type FmsStageDefinition } from "@jewelos/core";
+import { fmsStageFormDefinition, isFormFieldActive, simulateFmsDefinition, type FormAnswer, type FormFieldDefinition, type FormTemplateDefinition, type FmsFlowDefinition, type FmsStageDefinition } from "@jewelos/core";
 import { loadFmsSimulationForms } from "@jewelos/data/fms/formAuthoring";
 import { Button, Field, Modal, Notice } from "@/components/ui";
 import type { FmsData } from "./api";
@@ -35,7 +35,8 @@ export function FmsSimulation({ definition, data, onClose }: { definition: FmsFl
     return () => { active = false; };
   }, [definition]);
   const fieldsFor = (stage: FmsStageDefinition) => {
-    const form = stage.formTemplateId ? forms?.[stage.formTemplateId] : undefined;
+    const linked = stage.formTemplateId ? forms?.[stage.formTemplateId] : undefined;
+    const form = linked ? fmsStageFormDefinition(stage, linked) : undefined;
     return form?.fields.filter(field => field.type !== "section_header" && field.type !== "divider" && isFormFieldActive(form, field, answers[stage.key] ?? {})) ?? [];
   };
   const [result, setResult] = useState<ReturnType<typeof simulateFmsDefinition> | null>(null);

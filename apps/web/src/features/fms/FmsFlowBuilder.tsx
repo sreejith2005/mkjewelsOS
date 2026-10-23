@@ -3,9 +3,9 @@ import { FmsSimulation } from "./FmsSimulation";
 import { FmsFormActions, FmsFormAuthoring } from "./FmsFormAuthoring";
 import { prepareFmsFormAuthoring, type FmsFormAuthoringAction, type FmsFormAuthoringTarget } from "@jewelos/data/fms/formAuthoring";
 import { suggestFmsAssignment } from "@jewelos/core";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, CheckCircle2, ChevronDown, FileText, Plus, Redo2, Save, Send, Sparkles, TestTube2, Undo2, UserRoundPlus, X } from "lucide-react";
-import { copyFirstFmsAssigneeToHumanStages, normalizeFmsDefinition, validateFmsDefinition, type FmsDiagnosticFinding, type FmsFlowDefinition, type FmsStageDefinition } from "@jewelos/core";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { ArrowLeft, CheckCircle2, ChevronDown, FileText, FlaskConical, ListOrdered, Network, PanelLeftOpen, Plus, Redo2, Save, Send, Sparkles, TestTube2, Undo2, UserRoundPlus, X } from "lucide-react";
+import { copyFirstFmsAssigneeToHumanStages, fmsStageFormFields, normalizeFmsDefinition, validateFmsDefinition, type FmsDiagnosticFinding, type FmsFlowDefinition, type FmsStageDefinition } from "@jewelos/core";
 import { Button, Field, Modal, Notice } from "@/components/ui";
 import { AssigneePicker } from "@/components/assignees/AssigneePicker";
 import type { FmsData, FmsFlowRow } from "./api";
@@ -16,6 +16,7 @@ import { FmsStageEditor } from "./FmsStageEditor";
 import { fmsDepartmentLabel } from "./departments";
 import { FmsStepList } from "./FmsStepList";
 import { useIsMobile } from "@/lib/useMediaQuery";
+import { useFillViewportHeight } from "@/lib/useFillViewportHeight";
 import { cn } from "@/lib/utils";
 import { FmsAiPanel, type FmsAiTab } from "./ai/FmsAiPanel";
 import type { FmsAiSettings } from "./ai/api";
@@ -23,7 +24,8 @@ import type { FmsAiRunCandidate } from "./ai/FmsAiRun";
 
 function issueControlSelector(code: string, message: string): string {
   if (code === "invalid_assignment_field") return '[data-fms-focus="assignment"]';
-  if (["missing_form", "invalid_form", "missing_linked_form", "route_without_form"].includes(code)) return '[data-fms-focus="form"]';
+  if (["missing_form", "invalid_form", "missing_linked_form", "route_without_form", "section_without_form"].includes(code)) return '[data-fms-focus="form"]';
+  if (["section_on_trigger", "missing_form_section", "empty_form_section", "external_section_dependency"].includes(code)) return '[data-fms-focus="section"] select, [data-fms-focus="section"] button';
   if (["invalid_decision", "route_without_decision"].includes(code)) return '[data-fms-focus="decision"]';
   const routeNumber = /^"?Route (\d+)/.exec(message)?.[1];
   if (code === "unsupported_cycle") {
@@ -35,7 +37,7 @@ function issueControlSelector(code: string, message: string): string {
   if (routeNumber) {
     if (code === "invalid_route_source") return `[aria-label="Route ${routeNumber} field key"], [aria-label="Route ${routeNumber} question"]`;
     const part = ["route_without_destination", "invalid_route_target"].includes(code) ? "then go to"
-      : ["route_field_missing"].includes(code) ? "question"
+      : ["route_field_missing", "route_field_outside_section"].includes(code) ? "question"
       : ["invalid_route_value", "route_value_missing"].includes(code) ? "answer"
       : ["invalid_route_operator"].includes(code) ? "condition" : "source";
     return `[aria-label="Route ${routeNumber} ${part}"]`;
@@ -66,9 +68,20 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
   const [screen, setScreen] = useState<"details" | "canvas">(flow || startWithAi ? "canvas" : "details");
   const [aiOpen, setAiOpen] = useState<FmsAiTab | null>(startWithAi ? "build" : null);
   const isPhone = useIsMobile();
-  /** A phone opens on the step list with nothing selected, so the editor sheet does not cover the workflow on entry. */
-  const [selectedKey, setSelectedKey] = useState<string | null>(isPhone ? null : initial.stages[0]?.key ?? null);
-  const [phoneView, setPhoneView] = useState<"steps" | "map">("steps");
+  /** Nothing is selected on entry, so neither the phone sheet nor the desktop inspector covers the workflow. */
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  /** Desktop opens on the canvas; phones open on the step list. Both views stay available everywhere. */
+  const [phoneView, setPhoneView] = useState<"steps" | "map">(isPhone ? "steps" : "map");
+  /** The desktop Workflow tools drawer starts closed; its rail toggle stays visible. */
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const toolsButtonRef = useRef<HTMLButtonElement>(null);
+  /**
+   * One right-side panel at a time. Selecting a step shows its inspector; the
+   * assistant stays mounted (keeping its conversation) and returns when the
+   * inspector closes or the assistant button is pressed again.
+   */
+  const [rightPanel, setRightPanel] = useState<"inspector" | "ai">(startWithAi ? "ai" : "inspector");
+  const workspaceRef = useRef<HTMLDivElement>(null);
   const [issuesOpen, setIssuesOpen] = useState(false);
   const [focusRequest, setFocusRequest] = useState<{ key: string; id: number } | null>(null);
   const [focusedIssue, setFocusedIssue] = useState<{ code: string; message: string; id: number } | null>(null);
@@ -82,13 +95,13 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
   const [simulating, setSimulating] = useState(false);
 
   const normalized = useMemo(() => normalizeFmsDefinition(definition), [definition]);
-  const issues = useMemo(() => validateFmsDefinition(normalized, { formFields: data.formFields, availableFormIds: data.forms.map((form) => form.id) }), [data.formFields, data.forms, normalized]);
+  const issues = useMemo(() => validateFmsDefinition(normalized, { formFields: data.formFields, formSections: data.formSections, availableFormIds: data.forms.map((form) => form.id) }), [data.formFields, data.formSections, data.forms, normalized]);
   const invalidKeys = useMemo(() => new Set(issues.flatMap((issue) => issue.stageKey ? [issue.stageKey] : [])), [issues]);
   const selected = normalized.stages.find((stage) => stage.key === selectedKey) ?? null;
   const dirty = JSON.stringify(normalized) !== savedSnapshot;
   const assignableStages = normalized.stages.filter((stage) => ["form", "task", "approval"].includes(stage.type));
   const assignedStages = assignableStages.filter((stage) => stage.assigneeRules.some((rule) => rule.type === "specific_user" && rule.userProfileId));
-  const selectStage = (key: string | null) => { setFocusedIssue(null); setSelectedKey(key); };
+  const selectStage = (key: string | null) => { setFocusedIssue(null); setSelectedKey(key); if (key) setRightPanel("inspector"); };
   const openIssue = (issue: (typeof issues)[number]) => {
     const stageKey = issue.stageKey;
     if (!stageKey) {
@@ -97,7 +110,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
       setIssuesOpen(false);
       return;
     }
-    setSelectedKey(stageKey);
+    setSelectedKey(stageKey); setRightPanel("inspector");
     setFocusRequest((current) => ({ key: stageKey, id: (current?.id ?? 0) + 1 }));
     setFocusedIssue((current) => ({ code: issue.code, message: issue.message, id: (current?.id ?? 0) + 1 }));
     setIssuesOpen(false);
@@ -112,6 +125,13 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
     : null;
   const contextDefaultAssigneeId = normalized.moduleContext ? data.contextDefaults?.find((item) => item.module_context === normalized.moduleContext)?.user_profile_id : undefined;
 
+  const workspaceHeight = useFillViewportHeight(workspaceRef, !isPhone && screen === "canvas" && !formAuthoring);
+  useEffect(() => {
+    if (!toolsOpen) return;
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape") { setToolsOpen(false); toolsButtonRef.current?.focus(); } };
+    document.addEventListener("keydown", close);
+    return () => document.removeEventListener("keydown", close);
+  }, [toolsOpen]);
   useEffect(() => { const warn = (event: BeforeUnloadEvent) => { if (dirty) { event.preventDefault(); event.returnValue = ""; } }; window.addEventListener("beforeunload", warn); return () => window.removeEventListener("beforeunload", warn); }, [dirty]);
   useEffect(() => {
     if (!focusedIssue || !selected) return;
@@ -154,7 +174,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
       else stages.push(prepared);
       return { ...current, stages };
     });
-    setSelectedKey(stage.key); setError(null);
+    setSelectedKey(stage.key); setRightPanel("inspector"); setToolsOpen(false); setError(null);
   };
   const replace = (key: string, value: FmsStageDefinition) => commit((current) => ({ ...current, stages: current.stages.map((stage) => stage.key === key ? value : stage) }));
   const remove = (key: string) => {
@@ -164,7 +184,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
     if (!window.confirm(`Delete ${target.name || "this step"}? Connections will be repaired where possible.`)) return;
     const stages = removeFmsStage(normalized.stages, key); commit({ ...definition, stages }); setSelectedKey(stages[0]?.key ?? null);
   };
-  const duplicateStage = (key: string) => { const source = normalized.stages.find((stage) => stage.key === key); if (!source || normalized.stages[0]?.key === key) return; const stage = { ...source, key: nextKey(), name: `${source.name} copy`, order: normalized.stages.length, defaultNextStageKey: undefined, branchRules: source.type === "branch" ? [{ id: crypto.randomUUID(), source: "outcome" as const, operator: "default" as const, order: 0 }] : [], parallelTargetStageKeys: [], joinRequiredStageKeys: [] }; commit({ ...definition, stages: [...normalized.stages, stage] }); setSelectedKey(stage.key); };
+  const duplicateStage = (key: string) => { const source = normalized.stages.find((stage) => stage.key === key); if (!source || normalized.stages[0]?.key === key) return; const stage = { ...source, key: nextKey(), name: `${source.name} copy`, order: normalized.stages.length, defaultNextStageKey: undefined, branchRules: source.type === "branch" ? [{ id: crypto.randomUUID(), source: "outcome" as const, operator: "default" as const, order: 0 }] : [], parallelTargetStageKeys: [], joinRequiredStageKeys: [] }; commit({ ...definition, stages: [...normalized.stages, stage] }); setSelectedKey(stage.key); setRightPanel("inspector"); };
   /** A first connection becomes the plain next step; each extra one becomes an ordered route. */
   const connect = (from: string, to: string) => {
     commit((current) => ({ ...current, stages: current.stages.map((stage) => {
@@ -173,8 +193,9 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
       if (stage.type === "parallel_start") return { ...stage, parallelTargetStageKeys: stage.parallelTargetStageKeys.includes(to) ? stage.parallelTargetStageKeys : [...stage.parallelTargetStageKeys, to] };
       if (!stage.defaultNextStageKey) return { ...stage, defaultNextStageKey: to };
       if (stage.defaultNextStageKey === to || stage.branchRules.some((rule) => rule.nextStageKey === to)) return stage;
-      const source = stage.formTemplateId && (data.formFields[stage.formTemplateId]?.length ?? 0) > 0 ? "form_answer" as const : stage.sla.decisionMode === "yes_no" ? "outcome" as const : "context" as const;
-      const rule = { id: crypto.randomUUID(), source, ...(source === "form_answer" ? { sourceKey: data.formFields[stage.formTemplateId!]![0]!.key } : {}), operator: "equals" as const, value: source === "outcome" ? stage.sla.decisionOptions?.[0]?.key ?? "" : "", nextStageKey: to, order: stage.branchRules.length };
+      const questions = fmsStageFormFields(stage, data.formFields);
+      const source = questions.length > 0 ? "form_answer" as const : stage.sla.decisionMode === "yes_no" ? "outcome" as const : "context" as const;
+      const rule = { id: crypto.randomUUID(), source, ...(source === "form_answer" ? { sourceKey: questions[0]!.key } : {}), operator: "equals" as const, value: source === "outcome" ? stage.sla.decisionOptions?.[0]?.key ?? "" : "", nextStageKey: to, order: stage.branchRules.length };
       return { ...stage, branchRules: [...stage.branchRules, rule] };
     }) }));
     setSelectedKey(from);
@@ -211,7 +232,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
   const save = async () => { setBusy("save"); setError(null); setSuccess(null); try { await persist(); setSuccess("Draft saved"); } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to save FMS draft"); } finally { setBusy(null); } };
   const publish = async () => { if (issues.length) { setError("Resolve the publish-readiness issues below before publishing."); return; } setBusy("publish"); setError(null); try { const id = await persist(); await publishFmsFlow(id); await onSaved(); setSuccess("Workflow published and ready to run"); onClose(); } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to publish workflow"); } finally { setBusy(null); } };
 
-  if (screen === "details") return <section className="mx-auto max-w-2xl space-y-6"><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-gold-secondary">Workflow details</p><h3 className="mt-2 text-2xl font-semibold text-white">Name this workflow</h3><p className="mt-2 text-sm text-soft-grey">The first canvas step will be a Form trigger. No Start or End nodes are needed.</p></div><div className="space-y-4 rounded-2xl border border-gold/20 bg-charcoal p-5"><Field label="Workflow name *"><input autoFocus className="field" maxLength={150} onChange={(event) => commit({ ...definition, name: event.target.value })} value={definition.name} /></Field><Field label="Purpose *"><textarea className="field min-h-24" onChange={(event) => commit({ ...definition, description: event.target.value })} value={definition.description ?? ""} /></Field>{scopeSummary ? <p className="rounded-lg border border-gold/15 bg-gold/5 p-3 text-xs text-soft-grey">Existing scope kept: {scopeSummary}. Scope is no longer part of workflow setup and stays exactly as it was saved.</p> : null}</div><Button className="ml-auto flex" disabled={!normalized.name || !normalized.description?.trim()} onClick={() => { ensureFirstForm(); setScreen("canvas"); }}>Open builder <Plus className="size-4" /></Button></section>;
+  if (screen === "details") return <section className="mx-auto max-w-2xl space-y-6"><Button onClick={onClose} type="button" variant="ghost"><ArrowLeft className="size-4" />Back to FMS</Button><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-gold-secondary">Workflow details</p><h3 className="mt-2 text-2xl font-semibold text-white">Name this workflow</h3><p className="mt-2 text-sm text-soft-grey">The first canvas step will be a Form trigger. No Start or End nodes are needed.</p></div><div className="space-y-4 rounded-2xl border border-gold/20 bg-charcoal p-5"><Field label="Workflow name *"><input autoFocus className="field" maxLength={150} onChange={(event) => commit({ ...definition, name: event.target.value })} value={definition.name} /></Field><Field label="Purpose *"><textarea className="field min-h-24" onChange={(event) => commit({ ...definition, description: event.target.value })} value={definition.description ?? ""} /></Field>{scopeSummary ? <p className="rounded-lg border border-gold/15 bg-gold/5 p-3 text-xs text-soft-grey">Existing scope kept: {scopeSummary}. Scope is no longer part of workflow setup and stays exactly as it was saved.</p> : null}</div><Button className="ml-auto flex" disabled={!normalized.name || !normalized.description?.trim()} onClick={() => { ensureFirstForm(); setScreen("canvas"); }}>Open builder <Plus className="size-4" /></Button></section>;
 
   const checkWorkflow = () => { setSuccess(issues.length ? null : "Workflow check passed"); setError(issues.length ? "Workflow check found issues. Review Publish readiness." : null); };
   const processFormName = normalized.stages[0]?.formTemplateId ? data.forms.find((form) => form.id === normalized.stages[0]?.formTemplateId)?.name ?? "Form attached" : "None attached";
@@ -224,10 +245,13 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
     setFocusedIssue(null); setSelectedKey(stageKey);
     setFocusRequest((current) => ({ key: stageKey, id: (current?.id ?? 0) + 1 }));
   };
-  const toggleAi = () => setAiOpen((open) => open ? null : "check");
-  // The assistant and the step inspector share the right side; only one is open at a time.
-  const aiPanel = ai && aiOpen ? <FmsAiPanel canManageForms={canManageForms} data={data} definition={normalized} initialTab={aiOpen} onApply={(next) => { commit(next); setSuccess("Assistant changes applied. Use Undo to revert; Save draft and Publish when ready."); }} onClose={() => setAiOpen(null)} onGoToStage={goToStage} published={ai.published ?? null} readOnly={false} runCandidates={ai.runCandidates} selectedStageKey={selected?.key ?? selectedKey} settings={ai.settings} /> : null;
-  const emptyStart = !normalized.stages.length ? <div className="space-y-3 rounded-2xl border border-gold/20 bg-charcoal p-5 text-sm text-soft-grey"><p className="font-semibold text-white">This workflow has no steps yet.</p><p>Describe it to the assistant, or start with the Form trigger and build it yourself.</p><div className="flex flex-wrap gap-2">{aiAvailable && ai?.settings.builderEnabled ? <Button onClick={() => setAiOpen("build")} variant="secondary"><Sparkles className="size-4" />Build with AI</Button> : null}<Button onClick={() => { ensureFirstForm(); setAiOpen(null); }} variant="secondary"><Plus className="size-4" />Build manually</Button></div></div> : null;
+  const openAi = (tab: FmsAiTab) => { setAiOpen(tab); setRightPanel("ai"); };
+  const toggleAi = () => { if (aiOpen && (rightPanel === "ai" || !selected)) setAiOpen(null); else { setAiOpen((open) => open ?? "check"); setRightPanel("ai"); } };
+  // The assistant and the step inspector share the right side; only one is shown at a time.
+  const aiPanel = ai && aiOpen ? <FmsAiPanel canManageForms={canManageForms} embedded={!isPhone} data={data} definition={normalized} initialTab={aiOpen} onApply={(next) => { commit(next); setSuccess("Assistant changes applied. Use Undo to revert; Save draft and Publish when ready."); }} onClose={() => setAiOpen(null)} onGoToStage={goToStage} published={ai.published ?? null} readOnly={false} runCandidates={ai.runCandidates} selectedStageKey={selected?.key ?? selectedKey} settings={ai.settings} /> : null;
+  const emptyStart = !normalized.stages.length ? <div className="space-y-3 rounded-2xl border border-gold/20 bg-charcoal p-5 text-sm text-soft-grey"><p className="font-semibold text-white">This workflow has no steps yet.</p><p>Describe it to the assistant, or start with the Form trigger and build it yourself.</p><div className="flex flex-wrap gap-2">{aiAvailable && ai?.settings.builderEnabled ? <Button onClick={() => openAi("build")} variant="secondary"><Sparkles className="size-4" />Build with AI</Button> : null}<Button onClick={() => { ensureFirstForm(); setAiOpen(null); }} variant="secondary"><Plus className="size-4" />Build manually</Button></div></div> : null;
+  const showAi = !!aiPanel && (rightPanel === "ai" || !selected);
+  const showInspector = !!selected && !showAi;
   const inspector = selected ? <>
     <div aria-hidden="true" className="fixed inset-0 z-40 bg-obsidian/60 md:hidden" onClick={() => setSelectedKey(null)} />
     <aside ref={inspectorRef} className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 max-h-[80dvh] overflow-y-auto overscroll-contain rounded-t-2xl border border-gold/30 bg-obsidian px-4 pb-4 shadow-2xl md:bottom-0 md:left-auto md:top-16 md:max-h-none md:w-[min(32rem,45vw)] md:rounded-none md:border-y-0 md:border-r-0 md:pt-4">
@@ -240,6 +264,19 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
       <FmsStageEditor assignmentVersion={normalized.assignmentVersion} data={data} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); }} onDelete={() => remove(selected.key)} stage={selected} stages={normalized.stages} />
     </aside>
   </> : null;
+
+  const desktopInspector = selected ? <aside aria-label={`Configure ${selected.name || "step"}`} className="absolute inset-y-0 right-0 z-40 flex w-[min(32rem,calc(100%-3.5rem))] flex-col border-l border-gold/30 bg-obsidian shadow-2xl" ref={inspectorRef}>
+    <header className="flex shrink-0 items-center justify-between gap-2 border-b border-gold/15 px-4 py-3">
+      <div className="min-w-0"><p className="text-xs capitalize text-gold-secondary">{selected.type.replaceAll("_", " ")}</p><h3 className="truncate text-lg font-semibold text-white">{selected.name || "Untitled step"}</h3></div>
+      <Button aria-label="Close inspector" className="shrink-0" onClick={() => setSelectedKey(null)} variant="ghost"><X className="size-5" /></Button>
+    </header>
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-4">
+      {issues.filter((issue) => issue.stageKey === selected.key).map((issue, index) => <Notice key={`${issue.code}-${index}`} tone="danger">{issue.message}</Notice>)}
+      <FmsFormActions linked={!!selected.formTemplateId} canManage={canManageForms} disabled={!!busy} onOpen={action => void openForm(action)} />
+      <FmsStageEditor assignmentVersion={normalized.assignmentVersion} data={data} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); }} onDelete={() => remove(selected.key)} stage={selected} stages={normalized.stages} />
+    </div>
+  </aside> : null;
+  const rightPanels = <>{aiPanel ? <div className={showAi ? "contents" : "hidden"}>{aiPanel}</div> : null}{showInspector ? isPhone ? inspector : desktopInspector : null}</>;
 
   /**
    * Phones get their own layout: a two-row header that never hides Publish, a
@@ -284,18 +321,71 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
       </button>
       {issuesOpen && issues.length ? <ul className="max-h-[35dvh] space-y-2 overflow-y-auto px-4 pb-3">{issues.map((issue, index) => <li key={`${issue.code}-${issue.stageKey ?? index}`}><button className="min-h-11 w-full rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-left text-xs text-danger" onClick={() => openIssue(issue)} type="button">{issueLabel(issue)}</button></li>)}</ul> : null}
     </section>
-    {aiPanel ?? inspector}
+    {rightPanels}
     {simulating ? <FmsSimulation definition={normalized} data={data} onClose={() => setSimulating(false)} /> : null}
     {assigning ? <DefaultAssigneesDialog data={data} definition={normalized} onChange={(stages) => commit((current) => ({ ...current, stages }))} onClose={() => setAssigning(false)} /> : null}
   </div>;
 
-  return <div className={`relative flex min-h-[calc(100dvh-8rem)] flex-col transition-[padding] ${aiPanel ? "md:pr-[min(34rem,45vw)]" : selected ? "md:pr-[min(32rem,45vw)]" : ""}`}><header className="scroll-x no-scrollbar sticky top-0 z-40 -mx-2 mb-3 flex items-center gap-2 border-b border-gold/20 bg-obsidian/95 px-2 py-3 backdrop-blur md:flex-wrap md:overflow-visible"><Button className="shrink-0" onClick={onClose} type="button" variant="ghost"><ArrowLeft className="size-4" /><span className="hidden sm:inline">Back</span></Button><div className="mr-auto min-w-0 max-w-[45vw] md:max-w-none"><h2 className="truncate text-base font-semibold text-white sm:text-lg">{normalized.name}</h2><p className="truncate text-xs text-soft-grey">{dirty ? "Unsaved changes" : "Draft saved"}</p></div><Button aria-label="Undo" className="shrink-0" disabled={!past.length} onClick={undo} variant="ghost"><Undo2 className="size-4" /></Button><Button aria-label="Redo" className="shrink-0" disabled={!future.length} onClick={redo} variant="ghost"><Redo2 className="size-4" /></Button>{aiAvailable ? <Button aria-label="FMS assistant" aria-pressed={!!aiOpen} className="shrink-0" onClick={toggleAi} variant={aiOpen ? "primary" : "secondary"}><Sparkles className="size-4" /><span className="hidden lg:inline">AI assistant</span></Button> : null}<Button aria-label="Check workflow" className="shrink-0" onClick={checkWorkflow} variant="secondary"><TestTube2 className="size-4" /><span className="hidden lg:inline">Check workflow</span></Button><Button className="shrink-0" disabled={!!busy} onClick={() => void save()} variant="secondary"><Save className="size-4" /><span className="hidden lg:inline">{busy === "save" ? "Saving..." : "Save draft"}</span></Button><Button className="shrink-0" disabled={!!busy || issues.length > 0} onClick={() => void publish()}><Send className="size-4" />{busy === "publish" ? "Publishing..." : "Publish"}</Button></header>
-    {isPhone ? <Button variant="secondary" onClick={() => setSimulating(true)}>Simulate workflow</Button> : null}
-    {normalized.assignmentVersion !== 2 ? <Notice>This draft uses legacy assignment behavior. Existing running workflows keep their published contract. <Button variant="secondary" onClick={() => commit(upgradeFmsAssignmentContract(normalized, data.formFields))}>Upgrade this draft to stage-specific assignment</Button></Notice> : null}
-    {error ? <Notice tone="danger">{error}</Notice> : null}{success ? <Notice>{success}</Notice> : null}
-    <div className="grid gap-3 xl:grid-cols-[16rem_minmax(0,1fr)]"><aside className="max-h-64 overflow-y-auto rounded-xl border border-gold/20 bg-charcoal p-3 xl:max-h-[calc(100dvh-13rem)]"><p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Building blocks</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-left text-gold-secondary hover:bg-gold/20" onClick={() => add("task")} type="button"><span className="grid size-8 place-items-center rounded-lg bg-gold text-on-gold"><UserRoundPlus className="size-4" /></span><span><b className="block text-sm">Add Step</b><span className="text-[11px] text-champagne">Create the next general workflow step</span></span></button><section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Process form</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/15 p-3 text-left hover:border-gold" onClick={() => normalized.stages[0] && selectStage(normalized.stages[0].key)} type="button"><span className="grid size-8 place-items-center rounded-lg bg-champagne/20 text-champagne"><FileText className="size-4" /></span><span><b className="block text-sm text-white">{normalized.stages[0]?.formTemplateId ? data.forms.find((form) => form.id === normalized.stages[0]?.formTemplateId)?.name ?? "Form attached" : "None attached"}</b><span className="text-[11px] text-soft-grey">Configure the initial details form</span></span></button></section><section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Default assignees</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/15 p-3 text-left hover:border-gold" onClick={() => setAssigning(true)} type="button"><span className="grid size-8 place-items-center rounded-lg bg-champagne/20 text-champagne"><UserRoundPlus className="size-4" /></span><span><b className="block text-sm text-white">{assignableStages.length ? `${assignedStages.length}/${assignableStages.length} assigned` : "No steps yet"}</b><span className="text-[11px] text-soft-grey">Pre-assign users after building the flow</span></span></button></section><p className="mt-5 border-t border-gold/15 pt-3 text-[11px] text-soft-grey">The initial Form starts the workflow. The final unconnected step completes it.</p></aside><div className="min-w-0 space-y-3"><div className="flex flex-wrap gap-2"><Button variant={phoneView === "steps" ? "primary" : "secondary"} onClick={() => setPhoneView("steps")}>Guided Mode</Button><Button variant={phoneView === "map" ? "primary" : "secondary"} onClick={() => setPhoneView("map")}>Canvas Mode</Button><Button variant="secondary" onClick={() => setSimulating(true)}>Simulate workflow</Button></div>{emptyStart ?? (phoneView === "steps" ? <FmsStepList definition={normalized} formFields={data.formFields} invalidKeys={invalidKeys} onAddAfter={(key) => add("task", key)} onDelete={remove} onDuplicate={duplicateStage} onSelect={selectStage} selectedKey={selected?.key ?? null} /> : <FmsGraphCanvas definition={normalized} formFields={data.formFields} focusRequest={focusRequest} invalidKeys={invalidKeys} onAddAfter={(key) => add("task", key)} onConnect={connect} onDelete={remove} onDisconnect={disconnect} onDuplicate={duplicateStage} onMove={moveStages} onReconnect={reconnect} onSelect={selectStage} selectedKey={selected?.key ?? null} />)}</div></div>
-    {aiPanel ?? inspector}
-    <section className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 -mx-2 mt-3 rounded-t-2xl border border-b-0 border-gold/30 bg-charcoal/95 px-4 py-3 backdrop-blur md:bottom-0"><div className="flex flex-wrap items-center gap-3"><div className="mr-auto"><p className="font-semibold text-white">Publish readiness</p><p className="text-xs text-soft-grey">{issues.length ? `${issues.length} issue${issues.length === 1 ? "" : "s"} to resolve` : "Ready to publish"}</p></div>{issues.length ? <div className="hidden max-w-3xl flex-1 gap-2 overflow-x-auto md:flex">{issues.map((issue, index) => <button className="shrink-0 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-left text-xs text-danger" key={`${issue.code}-${issue.stageKey ?? index}`} onClick={() => openIssue(issue)} type="button">{issueLabel(issue)}</button>)}</div> : <CheckCircle2 className="size-5 text-success" />}</div></section>
+  /**
+   * Desktop and tablet: the canvas is the workspace. A compact toolbar sits on
+   * top, a narrow rail opens the Workflow tools drawer, and the step inspector
+   * or assistant overlays the right edge. Drawers overlay the canvas, so its
+   * size, pan and zoom never change when they open or close.
+   */
+  const rightOpen = showAi || showInspector;
+  const toolbarButton = "shrink-0 px-2.5";
+  return <div className="relative -m-4 flex flex-col overflow-hidden bg-obsidian sm:-m-6" ref={workspaceRef} style={workspaceHeight ? { height: workspaceHeight } : undefined}>
+    <header className="scroll-x no-scrollbar z-40 flex shrink-0 items-center gap-1.5 border-b border-gold/20 bg-charcoal/95 px-3 py-2 backdrop-blur">
+      <Button aria-label="Back to FMS" className={toolbarButton} onClick={onClose} type="button" variant="ghost"><ArrowLeft className="size-4" /><span className="hidden xl:inline">Back to FMS</span></Button>
+      <div className="mr-auto min-w-0 max-w-[40vw] px-1"><h2 className="truncate text-sm font-semibold text-white lg:text-base">{normalized.name}</h2><p className="truncate text-xs text-soft-grey">{dirty ? "Unsaved changes" : "All changes saved"}</p></div>
+      <div aria-label="Builder view" className="flex shrink-0 rounded-lg border border-gold/20 bg-obsidian p-0.5" role="group">
+        <button aria-label="Canvas Mode" aria-pressed={phoneView === "map"} className={cn("inline-flex min-h-9 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition", phoneView === "map" ? "bg-gold text-on-gold" : "text-champagne hover:text-white")} onClick={() => setPhoneView("map")} type="button"><Network aria-hidden className="size-4" /><span aria-hidden className="hidden lg:inline">Canvas Mode</span></button>
+        <button aria-label="Guided Mode" aria-pressed={phoneView === "steps"} className={cn("inline-flex min-h-9 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition", phoneView === "steps" ? "bg-gold text-on-gold" : "text-champagne hover:text-white")} onClick={() => setPhoneView("steps")} type="button"><ListOrdered aria-hidden className="size-4" /><span aria-hidden className="hidden lg:inline">Guided Mode</span></button>
+      </div>
+      <Button aria-label="Undo" className={toolbarButton} disabled={!past.length} onClick={undo} variant="ghost"><Undo2 className="size-4" /></Button>
+      <Button aria-label="Redo" className={toolbarButton} disabled={!future.length} onClick={redo} variant="ghost"><Redo2 className="size-4" /></Button>
+      {aiAvailable ? <Button aria-label="FMS assistant" aria-pressed={showAi} className={toolbarButton} onClick={toggleAi} variant={showAi ? "primary" : "secondary"}><Sparkles className="size-4" /><span className="hidden xl:inline">AI assistant</span></Button> : null}
+      <Button aria-label="Check workflow" className={toolbarButton} onClick={checkWorkflow} variant="secondary"><TestTube2 className="size-4" /><span className="hidden xl:inline">Check workflow</span></Button>
+      <Button aria-label="Simulate workflow" className={toolbarButton} onClick={() => setSimulating(true)} variant="secondary"><FlaskConical className="size-4" /><span className="hidden xl:inline">Simulate</span></Button>
+      <Button aria-label={busy === "save" ? "Saving..." : "Save draft"} className={toolbarButton} disabled={!!busy} onClick={() => void save()} variant="secondary"><Save className="size-4" /><span aria-hidden className="hidden lg:inline">{busy === "save" ? "Saving..." : "Save draft"}</span></Button>
+      <Button className={toolbarButton} disabled={!!busy || issues.length > 0} onClick={() => void publish()}><Send className="size-4" />{busy === "publish" ? "Publishing..." : "Publish"}</Button>
+    </header>
+    {normalized.assignmentVersion !== 2 || error || success ? <div className="shrink-0 space-y-2 border-b border-gold/15 px-3 py-2">
+      {normalized.assignmentVersion !== 2 ? <Notice>This draft uses legacy assignment behavior. Existing running workflows keep their published contract. <Button variant="secondary" onClick={() => commit(upgradeFmsAssignmentContract(normalized, data.formFields))}>Upgrade this draft to stage-specific assignment</Button></Notice> : null}
+      {error ? <Notice tone="danger">{error}</Notice> : null}{success ? <Notice>{success}</Notice> : null}
+    </div> : null}
+    {/* The canvas mounts once the workspace has its measured height, so its first fit uses the real size. */}
+    {workspaceHeight === undefined ? null : <div className="relative flex min-h-0 flex-1">
+      <nav aria-label="Workflow tools" className="z-30 flex w-12 shrink-0 flex-col items-center gap-2 border-r border-gold/15 bg-charcoal/80 py-3">
+        <button aria-controls="fms-workflow-tools" aria-expanded={toolsOpen} aria-label="Open workflow tools" className={cn("grid size-9 place-items-center rounded-lg border text-gold-secondary transition hover:bg-gold/10", toolsOpen ? "border-gold bg-gold/15" : "border-gold/25")} onClick={() => setToolsOpen((open) => !open)} ref={toolsButtonRef} title="Workflow tools" type="button"><PanelLeftOpen className="size-4" /></button>
+        <button aria-label="Add Step" className="grid size-9 place-items-center rounded-lg bg-gold text-on-gold shadow transition hover:brightness-110" onClick={() => add("task")} title="Add Step" type="button"><Plus className="size-4" /></button>
+      </nav>
+      <div className="relative min-w-0 flex-1" style={{ "--fms-canvas-overlay-bottom": "5rem" } as CSSProperties}>
+        {emptyStart ? <div className="grid h-full place-items-center overflow-y-auto p-6"><div className="max-w-md">{emptyStart}</div></div>
+          : phoneView === "map" ? <FmsGraphCanvas definition={normalized} fill formFields={data.formFields} focusRequest={focusRequest} invalidKeys={invalidKeys} onAddAfter={(key) => add("task", key)} onConnect={connect} onDelete={remove} onDisconnect={disconnect} onDuplicate={duplicateStage} onMove={moveStages} onReconnect={reconnect} onSelect={selectStage} selectedKey={selected?.key ?? null} />
+          : <div className="h-full overflow-y-auto overscroll-contain p-4 pb-24 lg:p-6 lg:pb-24"><div className="mx-auto max-w-3xl space-y-3"><p className="text-xs text-soft-grey">Guided Mode lists the workflow step by step. Select a step to edit it and choose where it continues.</p><FmsStepList definition={normalized} formFields={data.formFields} invalidKeys={invalidKeys} onAddAfter={(key) => add("task", key)} onDelete={remove} onDuplicate={duplicateStage} onSelect={selectStage} selectedKey={selected?.key ?? null} /></div></div>}
+        <section aria-label="Publish readiness" className={cn("absolute bottom-3 left-3 z-30 rounded-2xl border border-gold/30 bg-charcoal/95 px-3 py-2 shadow-xl backdrop-blur", rightOpen ? "max-w-[calc(100%-min(34rem,100%-3.5rem)-1.5rem)]" : "max-w-[min(56rem,calc(100%-1.5rem))]")}>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="shrink-0"><p className="text-sm font-semibold text-white">Publish readiness</p><p className="text-xs text-soft-grey">{issues.length ? `${issues.length} issue${issues.length === 1 ? "" : "s"} to resolve` : "Ready to publish"}</p></div>
+            {issues.length ? <div className="no-scrollbar flex min-w-0 flex-1 gap-2 overflow-x-auto">{issues.map((issue, index) => <button className="shrink-0 rounded-lg border border-danger/30 bg-danger/5 px-3 py-1.5 text-left text-xs text-danger" key={`${issue.code}-${issue.stageKey ?? index}`} onClick={() => openIssue(issue)} type="button">{issueLabel(issue)}</button>)}</div> : <CheckCircle2 aria-hidden className="size-5 text-success" />}
+          </div>
+        </section>
+        {toolsOpen ? <>
+          <div aria-hidden="true" className="absolute inset-0 z-30 bg-obsidian/40" onPointerDown={() => setToolsOpen(false)} />
+          <aside aria-label="Workflow tools drawer" className="absolute inset-y-0 left-0 z-40 flex w-[min(18rem,calc(100%-1rem))] flex-col border-r border-gold/30 bg-charcoal shadow-2xl" id="fms-workflow-tools">
+            <header className="flex shrink-0 items-center justify-between gap-2 border-b border-gold/15 px-3 py-2.5"><p className="text-sm font-semibold text-white">Workflow tools</p><Button aria-label="Close workflow tools" autoFocus className="shrink-0 px-2" onClick={() => { setToolsOpen(false); toolsButtonRef.current?.focus(); }} variant="ghost"><X className="size-5" /></Button></header>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Building blocks</p>
+              <button className="flex w-full items-center gap-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-left text-gold-secondary hover:bg-gold/20" onClick={() => add("task")} type="button"><span className="grid size-8 place-items-center rounded-lg bg-gold text-on-gold"><UserRoundPlus className="size-4" /></span><span><b className="block text-sm">Add Step</b><span className="text-[11px] text-champagne">Create the next general workflow step</span></span></button>
+              <section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Process form</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/15 p-3 text-left hover:border-gold" onClick={() => { if (normalized.stages[0]) { selectStage(normalized.stages[0].key); setToolsOpen(false); } }} type="button"><span className="grid size-8 place-items-center rounded-lg bg-champagne/20 text-champagne"><FileText className="size-4" /></span><span><b className="block text-sm text-white">{processFormName}</b><span className="text-[11px] text-soft-grey">Configure the initial details form</span></span></button></section>
+              <section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Default assignees</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/15 p-3 text-left hover:border-gold" onClick={() => { setAssigning(true); setToolsOpen(false); }} type="button"><span className="grid size-8 place-items-center rounded-lg bg-champagne/20 text-champagne"><UserRoundPlus className="size-4" /></span><span><b className="block text-sm text-white">{assigneeSummary}</b><span className="text-[11px] text-soft-grey">Pre-assign users after building the flow</span></span></button></section>
+              <p className="mt-5 border-t border-gold/15 pt-3 text-[11px] text-soft-grey">The initial Form starts the workflow. The final unconnected step completes it.</p>
+            </div>
+          </aside>
+        </> : null}
+        {rightPanels}
+      </div>
+    </div>}
     {simulating ? <FmsSimulation definition={normalized} data={data} onClose={() => setSimulating(false)} /> : null}
     {assigning ? <DefaultAssigneesDialog data={data} definition={normalized} onChange={(stages) => commit((current) => ({ ...current, stages }))} onClose={() => setAssigning(false)} /> : null}
   </div>;

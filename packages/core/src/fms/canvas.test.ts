@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   clampFmsZoom,
+  fmsWheelZoomFactor,
   fitFmsViewport,
   fmsNodeBounds,
   moveFmsNode,
@@ -144,5 +145,36 @@ describe("overview port hit areas", () => {
     expect(fmsCanvasHandleRadius(1, 104)).toBe(28);
     expect(fmsCanvasHandleRadius(0.1, 104)).toBeLessThan(104 / 2);
     expect(fmsCanvasHandleRadius(0, 104)).toBe(0);
+  });
+});
+
+describe("fmsWheelZoomFactor", () => {
+  it("zooms in on scroll up and out on scroll down by one familiar step per mouse notch", () => {
+    const up = fmsWheelZoomFactor({ deltaY: -100, deltaMode: 0, ctrlKey: false });
+    const down = fmsWheelZoomFactor({ deltaY: 100, deltaMode: 0, ctrlKey: false });
+    expect(up).toBeGreaterThan(1.1); expect(up).toBeLessThan(1.2);
+    expect(down).toBeCloseTo(1 / up, 10);
+  });
+  it("keeps trackpad scrolling smooth and pinches responsive", () => {
+    expect(fmsWheelZoomFactor({ deltaY: -4, deltaMode: 0, ctrlKey: false })).toBeLessThan(1.01);
+    expect(fmsWheelZoomFactor({ deltaY: -4, deltaMode: 0, ctrlKey: true })).toBeGreaterThan(1.03);
+  });
+  it("caps line, page and huge deltas so one flick cannot jump the zoom range", () => {
+    const page = fmsWheelZoomFactor({ deltaY: 3, deltaMode: 2, ctrlKey: false }, 900);
+    expect(page).toBe(fmsWheelZoomFactor({ deltaY: 5000, deltaMode: 0, ctrlKey: false }));
+    expect(page).toBeGreaterThan(0.8);
+    expect(fmsWheelZoomFactor({ deltaY: 3, deltaMode: 1, ctrlKey: false })).toBeCloseTo(Math.exp(-48 * 0.0014), 10);
+  });
+  it("ignores empty or junk deltas", () => {
+    expect(fmsWheelZoomFactor({ deltaY: 0, deltaMode: 0, ctrlKey: false })).toBe(1);
+    expect(fmsWheelZoomFactor({ deltaY: Number.NaN, deltaMode: 0, ctrlKey: false })).toBe(1);
+  });
+  it("keeps the world point under the pointer fixed while zooming", () => {
+    const pointer = { x: 420, y: 260 };
+    const before = { x: -120, y: 40, zoom: 0.8 };
+    const after = zoomFmsViewport(before, pointer, before.zoom * fmsWheelZoomFactor({ deltaY: -100, deltaMode: 0, ctrlKey: false }));
+    const world = (viewport: typeof before) => ({ x: (pointer.x - viewport.x) / viewport.zoom, y: (pointer.y - viewport.y) / viewport.zoom });
+    expect(world(after).x).toBeCloseTo(world(before).x, 8);
+    expect(world(after).y).toBeCloseTo(world(before).y, 8);
   });
 });
