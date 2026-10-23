@@ -1,16 +1,17 @@
 import { fmsOutcomeReplacesStage } from "@jewelos/core";
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { CheckCircle2, ChevronLeft } from "lucide-react";
 import { fmsAssignedWorkPath, parseFmsAssignedWorkPath, type FmsAssignedWorkTarget, type FmsWorkResult, fmsWorkTitle } from "@jewelos/core";
+import { FMS_TASKS_PATH } from "@/features/tasks/fms/FmsTaskWorkspace";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
 import { loadFormDynamicOptions, loadTaskForms, type FormBundle, type FmsStarterResult } from "@/features/forms/api";
 import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer";
 import { FmsStageRunner } from "@/features/fms/FmsStageRunner";
 import { loadFmsAssignedStage, type FmsAssignedStageBundle } from "@/features/fms/api";
-import { FmsWorkOutcome } from "@/features/fms/FmsWorkOutcome";
 import { FmsContextFirst } from "@/features/fms/FmsContextFirst";
-import { fmsStartConfirmationFromWork, recoverFmsStartingWork } from "@jewelos/data/fms/work";
+import { recoverFmsStartingWork } from "@jewelos/data/fms/work";
 import { useFmsHandoffConfirmation } from "@/features/fms/useFmsHandoffConfirmation";
 
 const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: [], masters: [] };
@@ -34,25 +35,37 @@ export function FmsAssignedWorkPage({ onNavigate }: { onNavigate: (path: string)
 }
 
 const BackToWork = ({ onNavigate }: { onNavigate: (path: string) => void }) =>
-  <Button className="-ml-2 self-start" onClick={() => onNavigate("/tasks")} variant="ghost"><ChevronLeft aria-hidden="true" className="size-4" />My work</Button>;
+  <Button className="-ml-2 self-start" onClick={() => onNavigate(FMS_TASKS_PATH)} variant="ghost"><ChevronLeft aria-hidden="true" className="size-4" />My FMS work</Button>;
 
-function Frame({ children, onNavigate, subtitle, title }: { children: React.ReactNode; onNavigate: (path: string) => void; subtitle: string; title: string }) {
-  return <section className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+/**
+ * The employee arrives from a card that already named the workflow, stage and
+ * reference, so the page heads with the record name only.
+ */
+function Frame({ children, onNavigate, subtitle, title }: { children: React.ReactNode; onNavigate: (path: string) => void; subtitle?: string | undefined; title: string }) {
+  return <section className="mx-auto flex w-full max-w-3xl flex-col gap-3">
     <BackToWork onNavigate={onNavigate} />
-    <header className="rounded-2xl border border-gold/20 bg-charcoal/40 p-4 sm:p-6">
-      <p className="text-xs font-semibold uppercase tracking-wide text-gold-secondary">FMS assigned work</p>
-      <h1 className="mt-1 break-words font-display text-[1.6rem] font-semibold leading-tight text-white sm:text-[2.1rem]">{title}</h1>
-      <p className="mt-1 break-words text-sm text-soft-grey">{subtitle}</p>
+    <header className="px-1">
+      <h1 className="break-words font-display text-[1.6rem] font-semibold leading-tight text-task-text sm:text-[2.1rem]">{title}</h1>
+      {subtitle ? <p className="mt-1 break-words text-sm text-task-text-muted">{subtitle}</p> : null}
     </header>
     {children}
   </section>;
+}
+
+/** Finished work returns to the FMS list; a short notice says what happened next. */
+export function fmsFinishedNotice(result: Pick<FmsWorkResult, "state" | "submissionId" | "destinations">): string {
+  const saved = result.submissionId ? "Form submitted." : "Work saved.";
+  if (result.state === "workflow_completed") return `${saved} The workflow is complete.`;
+  if (result.state === "workflow_on_hold") return `${saved} The workflow is on hold for manager review.`;
+  const people = [...new Set(result.destinations.map(item => item.employeeName).filter((name): name is string => !!name))];
+  return people.length ? `${saved} Next step assigned to ${people.join(", ")}.` : saved;
 }
 
 /** Work that cannot be opened still leaves the employee one tap from their task list. */
 function Unavailable({ children, onNavigate, tone = "neutral" }: { children: React.ReactNode; onNavigate: (path: string) => void; tone?: "neutral" | "danger" }) {
   return <section className="mx-auto flex w-full max-w-3xl flex-col gap-3">
     <Notice tone={tone}>{children}</Notice>
-    <Button className="self-start" onClick={() => onNavigate("/tasks")} variant="secondary">Back to my work</Button>
+    <Button className="self-start" onClick={() => onNavigate(FMS_TASKS_PATH)} variant="secondary">Back to my work</Button>
   </section>;
 }
 
@@ -99,7 +112,7 @@ function StarterForm({ onNavigate, target }: {
     </div>
     <div className="flex flex-col gap-2 sm:flex-row">
       {started.ownWorkTargets?.[0] ? <Button className="min-h-12" onClick={() => onNavigate(fmsAssignedWorkPath(started.ownWorkTargets![0]!))}>Continue to my next stage</Button> : null}
-      <Button className="min-h-12" onClick={() => onNavigate("/tasks")} variant="secondary">Back to my work</Button>
+      <Button className="min-h-12" onClick={() => onNavigate(FMS_TASKS_PATH)} variant="secondary">Back to my work</Button>
     </div>
   </Frame>;
   if (error) return <Unavailable onNavigate={onNavigate} tone="danger">{error}</Unavailable>;
@@ -114,7 +127,8 @@ function StarterForm({ onNavigate, target }: {
         onSubmit={async (answers) => {
           const completed = await confirmWork({ kind: "starter_form", formTemplateId: form.id, starterAssignmentId: target.starterAssignmentId, answers });
           if (!completed) return false;
-          setStarted(fmsStartConfirmationFromWork(completed));
+          toast.success(fmsFinishedNotice(completed));
+          onNavigate(FMS_TASKS_PATH);
           return true;
         }}
         templateId={form.id}
@@ -131,7 +145,6 @@ function AssignedStage({ onNavigate, target }: {
 }) {
   const [workName, setWorkName] = useState<{ id: string; name: string } | null>(null);
   const { profile } = useAuth();
-  const [completed, setCompleted] = useState<FmsWorkResult | null>(null);
   const [bundle, setBundle] = useState<FmsAssignedStageBundle | null>();
   const [forms, setForms] = useState<FormBundle[]>([]);
   const [options, setOptions] = useState<DynamicOptions>(EMPTY_OPTIONS);
@@ -153,7 +166,7 @@ function AssignedStage({ onNavigate, target }: {
 
   useEffect(() => {
     let active = true;
-    setBundle(undefined); setCompleted(null);
+    setBundle(undefined);
     setError(null);
     void refresh().catch((caught: unknown) => {
       if (active) setError(caught instanceof Error ? caught.message : "Unable to load this FMS step");
@@ -162,7 +175,6 @@ function AssignedStage({ onNavigate, target }: {
   }, [refresh]);
 
   if (!profile) return null;
-  if (completed && fmsOutcomeReplacesStage(completed.state)) return <section className="mx-auto w-full max-w-3xl space-y-4"><FmsWorkOutcome result={completed} viewerId={profile.id} /><Button className="min-h-12" onClick={() => onNavigate("/tasks")} variant="secondary">Back to my work</Button></section>;
   if (error) return <Unavailable onNavigate={onNavigate} tone="danger">{error}</Unavailable>;
   if (bundle === undefined) return <Loading />;
   if (bundle === null) return <Unavailable onNavigate={onNavigate}>This FMS step is complete, cancelled, or no longer visible to your account.</Unavailable>;
@@ -179,14 +191,20 @@ function AssignedStage({ onNavigate, target }: {
   if (!stage || !definition) {
     return <Frame onNavigate={onNavigate} subtitle={bundle.instance.reference_number} title={bundle.instance.title}>
       <Notice>This step is already complete or is not assigned to you. Nothing is waiting for you here.</Notice>
-      <Button onClick={() => onNavigate("/tasks")} variant="secondary">Back to my work</Button>
+      <Button onClick={() => onNavigate(FMS_TASKS_PATH)} variant="secondary">Back to my work</Button>
     </Frame>;
   }
 
   const requested = target.kind === "stage_form" ? target.formTemplateId : definition.form_template_id;
 
-  return <Frame onNavigate={onNavigate} subtitle={`${bundle.instance.title} · ${definition.name} · ${bundle.instance.reference_number}`} title={workName?.id === stage.id ? workName.name : fmsWorkTitle(definition.name, bundle.instance.reference_number)}>
-    <FmsContextFirst key={stage.id} showSteps instanceId={bundle.instance.id} instanceStageId={stage.id} hasForm={!!requested} onRecordName={name => setWorkName(name ? { id: stage.id, name } : null)}>
+  const finished = (result: FmsWorkResult) => {
+    if (!fmsOutcomeReplacesStage(result.state)) return;
+    toast.success(fmsFinishedNotice(result));
+    onNavigate(FMS_TASKS_PATH);
+  };
+
+  return <Frame onNavigate={onNavigate} title={workName?.id === stage.id ? workName.name : fmsWorkTitle(definition.name, bundle.instance.reference_number)}>
+    <FmsContextFirst key={stage.id} instanceId={bundle.instance.id} instanceStageId={stage.id} hasForm={!!requested} onRecordName={name => setWorkName(name ? { id: stage.id, name } : null)}>
     <FmsStageRunner
       branches={options.branches}
       checklist={bundle.checklist.filter((item) => item.fms_instance_stage_id === stage.id)}
@@ -199,7 +217,8 @@ function AssignedStage({ onNavigate, target }: {
       instance={bundle.instance}
       instanceStages={bundle.instanceStages}
       onRefresh={refresh}
-      onResult={setCompleted}
+      onResult={finished}
+      compact
       profile={profile}
       stage={stage}
       users={bundle.users}

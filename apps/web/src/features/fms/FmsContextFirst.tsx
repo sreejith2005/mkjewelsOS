@@ -18,7 +18,6 @@ export function FmsContextFirst({ instanceId, instanceStageId, hasForm, children
     <FmsWorkContext collapsed={continuing} instanceId={instanceId} instanceStageId={instanceStageId} onReady={setReady} onRecordName={onRecordName} />
     {reviewRequired && !continuing ? <div className="space-y-2">
       <Button className="min-h-12 w-full sm:w-auto" disabled={!ready} onClick={() => setContinuing(true)}>{hasForm ? "Continue to stage form" : "Continue to stage"}</Button>
-      {ready ? <p className="text-xs text-task-text-muted">The previous answers stay available above while you work.</p> : null}
     </div> : null}
     {working ? <div className="scroll-mt-24" ref={workRef}>{children}</div> : null}
   </>;

@@ -171,3 +171,11 @@ recipient. No new Kiara read tool: the data shown is unchanged.
 
 - [ ] Authors can use **Visible in Forms Library** on each form version. Hidden forms stay available in assigned Tasks/FMS and existing submission history, while staff cannot browse or fill them independently. Authors retain management access. Existing forms start visible; revisions and duplicates inherit visibility.
 - No additional Kiara read tool: existing app help explains this setting without a new data source. Local implementation is not evidence of production deployment.
+
+## FMS work page - 2026-10-23 (lean page)
+
+The assigned-work page shows the record name, due time / instructions when set,
+and **Previous form answers**; the workflow, stage, reference, assignee and the
+four-step bar are no longer repeated. After confirming, the employee returns to
+Tasks -> FMS with a short notice instead of a result page. Kiara's "Do my
+assigned stage" recipe is updated. No new read tool.

@@ -241,3 +241,9 @@ Automated proof: `supabase/functions/ask-kiara/eval.local.ts` (per-role eval on 
   **Keep it with me** restores you. A fixed-employee step still shows locked.
 - (2026-10-23) On a phone the stage form and the confirmation open full screen;
   no form text shows above the title or below the bottom buttons while scrolling.
+- (2026-10-23) The assigned FMS page shows only the record name, due/instructions
+  when set and Previous form answers (stacked, larger answers; unanswered folded).
+  Finishing a stage or an assigned start form returns to Tasks -> FMS with a
+  notice naming the next owner. "My FMS work" goes back to the FMS tab, and
+  switching tabs afterwards drops `?view=fms`. A save that still needs approval
+  or other doers stays on the page.

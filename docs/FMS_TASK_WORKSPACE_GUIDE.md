@@ -18,7 +18,9 @@ FMS handoff.
    Forms Library and is not a stage; a pending start form you were asked to fill
    is listed as **Form to start**. Counts include all matching assignments, even
    when records span several pages.
-3. Choose Open Work on the named record. Review previous answers, continue to the
+3. Choose Open Work on the named record. The page is headed by the record name
+   only (the card already showed workflow, stage and reference). Review previous
+   answers, continue to the
    exact stage form and complete the existing evidence/approval/handoff steps.
 4. Follow the confirmation from the existing runner. When no employee is set for
    the next step, it stays with you by default; press **Assign to a Different
@@ -120,3 +122,7 @@ form/stage completion, handoff, evidence and notification closure remain the
 execution source of truth.
 
 The feature plan records exact local validation and release limitations.
+
+After the confirmation, the employee returns to Tasks -> FMS (`/tasks?view=fms`)
+with a short notice naming who has the next step. There is no separate result
+page; next work is opened from the FMS list.
