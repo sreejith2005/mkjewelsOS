@@ -6,7 +6,20 @@ const { client } = vi.hoisted(() => ({ client: {} as Record<string, unknown> }))
 vi.mock("@jewelos/api-client", () => ({ supabase: client }));
 vi.mock("@jewelos/api-client/client", () => ({ getSupabase: () => client }));
 
-import { deletedFormBundle, deleteForm, publishAsNewForm, savePublishedForm, startFmsFromFormSubmission, submitStandaloneFormAndStartFms, toDefinition, type FormField, type FormSubmission, type FormTemplate } from "./api";
+import { deletedFormBundle, deleteForm, publishAsNewForm, savePublishedForm, setFormLibraryVisibility, startFmsFromFormSubmission, submitStandaloneFormAndStartFms, toDefinition, type FormField, type FormSubmission, type FormTemplate } from "./api";
+
+describe("setFormLibraryVisibility", () => {
+  it("saves through the audited contract and checks confirmation", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "form", error: null });
+    Object.assign(client, { rpc });
+    await expect(setFormLibraryVisibility("form", false)).resolves.toBeUndefined();
+    expect(rpc).toHaveBeenCalledWith("set_form_library_visibility_with_audit", { p_template_id: "form", p_visible: false });
+    rpc.mockResolvedValue({ data: null, error: null });
+    await expect(setFormLibraryVisibility("form", true)).rejects.toThrow("did not confirm");
+    rpc.mockResolvedValue({ data: null, error: { message: "Access denied" } });
+    await expect(setFormLibraryVisibility("form", true)).rejects.toThrow("Access denied");
+  });
+});
 
 describe("toDefinition", () => {
   it("does not turn a NULL database condition into a conditional field", () => {
