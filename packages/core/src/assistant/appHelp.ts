@@ -169,10 +169,11 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     section: "crm",
     title: "CRM",
     path: "/crm",
-    summary: "CRM holds client records, walk-ins, interactions, and follow-ups for CRM users.",
+    summary: "CRM holds client records, walk-ins, interactions, and follow-ups for CRM users. Client profile details accumulate from saved answers; newer nonblank answers replace older answers.",
     recipes: [
       "Find a client: open CRM and search by name or client id.",
       "Record a walk-in or follow-up: use the walk-in and follow-up screens in CRM.",
+      "Returning client: enter the phone number in REGISTER CLIENT ENTRY. CRM uses the most recently visited profile for that full phone number and prefills saved details. Older nonblank answers remain available when newer visits leave a field blank. Changed answers use the latest saved value. Client profiles use the same accumulated details; original visit records remain in their history.",
     ],
   },
   dropdown_master: {

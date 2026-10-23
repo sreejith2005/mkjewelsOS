@@ -2666,6 +2666,77 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      get_walkin_profile_defaults: { Args: { p_client_id: string }; Returns: Json }
+      get_client_profile: {
+        Args: { p_client_id: string }
+        Returns: {
+          address: string | null
+          anniversary: string | null
+          beverage: string | null
+          billing_phone: string | null
+          billing_phone_country_code: string | null
+          city: string | null
+          city_other: string | null
+          client_code: string
+          client_id: string
+          client_potential_category: string | null
+          communication_preference: string | null
+          community: string | null
+          community_other: string | null
+          country: string | null
+          dob: string | null
+          first_visit_date: string | null
+          gender: string | null
+          gift_history: Json | null
+          google_review_status: string | null
+          high_potential_reason: string | null
+          household_id: string | null
+          household_relation: string | null
+          instagram_status: string | null
+          last_bought_categories: string[] | null
+          last_branch_id: string | null
+          last_buy_status: Database["public"]["Enums"]["buy_status"] | null
+          last_crm_name: string | null
+          last_order_categories: string[] | null
+          last_product_requirement: string | null
+          last_remark: string | null
+          last_salesperson_id: string | null
+          last_seen_categories: string[] | null
+          last_visit_date: string | null
+          lifecycle_stage: string
+          marketing_message: string | null
+          next_visit_date: string | null
+          other_known_phones: string[] | null
+          other_names: string[] | null
+          pincode: string | null
+          primary_name: string
+          primary_phone: string | null
+          primary_phone_country_code: string | null
+          profile_updated_at: string
+          profile_updated_by: string | null
+          referral_code: string
+          referral_relation: string | null
+          referral_status: string | null
+          referred_by_client_id: string | null
+          secondary_phone: string | null
+          secondary_phone_country_code: string | null
+          snack: string | null
+          state: string | null
+          sugar: string | null
+          testimonial_status: string | null
+          total_non_purchase_visits: number
+          total_order_visits: number
+          total_purchase_visits: number
+          total_repair_visits: number
+          total_visits: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "clients"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       dedupe_category_array: { Args: { p_values: string[] }; Returns: string[] }
       get_crm_insight_records_v1: {
         Args: {

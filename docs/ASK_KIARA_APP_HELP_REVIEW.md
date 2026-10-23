@@ -111,6 +111,8 @@ who build workflows, the designs.
 - [ ] Download a report: press **Export CSV**. It appears under **Your exports** (Waiting, then Preparing), usually within a minute; press **Download** when Completed.
 
 ## CRM
+
+- [ ] Returning-client prefill (2026-10-23): **REGISTER CLIENT ENTRY** uses the most recently visited profile for the full phone number. Profile details accumulate from saved answers; newer nonblank answers win conflicts, while blanks preserve known details. Client profiles use the same details. Original client records and visit histories are retained. This repairs existing CRM reads; Kiara needs no new read tool.
 **What it is:** client records, walk-ins, interactions and follow-ups, for CRM users.
 - [ ] Find a client: open CRM and search by name or client id.
 - [ ] Record a walk-in or follow-up: use the walk-in and follow-up screens in CRM.

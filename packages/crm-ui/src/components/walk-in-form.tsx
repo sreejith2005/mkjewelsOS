@@ -1,12 +1,14 @@
 "use client";
 
+import { WALKIN_WEDDING_MONTHS as LEGACY_WEDDING_MONTHS } from "@/lib/walkin-profile-defaults";
+
 import { FormValidationSummary, useFormValidation } from "./form-validation";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "@/next-shim/navigation"; // crm-port: next/navigation -> local shim (same paths, /crm base path added)
 
 import { PhoneNumberInput } from "@/components/phone-number-input";
-import { composePhone, phoneError, phoneKey, splitPhone, storedPhone } from "@/lib/phone";
+import { composePhone, formatPhone, phoneError, phoneKey, splitPhone, storedPhone } from "@/lib/phone";
 import { isPotentialCategory, POTENTIAL_CATEGORIES } from "@/lib/client-potential";
 import { createClient } from "@/lib/supabase/client";
 import { lookupClientByPhone, clientProfileAutofill } from "@/lib/client-phone-lookup";
@@ -55,10 +57,7 @@ const LEGACY_VISIT_STATUSES = [
   "YES", "NO", "REPAIR_PLACED", "REPAIR_PICKUP", "ORDER_PLACED",
   "ORDER_PICKUP", "PRODUCT_EXCHANGE", "PRODUCT_RETURN", "STORE_VISIT", "PRICE_CALCULATION",
 ];
-const LEGACY_WEDDING_MONTHS = [
-  "JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
-  "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER",
-];
+
 const LEGACY_COMMUNICATION_PREFERENCES = [
   "CALL", "WHATSAPP CALLS", "WHATSAPP MESSAGE", "DON'T CONTACT",
 ];
@@ -89,7 +88,7 @@ function initialValue(
     primary_name: client?.primary_name ?? queue?.client_name ?? "",
     // The number only; the country code is primaryCountry in the form (stored phones carry it).
     primary_phone: splitPhone(client?.primary_phone ?? queue?.mobile).number,
-    billing_phone: client?.billing_phone ?? "",
+    billing_phone: formatPhone(client?.billing_phone),
     gender: client?.gender?.toUpperCase() ?? "",
     country: client?.country ?? "India",
     state: client?.state ?? "",
@@ -111,18 +110,18 @@ function initialValue(
     not_bought_other: "",
     repair_or_order_approach: "",
     marketing_message_sent: "",
-    occupation: "",
-    occupation_other: "",
-    bridal_or_non_bridal: "",
-    wedding_month: "",
-    wedding_year: "",
+    occupation: client?.walkin_defaults?.occupation ?? "",
+    occupation_other: client?.walkin_defaults?.occupation_other ?? "",
+    bridal_or_non_bridal: client?.walkin_defaults?.bridal_or_non_bridal ?? "",
+    wedding_month: LEGACY_WEDDING_MONTHS[Number(client?.walkin_defaults?.wedding_month) - 1] ?? client?.walkin_defaults?.wedding_month ?? "",
+    wedding_year: client?.walkin_defaults?.wedding_year ?? "",
     communication_preference: client?.communication_preference ?? "",
     beverage: client?.beverage ?? "",
     sugar: client?.sugar ?? "",
     snack: client?.snack ?? "",
-    beverage_other: "",
-    sugar_other: "",
-    snack_other: "",
+    beverage_other: client?.walkin_defaults?.beverage_other ?? "",
+    sugar_other: client?.walkin_defaults?.sugar_other ?? "",
+    snack_other: client?.walkin_defaults?.snack_other ?? "",
     gift: "",
     gift_other: "",
     next_visit_date: client?.next_visit_date ?? "",
@@ -194,7 +193,13 @@ function walkInSubmitErrorMessage(error: SubmitError | null) {
   }
   return "We could not save this visit. Please try again; if it persists, contact an administrator.";
 }
-export function WalkInForm({
+export function WalkInForm(props: Parameters<typeof WalkInFormFields>[0]) {
+  // Queue navigation changes only the query string. Reset all draft/upload state
+  // for a different assignment, while preserving edits on same-assignment refresh.
+  const identity = props.queue?.id ?? props.client?.client_id ?? "new";
+  return <WalkInFormFields key={identity} {...props} />;
+}
+function WalkInFormFields({
   profile,
   branches,
   crms,
@@ -273,7 +278,7 @@ export function WalkInForm({
   );
   const billingPhone = billingMatchesPrimary ? primaryPhone : values.billing_phone;
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(
-    () => new Set(client ? ["primary_name", "gender", "dob", "community", "address", "pincode"] : []),
+    () => new Set(client ? Object.entries(clientProfileAutofill(client)).filter(([, value]) => value.trim() !== "").map(([key]) => key) : []),
   );
   const set = (key: keyof typeof values, value: string) =>
     setValues((current) => ({ ...current, [key]: value }));
@@ -387,7 +392,7 @@ export function WalkInForm({
     // engagement section. Resolve it here as well, before committing the
     // immutable Storage path, so existing-client proofs use the actual client
     // UUID rather than the temporary UUID reserved for a new client.
-    let proofClientId = client?.client_id || queue?.client_id || "";
+    let proofClientId = keepsAnchorClient(primaryPhone) ? anchorClientId : "";
     if (!proofClientId) {
       const matched = await lookupClientByPhone(primaryPhone);
       if (currentLookupPhone.current !== primaryPhone) throw new Error("Mobile changed during lookup. Try the upload again.");
@@ -644,11 +649,11 @@ export function WalkInForm({
       <span>{label}{required ? requiredMark : null}</span>
       <input
         aria-label={label} type={type} required={required}
-        className={`${inputClass}${autoFilledFields.has(key) ? " border-amber-400 bg-amber-50" : ""}`}
+        className={`${inputClass}${autoFilledFields.has(key) && values[key].trim() ? " border-amber-400 bg-amber-50" : ""}`}
         value={values[key]}
         onChange={(event) => { set(key, event.target.value); setAutoFilledFields((current) => { const next = new Set(current); next.delete(key); return next; }); }}
       />
-      {autoFilledFields.has(key) ? <small className="mt-1 block text-amber-800">Auto-filled from client history — editable</small> : null}
+      {autoFilledFields.has(key) && values[key].trim() ? <small className="mt-1 block text-amber-800">Auto-filled from client history — editable</small> : null}
     </label>
   );
   const selectField = (
@@ -725,7 +730,7 @@ export function WalkInForm({
           <div className="grid gap-4 md:grid-cols-2">
             <h2 className="md:col-span-2 text-lg font-semibold">
               CLIENT DETAILS {" "}
-              {client ? (
+              {values.client_type === "existing" ? (
                 <span className="text-sm font-normal text-green-700">
                   Existing client detected
                 </span>

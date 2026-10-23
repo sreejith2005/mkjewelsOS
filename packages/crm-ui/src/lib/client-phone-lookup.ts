@@ -1,8 +1,10 @@
+import { parseWalkinProfileDefaults, type WalkinProfileDefaults } from "@/lib/walkin-profile-defaults";
 
-import { phoneKey } from "@/lib/phone";
+import { formatPhone, phoneKey } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/client";
 
 export type PhoneMatchedClient = {
+  walkin_defaults?: WalkinProfileDefaults;
   client_id: string;
   client_code: string;
   primary_name: string;
@@ -31,14 +33,15 @@ export type PhoneMatchedClient = {
 /** Presentation defaults shared by every phone-autofill entry point. */
 export function clientProfileAutofill(client: PhoneMatchedClient) {
   return {
-    primary_name: client.primary_name,
+    ...client.walkin_defaults,
+    primary_name: client.primary_name ?? '',
     gender: client.gender?.toUpperCase() ?? '',
     dob: client.dob ?? '', anniversary: client.anniversary ?? '',
     community: client.community ?? '', community_other: client.community_other ?? '',
     address: client.address ?? '', pincode: client.pincode ?? '', country: client.country ?? '',
     state: client.state ?? '', city: client.city ?? '', city_other: client.city_other ?? '',
     beverage: client.beverage ?? '', sugar: client.sugar ?? '', snack: client.snack ?? '',
-    billing_phone: client.billing_phone ?? '', communication_preference: client.communication_preference ?? '',
+    billing_phone: formatPhone(client.billing_phone), communication_preference: client.communication_preference ?? '',
     client_potential_category: client.client_potential_category ?? '', high_potential_reason: client.high_potential_reason ?? '',
     next_visit_date: client.next_visit_date ?? '',
   };
@@ -54,5 +57,8 @@ export async function lookupClientByPhone(value: string) {
   if (!result) return null;
   const { data, error } = result;
   if (error) return null;
-  return data?.[0] ?? null;
+  const matched = data?.[0];
+  if (!matched) return null;
+  const defaults = await createClient().rpc("get_walkin_profile_defaults", { p_client_id: matched.client_id });
+  return { ...matched, walkin_defaults: parseWalkinProfileDefaults(defaults?.error ? null : defaults?.data) };
 }

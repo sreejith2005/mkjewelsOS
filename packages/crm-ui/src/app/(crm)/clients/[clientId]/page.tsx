@@ -36,7 +36,7 @@ export default async function ClientPage({ params,searchParams=Promise.resolve({
     latestVisitResult,
 
   ] = await readCrmResults([
-    supabase.from("clients").select("*").eq("client_id", clientId).single(),
+    supabase.rpc("get_client_profile", { p_client_id: clientId }).single(),
     supabase.from("client_timeline").select("id,created_at,event_date,event_type,buy_status,crm_name,remark,branch_id,salesperson_id,seen_categories,bought_categories,order_categories,product_requirement,reference_number").eq("client_id", clientId).order("created_at", { ascending: false }).order("event_date", { ascending: false }).order("id", { ascending: false }).range((visitPage-1)*100,visitPage*100),
     supabase.from("client_edit_log").select("id,field_name,old_value,new_value,created_at,edited_by").eq("client_id", clientId).order("created_at", { ascending: false }).order("id", { ascending: false }) /* crm-port: deterministic order */.range((auditPage-1)*100,auditPage*100),
     supabase.rpc("get_my_profile"),
