@@ -44,7 +44,7 @@ export function runtimeDecisionOptions(plannedRule: Record<string, unknown>): re
   return plannedRule.decisionMode === "yes_no" ? [{ key: "yes", label: "Yes" }, { key: "no", label: "No" }] : [];
 }
 
-export function FmsStageRunner({ instance, instanceStages, stage, definition, definitions, checklist, evidence, users, branches, departments, profile, forms, formOptions, onRefresh, requestedFormTemplateId, onResult }: {
+export function FmsStageRunner({ instance, instanceStages, stage, definition, definitions, checklist, evidence, users, branches, departments, profile, forms, formOptions, onRefresh, requestedFormTemplateId, onResult, compact = false }: {
   instance: FmsInstance;
   instanceStages: FmsInstanceStage[];
   stage: FmsInstanceStage;
@@ -61,6 +61,8 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
   onRefresh: () => Promise<void>;
   onResult?: (result: FmsWorkResult) => void;
   requestedFormTemplateId?: string;
+  /** The assigned-work page already names the record; skip the stage/assignee/due header. */
+  compact?: boolean;
 }) {
   const requiresLinkedForm = isInitialFmsDefinition(definitions, definition) || hasFmsFormAssignmentSource(definition.planned_time_rule)
     || !!(definition.planned_time_rule && typeof definition.planned_time_rule === "object" && !Array.isArray(definition.planned_time_rule) && definition.planned_time_rule.completionFormRequired === true);
@@ -145,15 +147,15 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
   const due = describeDue(stage.planned_datetime, undefined, { completed: stage.status === "completed" });
   const assignedNames = (stage.assigned_to ?? []).map((id) => users.find((user) => user.id === id)?.employee_name ?? "Historical user").join(", ") || "Automatic";
 
-  return <section aria-label={`Your work: ${definition.name}`} className="space-y-4 rounded-2xl border border-gold/20 bg-task-bg p-4 sm:p-5">
+  return <section aria-label={`Your work: ${definition.name}`} className={compact ? "space-y-4" : "space-y-4 rounded-2xl border border-gold/20 bg-task-bg p-4 sm:p-5"}>
     {error ? <Notice tone="danger">{error}</Notice> : null}
     {instance.status === "on_hold" ? <Notice>The workflow is on hold for manager review. Your saved form and assigned work are preserved.</Notice> : null}
     {result ? <FmsWorkOutcome result={result} viewerId={profile.id} /> : null}
-    <header className="space-y-1">
+    {compact ? definition.method ? <p className="text-sm text-task-text-muted">{definition.method}</p> : null : <header className="space-y-1">
       <div className="flex flex-wrap items-start justify-between gap-2"><h3 className="min-w-0 break-words text-lg font-semibold text-task-text">{definition.name}{stage.visit_number && stage.visit_number > 1 ? ` (visit ${stage.visit_number})` : ""}</h3><span className="rounded-full bg-gold/10 px-3 py-1 text-xs font-semibold text-gold-secondary">{fmsEmployeeStatusLabel(stage.status)}</span></div>
       {definition.method ? <p className="text-sm text-task-text-muted">{definition.method}</p> : null}
       <p className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-task-text-muted"><span>Assigned to {assignedNames}</span><span className={due.tone === "overdue" || (stage.delay_minutes ?? 0) > 0 ? "font-semibold text-danger" : undefined}>{due.label}{(stage.delay_minutes ?? 0) > 0 && due.tone !== "overdue" ? " · Overdue" : ""}</span></p>
-    </header>
+    </header>}
     {canClaim ? <Button disabled={busy} onClick={() => void work(() => claimFmsStage(stage.id))} variant="secondary">Claim stage</Button> : null}
     {canAct && requirements.length ? <div className="rounded-xl border border-task-border bg-task-muted/50 p-3">
       <p className="text-sm font-semibold text-task-text">Before you complete this step</p>
@@ -195,7 +197,7 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
         {capability.canReassign && (stage.assigned_to?.length ?? 0) > 0 ? <Button disabled={busy} onClick={() => openManagedAction("reassign")} variant="secondary">Reassign</Button> : null}
       </div>
     </details> : null}
-    {showForm && linkedForm ? <Modal onClose={() => setShowForm(false)} title={`${requiresLinkedForm ? "Required" : "Optional"} form: ${linkedForm.name} v${linkedForm.version}`} mobileFullscreen wide><FormRenderer definition={{ name: linkedForm.name, description: linkedForm.description ?? undefined, sections: linkedForm.sections, fields: linkedForm.fields }} dynamicOptions={formOptions} templateId={linkedForm.id} onSubmit={async (answers) => {
+    {showForm && linkedForm ? <Modal onClose={() => setShowForm(false)} title={requiresLinkedForm ? linkedForm.name : `Optional form: ${linkedForm.name}`} mobileFullscreen wide><FormRenderer definition={{ name: linkedForm.name, description: linkedForm.description ?? undefined, sections: linkedForm.sections, fields: linkedForm.fields }} dynamicOptions={formOptions} templateId={linkedForm.id} onSubmit={async (answers) => {
       if (!await completeWork({ kind: "stage_form", formTemplateId: linkedForm.id, answers, instanceStageId: stage.id, outcome, remark, checklist: checklistPayload, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) })) return false;
       setShowForm(false); await onRefresh(); return true;
     }} workflowHint /></Modal> : null}

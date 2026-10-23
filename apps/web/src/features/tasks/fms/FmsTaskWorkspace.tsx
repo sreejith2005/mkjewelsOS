@@ -6,6 +6,8 @@ import { Button, Field } from "@/components/ui";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { useFmsRead } from "./useFmsRead";
 import { FmsReadState, FmsWorkflowGroup } from "./FmsTaskGroups";
+/** Tasks opened on its FMS tab: where finished FMS work returns the employee. */
+export const FMS_TASKS_PATH = "/tasks?view=fms";
 const TOPICS = ["tasks", "fms", "forms", "organization"] as const;
 const STATUSES: readonly FmsWorkspaceStatus[] = ["active", "pending", "overdue", "waiting", "completed"];
 const STATUS_HELP: Record<FmsWorkspaceStatus, string> = {

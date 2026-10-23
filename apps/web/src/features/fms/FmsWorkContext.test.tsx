@@ -15,7 +15,13 @@ describe("previous form details", () => {
     const ready = vi.fn(); render(<FmsWorkContext instanceId="instance" instanceStageId="stage" onReady={ready} />);
     expect(await screen.findByText("Client name")).toBeTruthy();
     expect(screen.getByText("Synthetic client")).toBeTruthy();
-    expect(screen.getByText(/Filled by Employee A/)).toBeTruthy();
+    expect(screen.getByText(/Employee A/)).toBeTruthy();
+    // The opening card already named these; the page does not repeat them.
+    const text = document.body.textContent ?? "";
+    expect(text).not.toContain("Enquiry");
+    expect(text).not.toContain("FMS-1");
+    expect(text).not.toContain("Employee B");
+    expect(text).not.toContain("Your step");
     await waitFor(() => expect(ready).toHaveBeenLastCalledWith(true));
     expect(mocks.forms).toHaveBeenCalledWith("instance", "stage");
   });

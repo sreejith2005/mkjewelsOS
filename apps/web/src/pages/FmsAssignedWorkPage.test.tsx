@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FmsAssignedWorkPage } from "./FmsAssignedWorkPage";
+import { FmsAssignedWorkPage, fmsFinishedNotice } from "./FmsAssignedWorkPage";
 
 const mocks = vi.hoisted(() => ({
   loadFormDynamicOptions: vi.fn(),
@@ -13,7 +13,9 @@ const mocks = vi.hoisted(() => ({
   loadFmsAssignedStage: vi.fn(),
   recoverFmsStartingWork: vi.fn(),
   runner: vi.fn(),
+  toast: vi.fn(),
 }));
+vi.mock("sonner", () => ({ toast: { success: mocks.toast } }));
 
 vi.mock("@/features/forms/api", () => ({
   loadFormDynamicOptions: mocks.loadFormDynamicOptions,
@@ -81,9 +83,10 @@ describe("focused FMS assigned work", () => {
     expect(screen.queryByText("Forms Library")).toBeNull();
     await user.click(screen.getByRole("button", { name: "Submit exact form" }));
     await waitFor(() => expect(mocks.confirmWork).toHaveBeenCalledWith({ kind: "starter_form", formTemplateId: "form-7", starterAssignmentId: "starter-2", answers: { approved: "yes" } }));
-    expect(onNavigate).not.toHaveBeenCalled();
-    expect(await screen.findByRole("heading", { name: "Form submitted successfully" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Open my next work" })).toBeNull();
+    // No result page: the employee goes straight back to the FMS list with a short notice.
+    await waitFor(() => expect(onNavigate).toHaveBeenCalledWith("/tasks?view=fms"));
+    expect(mocks.toast).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("heading", { name: "Form submitted successfully" })).toBeNull();
   });
 
   it("recovers a saved starting submission after its response was lost", async () => {
@@ -187,15 +190,24 @@ describe("focused FMS assigned work", () => {
   });
 });
 
-it("replaces completed stage controls with a clear outcome and exact next-work link", async () => {
+it("returns to the FMS list after finishing a stage instead of showing a result page", async () => {
   window.history.replaceState({}, "", "/tasks/fms?instance=instance-5&stage=stage-3&form=form-7");
   mocks.loadFmsAssignedStage.mockResolvedValue(stageBundle());
   mocks.loadFormDynamicOptions.mockResolvedValue(OPTIONS);
-  render(<FmsAssignedWorkPage onNavigate={vi.fn()} />);
+  const onNavigate = vi.fn();
+  render(<FmsAssignedWorkPage onNavigate={onNavigate} />);
+  // The header names the record only: no workflow · stage · reference line.
+  expect(screen.queryByText(/Repair job · Polishing · FMS-9/)).toBeNull();
   await userEvent.setup().click(await screen.findByRole("button", { name: "Continue to stage form" }));
+  expect(mocks.runner).toHaveBeenLastCalledWith(expect.objectContaining({ compact: true }));
   await userEvent.setup().click(screen.getByRole("button", { name: "Finish synthetic stage" }));
-  expect(await screen.findByRole("heading", { name: "Form submitted successfully" })).toBeTruthy();
-  expect(screen.queryByText("Running stage-3 form form-7")).toBeNull();
-  expect(screen.queryByRole("region", { name: "Previous form answers" })).toBeNull();
-  expect(screen.getByRole("link", { name: "Continue to Follow up" }).getAttribute("href")).toContain("stage=next-visit");
+  expect(onNavigate).toHaveBeenCalledWith("/tasks?view=fms");
+  expect(mocks.toast).toHaveBeenCalledWith("Form submitted. Next step assigned to Current employee.");
+  expect(screen.queryByRole("heading", { name: "Form submitted successfully" })).toBeNull();
+});
+
+it("words the finished notice for each outcome", () => {
+  const base = { submissionId: null, destinations: [] };
+  expect(fmsFinishedNotice({ ...base, state: "workflow_completed" })).toBe("Work saved. The workflow is complete.");
+  expect(fmsFinishedNotice({ ...base, state: "successors_activated" })).toBe("Work saved.");
 });

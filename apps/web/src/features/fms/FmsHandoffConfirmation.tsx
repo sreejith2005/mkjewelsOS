@@ -4,7 +4,6 @@ import { listFmsHandoffRecipients, previewFmsWork, type FmsHandoffRecipient } fr
 import { Check, UserRound } from "lucide-react";
 import { Button, Field, Modal, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { FmsWorkSteps } from "./FmsWorkSteps";
 
 /** The employee finishing the work. A next step nobody owns stays with them by default. */
 export type FmsHandoffActor = Readonly<{ id: string; name: string }>;
@@ -83,7 +82,6 @@ export function FmsHandoffConfirmation({ request, preview, actor, onConfirm, onC
   const many = preview.destinations.length > 1;
   return <Modal mobileFullscreen onClose={onCancel} title={preview.destinations.length ? "Complete Stage and Assign Next Work" : "Confirm Stage Completion"} wide>
     <div className="space-y-4">
-      <FmsWorkSteps current={3} />
       <p className="text-sm text-task-text-muted">You are completing: <strong className="text-task-text">{preview.currentStageName}</strong></p>
       {currentPreview.wouldDefer ? <Notice>Your form and handoff will be saved. Next work starts after the remaining requirements are met.<ul className="mt-2 list-disc pl-5">{currentPreview.requirements.map(requirement => <li key={requirement}>{requirement}</li>)}</ul></Notice> : null}
       {currentPreview.destinations.map(destination => {
