@@ -54,7 +54,10 @@ describe("Task Control template form", () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     render(<TaskTemplateForm data={referenceData} onCancel={vi.fn()} onSave={onSave} template={null} />);
     fillBasics();
-    fireEvent.click(screen.getByRole("button", { name: "3rd Saturday of every month" }));
+    fireEvent.change(screen.getByLabelText("Repeats"), { target: { value: "custom" } });
+    fireEvent.change(screen.getByLabelText("Unit"), { target: { value: "monthly_weekday" } });
+    fireEvent.change(screen.getByLabelText("Which"), { target: { value: "3" } });
+    fireEvent.change(screen.getByLabelText("Weekday"), { target: { value: "SA" } });
     fireEvent.change(screen.getByLabelText("Starts on"), { target: { value: "2030-11-01" } });
     expect(screen.getByTestId("schedule-preview").textContent).toContain("Every month on the 3rd Saturday");
     expect(screen.getByTestId("schedule-preview-dates").textContent).toContain("Sat, 16 Nov, 2030");
@@ -67,7 +70,7 @@ describe("Task Control template form", () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     render(<TaskTemplateForm data={referenceData} onCancel={vi.fn()} onSave={onSave} template={null} />);
     fillBasics();
-    fireEvent.click(screen.getByRole("button", { name: "Custom…" }));
+    fireEvent.change(screen.getByLabelText("Repeats"), { target: { value: "custom" } });
     fireEvent.change(screen.getByLabelText("Unit"), { target: { value: "weekly" } });
     for (const day of ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]) {
       const toggle = screen.getByRole("button", { name: day });

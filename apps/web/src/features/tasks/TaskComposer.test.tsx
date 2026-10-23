@@ -51,6 +51,18 @@ function renderComposer(overrides: Partial<Parameters<typeof TaskComposer>[0]> =
 }
 
 describe("TaskComposer selector panels", () => {
+  it("keeps the due panel open while choosing date and time, then closes on Done", () => {
+    renderComposer();
+    fireEvent.click(screen.getByRole("button", { name: /Due Date/i }));
+    fireEvent.change(screen.getByLabelText("Due date"), { target: { value: "2030-10-06" } });
+    fireEvent.change(screen.getByLabelText("Due time"), { target: { value: "18:00" } });
+    expect(screen.getByTestId("task-panel-due")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.queryByTestId("task-panel-due")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Due Date/i }));
+    expect((screen.getByLabelText("Due date") as HTMLInputElement).value).toBe("2030-10-06");
+    expect((screen.getByLabelText("Due time") as HTMLInputElement).value).toBe("18:00");
+  });
   it("honors the server roster for a staff profile with elevated assignment authority", () => {
     renderComposer({ profile: { ...profile, user_role: "staff" } });
     fireEvent.click(screen.getByRole("button", { name: /Users/i }));
@@ -65,7 +77,8 @@ describe("TaskComposer selector panels", () => {
     fireEvent.click(screen.getByRole("button", { name: /Users/i }));
     fireEvent.click(screen.getByLabelText("Teammate"));
     fireEvent.click(screen.getByRole("button", { name: /Due Date/i }));
-    fireEvent.change(screen.getByLabelText("Due date and time"), { target: { value: "2030-10-06T18:00" } });
+    fireEvent.change(screen.getByLabelText("Due date"), { target: { value: "2030-10-06" } });
+    fireEvent.change(screen.getByLabelText("Due time"), { target: { value: "18:00" } });
     const attachment = new File(["synthetic attachment"], "counter.pdf", { type: "application/pdf" });
     fireEvent.change(screen.getByLabelText("Attach image or document"), { target: { files: [attachment] } });
     fireEvent.click(screen.getByRole("button", { name: "Assign Task" }));
@@ -92,7 +105,8 @@ describe("TaskComposer selector panels", () => {
   function fillTitleAndDue() {
     fireEvent.change(screen.getByLabelText("Task title"), { target: { value: "Counter review" } });
     fireEvent.click(screen.getByRole("button", { name: /Due Date/i }));
-    fireEvent.change(screen.getByLabelText("Due date and time"), { target: { value: "2030-10-06T18:00" } });
+    fireEvent.change(screen.getByLabelText("Due date"), { target: { value: "2030-10-06" } });
+    fireEvent.change(screen.getByLabelText("Due time"), { target: { value: "18:00" } });
   }
 
   it("creates a separate task for each selected user by default, keeping every In Loop pick", async () => {

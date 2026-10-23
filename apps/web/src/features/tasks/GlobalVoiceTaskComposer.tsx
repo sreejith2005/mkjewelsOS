@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { UserProfile } from "@/types";
 import { createDelegationTask, loadTaskAuthoringReferenceData, uploadTaskAttachment, type TaskReferenceData } from "./api";
+import { createScheduledTask } from "@/features/recurringTodo/api";
 import { TaskComposer } from "./TaskComposer";
 
 /**
@@ -30,5 +31,5 @@ export function GlobalVoiceTaskComposer({ onClose, onReady, profile }: {
   }, [onClose, onReady]);
 
   if (!references) return null;
-  return <TaskComposer canUseVoice data={references} onClose={onClose} onCreated={onClose} onSave={createDelegationTask} onUploadAttachment={(taskId, file) => uploadTaskAttachment(profile.tenant_id, taskId, file)} profile={profile} />;
+  return <TaskComposer canUseVoice data={references} onClose={onClose} onCreated={onClose} onSave={createDelegationTask} onSaveSchedule={createScheduledTask} onUploadAttachment={(taskId, file) => uploadTaskAttachment(profile.tenant_id, taskId, file)} profile={profile} />;
 }

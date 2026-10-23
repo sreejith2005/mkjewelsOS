@@ -79,9 +79,11 @@ function prettyTime(value: string): string {
 
 function presetFor(spec: ScheduleSpec | null, startsOn: string): string {
   if (!spec) return "custom";
-  const rule = buildScheduleRule(spec).recurrenceRule;
+  const rule = buildScheduleRule({ ...spec, end: { type: "never" } }).recurrenceRule;
   return SCHEDULE_PRESETS.find((preset) => buildScheduleRule(preset.spec(startsOn)).recurrenceRule === rule)?.id ?? "custom";
 }
+
+const SIMPLE_PRESETS = [["daily", "Daily"], ["weekly", "Weekly"], ["monthly", "Monthly"], ["quarterly", "Quarterly"], ["yearly", "Annually"]] as const;
 
 function endLabel(end: ScheduleEnd): string {
   if (end.type === "count") return `Ends after ${end.count} occurrence${end.count === 1 ? "" : "s"}`;
@@ -120,12 +122,17 @@ export function ScheduleFields({
   onUseCheckpoints?: (labels: readonly string[]) => void;
 }) {
   const today = kolkataDateKey(new Date());
-  const [customOpen, setCustomOpen] = useState(() => presetFor(timing.spec, timing.startsOn) === "custom");
+  const [customOpen, setCustomOpen] = useState(() => !SIMPLE_PRESETS.some(([id]) => id === presetFor(timing.spec, timing.startsOn)));
   const spec = timing.spec;
   const selectedPreset = presetFor(spec, timing.startsOn);
 
   const setSpec = (next: ScheduleSpec) => onTiming({ ...timing, spec: next, keepRule: null });
-  const setStart = (startsOn: string) => onTiming({ ...timing, startsOn, keepRule: timing.spec ? null : timing.keepRule ?? null });
+  const setStart = (startsOn: string) => {
+    // Simple choices follow the chosen start date. Custom and unrecognized
+    // stored rules retain their explicit days instead of being rewritten.
+    const preset = !customOpen && SCHEDULE_PRESETS.find((item) => item.id === selectedPreset);
+    onTiming({ ...timing, startsOn, spec: preset && spec && startsOn ? { ...preset.spec(startsOn), end: spec.end } : spec, keepRule: spec ? null : timing.keepRule ?? null });
+  };
   const setEnd = (end: ScheduleEnd) => spec && setSpec({ ...spec, end });
 
   const specError = spec && !timing.keepRule ? validateScheduleSpec(spec, timing.startsOn) : null;
@@ -145,25 +152,23 @@ export function ScheduleFields({
   const readable = timing.keepRule && !spec ? describeScheduleRule(timing.keepRule.recurrenceRule, timing.startsOn) : spec ? describeScheduleSpec(spec) : "";
 
   return (
-    <div className="space-y-4" data-testid="schedule-fields">
-      <fieldset>
-        <legend className="mb-2 text-xs font-semibold text-task-text">Repeats</legend>
-        <div className="flex flex-wrap gap-2">
-          {SCHEDULE_PRESETS.map((preset) => (
-            <Toggle key={preset.id} onClick={() => { setSpec({ ...preset.spec(timing.startsOn), end: spec?.end ?? { type: "never" } }); setCustomOpen(false); }} pressed={!customOpen && selectedPreset === preset.id}>
-              {preset.label}
-            </Toggle>
-          ))}
-          <Toggle onClick={() => { if (!spec) setSpec(changeSchedulePattern({ pattern: "daily", interval: 1, end: { type: "never" } }, "weekly", timing.startsOn)); setCustomOpen(true); }} pressed={customOpen || selectedPreset === "custom"}>
-            Custom…
-          </Toggle>
-        </div>
+    <div className="space-y-4 [&_input]:min-w-0 [&_input]:max-w-full [&_select]:min-w-0" data-testid="schedule-fields">
+      <div>
+        <Label htmlFor="schedule-repeats">Repeats</Label>
+        <select className="task-field" id="schedule-repeats" value={customOpen ? "custom" : selectedPreset} onChange={(event) => {
+          const preset = SCHEDULE_PRESETS.find((item) => item.id === event.target.value);
+          if (preset) { setSpec({ ...preset.spec(timing.startsOn || today), end: spec?.end ?? { type: "never" } }); setCustomOpen(false); }
+          else { if (!spec) setSpec(changeSchedulePattern({ pattern: "daily", interval: 1, end: { type: "never" } }, "weekly", timing.startsOn)); setCustomOpen(true); }
+        }}>
+          {SIMPLE_PRESETS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+          <option value="custom">Custom</option>
+        </select>
         {timing.keepRule && !spec ? (
           <p className="mt-2 text-xs text-task-text-muted">
             This schedule uses a rule the builder cannot show ({timing.keepRule.recurrenceRule}). It is kept unchanged unless you choose a new pattern.
           </p>
         ) : null}
-      </fieldset>
+      </div>
 
       {(customOpen || selectedPreset === "custom") && spec ? (
         <div className="space-y-3 rounded-xl border border-task-border bg-task-muted p-3" data-testid="schedule-custom">
@@ -192,7 +197,7 @@ export function ScheduleFields({
           {spec.pattern === "weekly" ? (
             <fieldset>
               <legend className="mb-1 text-xs font-semibold text-task-text">On</legend>
-              <div className="grid grid-cols-7 gap-1">
+              <div className="grid grid-cols-4 gap-1 min-[420px]:grid-cols-7">
                 {SCHEDULE_WEEKDAYS.map((day) => (
                   <Toggle key={day} label={scheduleWeekdayName(day)} onClick={() => setSpec({ ...spec, weekdays: toggled(spec.weekdays, day) })} pressed={spec.weekdays.includes(day)}>
                     {SHORT_DAY[day]}
@@ -205,7 +210,7 @@ export function ScheduleFields({
           {spec.pattern === "monthly_dates" ? (
             <fieldset>
               <legend className="mb-1 text-xs font-semibold text-task-text">On these dates</legend>
-              <div className="grid grid-cols-7 gap-1">
+              <div className="grid grid-cols-5 gap-1 min-[420px]:grid-cols-7">
                 {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => (
                   <Toggle key={day} label={`Day ${day}`} onClick={() => setSpec({ ...spec, days: toggled(spec.days, day) })} pressed={spec.days.includes(day)}>
                     {day}
@@ -257,7 +262,7 @@ export function ScheduleFields({
         </div>
       ) : null}
 
-      <div className="grid gap-3 min-[420px]:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-3">
         <div>
           <Label htmlFor="schedule-start">{isNew ? "Starts on" : "Schedule start date"}</Label>
           <input className="task-field" id="schedule-start" min={isNew ? today : undefined} onChange={(event) => setStart(event.target.value)} required type="date" value={timing.startsOn} />
@@ -274,7 +279,9 @@ export function ScheduleFields({
       {timeError ? <p className="text-xs text-danger" id="schedule-time-error" role="alert">{timeError}</p> : null}
 
       {spec ? (
-        <fieldset>
+        <details open={spec.end.type !== "never" || undefined}>
+          <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-task-text">End schedule · {endLabel(spec.end)}</summary>
+        <fieldset className="mt-2">
           <legend className="mb-2 text-xs font-semibold text-task-text">Ends</legend>
           <div className="grid gap-2 min-[420px]:grid-cols-3">
             <Toggle onClick={() => setEnd({ type: "never" })} pressed={spec.end.type === "never"}>Never</Toggle>
@@ -294,6 +301,7 @@ export function ScheduleFields({
             </div>
           ) : null}
         </fieldset>
+        </details>
       ) : null}
 
       {specError ? <p className="text-xs text-danger" role="alert">{specError}</p> : null}
@@ -314,6 +322,8 @@ export function ScheduleFields({
             <div><dt className="inline">First occurrence: </dt><dd className="inline text-task-text">{prettyDate(storedStart)}</dd></div>
           ) : null}
         </dl>
+        <details className="mt-2">
+          <summary className="min-h-11 cursor-pointer py-3 text-sm text-task-text">View upcoming dates</summary>
         {preview.length ? (
           <ol className="mt-3 grid gap-1 text-xs text-task-text min-[420px]:grid-cols-2" data-testid="schedule-preview-dates">
             {preview.map((date, index) => (
@@ -326,6 +336,7 @@ export function ScheduleFields({
           <p className="mt-3 text-xs text-task-text-muted">{specError ? "Fix the schedule to see its dates." : "No upcoming dates."}</p>
         )}
         {preview.length > 0 && preview.length < PREVIEW_COUNT ? <p className="mt-2 text-xs text-task-text-muted">The schedule ends after these dates.</p> : null}
+        </details>
       </section>
 
       <details className="rounded-xl border border-task-border p-3 text-xs text-task-text-muted">

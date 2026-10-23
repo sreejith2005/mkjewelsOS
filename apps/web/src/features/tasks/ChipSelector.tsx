@@ -13,6 +13,7 @@ export function ChipSelector({ active, children, Icon, label, onClick, summary }
   return (
     <button
       aria-expanded={active}
+      aria-label={summary ? `${label}: ${summary}` : label}
       className={cn(
         "inline-flex min-h-11 max-w-full items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium",
         active ? "border-task-accent bg-task-accent-soft text-task-text" : "border-task-border bg-task-bg text-task-text-muted",

@@ -41,6 +41,12 @@ function chooseUsers(...names: string[]) {
 }
 
 describe("Create Task scheduling", () => {
+  it("offers recurring creation to an ordinary employee with the schedule save path", () => {
+    renderComposer({ profile: { ...profile, user_role: "staff" }, onSaveSchedule: vi.fn() });
+    fireEvent.click(screen.getByRole("button", { name: "Recurring" }));
+    expect(screen.getByLabelText("Repeats")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Create schedule" })).toBeTruthy();
+  });
   it("keeps the one-time composer unchanged for authors who cannot schedule", () => {
     renderComposer();
     expect(screen.queryByTestId("task-schedule-type")).toBeNull();
@@ -50,7 +56,7 @@ describe("Create Task scheduling", () => {
   });
 
   it("defaults to a one-time task when scheduling is offered", () => {
-    renderComposer({ canSchedule: true, onSaveSchedule: vi.fn() });
+    renderComposer({ onSaveSchedule: vi.fn() });
     expect(screen.getByRole("button", { name: "One-time" }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.queryByTestId("schedule-fields")).toBeNull();
     expect(screen.getByRole("button", { name: "Assign Task" })).toBeTruthy();
@@ -60,13 +66,16 @@ describe("Create Task scheduling", () => {
     const onSaveSchedule = vi.fn().mockResolvedValue("template");
     const onCreated = vi.fn();
     const onSave = vi.fn();
-    renderComposer({ canSchedule: true, onSaveSchedule, onCreated, onSave });
+    renderComposer({ onSaveSchedule, onCreated, onSave });
     fireEvent.change(screen.getByLabelText("Task title"), { target: { value: "Monthly stock audit" } });
     fireEvent.click(screen.getByRole("button", { name: "Recurring" }));
     expect(screen.queryByRole("button", { name: /Due Date/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /In Loop/i })).toBeNull();
     expect(screen.getByTestId("schedule-unsupported-note")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "3rd Saturday of every month" }));
+    fireEvent.change(screen.getByLabelText("Repeats"), { target: { value: "custom" } });
+    fireEvent.change(screen.getByLabelText("Unit"), { target: { value: "monthly_weekday" } });
+    fireEvent.change(screen.getByLabelText("Which"), { target: { value: "3" } });
+    fireEvent.change(screen.getByLabelText("Weekday"), { target: { value: "SA" } });
     fireEvent.change(screen.getByLabelText("Start time"), { target: { value: "11:00" } });
     fireEvent.change(screen.getByLabelText("Due time"), { target: { value: "18:00" } });
     chooseUsers("Teammate", "Cross-branch teammate");
@@ -86,7 +95,7 @@ describe("Create Task scheduling", () => {
   it("retries only the schedules that were not saved", async () => {
     const onSaveSchedule = vi.fn().mockResolvedValueOnce("first").mockRejectedValueOnce(new Error("Network down")).mockResolvedValue("second");
     const onCreated = vi.fn();
-    renderComposer({ canSchedule: true, onSaveSchedule, onCreated });
+    renderComposer({ onSaveSchedule, onCreated });
     fireEvent.change(screen.getByLabelText("Task title"), { target: { value: "Daily cash count" } });
     fireEvent.click(screen.getByRole("button", { name: "Recurring" }));
     chooseUsers("Teammate", "Cross-branch teammate");
@@ -101,7 +110,7 @@ describe("Create Task scheduling", () => {
   it("creates an as-needed duty without a calendar", async () => {
     const onSaveSchedule = vi.fn().mockResolvedValue("duty");
     const onCreated = vi.fn();
-    renderComposer({ canSchedule: true, onSaveSchedule, onCreated });
+    renderComposer({ onSaveSchedule, onCreated });
     fireEvent.change(screen.getByLabelText("Task title"), { target: { value: "Customer follow-up" } });
     fireEvent.click(screen.getByRole("button", { name: "As needed" }));
     fireEvent.change(screen.getByPlaceholderText(/As Required, Per Customer/), { target: { value: "Per Customer" } });
@@ -113,7 +122,7 @@ describe("Create Task scheduling", () => {
 
   it("asks for a verifier next to the option before saving", async () => {
     const onSaveSchedule = vi.fn();
-    renderComposer({ canSchedule: true, onSaveSchedule });
+    renderComposer({ onSaveSchedule });
     fireEvent.change(screen.getByLabelText("Task title"), { target: { value: "Vault audit" } });
     fireEvent.click(screen.getByRole("button", { name: "Recurring" }));
     chooseUsers("Teammate");

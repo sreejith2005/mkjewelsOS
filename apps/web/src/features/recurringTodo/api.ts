@@ -66,20 +66,15 @@ export async function materializeRecurringTemplate(
 }
 
 /**
- * Creates one schedule from Create Task and, when it is due today, its
- * occurrence. Once the template is saved this resolves with its id even if the
- * immediate occurrence could not be made: a retry must not create a second
- * schedule, and the scheduler and the doer's own catch-up
- * (`ensure-my-recurring-tasks`) create a due occurrence idempotently.
+ * Creates one schedule and its first calendar occurrence atomically. As-needed
+ * duties create no occurrence until started. The scheduler and the doer's own
+ * catch-up (`ensure-my-recurring-tasks`) create later occurrences idempotently.
  */
 export async function createScheduledTask(payload: Json): Promise<string> {
-  const templateId = await saveRecurringTemplate(null, payload);
-  try {
-    await materializeRecurringTemplate(templateId, payload);
-  } catch {
-    // The schedule is saved; today's occurrence follows from the scheduler.
-  }
-  return templateId;
+  // The save transaction already creates the first calendar occurrence (and
+  // none for as-needed work). Creation must not call the management-only
+  // "run now" endpoint, which ordinary task authors cannot use.
+  return saveRecurringTemplate(null, payload);
 }
 
 export async function deleteRecurringTemplate(id: string): Promise<string> {

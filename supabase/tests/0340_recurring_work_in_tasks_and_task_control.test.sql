@@ -74,11 +74,11 @@ insert into saved values('per_customer',public.save_recurring_todo_template_with
   'requires_form',false,'form_template_id','','is_active',false,'verification_required',false,'verifier_user_profile_id','',
   'followup_enabled',false,'personal_performance_enabled',true,'trigger_label','  Per Customer ')));
 
--- Not everyone may create schedules.
+-- Creation requires an active author and valid organizational scope.
 select pg_temp.act(3);
 select throws_ok($$select public.save_recurring_todo_template_with_audit(null,jsonb_build_object('title','Doer schedule',
   'recurrence_rule','FREQ=DAILY','planned_time','11:00','default_assignee_type','specific_user',
-  'default_assignee_user_id','34040000-0000-4000-8000-000000000003'))$$,'42501',null,'a doer cannot create a schedule');
+  'default_assignee_user_id','34040000-0000-4000-8000-000000000003'))$$,'42501',null,'a doer cannot create a schedule without their organizational scope');
 select pg_temp.act(7);
 select throws_ok($$select public.save_recurring_todo_template_with_audit(null,jsonb_build_object('title','Inactive schedule',
   'recurrence_rule','FREQ=DAILY','planned_time','11:00','default_assignee_type','specific_user',
