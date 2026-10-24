@@ -9,6 +9,15 @@ export const FORM_FIELD_TYPES = [
 
 export const FORM_DRAFT_FIELD_TYPES = [...FORM_FIELD_TYPES, "file"] as const;
 
+/** The only roles the server accepts in a form's permissions (`normalize_form_permissions`, migration 0009). */
+export const FORM_LIBRARY_ROLES = ["super_admin", "admin", "manager", "crm", "staff"] as const satisfies readonly UserRole[];
+
+/** A form's role list reduced to the approved Forms Library roles, without duplicates; empty falls back to all of them. */
+export function approvedFormRoles(roles: readonly string[] | undefined): readonly (typeof FORM_LIBRARY_ROLES)[number][] {
+  const approved = FORM_LIBRARY_ROLES.filter((role) => roles?.includes(role));
+  return approved.length ? approved : FORM_LIBRARY_ROLES;
+}
+
 export type FormFieldType = (typeof FORM_DRAFT_FIELD_TYPES)[number];
 export type FormConditionOperator = "equals" | "not_equals" | "contains" | "not_empty";
 export type FormRuleOperator = FormConditionOperator | "not_contains" | "in" | "not_in" | "greater_than" | "less_than" | "greater_than_or_equal" | "less_than_or_equal" | "is_empty";

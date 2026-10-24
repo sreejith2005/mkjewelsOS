@@ -1,4 +1,4 @@
-import type { FmsStageDefinition, FormTemplateDefinition, Json } from "@jewelos/core";
+import { approvedFormRoles, FORM_LIBRARY_ROLES, type FmsStageDefinition, type FormTemplateDefinition, type Json } from "@jewelos/core";
 import { deleteForm, duplicateForm, loadTaskForms, publishForm, reviseForm, saveDraft, setFormLibraryVisibility, type FormBundle } from "@/features/forms/api";
 
 /**
@@ -50,7 +50,20 @@ export async function loadFormDefinition(id: string): Promise<FormTemplateDefini
  * version and returns the draft id. The id is returned as soon as the draft
  * exists, so the caller can attach it to the step before anything else can fail.
  */
-export async function saveQuestionnaireDraft(target: QuestionnaireTarget, payload: Json, fields: Json, name: string, onCreated: (draftId: string) => Promise<void>): Promise<string> {
+/**
+ * The server accepts only the approved Forms Library roles. A step's doer opens
+ * its form through the assignment, not these roles, so they are cleaned here
+ * rather than failing the save.
+ */
+function withApprovedRoles(payload: Json): Json {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
+  const permissions = payload.permissions;
+  const roles = permissions && typeof permissions === "object" && !Array.isArray(permissions) && Array.isArray(permissions.roles) ? permissions.roles.filter((role): role is string => typeof role === "string") : undefined;
+  return { ...payload, permissions: { roles: [...approvedFormRoles(roles)] } };
+}
+
+export async function saveQuestionnaireDraft(target: QuestionnaireTarget, rawPayload: Json, fields: Json, name: string, onCreated: (draftId: string) => Promise<void>): Promise<string> {
+  const payload = withApprovedRoles(rawPayload);
   if (target.kind === "draft") return saveDraft(target.draftId, payload, fields);
   if (target.kind === "new") {
     const id = await saveDraft(null, payload, fields);
@@ -84,6 +97,6 @@ export function blankQuestionnaire(stageName: string, workflowName: string): For
     description: `Questions for the ${stageName || "workflow"} step.`,
     sections: [{ key: "section_1", title: "Section 1" }],
     fields: [],
-    permissions: { roles: ["super_admin", "admin", "manager", "crm", "staff", "doer", "housekeeping", "hr"] },
+    permissions: { roles: [...FORM_LIBRARY_ROLES] },
   };
 }
