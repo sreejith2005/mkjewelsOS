@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, Paperclip } from "lucide-react";
-import { displayFormAnswer, formCompletionProgress, formUsesSteps, isFinalFormStep, nextFormStepKey, normalizeFormAnswers, previousFormStepKey, resolveFormOptions, updateVisibleFormAnswers, validateCompleteForm, validateFormStep, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition, type FormValidationIssue } from "@jewelos/core";
+import { displayFormAnswer, reconcileFormPreviewAnswers, formCompletionProgress, formUsesSteps, isFinalFormStep, nextFormStepKey, normalizeFormAnswers, previousFormStepKey, resolveFormOptions, updateVisibleFormAnswers, validateCompleteForm, validateFormStep, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition, type FormValidationIssue } from "@jewelos/core";
 import { Button, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { signedFormFileUrl, uploadFormFile } from "./api";
@@ -95,6 +95,10 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
     departments: new Map(dynamicOptions.departments.map((item) => [item.id, item.label])),
   }), [dynamicOptions]);
   const optionsFor = (type: string) => type === "user_dropdown" ? dynamicOptions.users : type === "branch_dropdown" ? dynamicOptions.branches : type === "department_dropdown" ? dynamicOptions.departments.filter((item) => !branchFieldKey || !answers[branchFieldKey] || item.branchId === answers[branchFieldKey]) : [];
+
+  // A live preview follows an editor: sample answers the edited Form can no longer
+  // hold (a removed question or choice, a changed type) are dropped.
+  useEffect(() => { if (preview) setAnswers((current) => reconcileFormPreviewAnswers(resolved, current) as Record<string, FormAnswer>); }, [preview, resolved]);
 
   // A new step starts at its first question, not wherever the last one was scrolled to.
   const firstStepRender = useRef(true);

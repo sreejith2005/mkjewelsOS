@@ -46,7 +46,8 @@ function RoutingHarness({ rule }: { rule?: FmsBranchRule } = {}) {
 function DecisionHarness() {
   const [stages, setStages] = useState<FmsStageDefinition[]>(() => {
     const first = { ...newFmsStage("form", 0), key: "initial", name: "Initial details", formTemplateId: data.forms[0]!.id, defaultNextStageKey: "decision" };
-    const decision = { ...newFmsStage("task", 1), key: "decision", name: "Approve request", defaultNextStageKey: "follow_up" };
+    // A Decision Step saved by an earlier version: kept and editable, never offered for new steps.
+    const decision = { ...newFmsStage("task", 1), key: "decision", name: "Approve request", defaultNextStageKey: "follow_up", sla: { ...newFmsStage("task", 1).sla, decisionMode: "decision" as const, decisionOptions: [{ key: "yes", label: "Yes" }, { key: "no", label: "No" }] } };
     const followUp = { ...newFmsStage("task", 2), key: "follow_up", name: "Follow up" };
     return [first, decision, followUp];
   });
@@ -79,26 +80,31 @@ describe("FMS stage editor", () => {
   it("offers optional deadlines and a normalized hours/minutes TAT", async () => {
     const user = userEvent.setup();
     render(<Harness />);
-    expect(screen.getByLabelText("Set deadline")).toBeTruthy();
-    expect(screen.getByLabelText("Completion due date").getAttribute("type")).toBe("date");
-    await user.click(screen.getByRole("button", { name: /TAT \(hours\)/ }));
+    const deadline = screen.getByRole("switch", { name: "Set deadline" });
+    expect(screen.getByLabelText("Due date").getAttribute("type")).toBe("date");
+    await user.selectOptions(screen.getByLabelText("Deadline method"), "tat_hours");
     expect(screen.getByLabelText("TAT value")).toBeTruthy();
     await user.selectOptions(screen.getByLabelText("TAT unit"), "minutes");
     expect((screen.getByLabelText("TAT unit") as HTMLSelectElement).value).toBe("minutes");
-    expect(screen.getByLabelText("Trigger from")).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: /Days before date/ }));
+    expect(screen.getByLabelText("Counted from")).toBeTruthy();
+    await user.selectOptions(screen.getByLabelText("Deadline method"), "days_before_date");
     expect(screen.getByLabelText("Future date")).toBeTruthy();
     expect(screen.getByLabelText("Days before")).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: /Specific clock time/ }));
+    await user.selectOptions(screen.getByLabelText("Deadline method"), "specific_time");
     expect(screen.getByLabelText("Clock time")).toBeTruthy();
-    await user.click(screen.getByLabelText("Set deadline"));
+    await user.click(deadline);
     expect(screen.queryByLabelText("TAT value")).toBeNull();
     expect(screen.queryByLabelText("Escalate after")).toBeNull();
   });
-  it("shows the linked form selector directly, without an optional-information toggle", () => {
+  it("offers the questionnaire choices first and the existing-form list only when linking", async () => {
+    const user = userEvent.setup();
     render(<LaterFormHarness />);
-    expect(screen.queryByLabelText("Add additional information")).toBeNull();
     expect(screen.queryByLabelText("Initial details form")).toBeNull();
+    expect(screen.queryByLabelText("Linked form")).toBeNull();
+    expect((screen.getByRole("button", { name: "No questionnaire" }) as HTMLButtonElement).getAttribute("aria-pressed")).toBe("true");
+    // Creating or importing needs Forms authoring permission, which this harness does not grant.
+    expect(screen.queryByRole("button", { name: "Create questionnaire" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Link existing form" }));
     const select = screen.getByLabelText("Linked form") as HTMLSelectElement;
     expect(select.value).toBe("");
     expect(select.textContent).toContain("Initial details");
@@ -128,8 +134,9 @@ describe("FMS stage editor", () => {
   it("keeps instructions and completion controls available but secondary", () => {
     render(<Harness />);
     expect(screen.getByLabelText("How / instructions")).toBeTruthy();
-    expect(screen.getByText("How / instructions (optional)").tagName).toBe("SUMMARY");
-    expect(screen.getByText("Completion controls").tagName).toBe("SUMMARY");
+    expect(screen.getByText("Instructions").closest("summary")).toBeTruthy();
+    expect(screen.getByText("Completion controls").closest("summary")).toBeTruthy();
+    expect((screen.getByText("Completion controls").closest("details") as HTMLDetailsElement).open).toBe(false);
     expect(screen.getByLabelText("Require evidence")).toBeTruthy();
   });
 
@@ -143,7 +150,7 @@ describe("FMS stage editor", () => {
     await user.selectOptions(screen.getByLabelText("Route 1 then go to"), "wholesale_desk");
     const rule = latestStage!.branchRules[0]!;
     expect(rule).toMatchObject({ source: "form_answer", sourceKey: "customer_type", operator: "equals", value: "wholesale", nextStageKey: "wholesale_desk" });
-    expect(screen.getByText("Otherwise (fallback) go to")).toBeTruthy();
+    expect(screen.getByText("Otherwise go to")).toBeTruthy();
   });
   it("offers the question's option labels while still matching on the stable option value", async () => {
     const user = userEvent.setup();
@@ -181,15 +188,15 @@ describe("FMS stage editor", () => {
     const user = userEvent.setup();
     render(<RoutingHarness />);
     await user.click(screen.getByRole("button", { name: "Add conditional route" }));
-    expect(screen.getByText(/An answer that matches no route must still have somewhere to go/)).toBeTruthy();
+    expect(screen.getByText("Choose where any other answer goes.")).toBeTruthy();
     await user.selectOptions(screen.getByLabelText("Otherwise (fallback) go to"), "wholesale_desk");
-    expect(screen.queryByText(/An answer that matches no route must still have somewhere to go/)).toBeNull();
+    expect(screen.queryByText("Choose where any other answer goes.")).toBeNull();
   });
-  it("configures conditions only from dynamic earlier-decision options", async () => {
+  it("keeps a legacy decision's outcomes editable and configures conditions only from them", async () => {
     const user = userEvent.setup();
     render(<DecisionHarness />);
-    await user.click(screen.getByRole("button", { name: /Decision step/ }));
-    await user.click(screen.getByRole("button", { name: "Add decision option" }));
+    expect(screen.queryByRole("button", { name: /Decision step/ })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Add outcome" }));
     await user.type(screen.getByLabelText("Decision option 3"), " Call Back Required");
     await user.click(screen.getByRole("button", { name: "Edit follow up" }));
     const conditional = screen.getByLabelText("Enable conditional step");

@@ -13,9 +13,12 @@ export function stableFmsJson(value: unknown): string {
 /**
  * A short, stable content fingerprint of a normalized definition. It detects
  * "the draft changed while the assistant was working"; it is not a security hash.
+ * Builder-only questionnaire metadata is left out, so a server compiled with an
+ * older normalizer that drops it still produces the same fingerprint.
  */
 export function fmsDefinitionFingerprint(definition: FmsFlowDefinition): string {
-  const text = stableFmsJson(normalizeFmsDefinition(definition));
+  const normalized = normalizeFmsDefinition(definition);
+  const text = stableFmsJson({ ...normalized, stages: normalized.stages.map(({ sla: { questionnaire: _questionnaire, ...sla }, ...stage }) => ({ ...stage, sla })) });
   // cyrb53: two 32-bit lanes, enough to make accidental collisions negligible.
   let h1 = 0xdeadbeef; let h2 = 0x41c6ce57;
   for (let index = 0; index < text.length; index += 1) {

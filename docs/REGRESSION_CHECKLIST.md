@@ -165,6 +165,54 @@ Ships dark: every switch is off until an administrator turns it on under FMS ->
 - [ ] A failed FMS step submission (e.g. revoked permission) still shows its
       original error; the run's **Run** tab then lists the failed attempt.
 
+### FMS Builder 3.0 - 2026-10-24
+
+Web and shared packages only (no migration). Design:
+`docs/superpowers/specs/2026-10-24-fms-builder-3-design.md`. Check on desktop
+and at phone width (also inside the Android app).
+
+- [ ] No **Guided Mode** / **Canvas Mode** toggle; phones open on the canvas.
+      No Normal/Decision step choice; **Add Step** gives a step with no deadline.
+- [ ] Select mode: drag empty space to box-select; drag one selected card and
+      the group moves together, connections follow, one Undo reverts the move.
+      Hand mode, Space+drag and middle-drag pan. Wheel and pinch zoom.
+- [ ] Shift/Ctrl+click toggles; Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+D, Ctrl+X,
+      Delete, Ctrl+Z / Ctrl+Shift+Z, Esc, 1 work on the canvas and do NOT fire
+      while typing in the inspector, a Form question or any dialog.
+- [ ] Duplicate Introduction -> Proposal -> Negotiation: three copies, chained,
+      new keys, not connected to the originals; Undo removes all three.
+- [ ] Copy two steps in workflow A, open workflow B in the same tab, Ctrl+V:
+      copies land at the pointer with their internal link; links to uncopied
+      steps are reported, not re-pointed; Forms/people not available here are
+      reported. Nothing is published.
+- [ ] Delete four selected steps: one confirmation naming steps and
+      connections; remaining steps are not reconnected; the Start form stays.
+- [ ] Click the middle of three close routes: only it highlights; **Edit
+      route** opens that exact condition; **Change destination** + click a step
+      moves only that route; **Delete route** removes only it.
+- [ ] **Create questionnaire** on a step: editor opens over the canvas with a
+      live preview; add two sections and a conditional question; **Save
+      draft**, reload the page: the step shows "Unpublished changes" and
+      **Continue editing** reopens it. **Use in workflow**: the step pins the
+      new published version and its question appears in **Add condition**.
+- [ ] Simulate Yes -> Proposal / No -> Follow-up on that question.
+- [ ] **Edit a copy** of a Forms Library form on a step: the library form and
+      other workflows using it are unchanged.
+- [ ] **Import section** (copy) from a three-section Form: only that section
+      arrives, a dependency on another section is warned about first.
+      **Link one section of a form…** still pins the section (0345).
+- [ ] Publish readiness lists an unpublished questionnaire draft; **Discard
+      changes** removes the draft and keeps the version in use.
+- [ ] Forms Library editor: live preview beside the questions; renaming a
+      question, adding an option, Required and conditions show immediately;
+      hide/show keeps edits; phone uses **Preview form** / **Edit**.
+- [ ] **Import / Export**: export whole/selected JSON; import that file, pasted
+      JSON, and steps from another FMS; an n8n file is refused.
+- [ ] Legacy: a published workflow with a Decision Step renders (Outcome
+      choices under Routing), runs, and its outcome routes and "Run this step
+      only if" conditions behave exactly as before. A saved step with a
+      deadline still shows **Set deadline** ON.
+
 ### FMS form sections and full-screen canvas - 2026-10-23
 
 Migration `0345_fms_stage_form_sections.sql`; design:

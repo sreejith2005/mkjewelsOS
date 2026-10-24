@@ -53,18 +53,19 @@ describe("Linked Form section configuration", () => {
   it("links a Form, scopes it to one section, and routes on that section's questions", async () => {
     const user = userEvent.setup();
     render(<Workflow />);
-    expect(screen.queryByRole("group", { name: "Form scope" })).toBeNull();
+    expect(screen.queryByLabelText("Form section")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Link existing form" }));
     await user.selectOptions(screen.getByLabelText("Linked form"), SALES);
     // Entire Form stays the default, preserving the historical behaviour.
-    expect(screen.getByRole("button", { name: /Entire Form/ }).getAttribute("aria-pressed")).toBe("true");
-    expect(intro().sla.formSectionKey).toBeUndefined();
-
-    await user.click(screen.getByRole("button", { name: /Specific Section/ }));
     const picker = screen.getByLabelText("Form section") as HTMLSelectElement;
+    expect(picker.value).toBe("");
+    expect(intro().sla.formSectionKey).toBeUndefined();
     expect([...picker.options].map((option) => option.textContent)).toEqual([
-      "Introduction Call · 3 questions", "Product Demonstration · 2 questions", "Negotiation · 1 question", "Closing · 1 question",
+      "Entire Form", "Only Introduction Call · 3 questions", "Only Product Demonstration · 2 questions", "Only Negotiation · 1 question", "Only Closing · 1 question",
     ]);
+    await user.selectOptions(picker, "intro");
     expect(intro().sla.formSectionKey).toBe("intro");
+    expect(screen.getByText(/3 questions · Introduction Call/)).toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: "Add conditional route" }));
     const question = screen.getByLabelText("Route 1 question") as HTMLSelectElement;
@@ -95,11 +96,9 @@ describe("Linked Form section configuration", () => {
   it("returns to Entire Form without touching routes, and clears the section when the Form is removed", async () => {
     const user = userEvent.setup();
     render(<Workflow initial={{ formTemplateId: SALES, sla: { ...newFmsStage("task", 1).sla, formSectionKey: "demo" } }} />);
-    await user.click(screen.getByRole("button", { name: /Entire Form/ }));
+    await user.selectOptions(screen.getByLabelText("Form section"), "");
     expect(intro().sla.formSectionKey).toBeUndefined();
-    expect(screen.queryByLabelText("Form section")).toBeNull();
-    await user.click(screen.getByRole("button", { name: /Specific Section/ }));
-    await user.selectOptions(screen.getByLabelText("Linked form"), "");
+    await user.click(screen.getByRole("button", { name: "Remove" }));
     expect(intro().formTemplateId).toBeUndefined();
     expect(intro().sla.formSectionKey).toBeUndefined();
   });
@@ -110,7 +109,7 @@ describe("Linked Form section configuration", () => {
     const picker = screen.getByLabelText("Form section") as HTMLSelectElement;
     expect(picker.value).toBe("intro");
     expect(picker.getAttribute("aria-invalid")).toBe("true");
-    expect(picker.options[0]!.textContent).toBe("Unavailable section (not in this Form version)");
+    expect(picker.selectedOptions[0]!.textContent).toBe("Unavailable section (not in this Form version)");
     expect(screen.getByText(/This section is not in the linked Form version/)).toBeTruthy();
   });
 
@@ -120,6 +119,6 @@ describe("Linked Form section configuration", () => {
       return <FmsStageEditor data={data} onChange={setStage} onDelete={() => undefined} stage={stage} stages={[stage]} />;
     }
     render(<Trigger />);
-    expect(screen.queryByRole("group", { name: "Form scope" })).toBeNull();
+    expect(screen.queryByLabelText("Form section")).toBeNull();
   });
 });

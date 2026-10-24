@@ -58,6 +58,7 @@ export function normalizeFmsDefinition(input: FmsFlowDefinition): FmsFlowDefinit
       ...(stage.sla?.followUp ? { followUp: stage.sla.followUp } : {}),
       ...(text(stage.sla?.assignmentFieldKey) ? { assignmentFieldKey: text(stage.sla.assignmentFieldKey).toLowerCase() } : {}),
       ...(text(stage.sla?.formSectionKey) ? { formSectionKey: text(stage.sla.formSectionKey) } : {}),
+      ...(stage.sla?.questionnaire?.origin === "stage" || stage.sla?.questionnaire?.origin === "copied" ? { questionnaire: { origin: stage.sla.questionnaire.origin, ...(UUID.test(text(stage.sla.questionnaire.draftFormId)) ? { draftFormId: text(stage.sla.questionnaire.draftFormId) } : {}) } } : {}),
       timingMethod: TIMING_METHODS.has(stage.sla?.timingMethod as FmsTimingMethod) ? stage.sla.timingMethod as FmsTimingMethod : "completion_date",
       dueDate: text(stage.sla?.dueDate), deadlineEnabled: stage.sla?.deadlineEnabled !== false,
       decisionMode: stage.sla?.decisionMode === "yes_no" || stage.sla?.decisionMode === "decision" ? "yes_no" as const : "normal" as const,
@@ -242,6 +243,7 @@ export function validateFmsDefinition(raw: FmsFlowDefinition, context: FmsValida
     if (stageIndex === 0 && !stage.formTemplateId) add("missing_form", "The initial Form requires an exact published template version");
     if (stage.formTemplateId && !UUID.test(stage.formTemplateId)) add("invalid_form", "Linked form ID is invalid");
     if (stage.formTemplateId && UUID.test(stage.formTemplateId) && context.availableFormIds && !context.availableFormIds.includes(stage.formTemplateId)) add("missing_linked_form", "The linked Form is no longer an available published version");
+    if (stage.sla.questionnaire?.draftFormId) add("questionnaire_draft_pending", "Questionnaire changes are saved as a draft but not in use yet. Open the questionnaire and choose Use in workflow, or discard the changes");
     if (stage.sla.assignmentFieldKey) {
       const field = stage.formTemplateId ? context.formFields?.[stage.formTemplateId]?.find((item) => item.key === stage.sla.assignmentFieldKey) : undefined;
       if (AUTO.has(stage.type) || !field || !fmsAssignmentFields([field]).length) add("invalid_assignment_field", "Choose a required, always visible User question in this step's linked Form");

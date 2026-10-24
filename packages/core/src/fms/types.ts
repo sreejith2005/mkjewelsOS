@@ -30,6 +30,14 @@ export type FmsDecisionMode = "normal" | "yes_no" | "decision";
 export type FmsDecisionOption = Readonly<{ key: string; label: string }>;
 /** A conditional step activates only for one configured option of an earlier Decision Step. */
 export type FmsConditionalRule = Readonly<{ decisionStageKey: string; outcome: string } | { decisionStageKey: string; decisionOptionKey: string }>;
+/**
+ * `stage`: the Form family was created for this stage, so an edit publishes the
+ * next version of the same family. `copied`: the stage was pasted or imported
+ * from another workflow, so the first edit makes this stage its own copy and
+ * two workflows never share one editable questionnaire. `draftFormId` is an
+ * unpublished draft of the next version, kept so the work survives a reload.
+ */
+export type FmsStageQuestionnaire = Readonly<{ origin: "stage" | "copied"; draftFormId?: string | undefined }>;
 export type FmsSlaRule = Readonly<{
   pipelineName?: string | undefined;
   assignment?: FmsAssignmentConfig | undefined;
@@ -44,6 +52,12 @@ export type FmsSlaRule = Readonly<{
    * The server validates a stage submission against exactly this section.
    */
   formSectionKey?: string | undefined;
+  /**
+   * Authoring metadata for a questionnaire built inside the FMS builder. The
+   * runtime never reads it: the stage still runs the exact published Form in
+   * `formTemplateId`. Absent means the Form is linked from the Forms Library.
+   */
+  questionnaire?: FmsStageQuestionnaire | undefined;
   timingMethod?: FmsTimingMethod | undefined;
   deadlineEnabled?: boolean | undefined;
   dueDate: string;
