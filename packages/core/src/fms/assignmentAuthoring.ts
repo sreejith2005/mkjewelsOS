@@ -36,9 +36,17 @@ export function fmsFormAssignmentPreview(stages: readonly FmsStageDefinition[], 
     return `After "${source.name}": the same employee who did "${source.name}". Its form has no employee question.`;
   });
 }
+/**
+ * Whether the completing employee may keep the suggested employee or choose
+ * another. Mirrors `fms_assignment_allows_handoff` (0348): never for a fixed
+ * employee; always when the step follows the previous form's Assigned To.
+ */
+export function fmsAssignmentAllowsHandoff(config: Pick<FmsAssignmentConfig, "mode" | "allowHandoff" | "followFormAssignee"> | undefined): boolean {
+  return !!config && config.mode !== "fixed_employee" && (config.allowHandoff || config.followFormAssignee === true);
+}
 export function suggestFmsAssignment(previous: FmsStageDefinition | undefined, fields: Readonly<Record<string, readonly FmsFormFieldRef[]>>): FmsAssignmentConfig {
   const questions = previous?.formTemplateId ? fmsStageFormFields(previous, fields).filter(field => field.type === "user_dropdown" && field.required && field.shown !== false && !field.hasCondition) : [];
-  return { mode: "previous_form", allowHandoff: false, followFormAssignee: true,
+  return { mode: "previous_form", allowHandoff: true, followFormAssignee: true,
     fallbackRule: { type: "previous_step_doer" },
     sources: previous?.formTemplateId && questions.length === 1
       ? [{ sourceStageKey: previous.key, formTemplateId: previous.formTemplateId, fieldKey: questions[0]!.key }] : [] };

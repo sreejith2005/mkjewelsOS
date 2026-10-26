@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fmsFormAssigneeQuestions, fmsFormAssignmentPreview, fmsSourceQuestions, requireFmsAssignmentSourceForms, suggestFmsAssignment } from "./assignmentAuthoring";
+import { fmsAssignmentAllowsHandoff, fmsFormAssigneeQuestions, fmsFormAssignmentPreview, fmsSourceQuestions, requireFmsAssignmentSourceForms, suggestFmsAssignment } from "./assignmentAuthoring";
 import { normalizeFmsDefinition } from "./engine";
 import type { FmsFlowDefinition, FmsStageDefinition } from "./types";
 const stage = { key: "call", name: "Call", type: "form", formTemplateId: "form", defaultNextStageKey: "demo", branchRules: [], parallelTargetStageKeys: [], sla: {}, assigneeRules: [] } as unknown as FmsStageDefinition;
@@ -14,6 +14,14 @@ describe("assignment authoring defaults", () => {
     const flow = { assignmentVersion: 2, stages: [stage, { ...stage, key: "demo", sla: { assignment: suggestFmsAssignment(stage, { form: [{key:"owner",label:"Owner",type:"user_dropdown",required:true}] }) } }] } as unknown as FmsFlowDefinition;
     expect(requireFmsAssignmentSourceForms(flow).stages[0]?.sla.completionFormRequired).toBe(true);
     expect(requireFmsAssignmentSourceForms({ ...flow, assignmentVersion: 1 }).stages[0]?.sla.completionFormRequired).toBeUndefined();
+  });
+  it("lets the completing employee replace a form-assigned employee but never a fixed one", () => {
+    expect(fmsAssignmentAllowsHandoff({ mode: "previous_form", allowHandoff: false, followFormAssignee: true })).toBe(true);
+    expect(fmsAssignmentAllowsHandoff({ mode: "previous_form", allowHandoff: false })).toBe(false);
+    expect(fmsAssignmentAllowsHandoff({ mode: "manual_handoff", allowHandoff: true })).toBe(true);
+    expect(fmsAssignmentAllowsHandoff({ mode: "fixed_employee", allowHandoff: true, followFormAssignee: true })).toBe(false);
+    expect(fmsAssignmentAllowsHandoff(undefined)).toBe(false);
+    expect(suggestFmsAssignment(undefined, {}).allowHandoff).toBe(true);
   });
   it("follows a named Assigned To first, otherwise the only employee question", () => {
     const user = (key: string, label: string) => ({ key, label, type: "user_dropdown" });

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fmsStageFormDefinition, isFormFieldActive, simulateFmsDefinition, type FormAnswer, type FormFieldDefinition, type FormTemplateDefinition, type FmsFlowDefinition, type FmsStageDefinition } from "@jewelos/core";
+import { fmsAssignmentAllowsHandoff, fmsStageFormDefinition, isFormFieldActive, simulateFmsDefinition, type FormAnswer, type FormFieldDefinition, type FormTemplateDefinition, type FmsFlowDefinition, type FmsStageDefinition } from "@jewelos/core";
 import { loadFmsSimulationForms } from "@jewelos/data/fms/formAuthoring";
 import { Button, Field, Modal, Notice } from "@/components/ui";
 import type { FmsData } from "./api";
@@ -61,7 +61,7 @@ export function FmsSimulation({ definition, data, onClose }: { definition: FmsFl
       {definition.stages.map(stage => <details className="rounded-xl border border-gold/20 p-3" key={stage.key}><summary className="cursor-pointer font-semibold text-champagne">{stage.name}</summary><div className="mt-3 space-y-3">
         {fieldsFor(stage).map(field => <SampleAnswer key={field.key} field={field} value={answers[stage.key]?.[field.key]} data={data} onChange={value => setAnswer(stage.key, field.key, value)} />)}
         {stage.sla.decisionOptions?.length ? <Field label="Sample decision"><select className="field" value={outcomes[stage.key] ?? ""} onChange={event => setOutcomes(current => ({...current,[stage.key]:event.target.value}))}><option value="">Choose outcome</option>{stage.sla.decisionOptions.map(option => <option key={option.key} value={option.key}>{option.label}</option>)}</select></Field> : null}
-        {stage.sla.assignment?.allowHandoff && stage.sla.assignment.mode !== "fixed_employee" ? <Field label="Sample manual handoff"><select className="field" value={handoffs[stage.key] ?? ""} onChange={event => setHandoffs(current => ({...current,[stage.key]:event.target.value}))}><option value="">Use configured source</option>{data.users.map(user => <option key={user.id} value={user.id}>{user.employee_name}</option>)}</select></Field> : null}
+        {fmsAssignmentAllowsHandoff(stage.sla.assignment) ? <Field label="Sample manual handoff"><select className="field" value={handoffs[stage.key] ?? ""} onChange={event => setHandoffs(current => ({...current,[stage.key]:event.target.value}))}><option value="">Use configured source</option>{data.users.map(user => <option key={user.id} value={user.id}>{user.employee_name}</option>)}</select></Field> : null}
       </div></details>)}
       <Notice>{loadError || (forms ? "Linked Forms loaded." : "Loading linked Forms...")}</Notice>
       {simulationError ? <Notice tone="danger">{simulationError}</Notice> : null}
