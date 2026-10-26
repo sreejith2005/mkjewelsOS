@@ -3,7 +3,7 @@ import type { FmsFlowDefinition, FmsStageDefinition } from "./types.ts";
 import { normalizeFormAnswers } from "../forms/answers.ts";
 import { validateCompleteForm } from "../forms/validation.ts";
 import { fmsStageFormDefinition } from "./formSections.ts";
-import { fmsFormAssigneeQuestions } from "./assignmentAuthoring.ts";
+import { fmsAssignmentAllowsHandoff, fmsFormAssigneeQuestions } from "./assignmentAuthoring.ts";
 import type { FormAnswers, FormTemplateDefinition } from "../forms/types.ts";
 
 export type FmsSimulationInput = Readonly<{
@@ -94,7 +94,7 @@ export function simulateFmsDefinition(raw: FmsFlowDefinition, input: FmsSimulati
           if (source && typeof prior.answers[source.fieldKey] === "string" && prior.answers[source.fieldKey]) { selected = String(prior.answers[source.fieldKey]); break; }
         }
       } else if (config.mode === "previous_stage_employee") selected = previousEmployee;
-      if (config?.allowHandoff && config.mode !== "fixed_employee") selected = input.handoffs?.[stage.key]?.[visit - 1] ?? selected;
+      if (fmsAssignmentAllowsHandoff(config)) selected =input.handoffs?.[stage.key]?.[visit - 1] ?? selected;
       if (!selected && !selectedIds.length && config?.fallbackRule && !config.followFormAssignee) {
         const fallback = config.fallbackRule;
         selected = fallback.type === "specific_user" ? fallback.userProfileId ?? null : fallback.type === "reporter" ? input.starterId ?? null : fallback.type === "previous_step_doer" ? previousEmployee : null;

@@ -28,7 +28,7 @@ describe("versioned assignment editor",()=>{
     await userEvent.setup().click(screen.getByText("Assignment"));
     expect(onChange).not.toHaveBeenCalled();
     await userEvent.setup().click(screen.getByRole("button", { name: "Use form assignment" }));
-    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ sla: expect.objectContaining({ assignment: expect.objectContaining({ followFormAssignee: true, allowHandoff: false }) }) }));
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ sla: expect.objectContaining({ assignment: expect.objectContaining({ followFormAssignee: true, allowHandoff: true }) }) }));
   });
   it("lets a pinned source question apply only to a selected route", async () => {
     const onChange = vi.fn();

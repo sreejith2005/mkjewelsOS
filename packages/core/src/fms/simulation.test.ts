@@ -25,6 +25,15 @@ describe("workflow authoring simulation",()=>{
     ]), { starterId: "A", answers: { initial: [{ assigned_to: "B" }], demo: [{ assigned_to: "C" }] }, forms: { form: { name: "Form", fields: [{ key: "assigned_to", label: "Assigned To", type: "user_dropdown", sortOrder: 0, required: true }] } } });
     expect(result.events.map(event => event.selectedUserId)).toEqual(["A", "B", "B", "C"]);
   });
+  it("lets the completing employee hand form-assigned work to someone else, even with handoff unticked", () => {
+    const assignment = { mode: "previous_form" as const, sources: [], allowHandoff: false, followFormAssignee: true, fallbackRule: { type: "previous_step_doer" as const } };
+    const result = simulateFmsDefinition(flow([
+      stage("initial", { type: "form", defaultNextStageKey: "call" }),
+      stage("call", { defaultNextStageKey: "visit", sla: { assignment } }),
+      stage("visit", { sla: { assignment } }),
+    ]), { starterId: "A", answers: {}, handoffs: { visit: ["S"] } });
+    expect(result.events.map(event => event.selectedUserId)).toEqual(["A", "A", "S"]);
+  });
   it("hands a follow-up to the employee chosen in its only employee question, whatever it is called", () => {
     const assignment = { mode: "previous_form" as const, sources: [], allowHandoff: false, followFormAssignee: true, fallbackRule: { type: "previous_step_doer" as const } };
     const form = { name: "Follow-ups", sections: [{ key: "f2", title: "Follow up 2" }, { key: "f3", title: "Follow up 3" }], fields: [
