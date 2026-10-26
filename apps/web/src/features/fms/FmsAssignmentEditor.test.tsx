@@ -20,7 +20,7 @@ describe("versioned assignment editor",()=>{
     await user.click(summary);
     expect(summary.closest("details")?.open).toBe(true);
     expect(screen.getByText("Advanced assignment rules").closest("details")?.open).toBe(false);
-    expect(screen.getByText(/If the form has no Assigned To question/)).toBeTruthy();
+    expect(screen.getByText(/If that form has no employee question/)).toBeTruthy();
   });
   it("switches a custom step to the simple rule only on request", async () => {
     const onChange = vi.fn();

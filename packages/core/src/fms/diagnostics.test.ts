@@ -40,10 +40,10 @@ describe("diagnoseFmsDefinition", () => {
     expect(findings.find((finding) => finding.code === "unreachable_stage")?.stageKey).toBe("approve");
   });
 
-  it("flags a missing fallback deterministically", () => {
+  it("does not require a fallback: an unmatched answer finishes the workflow", () => {
     const definition = build([op({ op: "add_route", stageKey: "request", route: { source: "form_answer", questionKey: "urgency", operator: "equals", values: ["high"], targetStageKey: "approve", label: null } })]);
     const withoutFallback = { ...definition, stages: definition.stages.map((stage) => stage.key === "request" ? { ...stage, defaultNextStageKey: undefined } : stage) };
-    expect(codes(withoutFallback)).toContain("route_without_fallback");
+    expect(codes(withoutFallback)).not.toContain("route_without_fallback");
     expect(codes(definition)).not.toContain("route_without_fallback");
   });
 

@@ -1,4 +1,4 @@
-import { USER_ROLES, FMS_ASSIGNMENT_LABELS, FMS_ASSIGNMENT_MODES, fmsSourceQuestions, suggestFmsAssignment, type FmsAssignmentConfig, type FmsStageDefinition } from "@jewelos/core";
+import { USER_ROLES, FMS_ASSIGNMENT_LABELS, FMS_ASSIGNMENT_MODES, fmsFormAssignmentPreview, fmsSourceQuestions, suggestFmsAssignment, type FmsAssignmentConfig, type FmsStageDefinition } from "@jewelos/core";
 import { Field } from "@/components/ui";
 import type { FmsData } from "./api";
 
@@ -7,14 +7,15 @@ export function FmsAssignmentEditor({ stage, stages, data, onChange }: { stage: 
   const update = (patch: Partial<FmsAssignmentConfig>) => onChange({ ...stage, sla: { ...stage.sla, assignment: { ...config, ...patch } } });
   const questions = fmsSourceQuestions(stages, data.formFields, stage.key);
   const displayQuestions = fmsSourceQuestions(stages, data.formFields, stage.key, false);
+  const formPreview = config.followFormAssignee ? fmsFormAssignmentPreview(stages, data.formFields, stage.key) : [];
   const display = stage.sla.taskDisplay ?? { fields: [] };
   const updateDisplay = (patch: Partial<typeof display>) => onChange({ ...stage, sla: { ...stage.sla, taskDisplay: { ...display, ...patch } } });
   return <section className="space-y-3 border-t border-gold/15 pt-4" data-fms-focus="assignment">
     <details className="rounded-xl border border-gold/15 p-3">
     <summary className="cursor-pointer text-sm font-semibold text-gold">Assignment</summary>
     <div className="mt-3 space-y-3">
-    <p className="text-sm text-soft-grey">The employee selected in Assigned To receives the next stage. If the form has no Assigned To question, the previous assigned employee keeps the work.</p>
-    {config.followFormAssignee ? <p className="text-xs text-champagne">Form assignment is active.</p> : <><p className="text-xs text-soft-grey">This step uses a custom rule: {FMS_ASSIGNMENT_LABELS[config.mode]}.</p><button type="button" className="btn-secondary" onClick={() => onChange({ ...stage, sla: { ...stage.sla, assignment: suggestFmsAssignment(undefined, {}) } })}>Use form assignment</button></>}
+    <p className="text-sm text-soft-grey">The employee chosen in the previous step's form receives this step: its Assigned To question, or its only employee question. If that form has no employee question, the previous employee keeps the work.</p>
+    {config.followFormAssignee ? <><p className="text-xs text-champagne">Form assignment is active.</p>{formPreview.length ? <ul aria-label="Who receives this step" className="space-y-1 text-xs text-champagne">{formPreview.map((line) => <li key={line}>{line}</li>)}</ul> : null}</> :<><p className="text-xs text-soft-grey">This step uses a custom rule: {FMS_ASSIGNMENT_LABELS[config.mode]}.</p><button type="button" className="btn-secondary" onClick={() => onChange({ ...stage, sla: { ...stage.sla, assignment: suggestFmsAssignment(undefined, {}) } })}>Use form assignment</button></>}
     <details className="rounded-xl border border-gold/15 p-3"><summary className="cursor-pointer text-sm text-champagne">Advanced assignment rules</summary><div className="mt-3 space-y-3">
     <Field label="Pipeline group (optional)"><input className="field" maxLength={80} value={stage.sla.pipelineName ?? ""} onChange={event => onChange({ ...stage, sla: { ...stage.sla, pipelineName: event.target.value } })} placeholder="Sales, Production, Dispatch…" /></Field>
     <Field label="How this step receives its employee"><select className="field" value={config.followFormAssignee ? "form_assignment" : config.mode} onChange={event => { if (event.target.value === "form_assignment") { update(suggestFmsAssignment(undefined, {})); return; } const mode = FMS_ASSIGNMENT_MODES.find(value => value === event.target.value); if (mode) update({ mode, followFormAssignee: false, allowHandoff: mode !== "fixed_employee" }); }}><option value="form_assignment">Assigned To from the previous form</option>{FMS_ASSIGNMENT_MODES.map(mode => <option key={mode} value={mode}>{FMS_ASSIGNMENT_LABELS[mode]}</option>)}</select></Field>

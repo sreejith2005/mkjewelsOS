@@ -3,6 +3,7 @@ import type { FmsFlowDefinition, FmsStageDefinition } from "./types.ts";
 import { normalizeFormAnswers } from "../forms/answers.ts";
 import { validateCompleteForm } from "../forms/validation.ts";
 import { fmsStageFormDefinition } from "./formSections.ts";
+import { fmsFormAssigneeQuestions } from "./assignmentAuthoring.ts";
 import type { FormAnswers, FormTemplateDefinition } from "../forms/types.ts";
 
 export type FmsSimulationInput = Readonly<{
@@ -69,10 +70,11 @@ export function simulateFmsDefinition(raw: FmsFlowDefinition, input: FmsSimulati
       else if (config.mode === "previous_form" && config.followFormAssignee) {
         const previousStage = previousHuman ? byKey.get(previousHuman.stageKey) : undefined;
         const previousForm = previousHuman?.formTemplateId ? input.forms?.[previousHuman.formTemplateId] : undefined;
-        const questions = previousForm?.fields.filter(field => field.type === "user_dropdown") ?? [];
-        const normalizedName = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
-        const named = questions.filter(field => field.key === previousStage?.sla.assignmentFieldKey || ["assignedto", "assignto"].includes(normalizedName(field.key)) || ["assignedto", "assignto"].includes(normalizedName(field.label)));
-        const choices = named;
+        // Only the questions the previous step answered (its section) can hand the work over.
+        const answeredForm = previousForm && previousStage ? fmsStageFormDefinition(previousStage, previousForm) ?? previousForm : previousForm;
+        const questions = answeredForm?.fields.filter(field => field.type === "user_dropdown") ?? [];
+        const { named: choices, only } = fmsFormAssigneeQuestions(questions, previousStage?.sla.assignmentFieldKey);
+        const onlyAnswer = only ? previousHuman?.answers[only.key] : undefined;
         const previousScope = previousHuman ? eventScopes.get(events.indexOf(previousHuman)) : undefined;
         const previousLineage = scopeLineage(previousScope);
         const mergedBranches = token.path.some(index => events[index]?.status === "simulated"
@@ -80,7 +82,7 @@ export function simulateFmsDefinition(raw: FmsFlowDefinition, input: FmsSimulati
           && scopeLineage(eventScopes.get(index)).some(other => previousLineage.some(own => own.cohort === other.cohort && own.branch !== other.branch)));
         if (mergedBranches) note = "Simple assignment after a parallel join needs an explicit advanced assignment rule.";
         else if (previousHuman?.formTemplateId && !previousForm) note = "Load the preceding Form to simulate Assigned To.";
-        else if (choices.length === 0) selected = previousEmployee;
+        else if (choices.length === 0) selected = typeof onlyAnswer === "string" && onlyAnswer ? onlyAnswer : previousEmployee;
         else if (choices.length === 1 && typeof previousHuman?.answers[choices[0]!.key] === "string" && previousHuman.answers[choices[0]!.key]) selected = String(previousHuman.answers[choices[0]!.key]);
         else note = "Choose one Assigned To employee in the preceding form, or configure an advanced assignment rule.";
       }

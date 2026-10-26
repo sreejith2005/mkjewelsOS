@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fmsSourceQuestions, requireFmsAssignmentSourceForms, suggestFmsAssignment } from "./assignmentAuthoring";
+import { fmsFormAssigneeQuestions, fmsFormAssignmentPreview, fmsSourceQuestions, requireFmsAssignmentSourceForms, suggestFmsAssignment } from "./assignmentAuthoring";
 import { normalizeFmsDefinition } from "./engine";
 import type { FmsFlowDefinition, FmsStageDefinition } from "./types";
 const stage = { key: "call", name: "Call", type: "form", formTemplateId: "form", defaultNextStageKey: "demo", branchRules: [], parallelTargetStageKeys: [], sla: {}, assigneeRules: [] } as unknown as FmsStageDefinition;
@@ -14,6 +14,25 @@ describe("assignment authoring defaults", () => {
     const flow = { assignmentVersion: 2, stages: [stage, { ...stage, key: "demo", sla: { assignment: suggestFmsAssignment(stage, { form: [{key:"owner",label:"Owner",type:"user_dropdown",required:true}] }) } }] } as unknown as FmsFlowDefinition;
     expect(requireFmsAssignmentSourceForms(flow).stages[0]?.sla.completionFormRequired).toBe(true);
     expect(requireFmsAssignmentSourceForms({ ...flow, assignmentVersion: 1 }).stages[0]?.sla.completionFormRequired).toBeUndefined();
+  });
+  it("follows a named Assigned To first, otherwise the only employee question", () => {
+    const user = (key: string, label: string) => ({ key, label, type: "user_dropdown" });
+    expect(fmsFormAssigneeQuestions([user("sales", "Salesperson"), user("assigned_to", "Assigned To")])).toMatchObject({ named: [{ key: "assigned_to" }], only: undefined });
+    expect(fmsFormAssigneeQuestions([user("sales", "Salesperson")])).toMatchObject({ named: [], only: { key: "sales" } });
+    expect(fmsFormAssigneeQuestions([user("sales", "Salesperson"), user("closer", "Closer")])).toMatchObject({ named: [], only: undefined });
+    expect(fmsFormAssigneeQuestions([user("sales", "Salesperson"), user("closer", "Closer")], "closer")).toMatchObject({ named: [{ key: "closer" }] });
+  });
+  it("describes who receives a step for each incoming step", () => {
+    const fields = { form: [{ key: "sales", label: "Salesperson", type: "user_dropdown" }], blank: [] };
+    const stages = [
+      { ...stage, key: "call", name: "Call" },
+      { ...stage, key: "visit", name: "Visit", formTemplateId: "blank" },
+      { ...stage, key: "demo", name: "Demo", defaultNextStageKey: undefined },
+    ] as unknown as FmsStageDefinition[];
+    expect(fmsFormAssignmentPreview(stages, fields as never, "demo")).toEqual([
+      'After "Call": the employee chosen in "Salesperson" (the same employee if it is left blank).',
+      'After "Visit": the same employee who did "Visit". Its form has no employee question.',
+    ]);
   });
   it("preserves a legacy named fallback while normalizing", () => {
     const flow = { stages: [{ ...stage, assigneeRules: [{ type: "specific_user", userProfileId: "owner", fallbackUserProfileId: "cover" }] }] } as unknown as FmsFlowDefinition;

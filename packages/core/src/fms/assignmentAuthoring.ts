@@ -13,6 +13,29 @@ export function fmsSourceQuestions(stages: readonly FmsStageDefinition[], fields
     .map(field => ({ label: `${stage.name} · ${field.label}`, key: `${stage.key}:${field.key}`,
       source: { sourceStageKey: stage.key, formTemplateId: stage.formTemplateId!, fieldKey: field.key } satisfies FmsAssignmentSource })));
 }
+const ASSIGNED_TO_NAMES: ReadonlySet<string> = new Set(["assignedto", "assignto"]);
+const normalizedQuestionName = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+/**
+ * Which User question "Assigned To from the previous form" follows, given the
+ * User questions the previous step answers (its section only). Mirrors
+ * `fms_form_chain_choice` (0347): a question named Assigned To / Assign To (or
+ * the step's `assignmentFieldKey`) wins; otherwise the only User question does,
+ * when answered. With neither, the previous employee keeps the work.
+ */
+export function fmsFormAssigneeQuestions<T extends Readonly<{ key: string; label: string }>>(userQuestions: readonly T[], assignmentFieldKey?: string): Readonly<{ named: readonly T[]; only: T | undefined }> {
+  const named = userQuestions.filter(field => field.key === assignmentFieldKey || ASSIGNED_TO_NAMES.has(normalizedQuestionName(field.key)) || ASSIGNED_TO_NAMES.has(normalizedQuestionName(field.label)));
+  return { named, only: !named.length && userQuestions.length === 1 ? userQuestions[0] : undefined };
+}
+/** Plain words, per incoming human step, for who receives `targetKey` under "Assigned To from the previous form". */
+export function fmsFormAssignmentPreview(stages: readonly FmsStageDefinition[], fields: Readonly<Record<string, readonly FmsFormFieldRef[]>>, targetKey: string): readonly string[] {
+  return stages.filter(source => ["form", "task", "approval"].includes(source.type) && fmsOutgoingStageKeys(source).includes(targetKey)).map(source => {
+    const { named, only } = fmsFormAssigneeQuestions(fmsStageFormFields(source, fields).filter(field => field.type === "user_dropdown"), source.sla.assignmentFieldKey);
+    if (named.length > 1) return `After "${source.name}": its form has more than one Assigned To question. Keep one, or use an advanced rule.`;
+    const question = named[0] ?? only;
+    if (question) return `After "${source.name}": the employee chosen in "${question.label}"${only ? " (the same employee if it is left blank)" : ""}.`;
+    return `After "${source.name}": the same employee who did "${source.name}". Its form has no employee question.`;
+  });
+}
 export function suggestFmsAssignment(previous: FmsStageDefinition | undefined, fields: Readonly<Record<string, readonly FmsFormFieldRef[]>>): FmsAssignmentConfig {
   const questions = previous?.formTemplateId ? fmsStageFormFields(previous, fields).filter(field => field.type === "user_dropdown" && field.required && field.shown !== false && !field.hasCondition) : [];
   return { mode: "previous_form", allowHandoff: false, followFormAssignee: true,

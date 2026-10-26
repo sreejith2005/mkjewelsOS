@@ -27,11 +27,11 @@ import type { FmsData } from "./api";
 import { newerFormVersion } from "./definition";
 
 const humanTypes: readonly FmsStageDefinition["type"][] = ["form", "task", "approval"];
-const timingOptions: readonly { value: FmsTimingMethod; label: string }[] = [
-  { value: "completion_date", label: "Due on a date" },
-  { value: "tat_hours", label: "Time after an earlier step (TAT)" },
-  { value: "days_before_date", label: "Days before a date" },
-  { value: "specific_time", label: "Date and clock time" },
+const timingOptions: readonly { value: FmsTimingMethod; label: string; help: string }[] = [
+  { value: "completion_date", label: "Completion date", help: "Complete by the selected calendar date." },
+  { value: "tat_hours", label: "TAT (hours)", help: "Working target measured from an earlier step." },
+  { value: "days_before_date", label: "Days before date", help: "Due a fixed number of days before a future date." },
+  { value: "specific_time", label: "Specific clock time", help: "Due on a selected date at a selected time." },
 ];
 /** Route conditions offered on an ordinary step. `default` stays reserved for the fallback. */
 const routeOperators: readonly { value: FmsBranchOperator; label: string }[] = [
@@ -122,7 +122,7 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete, assign
       switched={deadlineOn}
       title="When / Deadline"
     >
-      <Field label="Deadline is"><select aria-label="Deadline method" className="field" onChange={(event) => updateSla({ timingMethod: event.target.value as FmsTimingMethod })} value={timingMethod(stage.sla)}>{timingOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></Field>
+      <div aria-label="Deadline method" className="grid gap-2 sm:grid-cols-2" role="group">{timingOptions.map((option) => <button aria-pressed={timingMethod(stage.sla) === option.value} className={cn("min-h-11 rounded-xl border p-3 text-left transition", timingMethod(stage.sla) === option.value ? "border-gold bg-gold/10 text-white" : "border-gold/20 text-soft-grey hover:border-gold/60")} key={option.value} onClick={() => updateSla({ timingMethod: option.value })} type="button"><span className="block text-sm font-semibold">{option.label}</span><span className="mt-0.5 block text-xs text-soft-grey">{option.help}</span></button>)}</div>
       <div className="mt-3"><TimingFields earlierStages={earlierStages} sla={stage.sla} updateSla={updateSla} /></div>
     </InspectorSection>
 
@@ -288,7 +288,7 @@ function StageRouting({ stage, others, fields, allFields, decision, update, upda
     {decision ? <DecisionOptions options={stage.sla.decisionOptions ?? [{ key: "yes", label: "Yes" }, { key: "no", label: "No" }]} update={(decisionOptions) => updateSla({ decisionMode: "decision", decisionOptions })} /> : null}
     {stage.branchRules.map((rule, index) => <RouteRow allFields={allFields} decision={decision} fields={fields} index={index} key={rule.id} others={others} rule={rule} stage={stage} changeRule={changeRule} moveRule={moveRule} remove={() => update({ branchRules: stage.branchRules.filter((_, ruleIndex) => ruleIndex !== index).map((item, order) => ({ ...item, order })) })} />)}
     <Field label={routed ? "Otherwise go to" : "Next step"}><StageSelect label={routed ? "Otherwise (fallback) go to" : "Continue to"} others={others} value={stage.defaultNextStageKey} onChange={(value) => update({ defaultNextStageKey: value })} /></Field>
-    {routed && !hasFmsStageFallback(stage) ? <p className="rounded-lg border border-danger/40 bg-danger/5 p-2 text-xs text-danger">Choose where any other answer goes.</p> : null}
+    {routed && !hasFmsStageFallback(stage) ? <p className="text-xs text-soft-grey">Optional. If no condition matches, the workflow completes here.</p> : null}
     {routed && !stage.formTemplateId && stage.branchRules.some((rule) => rule.source === "form_answer") ? <p className="rounded-lg border border-danger/40 bg-danger/5 p-2 text-xs text-danger">Add questions above so these answers exist.</p> : null}
     {stage.formTemplateId && !fields.length ? <p className="text-xs text-soft-grey">{fmsStageFormSectionKey(stage) ? "No questions in the selected section can route." : "This form has no questions that can route."}</p> : null}
   </section>;
