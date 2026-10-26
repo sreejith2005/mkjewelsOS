@@ -177,7 +177,7 @@ export function FMSBuilderPage() {
     <section className="mx-auto w-full max-w-7xl space-y-4">
       <Button onClick={() => { setTasksFor(null); setOpenInstanceId(""); }} variant="ghost"><ArrowLeft className="size-4" />Back to FMS</Button>
       <FMSTasksPage
-        {...(tasksFor === "all" ? {} : { flowIds: tasksFor.flowIds, heading: `${tasksFor.primary.name} — live instances` })}
+        {...(tasksFor === "all" ? {} : { flowIds: tasksFor.flowIds, heading: tasksFor.primary.name })}
         {...(openInstanceId ? { initialInstanceId: openInstanceId } : {})}
       />
     </section>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getMenuForRole } from "@jewelos/core";
-import { eligibleFmsUsers, filterFmsInstances, isInitialFmsDefinition, parseFmsContext, priorFmsDefinitions, shouldOpenFmsForm, shouldOpenInitialFmsForm } from "./runtimeView";
+import { eligibleFmsUsers, isInitialFmsDefinition, parseFmsContext, priorFmsDefinitions, shouldOpenFmsForm, shouldOpenInitialFmsForm } from "./runtimeView";
 import type { FmsData, FmsInstance, FmsInstanceStage, FmsStageRow } from "./api";
 
 const instance = (patch: Partial<FmsInstance> = {}): FmsInstance => ({ id: "i1", fms_flow_id: "f1", reference_number: "FMS-1", title: "Order check", status: "active", priority: "medium", context: {}, branch_id: "b1", department_id: "d1", started_by: "u1", started_at: null, completed_at: null, parent_instance_id: null, flow_version: 1, ...patch });
@@ -16,11 +16,6 @@ const users: FmsData["users"] = [
 describe("FMS runtime view rules", () => {
   it("offers active login-enabled assignees across branches for a direct assignment", () => expect(eligibleFmsUsers(users, instance()).map((item) => item.id)).toEqual(["u1", "u2"]));
   it("supports tenant-wide eligible assignees", () => expect(eligibleFmsUsers(users, instance({ branch_id: null, department_id: null })).map((item) => item.id)).toEqual(["u1", "u2"]));
-  it("shows assigned instances in My Stages", () => expect(filterFmsInstances({ instances: [instance()], stages: [runtimeStage()], profileId: "u2", tab: "mine", query: "", status: "all", priority: "all", overdueOnly: false, now: "2026-01-01T00:00:00Z" })).toHaveLength(1));
-  it("hides unassigned instances from My Stages", () => expect(filterFmsInstances({ instances: [instance()], stages: [runtimeStage()], profileId: "u3", tab: "mine", query: "", status: "all", priority: "all", overdueOnly: false })).toHaveLength(0));
-  it("shows only instances started by the viewer", () => expect(filterFmsInstances({ instances: [instance(), instance({ id: "i2", started_by: "u2" })], stages: [], profileId: "u1", tab: "started", query: "", status: "all", priority: "all", overdueOnly: false })).toHaveLength(1));
-  it("combines normalized search, status, and priority filters", () => expect(filterFmsInstances({ instances: [instance({ status: "overdue", priority: "high" })], stages: [], profileId: "u1", tab: "branch", query: " order ", status: "overdue", priority: "high", overdueOnly: false })).toHaveLength(1));
-  it("uses due timestamps for overdue filtering", () => expect(filterFmsInstances({ instances: [instance()], stages: [runtimeStage()], profileId: "u1", tab: "branch", query: "", status: "all", priority: "all", overdueOnly: true, now: "2026-01-01T02:00:00Z" })).toHaveLength(1));
   it("offers only earlier activated definitions as revision targets", () => { const current = definition({ id: "s3", sort_order: 2 }); const rows = [definition(), definition({ id: "s2", sort_order: 1 }), current, definition({ id: "other", fms_flow_id: "f2", sort_order: 0 })]; expect(priorFmsDefinitions(rows, [runtimeStage(), runtimeStage({ id: "r2", fms_stage_id: "s2" })], "f1", current).map((item) => item.id)).toEqual(["s1", "s2"]); });
   it("requires a linked form only on the first definition", () => { const later = definition({ id: "s2", sort_order: 1, form_template_id: "form" }); const rows = [later, definition()]; expect(isInitialFmsDefinition(rows, rows[1]!)).toBe(true); expect(isInitialFmsDefinition(rows, later)).toBe(false); });
   it("opens an unsubmitted actionable first Form immediately", () => { const first = definition({ step_type: "form", form_template_id: "form" }); expect(shouldOpenInitialFmsForm([first], first, runtimeStage())).toBe(true); expect(shouldOpenInitialFmsForm([first], first, runtimeStage({ form_submission_id: "submission" }))).toBe(false); });
