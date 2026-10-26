@@ -111,6 +111,19 @@ export async function loadFmsRuntime(instanceId?: string): Promise<{ instances: 
   ]); [instances, stages, definitions, flows, checklist, evidence, logs, users].forEach((result) => fail("Load FMS runtime", result.error));
   return { instances: instances.data as FmsInstance[], stages: stages.data as FmsInstanceStage[], definitions: definitions.data as FmsStageRow[], flows: flows.data as FmsFlowRow[], checklist: checklist.data as FmsChecklistItem[], evidence: evidence.data as FmsEvidence[], logs: logs.data as FmsLog[], users: users.data ?? [] };
 }
+/**
+ * Display names for runs (for example the client), 500 per request. Names are a
+ * convenience: when they cannot be loaded the board shows reference numbers.
+ */
+export async function loadFmsRunNames(instanceIds: readonly string[]): Promise<ReadonlyMap<string, string>> {
+  const names = new Map<string, string>();
+  for (let start = 0; start < instanceIds.length; start += 500) {
+    const { data, error } = await supabase.rpc("get_fms_run_names", { p_instance_ids: instanceIds.slice(start, start + 500) });
+    if (error) return names;
+    for (const row of data ?? []) if (row.record_name) names.set(row.instance_id, row.record_name);
+  }
+  return names;
+}
 export async function startFmsInstance(input: { flowId: string; title: string; priority: "high" | "medium" | "low"; context: Json; branchId: string; departmentId: string; firstAssigneeId: string | null }): Promise<FmsStartResult> { const { data, error } = await supabase.rpc("start_fms_instance_with_audit", { p_flow_id: input.flowId, p_title: input.title, p_priority: input.priority, p_context: input.context, p_branch_id: input.branchId, p_department_id: input.departmentId, ...(input.firstAssigneeId ? { p_first_assignee_id: input.firstAssigneeId } : {}) }); fail("Start FMS instance", error); const result = data?.[0]; if (!result) throw new Error("Start FMS instance returned no reference"); return result; }
 export const claimFmsStage = async (id: string) => { const { error } = await supabase.rpc("claim_fms_stage_with_audit", { p_instance_stage_id: id }); fail("Claim FMS stage", error); };
 export const completeFmsStage = async (id: string, outcome: string, remark: string, checklist: Record<string, boolean>, nextAssigneeId: string | null) => { const { error } = await supabase.rpc("complete_fms_stage_with_audit", { p_instance_stage_id: id, p_checklist: checklist, ...(outcome ? { p_outcome: outcome } : {}), ...(remark ? { p_remark: remark } : {}), ...(nextAssigneeId ? { p_next_assignee_id: nextAssigneeId } : {}) }); fail("Complete FMS stage", error); };

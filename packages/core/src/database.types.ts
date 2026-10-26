@@ -12442,6 +12442,7 @@ export type Database = {
       get_fms_assigned_stage: { Args: { p_instance_id: string; p_instance_stage_id?: string }; Returns: Json }
       get_fms_work_form_context: { Args: { p_instance_id: string; p_instance_stage_id: string; p_offset?: number; p_limit?: number }; Returns: Json }
       get_fms_assigned_work_context: { Args: { p_instance_id: string; p_instance_stage_id: string; p_cursor?: string; p_limit?: number }; Returns: Json }
+      get_fms_run_names: { Args: { p_instance_ids: string[] }; Returns: { instance_id: string; record_name: string | null }[] }
 
       assert_task_assignment_targets: {
         Args: { p_doer_ids: string[]; p_watcher_ids?: string[] }

@@ -1,4 +1,3 @@
-import { calculateFmsDelay } from "@jewelos/core";
 import type { FmsData, FmsInstance, FmsInstanceStage, FmsStageRow } from "./api";
 
 export function eligibleFmsUsers(users: FmsData["users"], instance: Pick<FmsInstance, "branch_id" | "department_id">) {
@@ -26,16 +25,6 @@ export function shouldOpenInitialFmsForm(definitions: FmsStageRow[], current: Fm
 export function shouldOpenFmsForm(definitions: FmsStageRow[], current: FmsStageRow, runtime: Pick<FmsInstanceStage, "status" | "form_submission_id">, requestedFormTemplateId?: string) {
   return !runtime.form_submission_id && !!current.form_template_id && ["pending", "in_progress", "in_review", "overdue"].includes(runtime.status)
     && (shouldOpenInitialFmsForm(definitions, current, runtime) || current.form_template_id === requestedFormTemplateId);
-}
-
-export function filterFmsInstances(input: { instances: FmsInstance[]; stages: FmsInstanceStage[]; profileId: string; tab: "mine" | "started" | "branch"; query: string; status: string; priority: string; overdueOnly: boolean; now?: string }) {
-  return input.instances.filter((instance) => {
-    const stages = input.stages.filter((stage) => stage.fms_instance_id === instance.id);
-    const mine = stages.some((stage) => stage.assigned_to?.includes(input.profileId));
-    const inTab = input.tab === "mine" ? mine : input.tab === "started" ? instance.started_by === input.profileId : true;
-    const late = stages.some((stage) => calculateFmsDelay(stage.planned_datetime, stage.actual_datetime, input.now).overdue);
-    return inTab && `${instance.reference_number} ${instance.title}`.toLowerCase().includes(input.query.trim().toLowerCase()) && (input.status === "all" || instance.status === input.status) && (input.priority === "all" || instance.priority === input.priority) && (!input.overdueOnly || late);
-  });
 }
 
 export function parseFmsContext(value: string) {
