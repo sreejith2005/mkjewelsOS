@@ -52,7 +52,7 @@ function issueControlSelector(code: string, message: string): string {
   if (["invalid_parallel", "invalid_join"].includes(code)) return '[data-fms-focus="parallel"] input, [data-fms-focus="parallel"] select';
   if (["invalid_branch"].includes(code)) return '[data-fms-focus="branch"] input, [data-fms-focus="branch"] select';
   if (code === "missing_completion_path") return '[data-fms-focus="routing"] select, [data-fms-focus="branch"] select, [data-fms-focus="parallel"] input';
-  if (["route_without_fallback", "conflicting_fallback_route"].includes(code)) return '[aria-label="Otherwise (fallback) go to"]';
+  if (code === "conflicting_fallback_route") return '[aria-label="Otherwise (fallback) go to"]';
   if (code === "invalid_assignee") return '[data-fms-focus="name"]';
   return '[data-fms-focus="routing"] input, [data-fms-focus="routing"] select, [data-fms-focus="routing"] button';
 }

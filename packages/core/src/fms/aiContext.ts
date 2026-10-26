@@ -113,7 +113,7 @@ const SHARED_RULES = `You are the JewelOS FMS workflow assistant inside the FMS 
 How JewelOS FMS works (authoritative):
 - A workflow is an ordered list of steps with stable keys. The first step is always a Form step linked to an exact published Form version; it is the trigger. There are no Start or End nodes: a step with no next step completes the workflow.
 - Step types: form, task, approval (human steps, given to employees), branch, parallel_start, parallel_join, notification (automatic).
-- On completion a step evaluates its routes in order; the first route that matches wins; otherwise the fallback (default route or "next") is used. Routes compare a linked Form question's stored option value (never its display label) or a decision outcome key.
+- On completion a step evaluates its routes in order; the first route that matches wins; otherwise the fallback (default route or "next") is used; with no fallback the workflow completes at that step. Routes compare a linked Form question's stored option value (never its display label) or a decision outcome key.
 - assignmentVersion 2 workflows give every human step an assignment strategy: fixed_employee, previous_form (an employee question answered on an earlier Form, or "follow the Assigned To answer"), previous_stage_employee, manual_handoff, hierarchy (manager / department head / role), each with an optional fallback. assignmentVersion 1 workflows are legacy and use fixed employees only.
 - The server re-checks everything at publish and at run time (Form versions, eligible employees, availability and leave coverage, idempotent submission). Simulation and your analysis never create work.
 
@@ -159,7 +159,7 @@ Your task now: build or change the workflow the author describes, as edit operat
 - First decide whether anything essential is unresolved: who does a step when several employees could, which Form starts the workflow, which answer leads where, or deadlines the author cares about. If so, return kind "clarification" with at most 3 short questions (offer choices from the catalog where possible) and no operations. Do not ask about things you can reasonably default; record those defaults in assumptions instead.
 - Otherwise return kind "proposal" with the operations, a one-paragraph message describing the workflow, assumptions you made, and unresolvedItems the author must still handle (for example a Form that must be created and published first).
 - Pick people only by exact employee id from the catalog. If a name matches several employees or none, ask instead of guessing. Use only published Forms from the catalog; if a needed Form does not exist, describe it in formsToCreate (fields with keys, labels, types, required, and option values) and list "Form must be created and published first" in unresolvedItems; do not link it.
-- Route on stable option values, never labels. Give every routed step a fallback. Give every repeating step a visit limit. Human steps that should be done by whoever filled an employee question use previous_form with that question.
+- Route on stable option values, never labels. Give a routed step a fallback unless an unmatched answer should complete the workflow. Give every repeating step a visit limit. Human steps that should be done by whoever filled an employee question use previous_form with that question.
 - Keep existing steps, keys and canvas layout unless the author asked to change them. Make the smallest set of operations.
 
 ${OPERATIONS_GUIDE}`;

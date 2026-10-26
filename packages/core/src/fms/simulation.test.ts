@@ -25,6 +25,21 @@ describe("workflow authoring simulation",()=>{
     ]), { starterId: "A", answers: { initial: [{ assigned_to: "B" }], demo: [{ assigned_to: "C" }] }, forms: { form: { name: "Form", fields: [{ key: "assigned_to", label: "Assigned To", type: "user_dropdown", sortOrder: 0, required: true }] } } });
     expect(result.events.map(event => event.selectedUserId)).toEqual(["A", "B", "B", "C"]);
   });
+  it("hands a follow-up to the employee chosen in its only employee question, whatever it is called", () => {
+    const assignment = { mode: "previous_form" as const, sources: [], allowHandoff: false, followFormAssignee: true, fallbackRule: { type: "previous_step_doer" as const } };
+    const form = { name: "Follow-ups", sections: [{ key: "f2", title: "Follow up 2" }, { key: "f3", title: "Follow up 3" }], fields: [
+      { key: "salesperson", label: "Salesperson", type: "user_dropdown" as const, sortOrder: 0, sectionKey: "f2" },
+      { key: "closer", label: "Closer", type: "user_dropdown" as const, sortOrder: 1, sectionKey: "f3" },
+    ] };
+    const run = (answers: Record<string, unknown>) => simulateFmsDefinition(flow([
+      stage("initial", { type: "form", formTemplateId: "form", defaultNextStageKey: "followup2" }),
+      stage("followup2", { formTemplateId: "form", defaultNextStageKey: "followup3", sla: { assignment, formSectionKey: "f2" } }),
+      stage("followup3", { sla: { assignment } }),
+    ]), { starterId: "A", answers: { initial: [{}], followup2: [answers as never] }, forms: { form } });
+    // The Follow up 3 question is outside the section Follow up 2 answers, so it does not count.
+    expect(run({ salesperson: "S" }).events.map(event => event.selectedUserId)).toEqual(["A", "A", "S"]);
+    expect(run({}).events.at(-1)?.selectedUserId).toBe("A");
+  });
   it("normalizes hidden answers using the pinned Form definition", () => {
     const result = simulateFmsDefinition(flow([stage("initial", { type: "form", formTemplateId: "form", defaultNextStageKey: "call" }), stage("call", { sla: { assignment: { mode: "previous_form", allowHandoff: false, sources: [{ sourceStageKey: "initial", formTemplateId: "form", fieldKey: "owner" }], fallbackRule: { type: "specific_user", userProfileId: "C" } } } })]), { starterId: "A", answers: { initial: [{ owner: "B" }] }, forms: { form: { name: "Pinned", fields: [{ key: "owner", label: "Owner", type: "user_dropdown", sortOrder: 0, shown: false }] } } });
     expect(result.events.at(-1)?.selectedUserId).toBe("C");

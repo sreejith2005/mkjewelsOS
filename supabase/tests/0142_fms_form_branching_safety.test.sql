@@ -73,13 +73,11 @@ begin
     ('flow',v_flow),('form',v_form),('purchase',v_purchase),('product',v_product);
 end $$;
 
--- The publish gate must reject this flow precisely because nothing covers an
--- answer of "Did Not Buy".
-select throws_ok(
+-- 0347: Otherwise is optional. Nothing covers "Did Not Buy", and that answer
+-- now finishes the workflow at this step instead of blocking publication.
+select lives_ok(
   $$select assert_fms_flow_publishable((select id from hold_fixture where name='flow'))$$,
-  '23514',
-  'A step with conditional routes needs an Otherwise destination for answers that match no route',
-  'publishing a routed step without an Otherwise destination is refused');
+  'publishing a routed step without an Otherwise destination is allowed');
 
 -- A route matching an option the question no longer offers is refused too.
 do $$
@@ -131,7 +129,7 @@ select lives_ok(
   'the doer can still complete the step');
 reset role;
 
-select is((select status from fms_instances where id=(select id from hold_fixture where name='instance')),'on_hold','an unmatched route holds the instance instead of completing it');
+select is((select status from fms_instances where id=(select id from hold_fixture where name='instance')),'completed','an unmatched route without Otherwise completes the instance (0347)');
 select is((select count(*)::integer from fms_stage_logs where fms_instance_stage_id=(select id from hold_fixture where name='instance_stage') and action='route_unmatched'),1,'the unmatched route is recorded on the stage');
 select is((select count(*)::integer from fms_instance_stages where fms_instance_id=(select id from hold_fixture where name='instance')),1,'no downstream task is created for a branch that was not taken');
 

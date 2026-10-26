@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useState } from "react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import type { FmsBranchRule, FmsStageDefinition } from "@jewelos/core";
@@ -82,20 +82,25 @@ describe("FMS stage editor", () => {
     render(<Harness />);
     const deadline = screen.getByRole("switch", { name: "Set deadline" });
     expect(screen.getByLabelText("Due date").getAttribute("type")).toBe("date");
-    await user.selectOptions(screen.getByLabelText("Deadline method"), "tat_hours");
+    const methods = screen.getByRole("group", { name: "Deadline method" });
+    // All four deadline types are visible choices, each with its explanation.
+    expect(within(methods).getAllByRole("button").map((button) => button.querySelector("span")?.textContent)).toEqual(["Completion date", "TAT (hours)", "Days before date", "Specific clock time"]);
+    expect(within(methods).getByRole("button", { name: /Completion date/ }).getAttribute("aria-pressed")).toBe("true");
+    await user.click(within(methods).getByRole("button", { name: /TAT \(hours\)/ }));
+    expect(within(methods).getByRole("button", { name: /TAT \(hours\)/ }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByLabelText("TAT value")).toBeTruthy();
     await user.selectOptions(screen.getByLabelText("TAT unit"), "minutes");
     expect((screen.getByLabelText("TAT unit") as HTMLSelectElement).value).toBe("minutes");
     expect(screen.getByLabelText("Counted from")).toBeTruthy();
-    await user.selectOptions(screen.getByLabelText("Deadline method"), "days_before_date");
+    await user.click(within(methods).getByRole("button", { name: /Days before date/ }));
     expect(screen.getByLabelText("Future date")).toBeTruthy();
     expect(screen.getByLabelText("Days before")).toBeTruthy();
-    await user.selectOptions(screen.getByLabelText("Deadline method"), "specific_time");
+    await user.click(within(methods).getByRole("button", { name: /Specific clock time/ }));
     expect(screen.getByLabelText("Clock time")).toBeTruthy();
     await user.click(deadline);
     expect(screen.queryByLabelText("TAT value")).toBeNull();
     expect(screen.queryByLabelText("Escalate after")).toBeNull();
-  });
+  }, 20_000);
   it("offers the questionnaire choices first and the existing-form list only when linking", async () => {
     const user = userEvent.setup();
     render(<LaterFormHarness />);
@@ -184,13 +189,16 @@ describe("FMS stage editor", () => {
     await user.selectOptions(screen.getByLabelText("Route 1 answer"), "wholesale");
     expect(latestStage!.branchRules[0]).toMatchObject({ operator: "not_equals", value: "wholesale" });
   });
-  it("warns until an unmatched answer has somewhere to go", async () => {
+  it("keeps Otherwise optional: an unmatched answer completes the workflow", async () => {
     const user = userEvent.setup();
     render(<RoutingHarness />);
     await user.click(screen.getByRole("button", { name: "Add conditional route" }));
-    expect(screen.getByText("Choose where any other answer goes.")).toBeTruthy();
-    await user.selectOptions(screen.getByLabelText("Otherwise (fallback) go to"), "wholesale_desk");
     expect(screen.queryByText("Choose where any other answer goes.")).toBeNull();
+    const otherwise = screen.getByLabelText("Otherwise (fallback) go to") as HTMLSelectElement;
+    expect(otherwise.selectedOptions[0]?.textContent).toBe("Complete workflow here");
+    expect(screen.getByText("Optional. If no condition matches, the workflow completes here.")).toBeTruthy();
+    await user.selectOptions(otherwise, "wholesale_desk");
+    expect(screen.queryByText("Optional. If no condition matches, the workflow completes here.")).toBeNull();
   });
   it("keeps a legacy decision's outcomes editable and configures conditions only from them", async () => {
     const user = userEvent.setup();

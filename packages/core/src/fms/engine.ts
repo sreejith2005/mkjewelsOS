@@ -86,7 +86,7 @@ export function fmsFallbackStageKey(stage: FmsStageDefinition): string | undefin
   return stage.branchRules.find((rule) => rule.operator === "default")?.nextStageKey ?? stage.defaultNextStageKey;
 }
 
-/** True when an unmatched answer has somewhere deterministic to go. */
+/** True when an unmatched answer has a destination; without one it finishes that path. */
 export function hasFmsStageFallback(stage: FmsStageDefinition): boolean {
   return fmsFallbackStageKey(stage) !== undefined;
 }
@@ -166,7 +166,8 @@ function unsupportedCycleRoute(definition: FmsFlowDefinition): { sourceKey: stri
 export function validateFmsRoutingGraph(stages: readonly FmsStageDefinition[]): readonly FmsValidationIssue[] {
   const definition: FmsFlowDefinition = { name: "Graph", scope: "tenant", manualTrigger: true, stages };
   const reached = reachableFmsStageKeys(definition);
-  const canFinish = new Set(stages.filter((stage) => !fmsOutgoingStageKeys(stage).length).map((stage) => stage.key));
+  // A routed step without Otherwise finishes the workflow when no route matches, so it is a completion point too.
+  const canFinish = new Set(stages.filter((stage) => !fmsOutgoingStageKeys(stage).length || hasFmsStageRouting(stage) && !hasFmsStageFallback(stage)).map((stage) => stage.key));
   let changed = true;
   while (changed) {
     changed = false;
@@ -192,7 +193,7 @@ const ROUTE_VALUE_FREE = new Set<string>(["default", "not_empty"]);
 function validateStageRoutes(stage: FmsStageDefinition, byKey: ReadonlyMap<string, FmsStageDefinition>, context: FmsValidationContext, add: (code: string, message: string) => void): void {
   const fields = stage.formTemplateId ? context.formFields?.[stage.formTemplateId] : undefined;
   if (stage.branchRules.filter((rule) => rule.operator === "default").length > 1) add("conflicting_fallback_route", "A step can define only one fallback route");
-  if (!hasFmsStageFallback(stage)) add("route_without_fallback", "Give this step an Otherwise destination so an answer that matches no route cannot strand the workflow");
+  // Otherwise is optional (0347): an answer that matches no route finishes this path, like "Complete workflow here".
   if (stage.branchRules.some((rule) => rule.nextFlowId)) add("invalid_route_target", "A conditional route must point to a step in this workflow");
   for (const rule of stage.branchRules) {
     const label = rule.label ? `"${rule.label}"` : `Route ${rule.order + 1}`;

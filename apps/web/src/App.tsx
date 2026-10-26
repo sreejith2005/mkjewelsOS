@@ -35,6 +35,7 @@ import { AuthProvider, useAuth } from "@/auth/AuthContext";
 import { supabase } from "@jewelos/api-client";
 import { Button, Notice } from "@/components/ui";
 import { ApplicationShell } from "@/components/shell/ApplicationShell";
+import { readSidebarOpen, rememberSidebarOpen } from "@/components/shell/sidebarState";
 import { AuthLayout, BrandedLoading, PageLoading } from "@/components/shell/BrandScreens";
 import { LazyPageErrorBoundary } from "@/components/LazyPageErrorBoundary";
 import { crmProjectConfig } from "@/lib/crmProject";
@@ -248,7 +249,8 @@ function AppShell() {
   const { access, branch, logout, preferences, profile } = useAuth();
   const { theme, setTheme } = useTheme();
   const { navigate, path, search } = usePathname();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpenState] = useState(readSidebarOpen);
+  const setSidebarOpen = useCallback((open: boolean) => { setSidebarOpenState(open); rememberSidebarOpen(open); }, []);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sectionControls, setSectionControls] = useState(DEFAULT_SECTION_CONTROLS);
   const [savingSectionControls, setSavingSectionControls] = useState(false);
