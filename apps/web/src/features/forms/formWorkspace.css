@@ -1,0 +1,13 @@
+.form-workspace { display: block; min-width: 0; }
+.form-workspace-divider, .form-workspace-live { display: none; }
+.form-workspace-preview .form-workspace-editor { display: none; }
+.form-workspace-preview .form-workspace-live { display: block; }
+@media (min-width: 1280px) {
+  .form-workspace { display: grid; grid-template-columns: minmax(0, var(--form-editor-width)) 12px minmax(0, 1fr); align-items: start; }
+  .form-workspace .form-workspace-editor, .form-workspace .form-workspace-live { display: block; max-height: calc(100dvh - 12rem); overflow-y: auto; overscroll-behavior: contain; }
+  .form-workspace-divider { display: block; align-self: stretch; min-height: 20rem; cursor: col-resize; touch-action: none; border-inline: 4px solid transparent; background: var(--color-gold); background-clip: padding-box; opacity: .35; }
+  .form-workspace-divider:focus-visible { opacity: 1; outline: 2px solid var(--color-gold); }
+  .form-workspace-editor > .grid { grid-template-columns: minmax(0, 1fr); }
+  .form-workspace-collapsed { grid-template-columns: minmax(0, 1fr); }
+  .form-workspace-collapsed .form-workspace-divider, .form-workspace-collapsed .form-workspace-live { display: none; }
+}

@@ -20,3 +20,8 @@ export * from "./formUsage";
 export * from "./library";
 export * from "./sectionImport";
 export * from "./previewAnswers";
+export * from "./importSource";
+export * from "./importContract";
+export * from "./customerIntegration";
+export * from "./history";
+export type { CustomerIntegrationFunctions, CustomerIntegrationTables } from "./customerIntegrationRpc";

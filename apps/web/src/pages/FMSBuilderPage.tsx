@@ -54,6 +54,7 @@ export function FMSBuilderPage() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [edit, setEdit] = useState<FmsFlowRow | null | undefined>();
+  const [sourceFlowId, setSourceFlowId] = useState<string | null>(null);
   const [tasksFor, setTasksFor] = useState<FlowFamily | "all" | null>(() => parseFmsAssignedWorkPath(window.location.href) ? "all" : null);
   const [openInstanceId, setOpenInstanceId] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -75,6 +76,15 @@ export function FMSBuilderPage() {
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to load FMS"); }
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
+  // Forms provenance links select only a workflow already returned in this
+  // caller's authorized builder scope. They never change a pinned version.
+  useEffect(() => {
+    const sourceId = new URLSearchParams(window.location.search).get("flow");
+    if (!sourceId || !data) return;
+    const source = data.flows.find(flow => flow.id === sourceId);
+    if (source) setSourceFlowId(source.id);
+    else setNotice("The source workflow is no longer available in your access.");
+  }, [data]);
   useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["fms", "forms", "organization"], refresh });
 
   const families = useMemo<FlowFamily[]>(() => {
@@ -148,6 +158,8 @@ export function FMSBuilderPage() {
     return published ? flowToDefinition(published, data) : null;
   };
   const aiEnabled = !!aiSettings && (aiSettings.debuggerEnabled || aiSettings.builderEnabled);
+  const sourceFlow = data?.flows.find(flow => flow.id === sourceFlowId);
+  const closeSource = () => { setSourceFlowId(null); const params = new URLSearchParams(window.location.search); params.delete("flow"); params.delete("stage"); window.history.replaceState({}, "", `${window.location.pathname}${params.size ? `?${params}` : ""}`); };
 
   if (edit !== undefined && data) return (
     <section>
@@ -198,6 +210,7 @@ export function FMSBuilderPage() {
           <Button className="flex-1 sm:flex-none" onClick={() => { if (aiSettings?.builderEnabled) setChoosingStart(true); else setEdit(null); }}><Plus className="size-4" />New workflow</Button>
         </div> : null}
       </header>
+      {sourceFlow && data ? <Modal onClose={closeSource} title={`Source FMS — ${sourceFlow.name} · v${sourceFlow.version}`} wide><div className="space-y-4"><Notice>This is the exact source workflow version. Opening it does not change a form, workflow draft, or active run.</Notice><p className="text-sm text-champagne">{sourceFlow.description || "No description added."} · {flowState(sourceFlow)}</p><ol aria-label="Source workflow steps" className="space-y-2">{flowToDefinition(sourceFlow, data).stages.map((stage, index) => <li className="rounded-xl border border-gold/20 p-3 text-sm text-champagne" key={stage.key}>{index + 1}. {stage.name}<span className="ml-2 text-xs text-soft-grey">{stage.type.replaceAll("_", " ")}</span></li>)}</ol>{canManage && sourceFlow.status === "draft" ? <Button onClick={() => { closeSource(); setEdit(sourceFlow); }}>Edit source draft</Button> : null}<Button onClick={closeSource} variant="secondary">Back to workflows</Button></div></Modal> : null}
       {choosingStart ? <Modal onClose={() => setChoosingStart(false)} title="New workflow">
         <div className="grid gap-3 sm:grid-cols-2">
           <button className="rounded-2xl border border-gold/40 bg-gold/10 p-4 text-left hover:bg-gold/20" onClick={() => { setChoosingStart(false); setStartWithAi(true); setEdit(null); }} type="button"><Sparkles className="mb-2 size-5 text-gold-secondary" /><b className="block text-white">Build with AI</b><span className="text-xs text-soft-grey">Describe the process; review the proposed steps before anything is added.</span></button>

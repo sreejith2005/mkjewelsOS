@@ -43,9 +43,18 @@ const data = {
 } as unknown as FmsData;
 const runtime = { instances: [], stages: [], definitions: [], flows: [flow], checklist: [], evidence: [], logs: [], users: [] };
 
-afterEach(() => { cleanup(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); window.history.replaceState({}, "", "/fms"); });
 
 describe("unified FMS console", () => {
+  it("opens the exact authorized source version even when workflow names match", async () => {
+    window.history.replaceState({}, "", "/fms?flow=older-source");
+    mocks.loadFmsBuilderData.mockResolvedValue({ ...data, flows: [...data.flows, { ...flow, id: "older-source", version: 0, status: "archived", description: "Exact historical source" }] });
+    mocks.loadFmsRuntime.mockResolvedValue(runtime);
+    render(<FMSBuilderPage />);
+    expect(await screen.findByRole("heading", { name: "Source FMS — Sales intake · v0" }, { timeout: 20_000 })).toBeTruthy();
+    expect(screen.getByText(/Exact historical source/)).toBeTruthy();
+    expect(mocks.setFmsFlowActive).not.toHaveBeenCalled();
+  });
   it("keeps published workflows form-triggered instead of exposing a manual instance start", async () => {
     mocks.loadFmsBuilderData.mockResolvedValue(data);
     mocks.loadFmsRuntime.mockResolvedValue(runtime);

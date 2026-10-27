@@ -1,5 +1,9 @@
 project_id = "jewelos"
 
+# Same server-to-server scheduler gate as roster delivery, separate immutable queue.
+[functions.crm-customer-sync]
+verify_jwt = false
+
 # The original CRM is ported into schema crm (0182-0187) and is queried as
 # supabase.schema("crm"). crm is deliberately not on extra_search_path: its table
 # names (clients, client_timeline, ...) overlap public ones. crm_private is internal
@@ -53,3 +57,8 @@ verify_jwt = false
 # the database, and then calls only the service-role Kiara RPCs of migration 0220.
 [functions.kiara-insights]
 verify_jwt = false
+
+# Dedicated form conversion: platform JWT + getUser + caller-scoped forms.manage
+# and atomic quota RPC. No form writes or source execution in this endpoint.
+[functions.forms-import]
+verify_jwt = true

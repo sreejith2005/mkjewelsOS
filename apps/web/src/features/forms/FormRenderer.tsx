@@ -62,19 +62,41 @@ function FileFieldControl({ describedBy, disabled, field, labelledBy, onChange, 
   </div>;
 }
 
-export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initialAnswers = {}, onSubmit, preview = false, readOnly = false, templateId, workflowHint = false }: { definition: FormTemplateDefinition; dynamicOptions?: DynamicOptions; initialAnswers?: FormAnswers; onSubmit?: (answers: FormAnswers) => Promise<void | boolean>; preview?: boolean; readOnly?: boolean; templateId?: string; workflowHint?: boolean }) {
+export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initialAnswers = {}, onSubmit, preview = false, readOnly = false, templateId, workflowHint = false, selectedFieldKey, onEditField }: { definition: FormTemplateDefinition; dynamicOptions?: DynamicOptions; initialAnswers?: FormAnswers; onSubmit?: (answers: FormAnswers) => Promise<void | boolean>; preview?: boolean; readOnly?: boolean; templateId?: string; workflowHint?: boolean; selectedFieldKey?: string | undefined; onEditField?: ((key: string) => void) | undefined }) {
   const uid = useId();
   const [answers, setAnswers] = useState<Record<string, FormAnswer>>(() => Object.fromEntries(Object.entries(initialAnswers).filter((entry): entry is [string, FormAnswer] => entry[1] !== null && entry[1] !== undefined)));
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Readonly<Record<string, string>>>({});
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [previewChecked, setPreviewChecked] = useState(false);
   const [stepKey, setStepKey] = useState<string | null>(null);
   const fieldRefs = useRef(new Map<string, HTMLElement>());
   const formRef = useRef<HTMLFormElement>(null);
   // Dropdown Master questions store only a reference; resolve it for rendering
   // and validation so every option field behaves identically here.
   const resolved = useMemo(() => resolveFormOptions(definition, dynamicOptions.masters), [definition, dynamicOptions.masters]);
+  const previousDefinition = useRef(resolved);
+  useEffect(() => {
+    if (!preview || previousDefinition.current === resolved) return;
+    const previous = previousDefinition.current;
+    previousDefinition.current = resolved;
+    setAnswers(current => {
+      const compatible = Object.fromEntries(Object.entries(current).filter(([key, value]) => {
+        const next = resolved.fields.find(field => field.key === key);
+        if (!next || previous.fields.find(field => field.key === key)?.type !== next.type) return false;
+        if ((next.type === "select" || next.type === "radio") && next.options && typeof value === "string") return next.options.some(option => option.value === value);
+        if ((next.type === "multiselect" || next.type === "checkbox") && Array.isArray(value)) return value.every(item => next.options?.some(option => option.value === item));
+        return true;
+      }));
+      const next = normalizeFormAnswers(resolved, compatible);
+      return Object.fromEntries(Object.entries(next).filter((entry): entry is [string, FormAnswer] => entry[1] !== undefined && entry[1] !== null));
+    });
+    setFieldErrors({}); setError(null); setPreviewChecked(false);
+  }, [preview, resolved]);
+  useEffect(() => {
+    if (preview && selectedFieldKey) fieldRefs.current.get(selectedFieldKey)?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  }, [preview, selectedFieldKey]);
   const normalized = useMemo(() => normalizeFormAnswers(resolved, answers), [answers, resolved]);
   const sections = useMemo(() => visibleFormSections(resolved, answers), [answers, resolved]);
   const progress = useMemo(() => formCompletionProgress(resolved, answers), [answers, resolved]);
@@ -109,6 +131,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
   }, [currentStepKey, stepped]);
 
   const set = (key: string, value: FormAnswer) => {
+    setPreviewChecked(false);
     setAnswers((current) => stepped ? updateVisibleFormAnswers(resolved, current, key, value, initialAnswers) : { ...current, [key]: value });
     setFieldErrors((current) => {
       if (!(key in current)) return current;
@@ -138,7 +161,8 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
   const submitAnswers = async () => {
     const result = validateCompleteForm(resolved, answers);
     if (!result.valid) { showIssues(result.issues, "Check the form"); return; }
-    if (!onSubmit || preview) return;
+    if (preview) { setPreviewChecked(true); setError(null); setFieldErrors({}); return; }
+    if (!onSubmit) return;
     setBusy(true); setError(null); setFieldErrors({});
     try { if (await onSubmit(normalized) !== false) setSuccess(true); } catch (caught) { setError(caught instanceof Error ? caught.message : "Submission failed"); } finally { setBusy(false); }
   };
@@ -153,10 +177,10 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
     const aria = { "aria-describedby": describedBy, "aria-invalid": invalid ? true : undefined, "aria-required": field.required ? true : undefined } as const;
     const helper = field.helperText ? <span className="mb-2 block text-sm text-task-text-muted" id={helpId}>{field.helperText}</span> : null;
     const errorText = invalid ? <span className="mt-1.5 block text-sm font-medium text-danger" id={errorId}>{invalid}</span> : null;
-    const shell = (content: ReactNode) => <div className={cn("rounded-xl transition-colors", invalid && "-mx-2 bg-danger/5 px-2 py-2")} key={field.key}>{content}</div>;
+    const shell = (content: ReactNode) => <div className={cn("rounded-xl transition-colors", invalid && "-mx-2 bg-danger/5 px-2 py-2", preview && selectedFieldKey === field.key && "ring-2 ring-gold p-2")} key={field.key}>{preview && onEditField ? <Button className="mb-2" onClick={() => onEditField(field.key)} type="button" variant="ghost">Edit this field<span className="sr-only">: {field.label}</span></Button> : null}{content}</div>;
 
     if (field.type === "file") return shell(<div><QuestionText field={field} id={labelId} />{helper}
-      <FileFieldControl describedBy={describedBy} disabled={disabled} field={field} labelledBy={labelId} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} templateId={templateId} value={answers[field.key]} />{errorText}
+      {preview ? <Notice>Test mode: file uploads are disabled. No file will be stored.</Notice> : <FileFieldControl describedBy={describedBy} disabled={disabled} field={field} labelledBy={labelId} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} templateId={templateId} value={answers[field.key]} />}{errorText}
     </div>);
     const dynamic = optionsFor(field.type); const staticOptions = field.options ?? [];
     const checkboxOptions = staticOptions.length ? staticOptions : dynamic.map((option) => ({ value: option.id, label: option.label }));
@@ -221,10 +245,11 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
     </details> : null}
     {error ? <div aria-live="assertive" role="alert"><Notice tone="danger">{error}</Notice></div> : null}
     {success ? <Notice tone="success">Form submitted successfully.</Notice> : null}
+    {previewChecked ? <Notice tone="success">Test validation passed. No data was submitted.</Notice> : null}
     {!readOnly && resolved.fields.length > 0 ? <div className="form-actions sticky z-10 -mx-1 mt-1 flex gap-2 border-t border-task-border bg-task-bg/95 px-1 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
       {stepped && previousStepKey ? <Button className="min-h-12 shrink-0" disabled={busy || success} onClick={() => goToStep(previousStepKey)} type="button" variant="secondary"><ChevronLeft aria-hidden="true" className="size-4" />Back</Button> : null}
       {stepped && (nextStepKey || !finalStep) ? <Button className="min-h-12 flex-1 sm:flex-none" disabled={busy || success} onClick={advance} type="button">Next<ChevronRight aria-hidden="true" className="size-4" /></Button>
-        : <Button className="min-h-12 flex-1 sm:flex-none" disabled={busy || preview || success} type="submit">{busy ? "Submitting..." : "Submit form"}</Button>}
+        : <Button className="min-h-12 flex-1 sm:flex-none" disabled={busy || success} type="submit">{busy ? "Submitting..." : preview ? "Test validation" : "Submit form"}</Button>}
     </div> : null}
   </form>;
 }

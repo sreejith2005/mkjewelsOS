@@ -1,2 +1,3 @@
 import {ReportsView} from "@/features/reports/ReportsView";
-export function ReportsPage(){return <ReportsView/>;}
+import {CustomerExports} from "@/features/reports/CustomerExports";
+export function ReportsPage(){return <><CustomerExports/><ReportsView/></>;}

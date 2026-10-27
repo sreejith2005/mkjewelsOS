@@ -354,12 +354,12 @@ describe("Form builder follow-up questions", () => {
     await user.selectOptions(screen.getByLabelText("Route after Gold"), "question:gold_purity");
     await user.click(screen.getByRole("button", { name: "Preview form" }));
 
-    expect(screen.getByRole("button", { name: "Close preview" })).toBeTruthy();
-    expect(screen.queryByText("What happens after each answer?")).toBeNull();
+    expect(screen.getByRole("button", { name: "Preview form" })).toBeTruthy();
+    expect(screen.getByText("What happens after each answer?")).toBeTruthy();
     await user.selectOptions(screen.getByLabelText("Metal"), "gold");
     expect(screen.getByLabelText("Gold purity")).toBeTruthy();
 
-    await user.click(screen.getByRole("button", { name: "Close preview" }));
+    await user.click(screen.getByRole("button", { name: "Preview form" }));
     expect(screen.getByText("What happens after each answer?")).toBeTruthy();
   });
 

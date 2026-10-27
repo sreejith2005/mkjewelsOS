@@ -1,0 +1,11 @@
+{
+  "imports": {
+    "@anthropic-ai/sdk": "npm:@anthropic-ai/sdk@0.131.0",
+    "@std/assert": "jsr:@std/assert@1",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.112.1"
+  },
+  "tasks": {
+    "check": "deno check index.ts handler.ts model.ts handler.test.ts",
+    "test": "deno test --allow-read handler.test.ts"
+  }
+}

@@ -1,5 +1,13 @@
 # Ask Kiara: app help for you to check
 
+## Forms 2.0 — local implementation, 2026-10-24
+
+- [ ] **Import Form with AI** accepts empty HTML and optional Apps Script, JavaScript and CSS. Remove credentials and customer records before **Analyze & Build Form**. Review the outline, native preview and findings, acknowledge unsupported behavior, then edit and **Save draft**. Google Sheets/backend writes are reported, not migrated. Publishing is separate.
+- [ ] **Live Preview** shows the real form beside editing on wide screens. Phones switch between **Live Preview** and **Build**. **Reset Preview** clears test answers; preview never submits or uploads files. The desktop divider supports drag and arrow keys.
+- [ ] **Origin** records creation source. **Created in FMS** differs from **Used in FMS (within my access)**. The source link and workflow names respect workflow access. Earlier unknown origins are labeled honestly.
+- [ ] **Version History** compares exact saved checkpoints, including published in-place edits. **View historical form**, **Restore as New Draft**, and **Create New Form From This Version** preserve submissions and live workflow links. Restore refuses an existing family draft. Earlier checkpoint details may be unavailable.
+- Kiara read-tool decision: no new tool. These are authoring instructions; Kiara does not read imported source/checkpoints or perform writes. Existing section permission checks continue to govern app help. This entry does not establish deployment.
+
 For the owner. When someone asks Kiara **"how do I … in JewelOS?"**, Kiara answers only from
 the text below. It does not make up other steps. Please read each section and tick it, or
 write what is wrong next to it and send the list back. Kiara rewrites these answers in
@@ -195,3 +203,6 @@ and **Previous form answers**; the workflow, stage, reference, assignee and the
 four-step bar are no longer repeated. After confirming, the employee returns to
 Tasks -> FMS with a short notice instead of a result page. Kiara's "Do my
 assigned stage" recipe is updated. No new read tool.
+
+
+2026-10-27 customer integration: exact labels added for Customer Data Integration, Customer Integration Health, Customer Integration Administration, FMS Journeys & Collected Answers, and Customer & Stage Exports. No new Kiara data tool is added: these are authoring/recovery instructions; raw submissions, pending identities and customer exports are not available to the assistant. Existing read-tool authorization remains unchanged.

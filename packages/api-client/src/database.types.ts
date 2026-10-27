@@ -1,3 +1,4 @@
+import type { CustomerIntegrationFunctions,CustomerIntegrationTables } from "@jewelos/core";
 export type Json =
   | string
   | number
@@ -2266,7 +2267,185 @@ export type Database = {
     }
   }
   public: {
-    Tables: {
+    Tables: CustomerIntegrationTables & {
+      form_family_provenance: {
+        Row: {
+          family_id: string
+          tenant_id: string
+          origin: string
+          created_by: string | null
+          created_at: string
+          source_flow_id: string | null
+          source_flow_name: string | null
+          source_stage_key: string | null
+          source_stage_name: string | null
+          source_template_id: string | null
+          import_method: string | null
+        }
+        Insert: {
+          family_id: string
+          tenant_id: string
+          origin: string
+          created_by?: string | null
+          created_at?: string
+          source_flow_id?: string | null
+          source_flow_name?: string | null
+          source_stage_key?: string | null
+          source_stage_name?: string | null
+          source_template_id?: string | null
+          import_method?: string | null
+        }
+        Update: {
+          family_id?: string
+          tenant_id?: string
+          origin?: string
+          created_by?: string | null
+          created_at?: string
+          source_flow_id?: string | null
+          source_flow_name?: string | null
+          source_stage_key?: string | null
+          source_stage_name?: string | null
+          source_template_id?: string | null
+          import_method?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_family_provenance_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_family_provenance_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      form_definition_checkpoints: {
+        Row: {
+          id: string
+          tenant_id: string
+          family_id: string
+          template_id: string
+          version: number
+          sequence: number
+          action: string
+          actor_id: string | null
+          actor_name: string | null
+          created_at: string
+          definition: Json
+          legacy_field_defaults: Json
+          lifecycle: string
+          change_note: string | null
+          previous_id: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          family_id: string
+          template_id: string
+          version: number
+          sequence: number
+          action: string
+          actor_id?: string | null
+          actor_name?: string | null
+          created_at?: string
+          definition: Json
+          legacy_field_defaults?: Json
+          lifecycle: string
+          change_note?: string | null
+          previous_id?: string | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          family_id?: string
+          template_id?: string
+          version?: number
+          sequence?: number
+          action?: string
+          actor_id?: string | null
+          actor_name?: string | null
+          created_at?: string
+          definition?: Json
+          legacy_field_defaults?: Json
+          lifecycle?: string
+          change_note?: string | null
+          previous_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_definition_checkpoints_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_definition_checkpoints_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_definition_checkpoints_previous_id_fkey"
+            columns: ["previous_id"]
+            isOneToOne: false
+            referencedRelation: "form_definition_checkpoints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      forms_import_requests: {
+        Row: {
+          id: string
+          tenant_id: string
+          actor_id: string
+          request_key: string
+          created_at: string
+          completed_at: string | null
+          success: boolean | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          actor_id: string
+          request_key: string
+          created_at?: string
+          completed_at?: string | null
+          success?: boolean | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          actor_id?: string
+          request_key?: string
+          created_at?: string
+          completed_at?: string | null
+          success?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forms_import_requests_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forms_import_requests_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dashboard_saved_views: {
         Row: {
           config: Json
@@ -11979,7 +12158,7 @@ export type Database = {
         ]
       }
     }
-    Functions: {
+    Functions: CustomerIntegrationFunctions & {
       get_fms_work_mutation_result: { Args: { p_idempotency_key: string }; Returns: Json }
       list_fms_form_starters: { Args: { p_form_template_id: string }; Returns: Json }
       submit_form_and_start_fms_idempotent: { Args: { p_form_template_id: string; p_answers: Json; p_idempotency_key: string; p_flow_id?: string }; Returns: Json }
@@ -14376,6 +14555,30 @@ export type Database = {
       save_fms_flow_draft_with_audit: {
         Args: { p_flow_id: string; p_metadata: Json; p_stages: Json }
         Returns: string
+      }
+      save_form_workspace_with_audit: {
+        Args: { p_template_id: string | null; p_payload: Json; p_fields: Json; p_expected_updated_at: string | null; p_origin?: Json; p_change_note?: string | null }
+        Returns: string
+      }
+      list_form_history: {
+        Args: { p_template_id: string }
+        Returns: Json
+      }
+      get_form_provenance: {
+        Args: { p_template_ids: string[] }
+        Returns: Json
+      }
+      restore_form_checkpoint_with_audit: {
+        Args: { p_checkpoint_id: string; p_as_new_family: boolean; p_expected_checkpoint_id: string }
+        Returns: string
+      }
+      start_forms_import_request: {
+        Args: { p_request_key: string }
+        Returns: string
+      }
+      finish_forms_import_request: {
+        Args: { p_request_id: string; p_success: boolean }
+        Returns: undefined
       }
       save_form_draft_with_audit: {
         Args: { p_fields: Json; p_payload: Json; p_template_id: string }

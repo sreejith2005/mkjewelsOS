@@ -1,4 +1,4 @@
-const FORMULA_PREFIX = /^[=+\-@]/;
+const FORMULA_PREFIX = /^[\s\u0000-\u001f]*[=+\-@]/;
 
 export function escapeSpreadsheetFormula(value: string): string {
   return FORMULA_PREFIX.test(value) ? `'${value}` : value;

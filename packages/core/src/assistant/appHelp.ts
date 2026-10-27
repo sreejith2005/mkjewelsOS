@@ -120,13 +120,17 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     section: "forms_library",
     title: "Forms Library",
     path: "/forms",
-    summary: "Forms Library lists visible published forms the user can fill and the forms they submitted. Hidden forms remain accessible through assigned Tasks and FMS work.",
+    summary: "Forms Library lists visible forms and submissions, creation sources, FMS usage and version history. Authors can import source code with AI and test edits in Live Preview. Hidden forms remain accessible through assigned Tasks and FMS work.",
     recipes: [
       "Fill a form: open Forms Library, find the form under \"Forms to fill\", and press \"Fill\". Questions marked * must be answered, and the bar at the top counts them. Long forms are filled one step at a time with \"Next\" and \"Back\"; tap an earlier step to change it, and open \"Check your answers before submitting\" on the last step before pressing \"Submit form\". A missing answer is marked in red under the question.",
       "See what I submitted: \"My submissions\" in Forms Library shows each submission and its review status.",
       "Create a form: \"New form\" in Forms Library (form authors only), then \"Publish\" when ready.",
-      "See the form while editing it: on a wide screen the form editor shows the real form under \"Live preview\" beside the questions, updating with every change; answer it to test conditional questions (nothing is submitted). Use \"Desktop preview\" / \"Mobile preview\", \"Start preview again\", and \"Hide preview\" / \"Show preview\". On a phone press \"Preview form\" and \"Edit\" to switch.",
+      "Import an existing HTML form: form authors choose Import Form with AI, paste or upload empty HTML and optional Apps Script, JavaScript and CSS, then Analyze & Build Form. Remove credentials and customer records first. Review the source outline, native preview and findings, acknowledge unsupported behavior, then edit in the native builder and Save draft. Google Sheets writes and external integrations are not migrated. Publishing is separate.",
+      "Test while editing: Live Preview shows the real form alongside the editor on a wide screen. On phones use Live Preview and Build to switch views. Reset Preview clears test answers; test mode never submits data or uploads files. Drag the desktop divider or use its arrow keys to resize.",
+      "Identify a form: Origin records where it was created. Created in FMS is different from Used in FMS. Use the Origin filter and Used in FMS (within my access) together with search and lifecycle. Open Source FMS shows only a workflow you can access.",
+      "Review changes: Version History shows saved checkpoints, including changes within one published version. Compare two checkpoints or View historical form. Restore as New Draft preserves old submissions and workflow links and refuses an existing draft conflict. Create New Form From This Version makes a separate draft with no workflow links. Earlier checkpoint details may be unavailable.",
       "Control library visibility: form authors use Visible in Forms Library on each form version. Turning it off hides the form from staff browsing and standalone filling; assigned Tasks/FMS work and submission history remain available. Form authors can still see and manage it.",
+      "Contribute customer answers: authors open Customer Data Integration in Form Builder, set a channel/account scope and review each question destination. Save customer mapping creates an immutable version. CRM administration must separately approve the exact mapping. FMS work completes while synchronization waits; unmapped operational answers remain in JewelOS.",
       "Set a record name: in Form Builder, use Use this question as the record name to choose an identifying question, or leave Automatic. A used published form requires a new revision to change its default. Each FMS workflow can select its own naming question in Task Naming.",
     ],
   },
@@ -170,6 +174,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     summary: "Reports previews fixed reports for the user's level and lets them export private CSV files.",
     recipes: [
       "Preview a report: open Reports, tap the report, then pick dates (Today, Last 7 days, Last 30 days, This month, or From/To) and any Branch, Department or Status filter.",
+      "Customer exports: open Customer & Stage Exports, choose the export and optional workflow, stage, employee and dates, then Queue private CSV export. Download from Your exports. Full answers require source-work access; customer exports also require CRM administrator authority. Authors can save a reusable Sheet layout with stable question keys. Sheets remain one-way.",
       "Export a report: press \"Export CSV\". The file appears under \"Your exports\" (Waiting, then Preparing), usually within a minute; press \"Download\" when it is Completed. Files expire automatically.",
     ],
   },
@@ -179,6 +184,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     path: "/crm",
     summary: "CRM holds client records, walk-ins, interactions, and follow-ups for CRM users. Client profile details accumulate from saved answers; newer nonblank answers replace older answers.",
     recipes: [
+      "Customer history: open a client profile and expand FMS Journeys & Collected Answers to see original answers, employees, submission times and commercial classification. Open workflow work checks its own permissions. Administrators use Customer Integration Administration in roster administration to approve mappings and resolve pending identities.",
       "Find a client: open CRM and search by name or client id.",
       "Record a walk-in or follow-up: use the walk-in and follow-up screens in CRM.",
       "Read a client’s history: open Complete contact history, SAVED WALK-IN DETAILS & MEDIA or PROFILE EDIT LOG on their profile. Expand an entry for full notes, grouped answers, Media or Before and After values. Show more reveals older entries on the current page; the history page links open earlier pages. Use Add a contact to record a contact.",
@@ -201,6 +207,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     path: "/settings",
     summary: "Settings holds the user's own preferences and, for authorized roles, organization defaults and permissions.",
     recipes: [
+      "Integration recovery: open Customer Integration Health, press Refresh customer synchronization, review pending or failed event metadata, then Retry selected customer events after the CRM mapping or identity decision is saved. Only integration administrators can use these controls.",
       "Change the theme or table density: open Settings and change your preferences.",
       "Manage permissions: Settings > \"Open permission management\" (Super Admin only).",
     ],

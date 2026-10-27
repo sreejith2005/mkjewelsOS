@@ -1,5 +1,8 @@
+import {CUSTOMER_EXPORTS,CUSTOMER_EXPORT_COLUMNS,customerExportValue,type CustomerExportColumn} from "../../../packages/core/src/reports/customerExports.ts";
+import { csvCell } from "../../../packages/core/src/reports/csv.ts";
+export { csvCell } from "../../../packages/core/src/reports/csv.ts";
 export type ExportJob = Readonly<{ id:string;tenant_id:string;report_key:string;attempt_number:number;max_rows:number }>;
-export type ExportBatch = Readonly<{ rows:readonly Readonly<Record<string,unknown>>[];total:number;cancelled?:boolean }>;
+export type ExportBatch = Readonly<{ rows:readonly Readonly<Record<string,unknown>>[];total:number;cancelled?:boolean;columns?:readonly CustomerExportColumn[] }>;
 export type CleanupJob = Readonly<{ id:string;object_path:string }>;
 
 export type ExportGateway = Readonly<{
@@ -14,7 +17,6 @@ export type ExportGateway = Readonly<{
 }>;
 
 export const responseHeaders={"Access-Control-Allow-Headers":"content-type,x-cron-secret","Access-Control-Allow-Methods":"POST,OPTIONS","Access-Control-Allow-Origin":"*","Content-Type":"application/json"} as const;
-const FORMULA=/^[=+\-@]/;
 const COLUMNS:Readonly<Record<string,readonly string[]>>={
   task_operations:["task_id","title","task_type","priority","status","planned_datetime","assignee_name","checklist_completion"],
   task_completion_delay:["task_id","title","assignee_name","planned_datetime","actual_datetime","on_time","delay_minutes"],
@@ -30,12 +32,6 @@ const COLUMNS:Readonly<Record<string,readonly string[]>>={
   notification_delivery_health:["channel","status","delivery_count","retry_count","latest_attempt_at"],
 };
 
-export function csvCell(value:unknown):string {
-  if(value===null||value===undefined)return "";
-  let text=typeof value==="string"?value:String(value);
-  if(FORMULA.test(text))text=`'${text}`;
-  return /[",\r\n]/.test(text)?`"${text.replaceAll('"','""')}"`:text;
-}
 export function safeFilename(reportKey:string,date=new Date()):string {return `${reportKey.replace(/[^a-z0-9_-]/g,"-")}-${date.toISOString().slice(0,10)}.csv`;}
 export function encodeRows(columns:readonly string[],rows:readonly Readonly<Record<string,unknown>>[],includeHeader:boolean):string {
   const lines:string[]=[]; if(includeHeader)lines.push(columns.map(csvCell).join(",")); for(const row of rows)lines.push(columns.map((column)=>csvCell(row[column])).join(",")); return `${lines.join("\r\n")}\r\n`;
@@ -43,19 +39,25 @@ export function encodeRows(columns:readonly string[],rows:readonly Readonly<Reco
 function json(status:number,body:Readonly<Record<string,unknown>>):Response{return new Response(JSON.stringify(body),{status,headers:responseHeaders});}
 
 export async function processExportJob(gateway:ExportGateway,job:ExportJob,workerId:string,batchSize=500):Promise<"completed"|"failed"|"cancelled"> {
-  const columns=COLUMNS[job.report_key]; if(!columns){await gateway.finish(job.id,workerId,"failed",null,null,"unknown_report_key");return "failed";}
+  const customer=Object.hasOwn(CUSTOMER_EXPORTS,job.report_key);let customerColumns:readonly CustomerExportColumn[]=CUSTOMER_EXPORT_COLUMNS;
+  const columns=COLUMNS[job.report_key]; if(!columns&&!customer){await gateway.finish(job.id,workerId,"failed",null,null,"unknown_report_key");return "failed";}
   const chunks:BlobPart[]=[new Uint8Array([0xef,0xbb,0xbf])]; let offset=0; let total=0;
   try {
     while(offset<job.max_rows){
       const batch=await gateway.batch(job.id,offset,Math.min(batchSize,job.max_rows-offset));
       if(batch.cancelled){await gateway.finish(job.id,workerId,"cancelled",null,null,null);return "cancelled";}
       if(offset===0)total=Math.min(batch.total,job.max_rows);
-      if(batch.rows.length===0)break;
-      chunks.push(encodeRows(columns,batch.rows,offset===0)); offset+=batch.rows.length;
+      if(customer){
+        if(batch.columns){if(offset===0)customerColumns=batch.columns;else if(JSON.stringify(customerColumns)!==JSON.stringify(batch.columns))throw new Error("Export layout changed");}
+        if(!customerColumns.length||customerColumns.length>64||customerColumns.some(column=>!column.key||!column.label))throw new Error("Invalid export columns");
+        if(batch.rows.length===0)break;
+        if(offset===0)chunks.push(customerColumns.map(column=>csvCell(column.label)).join(",")+"\r\n");
+        chunks.push(batch.rows.map(row=>customerColumns.map(column=>csvCell(customerExportValue(row[column.key],column))).join(",")).join("\r\n")+"\r\n");
+      }else {if(batch.rows.length===0)break;chunks.push(encodeRows(columns!,batch.rows,offset===0));} offset+=batch.rows.length;
       await gateway.progress(job.id,workerId,Math.min(99,Math.floor((offset/Math.max(total,1))*100)),offset);
       if(batch.rows.length<batchSize||offset>=total)break;
     }
-    if(offset===0)chunks.push(encodeRows(columns,[],true));
+    if(offset===0)chunks.push(customer?customerColumns.map(column=>csvCell(column.label)).join(",")+"\r\n":encodeRows(columns!,[],true));
     const path=`${job.tenant_id}/${job.id}/${safeFilename(job.report_key)}`;
     await gateway.upload(path,new Blob(chunks,{type:"text/csv;charset=utf-8"}));
     const state=await gateway.finish(job.id,workerId,"completed",path,offset,null);

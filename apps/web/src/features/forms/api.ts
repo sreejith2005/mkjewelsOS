@@ -3,6 +3,7 @@ import { supabase } from "@jewelos/api-client";
 import type { FormUsageImpact, Json, Tables } from "@jewelos/core";
 import { normalizeFormDefinition, parseFormOptions, type FormBranch, type FormFieldDefinition, type FormRule, type FormSectionDefinition, type FormTemplateDefinition } from "@jewelos/core";
 import { loadMasterOptions, toFormMasterOptions } from "@/features/dropdowns/api";
+import { saveFormWorkspace, type FormOrigin } from "./historyApi";
 
 export type FormTemplate = Tables<"form_templates">;
 export type FormField = Tables<"form_fields">;
@@ -130,8 +131,9 @@ export async function loadFormDynamicOptions() {
   fail("Load form branches", branches.error); fail("Load form departments", departments.error);
   return { users: users.flatMap((row) => row.id && row.employee_name ? [{ id: row.id, label: row.employee_name }] : []), branches: (branches.data ?? []).map((row) => ({ id: row.id, label: row.name })), departments: (departments.data ?? []).map((row) => ({ id: row.id, branchId: row.branch_id, label: row.name })), masters: toFormMasterOptions(masters) };
 }
-export const saveDraft = async (id: string | null, payload: Json, fields: Json): Promise<string> => { const { data, error } = await supabase.rpc("save_form_draft_with_audit", { p_template_id: id as string, p_payload: payload, p_fields: fields }); fail("Save form draft", error); if (!data) throw new Error("Save form draft: the server did not return the draft id"); return data; };
-export const savePublishedForm = async (id: string, payload: Json, fields: Json) => { const { error } = await supabase.rpc("save_published_form_with_audit", { p_template_id: id, p_payload: payload, p_fields: fields }); fail("Save published form", error); };
+export type FormSaveContext = { expectedUpdatedAt: string | null; origin?: FormOrigin | undefined; note?: string | undefined };
+export const saveDraft = async (id: string | null, payload: Json, fields: Json, context?: FormSaveContext): Promise<string> => { if (context) return saveFormWorkspace(id, payload, fields, context.expectedUpdatedAt, context.origin, context.note); const { data, error } = await supabase.rpc("save_form_draft_with_audit", { p_template_id: id as string, p_payload: payload, p_fields: fields }); fail("Save form draft", error); if (!data) throw new Error("Save form draft: the server did not return the draft id"); return data; };
+export const savePublishedForm = async (id: string, payload: Json, fields: Json, context?: FormSaveContext) => { if (context) { await saveFormWorkspace(id, payload, fields, context.expectedUpdatedAt, undefined, context.note); return; } const { error } = await supabase.rpc("save_published_form_with_audit", { p_template_id: id, p_payload: payload, p_fields: fields }); fail("Save published form", error); };
 export const formUsageImpact = async (id: string): Promise<FormUsageImpact> => { const { data, error } = await supabase.rpc("form_usage_impact", { p_template_id: id }); fail("Check form usage", error); if (!data) throw new Error("Check form usage returned no result"); return data as unknown as FormUsageImpact; };
 export const reviseForm = async (id: string) => { const { data, error } = await supabase.rpc("create_form_revision_with_audit", { p_source_template_id: id, p_payload: {} }); fail("Create form revision", error); if (!data) throw new Error("Create form revision: the server did not return the new draft"); return data as string; };
 export const publishForm = async (id: string) => { const { error } = await supabase.rpc("publish_form_with_audit", { p_template_id: id }); fail("Publish form", error); };
