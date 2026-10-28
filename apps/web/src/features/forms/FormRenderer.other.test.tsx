@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FormFieldDefinition } from "@jewelos/core";
@@ -44,6 +44,8 @@ describe("Other answers", () => {
     await user.click(screen.getByRole("button", { name: "Submit form" }));
     expect(submit).not.toHaveBeenCalled();
     expect(screen.getAllByText("Lead source is required").length).toBeGreaterThan(0);
+    // The error sends the employee to the box they still have to type in.
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Lead source: your own answer" })));
     await user.type(screen.getByRole("textbox", { name: "Lead source: your own answer" }), "Friend");
     await user.click(screen.getByRole("button", { name: "Submit form" }));
     expect(submit).toHaveBeenCalledWith({ source: "Friend" });

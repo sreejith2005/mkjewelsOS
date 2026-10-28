@@ -113,6 +113,8 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
     if (open) requestAnimationFrame(() => otherInputs.current.get(key)?.focus());
   };
   const otherRef = (key: string) => (node: HTMLInputElement | null) => { if (node) otherInputs.current.set(key, node); else otherInputs.current.delete(key); };
+  // When "Other" is picked, a missing-answer error focuses its text box, not the first listed choice.
+  const otherFocusRef = (key: string) => (node: HTMLInputElement | null) => { otherRef(key)(node); if (node) fieldRefs.current.set(key, node); };
 
   // A live preview follows an editor: sample answers the edited Form can no longer
   // hold (a removed question or choice, a changed type) are dropped.
@@ -192,7 +194,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
         <p className="text-xs text-task-text-muted">Choose all that apply.</p>
         <div className="grid gap-2">{choices.map((option, index) => <label className={OPTION_ROW} key={option.value}><input checked={selected.includes(option.value)} disabled={disabled} onChange={(event) => set(field.key, event.target.checked ? [...selected, option.value] : selected.filter((item) => item !== option.value))} ref={index === 0 ? register(field.key) : undefined} type="checkbox" /><span className="min-w-0 break-words">{option.label}</span></label>)}
           {allowsOther ? <div><label className={OPTION_ROW}><input checked={otherChecked} disabled={disabled} onChange={(event) => { openOther(field.key, event.target.checked); if (!event.target.checked) set(field.key, withTyped("")); }} type="checkbox" /><span>Other</span></label>
-            {otherChecked ? <OtherAnswerInput disabled={disabled} inputRef={otherRef(field.key)} label={field.label} onChange={(text) => set(field.key, withTyped(text))} value={typed} /> : null}</div> : null}
+            {otherChecked ? <OtherAnswerInput disabled={disabled} inputRef={otherFocusRef(field.key)} label={field.label} onChange={(text) => set(field.key, withTyped(text))} value={typed} /> : null}</div> : null}
         </div>{errorText}
       </fieldset>);
     }
@@ -205,7 +207,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
     if (field.type === "radio") return shell(<fieldset aria-describedby={describedBy} className="space-y-2"><legend className="mb-1"><QuestionText field={field} /></legend>{helper}
       <div className="grid gap-2">{staticOptions.map((option, index) => <label className={OPTION_ROW} key={option.value}><input checked={!otherChosen && value === option.value} disabled={disabled} name={`${uid}-${field.key}`} onChange={() => chooseListed(option.value)} ref={index === 0 ? register(field.key) : undefined} type="radio" /><span className="min-w-0 break-words">{option.label}</span></label>)}
         {singleOther ? <div><label className={OPTION_ROW}><input checked={otherChosen} disabled={disabled} name={`${uid}-${field.key}`} onChange={() => { openOther(field.key, true); set(field.key, ""); }} type="radio" /><span>Other</span></label>
-          {otherChosen ? <OtherAnswerInput disabled={disabled} inputRef={otherRef(field.key)} label={field.label} onChange={(text) => set(field.key, text)} value={otherText} /> : null}</div> : null}
+          {otherChosen ? <OtherAnswerInput disabled={disabled} inputRef={otherFocusRef(field.key)} label={field.label} onChange={(text) => set(field.key, text)} value={otherText} /> : null}</div> : null}
       </div>{errorText}
     </fieldset>);
 
@@ -216,7 +218,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
     const textValue = typeof value === "string" || typeof value === "number" ? value : "";
     const control = field.type === "textarea" ? <textarea {...aria} className="field min-h-24" disabled={disabled} maxLength={field.validation?.maxLength} onChange={onText} placeholder={field.placeholder} ref={register(field.key)} rows={3} value={typeof value === "string" ? value : ""} />
       : SELECT_TYPES.has(field.type) ? <><select {...aria} className="field" disabled={disabled} onChange={(event) => { if (event.target.value === OTHER_CHOICE) { openOther(field.key, true); set(field.key, ""); } else chooseListed(event.target.value); }} ref={register(field.key)} value={otherChosen ? OTHER_CHOICE : typeof value === "string" ? value : ""}><option value="">Choose an answer</option>{selectOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}{singleOther ? <option value={OTHER_CHOICE}>Other (type your answer)</option> : null}</select>
-        {otherChosen ? <OtherAnswerInput disabled={disabled} inputRef={otherRef(field.key)} label={field.label} onChange={(text) => set(field.key, text)} value={otherText} /> : null}</>
+        {otherChosen ? <OtherAnswerInput disabled={disabled} inputRef={otherFocusRef(field.key)} label={field.label} onChange={(text) => set(field.key, text)} value={otherText} /> : null}</>
       : field.type === "checkbox" ? <span className={OPTION_ROW}><input {...aria} checked={value === true} disabled={disabled} onChange={(event) => set(field.key, event.target.checked)} ref={register(field.key)} type="checkbox" /><span>{field.placeholder ?? "Yes"}</span></span>
       : field.type === "currency" ? <span className="relative block"><span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-task-text-muted">₹</span><input {...aria} className="field pl-7" disabled={disabled} inputMode="decimal" onChange={onText} placeholder={field.placeholder} ref={register(field.key)} step="any" type="number" value={textValue} /></span>
       : <input {...aria} autoComplete={field.type === "phone" ? "tel" : field.type === "email" ? "email" : undefined} className="field" disabled={disabled} inputMode={inputMode} maxLength={field.validation?.maxLength} onChange={onText} placeholder={field.placeholder} ref={register(field.key)} step={NUMBER_TYPES.has(field.type) ? "any" : undefined} type={inputType} value={textValue} />;
