@@ -2,6 +2,9 @@
 
 Owner request: deploy necessary migrations and push to `main`.
 
+Latest outcome: the owner subsequently authorized CRM deployment. See the
+[completed two-project deployment](CRM_FMS_TWO_PROJECT_DEPLOYMENT_20261028.md).
+
 ## Scope
 
 Release is assembled from current `origin/main` (`3a31c72`) in an isolated
