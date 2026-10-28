@@ -35,7 +35,7 @@ export function buildModelParams(model: string, effort: "low" | "medium" | "high
 
 /** Claude through the server-side Anthropic SDK; the key never leaves the Edge runtime. */
 export function anthropicModel(apiKey: string, model: string, effort: "low" | "medium" | "high", maxTokens: number): FmsAiModel {
-  const client = new Anthropic({ apiKey, maxRetries: 1 });
+  const client = new Anthropic({ apiKey, maxRetries: 0 });
   return {
     async complete({ system, turns, timeoutMs }) {
       try {

@@ -64,6 +64,8 @@ export async function askFmsAi(request: FmsAiRequest, signal?: AbortSignal): Pro
     let code: FmsAiErrorCode | "network" = (result.error as { name?: unknown }).name === "FunctionsFetchError" ? "network" : "unavailable";
     let message = code === "network" ? "You appear to be offline. Nothing was changed." : "The FMS assistant is unavailable right now. Manual editing is not affected.";
     if (context instanceof Response) {
+      // A gateway timeout has no JSON body; say so instead of "unavailable".
+      if (context.status === 504) { code = "timeout"; message = "The assistant took too long. Try a shorter request, or build one part of the workflow at a time."; }
       try {
         const body = await context.json() as Record<string, unknown>;
         if (typeof body.code === "string") code = body.code as FmsAiErrorCode;

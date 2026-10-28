@@ -6,7 +6,7 @@ import { fmsDefinitionFingerprint } from "../../../packages/core/src/fms/definit
 import { fmsAiSystemPrompt } from "../../../packages/core/src/fms/aiContext.ts";
 import type { FmsAiErrorBody, FmsAiResponse } from "../../../packages/core/src/fms/aiContract.ts";
 import type { FmsAiActor } from "./catalog.ts";
-import { DEFAULT_FMS_AI_CONFIG, handleFmsAiTurn, type FmsAiDeps } from "./handler.ts";
+import { DEFAULT_FMS_AI_CONFIG, FMS_AI_MIN_REPAIR_MS, handleFmsAiTurn, type FmsAiDeps } from "./handler.ts";
 import { ModelFailure, buildModelParams, type FmsAiModel, type ModelTurn } from "./model.ts";
 
 // Synthetic fixture only: no real people, Forms or credentials.
@@ -214,4 +214,17 @@ Deno.test("one assistant: a build-or-check request uses the same prompt, and a f
   assertEquals(result.status, 200);
   assertEquals((result.body as FmsAiResponse).kind, "proposal");
   assertEquals(seen[0]!.system, fmsAiSystemPrompt());
+});
+
+Deno.test("the turn always finishes inside Supabase's 150 s gateway limit, and a repair is skipped when time is short", async () => {
+  // The gateway kills the worker at 150 s; the model budget must leave room for the database work around it.
+  assert(DEFAULT_FMS_AI_CONFIG.totalBudgetMs <= 120_000);
+  assert(DEFAULT_FMS_AI_CONFIG.requestTimeoutMs < DEFAULT_FMS_AI_CONFIG.totalBudgetMs);
+  const broken = fakeModel(["<html>", reply({ kind: "proposal", operations: buildOps })]);
+  const { actor, calls } = fakeActor();
+  const short = { ...DEFAULT_FMS_AI_CONFIG, totalBudgetMs: FMS_AI_MIN_REPAIR_MS - 1_000 };
+  const result = await handleFmsAiTurn("t", body(), deps(actor, broken.model, { config: short }));
+  assertEquals(broken.seen.length, 1);
+  assertEquals(result.status, 502);
+  assertEquals(calls.rpc.find((call) => call.fn === "finish_fms_ai_request")?.args?.p_status, "failed");
 });
