@@ -201,3 +201,4 @@ assigned stage" recipe is updated. No new read tool.
 - [ ] **Other answers**: form authors tick **Add an "Other" choice** on a Dropdown, Radio Group or Checkbox question; people filling the form pick **Other** and type their answer, which is saved as the answer itself.
 - [ ] **Assign to a Different Employee** lists eligible employees A to Z.
 - [ ] Assigned FMS stage forms open on the work page below **Previous form answers**, with **Earlier answers** while filling.
+- [ ] (2026-10-28) **Forms to fill** has two buttons: **Forms Library** (default, forms made in the library) and **FMS workflow forms** (questions built inside FMS steps, labelled with workflow and step for authors). Each shows a count; search works inside the chosen group.
