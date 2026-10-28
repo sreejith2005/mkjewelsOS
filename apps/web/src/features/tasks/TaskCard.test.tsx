@@ -127,7 +127,10 @@ describe("TaskCard direct completion", () => {
     const { rerender } = render(<TaskCard viewerId="doer-1" capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, checklists: [{ deleted_at: null, completed_at: null, completed_by: null, id: "item-1", is_completed: false, is_required: true, item_text: "Photograph the tray", sort_order: 1, task_instance_id: "task-1" }, second], title: "Two steps" }} />);
     fireEvent.click(screen.getByRole("button", { name: /View details/i }));
     expect(screen.getByRole("checkbox", { name: /Photograph the tray/ })).toHaveProperty("disabled", false);
-    expect(screen.getByRole("checkbox", { name: /Lock the safe/ })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("checkbox", { name: /Lock the safe/ }).getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(screen.getByRole("checkbox", { name: /Lock the safe/ }));
+    expect(screen.getByText("Tick step 1 first.")).toBeTruthy();
+    expect(onAction).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Complete checklist: Two steps" })).toBeNull();
 
     const ticked = [{ ...{ deleted_at: null, completed_at: null, completed_by: null, id: "item-1", is_completed: false, is_required: true, item_text: "Photograph the tray", sort_order: 1, task_instance_id: "task-1" }, is_completed: true }, { ...second, is_completed: true }];
@@ -333,5 +336,74 @@ describe("TaskCard direct completion", () => {
 
     fireEvent.change(input, { target: { files: [file] } });
     await waitFor(() => expect(onAction).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe("TaskCard checklist on a phone", () => {
+  const item = (id: string, text: string, sort: number) => ({ deleted_at: null, completed_at: null, completed_by: null, id, is_completed: false, is_required: true, item_text: text, sort_order: sort, task_instance_id: "task-1" });
+  const steps = [item("s1", "Open the shutter", 1), item("s2", "Switch on lights", 2), item("s3", "Count the trays", 3)];
+
+  it("ticks at once and accepts the next tap while the first one is still saving", async () => {
+    const pending: Array<() => void> = [];
+    const onAction = vi.fn(() => new Promise<void>((resolve) => { pending.push(resolve); }));
+    render(<TaskCard viewerId="doer-1" capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, checklists: steps, task_type: "checklist", title: "Opening" }} />);
+    fireEvent.click(screen.getByRole("button", { name: /View details/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Open the shutter/ }));
+    expect(screen.getByRole("checkbox", { name: /Open the shutter/ }).getAttribute("aria-checked")).toBe("true");
+    const second = screen.getByRole("checkbox", { name: /Switch on lights/ });
+    expect(second).toHaveProperty("disabled", false);
+    expect(second.getAttribute("aria-disabled")).toBeNull();
+    fireEvent.click(second);
+    expect(second.getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByText(/Saving/)).toBeTruthy();
+    // Saves go out one at a time, in tap order.
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
+    expect(onAction).toHaveBeenLastCalledWith({ kind: "checklist", checklistId: "s1", completed: true });
+    pending.shift()?.();
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(2));
+    expect(onAction).toHaveBeenLastCalledWith({ kind: "checklist", checklistId: "s2", completed: true });
+    pending.shift()?.();
+    await waitFor(() => expect(screen.queryByText(/Saving/)).toBeNull());
+  });
+
+  it("puts a tick back and says so when the save fails", async () => {
+    const onAction = vi.fn().mockRejectedValue(new Error("Network error"));
+    render(<TaskCard viewerId="doer-1" capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, checklists: steps, task_type: "checklist", title: "Opening" }} />);
+    fireEvent.click(screen.getByRole("button", { name: /View details/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Open the shutter/ }));
+    await screen.findByText("Network error. Tap the step again.");
+    expect(screen.getByRole("checkbox", { name: /Open the shutter/ }).getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("waits for ticks to save before completing", async () => {
+    const order: string[] = [];
+    let release: () => void = () => undefined;
+    const onAction = vi.fn((action: { kind: string }) => {
+      order.push(action.kind);
+      return action.kind === "checklist" ? new Promise<void>((resolve) => { release = resolve; }) : Promise.resolve();
+    });
+    const one = [item("only", "Lock the safe", 1)];
+    render(<TaskCard viewerId="doer-1" capability={capability} categoryLabel="Uncategorized" onAction={onAction} task={{ ...task, checklists: one, task_type: "checklist", title: "Closing" }} />);
+    fireEvent.click(screen.getByRole("button", { name: /View details/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Lock the safe/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Complete checklist: Closing" }));
+    await waitFor(() => expect(order).toEqual(["checklist"]));
+    release();
+    await waitFor(() => expect(order).toEqual(["checklist", "complete"]));
+  });
+
+  it("opens the checklist without a long smooth scroll", async () => {
+    const scrollIntoView = vi.fn();
+    const original = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    try {
+      render(<TaskCard viewerId="doer-1" capability={capability} categoryLabel="Uncategorized" onAction={vi.fn()} task={{ ...task, checklists: steps, task_type: "checklist", title: "Opening" }} />);
+      fireEvent.click(screen.getByRole("button", { name: "Open checklist: Opening" }));
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", behavior: "auto" }));
+      expect(scrollIntoView).not.toHaveBeenCalledWith(expect.objectContaining({ block: "start" }));
+      expect(scrollIntoView.mock.contexts[0]).toBe(screen.getByRole("checkbox", { name: /Open the shutter/ }));
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original;
+    }
   });
 });
