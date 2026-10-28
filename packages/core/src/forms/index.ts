@@ -20,3 +20,5 @@ export * from "./formUsage";
 export * from "./library";
 export * from "./sectionImport";
 export * from "./previewAnswers";
+export * from "./customerIntegration";
+export type { CustomerIntegrationFunctions, CustomerIntegrationTables } from "./customerIntegrationRpc";

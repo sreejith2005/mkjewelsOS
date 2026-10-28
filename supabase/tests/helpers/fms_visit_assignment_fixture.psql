@@ -44,6 +44,13 @@ begin
       values(t,f,'attachment_file',t::text||'/'||f::text||'/'||gen_random_uuid()::text||'.pdf','Synthetic attachment.pdf','application/pdf',32,u) returning id into a;
     insert into visit_assignment_fixture values('attachment',a);
   end if;
+  if current_setting('test.fms.customer_integration',true)='true' then
+    insert into form_fields(form_template_id,field_key,field_name,field_type,sort_order,is_required,is_shown)
+      values(f,'budget','Budget','number',10,false,true),(f,'requirement','Requirement','textarea',11,false,true),
+        (f,'customer_phone','Customer phone','phone',13,false,true),(f,'instagram_handle','Instagram handle','text',14,false,true);
+    insert into form_fields(form_template_id,field_key,field_name,field_type,sort_order,is_required,is_shown,options)
+      values(f,'contact_status','Contact outcome','select',12,false,true,'[{"value":"contacted","label":"Contact confirmed"},{"value":"not_connected","label":"Call not connected"}]');
+  end if;
   update form_templates set lifecycle='published' where id=f;
   insert into fms_flows(tenant_id,family_id,version,name,scope_type,status,is_active,created_by,updated_by,assignment_version)
     values(t,gen_random_uuid(),1,'Jewellery enquiry','tenant','draft',true,u,u,2) returning id into flow;

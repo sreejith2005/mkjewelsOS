@@ -129,6 +129,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
       "Let people type their own answer: in the form editor, open a Dropdown, Radio Group or Checkbox question and tick \"Add an Other choice\". People filling the form then see \"Other\" and can type any answer; the typed text is saved as their answer.",
       "See the form while editing it: on a wide screen the form editor shows the real form under \"Live preview\" beside the questions, updating with every change; answer it to test conditional questions (nothing is submitted). Use \"Desktop preview\" / \"Mobile preview\", \"Start preview again\", and \"Hide preview\" / \"Show preview\". On a phone press \"Preview form\" and \"Edit\" to switch.",
       "Control library visibility: form authors use Visible in Forms Library on each form version. Turning it off hides the form from staff browsing and standalone filling; assigned Tasks/FMS work and submission history remain available. Form authors can still see and manage it.",
+      "Contribute customer answers: authors open Customer Data Integration in Form Builder, set a channel/account scope and review each question destination. Save customer mapping creates an immutable version. CRM administration must separately approve the exact mapping. FMS work completes while synchronization waits; unmapped operational answers remain in JewelOS.",
       "Set a record name: in Form Builder, use Use this question as the record name to choose an identifying question, or leave Automatic. A used published form requires a new revision to change its default. Each FMS workflow can select its own naming question in Task Naming.",
     ],
   },
@@ -173,6 +174,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     recipes: [
       "Preview a report: open Reports, tap the report, then pick dates (Today, Last 7 days, Last 30 days, This month, or From/To) and any Branch, Department or Status filter.",
       "Export a report: press \"Export CSV\". The file appears under \"Your exports\" (Waiting, then Preparing), usually within a minute; press \"Download\" when it is Completed. Files expire automatically.",
+      "Customer exports: open Customer & Stage Exports, choose the export and optional workflow, stage, employee and dates, then Queue private CSV export. Download from Your exports. Full answers require source-work access; customer exports also require CRM administrator authority. Authors can save a reusable Sheet layout with stable question keys. Sheets remain one-way.",
     ],
   },
   crm: {
@@ -185,6 +187,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
       "Record a walk-in or follow-up: use the walk-in and follow-up screens in CRM.",
       "Read a client’s history: open Complete contact history, SAVED WALK-IN DETAILS & MEDIA or PROFILE EDIT LOG on their profile. Expand an entry for full notes, grouped answers, Media or Before and After values. Show more reveals older entries on the current page; the history page links open earlier pages. Use Add a contact to record a contact.",
       "Returning client: enter the phone number in REGISTER CLIENT ENTRY. CRM uses the most recently visited profile for that full phone number and prefills saved details. Older nonblank answers remain available when newer visits leave a field blank. Changed answers use the latest saved value. Client profiles use the same accumulated details; original visit records remain in their history.",
+      "Customer history: open a client profile and expand FMS Journeys & Collected Answers to see original answers, employees, submission times and commercial classification. Open workflow work checks its own permissions. Administrators use Customer Integration Administration on the CRM Dashboard to approve mappings and resolve pending identities.",
     ],
   },
   dropdown_master: {
@@ -206,6 +209,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     recipes: [
       "Change the theme or table density: open Settings and change your preferences.",
       "Manage permissions: Settings > \"Open permission management\" (Super Admin only).",
+      "Integration recovery: open Customer Integration Health, press Refresh customer synchronization, review pending or failed event metadata, then Retry selected customer events after the CRM mapping or identity decision is saved. If Review form changes appears, review and save the current form mapping again; capture pauses until that review. Only integration administrators can use these controls.",
     ],
   },
   ask_kiara: {

@@ -51,7 +51,8 @@ describe("ClientDatabase legacy presentation and queue launch", () => {
   it("shows a highlighted record type while retaining the client actions", () => {
     render(<ClientDatabase {...props} />);
     expect(screen.getByLabelText("Potential category")).toBeTruthy();
-    expect(screen.getAllByRole("columnheader").map((header) => header.textContent)).toEqual(["Type", "Client ID", "Name", "Phone", "City", "State", "Total visits", "Registered", "Latest interaction", "Last visit", "Last status", "Action"]);
+    expect(screen.getByLabelText("Commercial classification")).toBeTruthy();
+    expect(screen.getAllByRole("columnheader").map((header) => header.textContent)).toEqual(["Type", "Client ID", "Name", "Phone", "City", "State", "Total visits", "Registered", "Latest interaction", "Last visit", "Last status", "Commercial classification", "Action"]);
     expect(screen.getByRole("link", { name: "Register Client" }).getAttribute("href")).toBe("/queue");
     expect(screen.getByText("MKC-102707")).toBeTruthy();
     expect(screen.getByText("CLIENT")).toBeTruthy();

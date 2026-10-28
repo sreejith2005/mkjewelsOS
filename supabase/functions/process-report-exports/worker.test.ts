@@ -22,3 +22,16 @@ Deno.test("unknown reports fail safely",async()=>{const gateway=fake();assertEqu
 Deno.test("expiry cleanup removes paths and marks aggregate count",async()=>{const gateway=fake([],[],[{id:"expired",object_path:"tenant/export/file.csv"}]);assertEquals((await processBatch(gateway,5,"worker")).expired_cleaned,1);assertEquals(gateway.removed,["tenant/export/file.csv"]);});
 Deno.test("request authorization and privacy-safe aggregate response",async()=>{const gateway=fake([job],[{rows:[],total:0}]);assertEquals((await handleExportRequest(new Request("http://local",{method:"POST"}),"expected",gateway)).status,401);const response=await handleExportRequest(new Request("http://local",{method:"POST",headers:{"x-cron-secret":"expected","content-type":"application/json"},body:JSON.stringify({batch_size:1})}),"expected",gateway,"worker");const text=await response.text();assertEquals(response.status,200);assertFalse(text.includes(job.id));assertFalse(/name|phone|email|title|row/i.test(text));});
 Deno.test("header-only empty exports remain valid",()=>assertEquals(encodeRows(["a","b"],[],true),"a,b\r\n"));
+Deno.test("empty customer reports retain the reviewed question headers and order",async()=>{
+ const gateway=fake([],[{rows:[],total:0,columns:[{key:"answer_b",label:"Original budget"},{key:"answer_a",label:"Original name"}]}]);
+ assertEquals(await processExportJob(gateway,{...job,report_key:"customer_answers"},"worker"),"completed");
+ assertEquals(gateway.uploads[0]!.text,"Original budget,Original name\r\n");
+});
+Deno.test("customer exports preserve phone text, nested answers, IST and reviewed layout headers",async()=>{
+ const gateway=fake([],[{rows:[{source_id:"s",phone:"+919876543210",occurred_at:"2026-10-01T00:00:00Z",details:{original:false,budget:0}}],total:1}]);
+ assertEquals(await processExportJob(gateway,{...job,report_key:"customer_master"},"worker"),"completed");
+ assertStringIncludes(gateway.uploads[0]!.text,"Customer phone");
+ assertStringIncludes(gateway.uploads[0]!.text,"'+919876543210");
+ assertStringIncludes(gateway.uploads[0]!.text,"2026-10-01 05:30:00 IST");
+ assertStringIncludes(gateway.uploads[0]!.text,'""original"":false');
+});

@@ -295,3 +295,21 @@ html[data-theme="dark"] #crm-theme .crm-app .bg-emerald-100 { background: rgb(va
 #crm-theme .crm-app svg .fill-stone-500 { fill: rgb(var(--color-task-text-muted)); }
 #crm-theme .crm-app svg .fill-stone-900 { fill: rgb(var(--color-task-text)); }
 #crm-theme .crm-app i[style*="rgb(68, 64, 60)"] { background-color: rgb(var(--color-task-text)) !important; }
+
+
+/* Customer integration additions only. Merge these rules into the maintained
+   JewelOS theme when combining this CRM worktree with the release baseline. */
+#crm-theme .crm-customer-journeys { margin-block: 1rem; padding: 1rem; border: 1px solid rgb(var(--color-task-border)); border-radius: .75rem; background: rgb(var(--color-task-bg)); color: rgb(var(--color-task-text)); min-width: 0; }
+#crm-theme .crm-customer-journeys summary { min-height: 2.75rem; cursor: pointer; font-weight: 600; overflow-wrap: anywhere; }
+#crm-theme .crm-customer-journeys button,#crm-theme .crm-customer-journeys input,#crm-theme .crm-customer-journeys select { min-height: 2.75rem; padding: .5rem .75rem; border: 1px solid rgb(var(--color-task-border)); border-radius: .5rem; background: rgb(var(--color-task-bg)); color: rgb(var(--color-task-text)); max-width: 100%; }
+#crm-theme .crm-customer-journeys button { cursor: pointer; }
+#crm-theme .crm-customer-journeys button:disabled { opacity: .6; cursor: default; }
+#crm-theme .crm-customer-journeys form,#crm-theme .crm-customer-journeys label { display: grid; gap: .5rem; min-width: 0; }
+#crm-theme .crm-customer-journeys section,#crm-theme .crm-customer-event { padding-block: .75rem; border-top: 1px solid rgb(var(--color-task-border)); }
+#crm-theme .crm-customer-event summary { display: flex; flex-wrap: wrap; gap: .5rem 1rem; }
+#crm-theme .crm-customer-event time { color: rgb(var(--color-task-text-muted)); font-weight: 400; }
+#crm-theme .crm-customer-answer { margin-block: .75rem; overflow-wrap: anywhere; }
+#crm-theme .crm-customer-answer dt { font-weight: 600; }
+#crm-theme .crm-customer-journeys p { overflow-wrap: anywhere; margin-block: .5rem; }
+#crm-theme .crm-customer-journeys a { color: rgb(var(--color-gold-secondary)); text-decoration: underline; }
+@media (min-width: 40rem) { #crm-theme .crm-customer-journeys form { grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; align-items: end; } }

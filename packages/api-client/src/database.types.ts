@@ -1,3 +1,4 @@
+import type { CustomerIntegrationFunctions,CustomerIntegrationTables } from "@jewelos/core";
 export type Json =
   | string
   | number
@@ -2266,7 +2267,7 @@ export type Database = {
     }
   }
   public: {
-    Tables: {
+    Tables: CustomerIntegrationTables & {
       dashboard_saved_views: {
         Row: {
           config: Json
@@ -11979,7 +11980,7 @@ export type Database = {
         ]
       }
     }
-    Functions: {
+    Functions: CustomerIntegrationFunctions & {
       get_fms_work_mutation_result: { Args: { p_idempotency_key: string }; Returns: Json }
       list_fms_form_starters: { Args: { p_form_template_id: string }; Returns: Json }
       submit_form_and_start_fms_idempotent: { Args: { p_form_template_id: string; p_answers: Json; p_idempotency_key: string; p_flow_id?: string }; Returns: Json }

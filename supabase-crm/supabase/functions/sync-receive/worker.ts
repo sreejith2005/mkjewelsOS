@@ -10,13 +10,14 @@
 // Idempotency and ordering are enforced in the database. Responses carry ids, outcomes and
 // counts; snapshots (names, emails) are never logged or echoed.
 
+import { receiveCustomerBatch, type CustomerReceiveGateway } from "./customer.ts";
 export type ApplyResult = Readonly<{ outcome?: string; reason?: string | null; duplicate?: boolean }>;
 
 export type CrmSyncGateway = Readonly<{
   applyStaff: (eventId: string, snapshot: Record<string, unknown>) => Promise<ApplyResult>;
   reconcileStaff: (runId: string, snapshots: ReadonlyArray<Record<string, unknown>>) => Promise<Record<string, unknown>>;
   applyMasters?: (eventId:string,snapshot:Record<string,unknown>)=>Promise<ApplyResult>;
-}>;
+}> & CustomerReceiveGateway;
 
 export type ReceiveDeps = Readonly<{ secret: string | undefined; gateway: CrmSyncGateway | null }>;
 
@@ -64,6 +65,7 @@ export async function handleSyncReceive(request: Request, deps: ReceiveDeps): Pr
   if (!isObject(body)) return json(400, { error: "Invalid sync request" });
 
   const gateway = deps.gateway;
+  if (body.kind === "customer.events" || body.kind === "customer.mappings" || body.kind === "customer.export") return receiveCustomerBatch(body,gateway);
   if (body.kind === "staff.events" || body.kind === 'master.events') {
     const apply=body.kind==='master.events' ? gateway.applyMasters : gateway.applyStaff;
     if(!apply)return json(503,{error:'Master sync is not configured'});

@@ -1,4 +1,5 @@
 "use client";
+import { CustomerWorkflows } from "@/components/customer-workflows";
 import { ProfileEditLog } from '@/components/profile-edit-log';
 import { ResponsiveDisclosure } from '@/components/responsive-disclosure';
 import { ClientHistoryPager,type ClientHistoryPaging } from "@/components/client-history-pager";
@@ -299,6 +300,7 @@ export function ClientProfile({
   if (!editing) {
     const timelineRows = timeline.map((item) => <tr key={item.id} className={expandedHistory===item.id?"is-expanded":""}><td data-label="Timestamp">{displayDate(item.created_at)}<button type="button" className="crm-record-details" aria-expanded={expandedHistory===item.id} onClick={()=>setExpandedHistory(expandedHistory===item.id?null:item.id)}>{expandedHistory===item.id?"Less":"Details"}</button></td><td data-label="Visit date">{displayDate(item.event_date)}</td><td data-label="Event" data-secondary="true">{item.event_type}</td><td data-label="Purchase status">{item.buy_status ?? "NA"}</td><td data-label="Branch" data-secondary="true">{item.branch ?? "NA"}</td><td data-label="CRM" data-secondary="true">{item.crm_name ?? "NA"}</td><td data-label="Salesperson" data-secondary="true">{item.salesperson ?? "NA"}</td><td data-label="Seen" data-secondary="true">{item.seen_categories.join(", ") || "NA"}</td><td data-label="Bought" data-secondary="true">{item.bought_categories.join(", ") || "NA"}</td><td data-label="Order" data-secondary="true">{item.order_categories.join(", ") || "NA"}</td><td data-label="Product requirement" data-secondary="true">{item.product_requirement ?? "NA"}</td><td data-label="Remark" data-secondary="true">{item.remark ?? "NA"}</td><td data-label="Reference">{item.reference_number ?? "NO REF"}</td></tr>);
     return <main className="legacy-client-profile mx-auto max-w-7xl px-5 py-7">
+      <CustomerWorkflows clientId={client.client_id} actorNames={activityActorNames}/>
       <div className="legacy-profile-grid">
         <aside className="legacy-profile-left">
           <section className="legacy-client-hero"><h1>{client.primary_name}</h1><div className="legacy-client-badges"><span>{client.client_code}</span><span>{client.last_buy_status ?? "NA"}</span><span>{client.city ?? "NA"}</span>{identity?.referral_code ? <span>{identity.referral_code}</span> : null}{identity?.household_code ? <span>{identity.household_code}</span> : null}</div><div className="legacy-client-hero-actions"><ExistingClientWalkinAction clientId={client.client_id} primaryName={client.primary_name} primaryPhone={client.primary_phone ?? ""} role={walkinContext.role} branchId={walkinContext.branchId} branches={walkinContext.branches} /><button type="button" onClick={() => { setValues(initial(client)); setEditing(true); }}>EDIT PROFILE</button></div></section>
@@ -339,6 +341,7 @@ export function ClientProfile({
   }
   return (
     <main className="mx-auto max-w-7xl px-5 py-7">
+      <CustomerWorkflows clientId={client.client_id} actorNames={activityActorNames}/>
       <div className="legacy-profile-hero flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl font-semibold">{client.primary_name}</h1>

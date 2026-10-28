@@ -204,3 +204,6 @@ assigned stage" recipe is updated. No new read tool.
 - [ ] **Assign to a Different Employee** lists eligible employees A to Z.
 - [ ] Assigned FMS stage forms open on the work page below **Previous form answers**, with **Earlier answers** while filling.
 - [ ] (2026-10-28) **Forms to fill** has two buttons: **Forms Library** (default, forms made in the library) and **FMS workflow forms** (questions built inside FMS steps, labelled with workflow and step for authors). Each shows a count; search works inside the chosen group.
+
+2026-10-27 customer integration: exact labels added for Customer Data Integration, Customer Integration Health, Customer Integration Administration, FMS Journeys & Collected Answers, and Customer & Stage Exports. No new Kiara data tool is added: these are authoring/recovery instructions; raw submissions, pending identities and customer exports are not available to the assistant. Existing read-tool authorization remains unchanged.
+2026-10-28 validation follow-up: Settings explains Review form changes. A changed form definition pauses customer capture until its mapping is reviewed and saved again; original submissions remain available for explicit historical recovery. Kiara remains read-only.

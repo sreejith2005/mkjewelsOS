@@ -1,3 +1,4 @@
+import {FmsCustomerLink} from "./FmsCustomerLink";
 import { fmsOutcomeReplacesStage } from "@jewelos/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Circle, FileText, History, Paperclip } from "lucide-react";
@@ -159,6 +160,7 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
   const assignedNames = (stage.assigned_to ?? []).map((id) => users.find((user) => user.id === id)?.employee_name ?? "Historical user").join(", ") || "Automatic";
 
   return <section aria-label={`Your work: ${definition.name}`} className={compact ? "space-y-4" : "space-y-4 rounded-2xl border border-gold/20 bg-task-bg p-4 sm:p-5"}>
+    <FmsCustomerLink instanceId={instance.id}/>
     {error ? <Notice tone="danger">{error}</Notice> : null}
     {instance.status === "on_hold" ? <Notice>The workflow is on hold for manager review. Your saved form and assigned work are preserved.</Notice> : null}
     {result ? <FmsWorkOutcome result={result} viewerId={profile.id} /> : null}
