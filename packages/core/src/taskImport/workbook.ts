@@ -1,4 +1,5 @@
-import * as XLSX from "xlsx";
+// SheetJS is large, so it loads only when someone actually imports a file.
+const loadXlsx = () => import("xlsx");
 import { TASK_IMPORT_MAX_BYTES, TASK_IMPORT_MAX_ROWS } from "../taskImport";
 import { LEGACY_TASK_HEADERS, normalizeLegacyTaskSheet } from "./legacySheet";
 import {
@@ -72,6 +73,7 @@ export async function parseTaskImportFile(file: TaskImportReadableFile, options:
   const extension = file.name.toLowerCase().split(".").pop();
   if (extension !== "xlsx" && extension !== "csv") return { sourceFormat: "unknown" as const, payload: null, draftRows: [], identityRequirements: [], requiredTimingPresets: [], errors: ["Only .xlsx or .csv files are supported"], issues: [entry("Upload", 0, "file", "Unsupported file extension", "Choose an .xlsx or .csv file.")] };
   if (file.type && !["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "text/csv", "application/csv"].includes(file.type)) return { sourceFormat: "unknown" as const, payload: null, draftRows: [], identityRequirements: [], requiredTimingPresets: [], errors: ["File type does not match Excel or CSV"], issues: [entry("Upload", 0, "file", "Unexpected MIME type", "Export as .xlsx or CSV.")] };
+  const XLSX = await loadXlsx();
   const book = XLSX.read(await file.arrayBuffer(), { type: "array", raw: false, cellFormula: false });
   const first = book.Sheets[book.SheetNames[0]!]!;
   const firstRows = XLSX.utils.sheet_to_json(first, { defval: "", raw: false }) as Readonly<Record<string, unknown>>[];

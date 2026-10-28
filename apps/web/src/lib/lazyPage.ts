@@ -1,4 +1,4 @@
-import { lazy, type ComponentType } from "react";
+import { lazy, type ComponentType, type LazyExoticComponent } from "react";
 
 const RELOAD_GUARD_PREFIX = "jewelos:lazy-page-reload:";
 const STALE_CHUNK_PATTERNS = [
@@ -26,15 +26,71 @@ export function recoverFromStaleLazyPageChunk(page: string, error: unknown, relo
   return true;
 }
 
-export function lazyPage<T extends ComponentType<any>>(page: string, loader: () => Promise<{ default: T }>) {
-  return lazy(async () => {
+export type PreloadablePage<T extends ComponentType<any>> = LazyExoticComponent<T> & {
+  /** Downloads the page's code ahead of time; safe to call any number of times. */
+  preload: () => Promise<void>;
+};
+
+export function lazyPage<T extends ComponentType<any>>(page: string, loader: () => Promise<{ default: T }>): PreloadablePage<T> {
+  // One shared download for both the prefetch and the render. A failed
+  // download is forgotten so the next attempt (or the render) retries it.
+  let pending: Promise<{ default: T }> | null = null;
+  const load = () => {
+    pending ??= loader().catch((error: unknown) => { pending = null; throw error; });
+    return pending;
+  };
+  const component = lazy(async () => {
     try {
-      const module = await loader();
+      const module = await load();
       if (typeof window !== "undefined") window.sessionStorage.removeItem(guardKey(page));
       return module;
     } catch (error) {
       recoverFromStaleLazyPageChunk(page, error, () => window.location.reload());
       throw error;
     }
-  });
+  }) as PreloadablePage<T>;
+  // A prefetch failure is not an error the user should see; rendering retries.
+  component.preload = () => load().then(() => undefined, () => undefined);
+  return component;
+}
+
+type IdleWindow = Window & {
+  requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
+type SlowConnection = { saveData?: boolean; effectiveType?: string };
+
+/** True when the device asked to save data or the connection is too slow to prefetch. */
+export function shouldSkipPrefetch(connection: SlowConnection | undefined): boolean {
+  if (!connection) return false;
+  return connection.saveData === true || connection.effectiveType === "slow-2g" || connection.effectiveType === "2g";
+}
+
+/**
+ * Downloads page code one page at a time while the browser is idle, after the
+ * current page has had time to load its own data. Returns a cancel function.
+ */
+export function prefetchPagesWhenIdle(preloads: readonly (() => Promise<void>)[], startDelayMs = 1500): () => void {
+  if (typeof window === "undefined" || !preloads.length) return () => undefined;
+  const connection = (navigator as Navigator & { connection?: SlowConnection }).connection;
+  if (shouldSkipPrefetch(connection)) return () => undefined;
+  const idleWindow = window as IdleWindow;
+  let cancelled = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let idleHandle: number | undefined;
+  const queue = [...preloads];
+  const next = () => {
+    if (cancelled) return;
+    const preload = queue.shift();
+    if (!preload) return;
+    const run = () => { if (!cancelled) void preload().then(next); };
+    if (idleWindow.requestIdleCallback) idleHandle = idleWindow.requestIdleCallback(run, { timeout: 3000 });
+    else timer = setTimeout(run, 50);
+  };
+  timer = setTimeout(next, startDelayMs);
+  return () => {
+    cancelled = true;
+    if (timer !== undefined) clearTimeout(timer);
+    if (idleHandle !== undefined) idleWindow.cancelIdleCallback?.(idleHandle);
+  };
 }
