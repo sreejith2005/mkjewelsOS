@@ -14,7 +14,7 @@ vi.mock("@/features/dropdowns/api", () => ({
   toFormMasterOptions: vi.fn(() => []),
 }));
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 const options: DynamicOptions = {
   users: [], branches: [], departments: [],
@@ -284,6 +284,7 @@ describe("Form builder internal keys", () => {
   });
 
   it("opens only one editor and jumps from the form outline", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("min-width"), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }));
     const user = userEvent.setup();
     render(<FormBuilder bundle={conditionalBundle} dynamicOptions={{ users: [], branches: [], departments: [], masters: [] }} onClose={() => {}} onSaved={async () => {}} />);
 
@@ -292,6 +293,14 @@ describe("Form builder internal keys", () => {
     expect((screen.getByLabelText("Question") as HTMLInputElement).value).toBe("Gold purity");
     await user.click(screen.getByRole("button", { name: "Go to Silver finish" }));
     expect(screen.getAllByLabelText("Question")).toHaveLength(1);
+    expect((screen.getByLabelText("Question") as HTMLInputElement).value).toBe("Silver finish");
+  });
+
+  it("offers a jump list instead of the outline panel on a phone", async () => {
+    const user = userEvent.setup();
+    render(<FormBuilder bundle={conditionalBundle} dynamicOptions={{ users: [], branches: [], departments: [], masters: [] }} onClose={() => {}} onSaved={async () => {}} />);
+    expect(screen.queryByRole("complementary", { name: "Form outline" })).toBeNull();
+    await user.selectOptions(screen.getByLabelText("Jump to a question"), "Silver finish");
     expect((screen.getByLabelText("Question") as HTMLInputElement).value).toBe("Silver finish");
   });
 

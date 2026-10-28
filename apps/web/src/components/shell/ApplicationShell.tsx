@@ -161,7 +161,7 @@ export function ApplicationShell({
       </aside>
 
       <main className={cn("pb-mobile-nav min-h-[calc(100dvh_-_3.5rem_-_env(safe-area-inset-top))] md:min-h-screen md:pt-16 md:transition-[padding]", developerModeActive && "md:pt-28", sidebarOpen && "md:pl-64")}>
-        <div className={cn(fullBleed ? "w-full p-4 sm:p-6 [&>section]:max-w-none [&>section]:mx-0" : "mx-auto max-w-7xl p-4 sm:p-6")}>{children}</div>
+        <div className={cn(fullBleed ? "w-full p-4 sm:p-6 [&>section]:max-w-none [&>section]:mx-0" : "mx-auto max-w-7xl p-4 sm:p-6 [&:has(>[data-wide-page])]:max-w-none")}>{children}</div>
       </main>
 
       <MobileBottomNav menuOpen={drawerOpen} onNavigate={navigate} onOpenMenu={() => onDrawerOpenChange(true)} path={path} />
