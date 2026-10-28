@@ -26,7 +26,7 @@ function configFromEnv(): FmsAiConfig {
     ...DEFAULT_FMS_AI_CONFIG,
     model: Deno.env.get("FMS_AI_MODEL")?.trim() || DEFAULT_FMS_AI_CONFIG.model,
     effort: effort === "low" || effort === "medium" || effort === "high" ? effort : DEFAULT_FMS_AI_CONFIG.effort,
-    requestTimeoutMs: timeout >= 10_000 && timeout <= 130_000 ? timeout : DEFAULT_FMS_AI_CONFIG.requestTimeoutMs,
+    requestTimeoutMs: timeout >= 10_000 && timeout <= DEFAULT_FMS_AI_CONFIG.totalBudgetMs - 5_000 ? timeout : DEFAULT_FMS_AI_CONFIG.requestTimeoutMs,
   };
 }
 

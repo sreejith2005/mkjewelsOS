@@ -11,6 +11,13 @@ which sets `debugger_enabled` and `builder_enabled` together and
 `run_diagnosis_enabled` off; the run-snapshot RPC stays in the database unused.
 No migration. The sections below describe the original 2026-10-23 design.
 
+Second production fix (same day): requests still failed because one Opus
+answer at medium effort took over 100 s, the SDK retried the timed-out call,
+and Supabase's 150 s gateway limit killed the function (log: `POST | 504`,
+152 s; `fms_ai_requests` row stuck at `started`). Defaults are now Sonnet 5.5
+at low effort (as Ask Kiara), 8 000 output tokens, no SDK retry, and a 110 s
+model budget; the browser shows "took too long" for a 504.
+
 Production bug fixed at the same time: every request failed with "The FMS
 assistant is unavailable right now" because the reply schema was sent as
 structured output (`output_config.format`) and has more than the API's limit
@@ -104,9 +111,9 @@ Key choices:
 | Name | Default | Notes |
 | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | (already set for Ask Kiara) | Without it the function answers 503; manual editing is unaffected. |
-| `FMS_AI_MODEL` | `claude-opus-5-5` | Owner choice; `claude-sonnet-5-5` is cheaper. Requests use adaptive thinking, structured JSON output and the server-side refusal fallback (`fallbacks: "default"`). |
-| `FMS_AI_EFFORT` | `medium` | `low` / `medium` / `high`. |
-| `FMS_AI_TIMEOUT_MS` | `100000` | Per model call (10 000–130 000); total budget 140 s including one repair. |
+| `FMS_AI_MODEL` | `claude-sonnet-5-5` | Same model as Ask Kiara. `claude-opus-5-5` was the original default but took over 100 s per answer, past Supabase's 150 s request limit (2026-10-28). Requests use adaptive thinking and the server-side refusal fallback (`fallbacks: "default"`); the reply format is in the system prompt. |
+| `FMS_AI_EFFORT` | `low` | `low` / `medium` / `high`. Higher effort is slower and can exceed the time limit. |
+| `FMS_AI_TIMEOUT_MS` | `80000` | Per model call (10 000–105 000). Total model budget 110 s; the SDK does not retry; the one repair runs only if 25 s remain. Supabase ends every function request at 150 s, killing the worker before it can answer. |
 | `FMS_AI_DISABLED` | unset | `true` is a global kill switch (503, no database or model call). |
 
 Model availability and cost were **not** measured: no live model call was made

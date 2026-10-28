@@ -15,7 +15,13 @@ import { CatalogError, loadFmsAiCatalog, type FmsAiActor } from "./catalog.ts";
 import { ModelFailure, type FmsAiModel, type ModelTurn } from "./model.ts";
 
 export type FmsAiConfig = Readonly<{ model: string; effort: "low" | "medium" | "high"; requestTimeoutMs: number; totalBudgetMs: number; maxTokens: number }>;
-export const DEFAULT_FMS_AI_CONFIG: FmsAiConfig = { model: "claude-opus-5-5", effort: "medium", requestTimeoutMs: 100_000, totalBudgetMs: 140_000, maxTokens: 16_000 };
+// Supabase's gateway ends every Edge Function request at 150 s, killing the
+// worker before it can answer or record the request. The model budget leaves
+// room for the database work around it, and Sonnet at low effort (as Ask Kiara
+// uses) answers well inside it; Opus at medium effort did not (2026-10-28).
+export const DEFAULT_FMS_AI_CONFIG: FmsAiConfig = { model: "claude-sonnet-5-5", effort: "low", requestTimeoutMs: 80_000, totalBudgetMs: 110_000, maxTokens: 8_000 };
+/** A repair is only attempted when at least this much of the budget is left. */
+export const FMS_AI_MIN_REPAIR_MS = 25_000;
 
 export type FmsAiDeps = Readonly<{
   /** Validates the bearer token; resolves to null when it is not a signed-in user. */
@@ -159,7 +165,7 @@ async function runTurn(request: FmsAiRequest, draft: FmsFlowDefinition, publishe
         else { proposed = null; issues = [...applied.errors]; problem = `These operations could not be applied, so nothing was changed:\n${applied.errors.map((error) => `- ${error.message}`).join("\n")}\nFix them using only ids, keys and values from the data block, or ask the author.`; }
       }
     }
-    if (!problem || repairUsed) break;
+    if (!problem || repairUsed || deadline - Date.now() < FMS_AI_MIN_REPAIR_MS) break;
     repairUsed = true;
     turns.push({ role: "assistant", text: reply.text.slice(0, 20_000) || "(empty)" }, { role: "user", text: problem });
   }
