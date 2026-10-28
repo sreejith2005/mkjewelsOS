@@ -81,3 +81,30 @@ database corrections use forward migrations.
 Required function deployment names after the database gates are cleared:
 CRM `sync-receive`; JewelOS `crm-customer-sync` and `process-report-exports`.
 Web/shared changes require no Android APK under the current WebView shell.
+
+## Owner-authorized production window
+
+The owner answered the staging-target question with **"use only jewelos-prod"**.
+For this release that directs execution against JewelOS production without a
+separate staging target, and excludes hosted CRM migration/function/secret
+changes. The earlier staging hold above is superseded by this instruction.
+The two-project architecture remains intact; CRM-owned records and schema are
+not moved into JewelOS.
+
+Code checkpoint after rebasing onto `a454e6c` (the latest Dropdown Master
+release): `b05aa0429ae48408e1368bfa4b3c840747af7e5d`.
+Post-rebase focused web/Dropdown Master regression: 10/10 tests, four files.
+Latest completed automatic physical backup: `2026-10-27T20:23:59.217Z`;
+PITR is not enabled. A restore was not run. Recovery uses that managed backup
+under the owner's control if necessary; normal rollback pauses delivery and
+uses a reviewed forward correction, preserving evidence.
+
+Production before-apply aggregate counts: 56 form submissions, 19 workflow
+instances, 71 stage visits. No customer values were exported. Migration dry run
+lists exactly 0354 and 0355. Existing mappings/layouts are absent and the live
+form reachability function is owned by `postgres`. No historical backfill,
+source mapping approval, new scheduler or secret change is part of this window.
+
+CRM migrations/receiver deployment remain deferred by the owner target limit.
+Cross-project customer delivery, customer projections and CRM exports cannot
+be considered enabled or production-verified in this release.
