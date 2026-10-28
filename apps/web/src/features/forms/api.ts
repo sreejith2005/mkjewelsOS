@@ -1,7 +1,7 @@
 import { submitFmsStartingWork, submitLibraryForm, readFmsStartConfirmation, type FmsStartConfirmation } from "@jewelos/data/fms/work";
 import { supabase } from "@jewelos/api-client";
 import type { FormUsageImpact, Json, Tables } from "@jewelos/core";
-import { normalizeFormDefinition, parseFormOptions, type FormBranch, type FormFieldDefinition, type FormRule, type FormSectionDefinition, type FormTemplateDefinition } from "@jewelos/core";
+import { normalizeFormDefinition, parseFmsBuiltForms, parseFormOptions, type FmsBuiltForm, type FormBranch, type FormFieldDefinition, type FormRule, type FormSectionDefinition, type FormTemplateDefinition } from "@jewelos/core";
 import { loadMasterOptions, toFormMasterOptions } from "@/features/dropdowns/api";
 
 export type FormTemplate = Tables<"form_templates">;
@@ -11,6 +11,12 @@ export const setFormLibraryVisibility = async (id: string, visible: boolean): Pr
   const { data, error } = await supabase.rpc("set_form_library_visibility_with_audit", { p_template_id: id, p_visible: visible });
   fail("Change form visibility", error);
   if (data !== id) throw new Error("Change form visibility: the server did not confirm the change");
+};
+/** Which form families were built inside FMS workflow steps, so Forms Library can list them apart. */
+export const loadFmsBuiltForms = async (): Promise<ReadonlyMap<string, FmsBuiltForm>> => {
+  const { data, error } = await supabase.rpc("list_fms_built_forms");
+  fail("Load FMS forms", error);
+  return parseFmsBuiltForms(data);
 };
 export type FormBundle = FormTemplate & { fields: FormFieldDefinition[]; sections: FormSectionDefinition[]; submissionCount: number };
 const fail = (label: string, error: { message: string } | null) => { if (error) throw new Error(`${label}: ${error.message}`); };

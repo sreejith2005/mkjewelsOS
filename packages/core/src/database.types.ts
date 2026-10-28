@@ -12434,6 +12434,7 @@ export type Database = {
       record_fms_diagnostic_event: { Args: { p_operation: string; p_instance_stage_id: string; p_sqlstate: string | null; p_correlation_id: string }; Returns: string }
       get_fms_run_diagnostic_snapshot: { Args: { p_instance_id: string }; Returns: Json }
       list_fms_handoff_recipients: { Args: { p_request: Json; p_target_stage_id: string; p_query?: string; p_cursor?: string; p_limit?: number }; Returns: Json }
+      list_fms_built_forms: { Args: never; Returns: Json }
       get_fms_work_file_path: { Args: { p_instance_id: string; p_instance_stage_id: string; p_file_id: string }; Returns: string }
       get_fms_task_contexts: { Args: { p_visit_ids: string[] }; Returns: Json }
       get_fms_task_workspace: { Args: { p_filter?: Json; p_offset?: number; p_limit?: number }; Returns: Json }
