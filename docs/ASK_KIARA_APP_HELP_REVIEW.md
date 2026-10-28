@@ -94,6 +94,7 @@ who build workflows, the designs.
 - [ ] Fill a form: open Forms Library, find the form under **Forms to fill** (or **Search forms**), press **Fill form** (full screen on a phone). Questions marked * must be answered (the bar at the top counts them). Long forms go one step at a time with **Next** / **Back**; tap an earlier step to change it, and open **Check your answers before submitting** on the last step before **Submit form**. A missing answer is marked in red under its question. Choice questions may end with **Other**: pick it and type an answer.
 - [ ] See what I sent: **My submissions** shows each one and whether it was reviewed.
 - [ ] Make a form: **New form** (form makers only), then **Publish** when ready.
+- [ ] Share dropdown options (2026-10-28): on a Dropdown, Radio Group or Checkbox question, **Use existing Dropdown Master** picks a shared list; **Create new dropdown** + **Also add this dropdown to Dropdown Master** adds the new list when the form is saved (or at once with **Add now**). **Open in Dropdown Master** opens the list. No new Kiara tool: this is help text only.
 - [ ] Set its naming default: in Form Builder use **Use this question as the record name**, or leave **Automatic**. A used published form needs a new revision to change its default; each workflow can override it in **Task Naming**.
 
 ## Notifications
@@ -131,6 +132,7 @@ who build workflows, the designs.
 **What it is:** the shared option lists used across JewelOS.
 - [ ] Add an option: open the list, press **Add item**.
 - [ ] Hide an option without deleting it: mark it **Inactive**.
+- [ ] Find a list made in a form: it appears under **Category** with its item count, e.g. **Lead Source (4)**. In the form editor, **Open in Dropdown Master** opens it directly. *(added 2026-10-28)*
 
 ## Settings
 **What it is:** your own preferences and, for allowed roles, company defaults and permissions.

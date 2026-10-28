@@ -125,6 +125,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
       "Find a form made in an FMS workflow: under \"Forms to fill\" there are two buttons. \"Forms Library\" (shown first) lists forms made in Forms Library; \"FMS workflow forms\" lists the questions built inside FMS workflow steps, with the workflow and step they belong to (names shown to form authors). FMS workflow forms are filled from Tasks -> FMS when the step is assigned to you; authors change them from the workflow step's \"Questions & Form\".",
       "See what I submitted: \"My submissions\" in Forms Library lists each submission by date with its status (Submitted, Approved or Rejected); tap one to read the answers.",
       "Create a form: \"New form\" in Forms Library (form authors only), then \"Publish\" when ready. Each form shows its versions with a Live, Draft or Archived label.",
+      "Reuse or share dropdown options: in the form editor, open a Dropdown, Radio Group or Checkbox question. \"Use existing Dropdown Master\" picks a shared list, and the question then always shows that list's current options. To share new options, choose \"Create new dropdown\", add the options, tick \"Also add this dropdown to Dropdown Master\" and give the list a name. The list is added when you save the form, or straight away with \"Add now\". \"Open in Dropdown Master\" opens the list for editing.",
       "Let people type their own answer: in the form editor, open a Dropdown, Radio Group or Checkbox question and tick \"Add an Other choice\". People filling the form then see \"Other\" and can type any answer; the typed text is saved as their answer.",
       "See the form while editing it: on a wide screen the form editor shows the real form under \"Live preview\" beside the questions, updating with every change; answer it to test conditional questions (nothing is submitted). Use \"Desktop preview\" / \"Mobile preview\", \"Start preview again\", and \"Hide preview\" / \"Show preview\". On a phone press \"Preview form\" and \"Edit\" to switch.",
       "Control library visibility: form authors use Visible in Forms Library on each form version. Turning it off hides the form from staff browsing and standalone filling; assigned Tasks/FMS work and submission history remain available. Form authors can still see and manage it.",
@@ -194,6 +195,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     recipes: [
       "Add an option: open the list and press \"Add item\".",
       "Hide an option without deleting it: mark it Inactive.",
+      "Find a list made in a form: lists added from the form editor appear under \"Category\" with their item count, for example \"Lead Source (4)\". In the form editor, \"Open in Dropdown Master\" on that question opens the list directly.",
     ],
   },
   settings: {
