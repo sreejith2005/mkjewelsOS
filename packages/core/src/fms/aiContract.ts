@@ -114,8 +114,10 @@ export type FmsAiErrorCode = "unauthenticated" | "forbidden" | "disabled" | "inv
 export type FmsAiErrorBody = Readonly<{ error: string; code: FmsAiErrorCode; schemaVersion: typeof FMS_AI_SCHEMA_VERSION }>;
 
 // ---------------------------------------------------------------------------
-// JSON schema for structured output. Every object closes its properties and
-// lists all of them as required; optional values are expressed as null.
+// JSON schema of the reply. It is given to the model in the system prompt and
+// enforced by parseFmsAiModelOutput. It is NOT sent as structured output: its
+// nullable fields exceed the API's limit of 16 union-typed parameters, which
+// made every request fail with "Schema is too complex for compilation".
 // ---------------------------------------------------------------------------
 type Schema = Record<string, unknown>;
 const str: Schema = { type: "string" };
@@ -285,7 +287,7 @@ export function parseFmsAiModelOutput(raw: unknown): FmsAiModelOutput {
     questions: list(value.questions, "questions", FMS_AI_LIMITS.maxClarifyingQuestions, (entry, at) => { const item = record(entry, at); return { id: text(item.id, `${at}.id`, 40), question: text(item.question, `${at}.question`, 400), choices: list(item.choices, `${at}.choices`, 8, (choice, path) => text(choice, path, 120)) }; }),
     assumptions: list(value.assumptions, "assumptions", FMS_AI_LIMITS.maxListItems, (entry, at) => text(entry, at, 400)),
     unresolvedItems: list(value.unresolvedItems, "unresolvedItems", FMS_AI_LIMITS.maxListItems, (entry, at) => text(entry, at, 400)),
-    confidence: oneOf(value.confidence, ["low", "medium", "high"] as const, "confidence"),
+    confidence: value.confidence === undefined || value.confidence === null ? "medium" : oneOf(value.confidence, ["low", "medium", "high"] as const, "confidence"),
     evidence: list(value.evidence, "evidence", 20, (entry, at) => { const item = record(entry, at); return { basis: oneOf(item.basis, FMS_AI_EVIDENCE_BASES, `${at}.basis`), stageKey: optionalKey(item.stageKey, `${at}.stageKey`), findingId: optionalText(item.findingId, `${at}.findingId`, 160), text: text(item.text, `${at}.text`, 600) }; }),
     suggestedFixes: list(value.suggestedFixes, "suggestedFixes", 6, (entry, at) => { const item = record(entry, at); return { title: text(item.title, `${at}.title`, 200), stageKey: optionalKey(item.stageKey, `${at}.stageKey`), steps: list(item.steps, `${at}.steps`, 8, (step, path) => text(step, path, 400)), operations: list(item.operations, `${at}.operations`, 20, parseFmsAiOperation) }; }),
     operations,
@@ -302,10 +304,18 @@ export function parseFmsAiModelOutput(raw: unknown): FmsAiModelOutput {
   return output;
 }
 
-/** Parses a model reply that arrived as JSON text. */
+/**
+ * Parses a model reply that arrived as JSON text. The reply is not
+ * schema-constrained by the API (the contract has too many optional fields
+ * for structured output), so a code fence or a sentence around the object is
+ * tolerated; the object itself is still checked field by field.
+ */
 export function parseFmsAiModelText(raw: string): FmsAiModelOutput {
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start < 0 || end <= start) throw new FmsAiContractError("output", "the reply was not valid JSON (no object found)");
   let value: unknown;
-  try { value = JSON.parse(raw); } catch { throw new FmsAiContractError("output", "the reply was not valid JSON"); }
+  try { value = JSON.parse(raw.slice(start, end + 1)); } catch { throw new FmsAiContractError("output", "the reply was not valid JSON"); }
   return parseFmsAiModelOutput(value);
 }
 

@@ -3,7 +3,7 @@ import { FmsSimulation } from "./FmsSimulation";
 import { suggestFmsAssignment } from "@jewelos/core";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ArrowDownUp, ArrowLeft, CheckCircle2, ChevronDown, FileText, FlaskConical, PanelLeftOpen, Plus, Redo2, Save, Send, Sparkles, TestTube2, Undo2, UserRoundPlus, X } from "lucide-react";
-import { copyFirstFmsAssigneeToHumanStages, createFmsFragment, importFormSectionCopy, describeFmsPasteReport, fmsConnectionsTouching, fmsStageFormFields, FmsTransferError, normalizeFmsDefinition, parseFmsTransfer, pasteFmsFragment, removeFmsStages, validateFmsDefinition, type FmsDiagnosticFinding, type FmsFlowDefinition, type FmsStageDefinition, type FormTemplateDefinition } from "@jewelos/core";
+import { copyFirstFmsAssigneeToHumanStages, createFmsFragment, importFormSectionCopy, describeFmsPasteReport, fmsConnectionsTouching, fmsStageFormFields, FmsTransferError, normalizeFmsDefinition, parseFmsTransfer, pasteFmsFragment, removeFmsStages, validateFmsDefinition, type FmsFlowDefinition, type FmsStageDefinition, type FormTemplateDefinition } from "@jewelos/core";
 import { Button, Modal, Notice } from "@/components/ui";
 import { AssigneePicker } from "@/components/assignees/AssigneePicker";
 import type { FmsData, FmsFlowRow } from "./api";
@@ -16,9 +16,8 @@ import { layoutFmsDefinition, type FmsGraphPosition } from "./graph";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import { useFillViewportHeight } from "@/lib/useFillViewportHeight";
 import { cn } from "@/lib/utils";
-import { FmsAiPanel, type FmsAiTab } from "./ai/FmsAiPanel";
+import { FmsAiPanel } from "./ai/FmsAiPanel";
 import type { FmsAiSettings } from "./ai/api";
-import type { FmsAiRunCandidate } from "./ai/FmsAiRun";
 import { readAppFmsClipboard, readFmsClipboard, writeFmsClipboard } from "./clipboard";
 import { FmsImportSectionDialog } from "./FmsImportSectionDialog";
 import { FmsQuestionnairePreview, FmsQuestionnaireStudio } from "./FmsQuestionnaireStudio";
@@ -68,7 +67,7 @@ function revealControl(control: HTMLElement): () => void {
 }
 
 /** Optional FMS assistant wiring. Without it (or with every switch off) the builder is unchanged. */
-export type FmsBuilderAiOptions = Readonly<{ settings: FmsAiSettings; startWithAi?: boolean | undefined; published?: FmsFlowDefinition | null | undefined; runCandidates?: readonly FmsAiRunCandidate[] | undefined }>;
+export type FmsBuilderAiOptions = Readonly<{ settings: FmsAiSettings; published?: FmsFlowDefinition | null | undefined }>;
 
 type Studio = Readonly<{ stageKey: string; seed?: FormTemplateDefinition | undefined }>;
 type PendingDelete = Readonly<{ keys: readonly string[]; connections: number }>;
@@ -80,9 +79,9 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
   const [past, setPast] = useState<FmsFlowDefinition[]>([]);
   const [future, setFuture] = useState<FmsFlowDefinition[]>([]);
   const aiAvailable = !!ai && (ai.settings.debuggerEnabled || ai.settings.builderEnabled);
-  const startWithAi = !flow && !!ai?.startWithAi && ai.settings.builderEnabled;
-  const [screen, setScreen] = useState<"details" | "canvas">(flow || startWithAi ? "canvas" : "details");
-  const [aiOpen, setAiOpen] = useState<FmsAiTab | null>(startWithAi ? "build" : null);
+  // A new workflow always starts by naming it; the AI assistant is available inside the builder after that.
+  const [screen, setScreen] = useState<"details" | "canvas">(flow ? "canvas" : "details");
+  const [aiOpen, setAiOpen] = useState(false);
   const isPhone = useIsMobile();
   /** The step open in the inspector. Nothing is open on entry, so the workflow is never covered. */
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -96,7 +95,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
    * assistant stays mounted (keeping its conversation) and returns when the
    * inspector closes or the assistant button is pressed again.
    */
-  const [rightPanel, setRightPanel] = useState<"inspector" | "ai">(startWithAi ? "ai" : "inspector");
+  const [rightPanel, setRightPanel] = useState<"inspector" | "ai">("inspector");
   const workspaceRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<FmsCanvasHandle>(null);
   const [issuesOpen, setIssuesOpen] = useState(false);
@@ -393,17 +392,15 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
   const processFormName = normalized.stages[0]?.formTemplateId ? data.forms.find((form) => form.id === normalized.stages[0]?.formTemplateId)?.name ?? "Form attached" : "None attached";
   const assigneeSummary = assignableStages.length ? `${assignedStages.length}/${assignableStages.length} assigned` : "No steps yet";
   /** "Go to step" from the assistant reuses the Publish-readiness navigation, so the same control is focused. */
-  const goToStage = (stageKey: string, finding?: FmsDiagnosticFinding) => {
-    setAiOpen(null);
-    if (finding?.source === "validator") { openIssue({ code: finding.code, message: finding.title, stageKey }); return; }
-    setFocusedIssue(null); setSelectedKey(stageKey); setSelectedKeys([stageKey]);
+  const goToStage = (stageKey: string) => {
+    setFocusedIssue(null); setRightPanel("inspector"); setSelectedKey(stageKey); setSelectedKeys([stageKey]);
     setFocusRequest((current) => ({ key: stageKey, id: (current?.id ?? 0) + 1 }));
   };
-  const openAi = (tab: FmsAiTab) => { setAiOpen(tab); setRightPanel("ai"); };
-  const toggleAi = () => { if (aiOpen && (rightPanel === "ai" || !selected)) setAiOpen(null); else { setAiOpen((open) => open ?? "check"); setRightPanel("ai"); } };
+  const openAi = () => { setAiOpen(true); setRightPanel("ai"); };
+  const toggleAi = () => { if (aiOpen && (rightPanel === "ai" || !selected)) setAiOpen(false); else openAi(); };
   // The assistant and the step inspector share the right side; only one is shown at a time.
-  const aiPanel = ai && aiOpen ? <FmsAiPanel canManageForms={canManageForms} embedded={!isPhone} data={data} definition={normalized} initialTab={aiOpen} onApply={(next) => { commit(next); setSuccess("Assistant changes applied. Use Undo to revert; Save draft and Publish when ready."); }} onClose={() => setAiOpen(null)} onGoToStage={goToStage} published={ai.published ?? null} readOnly={false} runCandidates={ai.runCandidates} selectedStageKey={selected?.key ?? selectedKey} settings={ai.settings} /> : null;
-  const emptyStart = !normalized.stages.length ? <div className="space-y-3 rounded-2xl border border-gold/20 bg-charcoal p-5 text-sm text-soft-grey"><p className="font-semibold text-white">This workflow has no steps yet.</p><p>Describe it to the assistant, import a workflow, or start with the Form trigger and build it yourself.</p><div className="flex flex-wrap gap-2">{aiAvailable && ai?.settings.builderEnabled ? <Button onClick={() => openAi("build")} variant="secondary"><Sparkles className="size-4" />Build with AI</Button> : null}<Button onClick={() => setTransfer("import")} variant="secondary"><ArrowDownUp className="size-4" />Import</Button><Button onClick={() => { ensureFirstForm(); setAiOpen(null); }} variant="secondary"><Plus className="size-4" />Build manually</Button></div></div> : null;
+  const aiPanel = ai && aiOpen ? <FmsAiPanel canManageForms={canManageForms} embedded={!isPhone} data={data} definition={normalized} onApply={(next) => { commit(next); setSuccess("AI assistant changes applied. Use Undo to revert; Save draft and Publish when ready."); }} onClose={() => setAiOpen(false)} onGoToStage={goToStage} published={ai.published ?? null} selectedStageKey={selected?.key ?? selectedKey} settings={ai.settings} /> : null;
+  const emptyStart = !normalized.stages.length ? <div className="space-y-3 rounded-2xl border border-gold/20 bg-charcoal p-5 text-sm text-soft-grey"><p className="font-semibold text-white">This workflow has no steps yet.</p><p>Start with the Form trigger, import a workflow{aiAvailable ? ", or ask the AI assistant" : ""}.</p><div className="flex flex-wrap gap-2"><Button onClick={() => ensureFirstForm()} variant="secondary"><Plus className="size-4" />Add the first step</Button><Button onClick={() => setTransfer("import")} variant="secondary"><ArrowDownUp className="size-4" />Import</Button>{aiAvailable ? <Button onClick={openAi} variant="secondary"><Sparkles className="size-4" />AI assistant</Button> : null}</div></div> : null;
   const showAi = !!aiPanel && (rightPanel === "ai" || !selected);
   const showInspector = !!selected && !showAi;
   const stageIssues = selected ? issues.filter((issue) => issue.stageKey === selected.key) : [];
@@ -483,7 +480,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
       <div className="flex items-center gap-1">
         <Button aria-label="Undo" className="shrink-0 px-3" disabled={!past.length} onClick={undo} variant="ghost"><Undo2 className="size-5" /></Button>
         <Button aria-label="Redo" className="shrink-0 px-3" disabled={!future.length} onClick={redo} variant="ghost"><Redo2 className="size-5" /></Button>
-        {aiAvailable ? <Button aria-label="FMS assistant" aria-pressed={!!aiOpen} className="shrink-0 px-3" onClick={toggleAi} variant={aiOpen ? "primary" : "ghost"}><Sparkles className="size-5" /></Button> : null}
+        {aiAvailable ? <Button aria-label="AI assistant" aria-pressed={aiOpen} className="shrink-0 px-3" onClick={toggleAi} variant={aiOpen ? "primary" : "ghost"}><Sparkles className="size-5" /></Button> : null}
         <Button aria-label="Simulate workflow" className="shrink-0 px-3" onClick={() => setSimulating(true)} variant="ghost"><FlaskConical className="size-5" /></Button>
         <Button aria-label="Import or export" className="shrink-0 px-3" onClick={() => setTransfer("import")} variant="ghost"><ArrowDownUp className="size-5" /></Button>
         <Button aria-label="Default assignees" className="ml-auto shrink-0 px-3" onClick={() => setAssigning(true)} variant="ghost"><UserRoundPlus className="size-5" /></Button>
@@ -521,7 +518,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
       <Button aria-label="Undo" className={toolbarButton} disabled={!past.length} onClick={undo} title="Undo (Ctrl+Z)" variant="ghost"><Undo2 className="size-4" /></Button>
       <Button aria-label="Redo" className={toolbarButton} disabled={!future.length} onClick={redo} title="Redo (Ctrl+Shift+Z)" variant="ghost"><Redo2 className="size-4" /></Button>
       <Button aria-label="Import or export" className={toolbarButton} onClick={() => setTransfer("import")} title="Import or export workflow" variant="ghost"><ArrowDownUp className="size-4" /><span className="hidden xl:inline">Import / Export</span></Button>
-      {aiAvailable ? <Button aria-label="FMS assistant" aria-pressed={showAi} className={toolbarButton} onClick={toggleAi} variant={showAi ? "primary" : "secondary"}><Sparkles className="size-4" /><span className="hidden xl:inline">AI assistant</span></Button> : null}
+      {aiAvailable ? <Button aria-label="AI assistant" aria-pressed={showAi} className={toolbarButton} onClick={toggleAi} variant={showAi ? "primary" : "secondary"}><Sparkles className="size-4" /><span className="hidden md:inline">AI assistant</span></Button> : null}
       <Button aria-label="Check workflow" className={toolbarButton} onClick={checkWorkflow} variant="secondary"><TestTube2 className="size-4" /><span className="hidden xl:inline">Check workflow</span></Button>
       <Button aria-label="Simulate workflow" className={toolbarButton} onClick={() => setSimulating(true)} variant="secondary"><FlaskConical className="size-4" /><span className="hidden xl:inline">Simulate</span></Button>
       <Button aria-label={busy === "save" ? "Saving..." : "Save draft"} className={toolbarButton} disabled={!!busy} onClick={() => void save()} variant="secondary"><Save className="size-4" /><span aria-hidden className="hidden lg:inline">{busy === "save" ? "Saving..." : "Save draft"}</span></Button>

@@ -98,7 +98,7 @@ export async function handleFmsAiTurn(token: string | null, rawBody: string, dep
     return result;
   } catch (caught) {
     await finish("failed");
-    deps.log({ event: "fms_ai_turn_failed", kind: caught instanceof CatalogError ? "catalog" : caught instanceof ModelFailure ? caught.kind : "internal" });
+    deps.log({ event: "fms_ai_turn_failed", kind: caught instanceof CatalogError ? "catalog" : caught instanceof ModelFailure ? caught.kind : "internal", detail: caught instanceof ModelFailure ? caught.detail : caught instanceof CatalogError ? caught.message : null });
     if (caught instanceof ModelFailure) return caught.kind === "timeout" ? fail(504, "timeout", "The assistant took too long. Try a shorter question.") : fail(503, "provider_error", UNAVAILABLE);
     return fail(503, "unavailable", UNAVAILABLE);
   }
@@ -119,7 +119,7 @@ async function runTurn(request: FmsAiRequest, draft: FmsFlowDefinition, publishe
     if (!run) return fail(503, "unavailable", UNAVAILABLE);
   }
   const readOnly = request.readOnly || request.mode === "debug";
-  const context = buildFmsAiContext({ mode: request.mode, readOnly: request.readOnly, draft, published, selectedStageKey: request.selectedStageKey, findings, catalog, directory, run, now });
+  const context = buildFmsAiContext({ mode: request.mode, readOnly, draft, published, selectedStageKey: request.selectedStageKey, findings, catalog, directory, run, now });
   const turns: ModelTurn[] = [
     ...request.history.map((entry) => ({ role: entry.role, text: entry.text })),
     { role: "user", text: `<fms_data>\n${context}\n</fms_data>\n\nAuthor's message:\n${request.question}` },
@@ -128,7 +128,7 @@ async function runTurn(request: FmsAiRequest, draft: FmsFlowDefinition, publishe
   const call = async () => {
     const remaining = deadline - Date.now();
     if (remaining < 5_000) throw new ModelFailure("timeout");
-    const reply = await deps.model!.complete({ system: fmsAiSystemPrompt(request.mode), turns, timeoutMs: Math.min(deps.config.requestTimeoutMs, remaining - 2_000) });
+    const reply = await deps.model!.complete({ system: fmsAiSystemPrompt(), turns, timeoutMs: Math.min(deps.config.requestTimeoutMs, remaining - 2_000) });
     usage.requests += 1; usage.model = reply.model;
     usage.inputTokens += reply.usage.inputTokens; usage.outputTokens += reply.usage.outputTokens; usage.cacheReadTokens += reply.usage.cacheReadTokens; usage.cacheWriteTokens += reply.usage.cacheWriteTokens;
     return reply;

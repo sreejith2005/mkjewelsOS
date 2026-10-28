@@ -1,5 +1,4 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { FMS_AI_OUTPUT_SCHEMA } from "../../../packages/core/src/fms/aiContract.ts";
 
 export type ModelTurn = Readonly<{ role: "user" | "assistant"; text: string }>;
 export type ModelReply = Readonly<{ text: string; stopReason: string; model: string; usage: Readonly<{ inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number }> }>;
@@ -8,7 +7,8 @@ export interface FmsAiModel {
 }
 
 export class ModelFailure extends Error {
-  constructor(readonly kind: "timeout" | "provider" | "refused") { super(kind); }
+  /** `detail` is the provider's HTTP status and error type only (never prompt or reply text), for the function log. */
+  constructor(readonly kind: "timeout" | "provider" | "refused", readonly detail: string | null = null) { super(kind); }
 }
 
 type CreateParams = Anthropic.Beta.Messages.MessageCreateParamsNonStreaming;
@@ -22,7 +22,10 @@ export function buildModelParams(model: string, effort: "low" | "medium" | "high
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     thinking: { type: "adaptive" },
-    output_config: { effort, format: { type: "json_schema", schema: FMS_AI_OUTPUT_SCHEMA } },
+    // No output_config.format: the reply schema has more nullable fields than
+    // structured output accepts (the API refused it as too complex). The schema
+    // is in the system prompt and the handler parses and repairs the reply.
+    output_config: { effort },
     // The fixed system prompt is cached; everything about the workflow is in the last user turn.
     system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
     messages: turns.map((turn) => ({ role: turn.role, content: turn.text })),
@@ -44,7 +47,10 @@ export function anthropicModel(apiKey: string, model: string, effort: "low" | "m
         };
       } catch (caught) {
         if (caught instanceof Anthropic.APIConnectionTimeoutError) throw new ModelFailure("timeout");
-        if (caught instanceof Anthropic.APIError) throw new ModelFailure("provider");
+        if (caught instanceof Anthropic.APIError) {
+          const type = (caught.error as { error?: { type?: unknown } } | undefined)?.error?.type;
+          throw new ModelFailure("provider", `${caught.status ?? "no-status"}:${typeof type === "string" ? type : "unknown"}`);
+        }
         throw new ModelFailure("provider");
       }
     },
