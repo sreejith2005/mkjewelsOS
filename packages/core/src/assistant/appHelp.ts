@@ -194,11 +194,14 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     section: "dropdown_master",
     title: "Dropdown Master",
     path: "/dropdown-master",
-    summary: "Dropdown Master maintains the shared option lists used across JewelOS.",
+    summary: "Dropdown Master is the one shared set of option lists used across JewelOS: Forms, FMS, Tasks, Users, Leave and CRM all read the same lists.",
     recipes: [
+      "See every list: Dropdown Master opens on all lists with totals (Lists, Options, Made here, Made in forms, Built-in, Used by forms). Each card shows its active options, how many forms use it and when it was created. Use \"Search lists and options\" or the buttons \"All lists\", \"Made here\", \"Made in forms\" and \"Built-in\" to narrow them.",
+      "Open a list: tap its card. The list shows \"Used in forms\" and its options; \"All lists\" goes back.",
       "Add an option: open the list and press \"Add item\".",
-      "Hide an option without deleting it: mark it Inactive.",
-      "Find a list made in a form: lists added from the form editor appear under \"Category\" with their item count, for example \"Lead Source (4)\". In the form editor, \"Open in Dropdown Master\" on that question opens the list directly.",
+      "Create a list: press \"New list\", type the list name and its first item.",
+      "Hide an option without losing saved answers: open the list and press the eye button (\"Turn off\"). Press it again to turn it back on.",
+      "Lists made in the form editor (\"Also add this dropdown to Dropdown Master\") are marked \"Made in a form\"; in the form editor, \"Open in Dropdown Master\" opens that list directly.",
     ],
   },
   settings: {
