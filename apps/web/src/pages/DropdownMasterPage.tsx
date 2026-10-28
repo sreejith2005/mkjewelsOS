@@ -65,7 +65,14 @@ function DropdownEditor({ item, category, onClose, onSaved }: { item: DropdownMa
 export function DropdownMasterPage() {
   const { access, profile } = useAuth();
   const [items, setItems] = useState<DropdownMaster[]>([]);
-  const [category, setCategory] = useState("designation");
+  // "Open in Dropdown Master" in the form builder links here with ?category=<list>.
+  const [category, setCategoryState] = useState(() => new URLSearchParams(window.location.search).get("category")?.trim() || "designation");
+  const setCategory = (next: string) => {
+    setCategoryState(next);
+    const params = new URLSearchParams(window.location.search);
+    params.set("category", next);
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}?${params}`);
+  };
   const [editing, setEditing] = useState<DropdownMaster | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +87,8 @@ export function DropdownMasterPage() {
   useEffect(() => { void load(); }, [load]);
   useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["organization", "settings"], refresh: load });
 
-  const categories = useMemo(() => Array.from(new Set([...REQUIRED_EMPTY_CATEGORIES, ...items.map((item) => item.master_type)])).sort(), [items]);
+  const categories = useMemo(() => Array.from(new Set([...REQUIRED_EMPTY_CATEGORIES, category, ...items.map((item) => item.master_type)])).sort(), [category, items]);
+  const categorySizes = useMemo(() => items.reduce((sizes, item) => sizes.set(item.master_type, (sizes.get(item.master_type) ?? 0) + 1), new Map<string, number>()), [items]);
   const categoryItems = useMemo(() => filterDropdownMasterItems(items, category, status, search) as DropdownMaster[], [category, items, search, status]);
   const counts = useMemo(() => dropdownMasterCounts(items, category, categoryItems), [categoryItems, category, items]);
 
@@ -112,7 +120,7 @@ export function DropdownMasterPage() {
       {error ? <div className="mb-5"><Notice tone="danger">{error}</Notice><Button className="mt-3" onClick={() => void load()} variant="secondary">Retry</Button></div> : null}
       <div className="glass-card mb-5 rounded-xl p-4">
         <div className="mb-3 grid gap-3 sm:grid-cols-2"><label className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-soft-grey" /><input className="field pl-9" onChange={(event) => setSearch(event.target.value)} placeholder="Search label, code, or category" value={search} /></label><select className="field" onChange={(event) => setStatus(event.target.value as typeof status)} value={status}><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
-        <Field label="Category"><select className="field" onChange={(e) => setCategory(e.target.value)} value={category}>{categories.map((item) => <option key={item} value={item}>{titleCase(item)}</option>)}</select></Field>
+        <Field label="Category"><select className="field" onChange={(e) => setCategory(e.target.value)} value={category}>{categories.map((item) => <option key={item} value={item}>{titleCase(item)} ({categorySizes.get(item) ?? 0})</option>)}</select></Field>
         <div className="mt-4 grid grid-cols-3 gap-2 sm:flex sm:gap-3"><div className="rounded-lg border border-gold/20 bg-obsidian px-4 py-3"><p className="text-xl font-bold text-gold-secondary">{counts.total}</p><p className="text-xs text-soft-grey">Total</p></div><div className="rounded-lg border border-success/30 bg-success/5 px-4 py-3"><p className="text-xl font-bold text-success">{counts.active}</p><p className="text-xs text-soft-grey">Active</p></div><div className="rounded-lg border border-soft-grey/20 px-4 py-3"><p className="text-xl font-bold text-soft-grey">{counts.inactive}</p><p className="text-xs text-soft-grey">Inactive</p></div></div>
       </div>
       {loading ? <p className="py-10 text-center text-gold-secondary">Loading dropdowns…</p> : categoryItems.length === 0 ? <div className="glass-card rounded-xl p-10 text-center text-soft-grey">No items in {titleCase(category)} yet.</div> : (

@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { eligibleRecordNameFields } from "@jewelos/core";
+import { dropdownMasterKey, eligibleRecordNameFields } from "@jewelos/core";
 import { ArrowLeft, Banknote, CalendarDays, CheckSquare, ChevronDown, ChevronUp, CircleDot, Copy, Eye, EyeOff, FileUp, Filter, GitBranch, Hash, ListChecks, Mail, Minus, Monitor, Pencil, Phone, Plus, RotateCcw, Smartphone, Split, Star, Trash2, Type, UserRound, X } from "lucide-react";
 import { createFormField, formAnswerOptions, setQuestionAnswerCondition, describeFormRule, describePublishedFormEdit, FORM_LIST_OPERATORS, formRuleHasIncompletePredicate, FORM_OPERATOR_LABELS, FORM_SUBMIT_TARGET, FORM_VALUELESS_OPERATORS, nextFormFieldKey as sharedNextFormFieldKey, normalizeFormDefinition, operatorsForFieldType, pruneFormRules, renameFormRuleField, validateFormDefinition, type FormAnswer, type FormBranch, type FormFieldDefinition, type FormOption, type FormRule, type FormRuleOperator, type FormRulePredicate, type FormSectionDefinition, type FormTemplateDefinition, type Json, type UserRole } from "@jewelos/core";
 import { Button, Field, Notice } from "@/components/ui";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
-import { loadMasterOptions, toFormMasterOptions, type MasterOption } from "@/features/dropdowns/api";
+import { createMasterList, loadMasterOptions, toFormMasterOptions, type MasterOption } from "@/features/dropdowns/api";
 import { formUsageImpact, saveDraft, savePublishedForm, type FormBundle } from "./api";
 import { DropdownSourceEditor } from "./DropdownSourceEditor";
 import { FormRenderer, type DynamicOptions } from "./FormRenderer";
@@ -13,6 +13,9 @@ import { readAnswerRoutes, readGuidedConditionLinks, setAnswerRoute, type Answer
 import { convertFormFieldType, LAYOUT_FIELD_TYPES, OPTION_FIELD_TYPES, pruneOptionValueReferences } from "./fieldTypes";
 import { FormOutline } from "./FormOutline";
 import { FormRoutingMap } from "./FormRoutingMap";
+
+/** Lists waiting to be added to Dropdown Master when the form is saved. */
+type PendingMasterLists = Readonly<{ names: Readonly<Record<string, string>>; set: (key: string, name: string | undefined) => void }>;
 
 const ROLES: UserRole[] = ["super_admin", "admin", "manager", "hr", "crm", "staff", "doer", "housekeeping"];
 const OPTION_TYPES = OPTION_FIELD_TYPES;
@@ -95,6 +98,17 @@ export function FormBuilder({ bundle, dynamicOptions, onClose, onSaved, host }: 
     })),
   ], [form]);
   const refreshMasters = () => loadMasterOptions([], true).then(setMasterOptions).catch(() => setMasterOptions([]));
+  // Questions whose author ticked "Also add ... to Dropdown Master", keyed by
+  // question key. Kept here, not in the question editor, so collapsing the
+  // question does not lose it and saving the form creates the list.
+  const [pendingLists, setPendingLists] = useState<Readonly<Record<string, string>>>({});
+  const pendingMasterLists: PendingMasterLists = {
+    names: pendingLists,
+    set: (key, name) => setPendingLists((current) => {
+      const { [key]: _previous, ...rest } = current;
+      return name === undefined ? rest : { ...rest, [key]: name };
+    }),
+  };
   useEffect(() => { void refreshMasters(); }, []);
   useEffect(() => { const handler = (event: BeforeUnloadEvent) => { if (dirty) { event.preventDefault(); event.returnValue = ""; } }; window.addEventListener("beforeunload", handler); return () => window.removeEventListener("beforeunload", handler); }, [dirty]);
   const previewOptions = useMemo<DynamicOptions>(() => ({ ...dynamicOptions, masters: toFormMasterOptions(masterOptions) }), [dynamicOptions, masterOptions]);
@@ -120,6 +134,16 @@ export function FormBuilder({ bundle, dynamicOptions, onClose, onSaved, host }: 
       const removed = (form.fields[index]?.options ?? []).filter((option) => !retained.has(option.value));
       if (removed.length) setError(`Removed ${removed.map((option) => `“${option.label}”`).join(", ")} and cleared any answer paths that referenced it.`);
     }
+    // A pending Dropdown Master list follows its question when the key is renamed.
+    const renamedFrom = form.fields[index]?.key;
+    if (patch.key !== undefined && renamedFrom !== undefined && patch.key !== renamedFrom) {
+      const renamedTo = patch.key;
+      setPendingLists((pending) => {
+        if (!(renamedFrom in pending)) return pending;
+        const { [renamedFrom]: name = "", ...rest } = pending;
+        return { ...rest, [renamedTo]: name };
+      });
+    }
     setForm((current) => {
     const previousKey = current.fields[index]?.key;
     // Renaming a question must carry every rule that reads it along, otherwise
@@ -128,6 +152,7 @@ export function FormBuilder({ bundle, dynamicOptions, onClose, onSaved, host }: 
     // key is a rename like any other rather than "no rename".
     const rename = patch.key !== undefined && previousKey !== undefined && patch.key !== previousKey
       ? { from: previousKey, to: patch.key } : null;
+
     const fields = current.fields.map((field, position) => {
       if (position !== index) {
         if (!rename) return field;
@@ -211,11 +236,40 @@ export function FormBuilder({ bundle, dynamicOptions, onClose, onSaved, host }: 
     };
   });
 
+  /**
+   * Creates every list the author asked to add to Dropdown Master and points
+   * those questions at it, so the master stays the single copy of the options.
+   * Each success is kept even if a later list or the save itself fails.
+   */
+  const createPendingMasterLists = async (): Promise<FormTemplateDefinition> => {
+    let next = form;
+    let created = false;
+    try {
+      for (const [key, name] of Object.entries(pendingLists)) {
+        const position = next.fields.findIndex((field) => field.key === key);
+        const field = next.fields[position];
+        if (!field || field.optionSource || !OPTION_TYPES.has(field.type) || !field.options?.length) continue;
+        const question = field.label.trim() || key;
+        const masterKey = dropdownMasterKey(name);
+        if (!masterKey) throw new Error(`Give a Dropdown Master list name for "${question}", or untick "Also add to Dropdown Master".`);
+        let masterType: string;
+        try { masterType = await createMasterList(masterKey, field.options.map((option) => ({ value: option.value, label: option.label }))); }
+        catch (caught) { throw new Error(`"${question}": ${caught instanceof Error ? caught.message : "could not add the list to Dropdown Master."}`); }
+        const { options: _copied, ...rest } = field;
+        next = { ...next, fields: next.fields.map((item, at) => at === position ? { ...rest, optionSource: { kind: "master" as const, masterType } } : item) };
+        created = true;
+        setForm(next);
+        pendingMasterLists.set(key, undefined);
+      }
+    } finally { if (created) await refreshMasters(); }
+    return next;
+  };
+
   const save = async (intent: "draft" | "use" = "use") => {
     if (issues.length) { setError(issues[0]?.message ?? "Fix the highlighted form settings before saving."); return; }
     setSaving(true); setError(null);
     try {
-      const normalized = normalizeFormDefinition(form);
+      const normalized = normalizeFormDefinition(await createPendingMasterLists());
       const payload = { name: normalized.name, description: normalized.description ?? "", record_name_field_key: normalized.recordNameFieldKey ?? null, sections: normalized.sections ?? [], permissions: { roles: normalized.permissions?.roles ?? [] } } as unknown as Json;
       const fields = toDraftFields(normalized.fields) as unknown as Json;
       if (host) {
@@ -280,7 +334,7 @@ export function FormBuilder({ bundle, dynamicOptions, onClose, onSaved, host }: 
     <section aria-label="Fields"><div className="mb-3 flex items-center justify-between gap-3"><div className="flex items-center gap-2"><ListChecks className="size-5 text-gold-secondary" /><h3 className="text-xl font-semibold text-gold-secondary">Questions</h3></div><span className="rounded-full bg-gold/10 px-3 py-1 text-xs font-semibold text-gold-secondary">{form.fields.length} added</span></div>
       {form.fields.length === 0 ? <Notice>Use Add question below to begin your form.</Notice> : null}<div className="space-y-5">{sections.map((section) => <div key={section.key}>
         {sections.length > 1 ? <h4 className="mb-2 text-sm font-semibold uppercase tracking-wide text-soft-grey">{section.title}</h4> : null}
-        <div className="space-y-2">{form.fields.map((field, index) => ({ field, index })).filter((entry) => (entry.field.sectionKey ?? sections[0]!.key) === section.key).map(({ field, index }) => <div key={field.key}><CompactFieldRow dynamicOptions={previewOptions} editing={editing === index} field={field} fields={form.fields} index={index} masterOptions={masterOptions} onAddAfter={() => setAddMenu({ after: index, sectionKey: section.key })} onChangeType={changeFieldType} onDuplicate={duplicate} onEdit={() => setEditing((current) => current === index ? null : index)} onMasterCreated={refreshMasters} onMove={move} onPatch={patchField} onRemove={remove} onSetQuestionCondition={setQuestionCondition} onSetRoute={setRoute} sections={sections} />{addMenu?.after === index && addMenu.sectionKey === section.key ? <AddFieldMenu onAdd={add} onClose={() => setAddMenu(null)} /> : null}</div>)}</div>
+        <div className="space-y-2">{form.fields.map((field, index) => ({ field, index })).filter((entry) => (entry.field.sectionKey ?? sections[0]!.key) === section.key).map(({ field, index }) => <div key={field.key}><CompactFieldRow dynamicOptions={previewOptions} editing={editing === index} field={field} fields={form.fields} index={index} masterOptions={masterOptions} onAddAfter={() => setAddMenu({ after: index, sectionKey: section.key })} onChangeType={changeFieldType} onDuplicate={duplicate} onEdit={() => setEditing((current) => current === index ? null : index)} onMasterCreated={refreshMasters} onMove={move} pendingMasterLists={pendingMasterLists} onPatch={patchField} onRemove={remove} onSetQuestionCondition={setQuestionCondition} onSetRoute={setRoute} sections={sections} />{addMenu?.after === index && addMenu.sectionKey === section.key ? <AddFieldMenu onAdd={add} onClose={() => setAddMenu(null)} /> : null}</div>)}</div>
         {form.fields.every((field) => (field.sectionKey ?? sections[0]!.key) !== section.key) ? <p className="text-xs text-soft-grey">No questions in this section yet.</p> : null}
         <Button className="mt-2 w-full border-dashed" onClick={() => { const indices = form.fields.map((field, index) => ({ field, index })).filter((entry) => (entry.field.sectionKey ?? sections[0]!.key) === section.key).map((entry) => entry.index); setAddMenu({ after: indices.at(-1) ?? null, sectionKey: section.key }); }} type="button" variant="secondary"><Plus className="size-4" />Add question to {section.title}</Button>
         {addMenu?.sectionKey === section.key && addMenu.after === null ? <AddFieldMenu onAdd={add} onClose={() => setAddMenu(null)} /> : null}
@@ -294,7 +348,7 @@ function AddFieldMenu({ onAdd, onClose }: { onAdd: (type: FieldKind["type"]) => 
 
 function FieldPaletteButton({ kind, onAdd }: { kind: FieldKind; onAdd: (type: FieldKind["type"]) => void }) { const Icon = kind.icon; return <button className="flex min-h-20 flex-col items-center justify-center gap-1 rounded-xl border border-gold/20 bg-charcoal/40 px-2 text-center text-xs font-semibold text-champagne transition hover:border-gold hover:bg-gold/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold" onClick={() => onAdd(kind.type)} type="button"><span className="grid size-8 place-items-center rounded-full bg-gold/10 text-gold-secondary"><Icon className="size-4" /></span>{kind.label}</button>; }
 
-function CompactFieldRow({ field, fields, index, editing, dynamicOptions, masterOptions, sections, onAddAfter, onChangeType, onDuplicate, onEdit, onPatch, onMove, onRemove, onSetQuestionCondition, onSetRoute, onMasterCreated }: { field: FormFieldDefinition; fields: readonly FormFieldDefinition[]; index: number; editing: boolean; dynamicOptions: DynamicOptions; masterOptions: MasterOption[]; sections: readonly FormSectionDefinition[]; onAddAfter: () => void; onChangeType: (index: number, type: FormFieldDefinition["type"]) => void; onDuplicate: (index: number) => void; onEdit: () => void; onPatch: (index: number, patch: Partial<FormFieldDefinition>) => void; onMove: (index: number, direction: number) => void; onRemove: (index: number) => void; onSetQuestionCondition: (targetKey: string, sourceKey: string | undefined, optionValue: FormAnswer | undefined) => void; onSetRoute: (sourceKey: string, optionValue: FormAnswer, route: AnswerRoute) => void; onMasterCreated: () => Promise<void> }) {
+function CompactFieldRow({ field, fields, index, editing, dynamicOptions, masterOptions, sections, onAddAfter, onChangeType, onDuplicate, onEdit, onPatch, onMove, onRemove, onSetQuestionCondition, onSetRoute, onMasterCreated, pendingMasterLists }: { field: FormFieldDefinition; fields: readonly FormFieldDefinition[]; index: number; editing: boolean; dynamicOptions: DynamicOptions; masterOptions: MasterOption[]; sections: readonly FormSectionDefinition[]; onAddAfter: () => void; onChangeType: (index: number, type: FormFieldDefinition["type"]) => void; onDuplicate: (index: number) => void; onEdit: () => void; onPatch: (index: number, patch: Partial<FormFieldDefinition>) => void; onMove: (index: number, direction: number) => void; onRemove: (index: number) => void; onSetQuestionCondition: (targetKey: string, sourceKey: string | undefined, optionValue: FormAnswer | undefined) => void; onSetRoute: (sourceKey: string, optionValue: FormAnswer, route: AnswerRoute) => void; onMasterCreated: () => Promise<void>; pendingMasterLists: PendingMasterLists }) {
   const Icon = fieldIcon(field.type);
   const name = field.label || fieldLabel(field.type);
   const links = readGuidedConditionLinks(field);
@@ -308,16 +362,16 @@ function CompactFieldRow({ field, fields, index, editing, dynamicOptions, master
     <Button aria-label={`Edit ${name}`} className="size-11 min-h-11 p-0" onClick={onEdit} type="button" variant="ghost"><Pencil className="size-4" /></Button>
     <Button aria-label={`Duplicate ${name}`} className="size-11 min-h-11 p-0" onClick={() => onDuplicate(index)} type="button" variant="ghost"><Copy className="size-4" /></Button>
     <Button aria-label={`Remove ${name}`} className="size-11 min-h-11 p-0" onClick={() => onRemove(index)} type="button" variant="danger"><Trash2 className="size-4" /></Button>
-  </div>{editing ? <><FieldEditor dynamicOptions={dynamicOptions} field={field} fields={fields} index={index} masterOptions={masterOptions} onChangeType={onChangeType} onMasterCreated={onMasterCreated} onPatch={onPatch} onSetQuestionCondition={onSetQuestionCondition} onSetRoute={onSetRoute} sections={sections} /><button aria-label={`Add question after ${name}`} className="flex w-full items-center justify-center gap-1 border-t border-dashed border-gold/20 py-2 text-xs font-medium text-gold-secondary hover:bg-gold/5" onClick={onAddAfter} type="button"><Plus className="size-3.5" />Add question here</button></> : null}</article>;
+  </div>{editing ? <><FieldEditor dynamicOptions={dynamicOptions} field={field} fields={fields} index={index} masterOptions={masterOptions} onChangeType={onChangeType} onMasterCreated={onMasterCreated} onPatch={onPatch} onSetQuestionCondition={onSetQuestionCondition} onSetRoute={onSetRoute} pendingMasterLists={pendingMasterLists} sections={sections} /><button aria-label={`Add question after ${name}`} className="flex w-full items-center justify-center gap-1 border-t border-dashed border-gold/20 py-2 text-xs font-medium text-gold-secondary hover:bg-gold/5" onClick={onAddAfter} type="button"><Plus className="size-3.5" />Add question here</button></> : null}</article>;
 }
 
-function FieldEditor({ field, fields, index, dynamicOptions, masterOptions, sections, onChangeType, onPatch, onSetQuestionCondition, onSetRoute, onMasterCreated }: { field: FormFieldDefinition; fields: readonly FormFieldDefinition[]; index: number; dynamicOptions: DynamicOptions; masterOptions: MasterOption[]; sections: readonly FormSectionDefinition[]; onChangeType: (index: number, type: FormFieldDefinition["type"]) => void; onPatch: (index: number, patch: Partial<FormFieldDefinition>) => void; onSetQuestionCondition: (targetKey: string, sourceKey: string | undefined, optionValue: FormAnswer | undefined) => void; onSetRoute: (sourceKey: string, optionValue: FormAnswer, route: AnswerRoute) => void; onMasterCreated: () => Promise<void> }) {
+function FieldEditor({ field, fields, index, dynamicOptions, masterOptions, sections, onChangeType, onPatch, onSetQuestionCondition, onSetRoute, onMasterCreated, pendingMasterLists }: { field: FormFieldDefinition; fields: readonly FormFieldDefinition[]; index: number; dynamicOptions: DynamicOptions; masterOptions: MasterOption[]; sections: readonly FormSectionDefinition[]; onChangeType: (index: number, type: FormFieldDefinition["type"]) => void; onPatch: (index: number, patch: Partial<FormFieldDefinition>) => void; onSetQuestionCondition: (targetKey: string, sourceKey: string | undefined, optionValue: FormAnswer | undefined) => void; onSetRoute: (sourceKey: string, optionValue: FormAnswer, route: AnswerRoute) => void; onMasterCreated: () => Promise<void>; pendingMasterLists: PendingMasterLists }) {
   const validation = field.validation ?? {};
   const updateValidation = (key: "min" | "max" | "minLength" | "maxLength", raw: string) => onPatch(index, { validation: { ...validation, [key]: raw === "" ? undefined : Number(raw) } });
   return <div className="grid gap-3 border-t border-gold/15 p-3 sm:grid-cols-2">
     <Field label="Question"><input className="field" onChange={(event) => onPatch(index, { label: event.target.value })} value={field.label} /></Field>
     <Field label="Field type"><select aria-label="Field type" className="field" onChange={(event) => onChangeType(index, event.target.value as FormFieldDefinition["type"])} value={field.type}>{FIELD_KINDS.some((kind) => kind.type === field.type) ? null : <option value={field.type}>{fieldLabel(field.type)} (legacy)</option>}{FIELD_KINDS.map((kind) => <option key={kind.type} value={kind.type}>{kind.label}</option>)}</select></Field>
-    {OPTION_TYPES.has(field.type) ? <DropdownSourceEditor field={field} index={index} masterOptions={masterOptions} onMasterCreated={onMasterCreated} onPatch={onPatch} /> : null}
+    {OPTION_TYPES.has(field.type) ? <DropdownSourceEditor field={field} index={index} masterOptions={masterOptions} onMasterCreated={onMasterCreated} onPatch={onPatch} onPendingNameChange={(name) => pendingMasterLists.set(field.key, name)} pendingName={pendingMasterLists.names[field.key]} /> : null}
     {!LAYOUT_TYPES.has(field.type) ? <div className="flex flex-wrap items-center gap-4 sm:col-span-2"><label className="text-sm text-champagne"><input checked={field.required === true} onChange={(event) => onPatch(index, { required: event.target.checked })} type="checkbox" /> Required</label></div> : null}
     {!LAYOUT_TYPES.has(field.type) ? <details className="rounded-lg border border-gold/15 bg-obsidian/30 p-3 sm:col-span-2"><summary className="cursor-pointer text-sm font-semibold text-champagne">Routing</summary><div className="mt-3 grid gap-3">{field.type === "checkbox" && (field.options?.length ?? 0) > 0 ? <Notice>When several checked answers route to sections or the end, the first selected routed option in the option order wins. Question visibility can match every selected answer.</Notice> : null}{BRANCH_TYPES.has(field.type) ? <AnswerRoutingEditor dynamicOptions={dynamicOptions} field={field} fields={fields} index={index} masterOptions={masterOptions} onSetRoute={onSetRoute} sections={sections} /> : null}<OptionMappedConditionEditor dynamicOptions={dynamicOptions} field={field} fields={fields} index={index} masterOptions={masterOptions} onSetQuestionCondition={onSetQuestionCondition} /></div></details> : null}
     <details className="rounded-lg border border-gold/15 bg-obsidian/30 p-3 sm:col-span-2"><summary className="cursor-pointer text-sm font-semibold text-champagne">Advanced settings</summary><div className="mt-3 grid gap-3 sm:grid-cols-2">{field.type !== "divider" ? <Field label="Helper text"><input className="field" onChange={(event) => onPatch(index, { helperText: event.target.value })} value={field.helperText ?? ""} /></Field> : null}{!LAYOUT_TYPES.has(field.type) ? <Field label="Placeholder"><input className="field" onChange={(event) => onPatch(index, { placeholder: event.target.value })} value={field.placeholder ?? ""} /></Field> : null}{sections.length > 1 ? <Field label="Section"><select className="field" onChange={(event) => onPatch(index, { sectionKey: event.target.value })} value={field.sectionKey ?? sections[0]?.key ?? ""}>{sections.map((section) => <option key={section.key} value={section.key}>{section.title}</option>)}</select></Field> : null}{NUMBER_TYPES.has(field.type) && field.type !== "rating" ? <><Field label="Minimum"><input className="field" onChange={(event) => updateValidation("min", event.target.value)} type="number" value={validation.min ?? ""} /></Field><Field label="Maximum"><input className="field" onChange={(event) => updateValidation("max", event.target.value)} type="number" value={validation.max ?? ""} /></Field></> : null}{TEXT_TYPES.has(field.type) ? <><Field label="Minimum length"><input className="field" onChange={(event) => updateValidation("minLength", event.target.value)} type="number" value={validation.minLength ?? ""} /></Field><Field label="Maximum length"><input className="field" onChange={(event) => updateValidation("maxLength", event.target.value)} type="number" value={validation.maxLength ?? ""} /></Field></> : null}{!LAYOUT_TYPES.has(field.type) ? <div className="flex flex-wrap items-center gap-4 sm:col-span-2"><label className="text-sm text-champagne"><input checked={field.shown !== false} onChange={(event) => onPatch(index, { shown: event.target.checked })} type="checkbox" /> Shown</label><label className="text-sm text-champagne"><input checked={field.editable !== false} onChange={(event) => onPatch(index, { editable: event.target.checked })} type="checkbox" /> Editable</label></div> : null}</div></details>
