@@ -27,12 +27,12 @@ it("opens the stage form in the work page, not in a dialog over the earlier answ
   const user = userEvent.setup();
   const openEarlier = vi.fn();
   render(<FmsEarlierAnswersContext.Provider value={openEarlier}><FmsStageRunner {...props} compact /></FmsEarlierAnswersContext.Provider>);
-  await user.click(screen.getByRole("button", { name: "Fill the form: Call report" }));
+  await user.click(screen.getByRole("button", { name: "Fill the form" }));
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(screen.getByRole("region", { name: "Your form: Call report" })).toBeTruthy();
   expect(screen.getByLabelText("Call outcome")).toBeTruthy();
   // Shown once the form is open, so the employee is not offered the same form twice.
-  expect(screen.queryByRole("button", { name: "Fill the form: Call report" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Fill the form" })).toBeNull();
   await user.type(screen.getByLabelText("Call outcome"), "Interested");
   await user.click(screen.getByRole("button", { name: "See earlier answers" }));
   expect(openEarlier).toHaveBeenCalledTimes(1);
@@ -42,7 +42,7 @@ it("opens the stage form in the work page, not in a dialog over the earlier answ
 it("keeps the dialog on other surfaces", async () => {
   const user = userEvent.setup();
   render(<FmsStageRunner {...props} />);
-  await user.click(screen.getByRole("button", { name: "Fill the form: Call report" }));
+  await user.click(screen.getByRole("button", { name: "Fill the form" }));
   expect(screen.getByRole("dialog")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "See earlier answers" })).toBeNull();
 });

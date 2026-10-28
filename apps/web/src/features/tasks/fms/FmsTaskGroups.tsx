@@ -61,7 +61,7 @@ function FmsRecordCard({ record, stageName, onNavigate }: { record: FmsWorkspace
    <span className={cn("shrink-0 rounded-full border px-2 py-0.5 text-xs font-semibold", status.className)}>{status.label}</span>
   </div>
   {record.description ? <p className="mt-1 line-clamp-2 text-sm text-task-text-muted">{record.description}</p> : null}
-  <p className="mt-2 text-xs text-task-text-muted">{record.reference}{record.visitNumber > 1 ? ` · Visit ${record.visitNumber}` : ""}</p>
+  {record.visitNumber > 1 ? <p className="mt-2 text-xs text-task-text-muted">Visit {record.visitNumber}</p> : null}
   <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
    {record.dueAt ? <time dateTime={record.dueAt} className={cn("inline-flex items-center gap-1.5 text-sm", due.tone === "overdue" ? "font-semibold text-danger" : due.tone === "today" ? "font-medium text-task-text" : "text-task-text-muted")}><CalendarClock aria-hidden="true" className="size-4" />{due.label}</time> : <span className="text-sm text-task-text-muted">No due date</span>}
    <span className={cn("inline-flex min-h-11 items-center gap-1 rounded-lg px-4 text-sm font-semibold", record.status === "completed" || record.status === "waiting" ? "border border-task-border text-task-text" : "bg-gold-sheen text-on-gold shadow-gold")}>{action}<ChevronRight aria-hidden="true" className="size-4" /></span>

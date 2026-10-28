@@ -70,7 +70,7 @@ export function FmsWorkContext({ instanceId, instanceStageId, onReady, onRecordN
       {fileError ? <div className="mt-3"><Notice tone="danger">{fileError}</Notice></div> : null}
     </details> : null}
 
-    {context.journey.length ? <details className="rounded-2xl border border-task-border bg-task-bg p-4"><summary className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-semibold text-task-text"><History aria-hidden="true" className="size-4 text-gold-secondary" />Earlier steps</summary>
+    {context.journey.length ? <details className="rounded-2xl border border-task-border bg-task-bg px-4 [&[open]]:pb-4"><summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 text-sm font-semibold text-task-text"><History aria-hidden="true" className="size-4 text-gold-secondary" />Earlier steps</summary>
       <ol className="mt-3 space-y-3">{context.journey.map(item => <li className="border-l-2 border-gold/40 pl-3 text-sm" key={item.id}>
         <p className="font-medium text-task-text">{item.stageName}{item.visitNumber > 1 ? ` · visit ${item.visitNumber}` : ""}</p>
         <p className="text-xs text-task-text-muted">{[fmsEmployeeStatusLabel(item.status), item.employeeName, formatKolkataDateTime(item.completedAt)].filter(Boolean).join(" · ")}</p>

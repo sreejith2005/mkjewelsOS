@@ -70,7 +70,7 @@ function FileFieldControl({ describedBy, disabled, field, labelledBy, onChange, 
   </div>;
 }
 
-export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extraAction, initialAnswers = {}, onSubmit, preview = false, readOnly = false, templateId, workflowHint = false }: { definition: FormTemplateDefinition; dynamicOptions?: DynamicOptions; /** One more button for the bottom bar, kept within thumb reach (for example "Earlier answers"). */ extraAction?: ReactNode; initialAnswers?: FormAnswers; onSubmit?: (answers: FormAnswers) => Promise<void | boolean>; preview?: boolean; readOnly?: boolean; templateId?: string; workflowHint?: boolean }) {
+export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extraAction, initialAnswers = {}, onSubmit, preview = false, readOnly = false, templateId }: { definition: FormTemplateDefinition; dynamicOptions?: DynamicOptions; /** One more button for the bottom bar, kept within thumb reach (for example "Earlier answers"). */ extraAction?: ReactNode; initialAnswers?: FormAnswers; onSubmit?: (answers: FormAnswers) => Promise<void | boolean>; preview?: boolean; readOnly?: boolean; templateId?: string }) {
   const uid = useId();
   const [answers, setAnswers] = useState<Record<string, FormAnswer>>(() => Object.fromEntries(Object.entries(initialAnswers).filter((entry): entry is [string, FormAnswer] => entry[1] !== null && entry[1] !== undefined)));
   const [error, setError] = useState<string | null>(null);
@@ -231,7 +231,6 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
   const requiredPercent = progress.requiredTotal ? Math.round((progress.requiredAnswered / progress.requiredTotal) * 100) : 0;
 
   return <form className="flex flex-col gap-5" onSubmit={submit} ref={formRef}>
-    {workflowHint && !preview ? <p className="px-1 text-sm text-task-text-muted">When you submit, your answers are saved and you will see who receives the next step.</p> : null}
     {preview ? <Notice>Preview mode — nothing is saved.</Notice> : null}
     {resolved.fields.length === 0 ? <Notice tone="danger">This form version has no saved questions. Close it and edit the draft before publishing.</Notice> : null}
     {!readOnly && progress.requiredTotal > 0 ? <div className="space-y-1.5">
