@@ -54,7 +54,7 @@ export function FmsTaskWorkspace({ actorId, tenantId, onNavigate, onCount }: { a
  }, []);
  return <div className="space-y-4 text-task-text">
   <div className="space-y-3 rounded-2xl border border-task-border p-3 sm:p-4" role="search" aria-label="Find FMS work">
-   <Field label="Search FMS work"><input type="search" className="task-field" maxLength={200} placeholder="Record name or workflow reference" value={filters.query} onChange={event => change({ ...filters, query: event.target.value })} /></Field>
+   <Field label="Search FMS work"><input type="search" className="task-field" maxLength={200} placeholder="Search by name" value={filters.query} onChange={event => change({ ...filters, query: event.target.value })} /></Field>
    <details className="group rounded-xl border border-task-border px-3">
     <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-medium">Workflow and date filters{filters.familyId || filters.stageId || filters.from || filters.to ? <span className="rounded-full bg-task-accent-soft px-2 py-0.5 text-xs">Applied</span> : null}<ChevronDown aria-hidden="true" className="ml-auto size-4 transition-transform group-open:rotate-180" /></summary>
    <div className="grid grid-cols-1 gap-3 pb-3 sm:grid-cols-2 lg:grid-cols-4">

@@ -22,7 +22,7 @@ export function FmsContextFirst({ instanceId, instanceStageId, hasForm, children
     {showSteps && reviewRequired ? <FmsWorkSteps current={working ? 2 : 1} /> : null}
     <FmsWorkContext collapsed={continuing} instanceId={instanceId} instanceStageId={instanceStageId} onPreviousForms={setEarlierForms} onReady={setReady} onRecordName={onRecordName} />
     {reviewRequired && !continuing ? <div className="space-y-2">
-      <Button className="min-h-12 w-full sm:w-auto" disabled={!ready} onClick={() => setContinuing(true)}>{hasForm ? "Continue to stage form" : "Continue to stage"}</Button>
+      <Button className="min-h-12 w-full sm:w-auto" disabled={!ready} onClick={() => setContinuing(true)}>{hasForm ? "Continue to form" : "Continue"}</Button>
     </div> : null}
     {working ? <div className="scroll-mt-24" ref={workRef}><FmsEarlierAnswersContext.Provider value={openEarlier}>{children}</FmsEarlierAnswersContext.Provider></div> : null}
     {earlierOpen ? <Modal mobileFullscreen onClose={() => setEarlierOpen(false)} title="Earlier answers" wide>

@@ -86,7 +86,7 @@ describe("focused FMS assigned work", () => {
     // No result page: the employee goes straight back to the FMS list with a short notice.
     await waitFor(() => expect(onNavigate).toHaveBeenCalledWith("/tasks?view=fms"));
     expect(mocks.toast).toHaveBeenCalledOnce();
-    expect(screen.queryByRole("heading", { name: "Form submitted successfully" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Submitted" })).toBeNull();
   });
 
   it("recovers a saved starting submission after its response was lost", async () => {
@@ -94,8 +94,9 @@ describe("focused FMS assigned work", () => {
     mocks.recoverFmsStartingWork.mockResolvedValue({ submissionId: "saved", instanceId: "instance-5", referenceNumber: "FMS-9", workflowName: "Jewellery enquiry", ownWorkTargets: [], assignmentSummary: [{ stageName: "Call", employeeName: "Employee B" }] });
     mocks.loadFormDynamicOptions.mockResolvedValue(OPTIONS);
     render(<FmsAssignedWorkPage onNavigate={vi.fn()} />);
-    expect(await screen.findByRole("heading", { name: "Form submitted successfully" })).toBeTruthy();
-    expect(screen.getByText(/Call has been assigned to Employee B/)).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Submitted" })).toBeTruthy();
+    expect(screen.getByText("Sent to Employee B.")).toBeTruthy();
+    expect(screen.queryByText(/FMS-9/)).toBeNull();
     expect(screen.queryByRole("button", { name: "Submit exact form" })).toBeNull();
     expect(mocks.confirmWork).not.toHaveBeenCalled();
   });
@@ -128,7 +129,7 @@ describe("focused FMS assigned work", () => {
 
     expect(await screen.findByRole("region", { name: "Previous form answers" })).toBeTruthy();
     expect(screen.queryByText("Running stage-3 form form-7")).toBeNull();
-    await userEvent.setup().click(await screen.findByRole("button", { name: "Continue to stage form" }));
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Continue to form" }));
     expect(await screen.findByText("Running stage-3 form form-7")).toBeTruthy();
     // Scoped by id — never the whole-workspace loader that caps its results.
     expect(mocks.loadFmsAssignedStage).toHaveBeenCalledWith("instance-5", "stage-3");
@@ -153,7 +154,7 @@ describe("focused FMS assigned work", () => {
 
     expect(await screen.findByRole("region", { name: "Previous form answers" })).toBeTruthy();
     expect(screen.queryByText("Running stage-3 form form-7")).toBeNull();
-    await userEvent.setup().click(await screen.findByRole("button", { name: "Continue to stage form" }));
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Continue to form" }));
     expect(await screen.findByText("Running stage-3 form form-7")).toBeTruthy();
   });
 
@@ -198,16 +199,16 @@ it("returns to the FMS list after finishing a stage instead of showing a result 
   render(<FmsAssignedWorkPage onNavigate={onNavigate} />);
   // The header names the record only: no workflow · stage · reference line.
   expect(screen.queryByText(/Repair job · Polishing · FMS-9/)).toBeNull();
-  await userEvent.setup().click(await screen.findByRole("button", { name: "Continue to stage form" }));
+  await userEvent.setup().click(await screen.findByRole("button", { name: "Continue to form" }));
   expect(mocks.runner).toHaveBeenLastCalledWith(expect.objectContaining({ compact: true }));
   await userEvent.setup().click(screen.getByRole("button", { name: "Finish synthetic stage" }));
   expect(onNavigate).toHaveBeenCalledWith("/tasks?view=fms");
-  expect(mocks.toast).toHaveBeenCalledWith("Form submitted. Next step assigned to Current employee.");
-  expect(screen.queryByRole("heading", { name: "Form submitted successfully" })).toBeNull();
+  expect(mocks.toast).toHaveBeenCalledWith("Submitted. Sent to Current employee.");
+  expect(screen.queryByRole("heading", { name: "Submitted" })).toBeNull();
 });
 
 it("words the finished notice for each outcome", () => {
   const base = { submissionId: null, destinations: [] };
-  expect(fmsFinishedNotice({ ...base, state: "workflow_completed" })).toBe("Work saved. The workflow is complete.");
-  expect(fmsFinishedNotice({ ...base, state: "successors_activated" })).toBe("Work saved.");
+  expect(fmsFinishedNotice({ ...base, state: "workflow_completed" })).toBe("Done. All steps are finished.");
+  expect(fmsFinishedNotice({ ...base, state: "successors_activated" })).toBe("Done.");
 });

@@ -35,7 +35,7 @@ afterEach(() => { cleanup(); confirm.confirmWork.mockClear(); });
 it("shows the assigned employee only the linked section and submits only its answers", async () => {
   const user = userEvent.setup();
   render(<FmsStageRunner {...props(stageRow("intro"))} />);
-  await user.click(screen.getByRole("button", { name: "Fill the form: Jewellery Sales Pipeline · Introduction Call" }));
+  await user.click(screen.getByRole("button", { name: "Fill the form" }));
   const dialog = screen.getByRole("dialog");
   expect(within(dialog).getByText("Client Connected?")).toBeTruthy();
   expect(within(dialog).getByText("Client Interested?")).toBeTruthy();
@@ -64,7 +64,7 @@ it("requires the section's own questions before submitting", async () => {
 it("keeps the whole-form experience for a stage without a section", async () => {
   const user = userEvent.setup();
   render(<FmsStageRunner {...props(stageRow())} />);
-  await user.click(screen.getByRole("button", { name: "Fill the form: Jewellery Sales Pipeline" }));
+  await user.click(screen.getByRole("button", { name: "Fill the form" }));
   expect(within(screen.getByRole("dialog")).getByText("Client Connected?")).toBeTruthy();
 });
 

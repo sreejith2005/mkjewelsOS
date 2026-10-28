@@ -21,7 +21,7 @@ export function fmsStageCompletionChecklist(input: FmsStageRequirementInput): re
   const items: FmsStageRequirement[] = [];
   if (input.formRequired) items.push({ key: "form", label: input.formName ? `Fill and submit the form "${input.formName}"` : "Fill and submit the stage form", done: input.formSubmitted });
   if (input.requiredChecklistTotal > 0) items.push({ key: "checklist", label: input.requiredChecklistOpen > 0 ? `Tick the required checklist items (${input.requiredChecklistOpen} left)` : "Tick the required checklist items", done: input.requiredChecklistOpen === 0 });
-  if (input.evidenceRequired) items.push({ key: "evidence", label: "Upload the evidence file (photo or PDF)", done: input.evidenceCount > 0 });
+  if (input.evidenceRequired) items.push({ key: "evidence", label: "Upload a photo or PDF", done: input.evidenceCount > 0 });
   if (input.decisionRequired) items.push({ key: "decision", label: "Choose a decision", done: input.decisionChosen });
   if (input.remarkRequired) items.push({ key: "remark", label: "Write a remark", done: input.remarkProvided });
   if (input.nextAssigneeRequired) items.push({ key: "next_assignee", label: "Choose who does the next step", done: input.nextAssigneeChosen });

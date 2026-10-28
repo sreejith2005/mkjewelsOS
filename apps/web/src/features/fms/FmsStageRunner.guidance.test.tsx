@@ -38,8 +38,24 @@ it("leads with the form when the stage needs one, instead of a disabled Complete
   const formStage = { ...decisionStage, planned_time_rule: { completionFormRequired: true }, requires_remark: false, form_template_id: "form-1" } as unknown as Props["definition"];
   const form = { id: "form-1", name: "Call report", description: null, version: 2, sections: [], fields: [] } as unknown as Props["forms"][number];
   render(<FmsStageRunner {...props} definition={formStage} definitions={[{ ...formStage, id: "initial", stage_key: "initial", sort_order: 0 }, formStage]} forms={[form]} />);
-  expect(screen.getByRole("button", { name: "Fill the form: Call report" })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Complete stage" })).toBeNull();
-  expect(screen.getByText('Fill and submit the form "Call report"')).toBeTruthy();
-  expect(screen.getByText(/Submitting the form also completes this step/)).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Fill the form" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Mark as done" })).toBeNull();
+  // The button already says to fill the form, so the list does not repeat it.
+  expect(screen.queryByText('Fill and submit the form "Call report"')).toBeNull();
+  expect(screen.queryByText(/Submitting the form also completes this step/)).toBeNull();
+});
+
+it("has no claim button, outcome box or optional remark box", () => {
+  const plain = { ...decisionStage, planned_time_rule: {}, requires_remark: false, form_template_id: null } as unknown as Props["definition"];
+  render(<FmsStageRunner {...props} definition={plain} definitions={[{ ...plain, id: "initial", stage_key: "initial", sort_order: 0 }, plain]} />);
+  expect(screen.queryByRole("button", { name: /claim/i })).toBeNull();
+  expect(screen.queryByText(/Outcome/)).toBeNull();
+  expect(screen.queryByText(/Remark/)).toBeNull();
+  expect(screen.getByRole("button", { name: "Mark as done" })).toBeTruthy();
+});
+
+it("shows the remark box only when the step requires one", () => {
+  const remarkStage = { ...decisionStage, planned_time_rule: {}, requires_remark: true, form_template_id: null } as unknown as Props["definition"];
+  render(<FmsStageRunner {...props} definition={remarkStage} definitions={[{ ...remarkStage, id: "initial", stage_key: "initial", sort_order: 0 }, remarkStage]} />);
+  expect(screen.getByLabelText("Remark *")).toBeTruthy();
 });

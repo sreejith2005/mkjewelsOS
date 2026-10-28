@@ -31,12 +31,12 @@ it.each(["awaiting_approval", "awaiting_other_doers"] as const)("retains approva
   render(<FmsStageRunner {...props} />);
   expect(screen.getByRole("button", { name: "Approve" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Reject" })).toBeTruthy();
-  expect(screen.getByRole("heading", { name: "Form submitted successfully" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Submitted" })).toBeTruthy();
 });
 it("replaces completed stage controls once successors are activated", () => {
   outcome.value = { state: "successors_activated", submissionId: "saved", instanceId: "instance", referenceNumber: "FMS-41", sourceInstanceStageId: "visit", destinations: [], ownWorkTargets: [] };
   render(<FmsStageRunner {...props} />);
   expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
   expect(screen.queryByText("Stage is not actionable for this user")).toBeNull();
-  expect(screen.getByRole("heading", { name: "Form submitted successfully" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Submitted" })).toBeTruthy();
 });
