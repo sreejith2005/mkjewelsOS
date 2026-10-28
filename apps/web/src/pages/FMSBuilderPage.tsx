@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, GitBranch, ListChecks, Pause, Pencil, Play, Plus, RotateCcw, Search, Settings2, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, GitBranch, ListChecks, Pause, Pencil, Play, Plus, RotateCcw, Search, Settings2, Trash2 } from "lucide-react";
 import { useAuth } from "@/auth/AuthContext";
-import { Button, Modal, Notice } from "@/components/ui";
+import { Button, Notice } from "@/components/ui";
 import { flowToDefinition } from "@/features/fms/definition";
 import { loadFmsAiSettings, type FmsAiSettings } from "@/features/fms/ai/api";
-import { FmsAiPanel } from "@/features/fms/ai/FmsAiPanel";
 import { FmsAiSettingsDialog } from "@/features/fms/ai/FmsAiSettingsDialog";
 import {
   deleteFmsFlow,
@@ -59,10 +58,6 @@ export function FMSBuilderPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   // The assistant is optional: its settings read as "all off" on any error.
   const [aiSettings, setAiSettings] = useState<FmsAiSettings | null>(null);
-  const [startWithAi, setStartWithAi] = useState(false);
-  const [choosingStart, setChoosingStart] = useState(false);
-  const [aiFamily, setAiFamily] = useState<FlowFamily | null>(null);
-  const [aiSelectedKey, setAiSelectedKey] = useState<string | null>(null);
   const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
   useEffect(() => { if (canManage) void loadFmsAiSettings().then(setAiSettings); }, [canManage]);
 
@@ -140,8 +135,6 @@ export function FMSBuilderPage() {
     void run(flow.id, () => setFmsFlowActive(flow.id, !flow.is_active));
   };
 
-  const runCandidatesFor = (flowIds: readonly string[]) => (runtime?.instances ?? []).filter((instance) => flowIds.includes(instance.fms_flow_id))
-    .slice(0, 50).map((instance) => ({ id: instance.id, label: `${instance.reference_number} · ${instance.status.replaceAll("_", " ")}${instance.started_at ? ` · ${new Date(instance.started_at).toLocaleDateString()}` : ""}` }));
   const publishedFor = (flow: FmsFlowRow | null) => {
     if (!flow || !data) return null;
     const published = data.flows.find((item) => item.family_id === flow.family_id && item.status === "published" && item.id !== flow.id);
@@ -152,26 +145,10 @@ export function FMSBuilderPage() {
   if (edit !== undefined && data) return (
     <section>
       {/* The builder carries its own Back to FMS control in its toolbar and details screen. */}
-      <FmsFlowBuilder data={data} flow={edit} canManageForms={hasPermission(access, "forms.manage")} onClose={() => { setEdit(undefined); setStartWithAi(false); }} onSaved={refresh}
-        {...(aiSettings && aiEnabled ? { ai: { settings: aiSettings, startWithAi, published: publishedFor(edit), runCandidates: edit ? runCandidatesFor(families.find((family) => family.key === edit.family_id)?.flowIds ?? [edit.id]) : [] } } : {})} />
+      <FmsFlowBuilder data={data} flow={edit} canManageForms={hasPermission(access, "forms.manage")} onClose={() => setEdit(undefined)} onSaved={refresh}
+        {...(aiSettings && aiEnabled ? { ai: { settings: aiSettings, published: publishedFor(edit) } } : {})} />
     </section>
   );
-
-  // Read-only assistant on a live workflow: debugging never edits a published version.
-  if (aiFamily && data && aiSettings) {
-    const flow = aiFamily.primary;
-    const definition = flowToDefinition(flow, data);
-    const draft = aiFamily.versions.find((item) => item.status === "draft");
-    return (
-      <section className="mx-auto w-full max-w-7xl space-y-4 md:pr-[min(34rem,45vw)]">
-        <Button onClick={() => { setAiFamily(null); setAiSelectedKey(null); }} variant="ghost"><ArrowLeft className="size-4" />Back to FMS</Button>
-        <header><h2 className="text-xl font-semibold text-white">{flow.name}</h2><p className="text-sm text-soft-grey">v{flow.version} · {flowState(flow)} · read-only. Fixes are applied in a new draft version.</p></header>
-        <ol aria-label="Workflow steps" className="space-y-2">{definition.stages.map((stage, index) => <li key={stage.key}><button className={`w-full rounded-xl border p-3 text-left text-sm ${aiSelectedKey === stage.key ? "border-gold bg-gold/10" : "border-gold/15 bg-charcoal"}`} onClick={() => setAiSelectedKey(stage.key)} type="button"><b className="text-white">{index + 1}. {stage.name}</b> <span className="text-xs text-soft-grey">{stage.type.replaceAll("_", " ")}</span></button></li>)}</ol>
-        <FmsAiPanel data={data} definition={definition} initialTab="ask" onClose={() => { setAiFamily(null); setAiSelectedKey(null); }} onCreateRevision={() => { setAiFamily(null); if (draft) setEdit(draft); else void revise(flow); }}
-          onGoToStage={(key) => setAiSelectedKey(key)} published={null} readOnly runCandidates={runCandidatesFor(aiFamily.flowIds)} selectedStageKey={aiSelectedKey} settings={aiSettings} />
-      </section>
-    );
-  }
 
   if (tasksFor) return (
     <section className="mx-auto w-full max-w-7xl space-y-4">
@@ -194,16 +171,10 @@ export function FMSBuilderPage() {
           </div>
         </div>
         {canManage ? <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-          {aiSettings?.canConfigure ? <Button aria-label="FMS assistant settings" onClick={() => setAiSettingsOpen(true)} variant="secondary"><Settings2 className="size-4" /><span className="hidden sm:inline">Assistant</span></Button> : null}
-          <Button className="flex-1 sm:flex-none" onClick={() => { if (aiSettings?.builderEnabled) setChoosingStart(true); else setEdit(null); }}><Plus className="size-4" />New workflow</Button>
+          {aiSettings?.canConfigure ? <Button aria-label="AI assistant settings" onClick={() => setAiSettingsOpen(true)} variant="secondary"><Settings2 className="size-4" /><span className="hidden sm:inline">AI assistant</span></Button> : null}
+          <Button className="flex-1 sm:flex-none" onClick={() => setEdit(null)}><Plus className="size-4" />New workflow</Button>
         </div> : null}
       </header>
-      {choosingStart ? <Modal onClose={() => setChoosingStart(false)} title="New workflow">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <button className="rounded-2xl border border-gold/40 bg-gold/10 p-4 text-left hover:bg-gold/20" onClick={() => { setChoosingStart(false); setStartWithAi(true); setEdit(null); }} type="button"><Sparkles className="mb-2 size-5 text-gold-secondary" /><b className="block text-white">Build with AI</b><span className="text-xs text-soft-grey">Describe the process; review the proposed steps before anything is added.</span></button>
-          <button className="rounded-2xl border border-gold/20 bg-charcoal p-4 text-left hover:border-gold" onClick={() => { setChoosingStart(false); setStartWithAi(false); setEdit(null); }} type="button"><Plus className="mb-2 size-5 text-champagne" /><b className="block text-white">Build manually</b><span className="text-xs text-soft-grey">Name the workflow and add steps yourself.</span></button>
-        </div>
-      </Modal> : null}
       {aiSettingsOpen && aiSettings ? <FmsAiSettingsDialog onClose={() => setAiSettingsOpen(false)} onSaved={setAiSettings} settings={aiSettings} /> : null}
 
       <label className="relative block">
@@ -252,7 +223,6 @@ export function FMSBuilderPage() {
                   <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
 
                     <Button onClick={() => setTasksFor(family)} variant="secondary"><ListChecks className="size-4" />Tasks{counts.mine ? ` (${counts.mine})` : ""}</Button>
-                    {canManage && aiSettings?.debuggerEnabled ? <Button onClick={() => setAiFamily(family)} variant="secondary"><Sparkles className="size-4" />Ask AI</Button> : null}
                     {canManage && draft ? <Button disabled={busy} onClick={() => setEdit(draft)} variant="secondary"><Pencil className="size-4" />Edit draft</Button> : null}
                     {canManage && !draft && flow.status !== "draft" ? <Button disabled={busy} onClick={() => void revise(flow)} variant="secondary"><Pencil className="size-4" />New version</Button> : null}
                     {canManage && flow.status === "published" ? <Button disabled={busy} onClick={() => toggleActive(flow)} variant="secondary">{flow.is_active ? <><Pause className="size-4" />Pause</> : <><Play className="size-4" />Resume</>}</Button> : null}

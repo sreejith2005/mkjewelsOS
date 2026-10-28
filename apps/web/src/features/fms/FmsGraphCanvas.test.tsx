@@ -192,6 +192,18 @@ describe("FMS canvas navigation and selection", () => {
     expect(input.onMove).toHaveBeenCalledWith({ start: { x: 120, y: 160 } });
   });
 
+  it("lets a card go past the left edge: the layout and camera shift together, so nothing jumps", () => {
+    const input = props();
+    const { container } = render(<FmsGraphCanvas {...input} />);
+    const before = camera(container);
+    const card = container.querySelector<HTMLElement>('[data-node-key="start"]')!;
+    drag(card, { x: 100, y: 140 }, { x: 0, y: 100 });
+    // Start would land at x -60; every card moves right by 60 so saved positions stay >= 0.
+    expect(input.onMove).toHaveBeenCalledOnce();
+    expect(input.onMove).toHaveBeenCalledWith({ start: { x: 0, y: 60 }, follow: { x: 560, y: 100 } });
+    expect(camera(container)).toEqual({ ...before, x: before.x - 60 });
+  });
+
   it("moves every selected step together, keeping their spacing, in one change", () => {
     const input = props();
     const { container } = render(<FmsGraphCanvas {...input} selectedKeys={["start", "follow"]} />);

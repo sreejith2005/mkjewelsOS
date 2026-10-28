@@ -1,7 +1,7 @@
 import { supabase } from "@jewelos/api-client";
 import {
-  FMS_AI_SCHEMA_VERSION, parseFmsRunSnapshot,
-  type FmsAiErrorCode, type FmsAiRequest, type FmsAiResponse, type FmsRunSnapshot,
+  FMS_AI_SCHEMA_VERSION,
+  type FmsAiErrorCode, type FmsAiRequest, type FmsAiResponse,
 } from "@jewelos/core";
 
 export type FmsAiSettings = Readonly<{
@@ -36,15 +36,6 @@ export async function saveFmsAiSettings(input: Readonly<{ debuggerEnabled: boole
   const { data, error } = await supabase.rpc("set_fms_ai_settings_with_audit", { p_debugger: input.debuggerEnabled, p_builder: input.builderEnabled, p_run_diagnosis: input.runDiagnosisEnabled, p_user_daily_limit: input.userDailyLimit });
   if (error) throw new Error(error.code === "42501" ? "Only organization administrators can change the FMS assistant." : "Could not save the FMS assistant settings.");
   return parseSettings(data);
-}
-
-/** The bounded, redacted run record used by "Diagnose run". No model is involved. */
-export async function loadFmsRunSnapshot(instanceId: string): Promise<FmsRunSnapshot> {
-  const { data, error } = await supabase.rpc("get_fms_run_diagnostic_snapshot", { p_instance_id: instanceId });
-  if (error) throw new Error(error.message === "fms_ai_disabled" ? "Run diagnosis is switched off for your organization." : error.code === "42501" ? "That run is not one you can inspect." : "Could not load the run.");
-  const snapshot = parseFmsRunSnapshot(data);
-  if (!snapshot) throw new Error("The run record could not be read.");
-  return snapshot;
 }
 
 export class FmsAiCallError extends Error {

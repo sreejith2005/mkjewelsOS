@@ -3,7 +3,7 @@ import { CheckSquare, CircleHelp, ClipboardPaste, Copy, CopyPlus, FileText, Flag
 import { FMS_MIN_ZOOM as MIN_ZOOM, FMS_MAX_ZOOM as MAX_ZOOM, fmsWheelZoomFactor, routeFmsGraphEdges, fmsOutgoingStageKeys, hasFmsStageRouting, zoomFmsViewport, type FmsFlowDefinition, type FmsFormFieldRef, type FmsStageDefinition, type FmsViewport } from "@jewelos/core";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
-import { fmsGraphEdges, fmsStageSummary, fmsTimingSummary, layoutFmsDefinition, type FmsGraphEdge, type FmsGraphPosition } from "./graph";
+import { fmsCanvasOvershoot, fmsGraphEdges, fmsStageSummary, fmsTimingSummary, layoutFmsDefinition, type FmsGraphEdge, type FmsGraphPosition } from "./graph";
 import { fmsShortcutContext } from "./shortcuts";
 
 const NODE_WIDTH = 208;
@@ -136,7 +136,8 @@ export const FmsGraphCanvas = forwardRef<FmsCanvasHandle, CanvasProps>(function 
   const position = useCallback((key: string): FmsGraphPosition => {
     const base = saved.get(key) ?? layout.get(key) ?? { x: 60, y: 60 };
     const offset = offsets[key] ?? { x: 0, y: 0 };
-    return { x: Math.max(0, base.x + offset.x), y: Math.max(0, base.y + offset.y) };
+    // A card being dragged may go past the left or top edge; the drop shifts the layout back (see endPointer).
+    return { x: base.x + offset.x, y: base.y + offset.y };
   }, [layout, offsets, saved]);
 
   const positionMap = useMemo(() => new Map(definition.stages.map((stage) => [stage.key, position(stage.key)])), [definition.stages, position]);
@@ -423,7 +424,7 @@ export const FmsGraphCanvas = forwardRef<FmsCanvasHandle, CanvasProps>(function 
       for (const key of drag.keys) {
         const base = saved.get(key) ?? layout.get(key) ?? { x: 60, y: 60 };
         const origin = drag.origins.get(key) ?? base;
-        next[key] = { x: Math.max(0, origin.x + dx) - base.x, y: Math.max(0, origin.y + dy) - base.y };
+        next[key] = { x: origin.x + dx - base.x, y: origin.y + dy - base.y };
       }
       return next;
     });
@@ -499,7 +500,15 @@ export const FmsGraphCanvas = forwardRef<FmsCanvasHandle, CanvasProps>(function 
     // One commit (one undo step) for the whole group, at its final resting place.
     const world = toWorld(event.clientX, event.clientY);
     const dx = world.x - drag.worldX; const dy = world.y - drag.worldY;
-    actions.current.onMove(Object.fromEntries(drag.keys.map((key) => { const origin = drag.origins.get(key) ?? position(key); return [key, { x: Math.max(0, Math.round(origin.x + dx)), y: Math.max(0, Math.round(origin.y + dy)) }]; })));
+    const moved = Object.fromEntries(drag.keys.map((key) => { const origin = drag.origins.get(key) ?? position(key); return [key, { x: Math.round(origin.x + dx), y: Math.round(origin.y + dy) }]; }));
+    // Saved positions cannot be negative, so a drop past the left or top edge
+    // moves every card by the overshoot and the camera by the same amount:
+    // nothing jumps on screen and the canvas has no wall.
+    const shift = fmsCanvasOvershoot(Object.values(moved));
+    if (shift.x || shift.y) {
+      actions.current.onMove(Object.fromEntries(definition.stages.map((stage) => { const point = moved[stage.key] ?? position(stage.key); return [stage.key, { x: point.x + shift.x, y: point.y + shift.y }]; })));
+      setCamera((current) => ({ ...current, x: current.x - shift.x * current.zoom, y: current.y - shift.y * current.zoom }));
+    } else actions.current.onMove(moved);
     setOffsets((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !drag.keys.includes(key))));
   };
 
@@ -586,8 +595,9 @@ export const FmsGraphCanvas = forwardRef<FmsCanvasHandle, CanvasProps>(function 
       <button className="shrink-0 rounded px-1.5 font-semibold text-gold-secondary hover:bg-gold/10" onClick={dismissTip} type="button">Got it</button>
     </div> : null}
 
-    <div className={cn("absolute inset-0 overflow-hidden", canvasCursor)}>
-      <div className="absolute origin-top-left bg-[radial-gradient(circle_at_1px_1px,rgba(217,184,117,0.16)_1px,transparent_0)] bg-[size:22px_22px]" style={{ height: worldHeight, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, width: worldWidth }}>
+    {/* The dot grid belongs to the viewport and follows pan and zoom, so it never ends at an edge. */}
+    <div className={cn("absolute inset-0 overflow-hidden bg-[radial-gradient(circle_at_1px_1px,rgba(217,184,117,0.16)_1px,transparent_0)]", canvasCursor)} style={{ backgroundPosition: `${pan.x}px ${pan.y}px`, backgroundSize: `${22 * zoom}px ${22 * zoom}px` }}>
+      <div className="absolute origin-top-left" style={{ height: worldHeight, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, width: worldWidth }}>
         <svg className="pointer-events-none absolute inset-0" height={worldHeight - Math.min(0, ...routedEdges.map((edge) => edge.bounds.top - 40))} width={worldWidth - Math.min(0, ...routedEdges.map((edge) => edge.bounds.left - 40))} style={{ overflow: "visible" }}>
           <defs><marker id="fms-arrow" markerHeight="7" markerWidth="7" orient="auto" refX="6" refY="3.5"><path d="M0,0 L0,7 L7,3.5 z" fill="currentColor" /></marker></defs>
           {edges.map((edge) => {

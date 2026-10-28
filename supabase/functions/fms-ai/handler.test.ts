@@ -3,6 +3,7 @@ import { builtinAccessContext } from "../../../packages/core/src/permissions/res
 import { DEFAULT_SECTION_AVAILABILITY } from "../../../packages/core/src/settings/sectionAvailability.ts";
 import { applyFmsAiOperations, fmsAiIdFactory } from "../../../packages/core/src/fms/aiOperations.ts";
 import { fmsDefinitionFingerprint } from "../../../packages/core/src/fms/definitionDiff.ts";
+import { fmsAiSystemPrompt } from "../../../packages/core/src/fms/aiContext.ts";
 import type { FmsAiErrorBody, FmsAiResponse } from "../../../packages/core/src/fms/aiContract.ts";
 import type { FmsAiActor } from "./catalog.ts";
 import { DEFAULT_FMS_AI_CONFIG, handleFmsAiTurn, type FmsAiDeps } from "./handler.ts";
@@ -197,10 +198,20 @@ Deno.test("run diagnosis needs an explicit run and is refused when the database 
   assertStringIncludes(seen[0]!.turns.at(-1)!.text, "\"observations\"");
 });
 
-Deno.test("the model request uses structured output, adaptive thinking, refusal fallback and a cached system prompt", () => {
-  const params = buildModelParams("claude-opus-5-5", "medium", 16000, "SYSTEM", [{ role: "user", text: "hi" }]);
-  assertEquals(params.output_config?.format?.type, "json_schema");
+Deno.test("the model request uses adaptive thinking, refusal fallback and a cached system prompt, without a structured-output format", () => {
+  const params = buildModelParams("claude-opus-5-5", "medium", 16000, fmsAiSystemPrompt(), [{ role: "user", text: "hi" }]);
+  // The reply schema is too large for structured output (the API rejected it), so it is not sent as a format.
+  assertEquals(params.output_config?.format, undefined);
+  assertStringIncludes(JSON.stringify(params.system), "Reply format");
   assertEquals(params.thinking, { type: "adaptive" });
   assertEquals(params.fallbacks, "default");
   assertEquals(params.stream, false);
+});
+
+Deno.test("one assistant: a build-or-check request uses the same prompt, and a fenced JSON reply is accepted", async () => {
+  const { model, seen } = fakeModel(["```json\n" + reply({ kind: "proposal", message: "Built it.", operations: buildOps }) + "\n```"]);
+  const result = await handleFmsAiTurn("t", body({ question: "Build a stock request workflow and check it for problems" }), deps(fakeActor().actor, model));
+  assertEquals(result.status, 200);
+  assertEquals((result.body as FmsAiResponse).kind, "proposal");
+  assertEquals(seen[0]!.system, fmsAiSystemPrompt());
 });

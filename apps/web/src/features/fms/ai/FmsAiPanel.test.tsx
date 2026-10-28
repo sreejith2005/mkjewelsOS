@@ -8,8 +8,8 @@ import { fmsAiCatalogFromData } from "./catalog";
 import { FmsAiPanel, type FmsAiPanelProps } from "./FmsAiPanel";
 import { FmsAiCallError, type FmsAiSettings } from "./api";
 
-const mocks = vi.hoisted(() => ({ askFmsAi: vi.fn(), loadFmsRunSnapshot: vi.fn(), saveDraft: vi.fn() }));
-vi.mock("./api", async (importOriginal) => ({ ...(await importOriginal<typeof import("./api")>()), askFmsAi: mocks.askFmsAi, loadFmsRunSnapshot: mocks.loadFmsRunSnapshot }));
+const mocks = vi.hoisted(() => ({ askFmsAi: vi.fn(), saveDraft: vi.fn() }));
+vi.mock("./api", async (importOriginal) => ({ ...(await importOriginal<typeof import("./api")>()), askFmsAi: mocks.askFmsAi }));
 vi.mock("@/features/forms/api", () => ({ saveDraft: mocks.saveDraft }));
 
 const FORM = "00000000-0000-4000-8000-000000000001";
@@ -42,36 +42,32 @@ function proposalFor(request: FmsAiRequest, operations = plan): FmsAiResponse {
 
 function renderPanel(props: Partial<FmsAiPanelProps> = {}) {
   const onApply = vi.fn(); const onGoToStage = vi.fn();
-  const view = render(<FmsAiPanel data={data} definition={empty} onApply={onApply} onClose={() => undefined} onGoToStage={onGoToStage} published={null} readOnly={false} selectedStageKey={null} settings={on} {...props} />);
+  const view = render(<FmsAiPanel data={data} definition={empty} onApply={onApply} onClose={() => undefined} onGoToStage={onGoToStage} published={null} selectedStageKey={null} settings={on} {...props} />);
   return { onApply, onGoToStage, view, user: userEvent.setup() };
 }
+const ask = async (user: ReturnType<typeof userEvent.setup>, text: string) => {
+  await user.type(screen.getByLabelText("Message the AI assistant"), text);
+  await user.click(screen.getByRole("button", { name: "Send" }));
+};
 
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
-describe("FMS assistant panel", () => {
-  it("shows only the tools that are switched on, and the deterministic check needs no AI", () => {
-    renderPanel({ settings: { ...on, debuggerEnabled: false, builderEnabled: false, runDiagnosisEnabled: false } });
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Check (2)"]);
-    expect(screen.getByText("A flow must contain at least one stage")).toBeTruthy();
+describe("FMS AI assistant panel (one chat for build, check and debug)", () => {
+  it("has one message box and no separate Check / Ask / Build / Run sections", () => {
+    renderPanel();
+    expect(screen.queryAllByRole("tab")).toHaveLength(0);
+    expect(screen.getByLabelText("Message the AI assistant")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Check this workflow for problems/ })).toBeTruthy();
     expect(mocks.askFmsAi).not.toHaveBeenCalled();
-  });
-
-  it("navigates to the step of a finding", async () => {
-    const definition: FmsFlowDefinition = { ...empty, name: "X", stages: [{ key: "start", name: "Start", type: "task", order: 0, required: true, completionRule: "any_doer", allowMultipleDoers: false, requiresUpload: false, requiresRemark: false, checklist: [], assigneeRules: [], requiresNextDoerHandoff: false, canMoveBackward: false, canReject: false, canRequestRevision: false, canEscalate: false, branchRules: [], parallelTargetStageKeys: [], joinRequiredStageKeys: [], sla: { dueDate: "" } }] };
-    const { user, onGoToStage } = renderPanel({ definition });
-    const finding = screen.getByText("The first stage must be a Form").closest("li")!;
-    await user.click(within(finding).getByRole("button", { name: /Go to step/ }));
-    expect(onGoToStage).toHaveBeenCalledWith("start", expect.objectContaining({ code: "first_stage_must_be_form", source: "validator" }));
   });
 
   it("builds from plain English: review shows the diff, Apply commits exactly once", async () => {
     mocks.askFmsAi.mockImplementation((request: FmsAiRequest) => Promise.resolve(proposalFor(request)));
-    const { user, onApply } = renderPanel({ initialTab: "build" });
-    await user.type(screen.getByLabelText("Describe the workflow or change"), "Stock requests go to Neha who checks within 4 hours");
-    await user.click(screen.getByRole("button", { name: "Send" }));
-    const review = await screen.findByRole("region", { name: "Review: Review the proposed workflow" });
+    const { user, onApply } = renderPanel();
+    await ask(user, "Stock requests go to Neha who checks within 4 hours");
+    const review = await screen.findByRole("region", { name: "Review: Review the changes" });
     expect(within(review).getByText(/Add Check stock/)).toBeTruthy();
-    expect(mocks.askFmsAi.mock.calls[0]![0]).toMatchObject({ mode: "build", includeRunData: false, readOnly: false, baseFingerprint: fmsDefinitionFingerprint(empty) });
+    expect(mocks.askFmsAi.mock.calls[0]![0]).toMatchObject({ mode: "build", includeRunData: false, instanceId: null, readOnly: false, baseFingerprint: fmsDefinitionFingerprint(empty) });
     await user.click(within(review).getByRole("button", { name: "Apply to editor" }));
     expect(onApply).toHaveBeenCalledTimes(1);
     expect((onApply.mock.calls[0]![0] as FmsFlowDefinition).stages.map((stage) => stage.key)).toEqual(["request", "check"]);
@@ -79,15 +75,34 @@ describe("FMS assistant panel", () => {
     expect(within(review).getByText(/Use Undo to revert/)).toBeTruthy();
   });
 
+  it("answers a check question in the same chat and can apply its suggested fix", async () => {
+    mocks.askFmsAi.mockImplementation((request: FmsAiRequest) => Promise.resolve({ ...proposalFor(request), kind: "explanation", message: "The workflow has no steps.", operations: [], proposedFingerprint: null, suggestedFixes: [{ title: "Add the steps", stageKey: null, steps: ["Add a request form"], operations: plan }] }));
+    const { user, onApply } = renderPanel();
+    await ask(user, "Is anything wrong with this workflow?");
+    expect(await screen.findByText("The workflow has no steps.")).toBeTruthy();
+    const fix = await screen.findByRole("region", { name: "Review: Preview this fix" });
+    await user.click(within(fix).getByRole("button", { name: "Apply to editor" }));
+    expect(onApply).toHaveBeenCalledTimes(1);
+  });
+
+  it("with only the check switch on, it answers but never applies edits", async () => {
+    mocks.askFmsAi.mockImplementation((request: FmsAiRequest) => Promise.resolve(proposalFor(request)));
+    const { user, onApply } = renderPanel({ settings: { ...on, builderEnabled: false } });
+    await ask(user, "Build it");
+    expect(mocks.askFmsAi.mock.calls[0]![0]).toMatchObject({ mode: "debug", readOnly: true });
+    expect(await screen.findByText(/This version is read-only/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Apply to editor" })).toBeNull();
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
   it("refuses to apply over edits made while the assistant was working", async () => {
     let resolve: (value: FmsAiResponse) => void = () => undefined;
     mocks.askFmsAi.mockImplementation((request: FmsAiRequest) => new Promise<FmsAiResponse>((done) => { resolve = () => done(proposalFor(request)); }));
-    const { user, view, onApply } = renderPanel({ initialTab: "build" });
-    await user.type(screen.getByLabelText("Describe the workflow or change"), "Build it");
-    await user.click(screen.getByRole("button", { name: "Send" }));
-    view.rerender(<FmsAiPanel data={data} definition={{ ...empty, name: "Edited meanwhile" }} onApply={onApply} onClose={() => undefined} onGoToStage={() => undefined} published={null} readOnly={false} selectedStageKey={null} settings={on} initialTab="build" />);
+    const { user, view, onApply } = renderPanel();
+    await ask(user, "Build it");
+    view.rerender(<FmsAiPanel data={data} definition={{ ...empty, name: "Edited meanwhile" }} onApply={onApply} onClose={() => undefined} onGoToStage={() => undefined} published={null} selectedStageKey={null} settings={on} />);
     resolve(undefined as never);
-    const review = await screen.findByRole("region", { name: "Review: Review the proposed workflow" });
+    const review = await screen.findByRole("region", { name: "Review: Review the changes" });
     expect(within(review).getByText(/You changed the workflow after asking/)).toBeTruthy();
     expect((within(review).getByRole("button", { name: "Apply to editor" }) as HTMLButtonElement).disabled).toBe(true);
     expect(onApply).not.toHaveBeenCalled();
@@ -95,49 +110,22 @@ describe("FMS assistant panel", () => {
 
   it("rejects a reply whose compiled result differs from what the browser compiles", async () => {
     mocks.askFmsAi.mockImplementation((request: FmsAiRequest) => Promise.resolve({ ...proposalFor(request), proposedFingerprint: "fms1-0000000000000000" }));
-    const { user } = renderPanel({ initialTab: "build" });
-    await user.type(screen.getByLabelText("Describe the workflow or change"), "Build it");
-    await user.click(screen.getByRole("button", { name: "Send" }));
-    const review = await screen.findByRole("region", { name: "Review: Review the proposed workflow" });
+    const { user } = renderPanel();
+    await ask(user, "Build it");
+    const review = await screen.findByRole("region", { name: "Review: Review the changes" });
     expect(within(review).getByText(/no longer matches the Forms or people/)).toBeTruthy();
     expect((within(review).getByRole("button", { name: "Apply to editor" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("in read-only (published) mode offers a new version instead of applying", async () => {
-    const onCreateRevision = vi.fn();
-    mocks.askFmsAi.mockImplementation((request: FmsAiRequest) => Promise.resolve({ ...proposalFor(request), kind: "explanation", operations: [], proposedFingerprint: null, suggestedFixes: [{ title: "Add a check step", stageKey: null, steps: ["Add a step"], operations: plan }] }));
-    const { user } = renderPanel({ readOnly: true, onApply: undefined, onCreateRevision, initialTab: "ask" });
-    expect(screen.queryByRole("tab", { name: "Build" })).toBeNull();
-    await user.type(screen.getByLabelText("Ask the FMS assistant"), "Is any path missing a fallback?");
-    await user.click(screen.getByRole("button", { name: "Send" }));
-    await user.click(await screen.findByRole("button", { name: /Create a new version to apply this/ }));
-    expect(onCreateRevision).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole("button", { name: "Apply to editor" })).toBeNull();
-  });
-
-  it("cancels an in-flight request without changing anything", async () => {
+  it("shows the server's error message and cancels an in-flight request without changing anything", async () => {
+    mocks.askFmsAi.mockRejectedValueOnce(new FmsAiCallError("rate_limited", "You have reached the daily limit. Manual editing still works."));
+    const { user, onApply } = renderPanel();
+    await ask(user, "Why is this step blocked?");
+    expect(await screen.findByText(/reached the daily limit/)).toBeTruthy();
     mocks.askFmsAi.mockImplementation((_request: FmsAiRequest, signal: AbortSignal) => new Promise((_done, fail) => signal.addEventListener("abort", () => fail(new FmsAiCallError("cancelled", "Cancelled.")))));
-    const { user, onApply } = renderPanel({ initialTab: "ask" });
-    await user.type(screen.getByLabelText("Ask the FMS assistant"), "Why is this step blocked?");
-    await user.click(screen.getByRole("button", { name: "Send" }));
+    await ask(user, "Why is this step blocked?");
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(await screen.findByText(/Nothing was changed/)).toBeTruthy();
     expect(onApply).not.toHaveBeenCalled();
-  });
-
-  it("sends run records only after explicit consent", async () => {
-    const runId = "00000000-0000-4000-8000-0000000000bb";
-    mocks.loadFmsRunSnapshot.mockResolvedValue({ generatedAt: "", instance: { id: runId, referenceNumber: "FMS-9", status: "active", flowId: "f", flowVersion: 1, assignmentVersion: 2, executionVersion: 2, startedAt: null, completedAt: null, startedBy: null, held: false, cancelled: false }, flow: { id: "f", name: "Stock", version: 1, status: "published" }, stages: [], assignmentDecisions: [], logs: [], pendingRequests: [], diagnosticEvents: [], routeAnswers: [], people: [], truncated: [], redacted: ["remarks"], absent: [], diagnosticHistorySince: null });
-    mocks.askFmsAi.mockImplementation((request: FmsAiRequest) => Promise.resolve({ ...proposalFor(request), kind: "explanation", operations: [], proposedFingerprint: null }));
-    const { user } = renderPanel({ initialTab: "run", runCandidates: [{ id: runId, label: "FMS-9 · active" }] });
-    await user.selectOptions(screen.getByLabelText("Run to diagnose"), runId);
-    expect(await screen.findByText("The run is active but no step is open")).toBeTruthy();
-    await user.type(screen.getByLabelText("Ask the FMS assistant"), "Why is it stuck?");
-    await user.click(screen.getByRole("button", { name: "Send" }));
-    expect(mocks.askFmsAi.mock.calls[0]![0]).toMatchObject({ includeRunData: false, instanceId: null });
-    await user.click(screen.getByRole("checkbox", { name: /Include this run's records/ }));
-    await user.type(screen.getByLabelText("Ask the FMS assistant"), "And now?");
-    await user.click(screen.getByRole("button", { name: "Send" }));
-    expect(mocks.askFmsAi.mock.calls[1]![0]).toMatchObject({ includeRunData: true, instanceId: runId });
   });
 });

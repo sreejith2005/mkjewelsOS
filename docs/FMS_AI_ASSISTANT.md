@@ -1,5 +1,24 @@
 # FMS assistant: AI debugger and AI workflow builder
 
+**Update 2026-10-28 (owner request): one assistant, one chat.** The Check /
+Ask / Build / Run tabs, the **Build with AI** start choice and the **Ask AI**
+button on workflow cards are gone. Inside the builder, **AI assistant** opens a
+single chat that builds, changes, checks, fixes or explains the workflow; the
+model decides from the message (`FMS_AI_ASSISTANT_PROMPT`). The request `mode`
+now only says whether edits may be proposed (`build`, needs `builder_enabled`)
+or not (`debug`). Administrators get one switch (**Turn on the AI assistant**),
+which sets `debugger_enabled` and `builder_enabled` together and
+`run_diagnosis_enabled` off; the run-snapshot RPC stays in the database unused.
+No migration. The sections below describe the original 2026-10-23 design.
+
+Production bug fixed at the same time: every request failed with "The FMS
+assistant is unavailable right now" because the reply schema was sent as
+structured output (`output_config.format`) and has more than the API's limit
+of 16 union-typed (nullable) fields, so Claude's API rejected it ("Schema is
+too complex"). The schema is now in the system prompt, the reply is parsed and
+repaired by the existing contract code, and `fms_ai_turn_failed` logs a
+`detail` (provider status and error type only) for future diagnosis.
+
 Status (2026-10-23): implemented on branch `feat/fms-ai-builder-debugger`, not
 deployed. Migration `0344_fms_ai_assistant.sql`, Edge Function `fms-ai`. Ships
 dark: every capability is off until an administrator switches it on.
