@@ -129,10 +129,13 @@ who build workflows, the designs.
 - [ ] Record a walk-in or follow-up: use the walk-in and follow-up screens in CRM.
 
 ## Dropdown Master
-**What it is:** the shared option lists used across JewelOS.
-- [ ] Add an option: open the list, press **Add item**.
-- [ ] Hide an option without deleting it: mark it **Inactive**.
-- [ ] Find a list made in a form: it appears under **Category** with its item count, e.g. **Lead Source (4)**. In the form editor, **Open in Dropdown Master** opens it directly. *(added 2026-10-28)*
+**What it is:** the one shared set of option lists used across JewelOS (Forms, FMS, Tasks, Users, Leave, CRM). *(overview added 2026-10-28)*
+- [ ] See every list: the page opens on all lists with totals (**Lists**, **Options**, **Made here**, **Made in forms**, **Built-in**, **Used by forms**); filter with **Search lists and options** or **All lists** / **Made here** / **Made in forms** / **Built-in**.
+- [ ] Open a list: tap its card; it shows **Used in forms** and its options. **All lists** goes back.
+- [ ] Add an option: open the list, press **Add item**. Create a list: **New list**.
+- [ ] Hide an option without deleting it: the eye button (**Turn off** / **Turn on**).
+- [ ] Lists made in the form editor are marked **Made in a form**; **Open in Dropdown Master** in the form editor opens the list.
+- Kiara tool decision: none needed; help text only.
 
 ## Settings
 **What it is:** your own preferences and, for allowed roles, company defaults and permissions.

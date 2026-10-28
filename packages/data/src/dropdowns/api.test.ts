@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 const mock = vi.hoisted(() => ({ from: vi.fn() }));
 vi.mock("@jewelos/api-client/client", () => ({ getSupabase: () => mock }));
-import { invalidateMasterOptions, loadMasterOptions } from "./api";
+import { invalidateMasterOptions, loadAllMasterOptions, loadMasterOptions } from "./api";
 const result = (label: string, error: { message: string } | null = null) => {
   const query = { data: [{ id: "option", master_type: "metal", value: "gold", label, sort_order: 0, is_active: true }], error,
-    select: vi.fn(), eq: vi.fn(), order: vi.fn(), in: vi.fn() };
-  for (const method of [query.select, query.eq, query.order, query.in]) method.mockReturnValue(query);
+    select: vi.fn(), eq: vi.fn(), order: vi.fn(), in: vi.fn(), range: vi.fn() };
+  for (const method of [query.select, query.eq, query.order, query.in, query.range]) method.mockReturnValue(query);
   return query;
 };
 afterEach(() => { invalidateMasterOptions(); vi.resetAllMocks(); });
@@ -36,5 +36,18 @@ describe("master option refresh", () => {
     expect(loadMasterOptions(["metal"])).toBe(newRequest);
     expect(mock.from).toHaveBeenCalledTimes(2);
     finishSecond?.(); await expect(newRequest).resolves.toEqual(secondResult.data);
+  });
+  it("reads past the 1000-row page limit so no list is cut off", async () => {
+    const page = (count: number, offset: number) => {
+      const query = { data: Array.from({ length: count }, (_, index) => ({ id: `o${offset + index}`, master_type: "metal", value: `v${offset + index}`, label: "x", sort_order: 0, is_active: true })), error: null,
+        select: vi.fn(), order: vi.fn(), range: vi.fn() };
+      for (const method of [query.select, query.order, query.range]) method.mockReturnValue(query);
+      return query;
+    };
+    const first = page(1000, 0); const second = page(5, 1000);
+    mock.from.mockReturnValueOnce(first).mockReturnValueOnce(second);
+    expect(await loadAllMasterOptions()).toHaveLength(1005);
+    expect(first.range).toHaveBeenCalledWith(0, 999);
+    expect(second.range).toHaveBeenCalledWith(1000, 1999);
   });
 });
