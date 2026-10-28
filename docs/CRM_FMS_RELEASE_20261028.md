@@ -108,3 +108,29 @@ source mapping approval, new scheduler or secret change is part of this window.
 CRM migrations/receiver deployment remain deferred by the owner target limit.
 Cross-project customer delivery, customer projections and CRM exports cannot
 be considered enabled or production-verified in this release.
+
+## JewelOS production result
+
+Applied successfully through the linked CLI on `jewelos-prod` only:
+`0354_customer_form_events.sql` and `0355_customer_private_exports.sql`.
+The subsequent linked dry run reports the remote database is up to date with
+no pending migrations. The deployed source checkpoint is `f97462d` (code at
+`b05aa04` plus this release authorization record).
+
+After apply, aggregates remain 56 form submissions, 19 workflow instances and
+71 stage visits. New mapping/event counts are both zero. All five new tables
+have RLS enabled; anon cannot execute integration health and authenticated
+clients cannot directly SELECT the private event outbox. No source mapping,
+customer event, historical backfill or new delivery schedule was activated.
+
+Deployed the two necessary JewelOS workers by explicit name:
+`process-report-exports` and `crm-customer-sync`. Hosted smoke checks returned
+GET 405 and uncredentialed POST 401 for each endpoint. These prove method and
+credential denial, not authenticated export/delivery/Storage success. No CRM
+function was deployed and no secrets were changed.
+
+The post-rebase web build passed. Prior local evidence remains subject to the
+full-chain replay, authenticated hosted UX, private Storage and cross-project
+activation limits above. Physical Android behavior was not tested; no native
+files changed and no APK release is needed. Git publication and web-host
+status are verified separately after this record is committed.
