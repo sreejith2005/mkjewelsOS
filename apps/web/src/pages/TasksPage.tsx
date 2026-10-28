@@ -151,7 +151,9 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
   useEffect(() => { hasCompletedInitialLoad.current = false; setTabCounts({}); setCountsError(false); setFilters(defaultTaskSearch()); setQuery(""); setSections({}); setOffset(0); }, [profile?.id]);
   useEffect(() => { if (path === TASK_IN_LOOP_PATH) setWorkspaceView("inLoop"); }, [path]);
   useEffect(() => { void refresh(); return () => { refreshGeneration.current++; }; }, [refresh]);
-  useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: TASK_TOPICS, refresh });
+  // Debounced, coalesced reload: used after a checklist tick so a run of quick taps
+  // causes one quiet reload instead of one full reload per tap.
+  const requestRefresh = useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: TASK_TOPICS, refresh });
 
   const openComposer = useCallback(async () => {
     try { setError(null); setReferences(await loadTaskAuthoringReferenceData()); setComposerOpen(true); }
@@ -215,7 +217,11 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
       await uploadAndCompleteTask(profile.tenant_id, task.id, action.file);
     }
     else if (action.kind === "revise") await reviseTask(task.id, action.datetime, action.reason);
-    else if (action.kind === "checklist") await updateTask(task.id, "checklist", { checklistId: action.checklistId, completed: action.completed });
+    else if (action.kind === "checklist") {
+      await updateTask(task.id, "checklist", { checklistId: action.checklistId, completed: action.completed });
+      requestRefresh();
+      return;
+    }
     else if (action.kind === "complete") await updateTask(task.id, "complete");
     await refresh();
   };
