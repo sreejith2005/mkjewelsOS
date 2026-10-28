@@ -3,6 +3,17 @@ import type { FormFieldDefinition, FormOption, FormTemplateDefinition } from "./
 /** Field types whose answers must be one of a configured option list. */
 export const FORM_OPTION_TYPES: ReadonlySet<string> = new Set(["select", "multiselect", "radio", "checkbox"]);
 
+/** Choice questions that can offer "Other": the respondent types their own answer. */
+export const FORM_OTHER_TYPES: ReadonlySet<string> = new Set(["select", "radio", "multiselect", "checkbox"]);
+/** The longest typed "Other" answer the server accepts in a multi-answer question. */
+export const FORM_OTHER_MAX_LENGTH = 500;
+
+/** Whether a question offers "Other". A plain yes/no checkbox never does. */
+export function formFieldAllowsOther(field: Pick<FormFieldDefinition, "type" | "validation" | "options" | "optionSource">): boolean {
+  if (field.validation?.allowOther !== true || !FORM_OTHER_TYPES.has(field.type)) return false;
+  return field.type !== "checkbox" || (field.options?.length ?? 0) > 0 || field.optionSource !== undefined;
+}
+
 /** A Dropdown Master row, reduced to what the forms engine needs. */
 export type FormMasterOption = Readonly<{ masterType: string; value: string; label: string }>;
 

@@ -214,6 +214,23 @@
 
   }
 
+  /* While the phone keyboard is up, give its few remaining lines to the field being
+     typed in: the Submit bar stops floating and the bottom navigation steps aside. */
+  @media (max-width: 767px) {
+    html[data-keyboard="open"] .form-actions {
+      position: static;
+    }
+
+    html[data-keyboard="open"] nav[aria-label="Mobile navigation"] {
+      display: none;
+    }
+
+    html[data-keyboard="open"] main {
+      --sticky-bottom: 0px;
+      padding-bottom: 1rem;
+    }
+  }
+
   /* The bar is static from sm upward; only the phone sheet needs the safe area. */
   @media (max-width: 639px) {
     [role="dialog"] .form-actions {

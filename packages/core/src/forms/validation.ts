@@ -1,6 +1,6 @@
 import { validateFormDefinition } from "./definition.ts";
 import { normalizeFormAnswer } from "./answers.ts";
-import { formOptionValues } from "./options.ts";
+import { FORM_OTHER_MAX_LENGTH, formFieldAllowsOther, formOptionValues } from "./options.ts";
 import { fieldSectionKey, formSections, reachableSectionKeys } from "./sections.ts";
 import type { FormAnswer, FormAnswers, FormFieldDefinition, FormTemplateDefinition, FormValidationIssue, FormValidationResult } from "./types.ts";
 import { isEmptyFormValue, isFormFieldVisible } from "./visibility.ts";
@@ -29,6 +29,7 @@ export function validateFormField(field: FormFieldDefinition, value: FormAnswer 
   const optionBackedCheckbox = field.type === "checkbox" && ((field.options?.length ?? 0) > 0 || field.optionSource !== undefined);
   if (field.required && (isEmptyFormValue(canonicalValue) || (field.type === "checkbox" && !optionBackedCheckbox && canonicalValue !== true))) return { code: "required", fieldKey: field.key, message: `${field.label} is required` };
   if (isEmptyFormValue(canonicalValue)) return undefined;
+  const allowsOther = formFieldAllowsOther(field);
   if (STRING_TYPES.has(field.type) && typeof canonicalValue !== "string") return { code: "invalid_shape", fieldKey: field.key, message: `${field.label} must be text` };
   if ((field.type === "number" || field.type === "currency" || field.type === "rating") && (typeof canonicalValue !== "number" || !Number.isFinite(canonicalValue))) return { code: "invalid_shape", fieldKey: field.key, message: `${field.label} must be a number` };
   if (field.type === "checkbox" && !optionBackedCheckbox && typeof canonicalValue !== "boolean") return { code: "invalid_shape", fieldKey: field.key, message: `${field.label} must be true or false` };
@@ -40,11 +41,12 @@ export function validateFormField(field: FormFieldDefinition, value: FormAnswer 
     if (field.type === "phone" && (!PHONE.test(canonicalValue) || digits.length < 7 || digits.length > 15)) return { code: "invalid_phone", fieldKey: field.key, message: `${field.label} must be a valid phone number` };
     if (field.type === "date" && !isValidCalendarDate(canonicalValue)) return { code: "invalid_date", fieldKey: field.key, message: `${field.label} must be a valid date` };
     if (field.type === "datetime" && (!DATETIME.test(canonicalValue) || !isValidCalendarDate(canonicalValue.slice(0, 10)) || Number.isNaN(Date.parse(canonicalValue)))) return { code: "invalid_datetime", fieldKey: field.key, message: `${field.label} must be a valid datetime` };
-    if ((field.type === "select" || field.type === "radio") && !formOptionValues(field.options).includes(canonicalValue)) return { code: "invalid_option", fieldKey: field.key, message: `${field.label} contains an invalid option` };
+    if ((field.type === "select" || field.type === "radio") && !allowsOther && !formOptionValues(field.options).includes(canonicalValue)) return { code: "invalid_option", fieldKey: field.key, message: `${field.label} contains an invalid option` };
     if (field.validation?.minLength !== undefined && canonicalValue.length < field.validation.minLength) return { code: "min_length", fieldKey: field.key, message: `${field.label} is too short` };
     if (field.validation?.maxLength !== undefined && canonicalValue.length > field.validation.maxLength) return { code: "max_length", fieldKey: field.key, message: `${field.label} is too long` };
   }
-  if (Array.isArray(canonicalValue) && canonicalValue.some((item) => !formOptionValues(field.options).includes(item))) return { code: "invalid_option", fieldKey: field.key, message: `${field.label} contains an invalid option` };
+  if (Array.isArray(canonicalValue) && allowsOther && canonicalValue.some((item) => !formOptionValues(field.options).includes(item) && (!item.trim() || item.length > FORM_OTHER_MAX_LENGTH))) return { code: "invalid_other", fieldKey: field.key, message: `${field.label}: the typed answer must be 1 to ${FORM_OTHER_MAX_LENGTH} characters` };
+  if (Array.isArray(canonicalValue) && !allowsOther && canonicalValue.some((item) => !formOptionValues(field.options).includes(item))) return { code: "invalid_option", fieldKey: field.key, message: `${field.label} contains an invalid option` };
   if (typeof canonicalValue === "number") {
     if (field.type === "rating" && (!Number.isInteger(canonicalValue) || canonicalValue < 1 || canonicalValue > 5)) return { code: "invalid_rating", fieldKey: field.key, message: `${field.label} must be an integer from 1 to 5` };
     if (field.validation?.min !== undefined && canonicalValue < field.validation.min) return { code: "minimum", fieldKey: field.key, message: `${field.label} is below the minimum` };

@@ -1,9 +1,10 @@
 import { fmsOutcomeReplacesStage } from "@jewelos/core";
-import { useMemo, useState } from "react";
-import { CheckCircle2, Circle, FileText, Paperclip } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CheckCircle2, Circle, FileText, History, Paperclip } from "lucide-react";
 import { deriveFmsTransitionCapability, describeDue, fmsPlannedRuleFormSectionKey, fmsStageFormDefinition, fmsStageCompletionChecklist, fmsEmployeeStatusLabel, hasFmsFormAssignmentSource, type FmsStageDefinition, type FmsWorkResult, type FmsTransitionRequest } from "@jewelos/core";
 import { FmsWorkOutcome } from "./FmsWorkOutcome";
 import { useFmsHandoffConfirmation } from "./useFmsHandoffConfirmation";
+import { useFmsEarlierAnswers } from "./earlierAnswers";
 import { Button, Field, Modal, Notice } from "@/components/ui";
 import { AssigneePicker } from "@/components/assignees/AssigneePicker";
 import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer";
@@ -73,6 +74,11 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(shouldOpenInitialForm);
+  // On the assigned-work page the form opens in the page itself, under the earlier answers, instead of a dialog over them.
+  const inlineForm = compact;
+  const inlineFormRef = useRef<HTMLElement>(null);
+  const openEarlier = useFmsEarlierAnswers();
+  useEffect(() => { if (inlineForm && showForm) inlineFormRef.current?.scrollIntoView?.({ block: "start", behavior: "smooth" }); }, [inlineForm, showForm]);
   const actor = useMemo(() => ({ id: profile.id, name: profile.employee_name }), [profile.id, profile.employee_name]);
   const { confirmWork, result, confirmation } = useFmsHandoffConfirmation(stage.id, actor);
   const completeWork = async (request: FmsTransitionRequest) => {
@@ -185,7 +191,7 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
       : sectionUnavailable ? <Notice tone="danger">This step's form section is no longer in the linked form. Ask your manager to check the workflow.</Notice>
       : !linkedForm ? requiresLinkedForm ? <Notice tone="danger">This step's form is not available to your account. Ask your manager to check the workflow.</Notice> : <Notice>The optional form is not available right now. You can still complete this step.</Notice> : null : null}
     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-      {formPending && linkedForm && stageForm ? <Button className="min-h-12" onClick={() => setShowForm(true)} variant={requiresLinkedForm ? "primary" : "secondary"}><FileText aria-hidden="true" className="size-4" />{requiresLinkedForm ? `Fill the form: ${formTitle}` : `Fill the optional form: ${formTitle}`}</Button> : null}
+      {formPending && linkedForm && stageForm && !(inlineForm && showForm) ? <Button className="min-h-12" onClick={() => setShowForm(true)} variant={requiresLinkedForm ? "primary" : "secondary"}><FileText aria-hidden="true" className="size-4" />{requiresLinkedForm ? `Fill the form: ${formTitle}` : `Fill the optional form: ${formTitle}`}</Button> : null}
       {canAct ? <>
         {capability.canComplete && !(formPending && requiresLinkedForm) ? <Button className="min-h-12" disabled={busy || (isDecision && !outcome) || (requiresLinkedForm && !stage.form_submission_id)} onClick={() => void work(() => completeWork({ kind: "complete", instanceStageId: stage.id, outcome, remark, checklist: checklistPayload, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) }))}>{isDecision ? "Submit decision" : "Complete stage"}</Button> : null}
         {capability.canApprove ? <Button className="min-h-12" disabled={busy} onClick={() => void work(() => completeWork({ kind: "review", instanceStageId: stage.id, decision: "approved", remark, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) }))}>Approve</Button> : null}
@@ -203,10 +209,19 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
         {capability.canReassign && (stage.assigned_to?.length ?? 0) > 0 ? <Button disabled={busy} onClick={() => openManagedAction("reassign")} variant="secondary">Reassign</Button> : null}
       </div>
     </details> : null}
-    {showForm && linkedForm && stageForm ? <Modal onClose={() => setShowForm(false)} title={requiresLinkedForm ? formTitle : `Optional form: ${formTitle}`} mobileFullscreen wide><FormRenderer definition={stageForm} dynamicOptions={formOptions} templateId={linkedForm.id} onSubmit={async (answers) => {
-      if (!await completeWork({ kind: "stage_form", formTemplateId: linkedForm.id, answers, instanceStageId: stage.id, outcome, remark, checklist: checklistPayload, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) })) return false;
-      setShowForm(false); await onRefresh(); return true;
-    }} workflowHint /></Modal> : null}
+    {showForm && linkedForm && stageForm ? (() => {
+      const title = requiresLinkedForm ? formTitle : `Optional form: ${formTitle}`;
+      const renderer = <FormRenderer definition={stageForm} dynamicOptions={formOptions} templateId={linkedForm.id} onSubmit={async (answers) => {
+        if (!await completeWork({ kind: "stage_form", formTemplateId: linkedForm.id, answers, instanceStageId: stage.id, outcome, remark, checklist: checklistPayload, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) })) return false;
+        setShowForm(false); await onRefresh(); return true;
+      }} workflowHint {...(inlineForm && openEarlier ? { extraAction: <Button aria-label="See earlier answers" className="min-h-12 shrink-0 px-3" onClick={openEarlier} title="Earlier answers" type="button" variant="secondary"><History aria-hidden="true" className="size-5" /><span className="hidden sm:inline">Earlier answers</span></Button> } : {})} />;
+      return inlineForm
+        ? <section aria-label={`Your form: ${title}`} className="scroll-mt-24 space-y-3 rounded-2xl border border-gold/30 bg-task-muted/40 p-3 sm:p-5" ref={inlineFormRef}>
+            <header className="flex flex-wrap items-start justify-between gap-2 px-1"><h2 className="min-w-0 flex-1 break-words text-lg font-semibold text-task-text">{title}</h2>{openEarlier ? <Button className="min-h-11" onClick={openEarlier} type="button" variant="ghost"><History aria-hidden="true" className="size-4" />Earlier answers</Button> : null}</header>
+            {renderer}
+          </section>
+        : <Modal onClose={() => setShowForm(false)} title={title} mobileFullscreen wide>{renderer}</Modal>;
+    })() : null}
     {confirmation}
     {managedAction ? <Modal onClose={() => setManagedAction(null)} title={managedAction.replace("_", " ")}>
       <div className="space-y-3">

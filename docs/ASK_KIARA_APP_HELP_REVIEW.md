@@ -68,7 +68,7 @@ The page is gone. Recurring work is created from **Create Task** and managed in 
 ## FMS (workflows)
 **What it is:** company workflows: live workflows, the stages given to you, and, for people
 who build workflows, the designs.
-- [ ] Do my stage: open it from Home or Tasks. The steps at the top are **Read previous details**, **Complete your work**, **Review next assignment** and **Confirm**. Read **Your step** (what to do, when it is due) and **Previous form answers**, press **Continue to stage form** (or **Continue to stage**). **Before you complete this step** lists anything missing. Press **Fill the form** to fill and submit it; submitting also completes the step. Then check who receives the next step and confirm.
+- [ ] Do my stage: open it from Home or Tasks. The steps at the top are **Read previous details**, **Complete your work**, **Review next assignment** and **Confirm**. Read **Your step** (what to do, when it is due) and **Previous form answers**, press **Continue to stage form** (or **Continue to stage**). **Before you complete this step** lists anything missing. Press **Fill the form**: it opens on the same page below the earlier answers. While filling, **Earlier answers** (clock button beside Submit on a phone) shows them again; **Back to my form** keeps typed answers. Submitting also completes the step. Then check who receives the next step and confirm.
 - [ ] Start a workflow: open FMS, choose the workflow, press **Start instance** (if your role may start it).
 - [ ] Design a workflow: **New workflow** in FMS (workflow builders only).
 - [ ] Build on the canvas (updated 2026-10-24, FMS Builder 3.0): the canvas is the only builder view on computers and phones (**Guided Mode** and the Normal/Decision step choice are gone). **Select mode** (drag empty space to box-select) and **Hand mode** (drag to move around; phones start here) sit at the top right with zoom, **Fit workflow to view** (key 1), **Auto-arrange workflow** and **Canvas tips**. Space+drag or middle-drag pans; the wheel or a pinch zooms. **Add Step** adds one unified step. Clicking a step opens its settings (bottom sheet on phones).
@@ -92,7 +92,7 @@ who build workflows, the designs.
 ## Forms Library
 **What it is:** published forms you can fill, and forms you sent.
 - [ ] Edit with a live preview (2026-10-24): the form editor shows the real form beside the questions on wide screens (**Live preview**, **Desktop preview** / **Mobile preview**, **Start preview again**, **Hide preview** / **Show preview**); on phones press **Preview form** and **Edit** to switch. Every change shows immediately; sample answers are never submitted.
-- [ ] Fill a form: open Forms Library, find the form under **Forms to fill**, press **Fill**. Questions marked * must be answered (the bar at the top counts them). Long forms go one step at a time with **Next** / **Back**; tap an earlier step to change it, and open **Check your answers before submitting** on the last step before **Submit form**. A missing answer is marked in red under its question.
+- [ ] Fill a form: open Forms Library, find the form under **Forms to fill** (or **Search forms**), press **Fill form** (full screen on a phone). Questions marked * must be answered (the bar at the top counts them). Long forms go one step at a time with **Next** / **Back**; tap an earlier step to change it, and open **Check your answers before submitting** on the last step before **Submit form**. A missing answer is marked in red under its question. Choice questions may end with **Other**: pick it and type an answer.
 - [ ] See what I sent: **My submissions** shows each one and whether it was reviewed.
 - [ ] Make a form: **New form** (form makers only), then **Publish** when ready.
 - [ ] Set its naming default: in Form Builder use **Use this question as the record name**, or leave **Automatic**. A used published form needs a new revision to change its default; each workflow can override it in **Task Naming**.
@@ -195,3 +195,10 @@ and **Previous form answers**; the workflow, stage, reference, assignee and the
 four-step bar are no longer repeated. After confirming, the employee returns to
 Tasks -> FMS with a short notice instead of a result page. Kiara's "Do my
 assigned stage" recipe is updated. No new read tool.
+
+### Forms usability (2026-10-27)
+
+- [ ] **Forms Library**: forms show as cards with **Fill form**; authors see each version with a **Live** / **Draft** / **Archived** label and the existing actions. **My submissions** lists submissions by date and status.
+- [ ] **Other answers**: form authors tick **Add an "Other" choice** on a Dropdown, Radio Group or Checkbox question; people filling the form pick **Other** and type their answer, which is saved as the answer itself.
+- [ ] **Assign to a Different Employee** lists eligible employees A to Z.
+- [ ] Assigned FMS stage forms open on the work page below **Previous form answers**, with **Earlier answers** while filling.
