@@ -5,6 +5,7 @@ import { Button } from "@/components/ui";
 import { initials, titleCase } from "@/lib/format";
 import type { Branch, UserProfile } from "@/types";
 import { cn } from "@/lib/utils";
+import { useKeyboardOpen } from "@/lib/useKeyboardOpen";
 import { MobileNavigationDrawer, NavCountBadge, type MobileNavigationDrawerItem } from "./MobileNavigationDrawer";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
@@ -76,6 +77,7 @@ export function ApplicationShell({
   onThemeChange: (theme: Theme) => void;
   fullBleed?: boolean;
 }) {
+  useKeyboardOpen();
   const sidebarNavigation = getSidebarNavigation(nav);
   const navigateFromSidebar = (destination: string) => {
     navigate(destination);

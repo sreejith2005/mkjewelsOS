@@ -1,4 +1,5 @@
 import type { FormFieldDefinition, FormFieldType, FormRule } from "./index";
+import { FORM_OTHER_TYPES } from "./options";
 
 export const OPTION_FIELD_TYPES: ReadonlySet<FormFieldType> = new Set(["select", "radio", "checkbox", "multiselect"]);
 export const MULTI_ANSWER_FIELD_TYPES: ReadonlySet<FormFieldType> = new Set(["checkbox", "multiselect"]);
@@ -64,6 +65,8 @@ function compatibleValidation(field: FormFieldDefinition, nextType: FormFieldTyp
     const validation = { min: current.min, max: current.max };
     return validation.min === undefined && validation.max === undefined ? undefined : validation;
   }
+  // "Other" carries over between choice questions (dropdown, radio, checkbox list, multi-select).
+  if (current.allowOther === true && FORM_OTHER_TYPES.has(nextType)) return { allowOther: true };
   return undefined;
 }
 

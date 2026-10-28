@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, Paperclip } from "lucide-react";
-import { displayFormAnswer, reconcileFormPreviewAnswers, formCompletionProgress, formUsesSteps, isFinalFormStep, nextFormStepKey, normalizeFormAnswers, previousFormStepKey, resolveFormOptions, updateVisibleFormAnswers, validateCompleteForm, validateFormStep, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition, type FormValidationIssue } from "@jewelos/core";
+import { displayFormAnswer, FORM_OTHER_MAX_LENGTH, formFieldAllowsOther, formOptionValues, reconcileFormPreviewAnswers, formCompletionProgress, formUsesSteps, isFinalFormStep, nextFormStepKey, normalizeFormAnswers, previousFormStepKey, resolveFormOptions, updateVisibleFormAnswers, validateCompleteForm, validateFormStep, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition, type FormValidationIssue } from "@jewelos/core";
 import { Button, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { signedFormFileUrl, uploadFormFile } from "./api";
@@ -11,7 +11,15 @@ const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: []
 const NUMBER_TYPES = new Set(["number", "currency", "rating"]);
 const SELECT_TYPES = new Set(["select", "user_dropdown", "branch_dropdown", "department_dropdown"]);
 const LAYOUT_TYPES = new Set(["section_header", "divider"]);
-const OPTION_ROW = "flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-task-border bg-task-bg px-3 py-2 text-sm text-task-text transition hover:border-gold/50 has-[:checked]:border-gold has-[:checked]:bg-gold/10 has-[:disabled]:cursor-not-allowed";
+const OPTION_ROW = "flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-task-border bg-task-bg px-3.5 py-2.5 text-[15px] text-task-text transition hover:border-gold/50 has-[:checked]:border-gold has-[:checked]:bg-gold/10 has-[:checked]:font-medium has-[:disabled]:cursor-not-allowed sm:text-sm [&>input]:size-5 [&>input]:shrink-0 [&>input]:accent-gold";
+/** The UI-only dropdown value for "Other"; the stored answer is always the typed text. */
+const OTHER_CHOICE = "__other__";
+const byLabel = <T extends { label: string }>(items: readonly T[]) => [...items].sort((a, b) => a.label.localeCompare(b.label, "en", { sensitivity: "base" }));
+
+/** The text box shown under a choice question once "Other" is picked. */
+function OtherAnswerInput({ disabled, label, onChange, value, inputRef }: { disabled: boolean; label: string; onChange: (value: string) => void; value: string; inputRef?: (node: HTMLInputElement | null) => void }) {
+  return <input aria-label={`${label}: your own answer`} autoComplete="off" className="field mt-2" disabled={disabled} enterKeyHint="done" maxLength={FORM_OTHER_MAX_LENGTH} onChange={(event) => onChange(event.target.value)} placeholder="Type your answer" ref={inputRef} type="text" value={value} />;
+}
 
 /** The question text: readable sentence case, with a visible marker for required answers. */
 function QuestionText({ field, id }: { field: FormFieldDefinition; id?: string }) {
@@ -62,7 +70,7 @@ function FileFieldControl({ describedBy, disabled, field, labelledBy, onChange, 
   </div>;
 }
 
-export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initialAnswers = {}, onSubmit, preview = false, readOnly = false, templateId, workflowHint = false }: { definition: FormTemplateDefinition; dynamicOptions?: DynamicOptions; initialAnswers?: FormAnswers; onSubmit?: (answers: FormAnswers) => Promise<void | boolean>; preview?: boolean; readOnly?: boolean; templateId?: string; workflowHint?: boolean }) {
+export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extraAction, initialAnswers = {}, onSubmit, preview = false, readOnly = false, templateId, workflowHint = false }: { definition: FormTemplateDefinition; dynamicOptions?: DynamicOptions; /** One more button for the bottom bar, kept within thumb reach (for example "Earlier answers"). */ extraAction?: ReactNode; initialAnswers?: FormAnswers; onSubmit?: (answers: FormAnswers) => Promise<void | boolean>; preview?: boolean; readOnly?: boolean; templateId?: string; workflowHint?: boolean }) {
   const uid = useId();
   const [answers, setAnswers] = useState<Record<string, FormAnswer>>(() => Object.fromEntries(Object.entries(initialAnswers).filter((entry): entry is [string, FormAnswer] => entry[1] !== null && entry[1] !== undefined)));
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +78,9 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState(false);
   const [stepKey, setStepKey] = useState<string | null>(null);
+  /** Questions where "Other" is picked but nothing is typed yet. */
+  const [otherOpen, setOtherOpen] = useState<Readonly<Record<string, boolean>>>({});
+  const otherInputs = useRef(new Map<string, HTMLInputElement>());
   const fieldRefs = useRef(new Map<string, HTMLElement>());
   const formRef = useRef<HTMLFormElement>(null);
   // Dropdown Master questions store only a reference; resolve it for rendering
@@ -94,7 +105,14 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
     branches: new Map(dynamicOptions.branches.map((item) => [item.id, item.label])),
     departments: new Map(dynamicOptions.departments.map((item) => [item.id, item.label])),
   }), [dynamicOptions]);
-  const optionsFor = (type: string) => type === "user_dropdown" ? dynamicOptions.users : type === "branch_dropdown" ? dynamicOptions.branches : type === "department_dropdown" ? dynamicOptions.departments.filter((item) => !branchFieldKey || !answers[branchFieldKey] || item.branchId === answers[branchFieldKey]) : [];
+  // People, branches and departments are always listed A to Z, whatever order they were loaded in.
+  const sorted = useMemo(() => ({ users: byLabel(dynamicOptions.users), branches: byLabel(dynamicOptions.branches), departments: byLabel(dynamicOptions.departments) }), [dynamicOptions]);
+  const optionsFor = (type: string) => type === "user_dropdown" ? sorted.users : type === "branch_dropdown" ? sorted.branches : type === "department_dropdown" ? sorted.departments.filter((item) => !branchFieldKey || !answers[branchFieldKey] || item.branchId === answers[branchFieldKey]) : [];
+  const openOther = (key: string, open: boolean) => {
+    setOtherOpen((current) => ({ ...current, [key]: open }));
+    if (open) requestAnimationFrame(() => otherInputs.current.get(key)?.focus());
+  };
+  const otherRef = (key: string) => (node: HTMLInputElement | null) => { if (node) otherInputs.current.set(key, node); else otherInputs.current.delete(key); };
 
   // A live preview follows an editor: sample answers the edited Form can no longer
   // hold (a removed question or choice, a changed type) are dropped.
@@ -144,7 +162,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
   };
 
   const renderField = (field: FormFieldDefinition) => {
-    if (field.type === "section_header") return <h3 className="text-lg font-semibold text-gold-secondary" key={field.key}>{field.label}</h3>;
+    if (field.type === "section_header") return <h3 className="px-1 pt-2 text-lg font-semibold text-gold-secondary" key={field.key}>{field.label}</h3>;
     if (field.type === "divider") return <hr className="border-gold/20" key={field.key} />;
     const value = answers[field.key]; const disabled = readOnly || field.editable === false;
     const invalid = fieldErrors[field.key];
@@ -153,7 +171,8 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
     const aria = { "aria-describedby": describedBy, "aria-invalid": invalid ? true : undefined, "aria-required": field.required ? true : undefined } as const;
     const helper = field.helperText ? <span className="mb-2 block text-sm text-task-text-muted" id={helpId}>{field.helperText}</span> : null;
     const errorText = invalid ? <span className="mt-1.5 block text-sm font-medium text-danger" id={errorId}>{invalid}</span> : null;
-    const shell = (content: ReactNode) => <div className={cn("rounded-xl transition-colors", invalid && "-mx-2 bg-danger/5 px-2 py-2")} key={field.key}>{content}</div>;
+    // Each question is its own card, so a long form reads as one clear question at a time on a phone.
+    const shell = (content: ReactNode) => <div className={cn("scroll-mt-24 rounded-2xl border border-task-border bg-task-bg p-4 transition-colors sm:p-5", invalid && "border-danger/60 bg-danger/5")} key={field.key}>{content}</div>;
 
     if (field.type === "file") return shell(<div><QuestionText field={field} id={labelId} />{helper}
       <FileFieldControl describedBy={describedBy} disabled={disabled} field={field} labelledBy={labelId} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} templateId={templateId} value={answers[field.key]} />{errorText}
@@ -164,14 +183,30 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
     if ((field.type === "checkbox" && checkboxOptions.length) || field.type === "multiselect") {
       const selected = Array.isArray(value) ? value : [];
       const choices = field.type === "multiselect" ? staticOptions : checkboxOptions;
+      const allowsOther = formFieldAllowsOther({ ...field, options: choices });
+      const listed = new Set(choices.map((option) => option.value));
+      const typed = allowsOther ? selected.find((item) => !listed.has(item)) ?? "" : "";
+      const otherChecked = allowsOther && (!!typed || otherOpen[field.key] === true);
+      const withTyped = (text: string) => [...selected.filter((item) => listed.has(item)), ...(text.trim() ? [text] : [])];
       return shell(<fieldset aria-describedby={describedBy} className="space-y-2"><legend className="mb-1"><QuestionText field={field} /></legend>{helper}
         <p className="text-xs text-task-text-muted">Choose all that apply.</p>
-        <div className="grid gap-2">{choices.map((option, index) => <label className={OPTION_ROW} key={option.value}><input checked={selected.includes(option.value)} disabled={disabled} onChange={(event) => set(field.key, event.target.checked ? [...selected, option.value] : selected.filter((item) => item !== option.value))} ref={index === 0 ? register(field.key) : undefined} type="checkbox" /><span className="min-w-0 break-words">{option.label}</span></label>)}</div>{errorText}
+        <div className="grid gap-2">{choices.map((option, index) => <label className={OPTION_ROW} key={option.value}><input checked={selected.includes(option.value)} disabled={disabled} onChange={(event) => set(field.key, event.target.checked ? [...selected, option.value] : selected.filter((item) => item !== option.value))} ref={index === 0 ? register(field.key) : undefined} type="checkbox" /><span className="min-w-0 break-words">{option.label}</span></label>)}
+          {allowsOther ? <div><label className={OPTION_ROW}><input checked={otherChecked} disabled={disabled} onChange={(event) => { openOther(field.key, event.target.checked); if (!event.target.checked) set(field.key, withTyped("")); }} type="checkbox" /><span>Other</span></label>
+            {otherChecked ? <OtherAnswerInput disabled={disabled} inputRef={otherRef(field.key)} label={field.label} onChange={(text) => set(field.key, withTyped(text))} value={typed} /> : null}</div> : null}
+        </div>{errorText}
       </fieldset>);
     }
     if (field.type === "rating") return shell(<fieldset aria-describedby={describedBy} className="space-y-2"><legend className="mb-1"><QuestionText field={field} /></legend>{helper}<RatingField disabled={disabled} label={field.label} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} value={typeof value === "number" ? value : undefined} />{errorText}</fieldset>);
+    const singleOther = (field.type === "radio" || field.type === "select") && formFieldAllowsOther(field);
+    const typedSingle = singleOther && typeof value === "string" && value !== "" && !formOptionValues(staticOptions).includes(value) ? value : "";
+    const otherChosen = singleOther && (!!typedSingle || otherOpen[field.key] === true);
+    const otherText = otherChosen && typeof value === "string" ? value : "";
+    const chooseListed = (next: string) => { if (otherOpen[field.key]) openOther(field.key, false); set(field.key, next); };
     if (field.type === "radio") return shell(<fieldset aria-describedby={describedBy} className="space-y-2"><legend className="mb-1"><QuestionText field={field} /></legend>{helper}
-      <div className="grid gap-2">{staticOptions.map((option, index) => <label className={OPTION_ROW} key={option.value}><input checked={value === option.value} disabled={disabled} name={`${uid}-${field.key}`} onChange={() => set(field.key, option.value)} ref={index === 0 ? register(field.key) : undefined} type="radio" /><span className="min-w-0 break-words">{option.label}</span></label>)}</div>{errorText}
+      <div className="grid gap-2">{staticOptions.map((option, index) => <label className={OPTION_ROW} key={option.value}><input checked={!otherChosen && value === option.value} disabled={disabled} name={`${uid}-${field.key}`} onChange={() => chooseListed(option.value)} ref={index === 0 ? register(field.key) : undefined} type="radio" /><span className="min-w-0 break-words">{option.label}</span></label>)}
+        {singleOther ? <div><label className={OPTION_ROW}><input checked={otherChosen} disabled={disabled} name={`${uid}-${field.key}`} onChange={() => { openOther(field.key, true); set(field.key, ""); }} type="radio" /><span>Other</span></label>
+          {otherChosen ? <OtherAnswerInput disabled={disabled} inputRef={otherRef(field.key)} label={field.label} onChange={(text) => set(field.key, text)} value={otherText} /> : null}</div> : null}
+      </div>{errorText}
     </fieldset>);
 
     const selectOptions = dynamic.length ? dynamic : staticOptions.map((option) => ({ id: option.value, label: option.label }));
@@ -180,7 +215,8 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
     const inputMode = field.type === "phone" ? "tel" : field.type === "email" ? "email" : NUMBER_TYPES.has(field.type) ? "decimal" : undefined;
     const textValue = typeof value === "string" || typeof value === "number" ? value : "";
     const control = field.type === "textarea" ? <textarea {...aria} className="field min-h-24" disabled={disabled} maxLength={field.validation?.maxLength} onChange={onText} placeholder={field.placeholder} ref={register(field.key)} rows={3} value={typeof value === "string" ? value : ""} />
-      : SELECT_TYPES.has(field.type) ? <select {...aria} className="field" disabled={disabled} onChange={onText} ref={register(field.key)} value={typeof value === "string" ? value : ""}><option value="">Choose an answer</option>{selectOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select>
+      : SELECT_TYPES.has(field.type) ? <><select {...aria} className="field" disabled={disabled} onChange={(event) => { if (event.target.value === OTHER_CHOICE) { openOther(field.key, true); set(field.key, ""); } else chooseListed(event.target.value); }} ref={register(field.key)} value={otherChosen ? OTHER_CHOICE : typeof value === "string" ? value : ""}><option value="">Choose an answer</option>{selectOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}{singleOther ? <option value={OTHER_CHOICE}>Other (type your answer)</option> : null}</select>
+        {otherChosen ? <OtherAnswerInput disabled={disabled} inputRef={otherRef(field.key)} label={field.label} onChange={(text) => set(field.key, text)} value={otherText} /> : null}</>
       : field.type === "checkbox" ? <span className={OPTION_ROW}><input {...aria} checked={value === true} disabled={disabled} onChange={(event) => set(field.key, event.target.checked)} ref={register(field.key)} type="checkbox" /><span>{field.placeholder ?? "Yes"}</span></span>
       : field.type === "currency" ? <span className="relative block"><span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-task-text-muted">₹</span><input {...aria} className="field pl-7" disabled={disabled} inputMode="decimal" onChange={onText} placeholder={field.placeholder} ref={register(field.key)} step="any" type="number" value={textValue} /></span>
       : <input {...aria} autoComplete={field.type === "phone" ? "tel" : field.type === "email" ? "email" : undefined} className="field" disabled={disabled} inputMode={inputMode} maxLength={field.validation?.maxLength} onChange={onText} placeholder={field.placeholder} ref={register(field.key)} step={NUMBER_TYPES.has(field.type) ? "any" : undefined} type={inputType} value={textValue} />;
@@ -193,7 +229,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
   const requiredPercent = progress.requiredTotal ? Math.round((progress.requiredAnswered / progress.requiredTotal) * 100) : 0;
 
   return <form className="flex flex-col gap-5" onSubmit={submit} ref={formRef}>
-    {workflowHint && !preview ? <Notice>When you submit, your answers are saved and you will see who receives the next step.</Notice> : null}
+    {workflowHint && !preview ? <p className="px-1 text-sm text-task-text-muted">When you submit, your answers are saved and you will see who receives the next step.</p> : null}
     {preview ? <Notice>Preview mode — nothing is saved.</Notice> : null}
     {resolved.fields.length === 0 ? <Notice tone="danger">This form version has no saved questions. Close it and edit the draft before publishing.</Notice> : null}
     {!readOnly && progress.requiredTotal > 0 ? <div className="space-y-1.5">
@@ -208,9 +244,9 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
           : <span aria-current="step" className="inline-flex min-h-9 max-w-[14rem] items-center rounded-full border border-gold/60 bg-gold/10 px-3 text-xs font-semibold text-task-text"><span className="truncate">{index + 1}. {section.title}</span></span>}
       </li>)}</ol> : null}
     </nav> : null}
-    {renderedSections.map(({ section, fields }) => <section aria-label={section.title} className={showSectionTitles ? "rounded-xl border border-task-border p-4" : ""} key={section.key}>
-      {showSectionTitles ? <header className="mb-4"><h3 className="text-base font-semibold text-gold-secondary">{section.title}</h3>{section.description ? <p className="mt-0.5 text-sm text-task-text-muted">{section.description}</p> : null}</header> : null}
-      <div className="flex flex-col gap-5">{fields.map(renderField)}</div>
+    {renderedSections.map(({ section, fields }) => <section aria-label={section.title} key={section.key}>
+      {showSectionTitles ? <header className="mb-3 px-1"><h3 className="text-lg font-semibold text-gold-secondary">{section.title}</h3>{section.description ? <p className="mt-0.5 text-sm text-task-text-muted">{section.description}</p> : null}</header> : null}
+      <div className="flex flex-col gap-3">{fields.map(renderField)}</div>
     </section>)}
     {reviewRows.length ? <details className="rounded-xl border border-task-border bg-task-muted/40 p-3">
       <summary className="min-h-11 cursor-pointer content-center text-sm font-semibold text-task-text">Check your answers before submitting</summary>
@@ -222,6 +258,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
     {error ? <div aria-live="assertive" role="alert"><Notice tone="danger">{error}</Notice></div> : null}
     {success ? <Notice tone="success">Form submitted successfully.</Notice> : null}
     {!readOnly && resolved.fields.length > 0 ? <div className="form-actions sticky z-10 -mx-1 mt-1 flex gap-2 border-t border-task-border bg-task-bg/95 px-1 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+      {extraAction}
       {stepped && previousStepKey ? <Button className="min-h-12 shrink-0" disabled={busy || success} onClick={() => goToStep(previousStepKey)} type="button" variant="secondary"><ChevronLeft aria-hidden="true" className="size-4" />Back</Button> : null}
       {stepped && (nextStepKey || !finalStep) ? <Button className="min-h-12 flex-1 sm:flex-none" disabled={busy || success} onClick={advance} type="button">Next<ChevronRight aria-hidden="true" className="size-4" /></Button>
         : <Button className="min-h-12 flex-1 sm:flex-none" disabled={busy || preview || success} type="submit">{busy ? "Submitting..." : "Submit form"}</Button>}

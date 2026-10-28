@@ -1,3 +1,4 @@
+import { formFieldAllowsOther } from "./options.ts";
 import type { FormAnswer, FormFieldDefinition, FormTemplateDefinition } from "./types.ts";
 
 const LAYOUT = new Set<FormFieldDefinition["type"]>(["section_header", "divider"]);
@@ -11,6 +12,8 @@ function compatible(field: FormFieldDefinition, value: FormAnswer): boolean {
   if (field.type === "checkbox" && !multi) return typeof value === "boolean";
   if (NUMBER.has(field.type)) return typeof value === "number" || value === "";
   // Inline options are known here; a Dropdown Master list is resolved by the renderer.
+  // A typed "Other" answer is valid for any wording.
+  if (formFieldAllowsOther(field)) return true;
   if (field.options?.length && !field.optionSource) {
     const allowed = new Set(field.options.map((option) => option.value));
     return Array.isArray(value) ? value.every((item) => allowed.has(item)) : value === "" || allowed.has(String(value));

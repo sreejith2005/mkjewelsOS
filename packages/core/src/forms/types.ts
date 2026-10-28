@@ -76,6 +76,8 @@ export type FormValidation = Readonly<{
   maxLength?: number | undefined;
   min?: number | undefined;
   max?: number | undefined;
+  /** Choice questions only: the respondent may type their own answer ("Other"). The typed text is the stored answer. */
+  allowOther?: boolean | undefined;
 }>;
 
 export type FormFieldDefinition = Readonly<{

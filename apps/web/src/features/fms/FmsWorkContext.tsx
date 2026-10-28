@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { CalendarClock, ChevronDown, ClipboardList, History, Paperclip } from "lucide-react";
+import { CalendarClock, ChevronDown, ClipboardList, FileText, History, Paperclip } from "lucide-react";
 import { describeDue, fmsEmployeeStatusLabel, formatKolkataDateTime, presentFmsWorkContext, type FmsWorkContext as WorkContext, type FmsPreviousForm, type FmsPreviousFormsPage } from "@jewelos/core";
 import { loadFmsWorkContext, loadFmsPreviousForms, signedFmsContextFileUrl } from "@jewelos/data/fms/work";
 import { Button, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
-export function FmsWorkContext({ instanceId, instanceStageId, onReady, onRecordName, collapsed = false }: { instanceId: string; instanceStageId: string; onReady?: (ready: boolean) => void; onRecordName?: ((name: string | null) => void) | undefined; collapsed?: boolean }) {
+export function FmsWorkContext({ instanceId, instanceStageId, onReady, onRecordName, onPreviousForms, collapsed = false, expandAll = false }: { instanceId: string; instanceStageId: string; onReady?: (ready: boolean) => void; onRecordName?: ((name: string | null) => void) | undefined; onPreviousForms?: ((count: number) => void) | undefined; collapsed?: boolean; expandAll?: boolean }) {
   const readyCallback = useRef(onReady); readyCallback.current = onReady;
+  const previousCallback = useRef(onPreviousForms); previousCallback.current = onPreviousForms;
   const nameCallback = useRef(onRecordName); nameCallback.current = onRecordName;
   const [context, setContext] = useState<WorkContext | null>(null);
   const [previous, setPrevious] = useState<FmsPreviousFormsPage | null>(null);
@@ -26,7 +27,7 @@ export function FmsWorkContext({ instanceId, instanceStageId, onReady, onRecordN
   useEffect(() => {
     let active = true; setContext(null); setPrevious(null); setFailed(false); readyCallback.current?.(false); nameCallback.current?.(null);
     void Promise.all([loadFmsWorkContext(instanceId, instanceStageId), loadFmsPreviousForms(instanceId, instanceStageId)])
-      .then(([work, forms]) => { if (active) { setContext(work); setPrevious(forms); readyCallback.current?.(true); if (work.recordName) nameCallback.current?.(presentFmsWorkContext(work).title); } })
+      .then(([work, forms]) => { if (active) { setContext(work); setPrevious(forms); readyCallback.current?.(true); previousCallback.current?.(forms.forms.length); if (work.recordName) nameCallback.current?.(presentFmsWorkContext(work).title); } })
       .catch(() => { if (active) { setFailed(true); readyCallback.current?.(false); } });
     return () => { active = false; };
   }, [instanceId, instanceStageId, attempt]);
@@ -58,12 +59,12 @@ export function FmsWorkContext({ instanceId, instanceStageId, onReady, onRecordN
       {showExpected ? <p className="text-sm text-task-text-muted">Expected result: {work.expectedResult}</p> : null}
     </div> : null}
 
-    {previous.forms.length ? <details className="group" open={!collapsed}>
-      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-1">
-        <h2 className="text-lg font-semibold text-task-text">Previous form answers</h2>
+    {previous.forms.length ? <details className="group" open={expandAll || !collapsed}>
+      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-1 group-[:not([open])]:border group-[:not([open])]:border-task-border group-[:not([open])]:bg-task-bg group-[:not([open])]:px-4">
+        <span className="min-w-0"><h2 className="text-lg font-semibold text-task-text">Previous form answers</h2><span className="block text-xs text-task-text-muted group-open:hidden">{previous.forms.length === 1 ? "1 earlier form" : `${previous.forms.length} earlier forms`} · tap to read</span></span>
         <ChevronDown aria-hidden="true" className="size-5 shrink-0 text-task-text-muted transition-transform group-open:rotate-180" />
       </summary>
-      {previous.forms.length ? <ol className="mt-2 space-y-3">{previous.forms.map((form, formIndex) => <li key={form.id}><PreviousFormCard context={context} form={form} open={formIndex < 2} openingFile={openingFile} onOpenFile={openFile} /></li>)}</ol> : null}
+      {previous.forms.length ? <ol className="mt-2 space-y-3">{previous.forms.map((form, formIndex) => <li key={form.id}><PreviousFormCard context={context} form={form} open={expandAll || formIndex < 2} openingFile={openingFile} onOpenFile={openFile} /></li>)}</ol> : null}
       {previous.nextCursor ? <Button className="mt-3" disabled={loadingMore} onClick={() => void more()} variant="secondary">{loadingMore ? "Loading earlier forms..." : "Load earlier forms"}</Button> : null}
       {failed ? <div className="mt-3"><Notice>Earlier forms could not be loaded. Try again.</Notice></div> : null}
       {fileError ? <div className="mt-3"><Notice tone="danger">{fileError}</Notice></div> : null}
@@ -87,18 +88,19 @@ function PreviousFormCard({ context, form, open, openingFile, onOpenFile }: { co
   const row = (answer: (typeof answers)[number], index: number) => {
     const file = answer.received?.attachment;
     return <div className="min-w-0 py-3" key={answer.received?.field.key ?? index}>
-      <dt className="text-xs font-medium uppercase tracking-wide text-task-text-muted">{answer.label}</dt>
-      <dd className={cn("mt-0.5 min-w-0 whitespace-pre-wrap break-words text-base leading-snug", answer.answered || file ? "font-medium text-task-text" : "italic text-task-text-muted")}>
+      <dt className="text-sm leading-snug text-task-text-muted">{answer.label}</dt>
+      <dd className={cn("mt-1 min-w-0 whitespace-pre-wrap break-words text-base leading-snug", answer.answered || file ? "font-semibold text-task-text" : "italic text-task-text-muted")}>
         {file ? <Button className="max-w-full justify-start whitespace-normal break-words text-left" disabled={openingFile !== null} onClick={() => void onOpenFile(file.id)} variant="secondary"><Paperclip aria-hidden="true" className="size-4" />{openingFile === file.id ? "Opening..." : `Open attachment: ${file.name}`}</Button>
           : answer.answered ? answer.display : "Not answered"}
       </dd>
     </div>;
   };
-  return <details className="group/form rounded-2xl border border-task-border bg-task-bg" open={open}>
-    <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 py-3">
+  return <details className="group/form overflow-hidden rounded-2xl border border-task-border bg-task-bg" open={open}>
+    <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 bg-task-muted/60 px-4 py-3">
+      <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-full bg-gold/10 text-gold-secondary"><FileText className="size-4" /></span>
       <span className="min-w-0 flex-1">
         <span className="block break-words font-semibold text-task-text">{form.isInitial ? formName || "Starting form" : form.stageName}</span>
-        <span className="block text-xs text-task-text-muted">{[form.submittedBy, submitted || null].filter(Boolean).join(" · ")}</span>
+        <span className="block text-xs text-task-text-muted">{[form.submittedBy ? `Filled by ${form.submittedBy}` : null, submitted || null].filter(Boolean).join(" · ")}</span>
       </span>
       <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-task-text-muted transition-transform group-open/form:rotate-180" />
     </summary>

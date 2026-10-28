@@ -62,5 +62,9 @@ export function DropdownSourceEditor({ field, index, masterOptions, onPatch, onM
       </div> : null}
       {publishError ? <Notice tone="danger">{publishError}</Notice> : null}
     </div>}
+    <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border border-gold/15 bg-charcoal/40 p-3 text-sm text-champagne">
+      <input checked={field.validation?.allowOther === true} className="mt-0.5 size-5 shrink-0 accent-gold" onChange={(event) => onPatch(index, { validation: { ...(field.validation ?? {}), allowOther: event.target.checked ? true : undefined } })} type="checkbox" />
+      <span><span className="font-semibold">Add an &ldquo;Other&rdquo; choice</span><span className="block text-xs text-soft-grey">People filling the form can pick Other and type their own answer.</span></span>
+    </label>
   </div>;
 }

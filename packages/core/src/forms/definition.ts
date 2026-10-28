@@ -1,4 +1,4 @@
-import { FORM_OPTION_TYPES, parseFormOptions } from "./options.ts";
+import { FORM_OPTION_TYPES, FORM_OTHER_TYPES, parseFormOptions } from "./options.ts";
 import { normalizeFormRule, validateFormRule } from "./rules.ts";
 import { fieldSectionKey, formSections } from "./sections.ts";
 import { eligibleRecordNameFields } from "../fms/recordNaming.ts";
@@ -182,6 +182,9 @@ export function validateFormDefinition(template: FormTemplateDefinition): readon
           (validation.minLength !== undefined && validation.maxLength !== undefined && validation.minLength > validation.maxLength) ||
           (validation.min !== undefined && validation.max !== undefined && validation.min > validation.max)) {
         issues.push({ code: "invalid_validation", fieldKey: field.key, message: "Field validation bounds are invalid" });
+      }
+      if (validation.allowOther !== undefined && (typeof validation.allowOther !== "boolean" || !FORM_OTHER_TYPES.has(field.type))) {
+        issues.push({ code: "invalid_validation", fieldKey: field.key, message: "Only choice questions can offer an Other answer" });
       }
     }
     earlier.add(field.key);
