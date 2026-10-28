@@ -53,6 +53,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const forcedSignOut = useRef(false);
   const identityGeneration = useRef(0);
+  // The auth user whose profile is loaded or loading. A token refresh for the
+  // same user changes nothing a profile load reads, so it must not start one.
+  const profileUserId = useRef<string | null>(null);
 
   const refreshPreferences = useCallback(async () => {
     const generation = identityGeneration.current;
@@ -72,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadProfile = useCallback(async (nextSession: Session) => {
     invalidateMasterOptions();
     const generation = ++identityGeneration.current;
+    profileUserId.current = nextSession.user.id;
     setSession(nextSession);
     const { data: nextProfile, error } = await supabase
       .from("user_profiles")
@@ -80,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .maybeSingle();
     if (generation !== identityGeneration.current) return;
     if (error) {
+      profileUserId.current = null;
       setStatus("blocked");
       setStatusMessage("We could not load your account profile. Please try again or contact your admin.");
       return;
@@ -98,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const accountIsExplicitlyBlocked = nextProfile.account_status != null && nextProfile.account_status !== "active";
     if (accountIsExplicitlyBlocked || nextProfile.working_status === "resigned" || nextProfile.is_login_enabled === false) {
       setProfile(nextProfile);
+      profileUserId.current = null;
       forcedSignOut.current = true;
       setStatus("blocked");
       setStatusMessage(
@@ -112,17 +118,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    await applyProfile(nextProfile);
-    if (generation !== identityGeneration.current) return;
-    const { data: nextBranch } = await supabase
-      .from("branches")
-      .select("*")
-      .eq("id", nextProfile.branch_id)
-      .maybeSingle();
+    // Access, branch and preferences are independent reads, so they run
+    // together instead of one after another before the app can open.
+    const [, { data: nextBranch }] = await Promise.all([
+      applyProfile(nextProfile),
+      supabase.from("branches").select("*").eq("id", nextProfile.branch_id).maybeSingle(),
+      refreshPreferences(),
+    ]);
     if (generation !== identityGeneration.current) return;
     setBranch(nextBranch);
-    await refreshPreferences();
-    if (generation !== identityGeneration.current) return;
     setStatusMessage(null);
     setStatus("authenticated");
   }, [applyProfile, refreshPreferences]);
@@ -160,6 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await supabase.auth.signOut({ scope: "local" });
         if (!active) return;
         identityGeneration.current += 1;
+        profileUserId.current = null;
         invalidateMasterOptions();
         setPreferences(DEFAULT_USER_PREFERENCES);
         setSession(null);
@@ -170,16 +175,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setStatusMessage("Your session has expired. Please sign in again.");
         return;
       }
-      void loadProfile(refreshed.session);
+      // The stored session's INITIAL_SESSION event already started this
+      // user's profile load; only the token changed.
+      if (profileUserId.current === refreshed.session.user.id) setSession(refreshed.session);
+      else void loadProfile(refreshed.session);
     });
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!active) return;
       if (nextSession) {
-        void loadProfile(nextSession);
+        if (event === "TOKEN_REFRESHED" && profileUserId.current === nextSession.user.id) setSession(nextSession);
+        else void loadProfile(nextSession);
       } else if (event === "SIGNED_OUT" && forcedSignOut.current) {
         forcedSignOut.current = false;
       } else {
         identityGeneration.current += 1;
+        profileUserId.current = null;
         invalidateMasterOptions();
         setPreferences(DEFAULT_USER_PREFERENCES);
         setSession(null);

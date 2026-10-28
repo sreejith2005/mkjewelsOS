@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { startTransition, Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Building2,
   CalendarCheck,
@@ -39,7 +39,7 @@ import { readSidebarOpen, rememberSidebarOpen } from "@/components/shell/sidebar
 import { AuthLayout, BrandedLoading, PageLoading } from "@/components/shell/BrandScreens";
 import { LazyPageErrorBoundary } from "@/components/LazyPageErrorBoundary";
 import { crmProjectConfig } from "@/lib/crmProject";
-import { lazyPage } from "@/lib/lazyPage";
+import { lazyPage, prefetchPagesWhenIdle } from "@/lib/lazyPage";
 import { DailyChecklistManager } from "@/features/daily-checklists/DailyChecklistManager";
 import { useKiaraEscalationBadge } from "@/features/assistant/useKiaraEscalationBadge";
 import { DailyChecklistGate } from "@/features/daily-checklists/DailyChecklistGate";
@@ -74,6 +74,25 @@ const ReportsPage = lazyPage("reports", () => import("@/pages/ReportsPage").then
 const SettingsPage = lazyPage("settings", () => import("@/pages/SettingsPage").then((module) => ({ default: module.SettingsPage })));
 const AskKiaraPage = lazyPage("ask-kiara", () => import("@/pages/AskKiaraPage").then((module) => ({ default: module.AskKiaraPage })));
 const PermissionManagementPage = lazyPage("permission-management", () => import("@/features/permissions/PermissionManagementPage").then((module) => ({ default: module.PermissionManagementPage })));
+
+// The code each menu section opens with, downloaded in the background after
+// sign-in so switching sections does not wait for a download.
+const PAGE_PRELOADS: Partial<Record<PageId, readonly (() => Promise<void>)[]>> = {
+  home: [HomePage.preload],
+  dashboard: [DashboardPage.preload],
+  checklist_tasks: [TasksPage.preload, FmsAssignedWorkPage.preload],
+  task_templates: [TaskTemplatesPage.preload],
+  forms_library: [FormsPage.preload],
+  fms_builder: [FMSBuilderPage.preload],
+  notifications: [NotificationsPage.preload],
+  users: [TeamDirectoryPage.preload],
+  availability: [AvailabilityPage.preload],
+  reports: [ReportsPage.preload],
+  dropdown_master: [DropdownMasterPage.preload],
+  settings: [SettingsPage.preload],
+  ask_kiara: [AskKiaraPage.preload],
+  crm: [CrmApp.preload],
+};
 
 const PAGE_ICONS: Record<PageId, typeof Home> = {
   home: Home,
@@ -116,7 +135,7 @@ function usePathname() {
   // identical state update, so the URL advanced while the view did not.
   const [href, setHref] = useState(window.location.href);
   useEffect(() => {
-    const onPopState = () => setHref(window.location.href);
+    const onPopState = () => startTransition(() => setHref(window.location.href));
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
@@ -124,7 +143,9 @@ function usePathname() {
     const nextUrl = new URL(nextPath, window.location.origin);
     const next = `${nextUrl.pathname}${nextUrl.search}`;
     if (next !== `${window.location.pathname}${window.location.search}`) window.history.pushState({}, "", next);
-    setHref(nextUrl.href);
+    // A transition keeps the current screen on view while the next section's
+    // code finishes downloading, instead of flashing the loading skeleton.
+    startTransition(() => setHref(nextUrl.href));
   };
   // Every existing route comparison is pathname-only, so keep `path` that shape.
   const path = new URL(href, window.location.origin).pathname;
@@ -301,6 +322,11 @@ function AppShell() {
       .filter((item) => accessible.has(item.id))
       .map((item) => ({ ...item, Icon: PAGE_ICONS[item.id] }));
   }, [menu]);
+  const menuKey = menu.map((item) => item.id).join(",");
+  useEffect(() => {
+    if (!menuKey) return;
+    return prefetchPagesWhenIdle((menuKey.split(",") as PageId[]).flatMap((id) => PAGE_PRELOADS[id] ?? []));
+  }, [menuKey]);
   if (!profile || !effectiveAccess) return null;
   const isSuperAdmin = hasPermission(effectiveAccess, "developer_mode.manage");
   const disabledSectionCount = ALL_MENU_ITEMS.filter((item) => isImplementedPage(item.id) && sectionControls.section_availability[item.id] === false).length;
