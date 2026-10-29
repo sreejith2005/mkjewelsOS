@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import type { FormAnswers, FormFieldDefinition, FormTemplateDefinition } from "@jewelos/core";
@@ -27,6 +27,63 @@ const visitReport: FormTemplateDefinition = {
 };
 
 describe("guided form filling", () => {
+  it("does not submit or open workflow assignment while the next section is undecided", async () => {
+    const user = userEvent.setup();
+    const submitted: FormAnswers[] = [];
+    const form: FormTemplateDefinition = {
+      name: "Doubletick assignee form",
+      sections: [{ key: "details", title: "Details" }, { key: "assignment", title: "Assignment" }],
+      fields: [
+        { key: "route", label: "Continue to assignment", type: "radio", sectionKey: "details", sortOrder: 0, branches: [{ operator: "equals", value: "yes", targetSectionKey: "assignment" }], options: [{ value: "yes", label: "Yes" }] },
+        ...Array.from({ length: 7 }, (_, index) => text(`detail_${index}`, `Detail ${index + 1}`, "details", index + 1)),
+        ...Array.from({ length: 8 }, (_, index) => text(`assignment_${index}`, `Assignment ${index + 1}`, "assignment", index + 8)),
+      ],
+    };
+
+    render(<FormRenderer definition={form} onSubmit={async (answers) => { submitted.push(answers); }} />);
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+
+    expect(submitted).toEqual([]);
+    expect(screen.getByRole("alert").textContent).toContain("Choose an answer to continue");
+    expect(screen.getByRole("status").textContent).toBe("Step 1");
+
+    await user.click(screen.getByRole("radio", { name: "Yes" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(submitted).toEqual([]);
+    await user.type(screen.getByRole("textbox", { name: /Assignment 8/ }), "Final answer");
+    await user.click(screen.getByRole("button", { name: "Submit form" }));
+    expect(submitted).toEqual([{ route: "yes", assignment_7: "Final answer" }]);
+  });
+
+  it("does not submit when Next becomes the final submit button", async () => {
+    const user = userEvent.setup();
+    const submitted: FormAnswers[] = [];
+    render(<FormRenderer definition={{ ...visitReport, sections: [...visitReport.sections!, { key: "finish", title: "Finish" }], fields: [...visitReport.fields.map(field => ({ ...field, required: false })), text("finish", "Final notes", "finish", 8)] }} onSubmit={async answers => { submitted.push(answers); }} />);
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+
+    expect(screen.getByRole("status").textContent).toBe("Step 3");
+    expect(submitted).toEqual([]);
+    await user.type(screen.getByRole("textbox", { name: /Final notes/ }), "All sections completed");
+    await user.click(screen.getByRole("button", { name: "Submit form" }));
+    expect(submitted).toEqual([{ finish: "All sections completed" }]);
+  });
+
+  it("advances instead of submitting on a native submit event before the final section", async () => {
+    const user = userEvent.setup();
+    const submitted: FormAnswers[] = [];
+    render(<FormRenderer definition={{ ...visitReport, fields: visitReport.fields.map(field => ({ ...field, required: false })) }} onSubmit={async answers => { submitted.push(answers); }} />);
+
+    const name = screen.getByRole("textbox", { name: /Customer name/ });
+    await user.type(name, "Synthetic Customer");
+    fireEvent.submit(name.closest("form")!);
+
+    expect(submitted).toEqual([]);
+    expect(screen.getByRole("status").textContent).toBe("Step 2");
+  });
+
   it("fills a long form one step at a time with inline errors, progress and a final review", async () => {
     const user = userEvent.setup();
     const submitted: FormAnswers[] = [];

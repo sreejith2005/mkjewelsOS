@@ -150,11 +150,16 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
     if (!currentStepKey) return;
     const result = validateFormStep(resolved, answers, currentStepKey);
     if (!result.valid) { showIssues(result.issues, "Check this step"); return; }
-    // An optional branching question left blank ends the route here.
-    if (nextStepKey) goToStep(nextStepKey); else void submitAnswers();
+    if (nextStepKey) goToStep(nextStepKey);
+    else if (finalStep) void submitAnswers();
+    else setError("Choose an answer to continue.");
   };
   const register = (key: string) => (node: HTMLElement | null) => { if (node) fieldRefs.current.set(key, node); else fieldRefs.current.delete(key); };
-  const submit = (event: FormEvent) => { event.preventDefault(); void submitAnswers(); };
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (stepped && currentStepKey && !finalStep) { advance(); return; }
+    void submitAnswers();
+  };
   const submitAnswers = async () => {
     const result = validateCompleteForm(resolved, answers);
     if (!result.valid) { showIssues(result.issues, "Check the form"); return; }
@@ -261,8 +266,9 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
     {!readOnly && resolved.fields.length > 0 ? <div className="form-actions sticky z-10 -mx-1 mt-1 flex gap-2 border-t border-task-border bg-task-bg/95 px-1 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
       {extraAction}
       {stepped && previousStepKey ? <Button className="min-h-12 shrink-0" disabled={busy || success} onClick={() => goToStep(previousStepKey)} type="button" variant="secondary"><ChevronLeft aria-hidden="true" className="size-4" />Back</Button> : null}
-      {stepped && (nextStepKey || !finalStep) ? <Button className="min-h-12 flex-1 sm:flex-none" disabled={busy || success} onClick={advance} type="button">Next<ChevronRight aria-hidden="true" className="size-4" /></Button>
-        : <Button className="min-h-12 flex-1 sm:flex-none" disabled={busy || preview || success} type="submit">{busy ? "Submitting..." : "Submit form"}</Button>}
+      {/* Keep navigation separate: reusing Next as Submit can submit during the same native click. */}
+      {stepped && (nextStepKey || !finalStep) ? <Button className="min-h-12 flex-1 sm:flex-none" disabled={busy || success} key="next" onClick={advance} type="button">Next<ChevronRight aria-hidden="true" className="size-4" /></Button>
+        : <Button className="min-h-12 flex-1 sm:flex-none" disabled={busy || preview || success} key="submit" type="submit">{busy ? "Submitting..." : "Submit form"}</Button>}
     </div> : null}
   </form>;
 }
