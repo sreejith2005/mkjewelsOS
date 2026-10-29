@@ -14,6 +14,8 @@ export type CustomerIntegrationFunctions = {
 
  configure_customer_source:{Args:{p_tenant:string;p_enabled:boolean};Returns:undefined};
 
+ configure_customer_contributors:{Args:{p_tenant:string;p_enabled:boolean;p_reason:string};Returns:undefined};
+
  approve_customer_mapping:{Args:{p_mapping_id:string;p_digest:string};Returns:undefined};
 
  review_customer_identity:{Args:{p_event_id:string;p_client:string;p_reason:string};Returns:undefined};

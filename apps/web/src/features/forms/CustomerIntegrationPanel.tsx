@@ -1,17 +1,24 @@
 import { useEffect,useState } from "react";
-import { CUSTOMER_DESTINATIONS,CUSTOMER_CONTACT_KINDS,CUSTOMER_CONTACT_CHANNELS,validateCustomerMapping,type CustomerFormMapping,type CustomerFieldMapping,type FormTemplateDefinition } from "@jewelos/core";
+import { CUSTOMER_DESTINATIONS,CUSTOMER_CONTACT_KINDS,CUSTOMER_CONTACT_CHANNELS,customerSetupStatus,validateCustomerMapping,type CustomerFormMapping,type CustomerFieldMapping,type FormTemplateDefinition } from "@jewelos/core";
 import { Button,Field,Notice } from "@/components/ui";
 import { loadCustomerMapping,saveCustomerMapping } from "./customerIntegrationApi";
 
 const empty:CustomerFormMapping={schemaVersion:1,enabled:false,channel:"OTHER",identityScope:"",fields:[]};
 export function CustomerIntegrationPanel({definition,templateId,unsaved=false}:{definition:FormTemplateDefinition;templateId?:string|undefined;unsaved?:boolean}) {
  const [opened,setOpened]=useState(false),[mapping,setMapping]=useState<CustomerFormMapping>(empty),[loading,setLoading]=useState(false),[saving,setSaving]=useState(false),[version,setVersion]=useState<number|null>(null),[message,setMessage]=useState(""),[error,setError]=useState("");
- useEffect(()=>{if(!opened||!templateId)return;let active=true;setLoading(true);setError("");void loadCustomerMapping(templateId).then(saved=>{if(active){setMapping(saved?.mapping??empty);setVersion(saved?.version??null);}}).catch(caught=>{if(active)setError(caught instanceof Error?caught.message:"Unable to load integration");}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[opened,templateId]);
+ const [inherited,setInherited]=useState(false),[crmStatus,setCrmStatus]=useState<string|null>(null);
+ useEffect(()=>{if(!opened||!templateId)return;let active=true;setLoading(true);setError("");void loadCustomerMapping(templateId).then(saved=>{if(!active)return;
+  // A carried-over mapping keeps only questions that still exist on this revision.
+  const keys=new Set(definition.fields.map(field=>field.key));
+  setMapping(saved?{...saved.mapping,fields:saved.mapping.fields.filter(item=>keys.has(item.fieldKey))}:empty);
+  setVersion(saved&&!saved.inherited?saved.version:null);setInherited(saved?.inherited??false);setCrmStatus(saved?.crmStatus??null);
+ }).catch(caught=>{if(active)setError(caught instanceof Error?caught.message:"Unable to load integration");}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[opened,templateId,definition.fields]);
+ const crmText=inherited?customerSetupStatus("form_changed"):version===null?null:!mapping.enabled?customerSetupStatus("disabled"):crmStatus==="accepted"?customerSetupStatus("active"):crmStatus==="failed"?customerSetupStatus("blocked"):customerSetupStatus("awaiting_crm_approval");
  const patch=(fieldKey:string,change:Partial<CustomerFieldMapping>)=>setMapping(current=>{
   const previous=current.fields.find(item=>item.fieldKey===fieldKey)??{fieldKey,mode:"operational" as const,destination:"note" as const};
   const next={...previous,...change};return {...current,fields:[...current.fields.filter(item=>item.fieldKey!==fieldKey),...(next.mode==="operational"?[]:[next])]};
  });
- const save=async()=>{if(!templateId||unsaved||saving)return;const issues=validateCustomerMapping(definition,mapping);if(issues.length){setError(issues.join(". "));return;}setSaving(true);setError("");setMessage("");try{const saved=await saveCustomerMapping(templateId,mapping);setVersion(saved.version);setMapping(saved.mapping);setMessage("Mapping saved. CRM approval is required before customer data is applied.");}catch(caught){setError(caught instanceof Error?caught.message:"Unable to save mapping");}finally{setSaving(false);}};
+ const save=async()=>{if(!templateId||unsaved||saving)return;const issues=validateCustomerMapping(definition,mapping);if(issues.length){setError(issues.join(". "));return;}setSaving(true);setError("");setMessage("");try{const saved=await saveCustomerMapping(templateId,mapping);setVersion(saved.version);setMapping(saved.mapping);setInherited(false);setCrmStatus(saved.crmStatus);setMessage(saved.mapping.enabled?"Mapping saved. The CRM is told within about a minute; a CRM super admin approves it in CRM → Dashboard → Customer Integration Administration. After approval, submissions link automatically.":"Mapping saved but not enabled.");}catch(caught){setError(caught instanceof Error?caught.message:"Unable to save mapping");}finally{setSaving(false);}};
  return <details className="rounded-xl border border-gold/20 p-4" onToggle={event=>setOpened(event.currentTarget.open)}>
   <summary className="min-h-11 cursor-pointer content-center font-semibold text-gold-secondary">Customer Data Integration</summary>
   {opened?<div className="mt-3 space-y-4">
@@ -20,6 +27,8 @@ export function CustomerIntegrationPanel({definition,templateId,unsaved=false}:{
    {loading?<p role="status">Loading customer mapping…</p>:<>
     <label className="flex min-h-11 items-center gap-2"><input checked={mapping.enabled} onChange={event=>setMapping({...mapping,enabled:event.target.checked})} type="checkbox"/>Enable CRM data integration for future submissions</label>
     <div className="grid gap-3 sm:grid-cols-2"><Field label="Channel code"><input className="field" maxLength={40} onChange={event=>setMapping({...mapping,channel:event.target.value.toUpperCase().replace(/[^A-Z0-9_]/g,"_")})} value={mapping.channel}/></Field><Field label="Source account scope"><input className="field" maxLength={120} onChange={event=>setMapping({...mapping,identityScope:event.target.value})} placeholder="Account or channel reference" value={mapping.identityScope}/></Field></div>
+    {inherited?<Notice>This form was revised. The mapping from the earlier revision is filled in below; review it and save to request CRM re-approval. Until then, submissions of this revision are not sent to the CRM.</Notice>:null}
+    {crmText?<p className="text-sm" role="status"><span className="font-semibold">CRM status: {crmText.label}</span>{crmText.action?<span className="text-soft-grey"> · {crmText.action}</span>:null}</p>:null}
     <p className="text-xs text-soft-grey">{version===null?"No saved mapping":"Mapping version "+version} · {mapping.fields.length} mapped questions · Customer entity: person</p>
     <div className="space-y-3">{definition.fields.filter(field=>!["divider","section_header"].includes(field.type)).map(field=>{
      const item=mapping.fields.find(item=>item.fieldKey===field.key);const operational=["user_dropdown","branch_dropdown","department_dropdown","file"].includes(field.type);

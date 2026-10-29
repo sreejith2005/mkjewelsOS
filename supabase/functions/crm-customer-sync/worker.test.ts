@@ -16,3 +16,26 @@ Deno.test("review is durable and does not masquerade as delivery",async()=>{cons
 Deno.test("network timeout keeps leased source event for retry",async()=>{const f=fixture();f.deps.receiver!.post=()=>Promise.reject(new Error("synthetic network failure"));await handleCustomerSync(request(),f.deps);assertEquals(f.finished,[{result:null,error:"network"}]);});
 Deno.test("unconfigured sender fails without consuming work",async()=>{assertEquals((await handleCustomerSync(request(),{secret:"test",gateway:null,receiver:null})).status,503);});
 Deno.test("stage delivered before its starter is retried automatically",async()=>{const f=fixture({results:[{event_id:"jewelos.form.source1",ok:true,outcome:"retry",reason:"journey_pending"}]});await handleCustomerSync(request(),f.deps);assertEquals(f.finished,[{result:null,error:"dependency_pending"}]);});
+Deno.test("live mappings are registered before any event and the CRM answer is recorded",async()=>{
+ const f=fixture();const recorded:unknown[]=[];
+ f.deps.gateway!.claim=()=>Promise.resolve([]);
+ f.deps.gateway!.claimMappings=()=>Promise.resolve([{mapping_id:"m1",descriptor:{formName:"Synthetic"},digest:"d"},{mapping_id:"m2",descriptor:{},digest:"d2"}]);
+ f.deps.gateway!.recordMapping=(id,outcome)=>{recorded.push([id,outcome]);return Promise.resolve(id==="m1"?3:0);};
+ f.deps.receiver!.post=body=>{f.sent.push(body);return Promise.resolve({status:200,body:{results:[{mapping_id:"m1",ok:true,outcome:"accepted"},{mapping_id:"m2",ok:false,error:"apply_failed"}]}});};
+ const body=await(await handleCustomerSync(request(),f.deps)).json();
+ assertEquals(recorded,[["m1","accepted"],["m2","failed"]]);assertEquals(body.mappingsChecked,2);assertEquals(body.released,3);assertEquals(body.claimed,0);
+});
+Deno.test("an unknown CRM answer is never recorded as an approval",async()=>{
+ const f=fixture();const recorded:unknown[]=[];
+ f.deps.gateway!.claim=()=>Promise.resolve([]);
+ f.deps.gateway!.claimMappings=()=>Promise.resolve([{mapping_id:"m1",descriptor:{},digest:"d"}]);
+ f.deps.gateway!.recordMapping=(id,outcome)=>{recorded.push([id,outcome]);return Promise.resolve(0);};
+ f.deps.receiver!.post=()=>Promise.resolve({status:200,body:{results:[{mapping_id:"m1",ok:true,outcome:"approved_please"}]}});
+ await handleCustomerSync(request(),f.deps);assertEquals(recorded,[["m1","failed"]]);
+});
+Deno.test("mapping registration failure does not stop event delivery",async()=>{
+ const f=fixture();
+ f.deps.gateway!.claimMappings=()=>Promise.reject(new Error("synthetic"));
+ f.deps.gateway!.recordMapping=()=>Promise.resolve(0);
+ const response=await handleCustomerSync(request(),f.deps);assertEquals(response.status,200);assertEquals(f.finished.length,1);
+});

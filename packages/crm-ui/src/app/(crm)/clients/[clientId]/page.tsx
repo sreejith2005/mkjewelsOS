@@ -9,11 +9,14 @@ import { ClientProfile } from "@/components/client-profile";
 import { createClient } from "@/lib/supabase/server";
 import type { Json } from '@/lib/supabase/database.types';
 import { readAllCrmRows } from '@/crm-port/read-all-rows';
+import { journeyGroup, journeySources } from '@/lib/customer-journey';
 
 export default async function ClientPage({ params,searchParams=Promise.resolve({}) }: { params: Promise<{ clientId: string }>;searchParams?:Promise<Record<string,string|undefined>> }) {
   const filters=await searchParams;
   const pageFor=(key:string)=>Math.max(1,Math.min(1000000,Number.parseInt(filters[key+'_page']??'1',10)||1));
   const visitPage=pageFor('visits'),activityPage=pageFor('activity'),auditPage=pageFor('audit');
+  // Customer journey filter: a server-side source filter on the same paged activity read.
+  const journey=journeyGroup(filters.journey),journeyTables=journeySources(journey);
 
   const { clientId } = await params;
   const supabase = await createClient(); const masterOptionsPromise=loadCrmMasterOptions(supabase);
@@ -47,7 +50,7 @@ export default async function ClientPage({ params,searchParams=Promise.resolve({
     masterOptionsPromise.then(options=>({data:(options.lookup_sugar_options ?? []).map(label=>({label}))})),
     masterOptionsPromise.then(options=>({data:(options.lookup_communities ?? []).map(label=>({label}))})),
     masterOptionsPromise.then(options=>({data:(options.lookup_gifts ?? []).map(label=>({label}))})),
-    supabase.from("crm_client_activity").select("*").eq("client_id",clientId).order("occurred_at",{ascending:false}).order("activity_id").range((activityPage-1)*100,activityPage*100),
+    (journeyTables?supabase.from("crm_client_activity").select("*").eq("client_id",clientId).in("source_table",[...journeyTables]):supabase.from("crm_client_activity").select("*").eq("client_id",clientId)).order("occurred_at",{ascending:false}).order("activity_id").range((activityPage-1)*100,activityPage*100),
     supabase.from("lead_form_fields").select("field_key,label"),
     supabase.from("crm_client_activity_summary").select("first_recorded_at,latest_interaction_at").eq("client_id",clientId),
     supabase.from("client_identity").select("referral_code,household_code,household_id,referral_id,referral_person_id,relation,referred_by_client_id,referred_by_client_code,referred_by_name,lifecycle_stage").eq("client_id", clientId).maybeSingle(),
@@ -60,7 +63,7 @@ export default async function ClientPage({ params,searchParams=Promise.resolve({
     ? assertCrmRead(await supabase.from("users").select("branch_id").eq("id", authResult.data.user.id).single())
     : { data: null };
 
-  const historyPaging={visits:visitPage,activity:activityPage,audit:auditPage,hasMoreVisits:(timelineResult.data?.length??0)>100,hasMoreActivity:(activityResult.data?.length??0)>100,hasMoreAudit:(auditResult.data?.length??0)>100};
+  const historyPaging={visits:visitPage,activity:activityPage,audit:auditPage,hasMoreVisits:(timelineResult.data?.length??0)>100,hasMoreActivity:(activityResult.data?.length??0)>100,hasMoreAudit:(auditResult.data?.length??0)>100,journey};
   timelineResult.data=timelineResult.data?.slice(0,100)??null;
   activityResult.data=activityResult.data?.slice(0,100)??null;
   auditResult.data=auditResult.data?.slice(0,100)??null;
@@ -100,6 +103,7 @@ export default async function ClientPage({ params,searchParams=Promise.resolve({
     client={clientResult.data}
     historyPaging={historyPaging}
     activity={activityResult.data ?? []}
+    journey={journey}
     activitySummary={activitySummaryResult.data?.[0]}
     activityActorNames={Object.fromEntries(userNames)}
     activityBranchNames={Object.fromEntries(branchNames)}
