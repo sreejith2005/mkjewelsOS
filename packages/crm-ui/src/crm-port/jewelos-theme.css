@@ -313,3 +313,16 @@ html[data-theme="dark"] #crm-theme .crm-app .bg-emerald-100 { background: rgb(va
 #crm-theme .crm-customer-journeys p { overflow-wrap: anywhere; margin-block: .5rem; }
 #crm-theme .crm-customer-journeys a { color: rgb(var(--color-gold-secondary)); text-decoration: underline; }
 @media (min-width: 40rem) { #crm-theme .crm-customer-journeys form { grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; align-items: end; } }
+
+/* Customer journey filters and lifecycle (2026-10-29). Wraps at phone width, no horizontal scroll. */
+#crm-theme .crm-journey-filters { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .75rem; }
+#crm-theme .crm-journey-filters a { display: inline-flex; align-items: center; min-height: 2.75rem; padding: .25rem .75rem; border: 1px solid rgb(var(--color-task-border)); border-radius: 999px; color: rgb(var(--color-task-text)); font-size: .875rem; }
+#crm-theme .crm-journey-filters a[aria-current="page"] { border-color: rgb(var(--color-gold)); background: rgb(var(--color-gold) / .12); font-weight: 600; }
+#crm-theme .crm-journey-fms { display: grid; gap: .5rem; min-width: 0; overflow-wrap: anywhere; }
+#crm-theme .crm-journey-fms a { color: rgb(var(--color-gold-secondary)); font-weight: 600; text-decoration: underline; min-height: 2.75rem; display: inline-flex; align-items: center; }
+#crm-theme .crm-lifecycle { display: grid; gap: .35rem; margin-block: .5rem; font-size: .875rem; color: rgb(var(--color-task-text)); }
+#crm-theme .crm-lifecycle-steps { display: flex; flex-wrap: wrap; gap: .25rem .5rem; margin: 0; padding: 0; list-style: none; }
+#crm-theme .crm-lifecycle-steps li { padding: .15rem .6rem; border: 1px solid rgb(var(--color-task-border)); border-radius: 999px; color: rgb(var(--color-task-text-muted)); }
+#crm-theme .crm-lifecycle-steps li[data-done="true"] { border-color: rgb(var(--color-success)); color: rgb(var(--color-success)); font-weight: 600; }
+#crm-theme .crm-lifecycle-steps li + li::before { content: "→ "; color: rgb(var(--color-task-text-muted)); }
+#crm-theme .crm-lifecycle-purchase { color: rgb(var(--color-task-text-muted)); }

@@ -21,4 +21,5 @@ export * from "./library";
 export * from "./sectionImport";
 export * from "./previewAnswers";
 export * from "./customerIntegration";
+export * from "./customerIntegrationStatus";
 export type { CustomerIntegrationFunctions, CustomerIntegrationTables } from "./customerIntegrationRpc";

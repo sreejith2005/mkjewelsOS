@@ -2,20 +2,52 @@ import { secretMatches } from "../crm-staff-sync/worker.ts";
 
 export type CustomerDeliveryEvent = { id: string; lease_token: string; mapping_id: string; mapping_digest: string; descriptor: Record<string, unknown>; payload: Record<string, unknown> & { eventId: string } };
 type DeliveryResult = Record<string, unknown> & { outcome?: string };
+export type CustomerMappingRegistration = { mapping_id: string; descriptor: Record<string, unknown>; digest: string };
+export type MappingOutcome = "source_unapproved" | "mapping_unapproved" | "accepted" | "failed";
 export type CustomerSyncDeps = {
  secret: string | undefined;
- gateway: null | { claim(limit: number): Promise<readonly CustomerDeliveryEvent[]>; finish(id: string, lease: string, result: DeliveryResult | null, error: string | null): Promise<"delivered" | "review" | "retry" | "dead" | "rejected"> };
+ gateway: null | { claim(limit: number): Promise<readonly CustomerDeliveryEvent[]>; finish(id: string, lease: string, result: DeliveryResult | null, error: string | null): Promise<"delivered" | "review" | "retry" | "dead" | "rejected">;
+  /** 0356: mappings the CRM should learn before any event, and the CRM's answer for each. */
+  claimMappings?(limit: number): Promise<readonly CustomerMappingRegistration[]>;
+  recordMapping?(id: string, outcome: MappingOutcome): Promise<number> };
  receiver: null | { post(body: Record<string, unknown>): Promise<{ status: number; body: unknown }> };
 };
 function record(value: unknown): Record<string, unknown> | null { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null; }
+const MAPPING_OUTCOMES: readonly MappingOutcome[] = ["source_unapproved", "mapping_unapproved", "accepted"];
+
+/** Registers live mappings so a CRM administrator can approve them before the first submission.
+ * An approval answer releases that mapping's held events on the JewelOS side. Never blocks delivery. */
+async function registerMappings(deps: CustomerSyncDeps): Promise<{ checked: number; released: number }> {
+ const gateway = deps.gateway, receiver = deps.receiver;
+ if (!gateway?.claimMappings || !gateway.recordMapping || !receiver) return { checked: 0, released: 0 };
+ let checked = 0, released = 0;
+ try {
+  const mappings = await gateway.claimMappings(10);
+  if (!mappings.length) return { checked, released };
+  let results: unknown[] = [];
+  try {
+   const response = await receiver.post({ kind: "customer.mappings", mappings: mappings.map(m => ({ mapping_id: m.mapping_id, descriptor: m.descriptor, digest: m.digest })) });
+   const body = record(response.body);
+   if (response.status === 200 && Array.isArray(body?.results)) results = body.results;
+  } catch { /* Recorded as failed below and retried later. */ }
+  for (const mapping of mappings) {
+   const result = record(results.find(value => record(value)?.mapping_id === mapping.mapping_id));
+   const outcome = MAPPING_OUTCOMES.find(value => result?.ok === true && result.outcome === value) ?? "failed";
+   released += await gateway.recordMapping(mapping.mapping_id, outcome);
+   checked += 1;
+  }
+ } catch { /* Mapping status is advisory; event delivery below still runs. */ }
+ return { checked, released };
+}
 function json(status: number, body: Record<string, unknown>): Response { return Response.json(body, { status, headers: { "Cache-Control": "no-store" } }); }
 
 export async function handleCustomerSync(request: Request, deps: CustomerSyncDeps): Promise<Response> {
  if (request.method !== "POST") return new Response(null,{status:405,headers:{Allow:"POST"}});
  if (!deps.secret || !deps.gateway || !deps.receiver) return json(503,{error:"Customer sync is not configured"});
  if (!secretMatches(request.headers.get("x-cron-secret"),deps.secret)) return json(401,{error:"Scheduler authorization required"});
- const counts = { claimed:0,delivered:0,review:0,retry:0,dead:0,rejected:0 };
+ const counts = { claimed:0,delivered:0,review:0,retry:0,dead:0,rejected:0,mappingsChecked:0,released:0 };
  try {
+  const registration = await registerMappings(deps);counts.mappingsChecked=registration.checked;counts.released=registration.released;
   for(let batch=0;batch<2;batch++) {
    const events = await deps.gateway.claim(10);if(!events.length)break;counts.claimed+=events.length;
    let failure: string | null = null;let results: unknown[]=[];

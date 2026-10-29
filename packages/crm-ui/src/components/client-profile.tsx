@@ -4,6 +4,8 @@ import { ProfileEditLog } from '@/components/profile-edit-log';
 import { ResponsiveDisclosure } from '@/components/responsive-disclosure';
 import { ClientHistoryPager,type ClientHistoryPaging } from "@/components/client-history-pager";
 import { ClientActivity, type ClientActivityRow } from "@/components/client-activity";
+import { CustomerLifecycle } from "@/components/customer-lifecycle";
+import type { JourneyGroup } from "@/lib/customer-journey";
 
 import { WalkinHistory, type SavedWalkin } from '@/components/walkin-history';
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -190,6 +192,7 @@ export function ClientProfile({
   activityBranchNames = {},
   activitySummary,
   historyPaging,
+  journey = null,
 
 }: {
   client: Client;
@@ -230,6 +233,7 @@ export function ClientProfile({
   activityActorNames?: Record<string,string>;
   activityBranchNames?: Record<string,string>;
   activitySummary?: {first_recorded_at:string|null;latest_interaction_at:string|null};
+  journey?: JourneyGroup | null;
 
 }) {
   const [values, setValues] = useState(() => initial(client));
@@ -303,7 +307,7 @@ export function ClientProfile({
       <CustomerWorkflows clientId={client.client_id} actorNames={activityActorNames}/>
       <div className="legacy-profile-grid">
         <aside className="legacy-profile-left">
-          <section className="legacy-client-hero"><h1>{client.primary_name}</h1><div className="legacy-client-badges"><span>{client.client_code}</span><span>{client.last_buy_status ?? "NA"}</span><span>{client.city ?? "NA"}</span>{identity?.referral_code ? <span>{identity.referral_code}</span> : null}{identity?.household_code ? <span>{identity.household_code}</span> : null}</div><div className="legacy-client-hero-actions"><ExistingClientWalkinAction clientId={client.client_id} primaryName={client.primary_name} primaryPhone={client.primary_phone ?? ""} role={walkinContext.role} branchId={walkinContext.branchId} branches={walkinContext.branches} /><button type="button" onClick={() => { setValues(initial(client)); setEditing(true); }}>EDIT PROFILE</button></div></section>
+          <section className="legacy-client-hero"><h1>{client.primary_name}</h1><CustomerLifecycle clientId={client.client_id} lifecycleStage={identity?.lifecycle_stage ?? client.lifecycle_stage} totalVisits={client.total_visits}/><div className="legacy-client-badges"><span>{client.client_code}</span><span>{client.last_buy_status ?? "NA"}</span><span>{client.city ?? "NA"}</span>{identity?.referral_code ? <span>{identity.referral_code}</span> : null}{identity?.household_code ? <span>{identity.household_code}</span> : null}</div><div className="legacy-client-hero-actions"><ExistingClientWalkinAction clientId={client.client_id} primaryName={client.primary_name} primaryPhone={client.primary_phone ?? ""} role={walkinContext.role} branchId={walkinContext.branchId} branches={walkinContext.branches} /><button type="button" onClick={() => { setValues(initial(client)); setEditing(true); }}>EDIT PROFILE</button></div></section>
           <LegacyProfileCard title="CONTACT" rows={[["PRIMARY PHONE", formatPhone(client.primary_phone)], ["SECONDARY PHONE", formatPhone(client.secondary_phone)], ["BILLING PHONE", formatPhone(client.billing_phone)], ["OTHER KNOWN PHONES", client.other_known_phones?.map(formatPhone).join(", ") ?? ""]]} />
 
           <LegacyProfileCard title="FAMILY & REFERRAL" rows={[
@@ -329,7 +333,7 @@ export function ClientProfile({
           </div>
           <section className="legacy-timeline-card"><h2>FULL TIMELINE HISTORY</h2><div className="overflow-x-auto"><table className="crm-record-table"><thead><tr>{["TIMESTAMP", "CLIENT VISIT DATE", "EVENT TYPE", "BUY STATUS", "BRANCH", "CRM", "SALESPERSON", "SEEN", "BOUGHT", "ORDER", "PRODUCT REQUIREMENT", "REMARK", "REFERENCE NUMBER"].map((heading) => <th key={heading}>{heading}</th>)}</tr></thead><tbody>{timelineRows.length ? timelineRows : <tr><td colSpan={13}>NO TIMELINE FOUND.</td></tr>}</tbody></table></div></section>
           {historyPaging&&<ClientHistoryPager clientId={client.client_id} section="visits" paging={historyPaging}/>}
-          <ClientActivity clientId={client.client_id} activity={activity} fieldLabels={leadFieldLabels} actorNames={activityActorNames} branchNames={activityBranchNames} summary={activitySummary} />
+          <ClientActivity clientId={client.client_id} activity={activity} fieldLabels={leadFieldLabels} actorNames={activityActorNames} branchNames={activityBranchNames} summary={activitySummary} journey={journey} />
 
           {historyPaging&&<ClientHistoryPager clientId={client.client_id} section="activity" paging={historyPaging}/>}
           <WalkinHistory visits={savedWalkins} />
@@ -374,7 +378,7 @@ export function ClientProfile({
           {client.last_buy_status ?? "—"}
         </p>
       </div>
-      <ClientActivity clientId={client.client_id} activity={activity} fieldLabels={leadFieldLabels} actorNames={activityActorNames} branchNames={activityBranchNames} summary={activitySummary} />
+      <ClientActivity clientId={client.client_id} activity={activity} fieldLabels={leadFieldLabels} actorNames={activityActorNames} branchNames={activityBranchNames} summary={activitySummary} journey={journey} />
       {historyPaging&&<ClientHistoryPager clientId={client.client_id} section="activity" paging={historyPaging}/>}
       <div className="mt-6 flex gap-4 border-b">
         <button

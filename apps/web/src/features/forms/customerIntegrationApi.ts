@@ -1,7 +1,8 @@
 import { supabase } from "@jewelos/api-client";
 import { CUSTOMER_DESTINATIONS,CUSTOMER_CONTACT_KINDS,CUSTOMER_CONTACT_CHANNELS, type CustomerFormMapping, type CustomerFieldMapping, type Json } from "@jewelos/core";
 
-export type SavedCustomerMapping = { id: string; version: number; digest: string; mapping: CustomerFormMapping };
+/** `inherited`: carried over from an earlier revision of this form; it must be saved again and re-approved. */
+export type SavedCustomerMapping = { id: string; version: number; digest: string; mapping: CustomerFormMapping; inherited: boolean; crmStatus: string | null };
 function object(value: unknown): Record<string, unknown> { return value!==null&&typeof value==="object"&&!Array.isArray(value) ? value as Record<string,unknown> : {}; }
 function read(value: unknown): SavedCustomerMapping | null {
  if(value===null)return null;
@@ -14,7 +15,8 @@ function read(value: unknown): SavedCustomerMapping | null {
   const mode=item.mode;if(mode!=="operational"&&mode!=="profile"&&mode!=="history"&&mode!=="both")throw new Error("Invalid mapping mode");
   fields.push({fieldKey:item.fieldKey,mode,destination,...(Array.isArray(item.contactConfirmedValues)&&item.contactConfirmedValues.every((v):v is string=>typeof v==="string")?{contactConfirmedValues:item.contactConfirmedValues}:{}),contactKind:CUSTOMER_CONTACT_KINDS.find(v=>v===item.contactKind),contactChannel:CUSTOMER_CONTACT_CHANNELS.find(v=>v===item.contactChannel)});
  }
- return {id:row.id,version:row.version,digest:row.digest,mapping:{schemaVersion:1,enabled:descriptor.enabled===true,channel:descriptor.channel,identityScope:descriptor.identityScope,fields}};
+ return {id:row.id,version:row.version,digest:row.digest,inherited:row.inherited===true,crmStatus:typeof row.crmStatus==="string"?row.crmStatus:null,
+  mapping:{schemaVersion:1,enabled:descriptor.enabled===true,channel:descriptor.channel,identityScope:descriptor.identityScope,fields}};
 }
 export async function loadCustomerMapping(templateId: string): Promise<SavedCustomerMapping|null> {
  const {data,error}=await supabase.rpc("get_form_customer_mapping",{p_template_id:templateId});

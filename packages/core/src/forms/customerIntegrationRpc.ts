@@ -12,6 +12,8 @@ export type CustomerIntegrationFunctions = {
  customer_integration_health: { Args: Record<never, never>; Returns: Json };
  retry_customer_events: { Args: { p_ids: string[] }; Returns: number };
  get_fms_customer_link: { Args: { p_instance_id: string }; Returns: string | null };
+ get_fms_customer_sync_status: { Args: { p_instance_id: string }; Returns: Json };
+ customer_integration_overview: { Args: Record<never, never>; Returns: Json };
  reconcile_customer_submissions: { Args: { p_mapping_id: string; p_ids: string[]; p_apply?: boolean; p_expected_digest?: string | null }; Returns: Json };
  export_customer_stage_answers: { Args: { p_filters?: Json; p_before?: string | null; p_before_id?: string | null; p_limit?: number }; Returns: Json };
 };

@@ -19,3 +19,17 @@ it("saves stable question keys and keeps employee answers operational",async()=>
  fireEvent.click(screen.getByRole("button",{name:"Save customer mapping"}));
  await waitFor(()=>expect(mocks.save).toHaveBeenCalledWith("form",expect.objectContaining({fields:[{fieldKey:"client",mode:"both",destination:"primary_name"}]})));
 });
+it("offers a revised form the earlier mapping and asks for re-approval",async()=>{
+ mocks.load.mockResolvedValueOnce({id:"old",version:3,digest:"d",inherited:true,crmStatus:null,mapping:{schemaVersion:1,enabled:true,channel:"INSTAGRAM",identityScope:"mk",fields:[{fieldKey:"client",mode:"both",destination:"primary_name"},{fieldKey:"removed",mode:"both",destination:"note"}]}} as never);
+ render(<CustomerIntegrationPanel definition={definition} templateId="revision"/>);
+ openPanel();
+ expect(await screen.findByText(/This form was revised/)).toBeTruthy();
+ expect(screen.getByText(/Form changed, re-approval required/)).toBeTruthy();
+ expect(screen.getByText(/No saved mapping · 1 mapped questions/)).toBeTruthy();
+});
+it("shows the CRM answer for a saved mapping",async()=>{
+ mocks.load.mockResolvedValueOnce({id:"m",version:1,digest:"d",inherited:false,crmStatus:"accepted",mapping:{schemaVersion:1,enabled:true,channel:"INSTAGRAM",identityScope:"mk",fields:[{fieldKey:"client",mode:"both",destination:"primary_name"}]}} as never);
+ render(<CustomerIntegrationPanel definition={definition} templateId="form"/>);
+ openPanel();
+ expect(await screen.findByText(/CRM status: Approved and active/)).toBeTruthy();
+});
