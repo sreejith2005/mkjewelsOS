@@ -1,4 +1,4 @@
-import type { FmsRecordedOutcome, FmsTerminalOutcome } from "./types.ts";
+import type { FmsRecordedOutcome, FmsStageDefinition, FmsTerminalOutcome } from "./types.ts";
 
 /** Plain employee words for each stable End Node outcome code. */
 export const FMS_TERMINAL_OUTCOME_LABELS: Readonly<Record<FmsRecordedOutcome, string>> = {
@@ -130,6 +130,37 @@ export function decodeFmsJourney(raw: unknown): FmsJourney {
         events: arr(w.events, 500).map((event) => { const e = obj(event); return { action: str(e.action), at: str(e.at), by: optStr(e.by), reason: optStr(e.reason) }; }) };
     }),
   };
+}
+
+/** A sensible End type for a step being turned into an End Node, read from its name. The author can change it. */
+export function suggestFmsTerminalOutcome(name: string): FmsTerminalOutcome {
+  const text = name.toLowerCase();
+  if (/do\s*not\s*contact|\bdnc\b|don'?t\s*contact/.test(text)) return "do_not_contact";
+  if (/\blost\b|not\s*interested|lead\s*closed|declin|reject|drop/.test(text)) return "lost";
+  if (/\bwon\b|\bwin\b|sale|sold|closure|closed|order\s*(placed|confirmed)|paid|payment\s*received/.test(text)) return "won";
+  return "other";
+}
+
+/**
+ * Turn the last step of a path into an End Node. The key, name, position and every
+ * incoming route stay; the work it used to ask for (assignee, form, checklist,
+ * deadline, decision) is removed because an End Node never creates work.
+ */
+export function convertFmsStageToEnd(stage: FmsStageDefinition): FmsStageDefinition {
+  return {
+    key: stage.key, name: stage.name, type: "end", order: stage.order, required: true, completionRule: "any_doer",
+    allowMultipleDoers: false, requiresUpload: false, requiresRemark: false, checklist: [], assigneeRules: [],
+    requiresNextDoerHandoff: false, canMoveBackward: false, canReject: false, canRequestRevision: false, canEscalate: false,
+    branchRules: [], parallelTargetStageKeys: [], joinRequiredStageKeys: [],
+    ...(stage.method ? { method: stage.method } : {}), ...(stage.position ? { position: stage.position } : {}),
+    sla: { timingMethod: "completion_date", deadlineEnabled: false, dueDate: "", decisionMode: "normal", terminal: { outcome: suggestFmsTerminalOutcome(stage.name) } },
+  };
+}
+
+/** Turn an End Node back into an ordinary step with no deadline; the author then adds its questions and assignee. */
+export function convertFmsEndToStage(stage: FmsStageDefinition, template: FmsStageDefinition): FmsStageDefinition {
+  return { ...template, key: stage.key, name: stage.name, order: stage.order, ...(stage.method ? { method: stage.method } : {}), ...(stage.position ? { position: stage.position } : {}),
+    sla: { ...template.sla, deadlineEnabled: false } };
 }
 
 /** Reporting periods offered in the workspace. Dates are calendar days in India time, like the server filter. */

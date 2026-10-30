@@ -1,8 +1,9 @@
 import { Flag, Lock } from "lucide-react";
-import { FMS_TERMINAL_OUTCOMES, FMS_TERMINAL_OUTCOME_HELP, FMS_TERMINAL_OUTCOME_LABELS, fmsOutgoingStageKeys, type FmsStageDefinition, type FmsTerminalOutcome } from "@jewelos/core";
+import { convertFmsEndToStage, FMS_TERMINAL_OUTCOMES, FMS_TERMINAL_OUTCOME_HELP, FMS_TERMINAL_OUTCOME_LABELS, fmsOutgoingStageKeys, type FmsStageDefinition, type FmsTerminalOutcome } from "@jewelos/core";
 import { Button, Field } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { FMS_OUTCOME_STYLE } from "./outcomeStyle";
+import { newFmsStage } from "./definition";
 
 /**
  * End Node settings. An End Node only records how the workflow ended, so the
@@ -21,6 +22,10 @@ export function FmsEndNodeEditor({ stage, stages, onChange, onDelete, completedC
   const incoming = stages.filter((item) => item.key !== stage.key && fmsOutgoingStageKeys(item).includes(stage.key));
   return <div className="space-y-4 pb-8" data-fms-editor>
     <p className={cn("flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold", FMS_OUTCOME_STYLE[terminal.outcome] ?? FMS_OUTCOME_STYLE.other)}><Flag aria-hidden className="size-4 shrink-0" />End Node settings</p>
+    <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-success/40 bg-success/5 p-3">
+      <input aria-label="End the workflow at this step" checked className="mt-1 size-5 shrink-0" onChange={() => onChange(convertFmsEndToStage(stage, newFmsStage("task", stage.order)))} type="checkbox" />
+      <span className="min-w-0"><span className="block text-sm font-semibold text-white">End the workflow here (End Node)</span><span className="block text-xs text-soft-grey">Untick to make it a normal step again, with questions and an assignee.</span></span>
+    </label>
     <Field label="Node name"><input autoFocus className="field" data-fms-focus="name" maxLength={150} onChange={(event) => onChange({ ...stage, name: event.target.value })} placeholder="e.g. Sales Closed" value={stage.name} /></Field>
     <fieldset>
       <legend className="mb-2 text-sm font-medium text-champagne">End type</legend>
