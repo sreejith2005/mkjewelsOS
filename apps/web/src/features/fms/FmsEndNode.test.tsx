@@ -46,6 +46,29 @@ describe("End Node inspector", () => {
   });
 });
 
+describe("End the workflow here switch", () => {
+  function StepHarness({ start, onChange }: { start: FmsStageDefinition; onChange: (stage: FmsStageDefinition) => void }) {
+    const [stage, setStage] = useState(start);
+    return <FmsStageEditor data={data} onChange={(next) => { setStage(next); onChange(next); }} onDelete={() => undefined} stage={stage} stages={[intro, demo, stage]} />;
+  }
+  it("turns a last step into an End Node, keeping its name and key, and back again", async () => {
+    const lostSale: FmsStageDefinition = { ...newFmsStage("task", 3), key: "lost_sale", name: "Lost Sale" };
+    const changes = vi.fn();
+    const user = userEvent.setup();
+    render(<StepHarness onChange={changes} start={lostSale} />);
+    await user.click(screen.getByRole("checkbox", { name: "End the workflow at this step" }));
+    expect(changes.mock.lastCall?.[0]).toMatchObject({ key: "lost_sale", name: "Lost Sale", type: "end", sla: { terminal: { outcome: "lost" } } });
+    expect(screen.getByText("End Node settings")).toBeTruthy();
+    await user.click(screen.getByRole("checkbox", { name: "End the workflow at this step" }));
+    expect(changes.mock.lastCall?.[0]).toMatchObject({ key: "lost_sale", type: "task" });
+  });
+  it("cannot end the workflow at a step that still leads somewhere", () => {
+    render(<StepHarness onChange={vi.fn()} start={{ ...demo }} />);
+    expect((screen.getByRole("checkbox", { name: "End the workflow at this step" }) as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByText("Only a last step can end the workflow. Remove its next step or routes first.")).toBeTruthy();
+  });
+});
+
 describe("End Node on the canvas", () => {
   const definition: FmsFlowDefinition = { name: "Funnel", scope: "tenant", manualTrigger: true, stages: [intro, demo, leadClosed] };
   const props = () => ({ definition, formFields: {}, selectedKeys: [] as readonly string[], inspectedKey: null, invalidKeys: new Set<string>(), onSelectionChange: vi.fn(), onOpen: vi.fn(), onCommand: vi.fn(), onDelete: vi.fn(), onDuplicate: vi.fn(), onAddAfter: vi.fn(), onConnect: vi.fn(), onDisconnect: vi.fn(), onReconnect: vi.fn(), onMove: vi.fn(), onEditRoute: vi.fn() });
@@ -56,7 +79,13 @@ describe("End Node on the canvas", () => {
     expect(within(node).getByText("20")).toBeTruthy();
     expect(node.querySelector("[data-node-output]")).toBeNull();
     expect(within(node).queryByRole("button", { name: /Add next step/ })).toBeNull();
-    expect(within(container.querySelector<HTMLElement>('[data-node-key="demo"]')!).queryByText("Completes here")).toBeNull();
+    expect(within(node).getByText("End Node · closes automatically")).toBeTruthy();
+    expect(within(container.querySelector<HTMLElement>('[data-node-key="demo"]')!).queryByText("Last step · needs Mark as done")).toBeNull();
+  });
+  it("marks a last normal step as needing Mark as done", () => {
+    const lastStep: FmsStageDefinition = { ...newFmsStage("task", 3), key: "sales_closure", name: "Sales Closure" };
+    const { container } = render(<FmsGraphCanvas {...props()} definition={{ ...definition, stages: [intro, { ...demo, defaultNextStageKey: "sales_closure" }, lastStep, leadClosed] }} />);
+    expect(within(container.querySelector<HTMLElement>('[data-node-key="sales_closure"]')!).getByText("Last step · needs Mark as done")).toBeTruthy();
   });
 });
 
