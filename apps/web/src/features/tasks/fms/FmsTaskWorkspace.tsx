@@ -21,7 +21,7 @@ const STATUS_HELP: Partial<Record<FmsWorkspaceStatus, string>> = {
  waiting: "Workflows where your work is waiting for other employees or an approval.",
  completed: "Workflows where you have finished work.",
 };
-const readLocation = () => ({ familyId: fmsTaskBoardFamily(window.location.search), status: new URLSearchParams(window.location.search).get("status") });
+const readLocation = () => ({ familyId: fmsTaskBoardFamily(window.location.search), status: new URLSearchParams(window.location.search).get("status"), mine: new URLSearchParams(window.location.search).get("scope") === "mine" });
 /** The `workflow` (and optional `status`) of the current Tasks -> FMS URL; follows Back/Forward. */
 function useBoardLocation() {
  const [, setTick] = useState(0);
@@ -45,12 +45,14 @@ export function FmsTaskWorkspace(props: { actorId: string; tenantId: string; onN
 function FmsBoardWorkspace({ actorId, tenantId, onNavigate, onCount }: { actorId: string; tenantId: string; onNavigate: (path: string) => void; onCount: (count: number) => void }) {
  const location = useBoardLocation();
  const [status, setStatus] = useState<FmsWorkspaceStatus>("active");
+ // Managers see the whole team's workflows by default (server limits it to work they may open).
+ const [scope, setScope] = useState<"all" | "mine">("all");
  const [search, setSearch] = useState(""); const [query, setQuery] = useState(""); const [offset, setOffset] = useState(0);
  const [epoch, setEpoch] = useState(0);
  useEffect(() => { const timer = window.setTimeout(() => setQuery(search.trim()), 250); return () => window.clearTimeout(timer); }, [search]);
  const refresh = useCallback(() => { setEpoch(value => value + 1); }, []);
  useTenantRealtimeRefresh({ tenantId, topics: TOPICS, refresh });
- const filters = { ...defaultFmsWorkspaceFilters(), status, query };
+ const filters = { ...defaultFmsWorkspaceFilters(), status, query, scope };
  const result = useFmsRead(!location.familyId, `${actorId}|${JSON.stringify(filters)}|${offset}`, async () => { fmsWorkspaceFilter(filters); return loadFmsTaskWorkspace(filters, offset); }, epoch);
  const data = result.data;
  useEffect(() => { if (data) onCount(data.activeTotal); }, [data, onCount]);
@@ -58,15 +60,16 @@ function FmsBoardWorkspace({ actorId, tenantId, onNavigate, onCount }: { actorId
 
  if (location.familyId) {
   const initial = STATUSES.some(item => item.value === location.status) ? location.status as FmsWorkspaceStatus : "active";
-  return <FmsTaskBoard canSeeTeam familyId={location.familyId} initialStatus={initial} key={location.familyId} onBack={() => onNavigate(FMS_TASKS_PATH)} onNavigate={onNavigate} tenantId={tenantId} />;
+  return <FmsTaskBoard canSeeTeam familyId={location.familyId} initialScope={location.mine ? "mine" : undefined} initialStatus={initial} key={location.familyId} onBack={() => onNavigate(FMS_TASKS_PATH)} onNavigate={onNavigate} tenantId={tenantId} />;
  }
- const openBoard = (family: FmsFamilySummary) => onNavigate(`${fmsTaskBoardPath(family.id)}${status === "active" ? "" : `&status=${status}`}`);
+ const openBoard = (family: FmsFamilySummary) => onNavigate(`${fmsTaskBoardPath(family.id)}${status === "active" ? "" : `&status=${status}`}${scope === "mine" ? "&scope=mine" : ""}`);
  return <div className="space-y-4 text-task-text">
   <div className="space-y-3 rounded-2xl border border-task-border p-3 sm:p-4" role="search" aria-label="Find an FMS workflow">
    <label className="relative block"><Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-task-text-muted" /><span className="sr-only">Search FMS work</span>
     <input className="task-field pl-9" maxLength={200} onChange={event => { setSearch(event.target.value); setOffset(0); }} placeholder="Search workflow, customer or reference" type="search" value={search} /></label>
    <div className="no-scrollbar scroll-x -mx-1 flex items-center gap-2 px-1">{STATUSES.map(item => <button key={item.value} type="button" aria-pressed={status === item.value} className={cn("min-h-11 shrink-0 rounded-full border px-3 text-sm", status === item.value ? "border-task-accent bg-task-accent-soft font-semibold" : "border-task-border text-task-text-muted hover:bg-task-muted")} onClick={() => { setStatus(item.value); setOffset(0); }}>{item.label}{data ? ` (${data.counts[item.value]})` : ""}</button>)}</div>
-   <p className="text-xs text-task-text-muted">{STATUS_HELP[status]}</p>
+   <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-task-text-muted">{scope === "all" ? "Your team's FMS work." : STATUS_HELP[status]}</p>
+    <select aria-label="Whose work" className="task-field w-auto" onChange={event => { setScope(event.target.value === "mine" ? "mine" : "all"); setOffset(0); }} value={scope}><option value="all">My team</option><option value="mine">My work</option></select></div>
   </div>
   <FmsReadState {...result} />
   {data ? <>

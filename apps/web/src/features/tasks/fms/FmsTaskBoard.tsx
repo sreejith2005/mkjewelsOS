@@ -35,9 +35,9 @@ function useWideLayout(): boolean {
   }, []);
   return wide;
 }
-function restoredFilters(familyId: string, initialStatus: FmsWorkspaceStatus): FmsWorkspaceFilters {
+function restoredFilters(familyId: string, initialStatus: FmsWorkspaceStatus, initialScope?: "mine"): FmsWorkspaceFilters {
   const saved = readFmsBoardView<BoardView>(familyId).filters;
-  const merged: FmsWorkspaceFilters = { ...defaultFmsWorkspaceFilters(), ...(saved ?? {}), status: saved?.status ?? initialStatus, familyId: "", stageId: "", from: "", to: "" };
+  const merged: FmsWorkspaceFilters = { ...defaultFmsWorkspaceFilters(), ...(saved ?? {}), status: saved?.status ?? initialStatus, ...(initialScope ? { scope: initialScope, assigneeId: "" } : {}), familyId: "", stageId: "", from: "", to: "" };
   try { fmsWorkspaceFilter(merged); return merged; } catch { return { ...defaultFmsWorkspaceFilters(), status: initialStatus }; }
 }
 
@@ -47,8 +47,8 @@ function restoredFilters(familyId: string, initialStatus: FmsWorkspaceStatus): F
  * visit. Counts are exact (server), each column holds its first page, and
  * "Show more" pages the rest. Opening a card runs the existing FMS work page.
  */
-export function FmsTaskBoard({ familyId, tenantId, canSeeTeam, initialStatus = "active", onNavigate, onBack }: { familyId: string; tenantId: string; canSeeTeam: boolean; initialStatus?: FmsWorkspaceStatus; onNavigate: (path: string) => void; onBack: () => void }) {
-  const [filters, setFilters] = useState<FmsWorkspaceFilters>(() => restoredFilters(familyId, initialStatus));
+export function FmsTaskBoard({ familyId, tenantId, canSeeTeam, initialStatus = "active", initialScope, onNavigate, onBack }: { familyId: string; tenantId: string; canSeeTeam: boolean; initialStatus?: FmsWorkspaceStatus; initialScope?: "mine" | undefined; onNavigate: (path: string) => void; onBack: () => void }) {
+  const [filters, setFilters] = useState<FmsWorkspaceFilters>(() => restoredFilters(familyId, initialStatus, initialScope));
   const [query, setQuery] = useState(filters.query.trim());
   const [epoch, setEpoch] = useState(0);
   const [activeStage, setActiveStage] = useState(() => readFmsBoardView<BoardView>(familyId).stageId ?? "");
@@ -61,8 +61,9 @@ export function FmsTaskBoard({ familyId, tenantId, canSeeTeam, initialStatus = "
   useEffect(() => { const timer = window.setTimeout(() => setQuery(filters.query.trim()), 250); return () => window.clearTimeout(timer); }, [filters.query]);
   const refresh = useCallback(() => setEpoch((value) => value + 1), []);
   useTenantRealtimeRefresh({ tenantId, topics: TOPICS, refresh });
-  const team = canSeeTeam && filters.scope === "all";
-  const effective = useMemo<FmsWorkspaceFilters>(() => ({ ...filters, query, ...(team ? {} : { scope: "mine", assigneeId: "" }) }), [filters, query, team]);
+  // Managers start on the whole team's work; "My work" narrows it to their own.
+  const team = canSeeTeam && filters.scope !== "mine";
+  const effective = useMemo<FmsWorkspaceFilters>(() => ({ ...filters, query, ...(team ? { scope: "all" } : { scope: "mine", assigneeId: "" }) }), [filters, query, team]);
   const identity = `${familyId}|${JSON.stringify(effective)}`;
   const result = useFmsRead(true, identity, () => loadFmsTaskBoard(familyId, effective), epoch);
   const board = result.data;
@@ -144,7 +145,7 @@ export function FmsTaskBoard({ familyId, tenantId, canSeeTeam, initialStatus = "
           <option value="due">Due soonest</option><option value="priority">Highest priority</option>
         </select>
         {canSeeTeam ? <select aria-label="Whose work" className="task-field w-auto" onChange={(event) => change(event.target.value === "all" ? { scope: "all" } : { scope: "mine", assigneeId: "" })} value={team ? "all" : "mine"}>
-          <option value="mine">My work</option><option value="all">My team</option>
+          <option value="all">My team</option><option value="mine">My work</option>
         </select> : null}
         {team ? <select aria-label="Employee" className="task-field w-auto max-w-48" onChange={(event) => change({ assigneeId: event.target.value })} value={filters.assigneeId ?? ""}>
           <option value="">Everyone</option>{people.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}

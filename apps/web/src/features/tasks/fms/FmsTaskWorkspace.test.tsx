@@ -161,16 +161,22 @@ it("the step bar jumps to a column on a computer", async () => {
   expect(screen.getByRole("link", { name: "Open work — Lead 1" })).toBeTruthy();
 });
 
-it("a manager can switch to the team and filter by employee", async () => {
+it("a manager starts on the whole team, can filter by employee, or narrow to their own work", async () => {
   const user = userEvent.setup();
+  const { unmount } = renderWorkspace();
+  await screen.findByRole("link", { name: /Instagram Online Sales Funnel/ });
+  expect(api.loadFmsTaskWorkspace).toHaveBeenLastCalledWith(expect.objectContaining({ scope: "all" }), 0);
+  unmount();
   openBoard();
-  await user.selectOptions(await screen.findByRole("combobox", { name: "Whose work" }), "all");
   await waitFor(() => expect(api.loadFmsTaskBoard).toHaveBeenLastCalledWith(family, expect.objectContaining({ scope: "all" })));
-  const employee = screen.getByRole("combobox", { name: "Employee" });
+  expect((screen.getByRole("combobox", { name: "Whose work" }) as HTMLSelectElement).value).toBe("all");
   await screen.findByRole("option", { name: "Riya Mahto" });
-  await user.selectOptions(employee, id(90));
+  await user.selectOptions(screen.getByRole("combobox", { name: "Employee" }), id(90));
   await waitFor(() => expect(api.loadFmsTaskBoard).toHaveBeenLastCalledWith(family, expect.objectContaining({ scope: "all", assigneeId: id(90) })));
   expect((await screen.findByRole("link", { name: "Open work — Lead 1" })).textContent).toContain("Assigned: Riya Mahto");
+  await user.selectOptions(screen.getByRole("combobox", { name: "Whose work" }), "mine");
+  await waitFor(() => expect(api.loadFmsTaskBoard).toHaveBeenLastCalledWith(family, expect.objectContaining({ scope: "mine", assigneeId: "" })));
+  expect(screen.queryByRole("combobox", { name: "Employee" })).toBeNull();
 });
 
 it("on a phone shows one stage at a time with a stage selector", async () => {
