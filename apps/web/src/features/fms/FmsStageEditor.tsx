@@ -28,6 +28,7 @@ import type { FmsData } from "./api";
 import { newerFormVersion } from "./definition";
 import { FmsEndNodeEditor } from "./FmsEndNodeEditor";
 import { FmsDueDateSource } from "./FmsDueDateSource";
+import { convertFmsStageToEnd, fmsOutgoingStageKeys } from "@jewelos/core";
 
 const humanTypes: readonly FmsStageDefinition["type"][] = ["form", "task", "approval"];
 const timingOptions: readonly { value: FmsTimingMethod; label: string; help: string }[] = [
@@ -75,6 +76,30 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete, assign
   return <FmsStepEditor assignmentVersion={assignmentVersion} data={data} onChange={onChange} onDelete={onDelete} questionnaire={questionnaire} stage={stage} stages={stages} />;
 }
 
+/**
+ * A last step can end the workflow by itself: switched on, it becomes an End Node
+ * (same name, key and incoming routes) that closes the run automatically.
+ */
+function EndOfWorkflowSwitch({ stage, onChange }: { stage: FmsStageDefinition; onChange: (value: FmsStageDefinition) => void }) {
+  const last = fmsOutgoingStageKeys(stage).length === 0;
+  const turnOn = () => {
+    const losesWork = !!stage.formTemplateId || stage.assigneeRules.length > 0 || stage.checklist.length > 0 || !!stage.sla.assignment?.sources.length;
+    if (losesWork && !window.confirm(`Make "${stage.name || "this step"}" an End Node? It will end the workflow automatically, so its questions, assignee, checklist and deadline are removed. Routes into it stay.`)) return;
+    onChange(convertFmsStageToEnd(stage));
+  };
+  return <section aria-label="End of workflow" className={cn("rounded-2xl border p-3", last ? "border-warning/40 bg-warning/5" : "border-gold/15")}>
+    <label className={cn("flex items-start gap-3", last ? "cursor-pointer" : "cursor-not-allowed opacity-70")}>
+      <input aria-label="End the workflow at this step" checked={false} className="mt-1 size-5 shrink-0" disabled={!last} onChange={turnOn} type="checkbox" />
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-white">End the workflow here (End Node)</span>
+        <span className="block text-xs text-soft-grey">{last
+          ? "This is a last step. As a normal step, someone must press Mark as done. As an End Node it closes the run automatically and records an outcome (Won, Lost, Do not contact or Other)."
+          : "Only a last step can end the workflow. Remove its next step or routes first."}</span>
+      </span>
+    </label>
+  </section>;
+}
+
 function FmsStepEditor({ stage, stages, data, onChange, onDelete, assignmentVersion = 1, questionnaire }: { assignmentVersion?: 1 | 2 | undefined; stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; onChange: (value: FmsStageDefinition) => void; onDelete: () => void; questionnaire?: FmsStageQuestionnaireActions | undefined }) {
   const update = (patch: Partial<FmsStageDefinition>) => onChange({ ...stage, ...patch });
   const updateSla = (patch: Partial<FmsSlaRule>) => update({ sla: { ...stage.sla, ...patch } });
@@ -110,6 +135,8 @@ function FmsStepEditor({ stage, stages, data, onChange, onDelete, assignmentVers
 
   return <div className="space-y-4 pb-8" data-fms-editor>
     <Field label="Step name"><input autoFocus className="field" data-fms-focus="name" maxLength={150} onChange={(event) => update({ name: event.target.value })} placeholder="e.g. Introduction call" value={stage.name} /></Field>
+
+    {human && !firstStage ? <EndOfWorkflowSwitch onChange={onChange} stage={stage} /> : null}
 
     {human ? <StageQuestions actions={questionnaire} data={data} firstStage={firstStage} stage={stage} update={update} updateSla={updateSla} /> : null}
 

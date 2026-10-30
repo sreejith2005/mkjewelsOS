@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalizeFmsDefinition, validateFmsDefinition } from "./engine";
-import { decodeFmsFlowRecords, decodeFmsFlowReport, decodeFmsJourney, fmsConversionPercent, fmsJourneyLines, fmsRecordFilterJson, fmsReportFilterJson, defaultFmsRecordFilters, defaultFmsReportFilters } from "./outcomes";
+import { convertFmsEndToStage, convertFmsStageToEnd, suggestFmsTerminalOutcome, decodeFmsFlowRecords, decodeFmsFlowReport, decodeFmsJourney, fmsConversionPercent, fmsJourneyLines, fmsRecordFilterJson, fmsReportFilterJson, defaultFmsRecordFilters, defaultFmsReportFilters } from "./outcomes";
 import { simulateFmsDefinition } from "./simulation";
 import { fmsStageTemplate } from "./stageTemplate";
 import { exportFmsWorkflow, parseFmsTransfer } from "./transfer";
@@ -131,5 +131,28 @@ describe("FMS outcome reports", () => {
     expect(lines.map((line) => line.title)).toEqual(["f1 (visit 1)", "f1 (visit 2)", "Lead Closed"]);
     expect(lines[0]?.detail).toContain("Client status: follow up");
     expect(lines[2]).toMatchObject({ tone: "end", detail: ["Workflow ended automatically", "Final outcome: Lost"] });
+  });
+});
+
+describe("turning a last step into an End Node", () => {
+  it("keeps the key, name and incoming routes, drops the work, and guesses the End type from the name", () => {
+    const lost = step("lost_sale", 9, { name: "Lost Sale", checklist: [{ key: "a", label: "A", required: true }], requiresRemark: true });
+    const converted = convertFmsStageToEnd(lost);
+    expect(converted).toMatchObject({ key: "lost_sale", name: "Lost Sale", type: "end", assigneeRules: [], checklist: [], requiresRemark: false, sla: { deadlineEnabled: false, terminal: { outcome: "lost" } } });
+    expect(converted.formTemplateId).toBeUndefined();
+    const definition = { ...funnel(), stages: [...funnel().stages.map((item) => item.key === "intro" ? { ...item, branchRules: [...item.branchRules, route("gone", "lost_sale", 4)] } : item), converted] };
+    expect(validateFmsDefinition(definition, fields)).toEqual([]);
+  });
+  it("suggests outcomes from common names", () => {
+    expect(suggestFmsTerminalOutcome("Sales Closure")).toBe("won");
+    expect(suggestFmsTerminalOutcome("Lost Sale")).toBe("lost");
+    expect(suggestFmsTerminalOutcome("Lead Closed / Not interested")).toBe("lost");
+    expect(suggestFmsTerminalOutcome("Do Not Contact")).toBe("do_not_contact");
+    expect(suggestFmsTerminalOutcome("Archive")).toBe("other");
+  });
+  it("turns an End Node back into an ordinary step", () => {
+    const back = convertFmsEndToStage(end("closing", 3, "won"), fmsStageTemplate("task", 3, () => "x"));
+    expect(back).toMatchObject({ key: "closing", type: "task", sla: { deadlineEnabled: false } });
+    expect(back.sla.terminal).toBeUndefined();
   });
 });

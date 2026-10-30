@@ -710,6 +710,8 @@ const StageCard = memo(function StageCard({ stage, x, y, selected, inspected, hi
   const canOutput = stage.type !== "end";
   const canAppend = !["end", "branch", "parallel_start"].includes(stage.type);
   const isLeaf = fmsOutgoingStageKeys(stage).length === 0 && stage.type !== "end";
+  // A last human step still needs Mark as done; only an End Node closes the run by itself.
+  const manualLast = isLeaf && ["form", "task", "approval"].includes(stage.type);
   const routed = hasFmsStageRouting(stage) || stage.type === "branch";
   // A step is labelled by what it is; ordinary steps carry no "Normal step" badge.
   const badge = stage.type === "task" ? null : item.label;
@@ -730,7 +732,9 @@ const StageCard = memo(function StageCard({ stage, x, y, selected, inspected, hi
     style={{ height: NODE_HEIGHT, left: x, top: y, width: NODE_WIDTH }}
   >
     {isFirst ? <span className="pointer-events-none absolute -top-7 left-0 rounded-md border border-gold/30 bg-charcoal px-2 py-1 text-[10px] font-semibold text-gold-secondary">Starts here</span> : null}
-    {isLeaf ? <span className="pointer-events-none absolute -bottom-7 left-0 rounded-md border border-success/30 bg-charcoal px-2 py-1 text-[10px] font-semibold text-success">Completes here</span> : null}
+    {stage.type === "end" ? <span className="pointer-events-none absolute -bottom-7 left-0 inline-flex items-center gap-1 rounded-md border border-success/40 bg-charcoal px-2 py-1 text-[10px] font-semibold text-success"><Flag className="size-3" />End Node · closes automatically</span>
+      : manualLast ? <span className="pointer-events-none absolute -bottom-7 left-0 rounded-md border border-warning/40 bg-charcoal px-2 py-1 text-[10px] font-semibold text-warning" title="Open the step and tick End the workflow here to close runs automatically">Last step · needs Mark as done</span>
+      : isLeaf ? <span className="pointer-events-none absolute -bottom-7 left-0 rounded-md border border-success/30 bg-charcoal px-2 py-1 text-[10px] font-semibold text-success">Completes here</span> : null}
     <div className="mb-1.5 flex h-6 items-center justify-between gap-1">
       {endStyle ? <span className={cn("inline-flex min-w-0 items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide", endStyle)}><item.Icon className="size-3 shrink-0" />End · {END_BADGE[stage.sla.terminal?.outcome ?? "other"] ?? "Other"}</span>
         : badge ? <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide", item.className)}><item.Icon className="size-3" />{badge}</span> : <item.Icon aria-hidden className="size-4 text-gold-secondary" />}
