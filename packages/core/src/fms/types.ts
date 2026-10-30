@@ -49,6 +49,16 @@ export type FmsConditionalRule = Readonly<{ decisionStageKey: string; outcome: s
  * unpublished draft of the next version, kept so the work survives a reload.
  */
 export type FmsStageQuestionnaire = Readonly<{ origin: "stage" | "copied"; draftFormId?: string | undefined }>;
+/** One earlier step whose form answer sets this step's due date (migration 0360). */
+export type FmsFormDueSource = Readonly<{ stageKey: string; dateFieldKey: string; timeFieldKey?: string | undefined }>;
+/**
+ * Due date from a form answer. `sources` lists, per earlier step that can lead
+ * here, the date (or date-and-time) question and an optional time question. The
+ * server reads only the answer the causal previous step actually submitted.
+ * `onMissing`: use the timing rule as a fallback, leave no due date, or refuse
+ * the previous step's submission until the date is entered.
+ */
+export type FmsFormDueRule = Readonly<{ sources: readonly FmsFormDueSource[]; defaultTime?: string | undefined; onMissing: "fallback" | "none" | "require" }>;
 export type FmsSlaRule = Readonly<{
   pipelineName?: string | undefined;
   assignment?: FmsAssignmentConfig | undefined;
@@ -71,6 +81,8 @@ export type FmsSlaRule = Readonly<{
   questionnaire?: FmsStageQuestionnaire | undefined;
   timingMethod?: FmsTimingMethod | undefined;
   deadlineEnabled?: boolean | undefined;
+  /** Take the due date from an earlier form answer; the timing rule above becomes the fallback. */
+  formDue?: FmsFormDueRule | undefined;
   dueDate: string;
   tatHours?: number | undefined;
   tatMinutes?: number | undefined;
