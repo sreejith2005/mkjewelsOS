@@ -209,8 +209,23 @@ function parseSla(raw: unknown, path: string): FmsSlaRule {
   if (raw.followUp !== undefined && raw.followUp !== null) {
     const followUp = raw.followUp;
     if (!isRecord(followUp)) fail(`${path}.followUp`, "must be an object");
-    onlyKeys(followUp, ["maxVisits", "onLimit"], `${path}.followUp`);
-    sla.followUp = { maxVisits: numberValue(followUp.maxVisits, `${path}.followUp.maxVisits`) ?? 1, onLimit: oneOf(followUp.onLimit, ["hold", "escalate"] as const, `${path}.followUp.onLimit`) };
+    onlyKeys(followUp, ["maxVisits", "onLimit", "schedule"], `${path}.followUp`);
+    let schedule: import("./workContracts").FmsFollowUpSchedule | undefined;
+    if (followUp.schedule !== undefined) {
+      const rawSchedule = followUp.schedule;
+      if (!isRecord(rawSchedule)) fail(`${path}.followUp.schedule`, "must be an object");
+      onlyKeys(rawSchedule, ["delay", "unit", "time", "sourceStageKey", "dateFieldKey", "timeFieldKey", "workingDaysOnly"], `${path}.followUp.schedule`);
+      schedule = {
+        delay: numberValue(rawSchedule.delay, `${path}.followUp.schedule.delay`) ?? 1,
+        unit: rawSchedule.unit === undefined ? "days" : oneOf(rawSchedule.unit, ["days", "hours"] as const, `${path}.followUp.schedule.unit`),
+        time: textValue(rawSchedule.time, `${path}.followUp.schedule.time`, 5) ?? "11:00",
+        sourceStageKey: textValue(rawSchedule.sourceStageKey, `${path}.followUp.schedule.sourceStageKey`, 64),
+        dateFieldKey: textValue(rawSchedule.dateFieldKey, `${path}.followUp.schedule.dateFieldKey`, 100),
+        timeFieldKey: textValue(rawSchedule.timeFieldKey, `${path}.followUp.schedule.timeFieldKey`, 100),
+        workingDaysOnly: rawSchedule.workingDaysOnly === undefined ? false : boolValue(rawSchedule.workingDaysOnly, `${path}.followUp.schedule.workingDaysOnly`),
+      };
+    }
+    sla.followUp = { maxVisits: numberValue(followUp.maxVisits, `${path}.followUp.maxVisits`) ?? 1, onLimit: oneOf(followUp.onLimit, ["hold", "escalate"] as const, `${path}.followUp.onLimit`), ...(schedule ? { schedule } : {}) };
   }
   if (raw.questionnaire !== undefined && raw.questionnaire !== null) {
     const questionnaire = raw.questionnaire;
@@ -422,6 +437,10 @@ export function pasteFmsFragment(target: FmsFlowDefinition, source: readonly Fms
         questionnaire: sla.questionnaire && keepForm ? { origin: "copied" } : undefined,
         assignment, taskDisplay: display,
         triggerStageKey: mapKey(sla.triggerStageKey),
+        ...(sla.followUp?.schedule ? { followUp: { ...sla.followUp, schedule: { ...sla.followUp.schedule,
+          sourceStageKey: mapKey(sla.followUp.schedule.sourceStageKey),
+          ...(!mapKey(sla.followUp.schedule.sourceStageKey) ? { dateFieldKey: undefined, timeFieldKey: undefined } : {}),
+        } } } : {}),
         conditional: conditionKey && sla.conditional ? { ...sla.conditional, decisionStageKey: conditionKey } : undefined,
       },
     };
@@ -479,6 +498,7 @@ export function removeFmsStages(stages: readonly FmsStageDefinition[], keys: Ite
       joinRequiredStageKeys: stage.joinRequiredStageKeys.filter((key) => !gone(key)),
       sla: {
         ...sla,
+        ...(sla.followUp?.schedule && gone(sla.followUp.schedule.sourceStageKey) ? { followUp: { ...sla.followUp, schedule: { ...sla.followUp.schedule, sourceStageKey: undefined, dateFieldKey: undefined, timeFieldKey: undefined } } } : {}),
         ...(gone(sla.triggerStageKey) ? { triggerStageKey: undefined } : {}),
         ...(sla.conditional && gone(sla.conditional.decisionStageKey) ? { conditional: undefined } : {}),
         ...(sla.assignment ? { assignment: { ...sla.assignment, sources: sla.assignment.sources.filter((item) => !gone(item.sourceStageKey)) } } : {}),

@@ -3,7 +3,9 @@ import type { Json } from "./database.types";
 import { decodeTaskPage, type TaskPageScope, type TaskWorkspaceView } from "./taskPage";
 import type { TaskWorkKindFilter } from "./taskControlView";
 
+export type TaskDateScope = "today" | "overall" | "overdue";
 export type TaskSearchFilters = Readonly<{
+  scope?: TaskDateScope | undefined;
   query: string; kind: TaskWorkKindFilter; status: "all" | "pending" | "overdue" | "completed";
   priority: "all" | "high" | "medium" | "low"; from: string; to: string;
   subsection: "any" | TaskWorkspaceView; requirement: "all" | "upload" | "form" | "remark";
@@ -29,6 +31,7 @@ export const taskSearchActive = (value: TaskSearchFilters): boolean => Boolean(v
 export function taskSearchPayload(value: TaskSearchFilters): Json {
   const date = (day: string) => !day || (/^\d{4}-\d{2}-\d{2}$/.test(day) && !day.startsWith("0000") && Number.isFinite(Date.parse(day)) && new Date(day).toISOString().slice(0, 10) === day);
   if (value.query.trim().length > 200 || !date(value.from) || !date(value.to) || (value.from && value.to && value.from > value.to)) throw new Error("Enter a valid date range and search up to 200 characters.");
+  if (value.scope !== undefined && !["today", "overall", "overdue"].includes(value.scope)) throw new Error("Invalid task scope.");
   if (!["all", "one_time", "recurring", "crm", "fms"].includes(value.kind)
     || !["all", "pending", "overdue", "completed"].includes(value.status)
     || !["all", "high", "medium", "low"].includes(value.priority)

@@ -1,4 +1,4 @@
-import { FORM_SUBMIT_TARGET, type FormAnswer, type FormFieldDefinition, type FormRule, type FormRulePredicate, type FormSectionDefinition } from "./index";
+import { FORM_CONTINUE_TARGET, FORM_QUESTION_TARGET_PREFIX, FORM_SUBMIT_TARGET, type FormAnswer, type FormFieldDefinition, type FormRule, type FormRulePredicate, type FormSectionDefinition } from "./index";
 
 export type GuidedConditionLink = Readonly<{ sourceKey: string; optionValue: FormAnswer }>;
 export type AnswerRoute =
@@ -8,7 +8,7 @@ export type AnswerRoute =
   | Readonly<{ kind: "submit" }>;
 
 function linkFromPredicate(rule: FormRule): GuidedConditionLink | null {
-  if (rule.kind !== "predicate") return null;
+  if (rule.kind !== "predicate" || rule.negate) return null;
   const predicate = rule as FormRulePredicate;
   const value = predicate.value;
   if ((predicate.operator !== "equals" && predicate.operator !== "contains") || (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean")) return null;
@@ -17,7 +17,7 @@ function linkFromPredicate(rule: FormRule): GuidedConditionLink | null {
 
 /** Returns null for a saved condition the simple answer-follow-up UI must not rewrite. */
 export function readGuidedConditionLinks(field: FormFieldDefinition): readonly GuidedConditionLink[] | null {
-  if (field.rule && field.condition) return null;
+  if (field.rule?.negate || field.rule && field.condition) return null;
   if (field.condition) {
     if (field.condition.operator !== "equals" || field.condition.value === undefined) return null;
     return [{ sourceKey: field.condition.fieldKey, optionValue: field.condition.value }];
@@ -72,10 +72,18 @@ export function readAnswerRoutes(
   }
   const source = fields.find((field) => field.key === sourceKey);
   const knownSections = new Set(sections.map((section) => section.key));
+  const explicitAnswers = new Set<FormAnswer>();
   for (const branch of source?.branches ?? []) {
-    if ((branch.operator !== "equals" && branch.operator !== "contains") || branch.value === undefined) continue;
-    if (branch.targetSectionKey === FORM_SUBMIT_TARGET) routes.set(branch.value, { kind: "submit" });
-    else if (knownSections.has(branch.targetSectionKey)) routes.set(branch.value, { kind: "section", sectionKey: branch.targetSectionKey });
+    const predicate = branch.rule;
+    if (predicate && (predicate.kind !== "predicate" || predicate.fieldKey !== sourceKey || predicate.negate)) continue;
+    const operator = predicate?.kind === "predicate" ? predicate.operator : branch.operator;
+    const value = predicate?.kind === "predicate" ? predicate.value : branch.value;
+    if ((operator !== "equals" && operator !== "contains") || (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") || explicitAnswers.has(value)) continue;
+    explicitAnswers.add(value);
+    if (branch.targetSectionKey.startsWith(FORM_QUESTION_TARGET_PREFIX)) routes.set(value, { kind: "question", questionKey: branch.targetSectionKey.slice(FORM_QUESTION_TARGET_PREFIX.length) });
+    else if (branch.targetSectionKey === FORM_CONTINUE_TARGET) routes.set(value, { kind: "continue" });
+    else if (branch.targetSectionKey === FORM_SUBMIT_TARGET) routes.set(value, { kind: "submit" });
+    else if (knownSections.has(branch.targetSectionKey)) routes.set(value, { kind: "section", sectionKey: branch.targetSectionKey });
   }
   return routes;
 }
@@ -88,18 +96,16 @@ export function setAnswerRoute(
   fields: readonly FormFieldDefinition[], sourceKey: string, optionValue: FormAnswer, route: AnswerRoute,
 ): readonly FormFieldDefinition[] {
   const withoutQuestionRoute = setGuidedFollowUp(fields, sourceKey, optionValue, undefined);
-  if (route.kind === "question") {
-    const withoutSectionRoute = setAnswerRoute(withoutQuestionRoute, sourceKey, optionValue, { kind: "continue" });
-    return setGuidedFollowUp(withoutSectionRoute, sourceKey, optionValue, route.questionKey);
-  }
-  return withoutQuestionRoute.map((field) => {
+  const routed = withoutQuestionRoute.map((field): FormFieldDefinition => {
     if (field.key !== sourceKey) return field;
     const remaining = (field.branches ?? []).filter((branch) => !((branch.operator === "equals" || branch.operator === "contains") && sameLink({ sourceKey, optionValue }, { sourceKey, optionValue: branch.value ?? "" })));
-    if (route.kind === "continue") return remaining.length ? { ...field, branches: remaining } : { ...field, branches: undefined };
-    const targetSectionKey = route.kind === "submit" ? FORM_SUBMIT_TARGET : route.sectionKey;
+    const targetSectionKey = route.kind === "continue" ? FORM_CONTINUE_TARGET : route.kind === "submit" ? FORM_SUBMIT_TARGET : route.kind === "question" ? FORM_QUESTION_TARGET_PREFIX + route.questionKey : route.sectionKey;
     const operator = field.type === "checkbox" || field.type === "multiselect" ? "contains" as const : "equals" as const;
-    return { ...field, branches: [...remaining, { operator, value: optionValue, targetSectionKey }] };
+    return { ...field, branches: [...remaining.filter(b => b.operator !== "default"), { operator, value: optionValue, rule: { kind: "predicate", fieldKey: sourceKey, operator, value: optionValue }, targetSectionKey }, ...remaining.filter(b => b.operator === "default")] };
   });
+  // Preserve the guided follow-up eligibility authored by the existing answer
+  // picker, while the branch now performs a real forward navigation jump.
+  return route.kind === "question" ? setGuidedFollowUp(routed, sourceKey, optionValue, route.questionKey) : routed;
 }
 
 /** Replaces the simple incoming answer mappings for a question, preserving complex rules. */
@@ -110,7 +116,7 @@ export function setQuestionAnswerCondition(
   const existing = target ? readGuidedConditionLinks(target) : null;
   if (existing === null) return fields;
   let next = fields;
-  for (const link of existing) next = setAnswerRoute(next, link.sourceKey, link.optionValue, { kind: "continue" });
+  for (const link of existing) next = setGuidedFollowUp(next, link.sourceKey, link.optionValue, undefined);
   return sourceKey && optionValue !== undefined
-    ? setAnswerRoute(next, sourceKey, optionValue, { kind: "question", questionKey: targetKey }) : next;
+    ? setGuidedFollowUp(next, sourceKey, optionValue, targetKey) : next;
 }

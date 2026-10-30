@@ -12,7 +12,40 @@ export type FmsTaskDisplay = Readonly<{
   expectedResult?: string | undefined; dueLabel?: string | undefined; referenceField?: FmsAssignmentSource | undefined;
   fields: readonly Readonly<FmsAssignmentSource & { priority?: boolean | undefined }>[];
 }>;
-export type FmsFollowUp = Readonly<{ maxVisits: number; onLimit: "hold" | "escalate" }>;
+export type FmsFollowUpSchedule = Readonly<{
+  delay?: number | undefined; unit?: "days" | "hours" | undefined; time?: string | undefined;
+  sourceStageKey?: string | undefined; dateFieldKey?: string | undefined; timeFieldKey?: string | undefined;
+  workingDaysOnly?: boolean | undefined;
+}>;
+export type FmsFollowUp = Readonly<{ maxVisits: number; onLimit: "hold" | "escalate"; schedule?: FmsFollowUpSchedule | undefined }>;
+export function validFmsFollowUpSchedule(schedule: FmsFollowUpSchedule): boolean {
+  return Number.isInteger(schedule.delay ?? 1) && (schedule.delay ?? 1) >= 0 && (schedule.delay ?? 1) <= 3650
+    && ["days", "hours"].includes(schedule.unit ?? "days")
+    && /^([01]\d|2[0-3]):[0-5]\d$/.test(schedule.time ?? "11:00")
+    && (schedule.workingDaysOnly === undefined || typeof schedule.workingDaysOnly === "boolean");
+}
+/** Preview/simulation of the server's existing stage activation deadline. */
+export function fmsFollowUpDateTime(schedule: FmsFollowUpSchedule, answers: FormAnswers, now = new Date()): string {
+  if (!validFmsFollowUpSchedule(schedule)) throw new Error("Invalid follow-up schedule");
+  const dateAnswer = schedule.dateFieldKey ? answers[schedule.dateFieldKey] : undefined;
+  const timeAnswer = schedule.timeFieldKey ? answers[schedule.timeFieldKey] : undefined;
+  const requested = typeof dateAnswer === "string" && dateAnswer !== "";
+  const requestedTime = typeof timeAnswer === "string" && timeAnswer !== "";
+  let local = new Date(now.getTime() + 330 * 60_000);
+  if (requested) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateAnswer) || !Number.isFinite(Date.parse(dateAnswer)) || new Date(dateAnswer).toISOString().slice(0, 10) !== dateAnswer) throw new Error("Invalid requested follow-up date");
+    local = new Date(`${dateAnswer}T00:00:00Z`);
+  } else if ((schedule.unit ?? "days") === "days") local.setUTCDate(local.getUTCDate() + (schedule.delay ?? 1));
+  else local = new Date(local.getTime() + (schedule.delay ?? 1) * 3_600_000);
+  if (requestedTime || requested || (schedule.unit ?? "days") === "days") {
+    const clock = requestedTime ? timeAnswer : schedule.time ?? "11:00";
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(clock)) throw new Error("Invalid requested follow-up time");
+    const [hour, minute] = clock.split(":").map(Number);
+    local.setUTCHours(hour!, minute!, 0, 0);
+  }
+  if (!requested && schedule.workingDaysOnly) while ([0, 6].includes(local.getUTCDay())) local.setUTCDate(local.getUTCDate() + 1);
+  return new Date(local.getTime() - 330 * 60_000).toISOString();
+}
 export type FmsHandoffChoice = Readonly<{ targetStageId: string; userProfileId: string }>;
 export type FmsWorkState = "form_saved_pending_completion" | "awaiting_other_doers" | "awaiting_approval" | "successors_activated" | "workflow_completed" | "workflow_on_hold";
 type StageCompletion = Readonly<{ instanceStageId: string; outcome: string; remark: string; checklist: Readonly<Record<string, boolean>>; nextAssigneeId?: string | undefined }>;

@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, Paperclip } from "lucide-react";
-import { displayFormAnswer, FORM_OTHER_MAX_LENGTH, formFieldAllowsOther, formOptionValues, reconcileFormPreviewAnswers, formCompletionProgress, formUsesSteps, isFinalFormStep, nextFormStepKey, normalizeFormAnswers, previousFormStepKey, resolveFormOptions, updateVisibleFormAnswers, validateCompleteForm, validateFormStep, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition, type FormValidationIssue } from "@jewelos/core";
+import { describeFormRule, evaluateFormNavigation, displayFormAnswer, FORM_OTHER_MAX_LENGTH, formFieldAllowsOther, formOptionValues, reconcileFormPreviewAnswers, formCompletionProgress, formUsesSteps, isFinalFormStep, nextFormStepKey, normalizeFormAnswers, previousFormStepKey, resolveFormOptions, updateVisibleFormAnswers, validateCompleteForm, validateFormStep, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition, type FormValidationIssue } from "@jewelos/core";
 import { Button, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { signedFormFileUrl, uploadFormFile } from "./api";
@@ -27,13 +27,14 @@ function QuestionText({ field, id }: { field: FormFieldDefinition; id?: string }
 }
 
 /** A file field's answer is the id of a row already registered via `register_form_upload` — the upload happens up front, ahead of the eventual `onSubmit`. */
-function FileFieldControl({ describedBy, disabled, field, labelledBy, onChange, registerRef, templateId, value }: { describedBy?: string | undefined; disabled: boolean; field: FormFieldDefinition; labelledBy: string; onChange: (value: FormAnswer) => void; registerRef: (node: HTMLElement | null) => void; templateId?: string | undefined; value: FormAnswer | undefined }) {
+function FileFieldControl({ preview = false, describedBy, disabled, field, labelledBy, onChange, registerRef, templateId, value }: { describedBy?: string | undefined; disabled: boolean; field: FormFieldDefinition; labelledBy: string; onChange: (value: FormAnswer) => void; registerRef: (node: HTMLElement | null) => void; templateId?: string | undefined; value: FormAnswer | undefined; preview?: boolean }) {
   const [uploading, setUploading] = useState(false);
   const [viewing, setViewing] = useState(false);
   const [name, setName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileId = typeof value === "string" && value ? value : null;
 
+  if (preview) return <Notice>Uploads are disabled in preview.</Notice>;
   if (!templateId) return <Notice>File upload isn't available until the form is saved.</Notice>;
 
   const onFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,6 +78,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
   const [fieldErrors, setFieldErrors] = useState<Readonly<Record<string, string>>>({});
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [previewChecked, setPreviewChecked] = useState(false);
   const [stepKey, setStepKey] = useState<string | null>(null);
   /** Questions where "Other" is picked but nothing is typed yet. */
   const [otherOpen, setOtherOpen] = useState<Readonly<Record<string, boolean>>>({});
@@ -88,6 +90,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
   const resolved = useMemo(() => resolveFormOptions(definition, dynamicOptions.masters), [definition, dynamicOptions.masters]);
   const normalized = useMemo(() => normalizeFormAnswers(resolved, answers), [answers, resolved]);
   const sections = useMemo(() => visibleFormSections(resolved, answers), [answers, resolved]);
+  const navigation = useMemo(() => evaluateFormNavigation(resolved, answers, stepKey ?? undefined), [resolved, answers, stepKey]);
   const progress = useMemo(() => formCompletionProgress(resolved, answers), [answers, resolved]);
   const stepped = formUsesSteps(resolved) && !readOnly;
   const activeStep = stepped ? sections.find(({ section }) => section.key === stepKey) ?? sections[0] : undefined;
@@ -129,7 +132,8 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
   }, [currentStepKey, stepped]);
 
   const set = (key: string, value: FormAnswer) => {
-    setAnswers((current) => stepped ? updateVisibleFormAnswers(resolved, current, key, value, initialAnswers) : { ...current, [key]: value });
+    setPreviewChecked(false);
+    setAnswers((current) => updateVisibleFormAnswers(resolved, current, key, value, initialAnswers));
     setFieldErrors((current) => {
       if (!(key in current)) return current;
       const next = { ...current }; delete next[key]; return next;
@@ -163,7 +167,8 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
   const submitAnswers = async () => {
     const result = validateCompleteForm(resolved, answers);
     if (!result.valid) { showIssues(result.issues, "Check the form"); return; }
-    if (!onSubmit || preview) return;
+    if (preview) { setError(null); setFieldErrors({}); setPreviewChecked(true); return; }
+    if (!onSubmit) return;
     setBusy(true); setError(null); setFieldErrors({});
     try { if (await onSubmit(normalized) !== false) setSuccess(true); } catch (caught) { setError(caught instanceof Error ? caught.message : "Submission failed"); } finally { setBusy(false); }
   };
@@ -182,7 +187,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
     const shell = (content: ReactNode) => <div className={cn("scroll-mt-24 rounded-2xl border border-task-border bg-task-bg p-4 transition-colors sm:p-5", invalid && "border-danger/60 bg-danger/5")} key={field.key}>{content}</div>;
 
     if (field.type === "file") return shell(<div><QuestionText field={field} id={labelId} />{helper}
-      <FileFieldControl describedBy={describedBy} disabled={disabled} field={field} labelledBy={labelId} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} templateId={templateId} value={answers[field.key]} />{errorText}
+      <FileFieldControl preview={preview} describedBy={describedBy} disabled={disabled} field={field} labelledBy={labelId} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} templateId={templateId} value={answers[field.key]} />{errorText}
     </div>);
     const dynamic = optionsFor(field.type); const staticOptions = field.options ?? [];
     const checkboxOptions = staticOptions.length ? staticOptions : dynamic.map((option) => ({ value: option.id, label: option.label }));
@@ -236,7 +241,14 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
   const requiredPercent = progress.requiredTotal ? Math.round((progress.requiredAnswered / progress.requiredTotal) * 100) : 0;
 
   return <form className="flex flex-col gap-5" onSubmit={submit} ref={formRef}>
-    {preview ? <Notice>Preview mode — nothing is saved.</Notice> : null}
+    {preview ? <><Notice>Preview mode - nothing is saved.</Notice><details className="min-w-0 rounded-lg border border-task-border p-3"><summary className="cursor-pointer text-sm font-medium text-task-text">Routing simulation</summary><div className="mt-3 space-y-2 text-xs text-task-text-muted">
+      {resolved.sections?.map(section => <p key={section.key}>{section.title}: {navigation.reachedSectionKeys.includes(section.key) ? "on selected path" : "skipped"}{section.rule ? ` - ${section.visibility === "unless" ? "hide when" : "eligible when"} ${describeFormRule(section.rule, key => resolved.fields.find(f => f.key === key)?.label ?? key)}` : section.visibility === "routed" ? " - routing only" : ""}</p>)}
+      {navigation.routes.map((route, i) => <p key={i}>{route.name || (route.fieldKey ? resolved.fields.find(f => f.key === route.fieldKey)?.label : resolved.sections?.find(s => s.key === route.sectionKey)?.title)} -&gt; {route.target === "__submit__" ? "Submit form" : route.target === "__stage_end__" ? "End current form stage" : resolved.sections?.find(s => s.key === route.target)?.title ?? resolved.fields.find(f => "__question__:" + f.key === route.target)?.label ?? route.target}</p>)}
+      <p>{navigation.submissionAllowed ? "The selected path ends with form submission." : "Waiting for a routing answer."}</p>
+      {navigation.issues.map((issue, i) => <p className="text-danger" key={i}>{issue.message}</p>)}
+      <Button type="button" variant="secondary" onClick={() => { setAnswers({}); setStepKey(null); setFieldErrors({}); setError(null); setPreviewChecked(false); }}>Reset simulation</Button>
+    </div></details></> : null}
+    {preview && previewChecked ? <Notice>Validation passed for this path. Nothing was saved.</Notice> : null}
     {resolved.fields.length === 0 ? <Notice tone="danger">This form version has no saved questions. Close it and edit the draft before publishing.</Notice> : null}
     {!readOnly && progress.requiredTotal > 0 ? <div className="space-y-1.5">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-task-text-muted"><span>Questions marked <span className="text-danger">*</span> must be answered.</span><span className="tabular-nums">{progress.requiredAnswered} of {progress.requiredTotal} required answered</span></div>
@@ -268,7 +280,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
       {stepped && previousStepKey ? <Button className="min-h-12 shrink-0" disabled={busy || success} onClick={() => goToStep(previousStepKey)} type="button" variant="secondary"><ChevronLeft aria-hidden="true" className="size-4" />Back</Button> : null}
       {/* Keep navigation separate: reusing Next as Submit can submit during the same native click. */}
       {stepped && (nextStepKey || !finalStep) ? <Button className="min-h-12 flex-1 sm:flex-none" disabled={busy || success} key="next" onClick={advance} type="button">Next<ChevronRight aria-hidden="true" className="size-4" /></Button>
-        : <Button className="min-h-12 flex-1 sm:flex-none" disabled={busy || preview || success} key="submit" type="submit">{busy ? "Submitting..." : "Submit form"}</Button>}
+        : <Button className="min-h-12 flex-1 sm:flex-none" disabled={busy || success} key="submit" type="submit">{busy ? "Submitting..." : preview ? "Test validation" : "Submit form"}</Button>}
     </div> : null}
   </form>;
 }

@@ -59,13 +59,13 @@ describe("guided answer follow-ups", () => {
     const sectionRouted = setAnswerRoute(fields, "metal", "gold", { kind: "section", sectionKey: "silver_details" });
     const continued = setAnswerRoute(sectionRouted, "metal", "gold", { kind: "continue" });
 
-    expect(sectionRouted[0]?.branches).toEqual([{ operator: "equals", value: "gold", targetSectionKey: "silver_details" }]);
-    expect(continued[0]?.branches).toBeUndefined();
+    expect(sectionRouted[0]?.branches).toEqual([expect.objectContaining({ operator: "equals", value: "gold", targetSectionKey: "silver_details" })]);
+    expect(continued[0]?.branches?.[0]?.targetSectionKey).toBe("__continue__");
   });
   it("removes a previous section jump when the same answer is changed to a question", () => {
     const sectionRouted = setAnswerRoute(fields, "metal", "gold", { kind: "section", sectionKey: "silver_details" });
     const questionRouted = setAnswerRoute(sectionRouted, "metal", "gold", { kind: "question", questionKey: "karat" });
-    expect(questionRouted[0]?.branches).toBeUndefined();
+    expect(questionRouted[0]?.branches?.[0]?.targetSectionKey).toBe("__question__:karat");
     expect(readAnswerRoutes(questionRouted, sections, "metal").get("gold")).toEqual({ kind: "question", questionKey: "karat" });
   });
   it("replaces a question's existing incoming answers and clears them when set to always show", () => {

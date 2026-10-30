@@ -40,6 +40,7 @@ function isOneOf(value: unknown, expected: unknown): boolean {
 
 function evaluatePredicate(predicate: FormRulePredicate, answers: FormAnswers): boolean {
   const source = answers[predicate.fieldKey];
+  if (isEmptyFormValue(source) && predicate.operator !== "is_empty" && predicate.operator !== "not_empty") return false;
   switch (predicate.operator) {
     case "equals": return source === predicate.value;
     case "not_equals": return source !== predicate.value;
@@ -57,9 +58,15 @@ function evaluatePredicate(predicate: FormRulePredicate, answers: FormAnswers): 
 }
 
 export function evaluateFormRule(rule: FormRule, answers: FormAnswers): boolean {
-  if (rule.kind === "all") return rule.rules.every((child) => evaluateFormRule(child, answers));
-  if (rule.kind === "any") return rule.rules.some((child) => evaluateFormRule(child, answers));
-  return evaluatePredicate(rule as FormRulePredicate, answers);
+  const match = rule.kind === "all" ? rule.rules.every((child) => evaluateFormRule(child, answers))
+    : rule.kind === "any" ? rule.rules.some((child) => evaluateFormRule(child, answers))
+    : evaluatePredicate(rule as FormRulePredicate, answers);
+  if (!rule.negate) return match;
+  // Inversion must not turn an unanswered comparison into a negative match.
+  const available = (node: FormRule): boolean => node.kind === "predicate"
+    ? node.operator === "is_empty" || node.operator === "not_empty" || !isEmptyFormValue(answers[node.fieldKey])
+    : node.rules.every(available);
+  return available(rule) && !match;
 }
 
 export function isFormFieldVisible(field: FormFieldDefinition, answers: FormAnswers): boolean {

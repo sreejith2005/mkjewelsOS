@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TasksPage } from "./TasksPage";
 
-const mocks = vi.hoisted(() => ({ page: vi.fn(), feed: vi.fn(), tabs: vi.fn(), search: vi.fn(), prepare: vi.fn(), duties: vi.fn() }));
+const mocks = vi.hoisted(() => ({ page: vi.fn(), feed: vi.fn(), tabs: vi.fn(), search: vi.fn(), prepare: vi.fn(), duties: vi.fn(), realtime: vi.fn() }));
 vi.mock("@/auth/AuthContext", async () => {
   const { builtinAccessContext } = await vi.importActual<typeof import("@jewelos/core")>("@jewelos/core");
   const profile = { id: "admin", tenant_id: "tenant", user_role: "admin" as const };
@@ -19,9 +19,17 @@ vi.mock("@/features/tasks/api", () => ({
   uploadTaskAttachment: vi.fn(), loadFmsTaskDeepLink: vi.fn(),
   loadMyOnDemandDuties: mocks.duties, startOnDemandDuty: vi.fn(),
 }));
-vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealtimeRefresh: vi.fn() }));
+vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealtimeRefresh: mocks.realtime }));
 vi.mock("@/features/tasks/TaskCard", () => ({ TaskCard: ({ task }: { task: { title: string } }) => <div>{task.title}</div> }));
 vi.mock("@/features/tasks/TaskAdminControls", () => ({ TaskAdminControls: () => null }));
+
+vi.mock("@/features/tasks/fms/FmsTaskWorkspace", async () => {
+  const { useEffect } = await import("react");
+  return { FMS_TASKS_PATH: "/tasks?view=fms", FmsTaskWorkspace: ({ onCount }: { onCount: (count: number) => void }) => {
+    useEffect(() => { queueMicrotask(() => onCount(3)); }, [onCount]);
+    return <p>Filtered FMS results: 3</p>;
+  } };
+});
 
 const page = (title: string, total = 12000) => ({
   tasks: [{ id: title, title, task_type: "delegation", assignees: [], isWatchedByViewer: false }],
@@ -31,6 +39,36 @@ beforeEach(() => { mocks.search.mockReset(); mocks.page.mockReset(); mocks.feed.
 afterEach(cleanup);
 
 describe("task workspace paging", () => {
+  it("keeps searched counts and category drilldowns on the same filters including paged FMS results", async () => {
+    mocks.page.mockResolvedValue(page("Board task"));
+    mocks.search.mockResolvedValue({ ...page("Filtered task", 80), sections: { "Filtered task": "fms" } });
+    mocks.tabs.mockImplementation((_all, _scope, _status, filters) => Promise.resolve(filters ? { mine: 12, delegated: 5, inLoop: 2, fms: 80, all: 99 } : { mine: 4 }));
+    render(<TasksPage />);
+    await screen.findByText("Board task");
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search all tasks" }), { target: { value: "silver" } });
+    await screen.findByText("Filtered task");
+    await waitFor(() => expect(mocks.tabs).toHaveBeenCalledWith(true, "today", "pending", expect.objectContaining({ query: "silver", scope: "today" })));
+    fireEvent.click(screen.getByRole("button", { name: "FMS (80)" }));
+    await waitFor(() => expect(mocks.search).toHaveBeenCalledWith("admin", "tenant", expect.objectContaining({ query: "silver", scope: "today", subsection: "fms" }), 0));
+    expect(screen.queryByText("Filtered FMS results: 3")).toBeNull();
+    expect(screen.getByRole("searchbox", { name: "Search all tasks" })).toHaveProperty("value", "silver");
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(mocks.search).toHaveBeenCalledWith("admin", "tenant", expect.objectContaining({ query: "silver", subsection: "fms" }), 50));
+    fireEvent.click(screen.getByRole("button", { name: "Delegated (5)" }));
+    await waitFor(() => expect(mocks.search).toHaveBeenCalledWith("admin", "tenant", expect.objectContaining({ query: "silver", subsection: "delegated" }), 0));
+  });
+
+  it("keeps mounted FMS badges on the workspace dataset when broader counts finish later", async () => {
+    let finish: ((value: { mine: number; delegated: number; inLoop: number; fms: number; all: number }) => void) | undefined;
+    mocks.tabs.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    window.history.replaceState({}, "", "/tasks?view=fms");
+    render(<TasksPage />);
+    await screen.findByText("Filtered FMS results: 3");
+    await waitFor(() => expect(screen.getByRole("button", { name: "FMS (3)" })).toBeTruthy());
+    await act(async () => { finish?.({ mine: 4, delegated: 7, inLoop: 2, fms: 99, all: 112 }); });
+    expect(screen.getByRole("button", { name: "FMS (3)" })).toBeTruthy();
+  });
+
   it("shows anytime duties as a closed bar above the tasks on every Pending page", async () => {
     mocks.duties.mockResolvedValue([{ templateId: "d1", title: "Greet customer", description: null, triggerLabel: "Per Customer", taskType: "delegation",
       priority: "medium", dueTime: null, requiresUpload: true, startedToday: 1, completedToday: 0, openCount: 1, openTaskId: "Started greeting" }]);
@@ -57,7 +95,7 @@ describe("task workspace paging", () => {
     fireEvent.change(screen.getByRole("searchbox", { name: "Search all tasks" }), { target: { value: "watched" } });
     await screen.findByText("Matching watched task");
     expect(mocks.search).toHaveBeenCalledWith("admin", "tenant", expect.objectContaining({ query: "watched", subsection: "any" }), 0);
-    expect(screen.getByText("In Loop")).toBeTruthy();
+    expect(screen.getByText("In Loop", { selector: "span" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Clear search and filters" }));
     await screen.findByText("Board task");
   });
@@ -98,12 +136,12 @@ describe("task workspace paging", () => {
     render(<TasksPage />);
     await screen.findByText("First page");
     expect(screen.getByText("1 - 50 of 12000")).toBeTruthy();
-    expect(mocks.page).toHaveBeenCalledWith("admin", "tenant", "mine", "pending", 0);
+    expect(mocks.page).toHaveBeenCalledWith("admin", "tenant", "mine", "pending", 0, "today");
     expect(mocks.feed).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
-    await waitFor(() => expect(mocks.page).toHaveBeenCalledWith("admin", "tenant", "mine", "pending", 50));
+    await waitFor(() => expect(mocks.page).toHaveBeenCalledWith("admin", "tenant", "mine", "pending", 50, "today"));
     fireEvent.click(screen.getByRole("button", { name: /All Tasks/ }));
-    await waitFor(() => expect(mocks.page).toHaveBeenCalledWith("admin", "tenant", "all", "pending", 0));
+    await waitFor(() => expect(mocks.page).toHaveBeenCalledWith("admin", "tenant", "all", "pending", 0, "today"));
   });
   it("discards a late response after the selected tab changes", async () => {
     let finishOld: ((value: ReturnType<typeof page>) => void) | undefined;

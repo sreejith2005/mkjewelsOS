@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { defaultFmsWorkspaceFilters, fmsWorkspaceFilter, type FmsStageSummary, type FmsWorkspaceStatus } from "@jewelos/core";
+import { defaultFmsWorkspaceFilters, fmsWorkspaceFilter, type TaskDateScope, type FmsStageSummary, type FmsWorkspaceStatus } from "@jewelos/core";
 import { loadFmsTaskWorkspace, loadFmsTaskStages } from "@jewelos/data/fms/taskWorkspace";
 import { Button, Field } from "@/components/ui";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
@@ -17,7 +17,7 @@ const STATUS_HELP: Record<FmsWorkspaceStatus, string> = {
  waiting: "Your work that is waiting for other employees or an approval.",
  completed: "Work you have already finished.",
 };
-export function FmsTaskWorkspace({ actorId, tenantId, onNavigate, onCount }: { actorId: string; tenantId: string; onNavigate: (path: string) => void; onCount: (count: number) => void }) {
+export function FmsTaskWorkspace({ actorId, tenantId, onNavigate, onCount, scope }: { scope?: TaskDateScope; actorId: string; tenantId: string; onNavigate: (path: string) => void; onCount: (count: number) => void }) {
  const [filters, setFilters] = useState(defaultFmsWorkspaceFilters); const [query, setQuery] = useState(""); const [offset, setOffset] = useState(0);
  const [expandedFamilies, setExpandedFamilies] = useState<ReadonlySet<string>>(new Set());
  const [expandedStages, setExpandedStages] = useState<ReadonlySet<string>>(new Set());
@@ -28,7 +28,7 @@ export function FmsTaskWorkspace({ actorId, tenantId, onNavigate, onCount }: { a
  const [autoStageFamily, setAutoStageFamily] = useState<string | null>(null);
  const [epoch, setEpoch] = useState(0);
  useEffect(() => { const timer = window.setTimeout(() => setQuery(filters.query.trim()), 250); return () => window.clearTimeout(timer); }, [filters.query]);
- const effective = { ...filters, query }; const filterKey = JSON.stringify(effective);
+ const effective = { ...filters, query, scope }; const filterKey = JSON.stringify(effective);
  const refresh = useCallback(() => { setEpoch(value => value + 1); }, []);
  useTenantRealtimeRefresh({ tenantId, topics: TOPICS, refresh });
  const result = useFmsRead(true, `${actorId}|${filterKey}|${offset}`, async () => {
@@ -36,9 +36,10 @@ export function FmsTaskWorkspace({ actorId, tenantId, onNavigate, onCount }: { a
  }, epoch);
  const [knownFamilies, setKnownFamilies] = useState<NonNullable<typeof result.data>["families"]>([]);
  const [knownStages, setKnownStages] = useState<FmsStageSummary[]>([]);
- useEffect(() => { if (result.data) { onCount(result.data.activeTotal); setKnownFamilies(previous => [...new Map([...previous, ...result.data!.families].map(f => [f.id, f])).values()]);
+ useEffect(() => { if (result.data) { onCount(result.data.total); setKnownFamilies(previous => [...new Map([...previous, ...result.data!.families].map(f => [f.id, f])).values()]);
   if (offset > 0 && offset >= result.data.familyTotal) setOffset(Math.max(0, Math.floor((result.data.familyTotal - 1) / 50) * 50)); } }, [result.data, onCount, offset]);
- useEffect(() => { let active = true; setKnownStages([]); if (filters.familyId) void loadFmsTaskStages(filters.familyId, { ...effective, stageId: "" }).then(rows => { if (active) setKnownStages(rows); }).catch(() => { /* Main hierarchy keeps its explicit retry state. */ }); return () => { active = false; }; }, [filters.familyId, query, filters.status, filters.from, filters.to, epoch]);
+ useEffect(() => { let active = true; setKnownStages([]); if (filters.familyId) void loadFmsTaskStages(filters.familyId, { ...effective, stageId: "" }).then(rows => { if (active) setKnownStages(rows); }).catch(() => { /* Main hierarchy keeps its explicit retry state. */ }); return () => { active = false; }; }, [scope, filters.familyId, query, filters.status, filters.from, filters.to, epoch]);
+ useEffect(() => { setOffset(0); setExpandedFamilies(new Set()); setExpandedStages(new Set()); autoOpened.current = false; }, [scope]);
  const change = (next: typeof filters) => { setFilters(next); setOffset(0); };
  const data = result.data;
  useEffect(() => {

@@ -1,5 +1,5 @@
 import { fmsStageNeedsAssignment } from "./assignmentAuthoring.ts";
-import { FMS_ASSIGNMENT_MODES } from "./workContracts.ts";
+import { FMS_ASSIGNMENT_MODES, validFmsFollowUpSchedule } from "./workContracts.ts";
 import { eligibleRecordNameFields } from "./recordNaming.ts";
 import type { FmsFlowDefinition, FmsValidationContext, FmsValidationIssue } from "./types.ts";
 
@@ -7,6 +7,16 @@ import type { FmsFlowDefinition, FmsValidationContext, FmsValidationIssue } from
 export function validateFmsAssignmentConfig(flow: FmsFlowDefinition, context: FmsValidationContext): readonly FmsValidationIssue[] {
   const issues: FmsValidationIssue[] = [];
   for (const stage of flow.stages) {
+    const schedule = stage.sla.followUp?.schedule;
+    if (schedule) {
+      const source = flow.stages.find(item => item.key === schedule.sourceStageKey);
+      const fields = source?.formTemplateId ? context.formFields?.[source.formTemplateId] : undefined;
+      if (!validFmsFollowUpSchedule(schedule) || (schedule.dateFieldKey || schedule.timeFieldKey) && (!source?.formTemplateId
+        || fields && (schedule.dateFieldKey && !fields.some(field => field.key === schedule.dateFieldKey && field.type === "date")
+          || schedule.timeFieldKey && !fields.some(field => field.key === schedule.timeFieldKey && ["text", "time"].includes(field.type ?? ""))))) {
+        issues.push({ code: "invalid_follow_up_schedule", stageKey: stage.key, message: "Choose valid follow-up timing and date/time questions from the source form." });
+      }
+    }
     const naming = stage.sla.taskDisplay?.recordNaming;
     if (!naming) continue;
     const source = naming.source;

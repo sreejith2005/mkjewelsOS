@@ -12,6 +12,11 @@ describe("form library lifecycle filter", () => {
 });
 
 describe("FMS-built forms", () => {
+  it("parses optional authorized workflow-stage pairs and rejects malformed links", () => {
+    const link = { workflowId: "workflow", workflowName: "Sales", stageId: "stage", stageName: "Call" };
+    expect(parseFmsBuiltForms([{ familyId: "family", links: [link, null, { workflowId: "invalid" }] }]).get("family")?.links).toEqual([link]);
+    expect(parseFmsBuiltForms([{ familyId: "family", links: "invalid" }]).get("family")?.links).toBeUndefined();
+  });
   it("reads families with optional workflow and step names and skips malformed rows", () => {
     const built = parseFmsBuiltForms([{ familyId: "f1", workflows: ["Instagram Leads"], steps: ["Call", ""] }, { familyId: "f2" }, { nope: 1 }, null, "x"]);
     expect([...built.keys()]).toEqual(["f1", "f2"]);

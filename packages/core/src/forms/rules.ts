@@ -55,21 +55,21 @@ export function normalizeFormRule(rule: FormRule | undefined): FormRule | undefi
   if (rule.kind === "all" || rule.kind === "any") {
     const rules = (rule.rules ?? []).map(normalizeFormRule).filter((child): child is FormRule => child !== undefined);
     if (rules.length === 0) return undefined;
-    if (rules.length === 1) return rules[0];
-    return Object.freeze({ kind: rule.kind, rules: Object.freeze(rules) });
+    if (rules.length === 1 && !rule.negate) return rules[0];
+    return Object.freeze({ ...(rule.negate ? { negate: true } : {}), kind: rule.kind, rules: Object.freeze(rules) });
   }
   const predicate = rule as FormRulePredicate;
   const fieldKey = typeof predicate.fieldKey === "string" ? predicate.fieldKey.trim().toLowerCase() : "";
   if (!fieldKey || !OPERATORS.has(predicate.operator)) return undefined;
-  if (FORM_VALUELESS_OPERATORS.has(predicate.operator)) return Object.freeze({ kind: "predicate" as const, fieldKey, operator: predicate.operator });
+  if (FORM_VALUELESS_OPERATORS.has(predicate.operator)) return Object.freeze({ ...(rule.negate ? { negate: true } : {}), kind: "predicate" as const, fieldKey, operator: predicate.operator });
   if (FORM_LIST_OPERATORS.has(predicate.operator)) {
     const values = (Array.isArray(predicate.value) ? predicate.value : []).map(scalar).filter((item): item is FormAnswer => item !== undefined);
     if (!values.length) return undefined;
-    return Object.freeze({ kind: "predicate" as const, fieldKey, operator: predicate.operator, value: Object.freeze([...new Set(values)]) });
+    return Object.freeze({ ...(rule.negate ? { negate: true } : {}), kind: "predicate" as const, fieldKey, operator: predicate.operator, value: Object.freeze([...new Set(values)]) });
   }
   const value = scalar(predicate.value);
   if (value === undefined || value === "") return undefined;
-  return Object.freeze({ kind: "predicate" as const, fieldKey, operator: predicate.operator, value });
+  return Object.freeze({ ...(rule.negate ? { negate: true } : {}), kind: "predicate" as const, fieldKey, operator: predicate.operator, value });
 }
 
 function walk(rule: FormRule, depth: number, state: { predicates: number; depth: number }, keys: string[]): void {
@@ -122,8 +122,8 @@ export function filterFormRule(rule: FormRule | undefined, keep: (fieldKey: stri
   if (rule.kind === "all" || rule.kind === "any") {
     const rules = rule.rules.map((child) => filterFormRule(child, keep)).filter((child): child is FormRule => child !== undefined);
     if (rules.length === 0) return undefined;
-    if (rules.length === 1) return rules[0];
-    return Object.freeze({ kind: rule.kind, rules: Object.freeze(rules) });
+    if (rules.length === 1 && !rule.negate) return rules[0];
+    return Object.freeze({ ...(rule.negate ? { negate: true } : {}), kind: rule.kind, rules: Object.freeze(rules) });
   }
   return keep((rule as FormRulePredicate).fieldKey) ? rule : undefined;
 }
@@ -132,7 +132,7 @@ export function filterFormRule(rule: FormRule | undefined, keep: (fieldKey: stri
 export function renameFormRuleField(rule: FormRule | undefined, from: string, to: string): FormRule | undefined {
   if (!rule || from === to) return rule;
   if (rule.kind === "all" || rule.kind === "any") {
-    return Object.freeze({ kind: rule.kind, rules: Object.freeze(rule.rules.map((child) => renameFormRuleField(child, from, to)!)) });
+    return Object.freeze({ ...(rule.negate ? { negate: true } : {}), kind: rule.kind, rules: Object.freeze(rule.rules.map((child) => renameFormRuleField(child, from, to)!)) });
   }
   const predicate = rule as FormRulePredicate;
   return predicate.fieldKey === from ? Object.freeze({ ...predicate, fieldKey: to }) : rule;

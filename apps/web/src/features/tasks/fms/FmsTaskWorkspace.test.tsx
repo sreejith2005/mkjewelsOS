@@ -15,6 +15,17 @@ beforeEach(() => {
  api.loadFmsTaskStages.mockResolvedValue([{ id: `${id}:stage`, flowId: id, stageId: id, name: "Introduction Call", version: 1, count: 250, pipeline: "Sales", order: 0, starting: false, nextStageIds: [] }]);
  api.loadFmsTaskStagePage.mockResolvedValue({ total: 250, records: [{ id, name: "Rahul Shah", reference: "FMS-1", dueAt: null, status: "pending", visitNumber: 2, description: "Call the client", target: { kind: "stage", instanceId: id, instanceStageId: id } }] });
 });
+it("preserves the shared calendar scope through summary, stage and record drilldowns", async () => {
+ const onCount = vi.fn();
+ const { rerender } = render(<FmsTaskWorkspace actorId={id} tenantId={id} scope="today" onNavigate={vi.fn()} onCount={onCount} />);
+ await screen.findByText("Rahul Shah");
+ expect(api.loadFmsTaskWorkspace).toHaveBeenLastCalledWith(expect.objectContaining({ scope: "today" }), 0);
+ expect(api.loadFmsTaskStages).toHaveBeenLastCalledWith(id, expect.objectContaining({ scope: "today" }));
+ expect(api.loadFmsTaskStagePage).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ scope: "today" }), 0);
+ rerender(<FmsTaskWorkspace actorId={id} tenantId={id} scope="overall" onNavigate={vi.fn()} onCount={onCount} />);
+ await waitFor(() => expect(api.loadFmsTaskWorkspace).toHaveBeenLastCalledWith(expect.objectContaining({ scope: "overall" }), 0));
+ expect(onCount).toHaveBeenCalledWith(250);
+});
 it("loads exact family counts first and lazily opens stages, records and existing work", async () => {
  api.loadFmsTaskWorkspace.mockResolvedValue({ families: [{ id, name: "Enquiries", count: 250 }, { id: "00000000-0000-4000-8000-000000000002", name: "Repairs", count: 3 }], total: 253, activeTotal: 253, familyTotal: 2, counts: { active: 253, pending: 243, overdue: 10, waiting: 0, completed: 0 } });
  const user = userEvent.setup(); const navigate = vi.fn();

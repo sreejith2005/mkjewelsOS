@@ -214,3 +214,14 @@ assigned stage" recipe is updated. No new read tool.
 2026-10-28 simpler screens: FMS steps no longer show **Claim stage**, an **Outcome** box or an optional **Remark** box (a **Remark *** box appears only on steps that require one, just above the buttons). Buttons read **Continue to form** / **Continue**, **Fill the form** and **Mark as done**. After submitting, staff see **Submitted** and **Sent to <name>.** with no reference number; the Forms Library button is **Fill again**. The CRM client panel is now **Workflow history** with **Open this work** and **Show older**. Kiara needs no new read tool; it stays read-only.
 
 2026-10-29 customer integration activation: Settings **Customer Integration** (was Customer Integration Health) with **Forms → CRM**, **Other connections** and **Undelivered customer events**; Form Builder shows **CRM status** and the **This form was revised** notice; FMS steps show the customer sync line and **Open CRM customer profile**; the CRM profile shows **Customer journey** filters and **LEAD**/**CLIENT** with **Purchase evidence**; CRM admin adds **Roster contributors**. No Kiara tool change in this release. Kiara's CRM tools read client search, profile fields, follow-ups and CRM numbers, not the Customer journey, so it cannot yet answer "what happened after this customer's Instagram enquiry". Adding that needs a read-only tool over `crm_client_activity` called as the asker, plus allowed/denied eval cases; it is listed as a follow-up in `docs/architecture/JEWELOS_COMPLETE_INTEGRATION_AUDIT.md`. Integration status stays administrator metadata. Kiara stays read-only.
+
+### Advanced Forms and task scope (2026-10-30 local implementation)
+
+- [ ] Conditions & Routing: independent Visibility Conditions, nested Add AND group / Add OR group, Ordered IF routes and Set OTHERWISE.
+- [ ] Manage sections: Section Visibility and After this section. Explicit question routes override the end action; eligibility still applies.
+- [ ] Routing simulation, Test validation and Reset simulation use the production evaluator without writing or uploading.
+- [ ] FMS Workflow Forms groups permitted relationships Workflow / Stage / Form using Workflow filter and Stage filter.
+- [ ] Tasks Today uses the Asia/Kolkata calendar date; Overall includes future work; Overdue separately lists earlier unfinished work. Counts and pages share server scope.
+- [ ] Automatic follow-up scheduling extends existing FMS timing and assignment with next-day 11:00 defaults and requested date/time overrides.
+
+Kiara tool decision: no new read tool. Configuration/navigation extends existing section contracts without wider reads or writes. Local implementation is not proof of hosted availability.

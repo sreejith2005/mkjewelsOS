@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { dropdownMasterKey, eligibleRecordNameFields } from "@jewelos/core";
 import { ArrowLeft, Banknote, CalendarDays, CheckSquare, ChevronDown, ChevronUp, CircleDot, Copy, Eye, EyeOff, FileUp, Filter, GitBranch, Hash, ListChecks, Mail, Minus, Monitor, Pencil, Phone, Plus, RotateCcw, Smartphone, Split, Star, Trash2, Type, UserRound, X } from "lucide-react";
-import { createFormField, formAnswerOptions, setQuestionAnswerCondition, describeFormRule, describePublishedFormEdit, FORM_LIST_OPERATORS, formRuleHasIncompletePredicate, FORM_OPERATOR_LABELS, FORM_SUBMIT_TARGET, FORM_VALUELESS_OPERATORS, nextFormFieldKey as sharedNextFormFieldKey, normalizeFormDefinition, operatorsForFieldType, pruneFormRules, renameFormRuleField, validateFormDefinition, type FormAnswer, type FormBranch, type FormFieldDefinition, type FormOption, type FormRule, type FormRuleOperator, type FormRulePredicate, type FormSectionDefinition, type FormTemplateDefinition, type Json, type UserRole } from "@jewelos/core";
+import { duplicateFormField, createFormField, formAnswerOptions, setQuestionAnswerCondition, describePublishedFormEdit, formRuleHasIncompletePredicate, FORM_SUBMIT_TARGET, nextFormFieldKey as sharedNextFormFieldKey, normalizeFormDefinition, pruneFormRules, updateFormField, validateFormDefinition, type FormAnswer, type FormBranch, type FormFieldDefinition, type FormOption, type FormRule, type FormRuleOperator, type FormSectionDefinition, type FormTemplateDefinition, type Json, type UserRole } from "@jewelos/core";
 import { Button, Field, Notice } from "@/components/ui";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
@@ -10,13 +10,15 @@ import { formUsageImpact, saveDraft, savePublishedForm, type FormBundle } from "
 import { DropdownSourceEditor } from "./DropdownSourceEditor";
 import { FormRenderer, type DynamicOptions } from "./FormRenderer";
 import { readAnswerRoutes, readGuidedConditionLinks, setAnswerRoute, type AnswerRoute } from "./guidedConditions";
-import { convertFormFieldType, LAYOUT_FIELD_TYPES, OPTION_FIELD_TYPES, pruneOptionValueReferences } from "./fieldTypes";
+import { convertFormFieldType, LAYOUT_FIELD_TYPES, OPTION_FIELD_TYPES } from "./fieldTypes";
 import { CustomerIntegrationPanel } from "./CustomerIntegrationPanel";
 import { FormOutline } from "./FormOutline";
 import { FormRoutingMap } from "./FormRoutingMap";
 
 /** Lists waiting to be added to Dropdown Master when the form is saved. */
 type PendingMasterLists = Readonly<{ names: Readonly<Record<string, string>>; set: (key: string, name: string | undefined) => void }>;
+import { defaultFormRulePredicate, FormRuleTreeEditor } from "./FormRuleTreeEditor";
+import { FormAdvancedRoutes, FormDestinationSelect, FormSectionConditions } from "./FormRoutingControls";
 
 const ROLES: UserRole[] = ["super_admin", "admin", "manager", "hr", "crm", "staff", "doer", "housekeeping"];
 const OPTION_TYPES = OPTION_FIELD_TYPES;
@@ -39,7 +41,6 @@ const fieldIcon = (type: FormFieldDefinition["type"]) => FIELD_KINDS.find((item)
 const DEFAULT_SECTION: FormSectionDefinition = { key: "section_1", title: "Section 1" };
 // Headings and dividers hold no answer, so nothing can be shown based on them.
 const LAYOUT_TYPES = LAYOUT_FIELD_TYPES;
-const DATE_TYPES = new Set<FormFieldDefinition["type"]>(["date", "datetime"]);
 
 const sectionKeyFor = (title: string, used: readonly string[]) => {
   const base = title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").replace(/^([^a-z])/, "s$1").slice(0, 60) || "section";
@@ -102,7 +103,7 @@ export function FormBuilder({ bundle, dynamicOptions, onClose, onSaved, host }: 
   }, []);
   const sections = form.sections?.length ? form.sections : [DEFAULT_SECTION];
   const [baseline, setBaseline] = useState(() => host?.initialDirty ? "" : JSON.stringify(normalizeFormDefinition(host?.initialDefinition ?? formBuilderDefinition(bundle)))); const dirty = JSON.stringify(normalizeFormDefinition(form)) !== baseline; const issues = useMemo(() => [
-    ...validateFormDefinition(normalizeFormDefinition(form)),
+    ...validateFormDefinition(form),
     // Normalization drops a predicate with no answer, which would quietly turn
     // "only when ..." back into "always asked". Refuse to save it instead.
     ...form.fields.filter((field) => formRuleHasIncompletePredicate(field.rule)).map((field) => ({
@@ -157,38 +158,12 @@ export function FormBuilder({ bundle, dynamicOptions, onClose, onSaved, host }: 
         return { ...rest, [renamedTo]: name };
       });
     }
-    setForm((current) => {
-    const previousKey = current.fields[index]?.key;
-    // Renaming a question must carry every rule that reads it along, otherwise
-    // the dependants would silently lose their condition.
-    // Half-typed keys pass through here one character at a time, so an empty
-    // key is a rename like any other rather than "no rename".
-    const rename = patch.key !== undefined && previousKey !== undefined && patch.key !== previousKey
-      ? { from: previousKey, to: patch.key } : null;
-
-    const fields = current.fields.map((field, position) => {
-      if (position !== index) {
-        if (!rename) return field;
-        const rule = renameFormRuleField(field.rule, rename.from, rename.to);
-        const condition = field.condition?.fieldKey === rename.from ? { ...field.condition, fieldKey: rename.to } : field.condition;
-        return rule === field.rule && condition === field.condition ? field : { ...field, rule, condition };
-      }
-      const next = { ...field, ...patch };
-      // Deleting an option must not leave a branch pointing at an answer that
-      // no longer exists, and moving a question invalidates its old targets.
-      if (!next.branches?.length) return next;
-      const values = new Set((next.options ?? []).map((option) => option.value));
-      const sectionIndex = sections.findIndex((section) => section.key === next.sectionKey);
-      const branches = next.branches.filter((branch) =>
-        (next.optionSource || typeof branch.value !== "string" || values.has(branch.value))
-        && (branch.targetSectionKey === FORM_SUBMIT_TARGET || sections.findIndex((section) => section.key === branch.targetSectionKey) > sectionIndex));
-      return { ...next, ...(branches.length ? { branches } : { branches: undefined }) };
-    });
-    const nextOptions = patch.options;
-    const pruned = previousKey && nextOptions ? pruneOptionValueReferences(fields, previousKey, new Set(nextOptions.map((option) => option.value))) : fields;
-      return { ...current, fields: pruneFormRules(pruned) };
+    setForm(current => {
+      const field = current.fields[index];
+      return field ? updateFormField(current, field.key, patch) : current;
     });
   };
+
   const move = (index: number, direction: number) => setForm((current) => {
     const next = [...current.fields]; const to = index + direction;
     if (to < 0 || to >= next.length || next[to]!.sectionKey !== next[index]!.sectionKey) return current;
@@ -201,10 +176,8 @@ export function FormBuilder({ bundle, dynamicOptions, onClose, onSaved, host }: 
   });
   const duplicate = (index: number) => setForm((current) => {
     const source = current.fields[index]; if (!source) return current;
-    const { id: _id, ...copy } = source;
-    const next = [...current.fields]; next.splice(index + 1, 0, { ...copy, key: nextFormFieldKey(current.fields), label: `${source.label || fieldLabel(source.type)} copy` });
     setEditing(index + 1); setAddMenu(null);
-    return { ...current, fields: settle(next) };
+    return duplicateFormField(current, source.key);
   });
   const changeFieldType = (index: number, type: FormFieldDefinition["type"]) => {
     const conversion = convertFormFieldType(form.fields, index, type);
@@ -340,12 +313,9 @@ export function FormBuilder({ bundle, dynamicOptions, onClose, onSaved, host }: 
       <p className="mb-2 text-xs text-soft-grey">A question can send the respondent to a later section. Only the sections the answers lead to are shown while filling the form.</p>
       <div className="space-y-2">{sections.map((section, index) => <article className="grid gap-2 rounded-xl border border-gold/20 bg-charcoal/30 p-3 sm:grid-cols-[1fr_1fr_auto]" key={section.key}>
         <Field label={`Section ${index + 1} title`}><input className="field" onChange={(event) => patchSection(section.key, { title: event.target.value })} value={section.title} /></Field>
-        <Field label="After this section"><select className="field" onChange={(event) => patchSection(section.key, { next: event.target.value || undefined })} value={section.next ?? ""}>
-          <option value="">Continue to the next section</option>
-          {sections.slice(index + 1).map((option) => <option key={option.key} value={option.key}>Go to {option.title}</option>)}
-          <option value={FORM_SUBMIT_TARGET}>Submit the form</option>
-        </select></Field>
+        <FormDestinationSelect label="After this section" fields={form.fields} sections={sections} sectionKey={section.key} value={section.next ?? "__continue__"} onChange={next => patchSection(section.key, { next: next === "__continue__" ? undefined : next })} />
         <div className="flex items-end gap-1"><Button aria-label="Move section up" className="size-11 min-h-11 p-0" disabled={index === 0} onClick={() => moveSection(index, -1)} type="button" variant="ghost"><ChevronUp className="size-4" /></Button><Button aria-label="Move section down" className="size-11 min-h-11 p-0" disabled={index === sections.length - 1} onClick={() => moveSection(index, 1)} type="button" variant="ghost"><ChevronDown className="size-4" /></Button><Button aria-label={`Delete ${section.title}`} className="size-11 min-h-11 p-0" disabled={sections.length === 1} onClick={() => { if (window.confirm(`Delete "${section.title}" and its questions?`)) removeSection(section.key); }} type="button" variant="danger"><Trash2 className="size-4" /></Button></div>
+        <FormSectionConditions section={section} fields={form.fields} sections={sections} dynamicOptions={previewOptions} masterOptions={masterOptions} onChange={patch => patchSection(section.key, patch)} />
       </article>)}</div>
     </section></details>
 
@@ -393,7 +363,7 @@ function FieldEditor({ field, fields, index, dynamicOptions, masterOptions, sect
     <Field label="Field type"><select aria-label="Field type" className="field" onChange={(event) => onChangeType(index, event.target.value as FormFieldDefinition["type"])} value={field.type}>{FIELD_KINDS.some((kind) => kind.type === field.type) ? null : <option value={field.type}>{fieldLabel(field.type)} (legacy)</option>}{FIELD_KINDS.map((kind) => <option key={kind.type} value={kind.type}>{kind.label}</option>)}</select></Field>
     {OPTION_TYPES.has(field.type) ? <DropdownSourceEditor field={field} index={index} masterOptions={masterOptions} onMasterCreated={onMasterCreated} onPatch={onPatch} onPendingNameChange={(name) => pendingMasterLists.set(field.key, name)} pendingName={pendingMasterLists.names[field.key]} /> : null}
     {!LAYOUT_TYPES.has(field.type) ? <div className="flex flex-wrap items-center gap-4 sm:col-span-2"><label className="text-sm text-champagne"><input checked={field.required === true} onChange={(event) => onPatch(index, { required: event.target.checked })} type="checkbox" /> Required</label></div> : null}
-    {!LAYOUT_TYPES.has(field.type) ? <details className="rounded-lg border border-gold/15 bg-obsidian/30 p-3 sm:col-span-2"><summary className="cursor-pointer text-sm font-semibold text-champagne">Routing</summary><div className="mt-3 grid gap-3">{field.type === "checkbox" && (field.options?.length ?? 0) > 0 ? <Notice>When several checked answers route to sections or the end, the first selected routed option in the option order wins. Question visibility can match every selected answer.</Notice> : null}{BRANCH_TYPES.has(field.type) ? <AnswerRoutingEditor dynamicOptions={dynamicOptions} field={field} fields={fields} index={index} masterOptions={masterOptions} onSetRoute={onSetRoute} sections={sections} /> : null}<OptionMappedConditionEditor dynamicOptions={dynamicOptions} field={field} fields={fields} index={index} masterOptions={masterOptions} onSetQuestionCondition={onSetQuestionCondition} /></div></details> : null}
+    {!LAYOUT_TYPES.has(field.type) ? <details className="rounded-lg border border-gold/15 bg-obsidian/30 p-3 sm:col-span-2"><summary className="cursor-pointer text-sm font-semibold text-champagne">Conditions &amp; Routing</summary><div className="mt-3 grid gap-3"><VisibilityRuleEditor field={field} index={index} sources={fields.slice(0, index).filter(f => !LAYOUT_TYPES.has(f.type))} masterOptions={masterOptions} dynamicOptions={dynamicOptions} onPatch={onPatch} />{field.type === "checkbox" && (field.options?.length ?? 0) > 0 ? <Notice>When several checked answers route to sections or the end, the first selected routed option in the option order wins. Question visibility can match every selected answer.</Notice> : null}{BRANCH_TYPES.has(field.type) ? <AnswerRoutingEditor dynamicOptions={dynamicOptions} field={field} fields={fields} index={index} masterOptions={masterOptions} onSetRoute={onSetRoute} sections={sections} /> : null}<OptionMappedConditionEditor dynamicOptions={dynamicOptions} field={field} fields={fields} index={index} masterOptions={masterOptions} onSetQuestionCondition={onSetQuestionCondition} /><FormAdvancedRoutes field={field} fields={fields} sections={sections} masterOptions={masterOptions} dynamicOptions={dynamicOptions} onChange={branches => onPatch(index, { branches })} /></div></details> : null}
     <details className="rounded-lg border border-gold/15 bg-obsidian/30 p-3 sm:col-span-2"><summary className="cursor-pointer text-sm font-semibold text-champagne">Advanced settings</summary><div className="mt-3 grid gap-3 sm:grid-cols-2">{field.type !== "divider" ? <Field label="Helper text"><input className="field" onChange={(event) => onPatch(index, { helperText: event.target.value })} value={field.helperText ?? ""} /></Field> : null}{!LAYOUT_TYPES.has(field.type) ? <Field label="Placeholder"><input className="field" onChange={(event) => onPatch(index, { placeholder: event.target.value })} value={field.placeholder ?? ""} /></Field> : null}{sections.length > 1 ? <Field label="Section"><select className="field" onChange={(event) => onPatch(index, { sectionKey: event.target.value })} value={field.sectionKey ?? sections[0]?.key ?? ""}>{sections.map((section) => <option key={section.key} value={section.key}>{section.title}</option>)}</select></Field> : null}{NUMBER_TYPES.has(field.type) && field.type !== "rating" ? <><Field label="Minimum"><input className="field" onChange={(event) => updateValidation("min", event.target.value)} type="number" value={validation.min ?? ""} /></Field><Field label="Maximum"><input className="field" onChange={(event) => updateValidation("max", event.target.value)} type="number" value={validation.max ?? ""} /></Field></> : null}{TEXT_TYPES.has(field.type) ? <><Field label="Minimum length"><input className="field" onChange={(event) => updateValidation("minLength", event.target.value)} type="number" value={validation.minLength ?? ""} /></Field><Field label="Maximum length"><input className="field" onChange={(event) => updateValidation("maxLength", event.target.value)} type="number" value={validation.maxLength ?? ""} /></Field></> : null}{!LAYOUT_TYPES.has(field.type) ? <div className="flex flex-wrap items-center gap-4 sm:col-span-2"><label className="text-sm text-champagne"><input checked={field.shown !== false} onChange={(event) => onPatch(index, { shown: event.target.checked })} type="checkbox" /> Shown</label><label className="text-sm text-champagne"><input checked={field.editable !== false} onChange={(event) => onPatch(index, { editable: event.target.checked })} type="checkbox" /> Editable</label></div> : null}</div></details>
   </div>;
 }
@@ -478,43 +448,9 @@ function visibilityRule(field: FormFieldDefinition): FormRule | undefined {
   return field.condition ? { kind: "predicate", ...field.condition } : undefined;
 }
 
-type EditableGroup = Readonly<{ kind: "all" | "any"; rules: readonly FormRulePredicate[] }>;
-
-/**
- * The editor authors a flat ALL/ANY list, which is what respondents can reason
- * about. A deeper tree stays valid and keeps evaluating, but is shown read-only
- * rather than silently flattened into something that means something else.
- */
-function toEditableGroup(rule: FormRule | undefined): EditableGroup | null {
-  if (!rule) return null;
-  if (rule.kind === "predicate") return { kind: "all", rules: [rule as FormRulePredicate] };
-  return rule.rules.every((child) => child.kind === "predicate")
-    ? { kind: rule.kind, rules: rule.rules as readonly FormRulePredicate[] }
-    : null;
-}
-
 /** The answers a question can offer, or null when it is answered freely. */
 function answerOptions(source: FormFieldDefinition, masterOptions: MasterOption[], dynamicOptions: DynamicOptions): readonly FormOption[] | null {
   return formAnswerOptions(source, { ...dynamicOptions, masters: toFormMasterOptions(masterOptions) });
-}
-
-function defaultPredicate(source: FormFieldDefinition, options: readonly FormOption[] | null): FormRulePredicate {
-  const operator = operatorsForFieldType(source.type)[0] ?? "equals";
-  if (FORM_VALUELESS_OPERATORS.has(operator)) return { kind: "predicate", fieldKey: source.key, operator };
-  if (FORM_LIST_OPERATORS.has(operator)) return { kind: "predicate", fieldKey: source.key, operator, value: options?.[0] ? [options[0].value] : [] };
-  if (source.type === "checkbox" && !source.options?.length && !source.optionSource) return { kind: "predicate", fieldKey: source.key, operator, value: true };
-  return { kind: "predicate", fieldKey: source.key, operator, value: options?.[0]?.value ?? "" };
-}
-
-/** Keeps as much of the authored answer as the new operator can still use. */
-function withOperator(predicate: FormRulePredicate, operator: FormRuleOperator): FormRulePredicate {
-  if (FORM_VALUELESS_OPERATORS.has(operator)) return { kind: "predicate", fieldKey: predicate.fieldKey, operator };
-  const value = predicate.value;
-  if (FORM_LIST_OPERATORS.has(operator)) {
-    const list = Array.isArray(value) ? value : value === undefined || value === "" ? [] : [value];
-    return { kind: "predicate", fieldKey: predicate.fieldKey, operator, value: list };
-  }
-  return { kind: "predicate", fieldKey: predicate.fieldKey, operator, value: Array.isArray(value) ? value[0] ?? "" : value ?? "" };
 }
 
 /**
@@ -524,93 +460,18 @@ function withOperator(predicate: FormRulePredicate, operator: FormRuleOperator):
  */
 export function VisibilityRuleEditor({ field, index, sources, masterOptions, dynamicOptions, onPatch }: { field: FormFieldDefinition; index: number; sources: readonly FormFieldDefinition[]; masterOptions: MasterOption[]; dynamicOptions: DynamicOptions; onPatch: (index: number, patch: Partial<FormFieldDefinition>) => void }) {
   const rule = visibilityRule(field);
-  const group = toEditableGroup(rule);
-  const labelFor = (key: string) => sources.find((source) => source.key === key)?.label || key;
-  const write = (next: EditableGroup | null) => onPatch(index, {
-    rule: next && next.rules.length ? { kind: next.kind, rules: next.rules } : undefined,
-    condition: undefined,
-  });
-  const setPredicate = (position: number, predicate: FormRulePredicate) =>
-    write({ kind: group?.kind ?? "all", rules: (group?.rules ?? []).map((item, slot) => slot === position ? predicate : item) });
-  const addPredicate = () => {
-    const source = sources[0];
-    if (!source) return;
-    write({ kind: group?.kind ?? "all", rules: [...(group?.rules ?? []), defaultPredicate(source, answerOptions(source, masterOptions, dynamicOptions))] });
-  };
-
-  return <div className="space-y-2 rounded-lg border border-gold/15 bg-obsidian/40 p-3 sm:col-span-2">
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <span className="label mb-0 flex items-center gap-1"><Filter className="size-4 text-gold-secondary" />Show this question</span>
-      {sources.length ? <label className="text-xs text-champagne"><input checked={rule !== undefined} onChange={(event) => event.target.checked ? addPredicate() : write(null)} type="checkbox" /> Only when earlier answers match</label> : null}
-    </div>
-    {!sources.length ? <p className="text-xs text-soft-grey">Add a question before this one to show or hide it based on the answer.</p>
-      : rule === undefined ? <p className="text-xs text-soft-grey">Always asked.</p>
-      : !group ? <div className="space-y-2"><p className="text-xs text-soft-grey">Shown when {describeFormRule(rule, labelFor)}. This grouped condition was not built here, so it is shown read-only.</p>
-        <Button className="min-h-9" onClick={() => write(null)} type="button" variant="secondary">Replace with a new condition</Button></div>
-      : <>
-        {group.rules.length > 1 ? <label className="flex items-center gap-2 text-xs text-soft-grey">Match<select aria-label="Match all or any condition" className="field h-9 w-auto" onChange={(event) => write({ kind: event.target.value === "any" ? "any" : "all", rules: group.rules })} value={group.kind}>
-          <option value="all">all of these</option>
-          <option value="any">any of these</option>
-        </select>conditions</label> : null}
-        {group.rules.map((predicate, position) => <PredicateRow
-          dynamicOptions={dynamicOptions}
-          key={position}
-          lead={position === 0 ? "IF" : group.kind === "all" ? "AND" : "OR"}
-          masterOptions={masterOptions}
-          onChange={(next) => setPredicate(position, next)}
-          onRemove={() => write({ kind: group.kind, rules: group.rules.filter((_, slot) => slot !== position) })}
-          predicate={predicate}
-          sources={sources}
-        />)}
-        <div className="flex flex-wrap items-center gap-2">
-          <Button className="min-h-9" onClick={addPredicate} type="button" variant="secondary"><Plus className="size-4" />Add condition</Button>
-          <p className="text-xs text-soft-grey">Shown when {describeFormRule({ kind: group.kind, rules: group.rules }, labelFor)}</p>
-        </div>
-      </>}
-  </div>;
-}
-
-function PredicateRow({ predicate, sources, lead, masterOptions, dynamicOptions, onChange, onRemove }: { predicate: FormRulePredicate; sources: readonly FormFieldDefinition[]; lead: string; masterOptions: MasterOption[]; dynamicOptions: DynamicOptions; onChange: (predicate: FormRulePredicate) => void; onRemove: () => void }) {
-  const source = sources.find((item) => item.key === predicate.fieldKey) ?? sources[0]!;
-  const options = answerOptions(source, masterOptions, dynamicOptions);
-  const operators = operatorsForFieldType(source.type);
-  const valueless = FORM_VALUELESS_OPERATORS.has(predicate.operator);
-  return <div className="grid gap-2 rounded-lg border border-gold/10 p-2 sm:grid-cols-[auto_1fr_1fr_1fr_auto] sm:items-end">
-    <span className="text-xs font-semibold text-soft-grey sm:pb-3">{lead}</span>
-    <Field label="Question"><select className="field" onChange={(event) => {
-      const next = sources.find((item) => item.key === event.target.value);
-      if (next) onChange(defaultPredicate(next, answerOptions(next, masterOptions, dynamicOptions)));
-    }} value={source.key}>{sources.map((item) => <option key={item.key} value={item.key}>{item.label || item.key}</option>)}</select></Field>
-    <Field label="Condition"><select className="field" onChange={(event) => onChange(withOperator(predicate, event.target.value as FormRuleOperator))} value={predicate.operator}>
-      {operators.map((operator) => <option key={operator} value={operator}>{FORM_OPERATOR_LABELS[operator]}</option>)}
-    </select></Field>
-    {valueless ? <span aria-hidden className="hidden sm:block" /> : <Field label="Answer"><PredicateValueInput onChange={(value) => onChange({ ...predicate, value })} options={options} predicate={predicate} source={source} /></Field>}
-    <Button aria-label="Remove condition" className="size-11 min-h-11 p-0" onClick={onRemove} type="button" variant="danger"><Trash2 className="size-4" /></Button>
-  </div>;
-}
-
-function PredicateValueInput({ predicate, source, options, onChange }: { predicate: FormRulePredicate; source: FormFieldDefinition; options: readonly FormOption[] | null; onChange: (value: FormAnswer | readonly FormAnswer[]) => void }) {
-  const list = FORM_LIST_OPERATORS.has(predicate.operator);
-  const selected = (Array.isArray(predicate.value) ? predicate.value : []).map(String);
-  if (options && list) return <select className="field" multiple onChange={(event) => onChange([...event.target.selectedOptions].map((option) => option.value))} value={selected}>
-    {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-  </select>;
-  if (list) return <input className="field" onChange={(event) => onChange(event.target.value.split(",").map((entry) => entry.trim()).filter(Boolean))} placeholder="Comma separated answers" value={selected.join(", ")} />;
-  const current = predicate.value === undefined || Array.isArray(predicate.value) ? "" : String(predicate.value);
-  if (options) {
-    // An option deleted after the rule was written stays visible so the author
-    // can see what broke instead of the rule silently pointing at nothing.
-    const known = options.some((option) => option.value === current);
-    const legacyCheckbox = source.type === "checkbox" && !source.options?.length && !source.optionSource;
-    return <select className="field" onChange={(event) => onChange(legacyCheckbox ? event.target.value === "true" : event.target.value)} value={current}>
-      <option value="">Choose an answer</option>
-      {current && !known ? <option value={current}>{current} (removed)</option> : null}
-      {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-    </select>;
-  }
-  if (NUMBER_TYPES.has(source.type)) return <input className="field" onChange={(event) => onChange(event.target.value === "" ? "" : Number(event.target.value))} step="any" type="number" value={current} />;
-  if (DATE_TYPES.has(source.type)) return <input className="field" onChange={(event) => onChange(event.target.value)} type={source.type === "datetime" ? "datetime-local" : "date"} value={current} />;
-  return <input className="field" onChange={(event) => onChange(event.target.value)} placeholder="Answer to match" value={current} />;
+  const mode = !rule ? "always" : rule.negate ? "unless" : "when";
+  const write = (next: FormRule | undefined) => onPatch(index, { rule: next, condition: undefined });
+  return <section className="space-y-3 rounded-lg border border-gold/15 p-3 sm:col-span-2">
+    <h4 className="font-semibold text-champagne">Visibility Conditions</h4>
+    <Field label="When should this question appear?"><select className="field" value={mode} onChange={event => {
+      if (event.target.value === "always") { write(undefined); return; }
+      const first = sources[0];
+      if (rule) write({ ...rule, negate: event.target.value === "unless" });
+      else if (first) write({ ...defaultFormRulePredicate(first, answerOptions(first, masterOptions, dynamicOptions)), negate: event.target.value === "unless" });
+    }}><option value="always">Always show</option><option value="when" disabled={!sources.length}>Show only when conditions match</option><option value="unless" disabled={!sources.length}>Hide when conditions match</option></select></Field>
+    {rule ? <FormRuleTreeEditor hideNegation rule={{ ...rule, negate: undefined }} sources={sources} masterOptions={masterOptions} dynamicOptions={dynamicOptions} onChange={next => write(next ? { ...next, negate: mode === "unless" } : undefined)} /> : <p className="text-xs text-soft-grey">Always asked.</p>}
+  </section>;
 }
 
 /** IF <this question> <operator> <answer> THEN go to <section>, as many times as needed. */

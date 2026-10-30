@@ -13,6 +13,14 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub',(select id::text from visit_assignment_fixture where name='b_auth'),true);
 select is((get_fms_task_workspace('{}')->>'total')::integer,250,'summary counts all 250 actual visits');
 select is((task_feed_page('fms','pending')->'counts'->>'open')::integer,250,'tab reconciles beyond first 50');
+-- Refresh planner statistics after bulk synthetic visits; retain the 8-second query budget.
+reset role;
+do $stats$declare t record;begin
+ for t in select n.nspname,c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p') loop
+ execute format('analyze %I.%I',t.nspname,t.relname);
+ end loop;
+end $stats$;
+set local role authenticated;
 set local statement_timeout='8s';
 select is((get_fms_task_workspace('{"query":"Synthetic client"}')->>'total')::integer,250,'form-answer search covers all visits within the authenticated request budget');
 set local statement_timeout=0;

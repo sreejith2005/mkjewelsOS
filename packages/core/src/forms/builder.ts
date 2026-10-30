@@ -1,3 +1,4 @@
+import { FORM_QUESTION_TARGET_PREFIX } from "./sections";
 import { type FormFieldDefinition, type FormFieldType, type FormOption, type FormSectionDefinition, type FormTemplateDefinition } from "./types";
 import { OPTION_FIELD_TYPES, pruneOptionValueReferences } from "./fieldTypes";
 import { pruneFormRules, renameFormRuleField } from "./rules";
@@ -41,15 +42,17 @@ export function updateFormField(definition: FormTemplateDefinition, key: string,
   const index = definition.fields.findIndex((field) => field.key === key);
   if (index < 0) return definition;
   const rename = patch.key !== undefined && patch.key !== key ? patch.key : null;
+  const destination = (target: string | undefined) => rename !== null && target === FORM_QUESTION_TARGET_PREFIX + key ? FORM_QUESTION_TARGET_PREFIX + rename : target;
   let fields: readonly FormFieldDefinition[] = definition.fields.map((field, position): FormFieldDefinition => {
-    if (position === index) return { ...field, ...patch };
-    if (!rename) return field;
-    const rule = renameFormRuleField(field.rule, key, rename);
-    const condition = field.condition?.fieldKey === key ? { ...field.condition, fieldKey: rename } : field.condition;
-    return rule === field.rule && condition === field.condition ? field : { ...field, rule, condition };
+    const next = position === index ? { ...field, ...patch } : field;
+    if (rename === null) return next;
+    return { ...next, rule: renameFormRuleField(next.rule, key, rename),
+      condition: next.condition?.fieldKey === key ? { ...next.condition, fieldKey: rename } : next.condition,
+      branches: next.branches?.map(branch => ({ ...branch, rule: renameFormRuleField(branch.rule, key, rename), targetSectionKey: destination(branch.targetSectionKey)! })) };
   });
   if (patch.options) fields = pruneOptionValueReferences(fields, rename ?? key, new Set(patch.options.map((option) => option.value)));
-  return { ...definition, fields: settle(fields) };
+  const sections = rename === null ? definition.sections : definition.sections?.map(section => ({ ...section, rule: renameFormRuleField(section.rule, key, rename), next: destination(section.next) }));
+  return { ...definition, sections, recordNameFieldKey: definition.recordNameFieldKey === key && rename !== null ? rename : definition.recordNameFieldKey, fields: settle(fields) };
 }
 
 export function moveFormField(definition: FormTemplateDefinition, key: string, direction: -1 | 1): FormTemplateDefinition {
@@ -67,7 +70,9 @@ export function duplicateFormField(definition: FormTemplateDefinition, key: stri
   if (!source) return definition;
   const { id: _id, ...copy } = source;
   const fields = [...definition.fields];
-  fields.splice(index + 1, 0, { ...copy, key: nextFormFieldKey(fields), label: `${source.label || labels[source.type] || "Field"} copy` });
+  const keyForCopy = nextFormFieldKey(fields);
+  const branches = copy.branches?.map(branch => ({ ...branch, rule: renameFormRuleField(branch.rule, key, keyForCopy) }));
+  fields.splice(index + 1, 0, { ...copy, key: keyForCopy, ...(branches ? { branches } : {}), label: `${source.label || labels[source.type] || "Field"} copy` });
   return { ...definition, fields: settle(fields) };
 }
 

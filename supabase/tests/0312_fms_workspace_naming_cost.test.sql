@@ -24,6 +24,14 @@ select work.fms_instance_id,work.fms_stage_id,'in_progress',work.assigned_to,now
 from fms_instance_stages work cross join generate_series(2,250) n
 where work.fms_instance_id=(select id from visit_assignment_fixture where name='instance') and work.fms_stage_id=(select id from visit_assignment_fixture where name='call');
 set local role authenticated;
+-- Refresh planner statistics after bulk synthetic visits; retain the 8-second query budget.
+reset role;
+do $stats$declare t record;begin
+ for t in select n.nspname,c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p') loop
+ execute format('analyze %I.%I',t.nspname,t.relname);
+ end loop;
+end $stats$;
+set local role authenticated;
 set local statement_timeout='8s';
 select is((get_fms_task_workspace('{"query":"Synthetic client"}')->>'total')::integer,249,
  'name search after a real handoff fits the authenticated budget for 249 visits');
