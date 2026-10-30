@@ -21,7 +21,7 @@ const STATUS_OPTIONS: readonly { value: FmsWorkspaceStatus; label: string }[] = 
   { value: "active", label: "To do" }, { value: "waiting", label: "Waiting for others" }, { value: "completed", label: "Done" },
 ];
 const PRIORITY_LABEL = { high: "High priority", medium: "Medium", low: "Low" } as const;
-type BoardView = Readonly<{ filters: FmsWorkspaceFilters; scrollLeft: number; stageId: string }>;
+type BoardView = Readonly<{ filters: FmsWorkspaceFilters; scrollLeft: number; stageId: string; showEmpty: boolean }>;
 
 /** Desktop shows every column side by side; a phone shows one readable column at a time. */
 function useWideLayout(): boolean {
@@ -52,6 +52,8 @@ export function FmsTaskBoard({ familyId, tenantId, canSeeTeam, initialStatus = "
   const [query, setQuery] = useState(filters.query.trim());
   const [epoch, setEpoch] = useState(0);
   const [activeStage, setActiveStage] = useState(() => readFmsBoardView<BoardView>(familyId).stageId ?? "");
+  // Only steps holding work are columns unless the user asks for every step.
+  const [showEmpty, setShowEmpty] = useState(() => readFmsBoardView<BoardView>(familyId).showEmpty === true);
   const [people, setPeople] = useState<readonly { id: string; name: string }[]>([]);
   const wide = useWideLayout();
   const scroller = useRef<HTMLDivElement>(null);
@@ -64,11 +66,13 @@ export function FmsTaskBoard({ familyId, tenantId, canSeeTeam, initialStatus = "
   const identity = `${familyId}|${JSON.stringify(effective)}`;
   const result = useFmsRead(true, identity, () => loadFmsTaskBoard(familyId, effective), epoch);
   const board = result.data;
-  const columns = useMemo(() => board ? fmsBoardColumns(board) : [], [board]);
+  const allColumns = useMemo(() => board ? fmsBoardColumns(board) : [], [board]);
+  const columns = useMemo(() => showEmpty ? allColumns : allColumns.filter((column) => column.count > 0), [allColumns, showEmpty]);
+  const emptyCount = allColumns.length - allColumns.filter((column) => column.count > 0).length;
   const versions = new Set(columns.map((column) => column.flowId)).size;
   const change = (patch: Partial<FmsWorkspaceFilters>) => setFilters((current) => ({ ...current, ...patch }));
 
-  useEffect(() => { saveFmsBoardView(familyId, { filters, scrollLeft: scroller.current?.scrollLeft ?? readFmsBoardView<BoardView>(familyId).scrollLeft ?? 0, stageId: activeStage }); }, [familyId, filters, activeStage]);
+  useEffect(() => { saveFmsBoardView(familyId, { filters, scrollLeft: scroller.current?.scrollLeft ?? readFmsBoardView<BoardView>(familyId).scrollLeft ?? 0, stageId: activeStage, showEmpty }); }, [familyId, filters, activeStage, showEmpty]);
   useEffect(() => {
     if (!team || people.length) return;
     let active = true;
@@ -91,8 +95,15 @@ export function FmsTaskBoard({ familyId, tenantId, canSeeTeam, initialStatus = "
     if (!restored.current) { restored.current = true; scroller.current.scrollLeft = readFmsBoardView<BoardView>(familyId).scrollLeft ?? 0; }
     measure();
   }, [board, wide, familyId, measure]);
-  const onScroll = () => { measure(); saveFmsBoardView(familyId, { filters, scrollLeft: scroller.current?.scrollLeft ?? 0, stageId: activeStage }); };
+  const onScroll = () => { measure(); saveFmsBoardView(familyId, { filters, scrollLeft: scroller.current?.scrollLeft ?? 0, stageId: activeStage, showEmpty }); };
   const nudge = (direction: -1 | 1) => scroller.current?.scrollBy({ left: direction * 320, behavior: "smooth" });
+  /** Step bar: on a phone it picks the one column shown; on a computer it jumps straight to that column. */
+  const jump = (id: string) => {
+    setActiveStage(id);
+    if (!wide) return;
+    const target = Array.from(scroller.current?.querySelectorAll<HTMLElement>("[data-column]") ?? []).find((element) => element.dataset.column === id);
+    if (target && scroller.current) scroller.current.scrollTo({ left: target.offsetLeft - scroller.current.offsetLeft - 8, behavior: "smooth" });
+  };
 
   const open = (record: FmsWorkspaceRecord) => {
     const path = fmsAssignedWorkPath(record.target);
@@ -150,17 +161,20 @@ export function FmsTaskBoard({ familyId, tenantId, canSeeTeam, initialStatus = "
     <FmsReadState {...result} />
     {board && !columns.length ? <div className="rounded-2xl border border-task-border px-5 py-12 text-center"><h3 className="font-semibold">No tasks in this workflow</h3><p className="mt-1 text-sm text-task-text-muted">Nothing here matches these filters.</p></div> : null}
 
-    {board && columns.length && !wide ? <nav aria-label="Stages" className="no-scrollbar scroll-x -mx-1 flex gap-2 px-1">
-      {columns.map((column) => <button aria-pressed={column.id === activeStage} className={cn("flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3 text-sm", column.id === activeStage ? "border-task-accent bg-task-accent-soft font-semibold" : "border-task-border text-task-text-muted")} key={column.id} onClick={() => setActiveStage(column.id)} type="button">
-        <span className="max-w-40 truncate">{column.name}</span><span className="tabular-nums">{column.count}</span>{column.overdue ? <span className="size-2 rounded-full bg-danger" aria-label={`${column.overdue} overdue`} /> : null}
-      </button>)}
-    </nav> : null}
+    {board && allColumns.length ? <div className="flex items-center gap-2">
+      {columns.length ? <nav aria-label="Stages" className="no-scrollbar scroll-x -mx-1 flex min-w-0 flex-1 gap-2 px-1">
+        {columns.map((column) => <button aria-pressed={column.id === activeStage} className={cn("flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3 text-sm", column.id === activeStage ? "border-task-accent bg-task-accent-soft font-semibold" : "border-task-border text-task-text-muted hover:bg-task-muted")} key={column.id} onClick={() => jump(column.id)} type="button">
+          <span className="max-w-40 truncate">{column.starting ? "Forms to start" : column.name}</span><span className="tabular-nums">{column.count}</span>{column.overdue ? <span className="size-2 rounded-full bg-danger" aria-label={`${column.overdue} overdue`} /> : null}
+        </button>)}
+      </nav> : <span className="flex-1" />}
+      {emptyCount ? <Button className="shrink-0" onClick={() => setShowEmpty((value) => !value)} variant="ghost">{showEmpty ? "Hide empty steps" : `Show empty steps (${emptyCount})`}</Button> : null}
+    </div> : null}
 
     {board && visible.length ? <div className="relative">
       {wide && edges.left ? <button aria-label="Scroll to earlier stages" className="absolute left-0 top-0 z-20 flex h-full w-10 items-center justify-center bg-gradient-to-r from-task-bg to-transparent" onClick={() => nudge(-1)} type="button"><ChevronLeft className="size-5" /></button> : null}
       {wide && edges.right ? <button aria-label="Scroll to more stages" className="absolute right-0 top-0 z-20 flex h-full w-10 items-center justify-center bg-gradient-to-l from-task-bg to-transparent" onClick={() => nudge(1)} type="button"><ChevronRight className="size-5" /></button> : null}
       <div aria-label="Workflow stages" className={cn(wide ? "scroll-x flex gap-3 overflow-x-auto pb-3" : "")} onScroll={wide ? onScroll : undefined} ref={scroller} role="region" tabIndex={wide ? 0 : undefined}>
-        {visible.map((column) => <BoardColumn column={column} effective={effective} familyId={familyId} key={`${column.id}|${identity}|${epoch}`} onOpen={open} showVersion={versions > 1} wide={wide} />)}
+        {visible.map((column) => <BoardColumn active={wide && column.id === activeStage} column={column} effective={effective} familyId={familyId} key={`${column.id}|${identity}|${epoch}`} onOpen={open} showVersion={versions > 1} wide={wide} />)}
       </div>
       {wide && edges.right ? <p className="text-xs text-task-text-muted">Scroll sideways for more stages.</p> : null}
     </div> : null}
@@ -173,7 +187,7 @@ function Count({ label, value, tone }: { label: string; value: number; tone?: "t
   </div>;
 }
 
-function BoardColumn({ column, familyId, effective, showVersion, wide, onOpen }: { column: FmsBoardStage; familyId: string; effective: FmsWorkspaceFilters; showVersion: boolean; wide: boolean; onOpen: (record: FmsWorkspaceRecord) => void }) {
+function BoardColumn({ active, column, familyId, effective, showVersion, wide, onOpen }: { active: boolean; column: FmsBoardStage; familyId: string; effective: FmsWorkspaceFilters; showVersion: boolean; wide: boolean; onOpen: (record: FmsWorkspaceRecord) => void }) {
   const [more, setMore] = useState<readonly FmsWorkspaceRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -188,7 +202,7 @@ function BoardColumn({ column, familyId, effective, showVersion, wide, onOpen }:
       .catch((caught: unknown) => { if (alive.current) setError(caught instanceof Error ? caught.message : "Unable to load more tasks"); })
       .finally(() => { if (alive.current) setLoading(false); });
   };
-  return <section aria-label={`${column.name}: ${column.count} tasks`} className={cn("flex flex-col rounded-2xl border border-task-border bg-task-muted/40", wide ? "w-72 shrink-0" : "w-full")}>
+  return <section aria-label={`${column.name}: ${column.count} tasks`} className={cn("flex flex-col rounded-2xl border bg-task-muted/40", active ? "border-task-accent" : "border-task-border", wide ? "w-64 shrink-0" : "w-full")} data-column={column.id}>
     <header className="sticky top-0 z-10 rounded-t-2xl border-b border-task-border bg-task-bg px-3 py-2.5">
       <h3 className="break-words text-sm font-semibold uppercase tracking-wide">{column.starting ? "Forms to start" : column.name}{showVersion ? <span className="ml-1.5 text-xs font-normal normal-case text-task-text-muted">v{column.version}</span> : null}</h3>
       <p className="mt-1 flex flex-wrap gap-1.5 text-xs">

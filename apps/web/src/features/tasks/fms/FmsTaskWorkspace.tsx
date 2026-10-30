@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useFmsRead } from "./useFmsRead";
 import { FmsReadState } from "./FmsTaskGroups";
 import { FmsTaskBoard } from "./FmsTaskBoard";
+import { FmsStaffWorkspace } from "./FmsStaffWorkspace";
 /** Tasks opened on its FMS tab: where finished FMS work returns the employee. */
 export const FMS_TASKS_PATH = FMS_TASKS_BOARD_BASE;
 const TOPICS = ["tasks", "fms", "forms", "organization"] as const;
@@ -34,9 +35,14 @@ function useBoardLocation() {
  * counts; Level 2 (`?view=fms&workflow=<family>`) is that workflow's stage board.
  * The FMS Library's Tasks button opens the same board URL.
  */
-export function FmsTaskWorkspace({ actorId, tenantId, onNavigate, onCount }: { actorId: string; tenantId: string; onNavigate: (path: string) => void; onCount: (count: number) => void }) {
+export function FmsTaskWorkspace(props: { actorId: string; tenantId: string; onNavigate: (path: string) => void; onCount: (count: number) => void }) {
  const { access } = useAuth();
+ // Managers, admins and super admins (team view) get the board; everyone else keeps the original list.
  const canSeeTeam = access ? hasPermission(access, "tasks.manage_team") || hasPermission(access, "tasks.view_all") : false;
+ return canSeeTeam ? <FmsBoardWorkspace {...props} /> : <FmsStaffWorkspace {...props} />;
+}
+
+function FmsBoardWorkspace({ actorId, tenantId, onNavigate, onCount }: { actorId: string; tenantId: string; onNavigate: (path: string) => void; onCount: (count: number) => void }) {
  const location = useBoardLocation();
  const [status, setStatus] = useState<FmsWorkspaceStatus>("active");
  const [search, setSearch] = useState(""); const [query, setQuery] = useState(""); const [offset, setOffset] = useState(0);
@@ -52,7 +58,7 @@ export function FmsTaskWorkspace({ actorId, tenantId, onNavigate, onCount }: { a
 
  if (location.familyId) {
   const initial = STATUSES.some(item => item.value === location.status) ? location.status as FmsWorkspaceStatus : "active";
-  return <FmsTaskBoard canSeeTeam={canSeeTeam} familyId={location.familyId} initialStatus={initial} key={location.familyId} onBack={() => onNavigate(FMS_TASKS_PATH)} onNavigate={onNavigate} tenantId={tenantId} />;
+  return <FmsTaskBoard canSeeTeam familyId={location.familyId} initialStatus={initial} key={location.familyId} onBack={() => onNavigate(FMS_TASKS_PATH)} onNavigate={onNavigate} tenantId={tenantId} />;
  }
  const openBoard = (family: FmsFamilySummary) => onNavigate(`${fmsTaskBoardPath(family.id)}${status === "active" ? "" : `&status=${status}`}`);
  return <div className="space-y-4 text-task-text">
