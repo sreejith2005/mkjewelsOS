@@ -74,6 +74,17 @@ export function FmsHandoffConfirmation({ request, preview, actor, onConfirm, onC
     } catch (caught) { if (version === generation.current) setError(caught instanceof Error ? caught.message : "Unable to load more employees"); }
     finally { if (version === generation.current) setLoading(false); }
   };
+  // Load the next page when the end of the list scrolls into view; the button stays as a fallback.
+  const listEndRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef(loadMore);
+  loadMoreRef.current = loadMore;
+  useEffect(() => {
+    const end = listEndRef.current;
+    if (!cursor || !end || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) void loadMoreRef.current(); }, { rootMargin: "0px 0px 200px 0px" });
+    observer.observe(end);
+    return () => observer.disconnect();
+  }, [cursor, picking, people.length]);
   const choose = (stageId: string, id: string, name: string) => {
     setChoices(current => ({ ...current, [stageId]: id })); setNames(current => ({ ...current, [stageId]: name })); setPicking(null);
   };
@@ -116,7 +127,9 @@ export function FmsHandoffConfirmation({ request, preview, actor, onConfirm, onC
             <Field label="Search eligible employees"><input className="field" enterKeyHint="search" placeholder="Type a name" type="search" value={query} onChange={event => setQuery(event.target.value)} /></Field>
             {loading ? <p role="status" className="text-sm text-task-text-muted">Loading eligible employees...</p> : null}
             {error ? <Notice tone="danger">{error}</Notice> : null}
-            <div className="max-h-[50dvh] space-y-2 overflow-y-auto overscroll-contain">{people.map(person => {
+            {/* One scroll area: the list grows inside the sheet. A separate scroll box here trapped
+                phone swipes and hid the list end and "Load more" behind the pinned buttons. */}
+            <div className="space-y-2">{people.map(person => {
               const selected = choiceId === person.id;
               return <label className={cn("flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border p-3 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-gold", selected ? "border-gold bg-gold/10" : "border-task-border hover:border-gold/50")} key={person.id}>
                 <input className="sr-only" type="radio" name={`handoff-${stageId}`} checked={selected} onChange={() => choose(stageId, person.id, person.employeeName)} />
@@ -124,6 +137,7 @@ export function FmsHandoffConfirmation({ request, preview, actor, onConfirm, onC
                 {selected ? <Check aria-hidden="true" className="size-5 shrink-0 text-gold-secondary" /> : null}
               </label>;
             })}</div>
+            <div aria-hidden="true" className="h-px" ref={listEndRef} />
             {!loading && !people.length && !error ? <p className="text-sm text-task-text-muted">No eligible employees match this search.</p> : null}
             <div className="flex flex-col gap-2 sm:flex-row">
               {cursor ? <Button className="min-h-12" variant="secondary" disabled={loading} onClick={() => void loadMore()}>Load more employees</Button> : null}

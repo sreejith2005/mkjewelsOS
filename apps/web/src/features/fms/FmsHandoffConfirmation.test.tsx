@@ -67,6 +67,25 @@ describe("pre-transition handoff confirmation", () => {
     await userEvent.click(screen.getByRole("button", { name: "Keep it with me" }));
     expect(screen.getByText("Asha (you)")).toBeTruthy();
   });
+  it("keeps the employee list in the sheet's one scroll area and loads the next page at the list end", async () => {
+    const callbacks: IntersectionObserverCallback[] = [];
+    vi.stubGlobal("IntersectionObserver", class { constructor(callback: IntersectionObserverCallback) { callbacks.push(callback); } observe() {} disconnect() {} });
+    try {
+      const page = (from: number, to: number) => Array.from({ length: to - from }, (_, index) => ({ id: `p${from + index}`, employeeName: `Person ${from + index}`, designation: null, branch: null, department: null }));
+      list.mockResolvedValueOnce({ people: page(0, 25), nextCursor: "next" }).mockResolvedValueOnce({ people: page(25, 30), nextCursor: null });
+      render(<FmsHandoffConfirmation request={request} preview={preview} onConfirm={vi.fn()} onCancel={vi.fn()} />);
+      await userEvent.click(screen.getByRole("button", { name: "Assign to a Different Employee" }));
+      const first = await screen.findByRole("radio", { name: /Person 0$/ });
+      // No nested scroll box: on a phone it trapped swipes and hid the list end behind the pinned buttons.
+      const picker = screen.getByRole("group", { name: "Eligible employee picker" });
+      for (let node = first.parentElement; node && node !== picker; node = node.parentElement) expect(node.className).not.toMatch(/overflow-y-auto|max-h-/);
+      expect(screen.getByRole("button", { name: "Load more employees" })).toBeTruthy();
+      callbacks.at(-1)!([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+      await screen.findByRole("radio", { name: /Person 29/ });
+      expect(list).toHaveBeenLastCalledWith(request, "demo", "", "next");
+      expect(screen.queryByRole("button", { name: "Load more employees" })).toBeNull();
+    } finally { vi.unstubAllGlobals(); }
+  });
   it("does not default a fixed-owner step to the employee", () => {
     expect(defaultFmsHandoffChoices({ ...preview, destinations: [{ ...preview.destinations[0]!, effectiveUserId: null, locked: true, allowHandoff: false }] }, { id: "me", name: "Asha" })).toEqual({});
     expect(defaultFmsHandoffChoices(preview, { id: "me", name: "Asha" })).toEqual({});
