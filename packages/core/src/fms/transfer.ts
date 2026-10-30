@@ -1,5 +1,5 @@
 import { fmsOutgoingStageKeys } from "./engine.ts";
-import { FMS_ASSIGNEE_TYPES, FMS_AUTHORING_STAGE_TYPES, FMS_BRANCH_OPERATORS, type FmsAssigneeRule, type FmsBranchRule, type FmsFlowDefinition, type FmsSlaRule, type FmsStageDefinition } from "./types.ts";
+import { FMS_ASSIGNEE_TYPES, FMS_AUTHORING_STAGE_TYPES, FMS_TERMINAL_OUTCOMES, FMS_BRANCH_OPERATORS, type FmsAssigneeRule, type FmsBranchRule, type FmsFlowDefinition, type FmsSlaRule, type FmsStageDefinition } from "./types.ts";
 import { FMS_ASSIGNMENT_MODES, type FmsAssignmentConfig, type FmsAssignmentSource, type FmsTaskDisplay } from "./workContracts.ts";
 
 /**
@@ -181,7 +181,7 @@ function parseBranchRule(raw: unknown, path: string): FmsBranchRule {
   };
 }
 
-const SLA_KEYS = ["pipelineName", "assignment", "completionFormRequired", "taskDisplay", "followUp", "assignmentFieldKey", "formSectionKey", "questionnaire", "timingMethod", "deadlineEnabled", "dueDate", "tatHours", "tatMinutes", "tatUnit", "futureDate", "daysBefore", "clockTime", "triggerStageKey", "decisionMode", "decisionOptions", "conditional"] as const;
+const SLA_KEYS = ["pipelineName", "assignment", "completionFormRequired", "taskDisplay", "followUp", "assignmentFieldKey", "formSectionKey", "questionnaire", "timingMethod", "deadlineEnabled", "dueDate", "tatHours", "tatMinutes", "tatUnit", "futureDate", "daysBefore", "clockTime", "triggerStageKey", "decisionMode", "decisionOptions", "conditional", "terminal"] as const;
 
 function parseSla(raw: unknown, path: string): FmsSlaRule {
   if (raw === undefined || raw === null) return { dueDate: "" };
@@ -205,6 +205,13 @@ function parseSla(raw: unknown, path: string): FmsSlaRule {
     onlyKeys(condition, ["decisionStageKey", "decisionOptionKey", "outcome"], `${path}.conditional`);
     const option = textValue(condition.decisionOptionKey ?? condition.outcome, `${path}.conditional.decisionOptionKey`, 64, true)!;
     sla.conditional = { decisionStageKey: textValue(condition.decisionStageKey, `${path}.conditional.decisionStageKey`, 64, true)!, decisionOptionKey: option };
+  }
+  if (raw.terminal !== undefined && raw.terminal !== null) {
+    const terminal = raw.terminal;
+    if (!isRecord(terminal)) fail(`${path}.terminal`, "must be an object");
+    onlyKeys(terminal, ["outcome", "reasonCode"], `${path}.terminal`);
+    const reasonCode = textValue(terminal.reasonCode, `${path}.terminal.reasonCode`, 64);
+    sla.terminal = { outcome: oneOf(terminal.outcome, FMS_TERMINAL_OUTCOMES, `${path}.terminal.outcome`), ...(reasonCode ? { reasonCode } : {}) };
   }
   if (raw.followUp !== undefined && raw.followUp !== null) {
     const followUp = raw.followUp;

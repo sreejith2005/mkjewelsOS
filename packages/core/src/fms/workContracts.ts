@@ -28,9 +28,11 @@ export type FmsWorkDestination = Readonly<{
   selectedEmployeeName?: string | null | undefined;
   assignmentMethod: string; locked: boolean; allowHandoff: boolean; issue: string | null;
 }>;
-export type FmsWorkPreview = Readonly<{ fingerprint: string; currentStageName: string; wouldDefer: boolean; requirements: readonly string[]; destinations: readonly FmsWorkDestination[] }>;
+/** The End Node a submission reaches (0358). It is never a destination to assign. */
+export type FmsWorkTerminal = Readonly<{ stageName: string; outcome: "won" | "lost" | "do_not_contact" | "other" | "unspecified" }>;
+export type FmsWorkPreview = Readonly<{ fingerprint: string; currentStageName: string; wouldDefer: boolean; requirements: readonly string[]; destinations: readonly FmsWorkDestination[]; terminal?: FmsWorkTerminal | null | undefined }>;
 export type FmsHandoffDecision = Readonly<{ handoffs: readonly FmsHandoffChoice[]; preview: FmsWorkPreview }>;
 export type FmsWorkResult = Readonly<{ state: FmsWorkState; submissionId: string | null; instanceId: string;
   workflowName?: string | undefined;
   sourceInstanceStageId: string | null; referenceNumber: string; destinations: readonly FmsWorkDestination[];
-  ownWorkTargets: readonly FmsAssignedWorkTarget[] }>;
+  ownWorkTargets: readonly FmsAssignedWorkTarget[]; terminal?: FmsWorkTerminal | null | undefined }>;

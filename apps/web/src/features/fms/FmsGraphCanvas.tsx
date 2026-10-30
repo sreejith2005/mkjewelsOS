@@ -5,6 +5,7 @@ import { useIsMobile } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { fmsCanvasOvershoot, fmsGraphEdges, fmsStageSummary, fmsTimingSummary, layoutFmsDefinition, type FmsGraphEdge, type FmsGraphPosition } from "./graph";
 import { fmsShortcutContext } from "./shortcuts";
+import { FMS_OUTCOME_STYLE } from "./outcomeStyle";
 
 const NODE_WIDTH = 208;
 const NODE_HEIGHT = 104;
@@ -29,6 +30,8 @@ const appearance: Record<FmsStageDefinition["type"], { Icon: typeof CheckSquare;
   end: { Icon: Flag, label: "End", className: "border-success/40 bg-success/10 text-success" },
 };
 
+/** Short outcome words for the End Node badge; the full outcome is on the summary line. */
+const END_BADGE: Readonly<Record<string, string>> = { won: "Won", lost: "Lost", do_not_contact: "No contact", other: "Other" };
 const clamp = (value: number, minimum: number, maximum: number) => Math.min(maximum, Math.max(minimum, value));
 const edgeId = (edge: FmsGraphEdge) => `${edge.from}->${edge.to}:${edge.ruleId ?? "default"}`;
 
@@ -75,6 +78,8 @@ type CanvasProps = Readonly<{
   onDelete: (key: string) => void;
   onDuplicate: (key: string) => void;
   onAddAfter: (key: string) => void;
+  /** Unique finished instances per End Node key, shown as a small count on published End Nodes. */
+  endCounts?: ReadonlyMap<string, number> | undefined;
   onConnect: (from: string, to: string) => void;
   onDisconnect: (from: string, to: string, ruleId?: string) => void;
   onReconnect: (from: string, previousTo: string, nextTo: string, ruleId?: string) => void;
@@ -628,6 +633,7 @@ export const FmsGraphCanvas = forwardRef<FmsCanvasHandle, CanvasProps>(function 
           return <StageCard
             actions={actions}
             dropTarget={dropTarget === stage.key}
+            endCount={stage.type === "end" ? props.endCounts?.get(stage.key) : undefined}
             highlighted={edgeDetails?.from === stage.key || edgeDetails?.to === stage.key || retarget?.from === stage.key}
             inspected={stage.key === inspectedKey}
             invalid={invalidKeys.has(stage.key)}
@@ -696,8 +702,8 @@ function MenuItem({ icon: Icon, label, shortcut, onClick, danger = false }: { ic
  * One workflow step. Memoised on its own data and position, so dragging one
  * step or panning re-renders only what moved, even in a 100-step workflow.
  */
-const StageCard = memo(function StageCard({ stage, x, y, selected, inspected, highlighted, invalid, dropTarget, isFirst, actions }: {
-  stage: FmsStageDefinition; x: number; y: number; selected: boolean; inspected: boolean; highlighted: boolean; invalid: boolean; dropTarget: boolean; isFirst: boolean;
+const StageCard = memo(function StageCard({ stage, x, y, selected, inspected, highlighted, invalid, dropTarget, isFirst, actions, endCount }: {
+  stage: FmsStageDefinition; x: number; y: number; selected: boolean; inspected: boolean; highlighted: boolean; invalid: boolean; dropTarget: boolean; isFirst: boolean; endCount?: number | undefined;
   actions: Readonly<{ current: Pick<CanvasProps, "onDuplicate" | "onDelete" | "onAddAfter"> }>;
 }) {
   const item = appearance[stage.type];
@@ -707,12 +713,16 @@ const StageCard = memo(function StageCard({ stage, x, y, selected, inspected, hi
   const routed = hasFmsStageRouting(stage) || stage.type === "branch";
   // A step is labelled by what it is; ordinary steps carry no "Normal step" badge.
   const badge = stage.type === "task" ? null : item.label;
+  // An End Node is a terminal outcome: coloured by its outcome, with an incoming handle only.
+  const endStyle = stage.type === "end" ? FMS_OUTCOME_STYLE[stage.sla.terminal?.outcome ?? "other"] ?? FMS_OUTCOME_STYLE.other : null;
   return <article
     aria-label={stage.name || "Untitled stage"}
     aria-selected={selected}
     className={cn(
       "absolute cursor-grab select-none rounded-xl border p-3 text-left shadow-lg transition-colors active:cursor-grabbing",
       selected ? "border-gold bg-charcoal outline outline-2 outline-offset-2 outline-gold/70" : inspected || highlighted ? "border-gold bg-charcoal" : "border-gold/25 bg-charcoal/95 hover:border-gold/70",
+      endStyle && !selected && !inspected && !highlighted && `${endStyle} rounded-3xl border-2`,
+      endStyle && (selected || inspected || highlighted) && "rounded-3xl border-2",
       invalid && "border-danger",
       dropTarget && "border-success outline outline-2 outline-success",
     )}
@@ -722,7 +732,9 @@ const StageCard = memo(function StageCard({ stage, x, y, selected, inspected, hi
     {isFirst ? <span className="pointer-events-none absolute -top-7 left-0 rounded-md border border-gold/30 bg-charcoal px-2 py-1 text-[10px] font-semibold text-gold-secondary">Starts here</span> : null}
     {isLeaf ? <span className="pointer-events-none absolute -bottom-7 left-0 rounded-md border border-success/30 bg-charcoal px-2 py-1 text-[10px] font-semibold text-success">Completes here</span> : null}
     <div className="mb-1.5 flex h-6 items-center justify-between gap-1">
-      {badge ? <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide", item.className)}><item.Icon className="size-3" />{badge}</span> : <item.Icon aria-hidden className="size-4 text-gold-secondary" />}
+      {endStyle ? <span className={cn("inline-flex min-w-0 items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide", endStyle)}><item.Icon className="size-3 shrink-0" />End · {END_BADGE[stage.sla.terminal?.outcome ?? "other"] ?? "Other"}</span>
+        : badge ? <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide", item.className)}><item.Icon className="size-3" />{badge}</span> : <item.Icon aria-hidden className="size-4 text-gold-secondary" />}
+      {endStyle && endCount !== undefined ? <span className="rounded-full border border-gold/30 bg-charcoal px-2 py-0.5 text-[10px] font-semibold tabular-nums text-white" title="Finished workflows that reached this ending">{endCount}</span> : null}
       <span className="flex gap-0.5" data-canvas-control>
         <button aria-label={`Duplicate ${stage.name}`} className="rounded p-1 text-soft-grey hover:bg-gold/10 hover:text-gold-secondary" onClick={() => actions.current.onDuplicate(stage.key)} title="Duplicate" type="button"><Copy className="size-3.5" /></button>
         <button aria-label={`Delete ${stage.name}`} className="rounded p-1 text-soft-grey hover:bg-danger/10 hover:text-danger" onClick={() => actions.current.onDelete(stage.key)} title="Delete" type="button"><Trash2 className="size-3.5" /></button>

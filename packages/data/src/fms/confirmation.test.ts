@@ -31,4 +31,19 @@ describe("shared web/native confirmation sequence", () => {
     await pending;
     expect(mocks.transition).toHaveBeenCalledWith(request, confirmedPreview, [{ targetStageId: "demo", userProfileId: "d" }]);
   });
+  it("submits straight away when the answer reaches an End Node and nobody receives work", async () => {
+    const ending = { ...preview, terminal: { stageName: "Lead Closed", outcome: "lost" as const } };
+    mocks.preview.mockResolvedValue(ending); mocks.transition.mockReset(); mocks.transition.mockResolvedValue({ state: "workflow_completed" });
+    const choose = vi.fn();
+    await runFmsHandoff(request, choose);
+    expect(choose).not.toHaveBeenCalled();
+    expect(mocks.transition).toHaveBeenCalledWith(request, ending, []);
+  });
+  it("still asks when an End Node is reached on one branch but another person receives work", async () => {
+    const mixed = { ...preview, terminal: { stageName: "Lead Closed", outcome: "lost" as const }, destinations: [{ targetStageId: "s", stageName: "Next", formTemplateId: null, selectedUserId: null, effectiveUserId: "u", employeeName: "U", assignmentMethod: "fixed_employee", locked: false, allowHandoff: true, issue: null }] };
+    mocks.preview.mockResolvedValue(mixed); mocks.transition.mockReset();
+    const choose = vi.fn().mockResolvedValue(null);
+    await runFmsHandoff(request, choose);
+    expect(choose).toHaveBeenCalledOnce();
+  });
 });

@@ -25,6 +25,7 @@ import { Button, Field } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import type { FmsData } from "./api";
 import { newerFormVersion } from "./definition";
+import { FmsEndNodeEditor } from "./FmsEndNodeEditor";
 
 const humanTypes: readonly FmsStageDefinition["type"][] = ["form", "task", "approval"];
 const timingOptions: readonly { value: FmsTimingMethod; label: string; help: string }[] = [
@@ -66,7 +67,12 @@ export type FmsStageQuestionnaireActions = Readonly<{
   discardDraft: () => void;
 }>;
 
-export function FmsStageEditor({ stage, stages, data, onChange, onDelete, assignmentVersion = 1, questionnaire }: { assignmentVersion?: 1 | 2 | undefined; stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; onChange: (value: FmsStageDefinition) => void; onDelete: () => void; questionnaire?: FmsStageQuestionnaireActions | undefined }) {
+export function FmsStageEditor({ stage, stages, data, onChange, onDelete, assignmentVersion = 1, questionnaire, endCounts }: { assignmentVersion?: 1 | 2 | undefined; stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; onChange: (value: FmsStageDefinition) => void; onDelete: () => void; questionnaire?: FmsStageQuestionnaireActions | undefined; endCounts?: ReadonlyMap<string, number> | undefined }) {
+  if (stage.type === "end") return <FmsEndNodeEditor completedCount={endCounts?.get(stage.key)} onChange={onChange} onDelete={onDelete} stage={stage} stages={stages} />;
+  return <FmsStepEditor assignmentVersion={assignmentVersion} data={data} onChange={onChange} onDelete={onDelete} questionnaire={questionnaire} stage={stage} stages={stages} />;
+}
+
+function FmsStepEditor({ stage, stages, data, onChange, onDelete, assignmentVersion = 1, questionnaire }: { assignmentVersion?: 1 | 2 | undefined; stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; onChange: (value: FmsStageDefinition) => void; onDelete: () => void; questionnaire?: FmsStageQuestionnaireActions | undefined }) {
   const update = (patch: Partial<FmsStageDefinition>) => onChange({ ...stage, ...patch });
   const updateSla = (patch: Partial<FmsSlaRule>) => update({ sla: { ...stage.sla, ...patch } });
   const stageIndex = stages.findIndex((item) => item.key === stage.key);
@@ -421,7 +427,7 @@ function BranchEditor({ stage, others, update, changeRule, moveRule }: { stage: 
 }
 
 function timingMethod(sla: FmsSlaRule): FmsTimingMethod { return sla.timingMethod ?? "completion_date"; }
-function StageSelect({ others, value, label, onChange }: { others: readonly FmsStageDefinition[]; value?: string | undefined; label?: string | undefined; onChange: (value: string | undefined) => void }) { return <select aria-label={label} className="field" onChange={(event) => onChange(event.target.value || undefined)} value={value ?? ""}><option value="">Complete workflow here</option>{others.map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}</select>; }
+function StageSelect({ others, value, label, onChange }: { others: readonly FmsStageDefinition[]; value?: string | undefined; label?: string | undefined; onChange: (value: string | undefined) => void }) { return <select aria-label={label} className="field" onChange={(event) => onChange(event.target.value || undefined)} value={value ?? ""}><option value="">Complete workflow here</option>{others.map((item) => <option key={item.key} value={item.key}>{item.type === "end" ? `End: ${item.name}` : item.name}</option>)}</select>; }
 function localCalendarDate(now = new Date()): string { const year = now.getFullYear(); const month = String(now.getMonth() + 1).padStart(2, "0"); const day = String(now.getDate()).padStart(2, "0"); return `${year}-${month}-${day}`; }
 
 /** Outcomes of a Decision Step authored before decisions became questionnaire routes. Kept exactly, so old routes still match. */

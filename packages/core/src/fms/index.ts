@@ -30,3 +30,4 @@ export * from "./aiContract";
 export * from "./aiOperations";
 export * from "./aiContext";
 export * from "./transfer";
+export * from "./outcomes";

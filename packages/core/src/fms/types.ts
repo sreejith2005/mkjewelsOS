@@ -2,8 +2,19 @@ import type { UserRole } from "../roleMenu.ts";
 import type { FmsAssignmentConfig, FmsTaskDisplay, FmsFollowUp } from "./workContracts.ts";
 
 export const FMS_STAGE_TYPES = ["task", "approval", "form", "notification", "branch", "parallel_start", "parallel_join", "end"] as const;
-/** New workflows use implicit entry/exit. `end` remains readable for legacy versions only. */
-export const FMS_AUTHORING_STAGE_TYPES = ["form", "task", "approval", "branch", "parallel_start", "parallel_join", "notification"] as const;
+/**
+ * Stage types an author may add. `end` is an explicit End Node (0358): reaching it
+ * closes the whole workflow automatically with a classified business outcome. A
+ * step without an outgoing route still finishes its path implicitly, as before.
+ */
+export const FMS_AUTHORING_STAGE_TYPES = ["form", "task", "approval", "branch", "parallel_start", "parallel_join", "notification", "end"] as const;
+/** Stable outcome codes of an End Node. Labels are display only and may be renamed. */
+export const FMS_TERMINAL_OUTCOMES = ["won", "lost", "do_not_contact", "other"] as const;
+export type FmsTerminalOutcome = typeof FMS_TERMINAL_OUTCOMES[number];
+/** An instance that finished without an End Node (legacy or implicit completion). */
+export type FmsRecordedOutcome = FmsTerminalOutcome | "unspecified";
+/** End Node settings. `reasonCode` is an optional stable business reason such as `price_too_high`. */
+export type FmsTerminalConfig = Readonly<{ outcome: FmsTerminalOutcome; reasonCode?: string | undefined }>;
 export const FMS_ASSIGNEE_TYPES = ["specific_user", "role", "manager", "department_head", "previous_step_doer", "reporter"] as const;
 export const FMS_BRANCH_OPERATORS = ["equals", "not_equals", "contains", "greater_than", "greater_than_or_equal", "less_than", "less_than_or_equal", "in", "not_empty", "default"] as const;
 
@@ -71,6 +82,8 @@ export type FmsSlaRule = Readonly<{
   decisionMode?: FmsDecisionMode | undefined;
   decisionOptions?: readonly FmsDecisionOption[] | undefined;
   conditional?: FmsConditionalRule | undefined;
+  /** End Nodes only: the terminal business outcome recorded when the workflow reaches this node. */
+  terminal?: FmsTerminalConfig | undefined;
 }>;
 /**
  * An ordered outgoing route. `branch` stages have always used these rules; since
