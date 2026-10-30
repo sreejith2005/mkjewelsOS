@@ -2,7 +2,7 @@ import { requireFmsAssignmentSourceForms } from "./assignmentAuthoring.ts";
 import type { UserRole } from "../roleMenu.ts";
 import { validateFmsAssignmentConfig } from "./assignmentConfig.ts";
 import { validateFmsFormSections } from "./formSections.ts";
-import { FMS_ASSIGNEE_TYPES, FMS_BRANCH_OPERATORS, FMS_STAGE_TYPES, type FmsAssignmentCandidate, type FmsAssigneeRule, type FmsBranchRule, type FmsChecklistItemDefinition, type FmsDecisionOption, type FmsFlowDefinition, type FmsFormFieldOption, type FmsFormFieldRef, type FmsInstanceStatus, type FmsStageActorState, type FmsStageDefinition, type FmsStageStatus, type FmsTimingMethod, type FmsTransitionCapability, type FmsValidationContext, type FmsValidationIssue } from "./types.ts";
+import { FMS_ASSIGNEE_TYPES, FMS_BRANCH_OPERATORS, FMS_STAGE_TYPES, FMS_TERMINAL_OUTCOMES, type FmsTerminalConfig, type FmsTerminalOutcome, type FmsAssignmentCandidate, type FmsAssigneeRule, type FmsBranchRule, type FmsChecklistItemDefinition, type FmsDecisionOption, type FmsFlowDefinition, type FmsFormFieldOption, type FmsFormFieldRef, type FmsInstanceStatus, type FmsStageActorState, type FmsStageDefinition, type FmsStageStatus, type FmsTimingMethod, type FmsTransitionCapability, type FmsValidationContext, type FmsValidationIssue } from "./types.ts";
 
 const KEY = /^[a-z][a-z0-9_]{0,63}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -33,6 +33,18 @@ export function copyFirstFmsAssigneeToHumanStages(stages: readonly FmsStageDefin
   if (!userProfileId) return stages;
   return stages.map((stage) => AUTO.has(stage.type) ? stage : { ...stage, assigneeRules: [{ type: "specific_user" as const, userProfileId }] });
 }
+
+const REASON_CODE = /^[a-z][a-z0-9_]{0,63}$/;
+/** End Node settings with a stable outcome code; an unknown code is kept so validation can report it. */
+export function normalizeFmsTerminal(raw: unknown): FmsTerminalConfig {
+  const value = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
+  const outcome = text(value.outcome).toLowerCase() || "other";
+  const reasonCode = text(value.reasonCode).toLowerCase();
+  return { outcome: outcome as FmsTerminalOutcome, ...(reasonCode ? { reasonCode } : {}) };
+}
+export const isFmsTerminalOutcome = (value: unknown): value is FmsTerminalOutcome => typeof value === "string" && (FMS_TERMINAL_OUTCOMES as readonly string[]).includes(value);
+/** True for an explicit End Node: an automatic terminal destination that never creates work. */
+export const isFmsEndStage = (stage: Pick<FmsStageDefinition, "type"> | undefined): boolean => stage?.type === "end";
 
 export function normalizeFmsDefinition(input: FmsFlowDefinition): FmsFlowDefinition {
   const stages = [...input.stages].sort((a, b) => a.order - b.order || a.key.localeCompare(b.key)).map((stage, order) => ({
@@ -70,6 +82,7 @@ export function normalizeFmsDefinition(input: FmsFlowDefinition): FmsFlowDefinit
       ...(Number.isFinite(stage.sla?.daysBefore) ? { daysBefore: Number(stage.sla.daysBefore) } : {}),
       ...(text(stage.sla?.clockTime) ? { clockTime: text(stage.sla.clockTime) } : {}),
       ...(text(stage.sla?.triggerStageKey) ? { triggerStageKey: text(stage.sla.triggerStageKey).toLowerCase() } : {}),
+      ...(stage.type === "end" ? { terminal: normalizeFmsTerminal(stage.sla?.terminal) } : {}),
       ...(stage.sla?.conditional && "decisionStageKey" in stage.sla.conditional ? (() => { const decisionOptionKey = text("decisionOptionKey" in stage.sla.conditional ? stage.sla.conditional.decisionOptionKey : stage.sla.conditional.outcome).toLowerCase(); return { conditional: { decisionStageKey: text(stage.sla.conditional.decisionStageKey).toLowerCase(), decisionOptionKey, outcome: decisionOptionKey } }; })() : {}),
     },
   }));
@@ -228,7 +241,7 @@ export function validateFmsDefinition(raw: FmsFlowDefinition, context: FmsValida
     const add = (code: string, message: string) => issues.push({ code, message, stageKey: stage.key });
     if (!KEY.test(stage.key) || keys.has(stage.key)) add("invalid_stage_key", "Stage keys must be unique stable identifiers"); keys.add(stage.key);
     if (!stage.name || stage.name.length > 150 || !FMS_STAGE_TYPES.includes(stage.type)) add("invalid_stage", "Stage name or type is invalid");
-    if (stage.type === "end") add("legacy_end_stage", "End nodes are no longer used. Leave the final executable stage without a next connection instead");
+    if (stage.type === "end") validateFmsEndStage(stage, stageIndex, add);
     if (!AUTO.has(stage.type) && stage.sla.deadlineEnabled !== false && stage.sla.timingMethod === "completion_date" && !validDate(stage.sla.dueDate)) add("invalid_deadline", "Choose a valid completion due date");
     if (!AUTO.has(stage.type) && stage.sla.deadlineEnabled !== false && stage.sla.timingMethod === "tat_hours" && (!Number.isFinite(stage.sla.tatMinutes) || stage.sla.tatMinutes! <= 0 || stage.sla.tatMinutes! > 525600)) add("invalid_deadline", "TAT must be between 1 minute and 8,760 hours");
     if (!AUTO.has(stage.type) && stage.sla.deadlineEnabled !== false && stage.sla.timingMethod === "days_before_date" && (!validDate(stage.sla.futureDate ?? "") || !Number.isInteger(stage.sla.daysBefore) || stage.sla.daysBefore! < 0 || stage.sla.daysBefore! > 3650)) add("invalid_deadline", "Choose a future date and a valid number of days before it");
@@ -257,11 +270,24 @@ export function validateFmsDefinition(raw: FmsFlowDefinition, context: FmsValida
     if (stage.type === "branch") { const defaults = stage.branchRules.filter((rule) => rule.operator === "default"); if (!stage.branchRules.length || defaults.length !== 1 || stage.branchRules.at(-1)?.operator !== "default") add("invalid_branch", "Branch stages require one final default route"); if (stage.branchRules.some((rule) => !FMS_BRANCH_OPERATORS.includes(rule.operator) || rule.source !== "outcome" && !rule.sourceKey || rule.operator !== "default" && rule.value === undefined && rule.operator !== "not_empty" || (!!rule.nextStageKey === !!rule.nextFlowId))) add("invalid_branch", "Branch rules contain invalid source, operator, value, or target"); }
     if (stage.type === "parallel_start" && !stage.parallelTargetStageKeys.length) add("invalid_parallel", "Parallel start requires targets");
     if (stage.type === "parallel_join" && (!stage.joinRule || stage.joinRule === "specific" && !stage.joinRequiredStageKeys.length)) add("invalid_join", "Parallel join configuration is incomplete");
-    if (stage.type === "end" && fmsOutgoingStageKeys(stage).length) add("invalid_end", "End stages cannot have outgoing paths");
   }
   const reached = reachableFmsStageKeys(definition); for (const stage of definition.stages) if (!reached.has(stage.key)) issues.push({ code: "unreachable_stage", message: `Stage ${stage.key} is unreachable`, stageKey: stage.key });
   issues.push(...validateFmsRoutingGraph(definition.stages));
   return [...issues, ...validateFmsAssignmentConfig(definition, context), ...validateFmsFormSections(definition, context)];
+}
+
+/**
+ * An End Node only receives connections. It never creates work, so it cannot ask
+ * for a form, an assignee, evidence, a checklist, a remark or a decision.
+ */
+function validateFmsEndStage(stage: FmsStageDefinition, stageIndex: number, add: (code: string, message: string) => void): void {
+  if (stageIndex === 0) add("end_first_stage", "A workflow cannot start with an End Node. Start with a Form");
+  if (fmsOutgoingStageKeys(stage).length || stage.parallelTargetStageKeys.length || stage.splitToFlowId) add("end_has_outgoing", "An End Node finishes the workflow, so it cannot lead to another step");
+  if (stage.assigneeRules.length || stage.sla.assignment?.sources.length || stage.sla.assignmentFieldKey) add("end_has_assignee", "An End Node runs automatically. Remove its assignee");
+  if (stage.formTemplateId || stage.requiresUpload || stage.requiresRemark || stage.checklist.length || stage.requiresNextDoerHandoff || stage.sla.decisionMode === "yes_no" || stage.sla.decisionMode === "decision" || stage.sla.followUp)
+    add("end_has_work", "An End Node cannot ask for a form, evidence, a remark, a checklist or a decision");
+  if (!isFmsTerminalOutcome(stage.sla.terminal?.outcome)) add("invalid_end_outcome", "Choose the End type: Won, Lost, Do not contact or Other");
+  if (stage.sla.terminal?.reasonCode !== undefined && !REASON_CODE.test(stage.sla.terminal.reasonCode)) add("invalid_end_reason", "The closure reason code must start with a letter and use only lowercase letters, numbers and underscores");
 }
 
 function comparable(value: unknown): string | number | boolean | null { return value === undefined ? null : typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? value : JSON.stringify(value); }

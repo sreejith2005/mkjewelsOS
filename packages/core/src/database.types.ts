@@ -5396,6 +5396,96 @@ export type Database = {
           },
         ]
       }
+      fms_instance_outcomes: {
+        Row: {
+          id: string
+          tenant_id: string
+          fms_instance_id: string
+          fms_flow_id: string
+          flow_family_id: string
+          flow_version: number
+          end_stage_id: string
+          end_stage_key: string
+          end_stage_name: string
+          outcome: string
+          reason_code: string | null
+          end_instance_stage_id: string
+          source_instance_stage_id: string | null
+          source_stage_id: string | null
+          branch_rule_id: string | null
+          route_label: string | null
+          source_question_key: string | null
+          source_value: Json | null
+          source_submission_id: string | null
+          finalized_by: string | null
+          final_status: string
+          provenance: string
+          stopped_visit_count: number
+          branch_id: string | null
+          department_id: string | null
+          instance_started_at: string
+          closed_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          fms_instance_id: string
+          fms_flow_id: string
+          flow_family_id: string
+          flow_version: number
+          end_stage_id: string
+          end_stage_key: string
+          end_stage_name: string
+          outcome: string
+          reason_code?: string | null
+          end_instance_stage_id: string
+          source_instance_stage_id?: string | null
+          source_stage_id?: string | null
+          branch_rule_id?: string | null
+          route_label?: string | null
+          source_question_key?: string | null
+          source_value?: Json | null
+          source_submission_id?: string | null
+          finalized_by?: string | null
+          final_status?: string
+          provenance?: string
+          stopped_visit_count?: number
+          branch_id?: string | null
+          department_id?: string | null
+          instance_started_at: string
+          closed_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          fms_instance_id?: string
+          fms_flow_id?: string
+          flow_family_id?: string
+          flow_version?: number
+          end_stage_id?: string
+          end_stage_key?: string
+          end_stage_name?: string
+          outcome?: string
+          reason_code?: string | null
+          end_instance_stage_id?: string
+          source_instance_stage_id?: string | null
+          source_stage_id?: string | null
+          branch_rule_id?: string | null
+          route_label?: string | null
+          source_question_key?: string | null
+          source_value?: Json | null
+          source_submission_id?: string | null
+          finalized_by?: string | null
+          final_status?: string
+          provenance?: string
+          stopped_visit_count?: number
+          branch_id?: string | null
+          department_id?: string | null
+          instance_started_at?: string
+          closed_at?: string
+        }
+        Relationships: []
+      }
       fms_visit_transitions: {
         Row: {
           source_instance_stage_id: string
@@ -12439,6 +12529,10 @@ export type Database = {
       get_fms_work_file_path: { Args: { p_instance_id: string; p_instance_stage_id: string; p_file_id: string }; Returns: string }
       get_fms_task_contexts: { Args: { p_visit_ids: string[] }; Returns: Json }
       get_fms_task_workspace: { Args: { p_filter?: Json; p_offset?: number; p_limit?: number }; Returns: Json }
+      get_fms_flow_report: { Args: { p_family_id: string; p_filter?: Json }; Returns: Json }
+      get_fms_library_outcomes: { Args: never; Returns: Json }
+      get_fms_flow_records: { Args: { p_family_id: string; p_filter?: Json; p_offset?: number; p_limit?: number }; Returns: Json }
+      get_fms_instance_journey: { Args: { p_instance_id: string }; Returns: Json }
       get_fms_task_stages: { Args: { p_family_id: string; p_filter?: Json }; Returns: Json }
       get_fms_task_stage_page: { Args: { p_family_id: string; p_flow_id: string; p_stage_id: string; p_starting?: boolean; p_filter?: Json; p_offset?: number; p_limit?: number }; Returns: Json }
       get_fms_assigned_stage: { Args: { p_instance_id: string; p_instance_stage_id?: string }; Returns: Json }

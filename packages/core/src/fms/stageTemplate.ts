@@ -8,6 +8,14 @@ import type { FmsStageDefinition } from "./types.ts";
  * `newId` supplies route ids (the browser and Edge runtime use crypto.randomUUID).
  */
 export function fmsStageTemplate(type: FmsStageDefinition["type"], order: number, newId: () => string): FmsStageDefinition {
+  if (type === "end") return {
+    key: `stage_${order + 1}`, name: "End", type, order, required: true, completionRule: "any_doer",
+    allowMultipleDoers: false, requiresUpload: false, requiresRemark: false, checklist: [], assigneeRules: [],
+    requiresNextDoerHandoff: false, canMoveBackward: false, canReject: false, canRequestRevision: false, canEscalate: false,
+    branchRules: [], parallelTargetStageKeys: [], joinRequiredStageKeys: [],
+    // An End Node creates no work: no assignee, deadline, form or decision. Its outcome is all it records.
+    sla: { timingMethod: "completion_date", deadlineEnabled: false, dueDate: "", decisionMode: "normal", terminal: { outcome: "other" } },
+  };
   return {
     key: `stage_${order + 1}`,
     name: type.split("_").map((part) => part[0]!.toUpperCase() + part.slice(1)).join(" "),

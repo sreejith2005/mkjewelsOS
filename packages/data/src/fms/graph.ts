@@ -1,4 +1,4 @@
-import { fmsFieldOptions, fmsOutgoingStageKeys, hasFmsStageRouting, type FmsBranchRule, type FmsFlowDefinition, type FmsFormFieldRef, type FmsStageDefinition } from "@jewelos/core";
+import { fmsFieldOptions, fmsOutgoingStageKeys, fmsTerminalOutcomeLabel, hasFmsStageRouting, type FmsBranchRule, type FmsFlowDefinition, type FmsFormFieldRef, type FmsStageDefinition } from "@jewelos/core";
 
 /**
  * How the FMS builder draws a workflow, shared by both clients. This is the
@@ -82,7 +82,7 @@ export function fmsGraphEdges(stages: readonly FmsStageDefinition[], formFields:
 }
 
 export function fmsStageSummary(stage: FmsStageDefinition): string {
-  if (stage.type === "end") return "Legacy completion node";
+  if (stage.type === "end") return `Ends workflow · ${fmsTerminalOutcomeLabel(stage.sla.terminal?.outcome)}`;
   if (stage.type === "branch") return `${stage.branchRules.length} route${stage.branchRules.length === 1 ? "" : "s"}`;
   if (hasFmsStageRouting(stage)) return `${fmsOutgoingStageKeys(stage).length} route${fmsOutgoingStageKeys(stage).length === 1 ? "" : "s"}`;
   if (stage.type === "parallel_start") return `${stage.parallelTargetStageKeys.length} parallel path${stage.parallelTargetStageKeys.length === 1 ? "" : "s"}`;
@@ -93,6 +93,7 @@ export function fmsStageSummary(stage: FmsStageDefinition): string {
 }
 
 export function fmsTimingSummary(stage: FmsStageDefinition): string {
+  if (stage.type === "end") return "Automatic";
   if (stage.sla.deadlineEnabled === false) return "No deadline";
   const method = stage.sla.timingMethod ?? "completion_date";
   if (method === "tat_hours") return stage.sla.tatMinutes ? `TAT ${stage.sla.tatUnit === "hours" ? stage.sla.tatMinutes / 60 : stage.sla.tatMinutes}${stage.sla.tatUnit === "hours" ? "h" : "m"}` : "TAT not set";

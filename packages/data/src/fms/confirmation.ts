@@ -7,6 +7,8 @@ export async function runFmsHandoff(request: FmsTransitionRequest,
   const recovered = await recoverFmsWork({ kind: request.kind, targetId: fmsRequestTarget(request) });
   if (recovered) return recovered;
   const preview = await previewFmsWork(request);
+  // The answer leads to an End Node and nobody else receives work: close it without a handoff question.
+  if (preview.terminal && preview.destinations.length === 0 && !preview.wouldDefer) return submitConfirmedFmsWork(request, preview, []);
   const decision = await choose(preview);
   return decision === null ? null : submitConfirmedFmsWork(request, decision.preview, decision.handoffs);
 }

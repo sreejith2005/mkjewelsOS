@@ -102,7 +102,7 @@ describe("FMS workflow export and import validation", () => {
     [JSON.stringify({ nodes: [], connections: {} }), "n8n workflow files are not supported"],
     [JSON.stringify({ format: "mkjewels.fms.fragment", version: 2, stages: [] }), "Unsupported workflow file version 2"],
     [JSON.stringify({ format: "mkjewels.fms.fragment", version: 1, stages: [] }), "no steps"],
-    [JSON.stringify({ format: "mkjewels.fms.fragment", version: 1, stages: [{ ...stage("a", 0), type: "end" }] }), "Step 1.type"],
+    [JSON.stringify({ format: "mkjewels.fms.fragment", version: 1, stages: [{ ...stage("a", 0), type: "teleport" }] }), "Step 1.type"],
     [JSON.stringify({ format: "mkjewels.fms.fragment", version: 1, stages: [{ ...stage("a", 0), instanceId: "x" }] }), "unexpected field instanceId"],
     [JSON.stringify({ format: "mkjewels.fms.fragment", version: 1, stages: [stage("a", 0), stage("a", 1)] }), "appears twice"],
     [JSON.stringify({ format: "mkjewels.fms.fragment", version: 1, stages: [{ ...stage("a", 0), key: "Bad Key" }] }), "stable identifier"],

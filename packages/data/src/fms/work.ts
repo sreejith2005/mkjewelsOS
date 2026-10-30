@@ -2,7 +2,7 @@ import { getSupabase } from "@jewelos/api-client/client";
 import { beginNewFmsMutation, getFmsMutationIdentity, getFmsMutationStorage, markFmsMutationComplete } from "./mutationIdentity";
 import { newRequestKey } from "../runtime";
 import { coerceFormAnswer, parseFormOptions, FORM_DRAFT_FIELD_TYPES, type FormAnswer, type FormFieldType, type FmsHandoffChoice, type FmsTransitionRequest,
-  type FmsWorkDestination, type FmsWorkPreview, type FmsWorkResult, type FmsAssignedWorkTarget, type FmsWorkContext, type FmsReceivedField, type FmsPreviousFormsPage, type Json } from "@jewelos/core";
+  type FmsWorkDestination, type FmsWorkPreview, type FmsWorkTerminal, type FmsWorkResult, type FmsAssignedWorkTarget, type FmsWorkContext, type FmsReceivedField, type FmsPreviousFormsPage, type Json } from "@jewelos/core";
 
 const invalid = () => new Error("Workflow service returned an invalid response. Refresh this work item.");
 function record(value: unknown): Record<string, unknown> { if (!value || typeof value !== "object" || Array.isArray(value)) throw invalid(); return value as Record<string, unknown>; }
@@ -18,10 +18,17 @@ function destination(raw: unknown): FmsWorkDestination {
     selectedEmployeeName: v.selectedEmployeeName === undefined ? nullable(v.employeeName) : nullable(v.selectedEmployeeName),
     assignmentMethod: string(v.assignmentMethod), locked: boolean(v.locked), allowHandoff: boolean(v.allowHandoff), issue: nullable(v.issue) };
 }
+const TERMINAL_OUTCOMES = new Set(["won", "lost", "do_not_contact", "other", "unspecified"]);
+function terminal(raw: unknown): FmsWorkTerminal | null {
+  if (raw === null || raw === undefined) return null;
+  const v = record(raw); const outcome = string(v.outcome);
+  if (!TERMINAL_OUTCOMES.has(outcome)) throw invalid();
+  return { stageName: string(v.stageName), outcome: outcome as FmsWorkTerminal["outcome"] };
+}
 export function parseFmsWorkPreview(raw: unknown): FmsWorkPreview {
   const v = record(raw);
   return { fingerprint: string(v.fingerprint), currentStageName: string(v.currentStageName), wouldDefer: boolean(v.wouldDefer),
-    requirements: array(v.requirements).map(string), destinations: array(v.destinations).map(destination) };
+    requirements: array(v.requirements).map(string), destinations: array(v.destinations).map(destination), terminal: terminal(v.terminal) };
 }
 function target(raw: unknown): FmsAssignedWorkTarget {
   const v = record(raw);
@@ -35,7 +42,7 @@ export function parseFmsWorkResult(raw: unknown): FmsWorkResult {
   if (state !== "form_saved_pending_completion" && state !== "awaiting_other_doers" && state !== "awaiting_approval" && state !== "successors_activated" && state !== "workflow_completed" && state !== "workflow_on_hold") throw invalid();
   return { state, submissionId: nullable(v.submissionId), instanceId: string(v.instanceId), sourceInstanceStageId: nullable(v.sourceInstanceStageId),
     ...(v.workflowName == null ? {} : { workflowName: string(v.workflowName) }),
-    referenceNumber: string(v.referenceNumber), destinations: array(v.destinations).map(destination), ownWorkTargets: array(v.ownWorkTargets).map(target) };
+    referenceNumber: string(v.referenceNumber), destinations: array(v.destinations).map(destination), ownWorkTargets: array(v.ownWorkTargets).map(target), terminal: terminal(v.terminal) };
 }
 /** Checked conversion also turns readonly answer arrays into mutable RPC JSON. */
 export function fmsWorkJson(value: unknown): Json {

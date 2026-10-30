@@ -8,7 +8,6 @@ import { FmsAiSettingsDialog } from "@/features/fms/ai/FmsAiSettingsDialog";
 import {
   deleteFmsFlow,
   loadFmsBuilderData,
-  loadFmsRuntime,
   restoreFmsFlow,
   reviseFmsFlow,
   setFmsFlowActive,
@@ -18,14 +17,13 @@ import {
 import { FmsFlowBuilder } from "@/features/fms/FmsFlowBuilder";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { FMSTasksPage } from "./FMSTasksPage";
-import { hasPermission, parseFmsAssignedWorkPath } from "@jewelos/core";
+import { FMS_TERMINAL_OUTCOME_LABELS, hasPermission, parseFmsAssignedWorkPath, type FmsLibraryOutcome } from "@jewelos/core";
+import { loadFmsLibraryOutcomes } from "@jewelos/data/fms/outcomes";
 
-type Runtime = Awaited<ReturnType<typeof loadFmsRuntime>>;
 type FlowState = "live" | "paused" | "draft" | "archived";
-type FlowFamily = { key: string; primary: FmsFlowRow; versions: FmsFlowRow[]; flowIds: string[] };
+type FlowFamily = { key: string; primary: FmsFlowRow; versions: FmsFlowRow[] };
 type Filter = "all" | FlowState | "mine";
 
-const OPEN_STAGE_STATUSES = ["pending", "in_progress", "in_review", "overdue"];
 const FILTERS: Array<{ id: Filter; label: string }> = [
   { id: "all", label: "All" },
   { id: "mine", label: "Assigned to me" },
@@ -47,14 +45,16 @@ export function FMSBuilderPage() {
   const { access, profile } = useAuth();
   const canManage = hasPermission(access, "fms.manage");
   const [data, setData] = useState<FmsData>();
-  const [runtime, setRuntime] = useState<Runtime>();
+  // Server-counted runs and outcomes per workflow family; the library never downloads the runtime.
+  const [outcomes, setOutcomes] = useState<ReadonlyMap<string, FmsLibraryOutcome>>();
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [edit, setEdit] = useState<FmsFlowRow | null | undefined>();
   const [tasksFor, setTasksFor] = useState<FlowFamily | "all" | null>(() => parseFmsAssignedWorkPath(window.location.href) ? "all" : null);
-  const [openInstanceId, setOpenInstanceId] = useState("");
+  // A work link opens that run directly.
+  const [linkedInstanceId] = useState(() => { const link = parseFmsAssignedWorkPath(window.location.href); return link && "instanceId" in link ? link.instanceId : ""; });
   const [busyId, setBusyId] = useState<string | null>(null);
   // The assistant is optional: its settings read as "all off" on any error.
   const [aiSettings, setAiSettings] = useState<FmsAiSettings | null>(null);
@@ -64,9 +64,9 @@ export function FMSBuilderPage() {
   const refresh = useCallback(async () => {
     try {
       setError(null);
-      const [builder, live] = await Promise.all([loadFmsBuilderData(), loadFmsRuntime().catch(() => undefined)]);
+      const [builder, counts] = await Promise.all([loadFmsBuilderData(), loadFmsLibraryOutcomes().catch(() => undefined)]);
       setData(builder);
-      setRuntime(live);
+      setOutcomes(counts);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to load FMS"); }
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
@@ -78,20 +78,15 @@ export function FMSBuilderPage() {
     return [...grouped.entries()].map(([key, rows]) => {
       const versions = [...rows].sort((left, right) => right.version - left.version);
       const primary = versions.find((flow) => flow.status === "published") ?? versions.find((flow) => flow.status === "draft") ?? versions[0]!;
-      const runtimeIds = (runtime?.flows ?? []).filter((flow) => flow.family_id === key).map((flow) => flow.id);
-      return { key, primary, versions, flowIds: [...new Set([...versions.map((flow) => flow.id), ...runtimeIds])] };
+      return { key, primary, versions };
     }).sort((left, right) => left.primary.name.localeCompare(right.primary.name));
-  }, [data, runtime]);
+  }, [data]);
 
   const countsFor = useCallback((family: FlowFamily) => {
-    const instances = (runtime?.instances ?? []).filter((instance) => family.flowIds.includes(instance.fms_flow_id));
-    const stages = (runtime?.stages ?? []).filter((stage) => instances.some((instance) => instance.id === stage.fms_instance_id));
-    return {
-      running: instances.filter((instance) => ["active", "overdue", "on_hold"].includes(instance.status)).length,
-      completed: instances.filter((instance) => instance.status === "completed").length,
-      mine: new Set(stages.filter((stage) => OPEN_STAGE_STATUSES.includes(stage.status) && stage.assigned_to?.includes(profile?.id ?? "")).map((stage) => stage.fms_instance_id)).size,
-    };
-  }, [profile?.id, runtime]);
+    const row = outcomes?.get(family.key);
+    return { running: (row?.running ?? 0) + (row?.onHold ?? 0), completed: row?.completed ?? 0, mine: row?.mine ?? 0, won: row?.won ?? 0, lost: row?.lost ?? 0,
+      other: (row?.doNotContact ?? 0) + (row?.other ?? 0) + (row?.unspecified ?? 0) };
+  }, [outcomes]);
 
   const visible = useMemo(() => families.filter((family) => {
     if (!`${family.primary.name} ${family.primary.description ?? ""}`.toLowerCase().includes(query.trim().toLowerCase())) return false;
@@ -100,12 +95,6 @@ export function FMSBuilderPage() {
     return family.versions.some((flow) => flowState(flow) === filter);
   }), [countsFor, families, filter, query]);
 
-  useEffect(() => {
-    if (!openInstanceId || !runtime || tasksFor) return;
-    const instance = runtime.instances.find((item) => item.id === openInstanceId);
-    const family = instance ? families.find((item) => item.flowIds.includes(instance.fms_flow_id)) : undefined;
-    if (family) setTasksFor(family);
-  }, [families, openInstanceId, runtime, tasksFor]);
 
   const run = async (id: string, action: () => Promise<void>) => {
     setBusyId(id); setError(null); setNotice(null);
@@ -152,10 +141,11 @@ export function FMSBuilderPage() {
 
   if (tasksFor) return (
     <section className="mx-auto w-full max-w-7xl space-y-4">
-      <Button onClick={() => { setTasksFor(null); setOpenInstanceId(""); }} variant="ghost"><ArrowLeft className="size-4" />Back to FMS</Button>
+      <Button onClick={() => { setTasksFor(null); void refresh(); }} variant="ghost"><ArrowLeft className="size-4" />Back to FMS</Button>
       <FMSTasksPage
-        {...(tasksFor === "all" ? {} : { flowIds: tasksFor.flowIds, heading: `${tasksFor.primary.name} — live instances` })}
-        {...(openInstanceId ? { initialInstanceId: openInstanceId } : {})}
+        key={tasksFor === "all" ? "linked" : tasksFor.key}
+        people={data?.users ?? []}
+        {...(tasksFor === "all" ? { initialInstanceId: linkedInstanceId } : { familyId: tasksFor.key, workflowName: tasksFor.primary.name, versions: tasksFor.versions })}
       />
     </section>
   );
@@ -218,7 +208,11 @@ export function FMSBuilderPage() {
                       {draft && draft.id !== flow.id ? <span className="rounded-full border border-champagne/30 bg-champagne/10 px-2 py-0.5 text-xs text-champagne">draft v{draft.version} in progress</span> : null}
                     </div>
                     <p className="mt-1 text-sm text-soft-grey">{flow.description || "No description added."}</p>
-                    <p className="mt-2 text-xs text-soft-grey">v{flow.version} · used {flow.usage_count} times · {counts.running} running · {counts.completed} completed{counts.mine ? ` · ${counts.mine} assigned to you` : ""}</p>
+                    <p className="mt-2 text-xs text-soft-grey">v{flow.version} · used {flow.usage_count} times{counts.mine ? ` · ${counts.mine} assigned to you` : ""}</p>
+                    <dl aria-label={`${flow.name} counts`} className="mt-2 flex flex-wrap gap-1.5 text-xs">
+                      {([["Running", counts.running, "border-gold/30 text-gold-secondary"], [FMS_TERMINAL_OUTCOME_LABELS.won, counts.won, "border-success/40 text-success"], [FMS_TERMINAL_OUTCOME_LABELS.lost, counts.lost, "border-danger/40 text-danger"], ["Other endings", counts.other, "border-champagne/30 text-champagne"]] as const).map(([label, value, tone]) =>
+                        <div className={`flex gap-1 rounded-full border px-2 py-0.5 ${tone}`} key={label}><dt>{label}</dt><dd className="font-semibold tabular-nums">{value}</dd></div>)}
+                    </dl>
                   </div>
                   <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
 
