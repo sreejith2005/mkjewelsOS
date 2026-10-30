@@ -35,7 +35,7 @@ const go = (path: string) => window.history.pushState({}, "", path);
 afterEach(() => { cleanup(); go("/"); window.sessionStorage.clear(); });
 beforeEach(() => {
   vi.clearAllMocks();
-  auth.access = null; permission.allowed = new Set();
+  auth.access = {}; permission.allowed = new Set(["tasks.manage_team"]);
   Object.defineProperty(window, "matchMedia", { configurable: true, value: undefined });
   api.loadFmsTaskWorkspace.mockResolvedValue({ families: [{ id: family, name: "Instagram Online Sales Funnel", count: 24, active: 24, overdue: 5, dueToday: 8 }, { id: id(2), name: "Order & Repair FMS", count: 15, active: 15, overdue: 3, dueToday: 4 }],
     total: 39, activeTotal: 39, familyTotal: 2, counts: { active: 39, pending: 31, overdue: 8, waiting: 2, completed: 7, dueToday: 12 } });
@@ -65,11 +65,15 @@ it("lists every workflow with exact server counts and opens its board URL", asyn
 it("shows a direct board link: one column per person step, in route order, with exact counts", async () => {
   openBoard();
   const region = await screen.findByRole("region", { name: "Workflow stages" });
-  expect(within(region).getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual(["Introduction", "Demo", "Follow-up 3"]);
+  // Only steps holding work are columns by default.
+  expect(within(region).getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual(["Introduction", "Demo"]);
   expect(screen.queryByText("Lead Closed")).toBeNull(); expect(screen.queryByText("Route check")).toBeNull();
   const intro = screen.getByRole("region", { name: "Introduction: 22 tasks" });
   expect(intro.textContent).toContain("22 pending"); expect(intro.textContent).toContain("1 overdue");
+  await userEvent.click(screen.getByRole("button", { name: "Show empty steps (1)" }));
   expect(within(screen.getByRole("region", { name: "Follow-up 3: 0 tasks" })).getByText("No pending work.")).toBeTruthy();
+  await userEvent.click(screen.getByRole("button", { name: "Hide empty steps" }));
+  expect(screen.queryByRole("region", { name: "Follow-up 3: 0 tasks" })).toBeNull();
   expect(screen.getByLabelText("Workflow counts").textContent).toMatch(/Active: 3.*Due today: 1.*Overdue: 1/);
   expect(api.loadFmsTaskWorkspace).not.toHaveBeenCalled();
   expect(api.loadFmsTaskBoard).toHaveBeenCalledTimes(1);
@@ -105,7 +109,6 @@ it("filters by due state, priority, sort and search on the server", async () => 
   await waitFor(() => expect(api.loadFmsTaskBoard).toHaveBeenLastCalledWith(family, expect.objectContaining({ sort: "priority" })));
   await user.type(screen.getByRole("searchbox"), "INST-2026-1001");
   await waitFor(() => expect(api.loadFmsTaskBoard).toHaveBeenLastCalledWith(family, expect.objectContaining({ query: "INST-2026-1001" })));
-  expect(screen.queryByRole("combobox", { name: "Whose work" })).toBeNull();
 });
 
 it("opens the existing work page and returns to the same board afterwards", async () => {
@@ -138,8 +141,27 @@ it("a realtime refresh reloads counts and keeps one card per visit", async () =>
   expect(screen.getByRole("region", { name: "Introduction: 21 tasks" })).toBeTruthy();
 });
 
+it("staff keep the original workflow -> stage list and never load the board", async () => {
+  permission.allowed = new Set();
+  api.loadFmsTaskStages.mockResolvedValue([{ id: `${id(11)}:stage`, flowId: id(5), stageId: id(11), name: "Introduction", version: 1, count: 2, pipeline: "", order: 0, starting: false, nextStageIds: [] }]);
+  go(`/tasks?view=fms&workflow=${family}`);
+  renderWorkspace();
+  expect(await screen.findByRole("button", { name: /Instagram Online Sales Funnel.*24/ })).toBeTruthy();
+  expect(screen.queryByRole("region", { name: "Workflow stages" })).toBeNull();
+  expect(api.loadFmsTaskBoard).not.toHaveBeenCalled();
+});
+
+it("the step bar jumps to a column on a computer", async () => {
+  const scrollTo = vi.fn(); Object.defineProperty(HTMLElement.prototype, "scrollTo", { configurable: true, value: scrollTo });
+  openBoard();
+  const stages = await screen.findByRole("navigation", { name: "Stages" });
+  await userEvent.click(within(stages).getByRole("button", { name: /Demo/ }));
+  expect(scrollTo).toHaveBeenCalled();
+  expect(screen.getByRole("region", { name: "Demo: 1 tasks" }).className).toContain("border-task-accent");
+  expect(screen.getByRole("link", { name: "Open work — Lead 1" })).toBeTruthy();
+});
+
 it("a manager can switch to the team and filter by employee", async () => {
-  auth.access = {}; permission.allowed = new Set(["tasks.manage_team"]);
   const user = userEvent.setup();
   openBoard();
   await user.selectOptions(await screen.findByRole("combobox", { name: "Whose work" }), "all");
@@ -155,7 +177,7 @@ it("on a phone shows one stage at a time with a stage selector", async () => {
   Object.defineProperty(window, "matchMedia", { configurable: true, value: () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }) });
   openBoard();
   const stages = await screen.findByRole("navigation", { name: "Stages" });
-  expect(within(stages).getAllByRole("button").map((button) => button.textContent)).toEqual(["Introduction22", "Demo1", "Follow-up 30"]);
+  expect(within(stages).getAllByRole("button").map((button) => button.textContent)).toEqual(["Introduction22", "Demo1"]);
   expect(screen.getByRole("link", { name: "Open work — Lead 1" })).toBeTruthy();
   expect(screen.queryByRole("link", { name: "Open work — Lead 2" })).toBeNull();
   await userEvent.click(within(stages).getByRole("button", { name: /Demo/ }));

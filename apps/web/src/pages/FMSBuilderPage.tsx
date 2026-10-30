@@ -45,6 +45,8 @@ const flowState = (flow: FmsFlowRow): FlowState => flow.status === "draft" ? "dr
 export function FMSBuilderPage() {
   const { access, profile } = useAuth();
   const canManage = hasPermission(access, "fms.manage");
+  // Managers, admins and super admins see the stage board; staff keep the run list.
+  const canSeeTeam = hasPermission(access, "tasks.manage_team") || hasPermission(access, "tasks.view_all");
   const [data, setData] = useState<FmsData>();
   // Server-counted runs and outcomes per workflow family; the library never downloads the runtime.
   const [outcomes, setOutcomes] = useState<ReadonlyMap<string, FmsLibraryOutcome>>();
@@ -226,9 +228,9 @@ export function FMSBuilderPage() {
                   </div>
                   <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
 
-                    {/* Tasks opens the same stage board as Tasks -> FMS; Runs keeps the run list, outcomes and journeys. */}
-                    <Button onClick={() => openUrl(fmsTaskBoardPath(family.key))} variant="secondary"><ListChecks className="size-4" />Tasks{counts.mine ? ` (${counts.mine})` : ""}</Button>
-                    <Button onClick={() => setTasksFor(family)} variant="secondary"><BarChart3 className="size-4" />Runs</Button>
+                    {/* Managers: Tasks opens the stage board, Runs the run list. Staff: Tasks keeps the run list as before. */}
+                    <Button onClick={() => canSeeTeam ? openUrl(fmsTaskBoardPath(family.key)) : setTasksFor(family)} variant="secondary"><ListChecks className="size-4" />Tasks{counts.mine ? ` (${counts.mine})` : ""}</Button>
+                    {canSeeTeam ? <Button onClick={() => setTasksFor(family)} variant="secondary"><BarChart3 className="size-4" />Runs</Button> : null}
                     {canManage && draft ? <Button disabled={busy} onClick={() => setEdit(draft)} variant="secondary"><Pencil className="size-4" />Edit draft</Button> : null}
                     {canManage && !draft && flow.status !== "draft" ? <Button disabled={busy} onClick={() => void revise(flow)} variant="secondary"><Pencil className="size-4" />New version</Button> : null}
                     {canManage && flow.status === "published" ? <Button disabled={busy} onClick={() => toggleActive(flow)} variant="secondary">{flow.is_active ? <><Pause className="size-4" />Pause</> : <><Play className="size-4" />Resume</>}</Button> : null}

@@ -58,6 +58,8 @@ Web only: no Android release (the app is the web shell).
 
 ## 4. Tasks -> FMS board
 
+**Who sees it (owner decision 2026-10-30, follow-up):** only users with `tasks.manage_team` or `tasks.view_all` (managers, admins, super admins). Everyone else keeps the original workflow -> stage -> record list (`FmsStaffWorkspace`, unchanged), and their FMS Library **Tasks** still opens the run workspace. The board shows only steps with tasks by default ("Show empty steps" reveals the rest) and a step bar jumps to any column in one click.
+
 * **Level 1** `/tasks?view=fms`: workflows with exact server counts (active, overdue, due today) from `get_fms_task_workspace`; To do / Waiting / Done chips; search by workflow, customer or reference.
 * **Level 2** `/tasks?view=fms&workflow=<family>` (refresh, direct link and Back work): `get_fms_task_board` returns, in one read, every stage of each version holding the caller's work (plus the latest published version), with exact count / overdue / today per column and the first 20 cards per column. `fmsBoardColumns` keeps person steps in graph order (`orderFmsWorkspaceStages`); automatic steps and End Nodes are not columns. Empty columns show "No pending work." Versions are never merged: each column is one stage id, labelled `vN` when several versions run.
 * Cards: customer (authorized record name), REF, due date/time (`describeDue`, "5 Nov 2026 · 3:30 pm"), priority, Visit N, assignee in team view. Key = visit id. Opening a card runs the existing work page (`fmsAssignedWorkPath`); finishing returns to the same board (per-tab `sessionStorage`, only for the work opened from it).
