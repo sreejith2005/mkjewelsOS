@@ -1,6 +1,6 @@
 import { FmsAssignmentEditor } from "./FmsAssignmentEditor";
 import { FmsTaskNaming } from "./FmsTaskNaming";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, ChevronRight, Eye, FilePlus2, GitBranch, Import, Link2, Pencil, Plus, Trash2, X } from "lucide-react";
 import {
   FMS_ASSIGNMENT_LABELS,
@@ -104,7 +104,7 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete, assign
 
     {human ? <StageQuestions actions={questionnaire} data={data} firstStage={firstStage} stage={stage} update={update} updateSla={updateSla} /> : null}
 
-    {canChooseNext ? <StageRouting allFields={allFormFields} decision={decision} fields={formFields} others={others} stage={stage} changeRule={changeBranchRule} moveRule={moveBranchRule} update={update} updateSla={updateSla} /> : null}
+    {canChooseNext ? <StageRouting key={stage.key} allFields={allFormFields} decision={decision} fields={formFields} others={others} stage={stage} changeRule={changeBranchRule} moveRule={moveBranchRule} update={update} updateSla={updateSla} /> : null}
 
     {human && fmsStageNeedsAssignment(stages, stage.key) && assignmentVersion === 2 ? <InspectorSection defaultOpen summary={assignedSummary} title="Assigned to">
       <FmsAssignmentEditor stage={stage} stages={stages} data={data} onChange={onChange} />
@@ -278,15 +278,24 @@ function NewerVersion({ data, stage, update }: { data: FmsData; stage: FmsStageD
  */
 function StageRouting({ stage, others, fields, allFields, decision, update, updateSla, changeRule, moveRule }: { stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; fields: readonly FmsFormFieldRef[]; allFields: readonly FmsFormFieldRef[]; decision: boolean; update: (patch: Partial<FmsStageDefinition>) => void; updateSla: (patch: Partial<FmsSlaRule>) => void; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void }) {
   const routed = hasFmsStageRouting(stage);
+  const [expandedId, setExpandedId] = useState<string | null>(() => stage.branchRules.at(-1)?.id ?? null);
+  const sectionRef = useRef<HTMLElement>(null);
   const addRoute = () => {
     const source = stage.formTemplateId && fields.length ? "form_answer" as const : decision ? "outcome" as const : "context" as const;
     const route: FmsBranchRule = { id: crypto.randomUUID(), source, operator: "equals", ...(source === "form_answer" ? { sourceKey: fields[0]?.key } : {}), value: source === "outcome" ? stage.sla.decisionOptions?.[0]?.key ?? "" : "", order: stage.branchRules.length, nextStageKey: undefined };
     update({ branchRules: [...stage.branchRules, route].map((rule, order) => ({ ...rule, order })) });
+    setExpandedId(route.id);
+    sectionRef.current?.scrollIntoView?.({ block: "start", behavior: "smooth" });
   };
-  return <section aria-label="Routing" className="space-y-2.5 rounded-xl border border-gold/15 p-3" data-fms-focus="routing">
-    <div className="flex items-center justify-between gap-2"><h4 className="text-sm font-semibold text-champagne">Routing</h4><Button aria-label="Add conditional route" className="min-h-9 shrink-0 px-2.5 text-xs" onClick={addRoute} type="button" variant="secondary"><GitBranch className="size-4" />Add condition</Button></div>
+  return <section aria-label="Routing" className="relative space-y-2.5 rounded-xl border border-gold/15 p-3" data-fms-focus="routing" ref={sectionRef}>
+    <div className="sticky top-0 z-10 flex items-center justify-between gap-2 bg-obsidian py-1"><h4 className="text-sm font-semibold text-champagne">Routing{routed ? <span className="ml-2 text-xs font-normal text-soft-grey">{stage.branchRules.length}</span> : null}</h4><Button aria-label="Add conditional route" className="min-h-11 shrink-0 px-2.5 text-xs" onClick={addRoute} type="button" variant="secondary"><GitBranch className="size-4" />Add condition</Button></div>
+    {routed ? <p className="text-xs text-soft-grey">Last added at the top. Checked in number order (1 first); the first match wins.</p> : null}
     {decision ? <DecisionOptions options={stage.sla.decisionOptions ?? [{ key: "yes", label: "Yes" }, { key: "no", label: "No" }]} update={(decisionOptions) => updateSla({ decisionMode: "decision", decisionOptions })} /> : null}
-    {stage.branchRules.map((rule, index) => <RouteRow allFields={allFields} decision={decision} fields={fields} index={index} key={rule.id} others={others} rule={rule} stage={stage} changeRule={changeRule} moveRule={moveRule} remove={() => update({ branchRules: stage.branchRules.filter((_, ruleIndex) => ruleIndex !== index).map((item, order) => ({ ...item, order })) })} />)}
+    {stage.branchRules.map((rule, index) => ({ rule, index })).reverse().map(({ rule, index }) => <RouteRow allFields={allFields} decision={decision} fields={fields} index={index} key={rule.id} others={others} rule={rule} stage={stage} expanded={expandedId === rule.id} toggle={() => setExpandedId(expandedId === rule.id ? null : rule.id)} changeRule={changeRule} moveRule={moveRule} remove={() => {
+      const remaining = stage.branchRules.filter((_, ruleIndex) => ruleIndex !== index);
+      if (expandedId === rule.id) setExpandedId(remaining.at(-1)?.id ?? null);
+      update({ branchRules: remaining.map((item, order) => ({ ...item, order })) });
+    }} />)}
     <Field label={routed ? "Otherwise go to" : "Next step"}><StageSelect label={routed ? "Otherwise (fallback) go to" : "Continue to"} others={others} value={stage.defaultNextStageKey} onChange={(value) => update({ defaultNextStageKey: value })} /></Field>
     {routed && !hasFmsStageFallback(stage) ? <p className="text-xs text-soft-grey">Optional. If no condition matches, the workflow completes here.</p> : null}
     {routed && !stage.formTemplateId && stage.branchRules.some((rule) => rule.source === "form_answer") ? <p className="rounded-lg border border-danger/40 bg-danger/5 p-2 text-xs text-danger">Add questions above so these answers exist.</p> : null}
@@ -294,20 +303,37 @@ function StageRouting({ stage, others, fields, allFields, decision, update, upda
   </section>;
 }
 
-function RouteRow({ rule, index, stage, others, fields, allFields, decision, changeRule, moveRule, remove }: { rule: FmsBranchRule; index: number; stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; fields: readonly FmsFormFieldRef[]; allFields: readonly FmsFormFieldRef[]; decision: boolean; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void; remove: () => void }) {
+function RouteRow({ rule, index, stage, others, fields, allFields, decision, expanded, toggle, changeRule, moveRule, remove }: { rule: FmsBranchRule; index: number; stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; fields: readonly FmsFormFieldRef[]; allFields: readonly FmsFormFieldRef[]; decision: boolean; expanded: boolean; toggle: () => void; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void; remove: () => void }) {
   const field = rule.source === "form_answer" ? fields.find((item) => item.key === rule.sourceKey) : undefined;
   /** A saved question outside the section stays selected and flagged until the author picks another. */
   const outside = rule.source === "form_answer" && !field ? allFields.find((item) => item.key === rule.sourceKey) : undefined;
   const options = rule.source === "outcome" ? (stage.sla.decisionOptions ?? []).map((option) => ({ value: option.key, label: option.label })) : fmsFieldOptions(field);
   const selected = Array.isArray(rule.value) ? rule.value.map(String) : [String(rule.value ?? "")].filter(Boolean);
-  return <article className="space-y-2 rounded-lg border border-gold/20 bg-white/[0.02] p-2.5" data-route-id={rule.id}>
-    <div className="flex items-center gap-1">
-      <span className="rounded-full bg-gold/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold-secondary">If {index + 1}</span>
-      <input aria-label={`Route ${index + 1} label`} className="field min-h-9 flex-1 py-1 md:text-xs" maxLength={60} onChange={(event) => changeRule(index, { label: event.target.value })} placeholder="Name on the canvas (optional)" value={rule.label ?? ""} />
-      <button aria-label={`Move route ${index + 1} up`} className="rounded p-1 text-soft-grey hover:text-gold-secondary disabled:opacity-40" disabled={index === 0} onClick={() => moveRule(index, -1)} title="Check earlier" type="button"><ArrowUp className="size-4" /></button>
-      <button aria-label={`Move route ${index + 1} down`} className="rounded p-1 text-soft-grey hover:text-gold-secondary disabled:opacity-40" disabled={index === stage.branchRules.length - 1} onClick={() => moveRule(index, 1)} title="Check later" type="button"><ArrowDown className="size-4" /></button>
-      <button aria-label={`Delete route ${index + 1}`} className="rounded p-1 text-soft-grey hover:text-danger" onClick={remove} title="Delete condition" type="button"><Trash2 className="size-4" /></button>
-    </div>
+  const question = field?.label ?? (outside ? `${outside.label} (not in this section)` : rule.sourceKey ? `${rule.sourceKey}${rule.source === "form_answer" ? " (removed)" : ""}` : rule.source === "outcome" ? "Outcome" : "Choose a field");
+  const answer = selected.map((value) => options.find((option) => option.value === value)?.label ?? `${value}${options.length ? " (removed)" : ""}`).join(", ");
+  const condition = `${question} ${routeOperators.find((operator) => operator.value === rule.operator)?.label ?? rule.operator}${VALUE_FREE_OPERATORS.has(rule.operator) ? "" : ` ${answer || "Choose an answer"}`}`;
+  const destination = rule.nextFlowId ? "Linked workflow" : rule.nextStageKey ? others.find((item) => item.key === rule.nextStageKey)?.name ?? `${rule.nextStageKey} (unavailable)` : "Complete workflow here";
+  const panelId = `route-editor-${stage.key}-${rule.id}`;
+  // Native details also lets the canvas/validation revealControl open the exact
+  // route around a field. Keep fields mounted so those existing selectors work.
+  return <details className={cn("min-w-0 rounded-lg border bg-white/[0.02]", expanded ? "border-gold/40" : "border-gold/20")} data-route-id={rule.id} onToggle={(event) => { if (event.currentTarget.open !== expanded) toggle(); }} open={expanded}>
+    <summary className="flex list-none flex-wrap items-center gap-0.5 p-1 [&::-webkit-details-marker]:hidden">
+      <button aria-controls={panelId} aria-expanded={expanded} aria-label={`Edit route ${index + 1}`} className="flex min-h-11 min-w-0 flex-1 items-start gap-2 rounded-md px-1.5 py-2 text-left hover:bg-gold/5 focus-visible:outline-gold" onClick={(event) => { event.preventDefault(); toggle(); }} type="button">
+        <ChevronRight aria-hidden className={cn("mt-0.5 size-4 shrink-0 text-soft-grey", expanded && "rotate-90")} />
+        <span className="shrink-0 rounded-full bg-gold/10 px-1.5 py-0.5 text-[10px] font-semibold text-gold-secondary">If {index + 1}</span>
+        <span className="min-w-0 flex-1"><span className="line-clamp-2 break-words text-xs font-semibold text-champagne" title={condition}>{rule.label ? `${rule.label} · ${condition}` : condition}</span><span className="block truncate text-xs text-soft-grey" title={destination}>→ {destination}</span></span>
+      </button>
+    </summary>
+    <div className="space-y-2 border-t border-gold/15 p-2.5" id={panelId}>
+      <div className="flex min-w-0 items-center gap-1">
+      <input aria-label={`Route ${index + 1} label`} className="field min-h-9 min-w-0 flex-1 py-1 md:text-xs" maxLength={60} onChange={(event) => changeRule(index, { label: event.target.value })} placeholder="Name on the canvas (optional)" value={rule.label ?? ""} />
+      <span className="flex shrink-0 items-center">
+        <button aria-label={`Move route ${index + 1} up`} className="flex size-11 items-center justify-center rounded text-soft-grey hover:text-gold-secondary disabled:opacity-40 sm:size-9" disabled={index === stage.branchRules.length - 1} onClick={(event) => { event.preventDefault(); moveRule(index, 1); }} title="Move up · check later" type="button"><ArrowUp className="size-4" /></button>
+        <button aria-label={`Move route ${index + 1} down`} className="flex size-11 items-center justify-center rounded text-soft-grey hover:text-gold-secondary disabled:opacity-40 sm:size-9" disabled={index === 0} onClick={(event) => { event.preventDefault(); moveRule(index, -1); }} title="Move down · check earlier" type="button"><ArrowDown className="size-4" /></button>
+        <button aria-label={`Delete route ${index + 1}`} className="flex size-11 items-center justify-center rounded text-soft-grey hover:text-danger sm:size-9" onClick={(event) => { event.preventDefault(); remove(); }} title="Delete condition" type="button"><Trash2 className="size-4" /></button>
+      </span>
+      </div>
+    <label className="block"><span className="label">Then go to</span><StageSelect label={`Route ${index + 1} then go to`} others={others} value={rule.nextStageKey} onChange={(value) => changeRule(index, { nextStageKey: value, nextFlowId: undefined })} /></label>
     <div className="grid gap-2 sm:grid-cols-2">
       {rule.source === "form_answer" ? <label className="block"><span className="label">Question</span><select aria-label={`Route ${index + 1} question`} className="field" onChange={(event) => changeRule(index, { sourceKey: event.target.value, value: "" })} value={rule.sourceKey ?? ""}><option value="">Select a question</option>{fields.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}{rule.sourceKey && !fields.some((item) => item.key === rule.sourceKey) ? <option value={rule.sourceKey}>{outside ? `${outside.label} (not in this section)` : `${rule.sourceKey} (removed)`}</option> : null}</select></label>
         : rule.source === "context" ? <label className="block"><span className="label">Process data field</span><input aria-label={`Route ${index + 1} field key`} className="field" onChange={(event) => changeRule(index, { sourceKey: event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_") })} placeholder="e.g. status" value={rule.sourceKey ?? ""} /></label>
@@ -330,13 +356,13 @@ function RouteRow({ rule, index, stage, others, fields, allFields, decision, cha
         : options.length ? <label className="block"><span className="label">Answer</span><select aria-label={`Route ${index + 1} answer`} className="field" multiple={rule.operator === "in"} onChange={(event) => changeRule(index, { value: rule.operator === "in" ? [...event.target.selectedOptions].map((option) => option.value) : event.target.value })} value={rule.operator === "in" ? selected : selected[0] ?? ""}>{rule.operator === "in" ? null : <option value="">Select an answer</option>}{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}{selected.filter((value) => !options.some((option) => option.value === value)).map((value) => <option key={value} value={value}>{value} (removed)</option>)}</select></label>
         : <label className="block"><span className="label">Answer</span><input aria-label={`Route ${index + 1} answer`} className="field" onChange={(event) => changeRule(index, { value: rule.operator === "in" ? event.target.value.split(",").map((item) => item.trim()).filter(Boolean) : event.target.value })} placeholder={rule.operator === "in" ? "value_a, value_b" : "Expected value"} value={selected.join(", ")} /></label>}
     </div>
-    <label className="block"><span className="label">Then go to</span><StageSelect label={`Route ${index + 1} then go to`} others={others} value={rule.nextStageKey} onChange={(value) => changeRule(index, { nextStageKey: value, nextFlowId: undefined })} /></label>
     <details className="text-xs"><summary className="cursor-pointer text-soft-grey">More</summary><label className="mt-2 block"><span className="label">Based on</span><select aria-label={`Route ${index + 1} source`} className="field" onChange={(event) => { const source = event.target.value as FmsBranchRule["source"]; changeRule(index, { source, sourceKey: source === "form_answer" ? fields[0]?.key : source === "outcome" ? undefined : rule.sourceKey, value: "" }); }} value={rule.source}>
       <option disabled={!fields.length} value="form_answer">An answer to this step's questions</option>
       <option disabled={!decision} value="outcome">The outcome chosen (earlier version)</option>
       <option value="context">A process data field</option>
     </select></label></details>
-  </article>;
+    </div>
+  </details>;
 }
 
 function ChecklistEditor({ items, onChange }: { items: readonly FmsChecklistItemDefinition[]; onChange: (items: readonly FmsChecklistItemDefinition[]) => void }) {

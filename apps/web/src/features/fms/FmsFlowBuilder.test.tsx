@@ -262,6 +262,21 @@ describe("FMS builder graph wiring", () => {
     expect(document.activeElement?.closest("[data-route-id]")?.getAttribute("data-route-id")).toBe(stage(start).branchRules[0]!.id);
   });
 
+  it("reveals a collapsed older condition from the canvas and from a readiness issue", async () => {
+    const { user, start } = await openBuilder();
+    await user.click(screen.getByRole("button", { name: "connect b" }));
+    await user.click(screen.getByRole("button", { name: "edit route" }));
+    await user.click(screen.getByRole("button", { name: "Add conditional route" }));
+    expect(screen.getByRole("button", { name: "Edit route 1" }).getAttribute("aria-expanded")).toBe("false");
+    await user.click(screen.getByRole("button", { name: "edit route" }));
+    expect(screen.getByRole("button", { name: "Edit route 1" }).getAttribute("aria-expanded")).toBe("true");
+    expect(document.activeElement?.closest("[data-route-id]")?.getAttribute("data-route-id")).toBe(stage(start).branchRules[0]!.id);
+    await user.click(screen.getByRole("button", { name: "Edit route 2" }));
+    await user.click(screen.getAllByRole("button", { name: /Route 1.*needs the question or process field/ })[0]!);
+    expect(screen.getByRole("button", { name: "Edit route 1" }).getAttribute("aria-expanded")).toBe("true");
+    expect(document.activeElement).toBe(screen.getByLabelText("Route 1 field key"));
+  });
+
   it("copies the first assignee to every step and permits a later override", async () => {
     const personId = "00000000-0000-4000-8000-000000000023";
     const builderData = { ...data, users: [{ id: personId, employee_name: "Asha", employee_code: "A1", account_status: "active", user_role: "staff", branch_id: "", department_id: "", working_status: "active", is_login_enabled: true }] } as FmsData;

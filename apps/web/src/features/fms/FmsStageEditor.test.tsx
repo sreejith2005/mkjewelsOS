@@ -35,10 +35,10 @@ function LaterFormHarness() {
 
 let latestStage: FmsStageDefinition | null = null;
 
-function RoutingHarness({ rule }: { rule?: FmsBranchRule } = {}) {
+function RoutingHarness({ rule, rules }: { rule?: FmsBranchRule; rules?: FmsBranchRule[] } = {}) {
   const first = { ...newFmsStage("form", 0), key: "initial", name: "Initial details", formTemplateId: data.forms[0]!.id, defaultNextStageKey: "qualify" };
   const wholesale = { ...newFmsStage("task", 2), key: "wholesale_desk", name: "Wholesale desk" };
-  const [stage, setStage] = useState<FmsStageDefinition>(() => ({ ...newFmsStage("task", 1), key: "qualify", name: "Customer qualification", formTemplateId: data.forms[0]!.id, branchRules: rule ? [rule] : [] }));
+  const [stage, setStage] = useState<FmsStageDefinition>(() => ({ ...newFmsStage("task", 1), key: "qualify", name: "Customer qualification", formTemplateId: data.forms[0]!.id, branchRules: rules ?? (rule ? [rule] : []) }));
   latestStage = stage;
   return <FmsStageEditor data={data} onChange={(value) => { latestStage = value; setStage(value); }} onDelete={() => undefined} stage={stage} stages={[first, stage, wholesale]} />;
 }
@@ -66,6 +66,52 @@ function AssignmentHarness({ invalid = false }: { invalid?: boolean }) {
 }
 
 describe("FMS stage editor", () => {
+  const savedRoutes: FmsBranchRule[] = [
+    { id: "older", source: "form_answer", sourceKey: "customer_type", operator: "equals", value: "retail", nextStageKey: "wholesale_desk", order: 0 },
+    { id: "newer", source: "form_answer", sourceKey: "customer_type", operator: "in", value: ["wholesale", "retired"], nextStageKey: "wholesale_desk", order: 1 },
+  ];
+
+  it("shows conditions in reverse order without changing saved priority and summarizes their labels", () => {
+    render(<RoutingHarness rules={savedRoutes} />);
+    const routing = screen.getByRole("region", { name: "Routing" });
+    expect([...routing.querySelectorAll("[data-route-id]")].map((row) => row.getAttribute("data-route-id"))).toEqual(["newer", "older"]);
+    expect(latestStage!.branchRules).toEqual(savedRoutes);
+    expect(screen.getByRole("button", { name: "Edit route 2" }).textContent).toContain("Wholesale buyer");
+    expect(screen.getByRole("button", { name: "Edit route 2" }).textContent).toContain("retired (removed)");
+    expect(screen.getByRole("button", { name: "Edit route 1" }).textContent).toContain("Wholesale desk");
+    expect(screen.getByRole("button", { name: "Edit route 1" }).getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("opens each newly added condition at the top and collapses the previous editor", async () => {
+    const user = userEvent.setup();
+    render(<RoutingHarness />);
+    await user.click(screen.getByRole("button", { name: "Add conditional route" }));
+    const olderId = latestStage!.branchRules[0]!.id;
+    await user.click(screen.getByRole("checkbox", { name: "Wholesale buyer" }));
+    await user.click(screen.getByRole("button", { name: "Add conditional route" }));
+    const rows = screen.getByRole("region", { name: "Routing" }).querySelectorAll("[data-route-id]");
+    expect(rows[0]!.getAttribute("data-route-id")).toBe(latestStage!.branchRules[1]!.id);
+    expect(screen.getByRole("button", { name: "Edit route 2" }).getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByLabelText("Route 1 answer").closest("details")!.open).toBe(false);
+    await user.click(screen.getByRole("button", { name: "Edit route 1" }));
+    await user.selectOptions(screen.getByLabelText("Route 1 then go to"), "wholesale_desk");
+    expect(latestStage!.branchRules[0]).toMatchObject({ id: olderId, value: "wholesale", nextStageKey: "wholesale_desk", order: 0 });
+    expect(latestStage!.branchRules[1]!.value).toBe("");
+    await user.click(screen.getByRole("button", { name: "Delete route 1" }));
+    expect(latestStage!.branchRules.map((rule) => rule.order)).toEqual([0]);
+    expect(latestStage!.branchRules[0]!.id).not.toBe(olderId);
+  });
+
+  it("moves a condition visually up while explicitly changing its evaluation priority", async () => {
+    const user = userEvent.setup();
+    render(<RoutingHarness rules={savedRoutes} />);
+    await user.click(screen.getByRole("button", { name: "Edit route 1" }));
+    await user.click(screen.getByRole("button", { name: "Move route 1 up" }));
+    expect(latestStage!.branchRules.map((rule) => [rule.id, rule.order])).toEqual([["newer", 0], ["older", 1]]);
+    expect(screen.getByRole("button", { name: "Move route 2 up" }).hasAttribute("disabled")).toBe(true);
+    await user.click(screen.getByRole("button", { name: "Move route 2 down" }));
+    expect(latestStage!.branchRules).toEqual(savedRoutes);
+  });
   it("defaults the initial Form deadline to off while later steps remain on", () => {
     expect(newFmsStage("form", 0).sla.deadlineEnabled).toBe(false);
     expect(newFmsStage("task", 1).sla.deadlineEnabled).toBe(true);

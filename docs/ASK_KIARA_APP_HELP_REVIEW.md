@@ -68,6 +68,7 @@ The page is gone. Recurring work is created from **Create Task** and managed in 
 ## FMS (workflows)
 **What it is:** company workflows: live workflows, the stages given to you, and, for people
 who build workflows, the designs.
+- [ ] Routing editor (2026-10-29): **Add condition** opens the new condition at the top; other editors collapse into condition/destination summaries. Click a row to edit. **Then go to** appears before answer choices. Display is reversed; **If 1** is still evaluated first, and only the arrows explicitly change priority. Canvas **Edit route** and readiness issues reveal the exact condition. No new Kiara read tool is needed for these presentation controls.
 - [ ] Do my stage: open it from Home or Tasks. The steps at the top are **Read previous details**, **Complete your work**, **Review next assignment** and **Confirm**. Read **Your step** (what to do, when it is due) and **Previous form answers**, press **Continue to stage form** (or **Continue to stage**). **Before you complete this step** lists anything missing. Press **Fill the form**: it opens on the same page below the earlier answers. While filling, **Earlier answers** (clock button beside Submit on a phone) shows them again; **Back to my form** keeps typed answers. Submitting also completes the step. Then check who receives the next step and confirm.
 - [ ] Start a workflow: open FMS, choose the workflow, press **Start instance** (if your role may start it).
 - [ ] Design a workflow: **New workflow** in FMS (workflow builders only).
