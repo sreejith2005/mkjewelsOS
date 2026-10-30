@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { CheckCircle2, ChevronLeft } from "lucide-react";
 import { fmsAssignedWorkPath, parseFmsAssignedWorkPath, type FmsAssignedWorkTarget, type FmsWorkResult } from "@jewelos/core";
-import { FMS_TASKS_PATH } from "@/features/tasks/fms/FmsTaskWorkspace";
+import { fmsTasksReturnPath } from "@/features/tasks/fms/boardReturn";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
 import { loadFormDynamicOptions, loadTaskForms, type FormBundle, type FmsStarterResult } from "@/features/forms/api";
@@ -36,7 +36,7 @@ export function FmsAssignedWorkPage({ onNavigate }: { onNavigate: (path: string)
 }
 
 const BackToWork = ({ onNavigate }: { onNavigate: (path: string) => void }) =>
-  <Button className="-ml-2 self-start" onClick={() => onNavigate(FMS_TASKS_PATH)} variant="ghost"><ChevronLeft aria-hidden="true" className="size-4" />My FMS work</Button>;
+  <Button className="-ml-2 self-start" onClick={() => onNavigate(fmsTasksReturnPath())} variant="ghost"><ChevronLeft aria-hidden="true" className="size-4" />My FMS work</Button>;
 
 /**
  * The employee arrives from a card that already named the workflow, stage and
@@ -66,7 +66,7 @@ export function fmsFinishedNotice(result: Pick<FmsWorkResult, "state" | "submiss
 function Unavailable({ children, onNavigate, tone = "neutral" }: { children: React.ReactNode; onNavigate: (path: string) => void; tone?: "neutral" | "danger" }) {
   return <section className="mx-auto flex w-full max-w-3xl flex-col gap-3">
     <Notice tone={tone}>{children}</Notice>
-    <Button className="self-start" onClick={() => onNavigate(FMS_TASKS_PATH)} variant="secondary">Back to my work</Button>
+    <Button className="self-start" onClick={() => onNavigate(fmsTasksReturnPath())} variant="secondary">Back to my work</Button>
   </section>;
 }
 
@@ -112,7 +112,7 @@ function StarterForm({ onNavigate, target }: {
     </div>
     <div className="flex flex-col gap-2 sm:flex-row">
       {started.ownWorkTargets?.[0] ? <Button className="min-h-12" onClick={() => onNavigate(fmsAssignedWorkPath(started.ownWorkTargets![0]!))}>Open my next step</Button> : null}
-      <Button className="min-h-12" onClick={() => onNavigate(FMS_TASKS_PATH)} variant="secondary">Back to my work</Button>
+      <Button className="min-h-12" onClick={() => onNavigate(fmsTasksReturnPath())} variant="secondary">Back to my work</Button>
     </div>
   </Frame>;
   if (error) return <Unavailable onNavigate={onNavigate} tone="danger">{error}</Unavailable>;
@@ -128,7 +128,7 @@ function StarterForm({ onNavigate, target }: {
           const completed = await confirmWork({ kind: "starter_form", formTemplateId: form.id, starterAssignmentId: target.starterAssignmentId, answers });
           if (!completed) return false;
           toast.success(fmsFinishedNotice(completed));
-          onNavigate(FMS_TASKS_PATH);
+          onNavigate(fmsTasksReturnPath());
           return true;
         }}
         templateId={form.id}
@@ -190,7 +190,7 @@ function AssignedStage({ onNavigate, target }: {
   if (!stage || !definition) {
     return <Frame onNavigate={onNavigate} title={bundle.instance.title}>
       <Notice>This step is already complete or is not assigned to you. Nothing is waiting for you here.</Notice>
-      <Button onClick={() => onNavigate(FMS_TASKS_PATH)} variant="secondary">Back to my work</Button>
+      <Button onClick={() => onNavigate(fmsTasksReturnPath())} variant="secondary">Back to my work</Button>
     </Frame>;
   }
 
@@ -199,7 +199,7 @@ function AssignedStage({ onNavigate, target }: {
   const finished = (result: FmsWorkResult) => {
     if (!fmsOutcomeReplacesStage(result.state)) return;
     toast.success(fmsFinishedNotice(result));
-    onNavigate(FMS_TASKS_PATH);
+    onNavigate(fmsTasksReturnPath());
   };
 
   return <Frame onNavigate={onNavigate} title={workName?.id === stage.id ? workName.name : definition.name}>

@@ -7,6 +7,7 @@ import {
   FMS_BRANCH_OPERATORS,
   fmsStageNeedsAssignment,
   fmsFieldOptions,
+  fmsFormDueSummary,
   fmsRouteAnswerSelection,
   fmsAssignmentFields,
   fmsStageFormFields,
@@ -26,6 +27,7 @@ import { cn } from "@/lib/utils";
 import type { FmsData } from "./api";
 import { newerFormVersion } from "./definition";
 import { FmsEndNodeEditor } from "./FmsEndNodeEditor";
+import { FmsDueDateSource } from "./FmsDueDateSource";
 
 const humanTypes: readonly FmsStageDefinition["type"][] = ["form", "task", "approval"];
 const timingOptions: readonly { value: FmsTimingMethod; label: string; help: string }[] = [
@@ -34,6 +36,7 @@ const timingOptions: readonly { value: FmsTimingMethod; label: string; help: str
   { value: "days_before_date", label: "Days before date", help: "Due a fixed number of days before a future date." },
   { value: "specific_time", label: "Specific clock time", help: "Due on a selected date at a selected time." },
 ];
+const fixedTimingOptions = timingOptions.filter((option) => option.value !== "tat_hours");
 /** Route conditions offered on an ordinary step. `default` stays reserved for the fallback. */
 const routeOperators: readonly { value: FmsBranchOperator; label: string }[] = [
   { value: "equals", label: "is" },
@@ -123,13 +126,13 @@ function FmsStepEditor({ stage, stages, data, onChange, onDelete, assignmentVers
     <InspectorSection
       focus="deadline"
       onSwitch={(on) => updateSla({ deadlineEnabled: on })}
-      summary={deadlineOn ? timingSummary(stage.sla) : "Off"}
+      summary={deadlineOn ? stage.sla.formDue ? fmsFormDueSummary({ stages }, stage.sla.formDue, data.formFields) : timingSummary(stage.sla) : "Off"}
       switchLabel="Set deadline"
       switched={deadlineOn}
       title="When / Deadline"
     >
-      <div aria-label="Deadline method" className="grid gap-2 sm:grid-cols-2" role="group">{timingOptions.map((option) => <button aria-pressed={timingMethod(stage.sla) === option.value} className={cn("min-h-11 rounded-xl border p-3 text-left transition", timingMethod(stage.sla) === option.value ? "border-gold bg-gold/10 text-white" : "border-gold/20 text-soft-grey hover:border-gold/60")} key={option.value} onClick={() => updateSla({ timingMethod: option.value })} type="button"><span className="block text-sm font-semibold">{option.label}</span><span className="mt-0.5 block text-xs text-soft-grey">{option.help}</span></button>)}</div>
-      <div className="mt-3"><TimingFields earlierStages={earlierStages} sla={stage.sla} updateSla={updateSla} /></div>
+      {human ? <FmsDueDateSource data={data} stage={stage} stageIndex={stageIndex} stages={stages} timing={(kind) => <TimingRule earlierStages={earlierStages} methods={kind === "fixed" ? fixedTimingOptions : kind === "tat" ? [] : timingOptions} sla={stage.sla} updateSla={updateSla} />} updateSla={updateSla} />
+        : <TimingRule earlierStages={earlierStages} methods={timingOptions} sla={stage.sla} updateSla={updateSla} />}
     </InspectorSection>
 
     {human ? <InspectorSection summary={stage.method ? truncate(stage.method, 36) : "None"} title="Instructions">
@@ -381,6 +384,14 @@ function ChecklistEditor({ items, onChange }: { items: readonly FmsChecklistItem
     </div>)}
     <Button className="min-h-9 px-2.5 text-xs" onClick={add} type="button" variant="secondary"><Plus className="size-4" />Add item</Button>
   </div>;
+}
+
+/** Method buttons (when there is a choice) and the chosen method's fields. */
+function TimingRule({ sla, earlierStages, updateSla, methods }: { sla: FmsSlaRule; earlierStages: readonly FmsStageDefinition[]; updateSla: (patch: Partial<FmsSlaRule>) => void; methods: typeof timingOptions }) {
+  return <>
+    {methods.length > 1 ? <div aria-label="Deadline method" className="grid gap-2 sm:grid-cols-2" role="group">{methods.map((option) => <button aria-pressed={timingMethod(sla) === option.value} className={cn("min-h-11 rounded-xl border p-3 text-left transition", timingMethod(sla) === option.value ? "border-gold bg-gold/10 text-white" : "border-gold/20 text-soft-grey hover:border-gold/60")} key={option.value} onClick={() => updateSla({ timingMethod: option.value })} type="button"><span className="block text-sm font-semibold">{option.label}</span><span className="mt-0.5 block text-xs text-soft-grey">{option.help}</span></button>)}</div> : null}
+    <div className={methods.length > 1 ? "mt-3" : ""}><TimingFields earlierStages={earlierStages} sla={sla} updateSla={updateSla} /></div>
+  </>;
 }
 
 function TimingFields({ sla, earlierStages, updateSla }: { sla: FmsSlaRule; earlierStages: readonly FmsStageDefinition[]; updateSla: (patch: Partial<FmsSlaRule>) => void }) {

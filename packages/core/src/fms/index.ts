@@ -13,6 +13,7 @@ export * from "./stageCompletion";
 export * from "./logPresentation";
 export * from "./recordNaming";
 export * from "./taskWorkspace";
+export * from "./formDue";
 
 export * from "./assignmentAuthoring";
 

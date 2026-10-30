@@ -12535,6 +12535,7 @@ export type Database = {
       get_fms_instance_journey: { Args: { p_instance_id: string }; Returns: Json }
       get_fms_task_stages: { Args: { p_family_id: string; p_filter?: Json }; Returns: Json }
       get_fms_task_stage_page: { Args: { p_family_id: string; p_flow_id: string; p_stage_id: string; p_starting?: boolean; p_filter?: Json; p_offset?: number; p_limit?: number }; Returns: Json }
+      get_fms_task_board: { Args: { p_family_id: string; p_filter?: Json; p_limit?: number }; Returns: Json }
       get_fms_assigned_stage: { Args: { p_instance_id: string; p_instance_stage_id?: string }; Returns: Json }
       get_fms_work_form_context: { Args: { p_instance_id: string; p_instance_stage_id: string; p_offset?: number; p_limit?: number }; Returns: Json }
       get_fms_assigned_work_context: { Args: { p_instance_id: string; p_instance_stage_id: string; p_cursor?: string; p_limit?: number }; Returns: Json }

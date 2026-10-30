@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, GitBranch, ListChecks, Pause, Pencil, Play, Plus, RotateCcw, Search, Settings2, Trash2 } from "lucide-react";
+import { ArrowLeft, BarChart3, GitBranch, ListChecks, Pause, Pencil, Play, Plus, RotateCcw, Search, Settings2, Trash2 } from "lucide-react";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
 import { flowToDefinition } from "@/features/fms/definition";
@@ -17,11 +17,12 @@ import {
 import { FmsFlowBuilder } from "@/features/fms/FmsFlowBuilder";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { FMSTasksPage } from "./FMSTasksPage";
-import { FMS_TERMINAL_OUTCOME_LABELS, hasPermission, parseFmsAssignedWorkPath, type FmsLibraryOutcome } from "@jewelos/core";
+import { FMS_TERMINAL_OUTCOME_LABELS, fmsTaskBoardPath, hasPermission, parseFmsAssignedWorkPath, type FmsLibraryOutcome } from "@jewelos/core";
 import { loadFmsLibraryOutcomes } from "@jewelos/data/fms/outcomes";
 
 type FlowState = "live" | "paused" | "draft" | "archived";
 type FlowFamily = { key: string; primary: FmsFlowRow; versions: FmsFlowRow[] };
+const openUrl = (path: string) => { window.history.pushState({}, "", path); window.dispatchEvent(new PopStateEvent("popstate")); };
 type Filter = "all" | FlowState | "mine";
 
 const FILTERS: Array<{ id: Filter; label: string }> = [
@@ -82,6 +83,15 @@ export function FMSBuilderPage() {
     }).sort((left, right) => left.primary.name.localeCompare(right.primary.name));
   }, [data]);
 
+  // The task board links here (`/fms?runs=<family>`) to open a workflow's runs and outcomes.
+  useEffect(() => {
+    const runs = new URLSearchParams(window.location.search).get("runs");
+    if (!runs) return;
+    const family = families.find((item) => item.key === runs);
+    if (!family) return;
+    setTasksFor(family);
+    window.history.replaceState(window.history.state, "", window.location.pathname);
+  }, [families]);
   const countsFor = useCallback((family: FlowFamily) => {
     const row = outcomes?.get(family.key);
     return { running: (row?.running ?? 0) + (row?.onHold ?? 0), completed: row?.completed ?? 0, mine: row?.mine ?? 0, won: row?.won ?? 0, lost: row?.lost ?? 0,
@@ -216,7 +226,9 @@ export function FMSBuilderPage() {
                   </div>
                   <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
 
-                    <Button onClick={() => setTasksFor(family)} variant="secondary"><ListChecks className="size-4" />Tasks{counts.mine ? ` (${counts.mine})` : ""}</Button>
+                    {/* Tasks opens the same stage board as Tasks -> FMS; Runs keeps the run list, outcomes and journeys. */}
+                    <Button onClick={() => openUrl(fmsTaskBoardPath(family.key))} variant="secondary"><ListChecks className="size-4" />Tasks{counts.mine ? ` (${counts.mine})` : ""}</Button>
+                    <Button onClick={() => setTasksFor(family)} variant="secondary"><BarChart3 className="size-4" />Runs</Button>
                     {canManage && draft ? <Button disabled={busy} onClick={() => setEdit(draft)} variant="secondary"><Pencil className="size-4" />Edit draft</Button> : null}
                     {canManage && !draft && flow.status !== "draft" ? <Button disabled={busy} onClick={() => void revise(flow)} variant="secondary"><Pencil className="size-4" />New version</Button> : null}
                     {canManage && flow.status === "published" ? <Button disabled={busy} onClick={() => toggleActive(flow)} variant="secondary">{flow.is_active ? <><Pause className="size-4" />Pause</> : <><Play className="size-4" />Resume</>}</Button> : null}
