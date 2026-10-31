@@ -23,7 +23,7 @@ select is(fms_form_due_resolution('{"deadlineEnabled":false,"followUp":{"schedul
 -- Inject this test's optional metadata before its draft is published.
 create function pg_temp.schedule_fixture_stage() returns trigger language plpgsql as $$
 begin
- if new.stage_key='call' then new.planned_time_rule:=new.planned_time_rule||'{"followUp":{"maxVisits":10,"onLimit":"hold","schedule":{"delay":1,"unit":"days","time":"11:00"}}}'::jsonb; end if;
+ if new.stage_key='call' then new.planned_time_rule:=new.planned_time_rule||'{"deadlineEnabled":true,"timingMethod":"tat_hours","tatHours":1,"followUp":{"maxVisits":10,"onLimit":"hold","schedule":{"delay":1,"unit":"days","time":"11:00"}}}'::jsonb; end if;
  return new;
 end $$;
 create trigger scheduling_fixture_stage before insert on fms_stages for each row execute function pg_temp.schedule_fixture_stage();
@@ -95,5 +95,8 @@ select ok(not has_function_privilege('service_role','get_fms_task_workspace(json
 select ok(not has_function_privilege('authenticated','fms_causal_stage_deadline(jsonb,uuid,uuid,uuid,jsonb)','EXECUTE'),'causal form answers remain internal');
 select ok(not has_function_privilege('authenticated','fms_form_due_resolution(jsonb,uuid,uuid,uuid,text,uuid,jsonb,uuid[])','EXECUTE'),'unified due resolver remains private');
 select ok(not has_function_privilege('authenticated','fms_form_due_resolution_before_followup(jsonb,uuid,uuid,uuid,text,uuid,jsonb,uuid[])','EXECUTE'),'compatibility due resolver remains private');
+select ok(has_function_privilege('authenticated','assert_fms_flow_publishable(uuid)','EXECUTE'),'builder publish preflight remains available');
+select ok(not has_function_privilege('anon','assert_fms_flow_publishable(uuid)','EXECUTE'),'anonymous publisher preflight denied');
+select ok(not has_function_privilege('authenticated','assert_fms_flow_publishable_before_schedule(uuid)','EXECUTE'),'compatibility publish helper remains private');
 select * from finish();
 rollback;

@@ -148,4 +148,7 @@ end $$;
 revoke all on function task_calendar_scope_matches(text,timestamptz,text,timestamptz),fms_follow_up_schedule_valid(jsonb),fms_follow_up_datetime(jsonb,jsonb,timestamptz),
  fms_causal_stage_deadline(jsonb,uuid,uuid,uuid,jsonb),fms_form_due_resolution(jsonb,uuid,uuid,uuid,text,uuid,jsonb,uuid[]),fms_form_due_resolution_before_followup(jsonb,uuid,uuid,uuid,text,uuid,jsonb,uuid[]),assert_fms_flow_publishable_before_schedule(uuid),assert_fms_flow_publishable(uuid),
  fms_assignment_coverage(uuid,uuid,uuid,uuid[],boolean,timestamptz) from public,anon,authenticated,service_role;
+-- Preserve the existing read-only builder preflight entry point; compatibility
+-- and causal-data helpers above remain private. Audited publishers retain writes.
+grant execute on function assert_fms_flow_publishable(uuid) to authenticated;
 notify pgrst,'reload schema';

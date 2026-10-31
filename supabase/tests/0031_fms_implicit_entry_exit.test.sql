@@ -9,7 +9,9 @@ select has_function('public','activate_fms_stage_internal',array['uuid','uuid','
 select function_owner_is('public','assert_fms_flow_publishable',array['uuid'],'postgres','publish validator remains owner-controlled');
 select ok(has_function_privilege('authenticated','assert_fms_flow_publishable(uuid)','EXECUTE'),'authenticated builders can preflight publish validation without a write');
 select ok(has_function_privilege('authenticated','resolve_fms_stage_assignees(uuid,uuid,uuid)','EXECUTE'),'runtime keeps resolver access');
-select ok((select pg_get_functiondef('assert_fms_flow_publishable(uuid)'::regprocedure) like '%first workflow step must be a Form%'),'publish requires a Form first');
+select ok((select pg_get_functiondef('assert_fms_flow_publishable(uuid)'::regprocedure) like '%assert_fms_flow_publishable_before_schedule%'
+ and pg_get_functiondef('assert_fms_flow_publishable_before_schedule(uuid)'::regprocedure) like '%assert_fms_flow_publishable_before_assignment%'
+ and pg_get_functiondef('assert_fms_flow_publishable_before_assignment(uuid)'::regprocedure) like '%first workflow step must be a Form%'),'publish requires a Form first');
 select ok((select pg_get_functiondef('assert_fms_end_nodes_publishable(uuid)'::regprocedure) like '%End Node finishes the workflow%'),'publish validates explicit End Nodes (0358) instead of rejecting them');
 select ok((select pg_get_functiondef('activate_fms_stage_v1_internal(uuid,uuid,uuid,uuid,integer)'::regprocedure) like '%not v_activated_next%'),'legacy automatic leaf behavior remains pinned; v2 fan-out is exercised in 0212');
 
