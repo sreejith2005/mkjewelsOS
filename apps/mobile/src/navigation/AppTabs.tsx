@@ -7,7 +7,8 @@ import {
   CalendarCheck, CheckSquare, ClipboardList, FileSpreadsheet, FolderCheck, GitBranch,
   Home, LayoutDashboard, ListChecks, ListFilter, Settings, Sparkles, Users,
 } from "lucide-react-native";
-import { DEFAULT_SECTION_CONTROLS, getPageForPath, hasPermission, type PageId, type SectionControls } from "@jewelos/core";
+import { DEFAULT_SECTION_CONTROLS, getPageForPath, hasPermission, type PageId, type SectionControls, type SidebarCounts } from "@jewelos/core";
+import { useSidebarCounts } from "@/lib/useSidebarCounts";
 import { subscribeToTenantRealtime } from "@jewelos/data/realtime/api";
 import { loadSectionControls } from "@jewelos/data/settings/api";
 import { useAccess, useAuth, useProfile } from "@/auth/AuthProvider";
@@ -60,6 +61,7 @@ const PAGE_ICONS: Record<PageId, MobileNavigationDrawerItem["Icon"]> = {
 };
 
 type ShellState = Readonly<{
+  counts: SidebarCounts;
   incomingPath: string | null;
   onPathConsumed: () => void;
   controlsReady: boolean;
@@ -127,14 +129,14 @@ function SectionGate({ page, children }: { page: PageId; children: ReactNode }) 
 
 function ShellPage({ children, raiseVoiceAction = false, hideVoiceAction = false }: { children: ReactNode; raiseVoiceAction?: boolean; hideVoiceAction?: boolean }) {
   const profile = useProfile();
-  const { setDrawerOpen, shellAccess } = useShell();
+  const { setDrawerOpen, shellAccess, counts } = useShell();
   const navigate = usePathNavigation();
   // Offered on the same terms as the Create Task voice card, and only while
   // the Tasks section is open to this user.
   const canUseVoice = !hideVoiceAction && hasPermission(shellAccess.access, "tasks.voice_assign") && pageDecision(shellAccess, "checklist_tasks") === "allowed";
   return (
     <View className="flex-1 bg-obsidian">
-      <MobileHeader onNavigate={navigate} onOpenNavigation={() => setDrawerOpen(true)} profileId={profile.id} profileName={profile.employee_name} />
+      <MobileHeader onNavigate={navigate} onOpenNavigation={() => setDrawerOpen(true)} profileName={profile.employee_name} unreadCount={counts.notifications} />
       <View className="flex-1">
         {children}
         {canUseVoice ? <GlobalVoiceTaskButton raised={raiseVoiceAction} /> : null}
@@ -206,11 +208,13 @@ function ParityTabBar({ navigation, state }: BottomTabBarProps) {
   return (
     <>
       <MobileBottomNav
+        taskCount={shell.counts.checklist_tasks}
         onNavigate={navigate}
         path={currentPath}
       />
       <MobileNavigationDrawer
         badges={kiaraBadge ? { ask_kiara: kiaraBadge } : undefined}
+        counts={shell.counts}
         branchName={branch?.name ?? "Branch unavailable"}
         currentPath={currentPath}
         items={launcherItems}
@@ -257,14 +261,16 @@ function useSectionControls(): { controls: SectionControls; ready: boolean } {
 /** Native routing underneath the approved phone shell: a Home/Tasks dock and a navigation drawer. */
 export function AppTabs({ incomingPath = null, onPathConsumed = () => {} }: { incomingPath?: string | null; onPathConsumed?: () => void }) {
   const access = useAccess();
+  const profile = useProfile();
+  const counts = useSidebarCounts(profile.id, profile.tenant_id);
   const { controls, ready: controlsReady } = useSectionControls();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [path, setPath] = useState("/");
   const shellAccess = useMemo<ShellAccess>(() => ({ access, controls }), [access, controls]);
   const shell = useMemo<ShellState>(() => ({
-    incomingPath, onPathConsumed, controlsReady,
+    incomingPath, onPathConsumed, controlsReady, counts,
     drawerOpen, path, shellAccess, setDrawerOpen, setPath,
-  }), [controlsReady, drawerOpen, incomingPath, onPathConsumed, path, shellAccess]);
+  }), [controlsReady, counts, drawerOpen, incomingPath, onPathConsumed, path, shellAccess]);
 
   return (
     <ShellContext.Provider value={shell}>

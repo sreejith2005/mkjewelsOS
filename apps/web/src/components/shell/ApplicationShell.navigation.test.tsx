@@ -9,6 +9,7 @@ import type { UserProfile } from "@/types";
 import { ApplicationShell, type ShellNavItem } from "./ApplicationShell";
 
 vi.mock("@/features/notifications/NotificationBell", () => ({ NotificationBell: () => null }));
+vi.mock("@/features/sidebar/useSidebarCounts", () => ({ useSidebarCounts: () => ({ checklist_tasks: 1203 }) }));
 
 const profile: UserProfile = {
   account_status: "active", auth_user_id: "test-auth", branch_id: "test-branch",
@@ -55,7 +56,7 @@ describe("desktop sidebar selection", () => {
     const group = ["reports", "dropdown_master", "settings"].includes(item.id)
       ? "System navigation" : "Primary navigation";
 
-    await user.click(within(screen.getByRole("navigation", { name: group })).getByRole("button", { name: item.label }));
+    await user.click(within(screen.getByRole("navigation", { name: group })).getByRole("button", { name: item.id === "checklist_tasks" ? "Tasks (1203)" : item.label }));
 
     expect(navigate).toHaveBeenCalledExactlyOnceWith(item.path);
     expect(container.querySelector("aside")?.classList.contains("-translate-x-full")).toBe(true);

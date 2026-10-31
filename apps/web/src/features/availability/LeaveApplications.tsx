@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { countLeaveDays, formatLeaveDate, hasPermission, leaveInformStatus, leaveNeedsHandover, leaveSummaryTotals, type LeaveHalf, type ReturnHalf } from "@jewelos/core";
 import { canSubmitLeave, deleteLeaveRequests, editPendingLeave, leaveHandoverCandidates, leaveSummaryApplicants, leaveTypes, listLeaveRequests, reviewLeave, signedLeaveImage, submitHandover, submitLeave, type LeaveDraft, type LeaveRequest } from "@jewelos/data/leave/api";
 import { useAuth } from "@/auth/AuthContext";
+import { loadMyLeaveUpdateIds, markMyLeaveUpdatesRead } from "@jewelos/data/sidebar/api";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { Button, Modal, Notice } from "@/components/ui";
 
@@ -28,6 +29,13 @@ export function LeaveApplications() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [deleteIds, setDeleteIds] = useState<string[] | null>(null);
   const [canApply, setCanApply] = useState<boolean | null>(null);
+  const [readSnapshot, setReadSnapshot] = useState<{ profileId: string; notificationIds: string[]; leaveIds: string[] } | null>(null);
+  const [pageVisible, setPageVisible] = useState(() => document.visibilityState === "visible");
+  useEffect(() => {
+    const updateVisibility = () => setPageVisible(document.visibilityState === "visible");
+    document.addEventListener("visibilitychange", updateVisibility);
+    return () => document.removeEventListener("visibilitychange", updateVisibility);
+  }, []);
   const [tab, setTab] = useState<Tab>("apply");
   const [types, setTypes] = useState<Array<{ value: string; label: string }>>([]);
   const [applicants, setApplicants] = useState<Array<{ id: string; employee_name: string }>>([]);
@@ -54,6 +62,7 @@ export function LeaveApplications() {
   const load = useCallback(async () => {
     if (!profile) return;
     try {
+      const notificationIds = await loadMyLeaveUpdateIds().catch(() => []);
       const [summaryRows, reviewRows, nextTypes, nextPeople, applicantEligible, nextApplicants] = await Promise.all([
         listLeaveRequests(canViewOffice ? undefined : profile.id), canReview && !canViewOffice ? listLeaveRequests(undefined, "pending") : Promise.resolve([]),
         leaveTypes(), leaveHandoverCandidates(), canSubmitLeave(), canViewOffice ? leaveSummaryApplicants() : Promise.resolve([]),
@@ -62,10 +71,17 @@ export function LeaveApplications() {
       setSelectedIds((current) => current.filter((id) => summaryRows.some((row) => row.id === id)));
       setTypes(nextTypes); setPeople(nextPeople); setApplicants(nextApplicants);
       setCanApply(applicantEligible);
+      setReadSnapshot({ profileId: profile.id, notificationIds, leaveIds: summaryRows.filter((row) => row.applicant_id === profile.id).map((row) => row.id) });
       if (!applicantEligible) setTab((current) => current === "apply" ? (canViewOffice ? "history" : canReview ? "review" : "history") : current);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to load leave requests"); }
   }, [canReview, canViewOffice, profile]);
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    // Only the displayed history snapshot is read; newer arrivals remain unread.
+    if (pageVisible && document.visibilityState === "visible" && tab === "history" && profile && readSnapshot?.profileId === profile.id && readSnapshot.notificationIds.length && readSnapshot.leaveIds.length) {
+      void markMyLeaveUpdatesRead(readSnapshot.notificationIds, readSnapshot.leaveIds).catch(() => {});
+    }
+  }, [pageVisible, readSnapshot, tab, profile?.id]);
   useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["organization", "tasks"], refresh: load });
   // Fill handover must visibly open the form, which sits below the pending list.
   useEffect(() => {

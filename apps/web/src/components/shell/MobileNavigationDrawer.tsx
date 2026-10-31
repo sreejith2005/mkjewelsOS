@@ -4,11 +4,12 @@ import { Button } from "@/components/ui";
 import wordmarkUrl from "@/assets/mk-jewels-wordmark.png";
 import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { sidebarCountLabel, type SidebarCounts, type PageId } from "@jewelos/core";
 
 export type MobileNavigationDrawerItem = Readonly<{
   Icon: ComponentType<{ className?: string }>;
   description: string;
-  id: string;
+  id: PageId;
   label: string;
   path: string;
 }>;
@@ -21,6 +22,7 @@ export function NavCountBadge({ count, label }: { count: number | undefined; lab
 
 export function MobileNavigationDrawer({
   badges,
+  counts = {},
   branchName,
   currentPath,
   items,
@@ -32,6 +34,7 @@ export function MobileNavigationDrawer({
 }: {
   /** Counts shown next to items, by item id. */
   badges?: Readonly<Record<string, number>> | undefined;
+  counts?: SidebarCounts;
   branchName: string;
   currentPath: string;
   items: readonly MobileNavigationDrawerItem[];
@@ -126,7 +129,7 @@ export function MobileNavigationDrawer({
                 >
                   <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl transition-colors", selected ? "bg-gold-sheen text-on-gold shadow-gold" : "bg-task-muted text-task-text-muted group-hover:text-gold-secondary")}><Icon className="size-5" /></span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold">{label}</span>
+                    <span className="block truncate text-sm font-semibold">{sidebarCountLabel(label, counts[id])}</span>
                     <span className="block truncate text-xs text-task-text-muted">{description}</span>
                   </span>
                   <NavCountBadge count={badges?.[id]} label="open questions for you" />

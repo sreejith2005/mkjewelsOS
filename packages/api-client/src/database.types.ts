@@ -13167,6 +13167,9 @@ export type Database = {
       get_dashboard_metrics: { Args: { p_context?: Json }; Returns: Json }
       get_employee_task_progress: { Args: { p_context?: Json }; Returns: Json }
       get_form_upload_path: { Args: { p_file_id: string }; Returns: string }
+      get_my_sidebar_counts: { Args: Record<PropertyKey, never>; Returns: Json }
+      get_my_leave_update_ids: { Args: Record<PropertyKey, never>; Returns: string[] }
+      mark_my_leave_updates_read: { Args: { p_notification_ids: string[]; p_leave_ids: string[] }; Returns: number }
       get_home_summary: { Args: { p_context?: Json }; Returns: Json }
       get_kiara_document: { Args: { p_id: string }; Returns: Json }
       get_kiara_escalation_badge: { Args: never; Returns: number }
@@ -13681,6 +13684,7 @@ export type Database = {
         Returns: Json
       }
       purge_kiara_conversations: { Args: never; Returns: Json }
+      progress_fms_initial_form_internal: { Args: { p_instance_stage_id: string }; Returns: undefined }
       queue_fms_starter_assignments: {
         Args: { p_assigned_by: string; p_flow_id: string }
         Returns: undefined

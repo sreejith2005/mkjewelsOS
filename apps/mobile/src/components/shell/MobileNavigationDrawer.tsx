@@ -4,11 +4,12 @@ import { LogOut, X, type LucideIcon } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { sidebarCountLabel, type SidebarCounts, type PageId } from "@jewelos/core";
 
 export type MobileNavigationDrawerItem = Readonly<{
   Icon: LucideIcon;
   description: string;
-  id: string;
+  id: PageId;
   label: string;
   path: string;
 }>;
@@ -25,6 +26,7 @@ export function NavCountBadge({ count, label }: { count: number | undefined; lab
 
 export function MobileNavigationDrawer({
   badges,
+  counts = {},
   branchName,
   currentPath,
   items,
@@ -37,6 +39,7 @@ export function MobileNavigationDrawer({
 }: {
   /** Counts shown on entries, by page id. */
   badges?: Readonly<Record<string, number>> | undefined;
+  counts?: SidebarCounts;
   branchName: string;
   currentPath: string;
   items: readonly MobileNavigationDrawerItem[];
@@ -80,7 +83,7 @@ export function MobileNavigationDrawer({
               return (
                 <Pressable
                   accessibilityHint={description}
-                  accessibilityLabel={label}
+                  accessibilityLabel={sidebarCountLabel(label, counts[id])}
                   accessibilityRole="button"
                   accessibilityState={{ selected }}
                   className={cn("min-h-14 flex-row items-center gap-3 rounded-xl px-3 py-2 active:bg-task-muted", selected ? "bg-task-accent-soft" : "")}
@@ -91,7 +94,7 @@ export function MobileNavigationDrawer({
                     <Icon className={selected ? "text-task-bg" : "text-task-text-muted"} size={20} />
                   </View>
                   <View className="min-w-0 flex-1">
-                    <Text className={cn("text-sm font-semibold", selected ? "text-task-accent" : "text-task-text")} numberOfLines={1}>{label}</Text>
+                    <Text className={cn("text-sm font-semibold", selected ? "text-task-accent" : "text-task-text")} numberOfLines={1}>{sidebarCountLabel(label, counts[id])}</Text>
                     <Text className="text-xs text-task-text-muted" numberOfLines={1}>{description}</Text>
                   </View>
                   <NavCountBadge count={badges?.[id]} label="open questions for you" />

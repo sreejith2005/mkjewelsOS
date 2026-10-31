@@ -1,5 +1,5 @@
 ﻿// @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LeaveApplications } from "./LeaveApplications";
 
@@ -16,8 +16,11 @@ const api = vi.hoisted(() => ({
   listLeaveRequests: vi.fn(), deleteLeaveRequests: vi.fn(), reviewLeave: vi.fn(), signedLeaveImage: vi.fn(), submitHandover: vi.fn(), submitLeave: vi.fn(),
 }));
 const actor = vi.hoisted(() => ({ role: "staff" as "staff" | "super_admin" }));
+const sidebarApi = vi.hoisted(() => ({ markMyLeaveUpdatesRead: vi.fn().mockResolvedValue(1), loadMyLeaveUpdateIds: vi.fn().mockResolvedValue(["old-update"]) }));
+const realtime = vi.hoisted(() => ({ refresh: undefined as (() => Promise<void>) | undefined }));
+vi.mock("@jewelos/data/sidebar/api", () => sidebarApi);
 vi.mock("@jewelos/data/leave/api", () => api);
-vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealtimeRefresh: vi.fn() }));
+vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealtimeRefresh: ({ refresh }: { refresh: () => Promise<void> }) => { realtime.refresh = refresh; } }));
 vi.mock("@/auth/AuthContext", async () => {
   const { builtinAccessContext } = await vi.importActual<typeof import("@jewelos/core")>("@jewelos/core");
   const staffProfile = { id: "me", tenant_id: "t", employee_name: "Richelle", user_role: "staff" as const };
@@ -29,9 +32,48 @@ vi.mock("@/auth/AuthContext", async () => {
 });
 
 describe("LeaveApplications handover", () => {
-  afterEach(cleanup);
+  it("keeps a background-loaded history snapshot unread until the page becomes visible", async () => {
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    render(<LeaveApplications />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Leave summary" }));
+    await waitFor(() => expect(api.listLeaveRequests).toHaveBeenCalledTimes(2));
+    expect(sidebarApi.markMyLeaveUpdatesRead).not.toHaveBeenCalled();
+    visibility.mockReturnValue("visible");
+    fireEvent(document, new Event("visibilitychange"));
+    await waitFor(() => expect(sidebarApi.markMyLeaveUpdatesRead).toHaveBeenCalledWith(["old-update"], ["one", "two"]));
+    visibility.mockRestore();
+  });
+  it("keeps updates unread on Apply and acknowledges only a visible loaded history snapshot", async () => {
+    render(<LeaveApplications />);
+    await screen.findByRole("tab", { name: "Leave summary" });
+    expect(sidebarApi.markMyLeaveUpdatesRead).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("tab", { name: "Leave summary" }));
+    await waitFor(() => expect(sidebarApi.markMyLeaveUpdatesRead).toHaveBeenCalledWith(["old-update"], ["one", "two"]));
+    expect(sidebarApi.loadMyLeaveUpdateIds.mock.invocationCallOrder[0]).toBeLessThan(api.listLeaveRequests.mock.invocationCallOrder[0]!);
+  });
+  it("acknowledges new successful snapshots while history remains open without a reload loop", async () => {
+    render(<LeaveApplications />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Leave summary" }));
+    await waitFor(() => expect(sidebarApi.markMyLeaveUpdatesRead).toHaveBeenCalled());
+    sidebarApi.markMyLeaveUpdatesRead.mockClear();
+    sidebarApi.loadMyLeaveUpdateIds.mockResolvedValueOnce(["new-update"]);
+    await act(async () => { await realtime.refresh?.(); });
+    await waitFor(() => expect(sidebarApi.markMyLeaveUpdatesRead).toHaveBeenCalledExactlyOnceWith(["new-update"], ["one", "two"]));
+    sidebarApi.markMyLeaveUpdatesRead.mockClear();
+    api.listLeaveRequests.mockRejectedValueOnce(new Error("Reload failed"));
+    await act(async () => { await realtime.refresh?.(); });
+    expect(sidebarApi.markMyLeaveUpdatesRead).not.toHaveBeenCalled();
+  });
+  it("does not acknowledge unread status updates when leave loading fails", async () => {
+    api.listLeaveRequests.mockRejectedValueOnce(new Error("Leave data unavailable"));
+    render(<LeaveApplications />);
+    expect(await screen.findByText("Leave data unavailable")).toBeTruthy();
+    expect(sidebarApi.markMyLeaveUpdatesRead).not.toHaveBeenCalled();
+  });
+  afterEach(() => { cleanup(); vi.restoreAllMocks(); });
   beforeEach(() => {
     vi.clearAllMocks();
+    sidebarApi.loadMyLeaveUpdateIds.mockResolvedValue(["old-update"]);
     actor.role = "staff";
     Element.prototype.scrollIntoView = vi.fn();
     api.canSubmitLeave.mockResolvedValue(true);

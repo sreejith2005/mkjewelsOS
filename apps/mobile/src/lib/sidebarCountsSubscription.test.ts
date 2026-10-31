@@ -1,0 +1,31 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+const mocks = vi.hoisted(() => ({ load: vi.fn(), tenant: vi.fn(), inbox: vi.fn(), availability: vi.fn() }));
+vi.mock("@jewelos/data/sidebar/api", () => ({ loadMySidebarCounts: mocks.load }));
+vi.mock("@jewelos/data/realtime/api", () => ({ subscribeToTenantRealtime: mocks.tenant }));
+vi.mock("@jewelos/data/notifications/api", () => ({ subscribeToInbox: mocks.inbox }));
+vi.mock("./useTenantRealtimeRefresh", () => ({ subscribeAppAvailability: mocks.availability }));
+import { subscribeSidebarCounts } from "./sidebarCountsSubscription";
+afterEach(() => { vi.useRealTimers(); vi.resetAllMocks(); });
+describe("native sidebar lifecycle", () => {
+  it("refreshes work and read counts and catches up after reconnect without background requests", async () => {
+    vi.useFakeTimers();
+    let work: () => void = () => {}; let inbox: () => void = () => {}; let available: (active: boolean) => void = () => {};
+    const stopWork = vi.fn(); const stopInbox = vi.fn(); const stopAvailability = vi.fn();
+    mocks.tenant.mockImplementation((_id, _topics, listener) => { work = listener; return stopWork; });
+    mocks.inbox.mockImplementation((_id, listener) => { inbox = listener; return stopInbox; });
+    mocks.availability.mockImplementation((listener) => { available = listener; listener(true); return stopAvailability; });
+    mocks.load.mockResolvedValue({ checklist_tasks: 1203, notifications: 701 });
+    const update = vi.fn();
+    const stop = subscribeSidebarCounts("profile", "tenant", update);
+    await vi.advanceTimersByTimeAsync(400);
+    expect(update).toHaveBeenLastCalledWith({ checklist_tasks: 1203, notifications: 701 });
+    mocks.load.mockResolvedValue({ checklist_tasks: 1202, notifications: 0 });
+    work(); inbox(); await vi.advanceTimersByTimeAsync(400);
+    expect(update).toHaveBeenLastCalledWith({ checklist_tasks: 1202, notifications: 0 });
+    available(false); mocks.load.mockClear(); work(); await vi.advanceTimersByTimeAsync(400);
+    expect(mocks.load).not.toHaveBeenCalled();
+    available(true); await vi.advanceTimersByTimeAsync(400);
+    expect(mocks.load).toHaveBeenCalledOnce();
+    stop(); expect(stopWork).toHaveBeenCalledOnce(); expect(stopInbox).toHaveBeenCalledOnce(); expect(stopAvailability).toHaveBeenCalledOnce();
+  });
+});

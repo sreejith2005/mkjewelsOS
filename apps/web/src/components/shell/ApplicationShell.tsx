@@ -1,6 +1,7 @@
 import type { ComponentType, ReactNode } from "react";
 import { Menu, PanelLeftClose } from "lucide-react";
-import type { PageId } from "@jewelos/core";
+import { sidebarCountLabel, type PageId } from "@jewelos/core";
+import { useSidebarCounts } from "@/features/sidebar/useSidebarCounts";
 import { Button } from "@/components/ui";
 import { initials, titleCase } from "@/lib/format";
 import type { Branch, UserProfile } from "@/types";
@@ -77,6 +78,7 @@ export function ApplicationShell({
   fullBleed?: boolean;
 }) {
   const sidebarNavigation = getSidebarNavigation(nav);
+  const counts = useSidebarCounts(profile.id, profile.tenant_id);
   const navigateFromSidebar = (destination: string) => {
     navigate(destination);
     setSidebarOpen(false);
@@ -109,7 +111,7 @@ export function ApplicationShell({
           <span className="hidden items-center gap-2 rounded-full border border-task-border bg-task-muted/60 px-3 py-1.5 text-xs font-medium text-champagne lg:inline-flex"><span aria-hidden className="size-1.5 rounded-full bg-success" />{branch?.name ?? "Branch unavailable"}</span>
           {developerModeControl}
           <ThemeToggle onChange={onThemeChange} theme={theme} />
-          <NotificationBell onNavigate={navigate} profileId={profile.id} />
+          <NotificationBell onNavigate={navigate} profileId={profile.id} unreadCount={counts.notifications} />
           <span aria-label={profile.employee_name} className="flex size-9 items-center justify-center rounded-full bg-gold-sheen text-xs font-bold tracking-wide text-on-gold shadow-gold ring-2 ring-task-bg md:size-10 md:text-sm" role="img">
             {initials(profile.employee_name)}
           </span>
@@ -136,7 +138,7 @@ export function ApplicationShell({
               onClick={() => navigateFromSidebar(item.path)}
               type="button"
             >
-              <Icon className={sidebarIconClass(currentPage === item.id)} />{item.label}
+              <Icon className={sidebarIconClass(currentPage === item.id)} />{sidebarCountLabel(item.label, counts[item.id])}
               <NavCountBadge count={badges?.[item.id]} label="open questions for you" />
             </button>
           ))}
@@ -151,7 +153,7 @@ export function ApplicationShell({
               onClick={() => navigateFromSidebar(item.path)}
               type="button"
             >
-              <Icon className={sidebarIconClass(currentPage === item.id)} />{item.label}
+              <Icon className={sidebarIconClass(currentPage === item.id)} />{sidebarCountLabel(item.label, counts[item.id])}
             </button>
           ))}
         </nav> : null}
@@ -162,8 +164,8 @@ export function ApplicationShell({
         <div className={cn(fullBleed ? "w-full p-4 sm:p-6 [&>section]:max-w-none [&>section]:mx-0" : "mx-auto max-w-7xl p-4 sm:p-6")}>{children}</div>
       </main>
 
-      <MobileBottomNav menuOpen={drawerOpen} onNavigate={navigate} onOpenMenu={() => onDrawerOpenChange(true)} path={path} />
-      {drawerOpen ? <MobileNavigationDrawer badges={badges} branchName={branch?.name ?? "Branch unavailable"} currentPath={path} items={launcherItems} onClose={() => onDrawerOpenChange(false)} onLogout={onLogout} onNavigate={navigate} profileName={profile.employee_name} roleLabel={titleCase(profile.user_role)} /> : null}
+      <MobileBottomNav taskCount={counts.checklist_tasks} menuOpen={drawerOpen} onNavigate={navigate} onOpenMenu={() => onDrawerOpenChange(true)} path={path} />
+      {drawerOpen ? <MobileNavigationDrawer counts={counts} badges={badges} branchName={branch?.name ?? "Branch unavailable"} currentPath={path} items={launcherItems} onClose={() => onDrawerOpenChange(false)} onLogout={onLogout} onNavigate={navigate} profileName={profile.employee_name} roleLabel={titleCase(profile.user_role)} /> : null}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CheckCircle2, Home } from "lucide-react-native";
 import { cn } from "@/lib/utils";
 import { isTaskPath } from "@/navigation/shellModel";
+import { sidebarCountLabel } from "@jewelos/core";
 
 /**
  * A verbatim port of `apps/web/src/components/shell/MobileBottomNav.tsx`.
@@ -22,9 +23,10 @@ import { isTaskPath } from "@/navigation/shellModel";
 type MobileBottomNavProps = {
   onNavigate: (path: string) => void;
   path: string;
+  taskCount?: number | undefined;
 };
 
-export function MobileBottomNav({ onNavigate, path }: MobileBottomNavProps) {
+export function MobileBottomNav({ onNavigate, path, taskCount }: MobileBottomNavProps) {
   const insets = useSafeAreaInsets();
 
   const destinations = [
@@ -44,7 +46,7 @@ export function MobileBottomNav({ onNavigate, path }: MobileBottomNavProps) {
       <View className="mx-auto w-full max-w-lg flex-row gap-1 px-2 py-1.5">
         {destinations.map(({ icon: Icon, label, onSelect, selected }) => (
           <Pressable
-            accessibilityLabel={label}
+            accessibilityLabel={sidebarCountLabel(label, label === "Tasks" ? taskCount : undefined)}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             className={cn(
@@ -65,7 +67,7 @@ export function MobileBottomNav({ onNavigate, path }: MobileBottomNavProps) {
                 selected ? "text-task-accent" : "text-task-text-muted",
               )}
             >
-              {label}
+              {sidebarCountLabel(label, label === "Tasks" ? taskCount : undefined)}
             </Text>
           </Pressable>
         ))}
