@@ -338,7 +338,7 @@ Automated proof: `supabase/functions/ask-kiara/eval.local.ts` (per-role eval on 
 - [ ] Exercise Forms create/edit/publish/revise/archive/duplicate/publish-as-new/delete-impact, fill, immutable deleted-form submission, signed file answer, and approve/reject for reviewer and read-only roles.
 - [ ] Filter Dropdown Master by all/active/inactive and deactivate/reactivate an item without changing its stable value.
 - [ ] Switch Users between list and organization views; apply search/status/branch/department filters and confirm missing-manager/cycle warnings do not freeze the UI.
-- [ ] Repeat portrait, landscape, compact height, keyboard-open, large-font, light/dark, safe-area, Android Back, offline/retry, and pull-to-refresh checks for every row in `MOBILE_PARITY_MATRIX.md`.
+- [ ] Repeat portrait, landscape, compact height, keyboard-open, large-font, light/dark, safe-area, Android Back, offline/retry, and pull-to-refresh checks on Home, Tasks, FMS, Forms, CRM, and Settings inside the Android shell.
 # Tasks -> FMS workspace (2026-10-20)
 
 - Verify ordinary recurring, delegated and watched tasks retain their sections;
