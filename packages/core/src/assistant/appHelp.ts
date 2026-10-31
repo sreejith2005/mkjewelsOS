@@ -30,7 +30,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     recipes: [
       "See today's work: open Home from the menu. Overdue items are listed first.",
       "See the team's day (leaders): the \"Team today\" section shows Assigned, Done, Pending and Overdue for today. With no tasks of your own, the top card shows \"Team completion today\". Tap a person under \"Needs follow-up\" to open their tasks in Task Control.",
-      "On mobile, My Tasks and FMS Tasks start collapsed with a pending count. Tap either heading to expand its work, then tap a task or stage to open it. Desktop starts expanded.",
+      "See your work by type: under \"Your work\" Home shows three cards, Daily Checklist (routine duties), My Tasks (work assigned to you) and FMS Tasks (workflow steps and start forms), each with a count and how many are overdue. On a phone, swipe between the cards or tap Checklist, My Tasks or FMS at the top; a red dot means that card has overdue work. Tap a task to open it directly, or press \"Open all tasks\" / \"Open FMS tasks\" at the bottom of a card for the full list. On a computer the three cards sit side by side.",
       "Fill a form linked to a task: use the form item on Home; it opens the exact form for that task.",
     ],
   },
