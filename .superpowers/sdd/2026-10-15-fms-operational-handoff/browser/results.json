@@ -1,0 +1,30 @@
+{
+  "synthetic": true,
+  "localOnly": true,
+  "checks": [
+    "task card replaces generic metadata with previous answers",
+    "Home and notification links open details first",
+    "viewing details does not complete stage",
+    "complete initial form questions and answers",
+    "direct link opens details before current form",
+    "context desktop and phone rendering",
+    "private mapped attachment upload/sign/download",
+    "phone preview writes nothing",
+    "cancel preserves answers",
+    "eligible replacement",
+    "atomic successor ownership",
+    "one saved submission",
+    "concurrent idempotent retry race",
+    "guided builder and canvas phone/desktop",
+    "simulation writes no work",
+    "clear committed outcome and next employee",
+    "same-person exact next-stage continuation with previous answers",
+    "no other-owner redirect",
+    "phone overflow",
+    "no runtime errors"
+  ],
+  "viewports": [
+    "390x844",
+    "1440x900"
+  ]
+}

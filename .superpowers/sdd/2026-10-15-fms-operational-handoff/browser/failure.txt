@@ -1,0 +1,166 @@
+Main
+Developer Mode · 1 off
+Dark mode
+EA
+
+Employee A
+
+SUPER ADMIN
+
+WORKSPACE
+
+Home
+Dashboard
+CRM
+Tasks
+Recurring / To-Do
+Task Control
+FMS
+Forms Library
+Availability
+Ask Kiara
+Users
+
+SYSTEM
+
+Reports
+Dropdown Master
+Settings
+
+JEWELOS · MK JEWELS
+
+Back to FMS
+Back
+Jewellery enquiry
+
+Draft saved
+
+Check workflow
+Save draft
+Publish
+
+BUILDING BLOCKS
+
+Add Step
+Create the next general workflow step
+
+PROCESS FORM
+
+Visit completion
+Configure the initial details form
+
+DEFAULT ASSIGNEES
+
+6/6 assigned
+Pre-assign users after building the flow
+
+The initial Form starts the workflow. The final unconnected step completes it.
+
+Guided Mode
+Canvas Mode
+Simulate workflow
+1
+FORM
+Starts here
+Initial
+Pinned form · No deadline
+Call
+Add step here
+2
+STEP
+Call
+Pinned form · No deadline
+Demo
+Add step here
+3
+STEP
+Demo
+Pinned form · No deadline
+Negotiation
+Add step here
+4
+STEP
+Negotiation
+Pinned form · No deadline
+Finish
+Add step here
+5
+STEP
+Finish
+specific user · No deadline
+Locked
+Add step here
+6
+STEP
+Locked
+Completes workflow · No deadline
+Completes here
+Add step here
+
+form
+
+Initial
+
+The workflow draft is saved before opening Forms. Returning keeps this step and its pinned version.
+
+Create New Form
+Preview Form
+Open Form Builder
+View Published Version
+STEP DETAILS
+STEP NAME
+STEP TYPE
+
+A normal step is completed once. A decision step records one configured outcome.
+
+Normal step (Done)
+Complete and continue
+Decision step
+Choose a configured path when completing
+
+The first step collects the initial form, so it remains a normal step.
+
+LINKED FORM
+
+The first step uses this form to collect the workflow’s initial details.
+
+Select the initial Form
+Visit completion · v1
+ON COMPLETION
+
+This step continues to one next step. Add a condition to send different answers down different paths.
+
+Add route
+CONTINUE TO
+Complete workflow here
+Initial
+Call
+Demo
+Negotiation
+Finish
+Locked
+WHEN
+
+Choose how this step’s deadline is calculated.
+
+Completion date
+Complete by the selected calendar date.
+TAT (hours)
+Working target measured from an earlier step.
+Days before date
+Due a fixed number of days before a future date.
+Specific clock time
+Due on a selected date at a selected time.
+Set Deadline: OFF
+
+No deadline will be created for this step.
+
+How / instructions (optional)
+Completion controls
+Technical details
+
+This Form is the workflow trigger. It can be reconfigured but not removed.
+
+Publish readiness
+
+Ready to publish

@@ -1,0 +1,317 @@
+[
+  {
+    "path": "/auth/v1/token",
+    "method": "POST",
+    "startedAt": 1792236170160,
+    "status": 200,
+    "elapsedMs": 2196
+  },
+  {
+    "path": "/rest/v1/user_profiles",
+    "method": "GET",
+    "startedAt": 1792236170161,
+    "status": 200,
+    "elapsedMs": 1301
+  },
+  {
+    "path": "/rest/v1/rpc/get_my_access_context",
+    "method": "POST",
+    "startedAt": 1792236171471,
+    "status": 200,
+    "elapsedMs": 224
+  },
+  {
+    "path": "/rest/v1/branches",
+    "method": "GET",
+    "startedAt": 1792236171698,
+    "status": 200,
+    "elapsedMs": 174
+  },
+  {
+    "path": "/rest/v1/user_preferences",
+    "method": "GET",
+    "startedAt": 1792236171882,
+    "status": 200,
+    "elapsedMs": 184
+  },
+  {
+    "path": "/rest/v1/notifications",
+    "method": "GET",
+    "startedAt": 1792236172131,
+    "status": 200,
+    "elapsedMs": 1041
+  },
+  {
+    "path": "/rest/v1/rpc/get_my_daily_checklist_status",
+    "method": "POST",
+    "startedAt": 1792236172132,
+    "status": 200,
+    "elapsedMs": 912
+  },
+  {
+    "path": "/rest/v1/rpc/get_section_availability",
+    "method": "POST",
+    "startedAt": 1792236172133,
+    "status": 200,
+    "elapsedMs": 1194
+  },
+  {
+    "path": "/rest/v1/rpc/get_my_daily_checklist_status",
+    "method": "POST",
+    "startedAt": 1792236172143,
+    "status": 200,
+    "elapsedMs": 798
+  },
+  {
+    "path": "/rest/v1/rpc/get_section_availability",
+    "method": "POST",
+    "startedAt": 1792236172161,
+    "status": 200,
+    "elapsedMs": 1011
+  },
+  {
+    "path": "/rest/v1/notifications",
+    "method": "GET",
+    "startedAt": 1792236172182,
+    "status": 200,
+    "elapsedMs": 449
+  },
+  {
+    "path": "/rest/v1/user_profiles",
+    "method": "GET",
+    "startedAt": 1792236172375,
+    "status": 200,
+    "elapsedMs": 916
+  },
+  {
+    "path": "/rest/v1/user_profiles",
+    "method": "GET",
+    "startedAt": 1792236172377,
+    "status": 200,
+    "elapsedMs": 870
+  },
+  {
+    "path": "/rest/v1/rpc/get_my_access_context",
+    "method": "POST",
+    "startedAt": 1792236173327,
+    "status": 200,
+    "elapsedMs": 456
+  },
+  {
+    "path": "/rest/v1/branches",
+    "method": "GET",
+    "startedAt": 1792236173844,
+    "status": 200,
+    "elapsedMs": 322
+  },
+  {
+    "path": "/rest/v1/user_preferences",
+    "method": "GET",
+    "startedAt": 1792236174267,
+    "status": 200,
+    "elapsedMs": 262
+  },
+  {
+    "path": "/rest/v1/rpc/get_fms_assigned_stage",
+    "method": "POST",
+    "startedAt": 1792236174456,
+    "status": 200,
+    "elapsedMs": 2047
+  },
+  {
+    "path": "/rest/v1/v_task_users",
+    "method": "GET",
+    "startedAt": 1792236174475,
+    "status": 200,
+    "elapsedMs": 255
+  },
+  {
+    "path": "/rest/v1/dropdown_masters",
+    "method": "GET",
+    "startedAt": 1792236174477,
+    "status": 200,
+    "elapsedMs": 174
+  },
+  {
+    "path": "/rest/v1/branches",
+    "method": "GET",
+    "startedAt": 1792236174478,
+    "status": 200,
+    "elapsedMs": 1206
+  },
+  {
+    "path": "/rest/v1/departments",
+    "method": "GET",
+    "startedAt": 1792236174478,
+    "status": 200,
+    "elapsedMs": 862
+  },
+  {
+    "path": "/rest/v1/rpc/get_fms_assigned_stage",
+    "method": "POST",
+    "startedAt": 1792236174479,
+    "status": 200,
+    "elapsedMs": 1387
+  },
+  {
+    "path": "/rest/v1/v_task_users",
+    "method": "GET",
+    "startedAt": 1792236174487,
+    "status": 200,
+    "elapsedMs": 228
+  },
+  {
+    "path": "/rest/v1/branches",
+    "method": "GET",
+    "startedAt": 1792236174501,
+    "status": 200,
+    "elapsedMs": 875
+  },
+  {
+    "path": "/rest/v1/departments",
+    "method": "GET",
+    "startedAt": 1792236174518,
+    "status": 200,
+    "elapsedMs": 326
+  },
+  {
+    "path": "/rest/v1/form_templates",
+    "method": "GET",
+    "startedAt": 1792236175874,
+    "status": 200,
+    "elapsedMs": 1592
+  },
+  {
+    "path": "/rest/v1/form_fields",
+    "method": "GET",
+    "startedAt": 1792236175881,
+    "status": 200,
+    "elapsedMs": 2880
+  },
+  {
+    "path": "/rest/v1/form_templates",
+    "method": "GET",
+    "startedAt": 1792236176512,
+    "status": 200,
+    "elapsedMs": 720
+  },
+  {
+    "path": "/rest/v1/form_fields",
+    "method": "GET",
+    "startedAt": 1792236176513,
+    "status": 200,
+    "elapsedMs": 1083
+  },
+  {
+    "path": "/rest/v1/rpc/get_fms_assigned_work_context",
+    "method": "POST",
+    "startedAt": 1792236177697,
+    "status": 200,
+    "elapsedMs": 1426
+  },
+  {
+    "path": "/rest/v1/rpc/get_fms_assigned_work_context",
+    "method": "POST",
+    "startedAt": 1792236177698,
+    "status": 200,
+    "elapsedMs": 953
+  },
+  {
+    "path": "/rest/v1/rpc/get_fms_work_mutation_result",
+    "method": "POST",
+    "startedAt": 1792236178724,
+    "status": 200,
+    "elapsedMs": 576
+  },
+  {
+    "path": "/rest/v1/rpc/preview_fms_work_transition",
+    "method": "POST",
+    "startedAt": 1792236179331,
+    "status": 200,
+    "elapsedMs": 2060
+  },
+  {
+    "path": "/rest/v1/rpc/get_fms_work_mutation_result",
+    "method": "POST",
+    "startedAt": 1792236182695,
+    "status": 200,
+    "elapsedMs": 335
+  },
+  {
+    "path": "/rest/v1/rpc/preview_fms_work_transition",
+    "method": "POST",
+    "startedAt": 1792236183034,
+    "status": 200,
+    "elapsedMs": 2693
+  },
+  {
+    "path": "/rest/v1/rpc/list_fms_handoff_recipients",
+    "method": "POST",
+    "startedAt": 1792236186849,
+    "status": 200,
+    "elapsedMs": 999
+  },
+  {
+    "path": "/rest/v1/rpc/preview_fms_work_transition",
+    "method": "POST",
+    "startedAt": 1792236188226,
+    "status": 200,
+    "elapsedMs": 3024
+  },
+  {
+    "path": "/rest/v1/rpc/transition_fms_work_with_audit",
+    "method": "POST",
+    "startedAt": 1792236191643,
+    "status": 200,
+    "elapsedMs": 2775
+  },
+  {
+    "path": "/rest/v1/rpc/get_fms_assigned_stage",
+    "method": "POST",
+    "startedAt": 1792236194434,
+    "status": 200,
+    "elapsedMs": 347
+  },
+  {
+    "path": "/rest/v1/v_task_users",
+    "method": "GET",
+    "startedAt": 1792236194471,
+    "status": 200,
+    "elapsedMs": 245
+  },
+  {
+    "path": "/rest/v1/dropdown_masters",
+    "method": "GET",
+    "startedAt": 1792236194488,
+    "status": 200,
+    "elapsedMs": 228
+  },
+  {
+    "path": "/rest/v1/branches",
+    "method": "GET",
+    "startedAt": 1792236194489,
+    "status": 200,
+    "elapsedMs": 523
+  },
+  {
+    "path": "/rest/v1/departments",
+    "method": "GET",
+    "startedAt": 1792236194500,
+    "status": 200,
+    "elapsedMs": 512
+  },
+  {
+    "path": "/rest/v1/form_templates",
+    "method": "GET",
+    "startedAt": 1792236195055,
+    "status": 200,
+    "elapsedMs": 1550
+  },
+  {
+    "path": "/rest/v1/form_fields",
+    "method": "GET",
+    "startedAt": 1792236195057,
+    "status": 200,
+    "elapsedMs": 2222
+  }
+]
