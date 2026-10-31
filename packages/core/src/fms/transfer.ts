@@ -1,5 +1,5 @@
 import { fmsOutgoingStageKeys } from "./engine.ts";
-import { FMS_ASSIGNEE_TYPES, FMS_AUTHORING_STAGE_TYPES, FMS_BRANCH_OPERATORS, type FmsAssigneeRule, type FmsBranchRule, type FmsFlowDefinition, type FmsSlaRule, type FmsStageDefinition } from "./types.ts";
+import { FMS_ASSIGNEE_TYPES, FMS_AUTHORING_STAGE_TYPES, FMS_TERMINAL_OUTCOMES, FMS_BRANCH_OPERATORS, type FmsAssigneeRule, type FmsBranchRule, type FmsFlowDefinition, type FmsSlaRule, type FmsStageDefinition } from "./types.ts";
 import { FMS_ASSIGNMENT_MODES, type FmsAssignmentConfig, type FmsAssignmentSource, type FmsTaskDisplay } from "./workContracts.ts";
 
 /**
@@ -181,7 +181,7 @@ function parseBranchRule(raw: unknown, path: string): FmsBranchRule {
   };
 }
 
-const SLA_KEYS = ["pipelineName", "assignment", "completionFormRequired", "taskDisplay", "followUp", "assignmentFieldKey", "formSectionKey", "questionnaire", "timingMethod", "deadlineEnabled", "dueDate", "tatHours", "tatMinutes", "tatUnit", "futureDate", "daysBefore", "clockTime", "triggerStageKey", "decisionMode", "decisionOptions", "conditional"] as const;
+const SLA_KEYS = ["pipelineName", "assignment", "completionFormRequired", "taskDisplay", "followUp", "assignmentFieldKey", "formSectionKey", "questionnaire", "timingMethod", "deadlineEnabled", "dueDate", "tatHours", "tatMinutes", "tatUnit", "futureDate", "daysBefore", "clockTime", "triggerStageKey", "decisionMode", "decisionOptions", "conditional", "terminal", "formDue"] as const;
 
 function parseSla(raw: unknown, path: string): FmsSlaRule {
   if (raw === undefined || raw === null) return { dueDate: "" };
@@ -192,6 +192,18 @@ function parseSla(raw: unknown, path: string): FmsSlaRule {
   for (const key of ["completionFormRequired", "deadlineEnabled"] as const) if (raw[key] !== undefined) sla[key] = boolValue(raw[key], `${path}.${key}`);
   for (const key of ["tatHours", "tatMinutes", "daysBefore"] as const) if (raw[key] !== undefined) sla[key] = numberValue(raw[key], `${path}.${key}`);
   if (raw.timingMethod !== undefined) sla.timingMethod = oneOf(raw.timingMethod, ["completion_date", "tat_hours", "days_before_date", "specific_time"] as const, `${path}.timingMethod`);
+  if (raw.formDue !== undefined) {
+    if (!isRecord(raw.formDue)) fail(`${path}.formDue`, "must be an object");
+    onlyKeys(raw.formDue, ["sources", "defaultTime", "onMissing"], `${path}.formDue`);
+    const sources = list(raw.formDue.sources ?? [], `${path}.formDue.sources`, 20).map((source, index) => {
+      if (!isRecord(source)) fail(`${path}.formDue.sources[${index}]`, "must be an object");
+      onlyKeys(source, ["stageKey", "dateFieldKey", "timeFieldKey"], `${path}.formDue.sources[${index}]`);
+      const timeFieldKey = textValue(source.timeFieldKey, `${path}.formDue.sources[${index}].timeFieldKey`, 120);
+      return { stageKey: textValue(source.stageKey, `${path}.formDue.sources[${index}].stageKey`, 64, true)!, dateFieldKey: textValue(source.dateFieldKey, `${path}.formDue.sources[${index}].dateFieldKey`, 120) ?? "", ...(timeFieldKey ? { timeFieldKey } : {}) };
+    });
+    const defaultTime = textValue(raw.formDue.defaultTime, `${path}.formDue.defaultTime`, 5);
+    sla.formDue = { sources, onMissing: oneOf(raw.formDue.onMissing ?? "none", ["fallback", "none", "require"] as const, `${path}.formDue.onMissing`), ...(defaultTime ? { defaultTime } : {}) };
+  }
   if (raw.tatUnit !== undefined) sla.tatUnit = oneOf(raw.tatUnit, ["hours", "minutes"] as const, `${path}.tatUnit`);
   if (raw.decisionMode !== undefined) sla.decisionMode = oneOf(raw.decisionMode, ["normal", "yes_no", "decision"] as const, `${path}.decisionMode`);
   if (raw.decisionOptions !== undefined) sla.decisionOptions = list(raw.decisionOptions, `${path}.decisionOptions`, 20).map((option, index) => {
@@ -205,6 +217,13 @@ function parseSla(raw: unknown, path: string): FmsSlaRule {
     onlyKeys(condition, ["decisionStageKey", "decisionOptionKey", "outcome"], `${path}.conditional`);
     const option = textValue(condition.decisionOptionKey ?? condition.outcome, `${path}.conditional.decisionOptionKey`, 64, true)!;
     sla.conditional = { decisionStageKey: textValue(condition.decisionStageKey, `${path}.conditional.decisionStageKey`, 64, true)!, decisionOptionKey: option };
+  }
+  if (raw.terminal !== undefined && raw.terminal !== null) {
+    const terminal = raw.terminal;
+    if (!isRecord(terminal)) fail(`${path}.terminal`, "must be an object");
+    onlyKeys(terminal, ["outcome", "reasonCode"], `${path}.terminal`);
+    const reasonCode = textValue(terminal.reasonCode, `${path}.terminal.reasonCode`, 64);
+    sla.terminal = { outcome: oneOf(terminal.outcome, FMS_TERMINAL_OUTCOMES, `${path}.terminal.outcome`), ...(reasonCode ? { reasonCode } : {}) };
   }
   if (raw.followUp !== undefined && raw.followUp !== null) {
     const followUp = raw.followUp;
@@ -442,6 +461,7 @@ export function pasteFmsFragment(target: FmsFlowDefinition, source: readonly Fms
           ...(!mapKey(sla.followUp.schedule.sourceStageKey) ? { dateFieldKey: undefined, timeFieldKey: undefined } : {}),
         } } } : {}),
         conditional: conditionKey && sla.conditional ? { ...sla.conditional, decisionStageKey: conditionKey } : undefined,
+        ...(sla.formDue ? { formDue: { ...sla.formDue, sources: sla.formDue.sources.flatMap((item) => { const mapped = mapKey(item.stageKey); return mapped ? [{ ...item, stageKey: mapped }] : []; }) } } : {}),
       },
     };
   });
@@ -502,6 +522,7 @@ export function removeFmsStages(stages: readonly FmsStageDefinition[], keys: Ite
         ...(gone(sla.triggerStageKey) ? { triggerStageKey: undefined } : {}),
         ...(sla.conditional && gone(sla.conditional.decisionStageKey) ? { conditional: undefined } : {}),
         ...(sla.assignment ? { assignment: { ...sla.assignment, sources: sla.assignment.sources.filter((item) => !gone(item.sourceStageKey)) } } : {}),
+        ...(sla.formDue ? { formDue: { ...sla.formDue, sources: sla.formDue.sources.filter((item) => !gone(item.stageKey)) } } : {}),
         ...(sla.taskDisplay ? { taskDisplay: { ...sla.taskDisplay, fields: sla.taskDisplay.fields.filter((item) => !gone(item.sourceStageKey)), referenceField: keepSource(sla.taskDisplay.referenceField), recordNaming: sla.taskDisplay.recordNaming?.mode === "field" && gone(sla.taskDisplay.recordNaming.source?.sourceStageKey) ? undefined : sla.taskDisplay.recordNaming } } : {}),
       },
     };

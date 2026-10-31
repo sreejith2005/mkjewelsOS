@@ -8,7 +8,7 @@ do $$declare d text; signature text; name text;begin
  foreach name in array array['normalize_form_rule','normalize_form_fields','normalize_form_sections','form_condition_matches'] loop
   signature:=case name when 'normalize_form_rule' then '(jsonb,text,text[],integer)' when 'normalize_form_fields' then '(jsonb,jsonb)' when 'normalize_form_sections' then '(jsonb)' else '(jsonb,jsonb)' end;
   d:=pg_get_functiondef(('public.'||name||signature)::regprocedure);
-  d:=replace(d,'FUNCTION public.'||name||'(','FUNCTION public.'||name||'_legacy_0358(');
+  d:=replace(d,'FUNCTION public.'||name||'(','FUNCTION public.'||name||'_legacy_0361(');
   execute d;
  end loop;
 end$$;
@@ -152,7 +152,7 @@ begin
    if coalesce(dependency->>'operator','') not in ('is_empty','not_empty') and form_answer_is_empty(p_answers->(dependency->>'fieldKey')) then return false; end if;
   end loop;
  end if;
- result:=coalesce(form_condition_matches_legacy_0358(p_condition-'negate',p_answers),false);
+ result:=coalesce(form_condition_matches_legacy_0361(p_condition-'negate',p_answers),false);
  return case when coalesce((p_condition->>'negate')::boolean,false) then not result else result end;
 end$$;
 
@@ -164,7 +164,7 @@ begin
  if p_depth=1 and (select count(*) from jsonb_path_query(p_rule,'strict $.**.kind') k where k='"predicate"')>20 then raise exception 'A rule can compare at most 20 answers' using errcode='22023'; end if;
  if p_rule->>'kind'='predicate' and p_rule->>'operator' not in ('is_empty','not_empty')
   and (p_rule->'value'='""' or exists(select 1 from jsonb_array_elements(case when jsonb_typeof(p_rule->'value')='array' then p_rule->'value' else '[]' end) v where v='""')) then raise exception 'Rule comparison answer is required' using errcode='22023'; end if;
- result:=normalize_form_rule_legacy_0358(p_rule-'negate',p_field_key,p_earlier,p_depth);
+ result:=normalize_form_rule_legacy_0361(p_rule-'negate',p_field_key,p_earlier,p_depth);
  -- The legacy normalizer collapses singleton groups. Preserve a negated
  -- group's level so its negate never overwrites the child's own negate.
  if result is not null and p_rule->>'kind' in ('all','any') and coalesce((p_rule->>'negate')::boolean,false) then
@@ -198,7 +198,7 @@ begin
  if p_sections is null or p_sections='null' then return '[]'; end if;
  if jsonb_typeof(p_sections)<>'array' then raise exception 'Sections must be an array' using errcode='22023'; end if;
  select coalesce(jsonb_agg(value-array['visibility','rule','next']),'[]') into clean from jsonb_array_elements(p_sections);
- result:=normalize_form_sections_legacy_0358(clean);
+ result:=normalize_form_sections_legacy_0361(clean);
  for item in select value from jsonb_array_elements(p_sections) loop
   if item ? 'visibility' and coalesce(item->>'visibility','') not in ('always','when','unless','routed') then raise exception 'Unsupported section visibility' using errcode='22023'; end if;
   if item->>'visibility' in ('when','unless') and (item->'rule' is null or item->'rule'='null') then raise exception 'Conditional sections require a rule' using errcode='22023'; end if;
@@ -238,7 +238,7 @@ begin
  sections:=normalize_form_sections(p_sections);
  if jsonb_typeof(p_fields) is distinct from 'array' then raise exception 'Fields must be an array' using errcode='22023'; end if;
  select coalesce(jsonb_agg(value-'branches'),'[]') into clean from jsonb_array_elements(p_fields);
- result:=normalize_form_fields_legacy_0358(clean,sections);
+ result:=normalize_form_fields_legacy_0361(clean,sections);
  for item in select value from jsonb_array_elements(p_fields) loop
   select ord::integer-1 into si from jsonb_array_elements(sections) with ordinality e(s,ord) where e.s->>'key'=item->>'sectionKey';
   branches:='[]';
@@ -287,7 +287,7 @@ end$$;
 
 do $$declare p record;begin
  for p in select oid::regprocedure as signature from pg_proc where pronamespace='public'::regnamespace and
- (proname like '%_legacy_0358' or proname in ('form_snapshot_active_path','form_active_field_keys','assert_form_route_target','assert_form_rule_options')) loop
+ (proname like '%_legacy_0361' or proname in ('form_snapshot_active_path','form_active_field_keys','assert_form_route_target','assert_form_rule_options')) loop
   execute format('revoke all on function %s from public,anon,authenticated,service_role',p.signature);
  end loop;
 end$$;

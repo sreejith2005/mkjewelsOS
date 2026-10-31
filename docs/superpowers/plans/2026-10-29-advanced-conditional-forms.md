@@ -33,7 +33,7 @@ Parent: shared form TypeScript engine, builder/renderer/map, help and final veri
 
 The authorized release is based on current `origin/main` at `dcee3bd`, isolated from the original dirty feature checkout. Only advanced routing, scheduling, task scope and workflow hierarchy changes are integrated. Unmerged Forms 2 history/AI-import dependencies are excluded; current main save/publish paths, Other answers, recipient sorting, activated customer integration and the task doer fix are retained.
 
-Migrations are renumbered to `0358_advanced_form_routing.sql` and `0359_advanced_fms_scheduling_task_scope.sql`; deployed migration files are unchanged. Existing `list_fms_built_forms` gains optional author-only exact workflow/stage links, without inferred cross-pairing. The release database report records verification against current main. Earlier implementation evidence below refers to the original checkout and its former local migration numbers.
+Migrations are renumbered to `0361_advanced_form_routing.sql` and `0362_advanced_fms_scheduling_task_scope.sql`; deployed migration files are unchanged. Existing `list_fms_built_forms` gains optional author-only exact workflow/stage links, without inferred cross-pairing. The release database report records verification against current main. Earlier implementation evidence below refers to the original checkout and its former local migration numbers.
 
 Release database regressions passed559 assertions across30 files, including unchanged8-second budgets after statistics refresh in the synthetic fixtures.
 
@@ -99,6 +99,9 @@ apps/web/src/pages/TasksPage.paging.test.tsx
 apps/web/src/features/tasks/api.ts
 apps/web/src/features/tasks/api.test.ts
 apps/web/src/features/tasks/fms/FmsTaskWorkspace.tsx
+apps/web/src/features/tasks/fms/FmsTaskBoard.tsx
+apps/web/src/features/tasks/fms/FmsStaffWorkspace.tsx
+apps/web/src/features/tasks/fms/FmsStaffWorkspace.test.tsx
 apps/web/src/features/tasks/fms/FmsTaskWorkspace.test.tsx
 apps/web/src/features/fms/FmsAssignmentEditor.tsx
 apps/web/src/features/fms/FmsAssignmentEditor.scheduling.test.tsx
@@ -138,13 +141,13 @@ packages/data/src/forms/api.ts
 packages/data/src/forms/api.test.ts
 packages/data/src/tasks/api.ts
 packages/data/src/tasks/api.test.ts
-supabase/migrations/0358_advanced_form_routing.sql
-supabase/migrations/0359_advanced_fms_scheduling_task_scope.sql
+supabase/migrations/0361_advanced_form_routing.sql
+supabase/migrations/0362_advanced_fms_scheduling_task_scope.sql
 supabase/tests/0293_fms_workspace_history_scale.test.sql
 supabase/tests/0312_fms_workspace_naming_cost.test.sql
-supabase/tests/0358_advanced_form_routing.test.sql
-supabase/tests/0358_fms_built_form_links.test.sql
-supabase/tests/0359_fms_scheduling_task_scope.test.sql
+supabase/tests/0361_advanced_form_routing.test.sql
+supabase/tests/0361_fms_built_form_links.test.sql
+supabase/tests/0362_fms_scheduling_task_scope.test.sql
 docs/ASK_KIARA_APP_HELP_REVIEW.md
 docs/ADVANCED_FORMS_DATABASE_VERIFICATION_2026-10-30.md
 docs/ADVANCED_FORMS_RELEASE_DATABASE_2026-10-30.md
@@ -152,3 +155,9 @@ docs/superpowers/plans/2026-10-29-advanced-conditional-forms.md
 docs/superpowers/plans/2026-10-29-fms-scheduling-task-scope.md
 docs/superpowers/plans/2026-10-29-workflow-form-hierarchy.md
 ```
+
+## Final current-main merge (2026-10-31)
+
+Merged main through955c4971, including End Nodes, recorded outcomes, form-answer due dates, manager team boards and the phone handoff picker. Release migrations are0361/0362; main0358–0360 remain unchanged. Calendar `dateScope` is separate from FMS ownership `scope` (mine/all); ordinary task RPCs retain calendar `scope`. Scheduling extends the0360 causal due resolver; explicit `formDue` keeps precedence. New/compatibility due resolvers remain private.
+
+The merged core suite passed1,395 tests across117files. Exact main0340–0362 replay succeeded atomically in isolated `advanced_forms_publish_20261030`, with no operational/customer rows copied. Focused board/staff scope regressions and final build/database gates are recorded by the final release outcome.

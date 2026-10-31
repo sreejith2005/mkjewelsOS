@@ -31,11 +31,11 @@ begin
  if amended=original or position('task_calendar_scope_matches' in amended)=0 or position('''scope'') or jsonb_typeof' in amended)=0 then raise exception 'Review task scope patch against current workspace'; end if;
  execute amended;
  original:=pg_get_functiondef('fms_workspace_validate(jsonb,integer,integer)'::regprocedure);
- amended:=replace(original,'''familyId'',''stageId''','''familyId'',''stageId'',''scope''');
- amended:=replace(amended,'or length(coalesce(p_filter->>''query'',''''))>200','or (p_filter ? ''scope'' and p_filter->>''scope'' not in (''today'',''overall'',''overdue'')) or length(coalesce(p_filter->>''query'',''''))>200');
+ amended:=replace(original,'''scope'',''due''','''scope'',''dateScope'',''due''');
+ amended:=replace(amended,'or length(coalesce(p_filter->>''query'',''''))>200','or (p_filter ? ''dateScope'' and p_filter->>''dateScope'' not in (''today'',''overall'',''overdue'')) or length(coalesce(p_filter->>''query'',''''))>200');
  if amended=original then raise exception 'Review FMS scope validation patch'; end if; execute amended;
  original:=pg_get_functiondef('fms_workspace_rows(jsonb)'::regprocedure);
- amended:=replace(original,'select * from work where (','select * from work where (coalesce(p_filter->>''scope'',''overall'')=''overall'' or task_calendar_scope_matches(p_filter->>''scope'',due_at,bucket)) and (');
+ amended:=replace(original,'select * from work where (','select * from work where (coalesce(p_filter->>''dateScope'',''overall'')=''overall'' or task_calendar_scope_matches(p_filter->>''dateScope'',due_at,bucket)) and (');
  if amended=original then raise exception 'Review FMS scope relation patch'; end if; execute amended;
  original:=pg_get_functiondef('get_fms_task_workspace(jsonb,integer,integer)'::regprocedure);
  -- Reuse the already-authorized, already-filtered materialized relation. A
@@ -84,6 +84,7 @@ create function fms_causal_stage_deadline(p_rule jsonb,p_tenant_id uuid,p_instan
 returns timestamptz language plpgsql stable security definer set search_path=public as $$
 declare schedule jsonb:=p_rule#>'{followUp,schedule}'; answers jsonb:='{}'; source fms_instance_stages;
 begin
+ if coalesce((p_rule->>'deadlineEnabled')::boolean,true)=false then return null; end if;
  if schedule is null then return fms_stage_deadline_for_instance(p_rule,p_tenant_id,p_instance_id); end if;
  if p_instance_id is not null and not exists(select 1 from fms_instances where id=p_instance_id and tenant_id=p_tenant_id) then raise exception 'Invalid scheduling instance' using errcode='23514'; end if;
  if p_answers is not null then answers:=p_answers;
@@ -121,50 +122,30 @@ begin
  end loop;
 end $$;
 
-do $$
-declare original text; amended text;
-begin
- original:=pg_get_functiondef('activate_fms_stage_v2_internal(uuid,uuid,uuid,uuid,integer,uuid,uuid,uuid[],uuid)'::regprocedure);
- amended:=replace(original,'fms_stage_deadline_for_instance(v_stage.planned_time_rule,v_instance.tenant_id,p_instance_id)','fms_causal_stage_deadline(v_stage.planned_time_rule,v_instance.tenant_id,p_instance_id,p_previous_instance_stage_id)');
- if amended=original then raise exception 'Review causal FMS deadline activation patch'; end if; execute amended;
-end $$;
-
--- One coverage implementation, with a supplied schedule instead of recomputing it.
-do $$
-declare original text; amended text;
-begin
- original:=pg_get_functiondef('fms_assignment_coverage(uuid,uuid,uuid,uuid[],boolean)'::regprocedure);
- amended:=replace(original,'p_explicit boolean)','p_explicit boolean, p_deadline timestamp with time zone)');
- amended:=replace(amended,'target_date:=(fms_stage_deadline_for_instance(target.planned_time_rule,p_tenant_id,p_instance_id) at time zone ''Asia/Kolkata'')::date;',
-   'target_date:=(p_deadline at time zone ''Asia/Kolkata'')::date;');
- if amended=original or position('p_deadline timestamp' in amended)=0 then raise exception 'Review scheduled coverage implementation'; end if;
- execute amended;
-end $$;
-create or replace function fms_assignment_coverage(p_stage_id uuid,p_tenant_id uuid,p_instance_id uuid,p_selected_ids uuid[],p_explicit boolean)
+-- Extend the existing causal due-date resolver; activation, coverage and provenance
+-- keep their 0360 transaction path. An explicit formDue contract retains precedence.
+alter function fms_form_due_resolution(jsonb,uuid,uuid,uuid,text,uuid,jsonb,uuid[]) rename to fms_form_due_resolution_before_followup;
+create function fms_form_due_resolution(p_rule jsonb,p_tenant_id uuid,p_instance_id uuid,p_source_visit_id uuid,p_step_type text,p_candidate_stage_id uuid default null,p_candidate_answers jsonb default null,p_candidate_path uuid[] default null)
 returns jsonb language plpgsql stable security definer set search_path=public as $$
-declare target fms_stages;
+declare candidate jsonb;
 begin
- select * into target from fms_stages where id=p_stage_id;
- return fms_assignment_coverage(p_stage_id,p_tenant_id,p_instance_id,p_selected_ids,p_explicit,
-   fms_causal_stage_deadline(target.planned_time_rule,p_tenant_id,p_instance_id,null));
+ if coalesce((p_rule->>'deadlineEnabled')::boolean,true) and p_rule#>'{followUp,schedule}' is not null and jsonb_typeof(p_rule->'formDue') is distinct from 'object' then
+  if p_candidate_stage_id is not null and exists(select 1 from fms_stages where id=p_candidate_stage_id and stage_key=p_rule#>>'{followUp,schedule,sourceStageKey}') then candidate:=p_candidate_answers; end if;
+  return jsonb_build_object('dueAt',fms_causal_stage_deadline(p_rule,p_tenant_id,p_instance_id,p_source_visit_id,candidate),'source','rule');
+ end if;
+ return fms_form_due_resolution_before_followup(p_rule,p_tenant_id,p_instance_id,p_source_visit_id,p_step_type,p_candidate_stage_id,p_candidate_answers,p_candidate_path);
 end $$;
+
 do $$
 declare original text; amended text;
 begin
- -- Coverage resolves using the exact same date as the eventual assignment.
- original:=pg_get_functiondef('resolve_fms_visit_assignment(uuid,uuid,uuid,uuid,jsonb,uuid,uuid[],text)'::regprocedure);
- amended:=replace(original,'coverage:=fms_assignment_coverage(target.id,i.tenant_id,i.id,chosen_ids,explicit_choice);',
-  $patch$coverage:=fms_assignment_coverage(target.id,i.tenant_id,i.id,chosen_ids,explicit_choice,fms_causal_stage_deadline(target.planned_time_rule,i.tenant_id,i.id,prior.id,case when p_candidate_stage_id=(select id from fms_stages where fms_flow_id=i.fms_flow_id and stage_key=target.planned_time_rule#>>'{followUp,schedule,sourceStageKey}') then p_candidate_answers end));$patch$);
- if amended=original then raise exception 'Review scheduled coverage call'; end if;
- execute amended;
-
  original:=pg_get_functiondef('fms_initial_assignment_preview(uuid,uuid,jsonb,uuid)'::regprocedure);
  amended:=replace(original,'fms_assignment_coverage(target.id,flow.tenant_id,null,selected,explicit)',
-  $patch$fms_assignment_coverage(target.id,flow.tenant_id,null,selected,explicit,fms_causal_stage_deadline(target.planned_time_rule,flow.tenant_id,null,null,case when initial.stage_key=target.planned_time_rule#>>'{followUp,schedule,sourceStageKey}' then p_answers end))$patch$);
+  $patch$fms_assignment_coverage(target.id,flow.tenant_id,null,selected,explicit,fms_stage_due_for_visit(target.planned_time_rule,flow.tenant_id,null,null,target.step_type::text,initial.id,p_answers))$patch$);
  if amended=original then raise exception 'Review initial scheduled coverage preview'; end if; execute amended;
 end $$;
 
 revoke all on function task_calendar_scope_matches(text,timestamptz,text,timestamptz),fms_follow_up_schedule_valid(jsonb),fms_follow_up_datetime(jsonb,jsonb,timestamptz),
- fms_causal_stage_deadline(jsonb,uuid,uuid,uuid,jsonb),assert_fms_flow_publishable_before_schedule(uuid),assert_fms_flow_publishable(uuid),
+ fms_causal_stage_deadline(jsonb,uuid,uuid,uuid,jsonb),fms_form_due_resolution(jsonb,uuid,uuid,uuid,text,uuid,jsonb,uuid[]),fms_form_due_resolution_before_followup(jsonb,uuid,uuid,uuid,text,uuid,jsonb,uuid[]),assert_fms_flow_publishable_before_schedule(uuid),assert_fms_flow_publishable(uuid),
  fms_assignment_coverage(uuid,uuid,uuid,uuid[],boolean,timestamptz) from public,anon,authenticated,service_role;
 notify pgrst,'reload schema';

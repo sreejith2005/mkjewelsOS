@@ -128,20 +128,24 @@ describe("FMS stage editor", () => {
     render(<Harness />);
     const deadline = screen.getByRole("switch", { name: "Set deadline" });
     expect(screen.getByLabelText("Due date").getAttribute("type")).toBe("date");
+    const sources = screen.getByRole("group", { name: "Due date source" });
+    // The four due-date sources are visible choices, each with its explanation.
+    expect(within(sources).getAllByRole("button").map((button) => button.querySelector("span")?.textContent)).toEqual(["From form answer", "Fixed date and time", "TAT / relative", "No due date"]);
+    expect(within(sources).getByRole("button", { name: /Fixed date and time/ }).getAttribute("aria-pressed")).toBe("true");
     const methods = screen.getByRole("group", { name: "Deadline method" });
-    // All four deadline types are visible choices, each with its explanation.
-    expect(within(methods).getAllByRole("button").map((button) => button.querySelector("span")?.textContent)).toEqual(["Completion date", "TAT (hours)", "Days before date", "Specific clock time"]);
+    expect(within(methods).getAllByRole("button").map((button) => button.querySelector("span")?.textContent)).toEqual(["Completion date", "Days before date", "Specific clock time"]);
     expect(within(methods).getByRole("button", { name: /Completion date/ }).getAttribute("aria-pressed")).toBe("true");
-    await user.click(within(methods).getByRole("button", { name: /TAT \(hours\)/ }));
-    expect(within(methods).getByRole("button", { name: /TAT \(hours\)/ }).getAttribute("aria-pressed")).toBe("true");
+    await user.click(within(sources).getByRole("button", { name: /TAT \/ relative/ }));
+    expect(within(sources).getByRole("button", { name: /TAT \/ relative/ }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByLabelText("TAT value")).toBeTruthy();
     await user.selectOptions(screen.getByLabelText("TAT unit"), "minutes");
     expect((screen.getByLabelText("TAT unit") as HTMLSelectElement).value).toBe("minutes");
     expect(screen.getByLabelText("Counted from")).toBeTruthy();
-    await user.click(within(methods).getByRole("button", { name: /Days before date/ }));
+    await user.click(within(sources).getByRole("button", { name: /Fixed date and time/ }));
+    await user.click(within(screen.getByRole("group", { name: "Deadline method" })).getByRole("button", { name: /Days before date/ }));
     expect(screen.getByLabelText("Future date")).toBeTruthy();
     expect(screen.getByLabelText("Days before")).toBeTruthy();
-    await user.click(within(methods).getByRole("button", { name: /Specific clock time/ }));
+    await user.click(within(screen.getByRole("group", { name: "Deadline method" })).getByRole("button", { name: /Specific clock time/ }));
     expect(screen.getByLabelText("Clock time")).toBeTruthy();
     await user.click(deadline);
     expect(screen.queryByLabelText("TAT value")).toBeNull();

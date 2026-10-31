@@ -1,5 +1,5 @@
 import { CheckCircle2 } from "lucide-react";
-import { fmsAssignedWorkPath, type FmsWorkResult } from "@jewelos/core";
+import { fmsAssignedWorkPath, fmsTerminalOutcomeLabel, type FmsWorkResult } from "@jewelos/core";
 
 /** One plain sentence naming who received the work next, or null when nobody did. */
 export function sentToLine(items: ReadonlyArray<{ employeeName?: string | null | undefined }> | null | undefined): string | null {
@@ -18,7 +18,9 @@ const STATE_LINE: Partial<Record<FmsWorkResult["state"], string>> = {
 /** Render only destinations returned by the committed, authorized server result. */
 export function FmsWorkOutcome({ result }: { result: FmsWorkResult; viewerId?: string }) {
   const nextWork = result.state === "successors_activated" ? result.ownWorkTargets.filter(target => target.kind !== "starter_form" && target.instanceStageId !== result.sourceInstanceStageId) : [];
-  const line = result.state === "successors_activated" ? sentToLine(result.destinations) : STATE_LINE[result.state] ?? null;
+  // An End Node closed the workflow: say where it ended instead of "All steps are finished".
+  const line = result.terminal ? `Workflow closed automatically at ${result.terminal.stageName} (${fmsTerminalOutcomeLabel(result.terminal.outcome)}). No further steps.`
+    : result.state === "successors_activated" ? sentToLine(result.destinations) : STATE_LINE[result.state] ?? null;
   return <section aria-label="Submission result" className="space-y-3 rounded-2xl border border-success/40 bg-success/10 p-4">
     <h2 className="flex items-center gap-2 font-semibold text-success"><CheckCircle2 aria-hidden="true" className="size-5 shrink-0" />{result.submissionId ? "Submitted" : "Done"}</h2>
     {line ? <p className="text-sm text-task-text">{line}</p> : null}

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FmsData } from "@/features/fms/api";
 import type { UserProfile } from "@/types";
 import { FMSBuilderPage } from "./FMSBuilderPage";
@@ -12,7 +12,9 @@ const mocks = vi.hoisted(() => ({
   startFmsInstance: vi.fn(),
   setFmsFlowActive: vi.fn(),
   deleteFmsFlow: vi.fn(),
+  loadFmsLibraryOutcomes: vi.fn(),
 }));
+vi.mock("@jewelos/data/fms/outcomes", () => ({ loadFmsLibraryOutcomes: mocks.loadFmsLibraryOutcomes }));
 
 vi.mock("@/auth/AuthContext", async () => {
   const { builtinAccessContext } = await vi.importActual<typeof import("@jewelos/core")>("@jewelos/core");
@@ -44,8 +46,22 @@ const data = {
 const runtime = { instances: [], stages: [], definitions: [], flows: [flow], checklist: [], evidence: [], logs: [], users: [] };
 
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
+beforeEach(() => { mocks.loadFmsLibraryOutcomes.mockResolvedValue(new Map()); });
 
 describe("unified FMS console", () => {
+  it("shows server-counted running and outcome totals on the workflow card without loading the runtime", async () => {
+    mocks.loadFmsBuilderData.mockResolvedValue(data);
+    mocks.loadFmsLibraryOutcomes.mockResolvedValue(new Map([["family", { familyId: "family", started: 100, running: 38, onHold: 2, completed: 60, cancelled: 0, won: 30, lost: 20, doNotContact: 10, other: 0, unspecified: 0, mine: 3 }]]));
+    render(<FMSBuilderPage />);
+    const counts = await screen.findByLabelText("Sales intake counts");
+    expect(counts.textContent).toContain("Running40");
+    expect(counts.textContent).toContain("Won30");
+    expect(counts.textContent).toContain("Lost20");
+    expect(counts.textContent).toContain("Other endings10");
+    expect(screen.getByRole("button", { name: /Tasks \(3\)/ })).toBeTruthy();
+    expect(mocks.loadFmsRuntime).not.toHaveBeenCalled();
+  });
+
   it("keeps published workflows form-triggered instead of exposing a manual instance start", async () => {
     mocks.loadFmsBuilderData.mockResolvedValue(data);
     mocks.loadFmsRuntime.mockResolvedValue(runtime);

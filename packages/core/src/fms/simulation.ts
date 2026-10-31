@@ -1,5 +1,5 @@
 import { fmsFallbackStageKey, normalizeFmsDefinition, resolveFmsBranch } from "./engine.ts";
-import type { FmsFlowDefinition, FmsStageDefinition } from "./types.ts";
+import type { FmsFlowDefinition, FmsStageDefinition, FmsTerminalOutcome } from "./types.ts";
 import { normalizeFormAnswers } from "../forms/answers.ts";
 import { validateCompleteForm } from "../forms/validation.ts";
 import { fmsStageFormDefinition } from "./formSections.ts";
@@ -14,8 +14,10 @@ export type FmsSimulationInput = Readonly<{
   starterId?: string;
   maxEvents?: number;
 }>;
-export type FmsSimulationEvent = Readonly<{ stageKey: string; stageName: string; visit: number; status: "simulated" | "skipped" | "waiting" | "held";
-  assignmentMethod: string; selectedUserId: string | null; selectedUserIds: readonly string[]; routeRuleId: string | null; formTemplateId: string | null; outcome: string | null; answers: FormAnswers; note: string }>;
+export type FmsSimulationEvent = Readonly<{ stageKey: string; stageName: string; visit: number; status: "simulated" | "skipped" | "waiting" | "held" | "ended";
+  assignmentMethod: string; selectedUserId: string | null; selectedUserIds: readonly string[]; routeRuleId: string | null; formTemplateId: string | null; outcome: string | null; answers: FormAnswers; note: string; terminalOutcome?: FmsTerminalOutcome | undefined }>;
+/** The End Node a simulated run reached. Like the server, the first End Node closes the whole run. */
+export type FmsSimulationTerminal = Readonly<{ stageKey: string; stageName: string; outcome: FmsTerminalOutcome; reasonCode: string | null; stoppedStageKeys: readonly string[] }>;
 /** Deterministic authoring aid only. It never calls an API or creates work;
  * final routing, form visibility, coverage and eligibility remain server-owned. */
 export function simulateFmsDefinition(raw: FmsFlowDefinition, input: FmsSimulationInput) {
@@ -37,6 +39,7 @@ export function simulateFmsDefinition(raw: FmsFlowDefinition, input: FmsSimulati
     return lineage;
   };
   let serial = 0;
+  let terminal: FmsSimulationTerminal | null = null;
   const limit = Math.max(1, Math.min(input.maxEvents ?? 100, 500));
   const route = (stage: FmsStageDefinition, answers: Readonly<Record<string, unknown>>, outcome: string | null) =>
     resolveFmsBranch(stage.branchRules, { formAnswers: answers, outcome })?.nextStageKey ?? fmsFallbackStageKey(stage);
@@ -120,6 +123,15 @@ export function simulateFmsDefinition(raw: FmsFlowDefinition, input: FmsSimulati
         token.cohort = scope?.parentCohort ?? null; token.branch = scope?.parentBranch ?? null;
       }
     }
+    if (stage.type === "end" && !skipped) {
+      // Global terminal policy: the End Node finishes the workflow; queued sibling work never starts.
+      const outcome = stage.sla.terminal?.outcome ?? "other";
+      visits.set(stage.key, visit);
+      events.push({ stageKey: stage.key, stageName: stage.name, visit, status: "ended", assignmentMethod: "automatic", selectedUserId: null, selectedUserIds: [], routeRuleId: null, formTemplateId: null, outcome: null, answers: {}, note: "Workflow ended automatically. No task or form is created.", terminalOutcome: outcome });
+      terminal = { stageKey: stage.key, stageName: stage.name, outcome, reasonCode: stage.sla.terminal?.reasonCode ?? null, stoppedStageKeys: [...new Set(queue.map(item => item.key))] };
+      queue.length = 0;
+      break;
+    }
     visits.set(stage.key, visit);
     const index = events.push({ stageKey: stage.key, stageName: stage.name, visit, status, assignmentMethod: method, selectedUserId: selected, selectedUserIds: selectedIds, routeRuleId: skipped ? null : resolveFmsBranch(stage.branchRules, { formAnswers: answers, outcome })?.id ?? null, formTemplateId: stage.formTemplateId ?? null, outcome, answers: skipped ? {} : answers, note }) - 1;
     eventScopes.set(index, { cohort: token.cohort, branch: token.branch });
@@ -134,5 +146,5 @@ export function simulateFmsDefinition(raw: FmsFlowDefinition, input: FmsSimulati
       if (next) queue.push({ ...token, key: next, path });
     }
   }
-  return { events, limitReached: queue.length > 0, warnings: ["Simulation creates no work. The server revalidates forms, routes, employee permissions and availability at submission."] };
+  return { events, terminal, limitReached: queue.length > 0, warnings: ["Simulation creates no work. The server revalidates forms, routes, employee permissions and availability at submission."] };
 }

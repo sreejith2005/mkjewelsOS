@@ -13,6 +13,7 @@ export * from "./stageCompletion";
 export * from "./logPresentation";
 export * from "./recordNaming";
 export * from "./taskWorkspace";
+export * from "./formDue";
 
 export * from "./assignmentAuthoring";
 
@@ -31,3 +32,5 @@ export * from "./aiOperations";
 export * from "./aiContext";
 export * from "./transfer";
 export * from "./workflowForms";
+
+export * from "./outcomes";

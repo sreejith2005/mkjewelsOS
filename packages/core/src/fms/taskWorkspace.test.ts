@@ -3,8 +3,8 @@ import { decodeFmsWorkspace, decodeFmsStages, decodeFmsRecords, fmsWorkspaceFilt
 const id = "00000000-0000-4000-8000-000000000001";
 const counts = { active: 250, pending: 240, overdue: 10, waiting: 2, completed: 3 };
 it("carries the shared scope into every FMS hierarchy query", () => {
-  const filters = { query: "", status: "active" as const, from: "", to: "", familyId: "", stageId: "", scope: "today" as const };
-  expect(fmsWorkspaceFilter(filters)).toMatchObject({ scope: "today" });
+  const filters = { query: "", status: "active" as const, from: "", to: "", familyId: "", stageId: "", dateScope: "today" as const };
+  expect(fmsWorkspaceFilter(filters)).toMatchObject({ dateScope: "today" });
   expect(() => fmsWorkspaceFilter({ ...filters, scope: "future" as "today" })).toThrow();
 });
 it("keeps exact summary totals independent of loaded families", () => {

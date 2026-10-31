@@ -5,13 +5,13 @@ This supersedes the earlier feature-branch database evidence for release purpose
 
 ## Scope
 
-- `0358_advanced_form_routing.sql` extends the installed main normalizers and
+- `0361_advanced_form_routing.sql` extends the installed main normalizers and
   candidate validator. Its private compatibility copies use `_legacy_0358`.
   Main 0352's Other answers and sorted recipient contract remain installed.
 - The existing 0353 `list_fms_built_forms()` gains optional author-only `links`
   containing exact workflow/step ids and names. Existing family classification,
   workflow/step arrays, module/profile/permission checks and grants are preserved.
-- `0359_advanced_fms_scheduling_task_scope.sql` extends existing atomic activation,
+- `0362_advanced_fms_scheduling_task_scope.sql` extends existing atomic activation,
   coverage and authorized workspace projections. Calendar filtering occurs before
   counts and pagination; Overall/legacy requests avoid per-row calendar helpers.
 - Main customer-event activation (0356) and original-doer coverage fix (0357)
@@ -62,3 +62,19 @@ The two performance fixtures initially exceeded their unchanged8-second budgets 
 No hosted write or deployment was performed by the database verifier. Parent release operations are recorded separately.
 
 Targeted `plpgsql_check_function_tb` checking of affected PL/pgSQL helper/RPC names on the final release schema reported **0 errors and 12 warnings** (not full-database CLI lint). The extension was installed only in the new local verification database for this check.
+
+## Final current-main merge (2026-10-31)
+
+Merged main through955c4971, including End Nodes, recorded outcomes, form-answer due dates, manager team boards and the phone handoff picker. Release migrations are0361/0362; main0358–0360 remain unchanged. Calendar `dateScope` is separate from FMS ownership `scope` (mine/all); ordinary task RPCs retain calendar `scope`. Scheduling extends the0360 causal due resolver; explicit `formDue` keeps precedence. New/compatibility due resolvers remain private.
+
+The merged core suite passed1,395 tests across117files. Exact main0340–0362 replay succeeded atomically in isolated `advanced_forms_publish_20261030`, with no operational/customer rows copied. Focused board/staff scope regressions and final build/database gates are recorded by the final release outcome.
+
+## Release hold (2026-10-31)
+
+Final merged client checks passed: core1,395 tests/117files; affected board/staff/task/scheduling web35 tests/4files; monorepo typecheck/build12 successful tasks. All conflict markers were resolved and the staged credential/whitespace scans passed.
+
+Production preflight lists ONLY0361/0362, but neither has been applied and no main push occurred. Docker Desktop lost its engine across the interrupted session. Supported start and graceful restart attempts timed out; a bounded docker ps also failed/timed out. No volume, existing database or WSL data was reset/deleted.
+
+The new main0340–0362 schema replay succeeded in isolated advanced_forms_publish_20261030 before the final No due date and unified initial-coverage adjustments. Those final adjustments and their tests remain unverified at the database runtime boundary. The earlier559-assertion result belongs to the earlier main baseline; it is not substituted for the missing final regression run.
+
+Resume with a functioning Docker engine: copy current migrations/tests into the retained local container, run the final exact migration replay plus034-file related regression set, confirm0360 form-due/board and0361/0362 contracts, then recheck linked production ledger/dry-run, apply the two approved migrations, push the reviewed merge to main and verify CI/Vercel. No new release approval is required by the existing user instruction.

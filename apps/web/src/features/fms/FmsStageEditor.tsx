@@ -7,6 +7,7 @@ import {
   FMS_BRANCH_OPERATORS,
   fmsStageNeedsAssignment,
   fmsFieldOptions,
+  fmsFormDueSummary,
   fmsRouteAnswerSelection,
   fmsAssignmentFields,
   fmsStageFormFields,
@@ -25,6 +26,9 @@ import { Button, Field } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import type { FmsData } from "./api";
 import { newerFormVersion } from "./definition";
+import { FmsEndNodeEditor } from "./FmsEndNodeEditor";
+import { FmsDueDateSource } from "./FmsDueDateSource";
+import { convertFmsStageToEnd, fmsOutgoingStageKeys } from "@jewelos/core";
 
 const humanTypes: readonly FmsStageDefinition["type"][] = ["form", "task", "approval"];
 const timingOptions: readonly { value: FmsTimingMethod; label: string; help: string }[] = [
@@ -33,6 +37,7 @@ const timingOptions: readonly { value: FmsTimingMethod; label: string; help: str
   { value: "days_before_date", label: "Days before date", help: "Due a fixed number of days before a future date." },
   { value: "specific_time", label: "Specific clock time", help: "Due on a selected date at a selected time." },
 ];
+const fixedTimingOptions = timingOptions.filter((option) => option.value !== "tat_hours");
 /** Route conditions offered on an ordinary step. `default` stays reserved for the fallback. */
 const routeOperators: readonly { value: FmsBranchOperator; label: string }[] = [
   { value: "equals", label: "is" },
@@ -66,7 +71,36 @@ export type FmsStageQuestionnaireActions = Readonly<{
   discardDraft: () => void;
 }>;
 
-export function FmsStageEditor({ stage, stages, data, onChange, onDelete, assignmentVersion = 1, questionnaire }: { assignmentVersion?: 1 | 2 | undefined; stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; onChange: (value: FmsStageDefinition) => void; onDelete: () => void; questionnaire?: FmsStageQuestionnaireActions | undefined }) {
+export function FmsStageEditor({ stage, stages, data, onChange, onDelete, assignmentVersion = 1, questionnaire, endCounts }: { assignmentVersion?: 1 | 2 | undefined; stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; onChange: (value: FmsStageDefinition) => void; onDelete: () => void; questionnaire?: FmsStageQuestionnaireActions | undefined; endCounts?: ReadonlyMap<string, number> | undefined }) {
+  if (stage.type === "end") return <FmsEndNodeEditor completedCount={endCounts?.get(stage.key)} onChange={onChange} onDelete={onDelete} stage={stage} stages={stages} />;
+  return <FmsStepEditor assignmentVersion={assignmentVersion} data={data} onChange={onChange} onDelete={onDelete} questionnaire={questionnaire} stage={stage} stages={stages} />;
+}
+
+/**
+ * A last step can end the workflow by itself: switched on, it becomes an End Node
+ * (same name, key and incoming routes) that closes the run automatically.
+ */
+function EndOfWorkflowSwitch({ stage, onChange }: { stage: FmsStageDefinition; onChange: (value: FmsStageDefinition) => void }) {
+  const last = fmsOutgoingStageKeys(stage).length === 0;
+  const turnOn = () => {
+    const losesWork = !!stage.formTemplateId || stage.assigneeRules.length > 0 || stage.checklist.length > 0 || !!stage.sla.assignment?.sources.length;
+    if (losesWork && !window.confirm(`Make "${stage.name || "this step"}" an End Node? It will end the workflow automatically, so its questions, assignee, checklist and deadline are removed. Routes into it stay.`)) return;
+    onChange(convertFmsStageToEnd(stage));
+  };
+  return <section aria-label="End of workflow" className={cn("rounded-2xl border p-3", last ? "border-warning/40 bg-warning/5" : "border-gold/15")}>
+    <label className={cn("flex items-start gap-3", last ? "cursor-pointer" : "cursor-not-allowed opacity-70")}>
+      <input aria-label="End the workflow at this step" checked={false} className="mt-1 size-5 shrink-0" disabled={!last} onChange={turnOn} type="checkbox" />
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-white">End the workflow here (End Node)</span>
+        <span className="block text-xs text-soft-grey">{last
+          ? "This is a last step. As a normal step, someone must press Mark as done. As an End Node it closes the run automatically and records an outcome (Won, Lost, Do not contact or Other)."
+          : "Only a last step can end the workflow. Remove its next step or routes first."}</span>
+      </span>
+    </label>
+  </section>;
+}
+
+function FmsStepEditor({ stage, stages, data, onChange, onDelete, assignmentVersion = 1, questionnaire }: { assignmentVersion?: 1 | 2 | undefined; stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; onChange: (value: FmsStageDefinition) => void; onDelete: () => void; questionnaire?: FmsStageQuestionnaireActions | undefined }) {
   const update = (patch: Partial<FmsStageDefinition>) => onChange({ ...stage, ...patch });
   const updateSla = (patch: Partial<FmsSlaRule>) => update({ sla: { ...stage.sla, ...patch } });
   const stageIndex = stages.findIndex((item) => item.key === stage.key);
@@ -102,6 +136,8 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete, assign
   return <div className="space-y-4 pb-8" data-fms-editor>
     <Field label="Step name"><input autoFocus className="field" data-fms-focus="name" maxLength={150} onChange={(event) => update({ name: event.target.value })} placeholder="e.g. Introduction call" value={stage.name} /></Field>
 
+    {human && !firstStage ? <EndOfWorkflowSwitch onChange={onChange} stage={stage} /> : null}
+
     {human ? <StageQuestions actions={questionnaire} data={data} firstStage={firstStage} stage={stage} update={update} updateSla={updateSla} /> : null}
 
     {canChooseNext ? <StageRouting key={stage.key} allFields={allFormFields} decision={decision} fields={formFields} others={others} stage={stage} changeRule={changeBranchRule} moveRule={moveBranchRule} update={update} updateSla={updateSla} /> : null}
@@ -117,13 +153,13 @@ export function FmsStageEditor({ stage, stages, data, onChange, onDelete, assign
     <InspectorSection
       focus="deadline"
       onSwitch={(on) => updateSla({ deadlineEnabled: on })}
-      summary={deadlineOn ? timingSummary(stage.sla) : "Off"}
+      summary={deadlineOn ? stage.sla.formDue ? fmsFormDueSummary({ stages }, stage.sla.formDue, data.formFields) : timingSummary(stage.sla) : "Off"}
       switchLabel="Set deadline"
       switched={deadlineOn}
       title="When / Deadline"
     >
-      <div aria-label="Deadline method" className="grid gap-2 sm:grid-cols-2" role="group">{timingOptions.map((option) => <button aria-pressed={timingMethod(stage.sla) === option.value} className={cn("min-h-11 rounded-xl border p-3 text-left transition", timingMethod(stage.sla) === option.value ? "border-gold bg-gold/10 text-white" : "border-gold/20 text-soft-grey hover:border-gold/60")} key={option.value} onClick={() => updateSla({ timingMethod: option.value })} type="button"><span className="block text-sm font-semibold">{option.label}</span><span className="mt-0.5 block text-xs text-soft-grey">{option.help}</span></button>)}</div>
-      <div className="mt-3"><TimingFields earlierStages={earlierStages} sla={stage.sla} updateSla={updateSla} /></div>
+      {human ? <FmsDueDateSource data={data} stage={stage} stageIndex={stageIndex} stages={stages} timing={(kind) => <TimingRule earlierStages={earlierStages} methods={kind === "fixed" ? fixedTimingOptions : kind === "tat" ? [] : timingOptions} sla={stage.sla} updateSla={updateSla} />} updateSla={updateSla} />
+        : <TimingRule earlierStages={earlierStages} methods={timingOptions} sla={stage.sla} updateSla={updateSla} />}
     </InspectorSection>
 
     {human ? <InspectorSection summary={stage.method ? truncate(stage.method, 36) : "None"} title="Instructions">
@@ -377,6 +413,14 @@ function ChecklistEditor({ items, onChange }: { items: readonly FmsChecklistItem
   </div>;
 }
 
+/** Method buttons (when there is a choice) and the chosen method's fields. */
+function TimingRule({ sla, earlierStages, updateSla, methods }: { sla: FmsSlaRule; earlierStages: readonly FmsStageDefinition[]; updateSla: (patch: Partial<FmsSlaRule>) => void; methods: typeof timingOptions }) {
+  return <>
+    {methods.length > 1 ? <div aria-label="Deadline method" className="grid gap-2 sm:grid-cols-2" role="group">{methods.map((option) => <button aria-pressed={timingMethod(sla) === option.value} className={cn("min-h-11 rounded-xl border p-3 text-left transition", timingMethod(sla) === option.value ? "border-gold bg-gold/10 text-white" : "border-gold/20 text-soft-grey hover:border-gold/60")} key={option.value} onClick={() => updateSla({ timingMethod: option.value })} type="button"><span className="block text-sm font-semibold">{option.label}</span><span className="mt-0.5 block text-xs text-soft-grey">{option.help}</span></button>)}</div> : null}
+    <div className={methods.length > 1 ? "mt-3" : ""}><TimingFields earlierStages={earlierStages} sla={sla} updateSla={updateSla} /></div>
+  </>;
+}
+
 function TimingFields({ sla, earlierStages, updateSla }: { sla: FmsSlaRule; earlierStages: readonly FmsStageDefinition[]; updateSla: (patch: Partial<FmsSlaRule>) => void }) {
   if (sla.deadlineEnabled === false) return <p className="text-xs text-soft-grey">No deadline will be created for this step.</p>;
   const method = timingMethod(sla);
@@ -421,7 +465,7 @@ function BranchEditor({ stage, others, update, changeRule, moveRule }: { stage: 
 }
 
 function timingMethod(sla: FmsSlaRule): FmsTimingMethod { return sla.timingMethod ?? "completion_date"; }
-function StageSelect({ others, value, label, onChange }: { others: readonly FmsStageDefinition[]; value?: string | undefined; label?: string | undefined; onChange: (value: string | undefined) => void }) { return <select aria-label={label} className="field" onChange={(event) => onChange(event.target.value || undefined)} value={value ?? ""}><option value="">Complete workflow here</option>{others.map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}</select>; }
+function StageSelect({ others, value, label, onChange }: { others: readonly FmsStageDefinition[]; value?: string | undefined; label?: string | undefined; onChange: (value: string | undefined) => void }) { return <select aria-label={label} className="field" onChange={(event) => onChange(event.target.value || undefined)} value={value ?? ""}><option value="">Complete workflow here</option>{others.map((item) => <option key={item.key} value={item.key}>{item.type === "end" ? `End: ${item.name}` : item.name}</option>)}</select>; }
 function localCalendarDate(now = new Date()): string { const year = now.getFullYear(); const month = String(now.getMonth() + 1).padStart(2, "0"); const day = String(now.getDate()).padStart(2, "0"); return `${year}-${month}-${day}`; }
 
 /** Outcomes of a Decision Step authored before decisions became questionnaire routes. Kept exactly, so old routes still match. */

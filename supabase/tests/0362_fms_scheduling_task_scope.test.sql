@@ -15,6 +15,10 @@ select ok(task_calendar_scope_matches('overdue','2026-10-11 18:29:59+00','pendin
 select ok(not task_calendar_scope_matches('overdue','2026-10-11 18:29:59+00','completed','2026-10-11 19:00+00'),'completed history is not overdue');
 select ok(task_calendar_scope_matches('overall','2027-10-11 18:30+00','pending','2026-10-11 19:00+00'),'Overall includes future');
 
+select is(fms_form_due_resolution('{"deadlineEnabled":false,"formDue":{"onMissing":"none"},"followUp":{"schedule":{"delay":1,"unit":"days"}}}',null,null,null,'task')->>'source','none','explicit form due configuration retains precedence over follow-up scheduling');
+
+select is(fms_form_due_resolution('{"deadlineEnabled":false,"followUp":{"schedule":{"delay":1,"unit":"days"}}}',null,null,null,'task')->>'dueAt',null::text,'No due date remains disabled when a follow-up schedule is present');
+
 -- The existing audited fixture configures incoming routing and employee rules.
 -- Inject this test's optional metadata before its draft is published.
 create function pg_temp.schedule_fixture_stage() returns trigger language plpgsql as $$
@@ -31,18 +35,18 @@ select is((select planned_datetime from fms_instance_stages where fms_instance_i
 select is((select count(*)::integer from fms_instance_stages where fms_instance_id=(select id from visit_assignment_fixture where name='instance') and fms_stage_id=(select id from visit_assignment_fixture where name='demo')),0,'unmatched successor is not created');
 set local role authenticated;
 select set_config('request.jwt.claim.sub',(select id::text from visit_assignment_fixture where name='b_auth'),true);
-select is((get_fms_task_workspace('{"scope":"today"}')->>'total')::integer,0,'future FMS work excluded from Today count');
-select is((get_fms_task_workspace('{"scope":"today"}')->>'activeTotal')::integer,0,'Today active total shares the same strict date scope');
-select is((get_fms_task_workspace('{"scope":"overall"}')->>'total')::integer,1,'Overall retains scheduled successor');
-select is((get_fms_task_workspace('{"scope":"overall"}')->'counts'->>'active')::integer,1,'Overall active badge matches hierarchy');
-select is((get_fms_task_workspace('{"scope":"overall","query":"no-such-work-item"}')->>'activeTotal')::integer,0,'active total reuses the searched authorized relation');
+select is((get_fms_task_workspace('{"dateScope":"today"}')->>'total')::integer,0,'future FMS work excluded from Today count');
+select is((get_fms_task_workspace('{"dateScope":"today"}')->>'activeTotal')::integer,0,'Today active total shares the same strict date scope');
+select is((get_fms_task_workspace('{"dateScope":"overall"}')->>'total')::integer,1,'Overall retains scheduled successor');
+select is((get_fms_task_workspace('{"dateScope":"overall"}')->'counts'->>'active')::integer,1,'Overall active badge matches hierarchy');
+select is((get_fms_task_workspace('{"dateScope":"overall","query":"no-such-work-item"}')->>'activeTotal')::integer,0,'active total reuses the searched authorized relation');
 select is((get_fms_task_stage_page((select family_id from fms_flows where id=(select id from visit_assignment_fixture where name='flow')),
- (select id from visit_assignment_fixture where name='flow'),(select id from visit_assignment_fixture where name='call'),false,'{"scope":"today"}')->>'total')::integer,0,'Today drilldown uses same date scope');
+ (select id from visit_assignment_fixture where name='flow'),(select id from visit_assignment_fixture where name='call'),false,'{"dateScope":"today"}')->>'total')::integer,0,'Today drilldown uses same date scope');
 select is((get_fms_task_stage_page((select family_id from fms_flows where id=(select id from visit_assignment_fixture where name='flow')),
- (select id from visit_assignment_fixture where name='flow'),(select id from visit_assignment_fixture where name='call'),false,'{"scope":"overall"}',0,1)->>'total')::integer,1,'Overall page total equals scoped badge');
+ (select id from visit_assignment_fixture where name='flow'),(select id from visit_assignment_fixture where name='call'),false,'{"dateScope":"overall"}',0,1)->>'total')::integer,1,'Overall page total equals scoped badge');
 select is((task_workspace_page('{"scope":"today","subsection":"fms","status":"pending","mode":"board"}')->>'total')::integer,0,'regular workspace also excludes future FMS before pagination');
 select is((task_workspace_page('{"scope":"overall","subsection":"fms","status":"pending","mode":"board"}',0,1)->>'total')::integer,1,'regular Overall page retains future FMS');
-select throws_ok($$select get_fms_task_workspace('{"scope":"invalid"}')$$,'22023',null,'invalid FMS scope rejected');
+select throws_ok($$select get_fms_task_workspace('{"dateScope":"invalid"}')$$,'22023',null,'invalid FMS scope rejected');
 select throws_ok($$select task_workspace_page('{"scope":"invalid"}')$$,'22023',null,'invalid ordinary scope rejected');
 select throws_ok($$select task_workspace_page('{"scope":"overall","subsection":"all"}')$$,'42501',null,'scope does not grant admin access');
 
@@ -58,17 +62,17 @@ update fms_instance_stages set planned_datetime=(((now() at time zone 'Asia/Kolk
  where fms_instance_id=(select id from visit_assignment_fixture where name='instance') and fms_stage_id=(select id from visit_assignment_fixture where name='call');
 set local role authenticated;
 select set_config('request.jwt.claim.sub',(select id::text from visit_assignment_fixture where name='b_auth'),true);
-select is((get_fms_task_workspace('{"scope":"today"}')->>'total')::integer,1,'assignment appears on scheduled IST date');
+select is((get_fms_task_workspace('{"dateScope":"today"}')->>'total')::integer,1,'assignment appears on scheduled IST date');
 select is((task_workspace_page('{"scope":"today","subsection":"fms","status":"pending"}',0,1)->>'total')::integer,1,'task page agrees on scheduled day');
 select set_config('request.jwt.claim.sub',(select id::text from visit_assignment_fixture where name='e_auth'),true);
-select is((get_fms_task_workspace('{"scope":"overall"}')->>'total')::integer,0,'unassigned employee cannot see scheduled private work');
+select is((get_fms_task_workspace('{"dateScope":"overall"}')->>'total')::integer,0,'unassigned employee cannot see scheduled private work');
 reset role;
 update fms_instance_stages set planned_datetime=now()-interval '2 days'
  where fms_instance_id=(select id from visit_assignment_fixture where name='instance') and fms_stage_id=(select id from visit_assignment_fixture where name='call');
 set local role authenticated;
 select set_config('request.jwt.claim.sub',(select id::text from visit_assignment_fixture where name='b_auth'),true);
-select is((get_fms_task_workspace('{"scope":"overdue"}')->>'total')::integer,1,'earlier-date pending assignment is available in Overdue');
-select is((get_fms_task_workspace('{"scope":"today"}')->>'total')::integer,0,'Overdue does not inflate strict Today');
+select is((get_fms_task_workspace('{"dateScope":"overdue"}')->>'total')::integer,1,'earlier-date pending assignment is available in Overdue');
+select is((get_fms_task_workspace('{"dateScope":"today"}')->>'total')::integer,0,'Overdue does not inflate strict Today');
 select lives_ok($$select submit_fms_form_and_progress_with_audit(
  (select id from visit_assignment_fixture where name='form'),jsonb_build_object('next_employee',(select id from visit_assignment_fixture where name='c')),
  'fms_stage',(select id from fms_instance_stages where fms_instance_id=(select id from visit_assignment_fixture where name='instance') and fms_stage_id=(select id from visit_assignment_fixture where name='call')),gen_random_uuid())$$,
@@ -84,10 +88,12 @@ update user_profiles set is_login_enabled=false where id=(select id from visit_a
 set local role authenticated;
 select set_config('request.jwt.claim.sub',(select id::text from visit_assignment_fixture where name='b_auth'),true);
 select throws_ok($$select task_workspace_page('{"scope":"overall"}')$$,'42501',null,'inactive caller cannot use Overall');
-select throws_ok($$select get_fms_task_workspace('{"scope":"overall"}')$$,'42501',null,'inactive caller cannot use FMS Overall');
+select throws_ok($$select get_fms_task_workspace('{"dateScope":"overall"}')$$,'42501',null,'inactive caller cannot use FMS Overall');
 reset role;
 select ok(not has_function_privilege('anon','task_workspace_page(jsonb,integer,integer)','EXECUTE'),'anonymous cannot query work');
 select ok(not has_function_privilege('service_role','get_fms_task_workspace(jsonb,integer,integer)','EXECUTE'),'service role cannot impersonate employee reads');
 select ok(not has_function_privilege('authenticated','fms_causal_stage_deadline(jsonb,uuid,uuid,uuid,jsonb)','EXECUTE'),'causal form answers remain internal');
+select ok(not has_function_privilege('authenticated','fms_form_due_resolution(jsonb,uuid,uuid,uuid,text,uuid,jsonb,uuid[])','EXECUTE'),'unified due resolver remains private');
+select ok(not has_function_privilege('authenticated','fms_form_due_resolution_before_followup(jsonb,uuid,uuid,uuid,text,uuid,jsonb,uuid[])','EXECUTE'),'compatibility due resolver remains private');
 select * from finish();
 rollback;

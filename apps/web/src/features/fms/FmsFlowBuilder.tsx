@@ -3,7 +3,7 @@ import { FmsSimulation } from "./FmsSimulation";
 import { suggestFmsAssignment } from "@jewelos/core";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ArrowDownUp, ArrowLeft, CheckCircle2, ChevronDown, FileText, FlaskConical, PanelLeftOpen, Plus, Redo2, Save, Send, Sparkles, TestTube2, Undo2, UserRoundPlus, X } from "lucide-react";
-import { copyFirstFmsAssigneeToHumanStages, createFmsFragment, importFormSectionCopy, describeFmsPasteReport, fmsConnectionsTouching, fmsStageFormFields, FmsTransferError, normalizeFmsDefinition, parseFmsTransfer, pasteFmsFragment, removeFmsStages, validateFmsDefinition, type FmsFlowDefinition, type FmsStageDefinition, type FormTemplateDefinition } from "@jewelos/core";
+import { copyFirstFmsAssigneeToHumanStages, createFmsFragment, defaultFmsReportFilters, fmsOutgoingStageKeys, importFormSectionCopy, describeFmsPasteReport, fmsConnectionsTouching, fmsStageFormFields, FmsTransferError, normalizeFmsDefinition, parseFmsTransfer, pasteFmsFragment, removeFmsStages, validateFmsDefinition, type FmsFlowDefinition, type FmsStageDefinition, type FormTemplateDefinition } from "@jewelos/core";
 import { Button, Modal, Notice } from "@/components/ui";
 import { AssigneePicker } from "@/components/assignees/AssigneePicker";
 import type { FmsData, FmsFlowRow } from "./api";
@@ -23,6 +23,7 @@ import { FmsImportSectionDialog } from "./FmsImportSectionDialog";
 import { FmsQuestionnairePreview, FmsQuestionnaireStudio } from "./FmsQuestionnaireStudio";
 import { FmsWorkflowTransfer, type FmsImportRequest } from "./FmsWorkflowTransfer";
 import { blankQuestionnaire, discardQuestionnaireDraft } from "./questionnaire";
+import { loadFmsFlowReport } from "@jewelos/data/fms/outcomes";
 
 function issueControlSelector(code: string, message: string): string {
   if (code === "invalid_assignment_field") return '[data-fms-focus="assignment"]';
@@ -77,6 +78,15 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
   const initial = useMemo(() => { const value = flowToDefinition(flow, data); return duplicate ? { ...value, id: undefined, familyId: undefined, version: 1, lifecycle: "draft" as const, name: `${value.name} (Copy)` } : value; }, [data, duplicate, flow]);
   const [definition, setDefinition] = useState<FmsFlowDefinition>(initial);
   const [past, setPast] = useState<FmsFlowDefinition[]>([]);
+  // Unique finished runs per End Node of this workflow family (published versions). Optional: unknown on error.
+  const [endCounts, setEndCounts] = useState<ReadonlyMap<string, number>>();
+  const familyId = duplicate ? undefined : flow?.family_id;
+  useEffect(() => {
+    if (!familyId) return;
+    let active = true;
+    void loadFmsFlowReport(familyId, defaultFmsReportFilters()).then((report) => { if (active) setEndCounts(new Map(report.endNodes.map((node) => [node.stageKey, node.instances]))); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [familyId]);
   const [future, setFuture] = useState<FmsFlowDefinition[]>([]);
   const aiAvailable = !!ai && (ai.settings.debuggerEnabled || ai.settings.builderEnabled);
   // A new workflow always starts by naming it; the AI assistant is available inside the builder after that.
@@ -194,6 +204,19 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
       sla: { ...template.sla, deadlineEnabled: false },
     };
     const sourceKey = after ?? (selected && !["branch", "parallel_start", "end"].includes(selected.type) ? selected.key : undefined);
+    if (type === "end") {
+      // An End Node never takes over a step's existing path. It is linked only to a selected step that has no next step yet;
+      // otherwise the author connects it from a route ("Then go to") or by dragging a connection.
+      const endStage = { ...stage, name: "End", assigneeRules: [] };
+      commit((current) => {
+        const currentStages = normalizeFmsDefinition(current).stages;
+        const source = sourceKey ? currentStages.find((item) => item.key === sourceKey) : undefined;
+        const link = source && !fmsOutgoingStageKeys(source).length && !["branch", "parallel_start", "end"].includes(source.type);
+        return { ...current, stages: [...currentStages.map((item) => link && item.key === source.key ? { ...item, defaultNextStageKey: endStage.key } : item), endStage] };
+      });
+      setSelectedKey(stage.key); setSelectedKeys([stage.key]); setRightPanel("inspector"); setToolsOpen(false); setError(null);
+      return;
+    }
     commit((current) => {
       const currentStages = normalizeFmsDefinition(current).stages;
       const sourceIndex = sourceKey ? currentStages.findIndex((item) => item.key === sourceKey) : -1;
@@ -404,7 +427,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
   const showAi = !!aiPanel && (rightPanel === "ai" || !selected);
   const showInspector = !!selected && !showAi;
   const stageIssues = selected ? issues.filter((issue) => issue.stageKey === selected.key) : [];
-  const editor = selected ? <FmsStageEditor assignmentVersion={normalized.assignmentVersion} data={data} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); setSelectedKeys([value.key]); }} onDelete={() => remove(selected.key)} questionnaire={questionnaireActions(selected)} stage={selected} stages={normalized.stages} /> : null;
+  const editor = selected ? <FmsStageEditor assignmentVersion={normalized.assignmentVersion} data={data} endCounts={endCounts} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); setSelectedKeys([value.key]); }} onDelete={() => remove(selected.key)} questionnaire={questionnaireActions(selected)} stage={selected} stages={normalized.stages} /> : null;
   const inspectorHeader = selected ? <div className="min-w-0"><p className="text-xs text-gold-secondary">{selected.key === triggerKey ? "Start form" : selected.type === "task" ? "Step" : selected.type.replaceAll("_", " ")}</p><h3 className="truncate text-lg font-semibold text-white">{selected.name || "Untitled step"}</h3></div> : null;
   const inspector = selected ? <>
     <div aria-hidden="true" className="fixed inset-0 z-40 bg-obsidian/60 md:hidden" onClick={() => setSelectedKey(null)} />
@@ -428,7 +451,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
     </div>
   </aside> : null;
   const rightPanels = <>{aiPanel ? <div className={showAi ? "contents" : "hidden"}>{aiPanel}</div> : null}{showInspector ? isPhone ? inspector : desktopInspector : null}</>;
-  const canvas = <FmsGraphCanvas definition={normalized} fill={!isPhone} formFields={data.formFields} focusRequest={focusRequest} inspectedKey={selected?.key ?? null} invalidKeys={invalidKeys} onAddAfter={(key) => add("task", key)} onCommand={runCommand} onConnect={connect} onDelete={(key) => requestDelete([key])} onDisconnect={disconnect} onDuplicate={duplicateStage} onEditRoute={editRoute} onMove={moveStages} onOpen={openStage} onReconnect={reconnect} onSelectionChange={changeSelection} ref={canvasRef} selectedKeys={selectedKeys} />;
+  const canvas = <FmsGraphCanvas definition={normalized} endCounts={endCounts} fill={!isPhone} formFields={data.formFields} focusRequest={focusRequest} inspectedKey={selected?.key ?? null} invalidKeys={invalidKeys} onAddAfter={(key) => add("task", key)} onCommand={runCommand} onConnect={connect} onDelete={(key) => requestDelete([key])} onDisconnect={disconnect} onDuplicate={duplicateStage} onEditRoute={editRoute} onMove={moveStages} onOpen={openStage} onReconnect={reconnect} onSelectionChange={changeSelection} ref={canvasRef} selectedKeys={selectedKeys} />;
   const studioStage = studio ? normalized.stages.find((stage) => stage.key === studio.stageKey) : undefined;
   const sectionStage = sectionPicker ? normalized.stages.find((stage) => stage.key === sectionPicker.stageKey) : undefined;
   const previewStage = previewKey ? normalized.stages.find((stage) => stage.key === previewKey) : undefined;
