@@ -15,8 +15,8 @@ function clientRows(offset: number, limit: number) {
 }
 
 const rpc = vi.fn(async (name: string, args: Record<string, unknown> = {}) => {
-  if (name === "browse_crm_records" && countError) return { data: null, error: countError };
-  if (name === "browse_crm_records") return { data: {total:TOTAL,rows:clientRows(Number(args.p_offset),Number(args.p_limit))}, error: null };
+  if (name === "browse_crm_records_page" && countError) return { data: null, error: countError };
+  if (name === "browse_crm_records_page") return { data: {total:TOTAL,rows:clientRows(Number(args.p_offset),Number(args.p_limit))}, error: null };
 
   if (name === "get_my_profile") return { data: [{ role: "salesperson" }], error: null };
   return { data: null, error: null };
@@ -40,7 +40,7 @@ import ClientsPage from "@/app/(crm)/clients/page";
 afterEach(() => { cleanup(); vi.clearAllMocks(); countError = null; });
 
 function browseCalls() {
-  return rpc.mock.calls.filter(([name]) => name === "browse_crm_records").map(([, args]) => args);
+  return rpc.mock.calls.filter(([name]) => name === "browse_crm_records_page").map(([, args]) => args);
 }
 
 describe("Client Database paging", () => {

@@ -76,17 +76,19 @@ function breakdown(visits: Visit[], name: (visit: Visit) => string): Breakdown[]
   return [...groups].map(([name, visits]) => ({ name, visits })).sort((a, b) => b.visits - a.visits || a.name.localeCompare(b.name));
 }
 
-export function buildDashboardData(visits: Visit[], today: string) {
+export function buildDashboardData(visits: Visit[], today: string, statusCounts?: {status:string;n:number}[]) {
+  const count=(group:ReadonlySet<string>)=>statusCounts ? statusCounts.reduce((n,row)=>n+(group.has(row.status)?row.n:0),0) : visits.filter(visit=>group.has(status(visit))).length;
+
   const totals = {
-    walkIns: visits.length,
-    notBought: visits.filter((visit) => statusGroups.nonBuyer.has(status(visit)) && !statusGroups.productReturn.has(status(visit))).length,
-    bought: visits.filter((visit) => statusGroups.readyProduct.has(status(visit))).length,
-    orderPlaced: visits.filter((visit) => statusGroups.orderPlaced.has(status(visit))).length,
-    repairPlaced: visits.filter((visit) => statusGroups.repairPlaced.has(status(visit))).length,
-    orderPickup: visits.filter((visit) => statusGroups.orderPickup.has(status(visit))).length,
-    repairPickup: visits.filter((visit) => statusGroups.repairPickup.has(status(visit))).length,
-    upsale: visits.filter((visit) => statusGroups.upsale.has(status(visit))).length,
-    productReturn: visits.filter((visit) => statusGroups.productReturn.has(status(visit))).length,
+    walkIns: statusCounts ? statusCounts.reduce((n,row)=>n+row.n,0) : visits.length,
+    notBought: count(new Set([...statusGroups.nonBuyer].filter(value=>!statusGroups.productReturn.has(value)))),
+    bought: count(statusGroups.readyProduct),
+    orderPlaced: count(statusGroups.orderPlaced),
+    repairPlaced: count(statusGroups.repairPlaced),
+    orderPickup: count(statusGroups.orderPickup),
+    repairPickup: count(statusGroups.repairPickup),
+    upsale: count(statusGroups.upsale),
+    productReturn: count(statusGroups.productReturn),
   };
   const trend = new Map<string, { day: string; total: number; bought: number; notBought: number }>();
   for (const visit of visits) {
