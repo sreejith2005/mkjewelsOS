@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalizeFmsDefinition, validateFmsDefinition } from "./engine";
-import { fmsDueUrgency, fmsFormDueIssues, fmsFormDueSummary, fmsIncomingFormStages, normalizeFmsFormDue, suggestFmsDueSource } from "./formDue";
+import { fmsAutoDueDateFields, fmsAutoFormDueApplies, fmsDueUrgency, fmsFormDueIssues, isFmsDueDateQuestion, fmsFormDueSummary, fmsIncomingFormStages, normalizeFmsFormDue, suggestFmsDueSource } from "./formDue";
 import { decodeFmsBoard, fmsBoardColumns, fmsWorkspaceFilter, defaultFmsWorkspaceFilters, decodeFmsRecords } from "./taskWorkspace";
 import { createFmsFragment, parseFmsTransfer } from "./transfer";
 import type { FmsFlowDefinition, FmsFormFieldRef, FmsStageDefinition } from "./types";
@@ -57,6 +57,28 @@ describe("due date from a form answer", () => {
     expect(fmsFormDueIssues(def, rule([{ stageKey: "intro", dateFieldKey: "next_date" }, { stageKey: "intro", dateFieldKey: "next_date" }]), 1, lookup)).toContain("Choose one due-date question per earlier step");
     expect(fmsFormDueIssues(def, rule([{ stageKey: "intro", dateFieldKey: "next_date" }]), 0, lookup)).toContain("The first step has no earlier form to take a due date from");
     expect(fmsFormDueSummary(def, { sources: [{ stageKey: "intro", dateFieldKey: "next_date", timeFieldKey: "next_time" }], onMissing: "none" }, lookup)).toBe("From form · Next Follow-up Date + Follow-up Time");
+  });
+});
+
+describe("automatic due date from the previous form", () => {
+  it("reads follow-up, next and appointment questions, never past events", () => {
+    for (const label of ["NEXT FOLLOW UP DATE", "APPOINTMENT IS SET FOR", "Follow-up date", "Call back date"]) expect(isFmsDueDateQuestion(label)).toBe(true);
+    for (const label of ["DM RECEIVED DATE", "Date of birth", "Last visit date", "Order date"]) expect(isFmsDueDateQuestion(label)).toBe(false);
+    expect(fmsAutoDueDateFields([{ key: "dm", label: "DM RECEIVED DATE", type: "date" }, { key: "next", label: "NEXT FOLLOW UP DATE", type: "date" }, { key: "note", label: "Next step", type: "text" }]).map((field) => field.key)).toEqual(["next"]);
+  });
+  it("applies only to a person's step without its own deadline, unless turned off", () => {
+    expect(fmsAutoFormDueApplies(stage("f1", 1))).toBe(true);
+    expect(fmsAutoFormDueApplies(stage("f1", 1, { sla: { dueDate: "", deadlineEnabled: false, autoFormDue: false } }))).toBe(false);
+    expect(fmsAutoFormDueApplies(stage("f1", 1, { sla: { dueDate: "", deadlineEnabled: true, timingMethod: "tat_hours", tatMinutes: 60 } }))).toBe(false);
+    expect(fmsAutoFormDueApplies(stage("f1", 1, { sla: { dueDate: "", deadlineEnabled: false, formDue: { sources: [], onMissing: "none" } } }))).toBe(false);
+    expect(fmsAutoFormDueApplies(stage("end", 1, { type: "end" }))).toBe(false);
+  });
+  it("keeps the off switch through the normalizer and import", () => {
+    const definition = flow([stage("intro", 0), stage("f1", 1, { sla: { dueDate: "", deadlineEnabled: false, autoFormDue: false } })]);
+    expect(normalizeFmsDefinition(definition).stages[1]!.sla.autoFormDue).toBe(false);
+    expect(normalizeFmsDefinition(flow([stage("intro", 0), stage("f1", 1)])).stages[1]!.sla.autoFormDue).toBeUndefined();
+    const imported = parseFmsTransfer(JSON.stringify(createFmsFragment(definition, ["intro", "f1"], new Map())));
+    expect(imported.stages.find((item) => item.key === "f1")!.sla.autoFormDue).toBe(false);
   });
 });
 

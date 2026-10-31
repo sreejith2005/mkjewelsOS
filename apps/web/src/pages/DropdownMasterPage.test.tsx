@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DropdownMasterPage } from "./DropdownMasterPage";
@@ -81,6 +81,6 @@ describe("Dropdown Master overview", () => {
     await user.type(screen.getByLabelText("List name"), "Gift Type");
     await user.type(screen.getByLabelText("Label"), "Coin");
     await user.click(screen.getByRole("button", { name: "Save" }));
-    expect(state.rpc).toHaveBeenCalledWith("change_dropdown_with_audit", expect.objectContaining({ p_operation: "create", p_master_type: "gift_type", p_label: "Coin", p_value: "coin" }));
+    await waitFor(() => expect(state.rpc).toHaveBeenCalledWith("change_dropdown_with_audit", expect.objectContaining({ p_operation: "create", p_master_type: "gift_type", p_label: "Coin", p_value: "coin" })));
   });
 });

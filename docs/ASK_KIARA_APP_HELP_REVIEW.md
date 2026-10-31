@@ -25,8 +25,8 @@ Tasks entry updated against the screens: 2026-10-21 (Anytime duties, task order)
 fill, and recent activity.
 - [ ] See today's work: open Home from the menu. Overdue items are listed first.
 - [ ] Leaders: **Team today** shows Assigned, Done, Pending and Overdue for today; with no tasks of your own the top card shows **Team completion today**. Tap a person under **Needs follow-up** to open their tasks in Task Control.
-- [ ] On mobile, **My Tasks** and **FMS Tasks** start collapsed with pending counts. Tap a heading to expand its work, then tap a task or stage to open it. Desktop starts expanded. No new Kiara read tool is needed; the counts use the existing Home summary.
-- [ ] Fill a form linked to a task: use the form item on Home. It opens the exact form for that task.
+- [ ] Under **Your work**, Home shows three cards: **Daily Checklist**, **My Tasks** and **FMS Tasks**, each with a count and overdue total. On a phone, swipe between them or tap Checklist / My Tasks / FMS at the top (a red dot marks overdue work); tap a task to open it, or **Open all tasks** / **Open FMS tasks** for the full list. On a computer the cards sit side by side. No new Kiara read tool is needed; the cards use the existing Home summary (2026-10-31).
+- [ ] Fill a form linked to a task: on Home the task shows a **Form: form name** tag; tap the task to open it and fill the form.
 
 ## Dashboard
 **What it is:** task, FMS and form numbers for your own scope and a period you choose, with
@@ -234,3 +234,8 @@ Kiara tool decision: no new read tool. Configuration/navigation extends existing
 
 - [ ] Builder: step settings -> **When / Deadline** -> **Due date source**: **From form answer**, **Fixed date and time**, **TAT / relative**, **No due date**. From form answer lists each earlier step that leads here ("Arriving from ...") with **Date question** and optional **Time question**, **Date-only answers are due at**, and **If the date is missing** (fallback timing / no due date / require the date).
 - [ ] Kiara tool decision: no new read tool. Due dates and counts are visible in the existing Tasks -> FMS reads; Kiara's existing task tools are unchanged.
+
+## 2026-10-31 FMS automatic due dates from the previous form (0361)
+
+- [ ] Builder: **When / Deadline** with **Set deadline** off now shows **Take the due date from the previous form** (ticked by default) and lists the question it reads ("From Introduction: NEXT FOLLOW UP DATE or APPOINTMENT IS SET FOR (whichever was answered)"), or warns when the previous form has no follow-up or due date question. The collapsed summary reads **From the previous form**. **No due date** unticks it.
+- [ ] Kiara tool decision: no new read tool. Due dates already show in the existing Tasks and Tasks -> FMS reads.

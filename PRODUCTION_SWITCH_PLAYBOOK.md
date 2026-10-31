@@ -4,7 +4,7 @@ Last source review: 2026-08-29 (Asia/Kolkata)
 
 This is the release procedure for the active JewelOS repository. It separates
 what source code is configured to do from what has actually been verified in a
-hosted environment. Read `AGENTS.md` and `PROJECT_HANDOFF.md` first.
+hosted environment. Read `AGENTS.md` first.
 
 ## 1. Scope and safety rules
 
@@ -74,7 +74,7 @@ project is a launch requirement, not a convenience.
 
 ## 3. Local setup and verification
 
-Follow `LOCAL_DEVELOPMENT.md` for local variables and synthetic users. Typical
+Follow the "Local development" section of `AGENTS.md` for local variables and synthetic users. Typical
 local database startup is:
 
 ```powershell
@@ -315,5 +315,5 @@ Outcome and follow-up:
 
 Update this playbook when the actual host/domain, CI, environments, monitoring,
 backup/recovery process, release commands, or security boundary changes. Keep
-`PROJECT_HANDOFF.md` focused on implementation state and this document focused
+`AGENTS.md` focused on repository rules and this document focused
 on repeatable operational evidence.

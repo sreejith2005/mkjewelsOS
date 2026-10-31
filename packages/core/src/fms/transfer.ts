@@ -181,7 +181,7 @@ function parseBranchRule(raw: unknown, path: string): FmsBranchRule {
   };
 }
 
-const SLA_KEYS = ["pipelineName", "assignment", "completionFormRequired", "taskDisplay", "followUp", "assignmentFieldKey", "formSectionKey", "questionnaire", "timingMethod", "deadlineEnabled", "dueDate", "tatHours", "tatMinutes", "tatUnit", "futureDate", "daysBefore", "clockTime", "triggerStageKey", "decisionMode", "decisionOptions", "conditional", "terminal", "formDue"] as const;
+const SLA_KEYS = ["pipelineName", "assignment", "completionFormRequired", "taskDisplay", "followUp", "assignmentFieldKey", "formSectionKey", "questionnaire", "timingMethod", "deadlineEnabled", "dueDate", "tatHours", "tatMinutes", "tatUnit", "futureDate", "daysBefore", "clockTime", "triggerStageKey", "decisionMode", "decisionOptions", "conditional", "terminal", "formDue", "autoFormDue"] as const;
 
 function parseSla(raw: unknown, path: string): FmsSlaRule {
   if (raw === undefined || raw === null) return { dueDate: "" };
@@ -189,7 +189,7 @@ function parseSla(raw: unknown, path: string): FmsSlaRule {
   onlyKeys(raw, SLA_KEYS, path);
   const sla: Record<string, unknown> = { dueDate: textValue(raw.dueDate, `${path}.dueDate`, 20) ?? "" };
   for (const key of ["pipelineName", "assignmentFieldKey", "formSectionKey", "futureDate", "clockTime", "triggerStageKey"] as const) if (raw[key] !== undefined) sla[key] = textValue(raw[key], `${path}.${key}`, 120);
-  for (const key of ["completionFormRequired", "deadlineEnabled"] as const) if (raw[key] !== undefined) sla[key] = boolValue(raw[key], `${path}.${key}`);
+  for (const key of ["completionFormRequired", "deadlineEnabled", "autoFormDue"] as const) if (raw[key] !== undefined) sla[key] = boolValue(raw[key], `${path}.${key}`);
   for (const key of ["tatHours", "tatMinutes", "daysBefore"] as const) if (raw[key] !== undefined) sla[key] = numberValue(raw[key], `${path}.${key}`);
   if (raw.timingMethod !== undefined) sla.timingMethod = oneOf(raw.timingMethod, ["completion_date", "tat_hours", "days_before_date", "specific_time"] as const, `${path}.timingMethod`);
   if (raw.formDue !== undefined) {
