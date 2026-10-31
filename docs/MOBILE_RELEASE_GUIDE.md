@@ -57,10 +57,8 @@ Read these for product and engineering context. This guide covers only
 release and distribution:
 
 - `AGENTS.md` — repository rules (read first, always)
-- `PROJECT_HANDOFF.md` — product and database state
 - `apps/mobile/README.md` — toolchain, why mobile installs with npm, device dev
-- `docs/MOBILE_HANDOFF.md`, `docs/MOBILE_PARITY_PLAYBOOK.md` — history of the native
-  screens (superseded; the code is under the Git tag `mobile-native-archive`)
+- The retired native screens are under the Git tag `mobile-native-archive` (history only)
 - `PRODUCTION_SWITCH_PLAYBOOK.md` — Supabase migrations / Edge Functions / Vercel
 
 **Web shell (owner decision 2026-10-15).** The app holds no screens of its own: it shows the

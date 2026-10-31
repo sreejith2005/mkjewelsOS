@@ -1,250 +1,203 @@
 # AGENTS.md - JewelOS repository instructions
 
 Read this file completely before inspecting, changing, testing, deploying, or
-publishing anything in this repository.
+publishing anything in this repository. It is the single instruction file for
+people and AI agents; `CLAUDE.md` only points here.
 
-## Repository authority
+## Repository
 
 The only JewelOS implementation is this repository:
+`C:\Users\MIS\Downloads\MKJewelOS` (GitHub `sreejith2005/mkjewelsOS`, default
+branch `main`). Confirm the Git root with `git rev-parse --show-toplevel` before
+any commit or publish.
 
-`C:\Users\MIS\Downloads\MKJewelOS`
+The earlier prototypes (Base44, the mock-data `mkjewelsos` app, the Apps Script
+reference) and the original standalone CRM were removed from this repository
+on 2026-10-31. They are not a specification, dependency, fixture, or target. Do
+not restore them or base work on them.
 
-Run Git, pnpm, Supabase, and file operations from that directory. Confirm the
-Git root with `git rev-parse --show-toplevel` before any commit or publish.
+The sources of truth are the current code, migrations, tests, and these
+maintained documents:
 
-Earlier prototype/Base44 projects are retired. They are not a behavioural
-specification, dependency source, test fixture, or deployment target. Do not
-search for them, restore them, import from them, or base new work on mock-data
-patterns. If an old copy happens to be present in a local checkout, leave it
-alone unless the user explicitly asks to remove it; it is outside the active
-application surface.
+| Document | Use it for |
+|---|---|
+| `PRODUCTION_SWITCH_PLAYBOOK.md` | Every hosted action: migration, function deploy, secret, web deploy |
+| `docs/MOBILE_RELEASE_GUIDE.md` | Android releases (`scripts/release-mobile.ps1` only) |
+| `docs/REGRESSION_CHECKLIST.md` | Manual regression pass |
+| `docs/ASK_KIARA_APP_HELP_REVIEW.md`, `docs/ASK_KIARA_PRODUCTION_TESTING.md` | Kiara's app-help content and owner test guide |
+| `docs/CRM_TWO_PROJECT_PRODUCTION_RUNBOOK.md`, `docs/CRM_SHEETS_INGEST_CUTOVER.md`, `docs/CRM_WALKIN_FIELD_MAP.md` | CRM project operations and walk-in data |
+| `docs/architecture/` | Hosted data inventory and the Forms/FMS -> CRM customer integration design and mappings |
+| `docs/FMS_AI_ASSISTANT.md`, `docs/LEAVE_APPLICATIONS.md` | Feature notes still in use |
+| `docs/superpowers/specs/` | The four designs that code comments cite (CRM embed, CRM two projects, task scores, Ask Kiara) |
+| `apps/mobile/README.md` | Android shell rules and toolchain |
 
-The authoritative sources are the current implementation, migrations, tests,
-and maintained repository documents:
-
-- `PROJECT_HANDOFF.md` - current product and technical state;
-- `PRODUCTION_SWITCH_PLAYBOOK.md` - release gates and production operations;
-- `LOCAL_DEVELOPMENT.md` - local setup and synthetic seed workflow;
-- `docs/superpowers/specs/` and `docs/superpowers/plans/` - approved feature
-  designs/plans when relevant;
-- `supabase/migrations/` and `supabase/tests/` - database contract history and
-  executable authorization tests.
-
-Do not treat a stale document, a commit message, or a frontend control as
-evidence that a feature is live. Check the current files and report the exact
-validation level reached.
+Finished plans, release notes, and verification reports are not kept in the
+tree; they remain in Git history. Do not treat a stale document, a commit
+message, or a frontend control as evidence that a feature is live. Check the
+current files and report the exact validation level reached.
 
 ## Architecture
 
-JewelOS is a pnpm monorepo for MK Jewels' multi-tenant retail operations:
+JewelOS is a pnpm monorepo for MK Jewels' retail operations:
 
 ```text
-apps/web              React 18 + Vite web application
-apps/mobile           Android shell: the deployed web app in one WebView (2026-10-15)
+apps/web              React 18 + Vite web app (deployed on Vercel, project mkjewels-os)
+apps/mobile           Android shell: the deployed web app in one WebView
 packages/core         Pure TypeScript business rules, types, validation, RBAC
+packages/data         Shared data-access layer used by the web app
 packages/api-client   Typed Supabase browser client
+packages/crm-ui       CRM screens rendered by the web app at /crm
 packages/ui-tokens    Shared design tokens
-supabase/migrations   Append-only Postgres schema, RLS, RPC, Storage and cron work
-supabase/tests        pgTAP database-contract tests
-supabase/functions    Edge Functions and their focused tests
-scripts               Controlled operational helpers
+supabase/             JewelOS project: migrations, pgTAP tests, Edge Functions, local seed
+supabase-crm/         CRM project: migrations, pgTAP tests, Edge Functions, Apps Script feed
+scripts/              Controlled operational helpers (release, CRM/FMS reconcile, audits)
 ```
 
-The web app is a client of hosted/local Supabase. The Vite client may contain
-only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (JewelOS project) and
-`VITE_CRM_SUPABASE_URL` and `VITE_CRM_SUPABASE_ANON_KEY` (CRM project, 2026-10-01
-two-project decision). An anon key is safe to ship only because that project's
-database enforces RLS and grants anon nothing it should not have. Service-role keys, cron secrets,
-provider credentials, Auth admin credentials, production exports, and customer
-data are never client configuration, source, Git content, terminal output, or
-chat content.
+### Two Supabase projects (owner decision 2026-10-01, live since 2026-10-06)
+
+- **JewelOS project** (production ref starts `yima`): users, roster, tasks, FMS,
+  forms, leave, notifications, reports, Ask Kiara.
+- **CRM project**: the client database. `/crm` reads and writes it through the
+  JewelOS login bridge (`crm-session-exchange`); JewelOS login is the only login.
+- The projects are never merged. Each record has one home project; the other
+  project receives events only through the audited outbox/inbox sync (roster
+  `crm-staff-sync`, walk-in -> task `sync-deliver`/`crm-sync-receive`, customer
+  answers `crm-customer-sync`).
+- The old JewelOS `crm` schema and `public` legacy CRM tables are retired: add
+  no features to them. New CRM schema work goes in `supabase-crm/`.
+- The CRM keeps field, label, order, vocabulary, flow, validation, and
+  calculation parity with the original MK Jewels CRM, with these approved
+  extensions: `MKC-`/`MKF-`/`MKREF-` identifiers and search, optional client
+  phone, walk-in -> JewelOS task, and channel/FMS contributions to the client
+  record. Its presentation uses the JewelOS theme through
+  `packages/crm-ui/src/crm-port/jewelos-theme.css`; map colours to JewelOS
+  `--color-*` variables there.
+
+The Vite client may contain only `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`,
+`VITE_CRM_SUPABASE_URL`, and `VITE_CRM_SUPABASE_ANON_KEY`. An anon key is safe
+to ship only because the database enforces RLS. Service-role keys, cron
+secrets, provider credentials, Auth admin credentials, production exports, and
+customer data never go into client config, source, Git, terminal output, or
+chat.
+
+### Android app (owner decision 2026-10-15)
+
+The Android app is a native shell that shows the deployed web app full screen
+in one WebView (`apps/mobile/src/features/webShell/`). Product work happens only
+in `apps/web` and the shared packages; web changes reach the app through the web
+deploy and need no APK. Native code is limited to what a web page cannot do on a
+phone: navigation allowlist, downloads, theme strips, back button, offline
+screen, gallery picker, and the update prompt. The old native screens live only
+under the Git tag `mobile-native-archive` and are not a reference.
 
 ## Non-negotiable implementation rules
 
-1. **Real persistence only.** Reads and writes use `@jewelos/api-client` and
-   the Supabase schema. Never add in-memory stores, demo fallback data,
-   `globalThis` databases, hardcoded application records, or a React context as
-   a fake backend. Local sample data belongs only in the local seed workflow.
+1. **Real persistence only.** Reads and writes use `@jewelos/api-client` /
+   `packages/data` and the Supabase schema. Never add in-memory stores, demo
+   fallback data, hardcoded records, or a React context as a fake backend. Local
+   sample data belongs only in the local seed workflow.
 2. **Database authorization is the boundary.** New tenant-scoped tables need
    RLS, minimal grants, tenant/branch/department rules where applicable, and
-   tested reader/writer cases. Hidden menus, disabled controls, and client-side
-   role checks are usability aids, never security controls.
+   tested reader/writer cases. Hidden menus and client role checks are
+   usability aids, never security.
 3. **Protected writes use audited server-side contracts.** Prefer a narrowly
    granted, validated RPC that authorizes the actor and writes its `audit_logs`
-   record in the same transaction. This applies to user and roster changes,
-   availability, task/FMS/form/CRM mutations, dropdown changes, exports,
-   permissions, settings, and operational controls.
-4. **Migrations are forward-only.** Never edit, rename, or reuse an applied
-   migration. Add the next numbered migration, preserve compatible data paths,
-   and update generated database types when the schema changes.
-5. **Shared business logic stays shared.** Put pure recurrence, SLA, task,
-   FMS, forms, notification, CRM, analytics, reports, settings, and role-menu
-   rules in `packages/core`; do not duplicate those rules across clients.
-6. **Strict TypeScript.** Do not add `.jsx`, implicit `any`, or an unchecked
-   type escape. If an unavoidable cast is needed, keep it narrow and explain
-   why it is safe.
-7. **Use design tokens.** Consume `@jewelos/ui-tokens` and existing semantic
-   CSS utilities/components. Do not introduce arbitrary colour values, blue UI
-   accents, or a second design system.
-8. **Keep Storage private by default.** Validate MIME type, size, path scope,
+   row in the same transaction (users, roster, availability, task/FMS/form/CRM
+   mutations, dropdowns, exports, permissions, settings, operational controls).
+4. **Migrations are forward-only.** Never edit, rename, delete, or reuse an
+   applied migration. Add the next number, keep compatible data paths, and
+   regenerate database types when the schema changes. Before numbering, read
+   the production `schema_migrations` ledger and `origin/main`: parallel
+   branches take numbers too.
+5. **Shared business logic stays shared.** Recurrence, SLA, task, FMS, forms,
+   notification, CRM, analytics, reports, settings, and role-menu rules live in
+   `packages/core`; do not duplicate them across clients.
+6. **Strict TypeScript.** No `.jsx`, implicit `any`, or unchecked type escape.
+   A necessary cast stays narrow and says why it is safe.
+7. **Use design tokens.** Consume `@jewelos/ui-tokens` and the existing semantic
+   utilities/components. No arbitrary colours, blue accents, or second design
+   system.
+8. **Storage is private by default.** Validate MIME type, size, path scope,
    authorization, signed URL use, lifecycle/cleanup, and audit linkage.
-9. **Do not weaken security to unblock UI.** An optional maintenance metadata
-   failure must fail open for authorized users, but access control must remain
-   server-side. Never make RLS/RPC checks optional for a browser flow.
+9. **Do not weaken security to unblock UI.** Optional maintenance metadata may
+   fail open for authorized users; RLS/RPC checks are never optional.
 
-## Current product surface
+## Product surface
 
-The current web source contains authenticated, role-aware routes for Home,
-Dashboard, Tasks, FMS, Forms Library, Notifications, CRM, Users, Availability,
-Reports, Dropdown Master, Settings, and Ask Kiara. Meeting AI remains a menu
-identifier, not an implemented route.
+Authenticated, role-aware web routes: Home, Dashboard, Tasks (with Task Control
+and the FMS stage board), FMS (builder, runs, End Nodes, AI assistant), Forms
+Library, Notifications, CRM, Users, Availability (leave), Reports, Dropdown
+Master, Settings (including Customer Integration), and Ask Kiara. Recurring /
+To-Do was retired as a page in migration 0340; recurring work now lives in Tasks
+and Task Control. Meeting AI is a menu identifier only.
 
-### Android app (2026-10-15 owner decision)
+### Keeping Ask Kiara current
 
-The Android app is a native shell that shows the deployed web app full screen
-in one WebView (`apps/mobile/src/features/webShell/`), so the app and the web
-are the same build. Product work happens only in `apps/web` and the shared
-packages; there are no native screens to keep in parity. The hand-written
-native screens were removed; they remain under the Git tag
-`mobile-native-archive` and are not a reference for new work. Native code is
-limited to what a web page cannot do on a phone (navigation allowlist,
-downloads, theme strips, back button, offline screen, the update prompt), and
-the web signs in and keeps its own session inside the WebView. Rules and
-security notes: `apps/mobile/README.md`.
+Kiara (`/ask-kiara`; Edge Functions `ask-kiara`, `kiara-knowledge-ingest`,
+`kiara-insights`) answers only from its tools and from
+`packages/core/src/assistant/appHelp.ts`, so it goes stale silently. Any change
+that adds or renames a section, route, screen, button label, or major feature
+must, in the same change:
 
-Important current contracts include:
-
-- task creation, delegation, templates, recurrence, availability, checklist,
-  attachments, required forms, immediate in-app assignment alerts, and audited
-  CSV import;
-- form drafting, publishing, revision/duplication, form submission/review, and
-  task/FMS form links;
-- FMS drafting/publishing/revision/deletion, graph stages, named assignees,
-  timing/decision conditions, starter form assignments, live instances, and
-  audited stage actions/evidence;
-- CRM clients, walk-ins, interactions, follow-ups, merge safeguards, and
-  documents;
-- notifications/outbox contracts, reports/private export processing, role-aware
-  user administration, controlled roster reconciliation, and section
-  maintenance controls;
-- Ask Kiara (`/ask-kiara`, section `ask_kiara`, migrations 0213-0220, 0227,
-  0230): a read-only assistant that answers about the asker's own work, their
-  Dashboard / Task Control / Reports / leave numbers, colleagues' names and
-  roles, CRM clients (for `crm.view` holders), how to use JewelOS, and the SOP
-  knowledge base with citations, plus "Ask a person" escalations, insights,
-  daily limits, and voice. Edge Functions `ask-kiara`, `kiara-knowledge-ingest`,
-  `kiara-insights`. Design and phases:
-  `docs/superpowers/specs/2026-10-08-ask-kiara-design.md` and
-  `docs/superpowers/plans/2026-10-08-ask-kiara-plan.md`; owner guide
-  `docs/ASK_KIARA_PRODUCTION_TESTING.md`.
-
-### Keeping Ask Kiara current (its "second brain")
-
-Kiara answers only from its tools and from `packages/core/src/assistant/appHelp.ts`,
-so it goes stale silently when the app changes. Any change that adds or renames a
-section, route, screen, button label, or major feature must, in the same change:
-
-1. Update the section's entry in `packages/core/src/assistant/appHelp.ts` (summary
-   and recipes use the exact labels on screen) and
-   `docs/ASK_KIARA_APP_HELP_REVIEW.md`. A new implemented page needs a new entry;
+1. Update that section's entry in `appHelp.ts` (exact on-screen labels) and
+   `docs/ASK_KIARA_APP_HELP_REVIEW.md`. A new page needs a new entry;
    `appHelp.test.ts` fails without one.
-2. Decide whether Kiara needs a read tool for the new data, and write the answer in
-   the PR description. A Kiara tool reads only through an existing section RPC or
-   view called as the asker (never the service role, never a wider raw table read),
-   is offered only with that section's permission and section switch
-   (`packages/core/src/assistant/tools.ts`), and gets allowed and denied eval cases in
-   `docs/superpowers/evals/ask-kiara/cases.json`.
-3. Never let a Kiara tool perform a write. Kiara only answers questions.
-
-### CRM (2026-09-25 owner decision)
-
-The CRM in `packages/crm-ui` (rendered by the web app at `/crm`; Phase 3) and
-database schema `crm` (migrations 0183-0192) is a port of the original MK Jewels
-CRM (`sreejith-crm/web-app`). Parity with the original - screens, fields, order,
-labels, vocabularies, flows, validation, calculations and styling - is the
-acceptance criterion; do not improve, rename, re-order, or merge it with the old
-JewelOS CRM (`public.clients`, `public.client_timeline`, ...), which stays untouched
-until the approved cutover. Approved exception to rule 7: the CRM UI keeps the
-original palette, fonts and CSS, scoped to the CRM surface only. **Superseded for
-presentation (owner decision 2026-10-14):** the CRM now wears the JewelOS theme (tokens,
-type, controls, shell, light/dark) through `packages/crm-ui/src/crm-port/jewelos-theme.css`,
-appended last by `crm-port/document.tsx`. Fields, labels, order, vocabularies, flows,
-validation and calculations stay at parity; keep new CRM styling in that file and map
-colours to JewelOS `--color-*` variables. `sreejith-crm/` is
-a read-only reference, not a dependency: never import from it or build it, and never
-copy its `.env*`, `*.xlsx`, `migration-backups`, `migration-reports`, or Android
-build outputs. JewelOS login is the only CRM login; CRM identity resolves through
-the audited bridge in 0183 (`crm.current_crm_user_id()`). The original's two server
-routes are the Edge Functions `crm-walkin-ingest` (Apps Script, key header, service_role
-RPCs of 0189 only) and `crm-runo-push` (caller JWT, RLS); owner cutover steps are in
-`docs/CRM_SHEETS_INGEST_CUTOVER.md`. CRM work is done only in the worktree `C:\crm`
-(branch `feat/crm-native`); tooling reads the original from `CRM_ORIGINAL_DIR`
-(default `C:\Users\MIS\Downloads\MKJewelOS\sreejith-crm\web-app`). Design and phases:
-`docs/superpowers/specs/2026-09-25-crm-native-integration-design.md`. crm read
-access is company-wide for active CRM users by owner decision; writes follow
-the original branch rules; the database enforces both.
-
-### CRM two-project decision (2026-10-01 owner decision; transition in progress)
-
-The paragraph above describes what is deployed today. The owner has decided the
-target architecture is different. The design is
-`docs/superpowers/specs/2026-10-01-crm-two-project-client-database-design.md`.
-
-- **Two Supabase projects, never merged.** The **CRM project** is the client database.
-  The **JewelOS project** holds users and every internal record (roster, tasks, FMS,
-  forms, leave, notifications, reports).
-- **One home project per record.** The other project never edits that record. It
-  receives events through the audited outbox/inbox sync described in the design.
-- **Target state:** the `/crm` screens read and write the CRM project through a login
-  bridge, and the JewelOS `crm` schema is retired.
-  - Do not add new features to the JewelOS `crm` schema.
-  - New CRM-project schema work goes in `supabase-crm/` (forward-only, pgTAP-tested),
-    once its baseline exists.
-- **Approved extensions** to the parity rule: client `MKC-`, family `MKF-` and referral
-  `MKREF-` identifiers and search; optional client phone; walk-in → JewelOS task; channel
-  and FMS contributions to the client record. Everything else stays at parity.
-- **Sync and live data** (2026-10-05): roster sync JewelOS -> CRM (`0195`, `crm-staff-sync`,
-  CRM `sync-receive`), walk-in -> JewelOS task (CRM `sync-deliver`, `0196`, `crm-sync-receive`),
-  the Apps Script walk-in feed (CRM `crm-walkin-ingest`). The ordered owner steps are in
-  `docs/CRM_TWO_PROJECT_PRODUCTION_RUNBOOK.md`; `feat/crm-native` is merged into `main` only at
-  its step f.
-- **Hosted actions.** Every hosted action on either project (migration, data move, secret,
-  deploy) follows `PRODUCTION_SWITCH_PLAYBOOK.md` and is run by, or in front of, the
-  owner.
-
-Read the relevant source, migration, and pgTAP test before changing one of
-these areas. Preserve historical task/form/FMS data when evolving a contract.
-For authoritative roster work, preserve personal contact information and use
-approved work email for login; stop and obtain approval before retiring an
-active conflicting account.
+2. Decide whether Kiara needs a read tool for the new data and say so in the PR.
+   A Kiara tool reads only through an existing section RPC or view called as the
+   asker (never service role, never a wider raw table read), is offered only
+   with that section's permission and switch (`packages/core/src/assistant/tools.ts`),
+   and gets allowed and denied cases in `docs/superpowers/evals/ask-kiara/cases.json`.
+3. Never let a Kiara tool write. Kiara only answers questions.
 
 ## Working safely
 
-1. Inspect `git status --short --branch` before editing. This worktree may
-   contain user changes; preserve unrelated work.
-2. For a non-trivial feature or behavioural change, read the applicable design
-   and write/refresh a concrete plan before implementation.
-3. Search current source, migrations, tests, and call sites before changing an
-   interface. Do not guess a database/RPC contract from UI code alone.
-4. Use `pnpm.cmd` and `supabase.cmd` on this Windows host. PowerShell `.ps1`
-   shims may be blocked. Run commands from this repository root.
-5. Make the smallest scoped change. Do not build adjacent modules merely
-   because their tables or menus already exist.
-6. For migrations and edge functions, test unauthenticated, inactive,
+1. Inspect `git status --short --branch` first. Other sessions may be editing
+   or committing in this checkout: preserve unrelated work, stage only named
+   paths, and prefer a separate worktree (outside this folder) per branch.
+2. For a non-trivial change, read the relevant source, migration, and pgTAP
+   test, then write a short plan before implementing.
+3. Search call sites before changing an interface. Do not guess a database/RPC
+   contract from UI code.
+4. Use `pnpm.cmd` and `supabase.cmd` on this Windows host (`.ps1` shims may be
+   blocked). Run commands from the repository root.
+5. Make the smallest scoped change. Do not build adjacent modules because their
+   tables or menus exist.
+6. For migrations and Edge Functions, test unauthenticated, inactive,
    cross-tenant, cross-branch, ordinary-user, privileged-user, and service-role
    paths where they apply.
-7. Treat database and hosted actions separately. `supabase.cmd db reset` and
-   local seed scripts are local-only. Every `--linked` command targets a real
-   hosted project: confirm it and use the production playbook.
+7. `supabase.cmd db reset` and the seed scripts are local-only. Every `--linked`
+   command hits a real hosted project: confirm the project ref and follow the
+   production playbook. Hosted actions are run by, or in front of, the owner.
+8. The owner tests on production. Finish a change with merge, production
+   deploy steps, and a short owner checklist for the live site.
+
+## Local development
+
+Prerequisites: Node.js 20.19+, pnpm 11, Docker Desktop (Linux containers),
+Supabase CLI. Keys stay in the current PowerShell session only:
+
+```powershell
+pnpm.cmd install --frozen-lockfile
+supabase.cmd start
+supabase.cmd db reset            # local database only; never add --linked
+$s = supabase.cmd status -o json | ConvertFrom-Json
+$env:SUPABASE_URL = $s.API_URL
+$env:SEED_SUPABASE_SERVICE_ROLE_KEY = $s.SERVICE_ROLE_KEY
+$env:VITE_SUPABASE_URL = $s.API_URL
+$env:VITE_SUPABASE_ANON_KEY = $s.ANON_KEY
+pnpm.cmd seed:local              # refuses non-local URLs
+pnpm.cmd --filter web dev        # http://localhost:5173
+```
+
+Local-only synthetic logins: `admin@mkjewels.local` / `admin123`,
+`crm@mkjewels.local` / `crm123`, `sales@mkjewels.local` / `sales123`. Seed
+source data is described in `supabase/seed-notes.md`.
 
 ## Validation and reporting
 
-Use the smallest focused checks first, then the relevant broader checks. A
-typical full local gate, when Docker is available, is:
+Run the smallest focused checks first, then the broader gate. With Docker:
 
 ```powershell
-supabase.cmd start
-supabase.cmd db reset
 supabase.cmd test db
 supabase.cmd db lint --local --level warning
 pnpm.cmd --filter @jewelos/core test
@@ -254,138 +207,97 @@ pnpm.cmd exec turbo run build --force --concurrency=1
 git diff --check
 ```
 
-Adapt the command list to the change. If Docker, browser automation, a device,
-or hosted credentials are unavailable, say exactly what was and was not proven;
-static/type/build checks do not prove Postgres, RLS, RPC, Storage, edge-runtime,
-or rendered UX behaviour.
+CI (`.github/workflows/ci.yml`) runs the core and web tests, typecheck, build,
+and `git diff --check`. If Docker, a browser, a device, or hosted credentials are
+unavailable, say exactly what was and was not proven: static/type/build checks
+do not prove Postgres, RLS, RPC, Storage, edge-runtime, or rendered behaviour.
 
-At handoff report:
-
-- files changed and why;
-- schema/RPC/RLS/Storage/audit impact and generated-type impact;
-- behaviour deliberately changed and any compatibility/data-migration concern;
-- exact validation commands and concise results, with local and hosted evidence
-  kept separate;
-- TODOs, blockers, and the next approval gate.
-
-Do not claim a feature is production-ready from a green typecheck/build alone.
+At handoff report: files changed and why; schema/RPC/RLS/Storage/audit and
+generated-type impact; deliberate behaviour changes and data concerns; exact
+validation commands and results (local and hosted kept separate); TODOs,
+blockers, and the next approval gate. Never claim production readiness from a
+green typecheck/build alone.
 
 ## Git and release discipline
 
 Read `PRODUCTION_SWITCH_PLAYBOOK.md` before a deploy, migration apply, secret
-change, or GitHub publish. Review a dirty worktree, stage only named approved
-paths, inspect the staged diff, run `git diff --cached --check`, and perform a
-credential-safe staged scan. Never include `.env`, `.supabase`,
-`supabase/.temp`, secrets, exports, or customer data. A Git push is not a
-Supabase migration/function/web-host deployment or production verification.
+change, or GitHub publish. Stage only named approved paths, inspect the staged
+diff, run `git diff --cached --check`, and scan for credentials. Never commit
+`.env`, `.supabase`, `supabase/.temp`, secrets, exports, or customer data. A Git
+push is not a Supabase migration/function deploy, a web deploy, or production
+verification.
 
-Android releases to employees follow `docs/MOBILE_RELEASE_GUIDE.md` and are cut
-only with `scripts/release-mobile.ps1`. It publishes the signed APK and the
-`latest.json` update manifest that installed apps poll. Never hand-roll a
-release, reuse a `versionCode`, or publish a non-mobile GitHub release as
-"latest" in this repository.
+Android releases follow `docs/MOBILE_RELEASE_GUIDE.md` and are cut only with
+`scripts/release-mobile.ps1`, which publishes the signed APK and the
+`latest.json` manifest installed apps poll. Never hand-roll a release, reuse a
+`versionCode`, or publish a non-mobile GitHub release as "latest".
 
-**Standing user release instruction (2026-09-23):** After completing an
-authorized change that affects the employee Android app (`apps/mobile/**`
-only: since the 2026-10-15 web shell, web and shared-package changes reach the
-app through the web deploy), run the required checks, commit the
-reviewed paths, publish the next signed Android update with
-`scripts/release-mobile.ps1`, push its release commit to `origin/main`, and
-verify the public `latest.json` and APK asset. Do this as part of the task,
-including in new chats, without asking again for routine release approval.
-Stop and report if a required gate fails; do not publish an unverified APK.
-Web changes need no APK and no native work. Documentation-only edits do not
-require a new APK. `-Mandatory`
-still requires explicit user approval because it blocks employees until they
-update. The permanent employee download link is
+**Standing release instruction (2026-09-23):** after an authorized change to
+`apps/mobile/**`, run the checks, commit the reviewed paths, publish the next
+signed update with `scripts/release-mobile.ps1`, push its release commit to
+`origin/main`, and verify the public `latest.json` and APK asset, without asking
+again for routine approval. Stop and report if a gate fails. Web, shared-package,
+and documentation changes need no APK. `-Mandatory` still needs explicit owner
+approval. Permanent download link:
 `https://github.com/sreejith2005/mkjewelsOS/releases/latest/download/JewelOS.apk`.
 
-## Regression-Safe Development Rules
+## Regression-safe development
 
-This application contains production functionality that must be treated as protected behavior.
+Existing production behaviour is protected.
 
-Before modifying an existing feature, inspect and understand its current implementation and dependencies.
+- Understand a feature's implementation and consumers before changing it, and
+  make the smallest safe change. Do not rewrite or restructure working code
+  unless the request requires it.
+- Preserve existing behaviour unless the owner asks for a change. Fix root
+  causes, not narrow workarounds.
+- Reuse the existing source of truth; never add a second implementation of an
+  existing system.
+- After every change, run the relevant tests and check related workflows, not
+  only the new feature.
 
-Prefer the smallest safe change that satisfies the requested requirement.
+Authorization:
 
-DO NOT rewrite, replace, refactor, or restructure working functionality unless it is strictly necessary for the requested change.
-
-Every new feature must preserve existing behavior unless the user explicitly requests a behavior change.
-
-When modifying shared components, services, database queries, authentication, authorization, routing, task logic, notification logic, or state management, identify all existing consumers before changing the implementation.
-
-After every change, run the relevant existing tests and perform regression checks on related functionality.
-
-Never assume that because a new feature works, the task is complete. Verify that existing workflows still work.
-
-When fixing a bug, fix the underlying cause rather than introducing a narrowly scoped workaround that may create inconsistencies elsewhere.
-
-Do not duplicate business logic in multiple places. Reuse the existing source of truth.
-
-Do not introduce a second implementation of an existing system when the existing system can be extended safely.
-
-For authorization specifically:
-- Never rely solely on frontend visibility or route hiding for security.
-- Enforce authorization at the appropriate backend/API/database boundary.
-- Centralize permission resolution.
-- Do not scatter hard-coded role checks throughout the application.
-- Role permissions, user-specific overrides, dashboard authority, and feature availability must remain conceptually separate.
-- Any permission change must be tested for both allowed and denied access.
-- Never allow client-controlled role/permission values to determine authorization.
-
-Before marking a task complete, verify:
-1. The requested feature works.
-2. Existing related functionality still works.
-3. Unauthorized access is actually blocked.
-4. Direct URL/API access cannot bypass the new restriction.
-5. No duplicate or conflicting permission logic has been introduced.
-6. Existing users retain their previous behavior unless intentionally changed.
+- Enforce it at the database/API boundary, never only by hiding routes.
+- Keep permission resolution central; no scattered hard-coded role checks.
+- Role permissions, user overrides, dashboard authority, and feature
+  availability stay conceptually separate.
+- Test every permission change for both allowed and denied access, including
+  direct URL/API access. Client-supplied role values never decide access.
 
 ### Protected cross-surface workflows
 
 Home alerts, Notifications, Tasks, a direct URL, and the web app (also inside
-the Android shell) are **entry surfaces onto one persisted work item** — not
-separate features. A
-change to a task, FMS, or form identifier, route, completion path, or
-notification state is a change to every one of them at once.
+the Android shell) are entry points onto one persisted work item. A change to a
+task, FMS, or form identifier, route, completion path, or notification state
+changes all of them. Inventory consumers across `apps/web`, `packages/core`,
+`packages/data`, and `supabase/migrations`, and test more than one surface.
 
-Before changing any of those, inventory the consumers across `apps/web`,
-`packages/core`, `packages/data`, and `supabase/migrations`, and cover the
-change with tests on more than one surface.
-
-- **Identify assigned work by its assignment, never by inference.** A starter
-  assignment is addressed by `fms_starter_assignment_id`; a runtime step by
-  `fms_instance_id` + `fms_instance_stage_id`. One form template backs many
-  assignments, so inferring work from a form id opens someone else's work.
-- **One destination contract.** `fmsAssignedWorkPath` / `parseFmsAssignedWorkPath`
-  in `@jewelos/core` are the only definition of an FMS work link. Do not add a
-  client-local deep-link helper.
-- **Submission and completion are one server-side transaction.** Submitting the
-  required form and completing/progressing its stage must not be two client
-  calls that can half-fail.
-- **Notification state is derived from durable work state.** A notification is
-  closed by a trigger on the underlying assignment completing, so completion is
-  correct regardless of which surface the user finished the work on. Never mark
-  a notification read from the client as a proxy for completion, and preserve
-  history (`is_read`, `read_at`) instead of deleting rows.
-- **A task feed must not hide open work.** Date-window filters apply to dated
-  work only; open FMS work stays visible regardless of its date, including when
-  it is future-dated or has no date. The filter lives in
-  `taskFeedCurrentOrOverdueFilter` — both API layers call it, neither copies it.
-- **Builder and canvas edits need phone-width checks.** A fix to the FMS
-  builder, the forms builder, or their canvases is incomplete until it is
-  checked at phone width, which is also what the Android app shows.
+- **Identify assigned work by its assignment.** A starter assignment is
+  `fms_starter_assignment_id`; a runtime step is `fms_instance_id` +
+  `fms_instance_stage_id`. One form template backs many assignments, so never
+  infer work from a form id.
+- **One link contract.** `fmsAssignedWorkPath` / `parseFmsAssignedWorkPath` in
+  `@jewelos/core` are the only FMS work-link definition.
+- **Submit and complete in one server transaction.** Submitting the required
+  form and progressing its stage must not be two client calls.
+- **Notification state follows durable work state.** A trigger on the
+  assignment completing closes the notification. Never mark it read from the
+  client as a proxy, and keep history (`is_read`, `read_at`) instead of deleting.
+- **A task feed must not hide open work.** Date filters apply to dated work
+  only; open FMS work stays visible even when future-dated or undated. The
+  filter is `taskFeedCurrentOrOverdueFilter`; both API layers call it.
+- **Builder and canvas edits need phone-width checks**, since that is what the
+  Android app shows. In full-screen phone sheets, avoid nested scroll areas.
 
 ### Authorization map (migration 0156)
 
-- The permission resolver is `permission_effective_for()` in the database;
-  `packages/core/src/permissions` mirrors it for previews and is kept in parity
-  by `catalog.migration.test.ts`. Use `has_permission('<key>')` in SQL and
-  `hasPermission(access, "<key>")` in clients instead of new role lists.
-- Dashboard authority is applied by `current_profile()` / `current_role_level()`;
+- The resolver is `permission_effective_for()` in the database;
+  `packages/core/src/permissions` mirrors it for previews, kept in parity by
+  `catalog.migration.test.ts`. Use `has_permission('<key>')` in SQL and
+  `hasPermission(access, "<key>")` in clients instead of role lists.
+- Dashboard authority comes from `current_profile()` / `current_role_level()`;
   resolve actors through `current_profile()`, never an inline
   `user_profiles where auth_user_id = auth.uid()` lookup.
-- A new section RPC must call `assert_module_enabled('<page>')` (or
-  `assert_module_access` when it is used only by that section), and a new
+- A new section RPC calls `assert_module_enabled('<page>')` (or
+  `assert_module_access` when only that section uses it), and a new
   section-owned table needs a restrictive `module_accessible` SELECT policy.
-- The manual regression pass lives in `docs/REGRESSION_CHECKLIST.md`.
