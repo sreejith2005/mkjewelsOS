@@ -223,3 +223,8 @@ assigned stage" recipe is updated. No new read tool.
 
 - [ ] Builder: step settings -> **When / Deadline** -> **Due date source**: **From form answer**, **Fixed date and time**, **TAT / relative**, **No due date**. From form answer lists each earlier step that leads here ("Arriving from ...") with **Date question** and optional **Time question**, **Date-only answers are due at**, and **If the date is missing** (fallback timing / no due date / require the date).
 - [ ] Kiara tool decision: no new read tool. Due dates and counts are visible in the existing Tasks -> FMS reads; Kiara's existing task tools are unchanged.
+
+## 2026-10-31 FMS automatic due dates from the previous form (0361)
+
+- [ ] Builder: **When / Deadline** with **Set deadline** off now shows **Take the due date from the previous form** (ticked by default) and lists the question it reads ("From Introduction: NEXT FOLLOW UP DATE or APPOINTMENT IS SET FOR (whichever was answered)"), or warns when the previous form has no follow-up or due date question. The collapsed summary reads **From the previous form**. **No due date** unticks it.
+- [ ] Kiara tool decision: no new read tool. Due dates already show in the existing Tasks and Tasks -> FMS reads.

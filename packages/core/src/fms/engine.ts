@@ -75,6 +75,7 @@ export function normalizeFmsDefinition(input: FmsFlowDefinition): FmsFlowDefinit
       timingMethod: TIMING_METHODS.has(stage.sla?.timingMethod as FmsTimingMethod) ? stage.sla.timingMethod as FmsTimingMethod : "completion_date",
       dueDate: text(stage.sla?.dueDate), deadlineEnabled: stage.sla?.deadlineEnabled !== false,
       ...(() => { const formDue = normalizeFmsFormDue(stage.sla?.formDue); return formDue ? { formDue } : {}; })(),
+      ...(stage.sla?.autoFormDue === false ? { autoFormDue: false } : {}),
       decisionMode: stage.sla?.decisionMode === "yes_no" || stage.sla?.decisionMode === "decision" ? "yes_no" as const : "normal" as const,
       ...(stage.sla?.decisionMode === "yes_no" || stage.sla?.decisionMode === "decision" ? { decisionOptions: (array<FmsDecisionOption>(stage.sla?.decisionOptions).map((option) => ({ key: text(option.key).toLowerCase(), label: text(option.label) })).filter((option) => option.key && option.label).length ? array<FmsDecisionOption>(stage.sla?.decisionOptions).map((option) => ({ key: text(option.key).toLowerCase(), label: text(option.label) })).filter((option) => option.key && option.label) : legacyDecisionOptions) } : {}),
       ...(Number.isFinite(stage.sla?.tatHours) ? { tatHours: Number(stage.sla.tatHours) } : {}),

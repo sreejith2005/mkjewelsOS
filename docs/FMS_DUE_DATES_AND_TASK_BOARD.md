@@ -87,3 +87,16 @@ Web only: no Android release (the app is the web shell).
 * pgTAP `0360_fms_form_due_dates_and_task_board`: 60/60 (publication rules; Intro->F1 date+time+Assigned To; F1->F2 end of day; F2->F3 default time; Demo->F1 datetime; skipped conditional; required missing/malformed rolls back with no downstream visit; fallback TAT; loop visit 2; past date overdue; retry no duplicate; history kept; no direct reschedule; landing/board/stage-page counts exact beyond the page; overdue first; filters; priority sort; repeat visits; manager team scope and employee filter; staff team = own; other tenant sees nothing; End Node closure removes cards).
 * Full pgTAP: no new failures. Pre-existing failures unchanged (0006, 0008, 0010, 0031 #5/#7, 0032, 0035, 0036, 0041, 0062, 0106/0199/0207/0213-0220 retirement manifest, 0124, 0195, 0202, 0208 plan count). 0312 passed when run alone (its budget test timed out once under the full parallel load).
 * Vitest: see the PR description for the final counts.
+
+## 7. Automatic due date (2026-10-31, migration 0361)
+
+On production no step was ever set to "From form answer": every step still had **Set deadline** off, so all FMS work was undated. From 0361 a person's step with the deadline off and no `formDue` rule takes its due date automatically from the causal previous form (same source as section 2):
+
+* Only `date`/`datetime` questions whose name means a future date (`fms_due_question_name`, mirrored by `isFmsDueDateQuestion`: next, follow-up, due, deadline, appointment, meeting, call back, visit, schedule, revisit) and not a past event (last, previous, received, birth, DOB, anniversary, created, joined, purchased). "DM RECEIVED DATE" is never used.
+* The question must be shown, its condition met and its section reached (the section the employee filled), as in section 2. Unanswered or malformed answers are skipped and never block the submission.
+* Several answered questions with different dates: no due date (no guessing). The same date twice is fine.
+* Date only: end of that day in the tenant timezone, or the answer of the single answered "time" question in the same section.
+* Precedence: explicit `formDue` rule -> explicit timing rule (deadline on) -> automatic date (deadline off) -> none. `planned_time_rule.autoFormDue = false` (builder: untick **Take the due date from the previous form**, or choose **No due date**) turns it off for a step.
+* Provenance: `fms_stage_logs` `due_date_resolved` with `automatic: true`, written only when a date was found.
+* One-time backfill: open, undated visits of active runs whose previous form has such an answer got their date (`backfill: true` in the log). Completed visits are untouched.
+* Nothing else changed: the task feed, Tasks -> FMS list, board and the SLA timer already read `planned_datetime`, so these tasks show their due date and turn overdue like normal tasks.

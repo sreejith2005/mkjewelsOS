@@ -20,6 +20,13 @@ const TIME_TYPES = new Set(["text", "select", "radio"]);
 /** Question names that clearly mean "when the next task is due". */
 const DUE_INTENT = /\b(next|follow[\s-]?up|due|deadline|appointment|meeting|call\s?back|callback|visit|schedule[d]?|revisit)\b/i;
 const TIME_INTENT = /\btime\b/i;
+/** Names of dates that already happened (DM received, last visit, birthday): never a due date. */
+const PAST_INTENT = /\b(last|previous|received|birth|dob|anniversary|created|joined|joining|purchased?)\b/i;
+
+/** A question whose name clearly means "when the next task is due". Same rule as fms_due_question_name. */
+export function isFmsDueDateQuestion(label: string): boolean {
+  return DUE_INTENT.test(label) && !PAST_INTENT.test(label);
+}
 
 /** Date or date-and-time questions that can set a due date. */
 export function fmsDueDateFields(fields: readonly FmsFormFieldRef[]): FmsFormFieldRef[] {
@@ -37,11 +44,25 @@ export function fmsDueTimeFields(fields: readonly FmsFormFieldRef[]): FmsFormFie
  */
 export function suggestFmsDueSource(stageKey: string, fields: readonly FmsFormFieldRef[]): FmsFormDueSource | undefined {
   const dates = fmsDueDateFields(fields);
-  if (dates.length !== 1 || !DUE_INTENT.test(dates[0]!.label)) return undefined;
+  if (dates.length !== 1 || !isFmsDueDateQuestion(dates[0]!.label)) return undefined;
   const date = dates[0]!;
   if (date.type !== "date") return { stageKey, dateFieldKey: date.key };
   const times = fmsDueTimeFields(fields).filter((field) => TIME_INTENT.test(field.label));
   return { stageKey, dateFieldKey: date.key, ...(times.length === 1 ? { timeFieldKey: times[0]!.key } : {}) };
+}
+
+/**
+ * Automatic due date (migration 0361, fms_auto_form_due): a person's step with
+ * no deadline of its own and no form-answer rule reads the previous form's
+ * answered follow-up/next/due date. No setting is needed; "No due date"
+ * (autoFormDue: false) turns it off.
+ */
+export function fmsAutoFormDueApplies(stage: Pick<FmsStageDefinition, "type" | "sla">): boolean {
+  return ["form", "task", "approval"].includes(stage.type) && stage.sla.deadlineEnabled === false && !stage.sla.formDue && stage.sla.autoFormDue !== false;
+}
+/** Date questions the automatic due date can read from a step's form. */
+export function fmsAutoDueDateFields(fields: readonly FmsFormFieldRef[]): FmsFormFieldRef[] {
+  return fmsDueDateFields(fields).filter((field) => isFmsDueDateQuestion(field.label));
 }
 
 /** Steps with a form that route into `stageKey` (default next, routes, parallel starts). */
