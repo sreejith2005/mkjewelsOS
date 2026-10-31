@@ -22,12 +22,16 @@ begin
  -- 0317 projects names after the membership relation; apply scope before that
  -- projection so every count/page uses the same authorized calendar window.
  amended:=replace(amended,'from membership where (',E'from membership where (coalesce(p_filter->>''scope'',''overall'')=''overall'' or task_calendar_scope_matches(p_filter->>''scope'',deadline,status::text))\n   and (');
- -- Modern scoped/search clients can select completed authorized FMS rows too.
- -- Retain the legacy active-only board and the exact workspace membership check.
+ -- Both installed variants retain the exact authorized workspace membership.
+ -- Production also supports explicit completed history; preserve those defaults
+ -- while allowing an explicit calendar scope to include authorized history.
  amended:=replace(amended,
   $patch$section_filter<>'fms' or id in (select id from fms_workspace_rows('{}') where bucket in ('pending','overdue'))$patch$,
-  $patch$section_filter<>'fms' or id in (select id from fms_workspace_rows('{}') where (status_filter='completed' and bucket='completed' or mode='explore' or p_filter ? 'scope' or bucket in ('pending','overdue')))$patch$);
- if position($patch$mode='explore' or p_filter ? 'scope' or bucket$patch$ in amended)=0 then raise exception 'Review completed FMS search membership patch'; end if;
+  $patch$section_filter<>'fms' or id in (select id from fms_workspace_rows('{}') where (bucket='completed' and status_filter='completed' or bucket in ('pending','overdue') and status_filter<>'completed' or mode='explore' and status_filter='all' or p_filter ? 'scope' and (status_filter='all' or bucket=status_filter)))$patch$);
+ amended:=replace(amended,
+  $patch$section_filter<>'fms' or id in (select id from fms_workspace_rows('{}') where (bucket='completed' and status_filter='completed' or bucket in ('pending','overdue') and status_filter<>'completed' or mode='explore' and status_filter='all'))$patch$,
+  $patch$section_filter<>'fms' or id in (select id from fms_workspace_rows('{}') where (bucket='completed' and status_filter='completed' or bucket in ('pending','overdue') and status_filter<>'completed' or mode='explore' and status_filter='all' or p_filter ? 'scope' and (status_filter='all' or bucket=status_filter)))$patch$);
+ if position($patch$p_filter ? 'scope' and (status_filter='all' or bucket=status_filter)$patch$ in amended)=0 then raise exception 'Review completed FMS search membership patch'; end if;
  if amended=original or position('task_calendar_scope_matches' in amended)=0 or position('''scope'') or jsonb_typeof' in amended)=0 then raise exception 'Review task scope patch against current workspace'; end if;
  execute amended;
  original:=pg_get_functiondef('fms_workspace_validate(jsonb,integer,integer)'::regprocedure);
