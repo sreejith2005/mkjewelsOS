@@ -83,6 +83,12 @@ export type FmsSlaRule = Readonly<{
   deadlineEnabled?: boolean | undefined;
   /** Take the due date from an earlier form answer; the timing rule above becomes the fallback. */
   formDue?: FmsFormDueRule | undefined;
+  /**
+   * A person's step with no deadline of its own takes the due date from the
+   * previous form's follow-up/next/due date answer automatically (absent = on).
+   * false = the author chose "No due date" for this step.
+   */
+  autoFormDue?: boolean | undefined;
   dueDate: string;
   tatHours?: number | undefined;
   tatMinutes?: number | undefined;

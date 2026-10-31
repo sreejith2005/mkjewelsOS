@@ -5,7 +5,7 @@ import { useState } from "react";
 import { afterEach, expect, it } from "vitest";
 import type { FmsSlaRule, FmsStageDefinition } from "@jewelos/core";
 import type { FmsData } from "./api";
-import { FmsDueDateSource, fmsDueSourceMode } from "./FmsDueDateSource";
+import { FmsAutoFormDue, FmsDueDateSource, fmsDueSourceMode } from "./FmsDueDateSource";
 
 afterEach(cleanup);
 const introForm = "11111111-1111-4111-8111-111111111111";
@@ -57,4 +57,35 @@ it("keeps an explicit configuration, offers the missing-answer policies and the 
   await userEvent.click(screen.getByRole("button", { name: /TAT \/ relative/ }));
   expect(sla().formDue).toBeUndefined(); expect(sla().timingMethod).toBe("tat_hours");
   expect(fmsDueSourceMode(sla())).toBe("tat");
+});
+
+function AutoHarness({ initial, introFields }: { initial: FmsSlaRule; introFields?: FmsData["formFields"][string] }) {
+  const [sla, setSla] = useState<FmsSlaRule>(initial);
+  const formFields = introFields ? { ...data.formFields, [introForm]: introFields } : data.formFields;
+  const stages = [step("intro", 0, { formTemplateId: introForm, defaultNextStageKey: "f1" }), step("f1", 1, { sla })];
+  return <><FmsAutoFormDue data={{ ...data, formFields } as FmsData} stage={stages[1]!} stageIndex={1} stages={stages} updateSla={(patch) => setSla((current) => ({ ...current, ...patch }))} />
+    <output data-testid="sla">{JSON.stringify(sla)}</output></>;
+}
+
+it("shows the automatic due date a step takes when its deadline is off, and lets the author turn it off", async () => {
+  render(<AutoHarness initial={{ dueDate: "", deadlineEnabled: false }} />);
+  expect(screen.getByText(/Next Follow-up Date/)).toBeTruthy();
+  const box = screen.getByRole("checkbox", { name: /Take the due date from the previous form/ }) as HTMLInputElement;
+  expect(box.checked).toBe(true);
+  await userEvent.click(box);
+  expect(sla().autoFormDue).toBe(false);
+  expect(screen.getByText("No due date for this step.")).toBeTruthy();
+  await userEvent.click(box);
+  expect(sla().autoFormDue).toBeUndefined();
+});
+
+it("warns when the previous form has no follow-up date question", () => {
+  render(<AutoHarness initial={{ dueDate: "", deadlineEnabled: false }} introFields={[{ key: "dm", label: "DM Received Date", type: "date" }]} />);
+  expect(screen.getByText(/has no follow-up or due date question/)).toBeTruthy();
+});
+
+it("No due date turns the automatic date off too", async () => {
+  render(<Harness initial={{ dueDate: "", deadlineEnabled: true, timingMethod: "completion_date" }} />);
+  await userEvent.click(screen.getByRole("button", { name: /No due date/ }));
+  expect(sla().deadlineEnabled).toBe(false); expect(sla().autoFormDue).toBe(false);
 });

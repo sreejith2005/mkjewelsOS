@@ -7,7 +7,7 @@ import {
   FMS_BRANCH_OPERATORS,
   fmsStageNeedsAssignment,
   fmsFieldOptions,
-  fmsFormDueSummary,
+  fmsAutoFormDueApplies, fmsFormDueSummary,
   fmsRouteAnswerSelection,
   fmsAssignmentFields,
   fmsStageFormFields,
@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
 import type { FmsData } from "./api";
 import { newerFormVersion } from "./definition";
 import { FmsEndNodeEditor } from "./FmsEndNodeEditor";
-import { FmsDueDateSource } from "./FmsDueDateSource";
+import { FmsAutoFormDue, FmsDueDateSource } from "./FmsDueDateSource";
 import { convertFmsStageToEnd, fmsOutgoingStageKeys } from "@jewelos/core";
 
 const humanTypes: readonly FmsStageDefinition["type"][] = ["form", "task", "approval"];
@@ -153,7 +153,8 @@ function FmsStepEditor({ stage, stages, data, onChange, onDelete, assignmentVers
     <InspectorSection
       focus="deadline"
       onSwitch={(on) => updateSla({ deadlineEnabled: on })}
-      summary={deadlineOn ? stage.sla.formDue ? fmsFormDueSummary({ stages }, stage.sla.formDue, data.formFields) : timingSummary(stage.sla) : "Off"}
+      summary={deadlineOn ? stage.sla.formDue ? fmsFormDueSummary({ stages }, stage.sla.formDue, data.formFields) : timingSummary(stage.sla) : human && stageIndex > 0 && fmsAutoFormDueApplies(stage) ? "From the previous form" : "Off"}
+      offContent={human ? <FmsAutoFormDue data={data} stage={stage} stageIndex={stageIndex} stages={stages} updateSla={updateSla} /> : undefined}
       switchLabel="Set deadline"
       switched={deadlineOn}
       title="When / Deadline"
@@ -209,7 +210,7 @@ function FmsStepEditor({ stage, stages, data, onChange, onDelete, assignmentVers
  * collapsing never changes a stored value. An optional switch is the real
  * setting (for example "Set deadline"); turning it on opens the section.
  */
-export function InspectorSection({ title, summary, children, defaultOpen = false, switched, onSwitch, switchLabel, focus }: { title: string; summary?: ReactNode; children: ReactNode; defaultOpen?: boolean; switched?: boolean | undefined; onSwitch?: ((on: boolean) => void) | undefined; switchLabel?: string | undefined; focus?: string | undefined }) {
+export function InspectorSection({ title, summary, children, defaultOpen = false, switched, onSwitch, switchLabel, focus, offContent }: { title: string; summary?: ReactNode; children: ReactNode; defaultOpen?: boolean; switched?: boolean | undefined; onSwitch?: ((on: boolean) => void) | undefined; switchLabel?: string | undefined; focus?: string | undefined; offContent?: ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
   return <details className="group rounded-xl border border-gold/15 open:border-gold/30" onToggle={(event) => setOpen(event.currentTarget.open)} open={open}>
     <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 py-2 [&::-webkit-details-marker]:hidden">
@@ -218,7 +219,7 @@ export function InspectorSection({ title, summary, children, defaultOpen = false
       {summary ? <span className="ml-auto min-w-0 truncate text-xs text-soft-grey">{summary}</span> : <span className="ml-auto" />}
       {onSwitch ? <input aria-label={switchLabel ?? title} checked={!!switched} className="size-5 shrink-0 accent-gold" onChange={(event) => { onSwitch(event.target.checked); if (event.target.checked) setOpen(true); }} onClick={(event) => event.stopPropagation()} role="switch" type="checkbox" /> : null}
     </summary>
-    <div className="border-t border-gold/10 px-3 pb-3 pt-3" data-fms-focus={focus}>{switched === false ? <p className="text-xs text-soft-grey">Off. Switch it on to set it up.</p> : children}</div>
+    <div className="border-t border-gold/10 px-3 pb-3 pt-3" data-fms-focus={focus}>{switched === false ? offContent ?? <p className="text-xs text-soft-grey">Off. Switch it on to set it up.</p> : children}</div>
   </details>;
 }
 

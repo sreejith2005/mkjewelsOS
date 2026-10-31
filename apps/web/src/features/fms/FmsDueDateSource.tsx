@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import {
-  FMS_FORM_DUE_MISSING, FMS_FORM_DUE_MISSING_LABELS, fmsDueDateFields, fmsDueTimeFields, fmsFormDueIssues, fmsIncomingFormStages, fmsStageFormFields, suggestFmsDueSource,
+  FMS_FORM_DUE_MISSING, FMS_FORM_DUE_MISSING_LABELS, fmsAutoDueDateFields, fmsAutoFormDueApplies, fmsDueDateFields, fmsDueTimeFields, fmsFormDueIssues, fmsIncomingFormStages, fmsStageFormFields, suggestFmsDueSource,
   type FmsFormDueMissing, type FmsFormDueRule, type FmsFormDueSource, type FmsSlaRule, type FmsStageDefinition,
 } from "@jewelos/core";
 import { cn } from "@/lib/utils";
@@ -36,7 +36,7 @@ export function FmsDueDateSource({ stage, stages, data, stageIndex, updateSla, t
   const mode = fmsDueSourceMode(stage.sla);
   const choose = (next: FmsDueSourceMode) => {
     if (next === mode) return;
-    if (next === "none") return updateSla({ deadlineEnabled: false });
+    if (next === "none") return updateSla({ deadlineEnabled: false, autoFormDue: false });
     if (next === "form") return updateSla({ deadlineEnabled: true, formDue: stage.sla.formDue ?? suggestedRule(stage, stages, data) });
     if (next === "tat") return updateSla({ deadlineEnabled: true, formDue: undefined, timingMethod: "tat_hours" });
     return updateSla({ deadlineEnabled: true, formDue: undefined, timingMethod: FIXED_METHODS.has(stage.sla.timingMethod ?? "completion_date") ? stage.sla.timingMethod ?? "completion_date" : "completion_date" });
@@ -53,6 +53,29 @@ export function FmsDueDateSource({ stage, stages, data, stageIndex, updateSla, t
     {mode === "fixed" ? timing("fixed") : null}
     {mode === "tat" ? timing("tat") : null}
     {mode === "none" ? <p className="text-xs text-soft-grey">No deadline will be created for this step.</p> : null}
+  </div>;
+}
+
+/**
+ * What a step with "Set deadline" off does: the server (fms_auto_form_due, 0361)
+ * takes the answered follow-up / next / due date from the previous step's form.
+ * The author can turn it off for this step.
+ */
+export function FmsAutoFormDue({ stage, stages, data, stageIndex, updateSla }: { stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; stageIndex: number; updateSla: (patch: Partial<FmsSlaRule>) => void }) {
+  if (stageIndex === 0) return <p className="text-xs text-soft-grey">No deadline. Switch it on to set one.</p>;
+  const on = fmsAutoFormDueApplies(stage);
+  const incoming = fmsIncomingFormStages({ stages }, stage.key).map((source) => ({ source, dates: fmsAutoDueDateFields(fmsStageFormFields(source, data.formFields)) }));
+  const found = incoming.filter((item) => item.dates.length);
+  return <div className="space-y-2">
+    <label className="flex min-h-10 items-start gap-2 text-sm text-champagne">
+      <input checked={on} className="mt-0.5 size-5 shrink-0 accent-gold" onChange={(event) => updateSla({ autoFormDue: event.target.checked ? undefined : false })} type="checkbox" />
+      <span>Take the due date from the previous form<span className="mt-0.5 block text-xs text-soft-grey">Like a normal task: the task is due on the date the employee picked, and shows as overdue once it passes.</span></span>
+    </label>
+    {!on ? <p className="text-xs text-soft-grey">No due date for this step.</p>
+      : found.length ? <ul className="space-y-1 rounded-lg border border-gold/15 p-2 text-xs text-soft-grey">{found.map(({ source, dates }) => <li key={source.key}>
+          From <span className="text-champagne">{source.name || "the earlier step"}</span>: {dates.map((field) => field.label).join(" or ")}{dates.length > 1 ? " (whichever was answered)" : ""}
+        </li>)}<li>Date-only answers are due at the end of that day.</li></ul>
+      : <p className="text-xs text-warning">The previous form has no follow-up or due date question, so this task gets no due date. Add a date question such as "Next follow-up date", or switch on Set deadline to choose a time.</p>}
   </div>;
 }
 
