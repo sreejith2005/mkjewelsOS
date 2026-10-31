@@ -38,8 +38,11 @@ export type FormOptionSource = Readonly<{ kind: "master"; masterType: string }>;
 export const FORM_SUBMIT_TARGET = "__submit__";
 
 export type FormBranch = Readonly<{
-  operator: FormConditionOperator;
+  operator: FormRuleOperator | "default";
   value?: FormAnswer | undefined;
+  /** Presence marks an immediate, ordered route; absent retains legacy section-end routing. */
+  rule?: FormRule | undefined;
+  name?: string | undefined;
   targetSectionKey: string;
 }>;
 
@@ -49,6 +52,8 @@ export type FormSectionDefinition = Readonly<{
   description?: string | undefined;
   /** Where the respondent goes after this section. Absent means the next section in order. */
   next?: string | undefined;
+  visibility?: "always" | "when" | "unless" | "routed" | undefined;
+  rule?: FormRule | undefined;
 }>;
 
 export type FormCondition = Readonly<{
@@ -58,6 +63,7 @@ export type FormCondition = Readonly<{
 }>;
 
 export type FormRulePredicate = Readonly<{
+  negate?: boolean | undefined;
   kind: "predicate";
   fieldKey: string;
   operator: FormRuleOperator;
@@ -65,6 +71,7 @@ export type FormRulePredicate = Readonly<{
 }>;
 
 export type FormRuleGroup = Readonly<{
+  negate?: boolean | undefined;
   kind: "all" | "any";
   rules: readonly FormRule[];
 }>;

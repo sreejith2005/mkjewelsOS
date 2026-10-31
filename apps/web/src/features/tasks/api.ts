@@ -1,3 +1,4 @@
+import { defaultTaskSearch, type TaskDateScope } from "@jewelos/core";
 import { loadFmsTaskContexts } from "@jewelos/data/fms/work";
 import type { FmsWorkContext } from "@jewelos/core";
 import { parseOnDemandDuties, type OnDemandDuty } from "@jewelos/core";
@@ -539,8 +540,8 @@ export async function recordAvailabilityRange(
 
 export type TaskPage = Omit<TaskPageScope, "ids"> & Readonly<{ tasks: TaskBundle[] }>;
 
-export async function loadTaskPage(viewerId: string, tenantId: string, view: TaskWorkspaceView, status: TaskFeedStatusFilter, offset = 0): Promise<TaskPage> {
-  const { data, error } = await supabase.rpc("task_feed_page", { p_view: view, p_status: status, p_offset: offset, p_limit: TASK_PAGE_SIZE });
+export async function loadTaskPage(viewerId: string, tenantId: string, view: TaskWorkspaceView, status: TaskFeedStatusFilter, offset = 0, calendarScope?: TaskDateScope): Promise<TaskPage> {
+  const { data, error } = calendarScope ? await supabase.rpc("task_workspace_page", { p_filter: { ...defaultTaskSearch(), mode: "board", subsection: view, status, scope: calendarScope }, p_offset: offset, p_limit: TASK_PAGE_SIZE }) : await supabase.rpc("task_feed_page", { p_view: view, p_status: status, p_offset: offset, p_limit: TASK_PAGE_SIZE });
   fail("Load task page", error);
   const scope = decodeTaskPage(data);
   const rows = await loadTaskFeed(viewerId, "", "", { tenantId, recordIds: scope.ids });

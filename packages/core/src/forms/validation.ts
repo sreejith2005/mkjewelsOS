@@ -1,7 +1,7 @@
 import { validateFormDefinition } from "./definition.ts";
 import { normalizeFormAnswer } from "./answers.ts";
 import { formOptionValues } from "./options.ts";
-import { fieldSectionKey, formSections, reachableSectionKeys } from "./sections.ts";
+import { evaluateFormNavigation } from "./sections.ts";
 import type { FormAnswer, FormAnswers, FormFieldDefinition, FormTemplateDefinition, FormValidationIssue, FormValidationResult } from "./types.ts";
 import { isEmptyFormValue, isFormFieldVisible } from "./visibility.ts";
 
@@ -57,11 +57,11 @@ export function validateCompleteForm(template: FormTemplateDefinition, answers: 
   const definitionIssues = validateFormDefinition(template);
   const keys = new Set(template.fields.map((field) => field.key));
   const answerIssues: FormValidationIssue[] = Object.keys(answers).filter((key) => !keys.has(key)).map((fieldKey) => ({ code: "unknown_answer", fieldKey, message: `Unknown answer key: ${fieldKey}` }));
-  const sections = formSections(template);
-  const reachable = reachableSectionKeys(template, answers);
+  const path = evaluateFormNavigation(template, answers);
+  const active = new Set(path.visibleFields.map(f => f.key));
   const normalized: Record<string, FormAnswer> = {};
   for (const field of [...template.fields].sort((a, b) => a.sortOrder - b.sortOrder)) {
-    if (!reachable.has(fieldSectionKey(field, sections))) continue;
+    if (!active.has(field.key)) continue;
     const value = answers[field.key];
     const issue = validateFormField(field, value, normalized);
     if (issue) answerIssues.push(issue);
@@ -69,6 +69,6 @@ export function validateCompleteForm(template: FormTemplateDefinition, answers: 
     const normalizedValue = normalizeFormAnswer(field, value as FormAnswer);
     if (!isEmptyFormValue(normalizedValue)) normalized[field.key] = normalizedValue;
   }
-  const issues = [...definitionIssues, ...answerIssues];
+  const issues = [...definitionIssues, ...path.issues, ...answerIssues, ...(!path.submissionAllowed && !path.issues.length ? [{ code: "routing_pending", message: "Answer the routing question before submitting." }] : [])];
   return { valid: issues.length === 0, issues };
 }

@@ -1,9 +1,10 @@
+import type { TaskDateScope } from "../taskSearch";
 import type { Json } from "../database.types";
 import type { FmsAssignedWorkTarget } from "./assignedWork";
 import { fmsStagesInFlowOrder } from "./engine";
 import type { FmsStageDefinition } from "./types";
 export type FmsWorkspaceStatus = "active" | "pending" | "overdue" | "waiting" | "completed";
-export type FmsWorkspaceFilters = Readonly<{ query: string; status: FmsWorkspaceStatus; from: string; to: string; familyId: string; stageId: string }>;
+export type FmsWorkspaceFilters = Readonly<{ scope?: TaskDateScope | undefined; query: string; status: FmsWorkspaceStatus; from: string; to: string; familyId: string; stageId: string }>;
 export const defaultFmsWorkspaceFilters = (): FmsWorkspaceFilters => ({ query: "", status: "active", from: "", to: "", familyId: "", stageId: "" });
 export type FmsWorkspaceCounts = Record<FmsWorkspaceStatus, number>;
 export type FmsFamilySummary = Readonly<{ id: string; name: string; count: number }>;
@@ -33,6 +34,7 @@ function list(value: unknown, max: number): unknown[] { if (!Array.isArray(value
 function unique<T extends { id: string }>(items: T[]): T[] { if (new Set(items.map(i => i.id)).size !== items.length) throw invalid(); return items; }
 export function fmsWorkspaceFilter(filter: FmsWorkspaceFilters): Json {
   const date = (s: string) => !s || /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s)) && new Date(s).toISOString().slice(0, 10) === s;
+  if (filter.scope !== undefined && !["today", "overall", "overdue"].includes(filter.scope)) throw new Error("Invalid task scope");
   if (filter.query.trim().length > 200 || !["active", "pending", "overdue", "waiting", "completed"].includes(filter.status)
     || !date(filter.from) || !date(filter.to) || filter.from && filter.to && filter.from > filter.to
     || filter.familyId && !uuidPattern.test(filter.familyId) || filter.stageId && !uuidPattern.test(filter.stageId)) throw new Error("Invalid FMS filters");

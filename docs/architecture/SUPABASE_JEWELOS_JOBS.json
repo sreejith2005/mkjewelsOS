@@ -1,0 +1,50 @@
+﻿[
+    {
+        "active":  true,
+        "jobid":  1,
+        "jobname":  "generate-recurring-tasks-daily",
+        "schedule":  "*/5 * * * *"
+    },
+    {
+        "active":  true,
+        "jobid":  2,
+        "jobname":  "sync-approved-half-day-leave",
+        "schedule":  "* * * * *"
+    },
+    {
+        "active":  true,
+        "jobid":  3,
+        "jobname":  "crm-staff-sync-deliver",
+        "schedule":  "* * * * *"
+    },
+    {
+        "active":  true,
+        "jobid":  4,
+        "jobname":  "crm-staff-sync-reconcile",
+        "schedule":  "0 21 * * *"
+    },
+    {
+        "active":  true,
+        "jobid":  9,
+        "jobname":  "kiara-insights-nightly",
+        "schedule":  "0 21 * * *"
+    },
+    {
+        "active":  true,
+        "jobid":  10,
+        "jobname":  "kiara-insights-collect",
+        "schedule":  "*/10 * * * *"
+    },
+    {
+        "active":  true,
+        "jobid":  11,
+        "jobname":  "kiara-retention-purge",
+        "schedule":  "30 21 * * *"
+    },
+    {
+        "active":  true,
+        "jobid":  12,
+        "jobname":  "process-report-exports",
+        "schedule":  "* * * * *"
+    }
+]

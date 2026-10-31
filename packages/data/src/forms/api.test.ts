@@ -13,6 +13,17 @@ beforeEach(() => {
 import { loadFormSubmissionDetail, deletedFormBundle, deleteForm, publishAsNewForm, savePublishedForm, startFmsFromFormSubmission, submitFmsStarterAssignment, toDefinition, type FormField, type FormSubmission, type FormTemplate } from "./api";
 
 describe("toDefinition", () => {
+  it("preserves section eligibility and ordered named route conditions on reload", () => {
+    const rule = { kind: "predicate", fieldKey: "status", operator: "equals", value: "interested" };
+    const template = { name: "Workflow form", permissions: { roles: ["staff"] }, sections: [
+      { key: "intro", title: "Introduction" },
+      { key: "followup", title: "Follow-up", visibility: "when", rule, next: "__submit__" },
+    ] } as unknown as FormTemplate;
+    const field = { id: "field", field_key: "status", field_name: "Status", field_type: "select", sort_order: 0, group_name: "intro", options: [{ value: "interested", label: "Interested" }], branch_logic: [{ operator: "default", name: "Interested follow-up", rule, targetSectionKey: "followup" }] } as unknown as FormField;
+    const definition = toDefinition(template, [field]);
+    expect(definition.sections?.[1]).toMatchObject({ visibility: "when", rule, next: "__submit__" });
+    expect(definition.fields[0]?.branches?.[0]).toMatchObject({ name: "Interested follow-up", rule, targetSectionKey: "followup" });
+  });
   it("does not turn a NULL database condition into a conditional field", () => {
     const template = { name: "Walk-in", description: null, record_name_field_key: "customer_name", permissions: { roles: ["staff"] } } as unknown as FormTemplate;
     const field = {

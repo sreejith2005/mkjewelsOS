@@ -41,6 +41,11 @@ select is((select count(*)::integer from crm_sync.customer_workflow_links),0,'un
 select count(*) from crm_sync_claim_customer_events(1);
 select lives_ok($$select crm_sync_finish_customer_event(id,lease_token,'{"outcome":"accepted","client_id":"00000000-0000-0000-0000-000000000001"}',null) from crm_sync.customer_events where lease_token is not null$$,'workflow acknowledgement persists a verified opaque client link');
 select is((select count(*)::integer from crm_sync.customer_workflow_links),1,'one workflow gets one customer reference');
+select set_config('request.jwt.claim.sub',(select id::text from visit_assignment_fixture where name='e_auth'),true);
+set local role authenticated;
+select throws_ok($$select get_fms_customer_link((select id from visit_assignment_fixture where name='instance'))$$,'42501',null,'CRM link cannot expose a restricted workflow to an unrelated employee');
+select throws_ok($$select get_fms_assigned_work_context((select id from visit_assignment_fixture where name='instance'),(select id from fms_instance_stages where fms_instance_id=(select id from visit_assignment_fixture where name='instance') and fms_stage_id=(select id from visit_assignment_fixture where name='call')))$$,'42501',null,'direct work RPC cannot bypass the same persisted workflow restriction');
+reset role;
 -- END standalone acknowledgement assertions
 
 -- Private export extension uses the same requester and source-work authorization.

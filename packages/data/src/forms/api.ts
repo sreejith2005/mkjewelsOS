@@ -8,7 +8,7 @@ import { newRequestKey, uploadBody, type UploadFileMeta, type UploadSource } fro
 export type FormTemplate = Tables<"form_templates">;
 export type FormField = Tables<"form_fields">;
 export type FormSubmission = Tables<"form_submissions">;
-export type FormBundle = FormTemplate & { fields: FormFieldDefinition[]; sections: FormSectionDefinition[]; submissionCount: number };
+export type FormBundle = Omit<FormTemplate, "sections"> & { fields: FormFieldDefinition[]; sections: FormSectionDefinition[]; submissionCount: number };
 const fail = (label: string, error: { message: string } | null) => { if (error) throw new Error(`${label}: ${error.message}`); };
 const object = (value: Json | null): Record<string, Json> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, Json> : {};
 
@@ -27,14 +27,18 @@ const parseSections = (value: Json | null): FormSectionDefinition[] => array(val
   if (!key) return [];
   return [{ key, title: typeof record.title === "string" ? record.title : key,
     ...(typeof record.description === "string" ? { description: record.description } : {}),
-    ...(typeof record.next === "string" ? { next: record.next } : {}) }];
+    ...(typeof record.next === "string" ? { next: record.next } : {}),
+    ...(record.visibility === "always" || record.visibility === "when" || record.visibility === "unless" || record.visibility === "routed" ? { visibility: record.visibility } : {}),
+    ...(record.rule && typeof record.rule === "object" && !Array.isArray(record.rule) ? { rule: record.rule as unknown as FormRule } : {}) }];
 });
 const parseBranches = (value: Json | null): FormBranch[] => array(value).flatMap((entry) => {
   const record = object(entry as Json);
   const target = typeof record.targetSectionKey === "string" ? record.targetSectionKey : "";
   const operator = record.operator as FormBranch["operator"];
   if (!target || !operator) return [];
-  return [{ operator, ...(record.value === undefined || record.value === null ? {} : { value: record.value as FormBranch["value"] }), targetSectionKey: target }];
+  return [{ operator, ...(record.value === undefined || record.value === null ? {} : { value: record.value as FormBranch["value"] }),
+    ...(typeof record.name === "string" ? { name: record.name } : {}),
+    ...(record.rule && typeof record.rule === "object" && !Array.isArray(record.rule) ? { rule: record.rule as unknown as FormRule } : {}), targetSectionKey: target }];
 });
 /**
  * `form_fields.conditional_logic` carries either the legacy single condition or,

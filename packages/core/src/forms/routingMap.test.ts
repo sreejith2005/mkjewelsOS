@@ -22,7 +22,7 @@ describe("form routing map model", () => {
       expect.objectContaining({ from: "start", to: "section:start", kind: "normal" }),
       expect.objectContaining({ from: "question:kind", to: "question:name", kind: "normal" }),
       expect.objectContaining({ from: "question:kind", to: "section:details", kind: "conditional", label: "Business" }),
-      expect.objectContaining({ from: "question:kind", to: "question:company", kind: "conditional", label: "Business" }),
+      expect.objectContaining({ from: "question:kind", to: "question:company", kind: "visibility", label: "Business" }),
       expect.objectContaining({ from: "question:company", to: "end", kind: "normal" }),
     ]));
   });

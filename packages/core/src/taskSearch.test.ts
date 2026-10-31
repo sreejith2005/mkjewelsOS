@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { defaultTaskSearch, taskSearchActive, taskSearchFilterCount, taskSearchPayload, decodeTaskSearchPage, taskSearchDateRange } from "./taskSearch";
 
 describe("task search contract", () => {
+  it("preserves a shared calendar scope without activating search and rejects unsupported scopes", () => {
+    expect(taskSearchActive({ ...defaultTaskSearch(), scope: "today" })).toBe(false);
+    expect(taskSearchPayload({ ...defaultTaskSearch(), scope: "overall" })).toMatchObject({ scope: "overall" });
+    expect(() => taskSearchPayload({ ...defaultTaskSearch(), scope: "invalid" as "today" })).toThrow();
+  });
   it("keeps the ordinary board until search or a filter is applied", () => {
     const defaults = defaultTaskSearch();
     expect(taskSearchActive(defaults)).toBe(false);

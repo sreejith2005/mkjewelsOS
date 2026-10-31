@@ -56,7 +56,7 @@ create trigger customer_event_immutable before update or delete on crm_sync.cust
 -- Hash only form interpretation, excluding mutable timestamps/title/permissions.
 create function crm_sync.customer_definition_digest(p_snapshot jsonb) returns text language sql immutable set search_path='' as $$
  select encode(extensions.digest(jsonb_build_object('id',p_snapshot#>'{template,id}','version',p_snapshot#>'{template,version}','sections',p_snapshot#>'{template,sections}',
- 'fields',(select coalesce(jsonb_agg(jsonb_build_object('key',f->'field_key','label',f->'field_name','type',f->'field_type','options',f->'options','shown',f->'is_shown','condition',f->'conditional_logic','section',f->'group_name','branches',f->'branch_logic','order',f->'sort_order') order by f->>'field_key'),'[]') from jsonb_array_elements(p_snapshot->'fields') f))::text,'sha256'),'hex');
+ 'fields',(select coalesce(jsonb_agg(jsonb_build_object('key',f->'field_key','label',f->'field_name','type',f->'field_type','options',f->'options','shown',f->'is_shown','condition',f->'conditional_logic','legacyRule',f->'rule_definition','section',f->'group_name','branches',f->'branch_logic','order',f->'sort_order') order by f->>'field_key'),'[]') from jsonb_array_elements(p_snapshot->'fields') f))::text,'sha256'),'hex');
 $$;
 revoke all on function crm_sync.customer_definition_digest(jsonb) from public,anon,authenticated,service_role;
 
@@ -158,7 +158,7 @@ create function crm_sync.pin_customer_mapping() returns trigger language plpgsql
 declare m form_customer_mapping_versions;
 begin
  select * into m from form_customer_mapping_versions where template_id=new.form_template_id and tenant_id=new.tenant_id and not(descriptor ? 'historicalSnapshotDigest') order by version desc limit 1;
- if m.enabled and new.status='submitted' then insert into crm_sync.submission_mappings values(new.id,m.id);end if;
+ if m.enabled and new.status='submitted' and crm_sync.customer_definition_digest(new.template_snapshot) is not distinct from m.descriptor->>'definitionDigest' then insert into crm_sync.submission_mappings values(new.id,m.id);end if;
  return null;
 end $$;
 create trigger customer_mapping_pin after insert on form_submissions for each row execute function crm_sync.pin_customer_mapping();
@@ -181,9 +181,9 @@ begin
    if original='null' or original='[]' or (jsonb_typeof(original)='string' and btrim(original#>>'{}')='') then continue;end if;
    select value into field from jsonb_array_elements(s.template_snapshot->'fields') where value->>'field_key'=item->>'fieldKey';
    -- The saved submission snapshot, not today's editable form, determines labels/options/visibility.
-   if field is null or field->>'is_shown'='false' or not form_condition_matches(field->'conditional_logic',s.data)
+   if field is null or field->>'is_shown'='false' or form_condition_matches(field->'conditional_logic',s.data) is not true
      or (reached is not null and not form_field_section_key(field->>'group_name',s.template_snapshot#>'{template,sections}')=any(reached)) then continue;end if;
-   if field->'rule_definition' is not null and field->'rule_definition'<>'null'::jsonb and not form_condition_matches(field->'rule_definition',s.data) then continue;end if;
+   if field->'rule_definition' is not null and field->'rule_definition'<>'null'::jsonb and form_condition_matches(field->'rule_definition',s.data) is not true then continue;end if;
    select coalesce(jsonb_agg(option->'label'),'[]') into labels from jsonb_array_elements(case when jsonb_typeof(field->'options')='array' then field->'options' else '[]'::jsonb end) option
     where option->'value'=original or (jsonb_typeof(original)='array' and original @> jsonb_build_array(option->'value'));
    answers:=answers||jsonb_build_array(jsonb_build_object('fieldKey',item->>'fieldKey','label',field->>'field_name',
@@ -278,6 +278,7 @@ declare a user_profiles:=current_profile();r jsonb;begin
  'review',count(*) filter(where review_at is not null),'failed',count(*) filter(where dead_at is not null),'lastSuccess',max(delivered_at),'oldestPending',min(created_at) filter(where delivered_at is null)) into r from crm_sync.customer_events where tenant_id=a.tenant_id;
  return r||jsonb_build_object('mappingStatus',(select coalesce(jsonb_agg(to_jsonb(q)),'[]') from(
  select t.id,t.name,m.version,coalesce(m.enabled,false) as enabled,
+ (m.descriptor->>'definitionDigest' is distinct from crm_sync.customer_definition_digest(jsonb_build_object('template',to_jsonb(t),'fields',coalesce((select jsonb_agg(to_jsonb(f) order by f.sort_order,f.id) from form_fields f where f.form_template_id=t.id),'[]')))) as definition_changed,
  (select count(*) from form_fields f where f.form_template_id=t.id and f.field_type not in ('section_header','divider','user_dropdown','branch_dropdown','department_dropdown','file_upload') and not exists(select 1 from jsonb_array_elements(coalesce(m.descriptor->'fields','[]')) v where v->>'fieldKey'=f.field_key)) as unreviewed_questions
  from form_templates t join lateral(select * from form_customer_mapping_versions v where v.template_id=t.id and not(v.descriptor ? 'historicalSnapshotDigest') order by v.version desc limit 1)m on true where t.tenant_id=a.tenant_id order by t.name limit 100)q),
  'eventTableBytes',pg_total_relation_size('crm_sync.customer_events'::regclass),'mappingTableBytes',pg_total_relation_size('form_customer_mapping_versions'::regclass),'events',(select coalesce(jsonb_agg(to_jsonb(row)),'[]') from(select id,created_at,last_error,case when dead_at is not null then 'failed' when review_at is not null then 'review' else 'pending' end as status from crm_sync.customer_events where tenant_id=a.tenant_id and delivered_at is null and rejected_at is null order by created_at,id limit 100)row));end $$;

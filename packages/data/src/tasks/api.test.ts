@@ -50,6 +50,15 @@ beforeEach(() => {
 });
 
 describe("server-authorized task assignment roster", () => {
+  it("counts Today from the same server filters used by pages, including the FMS hierarchy", async () => {
+    pageRpc.mockImplementation(async (name: string) => name === "get_fms_task_workspace"
+      ? { data: { total: 10 }, error: null }
+      : { data: { ids: [], total: 2, counts: { pending: 2, overdue: 1, completed: 0, open: 3 } }, error: null });
+    expect(await loadTaskTabCounts(false, "today")).toEqual({ mine: 2, delegated: 2, inLoop: 2, fms: 10 });
+    expect(pageRpc).toHaveBeenCalledWith("get_fms_task_workspace", expect.objectContaining({ p_filter: { scope: "today", status: "active" } }));
+    expect(pageRpc.mock.calls.filter(call => call[0] === "task_workspace_page").every(call => call[1].p_filter.scope === "today")).toBe(true);
+    expect(selectedTables).toEqual([]);
+  });
   it("loads all personal subsection counts without hydrating tasks or querying the admin scope", async () => {
     pageRpc.mockImplementation(async (_name: string, args: { p_view: string }) => ({
       data: { ids: [], total: 0, counts: { pending: args.p_view === "mine" ? 5 : 2, overdue: 1, completed: 0, open: args.p_view === "mine" ? 6 : 3 } }, error: null,
@@ -238,6 +247,26 @@ describe("bounded page hydration", () => {
 
 
 describe("server task page access", () => {
+  it("counts every searched subsection from the same filters before pagination without hydration", async () => {
+    const { defaultTaskSearch } = await import("@jewelos/core");
+    const { loadTaskTabCounts } = await import("./api");
+    const filters = { ...defaultTaskSearch(), query: "silver", status: "completed" as const, priority: "high" as const, scope: "today" as const, subsection: "mine" as const };
+    pageRpc.mockResolvedValue({ data: { ids: [], total: 850, counts: { pending: 0, overdue: 0, completed: 850, open: 0 } }, error: null });
+    expect(await loadTaskTabCounts(true, "today", "pending", filters)).toEqual({ mine: 850, delegated: 850, inLoop: 850, fms: 850, all: 850 });
+    for (const subsection of ["mine", "delegated", "inLoop", "fms", "all"]) {
+      expect(pageRpc).toHaveBeenCalledWith("task_workspace_page", { p_filter: { ...filters, subsection, mode: "explore" }, p_offset: 0, p_limit: 1 });
+    }
+    expect(selectedTables).toEqual([]);
+  });
+
+  it("passes strict calendar scope to the server before hydrating only the returned page", async () => {
+    pageRpc.mockResolvedValue({ data: { ids: [], total: 0, counts: { pending: 0, overdue: 0, completed: 0, open: 0 } }, error: null });
+    const result = await loadTaskPage("viewer", "tenant", "delegated", "pending", 50, "today");
+    expect(pageRpc).toHaveBeenCalledWith("task_workspace_page", expect.objectContaining({ p_filter: expect.objectContaining({ scope: "today", subsection: "delegated", status: "pending", mode: "board" }), p_offset: 50, p_limit: 50 }));
+    expect(result.tasks).toEqual([]);
+    expect(selectedTables).toEqual([]);
+  });
+
   it("preserves server ordering and full counts after detail hydration", async () => {
     const ids = ["00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002"];
     const counts = { pending: 12000, overdue: 40, completed: 10, open: 12040 };

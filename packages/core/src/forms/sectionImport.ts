@@ -1,6 +1,6 @@
-import { fieldsInSection, formSections } from "./sections.ts";
-import { filterFormRule, formRuleFieldKeys, pruneFormRules, renameFormRuleField } from "./rules.ts";
-import { FORM_SUBMIT_TARGET, type FormFieldDefinition, type FormSectionDefinition, type FormTemplateDefinition } from "./types.ts";
+import { FORM_CONTINUE_TARGET, FORM_QUESTION_TARGET_PREFIX, FORM_STAGE_END_TARGET, fieldsInSection, formSections } from "./sections.ts";
+import { filterFormRule, formRuleFieldKeys, pruneFormRules } from "./rules.ts";
+import { FORM_SUBMIT_TARGET, type FormBranch, type FormRule, type FormFieldDefinition, type FormSectionDefinition, type FormTemplateDefinition } from "./types.ts";
 
 /**
  * Copying one Section of a Form into another Form, as an editable copy. Used
@@ -16,13 +16,27 @@ export type FormSectionImportPlan = Readonly<{
   sectionKey: string;
   title: string;
   questions: readonly Readonly<{ key: string; label: string; type: FormFieldDefinition["type"]; required: boolean }>[];
-  /** Questions whose visibility reads a question outside the section; that part of the rule is dropped. */
+  /** Visibility, route, or section conditions that read outside the copied section. */
   externalDependencies: readonly FormSectionDependency[];
-  /** "Skip to another section" jumps that point outside the copy and are dropped. */
+  /** Routes with external destinations or conditions, and external section end actions, are dropped. */
   droppedJumps: number;
 }>;
 
 const KEY = /^[a-z][a-z0-9_]{0,63}$/;
+const TERMINAL_TARGETS: ReadonlySet<string> = new Set([FORM_SUBMIT_TARGET, FORM_STAGE_END_TARGET, FORM_CONTINUE_TARGET]);
+
+function retainedBranch(branch: FormBranch, inside: ReadonlySet<string>): boolean {
+  const target = branch.targetSectionKey;
+  return (TERMINAL_TARGETS.has(target) || target.startsWith(FORM_QUESTION_TARGET_PREFIX) && inside.has(target.slice(FORM_QUESTION_TARGET_PREFIX.length)))
+    && formRuleFieldKeys(branch.rule).every(key => inside.has(key));
+}
+
+/** Map each original key exactly once, including when generated keys collide with other source keys. */
+function remapRule(rule: FormRule | undefined, keyMap: ReadonlyMap<string, string>): FormRule | undefined {
+  if (!rule) return undefined;
+  return rule.kind === "predicate" ? { ...rule, fieldKey: keyMap.get(rule.fieldKey) ?? rule.fieldKey }
+    : { ...rule, rules: rule.rules.map(child => remapRule(child, keyMap)!) };
+}
 
 function uniqueKey(base: string, used: Set<string>, fallback: string): string {
   const root = (KEY.test(base) ? base : fallback).slice(0, 58);
@@ -46,11 +60,14 @@ export function planFormSectionImport(source: FormTemplateDefinition, sectionKey
   return {
     sectionKey, title: section.title,
     questions: fields.filter((field) => field.type !== "section_header" && field.type !== "divider").map((field) => ({ key: field.key, label: field.label, type: field.type, required: field.required === true })),
-    externalDependencies: fields.flatMap((field) => {
-      const outside = [...new Set(conditionKeys(field).filter((key) => !inside.has(key)))];
+    externalDependencies: [...fields.flatMap((field) => {
+      const outside = [...new Set([...conditionKeys(field), ...(field.branches ?? []).flatMap(branch => formRuleFieldKeys(branch.rule))].filter((key) => !inside.has(key)))];
       return outside.length ? [{ fieldKey: field.key, label: field.label || field.key, dependsOn: outside.map((key) => ({ key, label: labelOf(key) })) }] : [];
-    }),
-    droppedJumps: fields.reduce((count, field) => count + (field.branches ?? []).filter((branch) => branch.targetSectionKey !== FORM_SUBMIT_TARGET).length, 0) + (section.next && section.next !== FORM_SUBMIT_TARGET ? 1 : 0),
+    }), ...(() => {
+      const outside = [...new Set(formRuleFieldKeys(section.rule).filter(key => !inside.has(key)))];
+      return outside.length ? [{ fieldKey: section.key, label: section.title, dependsOn: outside.map(key => ({ key, label: labelOf(key) })) }] : [];
+    })()],
+    droppedJumps: fields.reduce((count, field) => count + (field.branches ?? []).filter(branch => !retainedBranch(branch, inside)).length, 0) + (section.next && !TERMINAL_TARGETS.has(section.next) ? 1 : 0),
   };
 }
 
@@ -70,18 +87,25 @@ export function importFormSectionCopy(target: FormTemplateDefinition, source: Fo
   const sourceFields = fieldsInSection(source, sectionKey);
   const keyMap = new Map(sourceFields.map((field) => [field.key, uniqueKey(field.key, usedFields, "field")]));
   const inside = (key: string) => keyMap.has(key);
+  const insideKeys = new Set(keyMap.keys());
   const copied = sourceFields.map(({ id: _id, ...field }): FormFieldDefinition => {
-    let rule = filterFormRule(field.rule, inside);
-    for (const [from, to] of keyMap) rule = renameFormRuleField(rule, from, to);
+    const rule = remapRule(filterFormRule(field.rule, inside), keyMap);
     const condition = field.condition && inside(field.condition.fieldKey) ? { ...field.condition, fieldKey: keyMap.get(field.condition.fieldKey)! } : undefined;
-    const branches = (field.branches ?? []).filter((branch) => branch.targetSectionKey === FORM_SUBMIT_TARGET);
+    // A route condition is atomic: pruning an external predicate could broaden it.
+    const branches = (field.branches ?? []).filter(branch => retainedBranch(branch, insideKeys)).map(branch => ({
+      ...branch,
+      ...(branch.rule ? { rule: remapRule(branch.rule, keyMap) } : {}),
+      targetSectionKey: branch.targetSectionKey.startsWith(FORM_QUESTION_TARGET_PREFIX)
+        ? FORM_QUESTION_TARGET_PREFIX + keyMap.get(branch.targetSectionKey.slice(FORM_QUESTION_TARGET_PREFIX.length))!
+        : branch.targetSectionKey,
+    }));
     const { rule: _rule, condition: _condition, branches: _branches, ...rest } = field;
     return { ...rest, key: keyMap.get(field.key)!, sectionKey: newSectionKey, ...(rule ? { rule } : {}), ...(condition ? { condition } : {}), ...(branches.length ? { branches } : {}) };
   });
-  const { next: _next, ...copiedSection } = section;
+  const { next: _next, rule: _sectionRule, visibility: _visibility, ...copiedSection } = section;
   const definition: FormTemplateDefinition = {
     ...target,
-    sections: [...keptSections, { ...copiedSection, key: newSectionKey, ...(section.next === FORM_SUBMIT_TARGET ? { next: FORM_SUBMIT_TARGET } : {}) }],
+    sections: [...keptSections, { ...copiedSection, key: newSectionKey, ...(section.next && TERMINAL_TARGETS.has(section.next) ? { next: section.next } : {}) }],
     fields: pruneFormRules([...target.fields, ...copied].map((field, sortOrder) => ({ ...field, sortOrder }))),
   };
   return { definition, sectionKey: newSectionKey, keyMap, plan };

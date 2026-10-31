@@ -13876,6 +13876,21 @@ export type Database = {
         Args: { p_actual: string; p_expected: string; p_operator: string }
         Returns: boolean
       }
+      // Private implementation helpers from migrations 0352/0353; types do not grant EXECUTE.
+      form_snapshot_active_path: { Args: { p_snapshot: Json; p_answers: Json; p_section_key?: string }; Returns: Json }
+      form_active_field_keys: { Args: { p_template_id: string; p_answers: Json; p_section_key?: string }; Returns: string[] }
+      assert_form_route_target: { Args: { p_target: string; p_fields: Json; p_sections: Json; p_index: number; p_section_index: number }; Returns: undefined }
+      assert_form_rule_options: { Args: { p_rule: Json; p_fields: Json }; Returns: undefined }
+      normalize_form_rule_legacy_0352: { Args: { p_rule: Json; p_field_key: string; p_earlier: string[]; p_depth?: number }; Returns: Json }
+      normalize_form_fields_legacy_0352: { Args: { p_fields: Json; p_sections?: Json }; Returns: Json }
+      normalize_form_sections_legacy_0352: { Args: { p_sections: Json }; Returns: Json }
+      form_condition_matches_legacy_0352: { Args: { p_condition: Json; p_answers: Json }; Returns: boolean }
+      task_calendar_scope_matches: { Args: { p_scope: string; p_due: string; p_status: string; p_now?: string }; Returns: boolean }
+      fms_follow_up_schedule_valid: { Args: { p_schedule: Json }; Returns: boolean }
+      fms_follow_up_datetime: { Args: { p_schedule: Json; p_answers: Json; p_now?: string }; Returns: string }
+      fms_causal_stage_deadline: { Args: { p_rule: Json; p_tenant_id: string; p_instance_id: string; p_source_id: string; p_answers?: Json }; Returns: string }
+      fms_assignment_coverage: { Args: { p_stage_id: string; p_tenant_id: string; p_instance_id: string; p_selected_ids: string[]; p_explicit: boolean; p_deadline?: string }; Returns: Json }
+      assert_fms_flow_publishable_before_schedule: { Args: { p_flow_id: string }; Returns: undefined }
       form_answer_is_empty: { Args: { p_value: Json }; Returns: boolean }
       form_compare_values: {
         Args: { p_left: Json; p_right: Json }

@@ -1,6 +1,6 @@
-import { fieldsInSection, formSections, visibleFormSections } from "./sections";
+import { evaluateFormNavigation, fieldsInSection, formBranchMatches, formHasAdvancedRouting, formSections, visibleFormSections } from "./sections";
 import { validateCompleteForm, validateFormField } from "./validation";
-import { evaluateFormCondition, isEmptyFormValue, isFormFieldVisible } from "./visibility";
+import { isEmptyFormValue, isFormFieldVisible } from "./visibility";
 import { isWorkUploadForm } from "./workUploadForm";
 import { FORM_SUBMIT_TARGET, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormTemplateDefinition, type FormValidationResult } from "./types";
 
@@ -11,22 +11,24 @@ import { FORM_SUBMIT_TARGET, type FormAnswer, type FormAnswers, type FormFieldDe
  * `reachableSectionKeys`.
  */
 export function isFinalFormStep(definition: FormTemplateDefinition, answers: FormAnswers, sectionKey: string): boolean {
-  const sections = formSections(definition);
-  const index = sections.findIndex((section) => section.key === sectionKey);
-  if (index < 0) return false;
-  let target: string | undefined;
-  let undecided = false;
-  for (const field of fieldsInSection(definition, sectionKey)) {
-    if (!field.branches?.length || !isFormFieldVisible(field, answers)) continue;
-    const match = field.branches.find((branch) => evaluateFormCondition({ fieldKey: field.key, operator: branch.operator, value: branch.value }, answers));
-    if (match) target = match.targetSectionKey;
-    else if (isEmptyFormValue(answers[field.key])) undecided = true;
+  if (!formHasAdvancedRouting(definition)) {
+    const sections = formSections(definition);
+    const index = sections.findIndex(s => s.key === sectionKey);
+    if (index < 0) return false;
+    let target: string | undefined; let undecided = false;
+    for (const field of fieldsInSection(definition, sectionKey)) {
+      if (!field.branches?.length || !isFormFieldVisible(field, answers)) continue;
+      const match = field.branches.find(b => formBranchMatches(field, b, answers));
+      if (match) target = match.targetSectionKey;
+      else if (isEmptyFormValue(answers[field.key])) undecided = true;
+    }
+    if (undecided && !target) return false;
+    const next = target ?? sections[index]?.next;
+    return next === FORM_SUBMIT_TARGET || (!next && index === sections.length - 1);
   }
-  if (undecided && !target) return false;
-  const destination = target ?? sections[index]?.next;
-  if (destination === FORM_SUBMIT_TARGET) return true;
-  if (destination) return sections.findIndex((section) => section.key === destination) <= index;
-  return index === sections.length - 1;
+  const path = evaluateFormNavigation(definition, answers);
+  const index = path.reachedSectionKeys.indexOf(sectionKey);
+  return index >= 0 && path.submissionAllowed && index === path.reachedSectionKeys.length - 1;
 }
 
 const LAYOUT_TYPES = new Set(["section_header", "divider"]);
@@ -42,6 +44,7 @@ export const FORM_STEP_MIN_QUESTIONS = 8;
  */
 export function formUsesSteps(definition: FormTemplateDefinition): boolean {
   if (isWorkUploadForm(definition)) return true;
+  if (formHasAdvancedRouting(definition)) return (definition.sections?.length ?? 0) > 1;
   if ((definition.sections?.length ?? 0) < 2) return false;
   return definition.fields.filter(isQuestion).length >= FORM_STEP_MIN_QUESTIONS;
 }
@@ -92,6 +95,6 @@ export function previousFormStepKey(definition: FormTemplateDefinition, answers:
 /** Required and conditional fields on future steps are checked when reached. */
 export function validateFormStep(definition: FormTemplateDefinition, answers: FormAnswers, sectionKey: string): FormValidationResult {
   const fieldKeys = new Set(visibleFormSections(definition, answers).find(({ section }) => section.key === sectionKey)?.fields.map((field) => field.key) ?? []);
-  const issues = validateCompleteForm(definition, answers).issues.filter((issue) => !issue.fieldKey || fieldKeys.has(issue.fieldKey));
+  const issues = validateCompleteForm(definition, answers).issues.filter((issue) => issue.code !== "routing_pending" && (!issue.fieldKey || fieldKeys.has(issue.fieldKey)));
   return { valid: issues.length === 0, issues };
 }

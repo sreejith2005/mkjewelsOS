@@ -394,6 +394,7 @@ describe("Form builder follow-up questions", () => {
 
     await user.click(screen.getByRole("button", { name: "Preview form" }));
     await user.selectOptions(screen.getByLabelText("Customer type"), "business");
+    await user.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByLabelText("Company")).toBeTruthy();
     expect(screen.queryByLabelText("Name")).toBeNull();
   });

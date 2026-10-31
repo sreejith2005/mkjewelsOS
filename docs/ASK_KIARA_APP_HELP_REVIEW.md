@@ -76,6 +76,7 @@ The page is gone. Recurring work is created from **Create Task** and managed in 
 ## FMS (workflows)
 **What it is:** company workflows: live workflows, the stages given to you, and, for people
 who build workflows, the designs.
+- [ ] Routing editor (2026-10-29): **Add condition** opens the new condition at the top; other editors collapse into condition/destination summaries. Click a row to edit. **Then go to** appears before answer choices. Display is reversed; **If 1** is still evaluated first, and only the arrows explicitly change priority. Canvas **Edit route** and readiness issues reveal the exact condition. No new Kiara read tool is needed for these presentation controls.
 - [ ] Do my stage: open it from Home or Tasks. The steps at the top are **Read previous details**, **Complete your work**, **Review next assignment** and **Confirm**. Read **Your step** (what to do, when it is due) and **Previous form answers**, press **Continue to stage form** (or **Continue to stage**). **Before you complete this step** lists anything missing. Press **Fill the form** to fill and submit it; submitting also completes the step. Then check who receives the next step and confirm.
 - [ ] Start a workflow: open FMS, choose the workflow, press **Start instance** (if your role may start it).
 - [ ] Design a workflow: **New workflow** in FMS (workflow builders only).
@@ -206,3 +207,17 @@ assigned stage" recipe is updated. No new read tool.
 
 
 2026-10-27 customer integration: exact labels added for Customer Data Integration, Customer Integration Health, Customer Integration Administration, FMS Journeys & Collected Answers, and Customer & Stage Exports. No new Kiara data tool is added: these are authoring/recovery instructions; raw submissions, pending identities and customer exports are not available to the assistant. Existing read-tool authorization remains unchanged.
+
+2026-10-28 validation follow-up: Settings explains Review form changes. A changed form definition pauses customer capture until its mapping is reviewed and saved again; original submissions remain available for explicit historical recovery. Kiara remains read-only.
+
+
+### Advanced Forms and task scope (2026-10-30 local implementation)
+
+- [ ] Conditions & Routing: independent Visibility Conditions, nested Add AND group / Add OR group, Ordered IF routes and Set OTHERWISE.
+- [ ] Manage sections: Section Visibility and After this section. Explicit question routes override the end action; eligibility still applies.
+- [ ] Routing simulation, Test validation and Reset simulation use the production evaluator without writing or uploading.
+- [ ] FMS Workflow Forms groups permitted relationships Workflow / Stage / Form using Workflow filter and Stage filter.
+- [ ] Tasks Today uses the Asia/Kolkata calendar date; Overall includes future work; Overdue separately lists earlier unfinished work. Counts and pages share server scope.
+- [ ] Automatic follow-up scheduling extends existing FMS timing and assignment with next-day 11:00 defaults and requested date/time overrides.
+
+Kiara tool decision: no new read tool. Configuration/navigation extends existing section contracts without wider reads or writes. Local implementation is not proof of hosted availability.

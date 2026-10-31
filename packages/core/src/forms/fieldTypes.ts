@@ -14,7 +14,7 @@ function rewriteRule(rule: FormRule | undefined, sourceKey: string, nextType: Fo
   if (rule.kind !== "predicate") {
     const rules = rule.rules.map((child) => rewriteRule(child, sourceKey, nextType, preserve)).filter((child): child is FormRule => child !== undefined);
     if (!rules.length) return undefined;
-    return rules.length === 1 ? rules[0] : { kind: rule.kind, rules };
+    return rules.length === 1 && !rule.negate ? rules[0] : { ...rule, rules };
   }
   if (rule.fieldKey !== sourceKey) return rule;
   if (!preserve) return undefined;
@@ -30,7 +30,7 @@ function pruneRuleOptions(rule: FormRule | undefined, sourceKey: string, allowed
   if (rule.kind !== "predicate") {
     const rules = rule.rules.map((child) => pruneRuleOptions(child, sourceKey, allowed)).filter((child): child is FormRule => child !== undefined);
     if (!rules.length) return undefined;
-    return rules.length === 1 ? rules[0] : { kind: rule.kind, rules };
+    return rules.length === 1 && !rule.negate ? rules[0] : { ...rule, rules };
   }
   if (rule.fieldKey !== sourceKey || rule.value === undefined) return rule;
   if (Array.isArray(rule.value)) {
@@ -91,6 +91,7 @@ export function convertFormFieldType(fields: readonly FormFieldDefinition[], ind
       ...(preserveRoutes && source.branches?.length ? {
         branches: source.branches.map((branch) => ({
           ...branch,
+          rule: rewriteRule(branch.rule, source.key, nextType, preserveRoutes),
           operator: MULTI_ANSWER_FIELD_TYPES.has(nextType)
             ? branch.operator === "equals" ? "contains" : branch.operator
             : branch.operator === "contains" ? "equals" : branch.operator,
@@ -109,6 +110,10 @@ export function convertFormFieldType(fields: readonly FormFieldDefinition[], ind
   const result = fields.map((field, position): FormFieldDefinition => {
     if (position === index) return converted;
     const rule = rewriteRule(field.rule, source.key, nextType, preserveRoutes);
+    // A route is an atomic condition: removing one leaf could broaden an AND
+    // group or reactivate its legacy outer predicate. Keep the full comparison
+    // when types are incompatible so it remains available for review/validation.
+    const branches = field.branches?.map(branch => ({ ...branch, rule: preserveRoutes ? rewriteRule(branch.rule, source.key, nextType, true) : branch.rule }));
     const condition = field.condition?.fieldKey === source.key
       ? preserveRoutes
         ? { ...field.condition, operator: MULTI_ANSWER_FIELD_TYPES.has(nextType)
@@ -117,9 +122,9 @@ export function convertFormFieldType(fields: readonly FormFieldDefinition[], ind
         : undefined
       : field.condition;
     if ((field.rule && !rule) || (field.condition && !condition)) cleared.add("routing");
-    if (rule === field.rule && condition === field.condition) return field;
+    if (rule === field.rule && condition === field.condition && !branches) return field;
     const { rule: _rule, condition: _condition, ...rest } = field;
-    return { ...rest, ...(rule ? { rule } : {}), ...(condition ? { condition } : {}) };
+    return { ...rest, ...(branches ? { branches } : {}), ...(rule ? { rule } : {}), ...(condition ? { condition } : {}) };
   });
   return { fields: result, cleared: [...cleared] };
 }

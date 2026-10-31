@@ -1,4 +1,4 @@
-import { fieldSectionKey, formSections, reachableSectionKeys } from "./sections.ts";
+import { evaluateFormNavigation } from "./sections.ts";
 import type { FormAnswer, FormAnswers, FormFieldDefinition, FormTemplateDefinition } from "./types.ts";
 import { isEmptyFormValue, isFormFieldVisible } from "./visibility.ts";
 
@@ -14,11 +14,10 @@ export function normalizeFormAnswer(field: FormFieldDefinition, value: FormAnswe
 
 export function normalizeFormAnswers(template: FormTemplateDefinition, answers: FormAnswers): FormAnswers {
   const normalized: Record<string, FormAnswer> = {};
-  const sections = formSections(template);
-  const reachable = reachableSectionKeys(template, answers);
+  const active = new Set(evaluateFormNavigation(template, answers).visibleFields.map(f => f.key));
   for (const field of [...template.fields].sort((a, b) => a.sortOrder - b.sortOrder)) {
     const value = answers[field.key];
-    if (!reachable.has(fieldSectionKey(field, sections)) || !isFormFieldVisible(field, normalized) || isEmptyFormValue(value) || field.type === "section_header" || field.type === "divider") continue;
+    if (!active.has(field.key) || !isFormFieldVisible(field, normalized) || isEmptyFormValue(value) || field.type === "section_header" || field.type === "divider") continue;
     const normalizedValue = normalizeFormAnswer(field, value as FormAnswer);
     if (isEmptyFormValue(normalizedValue)) continue;
     normalized[field.key] = normalizedValue;

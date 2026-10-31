@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, Paperclip } from "lucide-react";
-import { displayFormAnswer, reconcileFormPreviewAnswers, formCompletionProgress, formUsesSteps, isFinalFormStep, nextFormStepKey, normalizeFormAnswers, previousFormStepKey, resolveFormOptions, updateVisibleFormAnswers, validateCompleteForm, validateFormStep, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition, type FormValidationIssue } from "@jewelos/core";
+import { describeFormRule, evaluateFormNavigation, displayFormAnswer, reconcileFormPreviewAnswers, formCompletionProgress, formUsesSteps, isFinalFormStep, nextFormStepKey, normalizeFormAnswers, previousFormStepKey, resolveFormOptions, updateVisibleFormAnswers, validateCompleteForm, validateFormStep, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition, type FormValidationIssue } from "@jewelos/core";
 import { Button, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { signedFormFileUrl, uploadFormFile } from "./api";
@@ -99,6 +99,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
   }, [preview, selectedFieldKey]);
   const normalized = useMemo(() => normalizeFormAnswers(resolved, answers), [answers, resolved]);
   const sections = useMemo(() => visibleFormSections(resolved, answers), [answers, resolved]);
+  const navigation = useMemo(() => evaluateFormNavigation(resolved, answers, stepKey ?? undefined), [resolved, answers, stepKey]);
   const progress = useMemo(() => formCompletionProgress(resolved, answers), [answers, resolved]);
   const stepped = formUsesSteps(resolved) && !readOnly;
   const activeStep = stepped ? sections.find(({ section }) => section.key === stepKey) ?? sections[0] : undefined;
@@ -132,7 +133,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
 
   const set = (key: string, value: FormAnswer) => {
     setPreviewChecked(false);
-    setAnswers((current) => stepped ? updateVisibleFormAnswers(resolved, current, key, value, initialAnswers) : { ...current, [key]: value });
+    setAnswers((current) => updateVisibleFormAnswers(resolved, current, key, value, initialAnswers));
     setFieldErrors((current) => {
       if (!(key in current)) return current;
       const next = { ...current }; delete next[key]; return next;
@@ -153,11 +154,16 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
     if (!currentStepKey) return;
     const result = validateFormStep(resolved, answers, currentStepKey);
     if (!result.valid) { showIssues(result.issues, "Check this step"); return; }
-    // An optional branching question left blank ends the route here.
-    if (nextStepKey) goToStep(nextStepKey); else void submitAnswers();
+    if (nextStepKey) goToStep(nextStepKey);
+    else if (finalStep) void submitAnswers();
+    else setError("Choose an answer to continue.");
   };
   const register = (key: string) => (node: HTMLElement | null) => { if (node) fieldRefs.current.set(key, node); else fieldRefs.current.delete(key); };
-  const submit = (event: FormEvent) => { event.preventDefault(); void submitAnswers(); };
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (stepped && currentStepKey && !finalStep) { advance(); return; }
+    void submitAnswers();
+  };
   const submitAnswers = async () => {
     const result = validateCompleteForm(resolved, answers);
     if (!result.valid) { showIssues(result.issues, "Check the form"); return; }
@@ -218,7 +224,13 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
 
   return <form className="flex flex-col gap-5" onSubmit={submit} ref={formRef}>
     {workflowHint && !preview ? <Notice>When you submit, your answers are saved and you will see who receives the next step.</Notice> : null}
-    {preview ? <Notice>Preview mode — nothing is saved.</Notice> : null}
+    {preview ? <><Notice>Preview mode - nothing is saved.</Notice><details className="min-w-0 rounded-lg border border-task-border p-3"><summary className="cursor-pointer text-sm font-medium text-task-text">Routing simulation</summary><div className="mt-3 space-y-2 text-xs text-task-text-muted">
+      {resolved.sections?.map(section => <p key={section.key}>{section.title}: {navigation.reachedSectionKeys.includes(section.key) ? "on selected path" : "skipped"}{section.rule ? ` - ${section.visibility === "unless" ? "hide when" : "eligible when"} ${describeFormRule(section.rule, key => resolved.fields.find(f => f.key === key)?.label ?? key)}` : section.visibility === "routed" ? " - routing only" : ""}</p>)}
+      {navigation.routes.map((route, i) => <p key={i}>{route.name || (route.fieldKey ? resolved.fields.find(f => f.key === route.fieldKey)?.label : resolved.sections?.find(s => s.key === route.sectionKey)?.title)} -&gt; {route.target === "__submit__" ? "Submit form" : route.target === "__stage_end__" ? "End current form stage" : resolved.sections?.find(s => s.key === route.target)?.title ?? resolved.fields.find(f => "__question__:" + f.key === route.target)?.label ?? route.target}</p>)}
+      <p>{navigation.submissionAllowed ? "The selected path ends with form submission." : "Waiting for a routing answer."}</p>
+      {navigation.issues.map((issue, i) => <p className="text-danger" key={i}>{issue.message}</p>)}
+      <Button type="button" variant="secondary" onClick={() => { setAnswers({}); setStepKey(null); setFieldErrors({}); setError(null); setPreviewChecked(false); }}>Reset simulation</Button>
+    </div></details></> : null}
     {resolved.fields.length === 0 ? <Notice tone="danger">This form version has no saved questions. Close it and edit the draft before publishing.</Notice> : null}
     {!readOnly && progress.requiredTotal > 0 ? <div className="space-y-1.5">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-task-text-muted"><span>Questions marked <span className="text-danger">*</span> must be answered.</span><span className="tabular-nums">{progress.requiredAnswered} of {progress.requiredTotal} required answered</span></div>
@@ -248,8 +260,9 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, initi
     {previewChecked ? <Notice tone="success">Test validation passed. No data was submitted.</Notice> : null}
     {!readOnly && resolved.fields.length > 0 ? <div className="form-actions sticky z-10 -mx-1 mt-1 flex gap-2 border-t border-task-border bg-task-bg/95 px-1 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
       {stepped && previousStepKey ? <Button className="min-h-12 shrink-0" disabled={busy || success} onClick={() => goToStep(previousStepKey)} type="button" variant="secondary"><ChevronLeft aria-hidden="true" className="size-4" />Back</Button> : null}
-      {stepped && (nextStepKey || !finalStep) ? <Button className="min-h-12 flex-1 sm:flex-none" disabled={busy || success} onClick={advance} type="button">Next<ChevronRight aria-hidden="true" className="size-4" /></Button>
-        : <Button className="min-h-12 flex-1 sm:flex-none" disabled={busy || success} type="submit">{busy ? "Submitting..." : preview ? "Test validation" : "Submit form"}</Button>}
+      {/* Keep navigation separate: reusing Next as Submit can submit during the same native click. */}
+      {stepped && (nextStepKey || !finalStep) ? <Button className="min-h-12 flex-1 sm:flex-none" disabled={busy || success} key="next" onClick={advance} type="button">Next<ChevronRight aria-hidden="true" className="size-4" /></Button>
+        : <Button className="min-h-12 flex-1 sm:flex-none" disabled={busy || success} key="submit" type="submit">{busy ? "Submitting..." : preview ? "Test validation" : "Submit form"}</Button>}
     </div> : null}
   </form>;
 }

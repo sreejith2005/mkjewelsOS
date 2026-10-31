@@ -1,0 +1,20 @@
+﻿[
+    {
+        "active":  true,
+        "jobid":  1,
+        "jobname":  "crm-sync-deliver",
+        "schedule":  "* * * * *"
+    },
+    {
+        "active":  true,
+        "jobid":  3,
+        "jobname":  "crm-staff-sync-deliver",
+        "schedule":  "* * * * *"
+    },
+    {
+        "active":  true,
+        "jobid":  4,
+        "jobname":  "crm-staff-sync-reconcile",
+        "schedule":  "0 21 * * *"
+    }
+]

@@ -1,3 +1,4 @@
+import { defaultTaskSearch, type TaskDateScope } from "@jewelos/core";
 import { decodeTaskSearchPage, taskSearchPayload, type TaskSearchFilters } from "@jewelos/core";
 import { loadFmsTaskContexts } from "../fms/work";
 import type { FmsWorkContext } from "@jewelos/core";
@@ -575,18 +576,31 @@ export async function recordAvailabilityRange(
 export type TaskPage = Omit<TaskPageScope, "ids"> & Readonly<{ tasks: TaskBundle[] }>;
 
 /** Count unopened tabs without fetching their cards or any caller-selected actor. */
-export async function loadTaskTabCounts(includeAll: boolean): Promise<Partial<Record<TaskWorkspaceView, number>>> {
+export async function loadTaskTabCounts(includeAll: boolean, calendarScope?: TaskDateScope, status: TaskFeedStatusFilter = "pending", filters?: TaskSearchFilters): Promise<Partial<Record<TaskWorkspaceView, number>>> {
+  if (filters) taskSearchPayload(filters);
   const views: TaskWorkspaceView[] = ["mine", "delegated", "inLoop", "fms", ...(includeAll ? ["all" as const] : [])];
   const entries = await Promise.all(views.map(async (view) => {
-    const { data, error } = await db().rpc("task_feed_page", { p_view: view, p_status: "pending", p_offset: 0, p_limit: 1 });
+    if (filters) {
+      const { data, error } = await db().rpc("task_workspace_page", { p_filter: { ...filters, query: filters.query.trim(), subsection: view, mode: "explore" }, p_offset: 0, p_limit: 1 });
+      fail("Load searched task subsection counts", error);
+      return [view, decodeTaskPage(data).total] as const;
+    }
+    if (calendarScope && view === "fms") {
+      const result = await db().rpc("get_fms_task_workspace", { p_filter: { scope: calendarScope, status: "active" }, p_offset: 0, p_limit: 1 });
+      fail("Load FMS subsection count", result.error);
+      const resultData = result.data;
+      if (!resultData || typeof resultData !== "object" || Array.isArray(resultData) || typeof resultData.total !== "number") throw new Error("Invalid FMS count");
+      return [view, resultData.total] as const;
+    }
+    const { data, error } = calendarScope ? await db().rpc("task_workspace_page", { p_filter: { ...defaultTaskSearch(), mode: "board", subsection: view, status, scope: calendarScope }, p_offset: 0, p_limit: 1 }) : await db().rpc("task_feed_page", { p_view: view, p_status: "pending", p_offset: 0, p_limit: 1 });
     fail("Load task subsection counts", error);
-    return [view, decodeTaskPage(data).counts.open] as const;
+    return [view, calendarScope ? decodeTaskPage(data).total : decodeTaskPage(data).counts.open] as const;
   }));
   return Object.fromEntries(entries);
 }
 
-export async function loadTaskPage(viewerId: string, tenantId: string, view: TaskWorkspaceView, status: TaskFeedStatusFilter, offset = 0): Promise<TaskPage> {
-  const { data, error } = await db().rpc("task_feed_page", { p_view: view, p_status: status, p_offset: offset, p_limit: TASK_PAGE_SIZE });
+export async function loadTaskPage(viewerId: string, tenantId: string, view: TaskWorkspaceView, status: TaskFeedStatusFilter, offset = 0, calendarScope?: TaskDateScope): Promise<TaskPage> {
+  const { data, error } = calendarScope ? await db().rpc("task_workspace_page", { p_filter: { ...defaultTaskSearch(), mode: "board", subsection: view, status, scope: calendarScope }, p_offset: offset, p_limit: TASK_PAGE_SIZE }) : await db().rpc("task_feed_page", { p_view: view, p_status: status, p_offset: offset, p_limit: TASK_PAGE_SIZE });
   fail("Load task page", error);
   const scope = decodeTaskPage(data);
   const rows = await loadTaskFeed(viewerId, "", "", { tenantId, recordIds: scope.ids });

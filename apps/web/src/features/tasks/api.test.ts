@@ -206,6 +206,14 @@ describe("bounded page hydration", () => {
 
 
 describe("server task page access", () => {
+  it("passes strict calendar scope to the server before hydrating only the returned page", async () => {
+    pageRpc.mockResolvedValue({ data: { ids: [], total: 0, counts: { pending: 0, overdue: 0, completed: 0, open: 0 } }, error: null });
+    const result = await loadTaskPage("viewer", "tenant", "delegated", "pending", 50, "today");
+    expect(pageRpc).toHaveBeenCalledWith("task_workspace_page", expect.objectContaining({ p_filter: expect.objectContaining({ scope: "today", subsection: "delegated", status: "pending", mode: "board" }), p_offset: 50, p_limit: 50 }));
+    expect(result.tasks).toEqual([]);
+    expect(selectedTables).toEqual([]);
+  });
+
   it("preserves server ordering and full counts after detail hydration", async () => {
     const ids = ["00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002"];
     const counts = { pending: 12000, overdue: 40, completed: 10, open: 12040 };

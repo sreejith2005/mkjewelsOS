@@ -1,13 +1,13 @@
 import { FORM_OPTION_TYPES, parseFormOptions } from "./options.ts";
-import { normalizeFormRule, validateFormRule } from "./rules.ts";
-import { fieldSectionKey, formSections } from "./sections.ts";
+import { FORM_RULE_OPERATORS, formRuleFieldKeys, formRuleHasIncompletePredicate, normalizeFormRule, validateFormRule } from "./rules.ts";
+import { FORM_QUESTION_TARGET_PREFIX, FORM_CONTINUE_TARGET, FORM_STAGE_END_TARGET, fieldSectionKey, formSections } from "./sections.ts";
 import { eligibleRecordNameFields } from "../fms/recordNaming.ts";
-import { FORM_DRAFT_FIELD_TYPES, FORM_SUBMIT_TARGET, type FormBranch, type FormFieldDefinition, type FormSectionDefinition, type FormTemplateDefinition, type FormValidationIssue } from "./types.ts";
+import { FORM_DRAFT_FIELD_TYPES, FORM_SUBMIT_TARGET, type FormRule, type FormBranch, type FormFieldDefinition, type FormSectionDefinition, type FormTemplateDefinition, type FormValidationIssue } from "./types.ts";
 
-const BRANCH_TYPES = new Set(["select", "radio"]);
+const BRANCH_TYPES: ReadonlySet<string> = new Set(FORM_DRAFT_FIELD_TYPES.filter(type => type !== "section_header" && type !== "divider"));
 const LAYOUT_TYPES = new Set(["section_header", "divider"]);
 const KEY_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
-const BRANCH_OPERATORS = new Set(["equals", "not_equals", "contains", "not_empty"]);
+const BRANCH_OPERATORS: ReadonlySet<string> = new Set([...FORM_RULE_OPERATORS, "default"]);
 
 function text(value: unknown): string | undefined {
   const normalized = typeof value === "string" ? value.trim() : undefined;
@@ -22,6 +22,8 @@ function normalizeSections(sections: readonly FormSectionDefinition[] | undefine
   if (!sections?.length) return undefined;
   return Object.freeze(sections.map((section) => Object.freeze({
     key: requiredText(section.key).toLowerCase(),
+    ...(section.visibility ? { visibility: section.visibility } : {}),
+    ...(section.rule ? { rule: normalizeFormRule(section.rule) } : {}),
     title: requiredText(section.title),
     ...(text(section.description) ? { description: text(section.description) } : {}),
     ...(text(section.next) ? { next: requiredText(section.next).toLowerCase() } : {}),
@@ -32,6 +34,8 @@ function normalizeBranches(field: FormFieldDefinition): readonly FormBranch[] | 
   if (!field.branches?.length || !BRANCH_TYPES.has(field.type)) return undefined;
   return Object.freeze(field.branches.map((branch) => Object.freeze({
     operator: branch.operator,
+    ...(branch.rule ? { rule: normalizeFormRule(branch.rule) } : {}),
+    ...(text(branch.name) ? { name: text(branch.name) } : {}),
     ...(branch.operator === "not_empty" ? {} : { value: branch.value }),
     targetSectionKey: requiredText(branch.targetSectionKey).toLowerCase(),
   })));
@@ -95,11 +99,23 @@ function validateSections(template: FormTemplateDefinition, issues: FormValidati
     if ((section.description?.length ?? 0) > 500) issues.push({ code: "invalid_section_description", message: "Section description is too long" });
   }
   sections.forEach((section, index) => {
-    if (!section.next || section.next === FORM_SUBMIT_TARGET) return;
+    if (!section.next || [FORM_SUBMIT_TARGET, FORM_STAGE_END_TARGET, FORM_CONTINUE_TARGET].includes(section.next)) return;
+    if (section.next.startsWith(FORM_QUESTION_TARGET_PREFIX)) {
+      const question = template.fields.find(f => f.key === section.next?.slice(FORM_QUESTION_TARGET_PREFIX.length));
+      const targetIndex = question ? sections.findIndex(s => s.key === fieldSectionKey(question, sections)) : -1;
+      if (targetIndex <= index) issues.push({ code: "backward_section_target", message: section.title + " must continue to a question in a later section" });
+      return;
+    }
     const targetIndex = sections.findIndex((item) => item.key === section.next);
     if (targetIndex === -1) issues.push({ code: "unknown_section_target", message: section.title + " continues to a section that no longer exists" });
     else if (targetIndex <= index) issues.push({ code: "backward_section_target", message: section.title + " must continue to a later section" });
   });
+  for (const [index, section] of sections.entries()) {
+    if (section.visibility && !["always", "when", "unless", "routed"].includes(section.visibility)) issues.push({ code: "invalid_section_visibility", message: "Invalid section visibility" });
+    if ((section.visibility === "when" || section.visibility === "unless") && (!section.rule || formRuleHasIncompletePredicate(section.rule))) issues.push({ code: "incomplete_section_rule", message: section.title + " needs a complete condition" });
+    const earlier = new Set(template.fields.filter(f => sections.findIndex(s => s.key === fieldSectionKey(f, sections)) < index).map(f => f.key));
+    if (section.rule) issues.push(...validateFormRule(section.rule, { key: section.key, label: section.title, type: "section_header", sortOrder: 0 }, earlier));
+  }
   for (const field of template.fields) {
     if (field.sectionKey && !keys.has(field.sectionKey)) issues.push({ code: "unknown_section", fieldKey: field.key, message: (field.label || field.key) + " belongs to a section that no longer exists" });
   }
@@ -119,15 +135,37 @@ function validateBranches(template: FormTemplateDefinition, field: FormFieldDefi
   const optionValues = new Set((field.options ?? []).map((option) => option.value));
   for (const branch of branches) {
     if (!BRANCH_OPERATORS.has(branch.operator)) issues.push({ code: "invalid_branch_operator", fieldKey: field.key, message: "Branch operator is unsupported" });
-    if (branch.operator !== "not_empty" && branch.value === undefined) issues.push({ code: "missing_branch_value", fieldKey: field.key, message: "A branch needs the answer it should match" });
-    else if (branch.operator !== "not_empty" && !field.optionSource && typeof branch.value === "string" && !optionValues.has(branch.value)) {
+    if (!branch.rule && branch.operator !== "default" && branch.operator !== "is_empty" && branch.operator !== "not_empty" && branch.value === undefined) issues.push({ code: "missing_branch_value", fieldKey: field.key, message: "A branch needs the answer it should match" });
+    else if (!branch.rule && branch.operator !== "default" && branch.operator !== "not_empty" && !field.optionSource && typeof branch.value === "string" && !optionValues.has(branch.value)) {
       issues.push({ code: "unknown_branch_option", fieldKey: field.key, message: name + " branches on an option that no longer exists" });
     }
-    if (branch.targetSectionKey === FORM_SUBMIT_TARGET) continue;
+    if (branch.rule) {
+      const available = new Set(template.fields.filter(f => f.sortOrder <= field.sortOrder).map(f => f.key));
+      if (formRuleHasIncompletePredicate(branch.rule)) issues.push({ code: "incomplete_route_rule", fieldKey: field.key, message: name + " has an incomplete routing condition" });
+      if (formRuleFieldKeys(branch.rule).some(key => !available.has(key))) issues.push({ code: "invalid_route_dependency", fieldKey: field.key, message: name + " routes using an unavailable question" });
+    }
+    if ([FORM_SUBMIT_TARGET, FORM_STAGE_END_TARGET, FORM_CONTINUE_TARGET].includes(branch.targetSectionKey)) continue;
+    if (branch.targetSectionKey.startsWith(FORM_QUESTION_TARGET_PREFIX)) {
+      const target = template.fields.find(f => f.key === branch.targetSectionKey.slice(FORM_QUESTION_TARGET_PREFIX.length));
+      const targetSection = target ? sections.findIndex(s => s.key === fieldSectionKey(target, sections)) : -1;
+      if (!target) issues.push({ code: "unknown_branch_target", fieldKey: field.key, message: name + " routes to a missing question" });
+      else if (targetSection < sourceIndex || targetSection === sourceIndex && target.sortOrder <= field.sortOrder) issues.push({ code: "backward_branch", fieldKey: field.key, message: name + " must route to a later question" });
+      continue;
+    }
     const targetIndex = sections.findIndex((section) => section.key === branch.targetSectionKey);
     if (targetIndex === -1) issues.push({ code: "unknown_branch_target", fieldKey: field.key, message: name + " branches to a section that no longer exists" });
     else if (targetIndex <= sourceIndex) issues.push({ code: "backward_branch", fieldKey: field.key, message: name + " must branch to a later section" });
   }
+}
+
+function validateRuleOptions(rule: FormRule | undefined, template: FormTemplateDefinition, fieldKey: string | undefined, issues: FormValidationIssue[]): void {
+  if (!rule) return;
+  if (rule.kind !== "predicate") { for (const child of rule.rules) validateRuleOptions(child, template, fieldKey, issues); return; }
+  const source = template.fields.find(f => f.key === rule.fieldKey);
+  if (!source || source.shown === false || LAYOUT_TYPES.has(source.type)) { issues.push({ code: "unavailable_rule_source", fieldKey, message: "A condition reads a missing or unavailable question." }); return; }
+  if (source.optionSource || !source.options?.length || ["is_empty", "not_empty"].includes(rule.operator)) return;
+  const values = Array.isArray(rule.value) ? rule.value : [rule.value];
+  if (values.some(value => !source.options!.some(option => option.value === value))) issues.push({ code: "unknown_rule_option", fieldKey, message: "A condition refers to an answer option that no longer exists." });
 }
 
 export function validateFormDefinition(template: FormTemplateDefinition): readonly FormValidationIssue[] {
@@ -137,6 +175,15 @@ export function validateFormDefinition(template: FormTemplateDefinition): readon
   if ((template.description?.length ?? 0) > 2000) issues.push({ code: "invalid_description", message: "Form description is too long" });
   if (template.fields.length > 100) issues.push({ code: "too_many_fields", message: "A form can contain at most 100 fields" });
   validateSections(template, issues);
+  for (const section of template.sections ?? []) validateRuleOptions(section.rule, template, undefined, issues);
+  for (const field of template.fields) {
+    validateRuleOptions(field.rule, template, field.key, issues);
+    for (const branch of field.branches ?? []) if (branch.rule) {
+      validateRuleOptions(branch.rule, template, field.key, issues);
+      const available = new Set(template.fields.filter(f => f.sortOrder <= field.sortOrder).map(f => f.key));
+      issues.push(...validateFormRule(branch.rule, { ...field, key: "__route__" }, available).map(issue => ({ ...issue, fieldKey: field.key })));
+    }
+  }
   const sections = template.sections ?? [];
   const sectionOrder = new Map(sections.map((section, index) => [section.key, index]));
   const keys = new Set<string>();

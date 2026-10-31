@@ -1,4 +1,4 @@
-﻿-- Customer exports extend the existing private export lifecycle; no second job/storage system.
+-- Customer exports extend the existing private export lifecycle; no second job/storage system.
 set search_path=public,extensions;
 create table customer_export_layouts(
  id uuid primary key default gen_random_uuid(),tenant_id uuid not null references tenants(id),name text not null,

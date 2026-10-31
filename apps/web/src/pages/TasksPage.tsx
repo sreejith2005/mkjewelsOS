@@ -1,4 +1,4 @@
-import { defaultTaskSearch, taskSearchActive, TASK_SUBSECTION_LABELS, type TaskSearchFilters } from "@jewelos/core";
+import { defaultTaskSearch, taskSearchActive, TASK_SUBSECTION_LABELS, type TaskSearchFilters, type TaskDateScope } from "@jewelos/core";
 import { TaskSearchControls } from "@/features/tasks/TaskSearchControls";
 import { FmsTaskWorkspace } from "@/features/tasks/fms/FmsTaskWorkspace";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -45,11 +45,12 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const { access, profile } = useAuth();
   const selectedTaskId=new URLSearchParams(window.location.search).get("task_id");
   const focusedTaskId=selectedTaskId&&/^[0-9a-f-]{36}$/i.test(selectedTaskId)?selectedTaskId:null;
+  const [calendarScope, setCalendarScope] = useState<TaskDateScope>("today");
   const [filters, setFilters] = useState<TaskSearchFilters>(defaultTaskSearch);
   const [query, setQuery] = useState("");
   const [sections, setSections] = useState<Record<string, TaskWorkspaceView>>({});
   useEffect(() => { const timer = window.setTimeout(() => { setQuery(filters.query.trim()); setOffset(0); }, 250); return () => window.clearTimeout(timer); }, [filters.query]);
-  const effectiveFilters = useMemo(() => ({ ...filters, query }), [query, filters.kind, filters.status, filters.priority, filters.from, filters.to, filters.subsection, filters.requirement, filters.sort]);
+  const effectiveFilters = useMemo(() => ({ ...filters, query, scope: calendarScope }), [calendarScope, query, filters.kind, filters.status, filters.priority, filters.from, filters.to, filters.subsection, filters.requirement, filters.sort]);
   const exploring = taskSearchActive(effectiveFilters) && !focusedTaskId;
   const searchIdentity = JSON.stringify(effectiveFilters);
   const changeSearch = (next: TaskSearchFilters) => { setFilters(next); if (next.query === filters.query || !next.query.trim()) setOffset(0); if (!next.query.trim()) setQuery(""); };
@@ -81,7 +82,7 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
   // The database resolves this key; the flag only decides whether the control is offered.
   const canUseVoice = access ? hasPermission(access, "tasks.voice_assign") : false;
 
-  const pageIdentity = `${profile?.id}|${workspaceView}|${statusFilter}|${offset}|${focusedTaskId}|${searchIdentity}`;
+  const pageIdentity = `${calendarScope}|${profile?.id}|${workspaceView}|${statusFilter}|${offset}|${focusedTaskId}|${searchIdentity}`;
   const updateFmsCount = useCallback((count: number) => setTabCounts(previous => ({ ...previous, fms: count })), []);
 
   const refresh = useCallback(async () => {
@@ -97,24 +98,26 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
         if (generation === refreshGeneration.current) { setFocusedTasks(rows); setCategories(referenceData.categories); setLoadedIdentity(pageIdentity); }
         return;
       }
-      if (workspaceView === "fms") {
-        const tabs = await loadTaskTabCounts(hasAdminTaskView);
-        if (generation === refreshGeneration.current) { setTabCounts(tabs); setLoadedIdentity(pageIdentity); }
+      if (workspaceView === "fms" && !exploring) {
+        const tabs = await loadTaskTabCounts(hasAdminTaskView, calendarScope, statusFilter);
+        if (generation === refreshGeneration.current) { setTabCounts(previous => { const { fms: _fms, ...otherTabs } = tabs; return { ...otherTabs, ...(previous.fms !== undefined ? { fms: previous.fms } : {}) }; }); setLoadedIdentity(pageIdentity); }
         return;
       }
       if (exploring) {
-        const [result, referenceData] = await Promise.all([loadTaskSearchPage(profile.id, profile.tenant_id, effectiveFilters, offset), loadTaskFeedReferenceData().catch(() => ({ categories: [] }))]);
+        const [result, referenceData, tabs] = await Promise.all([loadTaskSearchPage(profile.id, profile.tenant_id, effectiveFilters, offset), loadTaskFeedReferenceData().catch(() => ({ categories: [] })), loadTaskTabCounts(hasAdminTaskView, calendarScope, statusFilter, effectiveFilters).catch(() => null)]);
         if (generation !== refreshGeneration.current) return;
         if (offset > 0 && offset >= result.total) { setOffset(Math.max(0, Math.floor((result.total - 1) / TASK_PAGE_SIZE) * TASK_PAGE_SIZE)); return; }
         setPageTasks(result.tasks); setServerCounts(result.counts); setTotal(result.total); setSections(result.sections); setLoadedIdentity(pageIdentity);
         setCategories(referenceData.categories);
+        setCountsError(tabs === null);
+        setTabCounts(tabs ?? {});
         return;
       }
-      const loadPage = () => loadTaskPage(profile.id, profile.tenant_id, workspaceView, statusFilter, offset);
+      const loadPage = () => loadTaskPage(profile.id, profile.tenant_id, workspaceView, statusFilter, offset, calendarScope);
       let countsGeneration = 0;
       const refreshTabCounts = async () => {
         const request = ++countsGeneration;
-        const tabs = await loadTaskTabCounts(hasAdminTaskView).catch(() => null);
+        const tabs = await loadTaskTabCounts(hasAdminTaskView, calendarScope, statusFilter).catch(() => null);
         if (generation !== refreshGeneration.current || request !== countsGeneration) return;
         setCountsError(tabs === null);
         if (tabs) setTabCounts(tabs);
@@ -123,7 +126,7 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
         if (generation !== refreshGeneration.current) return;
         if (offset > 0 && offset >= page.total) { setOffset(Math.max(0, Math.floor((page.total - 1) / TASK_PAGE_SIZE) * TASK_PAGE_SIZE)); return; }
         setPageTasks(page.tasks); setServerCounts(page.counts); setTotal(page.total);
-        setTabCounts((counts) => ({ ...counts, [workspaceView]: page.counts.open }));
+        setTabCounts((counts) => ({ ...counts, [workspaceView]: page.total }));
         setLoadedIdentity(pageIdentity);
       };
       const [page, referenceData] = await Promise.all([
@@ -164,7 +167,7 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const showDuties = !focusedTaskId && !exploring && workspaceView === "mine" && statusFilter === "pending";
   // A started anytime duty is an ordinary task in the list; label it so the employee recognises it.
   const dutyLabels = useMemo(() => new Map(showDuties ? duties.map((duty) => [duty.templateId, duty.triggerLabel]) : []), [duties, showDuties]);
-  const changeView = (view: TaskWorkspaceView) => { if (view !== "fms" && new URLSearchParams(window.location.search).has("view")) window.history.replaceState(window.history.state, "", window.location.pathname); setWorkspaceView(view); setOffset(0); if (view === "fms") { setFilters(defaultTaskSearch()); setQuery(""); } };
+  const changeView = (view: TaskWorkspaceView) => { if (view !== "fms" && new URLSearchParams(window.location.search).has("view")) window.history.replaceState(window.history.state, "", window.location.pathname); setWorkspaceView(view); setOffset(0); if (exploring) setFilters(previous => ({ ...previous, subsection: view })); };
   const changeStatus = (status: TaskFeedStatusFilter) => { setStatusFilter(status); setOffset(0); };
   const emptyState = exploring ? { title: "No matching tasks", detail: "Try a different search or clear the filters." }
     : focusedTaskId ? { title: "Task not available", detail: "This task is finished, removed, or not visible to your account." }
@@ -227,8 +230,9 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
         <div><h2 className="font-display text-[2rem] font-semibold leading-tight text-task-text">Tasks</h2><p className="text-sm text-task-text-muted">Assigned, watched, coverage-blocked, and delegated work in one place.</p></div>
       </div>
 
-      {!focusedTaskId && workspaceView !== "fms" ? <TaskSearchControls value={filters} onChange={changeSearch} canViewAll={hasAdminTaskView} /> : null}
-      {!exploring ? <div className="no-scrollbar grid grid-cols-2 items-stretch gap-2 border-b border-task-border bg-task-bg px-3 pt-3 sm:flex sm:overflow-x-auto sm:px-5">
+      {!focusedTaskId ? <div className="flex flex-wrap items-center gap-2 border-b border-task-border px-3 py-3 sm:px-5" role="group" aria-label="Task date scope">{(["today", "overall", "overdue"] as const).map(scope => <button type="button" key={scope} aria-pressed={calendarScope === scope} className={`min-h-11 rounded-full border px-4 text-sm font-semibold capitalize ${calendarScope === scope ? "border-task-accent bg-task-accent-soft" : "border-task-border text-task-text-muted"}`} onClick={() => { setCalendarScope(scope); setStatusFilter(scope === "overdue" ? "overdue" : "pending"); setOffset(0); setTabCounts({}); }}>{scope}</button>)}<span className="text-xs text-task-text-muted">{calendarScope === "today" ? "Scheduled for today in Asia/Kolkata" : calendarScope === "overall" ? "Includes future scheduled work" : "Unfinished work scheduled before today"}</span></div> : null}
+      {!focusedTaskId && (workspaceView !== "fms" || exploring) ? <TaskSearchControls value={filters} onChange={changeSearch} canViewAll={hasAdminTaskView} /> : null}
+      {!focusedTaskId ? <div className="no-scrollbar grid grid-cols-2 items-stretch gap-2 border-b border-task-border bg-task-bg px-3 pt-3 sm:flex sm:overflow-x-auto sm:px-5">
         {([
           ["mine", "My Tasks", tabCounts.mine],
           ["delegated", "Delegated", tabCounts.delegated],
@@ -250,16 +254,16 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
         </div> : null}
       </div>
 
-      : <div className="px-4 py-2 text-xs text-task-text-muted" role="status">{loadedIdentity === pageIdentity ? `${total} results` : "Searching..."} | {effectiveFilters.subsection === "any" ? "All subsections" : TASK_SUBSECTION_LABELS[effectiveFilters.subsection]} | Includes earlier and completed work</div>}
+      : null}{exploring ? <div className="px-4 py-2 text-xs text-task-text-muted" role="status">{loadedIdentity === pageIdentity ? `${total} results` : "Searching..."} | {effectiveFilters.subsection === "any" ? "All subsections" : TASK_SUBSECTION_LABELS[effectiveFilters.subsection]} | {calendarScope === "overall" ? "Includes earlier and completed work" : calendarScope === "today" ? "Scheduled today (IST)" : "Overdue from earlier dates"}</div> : null}
       <>{focusedTaskId?<div className="px-4 py-3 text-sm text-task-text-muted">Selected task | <button className="min-h-11 text-task-accent" onClick={()=>navigateTo("/tasks")}>Return to task feed</button></div>:null}</>{!exploring && workspaceView !== "fms" ? <TaskFilterBar counts={counts} onStatusChange={changeStatus} status={statusFilter} /> : null}
 
       <div className="w-full p-3 sm:p-5">
         {showDuties ? <OnDemandDutiesPanel onLoaded={setDuties} onOpenTask={openTask} reloadKey={dutiesVersion} /> : null}
-        {countsError && !exploring ? <Notice tone="danger">Unable to refresh subsection counts. Reopen Tasks to retry.</Notice> : null}
-        {workspaceView === "fms" && !focusedTaskId && profile ? <FmsTaskWorkspace key={`${profile.tenant_id}:${profile.id}`} actorId={profile.id} tenantId={profile.tenant_id} onNavigate={navigateTo} onCount={updateFmsCount} /> : error ? <div className="flex flex-col gap-3 rounded-xl border border-danger/40 bg-danger/10 p-4"><Notice tone="danger">{error}</Notice><Button className="self-start border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={() => void refresh()} variant="secondary"><RefreshCw />Retry</Button></div> : shouldShowTaskLoading(loading || loadedIdentity !== pageIdentity, hasCompletedInitialLoad.current && loadedIdentity === pageIdentity) ? <div aria-label="Loading tasks" className="flex flex-col gap-3">{[0, 1, 2].map((item) => <div className="h-28 animate-pulse rounded-2xl border border-task-border bg-task-muted" key={item} />)}</div> : scopedTasks.length === 0 ? <div className="flex min-h-[48dvh] flex-col items-center justify-center px-5 text-center"><span className="mb-5 flex size-20 items-center justify-center rounded-[1.75rem] bg-task-muted text-task-accent"><CheckCircle2 className="size-10" /></span><h2 className="text-2xl font-semibold text-task-text">{emptyState.title}</h2><p className="mt-1 max-w-sm text-sm text-task-text-muted">{emptyState.detail}</p></div> : <div className="flex flex-col gap-3">{profile ? scopedTasks.map((task) => <div key={task.id}>{exploring && task.id && sections[task.id] ? <span className="mb-1 inline-block rounded-full bg-task-accent-soft px-2 py-0.5 text-xs font-medium text-task-text">{TASK_SUBSECTION_LABELS[sections[task.id] ?? "mine"]}</span> : null}{task.task_template_id && dutyLabels.has(task.task_template_id) ? <span className="mb-1 inline-block rounded-full bg-task-accent-soft px-2 py-0.5 text-xs font-medium text-task-text">Anytime duty · {dutyLabels.get(task.task_template_id)}</span> : null}<TaskCard viewerId={profile.id} management={hasAdminTaskView && task.task_type !== "fms" ? <TaskAdminControls task={task} onChanged={refresh} /> : undefined} capability={deriveTaskMutationCapability({ assigneeIds: task.assignees.map((assignee) => assignee.id), isWatcher: task.isWatchedByViewer, viewerId: profile.id, viewerRole: profile.user_role })} categoryLabel={task.category_id ? categoryNames.get(task.category_id) ?? "Uncategorized" : "Uncategorized"} key={task.id} onAction={(action) => handleAction(task, action)} task={task} /></div>) : null}</div>}
+        {countsError ? <Notice tone="danger">Unable to refresh subsection counts. Reopen Tasks to retry.</Notice> : null}
+        {workspaceView === "fms" && !exploring && !focusedTaskId && profile ? <FmsTaskWorkspace key={`${profile.tenant_id}:${profile.id}`} actorId={profile.id} tenantId={profile.tenant_id} scope={calendarScope} onNavigate={navigateTo} onCount={updateFmsCount} /> : error ? <div className="flex flex-col gap-3 rounded-xl border border-danger/40 bg-danger/10 p-4"><Notice tone="danger">{error}</Notice><Button className="self-start border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={() => void refresh()} variant="secondary"><RefreshCw />Retry</Button></div> : shouldShowTaskLoading(loading || loadedIdentity !== pageIdentity, hasCompletedInitialLoad.current && loadedIdentity === pageIdentity) ? <div aria-label="Loading tasks" className="flex flex-col gap-3">{[0, 1, 2].map((item) => <div className="h-28 animate-pulse rounded-2xl border border-task-border bg-task-muted" key={item} />)}</div> : scopedTasks.length === 0 ? <div className="flex min-h-[48dvh] flex-col items-center justify-center px-5 text-center"><span className="mb-5 flex size-20 items-center justify-center rounded-[1.75rem] bg-task-muted text-task-accent"><CheckCircle2 className="size-10" /></span><h2 className="text-2xl font-semibold text-task-text">{emptyState.title}</h2><p className="mt-1 max-w-sm text-sm text-task-text-muted">{emptyState.detail}</p></div> : <div className="flex flex-col gap-3">{profile ? scopedTasks.map((task) => <div key={task.id}>{exploring && task.id && sections[task.id] ? <span className="mb-1 inline-block rounded-full bg-task-accent-soft px-2 py-0.5 text-xs font-medium text-task-text">{TASK_SUBSECTION_LABELS[sections[task.id] ?? "mine"]}</span> : null}{task.task_template_id && dutyLabels.has(task.task_template_id) ? <span className="mb-1 inline-block rounded-full bg-task-accent-soft px-2 py-0.5 text-xs font-medium text-task-text">Anytime duty · {dutyLabels.get(task.task_template_id)}</span> : null}<TaskCard viewerId={profile.id} management={hasAdminTaskView && task.task_type !== "fms" ? <TaskAdminControls task={task} onChanged={refresh} /> : undefined} capability={deriveTaskMutationCapability({ assigneeIds: task.assignees.map((assignee) => assignee.id), isWatcher: task.isWatchedByViewer, viewerId: profile.id, viewerRole: profile.user_role })} categoryLabel={task.category_id ? categoryNames.get(task.category_id) ?? "Uncategorized" : "Uncategorized"} key={task.id} onAction={(action) => handleAction(task, action)} task={task} /></div>) : null}</div>}
       </div>
 
-      {!focusedTaskId && workspaceView !== "fms" && loadedIdentity === pageIdentity ? <nav aria-label="Task pages" className="flex items-center justify-center gap-3 px-4 pb-5">
+      {!focusedTaskId && (workspaceView !== "fms" || exploring) && loadedIdentity === pageIdentity ? <nav aria-label="Task pages" className="flex items-center justify-center gap-3 px-4 pb-5">
         <Button variant="secondary" disabled={loading || offset === 0} onClick={() => setOffset(Math.max(0, offset - TASK_PAGE_SIZE))}>Previous</Button>
         <span className="text-sm text-task-text-muted">{total === 0 ? "0 tasks" : `${offset + 1} - ${Math.min(offset + TASK_PAGE_SIZE, total)} of ${total}`}</span>
         <Button variant="secondary" disabled={loading || offset + TASK_PAGE_SIZE >= total} onClick={() => setOffset(offset + TASK_PAGE_SIZE)}>Next</Button>

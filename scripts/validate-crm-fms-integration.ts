@@ -1,13 +1,13 @@
 /** Synthetic local two-database contract test. Never connects to a hosted project.
  * deno run --allow-run=docker --allow-read --allow-env=CRM_WORKTREE_DIRECTORY scripts/validate-crm-fms-integration.ts
- * Requires the schema-only crm_fms_final_20261027 schema-only validation databases.
+ * Requires the schema-only crm_fms_final_20261028 schema-only validation databases.
  */
 import {PERMISSION_CATALOG} from "../packages/core/src/permissions/catalog.ts";
 import { handleCustomerSync,type CustomerDeliveryEvent } from "../supabase/functions/crm-customer-sync/worker.ts";
 const crmDirectory=(Deno.env.get("CRM_WORKTREE_DIRECTORY")??"C:/crm").replaceAll("\\","/");
 const {handleSyncReceive}=await import(`file:///${crmDirectory}/supabase-crm/supabase/functions/sync-receive/worker.ts`);
 const sourceContainer="supabase_db_jewelos-fms-workspace",crmContainer="supabase_db_mkcrm";
-const template="crm_fms_final_20261027",database=`crm_fms_e2e_${Date.now()}`;
+const template="crm_fms_final_20261028",database=`crm_fms_e2e_${Date.now()}`;
 if(!/^crm_fms_e2e_[0-9]+$/.test(database))throw new Error("Invalid local test database name");
 const decoder=new TextDecoder();
 function quote(value:string):string{return `'${value.replaceAll("'","''")}'`;}
@@ -98,7 +98,24 @@ try{
  check(proof.clients===1&&proof.events===sourceProof.events,"Source/receiver count reconciliation failed");
  check(sourceProof.delivered===sourceProof.events&&sourceProof.submissions===3&&sourceProof.workflowLinks===1,"Source durability/linkage assertion failed");
  check(proof.contacts===1&&proof.budget===120000&&proof.purchases===0&&proof.operationalLeaks===0,"Contact, projection, purchase or privacy regression");
- console.log(JSON.stringify({result:"passed",source:sourceProof,crm:proof,scenarios:["starter retry","introduction call","sales handoff","sales follow-up","mapping approval","out-of-order events","timeout after commit","idempotent replay","operational answer exclusion","no fabricated purchase","concurrent first delivery","phone and Instagram identity"]}));
+ // Pending review racing another accepted source uses the same durable journey lock.
+ const raceJourney=crypto.randomUUID(),raceId=`synthetic.review.${raceJourney}`,bindId=`synthetic.bind.${raceJourney}`;
+ const family=string(await json(crmContainer,`insert into public.clients(primary_name,primary_phone,last_branch_id,lifecycle_stage) values('Synthetic race family','+919876543210',${quote(branch)},'lead') returning to_jsonb(client_id);`));
+ const racePayload:Record<string,unknown>={...starter,eventId:raceId,journeyKey:raceJourney,workflow:{...object(starter.workflow),instanceId:raceJourney},isStartingForm:true};
+ check((await receiverGateway.applyCustomer(raceId,racePayload)).reason==="ambiguous_phone","Expected pending shared-phone review");
+ const raceAnswers=racePayload.answers;check(Array.isArray(raceAnswers),"Expected original source answers");
+ const bindPayload={...racePayload,eventId:bindId,answers:raceAnswers.filter(value=>object(value).destination!=="primary_phone")};
+ // Also remove other aliases so this independent synthetic bind creates its own customer.
+ bindPayload.answers=bindPayload.answers.filter(value=>!["instagram","email","whatsapp","website_chat","external_reference"].includes(string(object(value).destination)));
+ const raced=await Promise.allSettled([
+  json(crmContainer,`select to_jsonb(review_customer_identity(${quote(raceId)},${quote(family)}::uuid,'Synthetic concurrent review'));`,{role:"authenticated",sub:string(first.id)}),
+  receiverGateway.applyCustomer(bindId,bindPayload),
+ ]);
+ check(raced[1]!.status==="fulfilled","Concurrent independent source failed");
+ await receiverGateway.applyCustomer(raceId,racePayload);
+ const raceProof=object(await json(crmContainer,`select jsonb_build_object('wrongEvents',(select count(*) from public.crm_customer_workflow_events where event_id in(${quote(raceId)},${quote(bindId)}) and client_id=${quote(family)}::uuid),'wrongAliases',(select count(*) from crm_private.customer_source_identities where source_event_id=${quote(raceId)} and client_id=${quote(family)}::uuid),'journeys',(select count(*) from crm_private.customer_journeys where tenant_id=${quote(tenant)} and journey_key=${quote(raceJourney)}::uuid));`));
+ check(raceProof.wrongEvents===0&&raceProof.wrongAliases===0&&raceProof.journeys===1,"Concurrent review split accepted journey identity");
+ console.log(JSON.stringify({result:"passed",source:sourceProof,crm:proof,reviewRace:raceProof,scenarios:["starter retry","introduction call","sales handoff","sales follow-up","mapping approval","out-of-order events","timeout after commit","idempotent replay","operational answer exclusion","no fabricated purchase","concurrent first delivery","phone and Instagram identity","pending identity review versus first acceptance"]}));
 } finally {
  // Only databases created by THIS invocation, under the validated fixed prefix.
  for(const container of created)await sql(container,"postgres",`drop database ${database};`);

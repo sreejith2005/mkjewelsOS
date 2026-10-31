@@ -69,5 +69,31 @@ select lives_ok($$select reconcile_customer_submissions(id,array[(select id from
 reset role;
 select is((select payload#>>'{answers,0,label}' from crm_sync.customer_events where source_id=(select id from customer_fixture where name='historical_submission')),'Original name','backfill uses original section reachability and retains answered original question');
 
+
+-- Legacy persisted hidden/conditional answers are never promoted; meaningful false/zero survive.
+insert into form_fields(form_template_id,field_key,field_name,field_type,sort_order,is_required,is_shown,is_editable,conditional_logic)
+select id,v.key,v.label,v.type,v.ord,false,v.shown,true,v.condition from customer_fixture cross join (values
+ ('hidden_answer','Hidden answer','text',3,false,null::jsonb),
+ ('conditional_answer','Conditional answer','text',4,true,'{"fieldKey":"decision","operator":"equals","value":"show"}'::jsonb),
+ ('zero_budget','Budget','number',5,true,null::jsonb),
+ ('false_outcome','Outcome','checkbox',6,true,null::jsonb)
+) v(key,label,type,ord,shown,condition) where name='form';
+set local role authenticated;
+select save_form_customer_mapping((select id from customer_fixture where name='form'),'{"schemaVersion":1,"enabled":true,"channel":"INSTAGRAM","identityScope":"test","fields":[{"fieldKey":"name","mode":"both","destination":"primary_name"},{"fieldKey":"hidden_answer","mode":"history","destination":"note"},{"fieldKey":"conditional_answer","mode":"history","destination":"requirement"},{"fieldKey":"zero_budget","mode":"both","destination":"budget"},{"fieldKey":"false_outcome","mode":"history","destination":"outcome"}]}');
+reset role;
+insert into form_submissions(form_template_id,tenant_id,branch_id,submitted_by,data,status)
+select (select id from customer_fixture where name='form'),(select id from customer_fixture where name='tenant'),(select id from customer_fixture where name='branch'),(select id from customer_fixture where name='actor'),'{"name":"Synthetic retained values","hidden_answer":"Old hidden answer","conditional_answer":"Old conditional answer","zero_budget":0,"false_outcome":false}','submitted' returning id;
+select is((select jsonb_array_length(e.payload->'answers') from crm_sync.customer_events e join form_submissions s on s.id=e.source_id where s.data->>'name'='Synthetic retained values'),3,'only visible answered fields become mapped evidence');
+select ok(not exists(select 1 from crm_sync.customer_events e join form_submissions s on s.id=e.source_id cross join lateral jsonb_array_elements(e.payload->'answers') a where s.data->>'name'='Synthetic retained values' and a->>'fieldKey' in('hidden_answer','conditional_answer')),'hidden and unmet conditional values remain excluded even if legacy data retained them');
+select ok(exists(select 1 from crm_sync.customer_events e join form_submissions s on s.id=e.source_id cross join lateral jsonb_array_elements(e.payload->'answers') a where s.data->>'name'='Synthetic retained values' and a->>'fieldKey'='zero_budget' and a->'original'='0'::jsonb),'zero budget is retained as a real original answer');
+select ok(exists(select 1 from crm_sync.customer_events e join form_submissions s on s.id=e.source_id cross join lateral jsonb_array_elements(e.payload->'answers') a where s.data->>'name'='Synthetic retained values' and a->>'fieldKey'='false_outcome' and a->'original'='false'::jsonb),'false outcome is retained as a real original answer');
+
+
+update form_fields set field_name='Changed meaning after mapping review' where form_template_id=(select id from customer_fixture where name='form') and field_key='name';
+insert into form_submissions(form_template_id,tenant_id,branch_id,submitted_by,data,status)
+select (select id from customer_fixture where name='form'),(select id from customer_fixture where name='tenant'),(select id from customer_fixture where name='branch'),(select id from customer_fixture where name='actor'),'{"name":"Synthetic unreviewed definition"}','submitted';
+select is((select count(*)::integer from crm_sync.customer_events e join form_submissions s on s.id=e.source_id where s.data->>'name'='Synthetic unreviewed definition'),0,'changed live definition cannot reuse an approved mapping and reinterpret contact or identity values');
+select is((select (m->>'definition_changed')::boolean from jsonb_array_elements(customer_integration_health()->'mappingStatus')m where m->>'id'=(select id::text from customer_fixture where name='form')),true,'integration health identifies a definition that requires renewed mapping review');
+
 select * from finish();
 rollback;

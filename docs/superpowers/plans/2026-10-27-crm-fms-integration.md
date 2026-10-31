@@ -33,9 +33,9 @@
 
 **Interfaces:** Versioned `CustomerFormMapping`, destination/mode catalog, validation against existing `FormTemplateDefinition`, snapshot extraction and safe CSV cells. TypeScript is a preview mirror of SQL validation; it does not authorize writes.
 
-- [ ] Confirm linked migration versions; restore missing applied files without touching 0346.
-- [ ] Write/run failing tests for scoped field keys, mismatched destinations/types, operational assignees, ignored blanks/hidden/section answers, original option values/labels, false/zero/nested history and CSV injection.
-- [ ] Implement pure helpers; run focused core tests and typecheck.
+- [x] Confirm linked migration versions; restore missing applied files without touching 0346.
+- [x] Write/run failing tests for scoped field keys, mismatched destinations/types, operational assignees, ignored blanks/hidden/section answers, original option values/labels, false/zero/nested history and CSV injection.
+- [x] Implement pure helpers; run focused core tests and typecheck.
 
 ## Task 2: JewelOS persistence and transactional capture
 
@@ -43,21 +43,21 @@
 
 **Interfaces:** `save_form_customer_mapping(uuid,jsonb)`, `get_form_customer_mapping(uuid)`, immutable mapping versions; `crm_sync_claim_customer_events(integer)`, `crm_sync_finish_customer_event(uuid,uuid,jsonb,text)`, protected health/retry/backfill preview RPCs.
 
-- [ ] Add synthetic pgTAP fixtures for active/inactive/cross-tenant roles and denied direct writes.
-- [ ] Add RLS/minimal grants, audited mapping save and immutable payload delivery state with leased claims.
-- [ ] Capture relevant submitted fields and stage-log evidence through deferred triggers in the successful operational transaction; preserve existing functions.
-- [ ] Test replay, blank/hidden/section rules, exact source IDs, completion without CRM, lease expiry/stale finish, retry/dead and historical dry run.
+- [x] Add synthetic pgTAP fixtures for active/inactive/cross-tenant roles and denied direct writes.
+- [x] Add RLS/minimal grants, audited mapping save and immutable payload delivery state with leased claims.
+- [x] Capture relevant submitted fields and stage-log evidence through deferred triggers in the successful operational transaction; preserve existing functions.
+- [x] Test replay, blank/hidden/section rules, exact source IDs, completion without CRM, lease expiry/stale finish, retry/dead and historical dry run.
 
 ## Task 3: CRM identity, approved mappings and ingestion
 
 **Files:** Create `C:/crm/supabase-crm/supabase/migrations/20261027000100_crm_fms_customer_events.sql` and matching pgTAP suite. Use the released migration baseline from this repository for local replay, not C:/crm's divergent older files.
 
-**Interfaces:** `crm_apply_customer_event(text,jsonb)`, `crm_register_customer_mapping(text,jsonb)`, authenticated approval/review/read APIs, private digest inbox, scoped external identities/journeys/contributions, incremental customer projection.
+**Interfaces:** `crm_apply_customer_event(text,jsonb)`, `crm_register_customer_mapping(uuid,jsonb,text)`, authenticated approval/review/read APIs, private digest inbox, scoped external identities/journeys/contributions, incremental customer projection.
 
-- [ ] Write failing SQL cases for source tenant/branch/actor mapping, dual approval, same-payload replay/conflicting digest and ambiguous shared phone.
-- [ ] Implement identity locking, existing UUID/MKC creation, country-aware lookup, review states, immutable evidence, ordering/precedence and denied authority.
-- [ ] Extend existing activity/browse/profile reads without changing walk-in matching, lifecycle or purchase totals.
-- [ ] Test no-phone/new/existing/multichannel, loop/parallel/out-of-order, historical review and explicit verified contact behavior.
+- [x] Write failing SQL cases for source tenant/branch/actor mapping, dual approval, same-payload replay/conflicting digest and ambiguous shared phone.
+- [x] Implement identity locking, existing UUID/MKC creation, country-aware lookup, review states, immutable evidence, ordering/precedence and denied authority.
+- [x] Extend existing activity/browse/profile reads without changing walk-in matching, lifecycle or purchase totals.
+- [x] Test no-phone/new/existing/multichannel, loop/parallel/out-of-order, historical review and explicit verified contact behavior.
 
 ## Task 4: Server transport and recovery
 
@@ -65,9 +65,9 @@
 
 **Interfaces:** bounded `customer.mappings` and `customer.events`, constant-time existing secret gate, sanitized errors, claim lease tokens, exact event responses and no implicit success on missing results.
 
-- [ ] Write/run failing Deno worker tests: anonymous/invalid secret, size/schema limits, partial responses, timeout after commit, unsupported kind, stale leases and retries.
-- [ ] Implement separate customer sender; retain staff/master worker behavior and reuse existing secret names.
-- [ ] Run focused sender/receiver tests and Deno checks.
+- [x] Write/run failing Deno worker tests: anonymous/invalid secret, size/schema limits, partial responses, timeout after commit, unsupported kind, stale leases and retries.
+- [x] Implement separate customer sender; retain staff/master worker behavior and reuse existing secret names.
+- [x] Run focused sender/receiver tests and Deno checks.
 
 ## Task 5: Forms mapping editor
 
@@ -75,9 +75,9 @@
 
 **Interfaces:** stable field-key configuration, profile/history/both/operational modes, server validation/save, visible approval/version status, disabled preview.
 
-- [ ] Test map/save/error/no-phone config and existing builder behavior.
-- [ ] Implement optional integration panel using existing design tokens and controls; keep published question content unchanged.
-- [ ] Check phone/desktop rendered layout and existing Forms tests.
+- [x] Test map/save/error/no-phone config and existing builder behavior.
+- [x] Implement optional integration panel using existing design tokens and controls; keep published question content unchanged.
+- [x] Check phone/desktop rendered layout and existing Forms tests.
 
 ## Task 6: CRM journeys, privileged health and review
 
@@ -85,9 +85,9 @@
 
 **Interfaces:** cursor-based history, readable original answers/actors/times, role-authorized mapping approval/identity review/retry, aggregates only in diagnostics.
 
-- [ ] Test restricted link denial, bounded history, unknown/nested answers, duplicate decisions and administrator-only operations.
-- [ ] Implement expandable journey/history and modest health/review panels; preserve existing profile sections and server pagination.
-- [ ] Verify responsive rendering and existing CRM profile/walk-in regression tests.
+- [x] Test restricted link denial, bounded history, unknown/nested answers, duplicate decisions and administrator-only operations.
+- [x] Implement expandable journey/history and modest health/review panels; preserve existing profile sections and server pagination.
+- [x] Verify responsive rendering and existing CRM profile/walk-in regression tests.
 
 ## Task 7: Exports and historical reconciliation
 
@@ -95,19 +95,21 @@
 
 **Interfaces:** CRM exports only transported customer evidence; full original stage exports authorize source work in JewelOS. Original source IDs/times, deterministic headers, safe phone/text and Asia/Kolkata presentation. Historical source cursor/hash counts and no apply without audited approval.
 
-- [ ] Test formula injection, original values/options, filters/page boundaries, actor vs assignee and unauthorized exports.
-- [ ] Implement bounded reusable export configuration and dry-run count reconciliation; never enable two-way Sheets.
-- [ ] Test restart/idempotency/source drift and unresolved attribution remaining in review.
+- [x] Test formula injection, original values/options, filters/page boundaries, actor vs assignee and unauthorized exports.
+- [x] Implement bounded reusable export configuration and dry-run count reconciliation; never enable two-way Sheets.
+- [x] Test restart/idempotency/source drift and unresolved attribution remaining in review.
 
 ## Task 8: Validation, documentation and review
 
 **Files:** Update Kiara app help/review, architecture status and implementation/release runbook; generated database types for final signatures.
 
-- [ ] Run focused core/web/CRM/Deno/pgTAP suites, then relevant monorepo typecheck/build and whitespace/credential-safe scans.
-- [ ] Exercise the twenty requested scenarios using synthetic local cross-project persistence; record any environment failures and missing proof.
-- [ ] Fresh whole-change security/code review; fix important findings with regression tests.
-- [ ] Report implementation and evidence separately from hosted migration/deploy/backfill gates; no publication assumed.
+- [x] Run focused core/web/CRM/Deno/pgTAP suites, then relevant monorepo typecheck/build and whitespace/credential-safe scans.
+- [x] Exercise the twenty requested scenarios using synthetic local cross-project persistence; record any environment failures and missing proof.
+- [x] Fresh whole-change security/code review; fix important findings with regression tests.
+- [x] Report implementation and evidence separately from hosted migration/deploy/backfill gates; no publication assumed.
 
 ## Execution ledger
 
 Owner approval authorizes implementation of this design. Execute inline without another design approval prompt. Progress and deviations are recorded in `.superpowers/sdd/2026-10-27-crm-fms-integration/progress.md`; no automatic commit/staging of pre-existing dirty paths.
+
+Final evidence: see docs/CRM_FMS_INTEGRATION_IMPLEMENTATION.md and docs/CRM_FMS_INTEGRATION_TEST_REPORT.md. Implementation and local verification are complete; hosted release/backfill gates are separate. No automatic staging or publication.
