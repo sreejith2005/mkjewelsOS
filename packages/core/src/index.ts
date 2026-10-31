@@ -121,7 +121,6 @@ export { isFormerEmployee, type EmploymentState } from "./formerEmployees";
 export * from "./forms";
 export * from "./fms";
 export * from "./notifications";
-export * from "./crm";
 export * from "./crmEmbed";
 export * from "./analytics";
 export * from "./reports";
