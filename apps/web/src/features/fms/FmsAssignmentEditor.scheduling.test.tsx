@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { newFmsStage } from "./definition";
 import { FmsAssignmentEditor } from "./FmsAssignmentEditor";
 import type { FmsData } from "./api";
@@ -32,4 +32,14 @@ it("persists schedule preferences alongside the existing visit limit and assignm
  await user.type(screen.getByLabelText("Maximum visits"), "3");
  expect(screen.getByLabelText("Saved schedule").textContent).toContain('"dateFieldKey":"requested_date"');
  expect(screen.getByLabelText("Saved schedule").textContent).toContain('"timeFieldKey":"requested_time"');
+});
+
+it("enables timing when scheduling a step with its deadline disabled", async () => {
+ const user = userEvent.setup();
+ const stage = newFmsStage("task", 1);
+ const onChange = vi.fn();
+ render(<FmsAssignmentEditor stage={{ ...stage, sla: { ...stage.sla, deadlineEnabled: false } }} stages={[stage]} data={data} onChange={onChange} />);
+ await user.click(screen.getByText("Automatic follow-up scheduling"));
+ await user.click(screen.getByRole("checkbox", { name: "Schedule this step when its incoming route matches" }));
+ expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ sla: expect.objectContaining({ deadlineEnabled: true, timingMethod: "tat_hours", tatHours: 24 }) }));
 });
