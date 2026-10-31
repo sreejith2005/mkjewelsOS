@@ -15,7 +15,7 @@ const Utilities = {
     .replace("dd", pad(d.getUTCDate())).replace("HH", pad(d.getUTCHours())).replace("mm", pad(d.getUTCMinutes())).replace("ss", pad(d.getUTCSeconds())),
 };
 const source = await Deno.readTextFile(new URL("./crm-sheet-push.gs", import.meta.url));
-const names = ["crmspCell_", "crmspCleanHeader_", "crmspRowValues_", "crmspHashInput_", "crmspReferralKey_", "crmspWalkinReference_",
+const names = ["crmspCell_", "crmspCleanHeader_", "crmspRowValues_", "crmspHashInput_", "crmspWalkinReference_",
   "crmspWalkinKeys_", "crmspSha_", "crmspFormatDate_"];
 const gs = new Function("Utilities", `${source}\nreturn { ${names.join(", ")} };`)(Utilities) as Record<string, Fn>;
 const fmt = gs.crmspFormatDate_;
@@ -39,10 +39,13 @@ Deno.test("a repeated reference keeps the first row; later rows get -R<row>", ()
   assertEquals(gs.crmspWalkinKeys_(["MK-1", "mk-1", "MK-2"], [2, 7, 8]), ["MK-1", "MK-1-R7", "MK-2"]);
 });
 
-Deno.test("referral keys and hashes equal the CRM's", () => {
-  const raw = gs.crmspReferralKey_("Synthetic  friend", "+91 91000 09904", "Synthetic Giver");
-  assertEquals(raw, "9100009904|SYNTHETICFRIEND|SYNTHETICGIVER");
-  assertEquals("RK-" + gs.crmspSha_("x").slice(0, 24).toUpperCase(), "RK-2D711642B726B04401627CA9");
+Deno.test("fingerprints use the same SHA-256 as the CRM", () => {
+  assertEquals(gs.crmspSha_("x").slice(0, 24).toUpperCase(), "2D711642B726B04401627CA9");
+});
+
+Deno.test("only WALKIN DATASET and FAMILY DATA of one spreadsheet are read", () => {
+  assertEquals(source.includes("TABS: ['WALKIN DATASET', 'FAMILY DATA']"), true);
+  assertEquals((source.match(/openById\(/g) ?? []).length, 1);
 });
 
 Deno.test("cells and headers are read the CRM's way", () => {

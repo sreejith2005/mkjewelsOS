@@ -8,12 +8,13 @@
  * project read-only access to Sheets: Google refuses any write, so this script can never change
  * a Sheet. It keeps no state in the Sheets either: it asks the CRM which rows it already has.
  *
+ * It reads ONE spreadsheet and two tabs of it (owner, 2026-10-07): WALKIN DATASET (every visit;
+ * clients are found or created from it by CRM CLIENT ID, else phone + name) and FAMILY DATA.
+ *
  * Script Properties (Project settings > Script properties). Never paste values into chat:
  *   MK_CRM_SHEET_SYNC_URL   https://<crm-project-ref>.supabase.co/functions/v1/crm-sheet-sync
  *   MK_CRM_SHEET_SYNC_KEY   the same value as the CRM project's CRM_SHEET_SYNC_KEY secret
- *   MK_CRM_FILE_ID          the CRM file (CLIENT DATABASE MASTER)            = Code.gs CRM_SPREADSHEET_ID
- *   MK_WALKIN_FILE_ID       the walk-in file (WALKIN DATASET, REFERRALS)     = the effective walk-in source
- *   MK_REFERRALS_FILE_ID    REFERENCES GIVEN BY CLIENT (REFERRALS CALLING MASTER, REFERRALS HISTORY)
+ *   MK_SHEET_FILE_ID        the spreadsheet's ID (from its web address, between /d/ and /edit)
  *
  * Owner steps: crmspDryRun (repeat until "dry run complete") -> crmspImport (repeat until
  * "import complete") -> crmspInstall (every 5 minutes). crmspStop removes the trigger.
@@ -21,8 +22,8 @@
  */
 
 var CRMSP = {
-  // Order matters: clients before the rows that point at them.
-  TABS: ['CLIENT DATABASE MASTER', 'FAMILY DATA', 'WALKIN DATASET', 'REFERRALS', 'REFERRALS CALLING MASTER', 'REFERRALS HISTORY'],
+  // Walk-ins first: they find or create the clients that FAMILY DATA rows point at.
+  TABS: ['WALKIN DATASET', 'FAMILY DATA'],
   BATCH: 200,
   BUDGET_MS: 4.5 * 60 * 1000,
   TZ: 'Asia/Kolkata',
@@ -84,16 +85,6 @@ function crmspHex_(bytes) {
   return bytes.map(function (b) { var v = (b < 0 ? b + 256 : b).toString(16); return v.length === 1 ? '0' + v : v; }).join('');
 }
 
-/** Code.gs referralKey_, the key the Sheet itself gives a referral. */
-function crmspReferralKey_(name, number, givenBy) {
-  function clean(v) { return String(v || '').trim().replace(/\s+/g, ' '); }
-  var digits = String(number || '').replace(/\D/g, '');
-  var phone = digits ? digits.slice(-10) : '';
-  var n = clean(name).toUpperCase().replace(/[^A-Z0-9]/g, '');
-  var by = clean(givenBy).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20);
-  return (phone || n || 'REF') + '|' + n + '|' + by;
-}
-
 /**
  * Code.gs getReferenceNumberFromWalkinRow_: column DY (129), then DS (123), then a REFERENCE
  * NUMBER header, then an MK reference anywhere in the row, else AUTO-WALKIN-ROW-<row>.
@@ -149,13 +140,11 @@ function crmspConfig_() {
   var c = {
     url: props.getProperty('MK_CRM_SHEET_SYNC_URL'),
     key: props.getProperty('MK_CRM_SHEET_SYNC_KEY'),
-    crmFile: props.getProperty('MK_CRM_FILE_ID'),
-    walkinFile: props.getProperty('MK_WALKIN_FILE_ID'),
-    referralsFile: props.getProperty('MK_REFERRALS_FILE_ID'),
+    file: props.getProperty('MK_SHEET_FILE_ID'),
     props: props
   };
-  ['url', 'key', 'crmFile', 'walkinFile', 'referralsFile'].forEach(function (k) {
-    if (!c[k]) throw new Error('Set all five script properties first (see the top of this file).');
+  ['url', 'key', 'file'].forEach(function (k) {
+    if (!c[k]) throw new Error('Set the three script properties first (see the top of this file).');
   });
   return c;
 }
@@ -179,16 +168,7 @@ function crmspPost_(config, body) {
 }
 
 function crmspSheetFor_(config, tab) {
-  function open(id, name) { var sh = SpreadsheetApp.openById(id).getSheetByName(name); return sh || null; }
-  switch (tab) {
-    case 'CLIENT DATABASE MASTER': return open(config.crmFile, 'CLIENT DATABASE MASTER');
-    case 'WALKIN DATASET': return open(config.walkinFile, 'WALKIN DATASET');
-    case 'FAMILY DATA': return open(config.walkinFile, 'FAMILY DATA') || open(config.crmFile, 'FAMILY DATA');
-    case 'REFERRALS': return open(config.walkinFile, 'REFERRALS');
-    case 'REFERRALS CALLING MASTER': return open(config.referralsFile, 'REFERRALS CALLING MASTER');
-    case 'REFERRALS HISTORY': return open(config.referralsFile, 'REFERRALS HISTORY');
-  }
-  return null;
+  return SpreadsheetApp.openById(config.file).getSheetByName(tab) || null;
 }
 
 /** Reads a tab: every row's values, key and fingerprint. Reads only. */
@@ -208,21 +188,12 @@ function crmspReadTab_(config, tab) {
     if (!raw.some(function (v) { return String(v === null || v === undefined ? '' : v).trim() !== ''; })) return;
     var values = crmspRowValues_(headers, raw, crmspFormatDate_);
     var key = '';
-    if (tab === 'CLIENT DATABASE MASTER' || tab === 'FAMILY DATA') {
+    if (tab === 'FAMILY DATA') {
       key = String(values['CLIENT ID'] || '').trim().toUpperCase();
-    } else if (tab === 'WALKIN DATASET') {
+    } else {
       if (String(values['VISIT FINAL STATUS'] || '').trim().toUpperCase() === 'DRAFT') return;
       walkinRefs.push(crmspWalkinReference_(raw, headers, rowNumber, crmspFormatDate_));
       walkinRows.push(rowNumber);
-    } else if (tab === 'REFERRALS') {
-      if (!values['REFERRAL NAME'] && !values['REFERRAL NUMBER']) return;
-      key = 'RK-' + crmspSha_(crmspReferralKey_(values['REFERRAL NAME'], values['REFERRAL NUMBER'], values['REFERENCE GIVEN BY CLIENT NAME'])).slice(0, 24).toUpperCase();
-    } else if (tab === 'REFERRALS CALLING MASTER') {
-      if (!values['REFERRAL KEY']) return;
-      key = 'RK-' + crmspSha_(String(values['REFERRAL KEY']).trim()).slice(0, 24).toUpperCase();
-    } else if (tab === 'REFERRALS HISTORY') {
-      if (!values['REFERRAL KEY']) return;
-      key = 'RH-' + crmspSha_(String(values['REFERRAL KEY']).trim() + '|' + values['TIMESTAMP'] + '|' + String(values['NEW STATUS'] || '').trim().toUpperCase()).slice(0, 24).toUpperCase();
     }
     rows.push({ values: values, key: key });
   });

@@ -5,6 +5,8 @@ For the owner. Design: "CRM Sheet Sync Design" (https://claude.ai/artifact/MBHPP
 **Owner decision (2026-10-06): one-way first.** The Sheets are the production record. Until two-way
 is approved, data flows **Sheet -> CRM only**:
 
+- it reads **one spreadsheet** (on the mis account) and **two tabs**: WALKIN DATASET and FAMILY DATA;
+  clients are found or created in the CRM from the walk-in rows (CRM CLIENT ID, else phone + name);
 - the sync script runs in its **own new Apps Script project** with **read-only** access to Sheets
   (`appsscript.json`); Google refuses any write, and the script keeps no state in the Sheets;
 - MK JEWELS CRM SYSTEM (Code.gs, Index.html) is **not changed**;
@@ -21,16 +23,17 @@ the main folder's other work is not disturbed). Hosted steps are on the **CRM pr
 2. `supabase.cmd link --project-ref fsydcsyqnddacjfoutfe --workdir supabase-crm`
    (asks for the CRM database password, hidden). Expect `Finished supabase link.`
 3. `supabase.cmd db push --linked --workdir supabase-crm --dry-run`
-   Expect exactly four: `20261006000200_crm_phone_name_identity.sql`,
+   Expect exactly five: `20261006000200_crm_phone_name_identity.sql`,
    `20261006000300_crm_sheet_sync_storage.sql`, `20261006000400_crm_sheet_sync_functions.sql`,
-   `20261006000500_crm_sheet_sync_one_way.sql`. Anything else: stop.
+   `20261006000500_crm_sheet_sync_one_way.sql`, `20261007000100_crm_sheet_sync_walkin_merge.sql`.
+   (If A was already done before 7 Oct, only the last one is listed.) Anything else: stop.
 4. `supabase.cmd db push --linked --workdir supabase-crm`
-   Expect four `Applying migration ...` lines and `Finished supabase db push.`
+   Expect one `Applying migration ...` line per file listed, then `Finished supabase db push.`
 
 ## B. New Apps Script project (read-only)
 
-1. https://script.google.com > **New project** (signed in as an account that can view the three
-   spreadsheets). Rename it `MK CRM SHEET PUSH (READ-ONLY)`.
+1. https://script.google.com > **New project** (signed in as an account that can view the
+   spreadsheet, for example task). Rename it `MK CRM SHEET PUSH (READ-ONLY)`.
 2. Project Settings (gear) > tick **Show "appsscript.json" manifest file in editor**. Open
    `appsscript.json`, select all, paste:
    `Get-Content C:\crm-sync\supabase-crm\apps-script\appsscript.json -Raw | Set-Clipboard`
@@ -39,10 +42,9 @@ the main folder's other work is not disturbed). Hosted steps are on the **CRM pr
    Save (Ctrl+S).
 4. Project Settings > Script Properties > add:
    - `MK_CRM_SHEET_SYNC_URL` = `https://fsydcsyqnddacjfoutfe.supabase.co/functions/v1/crm-sheet-sync`
-   - `MK_CRM_FILE_ID` = `CRM_SPREADSHEET_ID` in MK JEWELS CRM SYSTEM's Code.gs (the CRM file)
-   - `MK_WALKIN_FILE_ID` = the walk-in file in use: in the CRM file, menu **MK CRM > Check Walk-in
-     Source File** shows "EFFECTIVE SPREADSHEET ID"
-   - `MK_REFERRALS_FILE_ID` = `REFERRAL_CALLING_CONFIG.SPREADSHEET_ID` in Code.gs ("REFERENCES GIVEN BY CLIENT")
+   - `MK_SHEET_FILE_ID` = the spreadsheet's ID: open the spreadsheet that has the WALKIN DATASET
+     and FAMILY DATA tabs; its web address looks like
+     `https://docs.google.com/spreadsheets/d/<ID>/edit#gid=...`; copy only `<ID>`.
    (`MK_CRM_SHEET_SYNC_KEY` is added in C2.)
 
 ## C. Edge Function and its key
