@@ -37,7 +37,7 @@ create function pg_temp.client(p_id text) returns clients language sql security 
   select * from clients where client_id = ('20261007-2222-4000-8000-0000000000' || p_id)::uuid;
 $$;
 create function pg_temp.by_phone(p_phone text) returns clients language sql security definer as $$
-  select c.* from clients c join client_phone_index pi on pi.client_id = c.client_id where pi.phone = p_phone;
+  select c.* from clients c join client_phone_index pi on pi.client_id = c.client_id where pi.phone = crm_private.phone_key(p_phone); -- stored with country code (20261007001000)
 $$;
 grant execute on function pg_temp.client(text), pg_temp.by_phone(text) to authenticated;
 
@@ -50,6 +50,7 @@ select isnt((pg_temp.client('c1')).referral_code, (pg_temp.client('c2')).referra
 select is((select count(*)::int from clients where referral_code is null), 0, 'every client has an MKREF code');
 select is((pg_temp.client('c1')).lifecycle_stage, 'visited', 'clients created by staff start as visited');
 
+\ir fixtures/crm_master_options.sql
 set local role authenticated;
 select pg_temp.act_as('2');
 select lives_ok($$update clients set city = 'Synthetic City' where client_id = '20261007-2222-4000-8000-0000000000c1'$$, 'staff still edit ordinary client fields');
@@ -73,7 +74,7 @@ select ok((pg_temp.by_phone('9199000203')).client_code ~ '^MKC-[0-9]+$', 'the re
 
 insert into referrals(id, salesperson_id, given_by_client_id, referral_name, referral_number, branch_id)
 values ('20261007-3333-4000-8000-000000000002', '20261007-1111-4000-8000-000000000002', '20261007-2222-4000-8000-0000000000c1',
-  'Synthetic Already Client', '9199000202', '20261007-0000-4000-8000-00000000000a');
+  'Synthetic Other Family', '9199000202', '20261007-0000-4000-8000-00000000000a');
 select is((select referred_client_id from referrals where id = '20261007-3333-4000-8000-000000000002'), '20261007-2222-4000-8000-0000000000c2'::uuid,
   'a referral with a known phone links to that client');
 select is((pg_temp.client('c2')).referred_by_client_id, null, 'an existing client is not re-parented');
@@ -93,7 +94,7 @@ select is((select client_type from create_entry_queue('Synthetic Referred Friend
   'a lead client registers as a new client');
 reset role;
 select is((pg_temp.by_phone('9199000203')).lifecycle_stage, 'engaged', 'registration engages the lead');
-select ok((select client_is_new from entry_queue where mobile = '9199000203'), 'the queue row is flagged new');
+select ok((select client_is_new from entry_queue where mobile = '919199000203'), 'the queue row is flagged new');
 set local role authenticated;
 select pg_temp.act_as('2');
 select is(reconcile_referral_calling_conversions(), 1, 'once engaged, the referral converts');
@@ -147,7 +148,7 @@ select pg_temp.act_as('3');
 select throws_ok($$select remove_client_from_family('20261007-2222-4000-8000-0000000000c3')$$, '42501', null, 'another branch''s staff cannot change this family');
 select pg_temp.act_as('2');
 select lives_ok($$select remove_client_from_family('20261007-2222-4000-8000-0000000000c3')$$, 'the branch''s staff can take a person out of a family');
-select is((pg_temp.client('c3')).household_id, null, 'removed');
+select isnt((pg_temp.client('c3')).household_id, (pg_temp.client('c1')).household_id, 'removed (into a new family of their own, 20261007001200)');
 select is(add_client_to_family('20261007-2222-4000-8000-0000000000c1', '20261007-2222-4000-8000-0000000000c3'), 'joined', 'and add them back');
 reset role;
 select is((select count(*)::int from crm_private.audit_logs where action in ('crm.add_client_to_family', 'crm.remove_client_from_family')

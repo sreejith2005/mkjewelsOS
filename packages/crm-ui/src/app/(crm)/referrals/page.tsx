@@ -1,19 +1,20 @@
+import { readCrmResults } from "@/crm-port/read-results";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ReferralQueue } from "@/components/referral-queue";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function ReferralsPage() {
   const supabase = await createClient();
-  const [{ data: profiles }, { data: auth }] = await Promise.all([supabase.rpc("get_my_profile"), supabase.auth.getUser()]);
+  const [{ data: profiles }, { data: auth }] = await readCrmResults([supabase.rpc("get_my_profile"), supabase.auth.getUser()]);
   const profile = profiles?.[0];
   if (!profile || !auth.user) return null;
   const db = supabase as any;
-  const [{ data: calling }] = await Promise.all([
+  const [{ data: calling }] = await readCrmResults([
     db.from("referral_calling").select("id,status,remark,next_followup_date,followup_count,converted_client_id,action_point,referrals!inner(crm_name,assigned_doer,salesperson_id,given_by_client_id,referral_name,referral_number)"),
   ]);
   const rows = calling ?? [];
   const clientIds = [...new Set(rows.flatMap((row: any) => [row.referrals.given_by_client_id, row.converted_client_id]).filter(Boolean))];
-  const [{ data: clients }, { data: history }, { data: users }] = await Promise.all([
+  const [{ data: clients }, { data: history }, { data: users }] = await readCrmResults([
     clientIds.length ? db.from("clients").select("client_id,primary_name").in("client_id", clientIds) : Promise.resolve({ data: [] }),
     rows.length ? db.from("referral_calling_history").select("referral_calling_id,remark,entered_by,created_at").in("referral_calling_id", rows.map((row: any) => row.id)).order("created_at", { ascending: false }).order("id", { ascending: false }) /* crm-port: deterministic order */ : Promise.resolve({ data: [] }),
     db.from("users").select("id,name"),

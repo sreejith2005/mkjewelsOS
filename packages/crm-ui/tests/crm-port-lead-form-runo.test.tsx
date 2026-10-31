@@ -9,7 +9,7 @@ const push = vi.fn();
 const single = vi.fn();
 const insert = vi.fn(() => ({ select: () => ({ single }) }));
 vi.mock("@/next-shim/navigation", () => ({ useRouter: () => ({ refresh, push: vi.fn() }) })); // crm-port: next/navigation -> local shim module
-vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({ from: () => ({ insert }) }) }));
+vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({ rpc: single }) }));
 vi.mock("@/crm-port/phase4", () => ({ pushLeadToRuno: (leadId: string) => push(leadId) }));
 import { LeadForm } from "@/components/lead-form";
 

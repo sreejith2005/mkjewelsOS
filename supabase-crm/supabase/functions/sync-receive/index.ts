@@ -12,6 +12,25 @@ function gateway(): CrmSyncGateway | null {
   if (!url || !key) return null;
   const admin = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
   return {
+    async exportCustomer(body) {
+      const {data,error}=await admin.rpc('crm_customer_export_batch',{p_tenant:body.tenantId,p_actor:body.actorId,p_export_id:body.exportId,p_key:body.key,p_filters:body.filters,p_before:body.before,p_offset:body.offset,p_limit:body.limit});
+      if(error)throw new Error('customer_export_failed');return data??{};
+    },
+    async applyCustomer(eventId,payload) {
+      const {data,error}=await admin.rpc('crm_apply_customer_event',{p_event_id:eventId,p_payload:payload});
+      if(error)throw new Error('customer_apply_failed');
+      return data ?? {};
+    },
+    async registerCustomerMapping(mappingId,descriptor,digest) {
+      const {data,error}=await admin.rpc('crm_register_customer_mapping',{p_mapping_id:mappingId,p_descriptor:descriptor,p_digest:digest});
+      if(error)throw new Error('customer_mapping_failed');
+      return data ?? {};
+    },
+    async applyMasters(eventId,snapshot) {
+      const {data,error}=await admin.rpc('crm_apply_master_snapshot',{p_event_id:eventId,p_snapshot:snapshot});
+      if(error)throw new Error(`rpc_${error.code ?? 'unknown'}`);
+      return (data ?? {}) as Awaited<ReturnType<NonNullable<CrmSyncGateway['applyMasters']>>>;
+    },
     async applyStaff(eventId, snapshot) {
       const { data, error } = await admin.rpc("crm_apply_staff_snapshot", { p_event_id: eventId, p_snapshot: snapshot });
       // Only the SQLSTATE is reported: a database message could quote input values.

@@ -14,34 +14,33 @@
 // - after push/replace the page's first element is scrolled into view the way Next's
 //   layout-router does; refresh and history traversal do not scroll.
 import { createContext, Fragment, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import CrmLayout from "@/app/(crm)/layout";
-import AllocationPage from "@/app/(crm)/allocation/page";
-import ClientPage from "@/app/(crm)/clients/[clientId]/page";
-import NewClientPage from "@/app/(crm)/clients/new/page";
-import ClientsPage from "@/app/(crm)/clients/page";
-import DashboardPage from "@/app/(crm)/dashboard/page";
-import FollowupsPage from "@/app/(crm)/followups/page";
-import NewLeadPage from "@/app/(crm)/leads/new/page";
-import QueuePage from "@/app/(crm)/queue/page";
-import ReferralsPage from "@/app/(crm)/referrals/page";
-import NewVisitPage from "@/app/(crm)/visits/new/page";
-import HomePage from "@/app/page";
 import { redirect } from "@/next-shim/navigation";
 
 import { CrmNavigationContext, type CrmAppRouter as AppRouter, type CrmNavigationState } from "./navigation-context";
 import { NextNotFound } from "./not-found";
 import { crmAppPath, crmHost, CrmLeave, CrmNotFound, CrmRedirect, withBasePath } from "./runtime";
+import { useCrmRefresh } from "./use-crm-refresh";
 
 type SearchParamsRecord = Record<string, string | string[]>;
 type PageProps = { params: Promise<Record<string, string>>; searchParams: Promise<SearchParamsRecord> };
 type PageLoader = (props: PageProps) => ReactNode | Promise<ReactNode> | void;
-type Route = { segments: string[]; load: PageLoader; inCrmLayout: boolean };
+type Route = { segments: string[]; load: PageLoader; preload?: () => Promise<unknown>; inCrmLayout: boolean };
 
 // Next passes the same loosely typed params/searchParams objects to every page; each
 // original page declares its own narrower shape, exactly as it did under Next.
 // app/page.tsx only redirects, so a page may also "return" void.
 const page = <P,>(component: (props: P) => ReactNode | Promise<ReactNode> | void): PageLoader => component as unknown as PageLoader;
+
+// Prefetch modules only: records and authorization are read afresh on navigation.
+function lazyPage<P>(importPage: () => Promise<{ default: (props: P) => ReactNode | Promise<ReactNode> | void }>) {
+  return {
+    preload: importPage,
+    load: async (props: PageProps) => (await page((await importPage()).default)(props)) ?? null,
+  };
+}
 
 // The original proxy (lib/supabase/proxy.ts) sends a signed-in visitor on /login to
 // `nextUrl.pathname = crmPath("/")`. nextUrl already carries the basePath, so the result is
@@ -52,18 +51,18 @@ function SignedInLoginPage(): void {
 }
 
 const ROUTES: Route[] = [
-  { segments: [], load: page(HomePage), inCrmLayout: false },
+  { segments: [], ...lazyPage(() => import("@/app/page")), inCrmLayout: false },
   { segments: ["login"], load: page(SignedInLoginPage), inCrmLayout: false },
-  { segments: ["dashboard"], load: page(DashboardPage), inCrmLayout: true },
-  { segments: ["queue"], load: page(QueuePage), inCrmLayout: true },
-  { segments: ["visits", "new"], load: page(NewVisitPage), inCrmLayout: true },
-  { segments: ["clients"], load: page(ClientsPage), inCrmLayout: true },
-  { segments: ["clients", "new"], load: page(NewClientPage), inCrmLayout: true },
-  { segments: ["clients", "[clientId]"], load: page(ClientPage), inCrmLayout: true },
-  { segments: ["followups"], load: page(FollowupsPage), inCrmLayout: true },
-  { segments: ["referrals"], load: page(ReferralsPage), inCrmLayout: true },
-  { segments: ["allocation"], load: page(AllocationPage), inCrmLayout: true },
-  { segments: ["leads", "new"], load: page(NewLeadPage), inCrmLayout: true },
+  { segments: ["dashboard"], ...lazyPage(() => import("@/app/(crm)/dashboard/page")), inCrmLayout: true },
+  { segments: ["queue"], ...lazyPage(() => import("@/app/(crm)/queue/page")), inCrmLayout: true },
+  { segments: ["visits", "new"], ...lazyPage(() => import("@/app/(crm)/visits/new/page")), inCrmLayout: true },
+  { segments: ["clients"], ...lazyPage(() => import("@/app/(crm)/clients/page")), inCrmLayout: true },
+  { segments: ["clients", "new"], ...lazyPage(() => import("@/app/(crm)/clients/new/page")), inCrmLayout: true },
+  { segments: ["clients", "[clientId]"], ...lazyPage(() => import("@/app/(crm)/clients/[clientId]/page")), inCrmLayout: true },
+  { segments: ["followups"], ...lazyPage(() => import("@/app/(crm)/followups/page")), inCrmLayout: true },
+  { segments: ["referrals"], ...lazyPage(() => import("@/app/(crm)/referrals/page")), inCrmLayout: true },
+  { segments: ["allocation"], ...lazyPage(() => import("@/app/(crm)/allocation/page")), inCrmLayout: true },
+  { segments: ["leads", "new"], ...lazyPage(() => import("@/app/(crm)/leads/new/page")), inCrmLayout: true },
 ];
 
 function matchRoute(pathname: string): { route: Route; params: Record<string, string> } | null {
@@ -158,6 +157,11 @@ export function CrmAppRouter({ browserPath, browserSearch }: { browserPath: stri
   const [refreshToken, setRefreshToken] = useState(0);
   const [view, setView] = useState<PageView | null>(null);
   const [failure, setFailure] = useState<{ error: unknown } | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const refreshCompletions = useRef(new Set<() => void>());
+  const queryClient = useQueryClient();
   const layoutRef = useRef<{ node: ReactNode; refreshToken: number } | null>(null);
   const requestRef = useRef(0);
   const navigationKind = useRef<"history" | "navigate" | "refresh">("history");
@@ -168,8 +172,25 @@ export function CrmAppRouter({ browserPath, browserSearch }: { browserPath: stri
     refresh: () => { navigationKind.current = "refresh"; setRefreshToken((token) => token + 1); },
     back: () => window.history.back(),
     forward: () => window.history.forward(),
-    prefetch: () => undefined,
+    prefetch: (href) => {
+      if (!href.startsWith("/") || href.startsWith("//")) return;
+      const match = matchRoute(new URL(href, "http://crm.invalid").pathname);
+      // Failed speculative imports must not interrupt the current page. Navigation
+      // still invokes the loader and reports its error through the normal boundary.
+      void match?.route.preload?.().catch(() => undefined);
+    },
   }), []);
+
+  const refreshCurrentPage = () => Promise.all([
+    queryClient.invalidateQueries(),
+    new Promise<void>((resolve) => { refreshCompletions.current.add(resolve); router.refresh(); }),
+  ]).then(() => undefined);
+  useCrmRefresh(refreshCurrentPage);
+  useEffect(() => () => {
+    requestRef.current++;
+    for (const complete of refreshCompletions.current) complete();
+    refreshCompletions.current.clear();
+  }, []);
 
   useEffect(() => {
     if (pathname !== "/" && pathname.endsWith("/")) {
@@ -200,12 +221,26 @@ export function CrmAppRouter({ browserPath, browserSearch }: { browserPath: stri
           setView({ key: `404:${pathname}`, pathname, search: browserSearch, node: <NextNotFound />, inCrmLayout });
           return;
         }
-        setFailure({ error });
+        const current = viewRef.current;
+        const accessDenied = typeof error === "object" && error !== null && (
+          ("code" in error && ["42501", "PGRST301", "PGRST302"].includes(String(error.code)))
+          || ("status" in error && (error.status === 401 || error.status === 403))
+        );
+        if (!accessDenied && navigationKind.current === "refresh" && current?.pathname === pathname && current.search === browserSearch) {
+          setRefreshError("CRM could not refresh. Your current page and unsaved edits have been kept.");
+        } else setFailure({ error });
         return;
       }
+      setRefreshError(null);
       if (layoutResult?.ok) layoutRef.current = { node: layoutResult.value, refreshToken };
       if (pageResult.ok && match) setView({ key: pathname, pathname, search: browserSearch, node: pageResult.value, inCrmLayout: match.route.inCrmLayout });
-    })();
+    })().finally(() => {
+      // A superseding navigation/refresh owns these waiters until its loader
+      // settles. An obsolete request must not release background coordination.
+      if (requestId !== requestRef.current) return;
+      for (const complete of refreshCompletions.current) complete();
+      refreshCompletions.current.clear();
+    });
   }, [pathname, browserSearch, refreshToken]);
 
   useLayoutEffect(() => {
@@ -222,6 +257,7 @@ export function CrmAppRouter({ browserPath, browserSearch }: { browserPath: stri
   if (failure) throw failure.error;
   if (!view || !navigation) return null;
   return <CrmNavigationContext.Provider value={navigation}>
+    {refreshError ? <div role="alert">{refreshError} <button onClick={() => { void refreshCurrentPage(); }} type="button">Retry</button></div> : null}
     {view.inCrmLayout
       ? <PageSlotContext.Provider value={view}>{layoutRef.current?.node}</PageSlotContext.Provider>
       : <Fragment key={view.key}>{view.node}</Fragment>}

@@ -2,17 +2,41 @@
 // element inside JewelOS. The original globals.css is compiled with Tailwind 4 and scoped to
 // this element by scripts/build-css.mjs; the stylesheet is attached only while the CRM is
 // mounted, so it never applies to other JewelOS routes.
-import { useLayoutEffect, type ReactNode } from "react";
+//
+// The phone layout (crm-port/mobile.css, owner request 2026-10-07) is appended to the same
+// <style> element. Its "#crm-mobile" placeholder becomes MOBILE_SCOPE: one id more than the
+// strongest tier of crm.generated.css (.crm-root + four #crm-root), so a phone rule wins over
+// the original rule it adjusts while the original file stays verbatim. The tablet and desktop
+// layout (crm-port/wide.css, owner request 2026-10-08: full width, listings that scroll inside
+// the window) follows it with the same scope through its "#crm-wide" placeholder, and the
+// JewelOS theme (crm-port/jewelos-theme.css, owner request 2026-10-14) comes last through
+// "#crm-theme", so the CRM wears the JewelOS palette, type and controls in both themes.
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 
 import crmCss from "@/styles/crm.generated.css?raw";
 
+import mobileCss from "./mobile.css?raw";
+import themeCss from "./jewelos-theme.css?raw";
+import wideCss from "./wide.css?raw";
+import { watchTableCells } from "./mobile-tables";
+
 export const CRM_ROOT_ID = "crm-root";
+export const MOBILE_SCOPE = `.crm-root${`#${CRM_ROOT_ID}`.repeat(5)}`;
+
+export function scopeMobileCss(source: string): string {
+  return source.replaceAll("#crm-mobile", MOBILE_SCOPE).replaceAll("#crm-wide", MOBILE_SCOPE).replaceAll("#crm-theme", MOBILE_SCOPE);
+}
+
+export function crmStylesheet(): string {
+  return `${crmCss}\n${scopeMobileCss(mobileCss)}\n${scopeMobileCss(wideCss)}\n${scopeMobileCss(themeCss)}`;
+}
 
 export function CrmDocument({ title, children }: { title: string; children: ReactNode }) {
+  const root = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const style = document.createElement("style");
     style.dataset.crmUi = "crm.generated.css";
-    style.textContent = crmCss;
+    style.textContent = crmStylesheet();
     document.head.appendChild(style);
     const previousTitle = document.title;
     document.title = title;
@@ -21,5 +45,6 @@ export function CrmDocument({ title, children }: { title: string; children: Reac
       document.title = previousTitle;
     };
   }, [title]);
-  return <div id={CRM_ROOT_ID} className="crm-root" lang="en">{children}</div>;
+  useLayoutEffect(() => (root.current ? watchTableCells(root.current) : undefined), []);
+  return <div ref={root} id={CRM_ROOT_ID} className="crm-root" lang="en">{children}</div>;
 }

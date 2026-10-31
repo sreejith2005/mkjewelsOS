@@ -1,12 +1,21 @@
+import { FilterPanel } from '@/components/filter-panel';
 "use client";
+import { FollowupPager } from '@/components/followup-pager';
+import { FollowupHistory } from '@/components/followup-history';
+import { useFollowupControls } from '@/crm-port/use-followup-controls';
+import type { FollowupPaging } from '@/crm-port/followup-page';
+
 
 import Link from "@/next-shim/link"; // crm-port: next/link -> local shim (same hrefs, /crm base path added)
 import { useRouter } from "@/next-shim/navigation"; // crm-port: next/navigation -> local shim (same paths, /crm base path added)
 import { useMemo, useState } from "react";
-import { isDoneFollowup, queueTabMatches, sortNotBoughtFollowups } from "@/lib/followup-logic";
+import { followupSaveError, isDoneFollowup, queueTabMatches, sortNotBoughtFollowups } from "@/lib/followup-logic";
 import { createClient } from "@/lib/supabase/client";
 import { displayDate } from "@/lib/clients";
 import { kolkataDateKey } from "@/lib/business-date";
+import { formatPhone } from "@/lib/phone";
+import { byDate, byNumberDesc, byText, sortQueue, type Compare } from "@/lib/queue-sort";
+import { normalizeRosterValue, OFF_ROSTER, rosterFilterMatches } from "@/lib/roster";
 
 export type FollowupItem = {
   id: string; client_id: string; reference_number: string | null; status: string;
@@ -14,7 +23,7 @@ export type FollowupItem = {
   client_name: string; phone: string; crm_name: string; visit_date: string | null;
   reason: string; seen_categories: string; product_requirement: string;
   product_seen_remark: string; action_point: string | null; followup_count: number;
-  history_count: number; remark_history: string;
+  history_count: number; remark_history: string; created_at?: string | null;
 };
 
 const TABS = [["today", "TODAY FOLLOW UP"], ["pending", "ALL PENDING FOLLOW UP"], ["inprocess", "INPROCESS FOLLOW UP"], ["done", "ALL DONE"]] as const;
@@ -25,24 +34,51 @@ const FOLLOW_UP_STATUSES = [
   "NO REQUIREMENT AT THE MOMENT (FOLLOW UP AFTER A FEW MONTHS)", "CALL NOT PICKED",
 ] as const;
 const CALL_RESPONSES = ["CONNECTED", "NOT PICKED", "SWITCHED OFF", "WHATSAPP ONLY", "WRONG NUMBER"] as const;
+// Owner request 2026-10-08: sort options. "Default" keeps the original order (due date; newest first outside Today).
+const SORTS: readonly (readonly [string, string, Compare<FollowupItem> | null])[] = [
+  ["default", "DEFAULT (FOLLOW-UP DATE)", null],
+  ["next_soonest", "NEXT FOLLOW UP: SOONEST", byDate((item) => item.next_followup_date, "asc")],
+  ["next_latest", "NEXT FOLLOW UP: LATEST", byDate((item) => item.next_followup_date, "desc")],
+  ["visit_newest", "VISIT DATE: NEWEST", byDate((item) => item.visit_date, "desc")],
+  ["visit_oldest", "VISIT DATE: OLDEST", byDate((item) => item.visit_date, "asc")],
+  ["newest", "NEWEST ADDED FIRST", byDate((item) => item.created_at, "desc")],
+  ["client", "CLIENT NAME A-Z", byText((item) => item.client_name)],
+  ["crm", "CRM NAME A-Z", byText((item) => item.crm_name)],
+  ["followups", "MOST FOLLOW-UPS", byNumberDesc((item) => item.followup_count)],
+];
+// Fix 2026-10-08: legacy statuses (e.g. "NO" from the April import) are not saveable, so the form
+// starts on PENDING instead of offering a value the save RPC refuses.
+const saveableStatus = (status: string) => FOLLOW_UP_STATUSES.find((choice) => choice === status.trim().toUpperCase()) ?? "PENDING";
+const inTab = (item: FollowupItem, tab: string, today: string) => queueTabMatches({ status: item.status, next_followup_date: item.next_followup_date, followup_count: item.followup_count }, tab, today);
 type FollowupRpcClient = { rpc: (name: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }> };
 
-export function FollowupQueue({ items, crmNames, enteredByName }: {
-  role: string; branchId: string | null; items: FollowupItem[]; crmNames: string[]; enteredByName: string;
+export function FollowupQueue({ items, crmNames, enteredByName, branches = [], paging }: {
+  role: string; branchId: string | null; items: FollowupItem[]; crmNames: string[]; enteredByName: string; branches?: { id: string; name: string }[]; paging?:FollowupPaging;
 }) {
+  const [expanded,setExpanded]=useState<string|null>(null);
   const router = useRouter();
-  const [tab, setTab] = useState("today");
-  const [crm, setCrm] = useState("");
-  const [search, setSearch] = useState("");
+  const {filters:{tab,crm,search,status,branch,sort},change}=useFollowupControls('not_bought',paging,'default');
   const [open, setOpen] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [syncing, setSyncing] = useState(false);
   const today = kolkataDateKey();
-  const visible = useMemo(() => sortNotBoughtFollowups(items.filter((item) => {
+  // The CRM NAME list is the current roster (JewelOS Users); records keep the name saved on the visit.
+  const roster = useMemo(() => new Set(crmNames.map(normalizeRosterValue)), [crmNames]);
+  const hasOffRoster = paging?.hasOffRoster ?? items.some((item) => !roster.has(normalizeRosterValue(item.crm_name)));
+  const statuses = useMemo(() => paging?.statuses ?? [...new Set(items.map((item) => item.status))].sort(), [items,paging]);
+  const filtered = useMemo(() => items.filter((item) => {
     const text = `${item.client_name} ${item.phone} ${item.reference_number ?? ""}`.toLowerCase();
-    return (!crm || item.crm_name === crm) && (!search || text.includes(search.toLowerCase()))
-      && queueTabMatches({ status: item.status, next_followup_date: item.next_followup_date, followup_count: item.followup_count }, tab, today);
-  }), tab), [items, crm, search, tab, today]);
+    const digits = search.replace(/\D/g, "");
+    return rosterFilterMatches(item.crm_name, crm, roster) && (!status || item.status === status) && (!branch || item.branch_id === branch)
+      && (!search || text.includes(search.toLowerCase()) || (digits !== "" && item.phone.replace(/\D/g, "").includes(digits)));
+  }), [items, crm, roster, status, branch, search]);
+  const counts = useMemo(() => paging?.counts ?? Object.fromEntries(TABS.map(([key]) => [key, filtered.filter((item) => inTab(item, key, today)).length])), [filtered, today,paging]);
+  const visible = useMemo(() => {
+    if(paging)return items;
+    const rows = filtered.filter((item) => inTab(item, tab, today));
+    const compare = SORTS.find(([key]) => key === sort)?.[2];
+    return compare ? sortQueue(rows, compare) : sortNotBoughtFollowups(rows, tab);
+  }, [filtered, tab, today, sort,paging,items]);
 
   async function sync() {
     setSyncing(true); setMessage("");
@@ -65,34 +101,36 @@ export function FollowupQueue({ items, crmNames, enteredByName }: {
       p_next_followup_date: String(data.get("next_date")) || null,
       p_remark: remark || null,
     });
-    if (error) { setMessage("Could not save this follow-up. Please try again or contact an administrator."); return; }
+    if (error) { setMessage(followupSaveError(error.message, "Could not save this follow-up. Please try again or contact an administrator.")); return; }
     setOpen(null); setMessage("Follow-up saved."); router.refresh();
   }
 
   return <main className="mx-auto max-w-[1800px] px-5 py-7">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><h1 className="text-3xl font-semibold">Not Bought Follow-Up</h1><p className="mt-1 text-sm text-stone-600">Live CRM data with a manual legacy-compatible sync.</p></div>
+      <div><h1 className="text-3xl font-semibold">Not Bought Follow-Up</h1></div>
       <div className="flex gap-2"><button className="rounded border px-3 py-2 text-sm" disabled={syncing} onClick={() => void sync()}>{syncing ? "SYNCING…" : "SYNC NOT BOUGHT DATA"}</button><button className="rounded bg-amber-800 px-3 py-2 text-sm text-white" onClick={() => router.refresh()}>REFRESH</button></div>
     </div>
-    <div className="mt-5 flex flex-wrap gap-2">{TABS.map(([key, label]) => <button key={key} className={tab === key ? "rounded bg-amber-800 px-3 py-2 text-xs font-semibold text-white" : "rounded border px-3 py-2 text-xs font-semibold"} onClick={() => setTab(key)}>{label}</button>)}</div>
-    <div className="mt-4 flex flex-wrap gap-3"><select aria-label="CRM name" className="rounded border p-2 text-sm" value={crm} onChange={(event) => setCrm(event.target.value)}><option value="">CRM NAME: ALL</option>{crmNames.map((name) => <option key={name}>{name}</option>)}</select><input className="min-w-64 rounded border p-2 text-sm" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="SEARCH CLIENT / PHONE / REFERENCE" /></div>
+    <div className="crm-queue-tabs" aria-label="Follow-up views">{TABS.map(([key, label]) => <button key={key} aria-label={label} className={tab === key ? "rounded bg-amber-800 px-3 py-2 text-xs font-semibold text-white" : "rounded border px-3 py-2 text-xs font-semibold"} onClick={() => change({tab:key})}>{{today:'Today',pending:'Pending',inprocess:'In progress',done:'Done',converted:'Converted'}[key]} ({counts[key]})</button>)}</div>
+    <FilterPanel activeCount={[crm,status,branch,search].filter(Boolean).length} onClear={()=>change({crm:'',status:'',branch:'',search:'',sort:'default'})}><div className="crm-filter-grid"><select aria-label="CRM name" className="rounded border p-2 text-sm" value={crm} onChange={(event) => change({crm:event.target.value})}><option value="">CRM NAME: ALL</option>{crmNames.map((name) => <option key={name} value={normalizeRosterValue(name)}>{name}</option>)}{hasOffRoster && <option value={OFF_ROSTER}>NOT IN CURRENT ROSTER</option>}</select><select aria-label="Status" className="rounded border p-2 text-sm" value={status} onChange={(event) => change({status:event.target.value})}><option value="">STATUS: ALL</option>{statuses.map((value) => <option key={value}>{value}</option>)}</select>{branches.length > 1 && <select aria-label="Branch" className="rounded border p-2 text-sm" value={branch} onChange={(event) => change({branch:event.target.value})}><option value="">BRANCH: ALL</option>{branches.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>}<select aria-label="Sort by" className="rounded border p-2 text-sm" value={sort} onChange={(event) => change({sort:event.target.value})}>{SORTS.map(([key, label]) => <option key={key} value={key}>SORT: {label}</option>)}</select></div></FilterPanel>
+    {search ? <p className="crm-search-summary">Results for <strong>{search}</strong> <button type="button" onClick={()=>change({search:''})}>Clear search</button></p> : null}<p className="mt-2 text-xs text-stone-600">SHOWING {visible.length} OF {paging?.total ?? items.length} FOLLOW-UPS</p>
     {message && <p role="alert" className="mt-3 text-sm text-red-700">{message}</p>}
-    <section className="mt-5 overflow-x-auto rounded border bg-white"><table className="w-full min-w-[2200px] text-left text-xs"><thead className="bg-stone-100 uppercase text-stone-600"><tr>{["CRM Name", "Client Name", "Number", "Client Visit Date", "Next Follow Up", "Reason", "Seen Categories", "Product Requirement", "Remark/Product Seen", "Follow Up Remark", "Action Point", "Action"].map((label) => <th key={label} className="p-3">{label}</th>)}</tr></thead><tbody>
-      {visible.map((item) => <tr className="border-t align-top" key={item.id}>
-        <td className="p-3">{item.crm_name || "—"}</td><td className="p-3"><Link className="font-semibold text-amber-800 underline" href={`/clients/${item.client_id}`}>{item.client_name}</Link><div className="mt-1 flex gap-1"><span className="rounded bg-stone-100 px-1">{item.status}</span><span className="rounded bg-stone-100 px-1">FU: {item.followup_count}</span><span className="rounded bg-stone-100 px-1">HIST: {item.history_count}</span></div></td><td className="p-3">{item.phone}</td><td className="p-3">{displayDate(item.visit_date)}</td><td className="p-3">{displayDate(item.next_followup_date)}</td><td className="p-3">{item.reason || "—"}</td><td className="p-3">{item.seen_categories || "—"}</td><td className="p-3">{item.product_requirement || "—"}</td><td className="p-3 max-w-56 whitespace-pre-wrap">{item.product_seen_remark || "—"}</td><td className="p-3 max-w-56 whitespace-pre-wrap">{item.remark || "—"}</td><td className="p-3 max-w-56 whitespace-pre-wrap">{item.action_point || "—"}</td>
-        <td className="p-3"><div className="flex flex-col gap-1"><Link className="rounded border px-2 py-1 text-center" href={`/clients/${item.client_id}`}>OPEN PROFILE</Link><button className="rounded border px-2 py-1" onClick={() => setOpen(open === item.id ? null : item.id)}>FOLLOW UP FORM</button><button className="rounded border px-2 py-1" onClick={() => setOpen(open === `${item.id}:history` ? null : `${item.id}:history`)}>VIEW HISTORY</button></div>
+    <section className="mt-5 overflow-x-auto rounded border bg-white"><table className="crm-record-table w-full text-left text-xs"><thead className="bg-stone-100 uppercase text-stone-600"><tr>{["CRM Name", "Client Name", "Number", "Client Visit Date", "Next Follow Up", "Reason", "Seen Categories", "Product Requirement", "Remark/Product Seen", "Follow Up Remark", "Action Point", "Action"].map((label) => <th key={label} className="p-3">{label}</th>)}</tr></thead><tbody>
+      {visible.map((item) => <tr className={`border-t align-top ${expanded===item.id?'is-expanded':''}`} key={item.id}>
+        <td data-label="CRM Name" data-secondary="true" className="p-3">{item.crm_name || "—"}</td><td data-label="Client Name" className="p-3"><Link className="font-semibold text-amber-800 underline" href={`/clients/${item.client_id}`}>{item.client_name}</Link><div className="mt-1 flex gap-1"><span className="rounded bg-stone-100 px-1">{item.status}</span><span className="rounded bg-stone-100 px-1">FU: {item.followup_count}</span><span className="rounded bg-stone-100 px-1">HIST: {item.history_count}</span></div></td><td data-label="Number" className="p-3">{formatPhone(item.phone)}</td><td data-label="Client Visit Date" data-secondary="true" className="p-3">{displayDate(item.visit_date)}</td><td data-label="Next Follow Up" className="p-3">{displayDate(item.next_followup_date)}</td><td data-label="Reason" data-secondary="true" className="p-3">{item.reason || "—"}</td><td data-label="Seen Categories" data-secondary="true" className="p-3">{item.seen_categories || "—"}</td><td data-label="Product Requirement" data-secondary="true" className="p-3">{item.product_requirement || "—"}</td><td data-label="Remark/Product Seen" data-secondary="true" className="p-3 max-w-56 whitespace-pre-wrap">{item.product_seen_remark || "—"}</td><td data-label="Follow Up Remark" data-secondary="true" className="p-3 max-w-56 whitespace-pre-wrap">{item.remark || "—"}</td><td data-label="Action Point" data-secondary="true" className="p-3 max-w-56 whitespace-pre-wrap">{item.action_point || "—"}</td>
+        <td data-label="Action" className="p-3"><div className="crm-record-actions"><button type="button" className="crm-record-details" aria-label={expanded===item.id?"Hide record details":"Show record details"} aria-expanded={expanded===item.id} onClick={()=>setExpanded(expanded===item.id?null:item.id)}>{expanded===item.id?"Less":"Details"}</button><Link className="rounded border px-2 py-1 text-center" href={`/clients/${item.client_id}`}>OPEN PROFILE</Link><button className="rounded border px-2 py-1" onClick={() => setOpen(open === item.id ? null : item.id)}>FOLLOW UP FORM</button><button className="rounded border px-2 py-1" onClick={() => setOpen(open === `${item.id}:history` ? null : `${item.id}:history`)}>VIEW HISTORY</button></div>
           {open === item.id && <form className="mt-2 grid min-w-56 gap-2" onSubmit={(event) => { event.preventDefault(); void save(item, event.currentTarget); }}>
-            <label>Follow Up Status<select aria-label="Follow Up Status" name="status" defaultValue={item.status} required className="mt-1 w-full rounded border p-1">{!FOLLOW_UP_STATUSES.includes(item.status as typeof FOLLOW_UP_STATUSES[number]) && <option>{item.status}</option>}{FOLLOW_UP_STATUSES.map((status) => <option key={status}>{status}</option>)}</select></label>
+            <label>Follow Up Status<select aria-label="Follow Up Status" name="status" defaultValue={saveableStatus(item.status)} required className="mt-1 w-full rounded border p-1">{FOLLOW_UP_STATUSES.map((status) => <option key={status}>{status}</option>)}</select></label>
             <label>Next Follow Up Date<input aria-label="Next Follow Up Date" name="next_date" type="date" defaultValue={item.next_followup_date ?? today} className="mt-1 w-full rounded border p-1" /></label>
             <label>Call Response<select aria-label="Call Response" name="call_response" required className="mt-1 w-full rounded border p-1">{CALL_RESPONSES.map((response) => <option key={response}>{response}</option>)}</select></label>
             <label>Entered By<input aria-label="Entered By" value={enteredByName} readOnly className="mt-1 w-full rounded border bg-stone-50 p-1" /></label>
             <label>Follow Up Remark<textarea aria-label="Follow Up Remark" name="remark" defaultValue={item.remark ?? ""} maxLength={2000} className="mt-1 w-full rounded border p-1" /></label>
             <button className="rounded bg-amber-800 p-1 text-white">Save</button>
           </form>}
-          {open === `${item.id}:history` && <p className="mt-2 max-w-56 whitespace-pre-wrap text-xs">{item.remark_history || "No logged history."}</p>}
+          {open === `${item.id}:history` && (paging ? <FollowupHistory key={item.id} kind="not_bought" id={item.id}/> : <p className="mt-2 max-w-56 whitespace-pre-wrap text-xs">{item.remark_history || "No logged history."}</p>)}
         </td>
       </tr>)}
       {!visible.length && <tr><td className="p-5 text-sm text-stone-600" colSpan={12}>No follow-ups match this view.</td></tr>}
     </tbody></table></section>
+    {paging&&<FollowupPager kind="not_bought" paging={paging}/>}
   </main>;
 }

@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { notFound } from "@/next-shim/navigation";
+
+let clientError: { message: string; code: string } | null = null;
+afterEach(() => { clientError = null; vi.clearAllMocks(); });
 
 const lookups = {
   lookup_beverages: [{ label: "Tea" }],
@@ -17,7 +21,7 @@ function responseFor(table: string) {
         : table === "users" ? { branch_id: null }
           : table === "client_identity" ? { referral_code: "MKREF-1", household_id: null }
       : lookups[table as keyof typeof lookups] ?? [];
-  const result = Promise.resolve({ data, error: null });
+  const result = Promise.resolve(table === "clients" && clientError ? { data: null, error: clientError } : { data, error: null });
   const query = {
     select: () => query,
     eq: () => query,
@@ -26,6 +30,7 @@ function responseFor(table: string) {
     single: () => result,
     maybeSingle: () => result,
     neq: () => query,
+    range: () => query,
     then: result.then.bind(result),
   };
   return query;
@@ -34,7 +39,7 @@ function responseFor(table: string) {
 vi.mock("@/next-shim/navigation", () => ({ notFound: vi.fn() })); // crm-port: next/navigation -> local shim module
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({
   from: responseFor,
-  rpc: vi.fn(async () => ({ data: [{ role: "salesperson" }], error: null })),
+  rpc: vi.fn((name: string) => name === "get_client_profile" ? responseFor("clients") : Promise.resolve({ data: name === "get_crm_master_options" ? Object.fromEntries(Object.entries(lookups).map(([key,rows])=>[key,rows.map(row=>row.label)])) : [{ role: "salesperson" }], error: null })),
   auth: { getUser: vi.fn(async () => ({ data: { user: null }, error: null })) },
 })) }));
 vi.mock("@/components/client-profile", () => ({
@@ -44,6 +49,11 @@ vi.mock("@/components/client-profile", () => ({
 import ClientPage from "@/app/(crm)/clients/[clientId]/page";
 
 describe("ClientPage lookup loading", () => {
+  it("propagates a transient client read failure instead of declaring the client missing", async () => {
+    clientError = { message: "TypeError: Failed to fetch", code: "" };
+    await expect(ClientPage({ params: Promise.resolve({ clientId: "client-1" }) })).rejects.toBe(clientError);
+    expect(notFound).not.toHaveBeenCalled();
+  });
   it("renders all lookup arrays after unwrapping Supabase response data", async () => {
     render(await ClientPage({ params: Promise.resolve({ clientId: "client-1" }) }));
 
