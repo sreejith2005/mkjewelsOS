@@ -4,7 +4,9 @@ import type { FmsData } from "./api";
 
 export function FmsAssignmentEditor({ stage, stages, data, onChange }: { stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; onChange: (value: FmsStageDefinition) => void }) {
   const schedule = stage.sla.followUp?.schedule;
-  const updateSchedule = (patch: Partial<FmsFollowUpSchedule>) => onChange({ ...stage, sla: { ...stage.sla, followUp: { maxVisits: stage.sla.followUp?.maxVisits ?? 50, onLimit: stage.sla.followUp?.onLimit ?? "hold", ...stage.sla.followUp, schedule: { ...schedule, ...patch } } } });
+  const updateSchedule = (patch: Partial<FmsFollowUpSchedule>) => onChange({ ...stage, sla: { ...stage.sla,
+    ...(!schedule && stage.sla.deadlineEnabled === false ? { deadlineEnabled: true, timingMethod: "tat_hours" as const, tatHours: 24, tatMinutes: undefined, tatUnit: "hours" as const } : {}),
+    followUp: { maxVisits: stage.sla.followUp?.maxVisits ?? 50, onLimit: stage.sla.followUp?.onLimit ?? "hold", ...stage.sla.followUp, schedule: { ...schedule, ...patch } } } });
   const scheduleSource = stages.find(item => item.key === schedule?.sourceStageKey);
   const scheduleFields = scheduleSource?.formTemplateId ? data.formFields[scheduleSource.formTemplateId] ?? [] : [];
   const config = stage.sla.assignment ?? { mode: "manual_handoff", sources: [], allowHandoff: true };

@@ -17,12 +17,13 @@ it("persists schedule preferences alongside the existing visit limit and assignm
  function Editor() {
   const [stage, setStage] = useState({ ...newFmsStage("task", 1), key: "followup", name: "Follow-up" });
   const source = { ...newFmsStage("form", 0), key: "initial", name: "Introduction", formTemplateId: "source_form" };
-  return <><FmsAssignmentEditor stage={stage} stages={[source, stage]} data={data} onChange={setStage} /><output aria-label="Saved schedule">{JSON.stringify(stage.sla.followUp)}</output></>;
+  return <><FmsAssignmentEditor stage={stage} stages={[source, stage]} data={data} onChange={setStage} /><output aria-label="Saved schedule">{JSON.stringify(stage.sla.followUp)}</output><output aria-label="Saved timing">{JSON.stringify(stage.sla)}</output></>;
  }
  render(<Editor />);
  await user.click(screen.getByText("Automatic follow-up scheduling"));
  await user.click(screen.getByRole("checkbox", { name: "Schedule this step when its incoming route matches" }));
  expect(screen.getByLabelText("Saved schedule").textContent).toContain('"time":"11:00"');
+ expect(JSON.parse(screen.getByLabelText("Saved timing").textContent ?? "{}")).toMatchObject({ deadlineEnabled: true, timingMethod: "tat_hours", tatHours: 24 });
  await user.selectOptions(screen.getByLabelText("Customer-requested date/time source"), "initial");
  await user.selectOptions(screen.getByLabelText("Use customer-requested date"), "requested_date");
  await user.selectOptions(screen.getByLabelText("Use customer-requested time"), "requested_time");
