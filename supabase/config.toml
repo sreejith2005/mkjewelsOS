@@ -1,4 +1,4 @@
-project_id = "jewelos"
+project_id = "jdue"
 
 # The original CRM is ported into schema crm (0182-0187) and is queried as
 # supabase.schema("crm"). crm is deliberately not on extra_search_path: its table
@@ -56,3 +56,10 @@ verify_jwt = false
 # the database, and then calls only the service-role Kiara RPCs of migration 0220.
 [functions.kiara-insights]
 verify_jwt = false
+
+[db]
+port = 58622
+shadow_port = 58620
+
+[studio]
+enabled = false
