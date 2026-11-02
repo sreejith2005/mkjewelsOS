@@ -7,7 +7,9 @@ import { loadFmsAiSettings, type FmsAiSettings } from "@/features/fms/ai/api";
 import { FmsAiSettingsDialog } from "@/features/fms/ai/FmsAiSettingsDialog";
 import {
   deleteFmsFlow,
+  eraseFmsFlow,
   loadFmsBuilderData,
+  loadFmsFlowDeletionImpact,
   restoreFmsFlow,
   reviseFmsFlow,
   setFmsFlowActive,
@@ -125,11 +127,26 @@ export function FMSBuilderPage() {
     if (draft) setEdit(draft);
   });
 
-  const remove = (flow: FmsFlowRow) => {
-    const permanent = flow.status === "draft";
-    if (!window.confirm(permanent ? `Delete the draft "${flow.name}" permanently?` : `"${flow.name}" v${flow.version} has already run, so it will be archived instead of erased. Continue?`)) return;
-    void run(flow.id, () => deleteFmsFlow(flow.id));
-  };
+  // The server decides what Delete does for this version; the warning matches it.
+  const remove = (flow: FmsFlowRow) => void run(flow.id, async () => {
+    const impact = await loadFmsFlowDeletionImpact(flow.id);
+    const label = `"${impact.name}" v${impact.version}`;
+    const runs = `${impact.runs} run${impact.runs === 1 ? "" : "s"}`;
+    const handoffs = impact.handoffsFrom.length ? `\n\nThese workflows hand off to it and will stop doing so: ${impact.handoffsFrom.join(", ")}.` : "";
+    if (impact.action === "denied") throw new Error(`${label} is already archived and has ${runs}. Only a super admin can delete it permanently.`);
+    if (impact.action === "erase") {
+      const typed = window.prompt(`Permanently delete ${label}?\n\nThis erases ${runs}${impact.openRuns ? ` (${impact.openRuns} still open)` : ""} with their steps, checklists, uploads and outcomes. Form answers stay in Forms. This cannot be undone. To keep the history instead, cancel and use Pause.${handoffs}\n\nType DELETE to confirm.`);
+      if (typed === null) return;
+      if (typed.trim() !== "DELETE") throw new Error("Nothing was deleted. Type DELETE in capital letters to confirm.");
+      await eraseFmsFlow(flow.id, "DELETE");
+      setNotice(`${label} and its ${runs} were deleted.`);
+      return;
+    }
+    const permanent = impact.action === "delete";
+    if (!window.confirm(permanent ? `Delete ${label} permanently? It has never been run.${handoffs}` : `${label} has ${runs}, so it will be archived to keep its history. Continue?`)) return;
+    await deleteFmsFlow(flow.id);
+    setNotice(permanent ? `${label} was deleted.` : `${label} was archived.`);
+  });
 
   const toggleActive = (flow: FmsFlowRow) => {
     if (flow.is_active && !window.confirm(`Pause "${flow.name}"? Running instances continue, but nobody can start it again until you resume.`)) return;

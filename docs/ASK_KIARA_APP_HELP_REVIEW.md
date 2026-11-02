@@ -89,6 +89,8 @@ who build workflows, the designs.
 - [ ] Workflow workspace (2026-10-30, 0359): FMS card counts **Running**, **Won**, **Lost**, **Other endings**; **Tasks** opens one page with **Reporting period**, counts (Started, Running, Won, Lost, Do not contact, Other endings, Completed, Cancelled, Conversion), **Endings and step reach**, **Search customer or reference**, Status / Step / Employee / Show filters, and each run's **Work to do**, **Journey** and **Step details and saved answers**. My Stages / Started by Me / Branch View are gone.
 - [ ] Kiara tool decision (2026-10-30): no new Kiara read tool now. Outcome counts come from `get_fms_flow_report` (section RPC, caller-scoped); a future Kiara tool could call it as the asker with the FMS permission. Kiara stays read-only.
 
+- [ ] Delete a workflow (2026-11-02, 0365): the red bin on an FMS card (or beside a version under **Version history**). A version that never ran is deleted permanently after a confirm; a version with runs is archived. A super admin can delete any version permanently, runs included: the warning shows the run and open-run counts and asks you to type DELETE. Form answers stay in Forms; **Pause** keeps the history. Kiara tool decision: none; this is a builder action and Kiara never writes.
+
 ## FMS work (my assigned stages)
 **What it is:** the workflow stages and starting forms waiting for you.
 - [ ] Open a stage: tap it from Home or Tasks. It opens that exact stage. **My work** at the top goes back to Tasks.
