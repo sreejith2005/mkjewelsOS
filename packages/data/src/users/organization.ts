@@ -18,7 +18,7 @@ export async function loadOrganization(): Promise<OrganizationData> {
   const [branches, departments, people] = await Promise.all([
     db().from("branches").select("id,name,code,address,city,state,pincode,manager_id,is_active").order("name"),
     db().from("departments").select("id,name,code,branch_id,head_id,is_active").order("name"),
-    db().from("user_profiles").select("id,employee_name,branch_id,department_id,account_status").order("employee_name"),
+    db().from("user_profiles").select("id,employee_name,branch_id,department_id,account_status").is("removed_at", null).order("employee_name"),
   ]);
   fail("Load branches", branches.error);
   fail("Load departments", departments.error);

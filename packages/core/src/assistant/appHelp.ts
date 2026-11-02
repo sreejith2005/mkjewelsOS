@@ -164,6 +164,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
       "Find an employee: open Users and filter by branch or department.",
       "Add an employee: \"Add user\" in Users (authorized roles only).",
       "Set someone's login password: open the employee and use \"Set login password\" (authorized roles only).",
+      "Delete an employee who has left (Super Admin only): open the employee and press \"Delete user\", then confirm. Their login stops working for good, their personal details are wiped and they no longer appear in Users. Tasks, FMS steps, forms and CRM records they worked on stay, shown as \"Removed employee\". It cannot be undone. Reassign their open work first if someone should continue it.",
     ],
   },
   availability: {

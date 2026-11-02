@@ -8,7 +8,7 @@ vi.mock("@/features/permissions/UserSectionAccess", () => ({ UserSectionAccess: 
 vi.mock("@/pages/UserManagementPage", () => ({ AddUserForm: () => null, EditUser: () => null }));
 vi.mock("@jewelos/api-client", () => ({ supabase: { from: (table: string) => {
   const records: Record<string, unknown[]> = { user_profiles: [{ id: "person", employee_name: "Employee", employee_code: "E1", email: "test@example.invalid", department_id: "dept", branch_id: "branch", account_status: "active", working_status: "active", user_role: "staff" }], departments: [{ id: "dept", branch_id: "branch", name: "Sales" }], branches: [{ id: "branch", name: "Branch" }], dropdown_masters: [] };
-  const chain = { select: () => chain, eq: () => chain, order: async () => ({ data: records[table] ?? [], error: null }) }; return chain;
+  const chain = { select: () => chain, eq: () => chain, is: () => chain, order: async () => ({ data: records[table] ?? [], error: null }) }; return chain;
 } } }));
 import { TeamDirectoryPage } from "./TeamDirectoryPage";
 afterEach(() => { cleanup(); mocks.manage = true; });
