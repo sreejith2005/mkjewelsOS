@@ -45,7 +45,11 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const { access, profile } = useAuth();
   const selectedTaskId=new URLSearchParams(window.location.search).get("task_id");
   const focusedTaskId=selectedTaskId&&/^[0-9a-f-]{36}$/i.test(selectedTaskId)?selectedTaskId:null;
-  const [calendarScope, setCalendarScope] = useState<TaskDateScope>("today");
+  const [workspaceView, setWorkspaceView] = useState<TaskWorkspaceView>(() => path === TASK_IN_LOOP_PATH ? "inLoop" : new URLSearchParams(window.location.search).get("view") === "fms" ? "fms" : "mine");
+  const [selectedCalendarScope, setCalendarScope] = useState<TaskDateScope | null>(null);
+  // FMS assignments can be undated or scheduled ahead. Show all assigned work
+  // on entry; an explicitly chosen date scope stays strict across subsections.
+  const calendarScope = selectedCalendarScope ?? (workspaceView === "fms" ? "overall" : "today");
   const [filters, setFilters] = useState<TaskSearchFilters>(defaultTaskSearch);
   const [query, setQuery] = useState("");
   const [sections, setSections] = useState<Record<string, TaskWorkspaceView>>({});
@@ -62,7 +66,6 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const [offset, setOffset] = useState(0);
   const [tabCounts, setTabCounts] = useState<Partial<Record<TaskWorkspaceView, number>>>({});
   const [loadedIdentity, setLoadedIdentity] = useState("");
-  const [workspaceView, setWorkspaceView] = useState<TaskWorkspaceView>(() => path === TASK_IN_LOOP_PATH ? "inLoop" : new URLSearchParams(window.location.search).get("view") === "fms" ? "fms" : "mine");
   const [categories, setCategories] = useState<TaskReferenceData["categories"]>([]);
   const [references, setReferences] = useState<TaskReferenceData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -169,7 +172,12 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
   const showDuties = !focusedTaskId && !exploring && workspaceView === "mine" && statusFilter === "pending";
   // A started anytime duty is an ordinary task in the list; label it so the employee recognises it.
   const dutyLabels = useMemo(() => new Map(showDuties ? duties.map((duty) => [duty.templateId, duty.triggerLabel]) : []), [duties, showDuties]);
-  const changeView = (view: TaskWorkspaceView) => { if (view !== "fms" && new URLSearchParams(window.location.search).has("view")) window.history.replaceState(window.history.state, "", window.location.pathname); setWorkspaceView(view); setOffset(0); if (exploring) setFilters(previous => ({ ...previous, subsection: view })); };
+  const changeView = (view: TaskWorkspaceView) => {
+    if (view !== "fms" && new URLSearchParams(window.location.search).has("view")) window.history.replaceState(window.history.state, "", window.location.pathname);
+    // A search drilldown must keep the date scope that produced its counts.
+    if (exploring) { setCalendarScope(calendarScope); setFilters(previous => ({ ...previous, subsection: view })); }
+    setWorkspaceView(view); setOffset(0);
+  };
   const changeStatus = (status: TaskFeedStatusFilter) => { setStatusFilter(status); setOffset(0); };
   const emptyState = exploring ? { title: "No matching tasks", detail: "Try a different search or clear the filters." }
     : focusedTaskId ? { title: "Task not available", detail: "This task is finished, removed, or not visible to your account." }

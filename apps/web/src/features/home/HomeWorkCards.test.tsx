@@ -70,7 +70,7 @@ describe("Home work cards", () => {
     fireEvent.click(screen.getByRole("button", { name: /Instagram leads/ }));
     expect(onNavigate.mock.lastCall?.[0]).toContain("starter");
     fireEvent.click(within(screen.getByRole("article", { name: "FMS Tasks" })).getByRole("button", { name: "Open FMS tasks" }));
-    expect(onNavigate).toHaveBeenLastCalledWith("/tasks/fms");
+    expect(onNavigate).toHaveBeenLastCalledWith("/tasks?view=fms");
   });
 
   it("switches cards from the labelled switcher", () => {

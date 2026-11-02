@@ -1,6 +1,6 @@
 import {ArrowRight,CheckCircle2,ChevronRight,ClipboardList,Clock3,ListChecks,Workflow,type LucideIcon} from "lucide-react";
 import {useMemo,useRef,useState} from "react";
-import {fmsAssignedWorkPath,fmsWorkTitle} from "@jewelos/core";
+import {FMS_TASKS_BOARD_BASE,fmsAssignedWorkPath,fmsWorkTitle} from "@jewelos/core";
 import type {HomeSummary,HomeTask} from "@/features/analytics/types";
 
 /** get_home_summary caps each list; a full list may hide more work. */
@@ -46,7 +46,7 @@ export function buildWorkCards(data:HomeSummary):WorkCard[]{
   return [
     {id:"checklist",title:"Daily Checklist",short:"Checklist",subtitle:"Your routine duties",icon:ListChecks,items:checklist.map((task)=>taskItem(task,tz,formByTask)),capped:tasksCapped,viewAllLabel:"Open all tasks",viewAllPath:"/tasks",emptyTitle:"Checklist clear",emptyText:"No routine duties are waiting."},
     {id:"mine",title:"My Tasks",short:"My Tasks",subtitle:"Work assigned to you",icon:ClipboardList,items:mine.map((task)=>taskItem(task,tz,formByTask)),capped:tasksCapped,viewAllLabel:"Open all tasks",viewAllPath:"/tasks",emptyTitle:"All caught up",emptyText:"No tasks are waiting on you."},
-    {id:"fms",title:"FMS Tasks",short:"FMS",subtitle:"Workflow steps for you",icon:Workflow,items:fms,capped:data.fms_stages.length>=FMS_STAGE_LIMIT||tasksCapped&&fmsTasks.length>0,viewAllLabel:"Open FMS tasks",viewAllPath:"/tasks/fms",emptyTitle:"No steps waiting",emptyText:"New FMS steps for you will show here."},
+    {id:"fms",title:"FMS Tasks",short:"FMS",subtitle:"Workflow steps for you",icon:Workflow,items:fms,capped:data.fms_stages.length>=FMS_STAGE_LIMIT||tasksCapped&&fmsTasks.length>0,viewAllLabel:"Open FMS tasks",viewAllPath:FMS_TASKS_BOARD_BASE,emptyTitle:"No steps waiting",emptyText:"New FMS steps for you will show here."},
   ];
 }
 
