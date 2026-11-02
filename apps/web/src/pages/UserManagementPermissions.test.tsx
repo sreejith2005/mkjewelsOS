@@ -8,7 +8,7 @@ vi.mock('@jewelos/api-client', () => ({ supabase: {} }));
 import { AddUserForm, EditUser } from './UserManagementPage';
 const employee: UserProfile = {
  id:'person',auth_user_id:'auth',tenant_id:'tenant',branch_id:'branch',department_id:'department',employee_name:'Synthetic employee',employee_code:'TEST',email:'employee@example.in',user_role:'staff',account_status:'active',working_status:'active',is_login_enabled:true,week_off:[],
- buddy_id:null,secondary_buddy_id:null,reports_to_user_id:null,designation_id:null,first_name:null,last_name:null,username:null,personal_email:null,official_email:null,personal_mobile:null,official_mobile:null,created_at:null,updated_at:null,created_by:null,updated_by:null,
+ buddy_id:null,secondary_buddy_id:null,reports_to_user_id:null,designation_id:null,first_name:null,last_name:null,username:null,personal_email:null,official_email:null,personal_mobile:null,removed_at:null,removed_by:null,official_mobile:null,created_at:null,updated_at:null,created_by:null,updated_by:null,
 };
 const data = { profiles:[employee], branches:[], departments:[], dropdowns:[] };
 afterEach(() => { cleanup(); access.delete=false; access.manage=true; });

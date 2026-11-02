@@ -10720,6 +10720,8 @@ export type Database = {
           official_mobile: string | null
           personal_email: string | null
           personal_mobile: string | null
+          removed_at: string | null
+          removed_by: string | null
           reports_to_user_id: string | null
           secondary_buddy_id: string | null
           tenant_id: string
@@ -10750,6 +10752,8 @@ export type Database = {
           official_mobile?: string | null
           personal_email?: string | null
           personal_mobile?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
           reports_to_user_id?: string | null
           secondary_buddy_id?: string | null
           tenant_id: string
@@ -10780,6 +10784,8 @@ export type Database = {
           official_mobile?: string | null
           personal_email?: string | null
           personal_mobile?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
           reports_to_user_id?: string | null
           secondary_buddy_id?: string | null
           tenant_id?: string
@@ -13767,6 +13773,10 @@ export type Database = {
         Returns: boolean
       }
       prepare_unused_user_deletion: {
+        Args: { p_profile_id: string }
+        Returns: string
+      }
+      remove_employee_with_audit: {
         Args: { p_profile_id: string }
         Returns: string
       }

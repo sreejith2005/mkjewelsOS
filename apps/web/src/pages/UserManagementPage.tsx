@@ -173,7 +173,7 @@ export function EditUser({
     if (
       !canDelete ||
       !window.confirm(
-        `Permanently delete ${user.employee_name}? This only works for disabled or invited accounts with no linked work.`,
+        `Delete ${user.employee_name}? Their login stops working, their personal details are wiped and they disappear from Users. Tasks, forms and CRM records they worked on stay, shown as "Removed employee". This cannot be undone.`,
       )
     )
       return;
@@ -871,7 +871,7 @@ export function UserManagementPage() {
   const load = useCallback(async () => {
     setLoading(true);
     const [profiles, branches, departments, dropdowns] = await Promise.all([
-      supabase.from("user_profiles").select("*").order("employee_name"),
+      supabase.from("user_profiles").select("*").is("removed_at", null).order("employee_name"),
       supabase.from("branches").select("*").order("name"),
       supabase.from("departments").select("*").order("name"),
       supabase.from("dropdown_masters").select("*").order("sort_order"),

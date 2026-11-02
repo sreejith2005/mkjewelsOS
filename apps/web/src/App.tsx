@@ -212,7 +212,7 @@ function LoginPage() {
           <Button className="mt-2 min-h-12 w-full text-base" disabled={submitting} type="submit">
             {submitting ? <><Loader2 className="size-4 animate-spin" />Signing in…</> : "Sign in"}
           </Button>
-          <p className="text-center text-xs text-soft-grey">For a password reset, contact your Super Admin.</p>
+          <p className="text-center text-xs text-soft-grey">Forgot your password? Ask your Super Admin to set a new one. To change it yourself, open Settings after signing in.</p>
         </form>
     </AuthLayout>
   );

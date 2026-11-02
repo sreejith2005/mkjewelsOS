@@ -114,6 +114,7 @@ who build workflows, the designs.
 - [ ] Find an employee: open Users and filter by branch or department.
 - [ ] Add an employee: **Add user** (allowed roles only).
 - [ ] Set someone's login password: open the employee, **Set login password** (allowed roles only).
+- [ ] Delete an employee (2026-11-02, 0368; Super Admin): open the employee, **Delete user**, confirm. Login locked for good, personal details wiped, gone from Users; past work shows **Removed employee**. Cannot be undone.
 
 ## Availability (attendance and leave)
 **What it is:** who is present, absent, on half day or remote, and leave applications.
@@ -147,6 +148,7 @@ who build workflows, the designs.
 ## Settings
 **What it is:** your own preferences and, for allowed roles, company defaults and permissions.
 - [ ] Change the theme or table density: open Settings and change your preferences.
+- [ ] Change your own password (2026-11-02, 0367; every employee): Settings > **Change password**: **Current password**, **New password** (6 to 72 characters), **Confirm new password**, **Show passwords**, then **Change password**. Forgot it: ask a Super Admin to use **Set login password**, sign in, then change it in Settings.
 - [ ] Manage permissions: Settings, then **Open permission management** (Super Admin only). *(changed in Phase 9; it used to say "Settings > Permissions")*
 
 ## Ask Kiara itself *(rewritten in Phase 9)*
@@ -243,3 +245,7 @@ Kiara tool decision: no new read tool. Configuration/navigation extends existing
 - [ ] Kiara tool decision: no new read tool. Due dates already show in the existing Tasks and Tasks -> FMS reads.
 
 2026-11-02 Home and account menu: **Daily Checklist**, **My Tasks** and **FMS Tasks** have equal fixed heights and show up to five items, with scrolling inside each preview. **Open all tasks** / **Open FMS tasks** reach the full lists. The universal top-right **Account menu** shows identity, **Settings** when permitted, and **Sign out**; Escape or tapping outside closes it. No new Kiara read tool is needed; existing data and session actions are reused.
+
+2026-11-02 own password change: every employee sees **Change password** in Settings (Edge Function `change-own-password`, migration 0367 audit). The sign-in page now says to ask a Super Admin when the password is forgotten, or open Settings to change it. No Kiara read tool is needed: there is no data to read, and Kiara can never change a password.
+
+2026-11-02 delete users (0368): Super Admins can press **Delete user** on any employee, including one with work history; the old "linked operational records" refusal is gone. The login is locked for good, personal details are wiped, the person disappears from Users, and past tasks, FMS steps, forms and CRM records show **Removed employee**. Users permission label is now **Delete users**. No Kiara read tool is needed; Kiara cannot delete anyone.

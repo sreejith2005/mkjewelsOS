@@ -19,9 +19,21 @@ Deno.serve(async (request) => {
     const body = await request.json(); profileId = typeof body?.profile_id === "string" ? body.profile_id : "";
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(profileId)) throw new Error();
   } catch { return respond(400, { error: "profile_id must be a valid UUID" }); }
-  const { data: targetAuthId, error: preflightError } = await caller.rpc("prepare_unused_user_deletion", { p_profile_id: profileId });
-  if (preflightError || !targetAuthId) return respond(preflightError?.code === "42501" ? 403 : 400, { error: preflightError?.message ?? "User cannot be deleted" });
+  // Removes the employee in the database (audited, history kept), then makes
+  // sure the old login can never be used again.
+  const { data: targetAuthId, error: removeError } = await caller.rpc("remove_employee_with_audit", { p_profile_id: profileId });
+  if (removeError || !targetAuthId) return respond(removeError?.code === "42501" ? 403 : 400, { error: removeError?.message ?? "User could not be deleted" });
+  // An account that never did any work can go entirely; anything with history fails here and is locked instead.
   const { error: deleteError } = await admin.auth.admin.deleteUser(targetAuthId);
-  if (deleteError) return respond(409, { error: "This user has linked operational records and cannot be deleted. Deactivate the account instead." });
+  if (deleteError) {
+    const { error: lockError } = await admin.auth.admin.updateUserById(targetAuthId, {
+      email: `removed-${profileId}@removed.invalid`, password: `${crypto.randomUUID()}${crypto.randomUUID()}`.slice(0, 72),
+      email_confirm: true, ban_duration: "876000h", user_metadata: {},
+    });
+    if (lockError) {
+      console.error("removed user login lock failed", { code: lockError.code ?? null });
+      return respond(500, { error: "The user was removed and can no longer sign in, but their old login record could not be cleaned up. Ask your system owner to check Supabase Auth." });
+    }
+  }
   return respond(200, { deleted: true });
 });

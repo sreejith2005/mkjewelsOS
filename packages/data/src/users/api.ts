@@ -15,7 +15,7 @@ function fail(label: string, error: { message: string } | null): asserts error i
 
 export async function loadUserDirectory(): Promise<UserDirectoryData> {
   const [profiles, branches, departments, designations] = await Promise.all([
-    db().from("user_profiles").select("*").order("employee_name"),
+    db().from("user_profiles").select("*").is("removed_at", null).order("employee_name"),
     db().from("branches").select("id,name").eq("is_active", true).order("name"),
     db().from("departments").select("id,name,branch_id").eq("is_active", true).order("name"),
     db().from("dropdown_masters").select("id,label").eq("master_type", "designation").eq("is_active", true).order("sort_order"),
@@ -112,8 +112,8 @@ export async function resetUserPassword(profileId: string, password: string): Pr
 }
 
 /**
- * Permanently deletes an account. The Edge Function refuses anything but a
- * disabled or invited account with no linked work.
+ * Deletes an employee (Super Admin). Their login is locked for good, personal
+ * details are wiped and they are hidden from Users; past work keeps its links.
  */
 export async function deleteUser(profileId: string): Promise<void> {
   await refreshSessionForSensitiveAction();

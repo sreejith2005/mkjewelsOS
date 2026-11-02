@@ -164,6 +164,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
       "Find an employee: open Users and filter by branch or department.",
       "Add an employee: \"Add user\" in Users (authorized roles only).",
       "Set someone's login password: open the employee and use \"Set login password\" (authorized roles only).",
+      "Delete an employee who has left (Super Admin only): open the employee and press \"Delete user\", then confirm. Their login stops working for good, their personal details are wiped and they no longer appear in Users. Tasks, FMS steps, forms and CRM records they worked on stay, shown as \"Removed employee\". It cannot be undone. Reassign their open work first if someone should continue it.",
     ],
   },
   availability: {
@@ -220,9 +221,10 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     section: "settings",
     title: "Settings",
     path: "/settings",
-    summary: "Settings holds the user's own preferences and, for authorized roles, organization defaults and permissions.",
+    summary: "Settings holds the user's own password change, preferences and, for authorized roles, organization defaults and permissions.",
     recipes: [
       "Change the theme or table density: open Settings and change your preferences.",
+      "Change your own password (every employee): open Settings, find \"Change password\", type your \"Current password\", type the \"New password\" (6 to 72 characters) and the same again in \"Confirm new password\", then press \"Change password\". \"Show passwords\" shows what you typed. Use the new password next time you sign in, on the computer and in the phone app. Forgot your current password? Ask your Super Admin to set a new one (Users > \"Set login password\"), sign in with it, then change it in Settings.",
       "Manage permissions: Settings > \"Open permission management\" (Super Admin only).",
       "Integration status: open Customer Integration in Settings. Forms → CRM lists each customer form with its state (Not configured, Draft mapping, Saved, awaiting CRM approval, Approved and active, Form changed, re-approval required, Blocked or Disabled), how many submissions are linked, anything waiting, and the Next step. Other connections shows the delivery worker, Users → CRM roster and CRM walk-ins → Tasks. Approval and identity decisions resume on their own; use Retry selected customer events under Undelivered customer events only for failed events after fixing the cause. Only integration administrators can open it. In an FMS step, a line such as Linked to CRM customer or Waiting for CRM authorization shows the customer sync, with Open CRM customer profile for CRM users.",
     ],

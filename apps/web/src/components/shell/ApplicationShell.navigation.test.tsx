@@ -16,7 +16,7 @@ const profile: UserProfile = {
   designation_id: null, email: "staff@example.test", employee_code: "TEST-1",
   employee_name: "Test Employee", first_name: null, id: "test-profile",
   is_login_enabled: true, last_name: null, official_email: null, official_mobile: null,
-  personal_email: null, personal_mobile: null, reports_to_user_id: null,
+  personal_email: null, personal_mobile: null, removed_at: null, removed_by: null, reports_to_user_id: null,
   secondary_buddy_id: null, tenant_id: "test-tenant", updated_at: null, updated_by: null,
   user_role: "staff", username: null, week_off: [], working_status: "active",
 };
