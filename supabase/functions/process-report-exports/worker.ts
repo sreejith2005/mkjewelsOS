@@ -1,8 +1,9 @@
 import {CUSTOMER_EXPORTS,CUSTOMER_EXPORT_COLUMNS,customerExportValue,type CustomerExportColumn} from "../../../packages/core/src/reports/customerExports.ts";
-import { csvCell } from "../../../packages/core/src/reports/csv.ts";
+import { businessCsvCell, businessExportHeader, csvCell, type ExportColumn } from "../../../packages/core/src/reports/csv.ts";
+import { reportFor } from "../../../packages/core/src/reports/catalog.ts";
 export { csvCell } from "../../../packages/core/src/reports/csv.ts";
 export type ExportJob = Readonly<{ id:string;tenant_id:string;report_key:string;attempt_number:number;max_rows:number }>;
-export type ExportBatch = Readonly<{ rows:readonly Readonly<Record<string,unknown>>[];total:number;cancelled?:boolean;columns?:readonly CustomerExportColumn[] }>;
+export type ExportBatch = Readonly<{ rows:readonly Readonly<Record<string,unknown>>[];total:number;cancelled?:boolean;columns?:readonly ExportColumn[] }>;
 export type CleanupJob = Readonly<{ id:string;object_path:string }>;
 
 export type ExportGateway = Readonly<{
@@ -17,6 +18,7 @@ export type ExportGateway = Readonly<{
 }>;
 
 export const responseHeaders={"Access-Control-Allow-Headers":"content-type,x-cron-secret","Access-Control-Allow-Methods":"POST,OPTIONS","Access-Control-Allow-Origin":"*","Content-Type":"application/json"} as const;
+/** Earlier reports keep their original raw-key CSV layout. */
 const COLUMNS:Readonly<Record<string,readonly string[]>>={
   task_operations:["task_id","title","task_type","priority","status","planned_datetime","assignee_name","checklist_completion"],
   task_completion_delay:["task_id","title","assignee_name","planned_datetime","actual_datetime","on_time","delay_minutes"],
@@ -27,10 +29,10 @@ const COLUMNS:Readonly<Record<string,readonly string[]>>={
   crm_walkins:["walkin_id","client_id","branch_name","visit_date","crm_owner_name","buy_status"],
   crm_interactions:["interaction_id","client_id","event_type","subject","outcome","occurred_at","actor_name"],
   crm_followups:["followup_id","client_id","subject","due_date","status","assignee_name","completed_at"],
-  people_availability:["profile_id","employee_name","branch_name","department_name","working_status","date","availability_status"],
   people_task_performance:["profile_id","employee_name","tasks_assigned","tasks_completed","completion_rate","on_time_completed","overdue_open","average_delay_minutes"],
   notification_delivery_health:["channel","status","delivery_count","retry_count","latest_attempt_at"],
 };
+const MAX_COLUMNS=250;
 
 export function safeFilename(reportKey:string,date=new Date()):string {return `${reportKey.replace(/[^a-z0-9_-]/g,"-")}-${date.toISOString().slice(0,10)}.csv`;}
 export function encodeRows(columns:readonly string[],rows:readonly Readonly<Record<string,unknown>>[],includeHeader:boolean):string {
@@ -38,26 +40,51 @@ export function encodeRows(columns:readonly string[],rows:readonly Readonly<Reco
 }
 function json(status:number,body:Readonly<Record<string,unknown>>):Response{return new Response(JSON.stringify(body),{status,headers:responseHeaders});}
 
+type Layout={kind:"business";columns:readonly ExportColumn[]}|{kind:"customer";columns:readonly CustomerExportColumn[]}|{kind:"fixed";columns:readonly string[]};
+
+/** Business Reports 2.0 use labelled catalogue columns; the server may send one form's question columns. */
+function layoutFor(reportKey:string):Layout|null{
+  const definition=reportFor(reportKey);
+  if(definition&&definition.category!=="legacy"&&definition.category!=="admin")return {kind:"business",columns:definition.columns};
+  if(Object.hasOwn(CUSTOMER_EXPORTS,reportKey))return {kind:"customer",columns:CUSTOMER_EXPORT_COLUMNS};
+  const fixed=COLUMNS[reportKey];
+  return fixed?{kind:"fixed",columns:fixed}:null;
+}
+function header(layout:Layout):string{
+  if(layout.kind==="fixed")return encodeRows(layout.columns,[],true);
+  const labels=layout.kind==="business"?layout.columns.map((column)=>businessExportHeader(column)):layout.columns.map((column)=>column.label);
+  return labels.map(csvCell).join(",")+"\r\n";
+}
+function body(layout:Layout,rows:readonly Readonly<Record<string,unknown>>[]):string{
+  if(layout.kind==="fixed")return encodeRows(layout.columns,rows,false);
+  if(layout.kind==="business"){const columns=layout.columns;return rows.map((row)=>columns.map((column)=>businessCsvCell(row[column.key],column)).join(",")).join("\r\n")+"\r\n";}
+  const columns=layout.columns;
+  return rows.map((row)=>columns.map((column)=>csvCell(customerExportValue(row[column.key],column))).join(",")).join("\r\n")+"\r\n";
+}
+
 export async function processExportJob(gateway:ExportGateway,job:ExportJob,workerId:string,batchSize=500):Promise<"completed"|"failed"|"cancelled"> {
-  const customer=Object.hasOwn(CUSTOMER_EXPORTS,job.report_key);let customerColumns:readonly CustomerExportColumn[]=CUSTOMER_EXPORT_COLUMNS;
-  const columns=COLUMNS[job.report_key]; if(!columns&&!customer){await gateway.finish(job.id,workerId,"failed",null,null,"unknown_report_key");return "failed";}
-  const chunks:BlobPart[]=[new Uint8Array([0xef,0xbb,0xbf])]; let offset=0; let total=0;
+  let layout=layoutFor(job.report_key);
+  if(!layout){await gateway.finish(job.id,workerId,"failed",null,null,"unknown_report_key");return "failed";}
+  const chunks:BlobPart[]=[new Uint8Array([0xef,0xbb,0xbf])]; let offset=0; let total=0; let serverColumns="";
   try {
     while(offset<job.max_rows){
       const batch=await gateway.batch(job.id,offset,Math.min(batchSize,job.max_rows-offset));
       if(batch.cancelled){await gateway.finish(job.id,workerId,"cancelled",null,null,null);return "cancelled";}
       if(offset===0)total=Math.min(batch.total,job.max_rows);
-      if(customer){
-        if(batch.columns){if(offset===0)customerColumns=batch.columns;else if(JSON.stringify(customerColumns)!==JSON.stringify(batch.columns))throw new Error("Export layout changed");}
-        if(!customerColumns.length||customerColumns.length>64||customerColumns.some(column=>!column.key||!column.label))throw new Error("Invalid export columns");
-        if(batch.rows.length===0)break;
-        if(offset===0)chunks.push(customerColumns.map(column=>csvCell(column.label)).join(",")+"\r\n");
-        chunks.push(batch.rows.map(row=>customerColumns.map(column=>csvCell(customerExportValue(row[column.key],column))).join(",")).join("\r\n")+"\r\n");
-      }else {if(batch.rows.length===0)break;chunks.push(encodeRows(columns!,batch.rows,offset===0));} offset+=batch.rows.length;
+      if(batch.columns&&layout.kind!=="fixed"){
+        // Columns chosen by the server (one form's questions) must stay identical across batches.
+        const signature=JSON.stringify(batch.columns);
+        if(offset===0){serverColumns=signature;layout=layout.kind==="business"?{kind:"business",columns:batch.columns}:{kind:"customer",columns:batch.columns as readonly CustomerExportColumn[]};}
+        else if(signature!==serverColumns)throw new Error("Export layout changed");
+      }
+      if(layout.kind!=="fixed"&&(!layout.columns.length||layout.columns.length>MAX_COLUMNS||layout.columns.some((column)=>!column.key||!column.label)))throw new Error("Invalid export columns");
+      if(batch.rows.length===0)break;
+      if(offset===0)chunks.push(header(layout));
+      chunks.push(body(layout,batch.rows)); offset+=batch.rows.length;
       await gateway.progress(job.id,workerId,Math.min(99,Math.floor((offset/Math.max(total,1))*100)),offset);
       if(batch.rows.length<batchSize||offset>=total)break;
     }
-    if(offset===0)chunks.push(customer?customerColumns.map(column=>csvCell(column.label)).join(",")+"\r\n":encodeRows(columns!,[],true));
+    if(offset===0)chunks.push(header(layout));
     const path=`${job.tenant_id}/${job.id}/${safeFilename(job.report_key)}`;
     await gateway.upload(path,new Blob(chunks,{type:"text/csv;charset=utf-8"}));
     const state=await gateway.finish(job.id,workerId,"completed",path,offset,null);

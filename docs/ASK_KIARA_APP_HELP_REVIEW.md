@@ -16,7 +16,7 @@ How it works:
 The source is `packages/core/src/assistant/appHelp.ts`. Keep this file and that one in step
 (AGENTS.md, "Keeping Ask Kiara current").
 
-Tasks entry updated against the screens: 2026-10-21 (Anytime duties, task order). Recurring / To-Do retired; its work moved to Tasks (Create Task scheduling) and Task Control (Review tab, Templates Next and Run now): 2026-10-21. Task Control: 2026-10-21 (Assign now is high priority). Home, Task Control (Delete) and Reports: 2026-10-21. Other entries last checked: 2026-10-14. FMS workspace implementation: 2026-10-21; local evidence is in the feature plan, not proof of deployment.
+Tasks entry updated against the screens: 2026-10-21 (Anytime duties, task order). Recurring / To-Do retired; its work moved to Tasks (Create Task scheduling) and Task Control (Review tab, Templates Next and Run now): 2026-10-21. Task Control: 2026-10-21 (Assign now is high priority). Home and Task Control (Delete): 2026-10-21. Reports: 2026-11-02 (Business Reports 2.0). Other entries last checked: 2026-10-14. FMS workspace implementation: 2026-10-21; local evidence is in the feature plan, not proof of deployment.
 
 ---
 
@@ -126,9 +126,15 @@ who build workflows, the designs.
 - [ ] Approve or reject leave (people who review leave): open Availability and choose **Review requests**. *(added in Phase 9)*
 
 ## Reports
-**What it is:** fixed reports for your level, and private CSV downloads.
-- [ ] See a report: open Reports, tap the report, pick dates (Today, Last 7 days, Last 30 days, This month, or From/To) and any Branch, Department or Status filter.
-- [ ] Download a report: press **Export CSV**. It appears under **Your exports** (Waiting, then Preparing), usually within a minute; press **Download** when Completed.
+**What it is:** the business reporting and export centre (Business Reports 2.0, 2026-11-02), limited to what you may see.
+- [ ] Pick a category: **Customer & CRM**, **Forms, FMS & Tasks** or **Employee Performance**, then tap a report card. Customer & CRM, **CRM Performance** and **Salesperson Performance** show only with CRM access.
+- [ ] Customer reports: **Customer Master Database**, **Customer 360° Journey** (search name, MKC ID, phone or Instagram ID, then tap the customer), **Leads and Enquiries**, **CRM Follow-ups**, **Lead Source and Conversion**.
+- [ ] Form answers: **All Form Submissions**; choose a form in **Form** for one column per question; tap an answer (or **View all answers** on a phone) for every answer.
+- [ ] FMS and tasks: **FMS Workflow Journey** (**Workflow summary** / **Stage-wise detail**), **FMS Stage Performance**, **Pending and Completed Tasks** (**Task type**).
+- [ ] Filters: **All dates** (where offered), Today, Last 7 days, Last 30 days, This month, From/To, and only the filters that report uses. **How these numbers are counted** explains each count.
+- [ ] Download a report: press **Export CSV** (every matching record). It appears under **Your exports** (Waiting, then Preparing); press **Download** when Completed. Customer exports also need CRM administrator access.
+- [ ] Administrators: **Settings → Report diagnostics** has Notification delivery health and the CRM synchronization exceptions export.
+- Kiara: no new read tool. The new reports are not offered to Kiara's `run_report` (pinned to the earlier work reports) until they have allowed and denied eval cases.
 
 ## CRM
 

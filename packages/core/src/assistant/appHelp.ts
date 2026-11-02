@@ -185,11 +185,15 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     section: "reports",
     title: "Reports",
     path: "/reports",
-    summary: "Reports previews fixed reports for the user's level and lets them export private CSV files.",
+    summary: "Reports is the business reporting and export centre: customers and CRM, submitted forms with answers, FMS journeys and tasks, and employee performance, each limited to what the user may see.",
     recipes: [
-      "Preview a report: open Reports, tap the report, then pick dates (Today, Last 7 days, Last 30 days, This month, or From/To) and any Branch, Department or Status filter.",
-      "Export a report: press \"Export CSV\". The file appears under \"Your exports\" (Waiting, then Preparing), usually within a minute; press \"Download\" when it is Completed. Files expire automatically.",
-      "Customer exports: open Customer & Stage Exports, choose the export and optional workflow, stage, employee and dates, then Queue private CSV export. Download from Your exports. Full answers require source-work access; customer exports also require CRM administrator authority. Authors can save a reusable Sheet layout with stable question keys. Sheets remain one-way.",
+      "Open a report: open Reports, pick a category (Customer & CRM, Forms, FMS & Tasks, or Employee Performance), then tap the report card. Customer & CRM and CRM/Salesperson Performance appear only for people with CRM access.",
+      "Customer & CRM reports: Customer Master Database (one row per customer), Customer 360° Journey (search a customer by name, MKC ID, phone or Instagram ID, then tap them), Leads and Enquiries, CRM Follow-ups, and Lead Source and Conversion.",
+      "Form answers: open All Form Submissions. Choose one form in Form to get one column per question; tap an answer, or View all answers on a phone, to read every answer of a submission.",
+      "FMS: FMS Workflow Journey has two views, Workflow summary (one row per FMS run) and Stage-wise detail (one row per stage visit, with the answers given). FMS Stage Performance shows on-time and delay by stage. Pending and Completed Tasks lists regular tasks and FMS steps; use Task type to pick one.",
+      "Filters: choose dates (All dates where offered, Today, Last 7 days, Last 30 days, This month, or From/To) and any Branch, Department, Employee, Form, FMS workflow, Stage, Source, Status or Search filter the report shows. Clear filters resets them. \"How these numbers are counted\" under a report explains every count.",
+      "Export a report: press \"Export CSV\". It exports every matching record, not just the page shown. The file appears under \"Your exports\" (Waiting, then Preparing), usually within a minute; press \"Download\" when it is Completed. Files expire automatically. Customer exports also need CRM administrator access.",
+      "Administrators find Notification delivery health and the CRM synchronization exceptions export in Settings → Report diagnostics.",
     ],
   },
   crm: {
@@ -229,6 +233,7 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
       "Change your own password (every employee): open Settings, find \"Change password\", type your \"Current password\", type the \"New password\" (6 to 72 characters) and the same again in \"Confirm new password\", then press \"Change password\". \"Show passwords\" shows what you typed. Use the new password next time you sign in, on the computer and in the phone app. Forgot your current password? Ask your Super Admin to set a new one (Users > \"Set login password\"), sign in with it, then change it in Settings.",
       "Manage permissions: Settings > \"Open permission management\" (Super Admin only).",
       "Integration status: open Customer Integration in Settings. Forms → CRM lists each customer form with its state (Not configured, Draft mapping, Saved, awaiting CRM approval, Approved and active, Form changed, re-approval required, Blocked or Disabled), how many submissions are linked, anything waiting, and the Next step. Other connections shows the delivery worker, Users → CRM roster and CRM walk-ins → Tasks. Approval and identity decisions resume on their own; use Retry selected customer events under Undelivered customer events only for failed events after fixing the cause. Only integration administrators can open it. In an FMS step, a line such as Linked to CRM customer or Waiting for CRM authorization shows the customer sync, with Open CRM customer profile for CRM users.",
+      "Report diagnostics (administrators): open Settings, find \"Report diagnostics\", press \"Show\" for Notification delivery health (last 30 days), or press \"Export CSV\" next to CRM synchronization exceptions (needs CRM administrator access); download it from Reports under \"Your exports\".",
     ],
   },
   ask_kiara: {

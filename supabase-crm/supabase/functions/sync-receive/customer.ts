@@ -12,7 +12,7 @@ const json=(status:number,body:Record<string,unknown>)=>Response.json(body,{stat
 /** Called only AFTER the existing secret, method and total-body-size checks. */
 export async function receiveCustomerBatch(body: Record<string,unknown>,gateway: CustomerReceiveGateway): Promise<Response> {
  if(body.kind==="customer.export") {
-  if(![body.tenantId,body.actorId,body.exportId].every(value=>typeof value==="string"&&uuid.test(value))||typeof body.key!=="string"||!/^customer_(master|enquiries|stages|activity|followups|commercial|exceptions)$/.test(body.key)||!object(body.filters)||typeof body.before!=="string"||Number.isNaN(Date.parse(body.before))||!Number.isInteger(body.offset)||Number(body.offset)<0||!Number.isInteger(body.limit)||Number(body.limit)<1||Number(body.limit)>500)return json(400,{error:"Invalid customer export"});
+  if(![body.tenantId,body.actorId,body.exportId].every(value=>typeof value==="string"&&uuid.test(value))||typeof body.key!=="string"||!/^customer_(master|enquiries|stages|activity|followups|commercial|exceptions|report_(master|journey|leads|followups|sources|crm_staff|sales))$/.test(body.key)||!object(body.filters)||typeof body.before!=="string"||Number.isNaN(Date.parse(body.before))||!Number.isInteger(body.offset)||Number(body.offset)<0||!Number.isInteger(body.limit)||Number(body.limit)<1||Number(body.limit)>500)return json(400,{error:"Invalid customer export"});
   if(!gateway.exportCustomer)return json(503,{error:"Customer exports are not configured"});
   try{return json(200,await gateway.exportCustomer(body));}catch{return json(403,{error:"Customer export authorization or batch failed"});}
  }

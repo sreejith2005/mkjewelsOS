@@ -86,7 +86,10 @@ select ok(report_allowed_for_role('task_operations','staff'),'staff has task ope
 select ok(report_allowed_for_role('task_operations','housekeeping'),'housekeeping has task operations report');
 select ok(report_allowed_for_role('notification_delivery_health','admin'),'admin has notification health report');
 select ok(not report_allowed_for_role('notification_delivery_health','manager'),'manager has no provider health report');
-select ok(pg_get_functiondef('report_rows_for_profile(uuid,text,jsonb,integer,integer)'::regprocedure) !~ 'primary_phone|personal_mobile|storage_path|answers','sensitive CRM contact, path, and answer columns are absent');
+-- Business Reports 2.0 (0369) adds the owner-requested form answers report; the earlier
+-- reports still carry no answers, and no report carries contact numbers or storage paths.
+select ok(pg_get_functiondef('report_rows_for_profile_v1(uuid,text,jsonb,integer,integer)'::regprocedure) !~ 'primary_phone|personal_mobile|storage_path|answers','sensitive CRM contact, path, and answer columns are absent from the earlier reports');
+select ok(pg_get_functiondef('report_rows_for_profile(uuid,text,jsonb,integer,integer)'::regprocedure) !~ 'primary_phone|personal_mobile|storage_path','no report carries contact numbers or storage paths');
 
 set local role authenticated;
 select set_config('request.jwt.claim.role','authenticated',true);

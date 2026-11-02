@@ -35,3 +35,24 @@ Deno.test("customer exports preserve phone text, nested answers, IST and reviewe
  assertStringIncludes(gateway.uploads[0]!.text,"2026-10-01 05:30:00 IST");
  assertStringIncludes(gateway.uploads[0]!.text,'""original"":false');
 });
+Deno.test("business reports export labelled headers, IST times, Yes/No and phones as text",async()=>{
+ const gateway=fake([],[{rows:[{followup_type:"Lead follow-up",customer_id:"MKC-1001",name:"=Synthetic",phone:"+91 9876543210",branch:"Main",status:"open",due_date:"2026-11-03",overdue:true,attempts:2,created_at:"2026-11-01T18:45:00Z"}],total:1}]);
+ assertEquals(await processExportJob(gateway,{...job,report_key:"customer_report_followups"},"worker"),"completed");
+ const text=gateway.uploads[0]!.text;
+ assertStringIncludes(text,"Type,Customer ID,Name,Phone,Branch,Status,Due date,Overdue,Attempts");
+ assertStringIncludes(text,"Created (IST)");
+ assertStringIncludes(text,'"=""+91 9876543210"""');
+ assertStringIncludes(text,"'=Synthetic");
+ assertStringIncludes(text,",Yes,2,");
+ assertStringIncludes(text,"2026-11-02 00:15");
+});
+Deno.test("one form's question columns from the server become the CSV headers",async()=>{
+ const columns=[{key:"form_name",label:"Form"},{key:"q:customer_name",label:"Customer Name"},{key:"q:customer_number",label:"Customer Number",phone:true},{key:"submitted_at",label:"Submitted (Asia/Kolkata)",instant:true}];
+ const gateway=fake([],[{rows:[{form_name:"Walk-in enquiry","q:customer_name":"Asha","q:customer_number":"9876543210",submitted_at:"2026-11-02T04:30:00Z"},{form_name:"Walk-in enquiry","q:customer_name":"Ravi",submitted_at:"2026-11-02T05:00:00Z"}],total:2,columns}]);
+ assertEquals(await processExportJob(gateway,{...job,report_key:"form_answers"},"worker"),"completed");
+ assertEquals(gateway.uploads[0]!.text,'Form,Customer Name,Customer Number,Submitted (Asia/Kolkata)\r\nWalk-in enquiry,Asha,"=""9876543210""",2026-11-02 10:00\r\nWalk-in enquiry,Ravi,,2026-11-02 10:30\r\n');
+});
+Deno.test("an export fails rather than mixing two different column layouts",async()=>{
+ const gateway=fake([],[{rows:[{a:1}],total:2,columns:[{key:"a",label:"A"}]},{rows:[{a:2}],total:2,columns:[{key:"b",label:"B"}]}]);
+ assertEquals(await processExportJob(gateway,{...job,report_key:"form_answers"},"worker",1),"failed");
+});

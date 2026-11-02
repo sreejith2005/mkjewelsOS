@@ -15,3 +15,9 @@ Deno.test("customer export adapter rejects invalid paging before service access"
 Deno.test("customer export adapter uses independently authorized CRM batch",async()=>{
  const response=await handleSyncReceive(request({kind:"customer.export",tenantId:"20261027-0000-4000-8000-000000000001",actorId:"20261027-0000-4000-8000-000000000001",exportId:"20261027-0000-4000-8000-000000000001",key:"customer_master",before:"2026-10-01T00:00:00Z",offset:0,limit:500,filters:{}}),{secret:"test",gateway:{...gateway,exportCustomer:()=>Promise.resolve({rows:[],total:0})}});assertEquals(response.status,200);assertEquals(await response.json(),{rows:[],total:0});
 });
+Deno.test("customer export adapter accepts the business report keys and rejects unknown keys",async()=>{
+ const body=(key:string)=>request({kind:"customer.export",tenantId:"20261027-0000-4000-8000-000000000001",actorId:"20261027-0000-4000-8000-000000000001",exportId:"20261027-0000-4000-8000-000000000001",key,before:"2026-11-02T00:00:00Z",offset:0,limit:500,filters:{}});
+ const ok={...gateway,exportCustomer:()=>Promise.resolve({rows:[],total:0})};
+ for(const key of ["customer_report_master","customer_report_journey","customer_report_leads","customer_report_followups","customer_report_sources","customer_report_crm_staff","customer_report_sales"])assertEquals((await handleSyncReceive(body(key),{secret:"test",gateway:ok})).status,200);
+ assertEquals((await handleSyncReceive(body("customer_report_everything"),{secret:"test",gateway:ok})).status,400);
+});

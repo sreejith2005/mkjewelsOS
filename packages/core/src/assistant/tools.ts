@@ -106,11 +106,14 @@ export type KiaraToolName = (typeof KIARA_TOOL_NAMES)[number];
 export const KIARA_HELP_SECTIONS: readonly PageId[] = IMPLEMENTED_PAGE_IDS;
 
 /**
- * Reports Kiara can run: the visible report catalogue (the retired public CRM
- * reports are already hidden there) except export history, which describes the
- * user's CSV downloads, not work.
+ * Reports Kiara can run: a fixed list of the work reports it was evaluated on
+ * (docs/superpowers/evals/ask-kiara/cases.json). Business Reports 2.0 (2026-11-02)
+ * added CRM reports (read from the CRM project, not get_report_data) and form
+ * answers; they are not offered to Kiara until they have their own allowed and
+ * denied eval cases. Export history describes CSV downloads, not work.
  */
-export const KIARA_REPORT_KEYS: readonly string[] = REPORT_CATALOG.map((report) => report.key).filter((key) => key !== "export_history");
+const KIARA_REPORT_ALLOWLIST: readonly string[] = ["task_operations", "task_completion_delay", "fms_instances_stages", "fms_sla", "form_submissions_reviews", "people_availability", "people_task_performance", "notification_delivery_health"];
+export const KIARA_REPORT_KEYS: readonly string[] = REPORT_CATALOG.map((report) => report.key).filter((key) => KIARA_REPORT_ALLOWLIST.includes(key));
 
 /** Free-text input limits, enforced by the validator (strict schemas carry no lengths). */
 export const KIARA_HELP_QUESTION_MAX = 200;

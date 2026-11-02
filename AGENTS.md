@@ -28,6 +28,7 @@ maintained documents:
 | `docs/CRM_TWO_PROJECT_PRODUCTION_RUNBOOK.md`, `docs/CRM_SHEETS_INGEST_CUTOVER.md`, `docs/CRM_WALKIN_FIELD_MAP.md` | CRM project operations and walk-in data |
 | `docs/architecture/` | Hosted data inventory and the Forms/FMS -> CRM customer integration design and mappings |
 | `docs/FMS_AI_ASSISTANT.md`, `docs/LEAVE_APPLICATIONS.md` | Feature notes still in use |
+| `docs/REPORTS.md` | Reports catalogue, data sources and every KPI formula |
 | `docs/superpowers/specs/` | The four designs that code comments cite (CRM embed, CRM two projects, task scores, Ask Kiara) |
 | `apps/mobile/README.md` | Android shell rules and toolchain |
 
