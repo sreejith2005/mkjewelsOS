@@ -586,7 +586,7 @@ export async function loadTaskTabCounts(includeAll: boolean, calendarScope?: Tas
       return [view, decodeTaskPage(data).total] as const;
     }
     if (calendarScope && view === "fms") {
-      const result = await db().rpc("get_fms_task_workspace", { p_filter: { scope: calendarScope, status: "active" }, p_offset: 0, p_limit: 1 });
+      const result = await db().rpc("get_fms_task_workspace", { p_filter: { dateScope: calendarScope, status: "active" }, p_offset: 0, p_limit: 1 });
       fail("Load FMS subsection count", result.error);
       const resultData = result.data;
       if (!resultData || typeof resultData !== "object" || Array.isArray(resultData) || typeof resultData.total !== "number") throw new Error("Invalid FMS count");

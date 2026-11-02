@@ -50,13 +50,13 @@ beforeEach(() => {
 });
 
 describe("server-authorized task assignment roster", () => {
-  it("counts Today from the same server filters used by pages, including the FMS hierarchy", async () => {
+  it.each(["today", "overall", "overdue"] as const)("counts %s using the calendar filter accepted by the FMS hierarchy", async (dateScope) => {
     pageRpc.mockImplementation(async (name: string) => name === "get_fms_task_workspace"
       ? { data: { total: 10 }, error: null }
       : { data: { ids: [], total: 2, counts: { pending: 2, overdue: 1, completed: 0, open: 3 } }, error: null });
-    expect(await loadTaskTabCounts(false, "today")).toEqual({ mine: 2, delegated: 2, inLoop: 2, fms: 10 });
-    expect(pageRpc).toHaveBeenCalledWith("get_fms_task_workspace", expect.objectContaining({ p_filter: { scope: "today", status: "active" } }));
-    expect(pageRpc.mock.calls.filter(call => call[0] === "task_workspace_page").every(call => call[1].p_filter.scope === "today")).toBe(true);
+    expect(await loadTaskTabCounts(false, dateScope)).toEqual({ mine: 2, delegated: 2, inLoop: 2, fms: 10 });
+    expect(pageRpc).toHaveBeenCalledWith("get_fms_task_workspace", expect.objectContaining({ p_filter: { dateScope, status: "active" } }));
+    expect(pageRpc.mock.calls.filter(call => call[0] === "task_workspace_page").every(call => call[1].p_filter.scope === dateScope)).toBe(true);
     expect(selectedTables).toEqual([]);
   });
   it("loads all personal subsection counts without hydrating tasks or querying the admin scope", async () => {
