@@ -122,8 +122,7 @@ select is((select count(*)::integer from fms_instances where id in (pg_temp.fx('
 select is((select count(*)::integer from fms_instance_stages where fms_instance_id in (pg_temp.fx('open_run'),pg_temp.fx('closed_run'))),0,'their steps are gone');
 select is((select count(*)::integer from fms_branch_rules where next_flow_id=pg_temp.fx('funnel')),0,'the other workflow no longer hands off to it');
 select is((select count(*)::integer from fms_branch_rules r join fms_stages s on s.id=r.fms_stage_id where s.fms_flow_id=pg_temp.fx('other')),7,'the other workflow keeps its own routes');
-select is((select count(*)::integer from notifications where tenant_id=pg_temp.fx('tenant') and source_module='fms' and not is_read),0,'alerts for the erased work are closed');
-select ok((select count(*) from notifications where tenant_id=pg_temp.fx('tenant') and source_module='fms')>0,'the alerts stay in history');
+select is((select count(*)::integer from notifications where tenant_id=pg_temp.fx('tenant') and source_module='fms'),0,'alerts for the erased work are removed (0366)');
 select is((select count(*)::integer from form_submissions where tenant_id=pg_temp.fx('tenant')),7,'form answers stay in Forms');
 select is((select count(*)::integer from audit_logs where action='fms_flow_erased' and record_id=pg_temp.fx('funnel') and old_value->>'open_runs'='1'),1,'the erase is audited with the open-run count');
 

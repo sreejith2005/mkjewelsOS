@@ -7,9 +7,11 @@ import { loadFmsAiSettings, type FmsAiSettings } from "@/features/fms/ai/api";
 import { FmsAiSettingsDialog } from "@/features/fms/ai/FmsAiSettingsDialog";
 import {
   deleteFmsFlow,
+  deleteFmsWorkflow,
   eraseFmsFlow,
   loadFmsBuilderData,
   loadFmsFlowDeletionImpact,
+  loadFmsWorkflowDeletionImpact,
   restoreFmsFlow,
   reviseFmsFlow,
   setFmsFlowActive,
@@ -127,8 +129,30 @@ export function FMSBuilderPage() {
     if (draft) setEdit(draft);
   });
 
-  // The server decides what Delete does for this version; the warning matches it.
-  const remove = (flow: FmsFlowRow) => void run(flow.id, async () => {
+  // The card's Delete removes the whole workflow, every version included.
+  const removeWorkflow = (family: FlowFamily) => void run(family.primary.id, async () => {
+    const impact = await loadFmsWorkflowDeletionImpact(family.key);
+    const label = `"${impact.name}"`;
+    const versions = `${impact.versions} version${impact.versions === 1 ? "" : "s"}`;
+    const runs = `${impact.runs} run${impact.runs === 1 ? "" : "s"}`;
+    const handoffs = impact.handoffsFrom.length ? `\n\nThese workflows hand off to it and will stop doing so: ${impact.handoffsFrom.join(", ")}.` : "";
+    if (impact.action === "denied") throw new Error(`${label} is archived and has ${runs}. Only a super admin can delete it permanently.`);
+    if (impact.action === "erase") {
+      const typed = window.prompt(`Permanently delete the whole workflow ${label}?\n\nThis removes all ${versions} and ${runs}${impact.openRuns ? ` (${impact.openRuns} still open)` : ""}, with their steps, checklists, uploads, outcomes and alerts. Form answers stay in Forms. This cannot be undone.${handoffs}\n\nType DELETE to confirm.`);
+      if (typed === null) return;
+      if (typed.trim() !== "DELETE") throw new Error("Nothing was deleted. Type DELETE in capital letters to confirm.");
+      await deleteFmsWorkflow(family.key, "DELETE");
+      setNotice(`${label} was deleted: ${versions} and ${runs}.`);
+      return;
+    }
+    const permanent = impact.action === "delete";
+    if (!window.confirm(permanent ? `Delete the whole workflow ${label} (${versions}) permanently? It has never been run.${handoffs}` : `${label} has ${runs}, so all its versions will be archived to keep the history. Only a super admin can delete it permanently. Continue?`)) return;
+    const outcome = await deleteFmsWorkflow(family.key);
+    setNotice(outcome === "deleted" ? `${label} was deleted.` : `${label} was archived.`);
+  });
+
+  // A bin under Version history removes just that version.
+  const remove =(flow: FmsFlowRow) => void run(flow.id, async () => {
     const impact = await loadFmsFlowDeletionImpact(flow.id);
     const label = `"${impact.name}" v${impact.version}`;
     const runs = `${impact.runs} run${impact.runs === 1 ? "" : "s"}`;
@@ -252,7 +276,7 @@ export function FMSBuilderPage() {
                     {canManage && !draft && flow.status !== "draft" ? <Button disabled={busy} onClick={() => void revise(flow)} variant="secondary"><Pencil className="size-4" />New version</Button> : null}
                     {canManage && flow.status === "published" ? <Button disabled={busy} onClick={() => toggleActive(flow)} variant="secondary">{flow.is_active ? <><Pause className="size-4" />Pause</> : <><Play className="size-4" />Resume</>}</Button> : null}
                     {canManage && state === "archived" ? <Button disabled={busy} onClick={() => void run(flow.id, () => restoreFmsFlow(flow.id))} variant="secondary"><RotateCcw className="size-4" />Restore</Button> : null}
-                    {canManage ? <Button aria-label={`Delete ${flow.name}`} disabled={busy} onClick={() => remove(flow)} variant="danger"><Trash2 className="size-4" /></Button> : null}
+                    {canManage ? <Button aria-label={`Delete ${flow.name}`} disabled={busy} onClick={() => removeWorkflow(family)} variant="danger"><Trash2 className="size-4" /></Button> : null}
                   </div>
                 </div>
                 {canManage && older.length ? (
