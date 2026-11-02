@@ -146,3 +146,19 @@ export * from "./assistant/index.ts";
 
 export * from "./taskSearch";
 export * from "./reports/customerExports";
+export {
+  REASSIGN_BATCH_SIZE,
+  batchReassignPlan,
+  parseReassignCandidates,
+  parseReassignResult,
+  planReassignAll,
+  planReassignSelected,
+  reassignPlanSize,
+  type ReassignAllOptions,
+  type ReassignCandidates,
+  type ReassignPlan,
+  type ReassignResult,
+  type ReassignSkipped,
+  type ReassignTaskCandidate,
+  type ReassignWorkCandidate,
+} from "./taskReassignment";

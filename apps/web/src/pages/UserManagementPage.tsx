@@ -13,6 +13,7 @@ import {
   Plus,
   Search,
   Trash2,
+  ArrowRightLeft,
   UserCog,
 } from "lucide-react";
 import { hasPermission,
@@ -91,6 +92,12 @@ export function EditUser({
 }) {
   const { access } = useAuth();
   const canDelete = hasPermission(access, "users.delete");
+  const canReassign = hasPermission(access, "tasks.view_all");
+  const openReassign = () => {
+    window.history.pushState({}, "", `/task-templates?tab=tasks&user=${encodeURIComponent(user.id)}&reassign=1`);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    onClose();
+  };
   const canManage = hasPermission(access, "users.manage");
   const [draft, setDraft] = useState({
     employee_name: user.employee_name,
@@ -173,7 +180,7 @@ export function EditUser({
     if (
       !canDelete ||
       !window.confirm(
-        `Delete ${user.employee_name}? Their login stops working, their personal details are wiped and they disappear from Users. Tasks, forms and CRM records they worked on stay, shown as "Removed employee". This cannot be undone.`,
+        `Delete ${user.employee_name}? Their login stops working, their personal details are wiped and they disappear from Users. Tasks, forms and CRM records they worked on stay, shown as "Removed employee". Use "Reassign tasks" first if someone should continue their open work. This cannot be undone.`,
       )
     )
       return;
@@ -444,6 +451,12 @@ export function EditUser({
               </Button>
             </div>
           ) : null}
+            {canReassign ? (
+              <Button disabled={saving} type="button" variant="secondary" onClick={openReassign}>
+                <ArrowRightLeft className="h-4 w-4" />
+                Reassign tasks
+              </Button>
+            ) : null}
             {canDelete ? (
               <Button
                 disabled={saving}

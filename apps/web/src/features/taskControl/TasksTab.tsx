@@ -159,6 +159,7 @@ export function TasksTab({
   onDelete,
   selection,
   onBulkDelete,
+  onReassign,
 }: {
   evidence: EvidenceWorkspace;
   view: TaskView;
@@ -173,6 +174,7 @@ export function TasksTab({
   onDelete?: ((row: TaskRow) => void) | undefined;
   selection?: TaskSelection | undefined;
   onBulkDelete?: ((ids: readonly string[] | null) => void) | undefined;
+  onReassign?: ((ids: readonly string[] | null) => void) | undefined;
 }) {
   const [openError, setOpenError] = useState<string | null>(null);
   const totalPages = Math.max(1, Math.ceil(evidence.tasks_total / pageSize));
@@ -189,6 +191,8 @@ export function TasksTab({
         <Button variant="secondary" onClick={() => selection.onChange([...new Set([...selection.ids, ...evidence.tasks.filter(canDeleteTaskControlRow).map((row) => row.task_id)])])}>Select this page</Button>
         <Button variant="secondary" disabled={!selection.ids.length} onClick={() => selection.onChange([])}>Clear selection</Button>
         <span className="text-sm">{selection.ids.length} selected</span>
+        {onReassign ? <Button variant="secondary" disabled={!selection.ids.length} onClick={() => onReassign(selection.ids)}>Reassign selected</Button> : null}
+        {onReassign ? <Button variant="secondary" onClick={() => onReassign(null)}>Reassign all open work</Button> : null}
         <Button variant="danger" disabled={!selection.ids.length} onClick={() => onBulkDelete(selection.ids)}>Delete selected</Button>
         <Button variant="danger" onClick={() => onBulkDelete(null)}>Delete all matching</Button>
       </div> : null}
