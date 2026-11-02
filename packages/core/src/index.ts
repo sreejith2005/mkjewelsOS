@@ -115,6 +115,9 @@ export type {
 export {
   ADMIN_SET_PASSWORD_LENGTH,
   validateAdminSetPassword,
+  OWN_PASSWORD_MAX_LENGTH,
+  OWN_PASSWORD_MIN_LENGTH,
+  validateOwnPasswordChange,
 } from "./userCredentials";
 export { eligibleBuddies, type BuddyCandidate, type BuddyScope } from "./buddyEligibility";
 export { isFormerEmployee, type EmploymentState } from "./formerEmployees";
