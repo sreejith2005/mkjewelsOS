@@ -224,7 +224,7 @@ assigned stage" recipe is updated. No new read tool.
 - [ ] Conditions & Routing: independent Visibility Conditions, nested Add AND group / Add OR group, Ordered IF routes and Set OTHERWISE.
 - [ ] Manage sections: Section Visibility and After this section. Explicit question routes override the end action; eligibility still applies.
 - [ ] Routing simulation, Test validation and Reset simulation use the production evaluator without writing or uploading.
-- [ ] FMS Workflow Forms groups permitted relationships Workflow / Stage / Form using Workflow filter and Stage filter.
+- [ ] (2026-11-02) **FMS workflow forms** shows each workflow once as a collapsible card (status **Live** / **Draft** / **Turned off**), not once per saved version. Tapping it shows **Step 1**, **Step 2**, ... with that step's forms; **Expand all** / **Collapse all** and search (opens matching workflows). Cards carry a workflow · step tag and **Also used in ...** for shared forms; forms only in a draft or older version sit under **Not in the live version**. The Workflow filter and Stage filter were removed.
 - [ ] Tasks Today uses the Asia/Kolkata calendar date; Overall includes future work; Overdue separately lists earlier unfinished work. Counts and pages share server scope.
 - [ ] Automatic follow-up scheduling extends existing FMS timing and assignment with next-day 11:00 defaults and requested date/time overrides.
 
