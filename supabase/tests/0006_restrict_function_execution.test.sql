@@ -244,6 +244,7 @@ select is((
   -- 0206/0207 (main): management insights reads and audited dashboard saved views.
   'delete_dashboard_view_with_audit(uuid,integer)',
   'delete_fms_flow_with_audit(uuid,text)',
+  'delete_fms_workflow_with_audit(uuid,text)',
   'delete_form_draft_with_audit(uuid)',
   'delete_form_with_audit(uuid)',
   'delete_kiara_document_with_audit(uuid)',
@@ -254,6 +255,7 @@ select is((
   'erase_fms_flow_with_audit(uuid,text)',
   'fail_kiara_extraction_with_audit(uuid,text)',
   'fms_flow_deletion_impact(uuid)',
+  'fms_workflow_deletion_impact(uuid)',
   'form_deletion_impact(uuid)',
   'form_usage_impact(uuid)',
   'get_employee_task_progress(jsonb)',

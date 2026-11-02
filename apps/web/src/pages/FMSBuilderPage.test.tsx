@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   deleteFmsFlow: vi.fn(),
   eraseFmsFlow: vi.fn(),
   loadFmsFlowDeletionImpact: vi.fn(),
+  deleteFmsWorkflow: vi.fn(),
+  loadFmsWorkflowDeletionImpact: vi.fn(),
   loadFmsLibraryOutcomes: vi.fn(),
 }));
 vi.mock("@jewelos/data/fms/outcomes", () => ({ loadFmsLibraryOutcomes: mocks.loadFmsLibraryOutcomes }));
@@ -31,6 +33,8 @@ vi.mock("@/features/fms/api", async () => ({
   deleteFmsFlow: mocks.deleteFmsFlow,
   eraseFmsFlow: mocks.eraseFmsFlow,
   loadFmsFlowDeletionImpact: mocks.loadFmsFlowDeletionImpact,
+  deleteFmsWorkflow: mocks.deleteFmsWorkflow,
+  loadFmsWorkflowDeletionImpact: mocks.loadFmsWorkflowDeletionImpact,
   restoreFmsFlow: vi.fn(),
   archiveFmsFlow: vi.fn(),
   publishFmsFlow: vi.fn(),
@@ -90,7 +94,7 @@ describe("unified FMS console", () => {
     await waitFor(() => expect(mocks.setFmsFlowActive).toHaveBeenCalledWith("flow", false));
   });
 
-  const impact = (action: string, runs = 0, openRuns = 0) => ({ name: "Sales intake", version: 1, status: "published", runs, openRuns, handoffsFrom: [], canErase: action === "erase", action });
+  const impact = (action: string, runs = 0, openRuns = 0) => ({ name: "Sales intake", versions: 3, runs, openRuns, handoffsFrom: [], canErase: action === "erase", action });
   const clickDelete = async () => {
     mocks.loadFmsBuilderData.mockResolvedValue(data);
     mocks.loadFmsRuntime.mockResolvedValue(runtime);
@@ -100,41 +104,42 @@ describe("unified FMS console", () => {
     await user.click(screen.getByRole("button", { name: "Delete Sales intake" }));
   };
 
-  it("deletes a never-run flow permanently after a confirm", async () => {
-    mocks.loadFmsFlowDeletionImpact.mockResolvedValue(impact("delete"));
-    mocks.deleteFmsFlow.mockResolvedValue(undefined);
+  it("deletes a never-run workflow, every version, after a confirm", async () => {
+    mocks.loadFmsWorkflowDeletionImpact.mockResolvedValue(impact("delete"));
+    mocks.deleteFmsWorkflow.mockResolvedValue("deleted");
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     await clickDelete();
-    await waitFor(() => expect(mocks.deleteFmsFlow).toHaveBeenCalledWith("flow"));
-    expect(confirm.mock.calls[0]?.[0]).toContain("permanently? It has never been run.");
-    expect(await screen.findByText('"Sales intake" v1 was deleted.')).toBeTruthy();
-  });
-
-  it("warns that a flow with runs is archived", async () => {
-    mocks.loadFmsFlowDeletionImpact.mockResolvedValue(impact("archive", 3));
-    mocks.deleteFmsFlow.mockResolvedValue(undefined);
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
-    await clickDelete();
-    await waitFor(() => expect(mocks.deleteFmsFlow).toHaveBeenCalledWith("flow"));
-    expect(confirm.mock.calls[0]?.[0]).toContain("has 3 runs, so it will be archived");
-    expect(mocks.eraseFmsFlow).not.toHaveBeenCalled();
-  });
-
-  it("lets a super admin erase a flow with runs only after typing DELETE", async () => {
-    mocks.loadFmsFlowDeletionImpact.mockResolvedValue(impact("erase", 4, 1));
-    mocks.eraseFmsFlow.mockResolvedValue(undefined);
-    const prompt = vi.spyOn(window, "prompt").mockReturnValue("DELETE");
-    await clickDelete();
-    await waitFor(() => expect(mocks.eraseFmsFlow).toHaveBeenCalledWith("flow", "DELETE"));
-    expect(prompt.mock.calls[0]?.[0]).toContain("This erases 4 runs (1 still open)");
+    await waitFor(() => expect(mocks.deleteFmsWorkflow).toHaveBeenCalledWith("family"));
+    expect(mocks.loadFmsWorkflowDeletionImpact).toHaveBeenCalledWith("family");
+    expect(confirm.mock.calls[0]?.[0]).toContain('Delete the whole workflow "Sales intake" (3 versions) permanently?');
+    expect(await screen.findByText('"Sales intake" was deleted.')).toBeTruthy();
     expect(mocks.deleteFmsFlow).not.toHaveBeenCalled();
   });
 
-  it("erases nothing when the typed word is wrong", async () => {
-    mocks.loadFmsFlowDeletionImpact.mockResolvedValue(impact("erase", 4));
+  it("tells an admin a workflow with runs is archived", async () => {
+    mocks.loadFmsWorkflowDeletionImpact.mockResolvedValue(impact("archive", 3));
+    mocks.deleteFmsWorkflow.mockResolvedValue("archived");
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    await clickDelete();
+    await waitFor(() => expect(mocks.deleteFmsWorkflow).toHaveBeenCalledWith("family"));
+    expect(confirm.mock.calls[0]?.[0]).toContain("has 3 runs, so all its versions will be archived");
+  });
+
+  it("lets a super admin delete the whole workflow with runs after typing DELETE", async () => {
+    mocks.loadFmsWorkflowDeletionImpact.mockResolvedValue(impact("erase", 4, 1));
+    mocks.deleteFmsWorkflow.mockResolvedValue("deleted");
+    const prompt = vi.spyOn(window, "prompt").mockReturnValue("DELETE");
+    await clickDelete();
+    await waitFor(() => expect(mocks.deleteFmsWorkflow).toHaveBeenCalledWith("family", "DELETE"));
+    expect(prompt.mock.calls[0]?.[0]).toContain("This removes all 3 versions and 4 runs (1 still open)");
+    expect(await screen.findByText('"Sales intake" was deleted: 3 versions and 4 runs.')).toBeTruthy();
+  });
+
+  it("deletes nothing when the typed word is wrong", async () => {
+    mocks.loadFmsWorkflowDeletionImpact.mockResolvedValue(impact("erase", 4));
     vi.spyOn(window, "prompt").mockReturnValue("delete");
     await clickDelete();
     expect(await screen.findByText(/Nothing was deleted/)).toBeTruthy();
-    expect(mocks.eraseFmsFlow).not.toHaveBeenCalled();
+    expect(mocks.deleteFmsWorkflow).not.toHaveBeenCalled();
   });
 });

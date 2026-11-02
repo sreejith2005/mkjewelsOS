@@ -102,6 +102,11 @@ export type FmsFlowDeletionImpact = { name: string; version: number; status: Fms
 export const loadFmsFlowDeletionImpact = async (id: string): Promise<FmsFlowDeletionImpact> => { const { data, error } = await supabase.rpc("fms_flow_deletion_impact" as any, { p_flow_id: id }); fail("Check FMS deletion", error); return data as unknown as FmsFlowDeletionImpact; };
 /** Super admin only: permanently removes a version and all of its runs. The server requires the typed word DELETE. */
 export const eraseFmsFlow = async (id: string, confirmation: string) => { const { error } = await supabase.rpc("erase_fms_flow_with_audit" as any, { p_flow_id: id, p_confirmation: confirmation }); fail("Delete FMS flow", error); };
+/** What Delete on a workflow card does to the whole workflow (every version). */
+export type FmsWorkflowDeletionImpact = { name: string; versions: number; runs: number; openRuns: number; handoffsFrom: string[]; canErase: boolean; action: "delete" | "archive" | "erase" | "denied" };
+export const loadFmsWorkflowDeletionImpact = async (familyId: string): Promise<FmsWorkflowDeletionImpact> => { const { data, error } = await supabase.rpc("fms_workflow_deletion_impact" as any, { p_family_id: familyId }); fail("Check FMS deletion", error); return data as unknown as FmsWorkflowDeletionImpact; };
+/** Deletes every version of a workflow. With runs, a super admin must pass the typed word DELETE; other builders archive it. */
+export const deleteFmsWorkflow = async (familyId: string, confirmation?: string): Promise<"deleted" | "archived"> => { const { data, error } = await supabase.rpc("delete_fms_workflow_with_audit" as any, { p_family_id: familyId, ...(confirmation ? { p_confirmation: confirmation } : {}) }); fail("Delete FMS workflow", error); return (data as unknown as { outcome: "deleted" | "archived" }).outcome; };
 
 export async function loadFmsRuntime(instanceId?: string): Promise<{ instances: FmsInstance[]; stages: FmsInstanceStage[]; definitions: FmsStageRow[]; flows: FmsFlowRow[]; checklist: FmsChecklistItem[]; evidence: FmsEvidence[]; logs: FmsLog[]; users: FmsData["users"] }> {
   if (instanceId) {
