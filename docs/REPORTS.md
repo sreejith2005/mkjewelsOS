@@ -1,6 +1,6 @@
 # Reports (Business Reports 2.0)
 
-Introduced 2026-11-02 (JewelOS migration `0369_business_reports.sql`, CRM migration
+Introduced 2026-11-02 (JewelOS migration `0370_business_reports.sql`, CRM migration
 `20261102000100_crm_business_reports.sql`). This file is the reference for what each
 report reads and how every count is calculated. Keep it in step with the code.
 

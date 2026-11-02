@@ -164,7 +164,7 @@ declare
   v_form uuid; v_flow uuid; v_stage text; v_kind text; v_search text; v_status text; v_branch uuid; v_dept uuid; v_user uuid;
   v_manager boolean; v_background boolean;
 begin
-  -- Before 0369 the Reports page sent From/To without a preset and every report and export
+  -- Before 0370 the Reports page sent From/To without a preset and every report and export
   -- silently covered today only. A chosen range is a custom range.
   if not f ? 'preset' and nullif(f->>'from','') is not null and nullif(f->>'to','') is not null then f:=f||'{"preset":"custom"}'::jsonb; end if;
   select * into a from user_profiles where id=p_profile_id;
