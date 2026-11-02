@@ -19,7 +19,7 @@ describe("workflow form hierarchy", () => {
       { workflowId: "support", workflowName: "Support", stageId: "resolve", stageName: "Resolve" },
     ] }]]);
     expect(groupFmsBuiltForms(forms, built).map(group => [group.name, group.stages.map(stage => stage.name)])).toEqual([["Sales", ["Call"]], ["Support", ["Resolve"]]]);
-    expect(groupFmsBuiltForms(forms, built, { workflow: "sales", stage: "Resolve" })).toEqual([]);
+    expect(groupFmsBuiltForms(forms, built, { query: "support resolve" }).map(group => group.name)).toEqual(["Support"]);
   });
   it("does not infer pairs from older responses or expose restricted workflow metadata", () => {
     const built = new Map([["family", { familyId: "family", workflows: ["Sales", "Support"], steps: ["Call", "Resolve"] }]]);
@@ -32,7 +32,29 @@ describe("workflow form hierarchy", () => {
       { workflowId: "sales", workflowName: "Sales", stageId: "second-call", stageName: "Call" },
     ] }]]);
     expect(groupFmsBuiltForms(forms, built)[0]?.stages.map(stage => stage.id)).toEqual(["first-call", "second-call"]);
-    expect(groupFmsBuiltForms(forms, built, { stage: "second-call" })[0]?.stages.map(stage => stage.id)).toEqual(["second-call"]);
+  });
+  it("shows one group per workflow, not per saved version, with the current version's steps in order", () => {
+    const link = (version: number, status: "draft" | "published" | "archived", isCurrent: boolean, stage: string, order: number, name = "Instagram FMS") =>
+      ({ workflowId: `flow-v${version}`, workflowName: name, stageId: `${stage}-v${version}`, stageName: stage, workflowFamilyId: "instagram", workflowVersion: version, workflowStatus: status, stageOrder: order, isCurrent });
+    const twoForms = [...forms, { id: "pay", family_id: "pay", name: "Payment", lifecycle: "published", version: 1 }, { id: "old", family_id: "old", name: "Old intro", lifecycle: "published", version: 1 }];
+    const built = new Map([
+      ["family", { familyId: "family", workflows: [], steps: [], links: [link(1, "archived", false, "Lead", 0, "Insta"), link(2, "published", true, "Lead", 2), link(3, "draft", false, "Lead", 2)] }],
+      ["pay", { familyId: "pay", workflows: [], steps: [], links: [link(2, "published", true, "Payment", 1), link(3, "draft", false, "Payment", 1)] }],
+      ["old", { familyId: "old", workflows: [], steps: [], links: [link(1, "archived", false, "Intro", 0, "Insta")] }],
+    ]);
+    const groups = groupFmsBuiltForms(twoForms, built);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ id: "instagram", name: "Instagram FMS", status: "published", version: 2, familyCount: 3 });
+    expect(groups[0]?.stages.map(stage => [stage.name, stage.families.map(family => family[0]!.name)])).toEqual([["Payment", ["Payment"]], ["Lead", ["Lead"]]]);
+    expect(groups[0]?.elsewhere.map(family => family[0]!.name)).toEqual(["Old intro"]);
+    expect(groupFmsBuiltForms(twoForms, built, { query: "intro" })[0]?.elsewhere.map(family => family[0]!.name)).toEqual(["Old intro"]);
+  });
+  it("names a workflow without a current link after its newest version", () => {
+    const built = new Map([["family", { familyId: "family", workflows: [], steps: [], links: [
+      { workflowId: "a", workflowName: "Old name", stageId: "s1", stageName: "Call", workflowFamilyId: "flow", workflowVersion: 1, isCurrent: false },
+      { workflowId: "b", workflowName: "New name", stageId: "s2", stageName: "Call", workflowFamilyId: "flow", workflowVersion: 2, workflowStatus: "archived" as const, isCurrent: false },
+    ] }]]);
+    expect(groupFmsBuiltForms(forms, built)).toMatchObject([{ id: "flow", name: "New name", status: "archived", stages: [], familyCount: 1 }]);
   });
   it("groups persisted FMS sources and attachments without duplicating versions or reclassifying library forms", () => {
     const groups = groupWorkflowForms(forms, provenance);
