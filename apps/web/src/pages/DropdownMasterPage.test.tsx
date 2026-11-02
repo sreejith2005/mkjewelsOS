@@ -78,6 +78,9 @@ describe("Dropdown Master overview", () => {
     render(<DropdownMasterPage />);
     await screen.findByRole("button", { name: "Open Occasion" });
     await user.click(screen.getByRole("button", { name: "New list" }));
+    // Modal focuses its dialog on the next animation frame. Let that finish
+    // before typing so the mount focus cannot steal the remaining keystrokes.
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("dialog")));
     await user.type(screen.getByLabelText("List name"), "Gift Type");
     await user.type(screen.getByLabelText("Label"), "Coin");
     await user.click(screen.getByRole("button", { name: "Save" }));
