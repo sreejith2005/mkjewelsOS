@@ -25,6 +25,7 @@ import { TasksTab } from "@/features/taskControl/TasksTab";
 import { TaskManagement } from "@/features/taskControl/TaskManagement";
 import { FmsWorkCancelDialog } from "@/features/taskControl/FmsWorkCancelDialog";
 import { BulkDeleteDialog, type BulkDeleteRequest } from "@/features/taskControl/BulkDeleteDialog";
+import { ReassignDialog, type ReassignRequest } from "@/features/taskControl/ReassignDialog";
 import { OverviewTab } from "@/features/taskControl/OverviewTab";
 import { PeopleTab } from "@/features/taskControl/PeopleTab";
 import { TemplatesTab } from "@/features/taskControl/TemplatesTab";
@@ -96,6 +97,16 @@ export function TaskTemplatesPage() {
   const [deletingRow, setDeletingRow] = useState<TaskRow | null>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [bulkDelete, setBulkDelete] = useState<BulkDeleteRequest | null>(null);
+  // `?reassign=1&user=<id>` (the Users page "Reassign tasks" button) opens the
+  // dialog for that person's open work.
+  const [reassign, setReassign] = useState<ReassignRequest | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("reassign") === "1" ? { selectedIds: null, fromUserId: params.get("user") ?? "" } : null;
+  });
+  const reassignNames = useMemo(() => ({
+    branches: new Map(options.branches.map((item) => [item.id, item.name])),
+    departments: new Map(options.departments.map((item) => [item.id, item.name])),
+  }), [options]);
   const [reviewReload, setReviewReload] = useState(0);
   useEffect(() => { setSelectedTaskIds([]); }, [filters, view, kind, profile?.id, canAdministerTasks]);
 
@@ -353,6 +364,7 @@ export function TaskTemplatesPage() {
               <TasksTab
                 selection={canAdministerTasks ? { ids: selectedTaskIds, onChange: setSelectedTaskIds } : undefined}
                 onBulkDelete={canAdministerTasks ? (selected) => setBulkDelete({ filter: evidenceFilter(filters, view, 1, 100, kind), selected, scopeLabel: filters.user_profile_id ? (users.find((user) => user.id === filters.user_profile_id)?.employee_name ?? "Selected employee") : "All employees matching these filters" }) : undefined}
+                onReassign={canAdministerTasks ? (selected) => setReassign({ selectedIds: selected, fromUserId: filters.user_profile_id }) : undefined}
                 onManage={canAdministerTasks ? setManagedTaskId : undefined}
                 onDelete={canAdministerTasks ? setDeletingRow : undefined}
                 evidence={snapshot.evidence}
@@ -374,6 +386,14 @@ export function TaskTemplatesPage() {
         if (page === 1) await refresh();
         else { setPage(1); await loadTemplates(); }
       }} /> : null}
+
+      {reassign && canAdministerTasks ? <ReassignDialog branchNames={reassignNames.branches} departmentNames={reassignNames.departments} request={reassign}
+        onClose={() => {
+          setReassign(null);
+          const params = new URLSearchParams(window.location.search);
+          if (params.has("reassign")) { params.delete("reassign"); window.history.replaceState({}, "", `${window.location.pathname}?${params}`); }
+        }}
+        onFinished={async () => { setSelectedTaskIds([]); if (page === 1) await refresh(); else { setPage(1); await loadTemplates(); } }} /> : null}
 
       {editing !== undefined && references ? (
         <Modal onClose={() => setEditing(undefined)} title={editing ? "Edit task template" : "Add new task"} wide>

@@ -61,6 +61,7 @@ The page is gone. Recurring work is created from **Create Task** and managed in 
 - [ ] Edit one task: **Edit task** changes Task/Checklist type, requirements, participants, dates, categorization and checklist items. Press **Save changes**. History is retained; future schedules have their own editor.
 - [ ] Change a schedule: edit the template and press **Save schedule**.
 - [ ] Delete work: in Tasks press **Delete** (also for CRM tasks), then **Confirm deletion**. FMS work: **Delete FMS task** cancels that whole FMS run (completed steps and history kept); **Delete start form** removes one person's pending start form. A reason is required. Several at once: tick rows (open FMS work included) or **Select this page**, then **Delete selected** or **Delete all matching**, then **Confirm deletion**.
+- [ ] Reassign work (2026-11-02, 0369; administrators): Task Control > Tasks: **Reassign selected** / **Reassign all open work**; **Move work from**, groups **Open tasks due today or later**, **Overdue tasks**, **Open FMS steps**, **Recurring schedules**, **Move work to**, **Reason (required)**, then **Reassign N items**. Every date is included; completed work stays; skipped items are listed; one summary notification.
 - [ ] Check recurring work (admins): **Review** tab. **Verification** (Verify / Reject with a reason), **Rejected**, **Overdue**, **Coverage Required**, **Manager Review**, **Follow-ups** (Follow up) and **Performance**; the tiles at the top open the matching list.
 - [ ] Manage schedules (admins): **Templates** rows show how often each repeats and its **Next** date (or Ended). **Edit** (future occurrences only), **Run now**, **Deactivate**/**Activate**, **Delete**.
 - [ ] Anytime duties: Templates rows with status **ON DEMAND** (frequency such as PER CUSTOMER) have no date; employees always see them as low priority under **Anytime duties**. **Assign now** enforces one as a high-priority occurrence due today.
@@ -114,6 +115,7 @@ who build workflows, the designs.
 - [ ] Find an employee: open Users and filter by branch or department.
 - [ ] Add an employee: **Add user** (allowed roles only).
 - [ ] Set someone's login password: open the employee, **Set login password** (allowed roles only).
+- [ ] Hand over work (2026-11-02, 0369; administrators): open the employee, **Reassign tasks** opens Task Control with **Reassign all open work** for them.
 - [ ] Delete an employee (2026-11-02, 0368; Super Admin): open the employee, **Delete user**, confirm. Login locked for good, personal details wiped, gone from Users; past work shows **Removed employee**. Cannot be undone.
 
 ## Availability (attendance and leave)
@@ -249,3 +251,5 @@ Kiara tool decision: no new read tool. Configuration/navigation extends existing
 2026-11-02 own password change: every employee sees **Change password** in Settings (Edge Function `change-own-password`, migration 0367 audit). The sign-in page now says to ask a Super Admin when the password is forgotten, or open Settings to change it. No Kiara read tool is needed: there is no data to read, and Kiara can never change a password.
 
 2026-11-02 delete users (0368): Super Admins can press **Delete user** on any employee, including one with work history; the old "linked operational records" refusal is gone. The login is locked for good, personal details are wiped, the person disappears from Users, and past tasks, FMS steps, forms and CRM records show **Removed employee**. Users permission label is now **Delete users**. No Kiara read tool is needed; Kiara cannot delete anyone.
+
+2026-11-02 bulk reassign (0369): Task Control Tasks tab **Reassign selected** and **Reassign all open work**; Users **Reassign tasks**. Server `task_reassignment_candidates` + `reassign_task_work_with_audit` (View all tasks permission). No new Kiara read tool: task assignment is already visible through the existing task reads, and Kiara cannot reassign anything.

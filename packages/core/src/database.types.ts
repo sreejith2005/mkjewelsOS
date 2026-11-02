@@ -14320,9 +14320,24 @@ export type Database = {
         Args: { p_key: string; p_profile_id: string }
         Returns: boolean
       }
+      task_reassignment_candidates: {
+        Args: { p_from_user_id: string }
+        Returns: Json
+      }
       prepare_unused_user_deletion: {
         Args: { p_profile_id: string }
         Returns: string
+      }
+      reassign_task_work_with_audit: {
+        Args: {
+          p_fms_stage_ids?: string[]
+          p_from_user_id: string
+          p_reason: string
+          p_task_ids?: string[]
+          p_template_ids?: string[]
+          p_to_user_id: string
+        }
+        Returns: Json
       }
       remove_employee_with_audit: {
         Args: { p_profile_id: string }
