@@ -13395,6 +13395,10 @@ export type Database = {
         Args: { p_export_id: string; p_limit: number; p_offset: number }
         Returns: Json
       }
+      get_report_filter_options: {
+        Args: { p_flow_family_id?: string }
+        Returns: Json
+      }
       get_report_export_download_url: {
         Args: { p_export_id: string }
         Returns: Json

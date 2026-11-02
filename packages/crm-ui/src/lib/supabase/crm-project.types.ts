@@ -2748,8 +2748,14 @@ export type Database = {
         }
         Returns: Json
       }
+      get_crm_business_report: {
+        Args: { p_filters?: Json; p_key: string; p_limit?: number; p_offset?: number }
+        Returns: Json
+      }
+      get_crm_business_report_options: { Args: never; Returns: Json }
       get_crm_insights_options_v1: { Args: { p_context?: Json }; Returns: Json }
       get_crm_insights_v1: { Args: { p_context?: Json }; Returns: Json }
+      find_crm_report_customers: { Args: { p_search: string }; Returns: Json }
       get_crm_lead_option_routes: {
         Args: never
         Returns: {

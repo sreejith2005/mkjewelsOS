@@ -50,7 +50,7 @@ describe("dashboard and report presentation contracts", () => {
   });
 
   it("keeps responsive report layouts represented by both table and card breakpoints", async () => {
-    const source = await import("../reports/ReportsView?raw").then((module) => module.default as string);
+    const source = await import("../reports/ReportTable?raw").then((module) => module.default as string);
     expect(source).toContain("hidden overflow-x-auto sm:block");
     expect(source).toContain("grid gap-3 sm:hidden");
   });
