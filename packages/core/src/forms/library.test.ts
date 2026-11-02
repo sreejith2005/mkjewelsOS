@@ -16,6 +16,9 @@ describe("FMS-built forms", () => {
     const link = { workflowId: "workflow", workflowName: "Sales", stageId: "stage", stageName: "Call" };
     expect(parseFmsBuiltForms([{ familyId: "family", links: [link, null, { workflowId: "invalid" }] }]).get("family")?.links).toEqual([link]);
     expect(parseFmsBuiltForms([{ familyId: "family", links: "invalid" }]).get("family")?.links).toBeUndefined();
+    const versioned = { ...link, workflowFamilyId: "flow-family", workflowVersion: 3, workflowStatus: "published", stageOrder: 2, isCurrent: true };
+    expect(parseFmsBuiltForms([{ familyId: "family", links: [versioned] }]).get("family")?.links).toEqual([versioned]);
+    expect(parseFmsBuiltForms([{ familyId: "family", links: [{ ...link, workflowStatus: "deleted", workflowVersion: "3", isCurrent: "yes" }] }]).get("family")?.links).toEqual([link]);
   });
   it("reads families with optional workflow and step names and skips malformed rows", () => {
     const built = parseFmsBuiltForms([{ familyId: "f1", workflows: ["Instagram Leads"], steps: ["Call", ""] }, { familyId: "f2" }, { nope: 1 }, null, "x"]);
