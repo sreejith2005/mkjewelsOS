@@ -97,6 +97,11 @@ export const archiveFmsFlow = async (id: string, reason: string) => { const { er
 export const setFmsFlowActive = async (id: string, active: boolean, reason?: string) => { const { error } = await supabase.rpc("set_fms_flow_active_with_audit" as any, { p_flow_id: id, p_active: active, ...(reason ? { p_reason: reason } : {}) }); fail(active ? "Resume FMS flow" : "Pause FMS flow", error); };
 export const restoreFmsFlow = async (id: string, reason?: string) => { const { error } = await supabase.rpc("restore_fms_flow_with_audit" as any, { p_flow_id: id, ...(reason ? { p_reason: reason } : {}) }); fail("Restore FMS flow", error); };
 export const deleteFmsFlow = async (id: string) => { const { error } = await supabase.rpc("delete_fms_flow_with_audit" as any, { p_flow_id: id }); fail("Delete FMS flow", error); };
+/** What the delete button will do for one version, read before the warning is shown. */
+export type FmsFlowDeletionImpact = { name: string; version: number; status: FmsFlowRow["status"]; runs: number; openRuns: number; handoffsFrom: string[]; canErase: boolean; action: "delete" | "archive" | "erase" | "denied" };
+export const loadFmsFlowDeletionImpact = async (id: string): Promise<FmsFlowDeletionImpact> => { const { data, error } = await supabase.rpc("fms_flow_deletion_impact" as any, { p_flow_id: id }); fail("Check FMS deletion", error); return data as unknown as FmsFlowDeletionImpact; };
+/** Super admin only: permanently removes a version and all of its runs. The server requires the typed word DELETE. */
+export const eraseFmsFlow = async (id: string, confirmation: string) => { const { error } = await supabase.rpc("erase_fms_flow_with_audit" as any, { p_flow_id: id, p_confirmation: confirmation }); fail("Delete FMS flow", error); };
 
 export async function loadFmsRuntime(instanceId?: string): Promise<{ instances: FmsInstance[]; stages: FmsInstanceStage[]; definitions: FmsStageRow[]; flows: FmsFlowRow[]; checklist: FmsChecklistItem[]; evidence: FmsEvidence[]; logs: FmsLog[]; users: FmsData["users"] }> {
   if (instanceId) {
