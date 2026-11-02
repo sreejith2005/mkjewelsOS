@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HomeSummary } from "@/features/analytics/types";
 import { HomeView } from "./HomeView";
-import { buildWorkCards, dueLabel } from "./HomeWorkCards";
+import { buildWorkCards, dueLabel, HomeWorkCards } from "./HomeWorkCards";
 
 const task = (id: string, task_type: string, extra: Partial<HomeSummary["tasks"][number]> = {}): HomeSummary["tasks"][number] =>
   ({ id, title: `Task ${id}`, task_type, status: "pending", priority: "medium", due_at: "2026-09-23T12:00:00Z", overdue: false, checklist_completion: null, ...extra });
@@ -36,6 +36,17 @@ vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealti
 afterEach(() => { cleanup(); });
 
 describe("Home work cards", () => {
+  it("limits the preview to five items while keeping the full count and task link", () => {
+    const onNavigate = vi.fn();
+    render(<HomeWorkCards data={{ ...summary, tasks: Array.from({ length: 9 }, (_, index) => task(`preview-${index}`, "checklist")) }} onNavigate={onNavigate} />);
+    const card = within(screen.getByRole("article", { name: "Daily Checklist" }));
+    expect(card.getAllByRole("listitem")).toHaveLength(5);
+    expect(card.getByLabelText("9 waiting")).toBeTruthy();
+    expect(card.queryByText("Task preview-5")).toBeNull();
+    expect(card.getByText("Showing 5 of 9. See the full list in Tasks.")).toBeTruthy();
+    fireEvent.click(card.getByRole("button", { name: "Open all tasks" }));
+    expect(onNavigate).toHaveBeenCalledWith("/tasks");
+  });
   it("puts each kind of work in its own card with a count", () => {
     render(<HomeView onNavigate={vi.fn()} />);
     const checklist = screen.getByRole("article", { name: "Daily Checklist" });

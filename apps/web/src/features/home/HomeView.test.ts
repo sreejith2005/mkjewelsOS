@@ -10,8 +10,7 @@ describe("HomeView work queue", () => {
     expect(source).toContain("<HomeWorkCards");
     expect(cards).toContain("starter.form_name");
     expect(cards).toContain("fmsAssignedWorkPath");
-    // Phones keep one vertical scroll area: card lists only scroll inside on desktop.
-    expect(cards).not.toMatch(/(^|[\s"])overflow-y-auto/);
+    // Scroll can pass back to the page when the bounded preview reaches its end.
     expect(cards).not.toContain("overscroll-contain");
   });
 });

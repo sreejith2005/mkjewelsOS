@@ -32,13 +32,13 @@ const nav: readonly ShellNavItem[] = [
 
 afterEach(cleanup);
 
-function ShellHarness({ navigate }: { navigate: (path: string) => void }) {
+function ShellHarness({ navigate, onLogout = async () => {} }: { navigate: (path: string) => void; onLogout?: () => Promise<void> }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   return (
     <ApplicationShell
       branch={null} currentPage="home" drawerOpen={false} launcherItems={[]}
       logoDarkUrl="/logo-dark.svg" logoLightUrl="/logo-light.svg" nav={nav}
-      navigate={navigate} onDrawerOpenChange={vi.fn()} onLogout={async () => {}}
+      navigate={navigate} onDrawerOpenChange={vi.fn()} onLogout={onLogout}
       path="/" profile={profile} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}
       theme="dark" onThemeChange={vi.fn()}
     >
@@ -48,6 +48,30 @@ function ShellHarness({ navigate }: { navigate: (path: string) => void }) {
 }
 
 describe("desktop sidebar selection", () => {
+  it("opens the account menu, dismisses with Escape, and signs out", async () => {
+    const user = userEvent.setup();
+    const onLogout = vi.fn().mockResolvedValue(undefined);
+    render(<ShellHarness navigate={vi.fn()} onLogout={onLogout} />);
+    const trigger = screen.getByRole("button", { name: "Account menu" });
+    await user.click(trigger);
+    expect(screen.getByRole("region", { name: "Your account" })).toBeTruthy();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("region", { name: "Your account" })).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    await user.click(trigger);
+    await user.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(onLogout).toHaveBeenCalledOnce();
+  });
+
+  it("opens Settings from the account menu", async () => {
+    const user = userEvent.setup();
+    const navigate = vi.fn();
+    render(<ShellHarness navigate={navigate} />);
+    await user.click(screen.getByRole("button", { name: "Account menu" }));
+    await user.click(within(screen.getByRole("region", { name: "Your account" })).getByRole("button", { name: "Settings" }));
+    expect(navigate).toHaveBeenCalledWith("/settings");
+    expect(screen.queryByRole("region", { name: "Your account" })).toBeNull();
+  });
   it.each(nav)("opens $label, closes the sidebar, and lets the hamburger reopen it", async (item) => {
     const user = userEvent.setup();
     const navigate = vi.fn();
