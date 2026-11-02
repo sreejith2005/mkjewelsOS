@@ -2,7 +2,8 @@ import type { ComponentType, ReactNode } from "react";
 import { Menu, PanelLeftClose } from "lucide-react";
 import type { PageId } from "@jewelos/core";
 import { Button } from "@/components/ui";
-import { initials, titleCase } from "@/lib/format";
+import { titleCase } from "@/lib/format";
+import { AccountMenu } from "./AccountMenu";
 import type { Branch, UserProfile } from "@/types";
 import { cn } from "@/lib/utils";
 import { useKeyboardOpen } from "@/lib/useKeyboardOpen";
@@ -112,9 +113,7 @@ export function ApplicationShell({
           {developerModeControl}
           <ThemeToggle onChange={onThemeChange} theme={theme} />
           <NotificationBell onNavigate={navigate} profileId={profile.id} />
-          <span aria-label={profile.employee_name} className="flex size-9 items-center justify-center rounded-full bg-gold-sheen text-xs font-bold tracking-wide text-on-gold shadow-gold ring-2 ring-task-bg md:size-10 md:text-sm" role="img">
-            {initials(profile.employee_name)}
-          </span>
+          <AccountMenu branchName={branch?.name ?? "Branch unavailable"} navigate={navigate} onLogout={onLogout} profile={profile} settingsPath={nav.find((item) => item.id === "settings")?.path} />
           <div className="hidden sm:block">
             <p className="max-w-36 truncate text-xs font-semibold text-white">{profile.employee_name}</p>
             <p className="text-[10px] font-semibold uppercase tracking-wider text-gold-secondary">{titleCase(profile.user_role)}</p>

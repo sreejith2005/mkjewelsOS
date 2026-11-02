@@ -6,6 +6,7 @@ import type {HomeSummary,HomeTask} from "@/features/analytics/types";
 /** get_home_summary caps each list; a full list may hide more work. */
 const TASK_LIMIT=10;
 const FMS_STAGE_LIMIT=6;
+const PREVIEW_LIMIT=5;
 
 type Tone="overdue"|"high"|"normal";
 export type WorkItem={key:string;title:string;meta:string;tags:string[];tone:Tone;path:string};
@@ -54,8 +55,8 @@ const prefersReducedMotion=()=>typeof window!=="undefined"&&typeof window.matchM
 
 /**
  * Phones and tablets get a swipe row with a labelled switcher (one card in view,
- * the next one peeking); desktops see the three cards side by side. The page is
- * the only vertical scroll area on phones, so long lists never trap a swipe.
+ * the next one peeking); desktops see the three cards side by side. All three
+ * cards have equal heights with a bounded, vertically scrollable preview.
  */
 export function HomeWorkCards({data,onNavigate}:{data:HomeSummary;onNavigate:(path:string)=>void}){
   const cards=useMemo(()=>buildWorkCards(data),[data]);
@@ -76,14 +77,14 @@ export function HomeWorkCards({data,onNavigate}:{data:HomeSummary;onNavigate:(pa
 
 function WorkCardView({card,onNavigate}:{card:WorkCard;onNavigate:(path:string)=>void}){
   const Icon=card.icon; const headingId=`home-card-${card.id}`; const overdue=card.items.filter((item)=>item.tone==="overdue").length;
-  return <article aria-labelledby={headingId} className="flex w-[86%] min-w-0 max-w-[24rem] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-task-border bg-task-bg shadow-card sm:w-[22rem] lg:w-auto lg:max-w-none">
-    <header className="flex items-center gap-3 border-b border-task-border px-4 py-3.5">
+  return <article aria-labelledby={headingId} className="flex h-[26rem] w-[86%] min-w-0 max-w-[24rem] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-task-border bg-task-bg shadow-card sm:w-[22rem] lg:w-auto lg:max-w-none">
+    <header className="flex shrink-0 items-center gap-3 border-b border-task-border px-4 py-3.5">
       <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gold/10 text-gold-secondary ring-1 ring-gold/20"><Icon aria-hidden className="size-5"/></span>
       <div className="min-w-0 flex-1"><h3 className="truncate text-base font-semibold" id={headingId}>{card.title}</h3><p className="truncate text-xs text-task-text-muted">{overdue?<span className="font-semibold text-task-overdue">{overdue} overdue</span>:card.subtitle}</p></div>
       <span aria-label={`${countLabel(card)} waiting`} className={`shrink-0 rounded-full px-2.5 py-1 text-sm font-semibold tabular-nums ${card.items.length?"bg-gold-sheen text-on-gold shadow-gold":"bg-task-muted text-task-text-muted"}`}>{countLabel(card)}</span>
     </header>
-    {card.items.length?<ul aria-label={`${card.title} waiting`} className="flex-1 divide-y divide-task-border lg:max-h-[26rem] lg:overflow-y-auto">
-      {card.items.map((item)=><li key={item.key}><button className="group flex min-h-14 w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-task-muted/60 active:bg-task-muted" onClick={()=>onNavigate(item.path)} type="button">
+    {card.items.length?<ul aria-label={`${card.title} waiting`} tabIndex={0} className="min-h-0 flex-1 divide-y divide-task-border overflow-y-auto">
+      {card.items.slice(0,PREVIEW_LIMIT).map((item)=><li key={item.key}><button className="group flex min-h-14 w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-task-muted/60 active:bg-task-muted" onClick={()=>onNavigate(item.path)} type="button">
         <span aria-hidden className={`mt-1.5 size-2 shrink-0 rounded-full ${item.tone==="overdue"?"bg-task-overdue":item.tone==="high"?"bg-task-warning":"bg-gold"}`}/>
         <span className="min-w-0 flex-1"><span className="block break-words text-[15px] font-semibold leading-snug">{item.title}</span><span className={`mt-1 flex items-center gap-1.5 text-[13px] ${item.tone==="overdue"?"text-task-overdue":"text-task-text-muted"}`}><Clock3 aria-hidden className="size-3.5 shrink-0"/><span className="truncate">{item.meta}</span></span>
           {item.tags.length?<span className="mt-2 flex flex-wrap gap-1.5">{item.tags.map((tag)=><span className={`max-w-full truncate rounded-full px-2 py-0.5 text-[11px] font-semibold ${tag==="Overdue"?"bg-task-overdue/10 text-task-overdue":tag==="High priority"?"bg-task-warning/10 text-task-warning":"bg-gold/10 text-gold-secondary"}`} key={tag}>{tag}</span>)}</span>:null}
@@ -91,6 +92,7 @@ function WorkCardView({card,onNavigate}:{card:WorkCard;onNavigate:(path:string)=
         <ChevronRight aria-hidden className="mt-0.5 size-5 shrink-0 text-task-text-muted transition-transform group-hover:translate-x-0.5 group-hover:text-gold-secondary"/>
       </button></li>)}
     </ul>:<div className="flex flex-1 flex-col items-center justify-center px-6 py-9 text-center"><span className="flex size-12 items-center justify-center rounded-full bg-success/10 text-success"><CheckCircle2 aria-hidden className="size-6"/></span><p className="mt-3 text-sm font-semibold">{card.emptyTitle}</p><p className="mt-1 text-sm text-task-text-muted">{card.emptyText}</p></div>}
-    <button className="group flex min-h-12 items-center justify-center gap-1.5 border-t border-task-border px-4 text-sm font-semibold text-gold-secondary transition-colors hover:bg-gold/5 active:bg-gold/10" onClick={()=>onNavigate(card.viewAllPath)} type="button">{card.viewAllLabel}<ArrowRight aria-hidden className="size-4 transition-transform group-hover:translate-x-0.5"/></button>
+    {card.items.length>PREVIEW_LIMIT||card.capped?<p className="shrink-0 px-4 py-2 text-xs text-task-text-muted">Showing {Math.min(card.items.length,PREVIEW_LIMIT)} of {countLabel(card)}. See the full list in Tasks.</p>:null}
+    <button className="group flex min-h-12 shrink-0 items-center justify-center gap-1.5 border-t border-task-border px-4 text-sm font-semibold text-gold-secondary transition-colors hover:bg-gold/5 active:bg-gold/10" onClick={()=>onNavigate(card.viewAllPath)} type="button">{card.viewAllLabel}<ArrowRight aria-hidden className="size-4 transition-transform group-hover:translate-x-0.5"/></button>
   </article>;
 }

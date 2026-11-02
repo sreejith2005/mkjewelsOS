@@ -239,3 +239,5 @@ Kiara tool decision: no new read tool. Configuration/navigation extends existing
 
 - [ ] Builder: **When / Deadline** with **Set deadline** off now shows **Take the due date from the previous form** (ticked by default) and lists the question it reads ("From Introduction: NEXT FOLLOW UP DATE or APPOINTMENT IS SET FOR (whichever was answered)"), or warns when the previous form has no follow-up or due date question. The collapsed summary reads **From the previous form**. **No due date** unticks it.
 - [ ] Kiara tool decision: no new read tool. Due dates already show in the existing Tasks and Tasks -> FMS reads.
+
+2026-11-02 Home and account menu: **Daily Checklist**, **My Tasks** and **FMS Tasks** have equal fixed heights and show up to five items, with scrolling inside each preview. **Open all tasks** / **Open FMS tasks** reach the full lists. The universal top-right **Account menu** shows identity, **Settings** when permitted, and **Sign out**; Escape or tapping outside closes it. No new Kiara read tool is needed; existing data and session actions are reused.
