@@ -300,6 +300,20 @@ Android phone-sized device.
 - [ ] Without `crm.view`, or with CRM switched off in Developer Mode, `/crm/...` shows the usual JewelOS fallback / maintenance notice inside the shell.
 - [ ] Android app: CRM opens inside the app layout; camera/gallery photo on the walk-in form, `tel:` links and Android Back still work.
 
+### CRM forms from the Form Builder - 2026-11-03
+
+- [ ] Only a Super Admin (or anyone given **Manage CRM forms**) sees **CRM FORM SETTINGS** on CRM REGISTRATION; a CRM salesperson does not, and calling `save_crm_form_binding` directly as them is refused.
+- [ ] **Create a starter form** (Client queue): a published form "CRM client queue registration" appears, hidden from Forms Library, with Client name and Mobile number side by side; the links fill in; **Save and use this form** makes it active.
+- [ ] **Edit in Form Builder** opens that form; change question order/width, add a section or a conditional question, publish; reopen CRM REGISTRATION and the next **REGISTER CLIENT** shows the new version.
+- [ ] REGISTER CLIENT with the linked form: one queue entry, correct branch, token, client ID message, existing-client detection by phone, queue list refresh, and the JewelOS walk-in task appears as before.
+- [ ] Press **Register client** twice quickly / after turning the network off and on: still one queue entry.
+- [ ] Remove a linked question in the Form Builder and publish: CRM falls back to the standard queue form; a Super Admin sees the "needs attention" line with **Open CRM Form Settings**.
+- [ ] Lead: link a lead form (starter or own); **OPEN LEAD FORM** → **Register lead** saves one lead with the mapped answers, shows "Lead saved and pushed to Runo." (or the Runo-not-configured line), and the lead appears in CLIENT DATABASE; a duplicate phone shows "A lead with this mobile number already exists."
+- [ ] A Dropdown Master choice question linked to a CRM lead dropdown saves the label CRM expects (for example Source of lead).
+- [ ] **Use the standard CRM form** returns each registration to the original CRM form; earlier clients, leads and links are unchanged.
+- [ ] Walk-in visit form, client profiles, follow-ups and referrals are unchanged.
+- [ ] Phone: the linked form opens full screen; half-width questions stack one per row; desktop shows them side by side.
+
 ### Notifications
 
 - [ ] Task assignment creates an in-app notification; read / mark-all-read work.

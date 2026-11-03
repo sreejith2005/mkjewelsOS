@@ -12,6 +12,9 @@ const NUMBER_TYPES = new Set(["number", "currency", "rating"]);
 const SELECT_TYPES = new Set(["select", "user_dropdown", "branch_dropdown", "department_dropdown"]);
 const LAYOUT_TYPES = new Set(["section_header", "divider"]);
 const OPTION_ROW = "flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-task-border bg-task-bg px-3.5 py-2.5 text-[15px] text-task-text transition hover:border-gold/50 has-[:checked]:border-gold has-[:checked]:bg-gold/10 has-[:checked]:font-medium has-[:disabled]:cursor-not-allowed sm:text-sm [&>input]:size-5 [&>input]:shrink-0 [&>input]:accent-gold";
+/** Question width chosen in the Form Builder (wider screens only; phones show one question per row). */
+const FIELD_WIDTH_CLASS = { full: "md:col-span-6", half: "md:col-span-3", third: "md:col-span-2" } as const;
+const fieldWidth = (field: FormFieldDefinition): keyof typeof FIELD_WIDTH_CLASS => LAYOUT_TYPES.has(field.type) ? "full" : field.validation?.width ?? "full";
 /** The UI-only dropdown value for "Other"; the stored answer is always the typed text. */
 const OTHER_CHOICE = "__other__";
 const byLabel = <T extends { label: string }>(items: readonly T[]) => [...items].sort((a, b) => a.label.localeCompare(b.label, "en", { sensitivity: "base" }));
@@ -71,7 +74,7 @@ function FileFieldControl({ preview = false, describedBy, disabled, field, label
   </div>;
 }
 
-export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extraAction, initialAnswers = {}, onSubmit, preview = false, readOnly = false, templateId }: { definition: FormTemplateDefinition; dynamicOptions?: DynamicOptions; /** One more button for the bottom bar, kept within thumb reach (for example "Earlier answers"). */ extraAction?: ReactNode; initialAnswers?: FormAnswers; onSubmit?: (answers: FormAnswers) => Promise<void | boolean>; preview?: boolean; readOnly?: boolean; templateId?: string }) {
+export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extraAction, initialAnswers = {}, onSubmit, preview = false, readOnly = false, submitLabel = "Submit form", templateId }: { definition: FormTemplateDefinition; /** The final button, e.g. "Register client". */ submitLabel?: string; dynamicOptions?: DynamicOptions; /** One more button for the bottom bar, kept within thumb reach (for example "Earlier answers"). */ extraAction?: ReactNode; initialAnswers?: FormAnswers; onSubmit?: (answers: FormAnswers) => Promise<void | boolean>; preview?: boolean; readOnly?: boolean; templateId?: string }) {
   const uid = useId();
   const [answers, setAnswers] = useState<Record<string, FormAnswer>>(() => Object.fromEntries(Object.entries(initialAnswers).filter((entry): entry is [string, FormAnswer] => entry[1] !== null && entry[1] !== undefined)));
   const [error, setError] = useState<string | null>(null);
@@ -264,7 +267,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
     </nav> : null}
     {renderedSections.map(({ section, fields }) => <section aria-label={section.title} key={section.key}>
       {showSectionTitles ? <header className="mb-3 px-1"><h3 className="text-lg font-semibold text-gold-secondary">{section.title}</h3>{section.description ? <p className="mt-0.5 text-sm text-task-text-muted">{section.description}</p> : null}</header> : null}
-      <div className="flex flex-col gap-3">{fields.map(renderField)}</div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-6">{fields.map((field) => <div className={cn("min-w-0", FIELD_WIDTH_CLASS[fieldWidth(field)])} key={field.key}>{renderField(field)}</div>)}</div>
     </section>)}
     {reviewRows.length ? <details className="rounded-xl border border-task-border bg-task-muted/40 p-3">
       <summary className="min-h-11 cursor-pointer content-center text-sm font-semibold text-task-text">Check your answers before submitting</summary>
@@ -280,7 +283,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
       {stepped && previousStepKey ? <Button className="min-h-12 shrink-0" disabled={busy || success} onClick={() => goToStep(previousStepKey)} type="button" variant="secondary"><ChevronLeft aria-hidden="true" className="size-4" />Back</Button> : null}
       {/* Keep navigation separate: reusing Next as Submit can submit during the same native click. */}
       {stepped && (nextStepKey || !finalStep) ? <Button className="min-h-12 flex-1 sm:flex-none" disabled={busy || success} key="next" onClick={advance} type="button">Next<ChevronRight aria-hidden="true" className="size-4" /></Button>
-        : <Button className="min-h-12 flex-1 sm:flex-none" disabled={busy || success} key="submit" type="submit">{busy ? "Submitting..." : preview ? "Test validation" : "Submit form"}</Button>}
+        : <Button className="min-h-12 flex-1 sm:flex-none" disabled={busy || success} key="submit" type="submit">{busy ? "Submitting..." : preview ? "Test validation" : submitLabel}</Button>}
     </div> : null}
   </form>;
 }

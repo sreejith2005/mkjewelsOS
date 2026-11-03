@@ -3011,6 +3011,10 @@ export type Database = {
         Args: { p_client_id: string }
         Returns: undefined
       }
+      register_walkin_entry_from_form: {
+        Args: { p_branch_id: string; p_client_name: string; p_mobile: string; p_source: Json; p_submission_key: string }
+        Returns: Json
+      }
       save_crm_lead: {
         Args: { p_fields: Json; p_name: string; p_phone: string }
         Returns: {
@@ -3037,6 +3041,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      save_crm_lead_from_form: {
+        Args: { p_fields: Json; p_name: string; p_phone: string; p_source: Json; p_submission_key: string }
+        Returns: Json
       }
       save_not_bought_followup: {
         Args: {
