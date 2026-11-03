@@ -2,6 +2,8 @@ import {
   identityRequirementKey,
   normalizeImportBoolean,
   planTaskImportFrequency,
+  taskImportFixedDueTime,
+  taskImportFixedStartTime,
   taskImportScheduledStart,
   taskImportTriggerLabel,
   TASK_IMPORT_MAX_ROWS,
@@ -11,6 +13,7 @@ import {
   type TaskImportTimingPresets,
 } from "../taskImport";
 import type { TaskBulkImportIssue } from "./workbook";
+import { dayHalfDueWarning } from "./businessSheet";
 
 export const LEGACY_TASK_HEADERS = ["EMPLOYEE EMAIL", "EMPLOYEE NAME", "DEPARTMENT", "BRANCH NAME", "TASK TYPE", "CORE TASK", "TASK", "TASK DESCRIPTION", "FREQUENCY", "TASK START DATE", "START TIME", "DUE TIME", "PRIORITY", "EVIDENCE REQUIRED", "VERIFICATION REQUIRED", "VERIFIER", "BUDDY ALLOWED", "ACTIVE"] as const;
 type Row = Readonly<Record<string, unknown>>;
@@ -70,9 +73,12 @@ export function normalizeLegacyTaskSheet(rows: readonly Row[], options: LegacyTa
     const startsOn = scheduleKind === "as_required" ? chosenStart : taskImportScheduledStart(plan, chosenStart);
     const groupedStartTime = groupedValue("START TIME"); const groupedDueTime = groupedValue("DUE TIME");
     const startPreset = options.timingPresets?.[plan.startTimingPreset]; const duePreset = options.timingPresets?.[plan.dueTimingPreset];
-    if (!groupedStartTime) requiredPresets.add(plan.startTimingPreset);
-    if (!groupedDueTime) requiredPresets.add(plan.dueTimingPreset);
-    const startTime = groupedStartTime || startPreset?.startTime || ""; const dueTime = groupedDueTime || duePreset?.dueTime || "";
+    // A First/Second Half row is due at the fixed half-day deadline, never a preset or sheet time.
+    const fixedStart = taskImportFixedStartTime(plan); const fixedDue = taskImportFixedDueTime(plan);
+    if (!groupedStartTime && !fixedStart) requiredPresets.add(plan.startTimingPreset);
+    if (!groupedDueTime && !fixedDue) requiredPresets.add(plan.dueTimingPreset);
+    if (fixedDue && TIME.test(groupedDueTime) && groupedDueTime !== fixedDue) issues.push(dayHalfDueWarning(sourceRow, groupedDueTime, fixedDue));
+    const startTime = groupedStartTime || fixedStart || startPreset?.startTime || ""; const dueTime = fixedDue || groupedDueTime || duePreset?.dueTime || "";
     if (!TIME.test(startTime)) issues.push(issue(sourceRow, "START TIME", "Start time is required", "Use HH:MM."));
     if (!TIME.test(dueTime) || dueTime <= startTime) issues.push(issue(sourceRow, "DUE TIME", "Due time must be later than start time", "Use a same-day HH:MM deadline."));
     if (scheduleKind !== "as_required" && !validDate(startsOn)) issues.push(issue(sourceRow, "TASK START DATE", "Start date must use YYYY-MM-DD", "Choose one valid start date above the import."));

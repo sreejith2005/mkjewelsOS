@@ -96,8 +96,9 @@ select throws_ok($$select fms_due_question_name('x')$$,'42501',null,'the browser
 
 -- Start form only records the DM received date: Introduction gets no due date.
 insert into auto_fixture values('lead_a',pg_temp.start('Rahul Shah','2026-10-01'));
-select is(pg_temp.due(pg_temp.fx('lead_a'),'intro'),null,'DM RECEIVED DATE is a past event, so Introduction has no due date');
-select is(pg_temp.log(pg_temp.fx('lead_a'),'intro'),null,'no due-date log row when nothing was found');
+select is(pg_temp.due(pg_temp.fx('lead_a'),'intro'),day_half_deadline(now()),'DM RECEIVED DATE is a past event, so Introduction takes the half-day deadline (0371)');
+select is(pg_temp.log(pg_temp.fx('lead_a'),'intro')->>'source','day_half','the log records the half-day deadline, not a form answer');
+select is(pg_temp.log(pg_temp.fx('lead_a'),'intro')->>'reason','no_due_answer','and why no form date was used');
 
 -- Introduction -> Follow-up 1: the shown NEXT FOLLOW UP DATE; the hidden appointment answer is ignored.
 select pg_temp.step(pg_temp.fx('lead_a'),'intro',jsonb_build_object('status','follow','assigned_to',pg_temp.fx('doer'),'next_date','2026-11-05','appt_date','2026-11-20'));
@@ -108,7 +109,7 @@ select is(pg_temp.log(pg_temp.fx('lead_a'),'f1')->>'automatic','true','the visit
 
 -- Follow-up 1 -> Follow-up 2: Follow-up 2 chose "No due date".
 select pg_temp.step(pg_temp.fx('lead_a'),'f1',jsonb_build_object('status','continue','assigned_to',pg_temp.fx('doer'),'next_date','2026-11-07','next_time','3:30 PM'));
-select is(pg_temp.due(pg_temp.fx('lead_a'),'f2'),null,'a step set to "No due date" stays undated');
+select is(pg_temp.due(pg_temp.fx('lead_a'),'f2'),day_half_deadline(now()),'a step set to "No due date" skips the form date but still takes the half-day deadline (0371)');
 
 -- Follow-up 2 -> Follow-up 1 again: date plus the separate time question; past date is overdue at once.
 select pg_temp.step(pg_temp.fx('lead_a'),'f2',jsonb_build_object('status','again','assigned_to',pg_temp.fx('doer'),'next_date','2026-01-10','next_time','3:30 PM'));
@@ -120,7 +121,7 @@ select is((select planned_datetime from fms_instance_stages where fms_instance_i
 -- Two different follow-up dates answered: ambiguous, no guess. The same date twice is fine.
 insert into auto_fixture values('lead_b',pg_temp.start('Priya Mehta','2026-10-02'));
 select pg_temp.step(pg_temp.fx('lead_b'),'intro',jsonb_build_object('status','both','assigned_to',pg_temp.fx('doer'),'next_date','2026-11-05','callback_date','2026-11-06'));
-select is(pg_temp.due(pg_temp.fx('lead_b'),'f1'),null,'two different answered due dates are never guessed between');
+select is(pg_temp.due(pg_temp.fx('lead_b'),'f1'),day_half_deadline(now()),'two different answered due dates are never guessed between: the half-day deadline applies (0371)');
 insert into auto_fixture values('lead_c',pg_temp.start('Anil Rao','2026-10-03'));
 select pg_temp.step(pg_temp.fx('lead_c'),'intro',jsonb_build_object('status','both','assigned_to',pg_temp.fx('doer'),'next_date','2026-11-08','callback_date','2026-11-08'));
 select is(pg_temp.due(pg_temp.fx('lead_c'),'f1'),'2026-11-08 23:59:59.999999 Asia/Kolkata'::timestamptz,'the same date answered twice is used');
@@ -129,7 +130,7 @@ select is(pg_temp.due(pg_temp.fx('lead_c'),'f1'),'2026-11-08 23:59:59.999999 Asi
 -- (An impossible date such as 2026-02-30 is already refused by the form itself.)
 insert into auto_fixture values('lead_d',pg_temp.start('Meera Nair','2026-10-04'));
 select lives_ok($$select pg_temp.step(pg_temp.fx('lead_d'),'intro',jsonb_build_object('status','follow','assigned_to',pg_temp.fx('doer')))$$,'an unanswered date does not block the form');
-select is(pg_temp.due(pg_temp.fx('lead_d'),'f1'),null,'an unanswered date gives no due date');
+select is(pg_temp.due(pg_temp.fx('lead_d'),'f1'),day_half_deadline(now()),'an unanswered date gives no form date: the half-day deadline applies (0371)');
 
 -- An explicit TAT step keeps its rule even though the form has an appointment date.
 insert into auto_fixture values('lead_e',pg_temp.start('Kiran Das','2026-10-05'));

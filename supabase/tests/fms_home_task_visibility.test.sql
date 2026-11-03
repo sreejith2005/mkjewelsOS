@@ -9,7 +9,8 @@ select set_config('request.jwt.claim.sub',(select id::text from visit_assignment
 select is(jsonb_array_length(get_home_summary()->'fms_stages'),1,'Home shows the form-selected employee assignment');
 select is((get_fms_task_workspace('{"dateScope":"overall"}')->>'total')::integer,1,'Overall FMS hierarchy includes undated assigned work');
 select is((get_fms_task_workspace('{"dateScope":"overall"}')->'counts'->>'active')::integer,1,'Overall badge counts the same undated assignment');
-select is((get_fms_task_workspace('{"dateScope":"today"}')->>'total')::integer,0,'explicit Today remains a strict scheduled-date filter');
+select is((get_fms_task_workspace('{"dateScope":"today"}')->>'total')::integer,((day_half_deadline(now()) at time zone 'Asia/Kolkata')::date=(now() at time zone 'Asia/Kolkata')::date)::integer,
+ 'explicit Today is a strict date filter on the half-day deadline (0371): in Today only when it is due today');
 select is(jsonb_array_length(jsonb_path_query_array(get_fms_task_stages(
  (select family_id from fms_flows where id=(select id from visit_assignment_fixture where name='flow')),
  '{"dateScope":"overall"}'),'$[*] ? (@.count > 0)')),1,'employee can drill into the assigned stage');

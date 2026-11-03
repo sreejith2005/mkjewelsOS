@@ -1,3 +1,4 @@
+import { DAY_HALF_LABELS, dayHalfOfDeadline } from "./dayHalfDeadline";
 import { kolkataDateKey } from "./recurrence";
 
 export type DueTone = "overdue" | "today" | "upcoming" | "none" | "done";
@@ -12,7 +13,8 @@ const dayNumber = (date: Date) => Date.parse(`${kolkataDateKey(date)}T00:00:00Z`
 
 /**
  * Plain-language due text for a work card, by MK Jewels calendar day:
- * "Due today, 5:00 pm", "Due tomorrow, 10:00 am", "Overdue by 2 days".
+ * "Due today, 5:00 pm", "Due tomorrow, 10:00 am", "Overdue by 2 days". A deadline on the
+ * fixed half-day times names its half: "Due today, 9:00 pm · Second half".
  * Display only — overdue status for filters and counts stays server-derived.
  */
 export function describeDue(dueAt: string | null | undefined, now: Date = new Date(), options: Readonly<{ completed?: boolean }> = {}): DueDescription {
@@ -27,9 +29,11 @@ export function describeDue(dueAt: string | null | undefined, now: Date = new Da
     const late = -days;
     return { label: `Overdue by ${late} ${late === 1 ? "day" : "days"}`, tone: "overdue" };
   }
-  if (days === 0) return { label: `Due today, ${time(due)}`, tone: "today" };
-  if (days === 1) return { label: `Due tomorrow, ${time(due)}`, tone: "upcoming" };
-  return { label: `Due ${day(due, !sameYear)}, ${time(due)}`, tone: "upcoming" };
+  const half = dayHalfOfDeadline(dueAt);
+  const at = half ? `${time(due)} · ${DAY_HALF_LABELS[half]}` : time(due);
+  if (days === 0) return { label: `Due today, ${at}`, tone: "today" };
+  if (days === 1) return { label: `Due tomorrow, ${at}`, tone: "upcoming" };
+  return { label: `Due ${day(due, !sameYear)}, ${at}`, tone: "upcoming" };
 }
 
 /** "22 Oct 2026, 2:30 pm" in MK Jewels time, for submission and history stamps. */

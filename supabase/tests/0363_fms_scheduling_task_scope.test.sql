@@ -15,9 +15,9 @@ select ok(task_calendar_scope_matches('overdue','2026-10-11 18:29:59+00','pendin
 select ok(not task_calendar_scope_matches('overdue','2026-10-11 18:29:59+00','completed','2026-10-11 19:00+00'),'completed history is not overdue');
 select ok(task_calendar_scope_matches('overall','2027-10-11 18:30+00','pending','2026-10-11 19:00+00'),'Overall includes future');
 
-select is(fms_form_due_resolution('{"deadlineEnabled":false,"formDue":{"onMissing":"none"},"followUp":{"schedule":{"delay":1,"unit":"days"}}}',null,null,null,'task')->>'source','none','explicit form due configuration retains precedence over follow-up scheduling');
+select is(fms_form_due_resolution('{"deadlineEnabled":false,"formDue":{"onMissing":"none"},"followUp":{"schedule":{"delay":1,"unit":"days"}}}',null,null,null,'task')->>'resolvedSource','none','explicit form due configuration retains precedence over follow-up scheduling');
 
-select is(fms_form_due_resolution('{"deadlineEnabled":false,"followUp":{"schedule":{"delay":1,"unit":"days"}}}',null,null,null,'task')->>'dueAt',null::text,'No due date remains disabled when a follow-up schedule is present');
+select is((fms_form_due_resolution('{"deadlineEnabled":false,"followUp":{"schedule":{"delay":1,"unit":"days"}}}',null,null,null,'task')->>'dueAt')::timestamptz,day_half_deadline(now()),'No due date ignores the follow-up schedule and takes the half-day deadline (0371)');
 
 -- The existing audited fixture configures incoming routing and employee rules.
 -- Inject this test's optional metadata before its draft is published.

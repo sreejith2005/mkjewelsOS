@@ -40,6 +40,8 @@ export {
   buildImportSchedule,
   normalizeTaskFrequencyLabel,
   planTaskImportFrequency,
+  taskImportFixedDueTime,
+  taskImportFixedStartTime,
   taskImportScheduledStart,
   taskImportTriggerLabel,
   TASK_TRIGGER_LABEL_MAX,
