@@ -254,7 +254,8 @@ function TriggerTest({ trigger, fields, definition, flowId }: Readonly<{ trigger
   const [answers, setAnswersState] = useState<Record<string, unknown>>({});
   // The latest answers, so "Test conditions" never sends a value one keystroke behind.
   const answersRef = useRef(answers);
-  const setAnswers = (update: (current: Record<string, unknown>) => Record<string, unknown>) => setAnswersState((current) => { const next = update(current); answersRef.current = next; return next; });
+  // Updated in the change handler itself (not in a state updater, which React may run later).
+  const setAnswers = (update: (current: Record<string, unknown>) => Record<string, unknown>) => { const next = update(answersRef.current); answersRef.current = next; setAnswersState(next); };
   const [samples, setSamples] = useState<readonly FmsTriggerSample[] | null>(null);
   const [result, setResult] = useState<FmsTriggerTestResult | null>(null);
   const [busy, setBusy] = useState(false);
