@@ -7,7 +7,7 @@ import { CRM_QUEUE_TARGETS, crmLeadTargets } from "@jewelos/core";
 
 const db = vi.hoisted(() => {
   type Row = Record<string, unknown>;
-  const tables: Record<string, Row[]> = { form_templates: [], form_fields: [] };
+  const tables: { form_templates: Row[]; form_fields: Row[]; [table: string]: Row[] } = { form_templates: [], form_fields: [] };
   const rpc = vi.fn();
   const from = (table: string) => {
     const filters: Array<[string, unknown]> = [];
