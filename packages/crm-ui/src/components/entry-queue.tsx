@@ -17,7 +17,7 @@ export function EntryQueue({ profile, selectedBranchId, selectedCrm, branches, c
   const router = useRouter(); const queueRef = useRef<HTMLElement>(null);
   const [name, setName] = useState(""); const [mobile, setMobile] = useState(""); const [countryCode, setCountryCode] = useState(DEFAULT_COUNTRY_CODE); const [branch, setBranch] = useState(selectedBranchId); const [queueCrm, setQueueCrm] = useState(selectedCrm); const [queueTab, setQueueTab] = useState<"active" | "recent">(paging?.tab??"active"); const [message, setMessage] = useState(""); const [autoFilled, setAutoFilled] = useState(false); const [saving, setSaving] = useState(false);
   useEffect(()=>{if(paging)setQueueTab(paging.tab);},[paging?.tab]);
-  function queueHref(tab:string,page=1,branchId=selectedBranchId,crmName=selectedCrm){const params=new URLSearchParams();if(branchId)params.set("branch",branchId);if(crmName)params.set("crm",crmName);if(tab==="recent")params.set("tab",tab);if(page>1)params.set("page",String(page));return `/queue${params.size?`?${params}`:""}`;}
+  function queueHref(tab:string,page=1,branchId=selectedBranchId,crmName=selectedCrm){const params=new URLSearchParams();if(branchId)params.set("branch",branchId);if(crmName)params.set("crm",crmName);if(tab==="recent")params.set("tab",tab);if(page>1)params.set("page",String(page));params.set("register","client");/* crm-port: stay on the client queue (WalkinStart reads ?register) */return `/queue?${params}`;}
   function changeTab(tab:"active"|"recent"){setQueueTab(tab);if(paging)router.push(queueHref(tab));}
   useEffect(() => { setBranch(selectedBranchId); setQueueCrm(selectedCrm); }, [selectedBranchId, selectedCrm]);
   const [committedItems, setCommittedItems] = useState<Item[]>([]);

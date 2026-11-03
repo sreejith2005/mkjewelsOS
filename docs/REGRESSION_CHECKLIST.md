@@ -286,6 +286,20 @@ Android phone-sized device.
 - [ ] **Narrow web viewport.** Repeat at 320/375/390 CSS px with no document-level
       horizontal scroll.
 
+### CRM inside JewelOS - 2026-11-03
+
+- [ ] Open CRM from the JewelOS sidebar (desktop) and the phone menu: the JewelOS header, sidebar/phone navigation, theme switch and sign-out stay; no second CRM header, drawer or login appears.
+- [ ] The CRM tabs read REGISTRATION, CLIENT QUEUE, CLIENT DATABASE, DASHBOARD, NOT BOUGHT FOLLOW UP, REFERRALS; the active tab follows the page (a walk-in visit form marks CLIENT QUEUE, a client profile marks CLIENT DATABASE). On a phone the tabs swipe sideways without moving the page.
+- [ ] `/crm` opens on **Who are you registering?** with CLIENT / WALK-IN and LEAD. Choosing one adds `?register=client` / `?register=lead`; browser Back returns to the choice; reloading keeps the view.
+- [ ] REGISTER CLIENT on CLIENT QUEUE saves one queue entry (existing-client lookup by phone, token, branch, CRM queue) and stays on the client queue; LOAD QUEUE, the Active/Recently submitted tabs and paging keep the client queue.
+- [ ] Complete a walk-in from the queue: the visit form opens with the queue client, saves, returns to `/crm/queue?...&completed=...` with the "Walk-in saved" message, and the matching JewelOS walk-in task closes.
+- [ ] Old deep links still work: `/crm/queue`, `/crm/visits/new?queue=<id>`, `/crm/clients/<id>`, `/crm/followups`, `/crm/referrals`, `/crm/leads/new`, `/crm/dashboard`.
+- [ ] Switch between CRM, Tasks, FMS, Forms Library and Dashboard from the JewelOS menu and back with browser Back/Forward; the CRM page reappears without a full reload.
+- [ ] Client search results open over the CRM page but under the JewelOS header; a client list on desktop has one scroll bar (the list), not a second page scroll.
+- [ ] Light and dark themes: CRM colours follow the JewelOS switch in the JewelOS header.
+- [ ] Without `crm.view`, or with CRM switched off in Developer Mode, `/crm/...` shows the usual JewelOS fallback / maintenance notice inside the shell.
+- [ ] Android app: CRM opens inside the app layout; camera/gallery photo on the walk-in form, `tel:` links and Android Back still work.
+
 ### Notifications
 
 - [ ] Task assignment creates an in-app notification; read / mark-all-read work.
@@ -334,7 +348,7 @@ Automated proof: `supabase/functions/ask-kiara/eval.local.ts` (per-role eval on 
 - [ ] Record and review a voice task, deny then grant microphone permission, hit the 60-second limit, and verify temporary audio is removed.
 - [ ] On web and native, say "next Monday", "tomorrow at 3 pm", "second week of next month", and a note with no deadline: the first two prefill the same due date on both surfaces (7:00 PM when no time is said) with a "Deadline from your voice note" line; the last two leave the due date empty and block Assign until one is chosen.
 - [ ] Import current CSV and canonical XLSX through the Android file picker; map an ambiguous identity, share a correction report, resume a partial batch, and finish Assigning Left.
-- [ ] CRM tab (web CRM in a WebView, since the CRM cutover): signed-in open, client list and profile, a walk-in with a camera photo, Android Back, a `tel:` link, "← JewelOS", and sign-out/sign-in as another user clears the previous session (`docs/CRM_CUTOVER_CHECKLIST.md` step 9). A user without `crm.view` or with the section disabled sees the section notice.
+- [ ] CRM tab (web CRM in a WebView, since the CRM cutover): signed-in open, client list and profile, a walk-in with a camera photo, Android Back, a `tel:` link, the JewelOS menu (CRM opens inside the JewelOS layout since 2026-11-03), and sign-out/sign-in as another user clears the previous session (`docs/CRM_CUTOVER_CHECKLIST.md` step 9). A user without `crm.view` or with the section disabled sees the section notice.
 - [ ] Exercise Forms create/edit/publish/revise/archive/duplicate/publish-as-new/delete-impact, fill, immutable deleted-form submission, signed file answer, and approve/reject for reviewer and read-only roles.
 - [ ] Filter Dropdown Master by all/active/inactive and deactivate/reactivate an item without changing its stable value.
 - [ ] Switch Users between list and organization views; apply search/status/branch/department filters and confirm missing-manager/cycle warnings do not freeze the UI.

@@ -29,7 +29,7 @@ maintained documents:
 | `docs/architecture/` | Hosted data inventory and the Forms/FMS -> CRM customer integration design and mappings |
 | `docs/FMS_AI_ASSISTANT.md`, `docs/LEAVE_APPLICATIONS.md` | Feature notes still in use |
 | `docs/REPORTS.md` | Reports catalogue, data sources and every KPI formula |
-| `docs/superpowers/specs/` | The four designs that code comments cite (CRM embed, CRM two projects, task scores, Ask Kiara) |
+| `docs/superpowers/specs/` | The designs that code comments cite (CRM embed, CRM two projects, task scores, Ask Kiara, CRM as a native section) |
 | `apps/mobile/README.md` | Android shell rules and toolchain |
 
 Finished plans, release notes, and verification reports are not kept in the

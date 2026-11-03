@@ -326,3 +326,28 @@ html[data-theme="dark"] #crm-theme .crm-app .bg-emerald-100 { background: rgb(va
 #crm-theme .crm-lifecycle-steps li[data-done="true"] { border-color: rgb(var(--color-success)); color: rgb(var(--color-success)); font-weight: 600; }
 #crm-theme .crm-lifecycle-steps li + li::before { content: "→ "; color: rgb(var(--color-task-text-muted)); }
 #crm-theme .crm-lifecycle-purchase { color: rgb(var(--color-task-text-muted)); }
+
+/* ---- CRM as a JewelOS section (owner request 2026-11-03). The JewelOS shell owns the header,
+   sidebar, theme switch and sign-out; the CRM adds only its own tabs and client search at the top
+   of the content area. Nothing here is pinned to the window, so it never covers the JewelOS
+   header, sidebar or phone navigation. ---- */
+#crm-theme.crm-in-shell { background: transparent; }
+#crm-theme .crm-section { background: transparent; }
+#crm-theme .crm-section-bar { display: flex; flex-direction: column; gap: .6rem; margin-bottom: .25rem; }
+#crm-theme .crm-section-tabs { display: flex; gap: .4rem; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: .15rem; }
+#crm-theme .crm-section-tabs::-webkit-scrollbar { display: none; }
+#crm-theme .crm-section-tab { display: inline-flex; flex: 0 0 auto; align-items: center; gap: .45rem; min-height: 2.5rem; padding: .4rem .85rem; border: 1px solid rgb(var(--color-task-border)); border-radius: 999px; background: rgb(var(--color-task-bg)); color: rgb(var(--color-task-text-muted)); font-size: .72rem; font-weight: 600; letter-spacing: .04em; text-decoration: none; white-space: nowrap; scroll-snap-align: start; transition: background-color .15s ease, color .15s ease, border-color .15s ease; }
+#crm-theme .crm-section-tab .crm-icon { width: 1rem; height: 1rem; }
+#crm-theme .crm-section-tab:hover, #crm-theme .crm-section-tab:focus-visible { border-color: rgb(var(--color-gold) / .45); color: rgb(var(--color-task-text)); outline: none; }
+#crm-theme .crm-section-tab.is-active { border-color: transparent; background: var(--crm-sheen); color: rgb(var(--color-on-gold)); box-shadow: var(--crm-shadow-gold); }
+#crm-theme .crm-section-search { position: relative; min-width: 0; }
+#crm-theme .crm-app .crm-section-search input[type="search"]:not([type="checkbox"]):not([type="radio"]) { min-height: 2.6rem; padding-top: .55rem !important; padding-bottom: .55rem !important; padding-right: 1rem !important; font-size: 16px; background: rgb(var(--color-task-bg)) !important; border-color: rgb(var(--color-task-border)) !important; border-radius: 999px !important; padding-left: 2.6rem !important; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") !important; background-repeat: no-repeat !important; background-position: .95rem center !important; }
+#crm-theme .crm-app .crm-section-search input[type="search"]:focus { border-color: rgb(var(--color-gold) / .7) !important; }
+/* The JewelOS content area already pads the page, so CRM pages do not add a second gutter. */
+#crm-theme .crm-section main { padding-inline: 0 !important; padding-block: .75rem 1rem !important; }
+#crm-theme .crm-section .legacy-client-profile { padding-inline: 0 !important; }
+@media (min-width: 1024px) {
+  #crm-theme .crm-section-bar { flex-direction: row; align-items: center; justify-content: space-between; }
+  #crm-theme .crm-section-tabs { flex-wrap: wrap; overflow-x: visible; }
+  #crm-theme .crm-section-search { flex: 0 1 22rem; }
+}

@@ -79,7 +79,7 @@ describe("consolidated client walk-in queue", () => {
     renderQueue();
     fireEvent.change(screen.getByLabelText("CRM NAME"), { target: { value: "Test CRM" } });
     fireEvent.click(screen.getByRole("button", { name: "LOAD QUEUE" }));
-    expect(push).toHaveBeenCalledWith(`/queue?branch=${branchId}&crm=Test+CRM`);
+    expect(push).toHaveBeenCalledWith(`/queue?branch=${branchId}&crm=Test+CRM&register=client`);
   });
   it("types a registered new client as NEW although registration already created the client (QA fix 2026-10-05)", () => {
     render(<EntryQueue profile={{ role: "salesperson", branchId }} selectedBranchId={branchId} selectedCrm="" branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queueCrms={["Test CRM"]} initialItems={[
