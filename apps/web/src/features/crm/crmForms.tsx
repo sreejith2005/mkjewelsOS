@@ -6,13 +6,13 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "@jewelos/api-client";
-import type { CrmFormLink, CrmFormLinks, CrmLinkedForm, CrmSubmittedForm } from "@jewelos/crm-ui";
+import type { CrmFormLink, CrmFormLinks, CrmLeadSetup, CrmLinkedForm, CrmSubmittedForm } from "@jewelos/crm-ui";
 import {
-  CRM_FORM_PURPOSE_LABELS, FORM_LIBRARY_ROLES, checkCrmFormBinding, crmStarterForm, crmTargetCandidates, displayFormAnswer,
+  CRM_FORM_PURPOSE_LABELS, FORM_LIBRARY_ROLES, checkCrmFormBinding, crmLeadFormCopy, crmQueueFormCopy, crmTargetCandidates, displayFormAnswer, validateFormDefinition,
   normalizeFormDefinition, resolveFormOptions, suggestCrmFieldMap,
   type CrmFieldMap, type CrmFormTarget, type FormAnswers, type FormFieldDefinition, type FormTemplateDefinition, type Json,
 } from "@jewelos/core";
-import { CheckCircle2, ExternalLink, Eye, EyeOff, Sparkles, TriangleAlert } from "lucide-react";
+import { CheckCircle2, Copy, ExternalLink, Eye, EyeOff, Sparkles, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Modal, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -106,28 +106,32 @@ async function loadPublishedDefinition(templateId: string): Promise<CrmLinkedFor
   return linkedForm(template.data!, fields.data ?? []);
 }
 
-const STARTER_NAMES: Readonly<Record<LinkablePurpose, string>> = { queue: "CRM client queue registration", lead: "CRM lead registration" };
-
-/** Publishes a form with one question per CRM answer (two per row), hidden from Forms Library, and returns its id. */
-async function createStarterForm(purpose: LinkablePurpose, targets: readonly CrmFormTarget[], masterTypes: ReadonlySet<string>, existingNames: ReadonlySet<string>): Promise<{ templateId: string; fieldMap: Record<string, string> }> {
-  const starter = crmStarterForm(targets, masterTypes);
-  let name = STARTER_NAMES[purpose];
-  for (let round = 2; existingNames.has(name.toLowerCase()); round += 1) name = `${STARTER_NAMES[purpose]} ${round}`;
-  const definition = normalizeFormDefinition({ name, description: `Used by CRM for ${CRM_FORM_PURPOSE_LABELS[purpose].toLowerCase()}. Edit the questions, order and widths freely; keep the questions linked in CRM Form Settings.`, fields: starter.fields });
+/**
+ * Publishes today's CRM form as an ordinary Forms Library form (shown to form authors under
+ * CRM forms; hidden from staff browsing, because answers given there would not register anyone
+ * in CRM) and returns it with the matching question links.
+ */
+async function createCrmFormCopy(purpose: LinkablePurpose, leadSetup: CrmLeadSetup, masters: DynamicOptions["masters"], existingNames: ReadonlySet<string>): Promise<{ templateId: string; fieldMap: Record<string, string>; name: string }> {
+  const copy = purpose === "queue" ? crmQueueFormCopy() : crmLeadFormCopy(leadSetup.fields, leadSetup.routes, leadSetup.lookupOptions, masters);
+  if (!copy.fields.length) throw new Error("CRM has no lead fields to copy yet.");
+  let name = copy.name;
+  for (let round = 2; existingNames.has(name.toLowerCase()); round += 1) name = `${copy.name} ${round}`;
+  const definition = normalizeFormDefinition({ name, description: copy.description, fields: copy.fields });
+  const issues = validateFormDefinition(definition);
+  if (issues.length) throw new Error(`The copy of today's CRM form is not valid: ${issues[0]!.message}`);
   const payload = { name: definition.name, description: definition.description ?? "", record_name_field_key: null, sections: [], permissions: { roles: [...FORM_LIBRARY_ROLES] } } as unknown as Json;
   // Same draft shape the Form Builder saves (no ids or sort order; the server orders by position).
   const fields = definition.fields.map(({ id: _id, sortOrder: _sortOrder, ...field }) => field) as unknown as Json;
   const templateId = await saveDraft(null, payload, fields);
   await publishForm(templateId);
-  // Answers given in Forms Library would not register anyone in CRM.
   await setFormLibraryVisibility(templateId, false);
-  return { templateId, fieldMap: starter.fieldMap };
+  return { templateId, fieldMap: copy.fieldMap, name: definition.name };
 }
 
 const TYPE_NAMES: Partial<Record<FormFieldDefinition["type"], string>> = { text: "Short text", textarea: "Long text", phone: "Phone", select: "Dropdown", radio: "Single choice", date: "Date", number: "Number", currency: "Amount", email: "Email" };
 const typeName = (field: FormFieldDefinition) => TYPE_NAMES[field.type] ?? field.type.replaceAll("_", " ");
 
-export function CrmFormSettingsDialog({ links, targets, onClose, onSaved, onEditForm }: { links: CrmFormLinks; targets: Targets; onClose: () => void; onSaved: () => void; onEditForm: (familyId: string) => void }) {
+export function CrmFormSettingsDialog({ links, targets, leadSetup, onClose, onSaved, onEditForm }: { links: CrmFormLinks; targets: Targets; leadSetup: CrmLeadSetup; onClose: () => void; onSaved: () => void; onEditForm: (familyId: string) => void }) {
   const [purpose, setPurpose] = useState<LinkablePurpose | "walkin">("queue");
   const [forms, setForms] = useState<PublishedForm[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
@@ -204,19 +208,20 @@ export function CrmFormSettingsDialog({ links, targets, onClose, onSaved, onEdit
     finally { setBusy(""); }
   };
 
-  const starter = async () => {
+  /** One step: today's CRM form becomes a Forms Library form, and CRM uses it. */
+  const copyCrmForm = async () => {
     if (!linkable) return;
     setBusy("starter"); setError(null);
     try {
-      const masterTypes = new Set((options?.masters ?? []).map((option) => option.masterType));
-      const created = await createStarterForm(linkable, purposeTargets, masterTypes, new Set((forms ?? []).map((form) => form.name.toLowerCase())));
+      const created = await createCrmFormCopy(linkable, leadSetup, options?.masters ?? [], new Set((forms ?? []).map((form) => form.name.toLowerCase())));
       const rows = await loadPublishedForms(); setForms(rows);
       const family = rows.find((form) => form.id === created.templateId)?.family_id;
       if (!family) throw new Error("The new form is not visible yet. Reload and choose it from the list.");
-      setBusy("");
-      await choose(family, created.fieldMap);
-      toast.success("Starter form created. Arrange it in the Form Builder any time, then save here to use it.");
-    } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not create the starter form."); }
+      const { error: saveError } = await supabase.rpc("save_crm_form_binding", { p_purpose: linkable, p_form_family_id: family, p_field_map: created.fieldMap as unknown as Json, ...(active ? { p_expected_version_id: active.versionId } : {}) });
+      fail("Use the copied form", saveError);
+      await reloadLinks();
+      toast.success(`"${created.name}" is now in Forms Library (CRM forms) and CRM uses it. Edit it there like any form.`);
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not copy the CRM form."); }
     finally { setBusy(""); }
   };
 
@@ -256,9 +261,9 @@ export function CrmFormSettingsDialog({ links, targets, onClose, onSaved, onEdit
             <option value="">{forms ? "Choose a published form" : "Loading forms…"}</option>
             {(forms ?? []).map((form) => <option key={form.family_id} value={form.family_id}>{form.name} (version {form.version})</option>)}
           </select>
-          <Button className="min-h-12" disabled={busy !== ""} onClick={() => void starter()} type="button" variant="secondary"><Sparkles aria-hidden className="size-4" />{busy === "starter" ? "Creating…" : "Create a starter form"}</Button>
+          <Button className="min-h-12" disabled={busy !== "" || (linkable === "lead" && !options)} onClick={() => void copyCrmForm()} type="button" variant="secondary"><Copy aria-hidden className="size-4" />{busy === "starter" ? "Copying…" : "Copy today's CRM form"}</Button>
         </div>
-        <p className="text-xs text-task-text-muted">A starter form has one question per CRM answer, two per row, ready to rearrange in the Form Builder. It is hidden from Forms Library.</p>
+        <p className="text-xs text-task-text-muted">"Copy today's CRM form" creates the same form CRM shows now (same questions, labels, order, choices and conditions) in Forms Library under CRM forms, and CRM starts using it. Change it there like any other form; each published version is used here from its next opening.</p>
         {listError ? <Notice tone="danger">{listError}</Notice> : null}
         {chosen ? <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm text-task-text-muted">Version {chosen.version} · {chosen.definition.fields.filter((field) => field.type !== "section_header" && field.type !== "divider").length} questions</span>

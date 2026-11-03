@@ -9,7 +9,7 @@ import { type ReactNode, useRef, useState } from "react";
 import { checkCrmFormBinding, crmAnswersFromForm, type CrmFormBindingIssue, type CrmFormPurpose, type CrmFormTarget } from "@jewelos/core";
 
 import { pushLeadToRuno } from "@/crm-port/phase4"; // crm-port: Runo push route -> crm-runo-push Edge Function
-import { useCrmFormsHost, type CrmFormLink, type CrmFormLinks, type CrmFormsHost, type CrmSubmittedForm } from "@/crm-port/forms-host";
+import { useCrmFormsHost, type CrmFormLink, type CrmFormLinks, type CrmFormsHost, type CrmLeadSetup, type CrmSubmittedForm } from "@/crm-port/forms-host";
 import { composePhone, DEFAULT_COUNTRY_CODE, phoneError } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/client";
 import type { Json } from "@/lib/supabase/crm-project.types";
@@ -143,12 +143,12 @@ export function LinkedLeadRegistration({ host, link, onSaved }: { host: CrmForms
 }
 
 /** CRM FORM SETTINGS, for people allowed to manage CRM forms. */
-export function CrmFormSettingsButton({ host, links, targets, openOnMount = false }: { host: CrmFormsHost; links: CrmFormLinks; targets: Readonly<Record<"queue" | "lead", readonly CrmFormTarget[]>>; openOnMount?: boolean }) {
+export function CrmFormSettingsButton({ host, links, targets, leadSetup, openOnMount = false }: { host: CrmFormsHost; links: CrmFormLinks; targets: Readonly<Record<"queue" | "lead", readonly CrmFormTarget[]>>; leadSetup: CrmLeadSetup; openOnMount?: boolean }) {
   const [open, setOpen] = useState(openOnMount);
   const queryClient = useQueryClient();
   if (!links.canManage) return null;
   return <>
     <button type="button" className="crm-form-settings-button" onClick={() => setOpen(true)}>CRM FORM SETTINGS</button>
-    {open ? host.renderSettings({ links, targets, onClose: () => setOpen(false), onSaved: () => { void queryClient.invalidateQueries({ queryKey: CRM_FORM_LINKS_QUERY }); } }) : null}
+    {open ? host.renderSettings({ links, targets, leadSetup, onClose: () => setOpen(false), onSaved: () => { void queryClient.invalidateQueries({ queryKey: CRM_FORM_LINKS_QUERY }); } }) : null}
   </>;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  CRM_QUEUE_TARGETS, checkCrmFormBinding, crmAnswersFromForm, crmLeadTargets, crmStarterForm, crmTargetCandidates,
+  CRM_QUEUE_TARGETS, checkCrmFormBinding, crmAnswersFromForm, crmLeadFormCopy, crmLeadTargets, crmQueueFormCopy, crmTargetCandidates,
   dropdownMasterForCrmOption, suggestCrmFieldMap, type CrmLeadFieldConfig,
 } from "./crmForms";
 import { validateFormDefinition } from "./forms/definition";
@@ -95,18 +95,51 @@ describe("answers for CRM", () => {
   });
 });
 
-describe("starter form", () => {
-  it("builds a valid two-per-row form with one question per CRM answer and its link", () => {
-    const targets = crmLeadTargets(leadFields);
-    const starter = crmStarterForm(targets, new Set(["crm_source"]));
-    expect(starter.fields.map((field) => [field.key, field.type, field.required, field.validation?.width])).toEqual([
-      ["name", "text", true, "half"], ["mobile_no", "phone", true, "half"], ["source_of_lead", "select", true, "half"], ["dob", "date", false, "half"],
+describe("copies of today's CRM forms", () => {
+  it("copies the client queue form: CLIENT NAME and MOBILE NUMBER side by side, linked", () => {
+    const copy = crmQueueFormCopy();
+    expect(copy.fields.map((field) => [field.key, field.label, field.type, field.required, field.validation?.width])).toEqual([
+      ["client_name", "CLIENT NAME", "text", true, "half"], ["mobile", "MOBILE NUMBER", "phone", true, "half"],
     ]);
-    expect(starter.fields[2]?.optionSource).toEqual({ kind: "master", masterType: "crm_source" });
-    expect(starter.fieldMap).toEqual({ name: "name", mobile_no: "mobile_no", source_of_lead: "source_of_lead", dob: "dob" });
-    const definition = { name: "Lead registration", fields: starter.fields };
+    const definition = { name: copy.name, fields: copy.fields };
     expect(validateFormDefinition(definition)).toEqual([]);
-    expect(checkCrmFormBinding(definition, starter.fieldMap, targets)).toEqual([]);
+    expect(checkCrmFormBinding(definition, copy.fieldMap, CRM_QUEUE_TARGETS)).toEqual([]);
+  });
+
+  it("copies the lead form from the live CRM configuration, with its labels, order, lists and reveal rules", () => {
+    const fields = [
+      { id: "f-src", field_key: "source_of_lead", label: "SOURCE OF LEAD", field_type: "dropdown", is_mandatory: true, is_hidden: false, display_order: 9, option_source: "lookup_source_of_leads" },
+      { id: "f-name", field_key: "name", label: "CLIENT NAME", field_type: "text", is_mandatory: true, is_hidden: false, display_order: 1, option_source: null },
+      { id: "f-mob", field_key: "mobile_no", label: "MOBILE NO", field_type: "text", is_mandatory: false, is_hidden: false, display_order: 2, option_source: null },
+      { id: "f-type", field_key: "lead_type", label: "LEAD TYPE", field_type: "dropdown", is_mandatory: true, is_hidden: false, display_order: 3, option_source: null },
+      { id: "f-exh", field_key: "exhibition_name", label: "EXHIBITION NAME", field_type: "text", is_mandatory: false, is_hidden: false, display_order: 4, option_source: null },
+      { id: "f-call", field_key: "type_of_calling", label: "TYPE OF CALLING", field_type: "dropdown", is_mandatory: false, is_hidden: false, display_order: 5, option_source: null },
+      { id: "f-geo", field_key: "location", label: "LOCATION", field_type: "geo", is_mandatory: false, is_hidden: false, display_order: 6, option_source: null },
+      { id: "f-old", field_key: "old", label: "OLD", field_type: "text", is_mandatory: false, is_hidden: true, display_order: 7, option_source: null },
+      { id: "f-file", field_key: "photo", label: "PHOTO", field_type: "file", is_mandatory: false, is_hidden: false, display_order: 8, option_source: null },
+    ];
+    const routes = [
+      { field_id: "f-type", option_value: "REMOTE", display_order: 1, triggers_field_key: "source_of_lead" },
+      { field_id: "f-src", option_value: "EXHIBITION", display_order: 1, triggers_field_key: "exhibition_name" },
+      { field_id: "f-src", option_value: "INSTAGRAM", display_order: 2, triggers_field_key: null },
+    ];
+    const lookups = { lead_type: ["Remote", "Walk-in", "remote"], type_of_calling: [] };
+    const masters = [{ masterType: "crm_source", value: "src_exh", label: "Exhibition" }, { masterType: "crm_source", value: "src_ig", label: "Instagram" }];
+    const copy = crmLeadFormCopy(fields, routes, lookups, masters);
+    // Same order as CRM, except a revealed field follows the question that reveals it; hidden, file and never-revealed fields are left out.
+    expect(copy.fields.map((field) => [field.key, field.label, field.type, field.required])).toEqual([
+      ["name", "CLIENT NAME", "text", true], ["mobile_no", "MOBILE NO", "phone", true], ["lead_type", "LEAD TYPE", "select", true],
+      ["location", "LOCATION", "text", false], ["source_of_lead", "SOURCE OF LEAD", "select", true], ["exhibition_name", "EXHIBITION NAME", "text", false],
+    ]);
+    expect(copy.fields.every((field) => field.validation?.width === "half")).toBe(true);
+    expect(copy.fields[2]!.options).toEqual([{ value: "remote", label: "Remote" }, { value: "walk_in", label: "Walk-in" }]);
+    expect(copy.fields[4]!.optionSource).toEqual({ kind: "master", masterType: "crm_source" });
+    expect(copy.fields[4]!.rule).toEqual({ kind: "predicate", fieldKey: "lead_type", operator: "equals", value: "remote" });
+    expect(copy.fields[5]!.rule).toEqual({ kind: "predicate", fieldKey: "source_of_lead", operator: "equals", value: "src_exh" });
+    const definition = { name: copy.name, fields: copy.fields };
+    expect(validateFormDefinition(definition)).toEqual([]);
+    const targets = crmLeadTargets(fields);
+    expect(checkCrmFormBinding(definition, copy.fieldMap, targets)).toEqual([]);
   });
 
   it("finds the Dropdown Master list behind a CRM choice", () => {
