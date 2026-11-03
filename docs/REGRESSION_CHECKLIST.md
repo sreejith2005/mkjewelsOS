@@ -303,7 +303,9 @@ Android phone-sized device.
 ### CRM forms from the Form Builder - 2026-11-03
 
 - [ ] Only a Super Admin (or anyone given **Manage CRM forms**) sees **CRM FORM SETTINGS** on CRM REGISTRATION; a CRM salesperson does not, and calling `save_crm_form_binding` directly as them is refused.
-- [ ] **Create a starter form** (Client queue): a published form "CRM client queue registration" appears, hidden from Forms Library, with Client name and Mobile number side by side; the links fill in; **Save and use this form** makes it active.
+- [ ] **Copy today's CRM form** (Client queue): "Client queue registration" is created in Forms Library under **CRM forms** with CLIENT NAME and MOBILE NUMBER side by side, and CRM uses it at once ("Now in use").
+- [ ] **Copy today's CRM form** (Lead): "Lead registration" has the same questions, labels, order, required marks and dropdown choices as the old CRM lead form; a field CRM showed only after an answer (for example after SOURCE OF LEAD) appears only after that answer.
+- [ ] Forms Library → **CRM forms** lists both; editing and publishing works as for any form; **Fill form** opens CRM registration (client queue or lead), not a plain library submission. Staff without form authoring do not see these forms in Forms Library.
 - [ ] **Edit in Form Builder** opens that form; change question order/width, add a section or a conditional question, publish; reopen CRM REGISTRATION and the next **REGISTER CLIENT** shows the new version.
 - [ ] REGISTER CLIENT with the linked form: one queue entry, correct branch, token, client ID message, existing-client detection by phone, queue list refresh, and the JewelOS walk-in task appears as before.
 - [ ] Press **Register client** twice quickly / after turning the network off and on: still one queue entry.

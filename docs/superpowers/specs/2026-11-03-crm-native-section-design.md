@@ -63,6 +63,12 @@ Now:
 - **Not built yet**: the copy into JewelOS `form_submissions` over the CRM outbox (Phase C step 3
   below). Until then the CRM link row is the record of which form version produced each CRM
   record; Forms Library does not list these submissions.
+- **Exact copies (owner request 2026-11-03, later)**: the generic starter form was replaced by
+  "Copy today's CRM form". The queue copy is CLIENT NAME + MOBILE NUMBER; the lead copy is built
+  in the browser from the CRM's live lead configuration (fields, labels, order, required, the same
+  Dropdown Master lists or choices, and option routes as Form Builder conditions;
+  `crmLeadFormCopy`). The copy is published as an ordinary form, linked at once, and listed in
+  Forms Library under **CRM forms** for authors; Fill form there opens CRM registration.
 - **Form Builder addition**: question width (`validation.width`: full, half, third) for
   side-by-side questions on wider screens; phones keep one question per row.
 

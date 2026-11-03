@@ -68,7 +68,8 @@ export type CrmLeadFieldConfig = Readonly<{
 /** Lead targets come from the CRM's lead field configuration, so a new CRM lead field appears here by itself. */
 export function crmLeadTargets(fields: readonly CrmLeadFieldConfig[]): CrmFormTarget[] {
   return [...fields]
-    .filter((field) => !field.is_hidden && field.field_type !== "file" && field.field_type !== "geo")
+    // The CRM lead form shows no file fields yet; a geo field is a text box there.
+    .filter((field) => !field.is_hidden && field.field_type !== "file")
     .sort((left, right) => left.display_order - right.display_order || left.field_key.localeCompare(right.field_key))
     .map((field) => {
       const kind: CrmTargetKind = field.field_key === "mobile_no" ? "phone"
@@ -206,29 +207,119 @@ export function dropdownMasterForCrmOption(optionKey: string, masterTypes: Reado
 }
 
 const FIELD_KEY = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").replace(/^(\d)/, "q_$1").slice(0, 60) || "question";
+const OPTION_VALUE = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 190) || "option";
+
+export type CrmFormCopy = { name: string; description: string; fields: FormFieldDefinition[]; fieldMap: Record<string, string> };
 
 /**
- * A ready-made Form Builder form with one question per CRM answer, laid out
- * two per row on wider screens, so an author starts from what CRM asks today
- * and rearranges it. Returns the questions and the matching link.
+ * Today's client queue registration form (REGISTER CLIENT ENTRY) as a Form Builder form:
+ * CLIENT NAME and MOBILE NUMBER side by side. BRANCH stays a CRM choice above the form.
  */
-export function crmStarterForm(targets: readonly CrmFormTarget[], masterTypes: ReadonlySet<string>): { fields: FormFieldDefinition[]; fieldMap: Record<string, string> } {
-  const fields: FormFieldDefinition[] = [];
-  const fieldMap: Record<string, string> = {};
-  const keys = new Set<string>();
-  targets.forEach((target, index) => {
-    let key = FIELD_KEY(target.key);
-    while (keys.has(key)) key = `${key}_${index}`;
-    keys.add(key);
-    const masterType = target.kind === "choice" && target.optionKey ? dropdownMasterForCrmOption(target.optionKey, masterTypes) : undefined;
-    const type: FormFieldType = target.kind === "phone" ? "phone" : target.kind === "date" ? "date" : target.kind === "number" ? "number" : masterType ? "select" : "text";
-    fields.push({
-      key, label: target.label, type, sortOrder: index, required: target.required,
-      validation: { width: "half" },
-      ...(masterType ? { optionSource: { kind: "master", masterType } } : {}),
-      ...(target.kind === "phone" ? { placeholder: "10-digit mobile number" } : {}),
+export function crmQueueFormCopy(): CrmFormCopy {
+  return {
+    name: "Client queue registration",
+    description: "CRM → REGISTRATION → CLIENT / WALK-IN. The branch is chosen in CRM. A mobile number outside India starts with + and the country code.",
+    fields: [
+      { key: "client_name", label: "CLIENT NAME", type: "text", sortOrder: 0, required: true, validation: { width: "half" } },
+      { key: "mobile", label: "MOBILE NUMBER", type: "phone", sortOrder: 1, required: true, validation: { width: "half" } },
+    ],
+    fieldMap: { client_name: "client_name", mobile: "mobile" },
+  };
+}
+
+/** One configured lead option route (get_crm_lead_option_routes): choosing option_value on a field shows triggers_field_key. */
+export type CrmLeadOptionRoute = Readonly<{ field_id: string; option_value: string; display_order: number; triggers_field_key: string | null }>;
+export type CrmLeadFieldWithId = CrmLeadFieldConfig & Readonly<{ id: string }>;
+type MasterChoice = Readonly<{ masterType: string; value: string; label: string }>;
+
+/** Fields the CRM lead form shows only when an earlier answer routes to them (lead-form.tsx, save_crm_lead). */
+export const CRM_LEAD_ROUTED_FIELDS: ReadonlySet<string> = new Set(["source_of_lead", "type_of_calling", "name_of_exhibition", "exhibition_name", "invitation_offer_name"]);
+
+function uniqueChoices(choices: readonly string[]) {
+  const seen = new Set<string>();
+  return choices.filter((choice) => { const key = choice.trim().toUpperCase(); if (!key || seen.has(key)) return false; seen.add(key); return true; });
+}
+
+/**
+ * Today's CRM lead form as a Form Builder form, built from the CRM's live lead configuration:
+ * the same fields, labels, order and required answers, two per row as in CRM; dropdowns read the
+ * same JewelOS Dropdown Master lists CRM reads (or the same choices, when no list matches), and
+ * fields CRM reveals after an answer (for example Exhibition after Source of lead) get the same
+ * condition. Questions keep the CRM field keys, so each is linked to its own CRM answer.
+ */
+export function crmLeadFormCopy(fields: readonly CrmLeadFieldWithId[], routes: readonly CrmLeadOptionRoute[], lookupOptions: Readonly<Record<string, readonly string[]>>, masters: readonly MasterChoice[]): CrmFormCopy {
+  const masterTypes = new Set(masters.map((option) => option.masterType));
+  const shown = [...fields].filter((field) => !field.is_hidden && field.field_type !== "file")
+    .sort((left, right) => left.display_order - right.display_order || left.field_key.localeCompare(right.field_key));
+  const byId = new Map(shown.map((field) => [field.id, field]));
+
+  // How each question offers its choices, and the stored value for a CRM choice.
+  const choiceSource = new Map<string, { masterType?: string; options?: { value: string; label: string }[] }>();
+  for (const field of shown) {
+    if (field.field_type !== "dropdown") continue;
+    const listKey = field.option_source ?? field.field_key;
+    const masterType = dropdownMasterForCrmOption(listKey, masterTypes);
+    if (masterType) { choiceSource.set(field.field_key, { masterType }); continue; }
+    const used = new Set<string>();
+    const options = uniqueChoices(lookupOptions[listKey] ?? []).slice(0, 100).map((label) => {
+      let value = OPTION_VALUE(label);
+      for (let round = 2; used.has(value); round += 1) value = `${OPTION_VALUE(label)}_${round}`;
+      used.add(value);
+      return { value, label };
     });
-    fieldMap[target.key] = key;
+    if (options.length) choiceSource.set(field.field_key, { options });
+  }
+  const storedValue = (fieldKey: string, crmChoice: string): string | undefined => {
+    const source = choiceSource.get(fieldKey);
+    const wanted = crmChoice.trim().toUpperCase();
+    if (source?.masterType) return masters.find((option) => option.masterType === source.masterType && option.label.trim().toUpperCase() === wanted)?.value;
+    return source?.options?.find((option) => option.label.trim().toUpperCase() === wanted)?.value;
+  };
+
+  // Which answers reveal each routed field.
+  const triggers = new Map<string, Array<{ sourceKey: string; value: string }>>();
+  for (const route of routes) {
+    const source = byId.get(route.field_id);
+    if (!source || !route.triggers_field_key) continue;
+    const value = storedValue(source.field_key, route.option_value);
+    if (!value) continue;
+    triggers.set(route.triggers_field_key, [...(triggers.get(route.triggers_field_key) ?? []), { sourceKey: source.field_key, value }]);
+  }
+  // A routed field nothing reveals is never shown in CRM, so it is left out.
+  const included = shown.filter((field) => !CRM_LEAD_ROUTED_FIELDS.has(field.field_key) || (triggers.get(field.field_key)?.length ?? 0) > 0);
+  const includedKeys = new Set(included.map((field) => field.field_key));
+  // Conditions read earlier questions: a revealed field moves after the questions that reveal it.
+  const ordered: CrmLeadFieldWithId[] = [];
+  const pending = [...included];
+  while (pending.length) {
+    const placed = new Set(ordered.map((field) => field.field_key));
+    const index = pending.findIndex((field) => !CRM_LEAD_ROUTED_FIELDS.has(field.field_key)
+      || (triggers.get(field.field_key) ?? []).every((trigger) => placed.has(trigger.sourceKey) || !includedKeys.has(trigger.sourceKey)));
+    ordered.push(...pending.splice(index === -1 ? 0 : index, 1));
+  }
+
+  const keys = new Map<string, string>();
+  const definitions = ordered.map((field, sortOrder): FormFieldDefinition => {
+    let key = FIELD_KEY(field.field_key);
+    while ([...keys.values()].includes(key)) key = `${key}_${sortOrder}`;
+    keys.set(field.field_key, key);
+    const source = choiceSource.get(field.field_key);
+    const type: FormFieldType = field.field_key === "mobile_no" ? "phone" : field.field_type === "date" ? "date" : field.field_type === "number" ? "number" : field.field_type === "dropdown" && source ? "select" : "text";
+    const placed = (triggers.get(field.field_key) ?? []).filter((trigger) => keys.has(trigger.sourceKey) && trigger.sourceKey !== field.field_key);
+    const predicates = placed.slice(0, 20).map((trigger) => ({ kind: "predicate" as const, fieldKey: keys.get(trigger.sourceKey)!, operator: "equals" as const, value: trigger.value }));
+    return {
+      key, label: field.label, type, sortOrder,
+      required: field.field_key === "mobile_no" || field.is_mandatory,
+      validation: { width: "half" },
+      ...(type === "select" && source?.masterType ? { optionSource: { kind: "master" as const, masterType: source.masterType } } : {}),
+      ...(type === "select" && source?.options ? { options: source.options } : {}),
+      ...(CRM_LEAD_ROUTED_FIELDS.has(field.field_key) && predicates.length ? { rule: predicates.length === 1 ? predicates[0]! : { kind: "any" as const, rules: predicates } } : {}),
+    };
   });
-  return { fields, fieldMap };
+  return {
+    name: "Lead registration",
+    description: "CRM → REGISTRATION → LEAD. For Instagram, WhatsApp, calling, exhibitions, referrals and other remote enquiries.",
+    fields: definitions,
+    fieldMap: Object.fromEntries(ordered.map((field) => [field.field_key, keys.get(field.field_key)!])),
+  };
 }

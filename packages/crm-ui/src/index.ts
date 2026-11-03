@@ -4,4 +4,4 @@
 export { CrmApp, type CrmAppProps } from "./crm-port/crm-app";
 export type { CrmProjectConfig } from "./crm-port/crm-project";
 export { CRM_BASE_PATH, type CrmAuth } from "./crm-port/runtime";
-export type { CrmFormLink, CrmFormLinks, CrmFormsHost, CrmLinkedForm, CrmSubmittedForm } from "./crm-port/forms-host";
+export type { CrmFormLink, CrmFormLinks, CrmFormsHost, CrmLeadSetup, CrmLinkedForm, CrmSubmittedForm } from "./crm-port/forms-host";

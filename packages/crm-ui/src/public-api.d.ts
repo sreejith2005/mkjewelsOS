@@ -2,7 +2,7 @@
 // sources are checked with their own compiler settings in this package; consumers read only
 // this declaration. tests/public-api.test.ts keeps it identical to src/index.ts.
 import type { ReactElement, ReactNode } from "react";
-import type { CrmFieldMap, CrmFormPurpose, CrmFormTarget, FormAnswers, FormTemplateDefinition } from "@jewelos/core";
+import type { CrmFieldMap, CrmFormPurpose, CrmFormTarget, CrmLeadFieldWithId, CrmLeadOptionRoute, FormAnswers, FormTemplateDefinition } from "@jewelos/core";
 import type { JewelosClient } from "@jewelos/api-client";
 
 export type CrmAppProps = {
@@ -58,6 +58,9 @@ export type CrmFormLink = Readonly<{
 
 export type CrmFormLinks = Readonly<{ canManage: boolean; links: readonly CrmFormLink[] }>;
 
+/** The CRM lead form as configured today (fields, answer routes, dropdown choices), for an exact Form Builder copy. */
+export type CrmLeadSetup = Readonly<{ fields: readonly CrmLeadFieldWithId[]; routes: readonly CrmLeadOptionRoute[]; lookupOptions: Readonly<Record<string, readonly string[]>> }>;
+
 /** A submitted form: the stored answers, and each answer as the person saw it (a choice's label). */
 export type CrmSubmittedForm = Readonly<{ answers: FormAnswers; display: Readonly<Record<string, string>> }>;
 
@@ -66,7 +69,7 @@ export type CrmFormsHost = Readonly<{
   /** Opens a linked form in a JewelOS dialog. onSubmit throws an Error whose message the form shows. */
   renderForm: (props: { title: string; description?: string | undefined; form: CrmLinkedForm; onClose: () => void; onSubmit: (submitted: CrmSubmittedForm) => Promise<void> }) => ReactNode;
   /** The CRM Form Settings dialog (people allowed to manage CRM forms). */
-  renderSettings: (props: { links: CrmFormLinks; targets: Readonly<Record<"queue" | "lead", readonly CrmFormTarget[]>>; onClose: () => void; onSaved: () => void }) => ReactNode;
+  renderSettings: (props: { links: CrmFormLinks; targets: Readonly<Record<"queue" | "lead", readonly CrmFormTarget[]>>; leadSetup: CrmLeadSetup; onClose: () => void; onSaved: () => void }) => ReactNode;
 }>;
 
 /** The CRM Supabase project the CRM reads and writes (public URL and anon key). */

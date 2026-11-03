@@ -4,7 +4,7 @@
 // means and saves it through its own audited RPCs. The host's forms open in JewelOS dialogs
 // outside the CRM root, because the CRM stylesheet resets every element inside it.
 import { createContext, useContext, type ReactNode } from "react";
-import type { CrmFieldMap, CrmFormPurpose, CrmFormTarget, FormAnswers, FormTemplateDefinition } from "@jewelos/core";
+import type { CrmFieldMap, CrmFormPurpose, CrmFormTarget, CrmLeadFieldWithId, CrmLeadOptionRoute, FormAnswers, FormTemplateDefinition } from "@jewelos/core";
 
 /** The published version of a linked form, as CRM opens it now. */
 export type CrmLinkedForm = Readonly<{ templateId: string; familyId: string; version: number; name: string; definition: FormTemplateDefinition }>;
@@ -21,6 +21,9 @@ export type CrmFormLink = Readonly<{
 
 export type CrmFormLinks = Readonly<{ canManage: boolean; links: readonly CrmFormLink[] }>;
 
+/** The CRM lead form as configured today (fields, answer routes, dropdown choices), for an exact Form Builder copy. */
+export type CrmLeadSetup = Readonly<{ fields: readonly CrmLeadFieldWithId[]; routes: readonly CrmLeadOptionRoute[]; lookupOptions: Readonly<Record<string, readonly string[]>> }>;
+
 /** A submitted form: the stored answers, and each answer as the person saw it (a choice's label). */
 export type CrmSubmittedForm = Readonly<{ answers: FormAnswers; display: Readonly<Record<string, string>> }>;
 
@@ -29,7 +32,7 @@ export type CrmFormsHost = Readonly<{
   /** Opens a linked form in a JewelOS dialog. onSubmit throws an Error whose message the form shows. */
   renderForm: (props: { title: string; description?: string | undefined; form: CrmLinkedForm; onClose: () => void; onSubmit: (submitted: CrmSubmittedForm) => Promise<void> }) => ReactNode;
   /** The CRM Form Settings dialog (people allowed to manage CRM forms). */
-  renderSettings: (props: { links: CrmFormLinks; targets: Readonly<Record<"queue" | "lead", readonly CrmFormTarget[]>>; onClose: () => void; onSaved: () => void }) => ReactNode;
+  renderSettings: (props: { links: CrmFormLinks; targets: Readonly<Record<"queue" | "lead", readonly CrmFormTarget[]>>; leadSetup: CrmLeadSetup; onClose: () => void; onSaved: () => void }) => ReactNode;
 }>;
 
 export const CrmFormsHostContext = createContext<CrmFormsHost | null>(null);

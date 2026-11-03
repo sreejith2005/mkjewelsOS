@@ -45,6 +45,18 @@ const targets = { queue: CRM_QUEUE_TARGETS, lead: crmLeadTargets([
   { field_key: "source_of_lead", label: "Source of lead", field_type: "dropdown", is_mandatory: false, is_hidden: false, display_order: 3, option_source: "lookup_source_of_leads" },
 ]) };
 
+// CRM's live lead configuration, as the registration page loads it.
+const leadSetup = {
+  fields: [
+    { id: "f-name", field_key: "name", label: "NAME", field_type: "text", is_mandatory: true, is_hidden: false, display_order: 1, option_source: null },
+    { id: "f-mob", field_key: "mobile_no", label: "MOBILE NO", field_type: "text", is_mandatory: true, is_hidden: false, display_order: 2, option_source: null },
+    { id: "f-type", field_key: "lead_type", label: "LEAD TYPE", field_type: "dropdown", is_mandatory: true, is_hidden: false, display_order: 3, option_source: null },
+    { id: "f-src", field_key: "source_of_lead", label: "SOURCE OF LEAD", field_type: "dropdown", is_mandatory: false, is_hidden: false, display_order: 4, option_source: "lookup_source_of_leads" },
+  ],
+  routes: [{ field_id: "f-type", option_value: "REMOTE", display_order: 1, triggers_field_key: "source_of_lead" }],
+  lookupOptions: { lead_type: ["REMOTE", "WALK-IN"] },
+};
+
 beforeEach(() => {
   db.tables.form_templates = [template("f1", "Front desk queue"), template("f2", "Visible survey", { library_visible: true })];
   db.tables.form_fields = [field("f1", "customer", "Client name", "text", 0), field("f1", "phone", "Mobile number", "phone", 1), field("f2", "q", "Anything else?", "textarea", 0, false)];
@@ -55,7 +67,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 function renderSettings(links = { canManage: true, links: [] as never[] }) {
   const onSaved = vi.fn(); const onEditForm = vi.fn();
-  render(<CrmFormSettingsDialog links={links} onClose={vi.fn()} onEditForm={onEditForm} onSaved={onSaved} targets={targets} />);
+  render(<CrmFormSettingsDialog leadSetup={leadSetup} links={links} onClose={vi.fn()} onEditForm={onEditForm} onSaved={onSaved} targets={targets} />);
   return { onSaved, onEditForm, dialog: screen.getByRole("dialog", { name: "CRM Form Settings" }) };
 }
 
@@ -86,24 +98,39 @@ describe("CRM Form Settings", () => {
     expect(screen.getByText(/also listed in Forms Library/)).toBeTruthy();
   });
 
-  it("creates a starter form from the CRM's own answers, hidden from Forms Library, and links it", async () => {
+  it("copies today's CRM lead form into Forms Library and makes CRM use it in one step", async () => {
     formsApi.saveDraft.mockImplementation(async () => {
-      db.tables.form_templates.push(template("f3", "CRM lead registration"));
-      db.tables.form_fields.push(field("f3", "name", "Name", "text", 0), field("f3", "mobile_no", "Mobile no", "phone", 1), field("f3", "source_of_lead", "Source of lead", "select", 2, false));
+      db.tables.form_templates.push(template("f3", "Lead registration"));
       return "f3";
     });
-    renderSettings();
+    db.rpc.mockImplementation(async (name: string) => name === "save_crm_form_binding" ? { data: { versionId: "v9" }, error: null } : { data: { canManage: true, bindings: [] }, error: null });
+    const { onSaved } = renderSettings();
     fireEvent.click(screen.getByRole("button", { name: "Lead" }));
-    await waitFor(() => expect(screen.getByRole("option", { name: "Front desk queue (version 1)" })).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: /Create a starter form/ }));
+    await waitFor(() => expect((screen.getByRole("button", { name: /Copy today's CRM form/ }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: /Copy today's CRM form/ }));
     await waitFor(() => expect(formsApi.publishForm).toHaveBeenCalledWith("f3"));
     expect(formsApi.setFormLibraryVisibility).toHaveBeenCalledWith("f3", false);
-    const [, payload, fields] = formsApi.saveDraft.mock.calls[0] as [null, { name: string; permissions: { roles: string[] } }, Array<{ key: string; type: string; optionSource?: unknown; validation?: { width?: string } }>];
-    expect(payload.name).toBe("CRM lead registration");
+    const [, payload, fields] = formsApi.saveDraft.mock.calls[0] as [null, { name: string; permissions: { roles: string[] } }, Array<{ key: string; label: string; type: string; optionSource?: unknown; rule?: unknown; options?: unknown }>];
+    expect(payload.name).toBe("Lead registration");
     expect(payload.permissions.roles.length).toBeGreaterThan(0);
-    expect(fields.map((item) => [item.key, item.type, item.validation?.width])).toEqual([["name", "text", "half"], ["mobile_no", "phone", "half"], ["source_of_lead", "select", "half"]]);
-    expect(fields[2]!.optionSource).toEqual({ kind: "master", masterType: "crm_source" });
-    await waitFor(() => expect((screen.getByRole("combobox", { name: "Question for Source of lead" }) as HTMLSelectElement).value).toBe("source_of_lead"));
+    // The same questions, labels and order as the CRM lead form; Source of lead appears after LEAD TYPE = REMOTE.
+    expect(fields.map((item) => [item.key, item.label, item.type])).toEqual([["name", "NAME", "text"], ["mobile_no", "MOBILE NO", "phone"], ["lead_type", "LEAD TYPE", "select"], ["source_of_lead", "SOURCE OF LEAD", "select"]]);
+    expect(fields[2]!.options).toEqual([{ value: "remote", label: "REMOTE" }, { value: "walk_in", label: "WALK-IN" }]);
+    expect(fields[3]!.optionSource).toEqual({ kind: "master", masterType: "crm_source" });
+    expect(fields[3]!.rule).toEqual({ kind: "predicate", fieldKey: "lead_type", operator: "equals", value: "remote" });
+    await waitFor(() => expect(db.rpc).toHaveBeenCalledWith("save_crm_form_binding", { p_purpose: "lead", p_form_family_id: "f3-family", p_field_map: { name: "name", mobile_no: "mobile_no", lead_type: "lead_type", source_of_lead: "source_of_lead" } }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+  });
+
+  it("copies today's client queue form: CLIENT NAME and MOBILE NUMBER", async () => {
+    formsApi.saveDraft.mockImplementation(async () => { db.tables.form_templates.push(template("f4", "Client queue registration")); return "f4"; });
+    db.rpc.mockImplementation(async (name: string) => name === "save_crm_form_binding" ? { data: { versionId: "v1" }, error: null } : { data: { canManage: true, bindings: [] }, error: null });
+    renderSettings();
+    await waitFor(() => expect(screen.getByRole("option", { name: "Front desk queue (version 1)" })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /Copy today's CRM form/ }));
+    await waitFor(() => expect(db.rpc).toHaveBeenCalledWith("save_crm_form_binding", { p_purpose: "queue", p_form_family_id: "f4-family", p_field_map: { client_name: "client_name", mobile: "mobile" } }));
+    const fields = formsApi.saveDraft.mock.calls[0]![2] as Array<{ label: string; type: string; required: boolean }>;
+    expect(fields.map((item) => [item.label, item.type, item.required])).toEqual([["CLIENT NAME", "text", true], ["MOBILE NUMBER", "phone", true]]);
   });
 
   it("keeps the walk-in visit on the standard form for now", () => {
