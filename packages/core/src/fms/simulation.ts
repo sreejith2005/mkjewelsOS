@@ -12,6 +12,8 @@ export type FmsSimulationInput = Readonly<{
   outcomes?: Readonly<Record<string, readonly string[]>>;
   handoffs?: Readonly<Record<string, readonly string[]>>;
   starterId?: string;
+  /** Automatic start (0374): the person the source names, when the trigger assigns to them. */
+  triggerAssigneeId?: string;
   maxEvents?: number;
 }>;
 export type FmsSimulationEvent = Readonly<{ stageKey: string; stageName: string; visit: number; status: "simulated" | "skipped" | "waiting" | "held" | "ended";
@@ -64,7 +66,8 @@ export function simulateFmsDefinition(raw: FmsFlowDefinition, input: FmsSimulati
     const automatic = ["branch", "parallel_start", "parallel_join", "notification", "end"].includes(stage.type);
     if (!automatic && !skipped) {
       method = config?.mode ?? "legacy";
-      if (stage.key === flow.stages[0]?.key && token.path.length === 0) selected = input.starterId ?? null;
+      if (stage.key === flow.stages[0]?.key && token.path.length === 0 && (flow.startMode ?? "form") === "form") selected = input.starterId ?? null;
+      else if (stage.key === flow.stages[0]?.key && token.path.length === 0 && input.triggerAssigneeId) { selected = input.triggerAssigneeId; method = "trigger_source"; }
       else if (config?.mode === "fixed_employee" || !config) {
         selectedIds = [...new Set(stage.assigneeRules.flatMap(rule => rule.type === "specific_user" && rule.userProfileId ? [rule.userProfileId] : []))];
         if (selectedIds.length === 1) selected = selectedIds[0] ?? null;

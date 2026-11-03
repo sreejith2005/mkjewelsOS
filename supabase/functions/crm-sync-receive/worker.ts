@@ -5,7 +5,9 @@
 // Server-to-server only. The caller (CRM sync-deliver) proves itself with x-crm-sync-secret
 // (CRM_SYNC_INBOUND_SECRET, the secret of the CRM -> JewelOS direction), checked in constant
 // time before the body is read. Kind:
-//   walkin.events  {events: [{event_id, snapshot}]} -> crm_sync_apply_walkin per event
+//   walkin.events      {events: [{event_id, snapshot}]} -> crm_sync_apply_walkin per event
+//   submission.events  {events: [{event_id, payload}]}  -> crm_sync_apply_submission_event per event
+//                      (saved CRM submissions for FMS start triggers, migration 0374)
 // Idempotency and ordering are enforced in the database. Responses carry ids, outcomes and
 // counts; snapshots (client display name, MKC) are never logged or echoed.
 
@@ -13,6 +15,7 @@ export type ApplyResult = Readonly<{ outcome?: string; duplicate?: boolean }>;
 
 export type JewelosSyncGateway = Readonly<{
   applyWalkin: (eventId: string, snapshot: Record<string, unknown>) => Promise<ApplyResult>;
+  applySubmission?: ((eventId: string, payload: Record<string, unknown>) => Promise<ApplyResult>) | undefined;
 }>;
 
 export type ReceiveDeps = Readonly<{ secret: string | undefined; gateway: JewelosSyncGateway | null }>;
@@ -56,18 +59,22 @@ export async function handleCrmSyncReceive(request: Request, deps: ReceiveDeps):
   } catch {
     return json(400, { error: "Request body must be JSON" });
   }
-  if (!isObject(body) || body.kind !== "walkin.events") return json(400, { error: "Unknown sync kind" });
+  if (!isObject(body) || (body.kind !== "walkin.events" && body.kind !== "submission.events")) return json(400, { error: "Unknown sync kind" });
+  const submissions = body.kind === "submission.events";
+  const apply = submissions ? deps.gateway.applySubmission : deps.gateway.applyWalkin;
+  if (!apply) return json(503, { error: "Sync is not configured" });
+  const field = submissions ? "payload" : "snapshot";
   const events = body.events;
   if (!Array.isArray(events) || events.length === 0 || events.length > MAX_EVENTS) return json(400, { error: "Invalid events" });
   for (const item of events) {
-    if (!isObject(item) || typeof item.event_id !== "string" || !ID_PATTERN.test(item.event_id) || !isObject(item.snapshot)) {
+    if (!isObject(item) || typeof item.event_id !== "string" || !ID_PATTERN.test(item.event_id) || !isObject(item[field])) {
       return json(400, { error: "Invalid events" });
     }
   }
   const results = [];
-  for (const item of events as Array<{ event_id: string; snapshot: Record<string, unknown> }>) {
+  for (const item of events as Array<Record<string, unknown> & { event_id: string }>) {
     try {
-      const result = await deps.gateway.applyWalkin(item.event_id, item.snapshot);
+      const result = await apply(item.event_id, item[field] as Record<string, unknown>);
       results.push({ event_id: item.event_id, ok: true, outcome: result.outcome ?? "unknown", duplicate: result.duplicate === true });
     } catch (error) {
       console.error("crm-sync-receive apply failed:", error instanceof Error ? error.message : "unknown");

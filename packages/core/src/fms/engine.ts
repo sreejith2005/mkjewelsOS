@@ -1,3 +1,4 @@
+import { FMS_TRIGGER_FIRST_STAGE_TYPES } from "./startTrigger.ts";
 import { requireFmsAssignmentSourceForms } from "./assignmentAuthoring.ts";
 import type { UserRole } from "../roleMenu.ts";
 import { validateFmsAssignmentConfig } from "./assignmentConfig.ts";
@@ -242,7 +243,9 @@ export function validateFmsDefinition(raw: FmsFlowDefinition, context: FmsValida
   if (definition.scope === "department" && (!definition.branchId || !definition.departmentId)) issues.push({ code: "invalid_scope", message: "Department scope requires branch and department" });
   if (definition.scope === "branch" && !definition.branchId) issues.push({ code: "invalid_scope", message: "Branch scope requires a branch" });
   if (!definition.stages.length) return [...issues, { code: "empty_flow", message: "A flow must contain at least one stage" }];
-  if (definition.stages[0]?.type !== "form") issues.push({ code: "first_stage_must_be_form", message: "The first stage must be a Form", stageKey: definition.stages[0]?.key });
+  const formStart = (definition.startMode ?? "form") === "form";
+  if (formStart && definition.stages[0]?.type !== "form") issues.push({ code: "first_stage_must_be_form", message: "The first stage must be a Form", stageKey: definition.stages[0]?.key });
+  if (!formStart && !FMS_TRIGGER_FIRST_STAGE_TYPES.includes(definition.stages[0]!.type as never)) issues.push({ code: "invalid_first_stage", message: "A workflow without a starting form must begin with a Task, Form, Approval, Decision, Notification or Parallel step", stageKey: definition.stages[0]?.key });
   for (const [stageIndex, stage] of definition.stages.entries()) {
     const add = (code: string, message: string) => issues.push({ code, message, stageKey: stage.key });
     if (!KEY.test(stage.key) || keys.has(stage.key)) add("invalid_stage_key", "Stage keys must be unique stable identifiers"); keys.add(stage.key);
@@ -254,14 +257,14 @@ export function validateFmsDefinition(raw: FmsFlowDefinition, context: FmsValida
     if (!AUTO.has(stage.type) && stage.sla.deadlineEnabled !== false && ruleTimingApplies(stage) && stage.sla.timingMethod === "specific_time" && (!validDate(stage.sla.dueDate) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(stage.sla.clockTime ?? ""))) add("invalid_deadline", "Choose a valid date and clock time");
     if (!AUTO.has(stage.type)) for (const message of fmsFormDueIssues(definition, stage, stageIndex, undefined)) add("invalid_form_due", message);
     if (stage.sla.triggerStageKey) { const trigger = byKey.get(stage.sla.triggerStageKey); if (!trigger || trigger.order >= stage.order) add("invalid_deadline_trigger", "Timing can only start from an earlier step"); }
-    if (stage.sla.decisionMode === "yes_no" && (AUTO.has(stage.type) || stageIndex === 0 || !stage.sla.decisionOptions?.length || new Set(stage.sla.decisionOptions.map((option) => option.key)).size !== stage.sla.decisionOptions.length || stage.sla.decisionOptions.some((option) => !KEY.test(option.key) || !option.label))) add("invalid_decision", "Decision steps need unique options on human steps after the initial Form");
+    if (stage.sla.decisionMode === "yes_no" && (AUTO.has(stage.type) || (formStart && stageIndex === 0) || !stage.sla.decisionOptions?.length || new Set(stage.sla.decisionOptions.map((option) => option.key)).size !== stage.sla.decisionOptions.length || stage.sla.decisionOptions.some((option) => !KEY.test(option.key) || !option.label))) add("invalid_decision", "Decision steps need unique options on human steps after the initial Form");
     if (stage.sla.conditional) {
       const decision = byKey.get(stage.sla.conditional.decisionStageKey);
       const optionKey = "decisionOptionKey" in stage.sla.conditional ? stage.sla.conditional.decisionOptionKey : stage.sla.conditional.outcome;
       if (!decision || decision.order >= stage.order || decision.sla.decisionMode !== "yes_no" || !decision.sla.decisionOptions?.some((option) => option.key === optionKey)) add("invalid_conditional", "A condition must reference an earlier configured decision option");
     }
     if (new Set(stage.checklist.map((item) => item.key)).size !== stage.checklist.length || stage.checklist.some((item) => !KEY.test(item.key) || !item.label)) add("invalid_checklist", "Checklist keys must be unique and labels are required");
-    if (stageIndex === 0 && !stage.formTemplateId) add("missing_form", "The initial Form requires an exact published template version");
+    if (formStart && stageIndex === 0 && !stage.formTemplateId) add("missing_form", "The initial Form requires an exact published template version");
     if (stage.formTemplateId && !UUID.test(stage.formTemplateId)) add("invalid_form", "Linked form ID is invalid");
     if (stage.formTemplateId && UUID.test(stage.formTemplateId) && context.availableFormIds && !context.availableFormIds.includes(stage.formTemplateId)) add("missing_linked_form", "The linked Form is no longer an available published version");
     if (stage.sla.questionnaire?.draftFormId) add("questionnaire_draft_pending", "Questionnaire changes are saved as a draft but not in use yet. Open the questionnaire and choose Use in workflow, or discard the changes");

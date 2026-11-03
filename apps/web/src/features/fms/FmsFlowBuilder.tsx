@@ -2,7 +2,9 @@ import { upgradeFmsAssignmentContract } from "@jewelos/core";
 import { FmsSimulation } from "./FmsSimulation";
 import { suggestFmsAssignment } from "@jewelos/core";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { ArrowDownUp, ArrowLeft, CheckCircle2, ChevronDown, FileText, FlaskConical, PanelLeftOpen, Plus, Redo2, Save, Send, Sparkles, TestTube2, Undo2, UserRoundPlus, X } from "lucide-react";
+import { ArrowDownUp, ArrowLeft, CheckCircle2, ChevronDown, FileText, FlaskConical, PanelLeftOpen, Plus, Redo2, Save, Send, Sparkles, TestTube2, Undo2, UserRoundPlus, X, Zap } from "lucide-react";
+import { describeFmsStartTrigger, validateFmsStartTrigger, type FmsStartMode } from "@jewelos/core";
+import { FmsStartTriggerPanel, fmsTriggerFields, latestFormVersions } from "./FmsStartTriggerPanel";
 import { copyFirstFmsAssigneeToHumanStages, createFmsFragment, defaultFmsReportFilters, fmsOutgoingStageKeys, importFormSectionCopy, describeFmsPasteReport, fmsConnectionsTouching, fmsStageFormFields, FmsTransferError, normalizeFmsDefinition, parseFmsTransfer, pasteFmsFragment, removeFmsStages, validateFmsDefinition, type FmsFlowDefinition, type FmsStageDefinition, type FormTemplateDefinition } from "@jewelos/core";
 import { Button, Modal, Notice } from "@/components/ui";
 import { AssigneePicker } from "@/components/assignees/AssigneePicker";
@@ -125,6 +127,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
   const [studio, setStudio] = useState<Studio | null>(null);
   const [sectionPicker, setSectionPicker] = useState<Readonly<{ stageKey: string; mode: "copy" | "link" }> | null>(null);
   const [previewKey, setPreviewKey] = useState<string | null>(null);
+  const [triggerOpen, setTriggerOpen] = useState(false);
 
   const normalized = useMemo(() => normalizeFmsDefinition(definition), [definition]);
   /** The latest definition, for async work that must not save a stale render's copy. */
@@ -132,19 +135,27 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
   latest.current = normalized;
   const persistedRef = useRef(persistedId);
   persistedRef.current = persistedId;
-  const issues = useMemo(() => validateFmsDefinition(normalized, { formFields: data.formFields, formSections: data.formSections, availableFormIds: data.forms.map((form) => form.id) }), [data.formFields, data.formSections, data.forms, normalized]);
+  /** 0374: how runs start. A form-started workflow keeps every historical rule about its first Form. */
+  const formStart = (normalized.startMode ?? "form") === "form";
+  const triggerFields = useMemo(() => fmsTriggerFields(normalized.startTrigger, data), [data, normalized.startTrigger]);
+  const issues = useMemo(() => {
+    const stageIssues = validateFmsDefinition(normalized, { formFields: data.formFields, formSections: data.formSections, availableFormIds: data.forms.map((form) => form.id) });
+    if (normalized.startMode !== "automatic") return stageIssues;
+    return [...validateFmsStartTrigger(normalized.startTrigger, triggerFields, normalized.stages[0]?.type).map((issue) => ({ code: issue.code, message: `Start trigger: ${issue.message}`, stageKey: undefined })), ...stageIssues];
+  }, [data.formFields, data.formSections, data.forms, normalized, triggerFields]);
   const invalidKeys = useMemo(() => new Set(issues.flatMap((issue) => issue.stageKey ? [issue.stageKey] : [])), [issues]);
   const selected = normalized.stages.find((stage) => stage.key === selectedKey) ?? null;
   const dirty = JSON.stringify(normalized) !== savedSnapshot;
   const assignableStages = normalized.stages.filter((stage) => ["form", "task", "approval"].includes(stage.type));
   const assignedStages = assignableStages.filter((stage) => stage.assigneeRules.some((rule) => rule.type === "specific_user" && rule.userProfileId));
-  const triggerKey = normalized.stages[0]?.key;
+  const triggerKey = formStart ? normalized.stages[0]?.key : undefined;
   const activeUserIds = useMemo(() => data.users.filter((user) => user.working_status === "active" && user.account_status !== "inactive" && user.account_status !== "suspended" && user.is_login_enabled).map((user) => user.id), [data.users]);
   const selectStage = (key: string | null) => { setFocusedIssue(null); setSelectedKey(key); if (key) setRightPanel("inspector"); };
   const openIssue = (issue: (typeof issues)[number]) => {
     const stageKey = issue.stageKey;
     if (!stageKey) {
       if (issue.code === "invalid_name" || issue.code === "invalid_scope") setScreen("details");
+      if (issue.code.startsWith("trigger_")) setTriggerOpen(true);
       setIssuesOpen(false);
       return;
     }
@@ -194,12 +205,12 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
   const nextKey = () => { let index = normalized.stages.length + 1; while (normalized.stages.some((stage) => stage.key === `stage_${index}`)) index += 1; return `stage_${index}`; };
   /** Every manually added step is one unified step: questions, routing and assignees, no type choice. A deadline is opt-in. */
   const add = (type: FmsStageDefinition["type"], after?: string) => {
-    if (!normalized.stages.length && type !== "form") { setError("Every workflow starts with a Form. Add the Form trigger first."); return; }
+    if (formStart && !normalized.stages.length && type !== "form") { setError("Every workflow starts with a Form. Add the Form trigger first."); return; }
     const template = newFmsStage(type, normalized.stages.length);
     const stage = {
       ...template,
       key: nextKey(),
-      name: type === "form" && normalized.stages.length === 0 ? "Start form" : type === "task" ? "Step" : newFmsStage(type, 0).name,
+      name: formStart && type === "form" && normalized.stages.length === 0 ? "Start form" : type === "task" ? "Step" : newFmsStage(type, 0).name,
       assigneeRules: ["form", "task", "approval"].includes(type) && contextDefaultAssigneeId ? [{ type: "specific_user" as const, userProfileId: contextDefaultAssigneeId }] : [],
       sla: { ...template.sla, deadlineEnabled: false },
     };
@@ -255,7 +266,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
     const base = options.replace ? { ...normalized, stages: [] } : normalized;
     const ordered = [...stages].sort((a, b) => a.order - b.order);
     // A workflow starts with exactly one Form. Steps pasted into an empty workflow follow a new Start form unless they bring their own.
-    const needsTrigger = base.stages.length === 0 && ordered[0]?.type !== "form";
+    const needsTrigger = formStart && base.stages.length === 0 && ordered[0]?.type !== "form";
     const start = needsTrigger ? { ...newFmsStage("form", 0), key: "start_form", name: "Start form", position: { x: Math.max(0, anchor.x - 300), y: anchor.y }, sla: { ...newFmsStage("form", 0).sla, deadlineEnabled: false } } : null;
     const result = pasteFmsFragment(start ? { ...base, stages: [start] } : base, ordered, { anchor, newId: () => crypto.randomUUID(), availableFormIds: data.forms.map((form) => form.id), availableUserIds: activeUserIds, availableFlowIds: data.flows.map((item) => item.id) });
     commit({ ...result.definition, ...(options.name && (options.replace || !normalized.name) ? { name: options.name } : {}), ...(options.description && (options.replace || !normalized.description) ? { description: options.description } : {}) });
@@ -373,7 +384,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
   const editRoute = (from: string, ruleId: string | undefined) => { setSelectedKey(from); setSelectedKeys([from]); setRightPanel("inspector"); setRouteFocus((current) => ({ ruleId, id: (current?.id ?? 0) + 1 })); };
   const changeSelection = (keys: readonly string[]) => { setSelectedKeys(keys); if (keys.length > 1 || (selectedKey && !keys.includes(selectedKey) && keys.length)) setSelectedKey(null); };
   const openStage = (key: string) => { setSelectedKeys([key]); selectStage(key); };
-  const ensureFirstForm = () => { if (normalized.stages.length) return; const template = newFmsStage("form", 0); const first = { ...template, key: "start_form", name: "Start form", assigneeRules: contextDefaultAssigneeId ? [{ type: "specific_user" as const, userProfileId: contextDefaultAssigneeId }] : [], sla: { ...template.sla, deadlineEnabled: false } }; commit({ ...definition, stages: [first] }); setSelectedKey(isPhone ? null : first.key); };
+  const ensureFirstForm = () => { if (normalized.stages.length) return; if (!formStart) { add("task"); return; } const template = newFmsStage("form", 0); const first = { ...template, key: "start_form", name: "Start form", assigneeRules: contextDefaultAssigneeId ? [{ type: "specific_user" as const, userProfileId: contextDefaultAssigneeId }] : [], sla: { ...template.sla, deadlineEnabled: false } }; commit({ ...definition, stages: [first] }); setSelectedKey(isPhone ? null : first.key); };
   const persist = async (value: FmsFlowDefinition = normalized) => { const id = await saveFmsDraft(persistedRef.current, value); setPersistedId(id); persistedRef.current = id; setSavedSnapshot(JSON.stringify(value)); await onSaved(); return id; };
   const save = async () => { setBusy("save"); setError(null); setSuccess(null); try { await persist(); setSuccess("Draft saved"); } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to save FMS draft"); } finally { setBusy(null); } };
   const publish = async () => { if (issues.length) { setError("Resolve the publish-readiness issues below before publishing."); return; } setBusy("publish"); setError(null); try { const id = await persist(); await publishFmsFlow(id); await onSaved(); setSuccess("Workflow published and ready to run"); onClose(); } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to publish workflow"); } finally { setBusy(null); } };
@@ -409,7 +420,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
     },
   });
 
-  if (screen === "details") return <section className="mx-auto max-w-2xl space-y-6"><Button onClick={onClose} type="button" variant="ghost"><ArrowLeft className="size-4" />Back to FMS</Button><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-gold-secondary">Workflow details</p><h3 className="mt-2 text-2xl font-semibold text-white">Name this workflow</h3><p className="mt-2 text-sm text-soft-grey">The first canvas step will be a Form trigger. No Start or End nodes are needed.</p></div><div className="space-y-4 rounded-2xl border border-gold/20 bg-charcoal p-5"><label className="block"><span className="label">Workflow name *</span><input autoFocus className="field" maxLength={150} onChange={(event) => commit({ ...definition, name: event.target.value })} value={definition.name} /></label><label className="block"><span className="label">Purpose *</span><textarea className="field min-h-24" onChange={(event) => commit({ ...definition, description: event.target.value })} value={definition.description ?? ""} /></label>{scopeSummary ? <p className="rounded-lg border border-gold/15 bg-gold/5 p-3 text-xs text-soft-grey">Existing scope kept: {scopeSummary}. Scope is no longer part of workflow setup and stays exactly as it was saved.</p> : null}</div><Button className="ml-auto flex" disabled={!normalized.name || !normalized.description?.trim()} onClick={() => { ensureFirstForm(); setScreen("canvas"); }}>Open builder <Plus className="size-4" /></Button></section>;
+  if (screen === "details") return <section className="mx-auto max-w-2xl space-y-6"><Button onClick={onClose} type="button" variant="ghost"><ArrowLeft className="size-4" />Back to FMS</Button><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-gold-secondary">Workflow details</p><h3 className="mt-2 text-2xl font-semibold text-white">Name this workflow</h3><p className="mt-2 text-sm text-soft-grey">{formStart ? "The first canvas step will be a Form trigger. No Start or End nodes are needed." : normalized.startMode === "automatic" ? "Next you choose what starts it and the conditions, then design the follow-up steps." : "The first canvas step will be an ordinary step. No intake form is needed."}</p></div><div className="space-y-4 rounded-2xl border border-gold/20 bg-charcoal p-5"><label className="block"><span className="label">Workflow name *</span><input autoFocus className="field" maxLength={150} onChange={(event) => commit({ ...definition, name: event.target.value })} value={definition.name} /></label><label className="block"><span className="label">Purpose *</span><textarea className="field min-h-24" onChange={(event) => commit({ ...definition, description: event.target.value })} value={definition.description ?? ""} /></label>{!flow ? <fieldset className="space-y-2"><legend className="label">How does it start? *</legend>{([["form", "Start with Form", "Someone fills a starting form."], ["automatic", "Automatic Trigger", "A saved form or CRM entry starts it when conditions match."], ["manual", "Manual Start Without Form", "Started from the FMS list, no intake form."]] as const).map(([mode, title, body]) => <label className="flex min-h-11 cursor-pointer gap-3 rounded-xl border border-gold/20 p-3 text-sm" key={mode}><input checked={(definition.startMode ?? "form") === mode} name="fms-new-start-mode" onChange={() => commit({ ...definition, startMode: mode as FmsStartMode })} type="radio" /><span><b className="block text-white">{title}</b><span className="text-xs text-soft-grey">{body}</span></span></label>)}</fieldset> : null}{scopeSummary ? <p className="rounded-lg border border-gold/15 bg-gold/5 p-3 text-xs text-soft-grey">Existing scope kept: {scopeSummary}. Scope is no longer part of workflow setup and stays exactly as it was saved.</p> : null}</div><Button className="ml-auto flex" disabled={!normalized.name || !normalized.description?.trim()} onClick={() => { ensureFirstForm(); setScreen("canvas"); if (normalized.startMode === "automatic") setTriggerOpen(true); }}>Open builder <Plus className="size-4" /></Button></section>;
 
   const checkWorkflow = () => { setSuccess(issues.length ? null : "Workflow check passed"); setError(issues.length ? "Workflow check found issues. Review Publish readiness." : null); };
   const processFormName = normalized.stages[0]?.formTemplateId ? data.forms.find((form) => form.id === normalized.stages[0]?.formTemplateId)?.name ?? "Form attached" : "None attached";
@@ -423,12 +434,12 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
   const toggleAi = () => { if (aiOpen && (rightPanel === "ai" || !selected)) setAiOpen(false); else openAi(); };
   // The assistant and the step inspector share the right side; only one is shown at a time.
   const aiPanel = ai && aiOpen ? <FmsAiPanel canManageForms={canManageForms} embedded={!isPhone} data={data} definition={normalized} onApply={(next) => { commit(next); setSuccess("AI assistant changes applied. Use Undo to revert; Save draft and Publish when ready."); }} onClose={() => setAiOpen(false)} onGoToStage={goToStage} published={ai.published ?? null} selectedStageKey={selected?.key ?? selectedKey} settings={ai.settings} /> : null;
-  const emptyStart = !normalized.stages.length ? <div className="space-y-3 rounded-2xl border border-gold/20 bg-charcoal p-5 text-sm text-soft-grey"><p className="font-semibold text-white">This workflow has no steps yet.</p><p>Start with the Form trigger, import a workflow{aiAvailable ? ", or ask the AI assistant" : ""}.</p><div className="flex flex-wrap gap-2"><Button onClick={() => ensureFirstForm()} variant="secondary"><Plus className="size-4" />Add the first step</Button><Button onClick={() => setTransfer("import")} variant="secondary"><ArrowDownUp className="size-4" />Import</Button>{aiAvailable ? <Button onClick={openAi} variant="secondary"><Sparkles className="size-4" />AI assistant</Button> : null}</div></div> : null;
+  const emptyStart = !normalized.stages.length ? <div className="space-y-3 rounded-2xl border border-gold/20 bg-charcoal p-5 text-sm text-soft-grey"><p className="font-semibold text-white">This workflow has no steps yet.</p><p>{formStart ? "Start with the Form trigger" : "Add the first step"}, import a workflow{aiAvailable ? ", or ask the AI assistant" : ""}.</p><div className="flex flex-wrap gap-2"><Button onClick={() => ensureFirstForm()} variant="secondary"><Plus className="size-4" />Add the first step</Button><Button onClick={() => setTransfer("import")} variant="secondary"><ArrowDownUp className="size-4" />Import</Button>{aiAvailable ? <Button onClick={openAi} variant="secondary"><Sparkles className="size-4" />AI assistant</Button> : null}</div></div> : null;
   const showAi = !!aiPanel && (rightPanel === "ai" || !selected);
   const showInspector = !!selected && !showAi;
   const stageIssues = selected ? issues.filter((issue) => issue.stageKey === selected.key) : [];
-  const editor = selected ? <FmsStageEditor assignmentVersion={normalized.assignmentVersion} data={data} endCounts={endCounts} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); setSelectedKeys([value.key]); }} onDelete={() => remove(selected.key)} questionnaire={questionnaireActions(selected)} stage={selected} stages={normalized.stages} /> : null;
-  const inspectorHeader = selected ? <div className="min-w-0"><p className="text-xs text-gold-secondary">{selected.key === triggerKey ? "Start form" : selected.type === "task" ? "Step" : selected.type.replaceAll("_", " ")}</p><h3 className="truncate text-lg font-semibold text-white">{selected.name || "Untitled step"}</h3></div> : null;
+  const editor = selected ? <FmsStageEditor assignmentVersion={normalized.assignmentVersion} startMode={normalized.startMode} data={data} endCounts={endCounts} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); setSelectedKeys([value.key]); }} onDelete={() => remove(selected.key)} questionnaire={questionnaireActions(selected)} stage={selected} stages={normalized.stages} /> : null;
+  const inspectorHeader = selected ? <div className="min-w-0"><p className="text-xs text-gold-secondary">{selected.key === triggerKey ? "Start form" : !formStart && selected.key === normalized.stages[0]?.key ? (normalized.startMode === "automatic" ? "First step (after the automatic start)" : "First step") : selected.type === "task" ? "Step" : selected.type.replaceAll("_", " ")}</p><h3 className="truncate text-lg font-semibold text-white">{selected.name || "Untitled step"}</h3></div> : null;
   const inspector = selected ? <>
     <div aria-hidden="true" className="fixed inset-0 z-40 bg-obsidian/60 md:hidden" onClick={() => setSelectedKey(null)} />
     <aside aria-label={`Configure ${selected.name || "step"}`} ref={inspectorRef} className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 max-h-[80dvh] overflow-y-auto overscroll-contain rounded-t-2xl border border-gold/30 bg-obsidian px-4 pb-4 shadow-2xl">
@@ -451,6 +462,14 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
     </div>
   </aside> : null;
   const rightPanels = <>{aiPanel ? <div className={showAi ? "contents" : "hidden"}>{aiPanel}</div> : null}{showInspector ? isPhone ? inspector : desktopInspector : null}</>;
+  const triggerFormName = normalized.startTrigger?.source.formFamilyId ? latestFormVersions(data.forms).find((form) => form.family_id === normalized.startTrigger?.source.formFamilyId)?.name : undefined;
+  const startLines = normalized.startMode === "automatic" ? describeFmsStartTrigger(normalized.startTrigger, triggerFields, normalized.name, triggerFormName) : normalized.startMode === "manual" ? ["MANUAL START", "STARTED FROM THE FMS LIST", "NO INTAKE FORM"] : [];
+  /** Non-executable anchor: it never becomes a step, a task or a form, and it leads to the first real step. */
+  const startAnchor = formStart || !normalized.stages.length ? null : <button aria-label="Edit start trigger" className="absolute left-3 top-3 z-20 max-w-[min(22rem,calc(100%-1.5rem))] rounded-2xl border border-dashed border-gold/60 bg-charcoal/95 p-3 text-left shadow-xl backdrop-blur hover:border-gold" data-testid="fms-start-anchor" onClick={() => setTriggerOpen(true)} type="button">
+    <span className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-gold-secondary"><Zap className="size-3.5" />{normalized.startMode === "automatic" ? "Automatic start" : "Manual start"}</span>
+    {startLines.map((line, index) => <span className={cn("mt-1 block text-xs", index === 1 ? "text-champagne" : "font-semibold text-white")} key={`${line}-${index}`}>{line}</span>)}
+    <span className="mt-2 block text-[11px] text-soft-grey">→ {normalized.stages[0]?.name || "First step"} · tap to edit</span>
+  </button>;
   const canvas = <FmsGraphCanvas definition={normalized} endCounts={endCounts} fill={!isPhone} formFields={data.formFields} focusRequest={focusRequest} inspectedKey={selected?.key ?? null} invalidKeys={invalidKeys} onAddAfter={(key) => add("task", key)} onCommand={runCommand} onConnect={connect} onDelete={(key) => requestDelete([key])} onDisconnect={disconnect} onDuplicate={duplicateStage} onEditRoute={editRoute} onMove={moveStages} onOpen={openStage} onReconnect={reconnect} onSelectionChange={changeSelection} ref={canvasRef} selectedKeys={selectedKeys} />;
   const studioStage = studio ? normalized.stages.find((stage) => stage.key === studio.stageKey) : undefined;
   const sectionStage = sectionPicker ? normalized.stages.find((stage) => stage.key === sectionPicker.stageKey) : undefined;
@@ -485,6 +504,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
       onLink={(formId, sectionKey) => { setSectionPicker(null); replace(sectionStage.key, { ...sectionStage, formTemplateId: formId, sla: { ...sectionStage.sla, formSectionKey: sectionKey, questionnaire: undefined } }); }}
     /> : null}
     {previewStage ? <FmsQuestionnairePreview onClose={() => setPreviewKey(null)} stage={previewStage} /> : null}
+    {triggerOpen ? <FmsStartTriggerPanel data={data} definition={normalized} flowId={persistedId} onApply={({ startMode, startTrigger }) => { commit((current) => ({ ...current, startMode, startTrigger })); setSuccess("Start settings updated. Save the draft to keep them."); }} onClose={() => setTriggerOpen(false)} /> : null}
   </>;
 
   /**
@@ -504,6 +524,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
         <Button aria-label="Undo" className="shrink-0 px-3" disabled={!past.length} onClick={undo} variant="ghost"><Undo2 className="size-5" /></Button>
         <Button aria-label="Redo" className="shrink-0 px-3" disabled={!future.length} onClick={redo} variant="ghost"><Redo2 className="size-5" /></Button>
         {aiAvailable ? <Button aria-label="AI assistant" aria-pressed={aiOpen} className="shrink-0 px-3" onClick={toggleAi} variant={aiOpen ? "primary" : "ghost"}><Sparkles className="size-5" /></Button> : null}
+        <Button aria-label="Start trigger" className="shrink-0 px-3" onClick={() => setTriggerOpen(true)} variant="ghost"><Zap className="size-5" /></Button>
         <Button aria-label="Simulate workflow" className="shrink-0 px-3" onClick={() => setSimulating(true)} variant="ghost"><FlaskConical className="size-5" /></Button>
         <Button aria-label="Import or export" className="shrink-0 px-3" onClick={() => setTransfer("import")} variant="ghost"><ArrowDownUp className="size-5" /></Button>
         <Button aria-label="Default assignees" className="ml-auto shrink-0 px-3" onClick={() => setAssigning(true)} variant="ghost"><UserRoundPlus className="size-5" /></Button>
@@ -513,6 +534,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
     {error ? <Notice tone="danger">{error}</Notice> : null}{success ? <Notice>{success}</Notice> : null}
     {emptyStart ?? <div className="relative">
       {canvas}
+      {startAnchor}
       <Button className="absolute bottom-3 left-3 z-30 shadow-lg" onClick={() => add("task")} type="button"><Plus className="size-4" />Add Step</Button>
     </div>}
     <section className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 -mx-2 mt-auto rounded-t-2xl border border-b-0 border-gold/30 bg-charcoal/95 backdrop-blur">
@@ -542,6 +564,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
       <Button aria-label="Redo" className={toolbarButton} disabled={!future.length} onClick={redo} title="Redo (Ctrl+Shift+Z)" variant="ghost"><Redo2 className="size-4" /></Button>
       <Button aria-label="Import or export" className={toolbarButton} onClick={() => setTransfer("import")} title="Import or export workflow" variant="ghost"><ArrowDownUp className="size-4" /><span className="hidden xl:inline">Import / Export</span></Button>
       {aiAvailable ? <Button aria-label="AI assistant" aria-pressed={showAi} className={toolbarButton} onClick={toggleAi} variant={showAi ? "primary" : "secondary"}><Sparkles className="size-4" /><span className="hidden md:inline">AI assistant</span></Button> : null}
+      <Button aria-label="Start trigger" className={toolbarButton} onClick={() => setTriggerOpen(true)} title="How this workflow starts" variant="secondary"><Zap className="size-4" /><span className="hidden xl:inline">Start trigger</span></Button>
       <Button aria-label="Check workflow" className={toolbarButton} onClick={checkWorkflow} variant="secondary"><TestTube2 className="size-4" /><span className="hidden xl:inline">Check workflow</span></Button>
       <Button aria-label="Simulate workflow" className={toolbarButton} onClick={() => setSimulating(true)} variant="secondary"><FlaskConical className="size-4" /><span className="hidden xl:inline">Simulate</span></Button>
       <Button aria-label={busy === "save" ? "Saving..." : "Save draft"} className={toolbarButton} disabled={!!busy} onClick={() => void save()} variant="secondary"><Save className="size-4" /><span aria-hidden className="hidden lg:inline">{busy === "save" ? "Saving..." : "Save draft"}</span></Button>
@@ -559,7 +582,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
         <button aria-label="Add Step" className="grid size-9 place-items-center rounded-lg bg-gold text-on-gold shadow transition hover:brightness-110" onClick={() => add("task")} title="Add Step" type="button"><Plus className="size-4" /></button>
       </nav>
       <div className="relative min-w-0 flex-1" style={{ "--fms-canvas-overlay-bottom": "5rem" } as CSSProperties}>
-        {emptyStart ? <div className="grid h-full place-items-center overflow-y-auto p-6"><div className="max-w-md">{emptyStart}</div></div> : canvas}
+        {emptyStart ? <div className="grid h-full place-items-center overflow-y-auto p-6"><div className="max-w-md">{emptyStart}</div></div> : <>{canvas}{startAnchor}</>}
         <section aria-label="Publish readiness" className={cn("absolute bottom-3 left-3 z-30 rounded-2xl border border-gold/30 bg-charcoal/95 px-3 py-2 shadow-xl backdrop-blur", rightOpen ? "max-w-[calc(100%-min(30rem,100%-3.5rem)-1.5rem)]" : "max-w-[min(56rem,calc(100%-1.5rem))]")}>
           <div className="flex flex-wrap items-center gap-3">
             <div className="shrink-0"><p className="text-sm font-semibold text-white">Publish readiness</p><p className="text-xs text-soft-grey">{issues.length ? `${issues.length} issue${issues.length === 1 ? "" : "s"} to resolve` : "Ready to publish"}</p></div>
@@ -572,7 +595,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
             <header className="flex shrink-0 items-center justify-between gap-2 border-b border-gold/15 px-3 py-2.5"><p className="text-sm font-semibold text-white">Workflow tools</p><Button aria-label="Close workflow tools" autoFocus className="shrink-0 px-2" onClick={() => { setToolsOpen(false); toolsButtonRef.current?.focus(); }} variant="ghost"><X className="size-5" /></Button></header>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
               <button className="flex w-full items-center gap-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-left text-gold-secondary hover:bg-gold/20" onClick={() => add("task")} type="button"><span className="grid size-8 place-items-center rounded-lg bg-gold text-on-gold"><Plus className="size-4" /></span><span><b className="block text-sm">Add Step</b><span className="text-[11px] text-champagne">Questions, routing and assignee</span></span></button>
-              <section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Process form</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/15 p-3 text-left hover:border-gold" onClick={() => { if (normalized.stages[0]) { openStage(normalized.stages[0].key); setToolsOpen(false); } }} type="button"><span className="grid size-8 place-items-center rounded-lg bg-champagne/20 text-champagne"><FileText className="size-4" /></span><span><b className="block text-sm text-white">{processFormName}</b><span className="text-[11px] text-soft-grey">The form that starts the workflow</span></span></button></section>
+              {formStart ? <section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Process form</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/15 p-3 text-left hover:border-gold" onClick={() => { if (normalized.stages[0]) { openStage(normalized.stages[0].key); setToolsOpen(false); } }} type="button"><span className="grid size-8 place-items-center rounded-lg bg-champagne/20 text-champagne"><FileText className="size-4" /></span><span><b className="block text-sm text-white">{processFormName}</b><span className="text-[11px] text-soft-grey">The form that starts the workflow</span></span></button></section> : <section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Start trigger</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/15 p-3 text-left hover:border-gold" onClick={() => { setTriggerOpen(true); setToolsOpen(false); }} type="button"><span className="grid size-8 place-items-center rounded-lg bg-champagne/20 text-champagne"><Zap className="size-4" /></span><span><b className="block text-sm text-white">{normalized.startMode === "automatic" ? "Automatic trigger" : "Manual start"}</b><span className="text-[11px] text-soft-grey">{startLines[0] ?? "Choose how runs start"}</span></span></button></section>}
               <section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Default assignees</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/15 p-3 text-left hover:border-gold" onClick={() => { setAssigning(true); setToolsOpen(false); }} type="button"><span className="grid size-8 place-items-center rounded-lg bg-champagne/20 text-champagne"><UserRoundPlus className="size-4" /></span><span><b className="block text-sm text-white">{assigneeSummary}</b><span className="text-[11px] text-soft-grey">Pre-assign people to steps</span></span></button></section>
               <section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Shortcuts</p><dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px] text-soft-grey">{[["Ctrl+C / X / V", "Copy, cut, paste steps"], ["Ctrl+D", "Duplicate"], ["Del", "Delete"], ["Ctrl+A", "Select all"], ["Ctrl+Z", "Undo"], ["Space+drag", "Pan"], ["1", "Fit workflow"], ["Esc", "Clear selection"]].flatMap(([keys, label]) => [<dt className="font-semibold text-champagne" key={`${keys}-k`}>{keys}</dt>, <dd key={`${keys}-v`}>{label}</dd>])}</dl></section>
             </div>

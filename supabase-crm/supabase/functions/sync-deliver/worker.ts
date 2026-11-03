@@ -5,6 +5,9 @@
 // Called by pg_cron (x-cron-secret), never by a browser. It claims due walkin.changed events,
 // sends their snapshots (computed at claim time) to JewelOS crm-sync-receive, and finishes each
 // event (delivered, requeued when it changed in flight, retry with backoff, dead after 10).
+// It then delivers the immutable saved-submission stream (CRM migration 20261103000200) the same
+// way, as kind submission.events, for JewelOS FMS start triggers. The two streams are independent:
+// a failure of one never blocks the other.
 // The response carries counts only. Snapshots (client display name, MKC) are never logged.
 
 export type WalkinSnapshot = Readonly<Record<string, unknown> & { queue_id: string; snapshot_at: string }>;
@@ -30,10 +33,19 @@ export type JewelosReceiver = Readonly<{
   post: (body: Record<string, unknown>) => Promise<Readonly<{ status: number; body: unknown }>>;
 }>;
 
+export type ClaimedSubmission = Readonly<{ event_id: number; kind: string; payload: Record<string, unknown> }>;
+
+export type CrmSubmissionGateway = Readonly<{
+  claim: (limit: number) => Promise<readonly ClaimedSubmission[]>;
+  finish: (eventId: number, ok: boolean, error: string | null) => Promise<FinishState>;
+}>;
+
 export type DeliverDeps = Readonly<{
   cronSecret: string | undefined;
   crm: CrmOutboxGateway | null;
   jewelos: JewelosReceiver | null;
+  /** Saved-submission stream; absent until the CRM migration is applied. */
+  submissions?: CrmSubmissionGateway | null | undefined;
 }>;
 
 const BATCH_SIZE = 50;
@@ -63,6 +75,9 @@ export function syncEventId(event: ClaimedEvent): string {
   const at = Date.parse(event.snapshot.snapshot_at);
   return `crm.walkin.${event.event_id}.${Number.isFinite(at) ? at : 0}`;
 }
+
+/** The JewelOS inbox key of a saved submission: the outbox row is immutable, so its id is enough. */
+export const submissionEventId = (event: ClaimedSubmission): string => `crm.sub.${event.event_id}`;
 
 function resultsById(body: unknown): Map<string, ReceiverResult> {
   const results = (body as { results?: unknown } | null)?.results;
@@ -104,15 +119,58 @@ async function deliver(crm: CrmOutboxGateway, jewelos: JewelosReceiver) {
   return counts;
 }
 
+async function deliverSubmissions(crm: CrmSubmissionGateway, jewelos: JewelosReceiver) {
+  const counts = { claimed: 0, delivered: 0, requeued: 0, retry: 0, dead: 0, ignored: 0 };
+  for (let batch = 0; batch < MAX_BATCHES; batch += 1) {
+    const events = await crm.claim(BATCH_SIZE);
+    if (events.length === 0) break;
+    counts.claimed += events.length;
+    let results = new Map<string, ReceiverResult>();
+    let failure: string | null = null;
+    try {
+      const response = await jewelos.post({
+        kind: "submission.events",
+        events: events.map((event) => ({ event_id: submissionEventId(event), payload: event.payload })),
+      });
+      if (response.status === 200) results = resultsById(response.body);
+      else failure = `http_${response.status}`;
+    } catch {
+      failure = "network";
+    }
+    for (const event of events) {
+      const result = results.get(submissionEventId(event));
+      const ok = failure === null && result?.ok === true;
+      const error = ok ? null : failure ?? (typeof result?.error === "string" ? result.error : "no_result");
+      counts[await crm.finish(event.event_id, ok, error)] += 1;
+    }
+    if (failure !== null || events.length < BATCH_SIZE) break;
+  }
+  return counts;
+}
+
 export async function handleSyncDeliver(request: Request, deps: DeliverDeps): Promise<Response> {
   if (request.method !== "POST") return new Response(null, { status: 405, headers: { Allow: "POST" } });
   if (!deps.cronSecret || !deps.crm || !deps.jewelos) return json(503, { error: "CRM sync is not configured" });
   if (!secretMatches(request.headers.get("x-cron-secret"), deps.cronSecret)) return json(401, { error: "Scheduler authorization required" });
 
+  let walkin: Awaited<ReturnType<typeof deliver>> | null = null;
+  let walkinFailed = false;
   try {
-    return json(200, await deliver(deps.crm, deps.jewelos));
+    walkin = await deliver(deps.crm, deps.jewelos);
   } catch (error) {
+    walkinFailed = true;
     console.error("sync-deliver failed:", error instanceof Error ? error.name : "unknown");
-    return json(500, { error: "CRM sync failed" });
   }
+  let submissions: Awaited<ReturnType<typeof deliverSubmissions>> | null = null;
+  let submissionsFailed = false;
+  if (deps.submissions) {
+    try {
+      submissions = await deliverSubmissions(deps.submissions, deps.jewelos);
+    } catch (error) {
+      submissionsFailed = true;
+      console.error("sync-deliver submissions failed:", error instanceof Error ? error.name : "unknown");
+    }
+  }
+  if (walkinFailed && (!deps.submissions || submissionsFailed)) return json(500, { error: "CRM sync failed" });
+  return json(200, { ...(walkin ?? { walkin_failed: true }), ...(deps.submissions ? { submissions: submissions ?? { failed: true } } : {}) });
 }

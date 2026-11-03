@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, BarChart3, GitBranch, ListChecks, Pause, Pencil, Play, Plus, RotateCcw, Search, Settings2, Trash2 } from "lucide-react";
+import { ArrowLeft, BarChart3, GitBranch, ListChecks, Pause, Pencil, Play, Plus, RotateCcw, Search, Settings2, Trash2, Zap } from "lucide-react";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
 import { flowToDefinition } from "@/features/fms/definition";
@@ -19,6 +19,8 @@ import {
   type FmsFlowRow,
 } from "@/features/fms/api";
 import { FmsFlowBuilder } from "@/features/fms/FmsFlowBuilder";
+import { FmsManualStart } from "@/features/fms/FmsManualStart";
+import { FmsTriggerHistory } from "@/features/fms/FmsTriggerHistory";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { FMSTasksPage } from "./FMSTasksPage";
 import { FMS_TERMINAL_OUTCOME_LABELS, fmsTaskBoardPath, hasPermission, parseFmsAssignedWorkPath, type FmsLibraryOutcome } from "@jewelos/core";
@@ -66,6 +68,8 @@ export function FMSBuilderPage() {
   // The assistant is optional: its settings read as "all off" on any error.
   const [aiSettings, setAiSettings] = useState<FmsAiSettings | null>(null);
   const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [manualStart, setManualStart] = useState<FmsFlowRow | null>(null);
   useEffect(() => { if (canManage) void loadFmsAiSettings().then(setAiSettings); }, [canManage]);
 
   const refresh = useCallback(async () => {
@@ -215,9 +219,12 @@ export function FMSBuilderPage() {
         </div>
         {canManage ? <div className="flex w-full flex-wrap gap-2 sm:w-auto">
           {aiSettings?.canConfigure ? <Button aria-label="AI assistant settings" onClick={() => setAiSettingsOpen(true)} variant="secondary"><Settings2 className="size-4" /><span className="hidden sm:inline">AI assistant</span></Button> : null}
+          <Button aria-label="Trigger history" onClick={() => setHistoryOpen(true)} variant="secondary"><Zap className="size-4" /><span className="hidden sm:inline">Trigger history</span></Button>
           <Button className="flex-1 sm:flex-none" onClick={() => setEdit(null)}><Plus className="size-4" />New workflow</Button>
         </div> : null}
       </header>
+      {historyOpen ? <FmsTriggerHistory onClose={() => setHistoryOpen(false)} /> : null}
+      {manualStart ? <FmsManualStart flow={manualStart} onClose={() => setManualStart(null)} onStarted={() => void refresh()} /> : null}
       {aiSettingsOpen && aiSettings ? <FmsAiSettingsDialog onClose={() => setAiSettingsOpen(false)} onSaved={setAiSettings} settings={aiSettings} /> : null}
 
       <label className="relative block">
@@ -258,6 +265,7 @@ export function FMSBuilderPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="text-lg font-semibold text-white">{flow.name}</h2>
                       <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase ${STATE_STYLES[state]}`}>{state}</span>
+                      {flow.start_mode === "automatic" ? <span className="inline-flex items-center gap-1 rounded-full border border-gold/30 px-2 py-0.5 text-xs text-gold-secondary"><Zap className="size-3" />Starts automatically</span> : flow.start_mode === "manual" ? <span className="rounded-full border border-gold/30 px-2 py-0.5 text-xs text-gold-secondary">Manual start</span> : null}
                       {draft && draft.id !== flow.id ? <span className="rounded-full border border-champagne/30 bg-champagne/10 px-2 py-0.5 text-xs text-champagne">draft v{draft.version} in progress</span> : null}
                     </div>
                     <p className="mt-1 text-sm text-soft-grey">{flow.description || "No description added."}</p>
@@ -272,6 +280,7 @@ export function FMSBuilderPage() {
                     {/* Managers: Tasks opens the stage board, Runs the run list. Staff: Tasks keeps the run list as before. */}
                     <Button onClick={() => canSeeTeam ? openUrl(fmsTaskBoardPath(family.key)) : setTasksFor(family)} variant="secondary"><ListChecks className="size-4" />Tasks{counts.mine ? ` (${counts.mine})` : ""}</Button>
                     {canSeeTeam ? <Button onClick={() => setTasksFor(family)} variant="secondary"><BarChart3 className="size-4" />Runs</Button> : null}
+                    {flow.start_mode === "manual" && flow.status === "published" && flow.is_active ? <Button onClick={() => setManualStart(flow)}><Play className="size-4" />Start</Button> : null}
                     {canManage && draft ? <Button disabled={busy} onClick={() => setEdit(draft)} variant="secondary"><Pencil className="size-4" />Edit draft</Button> : null}
                     {canManage && !draft && flow.status !== "draft" ? <Button disabled={busy} onClick={() => void revise(flow)} variant="secondary"><Pencil className="size-4" />New version</Button> : null}
                     {canManage && flow.status === "published" ? <Button disabled={busy} onClick={() => toggleActive(flow)} variant="secondary">{flow.is_active ? <><Pause className="size-4" />Pause</> : <><Play className="size-4" />Resume</>}</Button> : null}
