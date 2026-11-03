@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, FlaskConical, Plus, Trash2 } from "lucide-react";
 import {
   FMS_TRIGGER_OPERATOR_LABELS, FMS_TRIGGER_SOURCES, fmsTriggerFieldTypeForQuestion, fmsTriggerOperatorsFor, fmsTriggerSource,
@@ -251,7 +251,10 @@ function usedFields(node: FmsTriggerNode, out = new Set<string>()): Set<string> 
 }
 
 function TriggerTest({ trigger, fields, definition, flowId }: Readonly<{ trigger: FmsStartTrigger; fields: readonly FmsTriggerField[]; definition: FmsFlowDefinition; flowId: string | null }>) {
-  const [answers, setAnswers] = useState<Record<string, unknown>>({});
+  const [answers, setAnswersState] = useState<Record<string, unknown>>({});
+  // The latest answers, so "Test conditions" never sends a value one keystroke behind.
+  const answersRef = useRef(answers);
+  const setAnswers = (update: (current: Record<string, unknown>) => Record<string, unknown>) => setAnswersState((current) => { const next = update(current); answersRef.current = next; return next; });
   const [samples, setSamples] = useState<readonly FmsTriggerSample[] | null>(null);
   const [result, setResult] = useState<FmsTriggerTestResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -262,17 +265,17 @@ function TriggerTest({ trigger, fields, definition, flowId }: Readonly<{ trigger
   const run = async () => {
     if (!flowId) { setError("Save the draft once before testing."); return; }
     setBusy(true); setError(null);
-    try { setResult(await testFmsStartTrigger(flowId, trigger, answers)); } catch (caught) { setError(caught instanceof Error ? caught.message : "The test could not run"); } finally { setBusy(false); }
+    try { setResult(await testFmsStartTrigger(flowId, trigger, answersRef.current)); } catch (caught) { setError(caught instanceof Error ? caught.message : "The test could not run"); } finally { setBusy(false); }
   };
   const loadSamples = async () => { setError(null); try { setSamples(await listFmsTriggerSamples(trigger.source)); } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not load recent submissions"); } };
   const fieldLabel = (key: string) => fields.find((field) => field.key === key)?.label ?? key;
   return <section className="space-y-3 rounded-2xl border border-gold/20 p-4" data-testid="trigger-test">
     <div className="flex flex-wrap items-center gap-2"><h4 className="mr-auto font-semibold text-white">Test without creating work</h4><Button onClick={() => void loadSamples()} variant="ghost">Load a recent submission</Button></div>
-    {samples ? samples.length ? <select aria-label="Recent submission" className="field" onChange={(event) => { const sample = samples.find((item) => item.id === event.target.value); if (sample) setAnswers(sample.answers); }} defaultValue="">
+    {samples ? samples.length ? <select aria-label="Recent submission" className="field" onChange={(event) => { const sample = samples.find((item) => item.id === event.target.value); if (sample) setAnswers(() => sample.answers); }} defaultValue="">
       <option value="">Choose a recent submission</option>{samples.map((sample) => <option key={sample.id} value={sample.id}>{sample.label} · {new Date(sample.at).toLocaleString()}</option>)}
     </select> : <p className="text-xs text-soft-grey">No recent submissions you can open. Enter sample values instead.</p> : null}
     <div className="grid gap-2 md:grid-cols-2">{shown.map((field) => <label className="block" key={field.key}><span className="label">{field.label}</span>
-      <input aria-label={`Sample ${field.label}`} className="field" onChange={(event) => setAnswers({ ...answers, [field.key]: field.type === "multi_choice" ? event.target.value.split(",").map((item) => item.trim()).filter(Boolean) : field.type === "number" && event.target.value !== "" ? Number(event.target.value) : event.target.value })} placeholder={field.options?.length ? field.options.slice(0, 3).map((option) => option.value).join(" / ") : field.type === "date" ? "YYYY-MM-DD" : ""} value={Array.isArray(answers[field.key]) ? (answers[field.key] as unknown[]).join(", ") : String(answers[field.key] ?? "")} />
+      <input aria-label={`Sample ${field.label}`} className="field" onChange={(event) => { const value = event.target.value; setAnswers((current) => ({ ...current, [field.key]: field.type === "multi_choice" ? value.split(",").map((item) => item.trim()).filter(Boolean) : field.type === "number" && value !== "" ? Number(value) : value })); }} placeholder={field.options?.length ? field.options.slice(0, 3).map((option) => option.value).join(" / ") : field.type === "date" ? "YYYY-MM-DD" : ""} value={Array.isArray(answers[field.key]) ? (answers[field.key] as unknown[]).join(", ") : String(answers[field.key] ?? "")} />
     </label>)}</div>
     <Button disabled={busy} onClick={() => void run()} variant="secondary"><FlaskConical className="size-4" />{busy ? "Testing..." : "Test conditions"}</Button>
     {error ? <Notice tone="danger">{error}</Notice> : null}
