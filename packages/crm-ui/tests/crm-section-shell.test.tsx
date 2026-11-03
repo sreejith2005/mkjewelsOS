@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 // CRM as a JewelOS section (owner request 2026-11-03): inside the JewelOS shell the CRM shows only
 // its own tabs; JewelOS keeps the header, sidebar, theme switch and sign-out.
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { cleanup, fireEvent, render as baseRender, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const navigation = vi.hoisted(() => ({ pathname: "/queue", search: "", push: vi.fn() }));
@@ -23,6 +24,8 @@ import { registrationChoice, WalkinStart } from "@/components/walkin-start";
 import { CrmLayoutContext } from "@/crm-port/layout-context";
 import { CrmThemeContext } from "@/crm-port/theme-context";
 
+// WalkinStart reads CRM form links through react-query, as inside the CRM root.
+const render = (ui: React.ReactElement) => { const client = new QueryClient(); return baseRender(ui, { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> }); };
 const profile = { name: "Sample Person", role: "salesperson", branch_name: "Sample Branch" };
 beforeEach(() => { navigation.pathname = "/queue"; navigation.search = ""; navigation.push.mockReset(); });
 afterEach(cleanup);

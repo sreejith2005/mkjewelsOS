@@ -1,7 +1,8 @@
 // Type surface of @jewelos/crm-ui for its consumers (the web app). The ported original CRM
 // sources are checked with their own compiler settings in this package; consumers read only
 // this declaration. tests/public-api.test.ts keeps it identical to src/index.ts.
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
+import type { CrmFieldMap, CrmFormPurpose, CrmFormTarget, FormAnswers, FormTemplateDefinition } from "@jewelos/core";
 import type { JewelosClient } from "@jewelos/api-client";
 
 export type CrmAppProps = {
@@ -38,7 +39,35 @@ export type CrmAppProps = {
    * CRM header and drawer.
    */
   layout?: "standalone" | "section" | undefined;
+  /** JewelOS Form Builder forms linked to CRM registration (CRM Form Settings). Absent: the standard CRM forms. */
+  forms?: CrmFormsHost | undefined;
 };
+
+/** The published version of a linked form, as CRM opens it now. */
+export type CrmLinkedForm = Readonly<{ templateId: string; familyId: string; version: number; name: string; definition: FormTemplateDefinition }>;
+
+export type CrmFormLink = Readonly<{
+  purpose: CrmFormPurpose;
+  versionId: string;
+  fieldMap: CrmFieldMap;
+  savedAt: string;
+  savedBy: string | null;
+  /** Null when the form has no published version any more. */
+  form: CrmLinkedForm | null;
+}>;
+
+export type CrmFormLinks = Readonly<{ canManage: boolean; links: readonly CrmFormLink[] }>;
+
+/** A submitted form: the stored answers, and each answer as the person saw it (a choice's label). */
+export type CrmSubmittedForm = Readonly<{ answers: FormAnswers; display: Readonly<Record<string, string>> }>;
+
+export type CrmFormsHost = Readonly<{
+  loadLinks: () => Promise<CrmFormLinks>;
+  /** Opens a linked form in a JewelOS dialog. onSubmit throws an Error whose message the form shows. */
+  renderForm: (props: { title: string; description?: string | undefined; form: CrmLinkedForm; onClose: () => void; onSubmit: (submitted: CrmSubmittedForm) => Promise<void> }) => ReactNode;
+  /** The CRM Form Settings dialog (people allowed to manage CRM forms). */
+  renderSettings: (props: { links: CrmFormLinks; targets: Readonly<Record<"queue" | "lead", readonly CrmFormTarget[]>>; onClose: () => void; onSaved: () => void }) => ReactNode;
+}>;
 
 /** The CRM Supabase project the CRM reads and writes (public URL and anon key). */
 export type CrmProjectConfig = Readonly<{ url: string; anonKey: string }>;

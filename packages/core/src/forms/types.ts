@@ -85,7 +85,12 @@ export type FormValidation = Readonly<{
   max?: number | undefined;
   /** Choice questions only: the respondent may type their own answer ("Other"). The typed text is the stored answer. */
   allowOther?: boolean | undefined;
+  /** Layout only: how much of a row the question takes on wider screens. Phones always show one per row. */
+  width?: FormFieldWidth | undefined;
 }>;
+
+export const FORM_FIELD_WIDTHS = ["full", "half", "third"] as const;
+export type FormFieldWidth = (typeof FORM_FIELD_WIDTHS)[number];
 
 export type FormFieldDefinition = Readonly<{
   id?: string | undefined;

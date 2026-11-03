@@ -125,6 +125,7 @@ export * from "./forms";
 export * from "./fms";
 export * from "./notifications";
 export * from "./crmEmbed";
+export * from "./crmForms";
 export * from "./analytics";
 export * from "./reports";
 export * from "./settings";

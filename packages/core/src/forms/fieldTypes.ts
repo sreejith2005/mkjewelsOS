@@ -55,6 +55,13 @@ export function pruneOptionValueReferences(fields: readonly FormFieldDefinition[
 }
 
 function compatibleValidation(field: FormFieldDefinition, nextType: FormFieldType) {
+  const kept = compatibleRules(field, nextType);
+  // The question keeps its place in the layout whatever its type becomes.
+  const width = field.validation?.width;
+  return width && width !== "full" ? { ...kept, width } : kept;
+}
+
+function compatibleRules(field: FormFieldDefinition, nextType: FormFieldType) {
   const current = field.validation;
   if (!current) return undefined;
   if (nextType === "text" || nextType === "textarea") {

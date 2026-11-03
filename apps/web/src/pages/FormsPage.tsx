@@ -27,7 +27,17 @@ export function FormsPage() {
   const refresh = useCallback(async () => { try { setError(null); const [forms, dynamic, fmsBuilt] = await Promise.all([loadForms(), loadFormDynamicOptions(), Promise.resolve().then(() => loadFmsBuiltForms()).catch(() => null)]); setBuilt(fmsBuilt); if(selectedSubmissionId){const detail=await loadFormSubmissionDetail(selectedSubmissionId);if(!detail)throw new Error("Submission unavailable in your authorized scope");forms.submissions=[detail.submission,...forms.submissions.filter(row=>row.id!==detail.submission.id)];if(detail.bundle&&!forms.bundles.some(bundle=>bundle.id===detail.bundle?.id))forms.bundles.push(detail.bundle);setView(detail.submission);setTab("submissions");}setData(forms); setOptions(dynamic); } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to load Forms"); } }, [selectedSubmissionId]); useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => { if (!starter || !data) return; const pinned = data.bundles.find((bundle) => bundle.id === starter.formTemplateId); if (pinned) setFill(pinned); }, [data, starter]);
   useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["forms", "tasks", "fms", "organization"], refresh });
-  const author = hasPermission(access, "forms.manage"); const families = useMemo(() => { const groups = new Map<string, FormBundle[]>(); for (const item of data?.bundles ?? []) { if (!author && item.library_visible === false) continue; groups.set(item.family_id, [...(groups.get(item.family_id) ?? []), item]); } return [...groups.values()].map((items) => items.sort((a, b) => b.version - a.version)).filter((items) => items.some((item) => `${item.name} ${item.description ?? ""}`.toLowerCase().includes(query.toLowerCase()) && formMatchesLifecycle(item.lifecycle, life))).sort((a, b) => a[0]!.name.localeCompare(b[0]!.name)); }, [data, life, query, author]);
+  const author = hasPermission(access, "forms.manage");
+  // "Edit in Form Builder" from CRM Form Settings: /forms?editForm=<form family> opens that form's draft, or its published version.
+  const editFamily = useMemo(() => new URLSearchParams(window.location.search).get("editForm"), []);
+  useEffect(() => {
+    if (!editFamily || !data || !author) return;
+    const versions = data.bundles.filter((bundle) => bundle.family_id === editFamily).sort((left, right) => right.version - left.version);
+    const params = new URLSearchParams(window.location.search); params.delete("editForm");
+    window.history.replaceState({}, "", `${window.location.pathname}${params.size ? `?${params}` : ""}`);
+    const target = versions.find((bundle) => bundle.lifecycle === "draft") ?? versions[0];
+    if (target) setEdit(target);
+  }, [author, data, editFamily]); const families = useMemo(() => { const groups = new Map<string, FormBundle[]>(); for (const item of data?.bundles ?? []) { if (!author && item.library_visible === false) continue; groups.set(item.family_id, [...(groups.get(item.family_id) ?? []), item]); } return [...groups.values()].map((items) => items.sort((a, b) => b.version - a.version)).filter((items) => items.some((item) => `${item.name} ${item.description ?? ""}`.toLowerCase().includes(query.toLowerCase()) && formMatchesLifecycle(item.lifecycle, life))).sort((a, b) => a[0]!.name.localeCompare(b[0]!.name)); }, [data, life, query, author]);
   const libraryFamilies = useMemo(() => families.filter((versions) => !built?.has(versions[0]!.family_id)), [built, families]);
   const fmsFamilies = useMemo(() => built ? families.filter((versions) => built.has(versions[0]!.family_id)) : [], [built, families]);
   const workflowForms = useMemo(() => (data?.bundles ?? []).filter(item => author || item.library_visible !== false), [data, author]);

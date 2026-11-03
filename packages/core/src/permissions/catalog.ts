@@ -72,6 +72,7 @@ export const PERMISSION_CATALOG = [
   modulePermission("forms.view", "forms_library", "Forms", "Open Forms Library", "Browse and fill published forms."),
   { key: "forms.manage", kind: "action", category: "Forms", label: "Author forms", description: "Create, edit, publish, and archive form templates.", defaultRoles: ["super_admin", "admin", "manager"], pageId: null },
   modulePermission("crm.view", "crm", "CRM", "Use CRM", "Clients, walk-ins, interactions, follow-ups, and documents."),
+  { key: "crm.manage_forms", kind: "action", category: "CRM", label: "Manage CRM forms", description: "Choose which Form Builder forms CRM uses to register queue clients and leads, and link their questions to CRM answers.", defaultRoles: ["super_admin"], pageId: null },
   modulePermission("notifications.view", "notifications", "Notifications", "Open Notifications", "The notification inbox."),
   { key: "notifications.manage", kind: "action", category: "Notifications", label: "Manage notification rules", description: "Templates, rules, and delivery logs.", defaultRoles: ["super_admin", "admin"], pageId: null },
   modulePermission("users.view", "users", "People", "Open Users", "Employee directory."),

@@ -2,7 +2,7 @@ import { FORM_OPTION_TYPES, FORM_OTHER_TYPES, parseFormOptions } from "./options
 import { FORM_RULE_OPERATORS, formRuleFieldKeys, formRuleHasIncompletePredicate, normalizeFormRule, validateFormRule } from "./rules.ts";
 import { FORM_QUESTION_TARGET_PREFIX, FORM_CONTINUE_TARGET, FORM_STAGE_END_TARGET, fieldSectionKey, formSections } from "./sections.ts";
 import { eligibleRecordNameFields } from "../fms/recordNaming.ts";
-import { FORM_DRAFT_FIELD_TYPES, FORM_SUBMIT_TARGET, type FormRule, type FormBranch, type FormFieldDefinition, type FormSectionDefinition, type FormTemplateDefinition, type FormValidationIssue } from "./types.ts";
+import { FORM_DRAFT_FIELD_TYPES, FORM_FIELD_WIDTHS, FORM_SUBMIT_TARGET, type FormRule, type FormBranch, type FormFieldDefinition, type FormSectionDefinition, type FormTemplateDefinition, type FormValidationIssue } from "./types.ts";
 
 const BRANCH_TYPES: ReadonlySet<string> = new Set(FORM_DRAFT_FIELD_TYPES.filter(type => type !== "section_header" && type !== "divider"));
 const LAYOUT_TYPES = new Set(["section_header", "divider"]);
@@ -232,6 +232,9 @@ export function validateFormDefinition(template: FormTemplateDefinition): readon
       }
       if (validation.allowOther !== undefined && (typeof validation.allowOther !== "boolean" || !FORM_OTHER_TYPES.has(field.type))) {
         issues.push({ code: "invalid_validation", fieldKey: field.key, message: "Only choice questions can offer an Other answer" });
+      }
+      if (validation.width !== undefined && !(FORM_FIELD_WIDTHS as readonly string[]).includes(validation.width)) {
+        issues.push({ code: "invalid_validation", fieldKey: field.key, message: "A question's width must be full, half or a third" });
       }
     }
     earlier.add(field.key);

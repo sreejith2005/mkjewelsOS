@@ -8,6 +8,7 @@ import RootLayout from "@/app/layout";
 
 import { CrmAppRouter } from "./app-router";
 import type { CrmProjectConfig } from "./crm-project";
+import { CrmFormsHostContext, type CrmFormsHost } from "./forms-host";
 import { CrmLayoutContext, type CrmLayout } from "./layout-context";
 import { CrmThemeContext } from "./theme-context";
 import { configureCrmHost, type CrmAuth } from "./runtime";
@@ -46,10 +47,12 @@ export type CrmAppProps = {
    * CRM header and drawer.
    */
   layout?: CrmLayout | undefined;
+  /** JewelOS Form Builder forms linked to CRM registration (CRM Form Settings). Absent: the standard CRM forms. */
+  forms?: CrmFormsHost | undefined;
 };
 
-export function CrmApp({ supabase, crmProject, jewelosAccessToken, path, search, navigate, onSignOut, jewelosHomePath, auth, theme, onThemeChange, layout = "standalone" }: CrmAppProps) {
+export function CrmApp({ supabase, crmProject, jewelosAccessToken, path, search, navigate, onSignOut, jewelosHomePath, auth, theme, onThemeChange, layout = "standalone", forms }: CrmAppProps) {
   configureCrmHost({ supabase, crmProject, jewelosAccessToken, navigate, onSignOut, jewelosHomePath, auth });
   const themeControl = useMemo(() => theme && onThemeChange ? { theme, onThemeChange } : null, [theme, onThemeChange]);
-  return <CrmLayoutContext.Provider value={layout}><CrmThemeContext.Provider value={themeControl}><RootLayout><CrmAppRouter browserPath={path} browserSearch={search} /></RootLayout></CrmThemeContext.Provider></CrmLayoutContext.Provider>;
+  return <CrmFormsHostContext.Provider value={forms ?? null}><CrmLayoutContext.Provider value={layout}><CrmThemeContext.Provider value={themeControl}><RootLayout><CrmAppRouter browserPath={path} browserSearch={search} /></RootLayout></CrmThemeContext.Provider></CrmLayoutContext.Provider></CrmFormsHostContext.Provider>;
 }

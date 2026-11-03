@@ -11,3 +11,5 @@ export const basePathMatches: typeof Declared.CRM_BASE_PATH = Implemented.CRM_BA
 export const propsMatch: Same<Declared.CrmAppProps, Implemented.CrmAppProps> = true;
 export const authMatches: Same<Declared.CrmAuth, Implemented.CrmAuth> = true;
 export const crmProjectMatches: Same<Declared.CrmProjectConfig, Implemented.CrmProjectConfig> = true;
+export const formsHostMatches: Same<Declared.CrmFormsHost, Implemented.CrmFormsHost> = true;
+export const formLinksMatch: Same<Declared.CrmFormLinks, Implemented.CrmFormLinks> = true;

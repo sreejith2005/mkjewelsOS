@@ -39,6 +39,7 @@ import { readSidebarOpen, rememberSidebarOpen } from "@/components/shell/sidebar
 import { AuthLayout, BrandedLoading, PageLoading } from "@/components/shell/BrandScreens";
 import { LazyPageErrorBoundary } from "@/components/LazyPageErrorBoundary";
 import { crmProjectConfig } from "@/lib/crmProject";
+import { createCrmFormsHost } from "@/features/crm/crmFormsHost";
 import { lazyPage, prefetchPagesWhenIdle } from "@/lib/lazyPage";
 import { DailyChecklistManager } from "@/features/daily-checklists/DailyChecklistManager";
 import { useKiaraEscalationBadge } from "@/features/assistant/useKiaraEscalationBadge";
@@ -324,6 +325,8 @@ function AppShell() {
       .filter((item) => accessible.has(item.id))
       .map((item) => ({ ...item, Icon: PAGE_ICONS[item.id] }));
   }, [menu]);
+  // Form Builder forms linked to CRM registration (CRM Form Settings, 2026-11-03).
+  const crmFormsHost = useMemo(() => createCrmFormsHost(navigate), [navigate]);
   const menuKey = menu.map((item) => item.id).join(",");
   useEffect(() => {
     if (!menuKey) return;
@@ -375,7 +378,7 @@ function AppShell() {
               : currentPage === "fms_builder" ? <FMSBuilderPage />
                 : currentPage === "notifications" ? <NotificationsPage onNavigate={navigate} />
                 : currentPage === "ask_kiara" ? <AskKiaraPage onNavigate={navigate} search={search} />
-                : currentPage === "crm" ? <CrmApp crmProject={crmProjectConfig} jewelosHomePath="/" layout="section" navigate={navigate} onSignOut={logout} path={path} search={search} supabase={supabase} />
+                : currentPage === "crm" ? <CrmApp crmProject={crmProjectConfig} forms={crmFormsHost} jewelosHomePath="/" layout="section" navigate={navigate} onSignOut={logout} path={path} search={search} supabase={supabase} />
             : <DashboardPage />;
 
   return (

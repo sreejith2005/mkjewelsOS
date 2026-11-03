@@ -1,7 +1,12 @@
 # CRM as a native JewelOS section: layout, Form Builder bindings, CRM → FMS/Tasks
 
-Status: **Phase A implemented** (branch `feat/crm-native-section-20261103`). Phases B–E are the
-design below and are **not implemented**; each needs the owner decisions listed at the end.
+Status: **Phase A shipped** (PR #50). **Phase B and C shipped for client queue and lead
+registration** (branch `feat/crm-form-bindings-20261103`, JewelOS 0373, CRM 20261103000100). The
+walk-in visit form (Option A: Form Builder questions, with the existing companions, products and
+photos blocks kept), Phase D and Phase E are not implemented yet.
+
+Owner decisions 2026-11-03: Option A for the walk-in special parts; Super Admin manages CRM forms
+(permission `crm.manage_forms`); order Lead/Queue first, then Walk-in.
 
 Owner request 2026-11-03: CRM becomes an ordinary JewelOS section, its forms are maintained in
 the Form Builder, and CRM answers feed FMS and Tasks, without rebuilding the CRM, adding a second
@@ -33,7 +38,35 @@ Now:
   listings keep one scroll bar.
 - No schema, RPC, RLS, storage or sync change. No Android change (the app shows the web app).
 
-## Phase B: Form Builder bindings (design)
+## Phases B and C as built (queue and lead)
+
+- **Links** live in the JewelOS project: `crm_form_binding_versions` (immutable) and
+  `crm_form_bindings` (active pointer), written only by `save_crm_form_binding` /
+  `clear_crm_form_binding` (permission `crm.manage_forms`, `assert_module_enabled('crm')`,
+  optimistic `p_expected_version_id`, audit `crm_form_linked` / `crm_form_unlinked`).
+  `get_crm_form_bindings` (crm.view) returns each active link with the newest published version
+  of the linked form family, so CRM users can render it whatever the form's library roles.
+- **Targets** are the CRM RPC contracts, not a form layout: queue = `client_name`, `mobile`;
+  lead = the CRM's own `lead_form_fields` (so a new CRM lead field appears by itself).
+  `packages/core/src/crmForms.ts` holds the shared checks (`checkCrmFormBinding`), suggestions and
+  the starter form. At every opening CRM re-checks the link against the current published version;
+  if it no longer fits, CRM shows its standard form and tells form managers why.
+- **Rendering**: the linked form opens in a JewelOS dialog (portal to `document.body`) with the
+  shared `FormRenderer`. It cannot be inline: the CRM stylesheet resets every element inside the
+  CRM root. The branch for queue registration stays a CRM choice.
+- **Saving**: one browser write, to the CRM project, through `register_walkin_entry_from_form` /
+  `save_crm_lead_from_form`. They call the existing RPCs unchanged and record
+  `crm_private.form_submission_links` (submission key, form family/template/version, link
+  version, every answer with its displayed label, the CRM payload, answers CRM did not take) in
+  the same transaction. A retried key returns the first result; a different payload is refused.
+  The Runo push after a lead is unchanged.
+- **Not built yet**: the copy into JewelOS `form_submissions` over the CRM outbox (Phase C step 3
+  below). Until then the CRM link row is the record of which form version produced each CRM
+  record; Forms Library does not list these submissions.
+- **Form Builder addition**: question width (`validation.width`: full, half, third) for
+  side-by-side questions on wider screens; phones keep one question per row.
+
+## Phase B: Form Builder bindings (original design)
 
 Home: **JewelOS project**, beside the forms they reference.
 
@@ -64,7 +97,7 @@ Home: **JewelOS project**, beside the forms they reference.
 - Version pinning: an opened form keeps the template version it loaded; submission carries that
   version id and is validated against it. A newer publish applies to the next opening only.
 
-## Phase C: submissions into the existing CRM records (design)
+## Phase C: submissions into the existing CRM records (original design)
 
 One browser write, to the CRM, through the existing audited RPCs; JewelOS receives its copy over
 the existing CRM → JewelOS outbox.

@@ -12518,8 +12518,17 @@ export type Database = {
       }
     }
     Functions: CustomerIntegrationFunctions & {
+      clear_crm_form_binding: {
+        Args: { p_expected_version_id: string; p_purpose: string }
+        Returns: undefined
+      }
+      get_crm_form_bindings: { Args: never; Returns: Json }
       get_fms_work_mutation_result: { Args: { p_idempotency_key: string }; Returns: Json }
       list_fms_form_starters: { Args: { p_form_template_id: string }; Returns: Json }
+      save_crm_form_binding: {
+        Args: { p_expected_version_id?: string; p_field_map: Json; p_form_family_id: string; p_purpose: string }
+        Returns: Json
+      }
       submit_form_and_start_fms_idempotent: { Args: { p_form_template_id: string; p_answers: Json; p_idempotency_key: string; p_flow_id?: string }; Returns: Json }
 
       preview_fms_work_transition: { Args: { p_request: Json; p_handoffs?: Json }; Returns: Json }
