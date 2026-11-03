@@ -56,3 +56,39 @@ Deno.test("rejects malformed requests and unknown kinds", async () => {
   ];
   for (const body of cases) assertEquals((await handleCrmSyncReceive(post(body), { secret: SECRET, gateway })).status, 400);
 });
+
+// Saved-submission events for FMS start triggers (migration 0374).
+function fakeSubmissions(failFor?: string) {
+  const applied: Array<{ id: string; payload: Record<string, unknown> }> = [];
+  const gateway: JewelosSyncGateway = {
+    applyWalkin: () => Promise.reject(new Error("wrong stream")),
+    applySubmission: (eventId, payload) => {
+      if (eventId === failFor) return Promise.reject(new Error("rpc_P0001"));
+      applied.push({ id: eventId, payload });
+      return Promise.resolve({ outcome: "processed", duplicate: eventId === "crm.sub.9" });
+    },
+  };
+  return { gateway, applied };
+}
+const visit = { kind: "crm.walkin_visit_saved", record_id: "v-1", answers: { visit_status: "NO" } };
+
+Deno.test("applies submission.events through the submission gateway, one result per event", async () => {
+  const { gateway, applied } = fakeSubmissions("crm.sub.2");
+  const response = await handleCrmSyncReceive(post({ kind: "submission.events", events: [
+    { event_id: "crm.sub.1", payload: visit }, { event_id: "crm.sub.2", payload: visit }, { event_id: "crm.sub.9", payload: visit },
+  ] }), { secret: SECRET, gateway });
+  assertEquals(response.status, 200);
+  const body = await response.json();
+  assertEquals(body.results.map((item: { ok: boolean }) => item.ok), [true, false, true]);
+  assertEquals(body.results[2].duplicate, true);
+  assertEquals(applied.map((item) => item.id), ["crm.sub.1", "crm.sub.9"]);
+  assertFalse(JSON.stringify(body).includes("NO"));
+});
+
+Deno.test("refuses submission events without a payload or with a bad id, and an old deployment without the gateway", async () => {
+  const { gateway } = fakeSubmissions();
+  assertEquals((await handleCrmSyncReceive(post({ kind: "submission.events", events: [{ event_id: "crm.sub.1", snapshot: visit }] }), { secret: SECRET, gateway })).status, 400);
+  assertEquals((await handleCrmSyncReceive(post({ kind: "submission.events", events: [{ event_id: "bad id!", payload: visit }] }), { secret: SECRET, gateway })).status, 400);
+  const walkinOnly: JewelosSyncGateway = { applyWalkin: () => Promise.resolve({ outcome: "created" }) };
+  assertEquals((await handleCrmSyncReceive(post({ kind: "submission.events", events: [{ event_id: "crm.sub.1", payload: visit }] }), { secret: SECRET, gateway: walkinOnly })).status, 503);
+});

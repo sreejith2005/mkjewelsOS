@@ -71,7 +71,10 @@ export function requireFmsAssignmentSourceForms(flow: FmsFlowDefinition): FmsFlo
   return { ...flow, stages: flow.stages.map(stage => required.has(stage.key) ? { ...stage, sla: { ...stage.sla, completionFormRequired: true } } : stage) };
 }
 
-/** The first form needs an incoming owner only when a configured route returns to it. */
-export function fmsStageNeedsAssignment(stages: readonly FmsStageDefinition[], stageKey: string): boolean {
-  return stages[0]?.key !== stageKey || stages.some(stage => fmsOutgoingStageKeys(stage).includes(stageKey));
+/**
+ * The starting Form of a form-started workflow needs an incoming owner only when a configured
+ * route returns to it. Without a starting form (0374) the first step is assigned like any other.
+ */
+export function fmsStageNeedsAssignment(stages: readonly FmsStageDefinition[], stageKey: string, startMode: FmsFlowDefinition["startMode"] = "form"): boolean {
+  return startMode !== "form" || stages[0]?.key !== stageKey || stages.some(stage => fmsOutgoingStageKeys(stage).includes(stageKey));
 }

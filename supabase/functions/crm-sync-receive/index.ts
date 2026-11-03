@@ -18,6 +18,11 @@ function gateway(): JewelosSyncGateway | null {
       if (error) throw new Error(`rpc_${error.code ?? "unknown"}`);
       return (data ?? {}) as Awaited<ReturnType<JewelosSyncGateway["applyWalkin"]>>;
     },
+    async applySubmission(eventId, payload) {
+      const { data, error } = await admin.rpc("crm_sync_apply_submission_event", { p_event_id: eventId, p_payload: payload });
+      if (error) throw new Error(`rpc_${error.code ?? "unknown"}`);
+      return (data ?? {}) as Awaited<ReturnType<JewelosSyncGateway["applyWalkin"]>>;
+    },
   };
 }
 

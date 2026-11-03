@@ -34,3 +34,4 @@ export * from "./transfer";
 export * from "./workflowForms";
 
 export * from "./outcomes";
+export * from "./startTrigger";

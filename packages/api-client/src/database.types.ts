@@ -5207,6 +5207,8 @@ export type Database = {
           name: string
           published_by: string | null
           scope_type: string
+          start_mode: string
+          start_trigger: Json | null
           status: Database["public"]["Enums"]["fms_flow_status"]
           tenant_id: string
           trigger_type: string | null
@@ -5231,6 +5233,8 @@ export type Database = {
           name: string
           published_by?: string | null
           scope_type?: string
+          start_mode?: string
+          start_trigger?: Json | null
           status?: Database["public"]["Enums"]["fms_flow_status"]
           tenant_id: string
           trigger_type?: string | null
@@ -5255,6 +5259,8 @@ export type Database = {
           name?: string
           published_by?: string | null
           scope_type?: string
+          start_mode?: string
+          start_trigger?: Json | null
           status?: Database["public"]["Enums"]["fms_flow_status"]
           tenant_id?: string
           trigger_type?: string | null
@@ -11990,11 +11996,56 @@ export type Database = {
       }
     }
     Functions: CustomerIntegrationFunctions & {
+      get_fms_instance_trigger_source: {
+        Args: { p_instance_id: string }
+        Returns: Json
+      }
+      get_fms_trigger_history: {
+        Args: { p_filter?: Json; p_limit?: number; p_offset?: number }
+        Returns: Json
+      }
       get_fms_work_mutation_result: { Args: { p_idempotency_key: string }; Returns: Json }
+      inspect_fms_trigger_event: { Args: { p_event_id: string }; Returns: Json }
       list_fms_form_starters: { Args: { p_form_template_id: string }; Returns: Json }
+      list_fms_trigger_samples: {
+        Args: { p_limit?: number; p_source: Json }
+        Returns: Json
+      }
+      retry_fms_trigger_event_with_audit: {
+        Args: { p_event_id: string }
+        Returns: Json
+      }
+      set_fms_flow_start_with_audit: {
+        Args: {
+          p_flow_id: string
+          p_start_mode: string
+          p_start_trigger?: Json
+        }
+        Returns: undefined
+      }
+      start_fms_manual_with_audit: {
+        Args: {
+          p_branch_id?: string
+          p_client_code?: string
+          p_department_id?: string
+          p_first_assignee_id?: string
+          p_flow_id: string
+          p_idempotency_key?: string
+          p_note?: string
+          p_title: string
+        }
+        Returns: {
+          instance_id: string
+          reference_number: string
+        }[]
+      }
       submit_form_and_start_fms_idempotent: { Args: { p_form_template_id: string; p_answers: Json; p_idempotency_key: string; p_flow_id?: string }; Returns: Json }
 
       preview_fms_work_transition: { Args: { p_request: Json; p_handoffs?: Json }; Returns: Json }
+      test_fms_start_trigger: {
+        Args: { p_answers: Json; p_flow_id: string; p_trigger: Json }
+        Returns: Json
+      }
       transition_fms_work_with_audit: { Args: { p_request: Json; p_idempotency_key: string; p_handoffs: Json; p_preview_fingerprint: string }; Returns: Json }
       get_fms_ai_settings: { Args: never; Returns: Json }
       set_fms_ai_settings_with_audit: { Args: { p_debugger: boolean; p_builder: boolean; p_run_diagnosis: boolean; p_user_daily_limit: number }; Returns: Json }

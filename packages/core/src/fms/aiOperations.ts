@@ -131,7 +131,7 @@ export function applyFmsAiOperations(base: FmsFlowDefinition, operations: readon
         if (!key || !KEY.test(key)) { fail("invalid_stage_key", "a new step needs a stable key such as review_order"); break; }
         if (find(key)) { fail("duplicate_stage_key", `step "${key}" already exists`, key); break; }
         if (!type) { fail("invalid_stage", "a new step needs a step type", key); break; }
-        if (!stages.length && type !== "form") { fail("first_stage_must_be_form", "every workflow starts with a Form step", key); break; }
+        if (!stages.length && type !== "form" && (flow.startMode ?? "form") === "form") { fail("first_stage_must_be_form", "every workflow starts with a Form step", key); break; }
         if (stages.length >= Math.max(FMS_AI_LIMITS.maxStages, startingCount)) { fail("too_many_stages", `a workflow built here can have at most ${FMS_AI_LIMITS.maxStages} steps`, key); break; }
         const sourceIndex = operation.afterStageKey ? stages.findIndex((stage) => stage.key === operation.afterStageKey) : -1;
         if (operation.afterStageKey && sourceIndex < 0) { fail("unknown_stage", `step "${operation.afterStageKey}" does not exist`, operation.afterStageKey); break; }
@@ -163,7 +163,7 @@ export function applyFmsAiOperations(base: FmsFlowDefinition, operations: readon
       }
       case "remove_stage": {
         const stage = needTarget(); if (!stage) break;
-        if (flow.stages[0]?.key === stage.key) { fail("cannot_remove_trigger", "the first Form starts the workflow and cannot be removed", stage.key); break; }
+        if ((flow.startMode ?? "form") === "form" && flow.stages[0]?.key === stage.key) { fail("cannot_remove_trigger", "the first Form starts the workflow and cannot be removed", stage.key); break; }
         flow = { ...flow, stages: removeFmsStageFromStages(flow.stages, stage.key).map((item, order) => ({ ...item, order })) };
         break;
       }

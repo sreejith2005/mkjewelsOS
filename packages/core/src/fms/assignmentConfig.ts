@@ -29,7 +29,7 @@ export function validateFmsAssignmentConfig(flow: FmsFlowDefinition, context: Fm
   if (flow.assignmentVersion !== 2) return issues;
   const automatic = new Set(["branch", "parallel_start", "parallel_join", "notification", "end"]);
   for (const stage of flow.stages) {
-    if (automatic.has(stage.type) || !fmsStageNeedsAssignment(flow.stages, stage.key)) continue;
+    if (automatic.has(stage.type) || !fmsStageNeedsAssignment(flow.stages, stage.key, flow.startMode)) continue;
     const fail = (code: string, message: string) => issues.push({ code, message, stageKey: stage.key });
     const config = stage.sla.assignment;
     if (!config || !FMS_ASSIGNMENT_MODES.includes(config.mode)) {

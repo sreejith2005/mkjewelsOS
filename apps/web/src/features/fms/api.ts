@@ -10,6 +10,8 @@ const fail = (label: string, error: DbError) => { if (error) throw new Error(`${
 export type FmsFlowRow = {
   id: string; family_id: string; version: number; assignment_version?: number; name: string; description: string | null; status: "draft" | "published" | "archived";
   scope_type: "tenant" | "branch" | "department"; branch_id: string | null; department_id: string | null; module_context?: string | null; is_active: boolean; usage_count: number;
+  /** 0374: how runs start; absent on rows read before the migration. */
+  start_mode?: "form" | "automatic" | "manual" | string; start_trigger?: Json | null;
 };
 export type FmsStageRow = {
   id: string; fms_flow_id: string; stage_key: string; name: string; method: string | null; step_type: FmsFlowDefinition["stages"][number]["type"];
@@ -88,7 +90,10 @@ async function formQuestionIndex(forms: readonly FormRef[]): Promise<Pick<FmsDat
 
 export async function saveFmsDraft(flowId: string | null, definition: FmsFlowDefinition): Promise<string> {
   const metadata = { assignment_version: definition.assignmentVersion ?? (flowId ? 1 : 2), name: definition.name, description: definition.description ?? "", scope_type: definition.scope, branch_id: definition.branchId ?? "", department_id: definition.departmentId ?? "", module_context: definition.moduleContext ?? "", trigger_type: "manual", is_active: true };
-  const { data, error } = await supabase.rpc("save_fms_flow_draft_with_audit", { p_flow_id: flowId as string, p_metadata: metadata as Json, p_stages: definition.stages as unknown as Json }); fail("Save FMS draft", error); if (!data) throw new Error("Save FMS draft returned no ID"); const { error: contextError } = await supabase.rpc("set_fms_flow_context_with_audit", { p_flow_id: data, ...(definition.moduleContext ? { p_module_context: definition.moduleContext } : {}) }); fail("Save FMS workflow context", contextError); return data;
+  const { data, error } = await supabase.rpc("save_fms_flow_draft_with_audit", { p_flow_id: flowId as string, p_metadata: metadata as Json, p_stages: definition.stages as unknown as Json }); fail("Save FMS draft", error); if (!data) throw new Error("Save FMS draft returned no ID"); const { error: contextError } = await supabase.rpc("set_fms_flow_context_with_audit", { p_flow_id: data, ...(definition.moduleContext ? { p_module_context: definition.moduleContext } : {}) }); fail("Save FMS workflow context", contextError);
+  // 0374: the start settings travel with the draft; a form-started draft keeps start_mode = form.
+  const { error: startError } = await supabase.rpc("set_fms_flow_start_with_audit", { p_flow_id: data, p_start_mode: definition.startMode ?? "form", ...(definition.startMode === "automatic" && definition.startTrigger ? { p_start_trigger: definition.startTrigger as unknown as Json } : {}) });
+  fail("Save FMS start trigger", startError); return data;
 }
 export const saveFmsContextAssigneeDefault = async (moduleContext: string, userProfileId: string) => { const { error } = await supabase.rpc("save_fms_context_assignee_default_with_audit", { p_module_context: moduleContext, p_user_profile_id: userProfileId }); fail("Save FMS default assignee", error); };
 export const reviseFmsFlow = async (id: string) => { const { data, error } = await supabase.rpc("create_fms_revision_with_audit", { p_flow_id: id }); fail("Create FMS revision", error); return data; };

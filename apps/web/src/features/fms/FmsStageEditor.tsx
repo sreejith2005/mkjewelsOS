@@ -71,9 +71,9 @@ export type FmsStageQuestionnaireActions = Readonly<{
   discardDraft: () => void;
 }>;
 
-export function FmsStageEditor({ stage, stages, data, onChange, onDelete, assignmentVersion = 1, questionnaire, endCounts }: { assignmentVersion?: 1 | 2 | undefined; stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; onChange: (value: FmsStageDefinition) => void; onDelete: () => void; questionnaire?: FmsStageQuestionnaireActions | undefined; endCounts?: ReadonlyMap<string, number> | undefined }) {
+export function FmsStageEditor({ stage, stages, data, onChange, onDelete, assignmentVersion = 1, questionnaire, endCounts, startMode = "form" }: { startMode?: "form" | "automatic" | "manual" | undefined; assignmentVersion?: 1 | 2 | undefined; stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; onChange: (value: FmsStageDefinition) => void; onDelete: () => void; questionnaire?: FmsStageQuestionnaireActions | undefined; endCounts?: ReadonlyMap<string, number> | undefined }) {
   if (stage.type === "end") return <FmsEndNodeEditor completedCount={endCounts?.get(stage.key)} onChange={onChange} onDelete={onDelete} stage={stage} stages={stages} />;
-  return <FmsStepEditor assignmentVersion={assignmentVersion} data={data} onChange={onChange} onDelete={onDelete} questionnaire={questionnaire} stage={stage} stages={stages} />;
+  return <FmsStepEditor assignmentVersion={assignmentVersion} data={data} startMode={startMode} onChange={onChange} onDelete={onDelete} questionnaire={questionnaire} stage={stage} stages={stages} />;
 }
 
 /**
@@ -100,11 +100,12 @@ function EndOfWorkflowSwitch({ stage, onChange }: { stage: FmsStageDefinition; o
   </section>;
 }
 
-function FmsStepEditor({ stage, stages, data, onChange, onDelete, assignmentVersion = 1, questionnaire }: { assignmentVersion?: 1 | 2 | undefined; stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; onChange: (value: FmsStageDefinition) => void; onDelete: () => void; questionnaire?: FmsStageQuestionnaireActions | undefined }) {
+function FmsStepEditor({ stage, stages, data, onChange, onDelete, assignmentVersion = 1, questionnaire, startMode = "form" }: { startMode?: "form" | "automatic" | "manual" | undefined; assignmentVersion?: 1 | 2 | undefined; stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; onChange: (value: FmsStageDefinition) => void; onDelete: () => void; questionnaire?: FmsStageQuestionnaireActions | undefined }) {
   const update = (patch: Partial<FmsStageDefinition>) => onChange({ ...stage, ...patch });
   const updateSla = (patch: Partial<FmsSlaRule>) => update({ sla: { ...stage.sla, ...patch } });
   const stageIndex = stages.findIndex((item) => item.key === stage.key);
-  const firstStage = stageIndex === 0;
+  // Only a form-started workflow has a starting Form; otherwise the first step is an ordinary step (0374).
+  const firstStage = stageIndex === 0 && startMode === "form";
   const earlierStages = stages.slice(0, Math.max(0, stageIndex));
   const earlierDecisions = earlierStages.filter((item) => item.sla.decisionMode === "decision" || item.sla.decisionMode === "yes_no");
   const others = stages;
@@ -142,7 +143,7 @@ function FmsStepEditor({ stage, stages, data, onChange, onDelete, assignmentVers
 
     {canChooseNext ? <StageRouting key={stage.key} allFields={allFormFields} decision={decision} fields={formFields} others={others} stage={stage} changeRule={changeBranchRule} moveRule={moveBranchRule} update={update} updateSla={updateSla} /> : null}
 
-    {human && fmsStageNeedsAssignment(stages, stage.key) && assignmentVersion === 2 ? <InspectorSection defaultOpen summary={assignedSummary} title="Assigned to">
+    {human && fmsStageNeedsAssignment(stages, stage.key, startMode) && assignmentVersion === 2 ? <InspectorSection defaultOpen summary={assignedSummary} title="Assigned to">
       <FmsAssignmentEditor stage={stage} stages={stages} data={data} onChange={onChange} />
     </InspectorSection> : null}
 

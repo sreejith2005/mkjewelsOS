@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { type CrmOutboxGateway, handleSyncDeliver, type JewelosReceiver } from "./worker.ts";
+import { type CrmOutboxGateway, type CrmSubmissionGateway, handleSyncDeliver, type JewelosReceiver } from "./worker.ts";
 
 // Secrets (CRM project Edge Function secrets; never in Git, chat or logs):
 //   CRM_SYNC_CRON_SECRET      the x-cron-secret pg_cron sends (Vault secret crm_sync_cron_secret)
@@ -23,6 +23,25 @@ function crmGateway(): CrmOutboxGateway | null {
       const { data, error } = await admin.rpc("crm_sync_finish_event", { p_event_id: eventId, p_ok: ok, p_error: errorCode });
       if (error) throw new Error("finish_failed");
       return data as Awaited<ReturnType<CrmOutboxGateway["finish"]>>;
+    },
+  };
+}
+
+function submissionGateway(): CrmSubmissionGateway | null {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) return null;
+  const admin = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  return {
+    async claim(limit) {
+      const { data, error } = await admin.rpc("crm_sync_claim_submission_events", { p_limit: limit });
+      if (error) throw new Error("claim_failed");
+      return (data ?? []) as Awaited<ReturnType<CrmSubmissionGateway["claim"]>>;
+    },
+    async finish(eventId, ok, errorCode) {
+      const { data, error } = await admin.rpc("crm_sync_finish_submission_event", { p_event_id: eventId, p_ok: ok, p_error: errorCode });
+      if (error) throw new Error("finish_failed");
+      return data as Awaited<ReturnType<CrmSubmissionGateway["finish"]>>;
     },
   };
 }
@@ -51,5 +70,5 @@ function jewelosReceiver(): JewelosReceiver | null {
 }
 
 Deno.serve((request) =>
-  handleSyncDeliver(request, { cronSecret: Deno.env.get("CRM_SYNC_CRON_SECRET"), crm: crmGateway(), jewelos: jewelosReceiver() })
+  handleSyncDeliver(request, { cronSecret: Deno.env.get("CRM_SYNC_CRON_SECRET"), crm: crmGateway(), jewelos: jewelosReceiver(), submissions: submissionGateway() })
 );

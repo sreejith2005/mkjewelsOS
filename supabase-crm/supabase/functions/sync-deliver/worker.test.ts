@@ -79,3 +79,73 @@ Deno.test("event ids are per snapshot and match the receiver's pattern", () => {
   assertFalse(syncEventId(event(3)) === syncEventId(event(3, "2026-10-05T10:01:00.000Z")));
   assertEquals(/^[A-Za-z0-9_.:-]{1,160}$/.test(syncEventId(event(3))), true);
 });
+
+// Saved-submission stream (FMS start triggers, CRM migration 20261103000200).
+import { type ClaimedSubmission, type CrmSubmissionGateway, submissionEventId } from "./worker.ts";
+
+function submission(id: number): ClaimedSubmission {
+  return { event_id: id, kind: "crm.walkin_visit_saved", payload: { kind: "crm.walkin_visit_saved", record_id: `v-${id}`, answers: { visit_status: "NO" } } };
+}
+
+function submissions(batches: ClaimedSubmission[][], state: FinishState = "retry") {
+  const finished: Array<{ id: number; ok: boolean; error: string | null }> = [];
+  const gateway: CrmSubmissionGateway = {
+    claim: () => Promise.resolve(batches.shift() ?? []),
+    finish: (id, ok, error): Promise<FinishState> => {
+      finished.push({ id, ok, error });
+      return Promise.resolve(ok ? "delivered" : state);
+    },
+  };
+  return { gateway, finished };
+}
+
+Deno.test("delivers saved submissions as submission.events with stable event ids", async () => {
+  const { gateway } = crm([]);
+  const subs = submissions([[submission(7), submission(8)]]);
+  const { receiver, sent } = jewelos(allOk);
+  const response = await handleSyncDeliver(post(), { cronSecret: SECRET, crm: gateway, jewelos: receiver, submissions: subs.gateway });
+  assertEquals(response.status, 200);
+  assertEquals(sent.length, 1);
+  assertEquals(sent[0]!.kind, "submission.events");
+  assertEquals((sent[0]!.events as Array<{ event_id: string; payload: unknown }>).map((item) => item.event_id), ["crm.sub.7", "crm.sub.8"]);
+  assertEquals(submissionEventId(submission(7)), "crm.sub.7");
+  assertEquals(subs.finished.map((item) => item.ok), [true, true]);
+  assertEquals((await response.json()).submissions.delivered, 2);
+});
+
+Deno.test("a rejected or missing submission result is retried, the others are delivered", async () => {
+  const { gateway } = crm([]);
+  const subs = submissions([[submission(1), submission(2), submission(3)]]);
+  const { receiver } = jewelos((body) => ({
+    status: 200,
+    body: { results: [
+      { event_id: "crm.sub.1", ok: true },
+      { event_id: "crm.sub.2", ok: false, error: "apply_failed" },
+    ] },
+  }));
+  await handleSyncDeliver(post(), { cronSecret: SECRET, crm: gateway, jewelos: receiver, submissions: subs.gateway });
+  assertEquals(subs.finished, [
+    { id: 1, ok: true, error: null },
+    { id: 2, ok: false, error: "apply_failed" },
+    { id: 3, ok: false, error: "no_result" },
+  ]);
+});
+
+Deno.test("a JewelOS outage leaves every submission for retry and never marks it delivered", async () => {
+  const { gateway } = crm([]);
+  const subs = submissions([[submission(4)]]);
+  const { receiver } = jewelos(() => new Error("offline"));
+  const response = await handleSyncDeliver(post(), { cronSecret: SECRET, crm: gateway, jewelos: receiver, submissions: subs.gateway });
+  assertEquals(response.status, 200);
+  assertEquals(subs.finished, [{ id: 4, ok: false, error: "network" }]);
+});
+
+Deno.test("a failing walk-in stream does not stop submission delivery", async () => {
+  const broken: CrmOutboxGateway = { claim: () => Promise.reject(new Error("claim_failed")), finish: () => Promise.resolve("ignored") };
+  const subs = submissions([[submission(5)]]);
+  const { receiver } = jewelos(allOk);
+  const response = await handleSyncDeliver(post(), { cronSecret: SECRET, crm: broken, jewelos: receiver, submissions: subs.gateway });
+  assertEquals(response.status, 200);
+  assertEquals(subs.finished, [{ id: 5, ok: true, error: null }]);
+  assertFalse((await response.json()).submissions.failed === true);
+});

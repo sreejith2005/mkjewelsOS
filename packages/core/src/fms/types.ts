@@ -1,5 +1,6 @@
 import type { UserRole } from "../roleMenu.ts";
 import type { FmsAssignmentConfig, FmsTaskDisplay, FmsFollowUp } from "./workContracts.ts";
+import type { FmsStartMode, FmsStartTrigger } from "./startTrigger.ts";
 
 export const FMS_STAGE_TYPES = ["task", "approval", "form", "notification", "branch", "parallel_start", "parallel_join", "end"] as const;
 /**
@@ -164,6 +165,10 @@ export type FmsFlowDefinition = Readonly<{
   departmentId?: string | undefined;
   moduleContext?: string | undefined;
   manualTrigger: true;
+  /** How runs start (0374). Absent means `form`, the behaviour of every version before it. */
+  startMode?: FmsStartMode | undefined;
+  /** `automatic` only: the saved submission and conditions that start a run. Not a stage. */
+  startTrigger?: FmsStartTrigger | undefined;
   stages: readonly FmsStageDefinition[];
 }>;
 
