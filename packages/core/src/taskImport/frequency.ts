@@ -1,4 +1,5 @@
 import type { ImportScheduleKind, TaskImportDestination } from "../taskImport";
+import { DAY_HALF_DUE_TIMES, DAY_HALF_LABELS, parseDayHalfLabel, type DayHalf } from "../dayHalfDeadline";
 import {
   buildScheduleRule,
   firstScheduleDate,
@@ -46,6 +47,13 @@ export type TaskImportFrequencyPlan = Readonly<{
    * their replay fingerprints are unchanged.
    */
   anchorStart?: true;
+  /**
+   * Set only when the frequency names a business half ("Daily - First Half").
+   * The row's due time is then the fixed half-day deadline (3:00 PM or
+   * 9:00 PM), never a timing preset or an older sheet time. Second-half work
+   * starts when the first half ends unless the sheet gives a start time.
+   */
+  dueHalf?: DayHalf;
 }>;
 
 const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -185,8 +193,55 @@ function numberedCheckpoints(count: number, title: string): readonly string[] {
   return Array.from({ length: count }, (_, index) => `Checkpoint ${index + 1}: ${title}`);
 }
 
+const HALF_WORDS = String.raw`((?:first|1st|second|2nd)[\s_-]*half)`;
+const HALF_SUFFIX = new RegExp(String.raw`^(.*?)(?:\s*[-/,]\s*|\s+)\(?${HALF_WORDS}\)?$`);
+const BOTH_HALVES = new RegExp(String.raw`^(?:(.*?)(?:\s*[-/,]\s*|\s+))?(?:(?:first|1st)(?:[\s_-]*half)?\s*(?:&|and|\+)\s*(?:second|2nd)[\s_-]*half|both halves)$`);
+
+/**
+ * A frequency that names a business half: "First Half" alone (daily),
+ * "Daily - First Half", "Weekly (2nd half)", or both halves of the day
+ * ("First & Second Half": one task with two checkpoints, due at the end of the
+ * second half, like Morning & Evening). Returns null when no half is named.
+ */
+function planDayHalfFrequency(frequency: string, startsOn: string, title: string): TaskImportFrequencyPlan | null {
+  const half = parseDayHalfLabel(frequency);
+  if (half) return { ...plan("daily", "FREQ=DAILY", "general", "general"), dueHalf: half };
+  const both = BOTH_HALVES.exec(frequency);
+  if (both) {
+    const base = both[1] ? planTaskImportFrequency(both[1], startsOn, title) : plan("daily", "FREQ=DAILY", "general", "general");
+    if (base.dueHalf) return null;
+    return {
+      ...base,
+      generatedCheckpoints: base.generatedCheckpoints.length ? base.generatedCheckpoints
+        : [`${DAY_HALF_LABELS.first_half}: ${title}`, `${DAY_HALF_LABELS.second_half}: ${title}`],
+      dueHalf: "second_half",
+    };
+  }
+  const suffix = HALF_SUFFIX.exec(frequency);
+  if (!suffix) return null;
+  const suffixHalf = parseDayHalfLabel(suffix[2]!);
+  const baseLabel = suffix[1]!.replace(/[\s,/-]+$/, "");
+  if (!suffixHalf || !baseLabel) return null;
+  const base = planTaskImportFrequency(baseLabel, startsOn, title);
+  return base.dueHalf ? null : { ...base, dueHalf: suffixHalf };
+}
+
+/** The due time a planned row must use, or "" when its sheet time or timing preset decides. */
+export function taskImportFixedDueTime(plan: TaskImportFrequencyPlan): string {
+  return plan.dueHalf ? DAY_HALF_DUE_TIMES[plan.dueHalf] : "";
+}
+
+/** The start time a half-day row uses when its sheet leaves the start blank, or "" for the timing preset. */
+export function taskImportFixedStartTime(plan: TaskImportFrequencyPlan): string {
+  return plan.dueHalf === "second_half" ? DAY_HALF_DUE_TIMES.first_half : "";
+}
+
 export function planTaskImportFrequency(raw: string, startsOn: string, title: string): TaskImportFrequencyPlan {
   const frequency = normalizeTaskFrequencyLabel(raw);
+  if (/half|halves/.test(frequency)) {
+    const halfPlan = planDayHalfFrequency(frequency, startsOn, title);
+    if (halfPlan) return halfPlan;
+  }
   if (MANUAL.has(frequency)) return plan("as_required", "FREQ=DAILY", "manual", "manual");
   if (frequency === "once" || frequency === "one time") return plan("one_time", "", "general", "general");
   if (DAILY.has(frequency)) return plan("daily", "FREQ=DAILY", "general", "general");

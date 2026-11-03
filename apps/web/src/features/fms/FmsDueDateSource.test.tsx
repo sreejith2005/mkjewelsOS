@@ -74,7 +74,7 @@ it("shows the automatic due date a step takes when its deadline is off, and lets
   expect(box.checked).toBe(true);
   await userEvent.click(box);
   expect(sla().autoFormDue).toBe(false);
-  expect(screen.getByText("No due date for this step.")).toBeTruthy();
+  expect(screen.getByText(/No form date: this step is due 9:00 PM the same day/)).toBeTruthy();
   await userEvent.click(box);
   expect(sla().autoFormDue).toBeUndefined();
 });
@@ -84,8 +84,8 @@ it("warns when the previous form has no follow-up date question", () => {
   expect(screen.getByText(/has no follow-up or due date question/)).toBeTruthy();
 });
 
-it("No due date turns the automatic date off too", async () => {
+it("Half-day deadline turns the automatic date off too", async () => {
   render(<Harness initial={{ dueDate: "", deadlineEnabled: true, timingMethod: "completion_date" }} />);
-  await userEvent.click(screen.getByRole("button", { name: /No due date/ }));
+  await userEvent.click(screen.getByRole("button", { name: /Half-day deadline/ }));
   expect(sla().deadlineEnabled).toBe(false); expect(sla().autoFormDue).toBe(false);
 });

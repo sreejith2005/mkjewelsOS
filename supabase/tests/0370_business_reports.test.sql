@@ -177,7 +177,11 @@ select pg_temp.as_user('manager');
 set local role authenticated;
 select is((pg_temp.report('work_register','{"work_kind":"task"}')->>'total')::int,4,'the task register lists regular tasks due in the period');
 select is((pg_temp.report('work_register','{"work_kind":"task","status":"delayed"}')->'rows'->0->>'title'),'BR late task','the timing filter selects the late completion');
-select ok((pg_temp.report('work_register','{"work_kind":"fms"}')->>'total')::int=0,'FMS steps without a deadline are not due work');
+select is((pg_temp.report('work_register','{"work_kind":"fms"}')->>'total')::int,
+  (select count(*)::int from fms_instance_stages w join fms_instances i on i.id=w.fms_instance_id
+    where i.tenant_id=(select id from br_fixture where name='tenant') and w.planned_datetime is not null
+      and (w.planned_datetime at time zone 'Asia/Kolkata')::date between (now() at time zone 'Asia/Kolkata')::date-30 and (now() at time zone 'Asia/Kolkata')::date),
+  'FMS steps are due work exactly when their (half-day) deadline falls in the period');
 select is((select r->>'assigned'||'/'||(r->>'completed')||'/'||(r->>'overdue')||'/'||(r->>'on_time_completed')||'/'||(r->>'delayed_completed')||'/'||(r->>'completion_rate')
   from jsonb_array_elements(pg_temp.report('employee_task_performance','{"work_kind":"task"}')->'rows') r where r->>'employee_name'='BR staff'),
   '4/2/2/1/1/50.0','employee task counts follow the documented formulas');

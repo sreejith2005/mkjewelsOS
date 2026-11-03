@@ -11,7 +11,7 @@ const MODES: readonly { value: FmsDueSourceMode; label: string; help: string }[]
   { value: "form", label: "From form answer", help: "A date the previous step's form records, like Next Follow-up Date." },
   { value: "fixed", label: "Fixed date and time", help: "A calendar date, a clock time, or days before a date." },
   { value: "tat", label: "TAT / relative", help: "Hours or minutes after an earlier step." },
-  { value: "none", label: "No due date", help: "The task has no deadline." },
+  { value: "none", label: "Half-day deadline", help: "No date of its own: due 9:00 PM the same day if it reaches the employee before 3:00 PM, otherwise 3:00 PM the next day." },
 ];
 const FIXED_METHODS = new Set(["completion_date", "specific_time", "days_before_date"]);
 
@@ -52,7 +52,7 @@ export function FmsDueDateSource({ stage, stages, data, stageIndex, updateSla, t
     {mode === "form" && stage.sla.formDue ? <FormAnswerDue data={data} rule={stage.sla.formDue} stage={stage} stageIndex={stageIndex} stages={stages} timing={timing("fallback")} updateSla={updateSla} /> : null}
     {mode === "fixed" ? timing("fixed") : null}
     {mode === "tat" ? timing("tat") : null}
-    {mode === "none" ? <p className="text-xs text-soft-grey">No deadline will be created for this step.</p> : null}
+    {mode === "none" ? <p className="text-xs text-soft-grey">This step is due 9:00 PM the same day if it reaches the employee before 3:00 PM, otherwise 3:00 PM the next day.</p> : null}
   </div>;
 }
 
@@ -62,7 +62,7 @@ export function FmsDueDateSource({ stage, stages, data, stageIndex, updateSla, t
  * The author can turn it off for this step.
  */
 export function FmsAutoFormDue({ stage, stages, data, stageIndex, updateSla }: { stage: FmsStageDefinition; stages: readonly FmsStageDefinition[]; data: FmsData; stageIndex: number; updateSla: (patch: Partial<FmsSlaRule>) => void }) {
-  if (stageIndex === 0) return <p className="text-xs text-soft-grey">No deadline. Switch it on to set one.</p>;
+  if (stageIndex === 0) return <p className="text-xs text-soft-grey">The starting form is due at the half-day deadline from when it is assigned. Switch it on to set another deadline.</p>;
   const on = fmsAutoFormDueApplies(stage);
   const incoming = fmsIncomingFormStages({ stages }, stage.key).map((source) => ({ source, dates: fmsAutoDueDateFields(fmsStageFormFields(source, data.formFields)) }));
   const found = incoming.filter((item) => item.dates.length);
@@ -71,11 +71,11 @@ export function FmsAutoFormDue({ stage, stages, data, stageIndex, updateSla }: {
       <input checked={on} className="mt-0.5 size-5 shrink-0 accent-gold" onChange={(event) => updateSla({ autoFormDue: event.target.checked ? undefined : false })} type="checkbox" />
       <span>Take the due date from the previous form<span className="mt-0.5 block text-xs text-soft-grey">Like a normal task: the task is due on the date the employee picked, and shows as overdue once it passes.</span></span>
     </label>
-    {!on ? <p className="text-xs text-soft-grey">No due date for this step.</p>
+    {!on ? <p className="text-xs text-soft-grey">No form date: this step is due 9:00 PM the same day if it reaches the employee before 3:00 PM, otherwise 3:00 PM the next day.</p>
       : found.length ? <ul className="space-y-1 rounded-lg border border-gold/15 p-2 text-xs text-soft-grey">{found.map(({ source, dates }) => <li key={source.key}>
           From <span className="text-champagne">{source.name || "the earlier step"}</span>: {dates.map((field) => field.label).join(" or ")}{dates.length > 1 ? " (whichever was answered)" : ""}
         </li>)}<li>Date-only answers are due at the end of that day.</li></ul>
-      : <p className="text-xs text-warning">The previous form has no follow-up or due date question, so this task gets no due date. Add a date question such as "Next follow-up date", or switch on Set deadline to choose a time.</p>}
+      : <p className="text-xs text-warning">The previous form has no follow-up or due date question, so this task takes the half-day deadline (9:00 PM or 3:00 PM). Add a date question such as "Next follow-up date", or switch on Set deadline to choose a time.</p>}
   </div>;
 }
 
@@ -98,7 +98,7 @@ function FormAnswerDue({ stage, stages, data, rule, stageIndex, updateSla, timin
       const date = dates.find((field) => field.key === current?.dateFieldKey);
       return <fieldset className="space-y-2" key={source.key}>
         <legend className="text-xs font-semibold text-champagne">Arriving from {source.name || "an earlier step"}</legend>
-        {!dates.length ? <p className="text-xs text-soft-grey">This step's form has no date question. Add one (for example Next Follow-up Date) or the task falls back below.</p> : <div className="grid gap-2 sm:grid-cols-2">
+        {!dates.length ? <p className="text-xs text-soft-grey">This step's form has no date question. Add one (for example Next Follow-up Date) or the task uses the "If the date is missing" choice below.</p> : <div className="grid gap-2 sm:grid-cols-2">
           <label className="block"><span className="label">Date question</span>
             <select aria-label={`Due date question from ${source.name}`} className="field" onChange={(event) => setSource(source.key, event.target.value ? { stageKey: source.key, dateFieldKey: event.target.value, ...(current?.timeFieldKey && dates.find((field) => field.key === event.target.value)?.type === "date" ? { timeFieldKey: current.timeFieldKey } : {}) } : undefined)} value={current?.dateFieldKey ?? ""}>
               <option value="">{dates.length > 1 ? "Choose the due-date question" : "Do not use"}</option>

@@ -130,7 +130,7 @@ describe("FMS stage editor", () => {
     expect(screen.getByLabelText("Due date").getAttribute("type")).toBe("date");
     const sources = screen.getByRole("group", { name: "Due date source" });
     // The four due-date sources are visible choices, each with its explanation.
-    expect(within(sources).getAllByRole("button").map((button) => button.querySelector("span")?.textContent)).toEqual(["From form answer", "Fixed date and time", "TAT / relative", "No due date"]);
+    expect(within(sources).getAllByRole("button").map((button) => button.querySelector("span")?.textContent)).toEqual(["From form answer", "Fixed date and time", "TAT / relative", "Half-day deadline"]);
     expect(within(sources).getByRole("button", { name: /Fixed date and time/ }).getAttribute("aria-pressed")).toBe("true");
     const methods = screen.getByRole("group", { name: "Deadline method" });
     expect(within(methods).getAllByRole("button").map((button) => button.querySelector("span")?.textContent)).toEqual(["Completion date", "Days before date", "Specific clock time"]);

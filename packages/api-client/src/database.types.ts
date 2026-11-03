@@ -6089,6 +6089,7 @@ export type Database = {
           completed_at: string | null
           completed_by: string | null
           created_at: string
+          due_at: string | null
           fms_flow_id: string
           fms_stage_id: string
           form_template_id: string
@@ -6102,6 +6103,7 @@ export type Database = {
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string
+          due_at?: string | null
           fms_flow_id: string
           fms_stage_id: string
           form_template_id: string
@@ -6115,6 +6117,7 @@ export type Database = {
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string
+          due_at?: string | null
           fms_flow_id?: string
           fms_stage_id?: string
           form_template_id?: string

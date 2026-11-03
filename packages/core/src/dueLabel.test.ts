@@ -39,4 +39,11 @@ describe("submission stamps", () => {
     expect(formatKolkataDateTime(null)).toBe("");
     expect(formatKolkataDateTime("bad")).toBe("");
   });
+
+  it("names the half for the fixed half-day deadlines", () => {
+    const now = new Date("2026-11-03T05:00:00Z"); // 10:30 am India time
+    expect(describeDue("2026-11-03T15:30:00Z", now).label).toBe("Due today, 9:00 pm · Second half");
+    expect(describeDue("2026-11-04T09:30:00Z", now).label).toBe("Due tomorrow, 3:00 pm · First half");
+    expect(describeDue("2026-11-03T11:30:00Z", now).label).toBe("Due today, 5:00 pm");
+  });
 });

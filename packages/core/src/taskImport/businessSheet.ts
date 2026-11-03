@@ -2,6 +2,8 @@ import {
   identityRequirementKey,
   normalizeImportBoolean,
   planTaskImportFrequency,
+  taskImportFixedDueTime,
+  taskImportFixedStartTime,
   taskImportScheduledStart,
   taskImportTriggerLabel,
   TASK_IMPORT_MAX_ROWS,
@@ -43,7 +45,7 @@ export const TASK_IMPORT_BUSINESS_COLUMNS: readonly TaskImportBusinessColumn[] =
   { header: "MAIN TASK", required: true, width: 38, comment: "Required task title, up to 200 characters.", example: "Open showroom and complete readiness check" },
   { header: "TASK DESCRIPTION", required: false, width: 44, comment: "Optional supporting instructions in plain text.", example: "Confirm the showroom is ready before opening." },
   { header: "TASK TYPE", required: false, width: 16, comment: "TASK, CHECK LIST, or CHECKLIST. Blank defaults to TASK.", example: "CHECK LIST" },
-  { header: "TASK FREQUENCY", required: false, width: 24, comment: "Supported business frequency. Blank defaults to As Required.", example: "Daily - Opening" },
+  { header: "TASK FREQUENCY", required: false, width: 24, comment: "Supported business frequency. Blank defaults to As Required. Add First Half or Second Half (for example Daily - First Half) for the fixed 3:00 PM or 9:00 PM deadline.", example: "Daily - Opening" },
   { header: "CHECKPOINTS", required: false, width: 42, comment: "Optional checklist items, one per line. These override generated checkpoints.", example: "Open shutters\nSwitch on display lights" },
   { header: "KRA", required: false, width: 24, comment: "Optional task category/KRA label.", example: "Store Readiness" },
   { header: "CORE TASK", required: false, width: 24, comment: "Optional core-task grouping label.", example: "Opening" },
@@ -51,7 +53,7 @@ export const TASK_IMPORT_BUSINESS_COLUMNS: readonly TaskImportBusinessColumn[] =
   { header: "BRANCH NAME", required: false, width: 20, comment: "Optional branch hint; server authorization is rechecked.", example: "Sample Branch" },
   { header: "TASK START DATE", required: false, width: 18, comment: "YYYY-MM-DD. Blank uses the import-level start date for scheduled work.", example: "2026-09-22" },
   { header: "START TIME", required: false, width: 14, comment: "24-hour HH:MM. Blank uses the applicable import timing preset.", example: "09:00" },
-  { header: "DUE TIME", required: false, width: 14, comment: "24-hour HH:MM and later than start time. Blank uses a timing preset.", example: "11:00" },
+  { header: "DUE TIME", required: false, width: 14, comment: "24-hour HH:MM and later than start time. Blank uses a timing preset. First Half rows are always due 15:00 and Second Half rows 21:00.", example: "11:00" },
   { header: "PRIORITY", required: false, width: 13, comment: "LOW, MEDIUM, or HIGH. Blank defaults to MEDIUM.", example: "Medium" },
   { header: "EVIDENCE REQUIRED", required: false, width: 20, comment: "Tasks always require a file upload. Checklists are click-to-complete. The source value is retained for import matching.", example: "Yes" },
   { header: "VERIFICATION REQUIRED", required: false, width: 23, comment: "YES or NO. Blank defaults to NO.", example: "No" },
@@ -85,6 +87,15 @@ const unsafe = (text: string) => /^[=+\-@]/.test(text.trim()) || /[\x00-\x08\x0B
 const value = (row: Row, header: string) => String(row[header] ?? "").trim();
 const issue = (row: number, field: string, reason: string, guidance: string): TaskBulkImportIssue => ({ sheet: "Tasks", row, field, reason, guidance, severity: "error" });
 const validTimingWindow = (window: { startTime: string; dueTime: string } | undefined) => Boolean(window && TIME.test(window.startTime) && TIME.test(window.dueTime) && window.dueTime > window.startTime);
+
+/** Shown, not blocking: the sheet's own due time gives way to the fixed half-day deadline. */
+export function dayHalfDueWarning(row: number, sheetDue: string, fixedDue: string): TaskBulkImportIssue {
+  return {
+    sheet: "Tasks", row, field: "DUE TIME", severity: "warning",
+    reason: `Due time ${sheetDue} is replaced by the fixed half-day deadline ${fixedDue}`,
+    guidance: "First Half work is due at 3:00 PM and Second Half work at 9:00 PM India time.",
+  };
+}
 
 function validDate(value: string) {
   const match = DATE.exec(value);
@@ -150,16 +161,20 @@ export function normalizeBusinessTaskSheet(rows: readonly Row[], options: Busine
     if (explicitDue && !TIME.test(explicitDue)) issues.push(issue(sourceRow, "DUE TIME", "Due time is invalid", "Use 24-hour HH:MM."));
     const startPreset = options.timingPresets?.[plan.startTimingPreset];
     const duePreset = options.timingPresets?.[plan.dueTimingPreset];
-    if (!explicitStart) {
+    // A First/Second Half row is due at the fixed half-day deadline, never a preset or sheet time.
+    const fixedStart = taskImportFixedStartTime(plan);
+    const fixedDue = taskImportFixedDueTime(plan);
+    if (!explicitStart && !fixedStart) {
       requiredPresets.add(plan.startTimingPreset);
       if (!validTimingWindow(startPreset)) issues.push(issue(sourceRow, "START TIME", `${plan.startTimingPreset} timing preset is required`, "Choose the missing timing preset above the preview."));
     }
-    if (!explicitDue) {
+    if (!explicitDue && !fixedDue) {
       requiredPresets.add(plan.dueTimingPreset);
       if (!validTimingWindow(duePreset)) issues.push(issue(sourceRow, "DUE TIME", `${plan.dueTimingPreset} timing preset is required`, "Choose the missing timing preset above the preview."));
     }
-    const startTime = explicitStart || startPreset?.startTime || "";
-    const dueTime = explicitDue || duePreset?.dueTime || "";
+    if (fixedDue && explicitDue && TIME.test(explicitDue) && explicitDue !== fixedDue) issues.push(dayHalfDueWarning(sourceRow, explicitDue, fixedDue));
+    const startTime = explicitStart || fixedStart || startPreset?.startTime || "";
+    const dueTime = fixedDue || explicitDue || duePreset?.dueTime || "";
     if (TIME.test(startTime) && TIME.test(dueTime) && dueTime <= startTime) issues.push(issue(sourceRow, "DUE TIME", "Due time must be later than start time", "Use a same-day HH:MM deadline."));
 
     const optionalBoolean = (header: "EVIDENCE REQUIRED" | "VERIFICATION REQUIRED" | "BUDDY ALLOWED" | "ACTIVE", fallback: boolean) => {

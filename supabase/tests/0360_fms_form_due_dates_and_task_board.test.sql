@@ -135,7 +135,7 @@ select is((select planned_datetime from fms_instance_stages where fms_instance_i
 select pg_temp.act('doer');
 insert into due_fixture values('lead_b',pg_temp.start('Priya Mehta'));
 select pg_temp.step(pg_temp.fx('lead_b'),'intro',jsonb_build_object('status','demo','assigned_to',pg_temp.fx('doer'),'next_date','2026-11-30'));
-select is(pg_temp.due(pg_temp.fx('lead_b'),'demo'),null,'the Demo date question was hidden by its condition, so Demo has no deadline (policy: no due date)');
+select is(pg_temp.due(pg_temp.fx('lead_b'),'demo'),day_half_deadline(now()),'the Demo date question was hidden by its condition, so Demo takes the half-day deadline (0371), not the hidden date');
 select is((select details->>'reason' from fms_stage_logs where fms_instance_stage_id=pg_temp.visit(pg_temp.fx('lead_b'),'demo') and action='due_date_resolved'),'date_not_applicable','the skipped conditional question is recorded as not applicable');
 select pg_temp.step(pg_temp.fx('lead_b'),'demo',jsonb_build_object('status','follow','assigned_to',pg_temp.fx('doer'),'meet_at','2026-11-06T10:15','next_date','2026-12-25'));
 select is(pg_temp.due(pg_temp.fx('lead_b'),'f1'),'2026-11-06 10:15:00 Asia/Kolkata'::timestamptz,'Demo -> Follow-up 1 is due at the Demo form''s meeting time, not the older Introduction date');
@@ -148,7 +148,7 @@ select is((fms_form_due_resolution((select planned_time_rule from fms_stages whe
   '{"status":"demo_alt","alt_date":"2026-11-03"}')->>'dueAt')::timestamptz,'2026-11-03 23:59:59.999999 Asia/Kolkata'::timestamptz,'the conditional date counts when its condition is met');
 select is(fms_form_due_resolution((select planned_time_rule from fms_stages where id=pg_temp.fx('demo')),pg_temp.fx('tenant'),pg_temp.fx('lead_b'),
   (select id from fms_instance_stages where fms_instance_id=pg_temp.fx('lead_b') and fms_stage_id=pg_temp.fx('intro')),'form',pg_temp.fx('intro'),
-  '{"status":"demo","alt_date":"2026-11-03"}')->>'source','none','a skipped conditional date is never used, even if a value was sent');
+  '{"status":"demo","alt_date":"2026-11-03"}')->>'resolvedSource','none','a skipped conditional date is never used, even if a value was sent');
 
 set local role authenticated;
 -- 9: a required deadline that is missing or malformed blocks the submission, with no downstream work.

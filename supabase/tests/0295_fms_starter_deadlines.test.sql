@@ -11,7 +11,8 @@ select is((get_fms_task_workspace('{"status":"pending"}')->>'total')::integer,1,
 select is((task_feed_page('fms','pending')->>'total')::integer,1,'legacy task paging uses the same undated starter status');
 select is((task_feed_page('fms','overdue')->>'total')::integer,0,'creation time is not an invented due date');
 select is(get_fms_task_stage_page((select family_id from fms_flows where id=(select id from visit_assignment_fixture where name='flow')),
- (select id from visit_assignment_fixture where name='flow'),(select id from visit_assignment_fixture where name='initial'),true)->'records'->0->'dueAt','null'::jsonb,'starter card has no fabricated due date');
+ (select id from visit_assignment_fixture where name='flow'),(select id from visit_assignment_fixture where name='initial'),true)->'records'->0->'dueAt',to_jsonb(day_half_deadline(now())),
+ 'starter card shows the half-day deadline from when it was assigned (0371)');
 reset role;
 select * from finish();
 rollback;

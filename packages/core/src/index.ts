@@ -134,6 +134,7 @@ export * from "./taskImport";
 export * from "./taskImport/index";
 export * from "./taskCardState";
 export * from "./dueLabel";
+export * from "./dayHalfDeadline";
 export * from "./taskPage";
 export * from "./taskDetails";
 export * from "./availability";

@@ -9,7 +9,7 @@ export const FMS_FORM_DUE_MISSING = ["fallback", "none", "require"] as const;
 export type FmsFormDueMissing = (typeof FMS_FORM_DUE_MISSING)[number];
 export const FMS_FORM_DUE_MISSING_LABELS: Record<FmsFormDueMissing, string> = {
   fallback: "Use the fallback timing below",
-  none: "Leave the task without a due date",
+  none: "Use the half-day deadline (9:00 PM or 3:00 PM)",
   require: "Require the date before the previous step can be submitted",
 };
 
