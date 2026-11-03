@@ -32,6 +32,12 @@ export type CrmAppProps = {
   /** The JewelOS theme; with onThemeChange it shows the light/dark switch in the CRM header. */
   theme?: "light" | "dark" | undefined;
   onThemeChange?: ((theme: "light" | "dark") => void) | undefined;
+  /**
+   * "section": rendered inside the JewelOS application shell, which keeps its header, sidebar
+   * and theme switch; the CRM shows only its section tabs. Default "standalone": the original
+   * CRM header and drawer.
+   */
+  layout?: "standalone" | "section" | undefined;
 };
 
 /** The CRM Supabase project the CRM reads and writes (public URL and anon key). */

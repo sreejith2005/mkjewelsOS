@@ -82,13 +82,24 @@ export function fitListingHeights(root: ParentNode, view: Window = window): void
   const boxRect = fitted.getBoundingClientRect();
   const page = fitted.closest("main") ?? fitted;
   // Room under the box inside the page (its padding and anything after it), independent of the box height.
-  const below = Math.max(0, page.getBoundingClientRect().bottom - boxRect.bottom);
+  const below = Math.max(0, page.getBoundingClientRect().bottom - boxRect.bottom) + shellSpaceBelow(fitted, view);
   const top = boxRect.top + view.scrollY;
   const room = Math.floor(view.innerHeight - top - below);
   const value = room >= MIN_FIT_HEIGHT ? `${room}px` : "";
   if (fitted.style.getPropertyValue(FIT_HEIGHT_PROPERTY) === value) return;
   if (value) fitted.style.setProperty(FIT_HEIGHT_PROPERTY, value);
   else fitted.style.removeProperty(FIT_HEIGHT_PROPERTY);
+}
+
+/**
+ * Inside the JewelOS shell (layout "section") the shell pads the page under the CRM, so that room
+ * is left too; otherwise the window would scroll by it and bring back a second scroll bar.
+ */
+function shellSpaceBelow(box: HTMLElement, view: Window): number {
+  const root = box.closest(".crm-in-shell");
+  if (!root) return 0;
+  const documentHeight = view.document.documentElement.scrollHeight;
+  return Math.max(0, Math.floor(documentHeight - (root.getBoundingClientRect().bottom + view.scrollY)));
 }
 
 /** Labels the listings under root now and whenever rows are added or replaced. Returns a stop function. */

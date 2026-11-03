@@ -1,4 +1,5 @@
-// crm-port: the CRM entry point JewelOS renders full-screen for /crm and /crm/*.
+// crm-port: the CRM entry point JewelOS renders for /crm and /crm/*: inside the JewelOS shell
+// (layout "section") on the web, or with its own header in the embedded root.
 import type { JewelosClient } from "@jewelos/api-client";
 
 import { useMemo } from "react";
@@ -7,6 +8,7 @@ import RootLayout from "@/app/layout";
 
 import { CrmAppRouter } from "./app-router";
 import type { CrmProjectConfig } from "./crm-project";
+import { CrmLayoutContext, type CrmLayout } from "./layout-context";
 import { CrmThemeContext } from "./theme-context";
 import { configureCrmHost, type CrmAuth } from "./runtime";
 
@@ -38,10 +40,16 @@ export type CrmAppProps = {
   /** The JewelOS theme; with onThemeChange it shows the light/dark switch in the CRM header. */
   theme?: "light" | "dark" | undefined;
   onThemeChange?: ((theme: "light" | "dark") => void) | undefined;
+  /**
+   * "section": rendered inside the JewelOS application shell, which keeps its header, sidebar
+   * and theme switch; the CRM shows only its section tabs. Default "standalone": the original
+   * CRM header and drawer.
+   */
+  layout?: CrmLayout | undefined;
 };
 
-export function CrmApp({ supabase, crmProject, jewelosAccessToken, path, search, navigate, onSignOut, jewelosHomePath, auth, theme, onThemeChange }: CrmAppProps) {
+export function CrmApp({ supabase, crmProject, jewelosAccessToken, path, search, navigate, onSignOut, jewelosHomePath, auth, theme, onThemeChange, layout = "standalone" }: CrmAppProps) {
   configureCrmHost({ supabase, crmProject, jewelosAccessToken, navigate, onSignOut, jewelosHomePath, auth });
   const themeControl = useMemo(() => theme && onThemeChange ? { theme, onThemeChange } : null, [theme, onThemeChange]);
-  return <CrmThemeContext.Provider value={themeControl}><RootLayout><CrmAppRouter browserPath={path} browserSearch={search} /></RootLayout></CrmThemeContext.Provider>;
+  return <CrmLayoutContext.Provider value={layout}><CrmThemeContext.Provider value={themeControl}><RootLayout><CrmAppRouter browserPath={path} browserSearch={search} /></RootLayout></CrmThemeContext.Provider></CrmLayoutContext.Provider>;
 }

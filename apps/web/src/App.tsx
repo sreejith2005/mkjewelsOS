@@ -63,6 +63,8 @@ const FMSBuilderPage = lazyPage("fms", () => import("@/pages/FMSBuilderPage").th
 const NotificationsPage = lazyPage("notifications", () => import("@/pages/NotificationsPage").then((module) => ({ default: module.NotificationsPage })));
 // /crm is the ported original CRM (@jewelos/crm-ui, 2026-09-25 owner decision). The old
 // JewelOS CRMPage was retired at the CRM cutover (the old public CRM tables stay as an archive).
+// Since 2026-11-03 it renders inside the JewelOS shell like every other section (layout
+// "section"): JewelOS keeps its header, sidebar and theme switch; the CRM shows its own tabs.
 const CrmApp = lazyPage("crm", () => import("@jewelos/crm-ui").then((module) => ({ default: module.CrmApp })));
 const TasksPage = lazyPage("tasks", () => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
 const FmsAssignedWorkPage = lazyPage("fms-assigned-work", () => import("@/pages/FmsAssignedWorkPage").then((module) => ({ default: module.FmsAssignedWorkPage })));
@@ -373,22 +375,8 @@ function AppShell() {
               : currentPage === "fms_builder" ? <FMSBuilderPage />
                 : currentPage === "notifications" ? <NotificationsPage onNavigate={navigate} />
                 : currentPage === "ask_kiara" ? <AskKiaraPage onNavigate={navigate} search={search} />
+                : currentPage === "crm" ? <CrmApp crmProject={crmProjectConfig} jewelosHomePath="/" layout="section" navigate={navigate} onSignOut={logout} path={path} search={search} supabase={supabase} />
             : <DashboardPage />;
-
-  // The CRM renders full-screen with its own original shell once the JewelOS gates allow the
-  // section; a disabled section keeps the JewelOS maintenance notice inside the shell below.
-  if (currentPage === "crm" && pageAccess === "allowed" && !showPermissionManagement) {
-    return (
-      <>
-        <LazyPageErrorBoundary onNavigate={navigate} resetKey={path}>
-          <Suspense fallback={<BrandedLoading label="Opening CRM…" />}>
-            <CrmApp crmProject={crmProjectConfig} jewelosHomePath="/" navigate={navigate} onSignOut={logout} onThemeChange={setTheme} path={path} search={search} supabase={supabase} theme={theme} />
-          </Suspense>
-        </LazyPageErrorBoundary>
-        <DailyChecklistGate profileId={profile.id} />
-      </>
-    );
-  }
 
   return (
     <>

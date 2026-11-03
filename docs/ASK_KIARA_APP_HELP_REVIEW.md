@@ -141,7 +141,10 @@ who build workflows, the designs.
 - [ ] Returning-client prefill (2026-10-23): **REGISTER CLIENT ENTRY** uses the most recently visited profile for the full phone number. Profile details accumulate from saved answers; newer nonblank answers win conflicts, while blanks preserve known details. Client profiles use the same details. Original client records and visit histories are retained. This repairs existing CRM reads; Kiara needs no new read tool.
 **What it is:** client records, walk-ins, interactions and follow-ups, for CRM users.
 - [ ] Read profile histories: **Customer journey** (filters **All**, **Store visits**, **Enquiries & leads**, **Calls & follow-ups**, **FMS work**, **Engagement asks**, **Profile edits**), **SAVED WALK-IN DETAILS & MEDIA** and **PROFILE EDIT LOG** show five expandable entries initially. **Show more** reveals more loaded entries; existing history page links reach older pages. Walk-ins have grouped saved answers and **Media**. Edit entries compare **Before** and **After**. **Add a contact** opens the existing contact form. No new Kiara data tool is needed: this changes the presentation of existing CRM reads only.
-- [ ] Find a client: open CRM and search by name or client id.
+- [ ] CRM inside JewelOS (2026-11-03): CRM opens in the normal JewelOS layout; the JewelOS menu stays available. CRM tabs: **REGISTRATION**, **CLIENT QUEUE**, **CLIENT DATABASE**, **DASHBOARD**, **NOT BOUGHT FOLLOW UP**, **REFERRALS** (swipe sideways on a phone). The old CRM menu, its "← JewelOS" link, its theme switch and LOGOUT are gone from the web; JewelOS provides them. Kiara: no new read tool (navigation only).
+- [ ] Register someone: CRM opens on **Who are you registering?** with **CLIENT / WALK-IN** (customer in the store) and **LEAD** (remote enquiry). **Back to registration type** returns to the choice.
+- [ ] Client walk-in: **REGISTER CLIENT ENTRY** (**CLIENT NAME**, **MOBILE NUMBER**, **REGISTER CLIENT**), then the client's entry in the **CRM QUEUE** opens the walk-in visit form.
+- [ ] Find a client: the search box beside the CRM tabs (name, client id or phone), or **CLIENT DATABASE**.
 - [ ] Record a walk-in or follow-up: use the walk-in and follow-up screens in CRM.
 
 ## Dropdown Master

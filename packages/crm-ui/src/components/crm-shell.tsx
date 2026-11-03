@@ -7,6 +7,8 @@ import { useEffect, useState } from "react";
 
 import { signOut } from "@/app/actions";
 import { JewelosHomeLink } from "@/crm-port/jewelos-home-link"; // crm-port: "← JewelOS" menu link
+import { useCrmLayout } from "@/crm-port/layout-context";
+import { useSearchParams } from "@/next-shim/navigation";
 import { useCrmTheme } from "@/crm-port/theme-context";
 import brandWordmark from "@/mk-jewels-logos/mk-jewels-wordmark.png";
 import { ClientSearch } from "./client-search";
@@ -24,7 +26,47 @@ function BrandLink() {
   </Link>;
 }
 
+// crm-port: the CRM's own tabs when it is a JewelOS section (owner request 2026-11-03). JewelOS
+// keeps its header, sidebar, theme switch and sign-out; these tabs only move between CRM pages.
+// Paths are unchanged, so every existing /crm deep link still opens the same page.
+export const CRM_SECTION_TABS = [
+  { label: "REGISTRATION", href: "/queue", icon: "walkin" },
+  { label: "CLIENT QUEUE", href: "/queue?register=client", icon: "walkin" },
+  { label: "CLIENT DATABASE", href: "/clients", icon: "clients" },
+  { label: "DASHBOARD", href: "/dashboard", icon: "dashboard" },
+  { label: "NOT BOUGHT FOLLOW UP", href: "/followups", icon: "followup" },
+  { label: "REFERRALS", href: "/referrals", icon: "referral" },
+] as const;
+
+/** The tab that owns a CRM page: the walk-in visit form belongs to the client queue. */
+export function activeCrmSectionTab(pathname: string, register: string | null): (typeof CRM_SECTION_TABS)[number]["href"] | null {
+  if (pathname === "/queue") return register === "client" ? "/queue?register=client" : "/queue";
+  if (pathname === "/visits/new") return "/queue?register=client";
+  if (pathname === "/leads/new") return "/queue";
+  for (const href of ["/clients", "/dashboard", "/followups", "/referrals"] as const) if (pathname === href || pathname.startsWith(`${href}/`)) return href;
+  return null;
+}
+
+function CrmSectionShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const register = useSearchParams().get("register");
+  const active = activeCrmSectionTab(pathname, register);
+  return <div className="crm-app crm-section">
+    <div className="crm-section-bar">
+      <nav className="crm-section-tabs" aria-label="CRM sections">{CRM_SECTION_TABS.map(({ label, href, icon }) => <Link className={`crm-section-tab${active === href ? " is-active" : ""}`} aria-current={active === href ? "page" : undefined} href={href} key={href}><CrmIcon name={icon} /><span>{label}</span></Link>)}</nav>
+      <div className="crm-section-search"><ClientSearch /></div>
+    </div>
+    <div className="crm-main">{children}</div><PostCallInbox />
+  </div>;
+}
+
 export function CrmShell({ profile, children }: { profile: { name: string; role: string; branch_name: string | null }; children: React.ReactNode }) {
+  // crm-port: inside the JewelOS shell the CRM shows only its section tabs.
+  if (useCrmLayout() === "section") return <CrmSectionShell>{children}</CrmSectionShell>;
+  return <CrmStandaloneShell profile={profile}>{children}</CrmStandaloneShell>;
+}
+
+function CrmStandaloneShell({ profile, children }: { profile: { name: string; role: string; branch_name: string | null }; children: React.ReactNode }) {
   const navigation = [["DASHBOARD", "/dashboard", "dashboard"], ["CLIENT WALK-IN FORM", "/queue", "walkin"], ["NOT BOUGHT FOLLOW UP", "/followups", "followup"], ["REFERRALS CALLING", "/referrals", "referral"], ["CLIENT DATABASE", "/clients", "clients"]] as const; // crm-port: ROSTER / ALLOCATION removed; the roster follows JewelOS Users and Availability
   const [drawerOpen, setDrawerOpen] = useState(false);
   const pathname = usePathname();

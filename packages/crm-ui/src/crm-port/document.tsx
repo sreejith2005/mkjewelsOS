@@ -18,6 +18,7 @@ import crmCss from "@/styles/crm.generated.css?raw";
 import mobileCss from "./mobile.css?raw";
 import themeCss from "./jewelos-theme.css?raw";
 import wideCss from "./wide.css?raw";
+import { useCrmLayout } from "./layout-context";
 import { watchTableCells } from "./mobile-tables";
 
 export const CRM_ROOT_ID = "crm-root";
@@ -33,6 +34,7 @@ export function crmStylesheet(): string {
 
 export function CrmDocument({ title, children }: { title: string; children: ReactNode }) {
   const root = useRef<HTMLDivElement>(null);
+  const layout = useCrmLayout();
   useLayoutEffect(() => {
     const style = document.createElement("style");
     style.dataset.crmUi = "crm.generated.css";
@@ -46,5 +48,6 @@ export function CrmDocument({ title, children }: { title: string; children: Reac
     };
   }, [title]);
   useLayoutEffect(() => (root.current ? watchTableCells(root.current) : undefined), []);
-  return <div ref={root} id={CRM_ROOT_ID} className="crm-root" lang="en">{children}</div>;
+  // Inside the JewelOS shell the root adds "crm-in-shell", so it takes the shell's background.
+  return <div ref={root} id={CRM_ROOT_ID} className={layout === "section" ? "crm-root crm-in-shell" : "crm-root"} lang="en">{children}</div>;
 }

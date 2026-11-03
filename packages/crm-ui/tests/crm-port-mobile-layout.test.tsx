@@ -156,6 +156,14 @@ describe("one scroll bar on tablets and desktops (owner request 2026-10-08)", ()
     expect(box(several, 0).style.getPropertyValue("--crm-fit-height")).toBe("");
     expect(box(several, 1).style.getPropertyValue("--crm-fit-height")).toBe("");
   });
+  it("also leaves the JewelOS shell padding under the CRM when it is a section (2026-11-03)", () => {
+    const root = document.createElement("div"); root.className = "crm-root crm-in-shell";
+    const main = page(1); root.append(main);
+    place(box(main), 260, 4000); place(main, 0, 4024); place(root, 0, 4024);
+    const view = { ...fakeWindow(true), document: { documentElement: { scrollHeight: 4072 } } } as unknown as Window;
+    fitListingHeights(main, view);
+    expect(box(main).style.getPropertyValue("--crm-fit-height")).toBe("568px");
+  });
   it("leaves phones to the card layout", () => {
     const main = page(1); place(box(main), 260, 4000); place(main, 0, 4024);
     fitListingHeights(main, fakeWindow(false));
