@@ -1,7 +1,10 @@
 import {useState} from "react";
+import {useFillViewport} from "@/lib/useFillViewport";
+import {useMediaQuery} from "@/lib/useMediaQuery";
 import {humanizeReportValue,type ReportColumn} from "@jewelos/core";
 import {Modal} from "@/components/ui";
 import {StatusDot} from "@/features/analytics/components";
+import {ChevronRight} from "lucide-react";
 import type {ReportAnswer,ReportCell,ReportRow,ReportServerColumn} from "./api";
 
 const IST_DATE_TIME=new Intl.DateTimeFormat("en-IN",{timeZone:"Asia/Kolkata",day:"numeric",month:"short",year:"numeric",hour:"numeric",minute:"2-digit"});
@@ -55,18 +58,25 @@ function answers(row:ReportRow):ReportAnswer[]|null{const value=row.answer_list;
 /** Desktop table and phone cards over the same rows; long answers open in a full view. */
 export function ReportTable({columns,rows}:{columns:readonly ReportColumn[];rows:readonly ReportRow[]}){
   const [open,setOpen]=useState<{title:string;answers:ReportAnswer[]}|null>(null);
+  const [record,setRecord]=useState<ReportRow|null>(null);
+  // On a computer the table is the page's working area: it fills the window and scrolls inside, headers pinned.
+  const desktop=useMediaQuery("(min-width: 640px)");
+  const box=useFillViewport<HTMLDivElement>({enabled:desktop,minHeight:280,reserve:72});
+  const [lead,...rest]=columns;
   const viewAnswers=(row:ReportRow)=>{const list=answers(row);if(list)setOpen({title:String(row.form_name??"Form answers"),answers:list});};
   return <>
-    <div className="hidden overflow-x-auto sm:block"><table className="w-full min-w-[48rem] text-left text-sm">
-      <thead className="text-xs uppercase tracking-wide text-task-text-muted"><tr>{columns.map((column)=><th className="whitespace-nowrap pb-2 pr-4 font-medium" key={column.key} scope="col">{column.label}</th>)}</tr></thead>
-      <tbody>{rows.map((row,index)=><tr className="border-t border-task-border even:bg-task-muted/40" key={rowKey(row,index)}>{columns.map((column)=><td className="max-w-72 truncate py-2.5 pr-4" key={column.key}>
+    <div className="-mx-4 hidden overflow-auto overscroll-contain border-y border-task-border bg-task-bg sm:-mx-6 sm:block" ref={box.ref} style={rows.length>8?box.style:undefined}><table className="w-full min-w-[48rem] border-separate border-spacing-0 text-left text-sm">
+      <thead className="text-xs uppercase tracking-wide text-task-text-muted"><tr>{columns.map((column)=><th className="sticky top-0 z-10 whitespace-nowrap border-b border-task-border bg-task-muted px-3 py-2.5 font-semibold first:pl-4 sm:first:pl-6" key={column.key} scope="col">{column.label}</th>)}</tr></thead>
+      <tbody>{rows.map((row,index)=><tr className="hover:bg-gold/5 even:bg-task-muted/30" key={rowKey(row,index)}>{columns.map((column)=><td className="max-w-80 truncate border-b border-task-border px-3 py-2 first:pl-4 sm:first:pl-6" key={column.key}>
         {column.key==="answers"&&answers(row)?.length?<button className="max-w-72 truncate text-left underline-offset-2 hover:underline" onClick={()=>viewAnswers(row)} type="button"><Cell column={column} value={row[column.key]}/></button>:<Cell column={column} value={row[column.key]}/>}
       </td>)}</tr>)}</tbody>
     </table></div>
-    <div className="grid gap-3 sm:hidden">{rows.map((row,index)=><article className="rounded-xl border border-task-border p-3" key={rowKey(row,index)}>
-      {columns.map((column)=><div className="flex justify-between gap-3 border-b border-task-border py-2 last:border-0" key={column.key}><span className="shrink-0 text-xs text-task-text-muted">{column.label}</span><span className="min-w-0 max-w-[65%] break-words text-right text-sm font-medium"><Cell column={column} value={row[column.key]}/></span></div>)}
-      {answers(row)?.length?<button className="mt-2 min-h-11 w-full rounded-lg border border-task-border text-sm font-medium" onClick={()=>viewAnswers(row)} type="button">View all answers</button>:null}
-    </article>)}</div>
+    <ul className="-mx-4 divide-y divide-task-border border-y border-task-border bg-task-bg sm:hidden">{rows.map((row,index)=><li key={rowKey(row,index)}><button className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-task-muted" onClick={()=>setRecord(row)} type="button">
+      <span className="min-w-0 flex-1">{lead?<span className="block truncate text-[15px] font-semibold"><Cell column={lead} value={row[lead.key]}/></span>:null}
+        <span className="mt-0.5 block truncate text-xs text-task-text-muted">{rest.slice(0,3).map((column)=>reportCellText(row[column.key],column.format)).filter((text)=>text!=="—").join(" · ")||"Open for details"}</span></span>
+      <ChevronRight aria-hidden className="size-4 shrink-0 text-task-text-muted"/>
+    </button></li>)}</ul>
+    {record?<Modal mobileFullscreen onClose={()=>setRecord(null)} title={lead?reportCellText(record[lead.key],lead.format):"Record"} tone="light"><dl className="divide-y divide-task-border">{columns.map((column)=><div className="flex justify-between gap-3 py-2.5" key={column.key}><dt className="shrink-0 text-xs text-task-text-muted">{column.label}</dt><dd className="min-w-0 max-w-[65%] break-words text-right text-sm font-medium">{column.key==="answers"&&answers(record)?.length?<button className="text-left underline underline-offset-2" onClick={()=>{viewAnswers(record);setRecord(null);}} type="button">View all answers</button>:<Cell column={column} value={record[column.key]}/>}</dd></div>)}</dl></Modal>:null}
     {open?<Modal onClose={()=>setOpen(null)} title={open.title} tone="light"><dl className="flex flex-col gap-3 text-sm">{open.answers.map((answer,index)=><div className="border-b border-task-border pb-2 last:border-0" key={`${answer.label}:${index}`}><dt className="text-xs text-task-text-muted">{answer.label}</dt><dd className="mt-0.5 whitespace-pre-wrap break-words font-medium">{answer.value}</dd></div>)}</dl></Modal>:null}
   </>;
 }

@@ -12,7 +12,8 @@ import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties } fr
  * scrolls instead of clipping. Pass `enabled: false` (phones, for example)
  * to let the content take its natural height.
  */
-export function useFillViewport<T extends HTMLElement>({ enabled = true, minHeight = 360 }: { enabled?: boolean; minHeight?: number } = {}) {
+/** `reserve` keeps room below the workspace for a short bar such as pagination. */
+export function useFillViewport<T extends HTMLElement>({ enabled = true, minHeight = 360, reserve = 0 }: { enabled?: boolean; minHeight?: number; reserve?: number } = {}) {
   const ref = useRef<T>(null);
   const [height, setHeight] = useState<number | null>(null);
   const measure = useCallback(() => {
@@ -22,9 +23,9 @@ export function useFillViewport<T extends HTMLElement>({ enabled = true, minHeig
     const top = element.getBoundingClientRect().top + window.scrollY;
     const main = element.closest("main");
     const bottom = main ? Number.parseFloat(window.getComputedStyle(main).paddingBottom) || 0 : 0;
-    const next = Math.max(minHeight, Math.floor(viewport - top - bottom));
+    const next = Math.max(minHeight, Math.floor(viewport - top - bottom - reserve));
     setHeight((current) => current === next ? current : next);
-  }, [enabled, minHeight]);
+  }, [enabled, minHeight, reserve]);
   useLayoutEffect(() => {
     measure();
     if (!enabled) return;
