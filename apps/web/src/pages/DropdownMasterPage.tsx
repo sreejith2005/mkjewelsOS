@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useMediaQuery } from "@/lib/useMediaQuery";
 import { ArrowLeft, Eye, EyeOff, FileText, ListFilter, Pencil, Plus, Search } from "lucide-react";
 import { supabase } from "@jewelos/api-client";
 import { useAuth } from "@/auth/AuthContext";
@@ -180,6 +181,7 @@ export function DropdownMasterPage() {
     }
   };
 
+  const wide = useMediaQuery("(min-width: 1280px)");
   if (!hasPermission(access, "dropdowns.manage")) {
     return <Notice tone="danger">Changing dropdown values requires the Dropdown Master permission. The database rejects writes from everyone else.</Notice>;
   }
@@ -189,14 +191,50 @@ export function DropdownMasterPage() {
   const currentForms = category ? insights.usedBy.get(category) ?? [] : [];
 
   return (
-    <section>
+    <section className="mx-auto w-full max-w-[110rem]">
       <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3"><span className="rounded-xl bg-gold-sheen p-2.5 text-on-gold shadow-gold"><ListFilter className="h-5 w-5" /></span><div><h1 className="font-display text-[1.85rem] font-semibold leading-tight sm:text-[2.1rem] text-gold-secondary">Dropdown Master</h1><p className="text-sm text-soft-grey">One shared set of lists for Forms, FMS, Tasks, Users and CRM</p></div></div>
         <Button className="w-full sm:w-auto" onClick={() => setEditing(null)}><Plus className="h-4 w-4" />{category ? "Add item" : "New list"}</Button>
       </header>
       {error ? <div className="mb-5"><Notice tone="danger">{error}</Notice><Button className="mt-3" onClick={() => void load()} variant="secondary">Retry</Button></div> : null}
 
-      {category === null ? <>
+      {/* Wide screens: the lists stay on the left and the open list on the right, so moving between lists needs no back-and-forth. */}
+      {wide ? <div className="grid items-start gap-5 xl:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]">
+        <div className="min-w-0">
+        <div className="mb-4 grid grid-cols-3 gap-2">
+          {[["Lists", totals.lists], ["Options", totals.options], ["Made here", totals.madeHere], ["Made in forms", totals.madeInForms], ["Built-in", totals.builtIn], ["Used by forms", totals.usedByForms]].map(([label, value]) => <div className="rounded-lg border border-gold/20 bg-obsidian px-4 py-3" key={label}><p className="text-xl font-bold text-gold-secondary">{value}</p><p className="text-xs text-soft-grey">{label}</p></div>)}
+        </div>
+        <div className="glass-card mb-5 space-y-3 rounded-xl p-4">
+          <label className="relative block"><Search className="absolute left-3 top-3 h-4 w-4 text-soft-grey" /><input aria-label="Search lists and options" className="field pl-9" onChange={(event) => setListSearch(event.target.value)} placeholder="Search lists and options" value={listSearch} /></label>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Filter lists by origin">{ORIGIN_FILTERS.map((filter) => <button aria-pressed={originFilter === filter.value} className={`min-h-10 rounded-full border px-3 text-sm ${originFilter === filter.value ? "border-gold bg-gold/15 text-gold-secondary" : "border-gold/20 text-soft-grey hover:text-champagne"}`} key={filter.value} onClick={() => setOriginFilter(filter.value)} type="button">{filter.label}</button>)}</div>
+          {!insights.complete ? <p className="text-xs text-soft-grey">Some details (where a list came from or which forms use it) could not be loaded. The lists themselves are complete.</p> : null}
+        </div>
+        {loading ? <p className="py-10 text-center text-gold-secondary">Loading dropdowns…</p> : summaries.length === 0 ? <div className="glass-card rounded-xl p-10 text-center text-soft-grey">No lists match.</div> : (
+          <ul className="grid gap-2">{summaries.map((list) => <li key={list.key}>
+            <button aria-current={category === list.key ? "true" : undefined} aria-label={`Open ${titleCase(list.key)}`} className={`glass-card flex h-full w-full flex-col gap-1 rounded-xl px-4 py-3 text-left transition hover:border-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${category === list.key ? "border-gold bg-gold/10" : ""}`} onClick={() => setCategory(list.key)} type="button">
+              <div className="flex w-full items-start justify-between gap-2"><h2 className="min-w-0 break-words font-semibold text-white">{titleCase(list.key)}</h2>{originBadge(list.origin)}</div>
+              <p className="text-sm text-soft-grey">{list.active} active{list.total > list.active ? ` · ${list.total - list.active} off` : ""}{list.forms ? ` · used in ${list.forms} form${list.forms === 1 ? "" : "s"}` : ""}</p>
+              {list.createdAt ? <p className="text-xs text-soft-grey">Created {formatDate(list.createdAt)}</p> : null}
+              {list.matches.length ? <p className="truncate text-xs text-gold-secondary">Matches: {list.matches.slice(0, 4).join(", ")}{list.matches.length > 4 ? "…" : ""}</p> : null}
+            </button>
+          </li>)}</ul>
+        )}
+        </div>
+        <div className="min-w-0">{category === null ? <div className="glass-card rounded-xl p-10 text-center text-soft-grey">Select a list to see and edit its options.</div> : <>
+        <div className="glass-card mb-5 rounded-xl p-4">
+          <div className="mb-3 flex flex-wrap items-center gap-2"><h2 className="font-display text-xl font-semibold text-champagne">{titleCase(category)}</h2>{currentOrigin ? originBadge(currentOrigin) : null}</div>
+          {currentForms.length ? <div className="mb-3"><p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-soft-grey">Used in forms</p><ul className="flex flex-wrap gap-1.5">{currentForms.map((form) => <li className="inline-flex items-center gap-1 rounded-full bg-gold/10 px-2.5 py-1 text-xs text-champagne" key={form.formTemplateId} title={`Questions: ${form.questions.join(", ")}`}><FileText className="size-3" />{form.name}{form.lifecycle === "draft" ? " (draft)" : ""}</li>)}</ul></div>
+            : <p className="mb-3 text-xs text-soft-grey">No form questions use this list yet. It may still be used by Tasks, Users, Leave or CRM.</p>}
+          <div className="mb-3 grid gap-3 sm:grid-cols-2"><label className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-soft-grey" /><input aria-label="Search this list" className="field pl-9" onChange={(event) => setSearch(event.target.value)} placeholder="Search label or code" value={search} /></label><select aria-label="Status" className="field" onChange={(event) => setStatus(event.target.value as typeof status)} value={status}><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+          <div className="grid grid-cols-3 gap-2 sm:flex sm:gap-3"><div className="rounded-lg border border-gold/20 bg-obsidian px-4 py-3"><p className="text-xl font-bold text-gold-secondary">{counts.total}</p><p className="text-xs text-soft-grey">Total</p></div><div className="rounded-lg border border-success/30 bg-success/5 px-4 py-3"><p className="text-xl font-bold text-success">{counts.active}</p><p className="text-xs text-soft-grey">Active</p></div><div className="rounded-lg border border-soft-grey/20 px-4 py-3"><p className="text-xl font-bold text-soft-grey">{counts.inactive}</p><p className="text-xs text-soft-grey">Inactive</p></div></div>
+        </div>
+        {loading ? <p className="py-10 text-center text-gold-secondary">Loading dropdowns…</p> : categoryItems.length === 0 ? <div className="glass-card rounded-xl p-10 text-center text-soft-grey">No items in {titleCase(category)} yet.</div> : (
+          <div className="space-y-3">{categoryItems.map((item) => <article className={`glass-card flex flex-wrap items-center gap-3 rounded-xl p-4 sm:flex-nowrap sm:gap-4 ${item.is_active === false ? "opacity-50" : ""}`} key={item.id}><span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gold/10 text-sm font-bold text-gold-secondary">{item.sort_order ?? 0}</span><div className="min-w-0 flex-1"><h3 className="break-words font-semibold text-white">{item.label}</h3><p className="truncate font-mono text-xs text-soft-grey">{item.value}</p></div><span className={`shrink-0 rounded px-2 py-1 text-[10px] uppercase ${item.is_active === false ? "bg-soft-grey/10 text-soft-grey" : "bg-success/10 text-success"}`}>{item.is_active === false ? "Inactive" : "Active"}</span><div className="ml-auto flex shrink-0 gap-2"><Button aria-label={`Edit ${item.label}`} className="size-11 min-h-11 p-0" onClick={() => setEditing(item)} variant="secondary"><Pencil className="h-4 w-4" /></Button>{item.is_active === false
+            ? <Button aria-label={`Turn on ${item.label}`} className="size-11 min-h-11 p-0" onClick={() => void toggleActive(item)} variant="secondary"><Eye className="h-4 w-4" /></Button>
+            : <Button aria-label={`Turn off ${item.label}`} className="size-11 min-h-11 p-0" onClick={() => void toggleActive(item)} variant="danger"><EyeOff className="h-4 w-4" /></Button>}</div></article>)}</div>
+        )}
+        </>}</div>
+      </div> : category === null ? <>
         <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
           {[["Lists", totals.lists], ["Options", totals.options], ["Made here", totals.madeHere], ["Made in forms", totals.madeInForms], ["Built-in", totals.builtIn], ["Used by forms", totals.usedByForms]].map(([label, value]) => <div className="rounded-lg border border-gold/20 bg-obsidian px-4 py-3" key={label}><p className="text-xl font-bold text-gold-secondary">{value}</p><p className="text-xs text-soft-grey">{label}</p></div>)}
         </div>
@@ -207,7 +245,7 @@ export function DropdownMasterPage() {
         </div>
         {loading ? <p className="py-10 text-center text-gold-secondary">Loading dropdowns…</p> : summaries.length === 0 ? <div className="glass-card rounded-xl p-10 text-center text-soft-grey">No lists match.</div> : (
           <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{summaries.map((list) => <li key={list.key}>
-            <button aria-label={`Open ${titleCase(list.key)}`} className="glass-card flex h-full w-full flex-col gap-2 rounded-xl p-4 text-left transition hover:border-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold" onClick={() => setCategory(list.key)} type="button">
+            <button aria-current={category === list.key ? "true" : undefined} aria-label={`Open ${titleCase(list.key)}`} className="glass-card flex h-full w-full flex-col gap-2 rounded-xl p-4 text-left transition hover:border-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold" onClick={() => setCategory(list.key)} type="button">
               <div className="flex w-full items-start justify-between gap-2"><h2 className="min-w-0 break-words font-semibold text-white">{titleCase(list.key)}</h2>{originBadge(list.origin)}</div>
               <p className="text-sm text-soft-grey">{list.active} active{list.total > list.active ? ` · ${list.total - list.active} off` : ""}{list.forms ? ` · used in ${list.forms} form${list.forms === 1 ? "" : "s"}` : ""}</p>
               {list.createdAt ? <p className="text-xs text-soft-grey">Created {formatDate(list.createdAt)}</p> : null}
