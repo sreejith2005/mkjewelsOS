@@ -129,6 +129,11 @@ who build workflows, the designs.
 - [ ] Open the work behind an alert: tap the notification.
 - [ ] See unread alerts: the bell shows how many are unread.
 
+## UI v2 (2026-11-04)
+- [ ] Ask Kiara: chat list on the left (drawer on phones) with **Kiara tools** at its bottom for **Chat**, **Questions for you**, **Knowledge base**, **Insights**, **Limits** (permission-filtered). Kiara: no new read tool.
+- [ ] FMS: one row per workflow; **⋯** holds Pause / Resume, Restore, Version history, Delete.
+- [ ] Reports: categories and report chips (a **Report** list on phones) above a **Filters** bar; **Your exports** button in the header.
+
 ## Users
 **What it is:** the employee list for the people you may see, and account tools for allowed roles.
 - [ ] Find an employee (2026-11-04): one table of everyone (a list on a phone) with Branch, Department, Designation, Role, Phone, Status; **Search employees**, branch and department filters, **Show former employees**.
