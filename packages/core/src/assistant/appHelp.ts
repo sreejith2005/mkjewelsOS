@@ -22,6 +22,17 @@ export type AppHelpEntry = Readonly<{
 const COMMON_NOTE = "If a button described here is missing, the user's role may not have that action; they can ask their manager or Super Admin.";
 
 export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
+  sales_recording: {
+    section: "sales_recording", title: "Sales Recording", path: "/sales-recording",
+    summary: "An authorized recording pilot for consented conversations. Recording works without a customer selected. Audio is private; transcripts are provisional until processing finishes.",
+    recipes: [
+      "Read the consent statement, confirm recording consent, then press Start recording and allow microphone access. The red Recording indicator, timer and Audio input meter show capture. Pause stops microphone capture without ending the conversation; Resume continues the same session.",
+      "Stop ends capture and shows Saving until all queued audio is acknowledged, then Processing. Ready means processing finished; Needs attention requires recovery or review. Retry saving reuses the same durable session and does not start a new customer conversation.",
+      "Web recording depends on browser support and may be interrupted in the background. It does not continue after closing the tab. The Android recorder uses a persistent recording notification with Stop; device interruption and app-kill recovery must be tested on the pilot phones.",
+      "Provisional transcript snippets may change; final text replaces them. Managers with permission may enable Critical coaching alerts; these are rate-limited and require final, unambiguous evidence. Pilot transcription lag is measured under load; zero latency is not promised.",
+      "A customer link is optional and must be verified through the CRM. If verified linking is unavailable, recording remains usable without a link. New sales recording data is not available through a Kiara read tool.",
+    ],
+  },
   home: {
     section: "home",
     title: "Home",

@@ -15,7 +15,7 @@ What the shell does, and nothing more (`src/features/webShell/`):
 
 | Concern | Behaviour |
 |---|---|
-| Sign-in | The page signs in and keeps its own session in the WebView's storage. The app holds no session or token. App backup is off, so that storage never leaves the phone. |
+| Sign-in | The page signs in and keeps its own session in the WebView's storage. The app holds no account session or JWT; recording uses only scoped expiring ingestion credentials. App backup is off, so that storage never leaves the phone. |
 | Navigation | The top frame stays on the web origin. Other web addresses (including signed file links opened with `window.open`), `tel:`, `mailto:`, WhatsApp and other app links open outside the app. Anything else is blocked. |
 | Downloads | A file the page builds in memory (`blob:`/`data:` with `<a download>`) is handed to the app and offered through Android's share sheet (15 MB cap, sanitised name). |
 | Uploads, camera, microphone | The WebView's own file chooser and capture; Android asks for camera or microphone permission the first time. |
@@ -205,3 +205,72 @@ src/
 
 Keep it this small. A feature belongs in the web app; native code is only for
 what a web page cannot do on a phone.
+
+## Recording pilot native service
+
+The single WebView remains the only product UI. Approved recording capture is
+implemented by a narrow Kotlin `AudioRecord` microphone foreground service in
+`src/features/webShell/native`; `plugins/withRecorder.js` installs these same
+sources, permissions, module registration and synthetic instrumentation tests
+when prebuilding. Do not edit only the generated Android copy. Android 8/API26+
+is required for this recorder; older supported shell devices receive a rejection.
+
+Recorder commands require the existing allowed origin and a native-generated
+32-byte bridge nonce injected only into the top frame. The shell waits for
+that capability before mounting the WebView; older APKs keep their normal UI
+without advertising native recording. Navigation restrictions remain in force.
+
+SDK57/RN0.86 uses the legacy native-module interoperability layer for
+`RecorderPackage` registration. No Expo Audio or Siteed dependency was added:
+Expo Audio background capture alone does not establish durable chunk journaling,
+ACK/replay or capture independent of the RN runtime. Here Android `AudioRecord`
+produces PCM directly into private Android Keystore AES-GCM chunk files. HTTPS
+uploads continuously drain those chunks in order; SHA-256 acknowledgements precede
+deletion. Pending audio is never evicted. The 64 MiB limit pauses capture before
+capacity is exhausted; four hours of captured samples is the session limit.
+Background continuity, runtime interoperability and OEM interruption behaviour
+remain physical-device release gates, not conclusions from a Kotlin compile.
+
+The web sends only an opaque expiring ingestion ticket and scope; its JewelOS
+JWT stays in the WebView. Tickets and five-minute leases are memory-only. If a
+lease expires during an extended offline period or the process dies, reopen
+JewelOS to refresh the ticket for the **same** session. Audio stays encrypted on
+the device. No microphone auto-restart occurs after a crash. Reload recovery uses
+`recorder.status` without requiring the page to know the native session first.
+Resume remains a deliberate visible activity action. A notification Stop flushes
+and commits without relying on the page remaining alive.
+
+Internal native validation (not a public APK release):
+
+```powershell
+# apps/mobile; JDK17 and ANDROID_HOME as above
+npm test
+npm run typecheck
+cd android
+.\gradlew.bat :app:compileDebugKotlin :app:compileDebugAndroidTestKotlin --no-daemon
+# Dedicated synthetic debug test device only; does not use a production account:
+.\gradlew.bat :app:connectedDebugAndroidTest --no-daemon
+```
+
+Physical test matrix before the documented release script:
+
+| Test | Required observation |
+|---|---|
+| Deny microphone or notifications | Clear permission error; no microphone/foreground service starts |
+| Start from visible screen | Red web state, timer/meter; persistent microphone notification with Stop |
+| Home, lock and battery saver for 10 minutes | Ordered chunks reach same durable session, or explicit interruption; measure OEM behaviour |
+| Incoming call / another app takes microphone | Partial chunk preserved, Needs attention; no automatic resume |
+| Airplane mode then reconnect | Local queue grows; ordered replay with no duplicate sequences/hash conflicts |
+| Offline longer than lease | Audio retained; fresh ticket needed on return to JewelOS; no new conversation |
+| WebView route/reload/renderer restart | Native capture continues; status recovers same session |
+| Kill process / force stop then relaunch | Encrypted queue recovered; Needs attention, same session, deliberate resume/save |
+| Notification Stop with WebView background | Final partial ACK then commit; Saving -> Processing; no lost last samples |
+| Queue full | Capture pauses; prior unacknowledged bytes remain, no eviction |
+| Clear app data / uninstall | Explain that Android removes local app storage; upload before either action |
+
+Measure actual provisional end-of-audio lag p50/p95 with concurrent warm/cold
+workers and reconnects; no latency claim is implied by two-second native chunks.
+No signed production release until staging ingestion, authorization, these
+physical tests and the repo release gates pass. Use only
+`scripts/release-mobile.ps1`; no version bump or public replacement APK is part
+of this implementation validation.

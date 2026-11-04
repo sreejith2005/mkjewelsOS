@@ -1,0 +1,10 @@
+# Bind Uvicorn to loopback. Never expose port 8080 publicly.
+# Access logs deliberately disabled; no request/response body logging in proxy/APM.
+{$RECORDER_DOMAIN} {
+    request_body {
+        max_size 90KB
+    }
+    reverse_proxy 127.0.0.1:8080 {
+        header_up X-Forwarded-Proto https
+    }
+}

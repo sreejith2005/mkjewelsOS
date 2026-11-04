@@ -20,6 +20,14 @@ Tasks entry updated against the screens: 2026-10-21 (Anytime duties, task order)
 
 ---
 
+## Sales Recording (pilot; requires server configuration and permission)
+
+- [ ] Confirm recording consent, press **Start recording**, allow microphone permission. **Recording** is red; timer and **Audio input** meter show capture. **Pause** stops capture but keeps the session; **Resume** continues it.
+- [ ] **Stop** shows **Saving**, then **Processing**, then **Ready** or **Needs attention**. **Retry saving** preserves the conversation/session and queued audio. No customer selection is required.
+- [ ] Browser background capture depends on support and never continues after closing the tab. Android uses a foreground recording notification with **Stop**; physical-device evidence is a separate release gate.
+- [ ] Transcript text is marked **Provisional** until final text replaces it. **Critical coaching alerts** is an optional authorized-manager feed based on final unambiguous evidence. Pilot p50/p95 lag is unmeasured until a real load pilot.
+- [ ] No new Kiara read tool: recording/transcript content is sensitive and outside this capture pilot's assistant scope. Kiara explains controls only; it cannot read audio/transcripts or mutate sessions.
+
 ## Home (menu: Home)
 **What it is:** your own work for today: open and overdue tasks, your FMS stages, forms to
 fill. Overdue and high-priority tasks appear under **Needs attention now** (2026-11-04: the Recent Activity panel was removed from Home).

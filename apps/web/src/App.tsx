@@ -50,6 +50,7 @@ import { GlobalVoiceTaskButton } from "@/features/tasks/GlobalVoiceTaskButton";
 import { ThemeProvider, useTheme } from "@/theme/ThemeContext";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import { SectionMaintenanceNotice } from "@/components/SectionMaintenanceNotice";
+import { RecordingBanner } from "@/features/recording/RecordingBanner";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { saveSectionControls } from "@/features/settings/api";
 import type { MobileNavigationDrawerItem } from "@/components/shell/MobileNavigationDrawer";
@@ -58,6 +59,7 @@ import wordmarkUrl from "@/assets/mk-jewels-wordmark.png";
 import { Toaster, toast } from "sonner";
 
 const AvailabilityPage = lazyPage("availability", () => import("@/pages/AvailabilityPage").then((module) => ({ default: module.AvailabilityPage })));
+const SalesRecordingPage = lazyPage("sales-recording", () => import("@/pages/SalesRecordingPage").then((module) => ({ default: module.SalesRecordingPage })));
 const HomePage = lazyPage("home", () => import("@/pages/HomePage").then((module) => ({ default: module.HomePage })));
 const DashboardPage = lazyPage("dashboard", () => import("@/pages/DashboardPage").then((module) => ({ default: module.DashboardPage })));
 const DropdownMasterPage = lazyPage("dropdown-master", () => import("@/pages/DropdownMasterPage").then((module) => ({ default: module.DropdownMasterPage })));
@@ -100,6 +102,7 @@ const PAGE_PRELOADS: Partial<Record<PageId, readonly (() => Promise<void>)[]>> =
 };
 
 const PAGE_ICONS: Record<PageId, typeof Home> = {
+  sales_recording: ClipboardList,
   home: Home,
   dashboard: LayoutDashboard,
   crm: Users,
@@ -374,12 +377,13 @@ function AppShell() {
   // has its own voice input (Phase 7) that must not be confused with task voice.
   const canUseGlobalVoice = (access ? hasPermission(access, "tasks.voice_assign") : false)
     && resolvePageAccess(effectiveAccess, sectionControls, "checklist_tasks") === "allowed"
-    && currentPage !== "ask_kiara";
+    && currentPage !== "ask_kiara" && currentPage !== "sales_recording";
   const pageContent = showPermissionManagement ? <PermissionManagementPage onBack={() => navigate("/settings")} />
     : pageAccess === "denied" ? <div className="p-4"><Notice tone="danger">No sections are available to your account. Contact your Super Admin.</Notice></div>
     : pageAccess === "disabled" ? <SectionMaintenanceNotice section={currentPage === "checklist_tasks" ? "Tasks" : currentPage === "forms_library" ? "Forms Library" : currentPage === "fms_builder" ? "FMS" : currentPage === "dropdown_master" ? "Dropdown Master" : currentPage === "task_templates" ? "Task Control" : currentPage.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())} /> : currentPage === "home" ? <HomePage onNavigate={navigate} />
     : currentPage === "dashboard" ? <DashboardPage />
     : currentPage === "reports" ? <ReportsPage />
+    : currentPage === "sales_recording" ? <SalesRecordingPage />
     : currentPage === "settings" ? <><SettingsPage /><div className="pb-8 pt-4"><DailyChecklistManager /></div></>
     : currentPage === "users" ? <TeamDirectoryPage />
     : currentPage === "dropdown_master" ? <DropdownMasterPage />
@@ -418,6 +422,7 @@ function AppShell() {
       onThemeChange={setTheme}
       fullBleed={FULL_WIDTH_PAGES.has(currentPage)}
     >
+      <RecordingBanner employeeId={profile.id} onOpen={() => navigate("/sales-recording")} />
       <LazyPageErrorBoundary onNavigate={navigate} resetKey={path}><Suspense fallback={<PageLoading />}>{pageContent}</Suspense></LazyPageErrorBoundary>
     </ApplicationShell>
     {canUseGlobalVoice ? <GlobalVoiceTaskButton profile={profile} raised={currentPage === "checklist_tasks"} /> : null}

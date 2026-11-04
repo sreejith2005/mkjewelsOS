@@ -48,6 +48,15 @@ export function isFromWebOrigin(senderUrl: string | undefined, origin: string): 
   try { return new URL(senderUrl).origin === origin; } catch { return false; }
 }
 
+/** RN WebView's legacy JavaScript bridge reports the top URL for iframe messages. */
+export function isRecorderBridgeAuthorized(raw: string, expectedNonce: string | null): boolean {
+  if (!expectedNonce || !/^[a-f0-9]{64}$/.test(expectedNonce)) return false;
+  try {
+    const value: unknown = JSON.parse(raw);
+    return !!value && typeof value === "object" && "bridgeNonce" in value && value.bridgeNonce === expectedNonce;
+  } catch { return false; }
+}
+
 /** The page theme, its header colour (status-bar strip) and the colour at its bottom edge. */
 export type WebShellTheme = Readonly<{ theme: "light" | "dark"; barColour: string | null; bottomColour: string | null }>;
 export type WebShellDownload = Readonly<{ fileName: string; mimeType: string; base64: string }>;
@@ -57,7 +66,13 @@ export type WebShellDownload = Readonly<{ fileName: string; mimeType: string; ba
  * pad as well.
  */
 export type WebShellInsets = Readonly<{ top: number; bottom: number }>;
+export type RecorderScope = Readonly<{ id: string; tenant_id: string; branch_id: string; employee_id: string; device_id: string; next_sequence?: number }>;
+export type RecorderCommand =
+  | Readonly<{ kind: "recorder.start"; requestId: string; session: RecorderScope; ticket: string; expires_at: string; upload_url: string; stream_url: string }>
+  | Readonly<{ kind: "recorder.pause" | "recorder.resume" | "recorder.stop"; requestId: string; sessionId: string }>
+  | Readonly<{ kind: "recorder.status"; requestId: string; sessionId?: string }>;
 export type WebShellMessage =
+  | RecorderCommand
   | Readonly<{ kind: "theme" } & WebShellTheme>
   | Readonly<{ kind: "insets" } & WebShellInsets>
   | Readonly<{ kind: "download" } & WebShellDownload>
@@ -96,6 +111,12 @@ export function parseWebShellMessage(raw: string): WebShellMessage | null {
   const message = value as Record<string, unknown>;
   if (message.ns !== WEB_SHELL_MESSAGE_NAMESPACE) return null;
   switch (message.kind) {
+    case "recorder.start":
+    case "recorder.pause":
+    case "recorder.resume":
+    case "recorder.stop":
+    case "recorder.status":
+      return parseRecorderCommand(message);
     case "theme": {
       if (message.theme !== "light" && message.theme !== "dark") return null;
       return { kind: "theme", theme: message.theme, barColour: hexColour(message.color), bottomColour: hexColour(message.bottom) };
@@ -161,10 +182,12 @@ export function incomingWebPath(raw: string, origin: string): string | null {
  *     above and below the page (status bar, gesture bar) match it;
  *   - the safe-area insets the page sees, so the app pads only where the web does not.
  */
-export function webShellInjectedScript(): string {
+export function webShellInjectedScript(nonce?: string): string {
   return `(function () {
+  if (window.top !== window) return;
   if (window.__jewelosShell) return;
   window.__jewelosShell = true;
+  ${nonce && /^[a-f0-9]{64}$/.test(nonce) ? `window.__jewelosRecorderBridgeNonce = ${JSON.stringify(nonce)}; window.__jewelosRecorderVersion = 1;` : ""}
   var NS = ${JSON.stringify(WEB_SHELL_MESSAGE_NAMESPACE)};
   var MAX = ${WEB_SHELL_MAX_DOWNLOAD_BYTES};
   function post(message) {
@@ -271,4 +294,26 @@ export function webShellInjectedScript(): string {
   });
 })();
 true;`;
+}
+
+const RECORDER_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function parseRecorderCommand(message: Record<string, unknown>): RecorderCommand | null {
+ const requestId = message.requestId;
+ if (typeof requestId !== "string" || !/^[a-zA-Z0-9_-]{1,100}$/.test(requestId)) return null;
+ const sessionId = message.sessionId;
+ if (message.kind === "recorder.status") return sessionId === undefined ? {kind:"recorder.status", requestId} : typeof sessionId === "string" && RECORDER_UUID.test(sessionId) ? {kind:"recorder.status",requestId,sessionId} : null;
+ if (message.kind !== "recorder.start") return (message.kind === "recorder.pause" || message.kind === "recorder.resume" || message.kind === "recorder.stop") && typeof sessionId === "string" && RECORDER_UUID.test(sessionId) ? {kind:message.kind,requestId,sessionId} : null;
+ const scope = message.session;
+ if (!scope || typeof scope !== "object") return null;
+ const ids = scope as Record<string, unknown>;
+ if (["id","tenant_id","branch_id","employee_id","device_id"].some(key => typeof ids[key] !== "string" || !RECORDER_UUID.test(String(ids[key])))) return null;
+ function endpoint(value: unknown, scheme: string): value is string {
+  if (typeof value !== "string" || value.length > 2048) return false;
+  try { const url = new URL(value); return url.protocol === scheme && !url.username && !url.password && !url.search && !url.hash; } catch { return false; }
+ }
+ if (!endpoint(message.upload_url,"https:") || !endpoint(message.stream_url,"wss:") || typeof message.ticket !== "string" || message.ticket.length < 8 || message.ticket.length > 4096 || typeof message.expires_at !== "string" || !Number.isFinite(Date.parse(message.expires_at)) || Date.parse(message.expires_at) <= Date.now()) return null;
+ // UUID shape checked above; no unconstrained page fields reach native.
+ if (ids.next_sequence !== undefined && (typeof ids.next_sequence !== "number" || !Number.isInteger(ids.next_sequence) || ids.next_sequence < 0 || ids.next_sequence > 1000000)) return null;
+ const session: RecorderScope = {...(typeof ids.next_sequence === "number" ? {next_sequence:ids.next_sequence} : {}),id:String(ids.id),tenant_id:String(ids.tenant_id),branch_id:String(ids.branch_id),employee_id:String(ids.employee_id),device_id:String(ids.device_id)};
+ return {kind:"recorder.start",requestId,session,ticket:message.ticket,expires_at:message.expires_at,upload_url:message.upload_url,stream_url:message.stream_url};
 }

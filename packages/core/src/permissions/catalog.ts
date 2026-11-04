@@ -101,6 +101,10 @@ export const PERMISSION_CATALOG = [
   { key: "assistant.view_insights", kind: "action", category: "Assistant", label: "View Ask Kiara insights", description: "SOP knowledge estimates for employees in the user's scope. No transcripts.", defaultRoles: ["super_admin", "admin", "manager"], pageId: null },
   { key: "assistant.manage_knowledge", kind: "action", category: "Assistant", label: "Manage the knowledge base", description: "Upload, replace, edit, deactivate, and delete SOP documents Kiara answers from.", defaultRoles: ["super_admin"], pageId: null },
   { key: "assistant.manage_limits", kind: "protected", category: "Assistant", label: "Manage Ask Kiara limits", description: "Daily question limits, per-user exceptions, and retention. Super Admin authority only.", defaultRoles: ["super_admin"], pageId: null },
+  { key: "module.sales_recording", kind: "module", category: "Workflows", label: "Open Sales Recording", description: "Authorized conversation capture and review. Pilot configuration is required.", defaultRoles: ["super_admin", "admin", "manager"], pageId: "sales_recording" },
+  { key: "recording.capture", kind: "action", category: "Workflows", label: "Record sales conversations", description: "Start consented recording in the user's active branch. Explicit pilot grant required.", defaultRoles: [], pageId: null },
+  { key: "recording.review", kind: "action", category: "Workflows", label: "Review branch recordings", description: "Review recordings within manager authority and branch scope.", defaultRoles: ["super_admin", "admin", "manager"], pageId: null },
+  { key: "recording.coach", kind: "action", category: "Workflows", label: "Receive critical coaching alerts", description: "Opt in to rate-limited alerts from final, unambiguous transcript evidence within manager scope.", defaultRoles: ["super_admin", "admin", "manager"], pageId: null },
 ] as const satisfies readonly PermissionDefinition[];
 
 export type PermissionKey = (typeof PERMISSION_CATALOG)[number]["key"];

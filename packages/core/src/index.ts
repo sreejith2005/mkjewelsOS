@@ -1,3 +1,4 @@
+export * from "./recording";
 export type {
   CompositeTypes,
   Database,

@@ -56,3 +56,11 @@ verify_jwt = false
 # the database, and then calls only the service-role Kiara RPCs of migration 0220.
 [functions.kiara-insights]
 verify_jwt = false
+
+# Session handler validates the caller JWT through the caller-scoped RPC.
+[functions.recorder-session]
+verify_jwt = true
+
+# Dedicated server-only constant-time shared secret; never an AWS service-role key.
+[functions.recorder-ingest]
+verify_jwt = false

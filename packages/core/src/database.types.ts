@@ -2268,6 +2268,404 @@ export type Database = {
   }
   public: {
     Tables: CustomerIntegrationTables & {
+      recorder_tickets: {
+        Row: {
+          expires_at: string
+          hash: string
+          session_id: string
+          used_at: string | null
+        }
+        Insert: {
+          expires_at: string
+          hash: string
+          session_id: string
+          used_at?: string | null
+        }
+        Update: {
+          expires_at?: string
+          hash?: string
+          session_id?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recorder_tickets_session_id_fkey"
+            columns: ["session_id"]
+            referencedRelation: "recorder_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recorder_sessions: {
+        Row: {
+          branch_id: string
+          capture_ended_at: string | null
+          consent_version: string
+          consented_at: string
+          created_at: string
+          customer_ref: string | null
+          device_id: string
+          employee_id: string
+          error_reason: string | null
+          expires_at: string
+          id: string
+          last_seen_at: string
+          last_sequence: number | null
+          next_sequence: number
+          request_id: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          branch_id: string
+          capture_ended_at?: string | null
+          consent_version: string
+          consented_at?: string
+          created_at?: string
+          customer_ref?: string | null
+          device_id: string
+          employee_id: string
+          error_reason?: string | null
+          expires_at?: string
+          id?: string
+          last_seen_at?: string
+          last_sequence?: number | null
+          next_sequence?: number
+          request_id: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string
+          capture_ended_at?: string | null
+          consent_version?: string
+          consented_at?: string
+          created_at?: string
+          customer_ref?: string | null
+          device_id?: string
+          employee_id?: string
+          error_reason?: string | null
+          expires_at?: string
+          id?: string
+          last_seen_at?: string
+          last_sequence?: number | null
+          next_sequence?: number
+          request_id?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recorder_sessions_branch_id_fkey"
+            columns: ["branch_id"]
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_sessions_device_id_fkey"
+            columns: ["device_id"]
+            referencedRelation: "recorder_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_sessions_employee_id_fkey"
+            columns: ["employee_id"]
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_sessions_employee_id_fkey"
+            columns: ["employee_id"]
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_sessions_employee_id_fkey"
+            columns: ["employee_id"]
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_sessions_employee_id_fkey"
+            columns: ["employee_id"]
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_sessions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recorder_segments: {
+        Row: {
+          ended_ms: number
+          is_final: boolean
+          revision: number
+          segment_id: string
+          sequence: number
+          session_id: string
+          started_ms: number
+          text: string
+          updated_at: string
+        }
+        Insert: {
+          ended_ms: number
+          is_final: boolean
+          revision: number
+          segment_id: string
+          sequence: number
+          session_id: string
+          started_ms: number
+          text: string
+          updated_at?: string
+        }
+        Update: {
+          ended_ms?: number
+          is_final?: boolean
+          revision?: number
+          segment_id?: string
+          sequence?: number
+          session_id?: string
+          started_ms?: number
+          text?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recorder_segments_session_id_fkey"
+            columns: ["session_id"]
+            referencedRelation: "recorder_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recorder_jobs: {
+        Row: {
+          attempts: number
+          available_at: string
+          created_at: string
+          error_reason: string | null
+          id: string
+          kind: string
+          lease_token: string | null
+          lease_until: string | null
+          sequence: number
+          session_id: string
+          state: string
+          worker_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          available_at?: string
+          created_at?: string
+          error_reason?: string | null
+          id?: string
+          kind: string
+          lease_token?: string | null
+          lease_until?: string | null
+          sequence?: number
+          session_id: string
+          state?: string
+          worker_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          available_at?: string
+          created_at?: string
+          error_reason?: string | null
+          id?: string
+          kind?: string
+          lease_token?: string | null
+          lease_until?: string | null
+          sequence?: number
+          session_id?: string
+          state?: string
+          worker_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recorder_jobs_session_id_fkey"
+            columns: ["session_id"]
+            referencedRelation: "recorder_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recorder_devices: {
+        Row: {
+          branch_id: string
+          employee_id: string
+          health: string
+          id: string
+          last_seen_at: string
+          tenant_id: string
+        }
+        Insert: {
+          branch_id: string
+          employee_id: string
+          health?: string
+          id: string
+          last_seen_at?: string
+          tenant_id: string
+        }
+        Update: {
+          branch_id?: string
+          employee_id?: string
+          health?: string
+          id?: string
+          last_seen_at?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recorder_devices_branch_id_fkey"
+            columns: ["branch_id"]
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_devices_employee_id_fkey"
+            columns: ["employee_id"]
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_devices_employee_id_fkey"
+            columns: ["employee_id"]
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_devices_employee_id_fkey"
+            columns: ["employee_id"]
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_devices_employee_id_fkey"
+            columns: ["employee_id"]
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_devices_tenant_id_fkey"
+            columns: ["tenant_id"]
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recorder_config: {
+        Row: {
+          branch_ids: string[]
+          coaching_enabled: boolean
+          employee_ids: string[]
+          enabled: boolean
+          retention_days: number
+          tenant_id: string
+        }
+        Insert: {
+          branch_ids?: string[]
+          coaching_enabled?: boolean
+          employee_ids?: string[]
+          enabled?: boolean
+          retention_days?: number
+          tenant_id: string
+        }
+        Update: {
+          branch_ids?: string[]
+          coaching_enabled?: boolean
+          employee_ids?: string[]
+          enabled?: boolean
+          retention_days?: number
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recorder_config_tenant_id_fkey"
+            columns: ["tenant_id"]
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recorder_chunks: {
+        Row: {
+          byte_count: number
+          created_at: string
+          object_key: string
+          sequence: number
+          session_id: string
+          sha256: string
+        }
+        Insert: {
+          byte_count: number
+          created_at?: string
+          object_key: string
+          sequence: number
+          session_id: string
+          sha256: string
+        }
+        Update: {
+          byte_count?: number
+          created_at?: string
+          object_key?: string
+          sequence?: number
+          session_id?: string
+          sha256?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recorder_chunks_session_id_fkey"
+            columns: ["session_id"]
+            referencedRelation: "recorder_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recorder_alerts: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          segment_id: string
+          session_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          segment_id: string
+          session_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          segment_id?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recorder_alerts_session_id_fkey"
+            columns: ["session_id"]
+            referencedRelation: "recorder_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_alerts_session_id_segment_id_fkey"
+            columns: ["session_id", "segment_id"]
+            referencedRelation: "recorder_segments"
+            referencedColumns: ["session_id", "segment_id"]
+          },
+        ]
+      }
       dashboard_saved_views: {
         Row: {
           config: Json
@@ -12524,6 +12922,48 @@ export type Database = {
       }
     }
     Functions: CustomerIntegrationFunctions & {
+      recorder_session_snapshot: {
+        Args: { p_session_id: string }
+        Returns: Json
+      }
+      recorder_list_sessions: { Args: never; Returns: Json }
+      recorder_linkable_walkins: { Args: never; Returns: Json }
+      recorder_link_customer: {
+        Args: { p_customer_ref: string; p_session_id: string }
+        Returns: Json
+      }
+      recorder_issue_ticket: {
+        Args: {
+          p_consent?: boolean
+          p_consent_version?: string
+          p_device_id: string
+          p_request_id?: string
+          p_session_id?: string
+        }
+        Returns: Json
+      }
+      recorder_ingest: {
+        Args: { p_action: string; p_payload: Json }
+        Returns: Json
+      }
+      recorder_control_session: {
+        Args: {
+          p_action: string
+          p_last_sequence?: number
+          p_session_id: string
+        }
+        Returns: Json
+      }
+      recorder_configure: {
+        Args: {
+          p_branch_ids: string[]
+          p_coaching_enabled?: boolean
+          p_employee_ids: string[]
+          p_enabled: boolean
+          p_retention_days?: number
+        }
+        Returns: Json
+      }
       clear_crm_form_binding: {
         Args: { p_expected_version_id: string; p_purpose: string }
         Returns: undefined

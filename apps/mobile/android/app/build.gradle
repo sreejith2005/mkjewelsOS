@@ -214,3 +214,7 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+android.defaultConfig.testInstrumentationRunner = "android.test.InstrumentationTestRunner"
+android.useLibrary "android.test.runner", false
+android.useLibrary "android.test.base", false

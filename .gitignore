@@ -15,6 +15,7 @@ crm-migration-*.json
 .DS_Store
 .worktrees/
 .vercel/
+.local/
 
 # Android native build output. The relocated subproject directories come from
 # apps/mobile/plugins/withAndroidBuildBudget.js; the rest is standard Gradle.

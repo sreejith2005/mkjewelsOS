@@ -36,6 +36,7 @@ export const PAGE_IDS = [
   "dropdown_master",
   "settings",
   "ask_kiara",
+  "sales_recording",
 ] as const;
 
 export type PageId = (typeof PAGE_IDS)[number];
@@ -64,6 +65,7 @@ export const ALL_MENU_ITEMS: readonly MenuItem[] = [
   { id: "dropdown_master", label: "Dropdown Master", path: "/dropdown-master" },
   { id: "ask_kiara", label: "Ask Kiara", path: "/ask-kiara" },
   { id: "settings", label: "Settings", path: "/settings" },
+  { id: "sales_recording", label: "Sales Recording", path: "/sales-recording" },
 ] as const;
 
 export const IMPLEMENTED_PAGE_IDS: readonly PageId[] = [
@@ -82,6 +84,7 @@ export const IMPLEMENTED_PAGE_IDS: readonly PageId[] = [
   "reports",
   "settings",
   "ask_kiara",
+  "sales_recording",
 ] as const;
 
 const IMPLEMENTED_PAGES = new Set<PageId>(IMPLEMENTED_PAGE_IDS);
@@ -100,6 +103,7 @@ const APP_DESCRIPTIONS: Partial<Readonly<Record<PageId, string>>> = {
   reports: "Preview fixed reports and manage private CSV exports.",
   settings: "Manage account preferences and authorized organization defaults.",
   ask_kiara: "Ask about your work, using JewelOS, and company SOPs.",
+  sales_recording: "Record an authorized conversation and follow saving and transcription.",
 };
 
 const COMMON_WORK_PAGES: readonly PageId[] = [
@@ -119,7 +123,7 @@ const COMMON_WORK_PAGES: readonly PageId[] = [
 export const ROLE_PAGES: Readonly<Record<UserRole, readonly PageId[]>> = {
   super_admin: PAGE_IDS,
   admin: PAGE_IDS.filter((page) => page !== "dropdown_master"),
-  manager: [...COMMON_WORK_PAGES, "crm", "users", "reports", "task_templates"],
+  manager: [...COMMON_WORK_PAGES, "crm", "users", "reports", "task_templates", "sales_recording"],
   hr: [
     "home",
     "dashboard",

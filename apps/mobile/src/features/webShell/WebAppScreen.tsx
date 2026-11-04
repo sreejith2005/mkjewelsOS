@@ -13,11 +13,13 @@ import { errorText, log } from "@/lib/log";
 import { NetworkBanner } from "@/lib/NetworkBanner";
 import { useAppTheme, useTheme } from "@/theme/ThemeProvider";
 import { ErrorState, LoadingState } from "@/ui/states";
+import { recorderBridgeToken, sendRecorderCommand, subscribeRecorder } from "./nativeRecorder";
 import { saveWebDownload } from "./saveDownload";
 import {
   WEB_SHELL_USER_AGENT_TOKEN,
   incomingWebPath,
   isFromWebOrigin,
+  isRecorderBridgeAuthorized,
   parseWebShellMessage,
   statusBarStyleFor,
   webShellInjectedScript,
@@ -35,6 +37,13 @@ function WebApp({ origin }: { origin: string }) {
   const theme = useAppTheme();
   const { setTheme } = useTheme();
   const webView = useRef<WebView>(null);
+  const currentPage = useRef(origin);
+  const emitRecorder = useCallback((raw: string) => {
+    if (!isFromWebOrigin(currentPage.current, origin)) return;
+    // Native emits only status, bounded metrics and fixed error codes; never credentials/audio.
+    webView.current?.injectJavaScript(`window.dispatchEvent(new CustomEvent("jewelos-recorder", {detail: ${raw}})); true;`);
+  }, [origin]);
+  useEffect(() => subscribeRecorder(emitRecorder), [emitRecorder]);
   const canGoBack = useRef(false);
   const [startUrl, setStartUrl] = useState(`${origin}/`);
   const [loadState, setLoadState] = useState<LoadState>("loading");
@@ -45,7 +54,9 @@ function WebApp({ origin }: { origin: string }) {
   // Whether the page pads for the status and gesture bars itself (it does wherever the WebView
   // reports safe-area insets). Until the page says, the app pads, so nothing starts under a bar.
   const [pageInsets, setPageInsets] = useState<{ top: boolean; bottom: boolean }>({ top: false, bottom: false });
-  const injectedScript = useMemo(webShellInjectedScript, []);
+  const [recorderNonce, setRecorderNonce] = useState<string | null | undefined>(undefined);
+  useEffect(() => { let active = true; void recorderBridgeToken().then(token => { if (active) setRecorderNonce(token); }); return () => { active = false; }; }, []);
+  const injectedScript = useMemo(() => webShellInjectedScript(recorderNonce ?? undefined), [recorderNonce]);
 
   useEffect(() => {
     const shown = Keyboard.addListener("keyboardDidShow", () => setKeyboardOpen(true));
@@ -102,6 +113,7 @@ function WebApp({ origin }: { origin: string }) {
   }, [origin]);
 
   const onNavigationStateChange = useCallback((state: WebViewNavigation) => {
+    currentPage.current = state.url;
     canGoBack.current = state.canGoBack;
   }, []);
 
@@ -113,6 +125,17 @@ function WebApp({ origin }: { origin: string }) {
     const message = parseWebShellMessage(event.nativeEvent.data);
     if (!message) return;
     switch (message.kind) {
+      case "recorder.start":
+      case "recorder.pause":
+      case "recorder.resume":
+      case "recorder.stop":
+      case "recorder.status":
+        if (!isRecorderBridgeAuthorized(event.nativeEvent.data, recorderNonce ?? null)) return;
+        void sendRecorderCommand(message).then(raw => { if (raw) emitRecorder(raw); }).catch((error: unknown) => {
+          const code = error instanceof Error && ["permission_denied","unsupported_device","activity_required","recorder_unavailable"].includes(error.message) ? error.message : "command_rejected";
+          emitRecorder(JSON.stringify({kind:"recorder.error",requestId:message.requestId,state:"needs_attention",error:code}));
+        });
+        return;
       case "theme":
         setTheme(message.theme);
         setTopColour(message.barColour);
@@ -131,7 +154,7 @@ function WebApp({ origin }: { origin: string }) {
         Alert.alert("Download failed", message.reason === "too-large" ? "This file is too large to save from the app. Download it from JewelOS on a computer." : "The file could not be read. Try again.");
         return;
     }
-  }, [origin, setTheme]);
+  }, [origin, setTheme, emitRecorder, recorderNonce]);
 
   const reload = useCallback(() => {
     setLoadState("loading");
@@ -159,7 +182,7 @@ function WebApp({ origin }: { origin: string }) {
   return (
     <KeyboardAvoidingView behavior="padding" style={[styles.fill, { backgroundColor: top, paddingTop: pageInsets.top ? 0 : insets.top }]}>
       <StatusBar style={statusBarStyleFor(top)} />
-      <WebView
+      {recorderNonce !== undefined ? <WebView
         allowFileAccess={false}
         allowFileAccessFromFileURLs={false}
         allowUniversalAccessFromFileURLs={false}
@@ -191,7 +214,7 @@ function WebApp({ origin }: { origin: string }) {
         textZoom={100}
         thirdPartyCookiesEnabled={false}
         webviewDebuggingEnabled={__DEV__}
-      />
+      /> : null}
       <View style={{ height: keyboardOpen || pageInsets.bottom ? 0 : insets.bottom, backgroundColor: bottom }} />
       {/* Floats just below the status bar so it never moves the page. */}
       <View pointerEvents="none" style={[styles.banner, { top: insets.top }]}><NetworkBanner /></View>

@@ -54,7 +54,8 @@
           "backgroundColor": "#F8FAFC"
         }
       ],
-      "./plugins/withAndroidBuildBudget.js"
+      "./plugins/withAndroidBuildBudget.js",
+      "./plugins/withRecorder.js"
     ],
     "experiments": {
       "typedRoutes": false
