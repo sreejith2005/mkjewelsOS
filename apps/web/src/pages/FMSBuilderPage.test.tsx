@@ -89,7 +89,9 @@ describe("unified FMS console", () => {
     render(<FMSBuilderPage />);
 
     await screen.findByText("Sales intake");
-    await user.click(screen.getByRole("button", { name: "Pause" }));
+    // Pause and Delete sit in the row's "More actions" menu.
+    await user.click(screen.getByRole("button", { name: "More actions for Sales intake" }));
+    await user.click(screen.getByRole("menuitem", { name: "Pause" }));
 
     await waitFor(() => expect(mocks.setFmsFlowActive).toHaveBeenCalledWith("flow", false));
   });
@@ -101,7 +103,8 @@ describe("unified FMS console", () => {
     const user = userEvent.setup();
     render(<FMSBuilderPage />);
     await screen.findByText("Sales intake");
-    await user.click(screen.getByRole("button", { name: "Delete Sales intake" }));
+    await user.click(screen.getByRole("button", { name: "More actions for Sales intake" }));
+    await user.click(screen.getByRole("menuitem", { name: "Delete Sales intake" }));
   };
 
   it("deletes a never-run workflow, every version, after a confirm", async () => {

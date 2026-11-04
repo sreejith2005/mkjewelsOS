@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, BarChart3, GitBranch, ListChecks, Pause, Pencil, Play, Plus, RotateCcw, Search, Settings2, Trash2, Zap } from "lucide-react";
+import { ArrowLeft, BarChart3, GitBranch, History, ListChecks, Pause, Pencil, Play, Plus, RotateCcw, Search, Settings2, Trash2, Zap } from "lucide-react";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
+import { ActionMenu, type ActionMenuItem } from "@/components/ActionMenu";
 import { flowToDefinition } from "@/features/fms/definition";
 import { loadFmsAiSettings, type FmsAiSettings } from "@/features/fms/ai/api";
 import { FmsAiSettingsDialog } from "@/features/fms/ai/FmsAiSettingsDialog";
@@ -65,6 +66,8 @@ export function FMSBuilderPage() {
   // A work link opens that run directly.
   const [linkedInstanceId] = useState(() => { const link = parseFmsAssignedWorkPath(window.location.href); return link && "instanceId" in link ? link.instanceId : ""; });
   const [busyId, setBusyId] = useState<string | null>(null);
+  /** The workflow whose older versions are shown under its row. */
+  const [openHistory, setOpenHistory] = useState<string | null>(null);
   // The assistant is optional: its settings read as "all off" on any error.
   const [aiSettings, setAiSettings] = useState<FmsAiSettings | null>(null);
   const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
@@ -252,7 +255,11 @@ export function FMSBuilderPage() {
 
       {!data ? <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3"><div className="skeleton h-48 rounded-2xl" /><div className="skeleton h-48 rounded-2xl" /></div>
         : visible.length === 0 ? <Notice>No workflows match this view.{canManage ? " Create one with New workflow." : ""}</Notice>
-        : <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+        : <div className="-mx-4 border-y border-task-border bg-task-bg sm:-mx-6">
+          <div aria-hidden className="hidden grid-cols-[minmax(0,1fr)_7.5rem_minmax(14rem,0.8fr)_auto] gap-4 border-b border-task-border bg-task-muted px-6 py-2 text-xs font-semibold uppercase tracking-wide text-task-text-muted lg:grid">
+            <span>Workflow</span><span>Status</span><span>Runs</span><span className="text-right">Actions</span>
+          </div>
+          <ul className="divide-y divide-task-border">
           {visible.map((family) => {
             const flow = family.primary;
             const state = flowState(flow);
@@ -260,70 +267,78 @@ export function FMSBuilderPage() {
             const draft = family.versions.find((item) => item.status === "draft");
             const busy = family.versions.some((item) => item.id === busyId);
             const older = family.versions.filter((item) => item.id !== flow.id && item.id !== draft?.id);
-            // Every card has the same three bands: name and status, a two-line description with
-            // counts, and the actions pinned to the bottom, so buttons line up across the grid.
+            const historyOpen = openHistory === family.key;
+            const canStart = flow.start_mode === "manual" && flow.status === "published" && flow.is_active;
+            // One row per workflow: name and a short description, status, run counts, then the
+            // actions in a fixed place. Less frequent actions sit in the row's "⋯" menu.
+            const more: ActionMenuItem[] = canManage ? [
+              ...(flow.status === "published" ? [{ label: flow.is_active ? "Pause" : "Resume", icon: flow.is_active ? Pause : Play, onSelect: () => toggleActive(flow), disabled: busy }] : []),
+              ...(state === "archived" ? [{ label: "Restore", icon: RotateCcw, onSelect: () => void run(flow.id, () => restoreFmsFlow(flow.id)), disabled: busy }] : []),
+              ...(older.length ? [{ label: historyOpen ? "Hide version history" : `Version history (${older.length})`, icon: History, onSelect: () => setOpenHistory(historyOpen ? null : family.key) }] : []),
+              { label: `Delete ${flow.name}`, icon: Trash2, onSelect: () => removeWorkflow(family), disabled: busy, danger: true },
+            ] : [];
             return (
-              <article className="flex min-w-0 flex-col rounded-2xl border border-task-border bg-task-bg shadow-card" key={family.key}>
-                <div className="flex min-w-0 flex-1 flex-col gap-2 p-4 sm:p-5">
-                  <div className="flex min-w-0 items-start gap-2">
-                    <h2 className="min-w-0 flex-1 break-words text-base font-semibold leading-snug text-white sm:text-lg">{flow.name}</h2>
-                    <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase ${STATE_STYLES[state]}`}>{state}</span>
+              <li key={family.key}>
+                <article aria-label={flow.name} className="grid gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-gold/5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_7.5rem_minmax(14rem,0.8fr)_auto] lg:items-center">
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <h2 className="min-w-0 truncate text-[15px] font-semibold leading-snug text-white" title={flow.name}>{flow.name}</h2>
+                      <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase lg:hidden ${STATE_STYLES[state]}`}>{state}</span>
+                    </div>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-soft-grey">
+                      {flow.start_mode === "automatic" ? <span className="inline-flex items-center gap-1 text-gold-secondary"><Zap className="size-3" />Starts automatically</span> : flow.start_mode === "manual" ? <span className="text-gold-secondary">Manual start</span> : null}
+                      <span>v{flow.version} · used {flow.usage_count} times</span>
+                      {draft && draft.id !== flow.id ? <span className="text-champagne">· draft v{draft.version} in progress</span> : null}
+                    </div>
+                    <FlowDescription text={flow.description} />
                   </div>
-                  <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                    {flow.start_mode === "automatic" ? <span className="inline-flex items-center gap-1 rounded-full border border-gold/30 px-2 py-0.5 text-gold-secondary"><Zap className="size-3" />Starts automatically</span> : flow.start_mode === "manual" ? <span className="rounded-full border border-gold/30 px-2 py-0.5 text-gold-secondary">Manual start</span> : null}
-                    {draft && draft.id !== flow.id ? <span className="rounded-full border border-champagne/30 bg-champagne/10 px-2 py-0.5 text-champagne">draft v{draft.version} in progress</span> : null}
-                    <span className="text-soft-grey">v{flow.version} · used {flow.usage_count} times{counts.mine ? ` · ${counts.mine} assigned to you` : ""}</span>
-                  </div>
-                  <FlowDescription text={flow.description} />
-                  <dl aria-label={`${flow.name} counts`} className="mt-auto flex flex-wrap gap-1.5 pt-1 text-xs">
-                    {([["Running", counts.running, "border-gold/30 text-gold-secondary"], [FMS_TERMINAL_OUTCOME_LABELS.won, counts.won, "border-success/40 text-success"], [FMS_TERMINAL_OUTCOME_LABELS.lost, counts.lost, "border-danger/40 text-danger"], ["Other endings", counts.other, "border-champagne/30 text-champagne"]] as const).map(([label, value, tone]) =>
-                      <div className={`flex gap-1 rounded-full border px-2 py-0.5 ${tone}`} key={label}><dt>{label}</dt><dd className="font-semibold tabular-nums">{value}</dd></div>)}
+                  <div className="hidden lg:block"><span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase ${STATE_STYLES[state]}`}>{state}</span></div>
+                  <dl aria-label={`${flow.name} counts`} className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                    {([["Running", counts.running, "text-gold-secondary"], [FMS_TERMINAL_OUTCOME_LABELS.won, counts.won, "text-success"], [FMS_TERMINAL_OUTCOME_LABELS.lost, counts.lost, "text-danger"], ["Other endings", counts.other, "text-champagne"]] as const).map(([label, value, tone]) =>
+                      <div className={`flex gap-1 ${tone}`} key={label}><dt className="text-soft-grey">{label}</dt><dd className="font-semibold tabular-nums">{value}</dd></div>)}
                   </dl>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 border-t border-task-border px-4 py-3 sm:px-5">
-                  {/* Managers: Tasks opens the stage board, Runs the run list. Staff: Tasks keeps the run list as before. */}
-                  {flow.start_mode === "manual" && flow.status === "published" && flow.is_active ? <Button className="min-h-10" onClick={() => setManualStart(flow)}><Play className="size-4" />Start</Button> : null}
-                  <Button className="min-h-10" onClick={() => canSeeTeam ? openUrl(fmsTaskBoardPath(family.key)) : setTasksFor(family)} variant="secondary"><ListChecks className="size-4" />Tasks{counts.mine ? ` (${counts.mine})` : ""}</Button>
-                  {canSeeTeam ? <Button className="min-h-10" onClick={() => setTasksFor(family)} variant="secondary"><BarChart3 className="size-4" />Runs</Button> : null}
-                  {canManage && draft ? <Button className="min-h-10" disabled={busy} onClick={() => setEdit(draft)} variant="secondary"><Pencil className="size-4" />Edit draft</Button> : null}
-                  {canManage && !draft && flow.status !== "draft" ? <Button className="min-h-10" disabled={busy} onClick={() => void revise(flow)} variant="secondary"><Pencil className="size-4" />New version</Button> : null}
-                  {canManage ? <span className="ml-auto flex items-center gap-1">
-                    {flow.status === "published" ? <Button className="min-h-10 px-3" disabled={busy} onClick={() => toggleActive(flow)} variant="ghost">{flow.is_active ? <><Pause className="size-4" />Pause</> : <><Play className="size-4" />Resume</>}</Button> : null}
-                    {state === "archived" ? <Button className="min-h-10 px-3" disabled={busy} onClick={() => void run(flow.id, () => restoreFmsFlow(flow.id))} variant="ghost"><RotateCcw className="size-4" />Restore</Button> : null}
-                    <Button aria-label={`Delete ${flow.name}`} className="size-10 min-h-10 p-0" disabled={busy} onClick={() => removeWorkflow(family)} title="Delete workflow" variant="ghost"><Trash2 className="size-4 text-danger" /></Button>
-                  </span> : null}
-                </div>
-                {canManage && older.length ? (
-                  <details className="border-t border-task-border px-4 py-2 sm:px-5">
-                    <summary className="flex min-h-9 cursor-pointer items-center text-xs text-soft-grey">Version history ({older.length})</summary>
-                    <ul className="mt-1 space-y-1 pb-1">
-                      {older.map((version) => (
-                        <li className="flex flex-wrap items-center justify-between gap-2 text-xs text-soft-grey" key={version.id}>
-                          <span>v{version.version} · {flowState(version)} · used {version.usage_count} times</span>
-                          <span className="flex gap-1">
-                            {version.status === "archived" ? <Button className="min-h-9" disabled={busyId === version.id} onClick={() => void run(version.id, () => restoreFmsFlow(version.id))} variant="ghost"><RotateCcw className="size-4" />Restore</Button> : null}
-                            <Button aria-label={`Delete ${flow.name} v${version.version}`} className="size-9 min-h-9 p-0" disabled={busyId === version.id} onClick={() => remove(version)} variant="ghost"><Trash2 className="size-4" /></Button>
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
-                ) : null}
-              </article>
+                  <div className="flex flex-wrap items-center gap-1.5 lg:flex-nowrap lg:justify-end">
+                    {/* Managers: Tasks opens the stage board, Runs the run list. Staff: Tasks keeps the run list as before. */}
+                    {canStart ? <Button className="min-h-10 px-3" onClick={() => setManualStart(flow)}><Play className="size-4" />Start</Button> : null}
+                    <Button className="min-h-10 px-3" onClick={() => canSeeTeam ? openUrl(fmsTaskBoardPath(family.key)) : setTasksFor(family)} variant="secondary"><ListChecks className="size-4" />Tasks{counts.mine ? ` (${counts.mine})` : ""}</Button>
+                    {canSeeTeam ? <Button className="min-h-10 px-3" onClick={() => setTasksFor(family)} variant="secondary"><BarChart3 className="size-4" />Runs</Button> : null}
+                    {canManage && draft ? <Button className="min-h-10 px-3" disabled={busy} onClick={() => setEdit(draft)} variant="secondary"><Pencil className="size-4" />Edit draft</Button> : null}
+                    {canManage && !draft && flow.status !== "draft" ? <Button className="min-h-10 px-3" disabled={busy} onClick={() => void revise(flow)} variant="secondary"><Pencil className="size-4" />New version</Button> : null}
+                    <ActionMenu className="ml-auto lg:ml-0" items={more} label={`More actions for ${flow.name}`} />
+                  </div>
+                  {canManage && older.length && historyOpen ? (
+                    <div className="rounded-xl bg-task-muted/60 px-3 py-2 lg:col-span-4">
+                      <p className="mb-1 text-xs font-semibold text-soft-grey">Version history ({older.length})</p>
+                      <ul className="space-y-1">
+                        {older.map((version) => (
+                          <li className="flex flex-wrap items-center justify-between gap-2 text-xs text-soft-grey" key={version.id}>
+                            <span>v{version.version} · {flowState(version)} · used {version.usage_count} times</span>
+                            <span className="flex gap-1">
+                              {version.status === "archived" ? <Button className="min-h-9" disabled={busyId === version.id} onClick={() => void run(version.id, () => restoreFmsFlow(version.id))} variant="ghost"><RotateCcw className="size-4" />Restore</Button> : null}
+                              <Button aria-label={`Delete ${flow.name} v${version.version}`} className="size-9 min-h-9 p-0" disabled={busyId === version.id} onClick={() => remove(version)} variant="ghost"><Trash2 className="size-4" /></Button>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </article>
+              </li>
             );
           })}
+          </ul>
         </div>}
     </section>
   );
 }
 
-/** Two lines of description; the full text opens in place, so long descriptions never move the card's actions. */
+/** One line of description; the full text opens in place, so long descriptions never move the row's actions. */
 function FlowDescription({ text }: { text: string | null | undefined }) {
   const [open, setOpen] = useState(false);
-  if (!text) return <p className="text-sm text-soft-grey/80">No description added.</p>;
-  const long = text.length > 140 || text.includes("\n");
-  return <div className="text-sm text-soft-grey">
-    <p className={open ? "whitespace-pre-wrap break-words" : "line-clamp-2 break-words"}>{text}</p>
+  if (!text) return null;
+  const long = text.length > 90 || text.includes("\n");
+  return <div className="mt-0.5 text-xs text-soft-grey">
+    <p className={open ? "whitespace-pre-wrap break-words" : "line-clamp-1 break-words"}>{text}</p>
     {long ? <button aria-expanded={open} className="mt-0.5 text-xs font-semibold text-gold-secondary hover:underline" onClick={() => setOpen((value) => !value)} type="button">{open ? "Show less" : "Show full description"}</button> : null}
   </div>;
 }
