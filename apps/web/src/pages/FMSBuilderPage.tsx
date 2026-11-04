@@ -208,13 +208,13 @@ export function FMSBuilderPage() {
   );
 
   return (
-    <section className="mx-auto w-full max-w-7xl space-y-5">
-      <header className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-gold/30 bg-gold/15 p-5 sm:p-6">
+    <section className="mx-auto w-full max-w-[110rem] space-y-4">
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <GitBranch className="size-7 shrink-0 text-gold-secondary" />
+          <span className="rounded-xl bg-gold-sheen p-2.5 text-on-gold shadow-gold"><GitBranch className="size-5" /></span>
           <div className="min-w-0">
-            <h1 className="font-display text-2xl font-semibold leading-tight text-white sm:text-[1.85rem]">FMS</h1>
-            <p className="text-sm text-soft-grey">Every workflow in one place — start it, run its tasks, edit, pause, or remove it.</p>
+            <h1 className="font-display text-[1.75rem] font-semibold leading-tight text-gold-secondary sm:text-[2rem]">FMS</h1>
+            <p className="text-sm text-soft-grey">Start a workflow, run its tasks, edit, pause, or remove it.</p>
           </div>
         </div>
         {canManage ? <div className="flex w-full flex-wrap gap-2 sm:w-auto">
@@ -227,30 +227,32 @@ export function FMSBuilderPage() {
       {manualStart ? <FmsManualStart flow={manualStart} onClose={() => setManualStart(null)} onStarted={() => void refresh()} /> : null}
       {aiSettingsOpen && aiSettings ? <FmsAiSettingsDialog onClose={() => setAiSettingsOpen(false)} onSaved={setAiSettings} settings={aiSettings} /> : null}
 
-      <label className="relative block">
-        <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-soft-grey" />
-        <input aria-label="Search workflows" className="field min-h-14 rounded-2xl pl-12" onChange={(event) => setQuery(event.target.value)} placeholder="Search workflows..." value={query} />
-      </label>
-
-      <div className="flex flex-wrap gap-2">
-        {FILTERS.map((item) => (
-          <button
-            className={filter === item.id ? "min-h-11 rounded-full border border-gold bg-gold px-4 py-2 text-sm font-semibold text-on-gold" : "min-h-11 rounded-full border border-gold/25 px-4 py-2 text-sm font-semibold text-champagne hover:bg-gold/10"}
-            key={item.id}
-            onClick={() => setFilter(item.id)}
-            type="button"
-          >
-            {item.label}
-          </button>
-        ))}
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+        <label className="relative block lg:w-[26rem]">
+          <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-soft-grey" />
+          <input aria-label="Search workflows" className="field min-h-11 pl-10" enterKeyHint="search" onChange={(event) => setQuery(event.target.value)} placeholder="Search workflows..." type="search" value={query} />
+        </label>
+        <div aria-label="Workflow status" className="scroll-x no-scrollbar -mx-1 flex gap-1.5 px-1" role="group">
+          {FILTERS.map((item) => (
+            <button
+              aria-pressed={filter === item.id}
+              className={filter === item.id ? "min-h-11 shrink-0 rounded-full border border-gold bg-gold px-4 text-sm font-semibold text-on-gold" : "min-h-11 shrink-0 rounded-full border border-task-border bg-task-bg px-4 text-sm font-semibold text-champagne hover:border-gold/50 hover:bg-gold/10"}
+              key={item.id}
+              onClick={() => setFilter(item.id)}
+              type="button"
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {error ? <Notice tone="danger">{error} <button className="underline" onClick={() => void refresh()} type="button">Retry</button></Notice> : null}
       {notice ? <Notice tone="success">{notice}</Notice> : null}
 
-      {!data ? <div className="h-48 animate-pulse rounded-2xl bg-charcoal" />
+      {!data ? <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3"><div className="skeleton h-48 rounded-2xl" /><div className="skeleton h-48 rounded-2xl" /></div>
         : visible.length === 0 ? <Notice>No workflows match this view.{canManage ? " Create one with New workflow." : ""}</Notice>
-        : <div className="grid gap-4">
+        : <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {visible.map((family) => {
             const flow = family.primary;
             const state = flowState(flow);
@@ -258,46 +260,49 @@ export function FMSBuilderPage() {
             const draft = family.versions.find((item) => item.status === "draft");
             const busy = family.versions.some((item) => item.id === busyId);
             const older = family.versions.filter((item) => item.id !== flow.id && item.id !== draft?.id);
+            // Every card has the same three bands: name and status, a two-line description with
+            // counts, and the actions pinned to the bottom, so buttons line up across the grid.
             return (
-              <article className="rounded-2xl border border-gold/20 bg-charcoal p-5" key={family.key}>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-lg font-semibold text-white">{flow.name}</h2>
-                      <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase ${STATE_STYLES[state]}`}>{state}</span>
-                      {flow.start_mode === "automatic" ? <span className="inline-flex items-center gap-1 rounded-full border border-gold/30 px-2 py-0.5 text-xs text-gold-secondary"><Zap className="size-3" />Starts automatically</span> : flow.start_mode === "manual" ? <span className="rounded-full border border-gold/30 px-2 py-0.5 text-xs text-gold-secondary">Manual start</span> : null}
-                      {draft && draft.id !== flow.id ? <span className="rounded-full border border-champagne/30 bg-champagne/10 px-2 py-0.5 text-xs text-champagne">draft v{draft.version} in progress</span> : null}
-                    </div>
-                    <p className="mt-1 text-sm text-soft-grey">{flow.description || "No description added."}</p>
-                    <p className="mt-2 text-xs text-soft-grey">v{flow.version} · used {flow.usage_count} times{counts.mine ? ` · ${counts.mine} assigned to you` : ""}</p>
-                    <dl aria-label={`${flow.name} counts`} className="mt-2 flex flex-wrap gap-1.5 text-xs">
-                      {([["Running", counts.running, "border-gold/30 text-gold-secondary"], [FMS_TERMINAL_OUTCOME_LABELS.won, counts.won, "border-success/40 text-success"], [FMS_TERMINAL_OUTCOME_LABELS.lost, counts.lost, "border-danger/40 text-danger"], ["Other endings", counts.other, "border-champagne/30 text-champagne"]] as const).map(([label, value, tone]) =>
-                        <div className={`flex gap-1 rounded-full border px-2 py-0.5 ${tone}`} key={label}><dt>{label}</dt><dd className="font-semibold tabular-nums">{value}</dd></div>)}
-                    </dl>
+              <article className="flex min-w-0 flex-col rounded-2xl border border-task-border bg-task-bg shadow-card" key={family.key}>
+                <div className="flex min-w-0 flex-1 flex-col gap-2 p-4 sm:p-5">
+                  <div className="flex min-w-0 items-start gap-2">
+                    <h2 className="min-w-0 flex-1 break-words text-base font-semibold leading-snug text-white sm:text-lg">{flow.name}</h2>
+                    <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase ${STATE_STYLES[state]}`}>{state}</span>
                   </div>
-                  <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-
-                    {/* Managers: Tasks opens the stage board, Runs the run list. Staff: Tasks keeps the run list as before. */}
-                    <Button onClick={() => canSeeTeam ? openUrl(fmsTaskBoardPath(family.key)) : setTasksFor(family)} variant="secondary"><ListChecks className="size-4" />Tasks{counts.mine ? ` (${counts.mine})` : ""}</Button>
-                    {canSeeTeam ? <Button onClick={() => setTasksFor(family)} variant="secondary"><BarChart3 className="size-4" />Runs</Button> : null}
-                    {flow.start_mode === "manual" && flow.status === "published" && flow.is_active ? <Button onClick={() => setManualStart(flow)}><Play className="size-4" />Start</Button> : null}
-                    {canManage && draft ? <Button disabled={busy} onClick={() => setEdit(draft)} variant="secondary"><Pencil className="size-4" />Edit draft</Button> : null}
-                    {canManage && !draft && flow.status !== "draft" ? <Button disabled={busy} onClick={() => void revise(flow)} variant="secondary"><Pencil className="size-4" />New version</Button> : null}
-                    {canManage && flow.status === "published" ? <Button disabled={busy} onClick={() => toggleActive(flow)} variant="secondary">{flow.is_active ? <><Pause className="size-4" />Pause</> : <><Play className="size-4" />Resume</>}</Button> : null}
-                    {canManage && state === "archived" ? <Button disabled={busy} onClick={() => void run(flow.id, () => restoreFmsFlow(flow.id))} variant="secondary"><RotateCcw className="size-4" />Restore</Button> : null}
-                    {canManage ? <Button aria-label={`Delete ${flow.name}`} disabled={busy} onClick={() => removeWorkflow(family)} variant="danger"><Trash2 className="size-4" /></Button> : null}
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                    {flow.start_mode === "automatic" ? <span className="inline-flex items-center gap-1 rounded-full border border-gold/30 px-2 py-0.5 text-gold-secondary"><Zap className="size-3" />Starts automatically</span> : flow.start_mode === "manual" ? <span className="rounded-full border border-gold/30 px-2 py-0.5 text-gold-secondary">Manual start</span> : null}
+                    {draft && draft.id !== flow.id ? <span className="rounded-full border border-champagne/30 bg-champagne/10 px-2 py-0.5 text-champagne">draft v{draft.version} in progress</span> : null}
+                    <span className="text-soft-grey">v{flow.version} · used {flow.usage_count} times{counts.mine ? ` · ${counts.mine} assigned to you` : ""}</span>
                   </div>
+                  <FlowDescription text={flow.description} />
+                  <dl aria-label={`${flow.name} counts`} className="mt-auto flex flex-wrap gap-1.5 pt-1 text-xs">
+                    {([["Running", counts.running, "border-gold/30 text-gold-secondary"], [FMS_TERMINAL_OUTCOME_LABELS.won, counts.won, "border-success/40 text-success"], [FMS_TERMINAL_OUTCOME_LABELS.lost, counts.lost, "border-danger/40 text-danger"], ["Other endings", counts.other, "border-champagne/30 text-champagne"]] as const).map(([label, value, tone]) =>
+                      <div className={`flex gap-1 rounded-full border px-2 py-0.5 ${tone}`} key={label}><dt>{label}</dt><dd className="font-semibold tabular-nums">{value}</dd></div>)}
+                  </dl>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 border-t border-task-border px-4 py-3 sm:px-5">
+                  {/* Managers: Tasks opens the stage board, Runs the run list. Staff: Tasks keeps the run list as before. */}
+                  {flow.start_mode === "manual" && flow.status === "published" && flow.is_active ? <Button className="min-h-10" onClick={() => setManualStart(flow)}><Play className="size-4" />Start</Button> : null}
+                  <Button className="min-h-10" onClick={() => canSeeTeam ? openUrl(fmsTaskBoardPath(family.key)) : setTasksFor(family)} variant="secondary"><ListChecks className="size-4" />Tasks{counts.mine ? ` (${counts.mine})` : ""}</Button>
+                  {canSeeTeam ? <Button className="min-h-10" onClick={() => setTasksFor(family)} variant="secondary"><BarChart3 className="size-4" />Runs</Button> : null}
+                  {canManage && draft ? <Button className="min-h-10" disabled={busy} onClick={() => setEdit(draft)} variant="secondary"><Pencil className="size-4" />Edit draft</Button> : null}
+                  {canManage && !draft && flow.status !== "draft" ? <Button className="min-h-10" disabled={busy} onClick={() => void revise(flow)} variant="secondary"><Pencil className="size-4" />New version</Button> : null}
+                  {canManage ? <span className="ml-auto flex items-center gap-1">
+                    {flow.status === "published" ? <Button className="min-h-10 px-3" disabled={busy} onClick={() => toggleActive(flow)} variant="ghost">{flow.is_active ? <><Pause className="size-4" />Pause</> : <><Play className="size-4" />Resume</>}</Button> : null}
+                    {state === "archived" ? <Button className="min-h-10 px-3" disabled={busy} onClick={() => void run(flow.id, () => restoreFmsFlow(flow.id))} variant="ghost"><RotateCcw className="size-4" />Restore</Button> : null}
+                    <Button aria-label={`Delete ${flow.name}`} className="size-10 min-h-10 p-0" disabled={busy} onClick={() => removeWorkflow(family)} title="Delete workflow" variant="ghost"><Trash2 className="size-4 text-danger" /></Button>
+                  </span> : null}
                 </div>
                 {canManage && older.length ? (
-                  <details className="mt-4 border-t border-gold/10 pt-3">
-                    <summary className="cursor-pointer text-xs text-soft-grey">Version history ({older.length})</summary>
-                    <ul className="mt-2 space-y-2">
+                  <details className="border-t border-task-border px-4 py-2 sm:px-5">
+                    <summary className="flex min-h-9 cursor-pointer items-center text-xs text-soft-grey">Version history ({older.length})</summary>
+                    <ul className="mt-1 space-y-1 pb-1">
                       {older.map((version) => (
                         <li className="flex flex-wrap items-center justify-between gap-2 text-xs text-soft-grey" key={version.id}>
                           <span>v{version.version} · {flowState(version)} · used {version.usage_count} times</span>
-                          <span className="flex gap-2">
-                            {version.status === "archived" ? <Button disabled={busyId === version.id} onClick={() => void run(version.id, () => restoreFmsFlow(version.id))} variant="ghost"><RotateCcw className="size-4" />Restore</Button> : null}
-                            <Button aria-label={`Delete ${flow.name} v${version.version}`} disabled={busyId === version.id} onClick={() => remove(version)} variant="ghost"><Trash2 className="size-4" /></Button>
+                          <span className="flex gap-1">
+                            {version.status === "archived" ? <Button className="min-h-9" disabled={busyId === version.id} onClick={() => void run(version.id, () => restoreFmsFlow(version.id))} variant="ghost"><RotateCcw className="size-4" />Restore</Button> : null}
+                            <Button aria-label={`Delete ${flow.name} v${version.version}`} className="size-9 min-h-9 p-0" disabled={busyId === version.id} onClick={() => remove(version)} variant="ghost"><Trash2 className="size-4" /></Button>
                           </span>
                         </li>
                       ))}
@@ -310,4 +315,15 @@ export function FMSBuilderPage() {
         </div>}
     </section>
   );
+}
+
+/** Two lines of description; the full text opens in place, so long descriptions never move the card's actions. */
+function FlowDescription({ text }: { text: string | null | undefined }) {
+  const [open, setOpen] = useState(false);
+  if (!text) return <p className="text-sm text-soft-grey/80">No description added.</p>;
+  const long = text.length > 140 || text.includes("\n");
+  return <div className="text-sm text-soft-grey">
+    <p className={open ? "whitespace-pre-wrap break-words" : "line-clamp-2 break-words"}>{text}</p>
+    {long ? <button aria-expanded={open} className="mt-0.5 text-xs font-semibold text-gold-secondary hover:underline" onClick={() => setOpen((value) => !value)} type="button">{open ? "Show less" : "Show full description"}</button> : null}
+  </div>;
 }
