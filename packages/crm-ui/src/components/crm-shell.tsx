@@ -3,7 +3,7 @@
 import Image from "@/next-shim/image"; // crm-port: next/image -> local shim
 import Link from "@/next-shim/link"; // crm-port: next/link -> local shim (same hrefs, /crm base path added)
 import { usePathname } from "@/next-shim/navigation"; // crm-port: next/navigation -> local shim (same paths, /crm base path added)
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { signOut } from "@/app/actions";
 import { JewelosHomeLink } from "@/crm-port/jewelos-home-link"; // crm-port: "← JewelOS" menu link
@@ -47,16 +47,30 @@ export function activeCrmSectionTab(pathname: string, register: string | null): 
   return null;
 }
 
+// crm-port: on desktop the CRM sections are a slim second sidebar beside the JewelOS one
+// (owner request 2026-11-04); on phones and tablets they stay a scrolling strip whose open
+// section is always scrolled into view. The links and their order are the same either way.
 function CrmSectionShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const register = useSearchParams().get("register");
   const active = activeCrmSectionTab(pathname, register);
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const current = navRef.current?.querySelector<HTMLElement>('[aria-current="page"]');
+    current?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [active]);
   return <div className="crm-app crm-section">
-    <div className="crm-section-bar">
-      <nav className="crm-section-tabs" aria-label="CRM sections">{CRM_SECTION_TABS.map(({ label, href, icon }) => <Link className={`crm-section-tab${active === href ? " is-active" : ""}`} aria-current={active === href ? "page" : undefined} href={href} key={href}><CrmIcon name={icon} /><span>{label}</span></Link>)}</nav>
-      <div className="crm-section-search"><ClientSearch /></div>
+    <nav className="crm-section-tabs" aria-label="CRM sections" ref={navRef}>
+      <p className="crm-section-nav-title" aria-hidden="true">CRM</p>
+      {CRM_SECTION_TABS.map(({ label, href, icon }) => <Link className={`crm-section-tab${active === href ? " is-active" : ""}`} aria-current={active === href ? "page" : undefined} href={href} key={href}><CrmIcon name={icon} /><span>{label}</span></Link>)}
+    </nav>
+    <div className="crm-section-body">
+      <div className="crm-section-bar">
+        <div className="crm-section-search"><ClientSearch /></div>
+      </div>
+      <div className="crm-main">{children}</div>
     </div>
-    <div className="crm-main">{children}</div><PostCallInbox />
+    <PostCallInbox />
   </div>;
 }
 
