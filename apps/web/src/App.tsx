@@ -121,6 +121,9 @@ const PAGE_ICONS: Record<PageId, typeof Home> = {
   ask_kiara: Sparkles,
 };
 
+// Workspace, analytics and data-management pages use the whole content area and
+// set their own readable limits inside (tables, side panels, centred chat column).
+// Pages not listed here keep the shell's centred reading column.
 const FULL_WIDTH_PAGES = new Set<PageId>([
   "home",
   "dashboard",
@@ -131,6 +134,11 @@ const FULL_WIDTH_PAGES = new Set<PageId>([
   "settings",
   "fms_builder",
   "fms_tasks",
+  "forms_library",
+  "users",
+  "availability",
+  "dropdown_master",
+  "ask_kiara",
 ]);
 
 function usePathname() {
