@@ -22,7 +22,7 @@ export function CustomerIntegrationHealth() {
  async function retry(){if(!selected.length||loading)return;setLoading(true);setError("");try{const response=await supabase.rpc("retry_customer_events",{p_ids:selected});if(response.error)throw response.error;setSelected([]);await load();}catch(caught){setError(caught instanceof Error?caught.message:"Retry failed");}finally{setLoading(false);}}
  const forms=list(overview?.forms).map(object),connections=object(overview?.connections),worker=object(overview?.worker);
  const roster=object(connections.rosterToCrm),walkins=object(connections.crmWalkinsToTasks);
- return <details className="rounded-xl border border-task-border bg-task-bg p-4 text-task-text" onToggle={event=>{if(event.currentTarget.open&&!overview&&!loading)void load();}}>
+ return <details className="scroll-mt-32 rounded-xl border border-task-border bg-task-bg p-4 text-task-text" id="settings-customer-integration" onToggle={event=>{if(event.currentTarget.open&&!overview&&!loading)void load();}}>
   <summary className="min-h-11 cursor-pointer content-center font-semibold">Customer Integration</summary>
   <div className="space-y-4 pt-3">
    <p className="text-sm text-task-text-muted">How Forms and FMS work reaches the CRM. Set up a customer form in Form Builder → Customer Data Integration; a CRM super admin approves it in CRM → Dashboard → Customer Integration Administration. After approval, submissions link on their own. Completed FMS work stays complete while the CRM sync waits.</p>

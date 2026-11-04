@@ -71,6 +71,7 @@ export function DataPurgeCard({ isSuperAdmin, onLoadCounts, onPurge }: Props) {
 
   return (
     <Panel
+      id="settings-clear-data"
       title="Clear data"
       description="Delete operational records section by section, as often as you need. Users, branches, departments, Availability, dropdowns, settings, CRM and audit history are never touched."
     >

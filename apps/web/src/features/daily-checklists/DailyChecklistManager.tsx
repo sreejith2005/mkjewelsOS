@@ -108,7 +108,7 @@ export function DailyChecklistManager() {
     }
   };
 
-  return <Panel title="Daily checklists" description="Create one shared daily routine checklist for each designation. Every save is audited.">
+  return <Panel id="settings-daily-checklists" title="Daily checklists" description="Create one shared daily routine checklist for each designation. Every save is audited.">
     <div className="flex flex-col gap-3">
       {selected && (selectedRecord?.revision ?? 0) !== revision ? <div className="rounded-lg border border-task-border p-3"><p className="text-sm text-task-text-muted">This checklist changed elsewhere. Your edits are preserved with the original version.</p><Button onClick={() => choose(selected)} variant="secondary">Discard edits and reload checklist</Button></div> : null}
       <label><span className="mb-1 block text-xs text-task-text-muted">Designation</span><select className="task-field" value={selected} onChange={(event) => choose(event.target.value)}><option value="">Select designation</option>{designations.map((designation) => <option key={designation.id} value={designation.id}>{designation.label}</option>)}</select></label>
