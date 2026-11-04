@@ -97,9 +97,18 @@ export function resolveFieldOptions(field: FormFieldDefinition, masters: readonl
  * saved definition keeps the reference — the master stays the source of truth.
  */
 export function resolveFormOptions(definition: FormTemplateDefinition, masters: readonly FormMasterOption[] = []): FormTemplateDefinition {
-  if (!definition.fields.some((field) => field.optionSource)) return definition;
+  const repeatSources = (field: FormFieldDefinition) => field.validation?.repeat?.fields.some((sub) => sub.optionSource) ?? false;
+  if (!definition.fields.some((field) => field.optionSource || repeatSources(field))) return definition;
+  // A repeating group's dropdowns may read Dropdown Master lists too.
+  const withRows = (field: FormFieldDefinition): FormFieldDefinition => {
+    const repeat = field.validation?.repeat;
+    if (!repeat || !repeatSources(field)) return field;
+    return { ...field, validation: { ...field.validation, repeat: { ...repeat, fields: repeat.fields.map(({ optionSource, ...sub }) => optionSource
+      ? { ...sub, options: masters.filter((option) => option.masterType === optionSource.masterType).map((option) => ({ value: option.value, label: option.label })) }
+      : sub) } } };
+  };
   return {
     ...definition,
-    fields: definition.fields.map(({ optionSource, ...field }) => optionSource ? { ...field, options: resolveFieldOptions({ ...field, optionSource }, masters) } : { ...field, ...(optionSource ? { optionSource } : {}) }),
+    fields: definition.fields.map(withRows).map(({ optionSource, ...field }) => optionSource ? { ...field, options: resolveFieldOptions({ ...field, optionSource }, masters) } : { ...field, ...(optionSource ? { optionSource } : {}) }),
   };
 }

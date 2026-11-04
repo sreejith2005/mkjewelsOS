@@ -1,3 +1,4 @@
+import { formRepeatRowCount, isFormCrmFilesAnswer, isFormRepeatAnswer } from "./structuredAnswers.ts";
 import { formatFormAnswer } from "./format";
 import { formOptionLabel } from "./options";
 import type { FormAnswer, FormFieldDefinition } from "./types";
@@ -84,6 +85,14 @@ function referenceLabel(value: string, names: ReadonlyMap<string, string> | unde
  * empty answer returns "" so the caller decides how to show "not answered".
  */
 export function displayFormAnswer(field: FormFieldDefinition, raw: unknown, lookups: FormAnswerLookups = {}): string {
+  if (isFormRepeatAnswer(raw)) {
+    if (raw.count === "NA") return "NA";
+    const subfields = field.validation?.repeat?.fields ?? [];
+    return raw.rows.slice(0, formRepeatRowCount(raw)).map((row, index) => `${index + 1}. ${subfields.length
+      ? subfields.map((sub) => row[sub.key] ? `${sub.label}: ${formOptionLabel(sub.options, row[sub.key]!)}` : "").filter(Boolean).join(", ")
+      : Object.values(row).filter(Boolean).join(", ")}`).join("; ") || raw.count;
+  }
+  if (isFormCrmFilesAnswer(raw)) return raw.files.map((file) => file.fileName).join(", ");
   const value = coerceFormAnswer(raw);
   if (value === null || value === "" || (Array.isArray(value) && value.length === 0)) return "";
   if (typeof value === "boolean") return value ? "Yes" : "No";

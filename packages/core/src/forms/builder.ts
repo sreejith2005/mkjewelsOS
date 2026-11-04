@@ -22,6 +22,9 @@ export function createFormField(type: FormFieldType, fields: readonly FormFieldD
     key: nextFormFieldKey(fields), label: labels[type] ?? type.replaceAll("_", " "), type, sortOrder: fields.length,
     sectionKey, required: false, shown: true, editable: true,
     ...(OPTION_FIELD_TYPES.has(type) ? { options: [{ value: "option_1", label: "Option 1" }] as readonly FormOption[] } : {}),
+    // CRM question types start with a usable setup (owner request 2026-11-03).
+    ...(type === "repeat" ? { validation: { repeat: { countLabel: "How many?", min: 0, max: 10, fields: [{ key: "name", label: "Name", type: "text" as const, required: true }] } } } : {}),
+    ...(type === "crm_photo" ? { validation: { crm: { maxFiles: 1 } } } : {}),
   };
 }
 

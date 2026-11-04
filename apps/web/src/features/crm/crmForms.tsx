@@ -8,9 +8,9 @@ import { createPortal } from "react-dom";
 import { supabase } from "@jewelos/api-client";
 import type { CrmFormLink, CrmFormLinks, CrmLeadSetup, CrmLinkedForm, CrmSubmittedForm } from "@jewelos/crm-ui";
 import {
-  CRM_FORM_PURPOSE_LABELS, FORM_LIBRARY_ROLES, checkCrmFormBinding, crmLeadFormCopy, crmQueueFormCopy, crmTargetCandidates, displayFormAnswer, validateFormDefinition,
+  CRM_FORM_PURPOSE_LABELS, FORM_LIBRARY_ROLES, checkCrmFormBinding, crmLeadFormCopy, crmLinkedQuestions, crmQueueFormCopy, crmTargetCandidates, crmWalkinFormCopy, displayFormAnswer, formChoiceValueFromText, isFormRepeatAnswer, validateFormDefinition,
   normalizeFormDefinition, resolveFormOptions, suggestCrmFieldMap,
-  type CrmFieldMap, type CrmFormTarget, type FormAnswers, type FormFieldDefinition, type FormTemplateDefinition, type Json,
+  type CrmFieldMap, type CrmFormCopy, type CrmFormTarget, type FormAnswer, type FormAnswers, type FormCrmServices, type FormFieldDefinition, type FormSectionDefinition, type FormTemplateDefinition, type Json,
 } from "@jewelos/core";
 import { CheckCircle2, Copy, ExternalLink, Eye, EyeOff, Sparkles, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer";
 import { loadFormDynamicOptions, publishForm, saveDraft, setFormLibraryVisibility, toDefinition, type FormField, type FormTemplate } from "@/features/forms/api";
 
-type LinkablePurpose = "queue" | "lead";
+type LinkablePurpose = "queue" | "lead" | "walkin";
 type Targets = Readonly<Record<LinkablePurpose, readonly CrmFormTarget[]>>;
 
 const fail = (label: string, error: { message: string } | null) => { if (error) throw new Error(`${label}: ${error.message}`); };
@@ -63,6 +63,8 @@ function Portal({ children }: { children: ReactNode }) {
   return createPortal(children, document.body);
 }
 
+const SHOWN_AS_WORDING = new Set<FormFieldDefinition["type"]>(["select", "radio", "checkbox", "multiselect", "user_dropdown", "branch_dropdown", "department_dropdown"]);
+
 /** Each answer as the person saw it: a choice's label, a person's or branch's name. */
 function displayAnswers(definition: FormTemplateDefinition, answers: FormAnswers, options: DynamicOptions): Record<string, string> {
   const resolved = resolveFormOptions(definition, options.masters);
@@ -71,20 +73,55 @@ function displayAnswers(definition: FormTemplateDefinition, answers: FormAnswers
     branches: new Map(options.branches.map((item) => [item.id, item.label])),
     departments: new Map(options.departments.map((item) => [item.id, item.label])),
   };
+  // Only choices and people/branch pickers are sent as their wording; dates, numbers, phone numbers
+  // and text go to CRM as entered (CRM checks dates as YYYY-MM-DD).
   const display: Record<string, string> = {};
   for (const field of resolved.fields) {
+    if (!SHOWN_AS_WORDING.has(field.type)) continue;
     const text = displayFormAnswer(field, answers[field.key], lookups);
     if (text) display[field.key] = text;
   }
   return display;
 }
 
-export function LinkedFormDialog({ title, description, form, onClose, onSubmit }: { title: string; description?: string | undefined; form: CrmLinkedForm; onClose: () => void; onSubmit: (submitted: CrmSubmittedForm) => Promise<void> }) {
+/** Answers given as people see them (choice labels) as the form stores them. */
+function answersFromText(definition: FormTemplateDefinition, text: Readonly<Record<string, string>>, options: DynamicOptions): Record<string, FormAnswer> {
+  const resolved = resolveFormOptions(definition, options.masters);
+  const answers: Record<string, FormAnswer> = {};
+  for (const field of resolved.fields) {
+    const shown = text[field.key];
+    if (shown === undefined || !shown.trim()) continue;
+    if (field.type === "select" || field.type === "radio") answers[field.key] = formChoiceValueFromText(field.options, shown);
+    else if ((field.type === "checkbox" && field.options?.length) || field.type === "multiselect") answers[field.key] = shown.split(",").map((part) => formChoiceValueFromText(field.options, part.trim())).filter(Boolean);
+    else if (field.type === "number" || field.type === "currency") answers[field.key] = Number(shown);
+    else if (field.type === "repeat" || field.type === "crm_photo" || field.type === "checkbox") continue;
+    else answers[field.key] = shown;
+  }
+  return answers;
+}
+
+/** Each repeating group's rows with choice labels instead of stored values. */
+function rowLabels(definition: FormTemplateDefinition, answers: FormAnswers, options: DynamicOptions): Record<string, Array<Record<string, string>>> {
+  const resolved = resolveFormOptions(definition, options.masters);
+  const result: Record<string, Array<Record<string, string>>> = {};
+  for (const field of resolved.fields) {
+    const value = answers[field.key];
+    if (field.type !== "repeat" || !isFormRepeatAnswer(value)) continue;
+    const subs = field.validation?.repeat?.fields ?? [];
+    result[field.key] = value.rows.map((row) => Object.fromEntries(Object.entries(row).map(([key, cell]) => {
+      const sub = subs.find((item) => item.key === key);
+      return [key, sub?.options?.find((option) => option.value === cell)?.label ?? cell];
+    })));
+  }
+  return result;
+}
+
+export function LinkedFormDialog({ title, description, form, onClose, onSubmit, initialText, crm, submitLabel }: { title: string; description?: string | undefined; form: CrmLinkedForm; onClose: () => void; onSubmit: (submitted: CrmSubmittedForm) => Promise<void>; initialText?: Readonly<Record<string, string>> | undefined; crm?: FormCrmServices | undefined; submitLabel?: string | undefined }) {
   const { options, error } = useFormChoices();
   return <Portal><Modal mobileFullscreen onClose={onClose} stickyHeader title={title} wide>
     {description ? <p className="-mt-3 mb-4 text-sm text-soft-grey">{description}</p> : null}
     {error ? <Notice tone="danger">{error}</Notice>
-      : options ? <FormRenderer definition={form.definition} dynamicOptions={options} onSubmit={async (answers) => { await onSubmit({ answers, display: displayAnswers(form.definition, answers, options) }); return true; }} submitLabel={title} templateId={form.templateId} />
+      : options ? <FormRenderer crm={crm} definition={form.definition} dynamicOptions={options} initialAnswers={initialText ? answersFromText(form.definition, initialText, options) : {}} onSubmit={async (answers) => { await onSubmit({ answers, display: displayAnswers(form.definition, answers, options), rowDisplay: rowLabels(form.definition, answers, options) }); return true; }} submitLabel={submitLabel ?? title} templateId={form.templateId} />
       : <div aria-label="Loading the form" className="grid gap-3"><div className="skeleton h-24 rounded-2xl" /><div className="skeleton h-24 rounded-2xl" /></div>}
   </Modal></Portal>;
 }
@@ -111,15 +148,17 @@ async function loadPublishedDefinition(templateId: string): Promise<CrmLinkedFor
  * CRM forms; hidden from staff browsing, because answers given there would not register anyone
  * in CRM) and returns it with the matching question links.
  */
-async function createCrmFormCopy(purpose: LinkablePurpose, leadSetup: CrmLeadSetup, masters: DynamicOptions["masters"], existingNames: ReadonlySet<string>): Promise<{ templateId: string; fieldMap: Record<string, string>; name: string }> {
-  const copy = purpose === "queue" ? crmQueueFormCopy() : crmLeadFormCopy(leadSetup.fields, leadSetup.routes, leadSetup.lookupOptions, masters);
+async function createCrmFormCopy(purpose: LinkablePurpose, leadSetup: CrmLeadSetup, masters: DynamicOptions["masters"], existingNames: ReadonlySet<string>): Promise<{ templateId: string; fieldMap: Record<string, string | string[]>; name: string }> {
+  const copy: CrmFormCopy & { sections?: FormSectionDefinition[] } = purpose === "queue" ? crmQueueFormCopy()
+    : purpose === "lead" ? crmLeadFormCopy(leadSetup.fields, leadSetup.routes, leadSetup.lookupOptions, masters)
+    : crmWalkinFormCopy(leadSetup.lookupOptions, masters);
   if (!copy.fields.length) throw new Error("CRM has no lead fields to copy yet.");
   let name = copy.name;
   for (let round = 2; existingNames.has(name.toLowerCase()); round += 1) name = `${copy.name} ${round}`;
-  const definition = normalizeFormDefinition({ name, description: copy.description, fields: copy.fields });
+  const definition = normalizeFormDefinition({ name, description: copy.description, fields: copy.fields, ...(copy.sections ? { sections: copy.sections } : {}) });
   const issues = validateFormDefinition(definition);
   if (issues.length) throw new Error(`The copy of today's CRM form is not valid: ${issues[0]!.message}`);
-  const payload = { name: definition.name, description: definition.description ?? "", record_name_field_key: null, sections: [], permissions: { roles: [...FORM_LIBRARY_ROLES] } } as unknown as Json;
+  const payload = { name: definition.name, description: definition.description ?? "", record_name_field_key: null, sections: definition.sections ?? [], permissions: { roles: [...FORM_LIBRARY_ROLES] } } as unknown as Json;
   // Same draft shape the Form Builder saves (no ids or sort order; the server orders by position).
   const fields = definition.fields.map(({ id: _id, sortOrder: _sortOrder, ...field }) => field) as unknown as Json;
   const templateId = await saveDraft(null, payload, fields);
@@ -132,12 +171,12 @@ const TYPE_NAMES: Partial<Record<FormFieldDefinition["type"], string>> = { text:
 const typeName = (field: FormFieldDefinition) => TYPE_NAMES[field.type] ?? field.type.replaceAll("_", " ");
 
 export function CrmFormSettingsDialog({ links, targets, leadSetup, onClose, onSaved, onEditForm }: { links: CrmFormLinks; targets: Targets; leadSetup: CrmLeadSetup; onClose: () => void; onSaved: () => void; onEditForm: (familyId: string) => void }) {
-  const [purpose, setPurpose] = useState<LinkablePurpose | "walkin">("queue");
+  const [purpose, setPurpose] = useState<LinkablePurpose>("queue");
   const [forms, setForms] = useState<PublishedForm[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [familyId, setFamilyId] = useState("");
   const [chosen, setChosen] = useState<CrmLinkedForm | null>(null);
-  const [fieldMap, setFieldMap] = useState<Record<string, string>>({});
+  const [fieldMap, setFieldMap] = useState<Record<string, string | readonly string[]>>({});
   const [busy, setBusy] = useState<"" | "load" | "save" | "clear" | "starter" | "hide">("");
   const [error, setError] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
@@ -145,7 +184,7 @@ export function CrmFormSettingsDialog({ links, targets, leadSetup, onClose, onSa
   const [currentLinks, setCurrentLinks] = useState(links);
   const { options } = useFormChoices();
 
-  const linkable = purpose === "walkin" ? null : purpose;
+  const linkable: LinkablePurpose = purpose;
   const active = linkable ? currentLinks.links.find((link) => link.purpose === linkable) ?? null : null;
   const purposeTargets = linkable ? targets[linkable] : [];
   const activeIssues = active?.form ? checkCrmFormBinding(active.form.definition, active.fieldMap, purposeTargets) : active ? [{ message: "The linked form has no published version." }] : [];
@@ -166,7 +205,7 @@ export function CrmFormSettingsDialog({ links, targets, leadSetup, onClose, onSa
     setFieldMap({ ...(link?.fieldMap ?? {}) });
   }, [linkable, currentLinks]);
 
-  const choose = async (nextFamily: string, presetMap?: Record<string, string>) => {
+  const choose = async (nextFamily: string, presetMap?: Record<string, string | readonly string[]>) => {
     setFamilyId(nextFamily); setChecked(false); setPreview(false); setError(null);
     if (!nextFamily || !linkable) { setChosen(null); setFieldMap({}); return; }
     const row = (await loadPublishedForms().then((rows) => { setForms(rows); return rows; })).find((form) => form.family_id === nextFamily);
@@ -233,8 +272,8 @@ export function CrmFormSettingsDialog({ links, targets, leadSetup, onClose, onSa
     finally { setBusy(""); }
   };
 
-  const tabs: Array<{ key: LinkablePurpose | "walkin"; label: string; badge?: string }> = [
-    { key: "queue", label: "Client queue" }, { key: "lead", label: "Lead" }, { key: "walkin", label: "Walk-in visit", badge: "Next" },
+  const tabs: Array<{ key: LinkablePurpose; label: string; badge?: string }> = [
+    { key: "queue", label: "Client queue" }, { key: "lead", label: "Lead" }, { key: "walkin", label: "Walk-in visit" },
   ];
 
   return <Portal><Modal mobileFullscreen onClose={onClose} stickyHeader title="CRM Form Settings" tone="light" wide>
@@ -243,7 +282,7 @@ export function CrmFormSettingsDialog({ links, targets, leadSetup, onClose, onSa
       {tabs.map((tab) => <button aria-pressed={purpose === tab.key} className={cn("inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-2 text-sm font-semibold transition", purpose === tab.key ? "bg-task-bg text-task-text shadow-sm" : "text-task-text-muted hover:text-task-text")} key={tab.key} onClick={() => setPurpose(tab.key)} type="button">{tab.label}{tab.badge ? <span className="rounded-full bg-gold/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gold-secondary">{tab.badge}</span> : null}</button>)}
     </div>
 
-    {!linkable ? <Notice tone="task">The detailed walk-in visit form is next. Until then CRM keeps its standard walk-in form, which already opens from the client's queue entry with the client prefilled.</Notice> : <div className="grid gap-5">
+    {<div className="grid gap-5">
       <section aria-label="Now in use" className="rounded-2xl border border-task-border bg-task-muted/50 p-4">
         <p className="text-xs font-semibold uppercase tracking-wider text-task-text-muted">Now in use</p>
         {active?.form ? <>
@@ -281,8 +320,8 @@ export function CrmFormSettingsDialog({ links, targets, leadSetup, onClose, onSa
             const candidates = crmTargetCandidates(chosen.definition, target);
             const issue = issues.find((item) => item.targetKey === target.key);
             return <li className={cn("grid gap-2 rounded-xl border bg-task-bg p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] sm:items-center", issue && checked ? "border-danger/60" : "border-task-border")} key={target.key}>
-              <div className="min-w-0"><p className="font-medium text-task-text">{target.label}{target.required ? <span className="ml-2 rounded-full bg-gold/15 px-2 py-0.5 text-[11px] font-semibold text-gold-secondary">Required</span> : null}</p><p className="text-xs text-task-text-muted">CRM answer: {target.key}</p></div>
-              <div className="min-w-0"><select aria-label={`Question for ${target.label}`} className="field" onChange={(event) => { setFieldMap((current) => { const next = { ...current }; if (event.target.value) next[target.key] = event.target.value; else delete next[target.key]; return next; }); setChecked(false); }} value={fieldMap[target.key] ?? ""}>
+              <div className="min-w-0"><p className="font-medium text-task-text">{target.label}{target.required ? <span className="ml-2 rounded-full bg-gold/15 px-2 py-0.5 text-[11px] font-semibold text-gold-secondary">Required</span> : null}</p><p className="text-xs text-task-text-muted">CRM answer: {target.key}{crmLinkedQuestions(fieldMap, target.key).length > 1 ? ` · also from: ${crmLinkedQuestions(fieldMap, target.key).slice(1).map((key) => chosen.definition.fields.find((field) => field.key === key)?.label ?? key).join(", ")} (whichever is shown)` : ""}</p></div>
+              <div className="min-w-0"><select aria-label={`Question for ${target.label}`} className="field" onChange={(event) => { setFieldMap((current) => { const next = { ...current }; if (event.target.value) next[target.key] = event.target.value; else delete next[target.key]; return next; }); setChecked(false); }} value={crmLinkedQuestions(fieldMap, target.key)[0] ?? ""}>
                 <option value="">{target.required ? "Choose a question" : "Not asked in this form"}</option>
                 {candidates.map((field) => <option key={field.key} value={field.key}>{field.label || field.key} · {typeName(field)}</option>)}
               </select>{issue && checked ? <p className="mt-1 text-xs font-medium text-danger">{issue.message}</p> : null}</div>

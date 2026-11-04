@@ -3159,6 +3159,10 @@ export type Database = {
           timeline_id: string
         }[]
       }
+      submit_walkin_visit_from_form: {
+        Args: { p_payload: Json; p_source: Json; p_submission_key: string }
+        Returns: Json
+      }
       submit_walkin_visit: {
         Args: { p_payload: Json }
         Returns: {

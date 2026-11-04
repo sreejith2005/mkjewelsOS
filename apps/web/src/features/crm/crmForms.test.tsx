@@ -3,7 +3,7 @@
 // to a CRM registration and its questions to CRM answers; the form opens in a JewelOS dialog.
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CRM_QUEUE_TARGETS, crmLeadTargets } from "@jewelos/core";
+import { CRM_QUEUE_TARGETS, CRM_WALKIN_TARGETS, crmLeadTargets } from "@jewelos/core";
 
 const db = vi.hoisted(() => {
   type Row = Record<string, unknown>;
@@ -39,7 +39,7 @@ import { CrmFormSettingsDialog, LinkedFormDialog, loadCrmFormLinks } from "./crm
 
 const template = (id: string, name: string, extra: Record<string, unknown> = {}) => ({ id, family_id: `${id}-family`, name, version: 1, lifecycle: "published", library_visible: false, description: null, record_name_field_key: null, sections: [], permissions: { roles: [] }, ...extra });
 const field = (formId: string, key: string, label: string, type: string, sort: number, required = true) => ({ id: `${formId}-${key}`, form_template_id: formId, field_key: key, field_name: label, field_type: type, sort_order: sort, is_required: required, is_shown: true, is_editable: true, options: null, option_source: null, dropdown_master_type: null, conditional_logic: null, branch_logic: null, validation: { width: "half" }, placeholder: null, helper_text: null, group_name: null });
-const targets = { queue: CRM_QUEUE_TARGETS, lead: crmLeadTargets([
+const targets = { walkin: CRM_WALKIN_TARGETS, queue: CRM_QUEUE_TARGETS, lead: crmLeadTargets([
   { field_key: "name", label: "Name", field_type: "text", is_mandatory: true, is_hidden: false, display_order: 1, option_source: null },
   { field_key: "mobile_no", label: "Mobile no", field_type: "text", is_mandatory: true, is_hidden: false, display_order: 2, option_source: null },
   { field_key: "source_of_lead", label: "Source of lead", field_type: "dropdown", is_mandatory: false, is_hidden: false, display_order: 3, option_source: "lookup_source_of_leads" },
@@ -133,10 +133,19 @@ describe("CRM Form Settings", () => {
     expect(fields.map((item) => [item.label, item.type, item.required])).toEqual([["CLIENT NAME", "text", true], ["MOBILE NUMBER", "phone", true]]);
   });
 
-  it("keeps the walk-in visit on the standard form for now", () => {
+  it("copies today's walk-in visit form with its six sections and links it", async () => {
+    formsApi.saveDraft.mockImplementation(async () => { db.tables.form_templates.push(template("f5", "Client walk-in visit")); return "f5"; });
+    db.rpc.mockImplementation(async (name: string) => name === "save_crm_form_binding" ? { data: { versionId: "v1" }, error: null } : { data: { canManage: true, bindings: [] }, error: null });
     renderSettings();
     fireEvent.click(screen.getByRole("button", { name: /Walk-in visit/ }));
-    expect(screen.getByText(/walk-in visit form is next/)).toBeTruthy();
+    await waitFor(() => expect((screen.getByRole("button", { name: /Copy today's CRM form/ }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: /Copy today's CRM form/ }));
+    await waitFor(() => expect(formsApi.publishForm).toHaveBeenCalledWith("f5"));
+    const [, payload, fields] = formsApi.saveDraft.mock.calls[0] as [null, { sections: Array<{ title: string }> }, Array<{ key: string; type: string }>];
+    expect(payload.sections.map((section) => section.title)).toEqual(["CLIENT DETAILS", "FAMILY / FRIENDS WITH CLIENT", "VISIT DETAILS", "CRM APPROACH", "PREFERENCES", "REMARK"]);
+    expect(fields.find((field) => field.key === "companions")?.type).toBe("repeat");
+    expect(fields.find((field) => field.key === "engagement_google_review_proof")?.type).toBe("crm_photo");
+    await waitFor(() => expect(db.rpc).toHaveBeenCalledWith("save_crm_form_binding", expect.objectContaining({ p_purpose: "walkin", p_form_family_id: "f5-family" })));
   });
 
   it("returns to the standard CRM form on request", async () => {
@@ -173,6 +182,6 @@ describe("linked CRM forms", () => {
     fireEvent.change(within(dialog).getAllByRole("textbox")[0]!, { target: { value: "Ravi" } });
     fireEvent.change(within(dialog).getByRole("combobox"), { target: { value: "insta" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Register lead" }));
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ answers: { who: "Ravi", src: "insta" }, display: { who: "Ravi", src: "Instagram" } }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ answers: { who: "Ravi", src: "insta" }, display: { src: "Instagram" } })));
   });
 });

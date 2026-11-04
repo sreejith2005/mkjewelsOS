@@ -6,6 +6,7 @@ export * from "./definition";
 export * from "./visibility";
 export * from "./validation";
 export * from "./answers";
+export * from "./structuredAnswers";
 export * from "./format";
 export * from "./answerDisplay";
 export * from "./publishability";

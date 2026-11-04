@@ -14,7 +14,7 @@ import type { FormAnswer, FormFieldDefinition, FormFieldType, FormTemplateDefini
 export const CRM_FORM_PURPOSES = ["queue", "lead", "walkin"] as const;
 export type CrmFormPurpose = (typeof CRM_FORM_PURPOSES)[number];
 /** Purposes that can be linked to a Form Builder form today; the walk-in visit follows. */
-export const LINKABLE_CRM_FORM_PURPOSES = ["queue", "lead"] as const satisfies readonly CrmFormPurpose[];
+export const LINKABLE_CRM_FORM_PURPOSES = ["queue", "lead", "walkin"] as const satisfies readonly CrmFormPurpose[];
 
 export const CRM_FORM_PURPOSE_LABELS: Readonly<Record<CrmFormPurpose, string>> = {
   queue: "Client queue registration",
@@ -23,7 +23,7 @@ export const CRM_FORM_PURPOSE_LABELS: Readonly<Record<CrmFormPurpose, string>> =
 };
 
 /** What kind of answer a CRM target accepts, which decides the questions that may fill it. */
-export type CrmTargetKind = "name" | "phone" | "text" | "number" | "date" | "choice";
+export type CrmTargetKind = "name" | "phone" | "text" | "number" | "date" | "datetime" | "choice" | "multi" | "repeat" | "photo";
 
 export type CrmFormTarget = Readonly<{
   key: string;
@@ -40,10 +40,14 @@ const KIND_FIELD_TYPES: Readonly<Record<CrmTargetKind, readonly FormFieldType[]>
   text: ["text", "textarea", "select", "radio", "email", "phone", "number", "currency", "date", "datetime", "branch_dropdown", "user_dropdown", "department_dropdown"],
   number: ["number", "currency", "text"],
   date: ["date"],
+  datetime: ["datetime"],
   choice: ["select", "radio", "text"],
+  multi: ["checkbox", "multiselect"],
+  repeat: ["repeat"],
+  photo: ["crm_photo"],
 };
 
-/** Form question types that may fill a CRM target. Headings, dividers, files and multi-answer questions never do. */
+/** Form question types that may fill a CRM target. Headings, dividers and file uploads never do. */
 export function crmTargetFieldTypes(kind: CrmTargetKind): readonly FormFieldType[] {
   return KIND_FIELD_TYPES[kind];
 }
@@ -52,6 +56,94 @@ export function crmTargetFieldTypes(kind: CrmTargetKind): readonly FormFieldType
 export const CRM_QUEUE_TARGETS: readonly CrmFormTarget[] = [
   { key: "client_name", label: "Client name", required: true, kind: "name" },
   { key: "mobile", label: "Mobile number", required: true, kind: "phone" },
+];
+
+/** The engagement asks of the walk-in visit (walk-in-form.tsx engagementKinds), with their answers. */
+export const CRM_WALKIN_ENGAGEMENT: ReadonlyArray<Readonly<{ key: string; label: string; answers: readonly string[] }>> = [
+  { key: "instagram", label: "Instagram follow", answers: ["YES", "NO", "CLIENT_NOT_INTERESTED", "CLIENT_ALREADY_FOLLOWING_US"] },
+  { key: "google_review", label: "Google review", answers: ["YES", "NO", "ALREADY_DONE", "NOT_INTERESTED"] },
+  { key: "testimonial", label: "Testimonial", answers: ["YES", "NO", "NOT_INTERESTED"] },
+  { key: "feedback_form", label: "Feedback form", answers: ["YES", "NO", "NOT_INTERESTED"] },
+  { key: "thank_you_note", label: "Thank-you note", answers: ["YES", "NO"] },
+  { key: "referrals", label: "Referrals", answers: ["YES", "NO", "NOT_INTERESTED"] },
+];
+
+/** The product lists of the walk-in visit: categories, "Other", and the count + tag rows. */
+export const CRM_WALKIN_PRODUCT_LISTS: ReadonlyArray<Readonly<{ key: string; categories: string; other: string; tags: string; label: string }>> = [
+  { key: "seen", categories: "seen_categories", other: "seen_other", tags: "seen_tags", label: "seen" },
+  { key: "bought", categories: "bought_categories", other: "bought_other", tags: "bought_tags", label: "bought" },
+  { key: "order", categories: "order_categories", other: "order_other", tags: "order_tags", label: "order" },
+  { key: "camefor", categories: "came_for_categories", other: "came_for_other", tags: "camefor_tags", label: "came for" },
+  { key: "new_things", categories: "new_things_categories", other: "new_things_other", tags: "new_things_tags", label: "new buy / order" },
+];
+
+const target = (key: string, label: string, kind: CrmTargetKind, required = false): CrmFormTarget => ({ key, label, kind, required });
+
+/** submit_walkin_visit's answers, as the walk-in visit form collects them today. */
+export const CRM_WALKIN_TARGETS: readonly CrmFormTarget[] = [
+  target("event_date", "Visit date and time", "datetime"),
+  target("primary_name", "Client name", "name", true),
+  target("primary_phone", "Mobile", "phone", true),
+  target("source_of_lead", "Source of lead", "choice"),
+  target("reference_name", "Reference name", "text"),
+  target("reference_phone", "Reference phone", "text"),
+  target("source_of_lead_other", "Source other", "text"),
+  target("crm_name", "CRM / salesperson", "text"),
+  target("salesperson", "Salesperson attending the client", "text"),
+  target("gender", "Gender", "choice"),
+  target("billing_phone", "Billing phone", "phone"),
+  target("country", "Country", "text"),
+  target("state", "State", "text"),
+  target("city", "City", "text"),
+  target("city_other", "City other", "text"),
+  target("pincode", "Pincode", "text"),
+  target("address", "Address", "text"),
+  target("community", "Community / caste", "choice"),
+  target("community_other", "Community other", "text"),
+  target("dob", "Date of birth", "date"),
+  target("anniversary", "Anniversary", "date"),
+  target("occupation", "Occupation", "choice"),
+  target("occupation_other", "Occupation other", "text"),
+  target("bridal_or_non_bridal", "Bridal / non-bridal", "choice"),
+  target("wedding_month", "Wedding month", "choice"),
+  target("wedding_year", "Wedding year", "choice"),
+  target("communication_preference", "Communication preference", "choice"),
+  target("companions", "Family / friends with the client", "repeat"),
+  target("visit_status", "Client bought any product?", "choice", true),
+  target("not_bought_reasons", "Not-bought reasons", "multi"),
+  target("not_bought_other", "Other reason", "text"),
+  ...CRM_WALKIN_PRODUCT_LISTS.flatMap((list) => [
+    target(list.categories, `Product categories ${list.label}`, "multi"),
+    target(list.tags, `Number of products ${list.label} and their tags`, "repeat"),
+    target(list.other, `Other (${list.label} category)`, "text"),
+  ]),
+  target("other_order", "Did the client make any other / new order?", "choice"),
+  target("repair_or_order_approach", "Did CRM approach to show new products?", "choice"),
+  target("new_things_choice", "Is client buying / making order for new things?", "choice"),
+  target("salesperson_handled", "Salesperson attending new buy / order", "text"),
+  target("marketing_message_sent", "Marketing message", "choice"),
+  ...CRM_WALKIN_ENGAGEMENT.flatMap((ask) => [
+    target(`engagement_${ask.key}`, ask.label, "choice"),
+    target(`engagement_${ask.key}_reason`, `${ask.label} - no reason`, "text"),
+    target(`engagement_${ask.key}_proof`, `${ask.label} proof image`, "photo"),
+  ]),
+  target("referrals", "Referrals given", "repeat"),
+  target("beverage", "Beverage", "choice"),
+  target("beverage_other", "Other beverage", "text"),
+  target("sugar", "Sugar", "choice"),
+  target("sugar_other", "Other sugar preference", "text"),
+  target("snack", "Snack", "choice"),
+  target("snack_other", "Other snack", "text"),
+  target("gift", "Gift given", "choice"),
+  target("gift_other", "Other gift", "text"),
+  target("next_visit_date", "Next visit date", "date"),
+  target("client_potential_category", "Client potential category", "choice"),
+  target("high_potential_reason", "Why high potential", "text"),
+  target("product_requirement", "Product requirement", "text"),
+  target("other_store_client_wants_to_visit", "Other store client wants to visit", "text"),
+  target("categories_client_wants_more", "Which categories client wants to see more", "multi"),
+  target("remark", "Remark", "text"),
+  target("remark_photos", "Remark photos", "photo"),
 ];
 
 /** The CRM's own lead field configuration (lead_form_fields), as the lead form reads it. */
@@ -89,15 +181,29 @@ export function crmLeadTargets(fields: readonly CrmLeadFieldConfig[]): CrmFormTa
 }
 
 export function crmFormTargets(purpose: CrmFormPurpose, leadFields: readonly CrmLeadFieldConfig[] = []): readonly CrmFormTarget[] {
-  return purpose === "queue" ? CRM_QUEUE_TARGETS : purpose === "lead" ? crmLeadTargets(leadFields) : [];
+  return purpose === "queue" ? CRM_QUEUE_TARGETS : purpose === "lead" ? crmLeadTargets(leadFields) : CRM_WALKIN_TARGETS;
 }
 
-/** {CRM target key: form question key}. */
-export type CrmFieldMap = Readonly<Record<string, string>>;
+/**
+ * {CRM target key: form question key}. A walk-in answer may come from up to three questions shown
+ * in different cases (for example Next visit date, required only after a Not Bought visit); the
+ * first one answered is used.
+ */
+export type CrmFieldMap = Readonly<Record<string, string | readonly string[]>>;
+
+/** The questions linked to a CRM answer, in order. */
+export function crmLinkedQuestions(fieldMap: CrmFieldMap, targetKey: string): readonly string[] {
+  const linked = fieldMap[targetKey];
+  return linked === undefined ? [] : typeof linked === "string" ? (linked ? [linked] : []) : linked.filter(Boolean);
+}
 
 export type CrmFormBindingIssue = Readonly<{ targetKey?: string | undefined; fieldKey?: string | undefined; message: string }>;
 
 const ANSWER_FIELD = (field: FormFieldDefinition) => !["section_header", "divider", "file"].includes(field.type);
+const KIND_NAMES: Readonly<Record<CrmTargetKind, string>> = {
+  name: "text", phone: "phone or text", text: "matching", number: "number", date: "date", datetime: "date and time",
+  choice: "dropdown or single-choice", multi: "checkbox list", repeat: "repeating group", photo: "CRM photo",
+};
 
 /** Questions of a form that may fill a target. */
 export function crmTargetCandidates(definition: FormTemplateDefinition, target: CrmFormTarget): FormFieldDefinition[] {
@@ -115,27 +221,30 @@ export function checkCrmFormBinding(definition: FormTemplateDefinition, fieldMap
   const byKey = new Map(definition.fields.map((field) => [field.key, field]));
   const used = new Map<string, string>();
   for (const target of targets) {
-    const fieldKey = fieldMap[target.key];
-    if (!fieldKey) {
+    const linked = crmLinkedQuestions(fieldMap, target.key);
+    if (!linked.length) {
       if (target.required) issues.push({ targetKey: target.key, message: `Choose the question for ${target.label}.` });
       continue;
     }
-    const field = byKey.get(fieldKey);
-    if (!field) { issues.push({ targetKey: target.key, fieldKey, message: `The question linked to ${target.label} is no longer in the form.` }); continue; }
-    if (!crmTargetFieldTypes(target.kind).includes(field.type) || !ANSWER_FIELD(field)) {
-      issues.push({ targetKey: target.key, fieldKey, message: `"${field.label}" cannot fill ${target.label}: use a ${target.kind === "phone" ? "phone or text" : target.kind === "name" ? "text" : target.kind === "date" ? "date" : target.kind === "choice" ? "dropdown or single-choice" : "matching"} question.` });
-      continue;
+    if (linked.length > 3) issues.push({ targetKey: target.key, message: `${target.label} can come from up to three questions.` });
+    for (const fieldKey of linked) {
+      const field = byKey.get(fieldKey);
+      if (!field) { issues.push({ targetKey: target.key, fieldKey, message: `The question linked to ${target.label} is no longer in the form.` }); continue; }
+      if (!crmTargetFieldTypes(target.kind).includes(field.type) || !ANSWER_FIELD(field)) {
+        issues.push({ targetKey: target.key, fieldKey, message: `"${field.label}" cannot fill ${target.label}: use a ${KIND_NAMES[target.kind]} question.` });
+        continue;
+      }
+      if (target.required && linked.length === 1 && field.required !== true) {
+        issues.push({ targetKey: target.key, fieldKey, message: `"${field.label}" fills ${target.label}, which CRM requires: make the question required in the Form Builder.` });
+      }
+      const other = used.get(fieldKey);
+      if (other) issues.push({ targetKey: target.key, fieldKey, message: `"${field.label}" already fills ${other}. One question can fill one CRM answer.` });
+      used.set(fieldKey, target.label);
     }
-    if (target.required && field.required !== true) {
-      issues.push({ targetKey: target.key, fieldKey, message: `"${field.label}" fills ${target.label}, which CRM requires: make the question required in the Form Builder.` });
-    }
-    const other = used.get(fieldKey);
-    if (other) issues.push({ targetKey: target.key, fieldKey, message: `"${field.label}" already fills ${other}. One question can fill one CRM answer.` });
-    used.set(fieldKey, target.label);
   }
   // A file uploaded in a linked form would stay in JewelOS storage and never reach the CRM record.
-  for (const field of definition.fields) if (field.type === "file") issues.push({ fieldKey: field.key, message: `"${field.label}" is a file upload. CRM registration forms cannot save files yet: remove the question or move it to another form.` });
-  const known = new Set(targets.map((target) => target.key));
+  for (const field of definition.fields) if (field.type === "file") issues.push({ fieldKey: field.key, message: `"${field.label}" is a file upload. CRM forms save photos through a CRM photo question instead: change its type.` });
+  const known = new Set(targets.map((item) => item.key));
   for (const key of Object.keys(fieldMap)) if (!known.has(key)) issues.push({ targetKey: key, message: `CRM no longer has the answer "${key}". Remove that link.` });
   return issues;
 }
@@ -146,39 +255,52 @@ const TARGET_ALIASES: Readonly<Record<string, readonly string[]>> = {
   mobile: ["mobile", "mobile number", "phone", "phone number", "mobile no", "contact number"],
   mobile_no: ["mobile", "mobile number", "phone", "phone number", "mobile no", "contact number"],
   name: ["name", "client name", "customer name", "full name"],
+  primary_name: ["client name", "customer name", "name", "full name"],
+  primary_phone: ["mobile", "mobile number", "phone", "phone number", "mobile no", "contact number"],
 };
 
 /** A starting link: each target takes the free question with the same key, the same label, or a common alias. */
-export function suggestCrmFieldMap(definition: FormTemplateDefinition, targets: readonly CrmFormTarget[], current: CrmFieldMap = {}): Record<string, string> {
-  const map: Record<string, string> = {};
+export function suggestCrmFieldMap(definition: FormTemplateDefinition, targets: readonly CrmFormTarget[], current: CrmFieldMap = {}): Record<string, string | readonly string[]> {
+  const map: Record<string, string | readonly string[]> = {};
   const taken = new Set<string>();
   const keep = new Set(definition.fields.map((field) => field.key));
-  for (const target of targets) {
-    const existing = current[target.key];
-    if (existing && keep.has(existing) && !taken.has(existing)) { map[target.key] = existing; taken.add(existing); }
+  for (const item of targets) {
+    const existing = crmLinkedQuestions(current, item.key).filter((key) => keep.has(key) && !taken.has(key));
+    if (existing.length) { map[item.key] = existing.length === 1 ? existing[0]! : existing; existing.forEach((key) => taken.add(key)); }
   }
-  for (const target of targets) {
-    if (map[target.key]) continue;
-    const candidates = crmTargetCandidates(definition, target).filter((field) => !taken.has(field.key));
-    const names = new Set([normalized(target.key), normalized(target.label), ...(TARGET_ALIASES[target.key] ?? [])]);
-    const match = candidates.find((field) => field.key === target.key)
+  for (const item of targets) {
+    if (map[item.key]) continue;
+    const candidates = crmTargetCandidates(definition, item).filter((field) => !taken.has(field.key));
+    const names = new Set([normalized(item.key), normalized(item.label), ...(TARGET_ALIASES[item.key] ?? [])]);
+    const match = candidates.find((field) => field.key === item.key)
       ?? candidates.find((field) => names.has(normalized(field.key)) || names.has(normalized(field.label)));
-    if (match) { map[target.key] = match.key; taken.add(match.key); }
+    if (match) { map[item.key] = match.key; taken.add(match.key); }
   }
   return map;
 }
 
+/** The answer for a CRM target: the first linked question answered. */
+export function crmLinkedAnswer(fieldMap: CrmFieldMap, targetKey: string, answers: Readonly<Record<string, FormAnswer | null | undefined>>): { fieldKey: string; value: FormAnswer } | null {
+  for (const fieldKey of crmLinkedQuestions(fieldMap, targetKey)) {
+    const value = answers[fieldKey];
+    if (value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0)) continue;
+    return { fieldKey, value };
+  }
+  return null;
+}
+
 /**
- * The CRM answers from a submitted form. `display` is each answer as the person
+ * The CRM answers from a submitted form, as text. `display` is each answer as the person
  * saw it (a choice's label, a branch's name), which is what CRM stores; blank
- * answers are left out.
+ * answers are left out. Repeating groups and CRM photos are read with crmLinkedAnswer.
  */
 export function crmAnswersFromForm(fieldMap: CrmFieldMap, answers: Readonly<Record<string, FormAnswer | null | undefined>>, display: Readonly<Record<string, string>>): Record<string, string> {
   const result: Record<string, string> = {};
-  for (const [targetKey, fieldKey] of Object.entries(fieldMap)) {
-    const raw = answers[fieldKey];
-    if (raw === null || raw === undefined || raw === "") continue;
-    const text = (display[fieldKey] ?? (Array.isArray(raw) ? raw.join(", ") : String(raw))).trim();
+  for (const targetKey of Object.keys(fieldMap)) {
+    const found = crmLinkedAnswer(fieldMap, targetKey, answers);
+    if (!found || (typeof found.value === "object" && !Array.isArray(found.value))) continue;
+    const raw = found.value;
+    const text = (display[found.fieldKey] ?? (Array.isArray(raw) ? raw.join(", ") : String(raw))).trim();
     if (text) result[targetKey] = text;
   }
   return result;
@@ -209,7 +331,7 @@ export function dropdownMasterForCrmOption(optionKey: string, masterTypes: Reado
 const FIELD_KEY = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").replace(/^(\d)/, "q_$1").slice(0, 60) || "question";
 const OPTION_VALUE = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 190) || "option";
 
-export type CrmFormCopy = { name: string; description: string; fields: FormFieldDefinition[]; fieldMap: Record<string, string> };
+export type CrmFormCopy = { name: string; description: string; fields: FormFieldDefinition[]; fieldMap: Record<string, string | string[]> };
 
 /**
  * Today's client queue registration form (REGISTER CLIENT ENTRY) as a Form Builder form:

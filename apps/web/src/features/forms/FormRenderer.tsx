@@ -1,10 +1,11 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, Paperclip } from "lucide-react";
-import { describeFormRule, evaluateFormNavigation, displayFormAnswer, FORM_OTHER_MAX_LENGTH, formFieldAllowsOther, formOptionValues, reconcileFormPreviewAnswers, formCompletionProgress, formUsesSteps, isFinalFormStep, nextFormStepKey, normalizeFormAnswers, previousFormStepKey, resolveFormOptions, updateVisibleFormAnswers, validateCompleteForm, validateFormStep, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition, type FormValidationIssue } from "@jewelos/core";
+import { describeFormRule, evaluateFormNavigation, displayFormAnswer, FORM_OTHER_MAX_LENGTH, formFieldAllowsOther, formOptionValues, reconcileFormPreviewAnswers, formCompletionProgress, formUsesSteps, isFinalFormStep, nextFormStepKey, normalizeFormAnswers, previousFormStepKey, resolveFormOptions, updateVisibleFormAnswers, validateCompleteForm, validateFormStep, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition, type FormValidationIssue, type FormCrmServices, formChoiceValueFromText } from "@jewelos/core";
 import { Button, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { signedFormFileUrl, uploadFormFile } from "./api";
 import { RatingField } from "./RatingField";
+import { CrmChoiceField, CrmPhotoField, RepeatField } from "./CrmQuestions";
 
 export type DynamicOptions = { users: Array<{ id: string; label: string }>; branches: Array<{ id: string; label: string }>; departments: Array<{ id: string; branchId: string | null; label: string }>; masters: FormMasterOption[] };
 const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: [], masters: [] };
@@ -74,7 +75,7 @@ function FileFieldControl({ preview = false, describedBy, disabled, field, label
   </div>;
 }
 
-export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extraAction, initialAnswers = {}, onSubmit, preview = false, readOnly = false, submitLabel = "Submit form", templateId }: { definition: FormTemplateDefinition; /** The final button, e.g. "Register client". */ submitLabel?: string; dynamicOptions?: DynamicOptions; /** One more button for the bottom bar, kept within thumb reach (for example "Earlier answers"). */ extraAction?: ReactNode; initialAnswers?: FormAnswers; onSubmit?: (answers: FormAnswers) => Promise<void | boolean>; preview?: boolean; readOnly?: boolean; templateId?: string }) {
+export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extraAction, initialAnswers = {}, onSubmit, preview = false, readOnly = false, submitLabel = "Submit form", templateId, crm }: { definition: FormTemplateDefinition; /** The final button, e.g. "Register client". */ submitLabel?: string; /** CRM forms only: lookups, branch lists and CRM uploads (CRM Form Settings). */ crm?: FormCrmServices | undefined; dynamicOptions?: DynamicOptions; /** One more button for the bottom bar, kept within thumb reach (for example "Earlier answers"). */ extraAction?: ReactNode; initialAnswers?: FormAnswers; onSubmit?: (answers: FormAnswers) => Promise<void | boolean>; preview?: boolean; readOnly?: boolean; templateId?: string }) {
   const uid = useId();
   const [answers, setAnswers] = useState<Record<string, FormAnswer>>(() => Object.fromEntries(Object.entries(initialAnswers).filter((entry): entry is [string, FormAnswer] => entry[1] !== null && entry[1] !== undefined)));
   const [error, setError] = useState<string | null>(null);
@@ -87,6 +88,10 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
   const [otherOpen, setOtherOpen] = useState<Readonly<Record<string, boolean>>>({});
   const otherInputs = useRef(new Map<string, HTMLInputElement>());
   const fieldRefs = useRef(new Map<string, HTMLElement>());
+  /** CRM photo uploads still in progress; the form waits for them before submitting. */
+  const [uploadsBusy, setUploadsBusy] = useState(0);
+  /** Questions a CRM lookup filled (client history, pincode); editing one clears its mark. */
+  const [autoFilled, setAutoFilled] = useState<ReadonlySet<string>>(new Set());
   const formRef = useRef<HTMLFormElement>(null);
   // Dropdown Master questions store only a reference; resolve it for rendering
   // and validation so every option field behaves identically here.
@@ -136,6 +141,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
 
   const set = (key: string, value: FormAnswer) => {
     setPreviewChecked(false);
+    setAutoFilled((current) => { if (!current.has(key)) return current; const next = new Set(current); next.delete(key); return next; });
     setAnswers((current) => updateVisibleFormAnswers(resolved, current, key, value, initialAnswers));
     setFieldErrors((current) => {
       if (!(key in current)) return current;
@@ -168,6 +174,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
     void submitAnswers();
   };
   const submitAnswers = async () => {
+    if (uploadsBusy > 0) { setError("Wait for the photos to finish uploading."); return; }
     const result = validateCompleteForm(resolved, answers);
     if (!result.valid) { showIssues(result.issues, "Check the form"); return; }
     if (preview) { setError(null); setFieldErrors({}); setPreviewChecked(true); return; }
@@ -175,6 +182,43 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
     setBusy(true); setError(null); setFieldErrors({});
     try { if (await onSubmit(normalized) !== false) setSuccess(true); } catch (caught) { setError(caught instanceof Error ? caught.message : "Submission failed"); } finally { setBusy(false); }
   };
+
+  // CRM lookups (client history by mobile, address by pincode) fill other questions as people type.
+  const lookupFields = useMemo(() => crm ? resolved.fields.filter((field) => field.validation?.crm?.lookup) : [], [crm, resolved]);
+  const lookedUp = useRef(new Map<string, string>());
+  useEffect(() => {
+    if (!crm || readOnly || preview || !lookupFields.length) return;
+    const timers: number[] = [];
+    for (const field of lookupFields) {
+      const raw = answers[field.key];
+      const text = typeof raw === "string" ? raw.trim() : typeof raw === "number" ? String(raw) : "";
+      const kind = field.validation!.crm!.lookup!;
+      const ready = kind === "pincode" ? /^\d{6}$/.test(text) : text.replace(/\D/g, "").length >= 10;
+      if (!ready || lookedUp.current.get(field.key) === text) continue;
+      timers.push(window.setTimeout(() => {
+        lookedUp.current.set(field.key, text);
+        void crm.lookup(kind, text).then((found) => {
+          if (!found) return;
+          const filled: string[] = [];
+          setAnswers((current) => {
+            let next: Record<string, FormAnswer> = current;
+            for (const [key, shown] of Object.entries(found)) {
+              const target = resolved.fields.find((item) => item.key === key);
+              if (!target || key === field.key || !shown.trim()) continue;
+              const value: FormAnswer = target.type === "select" || target.type === "radio" ? formChoiceValueFromText(target.options, shown)
+                : target.type === "multiselect" || (target.type === "checkbox" && target.options?.length) ? shown.split(",").map((part) => formChoiceValueFromText(target.options, part)).filter(Boolean)
+                : target.type === "number" || target.type === "currency" ? Number(shown) : shown;
+              next = updateVisibleFormAnswers(resolved, next, key, value, initialAnswers) as Record<string, FormAnswer>;
+              filled.push(key);
+            }
+            return next;
+          });
+          setAutoFilled((current) => new Set([...current, ...filled]));
+        }).catch(() => undefined);
+      }, 350));
+    }
+    return () => { for (const timer of timers) window.clearTimeout(timer); };
+  }, [answers, crm, initialAnswers, lookupFields, preview, readOnly, resolved]);
 
   const renderField = (field: FormFieldDefinition) => {
     if (field.type === "section_header") return <h3 className="px-1 pt-2 text-lg font-semibold text-gold-secondary" key={field.key}>{field.label}</h3>;
@@ -189,6 +233,15 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
     // Each question is its own card, so a long form reads as one clear question at a time on a phone.
     const shell = (content: ReactNode) => <div className={cn("scroll-mt-24 rounded-2xl border border-task-border bg-task-bg p-4 transition-colors sm:p-5", invalid && "border-danger/60 bg-danger/5")} key={field.key}>{content}</div>;
 
+    if (field.type === "repeat") return shell(<fieldset aria-describedby={describedBy} className="space-y-2"><legend className="mb-1"><QuestionText field={field} id={labelId} /></legend>{helper}
+      <RepeatField disabled={disabled} field={field} labelId={labelId} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} value={value} />{errorText}
+    </fieldset>);
+    if (field.type === "crm_photo") return shell(<div><QuestionText field={field} id={labelId} />{helper}
+      <CrmPhotoField crm={crm} describedBy={describedBy} disabled={disabled || preview} field={field} onBusyChange={(busy) => setUploadsBusy((count) => Math.max(0, count + (busy ? 1 : -1)))} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} value={value} />{errorText}
+    </div>);
+    if (field.type === "text" && field.validation?.crm?.choices && crm) return shell(<label className="block"><span className="mb-1.5 block"><QuestionText field={field} /></span>{helper}
+      <CrmChoiceField aria={aria} crm={crm} disabled={disabled} field={field} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} value={value} />{errorText}
+    </label>);
     if (field.type === "file") return shell(<div><QuestionText field={field} id={labelId} />{helper}
       <FileFieldControl preview={preview} describedBy={describedBy} disabled={disabled} field={field} labelledBy={labelId} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} templateId={templateId} value={answers[field.key]} />{errorText}
     </div>);
@@ -235,7 +288,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
       : field.type === "checkbox" ? <span className={OPTION_ROW}><input {...aria} checked={value === true} disabled={disabled} onChange={(event) => set(field.key, event.target.checked)} ref={register(field.key)} type="checkbox" /><span>{field.placeholder ?? "Yes"}</span></span>
       : field.type === "currency" ? <span className="relative block"><span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-task-text-muted">₹</span><input {...aria} className="field pl-7" disabled={disabled} inputMode="decimal" onChange={onText} placeholder={field.placeholder} ref={register(field.key)} step="any" type="number" value={textValue} /></span>
       : <input {...aria} autoComplete={field.type === "phone" ? "tel" : field.type === "email" ? "email" : undefined} className="field" disabled={disabled} inputMode={inputMode} maxLength={field.validation?.maxLength} onChange={onText} placeholder={field.placeholder} ref={register(field.key)} step={NUMBER_TYPES.has(field.type) ? "any" : undefined} type={inputType} value={textValue} />;
-    return shell(<label className="block"><span className="mb-1.5 block"><QuestionText field={field} /></span>{helper}{control}{errorText}</label>);
+    return shell(<label className="block"><span className="mb-1.5 block"><QuestionText field={field} /></span>{helper}{control}{autoFilled.has(field.key) ? <span className="mt-1.5 block text-xs font-medium text-gold-secondary">Auto-filled from client history — editable</span> : null}{errorText}</label>);
   };
 
   const reviewRows = stepped && finalStep && stepIndex > 0

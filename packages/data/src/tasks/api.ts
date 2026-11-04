@@ -617,7 +617,9 @@ export async function submitTaskForm(taskId: string, formTemplateId: string, ans
   // Form answers contain readonly option arrays; copy those into the JSON payload.
   const payload: Record<string, Json> = {};
   for (const [key, value] of Object.entries(answers)) {
-    if (value !== undefined) payload[key] = typeof value === "object" && value !== null ? [...value] : value;
+    if (value === undefined || value === null) continue;
+    // Repeating groups and CRM files are plain JSON objects; option lists are copied into arrays.
+    payload[key] = Array.isArray(value) ? [...value] : typeof value === "object" ? JSON.parse(JSON.stringify(value)) as Json : value as Json;
   }
   const { data, error } = await db().rpc("submit_task_form_with_audit", {
     p_task_id: taskId, p_form_template_id: formTemplateId, p_answers: payload, p_remark: remark,

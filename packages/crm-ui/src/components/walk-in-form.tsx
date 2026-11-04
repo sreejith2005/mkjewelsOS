@@ -61,11 +61,11 @@ const LEGACY_VISIT_STATUSES = [
 const LEGACY_COMMUNICATION_PREFERENCES = [
   "CALL", "WHATSAPP CALLS", "WHATSAPP MESSAGE", "DON'T CONTACT",
 ];
-function legacyWeddingMonthNumber(value: string) {
+export function legacyWeddingMonthNumber(value: string) {
   const index = LEGACY_WEDDING_MONTHS.findIndex(month=>month.toUpperCase()===value.toUpperCase());
   return index === -1 ? value : String(index + 1);
 }
-function istDateTimeLocal(now = new Date()) {
+export function istDateTimeLocal(now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit", hourCycle: "h23",
@@ -155,17 +155,17 @@ function initialValue(
     new_things_count: "",
   };
 }
-function asList(value: string) {
+export function asList(value: string) {
   return value
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
 }
-function storageFileName(storagePath: string, fallback: string) {
+export function storageFileName(storagePath: string, fallback: string) {
   const leaf = storagePath.split("/").at(-1) ?? "";
   return leaf.replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}_(.+)$/i, "$1") || fallback;
 }
-function walkInSubmitErrorMessage(error: SubmitError | null) {
+export function walkInSubmitErrorMessage(error: SubmitError | null) {
   if (error?.code === "23505") {
     return "This client record could not be updated. Please try submitting the visit again.";
   }

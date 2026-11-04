@@ -41,6 +41,8 @@ describe("Forms definition contract", () => {
       key: `field_${sortOrder}`,
       sortOrder,
       options: ["select", "multiselect", "radio"].includes(type) ? opts("One") : undefined,
+      // A repeating group (CRM forms) lists the questions asked per row.
+      ...(type === "repeat" ? { validation: { repeat: { countLabel: "How many?", min: 0, max: 10, fields: [{ key: "name", label: "Name", type: "text" as const }] } } } : {}),
     }));
     expect(checkFormPublishability(template(fields))).toEqual({ valid: true, issues: [] });
   });

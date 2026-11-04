@@ -72,7 +72,7 @@ select throws_ok(format('select save_crm_form_binding(%L,%L,%L::jsonb)','queue',
 select throws_ok(format('select save_crm_form_binding(%L,%L,%L::jsonb)','queue',pg_temp.family(),'{"client_name":"phone","mobile":"customer"}'), '22023', 'The name must come from a text question', 'a question of the wrong kind is refused');
 select throws_ok(format('select save_crm_form_binding(%L,%L,%L::jsonb)','queue',pg_temp.family(),'{"client_name":"customer","mobile":"customer"}'), '22023', null, 'one question cannot fill two answers');
 select throws_ok(format('select save_crm_form_binding(%L,%L,%L::jsonb)','queue',pg_temp.family(),'{"client_name":"customer","mobile":"phone","city":"note"}'), '22023', 'The client queue form only takes the client name and mobile number', 'the queue form takes only its two answers');
-select throws_ok(format('select save_crm_form_binding(%L,%L,%L::jsonb)','walkin',pg_temp.family(),'{"client_name":"customer"}'), '22023', 'This CRM form cannot be linked yet', 'the walk-in visit cannot be linked yet');
+select throws_ok(format('select save_crm_form_binding(%L,%L,%L::jsonb)','walkin',pg_temp.family(),'{"client_name":"customer"}'), '22023', 'Link every required CRM answer to a question', 'the walk-in visit needs its own required answers (0375)');
 select throws_ok(format('select save_crm_form_binding(%L,%L,%L::jsonb)','queue',gen_random_uuid(),'{"client_name":"customer","mobile":"phone"}'), '22023', 'Choose a published form', 'an unknown form is refused');
 
 insert into r select 'v1', save_crm_form_binding('queue',pg_temp.family(),'{"client_name":"customer","mobile":"phone"}'::jsonb);

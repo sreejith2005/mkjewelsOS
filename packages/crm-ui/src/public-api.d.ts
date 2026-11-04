@@ -2,7 +2,7 @@
 // sources are checked with their own compiler settings in this package; consumers read only
 // this declaration. tests/public-api.test.ts keeps it identical to src/index.ts.
 import type { ReactElement, ReactNode } from "react";
-import type { CrmFieldMap, CrmFormPurpose, CrmFormTarget, CrmLeadFieldWithId, CrmLeadOptionRoute, FormAnswers, FormTemplateDefinition } from "@jewelos/core";
+import type { CrmFieldMap, CrmFormPurpose, CrmFormTarget, CrmLeadFieldWithId, CrmLeadOptionRoute, FormAnswers, FormCrmServices, FormTemplateDefinition } from "@jewelos/core";
 import type { JewelosClient } from "@jewelos/api-client";
 
 export type CrmAppProps = {
@@ -62,14 +62,21 @@ export type CrmFormLinks = Readonly<{ canManage: boolean; links: readonly CrmFor
 export type CrmLeadSetup = Readonly<{ fields: readonly CrmLeadFieldWithId[]; routes: readonly CrmLeadOptionRoute[]; lookupOptions: Readonly<Record<string, readonly string[]>> }>;
 
 /** A submitted form: the stored answers, and each answer as the person saw it (a choice's label). */
-export type CrmSubmittedForm = Readonly<{ answers: FormAnswers; display: Readonly<Record<string, string>> }>;
+export type CrmSubmittedForm = Readonly<{ answers: FormAnswers; display: Readonly<Record<string, string>>; rowDisplay?: Readonly<Record<string, readonly Readonly<Record<string, string>>[]>> | undefined }>;
 
 export type CrmFormsHost = Readonly<{
   loadLinks: () => Promise<CrmFormLinks>;
   /** Opens a linked form in a JewelOS dialog. onSubmit throws an Error whose message the form shows. */
-  renderForm: (props: { title: string; description?: string | undefined; form: CrmLinkedForm; onClose: () => void; onSubmit: (submitted: CrmSubmittedForm) => Promise<void> }) => ReactNode;
+  renderForm: (props: {
+    title: string; description?: string | undefined; form: CrmLinkedForm; onClose: () => void; onSubmit: (submitted: CrmSubmittedForm) => Promise<void>;
+    /** Answers to start with, keyed by question key, as people see them (choice labels). */
+    initialText?: Readonly<Record<string, string>> | undefined;
+    /** CRM lookups, branch lists and CRM uploads for CRM questions. */
+    crm?: FormCrmServices | undefined;
+    submitLabel?: string | undefined;
+  }) => ReactNode;
   /** The CRM Form Settings dialog (people allowed to manage CRM forms). */
-  renderSettings: (props: { links: CrmFormLinks; targets: Readonly<Record<"queue" | "lead", readonly CrmFormTarget[]>>; leadSetup: CrmLeadSetup; onClose: () => void; onSaved: () => void }) => ReactNode;
+  renderSettings: (props: { links: CrmFormLinks; targets: Readonly<Record<"queue" | "lead" | "walkin", readonly CrmFormTarget[]>>; leadSetup: CrmLeadSetup; onClose: () => void; onSaved: () => void }) => ReactNode;
 }>;
 
 /** The CRM Supabase project the CRM reads and writes (public URL and anon key). */
