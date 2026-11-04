@@ -42,11 +42,11 @@ describe("the walk-in visit as a Form Builder form", () => {
     expect(unlinked).toEqual([]);
   });
 
-  it("keeps the CRM form's labels, required answers, lists and lookups", () => {
+  it("keeps the CRM form's labels, required answers and lists, with no per-question settings", () => {
     const byKey = new Map(copy.fields.map((field) => [field.key, field]));
-    expect(byKey.get("primary_phone")).toMatchObject({ label: "Mobile", type: "phone", required: true, validation: { crm: { lookup: "client_phone" } } });
-    expect(byKey.get("pincode")?.validation?.crm).toEqual({ lookup: "pincode" });
-    expect(byKey.get("salesperson")).toMatchObject({ required: true, validation: { crm: { choices: "salespeople" } } });
+    expect(byKey.get("primary_phone")).toMatchObject({ label: "Mobile", type: "phone", required: true });
+    expect(copy.fields.filter((field) => field.validation?.width !== undefined || (field.validation?.crm && (field.validation.crm.lookup || field.validation.crm.choices)))).toEqual([]);
+    expect(byKey.get("salesperson")).toMatchObject({ type: "text", required: true });
     expect(byKey.get("source_of_lead")?.optionSource).toEqual({ kind: "master", masterType: "crm_source" });
     expect(byKey.get("gender")?.options).toEqual([{ value: "male", label: "MALE" }, { value: "female", label: "FEMALE" }]);
     expect(byKey.get("visit_status")?.options?.map((option) => option.label)).toEqual(["YES", "NO", "REPAIR PLACED", "REPAIR PICKUP", "ORDER PLACED", "ORDER PICKUP", "PRODUCT EXCHANGE", "PRODUCT RETURN", "STORE VISIT", "PRICE CALCULATION"]);

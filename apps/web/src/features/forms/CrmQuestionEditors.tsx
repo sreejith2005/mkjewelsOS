@@ -1,6 +1,6 @@
 // Form Builder editors for the CRM question types (owner request 2026-11-03): a repeating group's
-// "How many?" question and row questions, a CRM photo's upload settings, and the CRM behaviours
-// of a text or phone question (client lookup, pincode lookup, branch choice lists).
+// "How many?" question and row questions, and a CRM photo's upload settings. Client lookups by
+// phone number and pincode need no settings: every form does them (2026-11-04).
 import { Plus, Trash2 } from "lucide-react";
 import type { FormCrmBehaviour, FormFieldDefinition, FormRepeatConfig, FormRepeatSubfield } from "@jewelos/core";
 import { Button, Field, Notice } from "@/components/ui";
@@ -53,23 +53,4 @@ export function CrmPhotoEditor({ field, onChange }: { field: FormFieldDefinition
     <label className="min-h-11 content-center text-sm text-champagne"><input checked={crm.video === true} onChange={(event) => onChange({ ...crm, video: event.target.checked || undefined })} type="checkbox" /> Also accept videos</label>
     <Field label="Files allowed"><select className="field" onChange={(event) => onChange({ ...crm, maxFiles: Number(event.target.value) })} value={crm.maxFiles ?? 1}>{Array.from({ length: 10 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}</select></Field>
   </div>;
-}
-
-const BEHAVIOURS: ReadonlyArray<{ value: string; label: string; types: readonly FormFieldDefinition["type"][]; crm: FormCrmBehaviour }> = [
-  { value: "client_phone", label: "Find the CRM client by this mobile number and fill their saved details", types: ["phone", "text"], crm: { lookup: "client_phone" } },
-  { value: "pincode", label: "Fill city, state and country from this pincode", types: ["text", "number"], crm: { lookup: "pincode" } },
-  { value: "crm_names", label: "Show the branch's CRM people on duty as a dropdown", types: ["text"], crm: { choices: "crm_names" } },
-  { value: "salespeople", label: "Show the branch's salespeople as a dropdown", types: ["text"], crm: { choices: "salespeople" } },
-];
-
-/** CRM behaviour of a text or phone question in a form CRM uses. */
-export function CrmBehaviourEditor({ field, onChange }: { field: FormFieldDefinition; onChange: (crm: FormCrmBehaviour | undefined) => void }) {
-  const available = BEHAVIOURS.filter((item) => item.types.includes(field.type));
-  if (!available.length) return null;
-  const crm = field.validation?.crm;
-  const current = crm?.lookup ?? crm?.choices ?? "";
-  return <Field label="In CRM forms"><select className="field" onChange={(event) => onChange(available.find((item) => item.value === event.target.value)?.crm)} value={current}>
-    <option value="">Nothing extra</option>
-    {available.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-  </select></Field>;
 }

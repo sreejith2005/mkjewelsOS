@@ -178,7 +178,8 @@ describe("linked CRM forms", () => {
     ] } }} onClose={vi.fn()} onSubmit={onSubmit} title="Register lead" />);
     const dialog = screen.getByRole("dialog", { name: "Register lead" });
     await waitFor(() => expect(within(dialog).getByRole("option", { name: "Instagram" })).toBeTruthy());
-    expect(dialog.querySelector(".md\\:col-span-3")).toBeTruthy();
+    // One question after another, on every screen.
+    expect(dialog.querySelector('[class*="col-span"]')).toBeNull();
     fireEvent.change(within(dialog).getAllByRole("textbox")[0]!, { target: { value: "Ravi" } });
     fireEvent.change(within(dialog).getByRole("combobox"), { target: { value: "insta" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Register lead" }));

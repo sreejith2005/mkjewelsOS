@@ -52,7 +52,8 @@ export function CrmPhotoField({ field, value, disabled, crm, onChange, onBusyCha
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement | null>(null);
-  if (!crm) return <Notice>{CRM_ONLY_NOTICE}</Notice>;
+  if (!crm?.upload || !crm.remove) return <Notice>{CRM_ONLY_NOTICE}</Notice>;
+  const upload = crm.upload; const removeFile = crm.remove;
   const video = field.validation?.crm?.video === true;
   const max = field.validation?.crm?.maxFiles ?? 1;
   const files: readonly FormCrmFile[] = isFormCrmFilesAnswer(value) ? value.files : [];
@@ -63,15 +64,15 @@ export function CrmPhotoField({ field, value, disabled, crm, onChange, onBusyCha
     if (file.size > 10 * 1024 * 1024) { setError("The file must be 10MB or smaller."); return; }
     setUploading(true); onBusyChange(true); setError(null);
     try {
-      const uploaded = await crm.upload(field.key, file, { video });
+      const uploaded = await upload(field.key, file, { video });
       onChange({ kind: "crm_files", files: max === 1 ? [uploaded] : [...files, uploaded].slice(0, max) });
-      if (max === 1 && files[0]) void crm.remove(files[0]).catch(() => undefined);
+      if (max === 1 && files[0]) void removeFile(files[0]).catch(() => undefined);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Upload failed. Try again."); }
     finally { setUploading(false); onBusyChange(false); }
   };
   const remove = async (file: FormCrmFile) => {
     onChange({ kind: "crm_files", files: files.filter((item) => item.path !== file.path) });
-    await crm.remove(file).catch(() => undefined);
+    await removeFile(file).catch(() => undefined);
   };
   return <div className="space-y-2">
     {files.map((file) => <div className="flex items-center gap-2 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm text-task-text" key={file.path}>
@@ -87,13 +88,11 @@ export function CrmPhotoField({ field, value, disabled, crm, onChange, onBusyCha
   </div>;
 }
 
-/** A short text question showing the branch's CRM people on duty or salespeople. */
-export function CrmChoiceField({ field, value, disabled, crm, onChange, registerRef, aria }: { field: FormFieldDefinition; value: FormAnswer | undefined; disabled: boolean; crm: FormCrmServices; onChange: (value: string) => void; registerRef: (node: HTMLElement | null) => void; aria: Readonly<Record<string, string | boolean | undefined>> }) {
-  const list = field.validation?.crm?.choices ?? "salespeople";
-  const choices = crm.choices(list);
+/** A short text question CRM answers from a list (the branch's salespeople or CRM on duty). */
+export function CrmChoiceField({ choices, value, disabled, onChange, registerRef, aria }: { choices: readonly string[]; value: FormAnswer | undefined; disabled: boolean; onChange: (value: string) => void; registerRef: (node: HTMLElement | null) => void; aria: Readonly<Record<string, string | boolean | undefined>> }) {
   const current = typeof value === "string" ? value : "";
   return <select {...aria} className="field" disabled={disabled} onChange={(event) => onChange(event.target.value)} ref={registerRef} value={current}>
-    <option value="">{choices.length ? "Choose" : list === "salespeople" ? "No salespeople for this branch" : "No CRM on duty for this branch"}</option>
+    <option value="">{choices.length ? "Choose" : "No one listed for this branch"}</option>
     {current && !choices.includes(current) ? <option value={current}>{current} (saved)</option> : null}
     {choices.map((choice) => <option key={choice} value={choice}>{choice}</option>)}
   </select>;

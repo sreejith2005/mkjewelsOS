@@ -78,7 +78,12 @@ Now:
   saves through `submit_walkin_visit_from_form`, which calls `submit_walkin_visit` unchanged
   (JewelOS 0375, CRM 20261104000100). The three `*_from_form` wrappers now run with the caller's
   rights; only the replay check and a same-transaction link record are privileged.
-- **Form Builder addition**: question width (`validation.width`: full, half, third) for
+- **Automatic client details (2026-11-04, owner request)**: the per-question "In CRM forms"
+  settings and question widths were removed. Every form now recognises client phone and pincode
+  questions by type and wording (`clientAutofill.ts`) and, for people with CRM access, fills the
+  questions it recognises from CRM (`createCrmClientLookup`, through the login bridge). The
+  walk-in link gives its Salesperson / CRM questions the branch lists. Saved widths are ignored.
+- **Form Builder addition (withdrawn 2026-11-04)**: question width (`validation.width`: full, half, third) for
   side-by-side questions on wider screens; phones keep one question per row.
 
 ## Phase B: Form Builder bindings (original design)

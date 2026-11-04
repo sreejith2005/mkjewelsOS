@@ -342,8 +342,8 @@ export function crmQueueFormCopy(): CrmFormCopy {
     name: "Client queue registration",
     description: "CRM → REGISTRATION → CLIENT / WALK-IN. The branch is chosen in CRM. A mobile number outside India starts with + and the country code.",
     fields: [
-      { key: "client_name", label: "CLIENT NAME", type: "text", sortOrder: 0, required: true, validation: { width: "half" } },
-      { key: "mobile", label: "MOBILE NUMBER", type: "phone", sortOrder: 1, required: true, validation: { width: "half" } },
+      { key: "client_name", label: "CLIENT NAME", type: "text", sortOrder: 0, required: true },
+      { key: "mobile", label: "MOBILE NUMBER", type: "phone", sortOrder: 1, required: true },
     ],
     fieldMap: { client_name: "client_name", mobile: "mobile" },
   };
@@ -432,7 +432,6 @@ export function crmLeadFormCopy(fields: readonly CrmLeadFieldWithId[], routes: r
     return {
       key, label: field.label, type, sortOrder,
       required: field.field_key === "mobile_no" || field.is_mandatory,
-      validation: { width: "half" },
       ...(type === "select" && source?.masterType ? { optionSource: { kind: "master" as const, masterType: source.masterType } } : {}),
       ...(type === "select" && source?.options ? { options: source.options } : {}),
       ...(CRM_LEAD_ROUTED_FIELDS.has(field.field_key) && predicates.length ? { rule: predicates.length === 1 ? predicates[0]! : { kind: "any" as const, rules: predicates } } : {}),

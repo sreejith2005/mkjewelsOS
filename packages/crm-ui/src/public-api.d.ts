@@ -2,7 +2,7 @@
 // sources are checked with their own compiler settings in this package; consumers read only
 // this declaration. tests/public-api.test.ts keeps it identical to src/index.ts.
 import type { ReactElement, ReactNode } from "react";
-import type { CrmFieldMap, CrmFormPurpose, CrmFormTarget, CrmLeadFieldWithId, CrmLeadOptionRoute, FormAnswers, FormCrmServices, FormTemplateDefinition } from "@jewelos/core";
+import type { CrmFieldMap, CrmFormPurpose, CrmFormTarget, CrmLeadFieldWithId, CrmLeadOptionRoute, FormAnswers, FormClientLookup, FormCrmServices, FormTemplateDefinition } from "@jewelos/core";
 import type { JewelosClient } from "@jewelos/api-client";
 
 export type CrmAppProps = {
@@ -90,3 +90,7 @@ export type CrmAuth = {
 export declare function CrmApp(props: CrmAppProps): ReactElement;
 
 export declare const CRM_BASE_PATH: "/crm";
+
+/** Client details for a phone number (and an address for a pincode), for any JewelOS form. */
+export type CrmClientLookup = (kind: "client_phone" | "pincode", value: string) => Promise<FormClientLookup | null>;
+export declare function createCrmClientLookup(options: { supabase: JewelosClient; crmProject: CrmProjectConfig }): CrmClientLookup;
