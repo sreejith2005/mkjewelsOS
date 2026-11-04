@@ -50,3 +50,16 @@ it('explains and focuses missing fields instead of silently blocking submission'
  fireEvent.input(field);
  expect(field.getAttribute('aria-invalid')).toBeNull();
 });
+it('carries Section access as a tab of the employee editor and keeps the details form', () => {
+ render(<EditUser user={employee} data={data} superAdmin={false} onClose={() => {}} onSaved={async () => {}} sectionAccess={<p>Section editor</p>} />);
+ expect(screen.getByRole('tab',{name:'Employee details'}).getAttribute('aria-selected')).toBe('true');
+ expect(screen.queryByText('Section editor')).toBeNull();
+ fireEvent.click(screen.getByRole('tab',{name:'Section access'}));
+ expect(screen.getByText('Section editor')).toBeTruthy();
+ fireEvent.click(screen.getByRole('tab',{name:'Employee details'}));
+ expect(screen.getByRole('button',{name:'Save user'})).toBeTruthy();
+});
+it('shows no editor tabs without section administration', () => {
+ render(<EditUser user={employee} data={data} superAdmin={false} onClose={() => {}} onSaved={async () => {}} />);
+ expect(screen.queryByRole('tab',{name:'Section access'})).toBeNull();
+});

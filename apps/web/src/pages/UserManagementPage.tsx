@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type FormEvent,
+  type ReactNode,
 } from "react";
 import {
   KeyRound,
@@ -83,14 +84,18 @@ export function EditUser({
   superAdmin,
   onClose,
   onSaved,
+  sectionAccess,
 }: {
   user: UserProfile;
   data: Data;
   superAdmin: boolean;
   onClose: () => void;
   onSaved: () => Promise<void>;
+  /** The Section access editor, shown as a second tab when the viewer may manage sections. */
+  sectionAccess?: ReactNode;
 }) {
   const { access } = useAuth();
+  const [editorTab, setEditorTab] = useState<"details" | "access">("details");
   const canDelete = hasPermission(access, "users.delete");
   const canReassign = hasPermission(access, "tasks.view_all");
   const openReassign = () => {
@@ -232,7 +237,11 @@ export function EditUser({
 
   return (
     <Modal onClose={onClose} title={`Edit ${user.employee_name}`} wide>
-      <form className="space-y-5" onSubmit={submit}>
+      {sectionAccess ? <div aria-label="Employee editor" className="mb-5 grid grid-cols-2 gap-1 rounded-xl border border-task-border bg-task-muted p-1 sm:inline-grid" role="tablist">
+        {([["details", "Employee details"], ["access", "Section access"]] as const).map(([key, label]) => <button aria-controls={`employee-editor-${key}`} aria-selected={editorTab === key} className={`min-h-10 rounded-lg px-4 text-sm font-semibold transition ${editorTab === key ? "bg-task-bg text-task-text shadow-sm ring-1 ring-gold/40" : "text-task-text-muted hover:text-task-text"}`} id={`employee-editor-tab-${key}`} key={key} onClick={() => setEditorTab(key)} role="tab" type="button">{label}</button>)}
+      </div> : null}
+      {sectionAccess && editorTab === "access" ? <div aria-labelledby="employee-editor-tab-access" id="employee-editor-access" role="tabpanel">{sectionAccess}</div> : null}
+      <form className={editorTab === "access" && sectionAccess ? "hidden" : "space-y-5"} id="employee-editor-details" onSubmit={submit}>
         {error ? <Notice tone="danger">{error}</Notice> : null}
         <fieldset className="contents" disabled={!canManage}>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -122,7 +122,9 @@ who build workflows, the designs.
 
 ## Users
 **What it is:** the employee list for the people you may see, and account tools for allowed roles.
-- [ ] Find an employee: open Users and filter by branch or department.
+- [ ] Find an employee (2026-11-04): one table of everyone (a list on a phone) with Branch, Department, Designation, Role, Phone, Status; **Search employees**, branch and department filters, **Show former employees**.
+- [ ] Edit an employee: **Edit** on the row opens the editor with tabs **Employee details** and **Section access** (only with permission to manage permissions). Section-access-only managers see **Section access** on the row. Kiara: no new read tool (layout only).
+- [ ] **Branches & departments** button at the top of Users opens the organization manager (administrators).
 - [ ] Add an employee: **Add user** (allowed roles only).
 - [ ] Set someone's login password: open the employee, **Set login password** (allowed roles only).
 - [ ] Hand over work (2026-11-02, 0369; administrators): open the employee, **Reassign tasks** opens Task Control with **Reassign all open work** for them.

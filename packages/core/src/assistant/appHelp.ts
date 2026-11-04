@@ -170,7 +170,9 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     path: "/users",
     summary: "Users is the employee directory for the people the user is allowed to see, with account management for authorized roles.",
     recipes: [
-      "Find an employee: open Users and filter by branch or department.",
+      "Find an employee: open Users. Everyone is in one table (a list on a phone) with Branch, Department, Designation, Role, Phone and Status; type in \"Search employees\" or pick a branch or department. Tick \"Show former employees\" to include people who have left.",
+      "Edit an employee or their section access: press \"Edit\" on their row (tap the row on a phone). The editor has two tabs, \"Employee details\" and \"Section access\" (Section access appears only for people allowed to manage permissions). People who may only manage section access see \"Section access\" on the row instead.",
+      "Branches and departments (administrators): press \"Branches & departments\" at the top of Users to add or edit them.",
       "Add an employee: \"Add user\" in Users (authorized roles only).",
       "Set someone's login password: open the employee and use \"Set login password\" (authorized roles only).",
       "Hand over an employee's work (administrators): open the employee and press \"Reassign tasks\". It opens Task Control with \"Reassign all open work\" ready for that person.",

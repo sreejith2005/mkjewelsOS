@@ -4,7 +4,8 @@ import { Button, Modal, Notice } from "@/components/ui";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { fetchUserAccessBreakdown, saveUserSectionAccess, type UserAccessBreakdown } from "./api";
 
-export function UserSectionAccess({ profileId, selfId, tenantId, onClose, onSaved }: { profileId: string; selfId: string; tenantId: string; onClose: () => void; onSaved: () => void | Promise<void> }) {
+/** `embedded` renders the editor inside another dialog (the employee editor's Section access tab). */
+export function UserSectionAccess({ profileId, selfId, tenantId, onClose, onSaved, embedded = false }: { profileId: string; selfId: string; tenantId: string; onClose: () => void; onSaved: () => void | Promise<void>; embedded?: boolean }) {
   const [breakdown, setBreakdown] = useState<UserAccessBreakdown | null>(null);
   const [draft, setDraft] = useState<SectionAccessDraft>({});
   const [saving, setSaving] = useState(false);
@@ -33,7 +34,7 @@ export function UserSectionAccess({ profileId, selfId, tenantId, onClose, onSave
     } catch (cause) { if (request === epoch.current) setError(cause instanceof Error ? cause.message : "Unable to save section access."); }
     finally { if (request === epoch.current) { savingRef.current = false; setSaving(false); } }
   };
-  return <Modal title="Section access" onClose={onClose}><div className="space-y-4">
+  const content = <div className="space-y-4">
     {error ? <Notice tone="danger">{error}</Notice> : null}{feedback ? <Notice tone="success">{feedback}</Notice> : null}
     {!breakdown ? <p>Loading section access…</p> : <>
       <p className="font-semibold">{breakdown.employeeName}</p><p className="text-sm text-task-text-muted">Department: {breakdown.departmentName ?? "None"}. Individual choices override department defaults. Globally disabled sections remain unavailable.</p>
@@ -52,5 +53,6 @@ export function UserSectionAccess({ profileId, selfId, tenantId, onClose, onSave
       })}</div>
       <Button disabled={locked || saving || Object.keys(changes).length === 0} onClick={() => void save()}>{saving ? "Saving…" : "Save section access"}</Button>
     </>}
-  </div></Modal>;
+  </div>;
+  return embedded ? content : <Modal title="Section access" onClose={onClose}>{content}</Modal>;
 }
