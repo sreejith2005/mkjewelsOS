@@ -144,7 +144,7 @@ who build workflows, the designs.
 - [ ] Leave management (2026-11-04): the leave screens open from the **Leave management** button at the top of Availability, so the board comes first. Kiara: no new read tool (layout only).
 - [ ] Apply for leave: open Availability, press **Leave management**, choose **Apply leave**, enter the dates and reason, press **Submit leave**.
 - [ ] See my leave requests and their status: open Availability and choose **Leave summary**. *(changed in Phase 9; it used to say "the leave section")*
-- [ ] Mark a day: the board is a table (a list on a phone); choose Present, Absent, Half day or Remote in the row, or **Mark absent**. Department buttons above it focus one department.
+- [ ] Mark a day: the board is a table (a list on a phone); choose Present, Absent, Half day or Remote in the row, or **Mark absent**. The **Department** list beside the search focuses one department (2026-11-04 v2).
 - [ ] Approve or reject leave (people who review leave): open Availability and choose **Review requests**. *(added in Phase 9)*
 
 ## Reports

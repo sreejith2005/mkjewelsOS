@@ -197,9 +197,9 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     path: "/availability",
     summary: "Availability records whether people are present, absent, on half day, or remote, and holds leave applications.",
     recipes: [
-      "Apply for leave: open Availability, press \"Leave management\" at the top, choose \"Apply leave\", enter the dates and reason, then press \"Submit leave\".",
+      "Apply for leave: open Availability, press the \"Leave management\" button at the top right, choose \"Apply leave\", enter the dates and reason, then press \"Submit leave\".",
       "See my leave requests and their status: open Availability, press \"Leave management\" and choose \"Leave summary\".",
-      "Mark availability for a day: the Availability board lists the team in a table (a list on a phone). Set the Start date (and End date for a range), then choose Present, Absent, Half day, or Remote in the person's row, or press \"Mark absent\". Each change is saved at once. Pick a department above the table to focus on it.",
+      "Mark availability for a day: the Availability board lists the team in a table (a list on a phone). Set the Start date (and End date for a range), then choose Present, Absent, Half day, or Remote in the person's row, or press \"Mark absent\". Each change is saved at once. Choose a department in the \"Department\" list beside the search to focus on it.",
       "Approve or reject leave (people who review leave): open Availability, press \"Leave management\" and choose \"Review requests\".",
     ],
   },
