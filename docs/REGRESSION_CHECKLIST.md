@@ -338,6 +338,42 @@ Android phone-sized device.
 - [ ] Every form shows one question after another on desktop and phone, including forms saved with half / third widths.
 - [ ] Form editor: each question card shows how it will look (Short answer, Phone number, its choices); no width or "In CRM forms" settings.
 - [ ] CRM client queue form: typing a known number fills CLIENT NAME (as the old CRM form did).
+### UI redesign - 2026-11-04
+
+Check each at 1280, 1440, 1920 and 2560 px wide (sidebar open and closed) and at
+320, 360, 390 and 430 px on a phone (browser and the Android app). No page may
+scroll sideways as a whole; wide tables scroll inside their own box.
+
+- Forms Library: one compact row per form (name, status, counts, Fill form /
+  Edit draft). From 1280 px the selected form's versions and actions show in a
+  side panel; on a phone tapping the name expands them under the row. Publish,
+  Publish as separate form, Edit, Create new version, Archive, Delete (with its
+  impact warning), Visible in Forms Library, FMS and CRM sources all still work.
+- Form Builder: the tool rail (bottom bar on a phone) adds a question, section,
+  heading or divider where you are working, duplicates or deletes the selected
+  question, and opens the outline. New sections appear after the current one;
+  section title, After this section and section conditions live on the section.
+  Unsaved changes shows in the header; Back still asks before discarding.
+  Live preview, desktop/mobile switch, routes map, Save draft / Save changes and
+  the FMS questionnaire studio (Close / its own buttons) are unchanged.
+- CRM: opening CRM lands on CLIENT QUEUE. From 1024 px the six sections are a
+  slim second sidebar; on a phone a tab row with the open one scrolled into view.
+  REGISTRATION, client search, profiles and every /crm/* deep link still open.
+- Users: one table of everyone (list on a phone) with search, branch, department
+  and Show former employees. Edit opens Employee details / Section access tabs
+  for permission managers; a section-only manager gets Section access directly.
+  Branches & departments opens the organization manager.
+- Availability: the board shows first; Leave management opens from the header
+  (apply, handover, summary, review, delete with confirmation; Escape closes
+  only the top dialog). Status select and Mark absent save per row.
+- FMS: workflow cards line up their action rows whatever the description length;
+  Show full description expands; Start, Tasks, Runs, Edit draft / New version,
+  Pause / Resume, Restore, Delete and Version history still work.
+- Home: no Recent Activity; Needs attention now opens the task; work cards and
+  Team today unchanged. Dashboard: KPI row, charts, Needs attention rail and
+  drill-downs. Ask Kiara: chat sidebar and search, composer grows and stays
+  above the phone keyboard. Reports: catalogue rail from 1280 px. Dropdown
+  Master: lists beside the open list from 1280 px. Settings: section bar jumps.
 
 ### Notifications
 
