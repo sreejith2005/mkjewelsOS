@@ -339,6 +339,15 @@ Android phone-sized device.
 - [ ] Form editor: each question card shows how it will look (Short answer, Phone number, its choices); no width or "In CRM forms" settings.
 - [ ] CRM client queue form: typing a known number fills CLIENT NAME (as the old CRM form did).
 
+### Client history from every form - 2026-11-04
+
+- [ ] Submit any Forms Library form with a phone question, using a registered client's number: within a few minutes the client's profile → **Customer journey** shows the form with every answer, who filled it and when.
+- [ ] The same from an FMS step form and a task form.
+- [ ] A number that belongs to no client or lead: nothing appears and no new client is created; nothing is added to CRM's identity review list.
+- [ ] The client's profile details (city, gender...) do not change because of these answers.
+- [ ] A form that has its own Customer Integration mapping still works as before (and still needs CRM approval).
+- [ ] Settings → Customer Integration does not list these forms as configured.
+
 ### Notifications
 
 - [ ] Task assignment creates an in-app notification; read / mark-all-read work.
