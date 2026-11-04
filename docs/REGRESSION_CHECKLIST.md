@@ -316,6 +316,20 @@ Android phone-sized device.
 - [ ] Walk-in visit form, client profiles, follow-ups and referrals are unchanged.
 - [ ] Phone: the linked form opens full screen; half-width questions stack one per row; desktop shows them side by side.
 
+### CRM walk-in visit from the Form Builder - 2026-11-04
+
+- [ ] CRM FORM SETTINGS → **Walk-in visit** → **Copy today's CRM form**: "Client walk-in visit" appears in Forms Library → CRM forms with the six sections, the same questions, labels, dropdown lists and "shown only when" rules as the old walk-in form; CRM uses it at once.
+- [ ] Queue entry → walk-in page shows **OPEN WALK-IN FORM**; the form opens with client name, mobile, CRM, Walk-in source, country India and the client's saved profile prefilled; it goes one section at a time with **Next** / **Back**.
+- [ ] Typing another known client's mobile fills their saved details ("Auto-filled from client history — editable"); the queue client's own number keeps that client. A 6-digit pincode fills city, state and country.
+- [ ] Salesperson and CRM dropdowns list only the queue branch's people.
+- [ ] Companions: "How many family members / friends are with them?" shows one row per person (name, mobile, relation).
+- [ ] Visit status YES / NO / repair / order / exchange / store visit / price calculation each show the same follow-up questions as before; NO requires reasons and Next visit date; STORE VISIT and PRICE CALCULATION skip CRM APPROACH.
+- [ ] Engagement asks: YES requires a proof photo (testimonial also accepts a video), NO asks for a reason; Referrals YES asks "How many referrals?" with name and number per referral. Photos upload to the client's CRM documents and appear on the client profile.
+- [ ] **Submit complete visit**: one visit saved, queue entry completed, "Walk-in saved" message, walk-in task closed in JewelOS Tasks; pressing Submit again after a dropped connection does not save a second visit.
+- [ ] Without a walk-in link (or after **Use the standard CRM form**) the standard walk-in form opens exactly as before.
+- [ ] Form Builder: **Repeating group (CRM)** and **CRM photo / video** are in the question types; **In CRM forms** settings on text/phone questions; a Forms Library form using them says "This question works in CRM forms only." and cannot be submitted outside CRM.
+- [ ] Lead form linked earlier: a date question (for example Date of birth) now saves (it is sent as YYYY-MM-DD).
+
 ### Notifications
 
 - [ ] Task assignment creates an in-app notification; read / mark-all-read work.

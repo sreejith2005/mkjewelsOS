@@ -69,6 +69,15 @@ Now:
   Dropdown Master lists or choices, and option routes as Form Builder conditions;
   `crmLeadFormCopy`). The copy is published as an ordinary form, linked at once, and listed in
   Forms Library under **CRM forms** for authors; Fill form there opens CRM registration.
+- **Walk-in visit (2026-11-04)**: new Form Builder question types for CRM forms: `repeat`
+  (repeating group in `validation.repeat`) and `crm_photo` (CRM documents upload), plus
+  `validation.crm` behaviours (client lookup by mobile, pincode lookup, branch CRM people /
+  salespeople). JewelOS submission keeps refusing these types; CRM saves them. A walk-in answer
+  may be filled from up to three questions (first answered wins). `crmWalkinFormCopy` builds the
+  six-section copy; the walk-in page opens it from the queue entry with the standard prefill and
+  saves through `submit_walkin_visit_from_form`, which calls `submit_walkin_visit` unchanged
+  (JewelOS 0375, CRM 20261104000100). The three `*_from_form` wrappers now run with the caller's
+  rights; only the replay check and a same-transaction link record are privileged.
 - **Form Builder addition**: question width (`validation.width`: full, half, third) for
   side-by-side questions on wider screens; phones keep one question per row.
 

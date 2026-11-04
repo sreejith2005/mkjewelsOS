@@ -1,4 +1,5 @@
 import { formFieldAllowsOther } from "./options.ts";
+import { isFormCrmFilesAnswer, isFormRepeatAnswer } from "./structuredAnswers.ts";
 import type { FormAnswer, FormFieldDefinition, FormTemplateDefinition } from "./types.ts";
 
 const LAYOUT = new Set<FormFieldDefinition["type"]>(["section_header", "divider"]);
@@ -7,6 +8,9 @@ const NUMBER = new Set<FormFieldDefinition["type"]>(["number", "currency", "rati
 
 function compatible(field: FormFieldDefinition, value: FormAnswer): boolean {
   if (LAYOUT.has(field.type)) return false;
+  if (field.type === "repeat") return isFormRepeatAnswer(value);
+  if (field.type === "crm_photo") return isFormCrmFilesAnswer(value);
+  if (isFormRepeatAnswer(value) || isFormCrmFilesAnswer(value)) return false;
   const multi = MULTI.has(field.type) || (field.type === "checkbox" && !!(field.options?.length || field.optionSource));
   if (multi !== Array.isArray(value)) return false;
   if (field.type === "checkbox" && !multi) return typeof value === "boolean";

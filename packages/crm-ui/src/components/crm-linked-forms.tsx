@@ -34,9 +34,9 @@ export function linkFor(links: CrmFormLinks | null, purpose: CrmFormPurpose, tar
 }
 
 /** Shown to form managers when CRM fell back to the standard form. */
-export function LinkNeedsAttention({ usable, canManage, onOpenSettings }: { usable: UsableLink | null; canManage: boolean; onOpenSettings: () => void }) {
+export function LinkNeedsAttention({ usable, canManage, onOpenSettings }: { usable: UsableLink | null; canManage: boolean; onOpenSettings?: (() => void) | undefined }) {
   if (!usable || !usable.issues.length || !canManage) return null;
-  return <p role="status" className="mt-4 rounded bg-amber-50 p-3 text-sm text-amber-900">CRM is showing its standard form because the linked form {usable.link.form ? `"${usable.link.form.name}"` : ""} needs attention: {usable.issues[0]!.message} <button type="button" className="font-medium underline" onClick={onOpenSettings}>Open CRM Form Settings</button></p>;
+  return <p role="status" className="mt-4 rounded bg-amber-50 p-3 text-sm text-amber-900">CRM is showing its standard form because the linked form {usable.link.form ? `"${usable.link.form.name}"` : ""} needs attention: {usable.issues[0]!.message} {onOpenSettings ? <button type="button" className="font-medium underline" onClick={onOpenSettings}>Open CRM Form Settings</button> : "Fix it in REGISTRATION → CRM FORM SETTINGS."}</p>;
 }
 
 /** A browser-generated key per form opening, so a retried save cannot register the client twice. */
@@ -143,7 +143,7 @@ export function LinkedLeadRegistration({ host, link, onSaved }: { host: CrmForms
 }
 
 /** CRM FORM SETTINGS, for people allowed to manage CRM forms. */
-export function CrmFormSettingsButton({ host, links, targets, leadSetup, openOnMount = false }: { host: CrmFormsHost; links: CrmFormLinks; targets: Readonly<Record<"queue" | "lead", readonly CrmFormTarget[]>>; leadSetup: CrmLeadSetup; openOnMount?: boolean }) {
+export function CrmFormSettingsButton({ host, links, targets, leadSetup, openOnMount = false }: { host: CrmFormsHost; links: CrmFormLinks; targets: Readonly<Record<"queue" | "lead" | "walkin", readonly CrmFormTarget[]>>; leadSetup: CrmLeadSetup; openOnMount?: boolean }) {
   const [open, setOpen] = useState(openOnMount);
   const queryClient = useQueryClient();
   if (!links.canManage) return null;

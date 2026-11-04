@@ -1,6 +1,11 @@
 import type { FormAnswers, FormCondition, FormFieldDefinition, FormRule, FormRulePredicate } from "./types.ts";
 
 export function isEmptyFormValue(value: unknown): boolean {
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    const record = value as { kind?: unknown; count?: unknown; files?: unknown };
+    if (record.kind === "repeat") return record.count === "" || record.count === undefined;
+    if (record.kind === "crm_files") return !Array.isArray(record.files) || record.files.length === 0;
+  }
   return value === undefined || value === null || value === "" ||
     (Array.isArray(value) && value.length === 0);
 }

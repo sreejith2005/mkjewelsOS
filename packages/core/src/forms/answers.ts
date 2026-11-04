@@ -1,6 +1,7 @@
 import { evaluateFormNavigation } from "./sections.ts";
 import type { FormAnswer, FormAnswers, FormFieldDefinition, FormTemplateDefinition } from "./types.ts";
 import { isEmptyFormValue, isFormFieldVisible } from "./visibility.ts";
+import { formRepeatRowCount, isFormCrmFilesAnswer, isFormRepeatAnswer } from "./structuredAnswers.ts";
 
 export function normalizeFormAnswer(field: FormFieldDefinition, value: FormAnswer): FormAnswer {
   if (typeof value === "string") {
@@ -8,7 +9,12 @@ export function normalizeFormAnswer(field: FormFieldDefinition, value: FormAnswe
     if ((field.type === "number" || field.type === "currency" || field.type === "rating") && normalized !== "") return Number(normalized);
     return normalized;
   }
-  if (Array.isArray(value)) return Object.freeze([...new Set(value.map((item) => item.trim()).filter(Boolean))]);
+  if (isFormRepeatAnswer(value)) {
+    const size = formRepeatRowCount(value);
+    return Object.freeze({ kind: "repeat", count: value.count, rows: value.rows.slice(0, size).map((row) => Object.freeze(Object.fromEntries(Object.entries(row).map(([key, text]) => [key, text.trim()])))) });
+  }
+  if (isFormCrmFilesAnswer(value)) return value;
+  if (Array.isArray(value)) return Object.freeze([...new Set((value as readonly string[]).map((item) => item.trim()).filter(Boolean))]);
   return value;
 }
 

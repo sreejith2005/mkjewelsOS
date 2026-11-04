@@ -4,6 +4,7 @@ import { FORM_OTHER_MAX_LENGTH, formFieldAllowsOther, formOptionValues } from ".
 import { evaluateFormNavigation } from "./sections.ts";
 import type { FormAnswer, FormAnswers, FormFieldDefinition, FormTemplateDefinition, FormValidationIssue, FormValidationResult } from "./types.ts";
 import { isEmptyFormValue, isFormFieldVisible } from "./visibility.ts";
+import { isFormCrmFilesAnswer, isFormRepeatAnswer } from "./structuredAnswers.ts";
 
 const LAYOUT_TYPES = new Set(["section_header", "divider"]);
 const STRING_TYPES = new Set(["text", "textarea", "email", "phone", "date", "datetime", "select", "radio", "user_dropdown", "branch_dropdown", "department_dropdown"]);
@@ -23,8 +24,36 @@ function isValidCalendarDate(value: string): boolean {
   return year >= 1 && daysInMonth !== undefined && day >= 1 && day <= daysInMonth;
 }
 
+function validateRepeat(field: FormFieldDefinition, value: unknown): FormValidationIssue | undefined {
+  const config = field.validation?.repeat;
+  if (!isFormRepeatAnswer(value) || !config) return { code: "invalid_shape", fieldKey: field.key, message: `${field.label} must list its rows` };
+  if (value.count === "NA") return config.allowNa ? undefined : { code: "invalid_shape", fieldKey: field.key, message: `${field.label}: choose how many` };
+  const count = Number(value.count);
+  if (!Number.isInteger(count) || count < config.min || count > config.max) return { code: "invalid_shape", fieldKey: field.key, message: `${field.label}: choose ${config.min} to ${config.max}` };
+  for (let index = 0; index < count; index += 1) {
+    const row = value.rows[index] ?? {};
+    for (const sub of config.fields) {
+      const text = (row[sub.key] ?? "").trim();
+      if (!text) { if (sub.required) return { code: "required", fieldKey: field.key, message: `${field.label} ${index + 1}: ${sub.label} is required` }; continue; }
+      if (text.length > 500) return { code: "too_long", fieldKey: field.key, message: `${field.label} ${index + 1}: ${sub.label} is too long` };
+      const digits = text.replace(/\D/g, "");
+      if (sub.type === "phone" && (!PHONE.test(text) || digits.length < 7 || digits.length > 15)) return { code: "invalid_phone", fieldKey: field.key, message: `${field.label} ${index + 1}: ${sub.label} must be a valid phone number` };
+      if (sub.type === "select" && sub.options?.length && !formOptionValues(sub.options).includes(text)) return { code: "invalid_option", fieldKey: field.key, message: `${field.label} ${index + 1}: ${sub.label} contains an invalid option` };
+    }
+  }
+  return undefined;
+}
+
 export function validateFormField(field: FormFieldDefinition, value: FormAnswer | null | undefined, answers: FormAnswers): FormValidationIssue | undefined {
   if (LAYOUT_TYPES.has(field.type) || !isFormFieldVisible(field, answers)) return undefined;
+  if (field.type === "repeat" || field.type === "crm_photo") {
+    if (isEmptyFormValue(value)) return field.required ? { code: "required", fieldKey: field.key, message: `${field.label} is required` } : undefined;
+    if (field.type === "repeat") return validateRepeat(field, value);
+    const max = field.validation?.crm?.maxFiles ?? 1;
+    if (!isFormCrmFilesAnswer(value) || value.files.length > max) return { code: "invalid_shape", fieldKey: field.key, message: `${field.label}: add up to ${max} file${max === 1 ? "" : "s"}` };
+    return undefined;
+  }
+  if (isFormRepeatAnswer(value) || isFormCrmFilesAnswer(value)) return { code: "invalid_shape", fieldKey: field.key, message: `${field.label} has an answer of the wrong kind` };
   const canonicalValue = STRING_TYPES.has(field.type) && typeof value === "string" ? value.trim() : value;
   const optionBackedCheckbox = field.type === "checkbox" && ((field.options?.length ?? 0) > 0 || field.optionSource !== undefined);
   if (field.required && (isEmptyFormValue(canonicalValue) || (field.type === "checkbox" && !optionBackedCheckbox && canonicalValue !== true))) return { code: "required", fieldKey: field.key, message: `${field.label} is required` };

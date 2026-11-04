@@ -2,10 +2,48 @@ import { FORM_OPTION_TYPES, FORM_OTHER_TYPES, parseFormOptions } from "./options
 import { FORM_RULE_OPERATORS, formRuleFieldKeys, formRuleHasIncompletePredicate, normalizeFormRule, validateFormRule } from "./rules.ts";
 import { FORM_QUESTION_TARGET_PREFIX, FORM_CONTINUE_TARGET, FORM_STAGE_END_TARGET, fieldSectionKey, formSections } from "./sections.ts";
 import { eligibleRecordNameFields } from "../fms/recordNaming.ts";
-import { FORM_DRAFT_FIELD_TYPES, FORM_FIELD_WIDTHS, FORM_SUBMIT_TARGET, type FormRule, type FormBranch, type FormFieldDefinition, type FormSectionDefinition, type FormTemplateDefinition, type FormValidationIssue } from "./types.ts";
+import { CRM_ONLY_FIELD_TYPES, FORM_CRM_CHOICE_LISTS, FORM_CRM_LOOKUPS, FORM_DRAFT_FIELD_TYPES, FORM_FIELD_WIDTHS, FORM_REPEAT_SUBFIELD_TYPES, FORM_SUBMIT_TARGET, type FormRule, type FormBranch, type FormFieldDefinition, type FormSectionDefinition, type FormTemplateDefinition, type FormValidationIssue } from "./types.ts";
 
 const BRANCH_TYPES: ReadonlySet<string> = new Set(FORM_DRAFT_FIELD_TYPES.filter(type => type !== "section_header" && type !== "divider"));
 const LAYOUT_TYPES = new Set(["section_header", "divider"]);
+const KEY_OR_SUBKEY = /^[a-z][a-z0-9_]{0,63}$/;
+
+/** A repeating group (CRM forms): the "How many?" range and 1 to 10 questions per row. */
+function validateRepeatConfig(field: FormFieldDefinition): FormValidationIssue[] {
+  const config = field.validation?.repeat;
+  const name = field.label || field.key;
+  const issue = (message: string): FormValidationIssue[] => [{ code: "invalid_repeat", fieldKey: field.key, message: `${name}: ${message}` }];
+  if (!config) return issue("add the questions asked for each row");
+  if (typeof config.countLabel !== "string" || !config.countLabel.trim() || config.countLabel.length > 200) return issue("the \"How many?\" question needs a wording");
+  if (!Number.isInteger(config.min) || !Number.isInteger(config.max) || config.min < 0 || config.max < 1 || config.max > 20 || config.min > config.max) return issue("choose a \"How many?\" range between 0 and 20");
+  if (!Array.isArray(config.fields) || config.fields.length < 1 || config.fields.length > 10) return issue("ask 1 to 10 questions for each row");
+  const keys = new Set<string>();
+  for (const sub of config.fields) {
+    if (!KEY_OR_SUBKEY.test(sub.key) || keys.has(sub.key)) return issue("each row question needs its own key");
+    keys.add(sub.key);
+    if (!sub.label?.trim() || sub.label.length > 200) return issue("each row question needs a wording");
+    if (!(FORM_REPEAT_SUBFIELD_TYPES as readonly string[]).includes(sub.type)) return issue("row questions can be short text, phone or dropdown");
+    if (sub.type === "select" && !sub.optionSource && !(sub.options?.length)) return issue(`"${sub.label}" needs its choices or a Dropdown Master list`);
+    if (sub.type !== "select" && (sub.options?.length || sub.optionSource)) return issue(`"${sub.label}" is not a dropdown`);
+  }
+  return [];
+}
+
+/** CRM lookups, CRM choice lists and CRM upload settings, each only on the question type it suits. */
+function validateCrmBehaviour(field: FormFieldDefinition): FormValidationIssue[] {
+  const crm = field.validation?.crm;
+  if (!crm) return [];
+  const issue = (message: string): FormValidationIssue[] => [{ code: "invalid_crm_setting", fieldKey: field.key, message: `${field.label || field.key}: ${message}` }];
+  if (crm.lookup !== undefined) {
+    if (!(FORM_CRM_LOOKUPS as readonly string[]).includes(crm.lookup)) return issue("unknown CRM lookup");
+    if (crm.lookup === "client_phone" && field.type !== "phone" && field.type !== "text") return issue("the CRM client lookup works on a phone or text question");
+    if (crm.lookup === "pincode" && field.type !== "text" && field.type !== "number") return issue("the pincode lookup works on a text question");
+  }
+  if (crm.choices !== undefined && (!(FORM_CRM_CHOICE_LISTS as readonly string[]).includes(crm.choices) || field.type !== "text")) return issue("CRM choice lists work on a short text question");
+  if ((crm.video !== undefined || crm.maxFiles !== undefined) && field.type !== "crm_photo") return issue("upload settings belong to a CRM photo question");
+  if (crm.maxFiles !== undefined && (!Number.isInteger(crm.maxFiles) || crm.maxFiles < 1 || crm.maxFiles > 10)) return issue("allow 1 to 10 files");
+  return [];
+}
 const KEY_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
 const BRANCH_OPERATORS: ReadonlySet<string> = new Set([...FORM_RULE_OPERATORS, "default"]);
 
@@ -162,7 +200,7 @@ function validateRuleOptions(rule: FormRule | undefined, template: FormTemplateD
   if (!rule) return;
   if (rule.kind !== "predicate") { for (const child of rule.rules) validateRuleOptions(child, template, fieldKey, issues); return; }
   const source = template.fields.find(f => f.key === rule.fieldKey);
-  if (!source || source.shown === false || LAYOUT_TYPES.has(source.type)) { issues.push({ code: "unavailable_rule_source", fieldKey, message: "A condition reads a missing or unavailable question." }); return; }
+  if (!source || source.shown === false || LAYOUT_TYPES.has(source.type) || CRM_ONLY_FIELD_TYPES.has(source.type)) { issues.push({ code: "unavailable_rule_source", fieldKey, message: "A condition reads a missing or unavailable question." }); return; }
   if (source.optionSource || !source.options?.length || ["is_empty", "not_empty"].includes(rule.operator)) return;
   const values = Array.isArray(rule.value) ? rule.value : [rule.value];
   if (values.some(value => !source.options!.some(option => option.value === value))) issues.push({ code: "unknown_rule_option", fieldKey, message: "A condition refers to an answer option that no longer exists." });
@@ -236,7 +274,10 @@ export function validateFormDefinition(template: FormTemplateDefinition): readon
       if (validation.width !== undefined && !(FORM_FIELD_WIDTHS as readonly string[]).includes(validation.width)) {
         issues.push({ code: "invalid_validation", fieldKey: field.key, message: "A question's width must be full, half or a third" });
       }
+      if (validation.crm !== undefined) issues.push(...validateCrmBehaviour(field));
     }
+    if (field.type === "repeat") issues.push(...validateRepeatConfig(field));
+    else if (field.validation?.repeat !== undefined) issues.push({ code: "invalid_validation", fieldKey: field.key, message: "Only a repeating group can list questions per row" });
     earlier.add(field.key);
   });
   return issues;

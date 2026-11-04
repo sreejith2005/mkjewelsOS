@@ -1,7 +1,7 @@
 "use client";
 
 import { type ComponentProps, useMemo, useState } from "react";
-import { CRM_QUEUE_TARGETS, crmLeadTargets } from "@jewelos/core";
+import { CRM_QUEUE_TARGETS, CRM_WALKIN_TARGETS, crmLeadTargets } from "@jewelos/core";
 import { EntryQueue } from "@/components/entry-queue";
 import { LeadForm, type LeadField, type LeadOption } from "@/components/lead-form";
 import { CrmFormSettingsButton, LinkedLeadRegistration, LinkedQueueRegistration, LinkNeedsAttention, linkFor, useCrmFormLinks } from "@/components/crm-linked-forms";
@@ -22,7 +22,7 @@ export function WalkinStart({ entryQueueProps, fields, options, lookupOptions, a
   // crm-port: Form Builder forms linked in CRM Form Settings (2026-11-03); the standard forms stay until a link is usable.
   const { host, links, loading } = useCrmFormLinks();
   const [settingsOpenedFromNotice, setSettingsOpenedFromNotice] = useState(0);
-  const targets = useMemo(() => ({ queue: CRM_QUEUE_TARGETS, lead: crmLeadTargets(fields) }), [fields]);
+  const targets = useMemo(() => ({ queue: CRM_QUEUE_TARGETS, lead: crmLeadTargets(fields), walkin: CRM_WALKIN_TARGETS }), [fields]);
   const leadSetup = useMemo(() => ({ fields, routes: options, lookupOptions }), [fields, options, lookupOptions]);
   const queueLink = linkFor(links, "queue", targets.queue);
   const leadLink = linkFor(links, "lead", targets.lead);
