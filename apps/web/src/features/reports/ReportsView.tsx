@@ -115,15 +115,20 @@ export function ReportsView(){
   return <PageSurface>
     <PageHeading title="Reports" description="Choose a report, check the preview, then export every matching record as a CSV file." actions={canExport?<Button disabled={exportDisabled} onClick={()=>void doExport()}><FileSpreadsheet/>{exporting?"Preparing…":"Export CSV"}</Button>:undefined}/>
 
-    <nav aria-label="Report categories" className="mb-3 flex gap-2 overflow-x-auto pb-1">
+    {/* Desktop: the report catalogue is a rail beside the report, so choosing and reading happen side by side. */}
+    <div className="mx-auto max-w-[120rem] xl:grid xl:grid-cols-[17.5rem_minmax(0,1fr)] xl:items-start xl:gap-5">
+    <aside aria-label="Report catalogue" className="xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto xl:overscroll-contain xl:pr-1">
+    <nav aria-label="Report categories" className="mb-3 flex gap-2 overflow-x-auto pb-1 xl:flex-wrap xl:overflow-visible">
       {REPORT_CATEGORIES.filter((item)=>catalog.some((report)=>report.category===item.id)).map((item)=><button aria-pressed={item.id===category} className={cn("min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold",item.id===category?"bg-gold text-on-gold":"bg-task-bg text-task-text hover:bg-gold/10")} key={item.id} onClick={()=>changeReport(catalog.find((report)=>report.category===item.id))} title={item.description} type="button">{item.name}</button>)}
     </nav>
-    <nav aria-label="Reports" className="mb-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+    <nav aria-label="Reports" className="mb-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-1">
       {cards.map((item)=>{const selected=item.key===definition.key||(!!item.family&&item.family===definition.family);return <button aria-pressed={selected} className={cn("min-h-11 rounded-xl border p-3 text-left transition-colors",selected?"border-gold bg-gold/10 shadow-card":"border-task-border bg-task-bg hover:border-gold/50")} key={item.key} onClick={()=>changeReport(item)} type="button">
         <span className="block text-sm font-semibold">{item.name}</span>
-        <span className="mt-0.5 block text-xs leading-snug text-task-text-muted">{item.description}</span>
+        <span className="mt-0.5 line-clamp-2 block text-xs leading-snug text-task-text-muted" title={item.description}>{item.description}</span>
       </button>;})}
     </nav>
+    </aside>
+    <div className="min-w-0">
 
     <section aria-label="Report filters" className="mb-5 rounded-2xl border border-task-border bg-task-bg p-4 shadow-card">
       {variants.length>1?<div aria-label="Report view" className="mb-3 inline-flex rounded-full bg-task-muted p-1" role="group">{variants.map((item)=><button aria-pressed={item.key===definition.key} className={cn("min-h-9 rounded-full px-3 text-xs font-semibold",item.key===definition.key?"bg-task-bg shadow-card":"text-task-text-muted")} key={item.key} onClick={()=>changeReport(item)} type="button">{item.variantLabel}</button>)}</div>:null}
@@ -138,7 +143,7 @@ export function ReportsView(){
         {definition.dateOptional?<button aria-pressed={!filters.from} className={chip(!filters.from)} onClick={()=>changeFilters({from:undefined,to:undefined})} type="button">All dates</button>:null}
         {QUICK_RANGES.map((item)=><button aria-pressed={active===item.id} className={chip(active===item.id)} key={item.id} onClick={()=>changeFilters(quickRange(item.id))} type="button">{item.label}</button>)}
       </div>:null}
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6">
         {has("from")?<><Labelled label="From"><input className={field} max={filters.to} onChange={(event)=>changeFilters({from:event.target.value||undefined,...(!filters.to&&event.target.value?{to:event.target.value}:{})})} type="date" value={filters.from??""}/></Labelled>
           <Labelled label="To"><input className={field} min={filters.from} onChange={(event)=>changeFilters({to:event.target.value||undefined,...(!filters.from&&event.target.value?{from:event.target.value}:{})})} type="date" value={filters.to??""}/></Labelled></>:null}
         {has("form_family_id")?<Labelled label="Form"><select className={field} onChange={(event)=>changeFilters({form_family_id:event.target.value})} value={filters.form_family_id??""}><option value="">All forms</option>{choices.forms.map((item)=><option key={item.id} value={item.id}>{item.name}</option>)}</select></Labelled>:null}
@@ -196,5 +201,7 @@ export function ReportsView(){
         <Button className="mt-3 border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={()=>void load(false)} variant="secondary"><RefreshCw/>Refresh</Button>
       </Panel>
     </>:null}
+    </div>
+    </div>
   </PageSurface>;
 }
