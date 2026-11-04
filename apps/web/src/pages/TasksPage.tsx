@@ -239,14 +239,14 @@ export function TasksPage({ path = "/tasks" }: Readonly<{ path?: string }>) {
 
   return (
     <section className="-m-4 min-h-[calc(100dvh-7.875rem)] bg-task-bg pb-24 text-task-text sm:-m-6 md:min-h-[calc(100vh-4rem)] md:pb-10">
-      <h1 className="sr-only">Tasks</h1>
-      <div className="hidden items-center justify-between border-b border-task-border px-6 py-4 md:flex">
-        <div><h2 className="font-display text-[2rem] font-semibold leading-tight text-task-text">Tasks</h2><p className="text-sm text-task-text-muted">Assigned, watched, coverage-blocked, and delegated work in one place.</p></div>
-      </div>
 
-      {!focusedTaskId ? <div className="flex flex-wrap items-center gap-2 border-b border-task-border px-3 py-3 sm:px-5" role="group" aria-label="Task date scope">{(["today", "overall", "overdue"] as const).map(scope => <button type="button" key={scope} aria-pressed={calendarScope === scope} className={`min-h-11 rounded-full border px-4 text-sm font-semibold capitalize ${calendarScope === scope ? "border-task-accent bg-task-accent-soft" : "border-task-border text-task-text-muted"}`} onClick={() => { setCalendarScope(scope); setStatusFilter(scope === "overdue" ? "overdue" : "pending"); setOffset(0); setTabCounts({}); }}>{scope}</button>)}<span className="text-xs text-task-text-muted">{calendarScope === "today" ? "Scheduled for today in Asia/Kolkata" : calendarScope === "overall" ? "Includes future scheduled work" : "Unfinished work scheduled before today"}</span></div> : null}
-      {!focusedTaskId && (workspaceView !== "fms" || exploring) ? <TaskSearchControls value={filters} onChange={changeSearch} canViewAll={hasAdminTaskView} /> : null}
-      {!focusedTaskId ? <div className="no-scrollbar grid grid-cols-2 items-stretch gap-2 border-b border-task-border bg-task-bg px-3 pt-3 sm:flex sm:overflow-x-auto sm:px-5">
+      {/* One toolbar: the title, the date scope and search share a row on wide screens. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-task-border px-3 py-2.5 sm:px-5">
+        <h1 className="font-display text-xl font-semibold leading-tight text-task-text md:text-2xl">Tasks</h1>
+        {!focusedTaskId ? <div className="order-3 flex w-full gap-1 rounded-xl bg-task-muted p-1 md:order-none md:w-auto" role="group" aria-label="Task date scope">{(["today", "overall", "overdue"] as const).map(scope => <button type="button" key={scope} aria-pressed={calendarScope === scope} title={scope === "today" ? "Scheduled for today in Asia/Kolkata" : scope === "overall" ? "Includes future scheduled work" : "Unfinished work scheduled before today"} className={`min-h-10 flex-1 rounded-lg px-3 text-sm font-semibold capitalize transition-colors sm:flex-none sm:px-4 ${calendarScope === scope ? "bg-task-bg text-task-text shadow-sm ring-1 ring-task-accent/50" : "text-task-text-muted hover:text-task-text"}`} onClick={() => { setCalendarScope(scope); setStatusFilter(scope === "overdue" ? "overdue" : "pending"); setOffset(0); setTabCounts({}); }}>{scope}</button>)}</div> : null}
+        {!focusedTaskId && (workspaceView !== "fms" || exploring) ? <div className="order-2 ml-auto min-w-0 flex-1 basis-56 md:order-none md:max-w-xl"><TaskSearchControls canViewAll={hasAdminTaskView} inline onChange={changeSearch} value={filters} /></div> : null}
+      </div>
+      {!focusedTaskId ? <div className="no-scrollbar grid grid-cols-2 items-stretch gap-2 border-b border-task-border bg-task-bg px-3 pt-2 sm:flex sm:overflow-x-auto sm:px-5">
         {([
           ["mine", "My Tasks", tabCounts.mine],
           ["delegated", "Delegated", tabCounts.delegated],
