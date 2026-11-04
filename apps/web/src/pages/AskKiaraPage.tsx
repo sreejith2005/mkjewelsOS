@@ -304,8 +304,8 @@ export function AskKiaraPage({ onNavigate, search = window.location.search }: { 
     </div>;
   }
 
-  return <div className="flex h-[calc(100dvh-9rem)] min-h-[32rem] flex-col gap-4 md:h-[calc(100dvh-7rem)]">
-    <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-task-border bg-task-bg px-4 py-3 sm:px-5">
+  return <div className="flex h-[calc(100dvh-9rem)] min-h-[28rem] flex-col gap-3 md:h-[calc(100dvh-7rem)]">
+    <header className="flex flex-wrap items-center justify-between gap-3 px-1">
       <div className="flex items-center gap-2">
         <Sparkles aria-hidden className="size-6 text-task-accent" />
         <div>
@@ -322,11 +322,11 @@ export function AskKiaraPage({ onNavigate, search = window.location.search }: { 
       </div>
     </header>
     {notice ? <Notice tone="danger">{notice}</Notice> : null}
-    <div className="flex min-h-0 flex-1 gap-4">
-      <aside className={`${showList ? "flex" : "hidden"} w-full flex-col rounded-2xl border border-task-border bg-task-bg p-3 md:flex md:w-72 md:shrink-0`}>
+    <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-task-border bg-task-bg shadow-card">
+      <aside aria-label="Your Kiara chats" className={`${showList ? "flex" : "hidden"} w-full flex-col border-task-border bg-task-muted/60 p-3 md:flex md:w-72 md:shrink-0 md:border-r lg:w-80`}>
         <ConversationList activeId={activeId} conversations={conversations} loading={listLoading} onArchive={(id) => void archive(id)} onNew={newChat} onSelect={(id) => void openConversation(id)} />
       </aside>
-      <section aria-label="Chat with Kiara" className={`${showList ? "hidden" : "flex"} min-w-0 flex-1 flex-col rounded-2xl border border-task-border bg-task-bg p-3 sm:p-4 md:flex`}>
+      <section aria-label="Chat with Kiara" className={`${showList ? "hidden" : "flex"} min-w-0 flex-1 flex-col p-2 sm:p-3 md:flex`}>
         <ChatView
           bubbles={bubbles}
           canUseVoice={canUseVoice}

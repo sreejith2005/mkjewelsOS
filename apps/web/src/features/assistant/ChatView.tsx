@@ -82,6 +82,14 @@ export function ChatView({
   status: string | null;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  // The composer grows with the question, up to its max height, like a chat app.
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    input.style.height = "auto";
+    input.style.height = `${Math.min(input.scrollHeight, 160)}px`;
+  }, [draft]);
   const lastText = bubbles[bubbles.length - 1]?.text;
   useEffect(() => {
     endRef.current?.scrollIntoView?.({ block: "end" });
@@ -102,14 +110,14 @@ export function ChatView({
   };
 
   return <div className="flex min-h-0 flex-1 flex-col">
-    <div aria-live="polite" className="min-h-0 flex-1 space-y-4 overflow-y-auto px-1 py-2">
-      {bubbles.length === 0 ? <div className="mx-auto max-w-lg py-8 text-center">
-        <Sparkles aria-hidden className="mx-auto size-8 text-task-accent" />
-        <h2 className="mt-3 text-xl font-bold text-task-text">Namaste{firstName ? `, ${firstName}` : ""}! I'm Kiara.</h2>
+    <div aria-live="polite" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 py-2 sm:px-4"><div className="mx-auto w-full max-w-3xl space-y-6">
+      {bubbles.length === 0 ? <div className="mx-auto flex min-h-[50dvh] max-w-xl flex-col items-center justify-center py-8 text-center">
+        <span aria-hidden className="flex size-14 items-center justify-center rounded-2xl bg-gold-sheen text-on-gold shadow-gold"><Sparkles className="size-7" /></span>
+        <h2 className="mt-4 text-2xl font-semibold text-task-text">Namaste{firstName ? `, ${firstName}` : ""}! I'm Kiara.</h2>
         <p className="mt-2 text-sm text-task-text-muted">Ask me about your work, how to use JewelOS, or company procedures. You can write in English, Hindi, or Hinglish.</p>
-        <div className="mt-5 flex flex-wrap justify-center gap-2">
+        <div className="mt-6 grid w-full gap-2 sm:grid-cols-2">
           {KIARA_SUGGESTIONS.map((suggestion) => <button
-            className="min-h-10 rounded-full border border-task-border bg-task-bg px-4 text-sm text-task-text hover:border-task-accent hover:bg-task-accent-soft disabled:opacity-50"
+            className="min-h-12 rounded-xl border border-task-border bg-task-bg px-4 py-2 text-left text-sm text-task-text transition-colors hover:border-task-accent hover:bg-task-accent-soft disabled:opacity-50"
             disabled={locked || voiceBusy}
             key={suggestion}
             onClick={() => onSend(suggestion)}
@@ -119,7 +127,7 @@ export function ChatView({
       </div> : null}
       {bubbles.map((bubble) => bubble.role === "user"
         ? <div className="flex justify-end" key={bubble.id}>
-          <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-task-accent-soft px-4 py-2.5 text-sm text-task-text">{bubble.text}</p>
+          <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-3xl rounded-br-lg bg-task-accent-soft px-4 py-2.5 text-[15px] leading-relaxed text-task-text sm:max-w-[75%]">{bubble.text}</p>
         </div>
         : bubble.role === "human"
         ? <div className="flex justify-start gap-2" key={bubble.id}>
@@ -129,9 +137,9 @@ export function ChatView({
             <p className="whitespace-pre-wrap break-words">{bubble.text}</p>
           </div>
         </div>
-        : <div className="flex justify-start gap-2" key={bubble.id}>
-          <span aria-hidden className="mt-1 flex size-7 shrink-0 items-center justify-center rounded-full bg-task-accent text-xs font-bold text-white">K</span>
-          <div className="max-w-[85%] rounded-2xl rounded-bl-md border border-task-border bg-task-bg px-4 py-2.5 text-sm text-task-text">
+        : <div className="flex justify-start gap-3" key={bubble.id}>
+          <span aria-hidden className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-gold-sheen text-xs font-bold text-on-gold shadow-gold">K</span>
+          <div className="min-w-0 flex-1 pt-1 text-[15px] leading-relaxed text-task-text">
             <span className="sr-only">Kiara: </span>
             {bubble.text ? <KiaraMarkdown onNavigate={onNavigate} text={bubble.text} /> : null}
             {bubble.pending && !bubble.text ? <span className="inline-flex items-center gap-2 text-task-text-muted"><Loader2 aria-hidden className="size-4 animate-spin" />{status ?? "Thinking"}…</span> : null}
@@ -142,29 +150,30 @@ export function ChatView({
           </div>
         </div>)}
       <div ref={endRef} />
-    </div>
-    <form className="border-t border-task-border pt-3" onSubmit={submit}>
+    </div></div>
+    <form className="mx-auto w-full max-w-3xl px-1 pb-1 pt-2 sm:px-4" onSubmit={submit}>
       {disabledReason ? <p className="mb-2 rounded-lg bg-task-muted px-3 py-2 text-sm text-task-text">{disabledReason}</p> : null}
       {canUseVoice ? <KiaraVoiceStatus voice={voice} /> : null}
-      <div className="flex items-end gap-2">
+      <div className="flex items-end gap-2 rounded-3xl border border-task-border bg-task-bg p-1.5 pl-3 shadow-card transition-colors focus-within:border-task-accent/60">
         <label className="sr-only" htmlFor="kiara-question">Your question</label>
         <textarea
-          className="task-field max-h-40 min-h-11 flex-1 resize-none"
+          className="max-h-40 min-h-10 flex-1 resize-none border-0 bg-transparent px-1 py-2 text-base leading-relaxed text-task-text placeholder:text-task-text-muted/80 focus-visible:ring-0 focus-visible:ring-offset-0 md:text-[15px]"
           disabled={disabledReason !== null}
           id="kiara-question"
           maxLength={maxLength}
           onChange={(event) => onDraftChange(event.target.value)}
           onKeyDown={onKeyDown}
           placeholder={canUseVoice ? "Ask Kiara, or tap the mic…" : "Ask Kiara…"}
+          ref={inputRef}
           rows={1}
           value={draft}
         />
         {canUseVoice ? <KiaraMicButton disabled={locked} voice={voice} /> : null}
-        <button aria-label="Send" className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-task-accent text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50" disabled={locked || voiceBusy || !draft.trim()} type="submit">
+        <button aria-label="Send" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-task-accent text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" disabled={locked || voiceBusy || !draft.trim()} type="submit">
           {sending ? <Loader2 aria-hidden className="size-5 animate-spin" /> : <SendHorizontal aria-hidden className="size-5" />}
         </button>
       </div>
-      {draft.length >= COUNTER_FROM ? <p className="mt-1 text-right text-xs text-task-text-muted">{draft.length} / {maxLength}</p> : null}
+      {draft.length >= COUNTER_FROM ? <p className="mt-1 text-right text-xs text-task-text-muted">{draft.length} / {maxLength}</p> : <p className="mt-1.5 hidden text-center text-[11px] text-task-text-muted sm:block">Enter sends · Shift+Enter adds a new line</p>}
     </form>
   </div>;
 }

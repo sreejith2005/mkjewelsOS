@@ -1,4 +1,5 @@
-import { Archive, MessageSquarePlus } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Archive, MessageSquarePlus, Search } from "lucide-react";
 import { kiaraDateTime } from "@jewelos/core";
 import type { KiaraConversationSummary } from "@jewelos/data/assistant/api";
 
@@ -20,14 +21,23 @@ export function ConversationList({
   onNew: () => void;
   onSelect: (id: string) => void;
 }) {
-  return <div className="flex min-h-0 flex-col gap-3">
+  // Filters the chats already loaded; nothing extra is fetched.
+  const [query, setQuery] = useState("");
+  const shown = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return needle ? conversations.filter((conversation) => conversation.title.toLowerCase().includes(needle)) : conversations;
+  }, [conversations, query]);
+  return <div className="flex min-h-0 flex-1 flex-col gap-3">
     <button className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-task-accent px-4 text-sm font-semibold text-white hover:opacity-90" onClick={onNew} type="button">
       <MessageSquarePlus aria-hidden className="size-4" /> New chat
     </button>
     {loading && conversations.length === 0 ? <p className="px-1 text-sm text-task-text-muted">Loading your chats…</p> : null}
     {!loading && conversations.length === 0 ? <p className="px-1 text-sm text-task-text-muted">Your chats will appear here.</p> : null}
-    <ul aria-label="Your chats" className="min-h-0 space-y-1 overflow-y-auto">
-      {conversations.map((conversation) => <li className="group flex items-stretch gap-1" key={conversation.id}>
+    {conversations.length > 5 ? <label className="relative block"><span className="sr-only">Search your chats</span><Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-task-text-muted" /><input className="task-field min-h-10 pl-9" onChange={(event) => setQuery(event.target.value)} placeholder="Search chats" type="search" value={query} /></label> : null}
+    {query && shown.length === 0 ? <p className="px-1 text-sm text-task-text-muted">No chats match.</p> : null}
+    <p aria-hidden className="px-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-task-text-muted">{conversations.length ? "Recent chats" : null}</p>
+    <ul aria-label="Your chats" className="-mx-1 min-h-0 flex-1 space-y-0.5 overflow-y-auto px-1">
+      {shown.map((conversation) => <li className="group flex items-stretch gap-1" key={conversation.id}>
         <button
           aria-current={conversation.id === activeId ? "true" : undefined}
           className={conversation.id === activeId
