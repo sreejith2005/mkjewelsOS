@@ -26,6 +26,11 @@ export function Button({ className, variant = "primary", ...props }: ButtonProps
   );
 }
 
+/** Open dialogs in opening order. Escape closes only the one on top: a dialog nested inside
+ *  another (a confirmation inside a workspace dialog) is on top of it, else the last opened. */
+const openModals: HTMLElement[] = [];
+const topModal = () => openModals.filter((dialog) => !openModals.some((other) => other !== dialog && dialog.contains(other))).at(-1);
+
 export function Modal({
   title,
   children,
@@ -89,8 +94,10 @@ export function Modal({
       const preferred = dialogRef.current?.querySelector<HTMLElement>("[autofocus],[data-autofocus]");
       (preferred ?? dialogRef.current)?.focus();
     });
+    const dialog = dialogRef.current;
+    if (dialog) openModals.push(dialog);
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && (!dialog || topModal() === dialog)) {
         event.preventDefault();
         onCloseRef.current();
       }
@@ -99,6 +106,7 @@ export function Modal({
     return () => {
       window.cancelAnimationFrame(frame);
       document.removeEventListener("keydown", onKeyDown);
+      if (dialog) openModals.splice(openModals.indexOf(dialog), 1);
       document.body.style.overflow = previousOverflow;
       restoreFocusRef.current?.focus();
     };

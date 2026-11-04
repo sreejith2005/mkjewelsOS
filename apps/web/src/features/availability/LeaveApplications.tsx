@@ -125,8 +125,8 @@ export function LeaveApplications() {
   const fillHandover = (id: string) => { setHandoverId(id); setHandoverDone(""); setHandoverTo(""); setHandoverImage(null); setFileInputKey((key) => key + 1); setTab("handover"); setHandoverFocus((tick) => tick + 1); };
 
   if (!profile) return null;
-  return <section className="mb-6 space-y-4 rounded-xl border border-gold/25 bg-charcoal p-4 sm:p-5">
-    <div><h2 className="font-display text-xl text-gold-secondary">Leave management</h2><p className="text-sm text-soft-grey">Apply, complete your handover, and follow HR's decision.</p></div>
+  return <section aria-label="Leave management" className="space-y-4">
+    <p className="text-sm text-soft-grey">Apply, complete your handover, and follow HR's decision.</p>
     {canApply !== null ? <div className="flex flex-wrap gap-2" role="tablist" aria-label="Leave management">
       {tabs.map((item) => <Button aria-selected={tab === item} key={item} onClick={() => switchTab(item)} role="tab" variant={tab === item ? "primary" : "secondary"}>{tabLabels[item]}{item === "handover" && handoverRows.length ? ` (${handoverRows.length})` : ""}</Button>)}
     </div> : null}
