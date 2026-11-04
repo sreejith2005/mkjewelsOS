@@ -26,9 +26,9 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     section: "home",
     title: "Home",
     path: "/",
-    summary: "Home shows the user's own work for today: open and overdue tasks, assigned FMS stages, forms to fill, and recent activity. Managers, HR, Admins and Super Admins also see \"Team today\": today's team tasks, who needs follow-up, and progress by department.",
+    summary: "Home shows the user's own work for today: open and overdue tasks, assigned FMS stages and forms to fill, with overdue and high-priority work under \"Needs attention now\". Managers, HR, Admins and Super Admins also see \"Team today\": today's team tasks, who needs follow-up, and progress by department.",
     recipes: [
-      "See today's work: open Home from the menu. Overdue items are listed first.",
+      "See today's work: open Home from the menu. \"Needs attention now\" at the top lists overdue and high-priority tasks; tap one to open it. Overdue items are listed first.",
       "See the team's day (leaders): the \"Team today\" section shows Assigned, Done, Pending and Overdue for today. With no tasks of your own, the top card shows \"Team completion today\". Tap a person under \"Needs follow-up\" to open their tasks in Task Control.",
       "See your work by type: under \"Your work\" Home shows three cards, Daily Checklist (routine duties), My Tasks (work assigned to you) and FMS Tasks (workflow steps and start forms), each with a count and how many are overdue. On a phone, swipe between the cards or tap Checklist, My Tasks or FMS at the top; a red dot means that card has overdue work. Tap a task to open it directly, or press \"Open all tasks\" / \"Open FMS tasks\" at the bottom of a card for the full list. All three cards have the same fixed height and preview up to five items; scroll inside a card to see its preview. Use the link at the bottom for the full list in Tasks. On a computer the three cards sit side by side.",
       "Open your account: on any page, press the top-right Account menu (your initials) to see your name, role and branch. Choose Settings if available, or Sign out. Press Escape or tap outside to close it.",

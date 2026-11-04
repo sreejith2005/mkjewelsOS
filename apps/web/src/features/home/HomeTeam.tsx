@@ -41,7 +41,7 @@ export function HomeTeamSection({ team, onNavigate }: Readonly<{ team: TeamToday
   const people = needsAttention(progress.employees).slice(0, 8);
   const departments = [...progress.departments].filter((row) => row.assigned > 0).sort((a, b) => b.assigned - a.assigned).slice(0, 6);
   return (
-    <section aria-labelledby="team-today-heading" className="mt-7">
+    <section aria-labelledby="team-today-heading">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-lg font-semibold" id="team-today-heading">Team today</h2>

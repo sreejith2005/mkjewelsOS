@@ -22,7 +22,7 @@ Tasks entry updated against the screens: 2026-10-21 (Anytime duties, task order)
 
 ## Home (menu: Home)
 **What it is:** your own work for today: open and overdue tasks, your FMS stages, forms to
-fill, and recent activity.
+fill. Overdue and high-priority tasks appear under **Needs attention now** (2026-11-04: the Recent Activity panel was removed from Home).
 - [ ] See today's work: open Home from the menu. Overdue items are listed first.
 - [ ] Leaders: **Team today** shows Assigned, Done, Pending and Overdue for today; with no tasks of your own the top card shows **Team completion today**. Tap a person under **Needs follow-up** to open their tasks in Task Control.
 - [ ] Under **Your work**, Home shows three cards: **Daily Checklist**, **My Tasks** and **FMS Tasks**, each with a count and overdue total. On a phone, swipe between them or tap Checklist / My Tasks / FMS at the top (a red dot marks overdue work); tap a task to open it, or **Open all tasks** / **Open FMS tasks** for the full list. On a computer the cards sit side by side. No new Kiara read tool is needed; the cards use the existing Home summary (2026-10-31).
