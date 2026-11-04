@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { BarChart3, BookOpen, Gauge, MessageCircleQuestion, MessagesSquare, Sparkles, type LucideIcon } from "lucide-react";
+import { ArrowLeft, BarChart3, BookOpen, ChevronUp, Gauge, MessageCircleQuestion, MessagesSquare, Settings2, X, type LucideIcon } from "lucide-react";
 import { hasPermission, kiaraComposerDisabledReason, kiaraLocation, type KiaraQuota, type KiaraTab } from "@jewelos/core";
 import {
   KIARA_CONVERSATION_QUESTION_LIMIT,
@@ -30,6 +30,7 @@ import { QuotaChip } from "@/features/assistant/QuotaChip";
 import { KnowledgeBaseView } from "@/features/assistant/knowledge/KnowledgeBaseView";
 import { InsightsView } from "@/features/assistant/InsightsView";
 import { LimitsView } from "@/features/assistant/LimitsView";
+import { useFillViewport } from "@/lib/useFillViewport";
 
 /** The tab and item a URL opens, and the bubbles for a stored chat: shared with Android. */
 export { kiaraLocation };
@@ -67,6 +68,7 @@ export function AskKiaraPage({ onNavigate, search = window.location.search }: { 
   const [notice, setNotice] = useState<string | null>(null);
   const [showList, setShowList] = useState(false);
   const [escalationBusy, setEscalationBusy] = useState(false);
+  const workspace = useFillViewport<HTMLDivElement>({ minHeight: 420 });
   const activeRef = useRef<string | null>(null);
   activeRef.current = activeId;
   // A quota read that started before a newer quota arrived (from a send) is stale.
@@ -242,91 +244,52 @@ export function AskKiaraPage({ onNavigate, search = window.location.search }: { 
     ["insights", "Insights", BarChart3, canViewInsights],
     ["limits", "Limits", Gauge, canManageLimits],
   ] as const).filter(([, , , shown]) => shown);
-  const tabs = tabList.length > 1 ? <nav aria-label="Ask Kiara" className="flex flex-wrap gap-1 rounded-xl border border-task-border bg-task-bg p-1">
-    {tabList.map(([id, label, Icon]) =>
-      <button aria-current={tab === id ? "page" : undefined} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold ${tab === id ? "bg-task-accent text-white" : "text-task-text hover:bg-task-muted"}`} key={id} onClick={() => showTab(id)} type="button">
-        <Icon aria-hidden className="size-4" />{label}
-        {id === "questions" && waitingQuestions > 0 ? <span aria-label={`${waitingQuestions} waiting`} className={`rounded-full px-1.5 text-xs ${tab === id ? "bg-white text-task-accent" : "bg-task-accent text-white"}`}>{waitingQuestions}</span> : null}
-      </button>)}
-  </nav> : null;
+  const current = tabList.find(([id]) => id === tab) ?? tabList[0]!;
+  const showChat = tab === "chat" || !tabList.some(([id]) => id === tab);
+  const selectConversation = (id: string) => { if (!showChat) showTab("chat"); void openConversation(id); };
+  const startChat = () => { if (!showChat) showTab("chat"); newChat(); };
 
-  if (canAnswer && tab === "questions") {
-    return <div className="flex flex-col gap-4">
-      <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-task-border bg-task-bg px-4 py-3 sm:px-5">
-        <div className="flex items-center gap-2">
-          <MessageCircleQuestion aria-hidden className="size-6 text-task-accent" />
-          <div>
-            <h1 className="text-xl font-bold text-task-text">Questions for you</h1>
-            <p className="text-xs text-task-text-muted">Questions Kiara could not answer. The first answer goes to the employee.</p>
-          </div>
-        </div>
-        {tabs}
-      </header>
-      <section className="rounded-2xl border border-task-border bg-task-bg p-3 sm:p-4"><QuestionsForYou focusId={location.escalationId} /></section>
-    </div>;
-  }
+  // The admin areas, opened from Kiara tools. Each keeps its own permission check above.
+  const adminBody: ReactNode = canAnswer && tab === "questions" ? <QuestionsForYou focusId={location.escalationId} />
+    : canViewInsights && tab === "insights" ? <InsightsView />
+    : canManageLimits && tab === "limits" ? <LimitsView />
+    : canManageKnowledge && tab === "knowledge" ? <KnowledgeBaseView />
+    : null;
+  const adminSubtitle: Partial<Record<KiaraTab, string>> = {
+    questions: "Questions Kiara could not answer. The first answer goes to the employee.",
+    knowledge: "The SOPs and articles Kiara answers from. Employees see cited sections only, never files.",
+    insights: "What people ask Kiara about, to plan SOP training.",
+    limits: "Daily question limits, personal exceptions, and usage. Super Admin only.",
+  };
 
-  const adminTab = (Icon: LucideIcon, title: string, subtitle: string, body: ReactNode) => <div className="flex flex-col gap-4">
-    <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-task-border bg-task-bg px-4 py-3 sm:px-5">
-      <div className="flex items-center gap-2">
-        <Icon aria-hidden className="size-6 text-task-accent" />
-        <div>
-          <h1 className="text-xl font-bold text-task-text">{title}</h1>
-          <p className="text-xs text-task-text-muted">{subtitle}</p>
-        </div>
-      </div>
-      {tabs}
-    </header>
-    <section className="rounded-2xl border border-task-border bg-task-bg p-3 sm:p-4">{body}</section>
-  </div>;
+  const sidebar = <>
+    <ConversationList activeId={showChat ? activeId : null} conversations={conversations} loading={listLoading} onArchive={(id) => void archive(id)} onNew={startChat} onSelect={selectConversation} />
+    {tabList.length > 1 ? <KiaraTools current={current[0]} items={tabList.map(([id, label, Icon]) => ({ id, label, Icon, badge: id === "questions" ? waitingQuestions : 0 }))} onSelect={(id) => { setShowList(false); showTab(id); }} /> : null}
+  </>;
 
-  if (canViewInsights && tab === "insights") {
-    return adminTab(BarChart3, "Insights", "What people ask Kiara about, to plan SOP training.", <InsightsView />);
-  }
-
-  if (canManageLimits && tab === "limits") {
-    return adminTab(Gauge, "Limits", "Daily question limits, personal exceptions, and usage. Super Admin only.", <LimitsView />);
-  }
-
-  if (canManageKnowledge && tab === "knowledge") {
-    return <div className="flex flex-col gap-4">
-      <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-task-border bg-task-bg px-4 py-3 sm:px-5">
-        <div className="flex items-center gap-2">
-          <BookOpen aria-hidden className="size-6 text-task-accent" />
-          <div>
-            <h1 className="text-xl font-bold text-task-text">Knowledge base</h1>
-            <p className="text-xs text-task-text-muted">The SOPs and articles Kiara answers from. Employees see cited sections only, never files.</p>
-          </div>
-        </div>
-        {tabs}
-      </header>
-      <section className="rounded-2xl border border-task-border bg-task-bg p-3 sm:p-4"><KnowledgeBaseView /></section>
-    </div>;
-  }
-
-  return <div className="flex h-[calc(100dvh-9rem)] min-h-[28rem] flex-col gap-3 md:h-[calc(100dvh-7rem)]">
-    <header className="flex flex-wrap items-center justify-between gap-3 px-1">
-      <div className="flex items-center gap-2">
-        <Sparkles aria-hidden className="size-6 text-task-accent" />
-        <div>
-          <h1 className="text-xl font-bold text-task-text">Ask Kiara</h1>
-          <p className="text-xs text-task-text-muted">Answers use only what you can already see in JewelOS.</p>
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {tabs}
-        <QuotaChip quota={quota} />
-        <button aria-expanded={showList} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-task-border px-3 text-sm font-semibold text-task-text md:hidden" onClick={() => setShowList((open) => !open)} type="button">
-          <MessagesSquare aria-hidden className="size-4" /> Chats
-        </button>
-      </div>
-    </header>
-    {notice ? <Notice tone="danger">{notice}</Notice> : null}
-    <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-task-border bg-task-bg shadow-card">
-      <aside aria-label="Your Kiara chats" className={`${showList ? "flex" : "hidden"} w-full flex-col border-task-border bg-task-muted/60 p-3 md:flex md:w-72 md:shrink-0 md:border-r lg:w-80`}>
-        <ConversationList activeId={activeId} conversations={conversations} loading={listLoading} onArchive={(id) => void archive(id)} onNew={newChat} onSelect={(id) => void openConversation(id)} />
+  // An immersive workspace: it fills the content area edge to edge and the room
+  // left in the window, with chats on the left and the conversation beside them.
+  return <div className="relative -m-4 flex min-h-0 overflow-hidden border-t border-task-border bg-task-bg sm:-m-6 md:border-t-0" ref={workspace.ref} style={workspace.style}>
+    <aside aria-label="Your Kiara chats" className="hidden w-72 shrink-0 flex-col gap-3 border-r border-task-border bg-task-muted/50 p-3 md:flex lg:w-80">{sidebar}</aside>
+    {showList ? <div className="absolute inset-0 z-30 flex md:hidden">
+      <aside aria-label="Your Kiara chats" className="flex w-[86%] max-w-sm flex-col gap-3 border-r border-task-border bg-task-bg p-3 shadow-lift">
+        <div className="flex items-center justify-between"><p className="text-sm font-semibold text-task-text">Chats</p><button aria-label="Close chats" className="flex size-10 items-center justify-center rounded-lg text-task-text-muted hover:bg-task-muted" onClick={() => setShowList(false)} type="button"><X aria-hidden className="size-5" /></button></div>
+        {sidebar}
       </aside>
-      <section aria-label="Chat with Kiara" className={`${showList ? "hidden" : "flex"} min-w-0 flex-1 flex-col p-2 sm:p-3 md:flex`}>
+      <button aria-label="Close chats" className="flex-1 bg-obsidian/40" onClick={() => setShowList(false)} tabIndex={-1} type="button" />
+    </div> : null}
+    <section aria-label={showChat ? "Chat with Kiara" : current[1]} className="flex min-w-0 flex-1 flex-col">
+      <header className="flex min-h-12 shrink-0 items-center gap-2 border-b border-task-border px-2 py-1.5 sm:px-4">
+        <button aria-expanded={showList} aria-label="Chats" className="flex size-10 shrink-0 items-center justify-center rounded-lg text-task-text hover:bg-task-muted md:hidden" onClick={() => setShowList(true)} type="button"><MessagesSquare aria-hidden className="size-5" /></button>
+        <span aria-hidden className="flex size-7 shrink-0 items-center justify-center rounded-full bg-gold-sheen text-[11px] font-bold text-on-gold shadow-gold">K</span>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-sm font-semibold text-task-text">{showChat ? "Kiara" : current[1]}</h1>
+          <p className="truncate text-[11px] text-task-text-muted">{showChat ? "Answers use only what you can already see in JewelOS." : adminSubtitle[tab] ?? ""}</p>
+        </div>
+        {showChat ? <QuotaChip quota={quota} /> : <button className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg border border-task-border px-3 text-sm font-semibold text-task-text hover:bg-task-muted" onClick={() => showTab("chat")} type="button"><ArrowLeft aria-hidden className="size-4" />Chat</button>}
+      </header>
+      {notice ? <div className="px-3 pt-2 sm:px-4"><Notice tone="danger">{notice}</Notice></div> : null}
+      {showChat ? <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-3">
         <ChatView
           bubbles={bubbles}
           canUseVoice={canUseVoice}
@@ -343,7 +306,37 @@ export function AskKiaraPage({ onNavigate, search = window.location.search }: { 
           sending={sending}
           status={status}
         />
-      </section>
-    </div>
+      </div> : <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5">{adminBody}</div>}
+    </section>
+  </div>;
+}
+
+type KiaraToolItem = Readonly<{ id: KiaraTab; label: string; Icon: LucideIcon; badge: number }>;
+
+/** Kiara tools: the chat and the admin areas the signed-in person may open. Not the JewelOS Settings page. */
+function KiaraTools({ items, current, onSelect }: { items: readonly KiaraToolItem[]; current: KiaraTab; onSelect: (id: KiaraTab) => void }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) setOpen(false); };
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+  const waiting = items.reduce((total, item) => total + item.badge, 0);
+  return <div className="relative mt-auto border-t border-task-border pt-2" ref={rootRef}>
+    {open ? <div aria-label="Kiara tools" className="absolute bottom-full left-0 right-0 mb-2 rounded-xl border border-task-border bg-task-bg p-1 shadow-lift" id="kiara-tools" role="menu">
+      {items.map(({ id, label, Icon, badge }) => <button aria-current={current === id ? "page" : undefined} className={`flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-medium ${current === id ? "bg-task-accent-soft text-task-text" : "text-task-text hover:bg-task-muted"}`} key={id} onClick={() => { setOpen(false); onSelect(id); }} role="menuitem" type="button">
+        <Icon aria-hidden className="size-4 shrink-0 text-task-text-muted" /><span className="flex-1">{label}</span>
+        {badge > 0 ? <span aria-label={`${badge} waiting`} className="rounded-full bg-task-accent px-1.5 text-xs text-white">{badge}</span> : null}
+      </button>)}
+    </div> : null}
+    <button aria-controls="kiara-tools" aria-expanded={open} aria-haspopup="menu" className="flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-semibold text-task-text hover:bg-task-muted" onClick={() => setOpen((value) => !value)} type="button">
+      <Settings2 aria-hidden className="size-4 text-task-text-muted" /><span className="flex-1">Kiara tools</span>
+      {waiting > 0 ? <span aria-label={`${waiting} open questions for you`} className="rounded-full bg-task-accent px-1.5 text-xs text-white">{waiting}</span> : null}
+      <ChevronUp aria-hidden className={`size-4 text-task-text-muted transition-transform ${open ? "" : "rotate-180"}`} />
+    </button>
   </div>;
 }
