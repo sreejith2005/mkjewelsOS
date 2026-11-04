@@ -243,8 +243,8 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     path: "/dropdown-master",
     summary: "Dropdown Master is the one shared set of option lists used across JewelOS: Forms, FMS, Tasks, Users, Leave and CRM all read the same lists.",
     recipes: [
-      "See every list: Dropdown Master opens on all lists with totals (Lists, Options, Made here, Made in forms, Built-in, Used by forms). Each card shows its active options, how many forms use it and when it was created. Use \"Search lists and options\" or the buttons \"All lists\", \"Made here\", \"Made in forms\" and \"Built-in\" to narrow them.",
-      "Open a list: tap its card. The list shows \"Used in forms\" and its options; \"All lists\" goes back.",
+      "See every list: Dropdown Master opens on all lists with totals (Lists, Options, Made here, Made in forms, Built-in, Used by forms). Each list row shows its active options, how many forms use it and when it was created. Use \"Search lists and options\" or the buttons \"All lists\", \"Made here\", \"Made in forms\" and \"Built-in\" to narrow them.",
+      "Open a list: tap it. On a computer the lists stay on the left and the open list's options on the right; on a phone the list opens on its own screen and \"All lists\" goes back. The open list shows \"Used in forms\" and its options.",
       "Add an option: open the list and press \"Add item\".",
       "Create a list: press \"New list\", type the list name and its first item.",
       "Hide an option without losing saved answers: open the list and press the eye button (\"Turn off\"). Press it again to turn it back on.",

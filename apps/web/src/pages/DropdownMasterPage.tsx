@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useMediaQuery } from "@/lib/useMediaQuery";
+import { useFillViewport } from "@/lib/useFillViewport";
 import { ArrowLeft, Eye, EyeOff, FileText, ListFilter, Pencil, Plus, Search } from "lucide-react";
 import { supabase } from "@jewelos/api-client";
 import { useAuth } from "@/auth/AuthContext";
@@ -182,6 +183,9 @@ export function DropdownMasterPage() {
   };
 
   const wide = useMediaQuery("(min-width: 1280px)");
+  const panes = useFillViewport<HTMLDivElement>({ enabled: wide, minHeight: 420 });
+  /** "New list" starts a list even while another list is open. */
+  const [newList, setNewList] = useState(false);
   if (!hasPermission(access, "dropdowns.manage")) {
     return <Notice tone="danger">Changing dropdown values requires the Dropdown Master permission. The database rejects writes from everyone else.</Notice>;
   }
@@ -190,85 +194,67 @@ export function DropdownMasterPage() {
   const currentOrigin = category ? listOrigin(category, currentRows, insights) : null;
   const currentForms = category ? insights.usedBy.get(category) ?? [] : [];
 
-  return (
-    <section className="mx-auto w-full max-w-[110rem]">
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3"><span className="rounded-xl bg-gold-sheen p-2.5 text-on-gold shadow-gold"><ListFilter className="h-5 w-5" /></span><div><h1 className="font-display text-[1.85rem] font-semibold leading-tight sm:text-[2.1rem] text-gold-secondary">Dropdown Master</h1><p className="text-sm text-soft-grey">One shared set of lists for Forms, FMS, Tasks, Users and CRM</p></div></div>
-        <Button className="w-full sm:w-auto" onClick={() => setEditing(null)}><Plus className="h-4 w-4" />{category ? "Add item" : "New list"}</Button>
-      </header>
-      {error ? <div className="mb-5"><Notice tone="danger">{error}</Notice><Button className="mt-3" onClick={() => void load()} variant="secondary">Retry</Button></div> : null}
+  const statLine = <p className="text-xs text-soft-grey tabular-nums">{[["lists", totals.lists], ["options", totals.options], ["made here", totals.madeHere], ["made in forms", totals.madeInForms], ["built-in", totals.builtIn], ["used by forms", totals.usedByForms]].map(([label, value]) => `${value} ${label}`).join(" · ")}</p>;
+  const listTools = <div className="space-y-2">
+    <label className="relative block"><Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-soft-grey" /><input aria-label="Search lists and options" className="field pl-9" onChange={(event) => setListSearch(event.target.value)} placeholder="Search lists and options" type="search" value={listSearch} /></label>
+    <div className="scroll-x no-scrollbar flex gap-1.5" role="group" aria-label="Filter lists by origin">{ORIGIN_FILTERS.map((filter) => <button aria-pressed={originFilter === filter.value} className={`min-h-9 shrink-0 rounded-full border px-3 text-xs font-medium ${originFilter === filter.value ? "border-gold bg-gold/15 text-gold-secondary" : "border-task-border text-soft-grey hover:text-champagne"}`} key={filter.value} onClick={() => setOriginFilter(filter.value)} type="button">{filter.label}</button>)}</div>
+    {!insights.complete ? <p className="text-xs text-soft-grey">Some details (where a list came from or which forms use it) could not be loaded. The lists themselves are complete.</p> : null}
+  </div>;
+  // One compact row per list; the open one is highlighted.
+  const listRows = loading ? <p className="py-10 text-center text-gold-secondary">Loading dropdowns…</p> : summaries.length === 0 ? <p className="p-10 text-center text-soft-grey">No lists match.</p> : (
+    <ul className="divide-y divide-task-border">{summaries.map((list) => <li key={list.key}>
+      <button aria-current={category === list.key ? "true" : undefined} aria-label={`Open ${titleCase(list.key)}`} className={`relative flex w-full flex-col gap-0.5 px-4 py-2.5 text-left transition-colors hover:bg-gold/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold ${category === list.key ? "bg-gold/10 before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-full before:bg-gold" : ""}`} onClick={() => setCategory(list.key)} type="button">
+        <span className="flex w-full items-center justify-between gap-2"><span className="min-w-0 truncate text-sm font-semibold text-white">{titleCase(list.key)}</span>{originBadge(list.origin)}</span>
+        <span className="text-xs text-soft-grey">{list.active} active{list.total > list.active ? ` · ${list.total - list.active} off` : ""}{list.forms ? ` · used in ${list.forms} form${list.forms === 1 ? "" : "s"}` : ""}{list.createdAt ? ` · created ${formatDate(list.createdAt)}` : ""}</span>
+        {list.matches.length ? <span className="truncate text-xs text-gold-secondary">Matches: {list.matches.slice(0, 4).join(", ")}{list.matches.length > 4 ? "…" : ""}</span> : null}
+      </button>
+    </li>)}</ul>
+  );
+  const detailHead = category === null ? null : <div className="space-y-2 border-b border-task-border px-4 py-3">
+    <div className="flex flex-wrap items-center gap-2"><h2 className="min-w-0 flex-1 truncate font-display text-lg font-semibold text-champagne">{titleCase(category)}</h2>{currentOrigin ? originBadge(currentOrigin) : null}<Button className="min-h-10" onClick={() => { setNewList(false); setEditing(null); }}><Plus className="h-4 w-4" />Add item</Button></div>
+    {currentForms.length ? <div className="flex flex-wrap items-center gap-1.5"><span className="text-xs font-semibold uppercase tracking-wide text-soft-grey">Used in forms</span>{currentForms.map((form) => <span className="inline-flex items-center gap-1 rounded-full bg-gold/10 px-2.5 py-0.5 text-xs text-champagne" key={form.formTemplateId} title={`Questions: ${form.questions.join(", ")}`}><FileText className="size-3" />{form.name}{form.lifecycle === "draft" ? " (draft)" : ""}</span>)}</div>
+      : <p className="text-xs text-soft-grey">No form questions use this list yet. It may still be used by Tasks, Users, Leave or CRM.</p>}
+    <div className="flex flex-wrap items-center gap-2"><label className="relative min-w-[12rem] flex-1"><Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-soft-grey" /><input aria-label="Search this list" className="field pl-9" onChange={(event) => setSearch(event.target.value)} placeholder="Search label or code" type="search" value={search} /></label><select aria-label="Status" className="field w-auto" onChange={(event) => setStatus(event.target.value as typeof status)} value={status}><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select><span className="text-xs text-soft-grey tabular-nums">{counts.total} total · <span className="text-success">{counts.active} active</span> · {counts.inactive} inactive</span></div>
+  </div>;
+  // Options as compact rows: order, label and code, status, then Edit and on/off in one place.
+  const optionRows = category === null ? null : loading ? <p className="py-10 text-center text-gold-secondary">Loading dropdowns…</p> : categoryItems.length === 0 ? <p className="p-10 text-center text-soft-grey">No items in {titleCase(category)} yet.</p> : (
+    <ul className="divide-y divide-task-border">{categoryItems.map((item) => <li className={`flex items-center gap-3 px-4 py-2 ${item.is_active === false ? "opacity-60" : ""}`} key={item.id}>
+      <span className="w-8 shrink-0 text-center text-xs font-semibold text-gold-secondary tabular-nums">{item.sort_order ?? 0}</span>
+      <div className="min-w-0 flex-1"><h3 className="break-words text-sm font-semibold text-white">{item.label}</h3><p className="truncate font-mono text-xs text-soft-grey">{item.value}</p></div>
+      <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] uppercase ${item.is_active === false ? "bg-soft-grey/10 text-soft-grey" : "bg-success/10 text-success"}`}>{item.is_active === false ? "Inactive" : "Active"}</span>
+      <div className="flex shrink-0 gap-1"><Button aria-label={`Edit ${item.label}`} className="size-10 min-h-10 p-0" onClick={() => setEditing(item)} variant="ghost"><Pencil className="h-4 w-4" /></Button>{item.is_active === false
+        ? <Button aria-label={`Turn on ${item.label}`} className="size-10 min-h-10 p-0" onClick={() => void toggleActive(item)} variant="ghost"><Eye className="h-4 w-4" /></Button>
+        : <Button aria-label={`Turn off ${item.label}`} className="size-10 min-h-10 p-0" onClick={() => void toggleActive(item)} variant="ghost"><EyeOff className="h-4 w-4 text-danger" /></Button>}</div>
+    </li>)}</ul>
+  );
 
-      {/* Wide screens: the lists stay on the left and the open list on the right, so moving between lists needs no back-and-forth. */}
-      {wide ? <div className="grid items-start gap-5 xl:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]">
-        <div className="min-w-0">
-        <div className="mb-4 grid grid-cols-3 gap-2">
-          {[["Lists", totals.lists], ["Options", totals.options], ["Made here", totals.madeHere], ["Made in forms", totals.madeInForms], ["Built-in", totals.builtIn], ["Used by forms", totals.usedByForms]].map(([label, value]) => <div className="rounded-lg border border-gold/20 bg-obsidian px-4 py-3" key={label}><p className="text-xl font-bold text-gold-secondary">{value}</p><p className="text-xs text-soft-grey">{label}</p></div>)}
+  return (
+    <section className="w-full">
+      <header className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3"><span className="rounded-xl bg-gold-sheen p-2 text-on-gold shadow-gold"><ListFilter className="h-5 w-5" /></span><div className="min-w-0"><h1 className="font-display text-[1.6rem] font-semibold leading-tight text-gold-secondary sm:text-[1.85rem]">Dropdown Master</h1>{statLine}</div></div>
+        {wide || category === null ? <Button className="w-full sm:w-auto" onClick={() => { setNewList(true); setEditing(null); }}><Plus className="h-4 w-4" />New list</Button> : null}
+      </header>
+      {error ? <div className="mb-3"><Notice tone="danger">{error}</Notice><Button className="mt-3" onClick={() => void load()} variant="secondary">Retry</Button></div> : null}
+
+      {/* Wide screens: two panes that fill the window and scroll on their own, so switching lists never means scrolling back up. */}
+      {wide ? <div className="-mx-4 grid grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)] border-y border-task-border bg-task-bg sm:-mx-6" ref={panes.ref} style={panes.style}>
+        <div className="flex min-h-0 flex-col border-r border-task-border">
+          <div className="border-b border-task-border p-3">{listTools}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{listRows}</div>
         </div>
-        <div className="glass-card mb-5 space-y-3 rounded-xl p-4">
-          <label className="relative block"><Search className="absolute left-3 top-3 h-4 w-4 text-soft-grey" /><input aria-label="Search lists and options" className="field pl-9" onChange={(event) => setListSearch(event.target.value)} placeholder="Search lists and options" value={listSearch} /></label>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Filter lists by origin">{ORIGIN_FILTERS.map((filter) => <button aria-pressed={originFilter === filter.value} className={`min-h-10 rounded-full border px-3 text-sm ${originFilter === filter.value ? "border-gold bg-gold/15 text-gold-secondary" : "border-gold/20 text-soft-grey hover:text-champagne"}`} key={filter.value} onClick={() => setOriginFilter(filter.value)} type="button">{filter.label}</button>)}</div>
-          {!insights.complete ? <p className="text-xs text-soft-grey">Some details (where a list came from or which forms use it) could not be loaded. The lists themselves are complete.</p> : null}
-        </div>
-        {loading ? <p className="py-10 text-center text-gold-secondary">Loading dropdowns…</p> : summaries.length === 0 ? <div className="glass-card rounded-xl p-10 text-center text-soft-grey">No lists match.</div> : (
-          <ul className="grid gap-2">{summaries.map((list) => <li key={list.key}>
-            <button aria-current={category === list.key ? "true" : undefined} aria-label={`Open ${titleCase(list.key)}`} className={`glass-card flex h-full w-full flex-col gap-1 rounded-xl px-4 py-3 text-left transition hover:border-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${category === list.key ? "border-gold bg-gold/10" : ""}`} onClick={() => setCategory(list.key)} type="button">
-              <div className="flex w-full items-start justify-between gap-2"><h2 className="min-w-0 break-words font-semibold text-white">{titleCase(list.key)}</h2>{originBadge(list.origin)}</div>
-              <p className="text-sm text-soft-grey">{list.active} active{list.total > list.active ? ` · ${list.total - list.active} off` : ""}{list.forms ? ` · used in ${list.forms} form${list.forms === 1 ? "" : "s"}` : ""}</p>
-              {list.createdAt ? <p className="text-xs text-soft-grey">Created {formatDate(list.createdAt)}</p> : null}
-              {list.matches.length ? <p className="truncate text-xs text-gold-secondary">Matches: {list.matches.slice(0, 4).join(", ")}{list.matches.length > 4 ? "…" : ""}</p> : null}
-            </button>
-          </li>)}</ul>
-        )}
-        </div>
-        <div className="min-w-0">{category === null ? <div className="glass-card rounded-xl p-10 text-center text-soft-grey">Select a list to see and edit its options.</div> : <>
-        <div className="glass-card mb-5 rounded-xl p-4">
-          <div className="mb-3 flex flex-wrap items-center gap-2"><h2 className="font-display text-xl font-semibold text-champagne">{titleCase(category)}</h2>{currentOrigin ? originBadge(currentOrigin) : null}</div>
-          {currentForms.length ? <div className="mb-3"><p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-soft-grey">Used in forms</p><ul className="flex flex-wrap gap-1.5">{currentForms.map((form) => <li className="inline-flex items-center gap-1 rounded-full bg-gold/10 px-2.5 py-1 text-xs text-champagne" key={form.formTemplateId} title={`Questions: ${form.questions.join(", ")}`}><FileText className="size-3" />{form.name}{form.lifecycle === "draft" ? " (draft)" : ""}</li>)}</ul></div>
-            : <p className="mb-3 text-xs text-soft-grey">No form questions use this list yet. It may still be used by Tasks, Users, Leave or CRM.</p>}
-          <div className="mb-3 grid gap-3 sm:grid-cols-2"><label className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-soft-grey" /><input aria-label="Search this list" className="field pl-9" onChange={(event) => setSearch(event.target.value)} placeholder="Search label or code" value={search} /></label><select aria-label="Status" className="field" onChange={(event) => setStatus(event.target.value as typeof status)} value={status}><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
-          <div className="grid grid-cols-3 gap-2 sm:flex sm:gap-3"><div className="rounded-lg border border-gold/20 bg-obsidian px-4 py-3"><p className="text-xl font-bold text-gold-secondary">{counts.total}</p><p className="text-xs text-soft-grey">Total</p></div><div className="rounded-lg border border-success/30 bg-success/5 px-4 py-3"><p className="text-xl font-bold text-success">{counts.active}</p><p className="text-xs text-soft-grey">Active</p></div><div className="rounded-lg border border-soft-grey/20 px-4 py-3"><p className="text-xl font-bold text-soft-grey">{counts.inactive}</p><p className="text-xs text-soft-grey">Inactive</p></div></div>
-        </div>
-        {loading ? <p className="py-10 text-center text-gold-secondary">Loading dropdowns…</p> : categoryItems.length === 0 ? <div className="glass-card rounded-xl p-10 text-center text-soft-grey">No items in {titleCase(category)} yet.</div> : (
-          <div className="space-y-3">{categoryItems.map((item) => <article className={`glass-card flex flex-wrap items-center gap-3 rounded-xl p-4 sm:flex-nowrap sm:gap-4 ${item.is_active === false ? "opacity-50" : ""}`} key={item.id}><span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gold/10 text-sm font-bold text-gold-secondary">{item.sort_order ?? 0}</span><div className="min-w-0 flex-1"><h3 className="break-words font-semibold text-white">{item.label}</h3><p className="truncate font-mono text-xs text-soft-grey">{item.value}</p></div><span className={`shrink-0 rounded px-2 py-1 text-[10px] uppercase ${item.is_active === false ? "bg-soft-grey/10 text-soft-grey" : "bg-success/10 text-success"}`}>{item.is_active === false ? "Inactive" : "Active"}</span><div className="ml-auto flex shrink-0 gap-2"><Button aria-label={`Edit ${item.label}`} className="size-11 min-h-11 p-0" onClick={() => setEditing(item)} variant="secondary"><Pencil className="h-4 w-4" /></Button>{item.is_active === false
-            ? <Button aria-label={`Turn on ${item.label}`} className="size-11 min-h-11 p-0" onClick={() => void toggleActive(item)} variant="secondary"><Eye className="h-4 w-4" /></Button>
-            : <Button aria-label={`Turn off ${item.label}`} className="size-11 min-h-11 p-0" onClick={() => void toggleActive(item)} variant="danger"><EyeOff className="h-4 w-4" /></Button>}</div></article>)}</div>
-        )}
+        <div className="flex min-h-0 min-w-0 flex-col">{category === null ? <p className="m-auto p-10 text-center text-soft-grey">Select a list to see and edit its options.</p> : <>
+          {detailHead}
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{optionRows}</div>
         </>}</div>
-      </div> : category === null ? <>
-        <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-          {[["Lists", totals.lists], ["Options", totals.options], ["Made here", totals.madeHere], ["Made in forms", totals.madeInForms], ["Built-in", totals.builtIn], ["Used by forms", totals.usedByForms]].map(([label, value]) => <div className="rounded-lg border border-gold/20 bg-obsidian px-4 py-3" key={label}><p className="text-xl font-bold text-gold-secondary">{value}</p><p className="text-xs text-soft-grey">{label}</p></div>)}
-        </div>
-        <div className="glass-card mb-5 space-y-3 rounded-xl p-4">
-          <label className="relative block"><Search className="absolute left-3 top-3 h-4 w-4 text-soft-grey" /><input aria-label="Search lists and options" className="field pl-9" onChange={(event) => setListSearch(event.target.value)} placeholder="Search lists and options" value={listSearch} /></label>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Filter lists by origin">{ORIGIN_FILTERS.map((filter) => <button aria-pressed={originFilter === filter.value} className={`min-h-10 rounded-full border px-3 text-sm ${originFilter === filter.value ? "border-gold bg-gold/15 text-gold-secondary" : "border-gold/20 text-soft-grey hover:text-champagne"}`} key={filter.value} onClick={() => setOriginFilter(filter.value)} type="button">{filter.label}</button>)}</div>
-          {!insights.complete ? <p className="text-xs text-soft-grey">Some details (where a list came from or which forms use it) could not be loaded. The lists themselves are complete.</p> : null}
-        </div>
-        {loading ? <p className="py-10 text-center text-gold-secondary">Loading dropdowns…</p> : summaries.length === 0 ? <div className="glass-card rounded-xl p-10 text-center text-soft-grey">No lists match.</div> : (
-          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{summaries.map((list) => <li key={list.key}>
-            <button aria-current={category === list.key ? "true" : undefined} aria-label={`Open ${titleCase(list.key)}`} className="glass-card flex h-full w-full flex-col gap-2 rounded-xl p-4 text-left transition hover:border-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold" onClick={() => setCategory(list.key)} type="button">
-              <div className="flex w-full items-start justify-between gap-2"><h2 className="min-w-0 break-words font-semibold text-white">{titleCase(list.key)}</h2>{originBadge(list.origin)}</div>
-              <p className="text-sm text-soft-grey">{list.active} active{list.total > list.active ? ` · ${list.total - list.active} off` : ""}{list.forms ? ` · used in ${list.forms} form${list.forms === 1 ? "" : "s"}` : ""}</p>
-              {list.createdAt ? <p className="text-xs text-soft-grey">Created {formatDate(list.createdAt)}</p> : null}
-              {list.matches.length ? <p className="truncate text-xs text-gold-secondary">Matches: {list.matches.slice(0, 4).join(", ")}{list.matches.length > 4 ? "…" : ""}</p> : null}
-            </button>
-          </li>)}</ul>
-        )}
-      </> : <>
-        <Button className="mb-4" onClick={() => setCategory(null)} variant="secondary"><ArrowLeft className="h-4 w-4" />All lists</Button>
-        <div className="glass-card mb-5 rounded-xl p-4">
-          <div className="mb-3 flex flex-wrap items-center gap-2"><h2 className="font-display text-xl font-semibold text-champagne">{titleCase(category)}</h2>{currentOrigin ? originBadge(currentOrigin) : null}</div>
-          {currentForms.length ? <div className="mb-3"><p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-soft-grey">Used in forms</p><ul className="flex flex-wrap gap-1.5">{currentForms.map((form) => <li className="inline-flex items-center gap-1 rounded-full bg-gold/10 px-2.5 py-1 text-xs text-champagne" key={form.formTemplateId} title={`Questions: ${form.questions.join(", ")}`}><FileText className="size-3" />{form.name}{form.lifecycle === "draft" ? " (draft)" : ""}</li>)}</ul></div>
-            : <p className="mb-3 text-xs text-soft-grey">No form questions use this list yet. It may still be used by Tasks, Users, Leave or CRM.</p>}
-          <div className="mb-3 grid gap-3 sm:grid-cols-2"><label className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-soft-grey" /><input aria-label="Search this list" className="field pl-9" onChange={(event) => setSearch(event.target.value)} placeholder="Search label or code" value={search} /></label><select aria-label="Status" className="field" onChange={(event) => setStatus(event.target.value as typeof status)} value={status}><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
-          <div className="grid grid-cols-3 gap-2 sm:flex sm:gap-3"><div className="rounded-lg border border-gold/20 bg-obsidian px-4 py-3"><p className="text-xl font-bold text-gold-secondary">{counts.total}</p><p className="text-xs text-soft-grey">Total</p></div><div className="rounded-lg border border-success/30 bg-success/5 px-4 py-3"><p className="text-xl font-bold text-success">{counts.active}</p><p className="text-xs text-soft-grey">Active</p></div><div className="rounded-lg border border-soft-grey/20 px-4 py-3"><p className="text-xl font-bold text-soft-grey">{counts.inactive}</p><p className="text-xs text-soft-grey">Inactive</p></div></div>
-        </div>
-        {loading ? <p className="py-10 text-center text-gold-secondary">Loading dropdowns…</p> : categoryItems.length === 0 ? <div className="glass-card rounded-xl p-10 text-center text-soft-grey">No items in {titleCase(category)} yet.</div> : (
-          <div className="space-y-3">{categoryItems.map((item) => <article className={`glass-card flex flex-wrap items-center gap-3 rounded-xl p-4 sm:flex-nowrap sm:gap-4 ${item.is_active === false ? "opacity-50" : ""}`} key={item.id}><span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gold/10 text-sm font-bold text-gold-secondary">{item.sort_order ?? 0}</span><div className="min-w-0 flex-1"><h3 className="break-words font-semibold text-white">{item.label}</h3><p className="truncate font-mono text-xs text-soft-grey">{item.value}</p></div><span className={`shrink-0 rounded px-2 py-1 text-[10px] uppercase ${item.is_active === false ? "bg-soft-grey/10 text-soft-grey" : "bg-success/10 text-success"}`}>{item.is_active === false ? "Inactive" : "Active"}</span><div className="ml-auto flex shrink-0 gap-2"><Button aria-label={`Edit ${item.label}`} className="size-11 min-h-11 p-0" onClick={() => setEditing(item)} variant="secondary"><Pencil className="h-4 w-4" /></Button>{item.is_active === false
-            ? <Button aria-label={`Turn on ${item.label}`} className="size-11 min-h-11 p-0" onClick={() => void toggleActive(item)} variant="secondary"><Eye className="h-4 w-4" /></Button>
-            : <Button aria-label={`Turn off ${item.label}`} className="size-11 min-h-11 p-0" onClick={() => void toggleActive(item)} variant="danger"><EyeOff className="h-4 w-4" /></Button>}</div></article>)}</div>
-        )}
-      </>}
-      {editing !== undefined ? <DropdownEditor category={category} existingLists={listKeys} item={editing} onClose={() => setEditing(undefined)} onSaved={async (list) => { await load(); if (!category) setCategory(list); }} /> : null}
+      </div> : category === null ? <div className="-mx-4 border-y border-task-border bg-task-bg sm:-mx-6">
+        <div className="border-b border-task-border p-3">{listTools}</div>
+        {listRows}
+      </div> : <div className="-mx-4 border-y border-task-border bg-task-bg sm:-mx-6">
+        <div className="px-2 pt-2"><Button className="min-h-10 px-2" onClick={() => setCategory(null)} variant="ghost"><ArrowLeft className="h-4 w-4" />All lists</Button></div>
+        {detailHead}
+        {optionRows}
+      </div>}
+      {editing !== undefined ? <DropdownEditor category={newList ? null : category} existingLists={listKeys} item={editing} onClose={() => setEditing(undefined)} onSaved={async (list) => { await load(); if (newList || !category) setCategory(list); }} /> : null}
     </section>
   );
 }
