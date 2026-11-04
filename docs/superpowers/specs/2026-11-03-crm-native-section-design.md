@@ -83,6 +83,13 @@ Now:
   questions by type and wording (`clientAutofill.ts`) and, for people with CRM access, fills the
   questions it recognises from CRM (`createCrmClientLookup`, through the login bridge). The
   walk-in link gives its Salesperson / CRM questions the branch lists. Saved widths are ignored.
+- **Client history from every form (2026-11-04, owner request)**: JewelOS 0376 gives a submitted
+  form with a client phone answer and no own mapping an automatic "history only" mapping
+  (descriptor.automatic; phone -> primary_phone identity, every other answer history) through the
+  existing customer events pipeline; the author's screens ignore automatic mappings. CRM
+  20261104000200 approves such mappings on registration, attaches to existing clients only,
+  never projects profile values from them, and skips (outcome rejected, reason automatic_*) when
+  no client matches or the branch may not be written, without the identity review queue.
 - **Form Builder addition (withdrawn 2026-11-04)**: question width (`validation.width`: full, half, third) for
   side-by-side questions on wider screens; phones keep one question per row.
 
