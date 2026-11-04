@@ -1,6 +1,6 @@
 import { FmsStartingForm } from "@/features/forms/FmsStartingForm";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { AlertTriangle, Archive, BookOpen, ChevronRight, ClipboardList, Contact, Copy, FileText, History, Pencil, Plus, Search, Send, Trash2, Workflow } from "lucide-react";
+import { AlertTriangle, Archive, ArrowLeft, BookOpen, ChevronRight, ClipboardList, Contact, Copy, FileText, History, Pencil, Plus, Search, Send, Trash2, Workflow } from "lucide-react";
 import { formatKolkataDateTime, groupFormSubmissions, groupFmsBuiltForms, type FmsBuiltForm, formMatchesLifecycle, hasPermission, presentFormSubmission, WORK_UPLOAD_FORM_NAME, type FormMasterOption, type SubmissionRecord, type SubmissionTemplate } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Modal, Notice } from "@/components/ui";
@@ -13,6 +13,7 @@ import { type DynamicOptions } from "@/features/forms/FormRenderer";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/lib/useMediaQuery";
+import { useFillViewport } from "@/lib/useFillViewport";
 import { CRM_FORM_PURPOSE_LABELS, type CrmFormPurpose } from "@jewelos/core";
 import { crmFormFillPath, loadCrmLinkedFamilies } from "@/features/crm/crmFormLinks";
 
@@ -30,6 +31,7 @@ export function FormsPage() {
   /** The form family whose versions and actions are open; wide screens show it beside the list. */
   const [selectedFamily, setSelectedFamily] = useState<string | null>(null);
   const sideDetails = useMediaQuery("(min-width: 1280px)");
+  const panes = useFillViewport<HTMLDivElement>({ enabled: sideDetails, minHeight: 420 });
   const starter = useMemo(() => { const params = new URLSearchParams(window.location.search); const id = params.get("fmsStarter"); const formTemplateId = params.get("form"); return id && formTemplateId ? { id, formTemplateId } : null; }, []);
   const selectedSubmissionId=new URLSearchParams(window.location.search).get("submission_id");
   const canSeeCrm = hasPermission(access, "crm.view");
@@ -76,6 +78,7 @@ export function FormsPage() {
   const sidePanel = sideDetails && author && tab === "templates";
   const selectedVersions = sidePanel ? shownFamilies.find((versions) => versions[0]!.family_id === selectedFamily) ?? shownFamilies[0] : undefined;
   const selectedId = sidePanel ? selectedVersions?.[0]!.family_id ?? null : selectedFamily;
+  const narrowVersions = sidePanel ? undefined : shownFamilies.find((versions) => versions[0]!.family_id === selectedFamily);
   const sourceNote = source === "library" ? null : source === "crm" ? `Forms CRM uses to register people: ${[...new Set(crmForms.values())].map((purpose) => CRM_FORM_PURPOSE_LABELS[purpose].toLowerCase()).join(", ")}. ${author ? "Edit and publish them here like any form; CRM uses each new published version. Choose which form CRM uses in CRM → REGISTRATION → CRM FORM SETTINGS." : ""} Fill form opens CRM registration.` : author ? "Questions built inside FMS workflow steps. People fill them through their workflow. To change one, open the workflow in FMS and edit that step's Questions & Form, so the workflow uses the new version." : "Forms that belong to FMS workflows. You fill them from Tasks → FMS when a step is assigned to you.";
   const libraryActions: LibraryActions = { author, built, onVisibilitySaved: refresh, onVisibilityError: setError, onFill: fillForm, onEdit: setEdit, onPublish: runPublish, onPublishAsNew: runPublishAsNew, onCreateVersion: runCreateVersion, onDelete: setRemove, onArchive: (id) => void archiveForm(id).then(refresh).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Archive failed")), onEditPublished: (id) => { const form = data?.bundles.find((item) => item.id === id); if (form?.lifecycle === "published") setEdit(form); else setError("Archived forms cannot be edited."); } };
   const list = !data ? <div className="grid gap-2"><div className="skeleton h-16 rounded-xl" /><div className="skeleton h-16 rounded-xl" /><div className="skeleton h-16 rounded-xl" /></div>
@@ -101,13 +104,14 @@ export function FormsPage() {
       {built && sourceNote ? <p className="px-1 text-xs leading-relaxed text-task-text-muted">{sourceNote}</p> : null}
     </div> : null}
     {error ? <div className="mb-4"><Notice tone="danger">{error === "Publish form: Form version is pinned by an active FMS stage" ? "This version is in an active FMS stage. Use Publish as separate form to preserve in-progress work and publish your edited copy." : error} <button className="underline" onClick={() => void refresh()} type="button">Retry</button></Notice></div> : null}
-    {sidePanel && data ? <div className="grid grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)] items-start gap-5">
-      <div className="min-w-0">{list}</div>
-      <aside aria-label="Selected form" className="sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto overscroll-contain rounded-2xl border border-task-border bg-task-bg p-4 shadow-card">
+    {sidePanel && data ? <div className="-mx-4 grid grid-cols-[minmax(0,1fr)_minmax(22rem,30rem)] border-y border-task-border bg-task-bg sm:-mx-6" ref={panes.ref} style={panes.style}>
+      <div className="min-h-0 min-w-0 overflow-y-auto overscroll-contain">{list}</div>
+      <aside aria-label="Selected form" className="min-h-0 overflow-y-auto overscroll-contain border-l border-task-border bg-task-muted/30 p-4 sm:p-5">
         {selectedVersions ? <><div className="mb-3 flex items-start gap-3"><span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-xl bg-gold/10 text-gold-secondary"><FileText className="size-5" /></span><div className="min-w-0"><h2 className="break-words text-lg font-semibold leading-snug text-task-text">{selectedVersions[0]!.name}</h2><p className="text-xs text-task-text-muted">{plural(selectedVersions.length, "version")}</p></div></div><FormFamilyDetails {...libraryActions} placeText={fmsPlaceText(undefined, built?.get(selectedVersions[0]!.family_id))} versions={selectedVersions} /></> : <p className="text-sm text-task-text-muted">Select a form to see its versions and actions.</p>}
       </aside>
     </div> : list}
   </section>
+  {!sidePanel && author && tab === "templates" && narrowVersions ? <Modal mobileFullscreen onClose={() => setSelectedFamily(null)} title={narrowVersions[0]!.name} wide><div className="space-y-3"><Button className="-ml-2 min-h-10 px-2" onClick={() => setSelectedFamily(null)} type="button" variant="ghost"><ArrowLeft className="size-4" />Back to forms</Button><p className="text-xs text-task-text-muted">{plural(narrowVersions.length, "version")}</p><FormFamilyDetails {...libraryActions} placeText={fmsPlaceText(undefined, built?.get(narrowVersions[0]!.family_id))} versions={narrowVersions} /></div></Modal> : null}
   {fill ? <Modal mobileFullscreen onClose={() => setFill(null)} title={fill.name} stickyHeader wide><div className="mx-auto max-w-2xl"><FmsStartingForm formId={fill.id} {...(starter ? { starterAssignmentId: starter.id } : {})} onSaved={refresh} definition={{ name: fill.name, description: fill.description ?? undefined, sections: fill.sections, fields: fill.fields }} dynamicOptions={options} initialAnswers={fill.name === WORK_UPLOAD_FORM_NAME ? { ...(new URLSearchParams(window.location.search).get("referenceNumber") ? { reference_number: new URLSearchParams(window.location.search).get("referenceNumber")! } : {}), ...(options.users.some((user) => user.id === profile.id) ? { crm_follow_up: profile.id } : {}) } : {}} templateId={fill.id} /></div></Modal> : null}
   {remove ? <DeleteFormDialog form={remove} onCancel={() => setRemove(null)} onDeleted={(impact) => { setRemove(null); setRemoved(impact); void refresh(); }} /> : null}
   {removed ? <DeletedFormSummary impact={removed} onClose={() => setRemoved(null)} /> : null}
@@ -145,9 +149,10 @@ function fmsPlaceText(where: FmsFormPlace | undefined, fms: FmsBuiltForm | undef
  * row. Versions, permissions and the less frequent actions open on demand.
  */
 function FormLibraryList({ families, place, emptyText, selectedId, onSelect, inlineDetails, ...actions }: LibraryListProps) {
+  // inlineDetails: the row opens the full-screen details view instead of the side pane.
   if (families.length === 0) return <Notice>{emptyText}</Notice>;
   const { author, built, onFill, onEdit } = actions;
-  return <div className="overflow-hidden rounded-2xl border border-task-border bg-task-bg shadow-card"><ul className="divide-y divide-task-border">{families.map((versions) => {
+  return <div className={inlineDetails && !place ? "-mx-4 border-y border-task-border bg-task-bg sm:-mx-6" : inlineDetails ? "overflow-hidden rounded-xl border border-task-border bg-task-bg" : ""}><ul className="divide-y divide-task-border border-b border-task-border">{families.map((versions) => {
     const latest = versions[0]!;
     const live = versions.find((item) => item.lifecycle === "published");
     const shown = live ?? latest;
@@ -157,14 +162,13 @@ function FormLibraryList({ families, place, emptyText, selectedId, onSelect, inl
     const draft = versions.find((item) => item.lifecycle === "draft");
     const submissions = versions.reduce((total, item) => total + (item.submissionCount ?? 0), 0);
     const selected = selectedId === latest.family_id;
-    const detailsId = `form-details-${latest.family_id}`;
     return <li key={latest.family_id}><article className={cn("transition-colors", selected && "bg-gold/5")}>
       <div className="relative flex min-h-16 items-center gap-3 px-3 py-2.5 sm:px-4">
         <span aria-hidden="true" className={cn("hidden size-9 shrink-0 place-items-center rounded-lg sm:grid", selected ? "bg-gold/20 text-gold-secondary" : "bg-gold/10 text-gold-secondary")}><FileText className="size-4" /></span>
         {author ? <div className="group min-w-0 flex-1">
           <FormRowText badge={badge} draft={!!draft && draft !== shown} latest={latest} placeText={placeText} questionCount={questionCount(shown)} sharedWith={where?.sharedWith} submissions={submissions} versions={versions.length}>
             {/* The whole row opens the form's versions; the heading's button carries the name for assistive tech. */}
-            <button aria-controls={inlineDetails ? detailsId : undefined} aria-expanded={inlineDetails ? selected : undefined} aria-pressed={inlineDetails ? undefined : selected} className="min-w-0 truncate text-left after:absolute after:inset-0 after:content-[''] focus-visible:ring-offset-task-bg" onClick={() => onSelect(selected && inlineDetails ? null : latest.family_id)} title="Show versions and actions" type="button">{latest.name}</button>
+            <button aria-haspopup={inlineDetails ? "dialog" : undefined} aria-pressed={inlineDetails ? undefined : selected} className="min-w-0 truncate text-left after:absolute after:inset-0 after:content-[''] focus-visible:ring-offset-task-bg" onClick={() => onSelect(latest.family_id)} title="Show versions and actions" type="button">{latest.name}</button>
           </FormRowText>
         </div> : <div className="min-w-0 flex-1">
           <h2 className="break-words text-[15px] font-semibold leading-snug text-task-text">{latest.name}</h2>
@@ -173,9 +177,8 @@ function FormLibraryList({ families, place, emptyText, selectedId, onSelect, inl
         </div>}
         {live ? <Button className="relative z-10 min-h-10 shrink-0 px-3" onClick={() => onFill(live)} type="button"><Send className="size-4" /><span className="hidden sm:inline">Fill form</span><span className="sr-only sm:hidden">Fill form</span></Button>
           : author && draft ? <Button className="relative z-10 min-h-10 shrink-0 px-3" onClick={() => onEdit(draft)} type="button" variant="secondary"><Pencil className="size-4" /><span className="hidden sm:inline">Edit draft</span><span className="sr-only sm:hidden">Edit draft</span></Button> : null}
-        {author ? <ChevronRight aria-hidden="true" className={cn("size-4 shrink-0 text-task-text-muted transition-transform", inlineDetails && selected && "rotate-90")} /> : null}
+        {author ? <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-task-text-muted" /> : null}
       </div>
-      {author && inlineDetails && selected ? <div className="border-t border-task-border bg-task-muted/30 px-3 py-3 sm:px-4" id={detailsId}><FormFamilyDetails {...actions} placeText={placeText} versions={versions} /></div> : null}
     </article></li>;
   })}</ul></div>;
 }
