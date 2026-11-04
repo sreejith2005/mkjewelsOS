@@ -26,6 +26,7 @@ afterEach(() => { cleanup(); vi.resetAllMocks(); });
 describe("Form library visibility", () => {
   it("lets authors reveal hidden forms and shows the saved state", async () => {
     const user = userEvent.setup(); render(<FormsPage />);
+    await user.click(await screen.findByRole("button", { name: "Work and Upload" }));
     const toggle = await screen.findByRole("switch", { name: /Visible in Forms Library/ });
     expect(toggle.getAttribute("aria-checked")).toBe("false");
     mocks.loadForms.mockResolvedValue({ bundles: [{ ...bundle, library_visible: true }], submissions: [] });
@@ -36,6 +37,7 @@ describe("Form library visibility", () => {
   it("keeps the saved visibility when the server refuses the change", async () => {
     mocks.setFormLibraryVisibility.mockRejectedValue(new Error("Visibility change denied"));
     const user = userEvent.setup(); render(<FormsPage />);
+    await user.click(await screen.findByRole("button", { name: "Work and Upload" }));
     await user.click(await screen.findByRole("switch"));
     expect(await screen.findByText(/Visibility change denied/)).toBeTruthy();
     expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe("false");

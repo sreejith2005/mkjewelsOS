@@ -283,11 +283,13 @@ describe("Form builder internal keys", () => {
     expect(screen.getByText(/first selected routed option/i)).toBeTruthy();
   });
 
-  it("opens only one editor and jumps from the form outline", async () => {
+  it("opens only one editor and jumps from the optional form outline", async () => {
     vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("min-width"), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }));
     const user = userEvent.setup();
     render(<FormBuilder bundle={conditionalBundle} dynamicOptions={{ users: [], branches: [], departments: [], masters: [] }} onClose={() => {}} onSaved={async () => {}} />);
 
+    // The outline is optional on wide screens: the tool rail opens it.
+    await user.click(screen.getByRole("button", { name: "Show outline" }));
     await user.click(screen.getByRole("button", { name: "Go to Gold purity" }));
     expect(screen.getAllByLabelText("Question")).toHaveLength(1);
     expect((screen.getByLabelText("Question") as HTMLInputElement).value).toBe("Gold purity");

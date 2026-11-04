@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { dropdownMasterKey, eligibleRecordNameFields } from "@jewelos/core";
-import { ArrowLeft, Banknote, CalendarDays, Camera, Rows3, CheckSquare, ChevronDown, ChevronUp, CircleDot, Copy, Eye, EyeOff, FileUp, Filter, GitBranch, Hash, ListChecks, Mail, Minus, Monitor, Pencil, Phone, Plus, RotateCcw, Smartphone, Split, Star, Trash2, Type, UserRound, X } from "lucide-react";
+import { ArrowLeft, Banknote, CalendarDays, Camera, CheckSquare, ChevronDown, ChevronUp, CircleDot, Copy, Eye, EyeOff, FileUp, Filter, GitBranch, Hash, Heading, ListChecks, ListTree, Mail, Minus, Monitor, Pencil, Phone, Plus, RotateCcw, Rows3, Settings2, Smartphone, Split, Star, Trash2, Type, UserRound, X } from "lucide-react";
 import { duplicateFormField, createFormField, formAnswerOptions, setQuestionAnswerCondition, describePublishedFormEdit, formRuleHasIncompletePredicate, FORM_SUBMIT_TARGET, nextFormFieldKey as sharedNextFormFieldKey, normalizeFormDefinition, pruneFormRules, updateFormField, validateFormDefinition, type FormAnswer, type FormBranch, type FormFieldDefinition, type FormOption, type FormRule, type FormRuleOperator, type FormSectionDefinition, type FormTemplateDefinition, type Json, type UserRole } from "@jewelos/core";
 import { Button, Field, Notice } from "@/components/ui";
 import { useMediaQuery } from "@/lib/useMediaQuery";
@@ -92,8 +92,10 @@ export function FormBuilder({ bundle, dynamicOptions, onClose, onSaved, host }: 
   const [previewShown, setPreviewShown] = useState(true);
   const [narrowView, setNarrowView] = useState<"edit" | "preview">("edit");
   const [previewViewport, setPreviewViewport] = useState<"desktop" | "mobile">("desktop");
-  /** Very wide screens also keep the question outline open beside the editor and preview. */
-  const roomy = useMediaQuery("(min-width: 1720px)");
+  /** The question outline is an optional panel on wide screens; phones keep the jump list. */
+  const [outlineOpen, setOutlineOpen] = useState(false);
+  /** The section an author last worked in: new questions and sections land there. */
+  const [focusSection, setFocusSection] = useState<string | null>(null);
   // The side panels stay pinned just below the builder's own header, whatever its height.
   const headerRef = useRef<HTMLElement>(null);
   const [headerHeight, setHeaderHeight] = useState(72);
@@ -134,8 +136,8 @@ export function FormBuilder({ bundle, dynamicOptions, onClose, onSaved, host }: 
   // each visibility rule is re-checked against the questions that now precede
   // it, so reordering or deleting a question can never leave a dangling rule.
   const settle = (fields: readonly FormFieldDefinition[]) => pruneFormRules(fields.map((field, position) => ({ ...field, sortOrder: position })));
-  const add = (type: FieldKind["type"]) => setForm((current) => {
-    const placement = addMenu ?? { after: null, sectionKey: sections[0]!.key };
+  const add = (type: FieldKind["type"], at: { after: number | null; sectionKey: string } | null = addMenu) => setForm((current) => {
+    const placement = at ?? { after: null, sectionKey: sections[0]!.key };
     const sectionKey = sections.some((section) => section.key === placement.sectionKey) ? placement.sectionKey : sections[0]!.key;
     const fields = [...current.fields];
     const lastInSection = fields.map((field) => field.sectionKey).lastIndexOf(sectionKey);
@@ -201,11 +203,18 @@ export function FormBuilder({ bundle, dynamicOptions, onClose, onSaved, host }: 
   });
 
   const patchSection = (key: string, patch: Partial<FormSectionDefinition>) => setForm((current) => ({ ...current, sections: (current.sections ?? []).map((section) => section.key === key ? { ...section, ...patch } : section) }));
-  const addSection = () => setForm((current) => {
-    const existing = current.sections ?? [DEFAULT_SECTION];
+  /** A new section goes straight after the one being worked on, so the author keeps their place. */
+  const addSection = (afterKey?: string) => {
+    const existing = form.sections?.length ? form.sections : [DEFAULT_SECTION];
     const title = `Section ${existing.length + 1}`;
-    return { ...current, sections: [...existing, { key: sectionKeyFor(title, existing.map((section) => section.key)), title }] };
-  });
+    const key = sectionKeyFor(title, existing.map((section) => section.key));
+    const position = afterKey ? existing.findIndex((section) => section.key === afterKey) : -1;
+    const next = [...existing];
+    next.splice(position === -1 ? next.length : position + 1, 0, { key, title });
+    setForm((current) => ({ ...current, sections: next }));
+    setFocusSection(key); setEditing(null); setAddMenu(null);
+    requestAnimationFrame(() => document.getElementById(`form-section-${key}`)?.scrollIntoView?.({ behavior: "smooth", block: "start" }));
+  };
   const moveSection = (index: number, direction: number) => setForm((current) => {
     const next = [...(current.sections ?? [])]; const to = index + direction;
     if (to < 0 || to >= next.length) return current;
@@ -279,13 +288,41 @@ export function FormBuilder({ bundle, dynamicOptions, onClose, onSaved, host }: 
   const previewDefinition = useMemo(() => normalizeFormDefinition(form), [form]);
   const showPreview = wide ? previewShown : narrowView === "preview";
   const showEditor = wide || narrowView === "edit";
-  const outlineColumn = wide && (!showPreview || roomy);
+  const outlineColumn = wide && outlineOpen;
   // The library builder sits under the app's top bar; the FMS studio is its own full-screen dialog.
   const appBar = host ? "0px" : "4rem";
   const panelStyle: CSSProperties = { top: `calc(${appBar} + ${headerHeight}px + 0.75rem)`, maxHeight: `calc(100dvh - ${appBar} - ${headerHeight}px - 1.5rem)` };
-  const layout = !wide ? "max-w-3xl"
-    : showPreview ? cn("grid max-w-[120rem] items-start gap-5", roomy ? "grid-cols-[15rem_minmax(0,1.1fr)_minmax(26rem,1fr)]" : "grid-cols-[minmax(0,1.1fr)_minmax(22rem,1fr)]")
-    : "grid max-w-[90rem] grid-cols-[15rem_minmax(0,1fr)] items-start gap-6";
+  // Wide screens: a slim tool rail, an optional outline, the editor at a readable width, and the live preview.
+  // The editor never stretches across the monitor; spare width goes to the preview.
+  const gridColumns = wide ? ["4.75rem", outlineColumn ? "15rem" : null, "minmax(0,50rem)", showPreview ? "minmax(22rem,1fr)" : null].filter(Boolean).join(" ") : undefined;
+  const layout = wide ? "grid max-w-[120rem] items-start justify-center gap-5" : "max-w-3xl";
+  /** The section the author is working in: the selected question's, else the one last touched, else the last. */
+  const editingField = editing !== null ? form.fields[editing] : undefined;
+  const currentSection = editingField ? editingField.sectionKey ?? sections[0]!.key : focusSection && sections.some((section) => section.key === focusSection) ? focusSection : sections.at(-1)!.key;
+  const placementHere = () => {
+    const inSection = form.fields.map((field, index) => ({ field, index })).filter((entry) => (entry.field.sectionKey ?? sections[0]!.key) === currentSection).map((entry) => entry.index);
+    return { after: editing !== null && inSection.includes(editing) ? editing : inSection.at(-1) ?? null, sectionKey: currentSection };
+  };
+  const editingKey = editingField?.key;
+  // A new or selected question is brought into view, so adding one never loses the author's place.
+  useEffect(() => {
+    if (!editingKey) return;
+    const frame = requestAnimationFrame(() => document.getElementById(`form-field-${editingKey}`)?.scrollIntoView?.({ behavior: "smooth", block: "nearest" }));
+    return () => cancelAnimationFrame(frame);
+  }, [editingKey]);
+  useEffect(() => {
+    if (!addMenu) return;
+    const frame = requestAnimationFrame(() => document.getElementById("form-add-menu")?.scrollIntoView?.({ behavior: "smooth", block: "nearest" }));
+    return () => cancelAnimationFrame(frame);
+  }, [addMenu]);
+  const tools: readonly ToolAction[] = [
+    { label: "Add question", short: "Question", icon: Plus, onClick: () => setAddMenu(placementHere()) },
+    { label: "Add section", short: "Section", icon: Rows3, onClick: () => addSection(currentSection) },
+    { label: "Add heading", short: "Heading", icon: Heading, onClick: () => add("section_header", placementHere()) },
+    { label: "Add divider", short: "Divider", icon: Minus, onClick: () => add("divider", placementHere()) },
+    { label: "Duplicate selected question", short: "Duplicate", icon: Copy, onClick: () => { if (editing !== null) duplicate(editing); }, disabled: editing === null },
+    { label: "Delete selected question", short: "Delete", icon: Trash2, onClick: () => { if (editing !== null) remove(editing); }, disabled: editing === null, danger: true },
+  ];
   const close = () => { if (!dirty || window.confirm("Discard unsaved form changes?")) onClose(); };
   /**
    * The respondent's real form, rendered by the same FormRenderer employees
@@ -309,35 +346,52 @@ export function FormBuilder({ bundle, dynamicOptions, onClose, onSaved, host }: 
     </div>
   </aside>;
 
-  return <section className="min-h-[calc(100dvh-8rem)]" data-wide-page><header className={cn("sticky top-0 z-40 mb-5 flex flex-wrap items-center gap-2 border-b border-gold/20 bg-obsidian/95 py-3 backdrop-blur", host ? "-mx-2 px-2" : "-mx-4 -mt-4 px-4 sm:-mx-6 sm:-mt-6 sm:px-6 md:top-16 md:z-20")} ref={headerRef}><Button aria-label={host ? "Close questionnaire editor" : undefined} onClick={close} type="button" variant="ghost"><ArrowLeft className="size-4" />{host ? "Close" : "Back"}</Button><div className="mr-auto min-w-0"><h2 className="truncate text-lg font-semibold text-white">{host?.title ?? (form.name || "New form")}</h2><p className="text-xs text-soft-grey">{dirty ? <span className="inline-flex items-center gap-1.5"><span aria-hidden className="size-1.5 rounded-full bg-gold" />Unsaved changes</span> : host?.subtitle ?? "Build the questions and answer paths for this form."}</p></div>{host?.extraActions?.({ form, replace: (next) => setForm({ ...next, fields: settle(next.fields) }) })}<Button aria-label="Open routing map" onClick={() => setRoutingMap(true)} type="button" variant="ghost"><GitBranch className="size-4" /><span className="hidden sm:inline">Routes</span></Button>{wide ? (previewShown ? null : <Button aria-label="Show preview" onClick={() => setPreviewShown(true)} type="button" variant="secondary"><Eye className="size-4" />Preview</Button>) : narrowView === "edit" ? <Button aria-label="Preview form" onClick={() => setNarrowView("preview")} type="button" variant="secondary"><Eye className="size-4" />Preview</Button> : null}{host ? <>{host.draftLabel ? <Button disabled={saving} onClick={() => void save("draft")} type="button" variant="secondary">{host.draftLabel}</Button> : null}<Button disabled={saving} onClick={() => void save("use")}>{saving ? "Saving..." : host.useLabel}</Button></> : <Button disabled={saving} onClick={() => void save()}>{saving ? "Saving..." : bundle?.lifecycle === "published" ? "Save changes" : "Save draft"}</Button>}</header><div className={cn("mx-auto", layout)}>{outlineColumn ? <FormOutline {...(editing !== null && form.fields[editing]?.key ? { activeKey: form.fields[editing].key } : {})} fields={form.fields} onSelect={selectField} panelStyle={panelStyle} sections={sections} variant="panel" /> : null}{showEditor ? <div className="min-w-0 space-y-5">{error ? <Notice tone="danger">{error}</Notice> : null}
-    <section aria-label="Form settings" className="rounded-xl border border-gold/20 p-4"><div className="grid gap-3 sm:grid-cols-2"><Field label="Form name"><input className="field" onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="e.g. Customer Onboarding" value={form.name} /></Field><Field label="Description"><input className="field" onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder="What is this form for?" value={form.description ?? ""} /></Field><div className="space-y-1.5 sm:col-span-2"><Field label="Use this question as the record name"><select className="field" value={form.recordNameFieldKey ?? ""} onChange={event => setForm(current => ({ ...current, recordNameFieldKey: event.target.value || undefined }))}><option value="">Automatic</option>{eligibleRecordNameFields(form.fields).map(field => <option key={field.key} value={field.key}>{field.label || field.key}</option>)}</select></Field><p className="text-xs text-soft-grey">An optional default for FMS work using this form. Each workflow can select its own question. Changing a used published form's default requires a new revision.</p></div></div><details className="mt-3"><summary className="cursor-pointer text-xs font-medium text-soft-grey">Who can use this form</summary><div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">{ROLES.map((role) => <label className="inline-flex min-h-9 items-center gap-1.5 text-xs capitalize text-champagne" key={role}><input checked={form.permissions?.roles.includes(role) ?? false} onChange={(event) => setForm((current) => ({ ...current, permissions: { roles: event.target.checked ? [...new Set([...(current.permissions?.roles ?? []), role])] : (current.permissions?.roles ?? []).filter((value) => value !== role) } }))} type="checkbox" /> {role.replaceAll("_", " ")}</label>)}</div></details></section>
+  const fieldRows = (sectionKey: string) => form.fields.map((field, index) => ({ field, index })).filter((entry) => (entry.field.sectionKey ?? sections[0]!.key) === sectionKey);
+  const multiSection = sections.length > 1;
+  return <section className="min-h-[calc(100dvh-8rem)]" data-wide-page><header className={cn("sticky top-0 z-40 mb-5 flex flex-wrap items-center gap-2 border-b border-task-border bg-obsidian/95 py-3 backdrop-blur", host ? "-mx-2 px-2" : "-mx-4 -mt-4 px-4 sm:-mx-6 sm:-mt-6 sm:px-6 md:top-16 md:z-20")} ref={headerRef}><Button aria-label={host ? "Close questionnaire editor" : undefined} onClick={close} type="button" variant="ghost"><ArrowLeft className="size-4" />{host ? "Close" : "Back"}</Button><div className="mr-auto min-w-0"><h2 className="truncate text-lg font-semibold text-white">{host?.title ?? (form.name || "New form")}</h2><p aria-live="polite" className="text-xs text-soft-grey">{dirty ? <span className="inline-flex items-center gap-1.5 font-medium text-gold-secondary"><span aria-hidden className="size-1.5 rounded-full bg-gold" />Unsaved changes</span> : host?.subtitle ?? `${plural(form.fields.length, "question")} · ${plural(sections.length, "section")}`}</p></div>{host?.extraActions?.({ form, replace: (next) => setForm({ ...next, fields: settle(next.fields) }) })}<Button aria-label="Open routing map" onClick={() => setRoutingMap(true)} type="button" variant="ghost"><GitBranch className="size-4" /><span className="hidden sm:inline">Routes</span></Button>{wide ? (previewShown ? null : <Button aria-label="Show preview" onClick={() => setPreviewShown(true)} type="button" variant="secondary"><Eye className="size-4" />Preview</Button>) : narrowView === "edit" ? <Button aria-label="Preview form" onClick={() => setNarrowView("preview")} type="button" variant="secondary"><Eye className="size-4" />Preview</Button> : null}{host ? <>{host.draftLabel ? <Button disabled={saving} onClick={() => void save("draft")} type="button" variant="secondary">{host.draftLabel}</Button> : null}<Button disabled={saving} onClick={() => void save("use")}>{saving ? "Saving..." : host.useLabel}</Button></> : <Button disabled={saving} onClick={() => void save()}>{saving ? "Saving..." : bundle?.lifecycle === "published" ? "Save changes" : "Save draft"}</Button>}</header>
+    <div className={cn("mx-auto", layout)} style={gridColumns ? { gridTemplateColumns: gridColumns } : undefined}>
+      {wide && showEditor ? <nav aria-label="Form building tools" className="sticky flex flex-col gap-1 rounded-2xl border border-task-border bg-task-bg p-1.5 shadow-card" style={{ top: panelStyle.top }}>
+        {tools.map((tool) => <ToolButton key={tool.label} tool={tool} />)}
+        <span aria-hidden className="my-1 h-px bg-task-border" />
+        <ToolButton tool={{ label: outlineOpen ? "Hide outline" : "Show outline", short: "Outline", icon: ListTree, onClick: () => setOutlineOpen((open) => !open), pressed: outlineOpen }} />
+      </nav> : null}
+      {outlineColumn && showEditor ? <FormOutline {...(editingKey ? { activeKey: editingKey } : {})} fields={form.fields} onSelect={selectField} panelStyle={panelStyle} sections={sections} variant="panel" /> : null}
+      {showEditor ? <div className="min-w-0 space-y-4">{error ? <Notice tone="danger">{error}</Notice> : null}
+    <section aria-label="Form settings" className="overflow-hidden rounded-2xl border border-task-border bg-task-bg shadow-card"><div aria-hidden className="h-1.5 bg-gold-sheen" /><div className="grid gap-3 p-4 sm:p-5"><Field label="Form name"><input className="field text-base font-semibold" onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="e.g. Customer Onboarding" value={form.name} /></Field><Field label="Description"><input className="field" onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder="What is this form for?" value={form.description ?? ""} /></Field>
+      <details className="group rounded-xl border border-task-border bg-task-muted/40 px-3 py-2"><summary className="flex min-h-9 cursor-pointer list-none items-center gap-2 text-sm font-semibold text-champagne"><Settings2 aria-hidden className="size-4 shrink-0 text-gold-secondary" />Form settings<span className="ml-auto truncate text-xs font-normal capitalize text-soft-grey">{(form.permissions?.roles ?? []).map((role) => role.replaceAll("_", " ")).join(", ") || "Nobody can fill it yet"}</span><ChevronDown aria-hidden className="size-4 shrink-0 text-soft-grey transition group-open:rotate-180" /></summary><div className="mt-3 grid gap-3 pb-1"><div className="space-y-1.5"><Field label="Use this question as the record name"><select className="field" value={form.recordNameFieldKey ?? ""} onChange={event => setForm(current => ({ ...current, recordNameFieldKey: event.target.value || undefined }))}><option value="">Automatic</option>{eligibleRecordNameFields(form.fields).map(field => <option key={field.key} value={field.key}>{field.label || field.key}</option>)}</select></Field><p className="text-xs text-soft-grey">An optional default for FMS work using this form. Each workflow can select its own question. Changing a used published form's default requires a new revision.</p></div><fieldset><legend className="label">Who can use this form</legend><div className="flex flex-wrap gap-x-4 gap-y-1">{ROLES.map((role) => <label className="inline-flex min-h-9 items-center gap-1.5 text-xs capitalize text-champagne" key={role}><input checked={form.permissions?.roles.includes(role) ?? false} onChange={(event) => setForm((current) => ({ ...current, permissions: { roles: event.target.checked ? [...new Set([...(current.permissions?.roles ?? []), role])] : (current.permissions?.roles ?? []).filter((value) => value !== role) } }))} type="checkbox" /> {role.replaceAll("_", " ")}</label>)}</div></fieldset></div></details></div></section>
 
-    <details className="rounded-xl border border-gold/20 p-4"><summary className="cursor-pointer text-sm font-semibold text-gold-secondary">Manage sections</summary><section aria-label="Sections" className="mt-4"><div className="mb-3 flex items-center justify-between gap-3"><h3 className="text-lg font-semibold text-gold-secondary">Sections</h3><Button onClick={addSection} type="button" variant="secondary"><Plus />Add section</Button></div>
-      <p className="mb-2 text-xs text-soft-grey">A question can send the respondent to a later section. Only the sections the answers lead to are shown while filling the form.</p>
-      <div className="space-y-2">{sections.map((section, index) => <article className="grid gap-2 rounded-xl border border-gold/20 bg-charcoal/30 p-3 sm:grid-cols-[1fr_1fr_auto]" key={section.key}>
-        <Field label={`Section ${index + 1} title`}><input className="field" onChange={(event) => patchSection(section.key, { title: event.target.value })} value={section.title} /></Field>
-        <FormDestinationSelect label="After this section" fields={form.fields} sections={sections} sectionKey={section.key} value={section.next ?? "__continue__"} onChange={next => patchSection(section.key, { next: next === "__continue__" ? undefined : next })} />
-        <div className="flex items-end gap-1"><Button aria-label="Move section up" className="size-11 min-h-11 p-0" disabled={index === 0} onClick={() => moveSection(index, -1)} type="button" variant="ghost"><ChevronUp className="size-4" /></Button><Button aria-label="Move section down" className="size-11 min-h-11 p-0" disabled={index === sections.length - 1} onClick={() => moveSection(index, 1)} type="button" variant="ghost"><ChevronDown className="size-4" /></Button><Button aria-label={`Delete ${section.title}`} className="size-11 min-h-11 p-0" disabled={sections.length === 1} onClick={() => { if (window.confirm(`Delete "${section.title}" and its questions?`)) removeSection(section.key); }} type="button" variant="danger"><Trash2 className="size-4" /></Button></div>
-        <FormSectionConditions section={section} fields={form.fields} sections={sections} dynamicOptions={previewOptions} masterOptions={masterOptions} onChange={patch => patchSection(section.key, patch)} />
-      </article>)}</div>
-    </section></details>
-
-
-    {outlineColumn ? null : <FormOutline {...(editing !== null && form.fields[editing]?.key ? { activeKey: form.fields[editing].key } : {})} fields={form.fields} onSelect={selectField} sections={sections} variant="select" />}
-    <section aria-label="Fields"><CustomerIntegrationPanel definition={normalizeFormDefinition(form)} templateId={bundle?.id} unsaved={dirty}/><div className="mb-3 flex items-center justify-between gap-3"><div className="flex items-center gap-2"><ListChecks className="size-5 text-gold-secondary" /><h3 className="text-xl font-semibold text-gold-secondary">Questions</h3></div><span className="rounded-full bg-gold/10 px-3 py-1 text-xs font-semibold text-gold-secondary">{form.fields.length} added</span></div>
-      {form.fields.length === 0 ? <Notice>Use Add question below to begin your form.</Notice> : null}<div className="space-y-5">{sections.map((section) => <div key={section.key}>
-        {sections.length > 1 ? <h4 className="mb-2 text-sm font-semibold uppercase tracking-wide text-soft-grey">{section.title}</h4> : null}
-        <div className="space-y-2">{form.fields.map((field, index) => ({ field, index })).filter((entry) => (entry.field.sectionKey ?? sections[0]!.key) === section.key).map(({ field, index }) => <div key={field.key}><CompactFieldRow dynamicOptions={previewOptions} editing={editing === index} field={field} fields={form.fields} index={index} masterOptions={masterOptions} onAddAfter={() => setAddMenu({ after: index, sectionKey: section.key })} onChangeType={changeFieldType} onDuplicate={duplicate} onEdit={() => setEditing((current) => current === index ? null : index)} onMasterCreated={refreshMasters} onMove={move} pendingMasterLists={pendingMasterLists} onPatch={patchField} onRemove={remove} onSetQuestionCondition={setQuestionCondition} onSetRoute={setRoute} sections={sections} />{addMenu?.after === index && addMenu.sectionKey === section.key ? <AddFieldMenu onAdd={add} onClose={() => setAddMenu(null)} /> : null}</div>)}</div>
-        {form.fields.every((field) => (field.sectionKey ?? sections[0]!.key) !== section.key) ? <p className="text-xs text-soft-grey">No questions in this section yet.</p> : null}
-        <Button className="mt-2 w-full border-dashed" onClick={() => { const indices = form.fields.map((field, index) => ({ field, index })).filter((entry) => (entry.field.sectionKey ?? sections[0]!.key) === section.key).map((entry) => entry.index); setAddMenu({ after: indices.at(-1) ?? null, sectionKey: section.key }); }} type="button" variant="secondary"><Plus className="size-4" />Add question to {section.title}</Button>
-        {addMenu?.sectionKey === section.key && addMenu.after === null ? <AddFieldMenu onAdd={add} onClose={() => setAddMenu(null)} /> : null}
-      </div>)}</div></section>
+    {wide ? null : <FormOutline {...(editingKey ? { activeKey: editingKey } : {})} fields={form.fields} onSelect={selectField} sections={sections} variant="select" />}
+    <section aria-label="Fields"><CustomerIntegrationPanel definition={normalizeFormDefinition(form)} templateId={bundle?.id} unsaved={dirty}/><div className="mb-3 mt-1 flex items-center justify-between gap-3"><div className="flex items-center gap-2"><ListChecks className="size-5 text-gold-secondary" /><h3 className="text-lg font-semibold text-gold-secondary">Questions</h3></div><span className="rounded-full bg-gold/10 px-3 py-1 text-xs font-semibold text-gold-secondary">{form.fields.length} added</span></div>
+      {form.fields.length === 0 ? <Notice>Use Add question to begin your form.</Notice> : null}<div className="space-y-4">{sections.map((section, sectionIndex) => { const rows = fieldRows(section.key); return <section aria-label={multiSection ? `Section ${sectionIndex + 1}: ${section.title}` : undefined} className={cn("scroll-mt-40", multiSection && "rounded-2xl border bg-task-muted/30", multiSection && (currentSection === section.key ? "border-gold/45" : "border-task-border"))} id={`form-section-${section.key}`} key={section.key} onFocusCapture={() => { if (focusSection !== section.key) setFocusSection(section.key); }}>
+        {multiSection ? <div className="border-b border-task-border px-3 py-2.5 sm:px-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="shrink-0 rounded-full bg-gold/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-gold-secondary">Section {sectionIndex + 1} of {sections.length}</span>
+            <input aria-label={`Section ${sectionIndex + 1} title`} className="field min-h-10 min-w-[10rem] flex-1 font-semibold" onChange={(event) => patchSection(section.key, { title: event.target.value })} value={section.title} />
+            <div className="flex shrink-0 items-center"><Button aria-label="Move section up" className="size-10 min-h-10 p-0" disabled={sectionIndex === 0} onClick={() => moveSection(sectionIndex, -1)} type="button" variant="ghost"><ChevronUp className="size-4" /></Button><Button aria-label="Move section down" className="size-10 min-h-10 p-0" disabled={sectionIndex === sections.length - 1} onClick={() => moveSection(sectionIndex, 1)} type="button" variant="ghost"><ChevronDown className="size-4" /></Button><Button aria-label={`Delete ${section.title}`} className="size-10 min-h-10 p-0" onClick={() => { if (window.confirm(`Delete "${section.title}" and its questions?`)) removeSection(section.key); }} type="button" variant="ghost"><Trash2 className="size-4 text-danger" /></Button></div>
+          </div>
+          <details className="group mt-2"><summary className="flex min-h-9 cursor-pointer list-none items-center gap-1.5 text-xs font-semibold text-soft-grey hover:text-champagne"><ChevronDown aria-hidden className="size-3.5 shrink-0 transition group-open:rotate-180" />Section settings<span className="truncate font-normal">· {!section.next || section.next === "__continue__" ? "continues to the next section" : section.next === FORM_SUBMIT_TARGET ? "then submits" : sections.some((item) => item.key === section.next) ? `then ${sections.find((item) => item.key === section.next)!.title}` : "custom path set"}</span></summary><div className="mt-2 grid gap-3 pb-1"><FormDestinationSelect label="After this section" fields={form.fields} sections={sections} sectionKey={section.key} value={section.next ?? "__continue__"} onChange={next => patchSection(section.key, { next: next === "__continue__" ? undefined : next })} /><FormSectionConditions section={section} fields={form.fields} sections={sections} dynamicOptions={previewOptions} masterOptions={masterOptions} onChange={patch => patchSection(section.key, patch)} /></div></details>
+        </div> : null}
+        <div className={cn("space-y-2", multiSection && "p-2 sm:p-3")}>{rows.map(({ field, index }) => <div key={field.key}><CompactFieldRow dynamicOptions={previewOptions} editing={editing === index} field={field} fields={form.fields} index={index} masterOptions={masterOptions} onAddAfter={() => setAddMenu({ after: index, sectionKey: section.key })} onChangeType={changeFieldType} onDuplicate={duplicate} onEdit={() => setEditing((current) => current === index ? null : index)} onMasterCreated={refreshMasters} onMove={move} pendingMasterLists={pendingMasterLists} onPatch={patchField} onRemove={remove} onSetQuestionCondition={setQuestionCondition} onSetRoute={setRoute} sections={sections} />{addMenu?.after === index && addMenu.sectionKey === section.key ? <AddFieldMenu onAdd={add} onClose={() => setAddMenu(null)} /> : null}</div>)}
+        {rows.length === 0 ? <p className="px-1 text-xs text-soft-grey">No questions in this section yet.</p> : null}
+        <Button className="w-full border-dashed" onClick={() => setAddMenu({ after: rows.at(-1)?.index ?? null, sectionKey: section.key })} type="button" variant="secondary"><Plus className="size-4" />Add question to {section.title}</Button>
+        {addMenu?.sectionKey === section.key && addMenu.after === null ? <AddFieldMenu onAdd={add} onClose={() => setAddMenu(null)} /> : null}</div>
+      </section>; })}</div></section>
 
     {issues.length ? <Notice tone="danger">{issues[0]?.message}</Notice> : null}
+    {wide ? null : <nav aria-label="Form building tools" className="form-actions sticky z-20 -mx-4 grid grid-cols-6 gap-0.5 border-t border-task-border bg-task-bg/95 px-1 py-1.5 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border">{tools.map((tool) => <ToolButton compact key={tool.label} tool={tool} />)}</nav>}
   </div> : null}{showPreview ? previewPanel : null}</div>{routingMap ? <FormRoutingMap fields={form.fields} onClose={() => setRoutingMap(false)} onNavigate={selectField} sections={sections} /> : null}</section>;
 }
 
-function AddFieldMenu({ onAdd, onClose }: { onAdd: (type: FieldKind["type"]) => void; onClose: () => void }) { return <section aria-label="Choose question type" className="mt-2 rounded-xl border border-gold/30 bg-charcoal/80 p-3"><div className="mb-2 flex items-center justify-between"><p className="text-sm font-semibold text-champagne">Choose a question type</p><Button aria-label="Close question types" className="size-11 min-h-11 p-0" onClick={onClose} type="button" variant="ghost"><X className="size-4" /></Button></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">{FIELD_KINDS.map((kind) => <FieldPaletteButton key={kind.type} kind={kind} onAdd={onAdd} />)}</div></section>; }
+type ToolAction = Readonly<{ label: string; short: string; icon: typeof Plus; onClick: () => void; disabled?: boolean; danger?: boolean; pressed?: boolean }>;
+/** One creation tool: an icon with a short caption, always in reach while the form scrolls. */
+function ToolButton({ tool, compact = false }: { tool: ToolAction; compact?: boolean }) {
+  const Icon = tool.icon;
+  return <button aria-label={tool.label} aria-pressed={tool.pressed} className={cn("flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[10px] font-semibold leading-tight transition disabled:cursor-not-allowed disabled:opacity-40", tool.pressed ? "bg-gold/15 text-gold-secondary" : tool.danger ? "text-danger hover:bg-danger/10" : "text-champagne hover:bg-gold/10 hover:text-gold-secondary", !compact && "py-2")} disabled={tool.disabled} onClick={tool.onClick} title={tool.label} type="button"><Icon aria-hidden className="size-[18px]" /><span className="max-w-full truncate">{tool.short}</span></button>;
+}
+
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
+
+function AddFieldMenu({ onAdd, onClose }: { onAdd: (type: FieldKind["type"]) => void; onClose: () => void }) { return <section aria-label="Choose question type" id="form-add-menu" className="mt-2 scroll-mb-28 rounded-xl border border-gold/30 bg-charcoal/80 p-3"><div className="mb-2 flex items-center justify-between"><p className="text-sm font-semibold text-champagne">Choose a question type</p><Button aria-label="Close question types" className="size-11 min-h-11 p-0" onClick={onClose} type="button" variant="ghost"><X className="size-4" /></Button></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">{FIELD_KINDS.map((kind) => <FieldPaletteButton key={kind.type} kind={kind} onAdd={onAdd} />)}</div></section>; }
 
 function FieldPaletteButton({ kind, onAdd }: { kind: FieldKind; onAdd: (type: FieldKind["type"]) => void }) { const Icon = kind.icon; return <button className="flex min-h-20 flex-col items-center justify-center gap-1 rounded-xl border border-gold/20 bg-charcoal/40 px-2 text-center text-xs font-semibold text-champagne transition hover:border-gold hover:bg-gold/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold" onClick={() => onAdd(kind.type)} type="button"><span className="grid size-8 place-items-center rounded-full bg-gold/10 text-gold-secondary"><Icon className="size-4" /></span>{kind.label}</button>; }
 
@@ -372,7 +426,7 @@ function CompactFieldRow({ field, fields, index, editing, dynamicOptions, master
   const links = readGuidedConditionLinks(field);
   const summary = links === null ? "Advanced condition" : links.length ? `Shown after: ${links.map((link) => `${fields.find((item) => item.key === link.sourceKey)?.label ?? link.sourceKey} = ${String(link.optionValue)}`).join(" or ")}` : "";
   const optionPreview = field.options?.slice(0, 2).map((option) => option.label).join(" · ");
-  return <article className={`overflow-hidden rounded-xl border bg-charcoal/30 ${editing ? "border-gold ring-1 ring-gold/20" : "border-gold/20"}`} id={`form-field-${field.key}`}><div className="flex items-center gap-2 p-2 sm:p-3">
+  return <article className={`scroll-mt-40 scroll-mb-28 overflow-hidden rounded-xl border transition-[border-color,box-shadow] ${editing ? "border-gold border-l-4 bg-task-bg shadow-lift ring-1 ring-gold/20" : "border-task-border bg-task-bg/70 hover:border-gold/40"}`} id={`form-field-${field.key}`}><div className="flex items-center gap-2 p-2 sm:p-3">
     <div className="flex flex-col"><button aria-label={`Move ${name} up`} className="text-soft-grey hover:text-gold-secondary" onClick={() => onMove(index, -1)} type="button"><ChevronUp className="size-4" /></button><button aria-label={`Move ${name} down`} className="text-soft-grey hover:text-gold-secondary" onClick={() => onMove(index, 1)} type="button"><ChevronDown className="size-4" /></button></div>
     <span aria-hidden="true" className="hidden size-8 shrink-0 place-items-center rounded-full bg-gold/10 text-gold-secondary sm:grid"><Icon className="size-4" /></span>
     <button className="min-h-11 min-w-0 flex-1 text-left" onClick={onEdit} type="button"><span className="block truncate font-semibold text-champagne">{name}</span><span className="block truncate text-xs text-soft-grey">{answerPreview(field)}{field.required ? " · required" : ""}{field.branches?.length ? ` · ${field.branches.length} branch${field.branches.length === 1 ? "" : "es"}` : ""}</span>{summary ? <span className="mt-1 inline-flex max-w-full items-center gap-1 rounded-full bg-gold/10 px-2 py-0.5 text-xs text-gold-secondary"><Filter className="size-3 shrink-0" /><span className="truncate">Shown when {summary}</span></span> : null}</button>

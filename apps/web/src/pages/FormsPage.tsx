@@ -1,5 +1,5 @@
 import { FmsStartingForm } from "@/features/forms/FmsStartingForm";
-import { useCallback, useEffect, useMemo, useState, type ComponentProps } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AlertTriangle, Archive, BookOpen, ChevronRight, ClipboardList, Contact, Copy, FileText, History, Pencil, Plus, Search, Send, Trash2, Workflow } from "lucide-react";
 import { formatKolkataDateTime, groupFormSubmissions, groupFmsBuiltForms, type FmsBuiltForm, formMatchesLifecycle, hasPermission, presentFormSubmission, WORK_UPLOAD_FORM_NAME, type FormMasterOption, type SubmissionRecord, type SubmissionTemplate } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthContext";
@@ -12,6 +12,7 @@ import { FormBuilder } from "@/features/forms/FormBuilder";
 import { type DynamicOptions } from "@/features/forms/FormRenderer";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { cn } from "@/lib/utils";
+import { useMediaQuery } from "@/lib/useMediaQuery";
 import { CRM_FORM_PURPOSE_LABELS, type CrmFormPurpose } from "@jewelos/core";
 import { crmFormFillPath, loadCrmLinkedFamilies } from "@/features/crm/crmFormLinks";
 
@@ -26,6 +27,9 @@ export function FormsPage() {
   const [source, setSource] = useState<"library" | "fms" | "crm">("library");
   /** Forms CRM uses for registration (CRM Form Settings); listed under CRM forms. Empty without CRM access. */
   const [crmForms, setCrmForms] = useState<ReadonlyMap<string, CrmFormPurpose>>(new Map());
+  /** The form family whose versions and actions are open; wide screens show it beside the list. */
+  const [selectedFamily, setSelectedFamily] = useState<string | null>(null);
+  const sideDetails = useMediaQuery("(min-width: 1280px)");
   const starter = useMemo(() => { const params = new URLSearchParams(window.location.search); const id = params.get("fmsStarter"); const formTemplateId = params.get("form"); return id && formTemplateId ? { id, formTemplateId } : null; }, []);
   const selectedSubmissionId=new URLSearchParams(window.location.search).get("submission_id");
   const canSeeCrm = hasPermission(access, "crm.view");
@@ -67,23 +71,42 @@ export function FormsPage() {
     setEdit(draft);
   }).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Create form version failed"));
   if (edit !== undefined) return <FormBuilder bundle={edit ?? undefined} dynamicOptions={options} onClose={() => setEdit(undefined)} onSaved={refresh} />;
-  return <><section className="mx-auto max-w-5xl">
-    <header className="mb-5 flex flex-wrap items-end justify-between gap-3">
-      <div className="min-w-0"><h1 className="font-display text-[1.85rem] font-semibold leading-tight text-gold-secondary sm:text-[2.1rem]">Forms Library</h1><p className="mt-1 text-sm text-soft-grey">Pick a form, answer the questions, and press Submit.</p></div>
-      {author ? <Button className="min-h-12 w-full sm:w-auto" onClick={() => setEdit(null)}><Plus />New form</Button> : null}
-    </header>
-    <div aria-label="Forms views" className="mb-4 grid grid-cols-2 gap-1 rounded-2xl border border-task-border bg-task-muted p-1" role="group">
-      {([["templates", "Forms to fill", ClipboardList], ["submissions", "My submissions", History]] as const).map(([key, label, Icon]) => <button aria-pressed={tab === key} className={cn("inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold transition", tab === key ? "bg-task-bg text-task-text shadow-sm ring-1 ring-gold/40" : "text-task-text-muted hover:text-task-text")} key={key} onClick={() => setTab(key)} type="button"><Icon aria-hidden="true" className="size-4" />{label}</button>)}
-    </div>
-    {tab === "templates" && built ? <div className="mb-4">
-      <div aria-label="Which forms" className={cn("grid gap-2", crmFamilies.length ? "grid-cols-3" : "grid-cols-2")} role="group">
-        {([["library", "Forms Library", BookOpen, libraryFamilies.length], ["fms", "FMS workflow forms", Workflow, fmsFamilyCount], ...(crmFamilies.length ? [["crm", "CRM forms", Contact, crmFamilies.length] as const] : [])] as const).map(([key, label, Icon, count]) => <button aria-pressed={source === key} className={cn("flex min-h-14 items-center justify-center gap-2 rounded-2xl border-2 px-3 py-2 text-left text-sm font-semibold transition sm:justify-start sm:px-4", source === key ? "border-gold bg-gold/10 text-task-text" : "border-task-border bg-task-bg text-task-text-muted hover:border-gold/50 hover:text-task-text")} key={key} onClick={() => setSource(key)} type="button"><Icon aria-hidden="true" className={cn("size-5 shrink-0", source === key && "text-gold-secondary")} /><span className="min-w-0 leading-tight">{label}</span><span className={cn("ml-auto shrink-0 rounded-full px-2 py-0.5 text-xs", source === key ? "bg-gold/20 text-gold-secondary" : "bg-task-muted")}>{count}</span></button>)}
+  const fmsSource = !!built && source === "fms";
+  const shownFamilies = fmsSource ? fmsFamilies : source === "crm" ? crmFamilies : built ? libraryFamilies : families.filter((versions) => !crmForms.has(versions[0]!.family_id));
+  const sidePanel = sideDetails && author && tab === "templates";
+  const selectedVersions = sidePanel ? shownFamilies.find((versions) => versions[0]!.family_id === selectedFamily) ?? shownFamilies[0] : undefined;
+  const selectedId = sidePanel ? selectedVersions?.[0]!.family_id ?? null : selectedFamily;
+  const sourceNote = source === "library" ? null : source === "crm" ? `Forms CRM uses to register people: ${[...new Set(crmForms.values())].map((purpose) => CRM_FORM_PURPOSE_LABELS[purpose].toLowerCase()).join(", ")}. ${author ? "Edit and publish them here like any form; CRM uses each new published version. Choose which form CRM uses in CRM → REGISTRATION → CRM FORM SETTINGS." : ""} Fill form opens CRM registration.` : author ? "Questions built inside FMS workflow steps. People fill them through their workflow. To change one, open the workflow in FMS and edit that step's Questions & Form, so the workflow uses the new version." : "Forms that belong to FMS workflows. You fill them from Tasks → FMS when a step is assigned to you.";
+  const libraryActions: LibraryActions = { author, built, onVisibilitySaved: refresh, onVisibilityError: setError, onFill: fillForm, onEdit: setEdit, onPublish: runPublish, onPublishAsNew: runPublishAsNew, onCreateVersion: runCreateVersion, onDelete: setRemove, onArchive: (id) => void archiveForm(id).then(refresh).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Archive failed")), onEditPublished: (id) => { const form = data?.bundles.find((item) => item.id === id); if (form?.lifecycle === "published") setEdit(form); else setError("Archived forms cannot be edited."); } };
+  const list = !data ? <div className="grid gap-2"><div className="skeleton h-16 rounded-xl" /><div className="skeleton h-16 rounded-xl" /><div className="skeleton h-16 rounded-xl" /></div>
+    : tab === "templates" ? <Library {...libraryActions} emptyText={fmsSource ? "No FMS workflow forms match. Forms built inside an FMS step appear here." : source === "crm" ? "No CRM forms match these filters." : "No forms match these filters."} families={shownFamilies} inlineDetails={!sidePanel} onSelect={setSelectedFamily} searching={query.trim() !== ""} selectedId={selectedId} workflowGroups={fmsSource ? workflowGroups : undefined} />
+    : <SubmissionList bundles={data.bundles} onView={setView} submissions={data.submissions} />;
+  return <><section className="mx-auto w-full max-w-[100rem]">
+    <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="min-w-0"><h1 className="font-display text-[1.75rem] font-semibold leading-tight text-gold-secondary sm:text-[2rem]">Forms Library</h1>{author ? null : <p className="mt-0.5 text-sm text-soft-grey">Pick a form, answer the questions, and press Submit.</p>}</div>
+      <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+        <div aria-label="Forms views" className="grid flex-1 grid-cols-2 gap-1 rounded-xl border border-task-border bg-task-muted p-1 sm:flex-none" role="group">
+          {([["templates", "Forms to fill", ClipboardList], ["submissions", "My submissions", History]] as const).map(([key, label, Icon]) => <button aria-pressed={tab === key} className={cn("inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold transition", tab === key ? "bg-task-bg text-task-text shadow-sm ring-1 ring-gold/40" : "text-task-text-muted hover:text-task-text")} key={key} onClick={() => setTab(key)} type="button"><Icon aria-hidden="true" className="size-4" />{label}</button>)}
+        </div>
+        {author ? <Button className="min-h-12 w-full sm:min-h-11 sm:w-auto" onClick={() => setEdit(null)}><Plus />New form</Button> : null}
       </div>
-      <p className="mt-2 px-1 text-sm text-task-text-muted">{source === "library" ? null : source === "crm" ? `Forms CRM uses to register people: ${[...new Set(crmForms.values())].map((purpose) => CRM_FORM_PURPOSE_LABELS[purpose].toLowerCase()).join(", ")}. ${author ? "Edit and publish them here like any form; CRM uses each new published version. Choose which form CRM uses in CRM → REGISTRATION → CRM FORM SETTINGS." : ""} Fill form opens CRM registration.` : author ? "Questions built inside FMS workflow steps. People fill them through their workflow. To change one, open the workflow in FMS and edit that step's Questions & Form, so the workflow uses the new version." : "Forms that belong to FMS workflows. You fill them from Tasks → FMS when a step is assigned to you."}</p>
+    </header>
+    {tab === "templates" ? <div className="mb-4 space-y-2">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+        {built ? <div aria-label="Which forms" className="scroll-x no-scrollbar -mx-1 flex gap-1.5 px-1 lg:mx-0 lg:px-0" role="group">
+          {([["library", "Forms Library", BookOpen, libraryFamilies.length], ["fms", "FMS workflow forms", Workflow, fmsFamilyCount], ...(crmFamilies.length ? [["crm", "CRM forms", Contact, crmFamilies.length] as const] : [])] as const).map(([key, label, Icon, count]) => <button aria-pressed={source === key} className={cn("inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 text-sm font-semibold transition", source === key ? "border-gold bg-gold/10 text-task-text" : "border-task-border bg-task-bg text-task-text-muted hover:border-gold/50 hover:text-task-text")} key={key} onClick={() => setSource(key)} type="button"><Icon aria-hidden="true" className={cn("size-4 shrink-0", source === key && "text-gold-secondary")} /><span className="whitespace-nowrap">{label}</span><span className={cn("rounded-full px-2 py-0.5 text-xs tabular-nums", source === key ? "bg-gold/20 text-gold-secondary" : "bg-task-muted")}>{count}</span></button>)}
+        </div> : null}
+        <div className={cn("grid flex-1 gap-2", author && "sm:grid-cols-[1fr_auto]")}><label className="relative block"><Search aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-soft-grey" /><input aria-label="Search forms" className="field min-h-11 pl-10" enterKeyHint="search" onChange={(event) => setQuery(event.target.value)} placeholder="Search forms" type="search" value={query} /></label>{author ? <select aria-label="Lifecycle filter" className="field min-h-11 sm:w-52" onChange={(event) => setLife(event.target.value)} value={life}><option value="active">Current and drafts</option><option value="published">Published</option><option value="draft">Drafts</option><option value="archived">Archived history</option><option value="all">All lifecycle</option></select> : null}</div>
+      </div>
+      {built && sourceNote ? <p className="px-1 text-xs leading-relaxed text-task-text-muted">{sourceNote}</p> : null}
     </div> : null}
-    {tab === "templates" ? <div className={cn("mb-5 grid gap-2", author && "sm:grid-cols-[1fr_auto]")}><label className="relative block"><Search aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-soft-grey" /><input aria-label="Search forms" className="field min-h-12 pl-10" enterKeyHint="search" onChange={(event) => setQuery(event.target.value)} placeholder="Search forms" type="search" value={query} /></label>{author ? <select aria-label="Lifecycle filter" className="field min-h-12 sm:w-56" onChange={(event) => setLife(event.target.value)} value={life}><option value="active">Current and drafts</option><option value="published">Published</option><option value="draft">Drafts</option><option value="archived">Archived history</option><option value="all">All lifecycle</option></select> : null}</div> : null}
     {error ? <div className="mb-4"><Notice tone="danger">{error === "Publish form: Form version is pinned by an active FMS stage" ? "This version is in an active FMS stage. Use Publish as separate form to preserve in-progress work and publish your edited copy." : error} <button className="underline" onClick={() => void refresh()} type="button">Retry</button></Notice></div> : null}
-    {!data ? <div className="grid gap-3 sm:grid-cols-2"><div className="skeleton h-36 rounded-2xl" /><div className="skeleton h-36 rounded-2xl" /></div> : tab === "templates" ? <Library searching={query.trim() !== ""} workflowGroups={built && source === "fms" ? workflowGroups : undefined} onVisibilitySaved={refresh} onVisibilityError={setError} author={author} built={built} emptyText={built && source === "fms" ? "No FMS workflow forms match. Forms built inside an FMS step appear here." : source === "crm" ? "No CRM forms match these filters." : "No forms match these filters."} families={built && source === "fms" ? fmsFamilies : source === "crm" ? crmFamilies : built ? libraryFamilies : families.filter((versions) => !crmForms.has(versions[0]!.family_id))} onArchive={(id) => void archiveForm(id).then(refresh).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Archive failed"))} onCreateVersion={runCreateVersion} onDelete={setRemove} onEdit={setEdit} onFill={fillForm} onPublish={runPublish} onPublishAsNew={runPublishAsNew} onEditPublished={(id) => { const form = data.bundles.find((item) => item.id === id); if (form?.lifecycle === "published") setEdit(form); else setError("Archived forms cannot be edited."); }} /> : <SubmissionList bundles={data.bundles} onView={setView} submissions={data.submissions} />}
+    {sidePanel && data ? <div className="grid grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)] items-start gap-5">
+      <div className="min-w-0">{list}</div>
+      <aside aria-label="Selected form" className="sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto overscroll-contain rounded-2xl border border-task-border bg-task-bg p-4 shadow-card">
+        {selectedVersions ? <><div className="mb-3 flex items-start gap-3"><span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-xl bg-gold/10 text-gold-secondary"><FileText className="size-5" /></span><div className="min-w-0"><h2 className="break-words text-lg font-semibold leading-snug text-task-text">{selectedVersions[0]!.name}</h2><p className="text-xs text-task-text-muted">{plural(selectedVersions.length, "version")}</p></div></div><FormFamilyDetails {...libraryActions} placeText={fmsPlaceText(undefined, built?.get(selectedVersions[0]!.family_id))} versions={selectedVersions} /></> : <p className="text-sm text-task-text-muted">Select a form to see its versions and actions.</p>}
+      </aside>
+    </div> : list}
   </section>
   {fill ? <Modal mobileFullscreen onClose={() => setFill(null)} title={fill.name} stickyHeader wide><div className="mx-auto max-w-2xl"><FmsStartingForm formId={fill.id} {...(starter ? { starterAssignmentId: starter.id } : {})} onSaved={refresh} definition={{ name: fill.name, description: fill.description ?? undefined, sections: fill.sections, fields: fill.fields }} dynamicOptions={options} initialAnswers={fill.name === WORK_UPLOAD_FORM_NAME ? { ...(new URLSearchParams(window.location.search).get("referenceNumber") ? { reference_number: new URLSearchParams(window.location.search).get("referenceNumber")! } : {}), ...(options.users.some((user) => user.id === profile.id) ? { crm_follow_up: profile.id } : {}) } : {}} templateId={fill.id} /></div></Modal> : null}
   {remove ? <DeleteFormDialog form={remove} onCancel={() => setRemove(null)} onDeleted={(impact) => { setRemove(null); setRemoved(impact); void refresh(); }} /> : null}
@@ -101,51 +124,95 @@ const LIFECYCLE_BADGE: Readonly<Record<string, { label: string; tone: string }>>
 };
 const roleList = (item: FormBundle) => Array.isArray((item.permissions as { roles?: unknown })?.roles) ? ((item.permissions as { roles: string[] }).roles.map((role) => role.replaceAll("_", " ")).join(", ") || "none") : "none";
 
-function Library({ workflowGroups, searching, ...props }: ComponentProps<typeof FormLibraryCards> & { searching: boolean; workflowGroups?: ReturnType<typeof groupFmsBuiltForms<FormBundle>> | undefined }) {
-  if (!workflowGroups) return <FormLibraryCards {...props} />;
-  return <FmsWorkflowFormList emptyText={props.emptyText} groups={workflowGroups} renderForms={(families, place) => <FormLibraryCards {...props} families={families} place={place} />} searching={searching} />;
+type LibraryActions = Readonly<{ author: boolean; built: ReadonlyMap<string, FmsBuiltForm> | null; onVisibilitySaved: () => Promise<void>; onVisibilityError: (message: string) => void; onFill: (item: FormBundle) => void; onEdit: (item: FormBundle) => void; onPublish: (id: string) => void; onPublishAsNew: (id: string) => void; onEditPublished: (id: string) => void; onCreateVersion: (id: string) => void; onArchive: (id: string) => void; onDelete: (item: FormBundle) => void }>;
+type LibraryListProps = LibraryActions & { families: FormBundle[][]; place?: (familyId: string) => FmsFormPlace; emptyText: string; selectedId: string | null; onSelect: (familyId: string | null) => void; inlineDetails: boolean };
+
+function Library({ workflowGroups, searching, ...props }: LibraryListProps & { searching: boolean; workflowGroups?: ReturnType<typeof groupFmsBuiltForms<FormBundle>> | undefined }) {
+  if (!workflowGroups) return <FormLibraryList {...props} />;
+  return <FmsWorkflowFormList emptyText={props.emptyText} groups={workflowGroups} renderForms={(families, place) => <FormLibraryList {...props} families={families} place={place} />} searching={searching} />;
 }
 
-function FormLibraryCards({ families, place, author, built, emptyText, onVisibilitySaved, onVisibilityError, onFill, onEdit, onPublish, onPublishAsNew, onEditPublished, onCreateVersion, onArchive, onDelete }: { families: FormBundle[][]; place?: (familyId: string) => FmsFormPlace; author: boolean; built: ReadonlyMap<string, FmsBuiltForm> | null; emptyText: string; onVisibilitySaved: () => Promise<void>; onVisibilityError: (message: string) => void; onFill: (item: FormBundle) => void; onEdit: (item: FormBundle) => void; onPublish: (id: string) => void; onPublishAsNew: (id: string) => void; onEditPublished: (id: string) => void; onCreateVersion: (id: string) => void; onArchive: (id: string) => void; onDelete: (item: FormBundle) => void }) {
+/** Where an FMS-built form is used, in one line. */
+function fmsPlaceText(where: FmsFormPlace | undefined, fms: FmsBuiltForm | undefined): string | null {
+  if (where?.workflow) return `${where.workflow}${where.step ? ` · ${where.step}` : ""}`;
+  if (!fms) return null;
+  return fms.workflows.length ? `FMS: ${fms.workflows.join(", ")}${fms.steps.length ? ` · Step: ${fms.steps.join(", ")}` : ""}` : "Built inside an FMS workflow";
+}
+
+/**
+ * The catalogue: one compact row per form family. The name leads, the status and
+ * counts follow in one line, and the main action sits in the same place on every
+ * row. Versions, permissions and the less frequent actions open on demand.
+ */
+function FormLibraryList({ families, place, emptyText, selectedId, onSelect, inlineDetails, ...actions }: LibraryListProps) {
   if (families.length === 0) return <Notice>{emptyText}</Notice>;
-  return <div className={cn("grid gap-3", !author && "sm:grid-cols-2")}>{families.map((versions) => {
+  const { author, built, onFill, onEdit } = actions;
+  return <div className="overflow-hidden rounded-2xl border border-task-border bg-task-bg shadow-card"><ul className="divide-y divide-task-border">{families.map((versions) => {
     const latest = versions[0]!;
     const live = versions.find((item) => item.lifecycle === "published");
     const shown = live ?? latest;
     const where = place?.(latest.family_id);
-    const fms = where?.workflow ? null : built?.get(latest.family_id);
-    return <article className="flex min-w-0 flex-col gap-3 rounded-2xl border border-task-border bg-task-bg p-4 shadow-sm sm:p-5" key={latest.family_id}>
-      <div className="flex items-start gap-3">
-        <span aria-hidden="true" className="grid size-11 shrink-0 place-items-center rounded-xl bg-gold/10 text-gold-secondary"><FileText className="size-5" /></span>
-        <div className="min-w-0 flex-1">
-          <h2 className="break-words text-base font-semibold leading-snug text-task-text sm:text-lg">{latest.name}</h2>
-          {latest.description ? <p className="mt-0.5 line-clamp-3 break-words text-sm text-task-text-muted">{latest.description}</p> : null}
-          <p className="mt-1 text-xs text-task-text-muted">{plural(questionCount(shown), "question")}</p>
-          {fms ? <p className="mt-2 inline-flex max-w-full items-start gap-1.5 rounded-lg bg-gold/10 px-2 py-1 text-xs text-gold-secondary"><Workflow aria-hidden="true" className="mt-px size-3.5 shrink-0" /><span className="min-w-0 break-words">{fms.workflows.length ? `FMS: ${fms.workflows.join(", ")}${fms.steps.length ? ` · Step: ${fms.steps.join(", ")}` : ""}` : "Built inside an FMS workflow"}</span></p> : null}
-          {where?.workflow ? <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
-            <span className="inline-flex max-w-full items-start gap-1.5 rounded-lg bg-gold/10 px-2 py-1 font-medium text-gold-secondary"><Workflow aria-hidden="true" className="mt-px size-3.5 shrink-0" /><span className="min-w-0 break-words">{where.workflow}{where.step ? ` · ${where.step}` : ""}</span></span>
-            {where.sharedWith.length ? <span className="inline-flex max-w-full items-start gap-1.5 rounded-lg border border-task-border bg-task-muted px-2 py-1 text-task-text-muted"><Copy aria-hidden="true" className="mt-px size-3.5 shrink-0" /><span className="min-w-0 break-words">Also used in {where.sharedWith.join(", ")}</span></span> : null}
-          </div> : null}
-        </div>
+    const placeText = fmsPlaceText(where, where?.workflow ? undefined : built?.get(latest.family_id));
+    const badge = LIFECYCLE_BADGE[shown.lifecycle] ?? { label: shown.lifecycle, tone: "bg-task-muted text-task-text-muted" };
+    const draft = versions.find((item) => item.lifecycle === "draft");
+    const submissions = versions.reduce((total, item) => total + (item.submissionCount ?? 0), 0);
+    const selected = selectedId === latest.family_id;
+    const detailsId = `form-details-${latest.family_id}`;
+    return <li key={latest.family_id}><article className={cn("transition-colors", selected && "bg-gold/5")}>
+      <div className="relative flex min-h-16 items-center gap-3 px-3 py-2.5 sm:px-4">
+        <span aria-hidden="true" className={cn("hidden size-9 shrink-0 place-items-center rounded-lg sm:grid", selected ? "bg-gold/20 text-gold-secondary" : "bg-gold/10 text-gold-secondary")}><FileText className="size-4" /></span>
+        {author ? <div className="group min-w-0 flex-1">
+          <FormRowText badge={badge} draft={!!draft && draft !== shown} latest={latest} placeText={placeText} questionCount={questionCount(shown)} sharedWith={where?.sharedWith} submissions={submissions} versions={versions.length}>
+            {/* The whole row opens the form's versions; the heading's button carries the name for assistive tech. */}
+            <button aria-controls={inlineDetails ? detailsId : undefined} aria-expanded={inlineDetails ? selected : undefined} aria-pressed={inlineDetails ? undefined : selected} className="min-w-0 truncate text-left after:absolute after:inset-0 after:content-[''] focus-visible:ring-offset-task-bg" onClick={() => onSelect(selected && inlineDetails ? null : latest.family_id)} title="Show versions and actions" type="button">{latest.name}</button>
+          </FormRowText>
+        </div> : <div className="min-w-0 flex-1">
+          <h2 className="break-words text-[15px] font-semibold leading-snug text-task-text">{latest.name}</h2>
+          {latest.description ? <p className="line-clamp-1 break-words text-xs text-task-text-muted" title={latest.description}>{latest.description}</p> : null}
+          <p className="mt-0.5 text-xs text-task-text-muted">{plural(questionCount(shown), "question")}{placeText ? ` · ${placeText}` : ""}</p>
+        </div>}
+        {live ? <Button className="relative z-10 min-h-10 shrink-0 px-3" onClick={() => onFill(live)} type="button"><Send className="size-4" /><span className="hidden sm:inline">Fill form</span><span className="sr-only sm:hidden">Fill form</span></Button>
+          : author && draft ? <Button className="relative z-10 min-h-10 shrink-0 px-3" onClick={() => onEdit(draft)} type="button" variant="secondary"><Pencil className="size-4" /><span className="hidden sm:inline">Edit draft</span><span className="sr-only sm:hidden">Edit draft</span></Button> : null}
+        {author ? <ChevronRight aria-hidden="true" className={cn("size-4 shrink-0 text-task-text-muted transition-transform", inlineDetails && selected && "rotate-90")} /> : null}
       </div>
-      {!author && live ? <Button className="min-h-12 w-full" onClick={() => onFill(live)} type="button"><Send />Fill form</Button> : null}
-      {author ? <ul className="divide-y divide-task-border rounded-xl border border-task-border">{versions.map((item) => {
-        const badge = LIFECYCLE_BADGE[item.lifecycle] ?? { label: item.lifecycle, tone: "bg-task-muted text-task-text-muted" };
-        return <li className="space-y-3 p-3" key={item.id}>
-          <div className="flex flex-wrap items-center gap-2 text-sm"><span className="font-semibold text-task-text">Version {item.version}</span><span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", badge.tone)}>{badge.label}</span><span className="text-xs text-task-text-muted">{plural(questionCount(item), "question")} · {plural(item.submissionCount, "submission")}</span></div>
-          <p className="text-xs text-task-text-muted">Who can fill it: {roleList(item)}</p>
-          <FormLibraryVisibility templateId={item.id} visible={item.library_visible !== false} onSaved={onVisibilitySaved} onError={onVisibilityError} />
-          <div className="flex flex-wrap gap-2">
-            {item.lifecycle === "published" ? <Button onClick={() => onFill(item)} type="button"><Send />Fill form</Button> : null}
-            {item.lifecycle === "draft" ? <><Button onClick={() => onEdit(item)} type="button" variant="secondary"><Pencil />Edit</Button><Button onClick={() => onPublish(item.id)} type="button">Publish</Button><Button onClick={() => { if (window.confirm("Publish this edited version as a separate form? Active FMS stages will keep using the current version.")) onPublishAsNew(item.id); }} type="button" variant="secondary"><Copy />Publish as separate form</Button></> : null}
-            {item.lifecycle === "published" ? <><Button onClick={() => onEditPublished(item.id)} type="button" variant="secondary"><Pencil />Edit</Button><Button onClick={() => onCreateVersion(item.id)} type="button" variant="secondary"><Copy />Create new version</Button></> : null}
-            <Button onClick={() => onDelete(item)} type="button" variant="danger"><Trash2 />Delete</Button>
-            {item.lifecycle !== "archived" ? <Button onClick={() => { if (window.confirm("Archive this form version?")) onArchive(item.id); }} type="button" variant="danger"><Archive />Archive</Button> : null}
-          </div>
-        </li>;
-      })}</ul> : null}
-    </article>;
-  })}</div>;
+      {author && inlineDetails && selected ? <div className="border-t border-task-border bg-task-muted/30 px-3 py-3 sm:px-4" id={detailsId}><FormFamilyDetails {...actions} placeText={placeText} versions={versions} /></div> : null}
+    </article></li>;
+  })}</ul></div>;
+}
+
+function FormRowText({ children, latest, badge, draft, questionCount: questions, versions, submissions, placeText, sharedWith }: { children: ReactNode; latest: FormBundle; badge: { label: string; tone: string }; draft: boolean; questionCount: number; versions: number; submissions: number; placeText: string | null; sharedWith?: readonly string[] | undefined }) {
+  return <>
+    <span className="flex min-w-0 items-center gap-2"><h2 className="flex min-w-0 text-[15px] font-semibold leading-snug text-task-text group-hover:text-gold-secondary">{children}</h2><span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold", badge.tone)}>{badge.label}</span>{draft ? <span className="shrink-0 rounded-full bg-gold/15 px-2 py-0.5 text-[11px] font-semibold text-gold-secondary">Draft open</span> : null}</span>
+    <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-task-text-muted tabular-nums"><span>{plural(questions, "question")}</span><span aria-hidden>·</span><span>v{latest.version}{versions > 1 ? ` (${versions} versions)` : ""}</span><span aria-hidden>·</span><span>{plural(submissions, "submission")}</span></span>
+    {placeText ? <span className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-gold-secondary"><Workflow aria-hidden="true" className="size-3.5 shrink-0" /><span className="min-w-0 truncate" title={placeText}>{placeText}</span>{sharedWith?.length ? <span className="inline-flex min-w-0 items-center gap-1 text-task-text-muted"><Copy aria-hidden="true" className="size-3" />Also used in {sharedWith.join(", ")}</span> : null}</span> : null}
+  </>;
+}
+
+/** Everything about one form family: its versions, who can fill each, and every lifecycle action. */
+function FormFamilyDetails({ versions, placeText, author, onVisibilitySaved, onVisibilityError, onFill, onEdit, onPublish, onPublishAsNew, onEditPublished, onCreateVersion, onArchive, onDelete }: LibraryActions & { versions: FormBundle[]; placeText: string | null }) {
+  const latest = versions[0]!;
+  if (!author) return null;
+  return <div className="space-y-3">
+    {latest.description ? <p className="whitespace-pre-wrap break-words text-sm text-task-text-muted">{latest.description}</p> : null}
+    {placeText ? <p className="inline-flex max-w-full items-start gap-1.5 rounded-lg bg-gold/10 px-2 py-1 text-xs text-gold-secondary"><Workflow aria-hidden="true" className="mt-px size-3.5 shrink-0" /><span className="min-w-0 break-words">{placeText}</span></p> : null}
+    <ul aria-label={`${latest.name} versions`} className="space-y-2">{versions.map((item) => {
+      const badge = LIFECYCLE_BADGE[item.lifecycle] ?? { label: item.lifecycle, tone: "bg-task-muted text-task-text-muted" };
+      return <li className="space-y-2.5 rounded-xl border border-task-border bg-task-bg p-3" key={item.id}>
+        <div className="flex flex-wrap items-center gap-2 text-sm"><span className="font-semibold text-task-text">Version {item.version}</span><span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", badge.tone)}>{badge.label}</span><span className="text-xs text-task-text-muted tabular-nums">{plural(questionCount(item), "question")} · {plural(item.submissionCount, "submission")}</span></div>
+        <p className="text-xs capitalize text-task-text-muted"><span className="normal-case">Who can fill it:</span> {roleList(item)}</p>
+        <FormLibraryVisibility templateId={item.id} visible={item.library_visible !== false} onSaved={onVisibilitySaved} onError={onVisibilityError} />
+        <div className="flex flex-wrap gap-2">
+          {item.lifecycle === "published" ? <Button className="min-h-10" onClick={() => onFill(item)} type="button"><Send />Fill form</Button> : null}
+          {item.lifecycle === "draft" ? <><Button className="min-h-10" onClick={() => onEdit(item)} type="button" variant="secondary"><Pencil />Edit</Button><Button className="min-h-10" onClick={() => onPublish(item.id)} type="button">Publish</Button><Button className="min-h-10" onClick={() => { if (window.confirm("Publish this edited version as a separate form? Active FMS stages will keep using the current version.")) onPublishAsNew(item.id); }} type="button" variant="secondary"><Copy />Publish as separate form</Button></> : null}
+          {item.lifecycle === "published" ? <><Button className="min-h-10" onClick={() => onEditPublished(item.id)} type="button" variant="secondary"><Pencil />Edit</Button><Button className="min-h-10" onClick={() => onCreateVersion(item.id)} type="button" variant="secondary"><Copy />Create new version</Button></> : null}
+        </div>
+        <div className="flex flex-wrap gap-2 border-t border-dashed border-task-border pt-2.5">
+          {item.lifecycle !== "archived" ? <Button className="min-h-9 px-3 text-xs" onClick={() => { if (window.confirm("Archive this form version?")) onArchive(item.id); }} type="button" variant="ghost"><Archive className="size-4" />Archive</Button> : null}
+          <Button className="min-h-9 px-3 text-xs" onClick={() => onDelete(item)} type="button" variant="danger"><Trash2 className="size-4" />Delete</Button>
+        </div>
+      </li>;
+    })}</ul>
+  </div>;
 }
 function SubmissionList({ bundles, submissions, onView }: { bundles: FormBundle[]; submissions: FormSubmission[]; onView: (item: FormSubmission) => void }) { const groups = groupFormSubmissions(submissions.map(submissionRecord), bundles.map(submissionTemplate), (record) => { const row = submissions.find((item) => item.id === record.id); const deleted = row ? deletedFormBundle(row) : null; return deleted ? submissionTemplate(deleted) : null; }, []); return <div className="grid gap-4">{groups.length === 0 ? <Notice>You have not submitted any forms yet.</Notice> : groups.map((group) => <section className="overflow-hidden rounded-2xl border border-task-border bg-task-bg" key={group.key}><header className="flex items-center justify-between gap-3 border-b border-task-border bg-task-muted/60 px-4 py-3"><h2 className="min-w-0 break-words font-semibold text-task-text">{group.title}</h2><span className="shrink-0 rounded-full bg-gold/10 px-2.5 py-1 text-xs font-semibold text-gold-secondary">{group.items.length} filled</span></header><div className="divide-y divide-task-border">{group.items.map((item) => <button className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-gold/5" key={item.id} onClick={() => { const row = submissions.find((submission) => submission.id === item.id); if (row) onView(row); }} type="button"><span className="min-w-0 flex-1"><span className="block text-sm font-medium text-task-text">{item.submittedAt ? formatKolkataDateTime(item.submittedAt) : "Submitted"}</span><span className="block text-xs text-task-text-muted">{item.linkedModule ? `Part of ${LINKED_MODULES[item.linkedModule] ?? item.linkedModule.replaceAll("_", " ")}` : "Filled from Forms Library"}</span></span><span className={cn("shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold", STATUS_TONE[item.status] ?? "bg-task-muted text-task-text-muted")}>{submissionStatus(item.status)}</span><ChevronRight aria-hidden="true" className="size-4 shrink-0 text-task-text-muted" /></button>)}</div></section>)}</div>; }
 const SUBMISSION_STATUS: Readonly<Record<string, string>> = { submitted: "Submitted", approved: "Approved", rejected: "Rejected", draft: "Draft" };
