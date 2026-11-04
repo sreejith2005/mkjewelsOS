@@ -36,8 +36,8 @@ export function useFillViewport<T extends HTMLElement>({ enabled = true, minHeig
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
     const header = document.querySelector("body header");
     if (header) observer?.observe(header);
-    const previous = ref.current?.previousElementSibling;
-    if (previous) observer?.observe(previous);
+    // Anything above it opening or closing (a filter bar, a notice) moves its top edge.
+    observer?.observe(document.body);
     return () => {
       window.removeEventListener("resize", measure);
       viewport?.removeEventListener("resize", measure);
