@@ -384,6 +384,33 @@ scroll sideways as a whole; wide tables scroll inside their own box.
 - [ ] A form that has its own Customer Integration mapping still works as before (and still needs CRM approval).
 - [ ] Settings → Customer Integration does not list these forms as configured.
 
+### UI v2 - 2026-11-04
+
+Phones first (320, 360, 390, 430 px; Android app), then 768, 1024, 1366, 1440,
+1920, 2560 px. No whole-page sideways scroll; workspaces fill the window
+without a second page scroll bar.
+
+- Ask Kiara: edge-to-edge; chats on the left (Chats drawer on a phone);
+  Kiara tools at the sidebar bottom opens Chat / Questions for you / Knowledge
+  base / Insights / Limits per permission; ?tab= and escalation links still
+  open their area; composer stays above the phone keyboard.
+- Reports: category and report chips (Report select on a phone), Filters bar
+  (folded on a phone), full-width table with pinned headers, phone rows open
+  the whole record, Your exports dialog (download, cancel, retry).
+- FMS: one row per workflow; ⋯ menu for Pause / Resume, Restore, Version
+  history, Delete (with its confirmations); Start, Tasks, Runs, Edit draft /
+  New version on the row.
+- Forms Library: list and details panes reach the window bottom and scroll on
+  their own (1280 px+); phones and tablets open a form full screen with Back to
+  forms.
+- Tasks: title, Today / Overall / Overdue and search on one row; subsection
+  tabs, Assigning Left and Bulk Import below; Create Task still floats.
+- Task Control: header, tabs, filters and content share the page edges.
+- Availability: Leave management is the header's main button; Department
+  select beside search.
+- Dropdown Master: lists and options panes scroll independently (1280 px+);
+  New list in the header, Add item on the open list; phones: All lists.
+
 ### Notifications
 
 - [ ] Task assignment creates an in-app notification; read / mark-all-read work.
