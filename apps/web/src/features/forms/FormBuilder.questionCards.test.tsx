@@ -19,25 +19,20 @@ const bundle = {
   submissionCount: 0,
 } as unknown as FormBundle;
 
-describe("Form builder question width", () => {
+describe("Form builder questions, one after another", () => {
   beforeEach(() => { vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("min-width"), media: query, addEventListener: () => undefined, removeEventListener: () => undefined })); });
   afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-  it("sets a question to half or a third of a row, shows it in the list and the live preview, and back to full", async () => {
+  it("shows how each question will look, with no width or CRM settings to configure", async () => {
     const user = userEvent.setup();
     render(<FormBuilder bundle={bundle} dynamicOptions={{ users: [], branches: [], departments: [], masters: [] }} onClose={() => undefined} onSaved={async () => undefined} />);
-    await user.click(screen.getByLabelText("Edit Client name"));
-    const widths = screen.getByRole("group", { name: "Client name width" });
-    expect(within(widths).getByRole("button", { name: "Full" }).getAttribute("aria-pressed")).toBe("true");
-    await user.click(within(widths).getByRole("button", { name: "Half" }));
-    expect(within(widths).getByRole("button", { name: "Half" }).getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByText(/Short answer · half width|· half width/)).toBeTruthy();
+    expect(screen.getByText("Short answer")).toBeTruthy();
+    expect(screen.getByText("Phone number")).toBeTruthy();
+    await user.click(screen.getByLabelText("Edit Mobile number"));
+    expect(screen.queryByText("Width on wider screens")).toBeNull();
+    expect(screen.queryByText("In CRM forms")).toBeNull();
     const preview = screen.getByRole("complementary", { name: "Live preview" });
-    expect(preview.querySelector('[class~="md:col-span-3"]')).toBeTruthy();
-    await user.click(within(widths).getByRole("button", { name: "Third" }));
-    expect(preview.querySelector('[class~="md:col-span-2"]')).toBeTruthy();
-    await user.click(within(widths).getByRole("button", { name: "Full" }));
-    expect(preview.querySelector('[class~="md:col-span-2"]')).toBeNull();
-    expect(screen.queryByText(/· (half|third) width/)).toBeNull();
+    expect(preview.querySelector('[class*="col-span"]')).toBeNull();
+    expect(within(preview).getByText("Client name")).toBeTruthy();
   });
 });

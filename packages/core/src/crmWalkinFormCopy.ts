@@ -71,19 +71,18 @@ export function crmWalkinFormCopy(lookups: Readonly<Record<string, readonly stri
     const values = valuesWhere(key, (label) => label.trim().toUpperCase().startsWith("OTHER"), labelsOf(listKey));
     return any(...values.map((value): FormRule => ({ kind: "predicate", fieldKey: key, operator: multi ? "contains" : "equals", value })));
   };
-  const half = { width: "half" as const };
   const choiceQuestion = (target: string, key: string, label: string, listKey: string, extra: Partial<Question> = {}) => {
     const source = choices(listKey, key);
-    add(target, source ? { key, label, type: "select", ...source, validation: half, ...extra } : { key, label, type: "text", validation: half, ...extra });
+    add(target, source ? { key, label, type: "select", ...source, ...extra } : { key, label, type: "text", ...extra });
   };
-  const text = (target: string, key: string, label: string, extra: Partial<Question> = {}) => add(target, { key, label, type: "text", validation: half, ...extra });
+  const text = (target: string, key: string, label: string, extra: Partial<Question> = {}) => add(target, { key, label, type: "text", ...extra });
   const heading = (key: string, label: string, sectionKey: string) => add(null, { key, label, type: "section_header", sectionKey });
 
   // CLIENT DETAILS
   let section = "client_details";
-  add("event_date", { key: "event_date", label: "Visit date and time", type: "datetime", required: true, sectionKey: section, validation: half });
+  add("event_date", { key: "event_date", label: "Visit date and time", type: "datetime", required: true, sectionKey: section });
   text("primary_name", "primary_name", "Client name", { required: true, sectionKey: section });
-  add("primary_phone", { key: "primary_phone", label: "Mobile", type: "phone", required: true, sectionKey: section, validation: { ...half, crm: { lookup: "client_phone" } }, helperText: "A number outside India starts with + and the country code." });
+  add("primary_phone", { key: "primary_phone", label: "Mobile", type: "phone", required: true, sectionKey: section, helperText: "A number outside India starts with + and the country code." });
   choiceQuestion("source_of_lead", "source_of_lead", "Source of lead", "lookup_source_of_leads", { required: true, sectionKey: section });
   const reference = valuesWhere("source_of_lead", (label) => label.trim().toUpperCase() === "REFERENCE", labelsOf("lookup_source_of_leads"));
   const referenceRule = any(...reference.map((value) => eq("source_of_lead", value)));
@@ -91,22 +90,22 @@ export function crmWalkinFormCopy(lookups: Readonly<Record<string, readonly stri
   text("reference_phone", "reference_phone", "Reference phone", { sectionKey: section, ...(referenceRule ? { rule: referenceRule } : {}) });
   const sourceOther = otherRule("source_of_lead", "lookup_source_of_leads");
   text("source_of_lead_other", "source_of_lead_other", "Source other", { sectionKey: section, ...(sourceOther ? { rule: sourceOther } : {}) });
-  text("crm_name", "crm_name", "CRM / salesperson", { sectionKey: section, validation: { ...half, crm: { choices: "crm_names" } } });
-  text("salesperson", "salesperson", "Salesperson attending the client", { required: true, sectionKey: section, validation: { ...half, crm: { choices: "salespeople" } } });
+  text("crm_name", "crm_name", "CRM / salesperson", { sectionKey: section });
+  text("salesperson", "salesperson", "Salesperson attending the client", { required: true, sectionKey: section });
   heading("profile_heading", "CLIENT PROFILE & CONTACT", section);
   choiceQuestion("gender", "gender", "Gender", "gender", { required: true, sectionKey: section });
-  add("billing_phone", { key: "billing_phone", label: "Billing phone", type: "phone", sectionKey: section, validation: half, helperText: "Leave blank when it is the same as the mobile number." });
+  add("billing_phone", { key: "billing_phone", label: "Billing phone", type: "phone", sectionKey: section, helperText: "Leave blank when it is the same as the mobile number." });
   text("country", "country", "Country", { required: true, sectionKey: section });
   text("state", "state", "State", { required: true, sectionKey: section });
   text("city", "city", "City", { required: true, sectionKey: section });
   text("city_other", "city_other", "City other", { sectionKey: section, rule: inList("city", ["OTHER", "Other", "other"]) });
-  text("pincode", "pincode", "Pincode", { required: true, sectionKey: section, validation: { ...half, crm: { lookup: "pincode" } } });
+  text("pincode", "pincode", "Pincode", { required: true, sectionKey: section });
   text("address", "address", "Address", { required: true, sectionKey: section });
   choiceQuestion("community", "community", "Community / caste", "lookup_communities", { required: true, sectionKey: section });
   const communityOther = otherRule("community", "lookup_communities");
   text("community_other", "community_other", "Community other", { sectionKey: section, ...(communityOther ? { rule: communityOther } : {}) });
-  add("dob", { key: "dob", label: "Date of birth", type: "date", sectionKey: section, validation: half });
-  add("anniversary", { key: "anniversary", label: "Anniversary", type: "date", sectionKey: section, validation: half });
+  add("dob", { key: "dob", label: "Date of birth", type: "date", sectionKey: section });
+  add("anniversary", { key: "anniversary", label: "Anniversary", type: "date", sectionKey: section });
   heading("planning_heading", "CLIENT PLANNING", section);
   choiceQuestion("occupation", "occupation", "Occupation", "occupation", { required: true, sectionKey: section });
   const occupationOther = valuesWhere("occupation", (label) => label.trim().toUpperCase() === "OTHER", labelsOf("occupation"));
@@ -117,7 +116,7 @@ export function crmWalkinFormCopy(lookups: Readonly<Record<string, readonly stri
   const bridalRule = any(...bridal.map((value) => eq("bridal_or_non_bridal", value)));
   choiceQuestion("wedding_month", "wedding_month", "Wedding month", "wedding_month", { required: true, sectionKey: section, ...(bridalRule ? { rule: bridalRule } : {}) });
   const years = Array.from({ length: 11 }, (_, index) => String(year + index));
-  add("wedding_year", { key: "wedding_year", label: "Wedding year", type: "select", required: true, sectionKey: section, ...staticChoice("wedding_year", years.map((value) => ({ value, label: value }))), validation: half, ...(bridalRule ? { rule: bridalRule } : {}) });
+  add("wedding_year", { key: "wedding_year", label: "Wedding year", type: "select", required: true, sectionKey: section, ...staticChoice("wedding_year", years.map((value) => ({ value, label: value }))), ...(bridalRule ? { rule: bridalRule } : {}) });
   choiceQuestion("communication_preference", "communication_preference", "Communication preference", "communication_preference", { required: true, sectionKey: section });
 
   // FAMILY / FRIENDS WITH CLIENT
@@ -131,7 +130,7 @@ export function crmWalkinFormCopy(lookups: Readonly<Record<string, readonly stri
 
   // VISIT DETAILS
   section = "visit";
-  add("visit_status", { key: "visit_status", label: "Client bought any product?", type: "select", required: true, sectionKey: section, ...staticChoice("visit_status", coded(VISIT_STATUSES)), validation: half });
+  add("visit_status", { key: "visit_status", label: "Client bought any product?", type: "select", required: true, sectionKey: section, ...staticChoice("visit_status", coded(VISIT_STATUSES)) });
   const status = (...codes: string[]) => inList("visit_status", codes.map((code) => code.toLowerCase()));
   const reasons = choices("lookup_not_bought_reasons", "not_bought_reasons");
   if (reasons) add("not_bought_reasons", { key: "not_bought_reasons", label: "Not-bought reasons", type: "checkbox", required: true, sectionKey: section, ...reasons, rule: eq("visit_status", "no") });
@@ -151,25 +150,25 @@ export function crmWalkinFormCopy(lookups: Readonly<Record<string, readonly stri
   productBlock(seen, "", seenLabels, status("YES", "NO", "PRODUCT_EXCHANGE"), true);
   const bought = status("YES");
   productBlock({ categories: "bought_categories", tags: "bought_tags", other: "bought_other" }, "", { categories: "Bought product categories", count: "How many products did the client buy?", other: "Other (bought category)" }, bought, false);
-  add("other_order", { key: "other_order", label: "Did the client make any other / new order?", type: "select", sectionKey: section, ...staticChoice("other_order", YES_NO), validation: half, rule: bought });
+  add("other_order", { key: "other_order", label: "Did the client make any other / new order?", type: "select", sectionKey: section, ...staticChoice("other_order", YES_NO), rule: bought });
   productBlock({ categories: "order_categories", tags: "order_tags", other: "order_other" }, "", { categories: "Order / new-things categories", count: "How many products in the order?", other: "Other (order category)" }, all(bought, eq("other_order", "yes")), false);
 
   const repair = status(...REPAIR_OR_ORDER);
   const cameFor = { categories: "came_for_categories", tags: "camefor_tags", other: "came_for_other" };
   productBlock(cameFor, "", { categories: "Product categories client came for", count: "Number of products client came for", other: "Other (came-for category)" }, repair, true);
-  add("repair_or_order_approach", { key: "repair_or_order_approach", label: "Did CRM approach to show new products?", type: "select", sectionKey: section, ...staticChoice("repair_or_order_approach", YES_NO), validation: half, rule: repair });
+  add("repair_or_order_approach", { key: "repair_or_order_approach", label: "Did CRM approach to show new products?", type: "select", sectionKey: section, ...staticChoice("repair_or_order_approach", YES_NO), rule: repair });
   const approached = all(repair, eq("repair_or_order_approach", "yes"));
   productBlock(seen, "_b", seenLabels, approached, true);
-  add("new_things_choice", { key: "new_things_choice", label: "Is client buying / making order for new things?", type: "select", sectionKey: section, ...staticChoice("new_things_choice", coded(["BUYING_NEW_PRODUCT", "MAKING_NEW_ORDER", "NO"])), validation: half, rule: approached });
+  add("new_things_choice", { key: "new_things_choice", label: "Is client buying / making order for new things?", type: "select", sectionKey: section, ...staticChoice("new_things_choice", coded(["BUYING_NEW_PRODUCT", "MAKING_NEW_ORDER", "NO"])), rule: approached });
   const buyingNew = all(approached, inList("new_things_choice", ["buying_new_product", "making_new_order"]));
-  text("salesperson_handled", "salesperson_handled", "Salesperson attending new buy / order", { required: true, sectionKey: section, rule: buyingNew, validation: { ...half, crm: { choices: "salespeople" } } });
+  text("salesperson_handled", "salesperson_handled", "Salesperson attending new buy / order", { required: true, sectionKey: section, rule: buyingNew });
   const newThings = { categories: "new_things_categories", tags: "new_things_tags", other: "new_things_other" };
   const newLabels = { categories: "New buy / order categories", count: "Number of new products", other: "Other (new buy / order category)" };
   productBlock(newThings, "", newLabels, buyingNew, false);
 
   const exchange = status("PRODUCT_EXCHANGE");
   productBlock(cameFor, "_x", { categories: "Product categories client came for", count: "Number of products client came for", other: "Other (came for category)" }, exchange, true);
-  text("salesperson_handled", "salesperson_handled_x", "Salesperson attending the client (new buy / order)", { required: true, sectionKey: section, rule: exchange, validation: { ...half, crm: { choices: "salespeople" } } });
+  text("salesperson_handled", "salesperson_handled_x", "Salesperson attending the client (new buy / order)", { required: true, sectionKey: section, rule: exchange });
   productBlock(newThings, "_x", newLabels, exchange, false);
 
   // CRM APPROACH (not asked for a store visit or a price calculation)
@@ -177,7 +176,7 @@ export function crmWalkinFormCopy(lookups: Readonly<Record<string, readonly stri
   add("marketing_message_sent", { key: "marketing_message_sent", label: "Marketing message", type: "radio", sectionKey: section, ...staticChoice("marketing_message_sent", YES_NO) });
   for (const ask of CRM_WALKIN_ENGAGEMENT) {
     const key = `engagement_${ask.key}`;
-    add(key, { key, label: ask.label, type: "select", required: true, sectionKey: section, ...staticChoice(key, coded(ask.answers)), validation: half });
+    add(key, { key, label: ask.label, type: "select", required: true, sectionKey: section, ...staticChoice(key, coded(ask.answers)) });
     text(`${key}_reason`, `${key}_reason`, `${ask.label} - no reason`, { sectionKey: section, rule: eq(key, "no"), placeholder: "Reason" });
     if (ask.key === "referrals") add("referrals", { key: "referrals", label: "Referrals", type: "repeat", sectionKey: section, rule: eq(key, "yes"), validation: { repeat: { countLabel: "How many referrals?", min: 1, max: 10, fields: [
       { key: "name", label: "Referral name", type: "text", required: true }, { key: "mobile", label: "Referral number", type: "phone", required: true },
@@ -195,8 +194,8 @@ export function crmWalkinFormCopy(lookups: Readonly<Record<string, readonly stri
 
   // REMARK
   section = "remark";
-  add("next_visit_date", { key: "next_visit_date", label: "Next visit date", type: "date", required: true, sectionKey: section, validation: half, rule: eq("visit_status", "no") });
-  add("next_visit_date", { key: "next_visit_date_other", label: "Next visit date", type: "date", sectionKey: section, validation: half, rule: { kind: "predicate", fieldKey: "visit_status", operator: "not_equals", value: "no" } });
+  add("next_visit_date", { key: "next_visit_date", label: "Next visit date", type: "date", required: true, sectionKey: section, rule: eq("visit_status", "no") });
+  add("next_visit_date", { key: "next_visit_date_other", label: "Next visit date", type: "date", sectionKey: section, rule: { kind: "predicate", fieldKey: "visit_status", operator: "not_equals", value: "no" } });
   choiceQuestion("client_potential_category", "client_potential_category", "Client potential category", "client_potential_category", { sectionKey: section });
   text("high_potential_reason", "high_potential_reason", "Why high potential", { sectionKey: section });
   text("product_requirement", "product_requirement", "Product requirement", { sectionKey: section });

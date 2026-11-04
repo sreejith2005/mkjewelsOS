@@ -42,8 +42,11 @@ describe("walk-in visit with a linked form", () => {
     expect(opened!.initialText).toMatchObject({ primary_name: "Asha", primary_phone: "9876543210", crm_name: "CRM One", source_of_lead: "Walk-in", country: "India" });
     expect(opened!.submitLabel).toBe("Submit complete visit");
     const crm = opened!.crm as FormCrmServices;
-    expect(crm.choices("salespeople")).toEqual(["Priya"]);
-    expect(crm.choices("crm_names")).toEqual(["CRM One"]);
+    // The questions linked to Salesperson and CRM get the branch's lists; others get none.
+    expect(crm.choices!("salesperson")).toEqual(["Priya"]);
+    expect(crm.choices!("salesperson_handled_x")).toEqual(["Priya"]);
+    expect(crm.choices!("crm_name")).toEqual(["CRM One"]);
+    expect(crm.choices!("remark")).toBeNull();
     // The queue client's own number keeps the visit with that client, without a lookup.
     expect(await crm.lookup("client_phone", "9876543210")).toBeNull();
     expect(lookup).not.toHaveBeenCalled();

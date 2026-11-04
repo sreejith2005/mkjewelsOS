@@ -7,6 +7,7 @@ export * from "./visibility";
 export * from "./validation";
 export * from "./answers";
 export * from "./structuredAnswers";
+export * from "./clientAutofill";
 export * from "./format";
 export * from "./answerDisplay";
 export * from "./publishability";

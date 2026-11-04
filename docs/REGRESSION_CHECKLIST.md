@@ -327,8 +327,17 @@ Android phone-sized device.
 - [ ] Engagement asks: YES requires a proof photo (testimonial also accepts a video), NO asks for a reason; Referrals YES asks "How many referrals?" with name and number per referral. Photos upload to the client's CRM documents and appear on the client profile.
 - [ ] **Submit complete visit**: one visit saved, queue entry completed, "Walk-in saved" message, walk-in task closed in JewelOS Tasks; pressing Submit again after a dropped connection does not save a second visit.
 - [ ] Without a walk-in link (or after **Use the standard CRM form**) the standard walk-in form opens exactly as before.
-- [ ] Form Builder: **Repeating group (CRM)** and **CRM photo / video** are in the question types; **In CRM forms** settings on text/phone questions; a Forms Library form using them says "This question works in CRM forms only." and cannot be submitted outside CRM.
+- [ ] Form Builder: **Repeating group (CRM)** and **CRM photo / video** are in the question types; there is no "In CRM forms" or width setting; a Forms Library form with a CRM photo question says "This question works in CRM forms only." and cannot be submitted outside CRM.
 - [ ] Lead form linked earlier: a date question (for example Date of birth) now saves (it is sent as YYYY-MM-DD).
+
+### Automatic client details and one question per row - 2026-11-04
+
+- [ ] Any form (Forms Library, FMS step, task form), signed in with CRM access: type a registered client's or lead's phone number; client name, gender, date of birth, city and the other recognised questions fill with "Auto-filled from client history — editable". An answer typed before the lookup is not replaced.
+- [ ] A 6-digit pincode fills city, state and country.
+- [ ] Signed in without CRM access: nothing is filled.
+- [ ] Every form shows one question after another on desktop and phone, including forms saved with half / third widths.
+- [ ] Form editor: each question card shows how it will look (Short answer, Phone number, its choices); no width or "In CRM forms" settings.
+- [ ] CRM client queue form: typing a known number fills CLIENT NAME (as the old CRM form did).
 
 ### Notifications
 

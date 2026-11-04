@@ -96,10 +96,10 @@ describe("answers for CRM", () => {
 });
 
 describe("copies of today's CRM forms", () => {
-  it("copies the client queue form: CLIENT NAME and MOBILE NUMBER side by side, linked", () => {
+  it("copies the client queue form: CLIENT NAME then MOBILE NUMBER, linked", () => {
     const copy = crmQueueFormCopy();
     expect(copy.fields.map((field) => [field.key, field.label, field.type, field.required, field.validation?.width])).toEqual([
-      ["client_name", "CLIENT NAME", "text", true, "half"], ["mobile", "MOBILE NUMBER", "phone", true, "half"],
+      ["client_name", "CLIENT NAME", "text", true, undefined], ["mobile", "MOBILE NUMBER", "phone", true, undefined],
     ]);
     const definition = { name: copy.name, fields: copy.fields };
     expect(validateFormDefinition(definition)).toEqual([]);
@@ -131,7 +131,7 @@ describe("copies of today's CRM forms", () => {
       ["name", "CLIENT NAME", "text", true], ["mobile_no", "MOBILE NO", "phone", true], ["lead_type", "LEAD TYPE", "select", true],
       ["location", "LOCATION", "text", false], ["source_of_lead", "SOURCE OF LEAD", "select", true], ["exhibition_name", "EXHIBITION NAME", "text", false],
     ]);
-    expect(copy.fields.every((field) => field.validation?.width === "half")).toBe(true);
+    expect(copy.fields.every((field) => field.validation?.width === undefined)).toBe(true);
     expect(copy.fields[2]!.options).toEqual([{ value: "remote", label: "Remote" }, { value: "walk_in", label: "Walk-in" }]);
     expect(copy.fields[4]!.optionSource).toEqual({ kind: "master", masterType: "crm_source" });
     expect(copy.fields[4]!.rule).toEqual({ kind: "predicate", fieldKey: "lead_type", operator: "equals", value: "remote" });

@@ -68,11 +68,19 @@ export function LinkedWalkinVisit({ host, link, queue, client, profileName, crmB
   }, []);
 
   const services = useMemo<FormCrmServices>(() => ({
-    choices: (list) => list === "salespeople" ? salespeople.map((person) => person.name) : crmByBranch[queue.branch_id] ?? [],
+    // The questions the walk-in link ties to Salesperson / CRM get the branch's lists automatically.
+    choices: (fieldKey) => {
+      const linkedTo = (target: string) => crmLinkedQuestions(link.fieldMap, target).includes(fieldKey);
+      if (linkedTo("salesperson") || linkedTo("salesperson_handled")) return salespeople.map((person) => person.name);
+      if (linkedTo("crm_name")) return crmByBranch[queue.branch_id] ?? [];
+      return null;
+    },
     lookup: async (kind, value) => {
       if (kind === "pincode") {
         const { data } = await createClient().from("lookup_pincodes").select("city,state,country").eq("pincode", value.trim()).eq("active", true).maybeSingle();
-        return data ? byQuestion({ city: data.city, state: data.state, country: data.country }) : null;
+        if (!data) return null;
+        const address = { city: data.city, state: data.state, country: data.country };
+        return { details: address, byQuestion: byQuestion(address) };
       }
       const typed = composePhone(DEFAULT_COUNTRY_CODE, value);
       // While the mobile is still the queue client's own, the visit stays with that client.
@@ -82,7 +90,8 @@ export function LinkedWalkinVisit({ host, link, queue, client, profileName, crmB
       resolved.current = { clientId: matched.client_id, clientType: queue.client_is_new && matched.client_id === queue.client_id ? "new" : "existing" };
       proposedClientId.current = matched.client_id;
       const filled = clientProfileAutofill(matched) as Record<string, string>;
-      return byQuestion({ ...filled, wedding_month: monthName(filled.wedding_month) });
+      const details = { ...filled, wedding_month: monthName(filled.wedding_month) };
+      return { details, byQuestion: byQuestion(details) };
     },
     upload: async (fieldKey, file, { video }) => {
       const type = file.type.toLowerCase();

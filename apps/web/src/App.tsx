@@ -40,6 +40,8 @@ import { AuthLayout, BrandedLoading, PageLoading } from "@/components/shell/Bran
 import { LazyPageErrorBoundary } from "@/components/LazyPageErrorBoundary";
 import { crmProjectConfig } from "@/lib/crmProject";
 import { createCrmFormsHost } from "@/features/crm/crmFormsHost";
+import { appCrmServices } from "@/features/crm/crmClientLookup";
+import { FormCrmServicesContext } from "@/features/forms/crmServicesContext";
 import { lazyPage, prefetchPagesWhenIdle } from "@/lib/lazyPage";
 import { DailyChecklistManager } from "@/features/daily-checklists/DailyChecklistManager";
 import { useKiaraEscalationBadge } from "@/features/assistant/useKiaraEscalationBadge";
@@ -325,6 +327,8 @@ function AppShell() {
       .filter((item) => accessible.has(item.id))
       .map((item) => ({ ...item, Icon: PAGE_ICONS[item.id] }));
   }, [menu]);
+  // Any form fills a registered client's details from their phone number, for people allowed into CRM (2026-11-04).
+  const crmLookupAllowed = effectiveAccess !== null && resolvePageAccess(effectiveAccess, sectionControls, "crm") === "allowed";
   // Form Builder forms linked to CRM registration (CRM Form Settings, 2026-11-03).
   const crmFormsHost = useMemo(() => createCrmFormsHost(navigate), [navigate]);
   const menuKey = menu.map((item) => item.id).join(",");
@@ -382,7 +386,7 @@ function AppShell() {
             : <DashboardPage />;
 
   return (
-    <>
+    <FormCrmServicesContext.Provider value={crmLookupAllowed ? appCrmServices : undefined}>
     <ApplicationShell
       badges={kiaraBadge ? { ask_kiara: kiaraBadge } : undefined}
       branch={branch}
@@ -410,7 +414,7 @@ function AppShell() {
     </ApplicationShell>
     {canUseGlobalVoice ? <GlobalVoiceTaskButton profile={profile} raised={currentPage === "checklist_tasks"} /> : null}
     <DailyChecklistGate profileId={profile.id} />
-    </>
+    </FormCrmServicesContext.Provider>
   );
 }
 

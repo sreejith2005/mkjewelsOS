@@ -1,11 +1,12 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, Paperclip } from "lucide-react";
-import { describeFormRule, evaluateFormNavigation, displayFormAnswer, FORM_OTHER_MAX_LENGTH, formFieldAllowsOther, formOptionValues, reconcileFormPreviewAnswers, formCompletionProgress, formUsesSteps, isFinalFormStep, nextFormStepKey, normalizeFormAnswers, previousFormStepKey, resolveFormOptions, updateVisibleFormAnswers, validateCompleteForm, validateFormStep, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition, type FormValidationIssue, type FormCrmServices, formChoiceValueFromText } from "@jewelos/core";
+import { describeFormRule, evaluateFormNavigation, displayFormAnswer, FORM_OTHER_MAX_LENGTH, formFieldAllowsOther, formOptionValues, reconcileFormPreviewAnswers, formCompletionProgress, formUsesSteps, isFinalFormStep, nextFormStepKey, normalizeFormAnswers, previousFormStepKey, resolveFormOptions, updateVisibleFormAnswers, validateCompleteForm, validateFormStep, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition, type FormValidationIssue, type FormCrmServices, clientDetailsForForm, formChoiceValueFromText, isClientPhoneQuestion, isPincodeQuestion } from "@jewelos/core";
 import { Button, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { signedFormFileUrl, uploadFormFile } from "./api";
 import { RatingField } from "./RatingField";
 import { CrmChoiceField, CrmPhotoField, RepeatField } from "./CrmQuestions";
+import { useFormCrmServices } from "./crmServicesContext";
 
 export type DynamicOptions = { users: Array<{ id: string; label: string }>; branches: Array<{ id: string; label: string }>; departments: Array<{ id: string; branchId: string | null; label: string }>; masters: FormMasterOption[] };
 const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: [], masters: [] };
@@ -13,9 +14,6 @@ const NUMBER_TYPES = new Set(["number", "currency", "rating"]);
 const SELECT_TYPES = new Set(["select", "user_dropdown", "branch_dropdown", "department_dropdown"]);
 const LAYOUT_TYPES = new Set(["section_header", "divider"]);
 const OPTION_ROW = "flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-task-border bg-task-bg px-3.5 py-2.5 text-[15px] text-task-text transition hover:border-gold/50 has-[:checked]:border-gold has-[:checked]:bg-gold/10 has-[:checked]:font-medium has-[:disabled]:cursor-not-allowed sm:text-sm [&>input]:size-5 [&>input]:shrink-0 [&>input]:accent-gold";
-/** Question width chosen in the Form Builder (wider screens only; phones show one question per row). */
-const FIELD_WIDTH_CLASS = { full: "md:col-span-6", half: "md:col-span-3", third: "md:col-span-2" } as const;
-const fieldWidth = (field: FormFieldDefinition): keyof typeof FIELD_WIDTH_CLASS => LAYOUT_TYPES.has(field.type) ? "full" : field.validation?.width ?? "full";
 /** The UI-only dropdown value for "Other"; the stored answer is always the typed text. */
 const OTHER_CHOICE = "__other__";
 const byLabel = <T extends { label: string }>(items: readonly T[]) => [...items].sort((a, b) => a.label.localeCompare(b.label, "en", { sensitivity: "base" }));
@@ -75,8 +73,11 @@ function FileFieldControl({ preview = false, describedBy, disabled, field, label
   </div>;
 }
 
-export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extraAction, initialAnswers = {}, onSubmit, preview = false, readOnly = false, submitLabel = "Submit form", templateId, crm }: { definition: FormTemplateDefinition; /** The final button, e.g. "Register client". */ submitLabel?: string; /** CRM forms only: lookups, branch lists and CRM uploads (CRM Form Settings). */ crm?: FormCrmServices | undefined; dynamicOptions?: DynamicOptions; /** One more button for the bottom bar, kept within thumb reach (for example "Earlier answers"). */ extraAction?: ReactNode; initialAnswers?: FormAnswers; onSubmit?: (answers: FormAnswers) => Promise<void | boolean>; preview?: boolean; readOnly?: boolean; templateId?: string }) {
+export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extraAction, initialAnswers = {}, onSubmit, preview = false, readOnly = false, submitLabel = "Submit form", templateId, crm: crmProp }: { definition: FormTemplateDefinition; /** The final button, e.g. "Register client". */ submitLabel?: string; /** CRM forms only: lookups, branch lists and CRM uploads (CRM Form Settings). */ crm?: FormCrmServices | undefined; dynamicOptions?: DynamicOptions; /** One more button for the bottom bar, kept within thumb reach (for example "Earlier answers"). */ extraAction?: ReactNode; initialAnswers?: FormAnswers; onSubmit?: (answers: FormAnswers) => Promise<void | boolean>; preview?: boolean; readOnly?: boolean; templateId?: string }) {
   const uid = useId();
+  // Client lookups everywhere for people with CRM access; a form CRM opens brings its own services.
+  const appCrm = useFormCrmServices();
+  const crm = crmProp ?? appCrm;
   const [answers, setAnswers] = useState<Record<string, FormAnswer>>(() => Object.fromEntries(Object.entries(initialAnswers).filter((entry): entry is [string, FormAnswer] => entry[1] !== null && entry[1] !== undefined)));
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Readonly<Record<string, string>>>({});
@@ -92,6 +93,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
   const [uploadsBusy, setUploadsBusy] = useState(0);
   /** Questions a CRM lookup filled (client history, pincode); editing one clears its mark. */
   const [autoFilled, setAutoFilled] = useState<ReadonlySet<string>>(new Set());
+  const autoFilledRef = useRef<ReadonlySet<string>>(new Set());
   const formRef = useRef<HTMLFormElement>(null);
   // Dropdown Master questions store only a reference; resolve it for rendering
   // and validation so every option field behaves identically here.
@@ -141,7 +143,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
 
   const set = (key: string, value: FormAnswer) => {
     setPreviewChecked(false);
-    setAutoFilled((current) => { if (!current.has(key)) return current; const next = new Set(current); next.delete(key); return next; });
+    setAutoFilled((current) => { if (!current.has(key)) return current; const next = new Set(current); next.delete(key); autoFilledRef.current = next; return next; });
     setAnswers((current) => updateVisibleFormAnswers(resolved, current, key, value, initialAnswers));
     setFieldErrors((current) => {
       if (!(key in current)) return current;
@@ -184,7 +186,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
   };
 
   // CRM lookups (client history by mobile, address by pincode) fill other questions as people type.
-  const lookupFields = useMemo(() => crm ? resolved.fields.filter((field) => field.validation?.crm?.lookup) : [], [crm, resolved]);
+  const lookupFields = useMemo(() => crm ? resolved.fields.filter((field) => isClientPhoneQuestion(field) || isPincodeQuestion(field)) : [], [crm, resolved]);
   const lookedUp = useRef(new Map<string, string>());
   useEffect(() => {
     if (!crm || readOnly || preview || !lookupFields.length) return;
@@ -192,19 +194,24 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
     for (const field of lookupFields) {
       const raw = answers[field.key];
       const text = typeof raw === "string" ? raw.trim() : typeof raw === "number" ? String(raw) : "";
-      const kind = field.validation!.crm!.lookup!;
+      const kind = isClientPhoneQuestion(field) ? "client_phone" as const : "pincode" as const;
       const ready = kind === "pincode" ? /^\d{6}$/.test(text) : text.replace(/\D/g, "").length >= 10;
       if (!ready || lookedUp.current.get(field.key) === text) continue;
       timers.push(window.setTimeout(() => {
         lookedUp.current.set(field.key, text);
         void crm.lookup(kind, text).then((found) => {
           if (!found) return;
+          // CRM's own links first, then every other question that asks for a known detail.
+          const fill = { ...clientDetailsForForm(resolved.fields, found.details ?? {}), ...(found.byQuestion ?? {}) };
           const filled: string[] = [];
           setAnswers((current) => {
             let next: Record<string, FormAnswer> = current;
-            for (const [key, shown] of Object.entries(found)) {
+            for (const [key, shown] of Object.entries(fill)) {
               const target = resolved.fields.find((item) => item.key === key);
-              if (!target || key === field.key || !shown.trim()) continue;
+              if (!target || key === field.key || !shown.trim() || LAYOUT_TYPES.has(target.type) || target.type === "repeat" || target.type === "crm_photo" || target.type === "file") continue;
+              // Never overwrite what the person typed; refresh what an earlier lookup filled.
+              const existing = next[key];
+              if (existing !== undefined && existing !== "" && !(Array.isArray(existing) && existing.length === 0) && !autoFilledRef.current.has(key)) continue;
               const value: FormAnswer = target.type === "select" || target.type === "radio" ? formChoiceValueFromText(target.options, shown)
                 : target.type === "multiselect" || (target.type === "checkbox" && target.options?.length) ? shown.split(",").map((part) => formChoiceValueFromText(target.options, part)).filter(Boolean)
                 : target.type === "number" || target.type === "currency" ? Number(shown) : shown;
@@ -213,7 +220,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
             }
             return next;
           });
-          setAutoFilled((current) => new Set([...current, ...filled]));
+          setAutoFilled((current) => { const nextSet = new Set([...current, ...filled]); autoFilledRef.current = nextSet; return nextSet; });
         }).catch(() => undefined);
       }, 350));
     }
@@ -239,8 +246,9 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
     if (field.type === "crm_photo") return shell(<div><QuestionText field={field} id={labelId} />{helper}
       <CrmPhotoField crm={crm} describedBy={describedBy} disabled={disabled || preview} field={field} onBusyChange={(busy) => setUploadsBusy((count) => Math.max(0, count + (busy ? 1 : -1)))} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} value={value} />{errorText}
     </div>);
-    if (field.type === "text" && field.validation?.crm?.choices && crm) return shell(<label className="block"><span className="mb-1.5 block"><QuestionText field={field} /></span>{helper}
-      <CrmChoiceField aria={aria} crm={crm} disabled={disabled} field={field} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} value={value} />{errorText}
+    const crmChoices = field.type === "text" ? crm?.choices?.(field.key) ?? null : null;
+    if (crmChoices) return shell(<label className="block"><span className="mb-1.5 block"><QuestionText field={field} /></span>{helper}
+      <CrmChoiceField aria={aria} choices={crmChoices} disabled={disabled} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} value={value} />{errorText}
     </label>);
     if (field.type === "file") return shell(<div><QuestionText field={field} id={labelId} />{helper}
       <FileFieldControl preview={preview} describedBy={describedBy} disabled={disabled} field={field} labelledBy={labelId} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} templateId={templateId} value={answers[field.key]} />{errorText}
@@ -320,7 +328,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
     </nav> : null}
     {renderedSections.map(({ section, fields }) => <section aria-label={section.title} key={section.key}>
       {showSectionTitles ? <header className="mb-3 px-1"><h3 className="text-lg font-semibold text-gold-secondary">{section.title}</h3>{section.description ? <p className="mt-0.5 text-sm text-task-text-muted">{section.description}</p> : null}</header> : null}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-6">{fields.map((field) => <div className={cn("min-w-0", FIELD_WIDTH_CLASS[fieldWidth(field)])} key={field.key}>{renderField(field)}</div>)}</div>
+      <div className="flex flex-col gap-3">{fields.map(renderField)}</div>
     </section>)}
     {reviewRows.length ? <details className="rounded-xl border border-task-border bg-task-muted/40 p-3">
       <summary className="min-h-11 cursor-pointer content-center text-sm font-semibold text-task-text">Check your answers before submitting</summary>
