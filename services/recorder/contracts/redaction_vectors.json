@@ -1,0 +1,14 @@
+{
+  "description": "Shared redaction vectors. Used by services/recorder tests, packages/core salesScore tests and mirrored in supabase/tests/0379_recording_analysis.test.sql.",
+  "vectors": [
+    ["call me at 98765 43210 please", "call me at [PHONE] please"],
+    ["+91 9876543210", "[PHONE]"],
+    ["mail a.b@example.com", "mail [EMAIL]"],
+    ["upi ravi@okhdfc", "upi [UPI]"],
+    ["pan ABCDE1234F", "pan [PAN]"],
+    ["aadhaar 1234 5678 9012", "aadhaar [AADHAAR]"],
+    ["card 4111 1111 1111 1111", "card [CARD]"],
+    ["22 carat 916 hallmark, price 45000", "22 carat 916 hallmark, price 45000"],
+    ["Mera number 98765 43210 hai, kal papa ke saath aayenge.", "Mera number [PHONE] hai, kal papa ke saath aayenge."]
+  ]
+}

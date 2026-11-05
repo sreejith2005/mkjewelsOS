@@ -1,0 +1,546 @@
+{
+  "$defs": {
+    "AnalysisOutput": {
+      "additionalProperties": false,
+      "description": "No field exists for age, gender, emotion, religion, caste or other sensitive attributes.",
+      "properties": {
+        "analyzer_confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Analyzer Confidence",
+          "type": "number"
+        },
+        "coaching_gaps": {
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "maxItems": 5,
+          "title": "Coaching Gaps",
+          "type": "array"
+        },
+        "coaching_interventions": {
+          "items": {
+            "$ref": "#/$defs/Intervention"
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "title": "Coaching Interventions",
+          "type": "array"
+        },
+        "coaching_strengths": {
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "maxItems": 5,
+          "title": "Coaching Strengths",
+          "type": "array"
+        },
+        "competitor_mentions": {
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "maxItems": 10,
+          "title": "Competitor Mentions",
+          "type": "array"
+        },
+        "customer_concerns": {
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "maxItems": 10,
+          "title": "Customer Concerns",
+          "type": "array"
+        },
+        "customer_requirements": {
+          "$ref": "#/$defs/Requirements"
+        },
+        "key_points": {
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "maxItems": 5,
+          "minItems": 3,
+          "title": "Key Points",
+          "type": "array"
+        },
+        "next_best_actions": {
+          "items": {
+            "$ref": "#/$defs/NextAction"
+          },
+          "maxItems": 5,
+          "title": "Next Best Actions",
+          "type": "array"
+        },
+        "policy_findings": {
+          "items": {
+            "$ref": "#/$defs/PolicyFinding"
+          },
+          "maxItems": 10,
+          "title": "Policy Findings",
+          "type": "array"
+        },
+        "product_interests": {
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "maxItems": 10,
+          "title": "Product Interests",
+          "type": "array"
+        },
+        "purchase_blockers": {
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "maxItems": 10,
+          "title": "Purchase Blockers",
+          "type": "array"
+        },
+        "signals": {
+          "$ref": "#/$defs/Signals"
+        },
+        "summary": {
+          "maxLength": 600,
+          "minLength": 1,
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "summary",
+        "key_points",
+        "product_interests",
+        "customer_requirements",
+        "customer_concerns",
+        "competitor_mentions",
+        "purchase_blockers",
+        "coaching_strengths",
+        "coaching_gaps",
+        "coaching_interventions",
+        "next_best_actions",
+        "signals",
+        "policy_findings",
+        "analyzer_confidence"
+      ],
+      "title": "AnalysisOutput",
+      "type": "object"
+    },
+    "Claim": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "maxItems": 5,
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "text": {
+          "maxLength": 400,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "evidence"
+      ],
+      "title": "Claim",
+      "type": "object"
+    },
+    "DimensionResult": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "maxItems": 5,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "key": {
+          "pattern": "^[a-z][a-z0-9_]{1,39}$",
+          "title": "Key",
+          "type": "string"
+        },
+        "rating": {
+          "anyOf": [
+            {
+              "maximum": 10,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Rating"
+        },
+        "reason": {
+          "maxLength": 600,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "assessed",
+            "not_applicable",
+            "insufficient_evidence"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "status",
+        "rating",
+        "reason",
+        "evidence"
+      ],
+      "title": "DimensionResult",
+      "type": "object"
+    },
+    "EvidenceRef": {
+      "additionalProperties": false,
+      "properties": {
+        "quote": {
+          "description": "Verbatim words from that segment.",
+          "maxLength": 500,
+          "minLength": 3,
+          "title": "Quote",
+          "type": "string"
+        },
+        "segment_id": {
+          "format": "uuid",
+          "title": "Segment Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "segment_id",
+        "quote"
+      ],
+      "title": "EvidenceRef",
+      "type": "object"
+    },
+    "Intervention": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "maxItems": 5,
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "reason": {
+          "maxLength": 400,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 400,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "reason",
+        "evidence"
+      ],
+      "title": "Intervention",
+      "type": "object"
+    },
+    "NextAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Action",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "maxItems": 5,
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "reason": {
+          "maxLength": 400,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action",
+        "reason",
+        "evidence"
+      ],
+      "title": "NextAction",
+      "type": "object"
+    },
+    "PolicyFinding": {
+      "additionalProperties": false,
+      "properties": {
+        "clause_id": {
+          "pattern": "^[A-Z0-9][A-Z0-9._-]{0,39}$",
+          "title": "Clause Id",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "maxItems": 5,
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "severity": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "statement": {
+          "maxLength": 400,
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        }
+      },
+      "required": [
+        "severity",
+        "clause_id",
+        "statement",
+        "evidence"
+      ],
+      "title": "PolicyFinding",
+      "type": "object"
+    },
+    "Requirements": {
+      "additionalProperties": false,
+      "properties": {
+        "budget": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Claim"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "occasion": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Claim"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "requirements": {
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "maxItems": 10,
+          "title": "Requirements",
+          "type": "array"
+        }
+      },
+      "required": [
+        "budget",
+        "occasion",
+        "requirements"
+      ],
+      "title": "Requirements",
+      "type": "object"
+    },
+    "SalesOutcome": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "maxItems": 5,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "reason": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "value": {
+          "enum": [
+            "unknown",
+            "enquiry",
+            "follow_up",
+            "reported_purchase",
+            "no_purchase"
+          ],
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "confidence",
+        "reason",
+        "evidence"
+      ],
+      "title": "SalesOutcome",
+      "type": "object"
+    },
+    "Signal": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "detected": {
+          "title": "Detected",
+          "type": "boolean"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "maxItems": 5,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "reason": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "detected",
+        "confidence",
+        "reason",
+        "evidence"
+      ],
+      "title": "Signal",
+      "type": "object"
+    },
+    "Signals": {
+      "additionalProperties": false,
+      "properties": {
+        "competitor_mention": {
+          "$ref": "#/$defs/Signal"
+        },
+        "conversion_signal": {
+          "$ref": "#/$defs/Signal"
+        },
+        "customer_questions": {
+          "$ref": "#/$defs/Signal"
+        },
+        "drop_off": {
+          "$ref": "#/$defs/Signal"
+        },
+        "next_step": {
+          "$ref": "#/$defs/Signal"
+        },
+        "objection": {
+          "$ref": "#/$defs/Signal"
+        },
+        "price_concern": {
+          "$ref": "#/$defs/Signal"
+        },
+        "sales_outcome": {
+          "$ref": "#/$defs/SalesOutcome"
+        },
+        "stock_gap": {
+          "$ref": "#/$defs/Signal"
+        },
+        "upsell_opportunity": {
+          "$ref": "#/$defs/Signal"
+        }
+      },
+      "required": [
+        "objection",
+        "price_concern",
+        "stock_gap",
+        "competitor_mention",
+        "customer_questions",
+        "conversion_signal",
+        "next_step",
+        "drop_off",
+        "upsell_opportunity",
+        "sales_outcome"
+      ],
+      "title": "Signals",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "What the analysis model must return.",
+  "properties": {
+    "dimensions": {
+      "items": {
+        "$ref": "#/$defs/DimensionResult"
+      },
+      "title": "Dimensions",
+      "type": "array"
+    },
+    "output": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AnalysisOutput"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "status_hint": {
+      "enum": [
+        "scored",
+        "insufficient_evidence"
+      ],
+      "title": "Status Hint",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status_hint",
+    "output",
+    "dimensions"
+  ],
+  "title": "ModelResponse",
+  "type": "object"
+}

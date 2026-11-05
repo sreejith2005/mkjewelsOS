@@ -103,6 +103,37 @@ Lifecycle expiration is asynchronous. Worker reconciliation expires transcript/
 alert content, releases expired interrupted device slots and recovers expired
 job leases. Job retries back off and dead-letter after five attempts.
 
+## Store Intelligence analysis and MK Sales Score (migration 0379)
+
+Design: `docs/superpowers/specs/2026-11-05-store-intelligence-processing-design.md`.
+Dark until `recording_configure_analysis(true)` (Developer Mode authority) and
+the analysis worker runs. Backend only for now; there is no review screen yet.
+
+- Final transcripts become immutable revisions with speaker, offsets, language,
+  display/translation text and STT confidence. Manager corrections
+  (`recording_correct_transcript`) create new revisions; the original stays.
+- Each analysis pins transcript revision, rubric version, SOP version,
+  `job_version`, model and prompt version. The server computes the 0–100 score
+  over assessed dimensions only; too little evidence gives no score, doubtful
+  audio, unknown speakers, a fallback model or a HIGH SOP finding give
+  **needs review**.
+- Managers with `recording.review` in the branch approve, flag, comment or edit
+  (`recording_review_analysis`); edits are separate rows with a reviewed total,
+  never a rewrite. The recorded employee sees only approved or edited analyses.
+- `recording_request_rescore` and `recording_request_reprocess` are explicit and
+  audited; earlier analyses stay. `recording.manage_rubric` (Super Admin, Admin)
+  creates rubric and SOP versions; an SOP needs a second approver unless the
+  Super Admin approves.
+- Retention removes transcript revisions, analyses and reviews with the
+  recording. Rubric and SOP versions are kept.
+- AI output is a recommendation. Nothing writes CRM, marks a purchase or changes
+  reports. Ask Kiara has no access to transcripts or scores.
+
+Enable order: apply 0379, deploy `recorder-ingest`, set
+`RECORDER_FINALIZE_TRANSCRIPTS=true` on the recorder worker, load and approve an
+SOP version, start the analysis worker, run the evaluation report with the chosen
+analyzer, then enable analysis for the pilot tenant.
+
 ## Validation and release gates
 
 Focused commands, from the repository root:

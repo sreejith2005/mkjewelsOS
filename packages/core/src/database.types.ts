@@ -2268,6 +2268,781 @@ export type Database = {
   }
   public: {
     Tables: CustomerIntegrationTables & {
+      recording_analyses: {
+        Row: {
+          analyzer_model: string
+          analyzer_provider: string
+          assessed_weight: number
+          created_at: string
+          fallback_reason: string | null
+          fallback_used: boolean
+          id: string
+          job_id: string
+          job_version: string
+          output: Json
+          prompt_version: string
+          quality: Json
+          raw_total: number | null
+          rubric_version_id: string
+          session_id: string
+          sop_version_id: string | null
+          status: string
+          status_reasons: string[]
+          supersedes_id: string | null
+          tenant_id: string
+          transcript_revision_id: string
+        }
+        Insert: {
+          analyzer_model: string
+          analyzer_provider: string
+          assessed_weight: number
+          created_at?: string
+          fallback_reason?: string | null
+          fallback_used?: boolean
+          id?: string
+          job_id: string
+          job_version: string
+          output: Json
+          prompt_version: string
+          quality: Json
+          raw_total?: number | null
+          rubric_version_id: string
+          session_id: string
+          sop_version_id?: string | null
+          status: string
+          status_reasons?: string[]
+          supersedes_id?: string | null
+          tenant_id: string
+          transcript_revision_id: string
+        }
+        Update: {
+          analyzer_model?: string
+          analyzer_provider?: string
+          assessed_weight?: number
+          created_at?: string
+          fallback_reason?: string | null
+          fallback_used?: boolean
+          id?: string
+          job_id?: string
+          job_version?: string
+          output?: Json
+          prompt_version?: string
+          quality?: Json
+          raw_total?: number | null
+          rubric_version_id?: string
+          session_id?: string
+          sop_version_id?: string | null
+          status?: string
+          status_reasons?: string[]
+          supersedes_id?: string | null
+          tenant_id?: string
+          transcript_revision_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recording_analyses_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "recording_analysis_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_analyses_rubric_version_id_fkey"
+            columns: ["rubric_version_id"]
+            isOneToOne: false
+            referencedRelation: "recording_rubric_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_analyses_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "recorder_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_analyses_sop_version_id_fkey"
+            columns: ["sop_version_id"]
+            isOneToOne: false
+            referencedRelation: "recording_sop_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_analyses_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "recording_analyses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_analyses_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_analyses_transcript_revision_id_session_id_fkey"
+            columns: ["transcript_revision_id", "session_id"]
+            isOneToOne: false
+            referencedRelation: "recording_transcript_revisions"
+            referencedColumns: ["id", "session_id"]
+          },
+        ]
+      }
+      recording_analysis_jobs: {
+        Row: {
+          attempts: number
+          available_at: string
+          created_at: string
+          error_code: string | null
+          finished_at: string | null
+          id: string
+          job_version: string
+          lease_token: string | null
+          lease_until: string | null
+          max_attempts: number
+          reason: string
+          request_note: string | null
+          requested_by: string | null
+          rubric_version_id: string
+          session_id: string
+          sop_version_id: string | null
+          started_at: string | null
+          state: string
+          tenant_id: string
+          transcript_revision_id: string
+          updated_at: string
+          worker_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          available_at?: string
+          created_at?: string
+          error_code?: string | null
+          finished_at?: string | null
+          id?: string
+          job_version: string
+          lease_token?: string | null
+          lease_until?: string | null
+          max_attempts?: number
+          reason: string
+          request_note?: string | null
+          requested_by?: string | null
+          rubric_version_id: string
+          session_id: string
+          sop_version_id?: string | null
+          started_at?: string | null
+          state?: string
+          tenant_id: string
+          transcript_revision_id: string
+          updated_at?: string
+          worker_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          available_at?: string
+          created_at?: string
+          error_code?: string | null
+          finished_at?: string | null
+          id?: string
+          job_version?: string
+          lease_token?: string | null
+          lease_until?: string | null
+          max_attempts?: number
+          reason?: string
+          request_note?: string | null
+          requested_by?: string | null
+          rubric_version_id?: string
+          session_id?: string
+          sop_version_id?: string | null
+          started_at?: string | null
+          state?: string
+          tenant_id?: string
+          transcript_revision_id?: string
+          updated_at?: string
+          worker_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recording_analysis_jobs_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_analysis_jobs_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_analysis_jobs_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_analysis_jobs_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_analysis_jobs_rubric_version_id_fkey"
+            columns: ["rubric_version_id"]
+            isOneToOne: false
+            referencedRelation: "recording_rubric_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_analysis_jobs_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "recorder_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_analysis_jobs_sop_version_id_fkey"
+            columns: ["sop_version_id"]
+            isOneToOne: false
+            referencedRelation: "recording_sop_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_analysis_jobs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_analysis_jobs_transcript_revision_id_session_id_fkey"
+            columns: ["transcript_revision_id", "session_id"]
+            isOneToOne: false
+            referencedRelation: "recording_transcript_revisions"
+            referencedColumns: ["id", "session_id"]
+          },
+        ]
+      }
+      recording_analysis_reviews: {
+        Row: {
+          action: string
+          actor_id: string
+          analysis_id: string
+          created_at: string
+          dimension_overrides: Json | null
+          id: string
+          note: string | null
+          reviewed_status: string | null
+          reviewed_total: number | null
+          session_id: string
+          tenant_id: string
+        }
+        Insert: {
+          action: string
+          actor_id: string
+          analysis_id: string
+          created_at?: string
+          dimension_overrides?: Json | null
+          id?: string
+          note?: string | null
+          reviewed_status?: string | null
+          reviewed_total?: number | null
+          session_id: string
+          tenant_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string
+          analysis_id?: string
+          created_at?: string
+          dimension_overrides?: Json | null
+          id?: string
+          note?: string | null
+          reviewed_status?: string | null
+          reviewed_total?: number | null
+          session_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recording_analysis_reviews_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_analysis_reviews_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_analysis_reviews_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_analysis_reviews_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_analysis_reviews_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "recording_analyses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_analysis_reviews_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "recorder_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_analysis_reviews_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recording_rubric_versions: {
+        Row: {
+          activated_at: string | null
+          activated_by: string | null
+          created_at: string
+          created_by: string | null
+          dimensions: Json
+          id: string
+          min_assessed_weight: number
+          name: string
+          status: string
+          tenant_id: string
+          version: number
+        }
+        Insert: {
+          activated_at?: string | null
+          activated_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          dimensions: Json
+          id?: string
+          min_assessed_weight?: number
+          name: string
+          status?: string
+          tenant_id: string
+          version: number
+        }
+        Update: {
+          activated_at?: string | null
+          activated_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          dimensions?: Json
+          id?: string
+          min_assessed_weight?: number
+          name?: string
+          status?: string
+          tenant_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recording_rubric_versions_activated_by_fkey"
+            columns: ["activated_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_rubric_versions_activated_by_fkey"
+            columns: ["activated_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_rubric_versions_activated_by_fkey"
+            columns: ["activated_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_rubric_versions_activated_by_fkey"
+            columns: ["activated_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_rubric_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_rubric_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_rubric_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_rubric_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_rubric_versions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recording_score_dimensions: {
+        Row: {
+          analysis_id: string
+          configured_weight: number
+          dimension_key: string
+          effective_weight: number | null
+          evidence: Json
+          label: string
+          points: number | null
+          rating: number | null
+          reason: string
+          status: string
+        }
+        Insert: {
+          analysis_id: string
+          configured_weight: number
+          dimension_key: string
+          effective_weight?: number | null
+          evidence?: Json
+          label: string
+          points?: number | null
+          rating?: number | null
+          reason: string
+          status: string
+        }
+        Update: {
+          analysis_id?: string
+          configured_weight?: number
+          dimension_key?: string
+          effective_weight?: number | null
+          evidence?: Json
+          label?: string
+          points?: number | null
+          rating?: number | null
+          reason?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recording_score_dimensions_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "recording_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recording_sop_versions: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          clauses: Json
+          content_sha256: string
+          created_at: string
+          created_by: string
+          id: string
+          status: string
+          tenant_id: string
+          title: string
+          version: number
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          clauses: Json
+          content_sha256: string
+          created_at?: string
+          created_by: string
+          id?: string
+          status?: string
+          tenant_id: string
+          title: string
+          version: number
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          clauses?: Json
+          content_sha256?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          status?: string
+          tenant_id?: string
+          title?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recording_sop_versions_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_sop_versions_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_sop_versions_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_sop_versions_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_sop_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_sop_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_sop_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_sop_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_sop_versions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recording_transcript_revisions: {
+        Row: {
+          base_revision_id: string | null
+          content_sha256: string
+          created_at: string
+          created_by: string | null
+          diarization_provider: string | null
+          id: string
+          reason: string | null
+          revision: number
+          session_id: string
+          source: string
+          stt_model: string | null
+          stt_provider: string | null
+          tenant_id: string
+        }
+        Insert: {
+          base_revision_id?: string | null
+          content_sha256: string
+          created_at?: string
+          created_by?: string | null
+          diarization_provider?: string | null
+          id?: string
+          reason?: string | null
+          revision: number
+          session_id: string
+          source: string
+          stt_model?: string | null
+          stt_provider?: string | null
+          tenant_id: string
+        }
+        Update: {
+          base_revision_id?: string | null
+          content_sha256?: string
+          created_at?: string
+          created_by?: string | null
+          diarization_provider?: string | null
+          id?: string
+          reason?: string | null
+          revision?: number
+          session_id?: string
+          source?: string
+          stt_model?: string | null
+          stt_provider?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recording_transcript_revisions_base_revision_id_fkey"
+            columns: ["base_revision_id"]
+            isOneToOne: false
+            referencedRelation: "recording_transcript_revisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_transcript_revisions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_transcript_revisions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_transcript_revisions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_transcript_revisions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_transcript_revisions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "recorder_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_transcript_revisions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recording_transcript_segments: {
+        Row: {
+          display_text: string | null
+          end_ms: number
+          language: string | null
+          ordinal: number
+          raw_text: string
+          revision_id: string
+          segment_id: string
+          session_id: string
+          source_offset_ms: number
+          source_sequence: number
+          speaker: string
+          speaker_confidence: number | null
+          speaker_source: string
+          start_ms: number
+          stt_confidence: number | null
+          translation_en: string | null
+        }
+        Insert: {
+          display_text?: string | null
+          end_ms: number
+          language?: string | null
+          ordinal: number
+          raw_text: string
+          revision_id: string
+          segment_id: string
+          session_id: string
+          source_offset_ms: number
+          source_sequence: number
+          speaker?: string
+          speaker_confidence?: number | null
+          speaker_source?: string
+          start_ms: number
+          stt_confidence?: number | null
+          translation_en?: string | null
+        }
+        Update: {
+          display_text?: string | null
+          end_ms?: number
+          language?: string | null
+          ordinal?: number
+          raw_text?: string
+          revision_id?: string
+          segment_id?: string
+          session_id?: string
+          source_offset_ms?: number
+          source_sequence?: number
+          speaker?: string
+          speaker_confidence?: number | null
+          speaker_source?: string
+          start_ms?: number
+          stt_confidence?: number | null
+          translation_en?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recording_transcript_segments_revision_id_session_id_fkey"
+            columns: ["revision_id", "session_id"]
+            isOneToOne: false
+            referencedRelation: "recording_transcript_revisions"
+            referencedColumns: ["id", "session_id"]
+          },
+        ]
+      }
       recorder_tickets: {
         Row: {
           expires_at: string
@@ -2563,6 +3338,8 @@ export type Database = {
       }
       recorder_config: {
         Row: {
+          analysis_enabled: boolean
+          analysis_job_version: string
           branch_ids: string[]
           coaching_enabled: boolean
           employee_ids: string[]
@@ -2571,6 +3348,8 @@ export type Database = {
           tenant_id: string
         }
         Insert: {
+          analysis_enabled?: boolean
+          analysis_job_version?: string
           branch_ids?: string[]
           coaching_enabled?: boolean
           employee_ids?: string[]
@@ -2579,6 +3358,8 @@ export type Database = {
           tenant_id: string
         }
         Update: {
+          analysis_enabled?: boolean
+          analysis_job_version?: string
           branch_ids?: string[]
           coaching_enabled?: boolean
           employee_ids?: string[]
@@ -2590,6 +3371,7 @@ export type Database = {
           {
             foreignKeyName: "recorder_config_tenant_id_fkey"
             columns: ["tenant_id"]
+            isOneToOne: true
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
@@ -12922,6 +13704,78 @@ export type Database = {
       }
     }
     Functions: CustomerIntegrationFunctions & {
+      recording_activate_rubric_version: {
+        Args: { p_rubric_version_id: string }
+        Returns: Json
+      }
+      recording_analysis_ingest: {
+        Args: { p_action: string; p_payload: Json }
+        Returns: Json
+      }
+      recording_analysis_snapshot: {
+        Args: { p_revision_id?: string; p_session_id: string }
+        Returns: Json
+      }
+      recording_compute_score: {
+        Args: { p_dims: Json; p_min_assessed: number; p_rubric: Json }
+        Returns: Json
+      }
+      recording_configure_analysis: {
+        Args: { p_enabled: boolean; p_job_version?: string }
+        Returns: Json
+      }
+      recording_correct_transcript: {
+        Args: {
+          p_base_revision_id: string
+          p_changes: Json
+          p_reason: string
+          p_session_id: string
+        }
+        Returns: Json
+      }
+      recording_create_rubric_version: {
+        Args: {
+          p_dimensions: Json
+          p_min_assessed_weight?: number
+          p_name: string
+        }
+        Returns: Json
+      }
+      recording_create_sop_version: {
+        Args: { p_clauses: Json; p_title: string }
+        Returns: Json
+      }
+      recording_list_versions: { Args: never; Returns: Json }
+      recording_norm: { Args: { p: string }; Returns: string }
+      recording_redact: { Args: { p: string }; Returns: string }
+      recording_request_reprocess: {
+        Args: { p_note: string; p_session_id: string }
+        Returns: Json
+      }
+      recording_request_rescore: {
+        Args: {
+          p_job_version?: string
+          p_note?: string
+          p_rubric_version_id?: string
+          p_session_id: string
+          p_sop_version_id?: string
+          p_transcript_revision_id?: string
+        }
+        Returns: Json
+      }
+      recording_review_analysis: {
+        Args: {
+          p_action: string
+          p_analysis_id: string
+          p_dimension_overrides?: Json
+          p_note?: string
+        }
+        Returns: Json
+      }
+      recording_set_sop_status: {
+        Args: { p_sop_version_id: string; p_status: string }
+        Returns: Json
+      }
       recorder_session_snapshot: {
         Args: { p_session_id: string }
         Returns: Json

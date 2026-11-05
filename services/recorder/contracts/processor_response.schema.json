@@ -1,0 +1,240 @@
+{
+  "$defs": {
+    "ProcessorSegment": {
+      "additionalProperties": true,
+      "description": "One per canonical chunk. Extra keys (critical_signal) are allowed for the alert path.",
+      "properties": {
+        "ended_ms": {
+          "maximum": 14400000,
+          "minimum": 0,
+          "title": "Ended Ms",
+          "type": "integer"
+        },
+        "sequence": {
+          "maximum": 7199,
+          "minimum": 0,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "started_ms": {
+          "maximum": 14400000,
+          "minimum": 0,
+          "title": "Started Ms",
+          "type": "integer"
+        },
+        "text": {
+          "maxLength": 12000,
+          "title": "Text",
+          "type": "string"
+        },
+        "utterances": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Utterance"
+              },
+              "maxItems": 50,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Utterances"
+        }
+      },
+      "required": [
+        "sequence",
+        "text",
+        "started_ms",
+        "ended_ms"
+      ],
+      "title": "ProcessorSegment",
+      "type": "object"
+    },
+    "Utterance": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "display_text": {
+          "anyOf": [
+            {
+              "description": "Readable Roman-script Hinglish or English. No academic transliteration.",
+              "maxLength": 16000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Text"
+        },
+        "end_offset_ms": {
+          "maximum": 120000,
+          "minimum": 0,
+          "title": "End Offset Ms",
+          "type": "integer"
+        },
+        "includes_context": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "True when text may repeat the previous chunk tail (context audio).",
+          "title": "Includes Context"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Language"
+        },
+        "offset_ms": {
+          "description": "From the start of the chunk where the utterance starts.",
+          "maximum": 120000,
+          "minimum": 0,
+          "title": "Offset Ms",
+          "type": "integer"
+        },
+        "speaker_confidence": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Speaker Confidence"
+        },
+        "speaker_role": {
+          "anyOf": [
+            {
+              "enum": [
+                "employee",
+                "customer",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Speaker Role"
+        },
+        "text": {
+          "description": "Original language and script, as spoken.",
+          "maxLength": 16000,
+          "title": "Text",
+          "type": "string"
+        },
+        "translation_en": {
+          "anyOf": [
+            {
+              "maxLength": 16000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Translation En"
+        }
+      },
+      "required": [
+        "offset_ms",
+        "end_offset_ms",
+        "text"
+      ],
+      "title": "Utterance",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Private STT/diarization processor response for a recorder job.",
+  "properties": {
+    "diarization_provider": {
+      "anyOf": [
+        {
+          "maxLength": 120,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Diarization Provider"
+    },
+    "model": {
+      "anyOf": [
+        {
+          "maxLength": 120,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model"
+    },
+    "provider": {
+      "anyOf": [
+        {
+          "maxLength": 80,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Provider"
+    },
+    "segments": {
+      "items": {
+        "$ref": "#/$defs/ProcessorSegment"
+      },
+      "title": "Segments",
+      "type": "array"
+    }
+  },
+  "required": [
+    "segments"
+  ],
+  "title": "ProcessorResponse",
+  "type": "object"
+}

@@ -1,0 +1,196 @@
+{
+  "$defs": {
+    "FinalizeSegment": {
+      "additionalProperties": false,
+      "properties": {
+        "display_text": {
+          "anyOf": [
+            {
+              "maxLength": 16000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Display Text"
+        },
+        "end_ms": {
+          "maximum": 14400000,
+          "minimum": 0,
+          "title": "End Ms",
+          "type": "integer"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Language"
+        },
+        "raw_text": {
+          "maxLength": 16000,
+          "title": "Raw Text",
+          "type": "string"
+        },
+        "segment_id": {
+          "format": "uuid",
+          "title": "Segment Id",
+          "type": "string"
+        },
+        "source_offset_ms": {
+          "maximum": 120000,
+          "minimum": 0,
+          "title": "Source Offset Ms",
+          "type": "integer"
+        },
+        "source_sequence": {
+          "maximum": 7200,
+          "minimum": 0,
+          "title": "Source Sequence",
+          "type": "integer"
+        },
+        "speaker": {
+          "enum": [
+            "employee",
+            "customer",
+            "unknown"
+          ],
+          "title": "Speaker",
+          "type": "string"
+        },
+        "speaker_confidence": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Speaker Confidence"
+        },
+        "speaker_source": {
+          "enum": [
+            "diarization",
+            "manual",
+            "none"
+          ],
+          "title": "Speaker Source",
+          "type": "string"
+        },
+        "start_ms": {
+          "maximum": 14400000,
+          "minimum": 0,
+          "title": "Start Ms",
+          "type": "integer"
+        },
+        "stt_confidence": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Stt Confidence"
+        },
+        "translation_en": {
+          "anyOf": [
+            {
+              "maxLength": 16000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Translation En"
+        }
+      },
+      "required": [
+        "segment_id",
+        "source_sequence",
+        "source_offset_ms",
+        "start_ms",
+        "end_ms",
+        "speaker",
+        "speaker_confidence",
+        "speaker_source",
+        "language",
+        "raw_text",
+        "display_text",
+        "translation_en",
+        "stt_confidence"
+      ],
+      "title": "FinalizeSegment",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Payload of transcript_finalize besides the session claims and job lease.",
+  "properties": {
+    "diarization_provider": {
+      "anyOf": [
+        {
+          "maxLength": 120,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Diarization Provider"
+    },
+    "segments": {
+      "items": {
+        "$ref": "#/$defs/FinalizeSegment"
+      },
+      "maxItems": 20000,
+      "title": "Segments",
+      "type": "array"
+    },
+    "stt_model": {
+      "anyOf": [
+        {
+          "maxLength": 120,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Stt Model"
+    },
+    "stt_provider": {
+      "anyOf": [
+        {
+          "maxLength": 80,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Stt Provider"
+    }
+  },
+  "required": [
+    "stt_provider",
+    "stt_model",
+    "diarization_provider",
+    "segments"
+  ],
+  "title": "TranscriptFinalize",
+  "type": "object"
+}

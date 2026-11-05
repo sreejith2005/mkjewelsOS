@@ -105,6 +105,7 @@ export const PERMISSION_CATALOG = [
   { key: "recording.capture", kind: "action", category: "Workflows", label: "Record sales conversations", description: "Start consented recording in the user's active branch. Explicit pilot grant required.", defaultRoles: [], pageId: null },
   { key: "recording.review", kind: "action", category: "Workflows", label: "Review branch recordings", description: "Review recordings within manager authority and branch scope.", defaultRoles: ["super_admin", "admin", "manager"], pageId: null },
   { key: "recording.coach", kind: "action", category: "Workflows", label: "Receive critical coaching alerts", description: "Opt in to rate-limited alerts from final, unambiguous transcript evidence within manager scope.", defaultRoles: ["super_admin", "admin", "manager"], pageId: null },
+  { key: "recording.manage_rubric", kind: "action", category: "Workflows", label: "Manage sales score rubric and SOP versions", description: "Create MK Sales Score rubric versions and SOP versions, activate a rubric and approve SOP text written by someone else.", defaultRoles: ["super_admin", "admin"], pageId: null },
 ] as const satisfies readonly PermissionDefinition[];
 
 export type PermissionKey = (typeof PERMISSION_CATALOG)[number]["key"];

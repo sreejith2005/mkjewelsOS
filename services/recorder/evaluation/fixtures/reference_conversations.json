@@ -1,0 +1,95 @@
+{
+  "description": "Synthetic reference conversations written for evaluation. No customer data. Human labels follow the MK Sales Score v1 rubric and the calibration rules in prompts.py. Add owner-reviewed sets (including real store audio transcripts, Marathi or Gujarati) as separate files outside Git.",
+  "min_assessed_weight": 50,
+  "rubric": [
+    {"key": "greeting_sop", "label": "Greeting & SOP", "weight": 15},
+    {"key": "product_knowledge", "label": "Product Knowledge", "weight": 20},
+    {"key": "needs_discovery", "label": "Needs Discovery & Listening", "weight": 15},
+    {"key": "objection_handling", "label": "Objection Handling", "weight": 15},
+    {"key": "pricing_value", "label": "Pricing & Value Communication", "weight": 10},
+    {"key": "closing_follow_up", "label": "Closing & Follow-up", "weight": 15},
+    {"key": "personalization_empathy", "label": "Personalization & Empathy", "weight": 10}
+  ],
+  "sop": {"id": "eval-sop", "version": 1, "title": "Synthetic sales SOP", "clauses": [
+    {"clause_id": "MC-1", "topic": "making_charges", "text": "Explain making charges as a percentage of metal value and why design work affects it."},
+    {"clause_id": "OG-1", "topic": "old_gold_exchange", "text": "Old gold is tested and valued at the day's rate before exchange."},
+    {"clause_id": "HM-1", "topic": "certification", "text": "All gold jewellery is BIS hallmarked; diamonds above the threshold carry a lab certificate."}
+  ]},
+  "conversations": [
+    {
+      "id": "hi_bridal_follow_up", "language": "hi",
+      "segments": [
+        {"segment_id": "20000000-0000-4000-8000-000000000001", "start_ms": 0, "end_ms": 4000, "speaker": "employee", "raw_text": "Namaste ji, MK Jewels mein aapka swagat hai. Aaj kis occasion ke liye dekh rahe hain?", "display_text": null, "translation_en": "Hello, welcome to MK Jewels. What occasion are you shopping for today?", "stt_confidence": 0.9},
+        {"segment_id": "20000000-0000-4000-8000-000000000002", "start_ms": 4000, "end_ms": 8000, "speaker": "customer", "raw_text": "Beti ki shaadi hai, bridal necklace chahiye, budget around 3 lakh.", "display_text": null, "translation_en": "It is my daughter's wedding, I need a bridal necklace, budget around 3 lakh.", "stt_confidence": 0.88},
+        {"segment_id": "20000000-0000-4000-8000-000000000003", "start_ms": 8000, "end_ms": 14000, "speaker": "employee", "raw_text": "Hamare paas 22 carat hallmark wale bridal sets hain. Making charges design ke hisaab se 12 se 18 percent hain kyunki handwork zyada hota hai.", "display_text": null, "translation_en": null, "stt_confidence": 0.9},
+        {"segment_id": "20000000-0000-4000-8000-000000000004", "start_ms": 14000, "end_ms": 16000, "speaker": "customer", "raw_text": "Yeh wala design bahut sundar hai, iska weight kitna hai?", "display_text": null, "translation_en": null, "stt_confidence": 0.86},
+        {"segment_id": "20000000-0000-4000-8000-000000000005", "start_ms": 16000, "end_ms": 20000, "speaker": "employee", "raw_text": "Yeh 42 gram ka hai. Aapki beti ko kaunsa colour pasand hai, matching earrings bhi dikhaun?", "display_text": null, "translation_en": null, "stt_confidence": 0.9},
+        {"segment_id": "20000000-0000-4000-8000-000000000006", "start_ms": 20000, "end_ms": 23000, "speaker": "customer", "raw_text": "Kal papa ke saath aayenge, tab final karenge.", "display_text": null, "translation_en": null, "stt_confidence": 0.9},
+        {"segment_id": "20000000-0000-4000-8000-000000000007", "start_ms": 23000, "end_ms": 27000, "speaker": "employee", "raw_text": "Bilkul, main yeh design aapke liye hold kar deti hoon aur kal subah call karti hoon.", "display_text": null, "translation_en": null, "stt_confidence": 0.91}
+      ],
+      "human": {
+        "status": "scored",
+        "dimensions": {
+          "greeting_sop": {"status": "assessed", "rating": 8}, "product_knowledge": {"status": "assessed", "rating": 7},
+          "needs_discovery": {"status": "assessed", "rating": 8}, "objection_handling": {"status": "not_applicable", "rating": null},
+          "pricing_value": {"status": "assessed", "rating": 8}, "closing_follow_up": {"status": "assessed", "rating": 8},
+          "personalization_empathy": {"status": "assessed", "rating": 8}
+        },
+        "signals": {"conversion_signal": true, "next_step": true, "customer_questions": true, "upsell_opportunity": true},
+        "sales_outcome": "follow_up"
+      }
+    },
+    {
+      "id": "en_price_question_not_objection", "language": "en",
+      "segments": [
+        {"segment_id": "21000000-0000-4000-8000-000000000001", "start_ms": 0, "end_ms": 3000, "speaker": "employee", "raw_text": "Good afternoon, welcome to MK Jewels. How can I help you today?", "display_text": null, "translation_en": null, "stt_confidence": 0.93},
+        {"segment_id": "21000000-0000-4000-8000-000000000002", "start_ms": 3000, "end_ms": 7000, "speaker": "customer", "raw_text": "I want a simple gold chain for daily wear. What is today's rate and how much are your making charges?", "display_text": null, "translation_en": null, "stt_confidence": 0.92},
+        {"segment_id": "21000000-0000-4000-8000-000000000003", "start_ms": 7000, "end_ms": 13000, "speaker": "employee", "raw_text": "Today's 22 carat rate is on the board. For plain chains the making charge is around 8 percent because there is less handwork.", "display_text": null, "translation_en": null, "stt_confidence": 0.9},
+        {"segment_id": "21000000-0000-4000-8000-000000000004", "start_ms": 13000, "end_ms": 15000, "speaker": "customer", "raw_text": "Okay. Can I exchange my old gold ring?", "display_text": null, "translation_en": null, "stt_confidence": 0.91},
+        {"segment_id": "21000000-0000-4000-8000-000000000005", "start_ms": 15000, "end_ms": 20000, "speaker": "employee", "raw_text": "Yes, we test it in front of you and value it at today's rate, then adjust it against the new chain.", "display_text": null, "translation_en": null, "stt_confidence": 0.9},
+        {"segment_id": "21000000-0000-4000-8000-000000000006", "start_ms": 20000, "end_ms": 23000, "speaker": "customer", "raw_text": "Good. Show me chains around 10 grams.", "display_text": null, "translation_en": null, "stt_confidence": 0.92}
+      ],
+      "human": {
+        "status": "scored",
+        "dimensions": {
+          "greeting_sop": {"status": "assessed", "rating": 7}, "product_knowledge": {"status": "assessed", "rating": 8},
+          "needs_discovery": {"status": "assessed", "rating": 5}, "objection_handling": {"status": "not_applicable", "rating": null},
+          "pricing_value": {"status": "assessed", "rating": 9}, "closing_follow_up": {"status": "insufficient_evidence", "rating": null},
+          "personalization_empathy": {"status": "insufficient_evidence", "rating": null}
+        },
+        "signals": {"customer_questions": true, "conversion_signal": true},
+        "sales_outcome": "enquiry"
+      }
+    },
+    {
+      "id": "hi_competitor_drop_off", "language": "hi",
+      "segments": [
+        {"segment_id": "22000000-0000-4000-8000-000000000001", "start_ms": 0, "end_ms": 3000, "speaker": "employee", "raw_text": "Haan boliye, kya dikhaun?", "display_text": null, "translation_en": "Yes, tell me, what should I show?", "stt_confidence": 0.85},
+        {"segment_id": "22000000-0000-4000-8000-000000000002", "start_ms": 3000, "end_ms": 8000, "speaker": "customer", "raw_text": "Yeh diamond ring dusri dukaan mein 20 hazaar sasti mil rahi thi, aapka rate bahut zyada hai.", "display_text": null, "translation_en": "This diamond ring was 20 thousand cheaper at another shop, your price is too high.", "stt_confidence": 0.84},
+        {"segment_id": "22000000-0000-4000-8000-000000000003", "start_ms": 8000, "end_ms": 11000, "speaker": "employee", "raw_text": "Madam rate toh fix hai, isse kam nahi hoga.", "display_text": null, "translation_en": "Madam the rate is fixed, it will not go lower.", "stt_confidence": 0.86},
+        {"segment_id": "22000000-0000-4000-8000-000000000004", "start_ms": 11000, "end_ms": 14000, "speaker": "customer", "raw_text": "Certificate hai iska? Wahan toh IGI certificate de rahe the.", "display_text": null, "translation_en": "Does it have a certificate? They were giving an IGI certificate there.", "stt_confidence": 0.83},
+        {"segment_id": "22000000-0000-4000-8000-000000000005", "start_ms": 14000, "end_ms": 16000, "speaker": "employee", "raw_text": "Pata nahi, dekhna padega.", "display_text": null, "translation_en": "I don't know, I will have to check.", "stt_confidence": 0.86},
+        {"segment_id": "22000000-0000-4000-8000-000000000006", "start_ms": 16000, "end_ms": 19000, "speaker": "customer", "raw_text": "Theek hai, rehne dijiye, hum wahi le lenge.", "display_text": null, "translation_en": "Okay, leave it, we will buy it there.", "stt_confidence": 0.85}
+      ],
+      "human": {
+        "status": "scored",
+        "dimensions": {
+          "greeting_sop": {"status": "assessed", "rating": 3}, "product_knowledge": {"status": "assessed", "rating": 2},
+          "needs_discovery": {"status": "assessed", "rating": 2}, "objection_handling": {"status": "assessed", "rating": 2},
+          "pricing_value": {"status": "assessed", "rating": 2}, "closing_follow_up": {"status": "assessed", "rating": 1},
+          "personalization_empathy": {"status": "assessed", "rating": 2}
+        },
+        "signals": {"objection": true, "price_concern": true, "competitor_mention": true, "customer_questions": true, "drop_off": true},
+        "sales_outcome": "no_purchase"
+      }
+    },
+    {
+      "id": "hi_short_fragment", "language": "hi",
+      "segments": [
+        {"segment_id": "23000000-0000-4000-8000-000000000001", "start_ms": 0, "end_ms": 1500, "speaker": "unknown", "raw_text": "Haan ji dekhte hain", "display_text": null, "translation_en": null, "stt_confidence": 0.7},
+        {"segment_id": "23000000-0000-4000-8000-000000000002", "start_ms": 1500, "end_ms": 2500, "speaker": "unknown", "raw_text": "theek hai", "display_text": null, "translation_en": null, "stt_confidence": 0.6}
+      ],
+      "human": {"status": "insufficient_evidence", "dimensions": {}, "signals": {}, "sales_outcome": "unknown"}
+    }
+  ]
+}
