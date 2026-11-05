@@ -48,7 +48,7 @@ export function WalkinStart({ entryQueueProps, fields, options, lookupOptions, a
     <h1 className="sr-only">Client queue</h1>
     <div className="crm-queue-top">{actions}{settings}</div>
     {choice === "lead"
-      ? <section aria-labelledby="register-lead-heading"><div className="flex flex-wrap items-center justify-between gap-3"><h2 id="register-lead-heading" className="text-lg font-semibold">REGISTER LEAD</h2><button type="button" onClick={() => choose("client")} className="text-sm font-medium text-amber-800 underline">Back to queue</button></div>
+      ? <section aria-labelledby="register-lead-heading" className="crm-lead-panel"><div className="flex flex-wrap items-center justify-between gap-3"><h2 id="register-lead-heading" className="text-lg font-semibold">REGISTER LEAD</h2><button type="button" onClick={() => choose("client")} className="text-sm font-medium text-amber-800 underline">Back to queue</button></div>
           {loading ? <p role="status" className="mt-3 text-sm text-stone-600">Loading the lead form…</p> : <><LinkNeedsAttention canManage={canManage} onOpenSettings={openSettings} usable={leadLink} />{host && leadUsable ? <LinkedLeadRegistration host={host} link={leadUsable} onSaved={() => router.refresh()} /> : <LeadForm fields={fields} options={options} lookupOptions={lookupOptions} actorId={actorId} />}</>}</section>
       : <>{loading ? null : <LinkNeedsAttention canManage={canManage} onOpenSettings={openSettings} usable={queueLink} />}
           {/* The queue shows at once; a linked Form Builder intake replaces the quick form once the links have loaded. */}

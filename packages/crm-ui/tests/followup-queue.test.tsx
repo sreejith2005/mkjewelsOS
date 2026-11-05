@@ -98,3 +98,11 @@ describe("Not Bought case kinds in Client Database (2026-11-04)", () => {
     expect(screen.queryByText("Later Client")).toBeNull();
   });
 });
+
+describe("Not Bought readable rows (owner 2026-11-05)", () => {
+  it("does not show the visit reference in the row", () => {
+    render(<FollowupQueue role="salesperson" branchId="branch-1" items={[item]} crmNames={[]} enteredByName="Test CRM" />);
+    fireEvent.click(screen.getByRole("button", { name: "ALL PENDING FOLLOW UP" }));
+    expect(screen.queryByText(/VISIT REF/)).toBeNull();
+  });
+});

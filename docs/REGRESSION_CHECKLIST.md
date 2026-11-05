@@ -340,6 +340,14 @@ migration 20261104000300 must be applied first (see the handoff deployment order
 - [ ] Not Bought and Referrals: no duplicate heading; Sync and Refresh are under ⋯; counts read "N of M".
 - [ ] Phone text is comfortably small (not zoomed); nothing pans sideways at 360 px.
 
+### CRM queue spacing and phone rows - 2026-11-05 (3)
+
+- [ ] Desktop Client queue: the "Walk-in form" button sits next to each person (no wide gap). "Register lead" shows the form centred on the page.
+- [ ] Phone Client database: each record fills the screen width; its buttons share the row evenly.
+- [ ] Phone Not Bought: no "VISIT REF" line; name, status and case label, number with Call, next follow-up, then the buttons.
+- [ ] Phone Referrals received: the person's name and "Referred by <client> (<relation>)"; codes, date added and pending notes only under Details.
+- [ ] Phone Referrals given: the client's name and "Referred <person> (<relation>)"; codes and the referral column only under Details.
+
 ### CRM forms from the Form Builder - 2026-11-03
 
 - [ ] Only a Super Admin (or anyone given **Manage CRM forms**) sees **CRM FORM SETTINGS** on CRM REGISTRATION; a CRM salesperson does not, and calling `save_crm_form_binding` directly as them is refused.
