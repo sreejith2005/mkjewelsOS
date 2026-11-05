@@ -1,6 +1,6 @@
 import type { SalesRubricDimension } from "./score";
 
-/** MK Sales Score v1. Seeded by migration 0378 (recording_default_rubric_dimensions); rubric.test.ts checks parity. */
+/** MK Sales Score v1. Seeded by migration 0379 (recording_default_rubric_dimensions); rubric.test.ts checks parity. */
 export const MK_SALES_RUBRIC_V1: readonly SalesRubricDimension[] = [
   { key: "greeting_sop", label: "Greeting & SOP", weight: 15, description: "Welcome, introduction, hospitality and the MK Jewels opening steps." },
   { key: "product_knowledge", label: "Product Knowledge", weight: 20, description: "Accurate gold, diamond, purity, certification, making-charge and design facts." },

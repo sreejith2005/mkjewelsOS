@@ -7,7 +7,7 @@ import {
   type AnalysisTranscriptSegment, type SalesDimensionInput, type SalesDimensionStatus, type StoredSalesAnalysis,
 } from "./index";
 
-const migration = readFileSync(fileURLToPath(new URL("../../../../supabase/migrations/0378_recording_analysis.sql", import.meta.url)), "utf8");
+const migration = readFileSync(fileURLToPath(new URL("../../../../supabase/migrations/0379_recording_analysis.sql", import.meta.url)), "utf8");
 const vectors = JSON.parse(readFileSync(fileURLToPath(new URL("../../../../services/recorder/contracts/redaction_vectors.json", import.meta.url)), "utf8")) as { vectors: [string, string][] };
 
 const KEYS = MK_SALES_RUBRIC_V1.map((d) => d.key);

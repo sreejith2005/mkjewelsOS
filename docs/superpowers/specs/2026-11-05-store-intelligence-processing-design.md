@@ -35,7 +35,7 @@ longest speaker as the employee, logging raw transcripts and model responses,
 silent fallback to another provider, 0–10 scores for every dimension regardless
 of evidence, a customer-satisfaction guess, a local SQLite store.
 
-## Data model (migration 0378)
+## Data model (migration 0379)
 
 All tables are in the JewelOS project, RLS-enabled, with no direct client or
 service-role table writes. Writes go through audited `security definer` RPCs.

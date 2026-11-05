@@ -1,6 +1,6 @@
 /**
  * MK Sales Score formula. The database function recording_compute_score
- * (migration 0378) is the authority; this mirror exists for previews,
+ * (migration 0379) is the authority; this mirror exists for previews,
  * evaluation and review screens and is kept in parity by score.test.ts.
  *
  *   assessed_weight  = Σ configured weight of assessed dimensions

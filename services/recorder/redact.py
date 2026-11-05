@@ -1,6 +1,6 @@
 """Masks contact and identity numbers before text reaches a prompt or an extract.
 
-Same patterns and order as recording_redact (migration 0378) and
+Same patterns and order as recording_redact (migration 0379) and
 packages/core/src/salesScore/redact.ts; shared vectors in
 contracts/redaction_vectors.json. Stored transcripts keep the original.
 """

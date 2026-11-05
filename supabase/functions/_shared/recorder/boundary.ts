@@ -3,7 +3,7 @@ export interface RecorderBoundaryConfig {
  uploadUrl: string; streamUrl: string; allowedOrigins: string[];
 }
 const actions = new Set(['redeem','check_chunk','chunk','commit','event','alert','heartbeat','claim_job','finish_job','health','reconcile']);
-// Store Intelligence analysis (migration 0378): routed to recording_analysis_ingest.
+// Store Intelligence analysis (migration 0379): routed to recording_analysis_ingest.
 const analysisActions = new Set(['transcript_finalize','analysis_claim','analysis_submit','analysis_fail','analysis_reconcile','analysis_health']);
 // Only these two carry a whole transcript or analysis; everything else keeps the small limit.
 const largeBodyActions = new Set(['transcript_finalize','analysis_submit']);

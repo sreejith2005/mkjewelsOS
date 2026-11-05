@@ -191,11 +191,11 @@ requires the active final-job lease and final canonical segment. No business sco
 or sale outcome is inferred. Validate the private provider's evidence behavior
 with the owner before enabling either coaching switch.
 
-## Finalized transcript revisions (migration 0378)
+## Finalized transcript revisions (migration 0379)
 
 With `RECORDER_FINALIZE_TRANSCRIPTS=true` the final job also calls
 `transcript_finalize`, creating an immutable machine revision
-(`recording_transcript_revisions/segments`). Leave it unset until migration 0378
+(`recording_transcript_revisions/segments`). Leave it unset until migration 0379
 and the matching `recorder-ingest` are deployed; otherwise final jobs would fail.
 
 Processors may return `{segments, provider, model, diarization_provider}`

@@ -1,7 +1,7 @@
 """Machine-readable contracts for Store Intelligence processing.
 
 These pydantic models validate untrusted model and processor output in the
-worker. The database validates again (migration 0378). Exported JSON Schemas
+worker. The database validates again (migration 0379). Exported JSON Schemas
 live in contracts/*.schema.json; `python contracts.py` regenerates them and
 tests/test_contracts.py fails if they drift.
 """

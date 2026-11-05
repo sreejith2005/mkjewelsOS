@@ -35,7 +35,7 @@ class Worker:
         self.boundary,self.objects,self.processor=boundary,objects,processor
         self.worker_id = worker_id or str(uuid4())
         self.coaching_enabled = coaching_enabled
-        # Off until migration 0378 and the matching recorder-ingest are deployed.
+        # Off until migration 0379 and the matching recorder-ingest are deployed.
         self.finalize_transcripts = finalize_transcripts
 
     async def once(self) -> bool:

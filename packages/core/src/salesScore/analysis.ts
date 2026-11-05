@@ -1,6 +1,6 @@
 import type { SalesAnalysisStatus, SalesDimensionStatus, SalesStatusReason, TranscriptQuality } from "./score";
 
-/** Shapes returned by recording_analysis_snapshot (migration 0378). */
+/** Shapes returned by recording_analysis_snapshot (migration 0379). */
 export type SpeakerRole = "employee" | "customer" | "unknown";
 export type AnalysisTranscriptSegment = Readonly<{
   segment_id: string; ordinal: number; source_sequence: number; source_offset_ms: number;

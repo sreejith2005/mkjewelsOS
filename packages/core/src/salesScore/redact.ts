@@ -1,7 +1,7 @@
 /**
  * Masks contact and identity numbers before text leaves the review screen
  * (analytics extracts). Same patterns, in the same order, as recording_redact
- * (migration 0378) and services/recorder/redact.py; shared vectors in tests.
+ * (migration 0379) and services/recorder/redact.py; shared vectors in tests.
  * Ordinary prices, carat and purity numbers are left alone.
  */
 const PATTERNS: readonly (readonly [RegExp, string])[] = [

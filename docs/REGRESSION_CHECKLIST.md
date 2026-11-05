@@ -434,7 +434,7 @@ without a second page scroll bar.
 - Dropdown Master: lists and options panes scroll independently (1280 px+);
   New list in the header, Add item on the open list; phones: All lists.
 
-### Sales recording analysis (0378) - 2026-11-05
+### Sales recording analysis (0379) - 2026-11-05
 
 Backend only; checks run through RPCs until the review screen ships.
 

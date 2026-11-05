@@ -103,7 +103,7 @@ Lifecycle expiration is asynchronous. Worker reconciliation expires transcript/
 alert content, releases expired interrupted device slots and recovers expired
 job leases. Job retries back off and dead-letter after five attempts.
 
-## Store Intelligence analysis and MK Sales Score (migration 0378)
+## Store Intelligence analysis and MK Sales Score (migration 0379)
 
 Design: `docs/superpowers/specs/2026-11-05-store-intelligence-processing-design.md`.
 Dark until `recording_configure_analysis(true)` (Developer Mode authority) and
@@ -129,7 +129,7 @@ the analysis worker runs. Backend only for now; there is no review screen yet.
 - AI output is a recommendation. Nothing writes CRM, marks a purchase or changes
   reports. Ask Kiara has no access to transcripts or scores.
 
-Enable order: apply 0378, deploy `recorder-ingest`, set
+Enable order: apply 0379, deploy `recorder-ingest`, set
 `RECORDER_FINALIZE_TRANSCRIPTS=true` on the recorder worker, load and approve an
 SOP version, start the analysis worker, run the evaluation report with the chosen
 analyzer, then enable analysis for the pilot tenant.

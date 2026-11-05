@@ -1,5 +1,5 @@
 {
-  "description": "Shared redaction vectors. Used by services/recorder tests, packages/core salesScore tests and mirrored in supabase/tests/0378_recording_analysis.test.sql.",
+  "description": "Shared redaction vectors. Used by services/recorder tests, packages/core salesScore tests and mirrored in supabase/tests/0379_recording_analysis.test.sql.",
   "vectors": [
     ["call me at 98765 43210 please", "call me at [PHONE] please"],
     ["+91 9876543210", "[PHONE]"],
