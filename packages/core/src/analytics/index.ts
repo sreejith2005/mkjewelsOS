@@ -9,3 +9,4 @@ export * from "./insights";
 export * from "./insightsCatalog";
 export * from "./crmInsights";
 export * from "./insightsValidation";
+export * from "./taskPerformance";

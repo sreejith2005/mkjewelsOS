@@ -99,6 +99,31 @@ Delay = completed time − due. FMS steps without a deadline are not due work.
   reopened work counts by its current state. Rejected tasks, skipped/stopped FMS steps and
   FMS steps without a deadline are excluded. Source records and audit history are not
   changed.
+- Since migration 0382 the rows come from `performance_work_rows_v1`, the one source the
+  Dashboard's **Employee performance**, Task Control's employee progress
+  (`get_employee_task_progress`) and this report share, so the same person, scope and
+  period give the same counts and scores everywhere (see "Employee task performance" below).
+
+**Employee task performance (Dashboard, Task Control, this report — migration 0382).**
+- One row = one active doer (`task_assignees.role_at_task = 'doer'`, `is_active`) on one task
+  occurrence, or one assignee in `fms_instance_stages.assigned_to` on one FMS **person step**
+  visit (`form`, `task`, `approval`). End, branch, notification and parallel nodes are never work.
+- Cohort: deadline in the period, in India time. Tasks: `coalesce(revised, due, planned)`
+  (= `task_effective_due_datetime`). FMS: the visit's `planned_datetime`.
+- Every cohort row is in exactly one bucket: **on time** (completed at or before the
+  deadline), **late**, **completed with no completion time** (counts as completed, never on
+  time), **in progress** (`in_progress`/`in_review`, not yet due), **pending** (any other open
+  status, not yet due), **overdue** (open, deadline passed). Completed + remaining = assigned.
+- **Excluded** (counted and listed, never scored): rejected tasks/steps, skipped
+  (`condition_skipped`) and stopped (`workflow_closed`) FMS visits, open steps of cancelled runs.
+- **Work not done %** = completed ÷ assigned × 100 − 100; **Work not done on time %** = on time ÷
+  completed × 100 − 100; assigned 0 → No data; nothing completed → −100. Calculated only by
+  `taskPendingScore` / `taskDelayedScore` in `@jewelos/core`.
+- Shown beside the cohort, never inside it: open work whose deadline passed before the period
+  (current backlog), and pending FMS start forms (standing assignments with no occurrence history).
+- People are filtered by their current branch and department. Company-wide view needs the
+  `dashboard.view_team_performance` permission (default Super Admin and Admin); everyone else sees
+  only their own work. Every count opens `get_task_performance_records_v1` with the same filter.
 
 **CRM Performance** (activity in the period; each fact from exactly one table).
 - Leads registered (`leads.created_by`); lead call attempts (every `lead_call_history`
