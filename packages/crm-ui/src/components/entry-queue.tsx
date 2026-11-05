@@ -35,6 +35,14 @@ const ROSTER_REASONS: Record<string, string> = {
   invalid_snapshot: "their name or email in JewelOS Users is incomplete",
 };
 
+/** Entry time in India time: "10:42 am" today, "4 Nov, 10:42 am" on another day. */
+export function queueTime(iso: string, now = new Date()): string {
+  const zone = "Asia/Kolkata";
+  const day = (date: Date) => date.toLocaleDateString("en-CA", { timeZone: zone });
+  const time = new Date(iso).toLocaleTimeString("en-IN", { timeZone: zone, hour: "numeric", minute: "2-digit" });
+  return day(new Date(iso)) === day(now) ? time : `${new Date(iso).toLocaleDateString("en-IN", { timeZone: zone, day: "numeric", month: "short" })}, ${time}`;
+}
+
 function readStoredSelection(): { branch?: string; crm?: string } {
   try { const value: unknown = JSON.parse(window.localStorage.getItem(QUEUE_SELECTION_KEY) ?? "{}"); return value && typeof value === "object" ? value as { branch?: string; crm?: string } : {}; } catch { return {}; }
 }
@@ -139,7 +147,14 @@ export function EntryQueue({ profile, selectedBranchId, selectedCrm, branches, c
       {presentToday.length ? <p className="crm-flat-meta mt-3">In today: {presentToday.join(", ")}</p> : branch && toolbarRoster.length ? <p className="crm-flat-meta mt-3">No CRM staff in today.</p> : null}
       <div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={() => changeTab("active")} aria-pressed={queueTab === "active"} className={queueTab === "active" ? "rounded bg-amber-800 px-3 py-2 text-xs font-semibold text-white" : "rounded border px-3 py-2 text-xs font-semibold"}>Active queue</button><button type="button" onClick={() => changeTab("recent")} aria-pressed={queueTab === "recent"} className={queueTab === "recent" ? "rounded bg-amber-800 px-3 py-2 text-xs font-semibold text-white" : "rounded border px-3 py-2 text-xs font-semibold"}>Recently submitted</button></div>
       {completedName ? <p role="status" className="mt-3 text-sm font-medium text-green-800">Visit saved for {completedName}. It is under Recently submitted.</p> : null}</div>
-      {visibleItems.length ? <div className="overflow-x-auto"><table className="crm-record-table w-full text-left text-sm"><thead className="bg-stone-50 text-stone-600"><tr><th className="p-4">ENTRY TIME</th><th className="p-4">CLIENT NAME</th><th className="p-4">MOBILE</th><th className="p-4">BRANCH</th><th className="p-4">CRM</th><th className="p-4">TYPE</th><th className="p-4">ACTION</th></tr></thead><tbody>{visibleItems.map((item) => <tr key={item.id} className="border-t"><td data-label="Entry time" className="p-4 font-medium">{new Date(item.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</td><td data-label="Name" className="p-4">{item.client_name}</td><td data-label="Phone" className="p-4">{formatPhone(item.mobile)}</td><td data-label="Branch" className="p-4">{branches.find((itemBranch) => itemBranch.id === (item.branch_id ?? selectedBranchId))?.name ?? ""}</td><td data-label="CRM" className="p-4">{item.assigned_crm_name ?? "NA"}</td><td data-label="Type" className="p-4">{/* crm-port fix (owner 2026-10-05): registration always creates the client, so client_id alone always read EXISTING. */}{item.client_is_new || !item.client_id ? "NEW" : "EXISTING"}</td><td data-label="Action" className="p-4">{item.status === "complete" ? item.client_id ? <Link className="font-medium text-amber-800 underline" href={`/clients/${item.client_id}`}>Review client record</Link> : <span className="crm-status crm-status--done">Done</span> : <Link className="font-medium text-amber-800 underline" href={`/visits/new?queue=${item.id}`}>{item.client_id ? "MAKE WALK-IN ENTRY" : "ADD WALKIN ENTRY"}</Link>}</td></tr>)}</tbody></table></div> : <p className="crm-flat-empty">{selectedBranchId ? "No one is waiting." : "Choose a branch and press LOAD QUEUE."}</p>}
+      {/* One plain row per person (owner 2026-11-05): who, when, which CRM, and one clear action. No inner scroller. */}
+      {visibleItems.length ? <ul className="crm-queue-list" aria-label={queueTab === "active" ? "Waiting clients" : "Recently submitted"}>{visibleItems.map((item) => <li key={item.id} className="crm-queue-row">
+        <div className="crm-queue-who">
+          <p className="crm-queue-name">{item.client_name}<span className={`crm-queue-badge${item.client_is_new || !item.client_id ? " is-new" : ""}`}>{/* crm-port fix (owner 2026-10-05): registration always creates the client, so client_id alone always read EXISTING. */}{item.client_is_new || !item.client_id ? "New" : "Returning"}</span></p>
+          <p className="crm-queue-meta"><span>{formatPhone(item.mobile)}</span><span>{queueTime(item.created_at)}</span><span>{item.assigned_crm_name ? `CRM: ${item.assigned_crm_name}` : "No CRM yet"}</span></p>
+        </div>
+        <div className="crm-queue-act">{item.status === "complete" ? item.client_id ? <Link className="crm-queue-link" href={`/clients/${item.client_id}`}>View client</Link> : <span className="crm-status crm-status--done">Done</span> : <Link className="crm-queue-go" href={`/visits/new?queue=${item.id}`}>Walk-in form</Link>}</div>
+      </li>)}</ul> : <p className="crm-flat-empty">{selectedBranchId ? "No one is waiting." : "Choose a branch and press LOAD QUEUE."}</p>}
       {paging && <nav aria-label="Queue pages" className="flex flex-wrap gap-3 p-4 text-xs text-stone-600"><span>PAGE {paging.page} OF {Math.max(1, Math.ceil(paging.total / 50))} | {paging.total} ENTRIES</span>{paging.page > 1 && <Link className="rounded border px-3 py-1" href={queueHref(queueTab, paging.page - 1)}>PREVIOUS</Link>}{paging.page * 50 < paging.total && <Link className="rounded border px-3 py-1" href={queueHref(queueTab, paging.page + 1)}>NEXT</Link>}</nav>}
     </section>
   </div>;

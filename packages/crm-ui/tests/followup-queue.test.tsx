@@ -30,7 +30,7 @@ describe("FollowupQueue legacy parity", () => {
     expect(rpc).toHaveBeenCalledTimes(1);
   });
   it("syncs explicitly and refreshes", async () => {
-    rpc.mockResolvedValue({ data: 2, error: null }); renderQueue(); fireEvent.click(screen.getByRole("button", { name: "SYNC NOT BOUGHT DATA" }));
+    rpc.mockResolvedValue({ data: 2, error: null }); renderQueue(); fireEvent.click(screen.getByRole("button", { name: "Sync Not Bought data" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("sync_not_bought_followups")); expect(refresh).toHaveBeenCalled(); expect(screen.getByText(/2 follow-up\(s\) added/)).toBeTruthy();
   });
 });

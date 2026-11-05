@@ -50,7 +50,7 @@ describe("Client Database paging", () => {
     render(await ClientsPage({ searchParams: Promise.resolve({}) }));
 
     expect(browseCalls()).toEqual([{ p_filters: {search:""}, p_offset: 0, p_limit: 50 }]);
-    expect(screen.getByText("206 RESULT(S) FOUND.")).toBeTruthy();
+    expect(screen.getByText("206 records")).toBeTruthy();
     expect(screen.getAllByText("SHOWING CLIENTS 1-50 OF 206")).toHaveLength(2);
     expect(screen.getByText("Synthetic 1")).toBeTruthy();
     expect(screen.getByText("Synthetic 50")).toBeTruthy();
@@ -77,7 +77,7 @@ describe("Client Database paging", () => {
     expect(browseCalls()).toEqual([
       expect.objectContaining({ p_offset: 400, p_limit: 50 }),
     ]);
-    expect(screen.getByText("206 RESULT(S) FOUND.")).toBeTruthy();
+    expect(screen.getByText("206 records")).toBeTruthy();
     expect(screen.getAllByText("NO CLIENTS ON THIS PAGE.")).toHaveLength(2);
     expect(screen.getAllByRole("link", { name: "PREVIOUS" })[0].getAttribute("href")).toBe("/clients?page=5");
   });

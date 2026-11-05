@@ -2,7 +2,7 @@
 
 import Image from "@/next-shim/image"; // crm-port: next/image -> local shim
 import Link from "@/next-shim/link"; // crm-port: next/link -> local shim (same hrefs, /crm base path added)
-import { usePathname } from "@/next-shim/navigation"; // crm-port: next/navigation -> local shim (same paths, /crm base path added)
+import { usePathname, useSearchParams } from "@/next-shim/navigation"; // crm-port: next/navigation -> local shim (same paths, /crm base path added)
 import { useEffect, useRef, useState } from "react";
 
 import { signOut } from "@/app/actions";
@@ -13,6 +13,7 @@ import { PAGE_SCROLL_ATTRIBUTE } from "@/crm-port/mobile-tables";
 import { useCrmTheme } from "@/crm-port/theme-context";
 import brandWordmark from "@/mk-jewels-logos/mk-jewels-wordmark.png";
 import { ClientSearch } from "./client-search";
+import { CLIENT_WORKSPACE_VIEWS } from "./client-workspace";
 import { CrmIcon } from "./crm-icon";
 import { PostCallInbox } from "./post-call-inbox";
 
@@ -31,9 +32,9 @@ function BrandLink() {
 // Database. Opening CRM lands on Client Queue (app/page.tsx). Not Bought follow-ups and both sides
 // of referrals live inside Client Database as presets; their old addresses redirect there.
 export const CRM_SECTION_TABS = [
-  { label: "DASHBOARD", href: "/dashboard", icon: "dashboard" },
-  { label: "CLIENT QUEUE", href: "/queue", icon: "walkin" },
-  { label: "CLIENT DATABASE", href: "/clients", icon: "clients" },
+  { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
+  { label: "Client queue", href: "/queue", icon: "walkin" },
+  { label: "Client database", href: "/clients", icon: "clients" },
 ] as const;
 
 export type CrmSectionHref = (typeof CRM_SECTION_TABS)[number]["href"];
@@ -46,28 +47,66 @@ export function activeCrmSectionTab(pathname: string): CrmSectionHref | null {
   return null;
 }
 
-// crm-port: one bar above the page on every screen (owner request 2026-11-04): the three tabs and
-// the client search, so the page below keeps the full width of the JewelOS content area. On phones
-// the tabs scroll sideways and the open one is always scrolled into view.
+/** The Client Database view a CRM address shows ("" = All clients), or null off Client Database. */
+export function clientViewOf(pathname: string, search: string): string | null {
+  if (pathname === "/followups") return "not_bought";
+  if (pathname === "/referrals") return "referrals_received";
+  if (pathname !== "/clients") return null;
+  return new URLSearchParams(search).get("preset") ?? "";
+}
+
+/** The name of the open CRM page, shown on the menu button. */
+export function crmPageTitle(pathname: string, search: string): string {
+  const view = clientViewOf(pathname, search);
+  if (view !== null) return CLIENT_WORKSPACE_VIEWS.find((item) => item.preset === view)?.label ?? "Client database";
+  if (pathname.startsWith("/clients/")) return "Client profile";
+  if (pathname === "/visits/new") return "Walk-in form";
+  if (pathname === "/leads/new") return "Register lead";
+  return CRM_SECTION_TABS.find((tab) => tab.href === activeCrmSectionTab(pathname))?.label ?? "CRM";
+}
+
+// crm-port: the CRM pages are in a hamburger menu (owner request 2026-11-05): one small bar with the
+// menu button (named after the open page) and the client search, so the page has the whole screen.
+// Choosing a page opens it and closes the menu; Escape or tapping outside closes it too.
 function CrmSectionShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  // While a page loads, its tab is already highlighted (2026-11-05): the tap answers at once.
+  const search = useSearchParams().toString();
+  // While a page loads, its menu entry and title switch at once (2026-11-05): the tap answers at once.
   const pendingHref = usePendingHref();
-  const active = activeCrmSectionTab(pendingHref ? pendingHref.split("?")[0]! : pathname);
-  const navRef = useRef<HTMLElement>(null);
+  const [shownPath, shownSearch] = pendingHref ? [pendingHref.split("?")[0]!, pendingHref.split("?")[1] ?? ""] : [pathname, search];
+  const active = activeCrmSectionTab(shownPath);
+  const activeView = clientViewOf(shownPath, shownSearch);
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
   useEffect(() => {
-    const current = navRef.current?.querySelector<HTMLElement>('[aria-current="page"]');
-    current?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
-  }, [active]);
+    if (!open) return;
+    panelRef.current?.querySelector<HTMLElement>('[aria-current="page"], a')?.focus();
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { setOpen(false); triggerRef.current?.focus(); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+  const close = () => setOpen(false);
   // One vertical scroll bar on every CRM page, the page's own, as in the rest of JewelOS (owner 2026-11-05).
   return <div className="crm-app crm-section" {...{ [PAGE_SCROLL_ATTRIBUTE]: "" }}>
     {pendingHref ? <div className="crm-progress" role="progressbar" aria-label="Opening page" /> : null}
     <div className="crm-section-bar">
-      <nav className="crm-section-tabs" aria-label="CRM sections" ref={navRef}>
-        {CRM_SECTION_TABS.map(({ label, href, icon }) => <Link className={`crm-section-tab${active === href ? " is-active" : ""}`} aria-current={active === href ? "page" : undefined} href={href} key={href} preloadData><CrmIcon name={icon} /><span>{label}</span></Link>)}
-      </nav>
+      <button ref={triggerRef} type="button" className="crm-menu-trigger" aria-haspopup="dialog" aria-expanded={open} aria-controls="crm-section-menu" onClick={() => setOpen(true)}>
+        <span className="crm-menu-trigger-icon" aria-hidden="true"><span /><span /><span /></span>
+        <span className="crm-menu-trigger-label"><span className="sr-only">CRM menu, open page: </span>{crmPageTitle(shownPath, shownSearch)}</span>
+      </button>
       <div className="crm-section-search"><ClientSearch /></div>
     </div>
+    {open ? <>
+      <button type="button" className="crm-menu-backdrop" aria-label="Close CRM menu" tabIndex={-1} onClick={close} />
+      <nav id="crm-section-menu" ref={panelRef} className="crm-menu-panel" role="dialog" aria-modal="true" aria-label="CRM sections">
+        <div className="crm-menu-head"><span>CRM</span><button type="button" className="crm-menu-close" aria-label="Close CRM menu" onClick={() => { close(); triggerRef.current?.focus(); }}>×</button></div>
+        {CRM_SECTION_TABS.map(({ label, href, icon }) => <div key={href}>
+          <Link className={`crm-menu-link${active === href && (href !== "/clients" || activeView === "" || activeView === null) ? " is-active" : ""}`} aria-current={active === href && (href !== "/clients" || activeView === "") ? "page" : undefined} href={href} preloadData onClick={close}><CrmIcon name={icon} /><span>{href === "/clients" ? "Client database" : label}</span></Link>
+          {href === "/clients" ? <div className="crm-menu-sub">{CLIENT_WORKSPACE_VIEWS.filter((view) => view.preset).map((view) => <Link key={view.preset} className={`crm-menu-sublink${activeView === view.preset ? " is-active" : ""}`} aria-current={activeView === view.preset ? "page" : undefined} href={view.href} preloadData onClick={close}>{view.label}</Link>)}</div> : null}
+        </div>)}
+      </nav>
+    </> : null}
     <div className="crm-main">{children}</div>
     <PostCallInbox />
   </div>;

@@ -24,28 +24,28 @@ it("shows the server's committed queue row before a page refresh completes", asy
   rpc.mockResolvedValue({ data: [row], error: null });
   const view = render(<EntryQueue {...props} />);
   submit();
-  const saved = await screen.findByRole("row", { name: /Saved Client/ });
+  const saved = (await screen.findByText("Saved Client")).closest("li")!;
   expect(within(saved).getByRole("link").getAttribute("href")).toBe("/visits/new?queue=queue-committed");
   expect(rpc).toHaveBeenCalledWith("register_walkin_entry", expect.anything());
   // An older overlapping refresh cannot erase the acknowledged write.
   view.rerender(<EntryQueue {...props} initialItems={[]} />);
-  expect(screen.getAllByRole("row", { name: /Saved Client/ })).toHaveLength(1);
+  expect(screen.getAllByText("Saved Client").filter((element) => element.closest("li"))).toHaveLength(1);
   view.rerender(<EntryQueue {...props} initialItems={[{ ...row, status: "complete" }]} />);
-  expect(screen.queryByRole("row", { name: /Saved Client/ })).toBeNull();
+  expect(screen.queryByText("Saved Client")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Recently submitted" }));
-  expect(screen.getAllByRole("row", { name: /Saved Client/ })).toHaveLength(1);
+  expect(screen.getAllByText("Saved Client").filter((element) => element.closest("li"))).toHaveLength(1);
 });
 
 it("does not invent a queue row on failed registration", async () => {
   rpc.mockResolvedValue({ data: null, error: { code: "42501" } });
   render(<EntryQueue {...props} />); submit();
   await screen.findByText(/Could not register/);
-  expect(screen.queryByRole("row", { name: /Saved Client/ })).toBeNull();
+  expect(screen.queryByText("Saved Client")).toBeNull();
 });
 
 it("keeps the loaded CRM filter when the committed row belongs to another CRM", async () => {
   rpc.mockResolvedValue({ data: [{ ...row, assigned_crm_name: "Other CRM" }], error: null });
   render(<EntryQueue {...props} selectedCrm="Test CRM" />); submit();
   await screen.findByText(/MKC-100001/);
-  expect(screen.queryByRole("row", { name: /Saved Client/ })).toBeNull();
+  expect(screen.queryByText("Saved Client")).toBeNull();
 });

@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "@/next-shim/link"; // crm-port: next/link -> local shim (same hrefs, /crm base path added)
 import { PAGE_SCROLL_ATTRIBUTE } from "@/crm-port/mobile-tables";
-import { usePendingHref } from "@/crm-port/navigation-context";
 
 /**
  * Client Database views (owner request 2026-11-04). "All clients" is the client and lead browser;
@@ -21,18 +19,13 @@ export type ClientWorkspacePreset = (typeof CLIENT_WORKSPACE_VIEWS)[number]["pre
 /** Client Database page frame: one heading, the view chips, then the view. The document is the only vertical scroller. */
 export function ClientWorkspace({ preset, children }: { preset: ClientWorkspacePreset; children: ReactNode }) {
   const pageScroll = { [PAGE_SCROLL_ATTRIBUTE]: "" };
-  // The chip of the view being opened is highlighted at once, before its list arrives.
-  const pendingHref = usePendingHref();
-  const pendingPreset = pendingHref?.startsWith("/clients") && !pendingHref.startsWith("/clients/") ? (new URLSearchParams(pendingHref.split("?")[1] ?? "").get("preset") ?? "") : null;
-  const shown = pendingPreset ?? preset;
+  // The views are in the CRM menu (owner 2026-11-05); the page names the open one.
+  const view = CLIENT_WORKSPACE_VIEWS.find((item) => item.preset === preset) ?? CLIENT_WORKSPACE_VIEWS[0];
   return <main className="crm-workspace" {...pageScroll}>
     <header className="crm-workspace-header">
-      <div><p className="crm-workspace-eyebrow">CRM</p><h1 className="text-3xl font-semibold">CLIENT DATABASE</h1></div>
-      <Link className="rounded bg-amber-800 px-4 py-2 font-medium text-white" href="/queue">Register Client</Link>
+      <h1 className="text-3xl font-semibold">{view.preset ? view.label : "Client database"}</h1>
+      <p className="crm-workspace-hint">{view.hint}</p>
     </header>
-    <nav className="crm-workspace-views" aria-label="Client Database views">
-      {CLIENT_WORKSPACE_VIEWS.map((view) => <Link key={view.preset || "all"} href={view.href} preloadData className={`crm-workspace-view${view.preset === shown ? " is-active" : ""}`} aria-current={view.preset === shown ? "page" : undefined} title={view.hint}>{view.label}</Link>)}
-    </nav>
     {children}
   </main>;
 }

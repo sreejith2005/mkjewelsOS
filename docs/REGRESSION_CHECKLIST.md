@@ -332,6 +332,14 @@ migration 20261104000300 must be applied first (see the handoff deployment order
 - [ ] Phone (360-412 px): records are plain rows separated by a line (no boxed cards), showing name, ID, phone, status and actions; Details shows the rest. Filters sit two per line; nothing pans sideways.
 - [ ] Speed: tapping DASHBOARD / CLIENT QUEUE / CLIENT DATABASE, a Client Database view (Not Bought, Referrals received/given) or a Not Bought tab highlights it at once and shows a thin gold bar until it opens; hovering first (desktop) opens it almost instantly. After saving a follow-up the list shows the saved value (never an older preload).
 
+### CRM menu, queue rows and phone layout - 2026-11-05 (2)
+
+- [ ] CRM shows one menu button (three lines + the open page's name) beside the client search; no tab strip. The menu lists Dashboard, Client queue, Client database and its views Not Bought, Referrals received, Referrals given; choosing one opens it and closes the menu; Escape and tapping outside close it.
+- [ ] Client queue: small "Register client" / "Register lead" buttons on one line. Each waiting person is one row: name with New/Returning, phone, time and CRM, and one "Walk-in form" button. On PC the mouse wheel scrolls the page anywhere over the queue.
+- [ ] Client database on a phone: no view chips and no Register Client button; one "Filters" button shows the filters; records are short rows (name, ID, phone, status, Call / Walk-in / Details); no "View Client Profile" (tap the name).
+- [ ] Not Bought and Referrals: no duplicate heading; Sync and Refresh are under ⋯; counts read "N of M".
+- [ ] Phone text is comfortably small (not zoomed); nothing pans sideways at 360 px.
+
 ### CRM forms from the Form Builder - 2026-11-03
 
 - [ ] Only a Super Admin (or anyone given **Manage CRM forms**) sees **CRM FORM SETTINGS** on CRM REGISTRATION; a CRM salesperson does not, and calling `save_crm_form_binding` directly as them is refused.

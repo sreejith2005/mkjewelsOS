@@ -38,20 +38,55 @@ function renderSection(children: React.ReactNode = "content") {
 }
 
 describe("CRM inside the JewelOS shell", () => {
-  it("shows exactly three tabs in order, the search, and no second header, drawer, theme switch, sign-out or JewelOS link", () => {
+  it("shows one menu button named after the open page, the search, and no tab strip, second header, theme switch, sign-out or JewelOS link", () => {
     renderSection();
-    const tabs = screen.getByRole("navigation", { name: "CRM sections" });
-    expect([...tabs.querySelectorAll("a")].map((link) => link.textContent)).toEqual(["DASHBOARD", "CLIENT QUEUE", "CLIENT DATABASE"]);
-    expect([...tabs.querySelectorAll("a")].map((link) => link.getAttribute("href"))).toEqual(["/dashboard", "/queue", "/clients"]);
+    expect(screen.queryByRole("navigation", { name: "CRM sections" })).toBeNull();
+    const trigger = screen.getByRole("button", { name: /CRM menu, open page: Client queue/ });
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
     expect(screen.getByRole("searchbox", { name: "Search clients" })).toBeTruthy();
-    expect(screen.queryByText(/NOT BOUGHT FOLLOW UP|REFERRALS|REGISTRATION/)).toBeNull();
     expect(screen.queryByRole("button", { name: "Open navigation menu" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Switch to (dark|light) mode/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /LOGOUT/ })).toBeNull();
     expect(screen.queryByText("← JewelOS")).toBeNull();
     expect(screen.getByText("content")).toBeTruthy();
     // One vertical scroll bar on every CRM page, the page's own (owner 2026-11-05).
-    expect(tabs.closest(".crm-section")?.hasAttribute("data-crm-page-scroll")).toBe(true);
+    expect(trigger.closest(".crm-section")?.hasAttribute("data-crm-page-scroll")).toBe(true);
+  });
+
+  it("opens the hamburger menu with the three pages in order and the Client database views, and closes it on choosing one", () => {
+    renderSection();
+    fireEvent.click(screen.getByRole("button", { name: /CRM menu/ }));
+    const menu = screen.getByRole("dialog", { name: "CRM sections" });
+    expect([...menu.querySelectorAll("a")].map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
+      ["Dashboard", "/dashboard"], ["Client queue", "/queue"], ["Client database", "/clients"],
+      ["Not Bought", "/clients?preset=not_bought&tab=pending"], ["Referrals received", "/clients?preset=referrals_received&tab=pending"], ["Referrals given", "/clients?preset=referrals_given&tab=pending"],
+    ]);
+    expect(screen.getByRole("link", { name: "Client queue" }).getAttribute("aria-current")).toBe("page");
+    fireEvent.click(screen.getByRole("link", { name: "Not Bought" }));
+    expect(screen.queryByRole("dialog", { name: "CRM sections" })).toBeNull();
+  });
+
+  it("closes the menu with Escape or the backdrop", () => {
+    renderSection();
+    fireEvent.click(screen.getByRole("button", { name: /CRM menu/ }));
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /CRM menu/ }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Close CRM menu" })[0]!);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("names the open page on the menu button, including Client database views", () => {
+    navigation.pathname = "/clients"; navigation.search = "?preset=not_bought&tab=today";
+    renderSection();
+    expect(screen.getByRole("button", { name: /open page: Not Bought/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /CRM menu/ }));
+    expect(screen.getByRole("link", { name: "Not Bought" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("link", { name: "Client database" }).getAttribute("aria-current")).toBeNull();
+    cleanup();
+    navigation.pathname = "/clients/10000000-0000-4000-8000-000000000001"; navigation.search = "";
+    renderSection();
+    expect(screen.getByRole("button", { name: /open page: Client profile/ })).toBeTruthy();
   });
 
   it("never traps the mouse wheel inside a sideways-scrolling CRM table", () => {
@@ -59,22 +94,10 @@ describe("CRM inside the JewelOS shell", () => {
     expect(css).toMatch(/\[data-crm-page-scroll\] \[class\*="overflow-x-auto"\]:has\(> table\[data-crm-cards\]\) \{[^}]*overscroll-behavior: auto;/);
   });
 
-  it("keeps the original CRM header in the standalone (embedded) layout, with the same three tabs", () => {
+  it("keeps the original CRM header in the standalone (embedded) layout, with the same three pages", () => {
     render(<CrmShell profile={profile}>content</CrmShell>);
     expect(screen.getByRole("button", { name: "Open navigation menu" })).toBeTruthy();
-    expect(screen.queryByRole("navigation", { name: "CRM sections" })).toBeNull();
-    expect(screen.getAllByRole("link").map((link) => link.textContent).filter((text) => ["DASHBOARD", "CLIENT QUEUE", "CLIENT DATABASE", "NOT BOUGHT FOLLOW UP", "REFERRALS CALLING"].includes(text ?? ""))).toEqual(["DASHBOARD", "CLIENT QUEUE", "CLIENT DATABASE"]);
-  });
-
-  it("marks the tab that owns the current page", () => {
-    navigation.pathname = "/clients/10000000-0000-4000-8000-000000000001";
-    renderSection();
-    expect(screen.getByRole("link", { name: "CLIENT DATABASE" }).getAttribute("aria-current")).toBe("page");
-    expect(screen.getByRole("link", { name: "CLIENT QUEUE" }).getAttribute("aria-current")).toBeNull();
-    cleanup();
-    navigation.pathname = "/queue";
-    renderSection();
-    expect(screen.getByRole("link", { name: "CLIENT QUEUE" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getAllByRole("link").map((link) => link.textContent).filter((text) => ["Dashboard", "Client queue", "Client database", "NOT BOUGHT FOLLOW UP", "REFERRALS CALLING"].includes(text ?? ""))).toEqual(["Dashboard", "Client queue", "Client database"]);
   });
 
   it("maps every CRM page to its tab", () => {
@@ -93,18 +116,18 @@ describe("CRM inside the JewelOS shell", () => {
 describe("Client Queue landing (no registration chooser)", () => {
   const props = { entryQueueProps: {} as never, fields: [], options: [], lookupOptions: {}, actorId: "actor" };
 
-  it("opens straight on the queue with REGISTER CLIENT and REGISTER LEAD side by side", () => {
+  it("opens straight on the queue with small Register client and Register lead buttons side by side", () => {
     render(<WalkinStart {...props} />);
     expect(screen.queryByRole("heading", { name: "Who are you registering?" })).toBeNull();
     expect(screen.getByText("CRM QUEUE WITH REGISTER CLIENT")).toBeTruthy();
-    expect(screen.getByRole("button", { name: /REGISTER CLIENT/ }).getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByRole("button", { name: /REGISTER LEAD/ }).getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByRole("button", { name: "Register client" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Register lead" }).getAttribute("aria-pressed")).toBe("false");
   });
 
   it("opens the lead form in the address and goes back to the queue, keeping the branch", () => {
     navigation.search = "?branch=b1&completed=Asha&completedClientId=c1";
     render(<WalkinStart {...props} />);
-    fireEvent.click(screen.getByRole("button", { name: /REGISTER LEAD/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Register lead" }));
     expect(navigation.push).toHaveBeenCalledWith("/queue?branch=b1&register=lead");
   });
 

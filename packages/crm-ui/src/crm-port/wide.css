@@ -58,7 +58,10 @@
      data-crm-page-scroll workspace grow with their rows (mobile-tables.ts does not fit them); only a
      table wider than the window scrolls sideways inside its own box. Column headings are not sticky
      there: a sticky cell inside a sideways-scrolling box cannot follow the document scroll. */
-  #crm-wide .crm-app [data-crm-page-scroll] [class*="overflow-x-auto"]:has(> table[data-crm-cards]) { max-height: none; overflow-x: auto; overflow-y: hidden; overscroll-behavior: auto; }
-  #crm-wide .crm-app [data-crm-page-scroll] table[data-crm-cards] > thead > tr > th { position: static; }
-  #crm-wide .crm-app [data-crm-page-scroll] table[data-crm-actions] > thead > tr > th:last-child { position: sticky; }
+  #crm-wide .crm-app [data-crm-page-scroll] [class*="overflow-x-auto"]:has(> table[data-crm-cards]),
+  #crm-wide .crm-app[data-crm-page-scroll] [class*="overflow-x-auto"]:has(> table[data-crm-cards]) { max-height: none; overflow-x: auto; overflow-y: hidden; overscroll-behavior: auto; }
+  #crm-wide .crm-app [data-crm-page-scroll] table[data-crm-cards] > thead > tr > th,
+  #crm-wide .crm-app[data-crm-page-scroll] table[data-crm-cards] > thead > tr > th { position: static; }
+  #crm-wide .crm-app [data-crm-page-scroll] table[data-crm-actions] > thead > tr > th:last-child,
+  #crm-wide .crm-app[data-crm-page-scroll] table[data-crm-actions] > thead > tr > th:last-child { position: sticky; }
 }

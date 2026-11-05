@@ -36,7 +36,7 @@ describe("consolidated client walk-in queue", () => {
     await waitFor(() => expect(screen.getByRole("status").textContent).toContain("Client ID: MKC-102726"));
     expect(screen.getByDisplayValue("New Queue Client")).toBeTruthy();
     expect(screen.getByDisplayValue("9012345602")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "ADD WALKIN ENTRY" }).getAttribute("href")).toBe("/visits/new?queue=queue-1");
+    expect(screen.getByRole("link", { name: "Walk-in form" }).getAttribute("href")).toBe("/visits/new?queue=queue-1");
     expect(screen.queryByText("Direct walk-in")).toBeNull();
   });
 
@@ -72,7 +72,7 @@ describe("consolidated client walk-in queue", () => {
     expect(screen.queryByText("Submitted Client")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Recently submitted" }));
     expect(screen.getByText("Submitted Client")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Review client record" }).getAttribute("href")).toBe("/clients/client-2");
+    expect(screen.getByRole("link", { name: "View client" }).getAttribute("href")).toBe("/clients/client-2");
   });
 
   it("loads the branch and CRM filter into the canonical queue URL", () => {
@@ -80,6 +80,16 @@ describe("consolidated client walk-in queue", () => {
     fireEvent.change(screen.getByLabelText("CRM NAME"), { target: { value: "TEST CRM" } });
     fireEvent.click(screen.getByRole("button", { name: "LOAD QUEUE" }));
     expect(push).toHaveBeenCalledWith(`/queue?branch=${branchId}&crm=TEST+CRM`);
+  });
+
+  it("shows each waiting person as one plain row: name, badge, phone, time, CRM and one action (owner 2026-11-05)", () => {
+    renderQueue();
+    const row = screen.getByRole("listitem");
+    expect(row.querySelector("table")).toBeNull();
+    expect(row.textContent).toContain("Queued Client");
+    expect(row.textContent).toContain("CRM: Test CRM");
+    expect(row.querySelectorAll("a")).toHaveLength(1);
+    expect(row.closest(".overflow-x-auto")).toBeNull();
   });
 
   it("keeps CRM NAME, BRANCH and LOAD QUEUE always visible, with no Filters disclosure", () => {
@@ -122,12 +132,13 @@ describe("consolidated client walk-in queue", () => {
     expect(refresh).not.toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();
   });
-  it("types a registered new client as NEW although registration already created the client (QA fix 2026-10-05)", () => {
+  it("labels a registered new client New although registration already created the client (QA fix 2026-10-05)", () => {
     render(<EntryQueue profile={{ role: "salesperson", branchId }} selectedBranchId={branchId} selectedCrm="" branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queueCrms={["Test CRM"]} initialItems={[
       { id: "queue-new", token: "1005-NEW01", client_name: "Brand New", mobile: "9012345611", assigned_crm_name: "Test CRM", status: "pending", created_at: "2026-10-05T09:00:00Z", client_id: "client-new", client_is_new: true },
       { id: "queue-old", token: "1005-OLD01", client_name: "Returning", mobile: "9012345612", assigned_crm_name: "Test CRM", status: "pending", created_at: "2026-10-05T09:05:00Z", client_id: "client-old", client_is_new: false },
     ]} />);
-    expect(screen.getByRole("row", { name: /Brand New/ }).textContent).toContain("NEW");
-    expect(screen.getByRole("row", { name: /Returning/ }).textContent).toContain("EXISTING");
+    const rows = screen.getAllByRole("listitem");
+    expect(rows.find((row) => row.textContent?.includes("Brand New"))?.textContent).toContain("New");
+    expect(rows.find((row) => row.textContent?.includes("Returning"))?.querySelector(".crm-queue-badge")?.textContent).toBe("Returning");
   });
 });

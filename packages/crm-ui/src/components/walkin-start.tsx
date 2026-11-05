@@ -41,12 +41,12 @@ export function WalkinStart({ entryQueueProps, fields, options, lookupOptions, a
   const leadUsable = host && leadLink && !leadLink.issues.length ? leadLink.link : null;
   const canManage = links?.canManage ?? false;
   const actions = <div className="crm-queue-actions" role="group" aria-label="Register">
-    <button type="button" className="crm-queue-action" aria-pressed={choice === "client"} onClick={() => choose("client")}><b>REGISTER CLIENT</b><small>Customer in the store</small></button>
-    <button type="button" className="crm-queue-action" aria-pressed={choice === "lead"} onClick={() => choose("lead")}><b>REGISTER LEAD</b><small>Phone or online enquiry</small></button>
+    <button type="button" className="crm-queue-action" aria-pressed={choice === "client"} onClick={() => choose("client")}>Register client</button>
+    <button type="button" className="crm-queue-action" aria-pressed={choice === "lead"} onClick={() => choose("lead")}>Register lead</button>
   </div>;
   return <section className="crm-queue-page">
-    <div className="flex flex-wrap items-end justify-between gap-3"><h1 className="text-3xl font-semibold">Client queue</h1>{settings ? <div className="crm-form-settings-bar">{settings}</div> : null}</div>
-    {actions}
+    <h1 className="sr-only">Client queue</h1>
+    <div className="crm-queue-top">{actions}{settings}</div>
     {choice === "lead"
       ? <section aria-labelledby="register-lead-heading"><div className="flex flex-wrap items-center justify-between gap-3"><h2 id="register-lead-heading" className="text-lg font-semibold">REGISTER LEAD</h2><button type="button" onClick={() => choose("client")} className="text-sm font-medium text-amber-800 underline">Back to queue</button></div>
           {loading ? <p role="status" className="mt-3 text-sm text-stone-600">Loading the lead form…</p> : <><LinkNeedsAttention canManage={canManage} onOpenSettings={openSettings} usable={leadLink} />{host && leadUsable ? <LinkedLeadRegistration host={host} link={leadUsable} onSaved={() => router.refresh()} /> : <LeadForm fields={fields} options={options} lookupOptions={lookupOptions} actorId={actorId} />}</>}</section>
