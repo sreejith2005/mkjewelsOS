@@ -89,7 +89,7 @@ export function ClientDatabase({ clients, search, paging, walkinContext, filters
         </FilterPanel>
       </form>
       {search ? <p className="crm-search-summary">Results for <strong>{search}</strong> <Link href={clientListHref('', 1, filters)}>Clear search</Link></p> : null}
-      <section className="crm-workspace-panel crm-workspace-results" aria-labelledby="client-results">
+      <section className="crm-workspace-results" aria-labelledby="client-results">
         <div className="crm-workspace-results-head"><div><h2 id="client-results" className="text-sm font-semibold tracking-wide">SEARCH RESULTS</h2><p className="mt-1 text-xs text-stone-600">{paging ? paging.clientTotal : clients.length} RESULT(S) FOUND.</p></div>{paging ? <ClientPager paging={paging} search={search} filters={filters} /> : null}</div>
         <div className="overflow-x-auto">
           <table className="crm-record-table min-w-full text-left text-sm">
@@ -107,7 +107,7 @@ export function ClientDatabase({ clients, search, paging, walkinContext, filters
                 <td data-label="Location" data-secondary="true" className="p-3">{[client.city, client.state].filter(Boolean).join(", ") || "-"}</td>
                 <td data-label="Visits" data-secondary="true" className="p-3"><div>{client.total_visits}</div><div className="text-xs text-stone-600">Last: {displayDate(client.last_visit_date)}</div></td>
                 <td data-label="Last status" className="p-3">{client.last_buy_status ?? "-"}</td>
-                <td data-label="Commercial classification" className="p-3">{client.purchase_classification??"Unknown"}</td>
+                <td data-label="Commercial classification" data-secondary="true" className="p-3">{client.purchase_classification??"Unknown"}</td>
                 <td data-label="Activity" data-secondary="true" className="p-3"><div className="text-xs">Registered {displayDate(client.registered_at ?? null)}</div><div className="text-xs text-stone-600">Latest {displayDate(client.latest_interaction_at ?? null)}</div></td>
                 <td data-label="Action" className="p-3 crm-record-actions"><button type="button" className="crm-record-details" aria-label={expanded === client.client_id ? "Hide record details" : "Show record details"} aria-expanded={expanded === client.client_id} onClick={() => setExpanded(expanded === client.client_id ? null : client.client_id)}>{expanded === client.client_id ? "Less" : "Details"}</button>{client.primary_phone ? <CallButton phone={client.primary_phone} /> : null}<><Link className="ml-3 mr-3 underline" href={`/clients/${client.client_id}`}>View Client Profile</Link><ExistingClientWalkinAction clientId={client.client_id} primaryName={client.primary_name} primaryPhone={client.primary_phone ?? ""} {...walkinContext} /></></td>
               </tr>)}

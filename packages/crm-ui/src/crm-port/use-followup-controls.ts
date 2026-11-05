@@ -1,8 +1,10 @@
 import { useEffect,useRef,useState } from 'react';
 import { useRouter } from '@/next-shim/navigation';
+import { usePreload } from './navigation-context';
 import { followupHref,type FollowupFilters,type FollowupPaging,type FollowupPreset } from './followup-page';
 export function useFollowupControls(kind:'not_bought'|'referral',paging:FollowupPaging|undefined,defaultSort:string,preset?:FollowupPreset){
  const router=useRouter();
+ const preloadHref=usePreload();
  const defaults={tab:'today',crm:'',search:'',status:'',branch:'',sort:defaultSort};
  const [filters,setFilters]=useState({...defaults,...paging?.filters});
  const sent=useRef('');
@@ -20,5 +22,7 @@ export function useFollowupControls(kind:'not_bought'|'referral',paging:Followup
   const next={...filters,...patch};setFilters(next);
   if(paging&&Object.keys(patch).some(key=>key!=='search')){const href=followupHref(kind,next,1,preset??paging?.preset);sent.current=href;router.push(href);}
  }
- return {filters,change};
+ /** Starts loading a tab before it is opened (hover, focus or touch). */
+ function preload(patch:FollowupFilters){if(paging)preloadHref(followupHref(kind,{...filters,...patch},1,preset??paging.preset));}
+ return {filters,change,preload};
 }

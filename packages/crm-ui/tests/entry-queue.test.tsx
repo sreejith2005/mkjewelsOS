@@ -97,7 +97,7 @@ describe("consolidated client walk-in queue", () => {
       rosterByBranch={{ [branchId]: [{ crm_name: "ASHA", available: true }, { crm_name: "BINA", available: false }], [other]: [{ crm_name: "CHITRA", available: true }] }} />);
     const crmOptions = () => Array.from((screen.getByLabelText("CRM NAME") as HTMLSelectElement).options).map((option) => option.textContent);
     expect(crmOptions()).toEqual(["ALL CRM", "ASHA", "BINA (NOT AVAILABLE TODAY)"]);
-    expect(screen.getByText("CRM PRESENT TODAY: ASHA")).toBeTruthy();
+    expect(screen.getByText("In today: ASHA")).toBeTruthy();
     fireEvent.change(screen.getAllByLabelText("BRANCH")[1]!, { target: { value: other } });
     expect(crmOptions()).toEqual(["ALL CRM", "CHITRA"]);
   });
@@ -106,9 +106,9 @@ describe("consolidated client walk-in queue", () => {
     render(<EntryQueue profile={{ role: "super_admin", branchId: null }} requestedBranch={branchId} selectedBranchId={branchId} selectedCrm="" branches={[{ id: branchId, name: "Test Branch" }]} crms={[]} queueCrms={[]} initialItems={[]}
       rosterByBranch={{}} rosterHealth={{ crm_department_people: 2, on_roster: 0, not_on_roster: [{ outcome: "blocked", reason: "unmapped_branch", count: 2 }], last_staff_sync_at: null, master_snapshot_at: null }}
       branchSetup={{ source: "crm_branches", issues: [{ label: "MK Typo", reason: "no_jewelos_branch" }] }} />);
-    expect(screen.getByText(/No CRM-department staff are on this branch's CRM roster\. 2 not synced: their JewelOS branch has no CRM branch/)).toBeTruthy();
-    expect(screen.getByText(/CRM Branches has not reached CRM yet/)).toBeTruthy();
-    expect(screen.getByText(/MK Typo \(no JewelOS branch has this code\)/)).toBeTruthy();
+    expect(screen.getByText(/No CRM staff for this branch\. 2 missing: their JewelOS branch has no CRM branch/)).toBeTruthy();
+    // Branch-list setup notes are not shown on the queue (owner 2026-11-05).
+    expect(screen.queryByText(/CRM Branches|MK Typo|Not offered/)).toBeNull();
   });
 
   it("opens the existing pending entry instead of registering the same person twice today", async () => {
@@ -117,7 +117,7 @@ describe("consolidated client walk-in queue", () => {
     fireEvent.change(screen.getAllByRole("textbox")[0]!, { target: { value: "Queued Client" } });
     fireEvent.change(screen.getByLabelText("Mobile Number"), { target: { value: "9012345601" } });
     fireEvent.click(screen.getByRole("button", { name: "REGISTER CLIENT" }));
-    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("already has a pending queue entry today (token 0725-ABCDE)"));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("is already waiting in the queue today (token 0725-ABCDE)"));
     expect(screen.getByRole("link", { name: "Open that entry" }).getAttribute("href")).toBe("/visits/new?queue=queue-1");
     expect(refresh).not.toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();

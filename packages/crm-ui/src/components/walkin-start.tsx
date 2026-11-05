@@ -41,11 +41,11 @@ export function WalkinStart({ entryQueueProps, fields, options, lookupOptions, a
   const leadUsable = host && leadLink && !leadLink.issues.length ? leadLink.link : null;
   const canManage = links?.canManage ?? false;
   const actions = <div className="crm-queue-actions" role="group" aria-label="Register">
-    <button type="button" className="crm-queue-action" aria-pressed={choice === "client"} onClick={() => choose("client")}><b>REGISTER CLIENT</b><small>Store walk-in: queue entry with branch, name and mobile</small></button>
-    <button type="button" className="crm-queue-action" aria-pressed={choice === "lead"} onClick={() => choose("lead")}><b>REGISTER LEAD</b><small>Remote enquiry: the full lead form</small></button>
+    <button type="button" className="crm-queue-action" aria-pressed={choice === "client"} onClick={() => choose("client")}><b>REGISTER CLIENT</b><small>Customer in the store</small></button>
+    <button type="button" className="crm-queue-action" aria-pressed={choice === "lead"} onClick={() => choose("lead")}><b>REGISTER LEAD</b><small>Phone or online enquiry</small></button>
   </div>;
   return <section className="crm-queue-page">
-    <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-sm font-semibold uppercase tracking-wider text-amber-800">Front desk</p><h1 className="mt-1 text-3xl font-semibold">Client queue</h1></div>{settings ? <div className="crm-form-settings-bar">{settings}</div> : null}</div>
+    <div className="flex flex-wrap items-end justify-between gap-3"><h1 className="text-3xl font-semibold">Client queue</h1>{settings ? <div className="crm-form-settings-bar">{settings}</div> : null}</div>
     {actions}
     {choice === "lead"
       ? <section aria-labelledby="register-lead-heading"><div className="flex flex-wrap items-center justify-between gap-3"><h2 id="register-lead-heading" className="text-lg font-semibold">REGISTER LEAD</h2><button type="button" onClick={() => choose("client")} className="text-sm font-medium text-amber-800 underline">Back to queue</button></div>

@@ -310,8 +310,8 @@ migration 20261104000300 must be applied first (see the handoff deployment order
 - [ ] Changing BRANCH in the queue toolbar changes the CRM NAME list immediately to that branch's CRM-department staff; someone on leave today shows "(NOT AVAILABLE TODAY)". LOAD QUEUE opens that queue; reopening CRM later restores it.
 - [ ] Add a person to the CRM department in JewelOS Users (login on, CRM access on): after the staff sync they appear in CRM NAME on every CRM branch. Rename, move out of CRM, deactivate or delete: they disappear after the sync. A non-CRM department person never appears.
 - [ ] As a Super Admin with a CRM-department person whose CRM login is off: CLIENT QUEUE explains the missing person ("not synced: CRM login or CRM permission is off in JewelOS Users"); the list is never silently blank.
-- [ ] Dropdown Master → CRM Branches: the list holds one entry per active branch (value = branch code). Rename an entry's label: the BRANCH choice shows the new label after sync. Deactivate an entry: the branch is no longer offered. Add an entry with an unknown code: managers see it under "Not offered".
-- [ ] REGISTER CLIENT with the same mobile number twice on the same day in the same branch: the second attempt shows "already has a pending queue entry today (token …)" with "Open that entry"; only one queue row exists. After that entry's walk-in form is saved, registering again creates a new entry.
+- [ ] Dropdown Master → CRM Branches: the list holds one entry per active branch (value = branch code). Rename an entry's label: the BRANCH choice shows the new label after sync. Deactivate an entry: the branch is no longer offered. Add an entry with an unknown code: it is not offered (no note is shown on the queue).
+- [ ] REGISTER CLIENT with the same mobile number twice on the same day in the same branch: the second attempt shows "is already waiting in the queue today (token …)" with "Open that entry"; only one queue row exists. After that entry's walk-in form is saved, registering again creates a new entry.
 - [ ] MAKE WALK-IN ENTRY on a queue row opens the full walk-in form; save it (with a photo on the phone) and the row moves to Recently submitted.
 - [ ] REGISTER LEAD opens the lead form (or the linked Form Builder lead form via OPEN LEAD FORM); "Back to queue" returns with the branch kept. Runo push still reports as before.
 - [ ] CLIENT DATABASE at 1440 px and 1920 px: one vertical scroll bar (the page), the table uses the width, 8 columns (Client, Phone, Location, Visits, Last status, Commercial classification, Activity, Action). On a phone the rows are cards; a wide table scrolls sideways only inside its box.
@@ -321,7 +321,16 @@ migration 20261104000300 must be applied first (see the handoff deployment order
 - [ ] Old links: `/crm/followups?tab=done&crm=NAME` opens CLIENT DATABASE → Not Bought → Done filtered by NAME; `/crm/referrals` opens Referrals received.
 - [ ] DASHBOARD opens on the operations cards (Today). Each card's number matches what its drill-down opens (for example Overdue = Not Bought → Overdue count; Purchase visits = the records drawer). This week / This month and Branch change the numbers. No sales value is shown. Sync health is visible to Super Admins only, below.
 - [ ] FMS: with a published FMS workflow using Automatic Trigger "CRM Walk-In Visit" and condition Visit status Equals NO, save a not-bought walk-in: one run starts; saving the client's next not-bought visit while the run is open starts none (Trigger history shows Duplicate). With no such workflow, saving the walk-in works and starts nothing. The client profile's "FMS workflows" shows the run, its current step, assignee and due time, and "Open this work" opens it in Tasks.
-- [ ] A salesperson of branch A sees only branch A in BRANCH, no roster diagnostics and no Not offered list; a user without `crm.view` cannot open `/crm/...` or read client runs.
+- [ ] A salesperson of branch A sees only branch A in BRANCH and no roster diagnostics; a user without `crm.view` cannot open `/crm/...` or read client runs.
+
+### CRM tidy-up and speed - 2026-11-05
+
+- [ ] Client Queue shows no Dropdown Master / "Not offered" notes; text is short ("Register client", "Queue", "In today: …").
+- [ ] Selected chips, period buttons and REGISTER CLIENT / REGISTER LEAD use the same gold as the selected item in the JewelOS menu; no orange/yellow notice boxes.
+- [ ] Client Database, Not Bought and Referrals have no boxed panel around the list; the list sits on the page.
+- [ ] Desktop: with the mouse over any CRM table (Client Database, Not Bought, Referrals, Queue), the wheel scrolls the page. Every CRM page has one vertical scroll bar.
+- [ ] Phone (360-412 px): records are plain rows separated by a line (no boxed cards), showing name, ID, phone, status and actions; Details shows the rest. Filters sit two per line; nothing pans sideways.
+- [ ] Speed: tapping DASHBOARD / CLIENT QUEUE / CLIENT DATABASE, a Client Database view (Not Bought, Referrals received/given) or a Not Bought tab highlights it at once and shows a thin gold bar until it opens; hovering first (desktop) opens it almost instantly. After saving a follow-up the list shows the saved value (never an older preload).
 
 ### CRM forms from the Form Builder - 2026-11-03
 

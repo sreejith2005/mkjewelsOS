@@ -115,6 +115,14 @@ function replaceBrowserUrl(url: string) {
 
 type PageView = { key: string; pathname: string; search: string; node: ReactNode; inCrmLayout: boolean };
 
+/** A preloaded page is used when it is opened within this time; a refresh never uses one. */
+export const PRELOAD_FRESH_MS = 20_000;
+
+function loadPage(match: { route: Route; params: Record<string, string> }, search: string): Promise<Settled> {
+  const props: PageProps = { params: Promise.resolve(match.params), searchParams: Promise.resolve(searchParamsRecord(search)) };
+  return settle(() => match.route.load(props));
+}
+
 const PageSlotContext = createContext<PageView | null>(null);
 
 /** The (crm) layout's children: the current page, remounted when its path changes. */
@@ -164,13 +172,26 @@ export function CrmAppRouter({ browserPath, browserSearch }: { browserPath: stri
   const layoutRef = useRef<{ node: ReactNode; refreshToken: number } | null>(null);
   const requestRef = useRef(0);
   const navigationKind = useRef<"history" | "navigate" | "refresh">("history");
+  // crm-port (2026-11-05): pages preloaded on hover/focus/touch, keyed by path + search.
+  const preloaded = useRef(new Map<string, { at: number; result: Promise<Settled> }>());
 
   const router = useMemo<AppRouter>(() => ({
     push: (href) => { navigationKind.current = "navigate"; crmHost().navigate(withBasePath(href)); },
     replace: (href) => { navigationKind.current = "navigate"; replaceBrowserUrl(withBasePath(href)); },
-    refresh: () => { navigationKind.current = "refresh"; setRefreshToken((token) => token + 1); },
+    refresh: () => { navigationKind.current = "refresh"; preloaded.current.clear(); setRefreshToken((token) => token + 1); },
     back: () => window.history.back(),
     forward: () => window.history.forward(),
+    preload: (href) => {
+      if (!href.startsWith("/") || href.startsWith("//")) return;
+      const url = new URL(href, "http://crm.invalid");
+      const match = matchRoute(url.pathname);
+      if (!match?.route.inCrmLayout) return;
+      // Loading the page also loads its code.
+      const key = `${url.pathname}${url.search}`;
+      const hit = preloaded.current.get(key);
+      if (hit && Date.now() - hit.at < PRELOAD_FRESH_MS) return;
+      preloaded.current.set(key, { at: Date.now(), result: loadPage(match, url.search) });
+    },
     prefetch: (href) => {
       if (!href.startsWith("/") || href.startsWith("//")) return;
       const match = matchRoute(new URL(href, "http://crm.invalid").pathname);
@@ -191,6 +212,14 @@ export function CrmAppRouter({ browserPath, browserSearch }: { browserPath: stri
     refreshCompletions.current.clear();
   }, []);
 
+  // A preloaded page is used once, only for an ordinary navigation and only while fresh.
+  function takePreloaded(key: string): Promise<Settled> | null {
+    const hit = preloaded.current.get(key);
+    preloaded.current.delete(key);
+    if (!hit || navigationKind.current === "refresh" || Date.now() - hit.at >= PRELOAD_FRESH_MS) return null;
+    return hit.result;
+  }
+
   useEffect(() => {
     if (pathname !== "/" && pathname.endsWith("/")) {
       replaceBrowserUrl(`${withBasePath(pathname.replace(/\/+$/, "") || "/")}${browserSearch}`);
@@ -204,7 +233,7 @@ export function CrmAppRouter({ browserPath, browserSearch }: { browserPath: stri
     void (async () => {
       const [layoutResult, pageResult] = await Promise.all([
         needsLayout ? settle(() => CrmLayout({ children: <CrmPageSlot /> })) : Promise.resolve(null),
-        match ? settle(() => match.route.load(props)) : Promise.resolve<Settled>({ ok: false, error: new CrmNotFound() }),
+        match ? takePreloaded(`${pathname}${browserSearch}`) ?? settle(() => match.route.load(props)) : Promise.resolve<Settled>({ ok: false, error: new CrmNotFound() }),
       ]);
       if (requestId !== requestRef.current) return;
       // The layout sits above the page, so its redirect/leave takes effect first.
@@ -248,9 +277,10 @@ export function CrmAppRouter({ browserPath, browserSearch }: { browserPath: stri
     navigationKind.current = "history";
   }, [view]);
 
+  const pendingHref = view && (view.pathname !== pathname || view.search !== browserSearch) ? `${pathname}${browserSearch}` : null;
   const navigation = useMemo<CrmNavigationState | null>(
-    () => view ? { pathname: view.pathname, searchParams: new URLSearchParams(view.search), router } : null,
-    [router, view],
+    () => view ? { pathname: view.pathname, searchParams: new URLSearchParams(view.search), router, pendingHref } : null,
+    [router, view, pendingHref],
   );
 
   if (failure) throw failure.error;

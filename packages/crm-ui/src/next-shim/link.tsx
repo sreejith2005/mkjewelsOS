@@ -11,11 +11,13 @@ type LinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & {
   prefetch?: boolean;
   replace?: boolean;
   scroll?: boolean;
+  /** crm-port: also load the page's data on hover/focus/touch (tabs and view chips only, not table rows). */
+  preloadData?: boolean;
 };
 
-export default function Link({ href, onClick, onMouseEnter, onFocus, onTouchStart, children, prefetch = true, replace = false, scroll: _scroll, ...rest }: LinkProps) {
+export default function Link({ href, onClick, onMouseEnter, onFocus, onTouchStart, children, prefetch = true, preloadData = false, replace = false, scroll: _scroll, ...rest }: LinkProps) {
   const { router } = useCrmNavigation();
-  const preload = () => { if (prefetch) router.prefetch(href); };
+  const preload = () => { if (preloadData) router.preload(href); else if (prefetch) router.prefetch(href); };
   function handleClick(event: MouseEvent<HTMLAnchorElement>) {
     onClick?.(event);
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;

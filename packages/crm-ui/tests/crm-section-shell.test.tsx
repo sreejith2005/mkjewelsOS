@@ -4,6 +4,8 @@
 // 2026-11-04: Dashboard, Client Queue (the landing view), Client Database.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render as baseRender, screen } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const navigation = vi.hoisted(() => ({ pathname: "/queue", search: "", push: vi.fn() }));
@@ -48,6 +50,13 @@ describe("CRM inside the JewelOS shell", () => {
     expect(screen.queryByRole("button", { name: /LOGOUT/ })).toBeNull();
     expect(screen.queryByText("← JewelOS")).toBeNull();
     expect(screen.getByText("content")).toBeTruthy();
+    // One vertical scroll bar on every CRM page, the page's own (owner 2026-11-05).
+    expect(tabs.closest(".crm-section")?.hasAttribute("data-crm-page-scroll")).toBe(true);
+  });
+
+  it("never traps the mouse wheel inside a sideways-scrolling CRM table", () => {
+    const css = readFileSync(join(__dirname, "../src/crm-port/wide.css"), "utf8");
+    expect(css).toMatch(/\[data-crm-page-scroll\] \[class\*="overflow-x-auto"\]:has\(> table\[data-crm-cards\]\) \{[^}]*overscroll-behavior: auto;/);
   });
 
   it("keeps the original CRM header in the standalone (embedded) layout, with the same three tabs", () => {

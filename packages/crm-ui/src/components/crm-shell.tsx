@@ -8,6 +8,8 @@ import { useEffect, useRef, useState } from "react";
 import { signOut } from "@/app/actions";
 import { JewelosHomeLink } from "@/crm-port/jewelos-home-link"; // crm-port: "← JewelOS" menu link
 import { useCrmLayout } from "@/crm-port/layout-context";
+import { usePendingHref } from "@/crm-port/navigation-context";
+import { PAGE_SCROLL_ATTRIBUTE } from "@/crm-port/mobile-tables";
 import { useCrmTheme } from "@/crm-port/theme-context";
 import brandWordmark from "@/mk-jewels-logos/mk-jewels-wordmark.png";
 import { ClientSearch } from "./client-search";
@@ -49,16 +51,20 @@ export function activeCrmSectionTab(pathname: string): CrmSectionHref | null {
 // the tabs scroll sideways and the open one is always scrolled into view.
 function CrmSectionShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const active = activeCrmSectionTab(pathname);
+  // While a page loads, its tab is already highlighted (2026-11-05): the tap answers at once.
+  const pendingHref = usePendingHref();
+  const active = activeCrmSectionTab(pendingHref ? pendingHref.split("?")[0]! : pathname);
   const navRef = useRef<HTMLElement>(null);
   useEffect(() => {
     const current = navRef.current?.querySelector<HTMLElement>('[aria-current="page"]');
     current?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }, [active]);
-  return <div className="crm-app crm-section">
+  // One vertical scroll bar on every CRM page, the page's own, as in the rest of JewelOS (owner 2026-11-05).
+  return <div className="crm-app crm-section" {...{ [PAGE_SCROLL_ATTRIBUTE]: "" }}>
+    {pendingHref ? <div className="crm-progress" role="progressbar" aria-label="Opening page" /> : null}
     <div className="crm-section-bar">
       <nav className="crm-section-tabs" aria-label="CRM sections" ref={navRef}>
-        {CRM_SECTION_TABS.map(({ label, href, icon }) => <Link className={`crm-section-tab${active === href ? " is-active" : ""}`} aria-current={active === href ? "page" : undefined} href={href} key={href}><CrmIcon name={icon} /><span>{label}</span></Link>)}
+        {CRM_SECTION_TABS.map(({ label, href, icon }) => <Link className={`crm-section-tab${active === href ? " is-active" : ""}`} aria-current={active === href ? "page" : undefined} href={href} key={href} preloadData><CrmIcon name={icon} /><span>{label}</span></Link>)}
       </nav>
       <div className="crm-section-search"><ClientSearch /></div>
     </div>
