@@ -436,7 +436,16 @@ without a second page scroll bar.
 
 ### Sales recording analysis (0379) - 2026-11-05
 
-Backend only; checks run through RPCs until the review screen ships.
+Backend (0379) plus Conversation review screen and 0380 settings call.
+
+- Sales score settings appear only for Admins/Super Admin/managers with review;
+  **Turn analysis on/off** only for Developer Mode authority. Staff see nothing.
+- On a Ready recording: score or "No score" with reasons, weights shown as
+  configured → effective, evidence buttons highlight the quoted Final transcript
+  line, Readable / Original language / English switch.
+- Manager: Flag/Comment/score edits/correction/rescore refuse an empty note;
+  Approve makes the review visible to the recorded employee.
+- Phone width: review, score edit and correction forms fit without sideways scroll.
 
 - With analysis off, a finished recording still reaches Ready and creates a
   machine transcript revision (worker flag on) but no analysis job.

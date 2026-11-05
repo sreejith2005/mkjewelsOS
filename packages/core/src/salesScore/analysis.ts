@@ -1,4 +1,4 @@
-import type { SalesAnalysisStatus, SalesDimensionStatus, SalesStatusReason, TranscriptQuality } from "./score";
+import type { SalesAnalysisStatus, SalesDimensionStatus, SalesRubricDimension, SalesStatusReason, TranscriptQuality } from "./score";
 
 /** Shapes returned by recording_analysis_snapshot (migration 0379). */
 export type SpeakerRole = "employee" | "customer" | "unknown";
@@ -50,7 +50,67 @@ export type StoredSalesAnalysis = Readonly<{
   quality: TranscriptQuality; supersedes_id: string | null; created_at: string;
   dimensions: readonly StoredScoreDimension[] | null;
   review_state: ReviewAction | null;
+  /** Manager reviews; null for the recorded employee. */
+  reviews?: readonly AnalysisReview[] | null;
 }>;
+export type AnalysisReview = Readonly<{
+  id: string; action: ReviewAction; note: string | null; actor_id: string;
+  dimension_overrides: readonly Readonly<{ key: string; status: SalesDimensionStatus; rating?: number | null; reason: string }>[] | null;
+  reviewed_status: "scored" | "insufficient_evidence" | null; reviewed_total: number | null; created_at: string;
+}>;
+export type TranscriptRevisionMeta = Readonly<{
+  id: string; revision: number; source: "machine" | "manual_correction"; base_revision_id: string | null;
+  stt_provider: string | null; stt_model: string | null; diarization_provider: string | null;
+  created_by: string | null; reason: string | null; created_at: string;
+}>;
+export type AnalysisJobView = Readonly<{
+  id: string; state: "pending" | "leased" | "done" | "dead"; reason: "initial" | "reprocess" | "rescore"; attempts: number; error_code: string | null;
+  transcript_revision_id: string; rubric_version_id: string; sop_version_id: string | null; job_version: string;
+  created_at: string; updated_at: string; started_at: string | null; finished_at: string | null;
+}>;
+export type AnalysisSnapshot = Readonly<{
+  session_id: string; is_reviewer: boolean; revision_id: string | null;
+  revisions: readonly TranscriptRevisionMeta[]; segments: readonly AnalysisTranscriptSegment[];
+  analyses: readonly StoredSalesAnalysis[]; jobs: readonly AnalysisJobView[];
+}>;
+export type SopClause = Readonly<{ clause_id: string; topic: string; title?: string; text: string }>;
+export type ScoreVersions = Readonly<{
+  rubrics: readonly Readonly<{ id: string; version: number; status: "draft" | "active" | "retired"; name: string; dimensions: readonly SalesRubricDimension[]; min_assessed_weight: number; created_at: string; activated_at: string | null }>[];
+  sops: readonly Readonly<{ id: string; version: number; status: "draft" | "approved" | "retired"; title: string; clauses: readonly SopClause[]; content_sha256: string; created_by: string; approved_by: string | null; approved_at: string | null }>[];
+}>;
+
+const isObject = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
+const isString = (value: unknown): value is string => typeof value === "string";
+const isNum = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
+
+/** Structural check of recording_analysis_snapshot. The server built and validated every field. */
+export function parseAnalysisSnapshot(raw: unknown): AnalysisSnapshot {
+  if (!isObject(raw) || !isString(raw.session_id) || typeof raw.is_reviewer !== "boolean" || !(raw.revision_id === null || isString(raw.revision_id))
+    || !Array.isArray(raw.revisions) || !Array.isArray(raw.segments) || !Array.isArray(raw.analyses) || !Array.isArray(raw.jobs)) throw new Error("invalid_analysis_snapshot");
+  for (const segment of raw.segments) {
+    if (!isObject(segment) || !isString(segment.segment_id) || !isNum(segment.start_ms) || !isNum(segment.end_ms) || !isString(segment.raw_text)
+      || !["employee", "customer", "unknown"].includes(String(segment.speaker))) throw new Error("invalid_analysis_segment");
+  }
+  for (const analysis of raw.analyses) {
+    if (!isObject(analysis) || !isString(analysis.id) || !["scored", "needs_review", "insufficient_evidence"].includes(String(analysis.status))
+      || !(analysis.raw_total === null || isNum(analysis.raw_total)) || !isObject(analysis.output) || !Array.isArray(analysis.status_reasons)) throw new Error("invalid_analysis");
+  }
+  for (const revision of raw.revisions) if (!isObject(revision) || !isString(revision.id) || !isNum(revision.revision)) throw new Error("invalid_revision");
+  // Shapes checked above; remaining fields come straight from the 0379 contract.
+  return raw as unknown as AnalysisSnapshot;
+}
+
+export function parseScoreVersions(raw: unknown): ScoreVersions {
+  if (!isObject(raw) || !Array.isArray(raw.rubrics) || !Array.isArray(raw.sops)) throw new Error("invalid_versions");
+  for (const item of [...raw.rubrics, ...raw.sops]) if (!isObject(item) || !isString(item.id) || !isNum(item.version) || !isString(item.status)) throw new Error("invalid_versions");
+  // Shapes checked above; remaining fields come straight from recording_list_versions.
+  return raw as unknown as ScoreVersions;
+}
+
+/** Latest output with content (insufficient analyses have an empty object). */
+export function hasAnalysisOutput(analysis: StoredSalesAnalysis): analysis is StoredSalesAnalysis & { output: SalesAnalysisOutput } {
+  return "summary" in analysis.output;
+}
 
 export type EvidenceSeekTarget = Readonly<{ segment_id: string; quote: string; start_ms: number; end_ms: number; speaker: SpeakerRole }>;
 

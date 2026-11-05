@@ -13184,6 +13184,7 @@ export type Database = {
         Args: { p_action: string; p_payload: Json }
         Returns: Json
       }
+      recording_analysis_settings: { Args: never; Returns: Json }
       recording_analysis_snapshot: {
         Args: { p_revision_id?: string; p_session_id: string }
         Returns: Json
