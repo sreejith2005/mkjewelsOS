@@ -60,6 +60,7 @@ function modulePermission(key: string, page: PageId, category: PermissionCategor
 export const PERMISSION_CATALOG = [
   modulePermission("home.view", "home", "Home & Dashboard", "Open Home", "Today's work, linked forms, FMS stages, and activity."),
   modulePermission("dashboard.view", "dashboard", "Home & Dashboard", "Open Dashboard", "Operational analytics for the user's authorized scope."),
+  { key: "dashboard.view_team_performance", kind: "action", category: "Home & Dashboard", label: "View every employee's task performance", description: "Company-wide Employee Task Performance on the Dashboard: every employee's assigned, completed, pending and overdue work and FMS workflow performance. Grants no CRM or administrative access.", defaultRoles: ["super_admin", "admin"], pageId: null },
   modulePermission("tasks.view", "checklist_tasks", "Tasks", "Open Tasks", "Assigned tasks, manual tasks, and task import."),
   { key: "tasks.assign_others", kind: "action", category: "Tasks", label: "Assign tasks to other users", description: "Allow assigning and transferring tasks to other users within the existing branch, department or company scope. Deny restricts task assignment to yourself.", defaultRoles: ALL_ROLES, pageId: null },
   { key: "tasks.manage_team", kind: "authority", category: "Tasks", label: "Manage team tasks", description: "Create, edit, and delegate tasks for others. Follows Manager authority or higher.", defaultRoles: ["super_admin", "admin", "manager"], pageId: null },

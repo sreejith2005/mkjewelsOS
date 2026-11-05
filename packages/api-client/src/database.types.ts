@@ -14828,6 +14828,19 @@ export type Database = {
         Returns: string
       }
       get_task_evidence_workspace: { Args: { p_filter?: Json }; Returns: Json }
+      get_task_performance_dashboard_v1: { Args: { p_context?: Json }; Returns: Json }
+      get_task_performance_fms_stages_v1: { Args: { p_context: Json }; Returns: Json }
+      get_task_performance_options_v1: { Args: never; Returns: Json }
+      get_task_performance_records_v1: {
+        Args: {
+          p_bucket: string
+          p_context: Json
+          p_limit?: number
+          p_offset?: number
+          p_stage_key?: string
+        }
+        Returns: Json
+      }
       get_task_import_batch_status: {
         Args: { p_batch_id: string }
         Returns: Json
