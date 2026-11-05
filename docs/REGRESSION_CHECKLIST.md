@@ -434,6 +434,19 @@ without a second page scroll bar.
 - Dropdown Master: lists and options panes scroll independently (1280 px+);
   New list in the header, Add item on the open list; phones: All lists.
 
+### Sales recording analysis (0378) - 2026-11-05
+
+Backend only; checks run through RPCs until the review screen ships.
+
+- With analysis off, a finished recording still reaches Ready and creates a
+  machine transcript revision (worker flag on) but no analysis job.
+- A short recording (under 25 words) gives **insufficient evidence**, never a score.
+- A manager in the same branch reads the analysis; the recorded employee does
+  not until it is approved; a peer and an other-branch manager are refused.
+- A transcript correction creates revision 2 with the same segment IDs and
+  times; revision 1 is unchanged. Rescore keeps the earlier analysis.
+- Live recording, pause/resume, Stop and provisional text behave as before.
+
 ### Notifications
 
 - [ ] Task assignment creates an in-app notification; read / mark-all-read work.

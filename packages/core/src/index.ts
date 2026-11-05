@@ -1,4 +1,5 @@
 export * from "./recording";
+export * from "./salesScore";
 export type {
   CompositeTypes,
   Database,

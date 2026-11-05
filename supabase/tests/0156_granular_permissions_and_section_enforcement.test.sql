@@ -37,7 +37,7 @@ from (values
 
 -- Catalog and privilege contract.
 select has_table('public', 'permission_catalog', 'permission catalog exists');
-select is((select count(*)::integer from permission_catalog where key not like 'assistant.%'), 37, 'catalog includes office leave deletion, task assignment and CRM form permissions');
+select is((select count(*)::integer from permission_catalog where key not like 'assistant.%'), 42, 'catalog includes office leave deletion, task assignment, CRM form and sales recording permissions');
 select ok(not has_function_privilege('authenticated', 'permission_effective_for(uuid,text)', 'EXECUTE'), 'resolving another profile''s permissions stays owner-only');
 select throws_ok(
   $$insert into role_permissions(tenant_id, user_role, permission_key, is_allowed) values ('15610000-0000-4000-8000-000000000001', 'staff', 'permissions.manage', true)$$,

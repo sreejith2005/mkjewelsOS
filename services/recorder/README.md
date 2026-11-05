@@ -191,6 +191,58 @@ requires the active final-job lease and final canonical segment. No business sco
 or sale outcome is inferred. Validate the private provider's evidence behavior
 with the owner before enabling either coaching switch.
 
+## Finalized transcript revisions (migration 0378)
+
+With `RECORDER_FINALIZE_TRANSCRIPTS=true` the final job also calls
+`transcript_finalize`, creating an immutable machine revision
+(`recording_transcript_revisions/segments`). Leave it unset until migration 0378
+and the matching `recorder-ingest` are deployed; otherwise final jobs would fail.
+
+Processors may return `{segments, provider, model, diarization_provider}`
+instead of a bare list (`contracts/processor_response.schema.json`). A chunk
+segment may carry `utterances` with `offset_ms`/`end_offset_ms` relative to the
+chunk where the utterance starts, original-language `text`, readable
+`display_text` (Roman-script Hinglish or English, no academic
+transliteration), optional `translation_en`, `language`, STT `confidence`,
+`speaker_role` + `speaker_confidence`, and `includes_context` when the text may
+repeat the previous chunk tail (the worker then removes the repeated words).
+Chunk-level `text` is still required for the live display. An utterance that
+runs into later chunks stays anchored to its first chunk; the later chunks
+return empty text.
+
+Speakers are `employee`/`customer` only at diarization confidence ≥ 0.85;
+otherwise `unknown`. The worker never picks the employee by speaking time.
+Benchmark diarization on store audio before trusting any labels; managers can
+correct speakers through a correction revision.
+
+## Analysis worker (Store Intelligence)
+
+A separate process: `python production.py analysis`. It claims
+`recording_analysis_jobs`, sends one redacted prompt (`prompts.py`,
+`PROMPT_VERSION`) to a private analyzer, validates the JSON
+(`contracts/analysis_model_response.schema.json`, evidence quotes, rubric keys,
+SOP clause IDs, HIGH-finding speaker rule), retries with up to two repair
+prompts, and submits. The database computes the score and status. Fewer than 25
+words or 2 spoken segments never reaches a model.
+
+| Variable | Meaning |
+|---|---|
+| `RECORDER_EDGE_URL`, `RECORDER_BACKEND_SECRET` | Same boundary as the recorder worker. |
+| `RECORDER_ANALYZER_URL`, `_TOKEN`, `_HOSTS`, `_PROVIDER`, `_MODEL` | Required private analyzer. Request `{system,user,response_format:'json',temperature:0}`, response `{content}`. Provider/model labels are stored on each analysis. |
+| `RECORDER_ANALYZER_FALLBACK_*` | Optional second analyzer, same variables. Its use is stored (`fallback_used`, `fallback_reason`) and forces manager review. |
+| `RECORDER_ANALYSIS_JOB_VERSIONS` | Comma list the worker accepts (default `mk-sales-v1`). Unknown versions dead-letter instead of running with the current prompt. |
+
+Errors are fixed codes; nothing logs transcript, quote, prompt or model text.
+The analyzer must not retain prompts (configure zero retention with any vendor).
+
+Evaluation: `python -m evaluation.run_eval analysis --repeats 3 --out report.json`
+(same analyzer variables) reports score spread across repeats and noisy variants,
+agreement with human labels, signal precision/recall and failure examples.
+`python -m evaluation.run_eval wer --pairs pairs.jsonl` reports STT WER/CER by
+language and noise. Bundled fixtures are synthetic Hindi/Hinglish and English;
+real store audio, Marathi and Gujarati sets are owner-provided, kept outside Git,
+and must be measured before being called production quality.
+
 ## Pilot measurement and device gates
 
 No p50/p95 number is claimed by this implementation. Measure on the actual

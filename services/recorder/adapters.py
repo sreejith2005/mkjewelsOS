@@ -46,7 +46,8 @@ class EdgeBoundary:
 
     async def call(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
         try:
-            async with self.client.stream('POST',self.url,headers={'x-recorder-secret':self.secret},json={'action':action,'payload':payload}) as response:
+            # The action is repeated in the query so the Edge function can size the body limit before reading it.
+            async with self.client.stream('POST',self.url,params={'action':action},headers={'x-recorder-secret':self.secret},json={'action':action,'payload':payload}) as response:
                 if response.status_code != 200:
                     # Never reflect upstream body (may contain credentials, SQL, transcript).
                     status=response.status_code if response.status_code in (401,403,409,422,429) else 503
@@ -118,3 +119,29 @@ class PrivateGPU:
                 return segments
         except httpx.HTTPError:
             raise Fault(503,'processor_unavailable') from None
+
+
+class PrivateAnalyzer:
+    """Verified private analysis endpoint (self-hosted or a vendor behind our own gateway).
+
+    Request {system, user, response_format:'json'}; response {content: '<JSON text>'}.
+    The model label is configuration, recorded on every analysis.
+    """
+    def __init__(self, url: str, token: str, allowed_hosts: tuple[str,...], provider: str, model: str, client: httpx.AsyncClient | None = None):
+        self.url=https_endpoint(url)
+        if urlsplit(url).hostname not in allowed_hosts or not token or not provider or not model:
+            raise ValueError('Explicit analyzer hostname, credential, provider and model required')
+        self.token,self.provider,self.model=token,provider[:80],model[:120]
+        self.client=client or httpx.AsyncClient(timeout=120,follow_redirects=False,limits=httpx.Limits(max_connections=2))
+
+    async def complete(self, system: str, user: str) -> str:
+        try:
+            async with self.client.stream('POST',self.url,headers={'Authorization':'Bearer '+self.token},json={'system':system,'user':user,'response_format':'json','temperature':0}) as response:
+                if response.status_code!=200:
+                    raise Fault(503,'analyzer_unavailable')
+                content=(await read_json(response,2*1024*1024)).get('content')
+                if not isinstance(content,str):
+                    raise Fault(503,'analyzer_unavailable')
+                return content
+        except httpx.HTTPError:
+            raise Fault(503,'analyzer_unavailable') from None

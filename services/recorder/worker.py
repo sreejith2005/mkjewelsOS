@@ -4,10 +4,9 @@ import asyncio
 import math
 import time
 from typing import Any, Protocol
-from uuid import UUID, uuid4, uuid5
+from uuid import uuid4, uuid5
 from recorder import Boundary, Objects, Fault, integer, object_key, scope_from_session
-
-SEGMENT_NAMESPACE = UUID('49daa17e-cbc0-43c5-81b8-a921ae221f22')
+from transcript import SEGMENT_NAMESPACE, build_revision_segments, processor_metadata
 
 
 def critical_signal(segment: dict[str, Any]) -> str | None:
@@ -26,14 +25,18 @@ def critical_signal(segment: dict[str, Any]) -> str | None:
 
 
 class Processor(Protocol):
-    async def transcribe(self, job: dict[str, Any], manifest: list[dict[str, Any]]) -> list[dict[str, Any]]: ...
+    # A list of per-chunk segments, or {segments, provider, model, diarization_provider}.
+    async def transcribe(self, job: dict[str, Any], manifest: list[dict[str, Any]]) -> list[dict[str, Any]] | dict[str, Any]: ...
 
 
 class Worker:
-    def __init__(self, boundary: Boundary, objects: Objects, processor: Processor, worker_id: str | None = None, coaching_enabled: bool = False):
+    def __init__(self, boundary: Boundary, objects: Objects, processor: Processor, worker_id: str | None = None, coaching_enabled: bool = False,
+                 finalize_transcripts: bool = False):
         self.boundary,self.objects,self.processor=boundary,objects,processor
         self.worker_id = worker_id or str(uuid4())
         self.coaching_enabled = coaching_enabled
+        # Off until migration 0378 and the matching recorder-ingest are deployed.
+        self.finalize_transcripts = finalize_transcripts
 
     async def once(self) -> bool:
         job = (await self.boundary.call('claim_job', {'worker_id':self.worker_id})).get('job')
@@ -57,7 +60,7 @@ class Worker:
                     if job['kind']=='provisional' and seq not in (job['sequence']-1,job['sequence']):
                         continue
                     manifest.append({**chunk,'url':await self.objects.signed_read(chunk['object_key'])})
-                result = await self.processor.transcribe(job,manifest)
+                result, stt_meta = processor_metadata(await self.processor.transcribe(job,manifest))
                 if not isinstance(result,list) or len(result)>7200:
                     raise Fault(422,'invalid_processor_response')
                 seen=set()
@@ -77,6 +80,11 @@ class Worker:
                 expected={c['sequence'] for c in manifest} if job['kind']=='final' else {job['sequence']}
                 if not expected.issubset(seen):
                     raise Fault(422,'incomplete_processor_result')
+                if job['kind']=='final' and self.finalize_transcripts:
+                    # Immutable machine revision with speakers, offsets and confidence;
+                    # idempotent on identical content, so a retried job is safe.
+                    await self.boundary.call('transcript_finalize',{**claims,'job_id':job['id'],'worker_id':self.worker_id,'lease_token':job['lease_token'],**stt_meta,
+                        'segments':build_revision_segments(claims['session_id'],result)})
                 # No alerts until the complete final result and canonical event writes
                 # have succeeded. SQL independently checks opt-in, final evidence,
                 # job lease, rate limit and deduplication.
