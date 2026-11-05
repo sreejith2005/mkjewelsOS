@@ -26,7 +26,10 @@ Tasks entry updated against the screens: 2026-10-21 (Anytime duties, task order)
 - [ ] **Stop** shows **Saving**, then **Processing**, then **Ready** or **Needs attention**. **Retry saving** preserves the conversation/session and queued audio. No customer selection is required.
 - [ ] Browser background capture depends on support and never continues after closing the tab. Android uses a foreground recording notification with **Stop**; physical-device evidence is a separate release gate.
 - [ ] Transcript text is marked **Provisional** until final text replaces it. **Critical coaching alerts** is an optional authorized-manager feed based on final unambiguous evidence. Pilot p50/p95 lag is unmeasured until a real load pilot.
-- [ ] No new Kiara read tool: recording/transcript content is sensitive and outside this capture pilot's assistant scope. Kiara explains controls only; it cannot read audio/transcripts or mutate sessions.
+- [ ] **Live transcript** shows provisional text; after **Ready**, **Conversation review** shows the MK Sales Score, scores by area, evidence buttons that jump to the **Final transcript** line (**Readable** / **Original language** / **English**), and "No score" / **Needs review** explanations.
+- [ ] Managers: **Reason or note**, **Approve**, **Flag** / **Remove flag**, **Comment**, **Edit scores** → **Save manager scores**, **Request rescore**, **Transcribe audio again**, **Correct transcript** → **Save correction**. The employee sees a review only after approval or edit.
+- [ ] **Sales score settings**: **Turn analysis on/off**, rubric **Activate** / **Save draft rubric**, SOP **Approve** / **Retire** / **Save draft SOP**.
+- [ ] No new Kiara read tool (also for scores and reviews): recording/transcript content is sensitive and outside this capture pilot's assistant scope. Kiara explains controls only; it cannot read audio/transcripts or mutate sessions.
 
 ## Home (menu: Home)
 **What it is:** your own work for today: open and overdue tasks, your FMS stages, forms to

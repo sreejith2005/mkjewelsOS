@@ -106,8 +106,12 @@ job leases. Job retries back off and dead-letter after five attempts.
 ## Store Intelligence analysis and MK Sales Score (migration 0379)
 
 Design: `docs/superpowers/specs/2026-11-05-store-intelligence-processing-design.md`.
-Dark until `recording_configure_analysis(true)` (Developer Mode authority) and
-the analysis worker runs. Backend only for now; there is no review screen yet.
+Dark until **Turn analysis on** in **Sales score settings** (Developer Mode
+authority; `recording_configure_analysis`) and the analysis worker runs. On the
+Sales Recording page a Ready recording shows **Conversation review** (score,
+evidence, review actions, transcript corrections); migration 0380 adds the
+read-only settings call. Evidence jumps to the transcript line; audio playback
+from evidence needs a reviewed playback route and is not built yet.
 
 - Final transcripts become immutable revisions with speaker, offsets, language,
   display/translation text and STT confidence. Manager corrections

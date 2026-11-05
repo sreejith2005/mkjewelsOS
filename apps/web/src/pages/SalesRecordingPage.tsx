@@ -5,6 +5,8 @@ import { useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
 import { browserRecorder, webCaptureSupported } from "@/features/recording/browserRecorder";
 import { isJewelOSWebShell, nativeRecorderAvailable, sendNativeRecorder, useNativeCapture } from "@/features/recording/nativeCapture";
+import { ConversationAnalysis } from "@/features/recording/ConversationAnalysis";
+import { ScoreSettings } from "@/features/recording/ScoreSettings";
 
 const labels: Readonly<Record<string, string>> = { idle: "Not recording", recording: "Recording", paused: "Paused", saving: "Saving", processing: "Processing", ready: "Ready", needs_attention: "Needs attention" };
 function duration(ms: number) { const seconds = Math.floor(ms / 1000); return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`; }
@@ -120,9 +122,11 @@ export function SalesRecordingPage() {
       <div className="flex flex-wrap items-center gap-2"><select aria-label="Recording session" className="min-h-11 min-w-0 max-w-full rounded-lg border border-task-border bg-task-bg p-2 text-task-text" onChange={(event) => setSelected(event.target.value)} value={selectedId ?? ""}><option value="" disabled>Select a session</option>{sessions.map((session) => <option key={session.id} value={session.id}>{new Date(session.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} · {labels[session.status]}</option>)}</select><Button disabled={busy} onClick={() => void run(async () => { await refresh(); })} type="button">Refresh</Button></div>
       {selectedId ? <p className="break-all text-xs text-task-text-muted">Session {selectedId}</p> : <p className="text-sm text-task-text-muted">No recordings loaded.</p>}
     </section>
-    <section aria-label="Transcript" className="space-y-3 rounded-2xl border border-task-border bg-task-bg p-4 md:p-6"><h2 className="text-lg font-semibold text-task-text">Transcript{snapshot ? ` · ${labels[snapshot.session.status] ?? "Needs attention"}` : ""}</h2><p className="text-sm text-task-text-muted">Live snippets are provisional and may change. Final text replaces them. Availability and delay depend on processing capacity; pilot p50/p95 latency has not yet been measured.</p>
+    <section aria-label="Live transcript" className="space-y-3 rounded-2xl border border-task-border bg-task-bg p-4 md:p-6"><h2 className="text-lg font-semibold text-task-text">Live transcript{snapshot ? ` · ${labels[snapshot.session.status] ?? "Needs attention"}` : ""}</h2><p className="text-sm text-task-text-muted">Live snippets are provisional and may change. Final text replaces them. Availability and delay depend on processing capacity; pilot p50/p95 latency has not yet been measured.</p>
       {segments.length ? <ol className="space-y-3">{segments.map((segment) => <li className="border-l-2 border-task-border pl-3" key={segment.segment_id}><span className="text-xs font-semibold text-task-text-muted">{segment.is_final ? "Final" : "Provisional"} · {duration(segment.started_ms)}</span><p className="whitespace-pre-wrap break-words text-task-text">{segment.text}</p></li>)}</ol> : <p className="text-sm text-task-text-muted">No transcript snippets yet.</p>}
     </section>
+    {selectedId && snapshot && ["ready", "needs_attention"].includes(snapshot.session.status) ? <ConversationAnalysis sessionId={selectedId} /> : null}
     {canCoach ? <section className="space-y-3 rounded-2xl border border-task-border bg-task-bg p-4"><label className="flex min-h-11 items-center gap-3 text-task-text"><input checked={alerts} className="size-5 accent-gold" onChange={(event) => setAlerts(event.target.checked)} type="checkbox" />Critical coaching alerts</label><p className="text-sm text-task-text-muted">Optional manager feed. Alerts require final, unambiguous evidence and are rate-limited.</p>{alerts ? <ul aria-live="polite" className="space-y-2">{snapshot?.alerts.map((alert) => <li className="rounded-lg border border-warning p-3 text-task-text" key={alert.id}>{alert.message}</li>)}{!snapshot?.alerts.length ? <li className="text-sm text-task-text-muted">No critical alerts.</li> : null}</ul> : null}</section> : null}
+    <ScoreSettings />
   </main>;
 }
