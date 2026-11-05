@@ -105,7 +105,7 @@ class PrivateGPU:
         self.token=token
         self.client=client or httpx.AsyncClient(timeout=85,follow_redirects=False,limits=httpx.Limits(max_connections=2))
 
-    async def transcribe(self, job: dict[str,Any], manifest: list[dict[str,Any]]) -> list[dict[str,Any]]:
+    async def transcribe(self, job: dict[str,Any], manifest: list[dict[str,Any]]) -> dict[str,Any]:
         # Verified private adapter fetches signed objects, resamples/context-trims, and returns per-chunk text.
         # No legacy public endpoint, manager password, identity-by-name, or legacy database access.
         try:
@@ -116,7 +116,8 @@ class PrivateGPU:
                 segments=result.get('segments')
                 if not isinstance(segments,list):
                     raise Fault(422,'invalid_processor_response')
-                return segments
+                # Keep provider/model/diarization labels: they are stored on the transcript revision.
+                return {'segments':segments,**{k:result[k] for k in ('provider','model','diarization_provider') if isinstance(result.get(k),str)}}
         except httpx.HTTPError:
             raise Fault(503,'processor_unavailable') from None
 
@@ -145,3 +146,45 @@ class PrivateAnalyzer:
                 return content
         except httpx.HTTPError:
             raise Fault(503,'analyzer_unavailable') from None
+
+
+class ClaudeBedrockAnalyzer:
+    """Claude in Amazon Bedrock through Anthropic's SDK (`anthropic[bedrock]`), using the
+    worker's AWS instance role: no Anthropic key and no static AWS keys.
+
+    Same `complete(system, user) -> str` interface as PrivateAnalyzer; analysis.py validates
+    the JSON. Sampling settings are not sent (current Claude models reject them); depth is
+    set by `effort`. A refusal or truncated answer raises, so the worker's configured
+    fallback analyzer runs and the analysis is marked for manager review.
+    """
+    provider = 'anthropic-bedrock'
+
+    def __init__(self, region: str, model: str = 'anthropic.claude-opus-5-5', effort: str = 'high', client=None):
+        if not region or not model.startswith('anthropic.') or effort not in ('low', 'medium', 'high', 'xhigh', 'max'):
+            raise ValueError('Bedrock region, anthropic.-prefixed model id and a valid effort required')
+        self.model, self.effort = model[:120], effort
+        if client is None:
+            from anthropic import AsyncAnthropicBedrockMantle
+            client = AsyncAnthropicBedrockMantle(aws_region=region, timeout=75, max_retries=0)  # Three attempts fit the 240 s job limit; the job queue retries.
+        self.client = client
+
+    async def complete(self, system: str, user: str) -> str:
+        import anthropic
+        try:
+            async with self.client.messages.stream(model=self.model, max_tokens=32000, system=system,
+                                                   output_config={'effort': self.effort},
+                                                   messages=[{'role': 'user', 'content': user}]) as stream:
+                message = await stream.get_final_message()
+        except anthropic.RateLimitError:
+            raise Fault(503, 'analyzer_rate_limited') from None
+        except (anthropic.APIStatusError, anthropic.APIConnectionError):
+            # Never reflect provider bodies: they may echo transcript text.
+            raise Fault(503, 'analyzer_unavailable') from None
+        if message.stop_reason == 'refusal':
+            raise Fault(503, 'analyzer_refused')
+        if message.stop_reason == 'max_tokens':
+            raise Fault(503, 'analyzer_truncated')
+        text = ''.join(block.text for block in message.content if block.type == 'text')
+        if not text.strip():
+            raise Fault(503, 'analyzer_unavailable')
+        return text

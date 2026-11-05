@@ -1,0 +1,4 @@
+# Only for PROCESSOR_ENGINE=indic_conformer (legacy model, custom remote code).
+transformers==4.57.6
+onnx
+onnxruntime-gpu
