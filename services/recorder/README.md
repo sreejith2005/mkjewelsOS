@@ -234,6 +234,7 @@ words or 2 spoken segments never reaches a model.
 |---|---|
 | `RECORDER_EDGE_URL`, `RECORDER_BACKEND_SECRET` | Same boundary as the recorder worker. |
 | `RECORDER_ANALYZER_URL`, `_TOKEN`, `_HOSTS`, `_PROVIDER`, `_MODEL` | Required private analyzer. Request `{system,user,response_format:'json',temperature:0}`, response `{content}`. Provider/model labels are stored on each analysis. |
+| `RECORDER_ANALYZER_KIND=bedrock` | Use Claude in Amazon Bedrock instead of the gateway, through Anthropic's SDK (`anthropic[bedrock]`, pinned in the lockfile) and the worker's instance role (needs `bedrock:InvokeModel`-family permission for the model; no Anthropic key, no static AWS keys). Then set `RECORDER_ANALYZER_REGION`, optional `RECORDER_ANALYZER_MODEL` (default `anthropic.claude-opus-5-5`; Bedrock ids carry the `anthropic.` prefix) and `RECORDER_ANALYZER_EFFORT` (default `high`). Sampling settings are not sent. A refusal or truncated answer counts as unavailable, so the fallback analyzer (if set) runs and the analysis needs manager review. Check the model is enabled in the chosen region and that the data-residency terms suit customer conversations before use. |
 | `RECORDER_ANALYZER_FALLBACK_*` | Optional second analyzer, same variables. Its use is stored (`fallback_used`, `fallback_reason`) and forces manager review. |
 | `RECORDER_ANALYSIS_JOB_VERSIONS` | Comma list the worker accepts (default `mk-sales-v1`). Unknown versions dead-letter instead of running with the current prompt. |
 

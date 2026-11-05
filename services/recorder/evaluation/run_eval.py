@@ -171,9 +171,9 @@ def main(argv: list[str]) -> int:
     if args.command == 'wer':
         result = wer_report(args.pairs)
     else:
-        from adapters import PrivateAnalyzer
-        analyzer = PrivateAnalyzer(os.environ['RECORDER_ANALYZER_URL'], os.environ['RECORDER_ANALYZER_TOKEN'], tuple(os.environ['RECORDER_ANALYZER_HOSTS'].split(',')),
-                                   os.environ['RECORDER_ANALYZER_PROVIDER'], os.environ['RECORDER_ANALYZER_MODEL'])
+        # Same configuration as the analysis worker (RECORDER_ANALYZER_KIND=bedrock or the private gateway).
+        from production import _analyzer
+        analyzer = _analyzer('RECORDER_ANALYZER')
         fixtures = json.loads(args.fixtures.read_text(encoding='utf-8'))
         result = asyncio.run(evaluate(fixtures, analyzer, args.repeats, tuple(args.variants.split(',')), tuple(args.languages.split(','))))
     text = json.dumps(result, indent=2)

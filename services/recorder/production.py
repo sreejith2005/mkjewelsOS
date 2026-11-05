@@ -1,7 +1,7 @@
 """Production entry points. No local/test backend or plaintext mode can be selected here."""
 import asyncio
 import os
-from adapters import EdgeBoundary,S3Objects,PrivateGPU,PrivateAnalyzer
+from adapters import EdgeBoundary,S3Objects,PrivateGPU,PrivateAnalyzer,ClaudeBedrockAnalyzer
 from analysis import AnalysisWorker
 from recorder import Settings,create_app
 from worker import Worker
@@ -28,7 +28,10 @@ async def worker_main():
     await worker.run()
 
 
-def _analyzer(prefix: str) -> PrivateAnalyzer:
+def _analyzer(prefix: str):
+    # <prefix>_KIND=bedrock: Claude in Amazon Bedrock via the instance role. Otherwise the private HTTPS gateway.
+    if os.environ.get(prefix+'_KIND')=='bedrock':
+        return ClaudeBedrockAnalyzer(os.environ[prefix+'_REGION'],os.environ.get(prefix+'_MODEL','anthropic.claude-opus-5-5'),os.environ.get(prefix+'_EFFORT','high'))
     return PrivateAnalyzer(os.environ[prefix+'_URL'],os.environ[prefix+'_TOKEN'],tuple(os.environ[prefix+'_HOSTS'].split(',')),
                            os.environ[prefix+'_PROVIDER'],os.environ[prefix+'_MODEL'])
 
@@ -36,7 +39,7 @@ def _analyzer(prefix: str) -> PrivateAnalyzer:
 async def analysis_main():
     # Separate process. Refuses startup without an explicit primary analyzer; fallback only if fully configured.
     edge=EdgeBoundary(os.environ['RECORDER_EDGE_URL'],os.environ['RECORDER_BACKEND_SECRET'])
-    fallback=_analyzer('RECORDER_ANALYZER_FALLBACK') if os.environ.get('RECORDER_ANALYZER_FALLBACK_URL') else None
+    fallback=_analyzer('RECORDER_ANALYZER_FALLBACK') if os.environ.get('RECORDER_ANALYZER_FALLBACK_URL') or os.environ.get('RECORDER_ANALYZER_FALLBACK_KIND')=='bedrock' else None
     versions=frozenset(v.strip() for v in os.environ.get('RECORDER_ANALYSIS_JOB_VERSIONS','mk-sales-v1').split(',') if v.strip())
     await AnalysisWorker(edge,_analyzer('RECORDER_ANALYZER'),fallback,supported_job_versions=versions).run()
 
