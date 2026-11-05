@@ -2,10 +2,10 @@ import {useCallback,useEffect,useMemo,useRef,useState,type ReactNode} from "reac
 import {businessReports,crmReportFilters,hasPermission,jewelosReportFilters,parseReportFilters,PURCHASE_CLASSES,REPORT_CATEGORIES,reportDisplayName,reportStatusOptions,reportVariants,type ReportDefinition,type ReportFilterKey,type ReportFilters} from "@jewelos/core";
 import {createCrmReportReader,type CrmReportOptions,type CrmReportCustomer} from "@jewelos/crm-ui/analytics";
 import {supabase} from "@jewelos/api-client";
-import {CalendarRange,Download,FileSpreadsheet,Info,RefreshCw,RotateCcw,Search,Square,X} from "lucide-react";
+import {CalendarRange,ChevronDown,Download,FileSpreadsheet,History,Info,RefreshCw,RotateCcw,Search,SlidersHorizontal,Square,X} from "lucide-react";
 import {useAuth} from "@/auth/AuthContext";
-import {Button} from "@/components/ui";
-import {EmptyMessage,ErrorPanel,LoadingPanels,PageHeading,PageSurface,Panel,StatusDot} from "@/features/analytics/components";
+import {Button,Modal} from "@/components/ui";
+import {EmptyMessage,ErrorPanel,LoadingPanels,PageHeading,PageSurface,StatusDot} from "@/features/analytics/components";
 import {fetchReportingOptions,type ReportingOptions} from "@/features/analytics/api";
 import {exportActionsForStatus,type ExportStatus} from "@/features/analytics/presentation";
 import {crmProjectConfig} from "@/lib/crmProject";
@@ -52,6 +52,9 @@ export function ReportsView(){
   const [choices,setChoices]=useState<ReportFilterOptions>({forms:[],flows:[],stages:[],employees:[]});
   const [crmChoices,setCrmChoices]=useState<CrmReportOptions|null>(null);
   const [searchText,setSearchText]=useState(filters.search??"");
+  const [exportsOpen,setExportsOpen]=useState(false);
+  // Filters start open on a computer and folded on a phone, where the report comes first.
+  const [filtersOpen,setFiltersOpen]=useState(()=>typeof window==="undefined"||typeof window.matchMedia!=="function"||!window.matchMedia("(max-width: 639px)").matches);
   const [customerSearch,setCustomerSearch]=useState("");const [customers,setCustomers]=useState<CrmReportCustomer[]>([]);const [customer,setCustomer]=useState<CrmReportCustomer|null>(null);
   const generation=useRef(0);
   useEffect(()=>()=>{generation.current+=1;},[]);
@@ -110,27 +113,35 @@ export function ReportsView(){
   const narrowing=(Object.keys(filters) as (keyof ReportFilters)[]).some((key)=>!["from","to","page","page_size","client_id"].includes(key)&&filters[key]!==undefined);
   const range=filters.from&&filters.to?`${filters.from} to ${filters.to}`:"all dates";
   const summary=definition.summary?.filter((item)=>data?.summary?.[item.key]!==undefined)??[];
+  const pendingExports=(history?.rows??[]).filter((row)=>row.status==="queued"||row.status==="processing").length;
   const exportDisabled=exporting||loading||!data?.total||(needsCustomer&&!filters.client_id);
 
+  // A data-first workspace: one compact bar to pick the report and its filters,
+  // then the report itself across the full width. Nothing sits in a card.
   return <PageSurface>
-    <PageHeading title="Reports" description="Choose a report, check the preview, then export every matching record as a CSV file." actions={canExport?<Button disabled={exportDisabled} onClick={()=>void doExport()}><FileSpreadsheet/>{exporting?"Preparing…":"Export CSV"}</Button>:undefined}/>
+    <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="min-w-0"><h1 className="font-display text-[1.6rem] font-semibold leading-tight sm:text-[1.85rem]">Reports</h1></div>
+      <div className="flex flex-wrap items-center gap-2"><Button className="border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={()=>setExportsOpen(true)} variant="secondary"><History/>Your exports{pendingExports?<span className="rounded-full bg-gold/20 px-1.5 text-xs text-gold-secondary tabular-nums">{pendingExports}</span>:null}</Button>{canExport?<Button disabled={exportDisabled} onClick={()=>void doExport()}><FileSpreadsheet/>{exporting?"Preparing…":"Export CSV"}</Button>:null}</div>
+    </header>
 
-    {/* Desktop: the report catalogue is a rail beside the report, so choosing and reading happen side by side. */}
-    <div className="mx-auto max-w-[120rem] xl:grid xl:grid-cols-[17.5rem_minmax(0,1fr)] xl:items-start xl:gap-5">
-    <aside aria-label="Report catalogue" className="xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto xl:overscroll-contain xl:pr-1">
-    <nav aria-label="Report categories" className="mb-3 flex gap-2 overflow-x-auto pb-1 xl:flex-wrap xl:overflow-visible">
-      {REPORT_CATEGORIES.filter((item)=>catalog.some((report)=>report.category===item.id)).map((item)=><button aria-pressed={item.id===category} className={cn("min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold",item.id===category?"bg-gold text-on-gold":"bg-task-bg text-task-text hover:bg-gold/10")} key={item.id} onClick={()=>changeReport(catalog.find((report)=>report.category===item.id))} title={item.description} type="button">{item.name}</button>)}
+    <div className="-mx-4 border-y border-task-border bg-task-bg px-4 py-2.5 sm:-mx-6 sm:px-6">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+        <nav aria-label="Report categories" className="scroll-x no-scrollbar flex gap-1.5">
+      {REPORT_CATEGORIES.filter((item)=>catalog.some((report)=>report.category===item.id)).map((item)=><button aria-pressed={item.id===category} className={cn("min-h-10 shrink-0 rounded-full px-4 text-sm font-semibold",item.id===category?"bg-gold text-on-gold":"bg-task-bg text-task-text hover:bg-gold/10")} key={item.id} onClick={()=>changeReport(catalog.find((report)=>report.category===item.id))} title={item.description} type="button">{item.name}</button>)}
     </nav>
-    <nav aria-label="Reports" className="mb-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-1">
-      {cards.map((item)=>{const selected=item.key===definition.key||(!!item.family&&item.family===definition.family);return <button aria-pressed={selected} className={cn("min-h-11 rounded-xl border p-3 text-left transition-colors",selected?"border-gold bg-gold/10 shadow-card":"border-task-border bg-task-bg hover:border-gold/50")} key={item.key} onClick={()=>changeReport(item)} type="button">
-        <span className="block text-sm font-semibold">{item.name}</span>
-        <span className="mt-0.5 line-clamp-2 block text-xs leading-snug text-task-text-muted" title={item.description}>{item.description}</span>
+        <span aria-hidden className="hidden h-6 w-px shrink-0 bg-task-border lg:block"/>
+        <label className="sm:hidden"><span className="sr-only">Report</span><select aria-label="Report" className={field} onChange={(event)=>changeReport(cards.find((item)=>item.key===event.target.value))} value={cards.find((item)=>item.key===definition.key||(!!item.family&&item.family===definition.family))?.key??definition.key}>{cards.map((item)=><option key={item.key} value={item.key}>{item.name}</option>)}</select></label>
+        <nav aria-label="Reports" className="scroll-x no-scrollbar hidden min-w-0 gap-1.5 sm:flex">
+      {cards.map((item)=>{const selected=item.key===definition.key||(!!item.family&&item.family===definition.family);return <button aria-pressed={selected} className={cn("min-h-10 shrink-0 rounded-lg border px-3 text-left text-sm transition-colors",selected?"border-gold bg-gold/10 font-semibold text-task-text":"border-task-border bg-task-bg text-task-text-muted hover:border-gold/50 hover:text-task-text")} title={item.description} key={item.key} onClick={()=>changeReport(item)} type="button">
+        <span className="block whitespace-nowrap">{item.name}</span>
       </button>;})}
-    </nav>
-    </aside>
-    <div className="min-w-0">
+        </nav>
+      </div>
+    </div>
 
-    <section aria-label="Report filters" className="mb-5 rounded-2xl border border-task-border bg-task-bg p-4 shadow-card">
+    <details className="group -mx-4 border-b border-task-border bg-task-bg px-4 sm:-mx-6 sm:px-6" onToggle={(event)=>setFiltersOpen(event.currentTarget.open)} open={filtersOpen}>
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold text-task-text"><SlidersHorizontal aria-hidden className="size-4 text-task-text-muted"/>Filters{narrowing?<span className="rounded-full bg-gold/15 px-2 py-0.5 text-xs text-gold-secondary">Filtered</span>:null}<span className="ml-auto truncate text-xs font-normal text-task-text-muted">{range}</span><ChevronDown aria-hidden className="size-4 shrink-0 text-task-text-muted transition-transform group-open:rotate-180"/></summary>
+      <section aria-label="Report filters" className="pb-3">
       {variants.length>1?<div aria-label="Report view" className="mb-3 inline-flex rounded-full bg-task-muted p-1" role="group">{variants.map((item)=><button aria-pressed={item.key===definition.key} className={cn("min-h-9 rounded-full px-3 text-xs font-semibold",item.key===definition.key?"bg-task-bg shadow-card":"text-task-text-muted")} key={item.key} onClick={()=>changeReport(item)} type="button">{item.variantLabel}</button>)}</div>:null}
       {has("client_id")?<div className="mb-3">
         {filters.client_id?<div className="flex flex-wrap items-center gap-2 rounded-xl border border-gold/50 bg-gold/10 p-3 text-sm"><span className="font-semibold">{customer?`${customer.name} · ${customer.customer_id}`:"Selected customer"}</span>{customer?.phone?<span className="text-task-text-muted">{customer.phone}</span>:null}<button className="ml-auto inline-flex min-h-9 items-center gap-1 rounded-full px-3 text-xs font-medium hover:bg-task-muted" onClick={()=>{setCustomer(null);changeFilters({client_id:undefined});}} type="button"><X className="size-3.5"/>Change customer</button></div>
@@ -143,7 +154,7 @@ export function ReportsView(){
         {definition.dateOptional?<button aria-pressed={!filters.from} className={chip(!filters.from)} onClick={()=>changeFilters({from:undefined,to:undefined})} type="button">All dates</button>:null}
         {QUICK_RANGES.map((item)=><button aria-pressed={active===item.id} className={chip(active===item.id)} key={item.id} onClick={()=>changeFilters(quickRange(item.id))} type="button">{item.label}</button>)}
       </div>:null}
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6">
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7">
         {has("from")?<><Labelled label="From"><input className={field} max={filters.to} onChange={(event)=>changeFilters({from:event.target.value||undefined,...(!filters.to&&event.target.value?{to:event.target.value}:{})})} type="date" value={filters.from??""}/></Labelled>
           <Labelled label="To"><input className={field} min={filters.from} onChange={(event)=>changeFilters({to:event.target.value||undefined,...(!filters.from&&event.target.value?{from:event.target.value}:{})})} type="date" value={filters.to??""}/></Labelled></>:null}
         {has("form_family_id")?<Labelled label="Form"><select className={field} onChange={(event)=>changeFilters({form_family_id:event.target.value})} value={filters.form_family_id??""}><option value="">All forms</option>{choices.forms.map((item)=><option key={item.id} value={item.id}>{item.name}</option>)}</select></Labelled>:null}
@@ -166,14 +177,19 @@ export function ReportsView(){
         <span>{isCrm?"Read from the CRM through your JewelOS login.":"You only see records your role is allowed to see."}{has("from")?` Up to ${definition.maxDateRangeDays} days.`:""}</span>
         {narrowing?<button className="inline-flex min-h-9 items-center gap-1 rounded-full px-3 font-medium text-task-text hover:bg-task-muted" onClick={()=>{setSearchText("");setFilters((current)=>startingFilters(definition,{...(current.from&&current.to?{from:current.from,to:current.to}:{}),...(current.client_id?{client_id:current.client_id}:{}),page_size:String(current.page_size)}));}} type="button"><X className="size-3.5"/>Clear filters</button>:null}
       </div>
-    </section>
+      </section>
+    </details>
 
-    {message?<p aria-live="polite" className="mb-4 rounded-xl border border-success/40 bg-task-bg p-3 text-sm text-success">{message}</p>:null}
+    {message?<p aria-live="polite" className="mt-3 rounded-xl border border-success/40 bg-task-bg p-3 text-sm text-success">{message}</p>:null}
 
-    {loading&&!data?<LoadingPanels count={2}/>:error?<ErrorPanel message={error} onRetry={()=>void load()}/>:data?<>
-      {summary.length?<div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">{summary.map((item)=><div className="rounded-xl border border-task-border bg-task-bg p-3" key={item.key}><p className="text-xs text-task-text-muted">{item.label}</p><p className="mt-1 font-display text-xl font-semibold">{(data.summary?.[item.key]??0).toLocaleString("en-IN")}</p></div>)}</div>:null}
-      <Panel title={definition.variantLabel?`${definition.name} · ${definition.variantLabel}`:definition.name} description={`${definition.description} ${data.total.toLocaleString("en-IN")} record${data.total===1?"":"s"} · ${range}${loading?" · updating…":""}`}>
-        {data.rows.length===0?<EmptyMessage>{needsCustomer&&!filters.client_id?"Search for a customer above to see their full history.":definition.dateOptional?"No records match these filters.":"No records match these filters. Try a wider date range or clear a filter."}</EmptyMessage>
+    {loading&&!data?<div className="mt-4"><LoadingPanels count={2}/></div>:error?<div className="mt-4"><ErrorPanel message={error} onRetry={()=>void load()}/></div>:data?<section aria-label={definition.name} className="mt-3">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 className="text-base font-semibold">{definition.variantLabel?`${definition.name} · ${definition.variantLabel}`:definition.name}</h2>
+        <p className="text-xs text-task-text-muted tabular-nums" aria-live="polite">{data.total.toLocaleString("en-IN")} record{data.total===1?"":"s"} · {range}{loading?" · updating…":""}</p>
+        <p className="w-full text-xs text-task-text-muted">{definition.description}</p>
+      </div>
+      {summary.length?<dl className="mb-2 flex flex-wrap gap-x-6 gap-y-1 border-b border-task-border pb-2">{summary.map((item)=><div className="flex items-baseline gap-2" key={item.key}><dt className="text-xs text-task-text-muted">{item.label}</dt><dd className="font-display text-lg font-semibold tabular-nums">{(data.summary?.[item.key]??0).toLocaleString("en-IN")}</dd></div>)}</dl>:null}
+      {data.rows.length===0?<EmptyMessage>{needsCustomer&&!filters.client_id?"Search for a customer above to see their full history.":definition.dateOptional?"No records match these filters.":"No records match these filters. Try a wider date range or clear a filter."}</EmptyMessage>
           :<ReportTable columns={columns} rows={data.rows}/>}
         {data.total>filters.page_size||filters.page>1?<div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <Button className="border-task-border bg-task-bg text-task-text hover:bg-task-muted" disabled={filters.page<=1} onClick={()=>changeFilters({page:filters.page-1})} variant="secondary">Previous</Button>
@@ -183,10 +199,10 @@ export function ReportsView(){
         </div>:null}
         {definition.key==="form_answers"&&!filters.form_family_id&&data.rows.length?<p className="mt-3 text-xs text-task-text-muted">Choose one form above to see and export one column per question.</p>:null}
         {definition.notes?.length?<details className="mt-4 rounded-xl bg-task-muted/60 p-3 text-xs text-task-text-muted"><summary className="flex min-h-9 cursor-pointer items-center gap-1.5 font-medium text-task-text"><Info className="size-3.5"/>How these numbers are counted</summary><ul className="mt-2 list-disc space-y-1 pl-5">{definition.notes.map((note)=><li key={note}>{note}</li>)}</ul></details>:null}
-      </Panel>
+    </section>:null}
 
-      <Panel className="mt-5" title="Your exports" description="CSV files from the last 30 days. Each file is private to you and expires automatically.">
-        {!history?.rows.length?<EmptyMessage>No exports yet. Use “Export CSV” above to create one.</EmptyMessage>:<ul className="flex flex-col gap-2">{history.rows.map((row)=>{const status=String(row.status) as ExportStatus;const actions=exportActionsForStatus(status);const progress=Number(row.progress_percent??0);return <li className="rounded-xl border border-task-border p-3 text-sm" key={String(row.export_id)}>
+    {exportsOpen?<Modal onClose={()=>setExportsOpen(false)} title="Your exports" tone="light" wide><p className="mb-3 text-sm text-task-text-muted">CSV files from the last 30 days. Each file is private to you and expires automatically.</p>
+      {!history?.rows.length?<EmptyMessage>No exports yet. Use “Export CSV” above to create one.</EmptyMessage>:<ul className="flex flex-col gap-2">{history.rows.map((row)=>{const status=String(row.status) as ExportStatus;const actions=exportActionsForStatus(status);const progress=Number(row.progress_percent??0);return <li className="rounded-xl border border-task-border p-3 text-sm" key={String(row.export_id)}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0"><p className="font-medium">{reportDisplayName(String(row.report_key))}</p><p className="text-xs text-task-text-muted">Requested {reportCellText(typeof row.requested_at==="string"?row.requested_at:null,"instant")}{status==="completed"?` · ${reportCellText(typeof row.row_count==="number"?row.row_count:null,"number")} rows · expires ${reportCellText(typeof row.expires_at==="string"?row.expires_at:null,"instant")}`:""}</p></div>
             <div className="flex items-center gap-2">
@@ -199,9 +215,6 @@ export function ReportsView(){
           {status==="queued"||status==="processing"?<div aria-label={`Export ${progress}% ready`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={progress} className="mt-2 h-1.5 overflow-hidden rounded-full bg-task-muted" role="progressbar"><div className="h-full rounded-full bg-gold transition-[width]" style={{width:`${Math.max(4,progress)}%`}}/></div>:null}
         </li>;})}</ul>}
         <Button className="mt-3 border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={()=>void load(false)} variant="secondary"><RefreshCw/>Refresh</Button>
-      </Panel>
-    </>:null}
-    </div>
-    </div>
+    </Modal>:null}
   </PageSurface>;
 }

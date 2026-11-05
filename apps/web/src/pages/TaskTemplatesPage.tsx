@@ -281,15 +281,16 @@ export function TaskTemplatesPage() {
 
   return (
     <section className="-m-4 min-h-[calc(100dvh-7.875rem)] bg-task-bg pb-24 text-task-text sm:-m-6 md:min-h-[calc(100vh-4rem)] md:pb-10">
-      <header className="border-b border-task-border bg-charcoal px-4 py-5 sm:px-6">
-        <div className="mx-auto flex max-w-[100rem] flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <span className="rounded-xl bg-gold-sheen p-2.5 text-on-gold shadow-gold">
+      {/* Header, tabs, filters and content share one left and right edge across the full width. */}
+      <header className="border-b border-task-border bg-task-bg px-4 pt-3 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="rounded-xl bg-gold-sheen p-2 text-on-gold shadow-gold">
               <ListChecks className="size-5" />
             </span>
-            <div>
-              <h1 className="font-display text-[1.85rem] font-semibold leading-tight sm:text-[2.1rem] text-gold-secondary">Task Control</h1>
-              <p className="text-sm text-soft-grey">{TASK_CONTROL_TAB_DESCRIPTIONS[tab]}</p>
+            <div className="min-w-0">
+              <h1 className="font-display text-xl font-semibold leading-tight text-gold-secondary md:text-2xl">Task Control</h1>
+              <p className="truncate text-xs text-soft-grey sm:text-sm">{TASK_CONTROL_TAB_DESCRIPTIONS[tab]}</p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -305,14 +306,14 @@ export function TaskTemplatesPage() {
             </Button>
           </div>
         </div>
-        <nav aria-label="Task Control sections" className="mx-auto mt-4 flex max-w-[100rem] gap-2 overflow-x-auto pb-1">
+        <nav aria-label="Task Control sections" className="scroll-x no-scrollbar -mx-4 mt-2 flex gap-1 px-4 sm:-mx-6 sm:px-6">
           {tabs.map((item) => (
             <button
               aria-current={tab === item ? "page" : undefined}
               className={
                 tab === item
-                  ? "min-h-9 shrink-0 rounded-full bg-gold px-4 text-sm font-semibold text-on-gold"
-                  : "min-h-9 shrink-0 rounded-full bg-white/10 px-4 text-sm font-medium text-champagne hover:bg-white/15"
+                  ? "relative min-h-11 shrink-0 px-3 text-sm font-semibold text-task-text after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-task-accent"
+                  : "min-h-11 shrink-0 px-3 text-sm font-medium text-task-text-muted hover:text-task-text"
               }
               key={item}
               onClick={() => changeTab(item)}
@@ -324,7 +325,7 @@ export function TaskTemplatesPage() {
         </nav>
       </header>
 
-      <div className="mx-auto max-w-[100rem] space-y-4 p-4 sm:p-6">
+      <div className="space-y-4 p-4 sm:px-6 sm:py-5">
         <TaskControlFilterBar
           canSelectBranch={canSelectTaskControlBranch(role)}
           filters={filters}

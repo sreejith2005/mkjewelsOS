@@ -4,8 +4,9 @@ import { defaultTaskSearch, taskSearchActive, taskSearchDateRange, taskSearchFil
 import { Button, Field, Modal, Notice } from "@/components/ui";
 
 type SelectKey = "kind" | "status" | "priority" | "subsection" | "requirement" | "sort";
-export function TaskSearchControls({ value, onChange, canViewAll }: {
-  value: TaskSearchFilters; onChange: (value: TaskSearchFilters) => void; canViewAll: boolean;
+/** `inline`: sits inside the page's own toolbar, without its own row and divider. */
+export function TaskSearchControls({ value, onChange, canViewAll, inline = false }: {
+  value: TaskSearchFilters; onChange: (value: TaskSearchFilters) => void; canViewAll: boolean; inline?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -17,7 +18,7 @@ export function TaskSearchControls({ value, onChange, canViewAll }: {
     </select>
   </Field>;
   return <>
-    <div className="flex items-center gap-2 border-b border-task-border px-3 py-2 sm:px-5" role="search" aria-label="Find tasks">
+    <div className={inline ? "flex items-center gap-2" : "flex items-center gap-2 border-b border-task-border px-3 py-2 sm:px-5"} role="search" aria-label="Find tasks">
       <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-lg border border-task-border bg-task-bg px-3">
         <Search className="size-4 shrink-0 text-task-text-muted" aria-hidden="true" />
         <input type="search" aria-label="Search all tasks" placeholder="Search all tasks..." maxLength={200} value={value.query}

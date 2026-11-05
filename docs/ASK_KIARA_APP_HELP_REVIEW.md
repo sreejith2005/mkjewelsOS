@@ -129,6 +129,11 @@ who build workflows, the designs.
 - [ ] Open the work behind an alert: tap the notification.
 - [ ] See unread alerts: the bell shows how many are unread.
 
+## UI v2 (2026-11-04)
+- [ ] Ask Kiara: chat list on the left (drawer on phones) with **Kiara tools** at its bottom for **Chat**, **Questions for you**, **Knowledge base**, **Insights**, **Limits** (permission-filtered). Kiara: no new read tool.
+- [ ] FMS: one row per workflow; **⋯** holds Pause / Resume, Restore, Version history, Delete.
+- [ ] Reports: categories and report chips (a **Report** list on phones) above a **Filters** bar; **Your exports** button in the header.
+
 ## Users
 **What it is:** the employee list for the people you may see, and account tools for allowed roles.
 - [ ] Find an employee (2026-11-04): one table of everyone (a list on a phone) with Branch, Department, Designation, Role, Phone, Status; **Search employees**, branch and department filters, **Show former employees**.
@@ -144,7 +149,7 @@ who build workflows, the designs.
 - [ ] Leave management (2026-11-04): the leave screens open from the **Leave management** button at the top of Availability, so the board comes first. Kiara: no new read tool (layout only).
 - [ ] Apply for leave: open Availability, press **Leave management**, choose **Apply leave**, enter the dates and reason, press **Submit leave**.
 - [ ] See my leave requests and their status: open Availability and choose **Leave summary**. *(changed in Phase 9; it used to say "the leave section")*
-- [ ] Mark a day: the board is a table (a list on a phone); choose Present, Absent, Half day or Remote in the row, or **Mark absent**. Department buttons above it focus one department.
+- [ ] Mark a day: the board is a table (a list on a phone); choose Present, Absent, Half day or Remote in the row, or **Mark absent**. The **Department** list beside the search focuses one department (2026-11-04 v2).
 - [ ] Approve or reject leave (people who review leave): open Availability and choose **Review requests**. *(added in Phase 9)*
 
 ## Reports
