@@ -96,4 +96,8 @@ class PrivateFiles:
             os.fsync(out.fileno())
 
     async def signed_read(self, key): return 'https://private.invalid/'+key
+    async def get(self, key, maximum):
+        data = (self.root / key).read_bytes()
+        assert len(data) <= maximum
+        return data
     async def health(self): return True

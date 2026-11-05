@@ -176,3 +176,21 @@ export function compareSalesAnalyses(previous: StoredSalesAnalysis, next: Stored
     }),
   };
 }
+
+/** Longest evidence clip the server will grant (recording_playback_ticket). */
+export const EVIDENCE_PLAYBACK_MAX_MS = 60000;
+/**
+ * Audio window to hear one transcript line: a little lead-in and tail, at least
+ * a few seconds, never more than the server limit. `seekMs` is where to start
+ * inside the returned clip once the server snaps the window to its 2-second chunks.
+ */
+export function evidencePlaybackWindow(segment: Readonly<{ start_ms: number; end_ms: number }>): Readonly<{ start_ms: number; end_ms: number; lead_ms: number }> {
+  const lead = 1500;
+  const start = Math.max(0, Math.floor(segment.start_ms) - lead);
+  const end = Math.min(start + EVIDENCE_PLAYBACK_MAX_MS, Math.max(Math.ceil(segment.end_ms) + lead, start + 4000));
+  return { start_ms: start, end_ms: end, lead_ms: Math.max(0, Math.floor(segment.start_ms) - start) };
+}
+/** Seconds into a clip that the server returned from `clipStartMs` to reach `fromMs`. */
+export function evidenceClipOffset(clipStartMs: number, fromMs: number): number {
+  return Math.max(0, (fromMs - clipStartMs) / 1000);
+}

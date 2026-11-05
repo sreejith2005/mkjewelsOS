@@ -7,7 +7,9 @@ import binascii
 import hashlib
 import ipaddress
 import json
+import re
 import secrets
+import struct
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -15,13 +17,16 @@ from typing import Any, Protocol
 from uuid import UUID
 
 from fastapi import FastAPI, Request, WebSocket
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from starlette.middleware.cors import CORSMiddleware
 from starlette.websockets import WebSocketDisconnect
 
 MAX_FRAME = 90000
 MAX_CHUNK = 64000
 SCOPE = ('session_id', 'device_id', 'employee_id', 'branch_id', 'tenant_id')
+PLAYBACK_MAX_CHUNKS = 31  # Matches recording_playback_grants (at most a 60-second window).
+PLAYBACK_PER_MINUTE = 60
+_HEX64 = re.compile(r'^[0-9a-f]{64}$')
 
 
 class Fault(Exception):
@@ -37,6 +42,7 @@ class Boundary(Protocol):
 class Objects(Protocol):
     async def put(self, key: str, data: bytes, sha256: str) -> None: ...
     async def signed_read(self, key: str) -> str: ...
+    async def get(self, key: str, maximum: int) -> bytes: ...
     async def health(self) -> bool: ...
 
 
@@ -61,6 +67,11 @@ def scope_from_session(session: dict[str, Any]) -> dict[str, str]:
 
 def object_key(claims: dict[str, str], sequence: int, sha256: str) -> str:
     return '/'.join(['recordings', claims['tenant_id'], claims['branch_id'], claims['employee_id'], claims['device_id'], claims['session_id'], f'{sequence:08d}-{sha256}.pcm'])
+
+
+def wav(pcm: bytes) -> bytes:
+    """Mono 16-bit 16 kHz PCM (the canonical chunk format) -> WAV."""
+    return b'RIFF' + struct.pack('<I', 36 + len(pcm)) + b'WAVEfmt ' + struct.pack('<IHHIIHH', 16, 1, 1, 16000, 32000, 2, 16) + b'data' + struct.pack('<I', len(pcm)) + pcm
 
 
 def integer(value: Any, lower: int, upper: int) -> int:
@@ -97,6 +108,7 @@ class Ingestion:
         self.inflight = 0
         self.connections = 0
         self.connect_attempts: dict[str, tuple[float, int]] = {}
+        self.playback_attempts: dict[str, tuple[float, int]] = {}
 
     def expire(self) -> None:
         now = time.monotonic()
@@ -124,6 +136,63 @@ class Ingestion:
             token = secrets.token_urlsafe(32)
             self.leases[hashlib.sha256(token.encode()).hexdigest()] = (time.monotonic() + self.settings.lease_seconds, claims)
         return dict(ingest_token=token, expires_at=datetime.fromtimestamp(time.time()+self.settings.lease_seconds,timezone.utc).isoformat(), session=result['session'], next_sequence=result['next_sequence'])
+
+    async def playback(self, body: dict[str, Any], remote: str = '') -> bytes:
+        """Evidence playback: redeem a reviewer's single-use ticket and return only that window as WAV.
+
+        recording_playback_ticket authorized and audited the request in SQL. Object keys
+        from the boundary are re-derived here, so a boundary bug cannot read another recording.
+        """
+        now = time.monotonic()
+        for key in [k for k, (expiry, _) in self.playback_attempts.items() if expiry <= now]:
+            del self.playback_attempts[key]
+        expiry, count = self.playback_attempts.get(remote, (now + 60, 0))
+        if count >= PLAYBACK_PER_MINUTE or (remote not in self.playback_attempts and len(self.playback_attempts) >= 1024):
+            raise Fault(429, 'playback_rate_limit')
+        self.playback_attempts[remote] = (expiry, count + 1)
+        ticket = body.get('ticket')
+        if not isinstance(ticket, str) or not _HEX64.match(ticket):
+            raise Fault(401, 'ticket_invalid')
+        if self.inflight >= self.settings.max_inflight:
+            raise Fault(429, 'backpressure')
+        self.inflight += 1
+        try:
+            async with asyncio.timeout(self.settings.request_timeout):
+                result = await self.boundary.call('playback_redeem', {'ticket': ticket})
+                claims = scope_from_session(result.get('session') or {})
+                first = integer(result.get('first_sequence'), 0, 7200)
+                last = integer(result.get('last_sequence'), first, min(7200, first + PLAYBACK_MAX_CHUNKS - 1))
+                chunks = result.get('chunks')
+                if not isinstance(chunks, list) or not chunks or len(chunks) > PLAYBACK_MAX_CHUNKS:
+                    raise Fault(503, 'invalid_boundary_playback')
+                by_sequence: dict[int, dict[str, Any]] = {}
+                for item in chunks:
+                    if not isinstance(item, dict):
+                        raise Fault(503, 'invalid_boundary_playback')
+                    sequence = integer(item.get('sequence'), first, last)
+                    digest, size = item.get('sha256'), item.get('byte_count')
+                    if sequence in by_sequence or not isinstance(digest, str) or not _HEX64.match(digest) or type(size) is not int or not 2 <= size <= MAX_CHUNK or size % 2:
+                        raise Fault(503, 'invalid_boundary_playback')
+                    key = object_key(claims, sequence, digest)
+                    if item.get('object_key') != key:
+                        raise Fault(403, 'object_scope_mismatch')
+                    by_sequence[sequence] = {'key': key, 'sha256': digest, 'size': size}
+                pcm = bytearray()
+                final = max(by_sequence)
+                for sequence in range(first, final + 1):
+                    item = by_sequence.get(sequence)
+                    if item is None:
+                        pcm.extend(bytes(MAX_CHUNK))  # Missing audio stays silent so the timeline stays true.
+                        continue
+                    data = await self.objects.get(item['key'], item['size'])
+                    if len(data) != item['size'] or hashlib.sha256(data).hexdigest() != item['sha256']:
+                        raise Fault(409, 'audio_integrity')
+                    pcm.extend(data)
+                    if sequence != final:
+                        pcm.extend(bytes(MAX_CHUNK - len(data)))  # A paused partial chunk keeps later audio aligned.
+                return wav(bytes(pcm))
+        finally:
+            self.inflight -= 1
 
     def authorize(self, token: str) -> dict[str, str]:
         self.expire()
@@ -250,6 +319,11 @@ def create_app(settings: Settings, boundary: Boundary, objects: Objects) -> Fast
     @app.post('/v1/chunks')
     async def chunks(request: Request):
         return await service.operation(bearer(request), 'chunk', await body(request))
+
+    @app.post('/v1/playback')
+    async def playback(request: Request):
+        audio = await service.playback(await body(request), request.client.host if request.client else '')
+        return Response(content=audio, media_type='audio/wav', headers={'Cache-Control': 'no-store', 'Content-Disposition': 'inline'})
 
     @app.post('/v1/commit')
     async def commit(request: Request):

@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  SALES_SIGNAL_KEYS, compareSalesAnalyses, evidenceSeekTargets, formatAudioOffset, hasAnalysisOutput,
+  SALES_SIGNAL_KEYS, compareSalesAnalyses, evidenceClipOffset, evidencePlaybackWindow, evidenceSeekTargets, formatAudioOffset, hasAnalysisOutput,
   type AnalysisSnapshot, type AnalysisTranscriptSegment, type EvidenceRef, type SalesDimensionStatus, type SpeakerRole, type StoredSalesAnalysis,
 } from "@jewelos/core";
-import { AnalysisActionError, correctTranscript, fetchAnalysisSnapshot, requestReprocess, requestRescore, reviewAnalysis, type DimensionOverride } from "@jewelos/data";
+import { AnalysisActionError, correctTranscript, fetchAnalysisSnapshot, fetchEvidenceAudio, requestReprocess, requestRescore, reviewAnalysis, type DimensionOverride } from "@jewelos/data";
 import { Button, Notice } from "@/components/ui";
 
 const STATUS: Readonly<Record<StoredSalesAnalysis["status"], string>> = { scored: "Scored", needs_review: "Needs review", insufficient_evidence: "Not enough evidence" };
@@ -87,7 +87,27 @@ export function ConversationAnalysis({ sessionId }: { sessionId: string }) {
     if (snapshot && snapshot.revision_id !== analysis?.transcript_revision_id && analysis) setRevisionId(analysis.transcript_revision_id);
     setActive(id);
     requestAnimationFrame(() => document.getElementById(`analysis-seg-${id}`)?.scrollIntoView({ block: "center", behavior: "smooth" }));
+    // Managers also hear the moment. Timestamps never change between transcript versions.
+    const target = reviewer ? segments.find((segment) => segment.segment_id === id) : undefined;
+    if (target) void play(target);
   };
+  // Evidence audio: one clip at a time; every Play is a fresh audited, single-use grant.
+  const [clip, setClip] = useState<{ url: string; label: string; offset: number } | null>(null);
+  const [loadingClip, setLoadingClip] = useState<string | null>(null);
+  const player = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => () => { if (clip) URL.revokeObjectURL(clip.url); }, [clip]);
+  useEffect(() => { setClip(null); }, [sessionId]);
+  const play = async (segment: AnalysisTranscriptSegment) => {
+    if (loadingClip) return;
+    setLoadingClip(segment.segment_id); setActive(segment.segment_id); setError(null);
+    try {
+      const range = evidencePlaybackWindow(segment);
+      const audio = await fetchEvidenceAudio(sessionId, range.start_ms, range.end_ms);
+      setClip({ url: audio.url, label: `${formatAudioOffset(segment.start_ms)} · ${SPEAKER[segment.speaker]}`, offset: evidenceClipOffset(audio.clipStartMs, range.start_ms) });
+    } catch (cause) { setError(cause instanceof AnalysisActionError ? cause.message : "Audio could not be played."); }
+    finally { setLoadingClip(null); }
+  };
+  const startClip = () => { const el = player.current; if (!el || !clip) return; el.currentTime = clip.offset; void el.play().catch(() => undefined); };
   const act = async (action: () => Promise<string | void>) => {
     if (busy) return; setBusy(true); setError(null); setNotice(null);
     try { const message = await action(); if (message) setNotice(message); await load(); }
@@ -196,11 +216,16 @@ export function ConversationAnalysis({ sessionId }: { sessionId: string }) {
             <option value="readable">Readable</option><option value="original">Original language</option><option value="english">English</option></select>
           {reviewer && snapshot.revision_id === latestRevision?.id ? <Button disabled={busy} onClick={() => { setEditing(editing === "transcript" ? "none" : "transcript"); setDraft({}); }} type="button" variant="secondary">{editing === "transcript" ? "Cancel correction" : "Correct transcript"}</Button> : null}
         </div></div>
+      {clip ? <div aria-label="Evidence audio" className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-lg border border-task-border bg-task-bg p-2" role="region">
+        <span className="text-xs font-semibold text-task-text-muted">Playing {clip.label}</span>
+        <audio className="h-10 min-w-0 flex-1" controls onLoadedMetadata={startClip} preload="auto" ref={player} src={clip.url} />
+        <Button onClick={() => setClip(null)} type="button" variant="ghost">Close</Button></div> : null}
       {snapshot.revisions.find((r) => r.id === snapshot.revision_id)?.reason ? <p className="text-xs text-task-text-muted">Correction reason: {snapshot.revisions.find((r) => r.id === snapshot.revision_id)?.reason}</p> : null}
       <ol className="space-y-2">{segments.map((segment) => {
         const d = draft[segment.segment_id];
         return <li className={`rounded-lg border-l-2 py-1 pl-3 ${active === segment.segment_id ? "border-gold bg-gold/10" : "border-task-border"}`} id={`analysis-seg-${segment.segment_id}`} key={segment.segment_id}>
-          <span className="text-xs font-semibold text-task-text-muted">{formatAudioOffset(segment.start_ms)} · {SPEAKER[segment.speaker]}{segment.speaker_source === "manual" ? " (corrected)" : ""}{segment.stt_confidence !== null && segment.stt_confidence < 0.6 ? " · unclear audio" : ""}</span>
+          <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-task-text-muted">{formatAudioOffset(segment.start_ms)} · {SPEAKER[segment.speaker]}{segment.speaker_source === "manual" ? " (corrected)" : ""}{segment.stt_confidence !== null && segment.stt_confidence < 0.6 ? " · unclear audio" : ""}</span>
+            {reviewer && editing !== "transcript" ? <button aria-label={`Play ${formatAudioOffset(segment.start_ms)}`} className="min-h-8 rounded-md px-2 text-xs font-semibold text-gold underline-offset-2 hover:underline disabled:opacity-50" disabled={loadingClip !== null} onClick={() => void play(segment)} type="button">{loadingClip === segment.segment_id ? "Loading…" : "Play"}</button> : null}</div>
           {editing === "transcript" ? <div className="mt-1 grid gap-2 md:grid-cols-[auto_1fr]">
             <select aria-label="Speaker" className="min-h-10 rounded-lg border border-task-border bg-task-bg p-2 text-sm text-task-text" onChange={(e) => setDraft({ ...draft, [segment.segment_id]: { speaker: e.target.value as SpeakerRole, raw_text: d?.raw_text ?? segment.raw_text } })} value={d?.speaker ?? segment.speaker}>
               {(Object.keys(SPEAKER) as SpeakerRole[]).map((s) => <option key={s} value={s}>{SPEAKER[s]}</option>)}</select>
@@ -218,7 +243,7 @@ export function ConversationAnalysis({ sessionId }: { sessionId: string }) {
           await correctTranscript(sessionId, latestRevision.id, changes, needNote()); setEditing("none"); setRevisionId(undefined); setNote(""); return "Correction saved as a new transcript version.";
         })} type="button">Save correction</Button></div> : null}
       {reviewer ? <Button disabled={busy} onClick={() => void act(async () => { await requestReprocess(sessionId, needNote()); setNote(""); return "Audio sent for transcription again. The current transcript stays until the new one is ready."; })} type="button" variant="ghost">Transcribe audio again</Button> : null}
-      <p className="text-xs text-task-text-muted">Evidence buttons jump to the quoted line. Audio playback from evidence is not available yet.</p>
+      <p className="text-xs text-task-text-muted">Evidence buttons jump to the quoted line.{reviewer ? " Play listens to that moment of the recording; each listen is recorded in the audit log." : ""}</p>
     </div>
   </section>;
 }

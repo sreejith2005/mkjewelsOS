@@ -2,12 +2,12 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalysisSnapshot, StoredSalesAnalysis } from "@jewelos/core";
-import { correctTranscript, fetchAnalysisSnapshot, requestRescore, reviewAnalysis } from "@jewelos/data";
+import { correctTranscript, fetchAnalysisSnapshot, fetchEvidenceAudio, requestRescore, reviewAnalysis } from "@jewelos/data";
 import { ConversationAnalysis } from "./ConversationAnalysis";
 
 vi.mock("@jewelos/data", () => {
   class AnalysisActionError extends Error {}
-  return { AnalysisActionError, fetchAnalysisSnapshot: vi.fn(), correctTranscript: vi.fn(), requestRescore: vi.fn(async () => ({ alreadyRequested: false })), requestReprocess: vi.fn(), reviewAnalysis: vi.fn() };
+  return { AnalysisActionError, fetchAnalysisSnapshot: vi.fn(), correctTranscript: vi.fn(), requestRescore: vi.fn(async () => ({ alreadyRequested: false })), requestReprocess: vi.fn(), reviewAnalysis: vi.fn(), fetchEvidenceAudio: vi.fn(async () => ({ url: "blob:clip", clipStartMs: 58000 })) };
 });
 
 const seg = (id: string, start: number, speaker: "employee" | "customer" | "unknown", raw: string) => ({
@@ -37,7 +37,7 @@ const snapshot = (over: Partial<AnalysisSnapshot> = {}): AnalysisSnapshot => ({
   analyses: [analysis], jobs: [], ...over,
 });
 
-beforeEach(() => { Element.prototype.scrollIntoView = vi.fn(); });
+beforeEach(() => { Element.prototype.scrollIntoView = vi.fn(); URL.revokeObjectURL = vi.fn(); });
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("Conversation review", () => {
@@ -50,6 +50,23 @@ describe("Conversation review", () => {
     fireEvent.click(screen.getAllByRole("button", { name: /1:01 · “bridal necklace”/ })[0]!);
     await waitFor(() => expect(document.getElementById("analysis-seg-s2")?.className).toContain("border-gold"));
     expect(screen.getAllByText(/Unknown speaker/).length).toBeGreaterThan(0);
+    // Managers also hear the moment: a short window around the quoted line.
+    await waitFor(() => expect(fetchEvidenceAudio).toHaveBeenCalledWith("sess", 59500, 63500));
+    expect(await screen.findByText(/Playing 1:01/)).toBeTruthy();
+  });
+
+  it("plays a transcript line on request and explains a refused listen", async () => {
+    vi.mocked(fetchAnalysisSnapshot).mockResolvedValue(snapshot());
+    render(<ConversationAnalysis sessionId="sess" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Play 0:01" }));
+    await waitFor(() => expect(fetchEvidenceAudio).toHaveBeenCalledWith("sess", 0, 4000));
+    expect(await screen.findByRole("region", { name: "Evidence audio" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:clip"));
+    const { AnalysisActionError } = await import("@jewelos/data");
+    vi.mocked(fetchEvidenceAudio).mockRejectedValueOnce(new AnalysisActionError("Audio for this moment is unavailable."));
+    fireEvent.click(screen.getByRole("button", { name: "Play 1:01" }));
+    expect(await screen.findByText("Audio for this moment is unavailable.")).toBeTruthy();
   });
 
   it("tells employees their manager reviews first", async () => {
@@ -58,6 +75,7 @@ describe("Conversation review", () => {
     expect(await screen.findByText(/Your manager reviews the AI analysis/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Correct transcript" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Play / })).toBeNull();
   });
 
   it("needs a reason to flag, approves, and requests a rescore", async () => {

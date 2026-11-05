@@ -55,3 +55,16 @@ def test_gpu_is_private_explicitly_configured_and_bounded():
             result=await gpu.transcribe({'id':'job','kind':'final','session':{'id':'session'}},[{'sequence':0,'url':'https://private.invalid'}])
             assert result[0]['text']=='synthetic'
     asyncio.run(run())
+
+
+def test_s3_playback_read_is_scoped_and_bounded():
+    client=Mock()
+    objects=S3Objects('private-test','arn:aws:kms:region:account:key/test',client)
+    body=Mock();body.read.return_value=b'\x01\x00'*4
+    client.get_object.return_value={'Body':body}
+    assert asyncio.run(objects.get('recordings/synthetic/0.pcm',8))==b'\x01\x00'*4
+    body.read.assert_called_with(9);body.close.assert_called()
+    with pytest.raises(Fault): asyncio.run(objects.get('recordings/synthetic/0.pcm',6))
+    with pytest.raises(Fault): asyncio.run(objects.get('other/0.pcm',8))
+    client.get_object.side_effect=ClientError({'Error':{'Code':'AccessDenied'}},'GetObject')
+    with pytest.raises(Fault): asyncio.run(objects.get('recordings/synthetic/0.pcm',8))
