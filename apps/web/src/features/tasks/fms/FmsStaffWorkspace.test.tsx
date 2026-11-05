@@ -8,7 +8,7 @@ vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealti
 import { FmsStaffWorkspace as FmsTaskWorkspace } from "./FmsStaffWorkspace";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 const id = "00000000-0000-4000-8000-000000000001";
-afterEach(cleanup);
+afterEach(() => { cleanup(); sessionStorage.clear(); });
 beforeEach(() => {
  vi.clearAllMocks();
  api.loadFmsTaskWorkspace.mockResolvedValue({ families: [{ id, name: "Enquiries", count: 250 }], total: 250, activeTotal: 250, familyTotal: 1, counts: { active: 250, pending: 240, overdue: 10, waiting: 0, completed: 0 } });
@@ -132,4 +132,13 @@ it('keeps calendar scope through the staff summary and exact stage drilldown', a
  view.rerender(<FmsTaskWorkspace actorId={id} tenantId={id} dateScope="overall" onNavigate={vi.fn()} onCount={onCount}/>);
  await waitFor(()=>expect(api.loadFmsTaskWorkspace).toHaveBeenLastCalledWith(expect.objectContaining({dateScope:'overall'}),0));
  expect(onCount).toHaveBeenCalledWith(250);
+});
+
+it("restores the employee's FMS search after returning from a form", async () => {
+ const user = userEvent.setup();
+ const first = render(<FmsTaskWorkspace actorId={id} tenantId={id} onNavigate={vi.fn()} />);
+ await user.type(screen.getByRole("searchbox"), "ring");
+ first.unmount();
+ render(<FmsTaskWorkspace actorId={id} tenantId={id} onNavigate={vi.fn()} />);
+ expect(screen.getByRole("searchbox")).toHaveProperty("value", "ring");
 });

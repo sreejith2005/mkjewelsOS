@@ -576,7 +576,7 @@ export async function recordAvailabilityRange(
 export type TaskPage = Omit<TaskPageScope, "ids"> & Readonly<{ tasks: TaskBundle[] }>;
 
 /** Count unopened tabs without fetching their cards or any caller-selected actor. */
-export async function loadTaskTabCounts(includeAll: boolean, calendarScope?: TaskDateScope, status: TaskFeedStatusFilter = "pending", filters?: TaskSearchFilters): Promise<Partial<Record<TaskWorkspaceView, number>>> {
+export async function loadTaskTabCounts(includeAll: boolean, calendarScope?: TaskDateScope, status: TaskFeedStatusFilter = "pending", filters?: TaskSearchFilters, fmsFilter?: Readonly<{ dateScope: TaskDateScope; scope: "mine" | "all" }>): Promise<Partial<Record<TaskWorkspaceView, number>>> {
   if (filters) taskSearchPayload(filters);
   const views: TaskWorkspaceView[] = ["mine", "delegated", "inLoop", "fms", ...(includeAll ? ["all" as const] : [])];
   const entries = await Promise.all(views.map(async (view) => {
@@ -585,8 +585,8 @@ export async function loadTaskTabCounts(includeAll: boolean, calendarScope?: Tas
       fail("Load searched task subsection counts", error);
       return [view, decodeTaskPage(data).total] as const;
     }
-    if (calendarScope && view === "fms") {
-      const result = await db().rpc("get_fms_task_workspace", { p_filter: { dateScope: calendarScope, status: "active" }, p_offset: 0, p_limit: 1 });
+    if ((fmsFilter || calendarScope) && view === "fms") {
+      const result = await db().rpc("get_fms_task_workspace", { p_filter: { dateScope: fmsFilter?.dateScope ?? calendarScope, status: "active", ...(fmsFilter ? { scope: fmsFilter.scope } : {}) }, p_offset: 0, p_limit: 1 });
       fail("Load FMS subsection count", result.error);
       const resultData = result.data;
       if (!resultData || typeof resultData !== "object" || Array.isArray(resultData) || typeof resultData.total !== "number") throw new Error("Invalid FMS count");

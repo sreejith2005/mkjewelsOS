@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FormTemplateDefinition } from "@jewelos/core";
 import { FmsStartingForm } from "./FmsStartingForm";
 
-const mocks = vi.hoisted(() => ({ confirmWork: vi.fn(), onSaved: vi.fn() }));
+const mocks = vi.hoisted(() => ({ confirmWork: vi.fn(), onSaved: vi.fn(), toast: vi.fn() }));
+vi.mock("sonner", () => ({ toast: { success: mocks.toast } }));
 vi.mock("./api", () => ({ signedFormFileUrl: vi.fn(), uploadFormFile: vi.fn(), submitStandaloneFormAndStartFms: vi.fn() }));
 vi.mock("@jewelos/data/fms/work", () => ({
   listFmsFormStarters: async () => [{ flowId: "flow-1", name: "Synthetic workflow", version: 1 }],
@@ -42,6 +43,7 @@ describe("FMS starting form submission boundary", () => {
       formTemplateId: "form-1", answers: { answer_8: "Finished" },
     });
     expect(mocks.onSaved).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("heading", { name: "Submitted" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Submitted" })).toBeNull();
+    expect(mocks.toast).toHaveBeenCalledOnce();
   });
 });

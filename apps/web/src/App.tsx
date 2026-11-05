@@ -1,3 +1,4 @@
+import { rememberFmsBoardReturn } from "@/features/tasks/fms/boardReturn";
 import { startTransition, Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Building2,
@@ -158,7 +159,10 @@ function usePathname() {
   const navigate = (nextPath: string) => {
     const nextUrl = new URL(nextPath, window.location.origin);
     const next = `${nextUrl.pathname}${nextUrl.search}`;
-    if (next !== `${window.location.pathname}${window.location.search}`) window.history.pushState({}, "", next);
+    if (next !== `${window.location.pathname}${window.location.search}`) {
+      if (nextUrl.pathname === "/tasks/fms" && window.location.pathname !== "/tasks/fms") rememberFmsBoardReturn(`${window.location.pathname}${window.location.search}`, next);
+      window.history.pushState({}, "", next);
+    }
     // A transition keeps the current screen on view while the next section's
     // code finishes downloading, instead of flashing the loading skeleton.
     startTransition(() => setHref(nextUrl.href));

@@ -4,6 +4,7 @@ import { defaultFmsWorkspaceFilters, fmsWorkspaceFilter, type TaskDateScope, typ
 import { loadFmsTaskWorkspace, loadFmsTaskStages } from "@jewelos/data/fms/taskWorkspace";
 import { Button, Field } from "@/components/ui";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
+import { readFmsBoardView, saveFmsBoardView } from "./boardReturn";
 import { useFmsRead } from "./useFmsRead";
 import { FmsReadState, FmsWorkflowGroup } from "./FmsTaskGroups";
 const TOPICS = ["tasks", "fms", "forms", "organization"] as const;
@@ -19,18 +20,21 @@ const STATUS_HELP: Record<FmsWorkspaceStatus, string> = {
  * Tasks -> FMS for employees without a team view: the workflow -> stage -> record
  * list, unchanged from before the board (2026-10-30 owner decision).
  */
-export function FmsStaffWorkspace({ actorId, tenantId, onNavigate, onCount, dateScope }: { dateScope?: TaskDateScope | undefined; actorId: string; tenantId: string; onNavigate: (path: string) => void; onCount: (count: number) => void }) {
- const [filters, setFilters] = useState(defaultFmsWorkspaceFilters); const [query, setQuery] = useState(""); const [offset, setOffset] = useState(0);
- const [expandedFamilies, setExpandedFamilies] = useState<ReadonlySet<string>>(new Set());
- const [expandedStages, setExpandedStages] = useState<ReadonlySet<string>>(new Set());
+export function FmsStaffWorkspace({ actorId, tenantId, onNavigate, onCount, dateScope }: { dateScope?: TaskDateScope | undefined; actorId: string; tenantId: string; onNavigate: (path: string) => void; onCount?: (count: number) => void }) {
+ const [saved] = useState(() => readFmsBoardView<{ filters: ReturnType<typeof defaultFmsWorkspaceFilters>; offset: number; families: string[]; stages: string[] }>(`staff:${actorId}`));
+ const [filters, setFilters] = useState(() => { try { if (saved.filters) { fmsWorkspaceFilter(saved.filters); return saved.filters; } } catch { /* Ignore obsolete view preferences. */ } return defaultFmsWorkspaceFilters(); });
+ const [query, setQuery] = useState(filters.query.trim()); const [offset, setOffset] = useState(() => Number.isInteger(saved.offset) && saved.offset! >= 0 ? saved.offset! : 0);
+ const [expandedFamilies, setExpandedFamilies] = useState<ReadonlySet<string>>(() => new Set(Array.isArray(saved.families) ? saved.families.filter(id => typeof id === "string") : []));
+ const [expandedStages, setExpandedStages] = useState<ReadonlySet<string>>(() => new Set(Array.isArray(saved.stages) ? saved.stages.filter(id => typeof id === "string") : []));
  const toggle = (previous: ReadonlySet<string>, id: string) => { const next = new Set(previous); if (next.has(id)) next.delete(id); else next.add(id); return next; };
  // One workflow, one stage with work: open them so the employee sees their work without two taps.
  // Larger lists stay collapsed and load lazily. Happens once, so a closed group stays closed.
- const autoOpened = useRef(false);
+ const autoOpened = useRef(expandedFamilies.size > 0);
  const [autoStageFamily, setAutoStageFamily] = useState<string | null>(null);
  const [epoch, setEpoch] = useState(0);
  useEffect(() => { const timer = window.setTimeout(() => setQuery(filters.query.trim()), 250); return () => window.clearTimeout(timer); }, [filters.query]);
  const effective = { ...filters, query, dateScope }; const filterKey = JSON.stringify(effective);
+ useEffect(() => { saveFmsBoardView(`staff:${actorId}`, { filters, offset, families: [...expandedFamilies], stages: [...expandedStages] }); }, [actorId, filters, offset, expandedFamilies, expandedStages]);
  const refresh = useCallback(() => { setEpoch(value => value + 1); }, []);
  useTenantRealtimeRefresh({ tenantId, topics: TOPICS, refresh });
  const result = useFmsRead(true, `${actorId}|${filterKey}|${offset}`, async () => {
@@ -38,7 +42,7 @@ export function FmsStaffWorkspace({ actorId, tenantId, onNavigate, onCount, date
  }, epoch);
  const [knownFamilies, setKnownFamilies] = useState<NonNullable<typeof result.data>["families"]>([]);
  const [knownStages, setKnownStages] = useState<FmsStageSummary[]>([]);
- useEffect(() => { if (result.data) { onCount(result.data.total); setKnownFamilies(previous => [...new Map([...previous, ...result.data!.families].map(f => [f.id, f])).values()]);
+ useEffect(() => { if (result.data) { onCount?.(result.data.total); setKnownFamilies(previous => [...new Map([...previous, ...result.data!.families].map(f => [f.id, f])).values()]);
   if (offset > 0 && offset >= result.data.familyTotal) setOffset(Math.max(0, Math.floor((result.data.familyTotal - 1) / 50) * 50)); } }, [result.data, onCount, offset]);
  useEffect(() => { let active = true; setKnownStages([]); if (filters.familyId) void loadFmsTaskStages(filters.familyId, { ...effective, stageId: "" }).then(rows => { if (active) setKnownStages(rows); }).catch(() => { /* Main hierarchy keeps its explicit retry state. */ }); return () => { active = false; }; }, [dateScope, filters.familyId, query, filters.status, filters.from, filters.to, epoch]);
  const change = (next: typeof filters) => { setFilters(next); setOffset(0); };

@@ -13,7 +13,7 @@ vi.mock("@/auth/AuthContext", async () => {
 });
 vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealtimeRefresh: () => undefined }));
 vi.mock("@/features/forms/FormBuilder", () => ({ FormBuilder: () => <div>Builder</div> }));
-vi.mock("@/features/forms/FmsStartingForm", () => ({ FmsStartingForm: () => <div>Assigned form</div> }));
+vi.mock("@/features/forms/FmsStartingForm", () => ({ FmsStartingForm: ({ onSaved }: { onSaved: () => Promise<void> }) => <button onClick={() => void onSaved()}>Submit assigned form</button> }));
 vi.mock("@/features/forms/api", () => ({
   loadForms: mocks.loadForms, loadFmsBuiltForms: mocks.loadFmsBuiltForms, setFormLibraryVisibility: vi.fn(),
   loadFormDynamicOptions: async () => ({ users: [], branches: [], departments: [], masters: [] }),
@@ -30,6 +30,15 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
 describe("Forms Library and FMS workflow forms", () => {
+  it("closes the filled form and preserves the library search after saving", async () => {
+    const user = userEvent.setup(); render(<FormsPage />);
+    await screen.findByText("Instagram Assignee Form");
+    await user.type(screen.getByRole("searchbox", { name: "Search forms" }), "Instagram");
+    await user.click(screen.getByRole("button", { name: /Fill form/ }));
+    await user.click(screen.getByRole("button", { name: "Submit assigned form" }));
+    expect(screen.queryByRole("button", { name: "Submit assigned form" })).toBeNull();
+    expect(screen.getByRole("searchbox", { name: "Search forms" })).toHaveProperty("value", "Instagram");
+  });
   it("opens on Forms Library forms and switches to the forms built in FMS", async () => {
     const user = userEvent.setup(); render(<FormsPage />);
     expect(await screen.findByText("Instagram Assignee Form")).toBeTruthy();

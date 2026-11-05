@@ -50,6 +50,13 @@ beforeEach(() => {
 });
 
 describe("server-authorized task assignment roster", () => {
+  it("counts FMS with its destination scope before the tab is opened", async () => {
+    pageRpc.mockImplementation(async (name: string, args: { p_filter: { dateScope?: string } }) => name === "get_fms_task_workspace"
+      ? { data: { total: args.p_filter.dateScope === "overall" ? 12 : 0 }, error: null }
+      : { data: { ids: [], total: 2, counts: { pending: 2, overdue: 0, completed: 0, open: 2 } }, error: null });
+    expect(await loadTaskTabCounts(false, "today", "pending", undefined, { dateScope: "overall", scope: "all" })).toEqual({ mine: 2, delegated: 2, inLoop: 2, fms: 12 });
+    expect(pageRpc).toHaveBeenCalledWith("get_fms_task_workspace", expect.objectContaining({ p_filter: { dateScope: "overall", scope: "all", status: "active" } }));
+  });
   it.each(["today", "overall", "overdue"] as const)("counts %s using the calendar filter accepted by the FMS hierarchy", async (dateScope) => {
     pageRpc.mockImplementation(async (name: string) => name === "get_fms_task_workspace"
       ? { data: { total: 10 }, error: null }

@@ -76,6 +76,7 @@ it("asks for a customer before showing the 360° journey",async()=>{
   expect(mocks.crmReport).not.toHaveBeenCalled();
   expect((screen.getByRole("button",{name:/Export CSV/}) as HTMLButtonElement).disabled).toBe(true);
   fireEvent.change(screen.getByPlaceholderText("Type at least 2 characters"),{target:{value:"Asha"}});
-  fireEvent.click(await screen.findByRole("button",{name:/Asha Synthetic/}));
+  // Customer search is debounced; allow it to finish under full-suite CPU load.
+  fireEvent.click(await screen.findByRole("button",{name:/Asha Synthetic/},{timeout:5000}));
   await waitFor(()=>expect(mocks.crmReport).toHaveBeenCalledWith("customer_report_journey",{clientId:"7d6b1c1e-2f0a-4c1e-9a55-5b1f1d2c3e4f"},0,25));
 });

@@ -8,7 +8,7 @@ const STATUS_DOT: Record<TaskFeedStatusFilter, string> = {
 };
 
 export function TaskFilterBar({ counts, onStatusChange, status }: {
-  counts: Record<TaskFeedStatusFilter, number>;
+  counts: Record<TaskFeedStatusFilter, number> | null;
   onStatusChange: (value: TaskFeedStatusFilter) => void;
   status: TaskFeedStatusFilter;
 }) {
@@ -26,7 +26,7 @@ export function TaskFilterBar({ counts, onStatusChange, status }: {
           >
             <span className={cn("size-3 shrink-0 rounded-full", STATUS_DOT[filter])} />
             <span>{filter[0]!.toUpperCase() + filter.slice(1)}</span>
-            <span aria-label={`${counts[filter]} tasks`} className="tabular-nums">({counts[filter]})</span>
+            <span aria-label={counts ? `${counts[filter]} tasks` : "Loading task count"} className="tabular-nums">({counts ? counts[filter] : "?"})</span>
           </button>
         ))}
       </div>

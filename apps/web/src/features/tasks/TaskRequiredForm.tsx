@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { useState } from "react";
 import { TASK_EVIDENCE_ACCEPT, taskEvidenceFileError, type FormTemplateDefinition } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthContext";
@@ -29,6 +30,7 @@ export function TaskRequiredForm({ definition, dynamicOptions, templateId, taskI
     <FormRenderer definition={definition} dynamicOptions={dynamicOptions} templateId={templateId} onSubmit={async answers => {
       if (uploading) throw new Error("Wait for the evidence upload to finish.");
       await submitTaskForm(taskId, templateId, answers);
+      toast.success("Form submitted. Task completed.");
       await onCompleted();
     }} />
   </div>;

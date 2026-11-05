@@ -31,7 +31,7 @@ beforeEach(() => {
   mocks.dueAt = null;
   window.history.replaceState({}, "", "/tasks");
   mocks.page.mockResolvedValue({ tasks: [], total: 0, counts: { pending: 0, overdue: 0, completed: 0, open: 0 } });
-  mocks.tabs.mockResolvedValue({ mine: 0, delegated: 0, inLoop: 0, fms: 0 });
+  mocks.tabs.mockImplementation(async (_all, _scope, _status, _filters, fmsFilter) => ({ mine: 0, delegated: 0, inLoop: 0, fms: fmsFilter?.dateScope === "overall" ? 1 : 0 }));
   // A durable assignment without a deadline is returned by Overall, excluded by
   // strict Today/Overdue. Keep the real data decoder and employee hierarchy.
   mocks.rpc.mockImplementation(async (name: string, args: { p_filter: { dateScope: string } }) => {
@@ -50,7 +50,7 @@ beforeEach(() => {
     throw new Error(`Unexpected RPC: ${name}`);
   });
 });
-afterEach(cleanup);
+afterEach(() => { cleanup(); window.sessionStorage.clear(); });
 
 it.each([null, "2099-11-03T05:30:00Z"])("shows assigned FMS work due %s on entry without changing ordinary defaults", async (dueAt) => {
   mocks.dueAt = dueAt;

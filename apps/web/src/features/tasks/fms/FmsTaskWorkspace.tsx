@@ -35,14 +35,14 @@ function useBoardLocation() {
  * counts; Level 2 (`?view=fms&workflow=<family>`) is that workflow's stage board.
  * The FMS Library's Tasks button opens the same board URL.
  */
-export function FmsTaskWorkspace(props: { dateScope?: TaskDateScope | undefined; actorId: string; tenantId: string; onNavigate: (path: string) => void; onCount: (count: number) => void }) {
+export function FmsTaskWorkspace(props: { dateScope?: TaskDateScope | undefined; actorId: string; tenantId: string; onNavigate: (path: string) => void; onCount?: (count: number) => void }) {
  const { access } = useAuth();
  // Managers, admins and super admins (team view) get the board; everyone else keeps the original list.
  const canSeeTeam = access ? hasPermission(access, "tasks.manage_team") || hasPermission(access, "tasks.view_all") : false;
  return canSeeTeam ? <FmsBoardWorkspace {...props} /> : <FmsStaffWorkspace {...props} />;
 }
 
-function FmsBoardWorkspace({ actorId, tenantId, onNavigate, onCount, dateScope }: { dateScope?: TaskDateScope | undefined; actorId: string; tenantId: string; onNavigate: (path: string) => void; onCount: (count: number) => void }) {
+function FmsBoardWorkspace({ actorId, tenantId, onNavigate, onCount, dateScope }: { dateScope?: TaskDateScope | undefined; actorId: string; tenantId: string; onNavigate: (path: string) => void; onCount?: (count: number) => void }) {
  const location = useBoardLocation();
  const [status, setStatus] = useState<FmsWorkspaceStatus>("active");
  // Managers see the whole team's workflows by default (server limits it to work they may open).
@@ -55,12 +55,12 @@ function FmsBoardWorkspace({ actorId, tenantId, onNavigate, onCount, dateScope }
  const filters = { ...defaultFmsWorkspaceFilters(), status, query, scope, dateScope };
  const result = useFmsRead(!location.familyId, `${actorId}|${JSON.stringify(filters)}|${offset}`, async () => { fmsWorkspaceFilter(filters); return loadFmsTaskWorkspace(filters, offset); }, epoch);
  const data = result.data;
- useEffect(() => { if (data) onCount(data.total); }, [data, onCount]);
+ useEffect(() => { if (data) onCount?.(data.total); }, [data, onCount]);
  useEffect(() => { if (data && offset > 0 && offset >= data.familyTotal) setOffset(Math.max(0, Math.floor((data.familyTotal - 1) / 50) * 50)); }, [data, offset]);
 
  if (location.familyId) {
   const initial = STATUSES.some(item => item.value === location.status) ? location.status as FmsWorkspaceStatus : "active";
-  return <FmsTaskBoard dateScope={dateScope} onCount={onCount} canSeeTeam familyId={location.familyId} initialScope={location.mine ? "mine" : undefined} initialStatus={initial} key={location.familyId} onBack={() => onNavigate(FMS_TASKS_PATH)} onNavigate={onNavigate} tenantId={tenantId} />;
+  return <FmsTaskBoard dateScope={dateScope} {...(onCount ? { onCount } : {})} canSeeTeam familyId={location.familyId} initialScope={location.mine ? "mine" : undefined} initialStatus={initial} key={location.familyId} onBack={() => onNavigate(FMS_TASKS_PATH)} onNavigate={onNavigate} tenantId={tenantId} />;
  }
  const openBoard = (family: FmsFamilySummary) => onNavigate(`${fmsTaskBoardPath(family.id)}${status === "active" ? "" : `&status=${status}`}${scope === "mine" ? "&scope=mine" : ""}`);
  return <div className="space-y-4 text-task-text">

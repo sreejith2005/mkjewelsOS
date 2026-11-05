@@ -1,9 +1,9 @@
 import { fmsOutcomeReplacesStage } from "@jewelos/core";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, ChevronLeft } from "lucide-react";
-import { fmsAssignedWorkPath, parseFmsAssignedWorkPath, type FmsAssignedWorkTarget, type FmsWorkResult } from "@jewelos/core";
-import { fmsTasksReturnPath } from "@/features/tasks/fms/boardReturn";
+import { ChevronLeft } from "lucide-react";
+import { parseFmsAssignedWorkPath, type FmsAssignedWorkTarget, type FmsWorkResult } from "@jewelos/core";
+import { fmsTasksReturnPath, returnFromFmsWork } from "@/features/tasks/fms/boardReturn";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
 import { loadFormDynamicOptions, loadTaskForms, type FormBundle, type FmsStarterResult } from "@/features/forms/api";
@@ -28,11 +28,12 @@ const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: []
  * Scoped loading means the step either opens or is reported as unavailable.
  */
 export function FmsAssignedWorkPage({ onNavigate }: { onNavigate: (path: string) => void }) {
+  const navigate = (path: string) => path === fmsTasksReturnPath() ? returnFromFmsWork(onNavigate) : onNavigate(path);
   const target = parseFmsAssignedWorkPath(window.location.href);
   if (!target) return <Unavailable onNavigate={onNavigate} tone="danger">This FMS assignment link is incomplete or no longer valid.</Unavailable>;
   return target.kind === "starter_form"
-    ? <StarterForm onNavigate={onNavigate} target={target} />
-    : <AssignedStage onNavigate={onNavigate} target={target} />;
+    ? <StarterForm onNavigate={navigate} target={target} />
+    : <AssignedStage onNavigate={navigate} target={target} />;
 }
 
 const BackToWork = ({ onNavigate }: { onNavigate: (path: string) => void }) =>
@@ -105,16 +106,14 @@ function StarterForm({ onNavigate, target }: {
     return () => { active = false; };
   }, [target.formTemplateId]);
 
-  if (started) return <Frame onNavigate={onNavigate} title={form?.name ?? "Form"}>
-    <div aria-label="Submission result" className="space-y-1 rounded-2xl border border-success/40 bg-success/10 p-4 sm:p-5" role="region">
-      <h2 className="flex items-center gap-2 font-semibold text-success"><CheckCircle2 aria-hidden="true" className="size-5" />Submitted</h2>
-      {sentToLine(started.assignmentSummary) ? <p className="text-sm text-task-text">{sentToLine(started.assignmentSummary)}</p> : null}
-    </div>
-    <div className="flex flex-col gap-2 sm:flex-row">
-      {started.ownWorkTargets?.[0] ? <Button className="min-h-12" onClick={() => onNavigate(fmsAssignedWorkPath(started.ownWorkTargets![0]!))}>Open my next step</Button> : null}
-      <Button className="min-h-12" onClick={() => onNavigate(fmsTasksReturnPath())} variant="secondary">Back to my work</Button>
-    </div>
-  </Frame>;
+  const returned = useRef(false);
+  useEffect(() => {
+    if (!started || returned.current) return;
+    returned.current = true;
+    toast.success(["Form submitted.", sentToLine(started.assignmentSummary)].filter(Boolean).join(" "));
+    onNavigate(fmsTasksReturnPath());
+  }, [started, onNavigate]);
+  if (started) return null;
   if (error) return <Unavailable onNavigate={onNavigate} tone="danger">{error}</Unavailable>;
   if (form === undefined) return <Loading />;
   if (form === null) return <Unavailable onNavigate={onNavigate}>This FMS assignment is complete, withdrawn, or no longer available to your account.</Unavailable>;
@@ -197,7 +196,7 @@ function AssignedStage({ onNavigate, target }: {
   const requested = target.kind === "stage_form" ? target.formTemplateId : definition.form_template_id;
 
   const finished = (result: FmsWorkResult) => {
-    if (!fmsOutcomeReplacesStage(result.state)) return;
+    if (!result.submissionId && !fmsOutcomeReplacesStage(result.state)) return;
     toast.success(fmsFinishedNotice(result));
     onNavigate(fmsTasksReturnPath());
   };

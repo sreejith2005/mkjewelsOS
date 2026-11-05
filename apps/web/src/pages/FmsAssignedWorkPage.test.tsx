@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   recoverFmsStartingWork: vi.fn(),
   runner: vi.fn(),
   toast: vi.fn(),
+  resultState: "successors_activated" as import("@jewelos/core").FmsWorkResult["state"],
 }));
 vi.mock("sonner", () => ({ toast: { success: mocks.toast } }));
 
@@ -38,12 +39,12 @@ vi.mock("@/features/forms/FormRenderer", () => ({
 vi.mock("@/features/fms/FmsStageRunner", () => ({
   FmsStageRunner: (props: { stage: { id: string }; requestedFormTemplateId?: string; onResult?: (result: import("@jewelos/core").FmsWorkResult) => void }) => {
     mocks.runner(props);
-    return <div>Running {props.stage.id} form {props.requestedFormTemplateId ?? "none"}<button onClick={() => props.onResult?.({ state: "successors_activated", submissionId: "saved", instanceId: "instance-5", referenceNumber: "FMS-9", sourceInstanceStageId: props.stage.id, destinations: [{ targetStageId: "next-def", stageName: "Follow up", formTemplateId: "form-next", selectedUserId: "user-1", effectiveUserId: "user-1", employeeName: "Current employee", assignmentMethod: "previous_form", locked: false, allowHandoff: true, issue: null }], ownWorkTargets: [{ kind: "stage_form", instanceId: "instance-5", instanceStageId: "next-visit", formTemplateId: "form-next" }] })}>Finish synthetic stage</button></div>;
+    return <div>Running {props.stage.id} form {props.requestedFormTemplateId ?? "none"}<button onClick={() => props.onResult?.({ state: mocks.resultState, submissionId: "saved", instanceId: "instance-5", referenceNumber: "FMS-9", sourceInstanceStageId: props.stage.id, destinations: [{ targetStageId: "next-def", stageName: "Follow up", formTemplateId: "form-next", selectedUserId: "user-1", effectiveUserId: "user-1", employeeName: "Current employee", assignmentMethod: "previous_form", locked: false, allowHandoff: true, issue: null }], ownWorkTargets: [{ kind: "stage_form", instanceId: "instance-5", instanceStageId: "next-visit", formTemplateId: "form-next" }] })}>Finish synthetic stage</button></div>;
   },
 }));
 
 const OPTIONS = { users: [], branches: [], departments: [], masters: [] };
-beforeEach(() => { mocks.loadTaskForms.mockResolvedValue({ bundles: [], submissions: [] }); mocks.recoverFmsStartingWork.mockResolvedValue(null); });
+beforeEach(() => { mocks.resultState = "successors_activated"; mocks.loadTaskForms.mockResolvedValue({ bundles: [], submissions: [] }); mocks.recoverFmsStartingWork.mockResolvedValue(null); });
 
 function stageBundle(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -61,6 +62,7 @@ function stageBundle(overrides: Partial<Record<string, unknown>> = {}) {
 
 afterEach(() => {
   cleanup();
+  window.sessionStorage.clear();
   vi.clearAllMocks();
   window.history.replaceState({}, "", "/");
 });
@@ -93,9 +95,11 @@ describe("focused FMS assigned work", () => {
     window.history.replaceState({}, "", "/tasks/fms?starter=starter-2&form=form-7");
     mocks.recoverFmsStartingWork.mockResolvedValue({ submissionId: "saved", instanceId: "instance-5", referenceNumber: "FMS-9", workflowName: "Jewellery enquiry", ownWorkTargets: [], assignmentSummary: [{ stageName: "Call", employeeName: "Employee B" }] });
     mocks.loadFormDynamicOptions.mockResolvedValue(OPTIONS);
-    render(<FmsAssignedWorkPage onNavigate={vi.fn()} />);
-    expect(await screen.findByRole("heading", { name: "Submitted" })).toBeTruthy();
-    expect(screen.getByText("Sent to Employee B.")).toBeTruthy();
+    const navigate = vi.fn();
+    render(<FmsAssignedWorkPage onNavigate={navigate} />);
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/tasks?view=fms"));
+    expect(mocks.toast).toHaveBeenCalledWith("Form submitted. Sent to Employee B.");
+    expect(screen.queryByRole("heading", { name: "Submitted" })).toBeNull();
     expect(screen.queryByText(/FMS-9/)).toBeNull();
     expect(screen.queryByRole("button", { name: "Submit exact form" })).toBeNull();
     expect(mocks.confirmWork).not.toHaveBeenCalled();
@@ -211,4 +215,17 @@ it("words the finished notice for each outcome", () => {
   const base = { submissionId: null, destinations: [] };
   expect(fmsFinishedNotice({ ...base, state: "workflow_completed" })).toBe("Done. All steps are finished.");
   expect(fmsFinishedNotice({ ...base, state: "successors_activated" })).toBe("Done.");
+});
+
+it.each(["form_saved_pending_completion", "awaiting_approval", "awaiting_other_doers"] as const)("returns after a form is saved with outcome %s", async state => {
+  mocks.resultState = state;
+  window.history.replaceState({}, "", "/tasks/fms?instance=instance-5&stage=stage-3&form=form-7");
+  mocks.loadFmsAssignedStage.mockResolvedValue(stageBundle());
+  mocks.loadFormDynamicOptions.mockResolvedValue(OPTIONS);
+  const navigate = vi.fn();
+  render(<FmsAssignedWorkPage onNavigate={navigate} />);
+  await userEvent.click(await screen.findByRole("button", { name: "Continue to form" }));
+  await userEvent.click(screen.getByRole("button", { name: "Finish synthetic stage" }));
+  expect(navigate).toHaveBeenCalledWith("/tasks?view=fms");
+  expect(mocks.toast).toHaveBeenCalledOnce();
 });

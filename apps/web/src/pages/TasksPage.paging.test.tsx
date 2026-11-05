@@ -25,8 +25,8 @@ vi.mock("@/features/tasks/TaskAdminControls", () => ({ TaskAdminControls: () => 
 
 vi.mock("@/features/tasks/fms/FmsTaskWorkspace", async () => {
   const { useEffect } = await import("react");
-  return { FMS_TASKS_PATH: "/tasks?view=fms", FmsTaskWorkspace: ({ onCount }: { onCount: (count: number) => void }) => {
-    useEffect(() => { queueMicrotask(() => onCount(3)); }, [onCount]);
+  return { FMS_TASKS_PATH: "/tasks?view=fms", FmsTaskWorkspace: ({ onCount }: { onCount?: (count: number) => void }) => {
+    useEffect(() => { queueMicrotask(() => onCount?.(3)); }, [onCount]);
     return <p>Filtered FMS results: 3</p>;
   } };
 });
@@ -39,6 +39,33 @@ beforeEach(() => { mocks.search.mockReset(); mocks.page.mockReset(); mocks.feed.
 afterEach(cleanup);
 
 describe("task workspace paging", () => {
+  it("keeps restored FMS selected when it was opened from the In Loop URL", async () => {
+    window.history.replaceState({ taskView: { actorId: "admin", view: "fms", calendarScope: null, status: "pending", offset: 0, filters: { query: "", kind: "all", status: "all", priority: "all", from: "", to: "", subsection: "any", requirement: "all", sort: "due" } } }, "", "/tasks/in-loop");
+    mocks.page.mockResolvedValue(page("Unexpected In Loop"));
+    render(<TasksPage path="/tasks/in-loop" />);
+    await screen.findByText("Filtered FMS results: 3");
+    expect(screen.getByRole("button", { name: /^FMS/ }).getAttribute("aria-pressed")).toBe("true");
+    expect(mocks.page).not.toHaveBeenCalled();
+  });
+  it("restores the originating task subsection, date scope and page", async () => {
+    window.history.replaceState({ taskView: { actorId: "admin", view: "delegated", calendarScope: "overall", status: "overdue", offset: 50, filters: { query: "", kind: "all", status: "all", priority: "all", from: "", to: "", subsection: "any", requirement: "all", sort: "due" } } }, "", "/tasks");
+    mocks.page.mockResolvedValue(page("Returned task"));
+    render(<TasksPage />);
+    await screen.findByText("Returned task");
+    await waitFor(() => expect(mocks.page).toHaveBeenLastCalledWith("admin", "tenant", "delegated", "overdue", 50, "overall"));
+  });
+  it("does not present unloaded status counts as zero", async () => {
+    mocks.page.mockImplementation(() => new Promise(() => {}));
+    mocks.tabs.mockImplementation(() => new Promise(() => {}));
+    render(<TasksPage />);
+    expect(screen.queryAllByLabelText("0 tasks")).toHaveLength(0);
+  });
+  it("counts unopened FMS using Overall and ordinary tasks using Today", async () => {
+    mocks.page.mockResolvedValue(page("Task", 4));
+    render(<TasksPage />);
+    await screen.findByText("Task");
+    expect(mocks.tabs).toHaveBeenCalledWith(true, "today", "pending", undefined, { dateScope: "overall", scope: "all" });
+  });
   it("keeps searched counts and category drilldowns on the same filters including paged FMS results", async () => {
     mocks.page.mockResolvedValue(page("Board task"));
     mocks.search.mockResolvedValue({ ...page("Filtered task", 80), sections: { "Filtered task": "fms" } });
@@ -58,15 +85,15 @@ describe("task workspace paging", () => {
     await waitFor(() => expect(mocks.search).toHaveBeenCalledWith("admin", "tenant", expect.objectContaining({ query: "silver", subsection: "delegated" }), 0));
   });
 
-  it("keeps mounted FMS badges on the workspace dataset when broader counts finish later", async () => {
+  it("keeps the whole FMS badge independent of the filtered workflow dataset", async () => {
     let finish: ((value: { mine: number; delegated: number; inLoop: number; fms: number; all: number }) => void) | undefined;
     mocks.tabs.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
     window.history.replaceState({}, "", "/tasks?view=fms");
     render(<TasksPage />);
     await screen.findByText("Filtered FMS results: 3");
-    await waitFor(() => expect(screen.getByRole("button", { name: "FMS (3)" })).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "FMS (3)" })).toBeNull();
     await act(async () => { finish?.({ mine: 4, delegated: 7, inLoop: 2, fms: 99, all: 112 }); });
-    expect(screen.getByRole("button", { name: "FMS (3)" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "FMS (99)" })).toBeTruthy();
   });
 
   it("shows anytime duties as a closed bar above the tasks on every Pending page", async () => {

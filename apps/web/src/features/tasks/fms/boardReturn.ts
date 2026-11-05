@@ -1,4 +1,4 @@
-import { FMS_TASKS_BOARD_BASE, fmsTaskBoardFamily } from "@jewelos/core";
+import { FMS_TASKS_BOARD_BASE } from "@jewelos/core";
 
 const KEY = "jewelos.fms.boardReturn";
 
@@ -8,7 +8,7 @@ const KEY = "jewelos.fms.boardReturn";
  * the workflow list. Per tab, per piece of work; storage may be unavailable.
  */
 export function rememberFmsBoardReturn(boardPath: string, workPath: string): void {
-  try { window.sessionStorage.setItem(KEY, JSON.stringify({ boardPath, workPath })); } catch { /* Returning to the list is fine. */ }
+  try { window.sessionStorage.setItem(KEY, JSON.stringify({ boardPath, workPath, state: window.history.state })); } catch { /* Returning to the list is fine. */ }
 }
 
 /** Where "Back" and "done" go from the work at `currentPath` (the work page's own URL). */
@@ -16,7 +16,7 @@ export function fmsTasksReturnPath(currentPath = `${window.location.pathname}${w
   try {
     const saved = JSON.parse(window.sessionStorage.getItem(KEY) ?? "null") as { boardPath?: unknown; workPath?: unknown } | null;
     if (saved && typeof saved.boardPath === "string" && saved.workPath === currentPath
-      && fmsTaskBoardFamily(new URL(saved.boardPath, window.location.origin).search)) return saved.boardPath;
+      && safeReturnPath(saved.boardPath)) return saved.boardPath;
   } catch { /* Fall back to the workflow list. */ }
   return FMS_TASKS_BOARD_BASE;
 }
@@ -28,4 +28,24 @@ export function readFmsBoardView<T>(familyId: string): Partial<T> {
 }
 export function saveFmsBoardView(familyId: string, value: unknown): void {
   try { window.sessionStorage.setItem(`jewelos.fms.board.${familyId}`, JSON.stringify(value)); } catch { /* Optional convenience. */ }
+}
+
+/** Only app routes can be a return destination, even if storage was edited. */
+function safeReturnPath(path: string): boolean {
+  const url = new URL(path, window.location.origin);
+  return url.origin === window.location.origin && path.startsWith("/") && !path.startsWith("//")
+    && ["/", "/home", "/tasks", "/tasks/in-loop", "/notifications", "/forms", "/fms"].includes(url.pathname);
+}
+
+/** Restore the source entry's UI state when navigating back after completion. */
+export function returnFromFmsWork(navigate: (path: string) => void): void {
+  const current = `${window.location.pathname}${window.location.search}`;
+  const path = fmsTasksReturnPath(current);
+  let state: unknown = null;
+  try {
+    const saved: unknown = JSON.parse(window.sessionStorage.getItem(KEY) ?? "null");
+    if (saved && typeof saved === "object" && "workPath" in saved && saved.workPath === current && "state" in saved) state = saved.state;
+  } catch { /* UI state is optional. */ }
+  navigate(path);
+  if (`${window.location.pathname}${window.location.search}` === path) window.history.replaceState(state, "", path);
 }
