@@ -157,6 +157,11 @@ bucket versioning off unless noncurrent-version expiration is also reviewed.
 
 ## Optional GPU protocol, incremental events and alerts
 
+The processor implementation is `services/recorder-processor` (faster-whisper or
+IndicConformer, pyannote speakers, `bench.py` for store-audio benchmarks). It also
+returns `provider`, `model` and `diarization_provider`, which `PrivateGPU` passes
+through to the transcript revision.
+
 The GPU endpoint is a new verified **private** adapter, not legacy public Flask.
 It must require the dedicated worker bearer on every call, use HTTPS, remain
 reachable only from the worker network, disable body logging, restrict outbound

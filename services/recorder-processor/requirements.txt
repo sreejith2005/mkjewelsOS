@@ -1,0 +1,10 @@
+# Runtime for the GPU image (CUDA 12 + cuDNN 9). Pin, then lock with
+# `pip freeze > requirements.lock` inside the built image after the owner review.
+fastapi==0.115.6
+uvicorn==0.34.0
+httpx==0.28.1
+numpy==1.26.4
+faster-whisper==1.1.1
+torch==2.5.1
+torchaudio==2.5.1
+pyannote.audio==3.3.2

@@ -211,3 +211,14 @@ Manager review UI and evidence click-to-seek screen; real STT/diarization
 model deployment and latency numbers; loading MK Jewels SOP text as an approved
 version (owner review step); Ask Kiara read tool (none added; Kiara gets no
 transcript or score access); CRM delivery of next actions.
+
+## Private GPU processor (2026-11-05)
+
+`services/recorder-processor` implements the worker's private processor contract:
+faster-whisper (or the legacy IndicConformer) for original-language text with
+word timestamps and confidence; pyannote speakers on final jobs. A voice is
+reported as the employee only when it is clearly the loudest (6 dB or more), so
+uncertain lines stay "unknown". The legacy repeated-word guard caps confidence.
+`bench.py` reports WER/CER, real-time factor, live lag and unknown-speaker share
+on owner-supplied store audio, per language. Deployment and the benchmark run
+are owner steps.

@@ -49,9 +49,10 @@ def test_gpu_is_private_explicitly_configured_and_bounded():
         def handle(request):
             assert request.headers['Authorization']=='Bearer synthetic'
             assert json.loads(request.content)['format']=={'encoding':'pcm_s16le','sample_rate':16000,'channels':1}
-            return httpx.Response(200,json={'segments':[{'sequence':0,'text':'synthetic','started_ms':0,'ended_ms':10}]})
+            return httpx.Response(200,json={'segments':[{'sequence':0,'text':'synthetic','started_ms':0,'ended_ms':10}],'provider':'faster-whisper','model':'large-v3','diarization_provider':None,'extra':'x'})
         async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
             gpu=PrivateGPU('https://gpu.internal/v1/transcribe','synthetic',('gpu.internal',),client)
             result=await gpu.transcribe({'id':'job','kind':'final','session':{'id':'session'}},[{'sequence':0,'url':'https://private.invalid'}])
-            assert result[0]['text']=='synthetic'
+            assert result['segments'][0]['text']=='synthetic'
+            assert {k:v for k,v in result.items() if k!='segments'}=={'provider':'faster-whisper','model':'large-v3'}
     asyncio.run(run())

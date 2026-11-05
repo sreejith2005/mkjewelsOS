@@ -105,7 +105,7 @@ class PrivateGPU:
         self.token=token
         self.client=client or httpx.AsyncClient(timeout=85,follow_redirects=False,limits=httpx.Limits(max_connections=2))
 
-    async def transcribe(self, job: dict[str,Any], manifest: list[dict[str,Any]]) -> list[dict[str,Any]]:
+    async def transcribe(self, job: dict[str,Any], manifest: list[dict[str,Any]]) -> dict[str,Any]:
         # Verified private adapter fetches signed objects, resamples/context-trims, and returns per-chunk text.
         # No legacy public endpoint, manager password, identity-by-name, or legacy database access.
         try:
@@ -116,7 +116,8 @@ class PrivateGPU:
                 segments=result.get('segments')
                 if not isinstance(segments,list):
                     raise Fault(422,'invalid_processor_response')
-                return segments
+                # Keep provider/model/diarization labels: they are stored on the transcript revision.
+                return {'segments':segments,**{k:result[k] for k in ('provider','model','diarization_provider') if isinstance(result.get(k),str)}}
         except httpx.HTTPError:
             raise Fault(503,'processor_unavailable') from None
 
