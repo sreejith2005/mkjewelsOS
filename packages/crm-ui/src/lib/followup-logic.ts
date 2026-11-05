@@ -23,6 +23,7 @@ export function queueTabMatches(record: { status: string; next_followup_date: st
   if (tab === "converted") return converted || record.status === "CONVERTED TO CLIENT";
   if (tab === "done") return done;
   if (tab === "pending") return !done;
+  if (tab === "overdue") return !done && !historical && record.next_followup_date !== null && record.next_followup_date < today;
   if (tab === "inprocess") return !done && !historical && (record.followup_count > 0 || status !== "PENDING");
   if (historical) return false;
   return !done && (record.next_followup_date === null || record.next_followup_date <= today);

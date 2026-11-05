@@ -2754,6 +2754,10 @@ export type Database = {
       }
       get_crm_business_report_options: { Args: never; Returns: Json }
       get_crm_insights_options_v1: { Args: { p_context?: Json }; Returns: Json }
+      get_crm_operations_summary_v1: {
+        Args: { p_branch_id?: string; p_from?: string; p_to?: string }
+        Returns: Json
+      }
       get_crm_insights_v1: { Args: { p_context?: Json }; Returns: Json }
       find_crm_report_customers: { Args: { p_search: string }; Returns: Json }
       get_crm_lead_option_routes: {
@@ -2775,6 +2779,8 @@ export type Database = {
           role: Database["public"]["Enums"]["user_role"]
         }[]
       }
+      get_walkin_branch_choices: { Args: never; Returns: Json }
+      get_walkin_roster_health: { Args: never; Returns: Json }
       get_walkin_queue_page: {
         Args: {
           p_branch_id?: string

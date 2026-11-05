@@ -12,5 +12,6 @@ export const propsMatch: Same<Declared.CrmAppProps, Implemented.CrmAppProps> = t
 export const authMatches: Same<Declared.CrmAuth, Implemented.CrmAuth> = true;
 export const crmProjectMatches: Same<Declared.CrmProjectConfig, Implemented.CrmProjectConfig> = true;
 export const formsHostMatches: Same<Declared.CrmFormsHost, Implemented.CrmFormsHost> = true;
+export const clientRunMatches: Same<Declared.CrmClientRun, Implemented.CrmClientRun> = true;
 export const formLinksMatch: Same<Declared.CrmFormLinks, Implemented.CrmFormLinks> = true;
 export const clientLookupMatches: typeof Declared.createCrmClientLookup = Implemented.createCrmClientLookup;

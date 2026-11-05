@@ -11,7 +11,7 @@ it('clears committed queue filters immediately even when the search is already e
  vi.useFakeTimers();
  const {result}=renderHook(()=>useFollowupControls('not_bought',{...paging,filters:{...paging.filters,crm:'STAFF',status:'PENDING',branch:'branch-a'}},'default'));
  act(()=>result.current.change({crm:'',status:'',branch:'',search:'',sort:'default'}));
- expect(router.push).toHaveBeenCalledWith('/followups?tab=pending&sort=default');
+ expect(router.push).toHaveBeenCalledWith('/clients?preset=not_bought&tab=pending&sort=default');
  act(()=>vi.advanceTimersByTime(500));
  expect(router.push).toHaveBeenCalledTimes(1);
 });
@@ -20,7 +20,7 @@ it('debounces typing, resets pagination, and allows repeating a search after Bac
  const {result,rerender}=renderHook(({page})=>useFollowupControls('not_bought',page,'default'),{initialProps:{page:paging}});
  act(()=>result.current.change({search:'123'}));act(()=>vi.advanceTimersByTime(299));expect(router.push).not.toHaveBeenCalled();
  act(()=>result.current.change({search:'1234'}));act(()=>vi.advanceTimersByTime(300));
- expect(router.push).toHaveBeenLastCalledWith('/followups?tab=pending&sort=default&search=1234');
+ expect(router.push).toHaveBeenLastCalledWith('/clients?preset=not_bought&tab=pending&sort=default&search=1234');
  rerender({page:{...paging,page:1,filters:{...paging.filters,search:'1234'}}});
  rerender({page:paging});
  act(()=>result.current.change({search:'1234'}));act(()=>vi.advanceTimersByTime(300));expect(router.push).toHaveBeenCalledTimes(2);
@@ -28,5 +28,5 @@ it('debounces typing, resets pagination, and allows repeating a search after Bac
 it('an immediate tab change includes pending search and cancels its old timer',()=>{
  vi.useFakeTimers();const {result}=renderHook(()=>useFollowupControls('not_bought',paging,'default'));
  act(()=>result.current.change({search:'1234'}));act(()=>vi.advanceTimersByTime(100));act(()=>result.current.change({tab:'done'}));act(()=>vi.advanceTimersByTime(500));
- expect(router.push).toHaveBeenCalledTimes(1);expect(router.push).toHaveBeenCalledWith('/followups?tab=done&sort=default&search=1234');
+ expect(router.push).toHaveBeenCalledTimes(1);expect(router.push).toHaveBeenCalledWith('/clients?preset=not_bought&tab=done&sort=default&search=1234');
 });

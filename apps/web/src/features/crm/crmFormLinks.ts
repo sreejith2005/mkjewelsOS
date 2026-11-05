@@ -14,5 +14,5 @@ export async function loadCrmLinkedFamilies(): Promise<ReadonlyMap<string, CrmFo
 
 /** Where a CRM form is filled: CRM registration, client queue or lead. */
 export function crmFormFillPath(purpose: CrmFormPurpose): string {
-  return purpose === "lead" ? "/crm/queue?register=lead" : "/crm/queue?register=client";
+  return purpose === "lead" ? "/crm/queue?register=lead" : "/crm/queue";
 }

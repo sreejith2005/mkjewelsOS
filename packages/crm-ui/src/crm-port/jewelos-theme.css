@@ -335,7 +335,6 @@ html[data-theme="dark"] #crm-theme .crm-app .bg-emerald-100 { background: rgb(va
 #crm-theme .crm-section { background: transparent; }
 /* Phones and tablets: one column, the sections a scrolling strip above the page. */
 #crm-theme .crm-section-body { min-width: 0; }
-#crm-theme .crm-section-nav-title { display: none; }
 #crm-theme .crm-section-bar { display: flex; flex-direction: column; gap: .6rem; margin-bottom: .25rem; }
 #crm-theme .crm-section-tabs { display: flex; gap: .4rem; margin-bottom: .6rem; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: .15rem; }
 #crm-theme .crm-section-tabs::-webkit-scrollbar { display: none; }
@@ -351,20 +350,13 @@ html[data-theme="dark"] #crm-theme .crm-app .bg-emerald-100 { background: rgb(va
 #crm-theme .crm-section main { padding-inline: 0 !important; padding-block: .75rem 1rem !important; }
 #crm-theme .crm-section .legacy-client-profile { padding-inline: 0 !important; }
 @media (min-width: 768px) {
-  #crm-theme .crm-section-bar { flex-direction: row; align-items: center; justify-content: flex-end; }
+  #crm-theme .crm-section-bar { flex-direction: row; align-items: center; justify-content: space-between; gap: 1rem; }
+  #crm-theme .crm-section-bar .crm-section-tabs { flex: 1 1 auto; min-width: 0; margin-bottom: 0; }
   #crm-theme .crm-section-search { flex: 0 1 24rem; }
 }
-/* Desktop (owner request 2026-11-04): the sections become a slim second sidebar, lighter than
-   the JewelOS one, that stays beside the page while it scrolls. It sits in the content area, so
-   it never covers the JewelOS sidebar; the page keeps the rest of the width. */
+/* Desktop (owner request 2026-11-04, three tabs): tabs and client search share one bar above the
+   page, so CRM pages use the full width of the JewelOS content area. */
 @media (min-width: 1024px) {
-  #crm-theme .crm-section { display: grid; grid-template-columns: 12.5rem minmax(0, 1fr); align-items: start; gap: 1.25rem; }
-  #crm-theme .crm-section-tabs { position: sticky; top: 5rem; flex-direction: column; gap: .15rem; max-height: calc(100dvh - 6rem); margin: 0; padding: .25rem .75rem .5rem 0; overflow-x: visible; overflow-y: auto; border-right: 1px solid rgb(var(--color-task-border)); scroll-snap-type: none; }
-  #crm-theme .crm-section-nav-title { display: block; margin: 0; padding: .35rem .75rem .6rem; color: rgb(var(--color-task-text-muted)); font-size: .65rem; font-weight: 700; letter-spacing: .18em; }
-  #crm-theme .crm-section-tab { min-height: 2.6rem; padding: .5rem .75rem; border: 0; border-radius: .65rem; background: transparent; white-space: normal; line-height: 1.25; }
-  #crm-theme .crm-section-tab:hover { background: rgb(var(--color-gold) / .08); }
-  #crm-theme .crm-section-tab.is-active { background: rgb(var(--color-gold) / .14); color: rgb(var(--color-gold-secondary)); box-shadow: none; font-weight: 700; }
-  #crm-theme .crm-section-tab.is-active::before { content: ""; position: absolute; top: .55rem; bottom: .55rem; left: 0; width: 3px; border-radius: 3px; background: rgb(var(--color-gold)); }
   #crm-theme .crm-section main { padding-block: .5rem 1rem !important; }
 }
 
@@ -372,3 +364,67 @@ html[data-theme="dark"] #crm-theme .crm-app .bg-emerald-100 { background: rgb(va
 #crm-theme .crm-form-settings-bar { display: flex; justify-content: flex-end; margin-top: .75rem; }
 #crm-theme .crm-form-settings-button { display: inline-flex; align-items: center; gap: .4rem; min-height: 2.5rem; padding: .4rem .9rem; border: 1px solid rgb(var(--color-gold) / .45); border-radius: 999px; background: rgb(var(--color-task-bg)); color: rgb(var(--color-gold-secondary)); font-size: .72rem; font-weight: 700; letter-spacing: .06em; cursor: pointer; }
 #crm-theme .crm-form-settings-button:hover, #crm-theme .crm-form-settings-button:focus-visible { background: rgb(var(--color-gold) / .1); outline: none; }
+
+/* ---- CRM three-tab workspace (owner request 2026-11-04). Client Database uses the full content
+   width and the document's own scroll bar (data-crm-page-scroll, see wide.css); the queue keeps
+   its controls in one permanent toolbar. Colours come only from the JewelOS --color-* tokens. ---- */
+#crm-theme .crm-workspace { display: flex; flex-direction: column; gap: 1rem; width: 100%; max-width: none; }
+#crm-theme .crm-workspace-header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: .75rem; }
+#crm-theme .crm-workspace-eyebrow { margin: 0; color: var(--crm-muted); font-size: .68rem; font-weight: 700; letter-spacing: .18em; }
+#crm-theme .crm-workspace-views { display: flex; gap: .4rem; overflow-x: auto; scrollbar-width: none; padding-bottom: .1rem; }
+#crm-theme .crm-workspace-views::-webkit-scrollbar { display: none; }
+#crm-theme .crm-workspace-view { flex: 0 0 auto; display: inline-flex; align-items: center; min-height: 2.5rem; padding: .35rem .95rem; border: 1px solid var(--crm-line); border-radius: 999px; background: var(--crm-card); color: var(--crm-muted); font-size: .78rem; font-weight: 600; text-decoration: none; white-space: nowrap; }
+#crm-theme .crm-workspace-view:hover, #crm-theme .crm-workspace-view:focus-visible { border-color: rgb(var(--color-gold) / .5); color: var(--crm-ink); outline: none; }
+#crm-theme .crm-workspace-view:focus-visible { box-shadow: 0 0 0 2px rgb(var(--color-gold)); }
+#crm-theme .crm-workspace-view.is-active { border-color: transparent; background: rgb(var(--color-gold) / .16); color: rgb(var(--color-gold-secondary)); font-weight: 700; }
+#crm-theme .crm-workspace-panel { border: 1px solid var(--crm-line); border-radius: .85rem; background: var(--crm-card); padding: 1rem; min-width: 0; }
+#crm-theme .crm-workspace-results { padding: 0; overflow: hidden; }
+#crm-theme .crm-workspace-results-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; padding: .85rem 1rem; border-bottom: 1px solid var(--crm-line); }
+#crm-theme .crm-workspace-results-head nav { padding: 0; }
+#crm-theme .crm-workspace-filters { display: flex; flex-direction: column; gap: .6rem; }
+#crm-theme .crm-workspace-filter-row, #crm-theme .crm-workspace-filter-grid { display: grid; gap: .6rem .75rem; grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr)); align-items: end; }
+#crm-theme .crm-workspace-filter-row label, #crm-theme .crm-workspace-filter-grid label { display: flex; flex-direction: column; gap: .25rem; font-size: .75rem; font-weight: 600; color: var(--crm-muted); }
+#crm-theme .crm-workspace-filter-row select, #crm-theme .crm-workspace-filter-grid select, #crm-theme .crm-workspace-filter-row input, #crm-theme .crm-workspace-filter-grid input { min-height: 2.6rem; width: 100%; }
+#crm-theme .crm-workspace-filter-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+#crm-theme .crm-case-kind { display: inline-block; margin-top: .35rem; padding: .1rem .45rem; border-radius: .35rem; font-size: .66rem; font-weight: 700; letter-spacing: .03em; background: rgb(var(--color-task-muted)); color: var(--crm-muted); }
+#crm-theme .crm-case-kind--buyer { background: rgb(var(--color-gold) / .14); color: rgb(var(--color-gold-secondary)); }
+#crm-theme .crm-case-kind--recovered { background: rgb(var(--color-success) / .14); color: rgb(var(--color-success)); }
+#crm-theme .crm-case-kind--prospect { background: rgb(var(--color-warning) / .14); color: rgb(var(--color-warning)); }
+
+/* Client Queue: permanent toolbar and the two registration actions. */
+#crm-theme .crm-queue-page { display: flex; flex-direction: column; gap: 1rem; width: 100%; max-width: none; }
+#crm-theme .crm-queue-actions { display: grid; gap: .6rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#crm-theme .crm-queue-action { display: flex; flex-direction: column; align-items: flex-start; gap: .15rem; min-height: 3.5rem; padding: .7rem 1rem; border: 1px solid var(--crm-line); border-radius: .85rem; background: var(--crm-card); color: var(--crm-ink); text-align: left; text-decoration: none; cursor: pointer; }
+#crm-theme .crm-queue-action b { font-size: .9rem; letter-spacing: .04em; }
+#crm-theme .crm-queue-action small { color: var(--crm-muted); font-size: .72rem; }
+#crm-theme .crm-queue-action[aria-pressed="true"], #crm-theme .crm-queue-action--primary { border-color: transparent; background: var(--crm-sheen); color: rgb(var(--color-on-gold)); box-shadow: var(--crm-shadow-gold); }
+#crm-theme .crm-queue-action[aria-pressed="true"] small, #crm-theme .crm-queue-action--primary small { color: rgb(var(--color-on-gold) / .8); }
+#crm-theme .crm-queue-action:focus-visible { outline: none; box-shadow: 0 0 0 2px rgb(var(--color-gold)); }
+#crm-theme .crm-queue-toolbar { display: grid; gap: .6rem .75rem; grid-template-columns: minmax(0, 1fr); align-items: end; }
+#crm-theme .crm-queue-toolbar label { display: flex; flex-direction: column; gap: .25rem; font-size: .75rem; font-weight: 600; color: var(--crm-muted); }
+#crm-theme .crm-queue-toolbar select { min-height: 2.75rem; width: 100%; }
+#crm-theme .crm-notice { padding: .7rem .9rem; border-radius: .65rem; border: 1px solid rgb(var(--color-warning) / .45); background: rgb(var(--color-warning) / .1); color: var(--crm-ink); font-size: .85rem; }
+#crm-theme .crm-notice--error { border-color: rgb(var(--color-task-overdue) / .5); background: rgb(var(--color-task-overdue) / .08); }
+#crm-theme .crm-notice a, #crm-theme .crm-notice button { font-weight: 700; text-decoration: underline; color: rgb(var(--color-gold-secondary)); }
+@media (min-width: 640px) {
+  #crm-theme .crm-queue-toolbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
+}
+
+/* CRM dashboard operations cards (2026-11-04): a few source-backed numbers, each opening its records. */
+#crm-theme .crm-dashboard { width: 100%; max-width: none; }
+#crm-theme .crm-ops { display: flex; flex-direction: column; gap: 1rem; }
+#crm-theme .crm-ops-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: .75rem; }
+#crm-theme .crm-ops-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .6rem; }
+#crm-theme .crm-ops-controls label { display: flex; flex-direction: column; gap: .25rem; color: var(--crm-muted); }
+#crm-theme .crm-ops-controls select { min-height: 2.6rem; }
+#crm-theme .crm-ops-periods { display: inline-flex; gap: .25rem; padding: .2rem; border: 1px solid var(--crm-line); border-radius: 999px; background: var(--crm-card); }
+#crm-theme .crm-ops-periods button { min-height: 2.25rem; padding: .25rem .85rem; border: 0; border-radius: 999px !important; background: transparent; color: var(--crm-muted); font-size: .75rem; }
+#crm-theme .crm-ops-periods button[aria-pressed="true"] { background: rgb(var(--color-gold) / .18); color: rgb(var(--color-gold-secondary)); }
+#crm-theme .crm-ops-group { display: flex; flex-direction: column; gap: .5rem; }
+#crm-theme .crm-ops-cards { display: grid; gap: .6rem; grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr)); }
+#crm-theme .crm-ops-card { display: flex; flex-direction: column; gap: .2rem; min-height: 6.5rem; padding: .85rem 1rem; border: 1px solid var(--crm-line); border-radius: .85rem !important; background: var(--crm-card); color: var(--crm-ink); text-align: left; text-decoration: none; font-weight: 400; letter-spacing: normal; }
+#crm-theme a.crm-ops-card:hover, #crm-theme button.crm-ops-card:hover, #crm-theme .crm-ops-card:focus-visible { border-color: rgb(var(--color-gold) / .55); outline: none; }
+#crm-theme .crm-ops-card:focus-visible { box-shadow: 0 0 0 2px rgb(var(--color-gold)); }
+#crm-theme .crm-ops-label { color: var(--crm-muted); font-size: .72rem; font-weight: 600; }
+#crm-theme .crm-ops-value { font-size: 1.75rem; font-weight: 700; line-height: 1.1; }
+#crm-theme .crm-ops-note { color: var(--crm-muted); font-size: .68rem; line-height: 1.3; }

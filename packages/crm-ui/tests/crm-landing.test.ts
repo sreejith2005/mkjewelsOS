@@ -1,4 +1,4 @@
-// Opening CRM from JewelOS lands on CLIENT QUEUE (owner request 2026-11-04); REGISTRATION keeps /queue.
+// Opening CRM from JewelOS lands on CLIENT QUEUE (owner request 2026-11-04): the queue itself, no chooser.
 import { describe, expect, it } from "vitest";
 
 import HomePage from "@/app/page";
@@ -9,6 +9,6 @@ describe("CRM landing page", () => {
     let thrown: unknown;
     try { HomePage(); } catch (error) { thrown = error; }
     expect(thrown).toBeInstanceOf(CrmRedirect);
-    expect((thrown as CrmRedirect).path).toBe("/queue?register=client");
+    expect((thrown as CrmRedirect).path).toBe("/queue");
   });
 });

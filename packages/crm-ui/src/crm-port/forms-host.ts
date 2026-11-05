@@ -27,6 +27,13 @@ export type CrmLeadSetup = Readonly<{ fields: readonly CrmLeadFieldWithId[]; rou
 /** A submitted form: the stored answers, and each answer as the person saw it (a choice's label). */
 export type CrmSubmittedForm = Readonly<{ answers: FormAnswers; display: Readonly<Record<string, string>>; rowDisplay?: Readonly<Record<string, readonly Readonly<Record<string, string>>[]>> | undefined }>;
 
+/** An FMS run a CRM client's events started (JewelOS get_crm_client_fms_runs), for the client profile. */
+export type CrmClientRun = Readonly<{
+  instanceId: string; referenceNumber: string; title: string; status: string; workflowName: string; sourceType: string;
+  crmCaseId: string | null; caseOpen: boolean; startedAt: string | null; completedAt: string | null;
+  openSteps: readonly Readonly<{ instanceStageId: string; stageName: string; status: string; visitNumber: number; dueAt: string | null; assignees: readonly string[] }>[];
+}>;
+
 export type CrmFormsHost = Readonly<{
   loadLinks: () => Promise<CrmFormLinks>;
   /** Opens a linked form in a JewelOS dialog. onSubmit throws an Error whose message the form shows. */
@@ -40,6 +47,8 @@ export type CrmFormsHost = Readonly<{
   }) => ReactNode;
   /** The CRM Form Settings dialog (people allowed to manage CRM forms). */
   renderSettings: (props: { links: CrmFormLinks; targets: Readonly<Record<"queue" | "lead" | "walkin", readonly CrmFormTarget[]>>; leadSetup: CrmLeadSetup; onClose: () => void; onSaved: () => void }) => ReactNode;
+  /** The client's FMS runs, read in JewelOS as the signed-in person (absent outside JewelOS). */
+  loadClientRuns?: ((crmClientId: string) => Promise<readonly CrmClientRun[]>) | undefined;
 }>;
 
 export const CrmFormsHostContext = createContext<CrmFormsHost | null>(null);

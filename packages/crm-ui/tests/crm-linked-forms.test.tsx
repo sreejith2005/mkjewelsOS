@@ -112,7 +112,7 @@ describe("client queue registration with a linked form", () => {
   it("shows CRM FORM SETTINGS only to people who manage CRM forms", async () => {
     navigation.search = "";
     renderStart({ canManage: false, links: [] });
-    await screen.findByRole("heading", { name: "Who are you registering?" });
+    await screen.findByRole("button", { name: /REGISTER LEAD/ });
     expect(screen.queryByRole("button", { name: "CRM FORM SETTINGS" })).toBeNull();
     cleanup();
     renderStart({ canManage: true, links: [] });

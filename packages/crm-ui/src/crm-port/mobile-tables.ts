@@ -61,6 +61,8 @@ export const WIDE_QUERY = "(min-width: 768px)";
 /** A fitted listing box is never shorter than this; with less room the page scrolls instead. */
 export const MIN_FIT_HEIGHT = 240;
 export const FIT_HEIGHT_PROPERTY = "--crm-fit-height";
+/** Marks a page whose listings grow with their rows, so the document is the only vertical scroller. */
+export const PAGE_SCROLL_ATTRIBUTE = "data-crm-page-scroll";
 /** The window size-change event, spelt in two parts so the stylesheet scan (see the wording note above) does not add a utility class. */
 const WINDOW_SIZE_EVENT = ["re", "size"].join("");
 
@@ -76,7 +78,9 @@ export function fitListingHeights(root: ParentNode, view: Window = window): void
   const boxes = Array.from(root.querySelectorAll("TABLE[data-crm-cards]"))
     .map((listing) => listing.parentElement)
     .filter((box): box is HTMLElement => box instanceof HTMLElement && /(^|\s)overflow-x-auto(\s|$)/.test(box.className));
-  const fitted = boxes.length === 1 && view.matchMedia(WIDE_QUERY).matches ? boxes[0]! : null;
+  // A workspace marked data-crm-page-scroll (Client Database, 2026-11-04) is read with the page's own
+  // scroll bar: its listings are never fitted into a second vertical scroller.
+  const fitted = boxes.length === 1 && !boxes[0]!.closest(`[${PAGE_SCROLL_ATTRIBUTE}]`) && view.matchMedia(WIDE_QUERY).matches ? boxes[0]! : null;
   for (const box of boxes) if (box !== fitted && box.style.getPropertyValue(FIT_HEIGHT_PROPERTY)) box.style.removeProperty(FIT_HEIGHT_PROPERTY);
   if (!fitted) return;
   const boxRect = fitted.getBoundingClientRect();

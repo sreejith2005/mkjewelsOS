@@ -75,11 +75,52 @@ describe("consolidated client walk-in queue", () => {
     expect(screen.getByRole("link", { name: "Review client record" }).getAttribute("href")).toBe("/clients/client-2");
   });
 
-  it("loads the legacy branch and CRM filter into the canonical queue URL", () => {
+  it("loads the branch and CRM filter into the canonical queue URL", () => {
     renderQueue();
-    fireEvent.change(screen.getByLabelText("CRM NAME"), { target: { value: "Test CRM" } });
+    fireEvent.change(screen.getByLabelText("CRM NAME"), { target: { value: "TEST CRM" } });
     fireEvent.click(screen.getByRole("button", { name: "LOAD QUEUE" }));
-    expect(push).toHaveBeenCalledWith(`/queue?branch=${branchId}&crm=Test+CRM&register=client`);
+    expect(push).toHaveBeenCalledWith(`/queue?branch=${branchId}&crm=TEST+CRM`);
+  });
+
+  it("keeps CRM NAME, BRANCH and LOAD QUEUE always visible, with no Filters disclosure", () => {
+    renderQueue();
+    const toolbar = screen.getByRole("group", { name: "Queue selection" });
+    expect(toolbar.closest("details")).toBeNull();
+    expect(screen.queryByText("Filters")).toBeNull();
+    expect(screen.getByLabelText("CRM NAME")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "LOAD QUEUE" })).toBeTruthy();
+  });
+
+  it("lists every CRM-department person of the branch chosen in BRANCH at once, marking who is away today", () => {
+    const other = "10000000-0000-4000-8000-000000000602";
+    render(<EntryQueue profile={{ role: "super_admin", branchId: null }} requestedBranch={branchId} selectedBranchId={branchId} selectedCrm="" branches={[{ id: branchId, name: "Test Branch" }, { id: other, name: "Other Branch" }]} crms={[]} queueCrms={[]} initialItems={[]}
+      rosterByBranch={{ [branchId]: [{ crm_name: "ASHA", available: true }, { crm_name: "BINA", available: false }], [other]: [{ crm_name: "CHITRA", available: true }] }} />);
+    const crmOptions = () => Array.from((screen.getByLabelText("CRM NAME") as HTMLSelectElement).options).map((option) => option.textContent);
+    expect(crmOptions()).toEqual(["ALL CRM", "ASHA", "BINA (NOT AVAILABLE TODAY)"]);
+    expect(screen.getByText("CRM PRESENT TODAY: ASHA")).toBeTruthy();
+    fireEvent.change(screen.getAllByLabelText("BRANCH")[1]!, { target: { value: other } });
+    expect(crmOptions()).toEqual(["ALL CRM", "CHITRA"]);
+  });
+
+  it("explains an empty roster to managers instead of showing a blank list", () => {
+    render(<EntryQueue profile={{ role: "super_admin", branchId: null }} requestedBranch={branchId} selectedBranchId={branchId} selectedCrm="" branches={[{ id: branchId, name: "Test Branch" }]} crms={[]} queueCrms={[]} initialItems={[]}
+      rosterByBranch={{}} rosterHealth={{ crm_department_people: 2, on_roster: 0, not_on_roster: [{ outcome: "blocked", reason: "unmapped_branch", count: 2 }], last_staff_sync_at: null, master_snapshot_at: null }}
+      branchSetup={{ source: "crm_branches", issues: [{ label: "MK Typo", reason: "no_jewelos_branch" }] }} />);
+    expect(screen.getByText(/No CRM-department staff are on this branch's CRM roster\. 2 not synced: their JewelOS branch has no CRM branch/)).toBeTruthy();
+    expect(screen.getByText(/CRM Branches has not reached CRM yet/)).toBeTruthy();
+    expect(screen.getByText(/MK Typo \(no JewelOS branch has this code\)/)).toBeTruthy();
+  });
+
+  it("opens the existing pending entry instead of registering the same person twice today", async () => {
+    rpc.mockImplementation((name: string) => name === "lookup_client_by_phone" ? Promise.resolve({ data: [], error: null }) : Promise.resolve({ data: [{ id: "queue-1", token: "0725-ABCDE", client_name: "Queued Client", client_code: "MKC-1", client_type: "pending_duplicate" }], error: null }));
+    renderQueue();
+    fireEvent.change(screen.getAllByRole("textbox")[0]!, { target: { value: "Queued Client" } });
+    fireEvent.change(screen.getByLabelText("Mobile Number"), { target: { value: "9012345601" } });
+    fireEvent.click(screen.getByRole("button", { name: "REGISTER CLIENT" }));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("already has a pending queue entry today (token 0725-ABCDE)"));
+    expect(screen.getByRole("link", { name: "Open that entry" }).getAttribute("href")).toBe("/visits/new?queue=queue-1");
+    expect(refresh).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
   });
   it("types a registered new client as NEW although registration already created the client (QA fix 2026-10-05)", () => {
     render(<EntryQueue profile={{ role: "salesperson", branchId }} selectedBranchId={branchId} selectedCrm="" branches={[{ id: branchId, name: "Test Branch" }]} crms={["Test CRM"]} queueCrms={["Test CRM"]} initialItems={[

@@ -12436,6 +12436,10 @@ export type Database = {
         }
         Returns: Json
       }
+      get_crm_client_fms_runs: {
+        Args: { p_crm_client_id: string }
+        Returns: Json
+      }
       get_fms_instance_trigger_source: {
         Args: { p_instance_id: string }
         Returns: Json

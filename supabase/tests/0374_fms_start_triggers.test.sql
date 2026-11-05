@@ -290,5 +290,28 @@ reset role;
 select is((select count(*) from fms_instances where fms_flow_id=pg_temp.flow('manual')),1::bigint,'one manual run');
 select is((select s.assigned_to from fms_instance_stages s join fms_instances i on i.id=s.fms_instance_id where i.fms_flow_id=pg_temp.flow('manual')),array[pg_temp.fx('manager')],'the first step follows its own assignment, not the starter');
 
+-- ---------------------------------------------------------------------------------------------
+-- CRM client profile: the runs a CRM client's events started (0378), read as the asker.
+-- ---------------------------------------------------------------------------------------------
+select pg_temp.act('admin');
+set local role authenticated;
+select ok(jsonb_array_length(get_crm_client_fms_runs('11111111-1111-4111-8111-111111111111'))>=2,'the client profile lists every run its visits started');
+select is((select count(*)::int from jsonb_array_elements(get_crm_client_fms_runs('11111111-1111-4111-8111-111111111111')) r where r->>'workflowName'='NOT BOUGHT FOLLOW-UP' and r->>'status'='active' and jsonb_array_length(r->'openSteps')=1),1,
+  'the open run shows its current step');
+select is((select count(*)::int from jsonb_array_elements(get_crm_client_fms_runs('11111111-1111-4111-8111-111111111111')) r where r->>'status'='completed' and r->'openSteps'='[]'::jsonb),1,'a finished run stays in the history with no open step');
+select is(get_crm_client_fms_runs('99999999-9999-4999-8999-999999999999'),'[]'::jsonb,'a client without runs has none');
+reset role;
+select pg_temp.act('other_admin');
+set local role authenticated;
+select is(get_crm_client_fms_runs('11111111-1111-4111-8111-111111111111'),'[]'::jsonb,'another tenant sees nothing');
+reset role;
+reset role;
+select pg_temp.act('resigned');
+set local role authenticated;
+set local role authenticated;
+select throws_ok($$select get_crm_client_fms_runs('11111111-1111-4111-8111-111111111111')$$,'42501',null,'an inactive person cannot read runs');
+reset role;
+select ok(not has_function_privilege('anon','get_crm_client_fms_runs(uuid)','execute'),'anonymous callers cannot read runs');
+
 select * from finish();
 rollback;

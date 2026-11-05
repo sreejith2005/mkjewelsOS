@@ -15,8 +15,22 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); });
 describe("ClientDatabase legacy presentation and queue launch", () => {
   const props = { clients: [{ client_id: "client-1", client_code: "MKC-102707", primary_name: "Anita", primary_phone: "9012345678", city: "Kochi", state: "Kerala", total_visits: 4, last_visit_date: "2026-07-25", last_buy_status: "YES" }], search: "", walkinContext: { role: "salesperson", branchId: "branch-1", branches: [{ id: "branch-1", name: "Kochi" }] } };
 
-  it('keeps filters collapsed and uses only the header person search',()=>{
+  it('fills the content width with one page scroll and the four Client Database views',()=>{
     render(<ClientDatabase {...props}/>);
+    const workspace=screen.getByRole('main');
+    expect(workspace.hasAttribute('data-crm-page-scroll')).toBe(true);
+    expect(workspace.className).not.toContain('max-w-7xl');
+    const views=screen.getByRole('navigation',{name:'Client Database views'});
+    expect([...views.querySelectorAll('a')].map(link=>[link.textContent,link.getAttribute('href')])).toEqual([
+      ['All clients','/clients'],['Not Bought','/clients?preset=not_bought&tab=pending'],
+      ['Referrals received','/clients?preset=referrals_received&tab=pending'],['Referrals given','/clients?preset=referrals_given&tab=pending']]);
+    expect(screen.getByRole('link',{name:'All clients'}).getAttribute('aria-current')).toBe('page');
+  });
+
+  it('keeps everyday filters in view, the rest collapsed, and uses only the header person search',()=>{
+    render(<ClientDatabase {...props}/>);
+    expect(screen.getByLabelText('Record type').closest('details')).toBeNull();
+    expect(screen.getByLabelText('City').closest('details')).not.toBeNull();
     const panel=screen.getByText('Filters').closest('details');
     expect(panel?.open).toBe(false);
     expect(screen.queryByPlaceholderText('Search by client ID, phone, or name')).toBeNull();
@@ -52,7 +66,7 @@ describe("ClientDatabase legacy presentation and queue launch", () => {
     render(<ClientDatabase {...props} />);
     expect(screen.getByLabelText("Potential category")).toBeTruthy();
     expect(screen.getByLabelText("Commercial classification")).toBeTruthy();
-    expect(screen.getAllByRole("columnheader").map((header) => header.textContent)).toEqual(["Type", "Client ID", "Name", "Phone", "City", "State", "Total visits", "Registered", "Latest interaction", "Last visit", "Last status", "Commercial classification", "Action"]);
+    expect(screen.getAllByRole("columnheader").map((header) => header.textContent)).toEqual(["Client", "Phone", "Location", "Visits", "Last status", "Commercial classification", "Activity", "Action"]);
     expect(screen.getByRole("link", { name: "Register Client" }).getAttribute("href")).toBe("/queue");
     expect(screen.getByText("MKC-102707")).toBeTruthy();
     expect(screen.getByText("CLIENT")).toBeTruthy();

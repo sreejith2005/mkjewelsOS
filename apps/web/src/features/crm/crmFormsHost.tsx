@@ -10,6 +10,7 @@ const CrmFormSettingsDialog = lazy(() => import("./crmForms").then((module) => (
 export function createCrmFormsHost(navigate: (href: string) => void): CrmFormsHost {
   return {
     loadLinks: () => import("./crmForms").then((module) => module.loadCrmFormLinks()),
+    loadClientRuns: (crmClientId) => import("./crmClientRuns").then((module) => module.loadCrmClientRuns(crmClientId)),
     renderForm: (props) => <Suspense fallback={null}><LinkedFormDialog {...props} /></Suspense>,
     renderSettings: ({ links, targets, leadSetup, onClose, onSaved }) => <Suspense fallback={null}><CrmFormSettingsDialog leadSetup={leadSetup} links={links} onClose={onClose} onEditForm={(familyId) => { onClose(); navigate(`/forms?editForm=${encodeURIComponent(familyId)}`); }} onSaved={onSaved} targets={targets} /></Suspense>,
   };

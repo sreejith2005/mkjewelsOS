@@ -289,16 +289,39 @@ Android phone-sized device.
 ### CRM inside JewelOS - 2026-11-03
 
 - [ ] Open CRM from the JewelOS sidebar (desktop) and the phone menu: the JewelOS header, sidebar/phone navigation, theme switch and sign-out stay; no second CRM header, drawer or login appears.
-- [ ] The CRM tabs read REGISTRATION, CLIENT QUEUE, CLIENT DATABASE, DASHBOARD, NOT BOUGHT FOLLOW UP, REFERRALS; the active tab follows the page (a walk-in visit form marks CLIENT QUEUE, a client profile marks CLIENT DATABASE). On a phone the tabs swipe sideways without moving the page.
-- [ ] `/crm` opens on **Who are you registering?** with CLIENT / WALK-IN and LEAD. Choosing one adds `?register=client` / `?register=lead`; browser Back returns to the choice; reloading keeps the view.
+- [ ] The CRM tabs read DASHBOARD, CLIENT QUEUE, CLIENT DATABASE (see the 2026-11-04 section); the active tab follows the page (a walk-in visit form marks CLIENT QUEUE, a client profile marks CLIENT DATABASE). On a phone the tabs swipe sideways without moving the page.
+- [ ] `/crm` opens straight on CLIENT QUEUE (no registration chooser since 2026-11-04). REGISTER LEAD adds `?register=lead`; browser Back returns to the queue; reloading keeps the view.
 - [ ] REGISTER CLIENT on CLIENT QUEUE saves one queue entry (existing-client lookup by phone, token, branch, CRM queue) and stays on the client queue; LOAD QUEUE, the Active/Recently submitted tabs and paging keep the client queue.
 - [ ] Complete a walk-in from the queue: the visit form opens with the queue client, saves, returns to `/crm/queue?...&completed=...` with the "Walk-in saved" message, and the matching JewelOS walk-in task closes.
 - [ ] Old deep links still work: `/crm/queue`, `/crm/visits/new?queue=<id>`, `/crm/clients/<id>`, `/crm/followups`, `/crm/referrals`, `/crm/leads/new`, `/crm/dashboard`.
 - [ ] Switch between CRM, Tasks, FMS, Forms Library and Dashboard from the JewelOS menu and back with browser Back/Forward; the CRM page reappears without a full reload.
-- [ ] Client search results open over the CRM page but under the JewelOS header; a client list on desktop has one scroll bar (the list), not a second page scroll.
+- [ ] Client search results open over the CRM page but under the JewelOS header. Client Database has one vertical scroll bar, the page's (2026-11-04); other single-list CRM pages keep their fitted list.
 - [ ] Light and dark themes: CRM colours follow the JewelOS switch in the JewelOS header.
 - [ ] Without `crm.view`, or with CRM switched off in Developer Mode, `/crm/...` shows the usual JewelOS fallback / maintenance notice inside the shell.
 - [ ] Android app: CRM opens inside the app layout; camera/gallery photo on the walk-in form, `tel:` links and Android Back still work.
+
+### CRM three tabs - 2026-11-04
+
+Run on desktop (1440 px and 1920 px), a tablet and the Android app. JewelOS migration 0378 and CRM
+migration 20261104000300 must be applied first (see the handoff deployment order).
+
+- [ ] The JewelOS sidebar's CRM opens `/crm/queue` with CLIENT QUEUE highlighted. Exactly three tabs, in order DASHBOARD, CLIENT QUEUE, CLIENT DATABASE, share one bar with the client search; the page below uses the full content width (no CRM side rail).
+- [ ] CLIENT QUEUE shows at once: REGISTER CLIENT and REGISTER LEAD side by side, the REGISTER CLIENT form (BRANCH, CLIENT NAME, MOBILE NUMBER with country code), and the CRM QUEUE with CRM NAME, BRANCH and LOAD QUEUE always visible (no Filters disclosure).
+- [ ] Changing BRANCH in the queue toolbar changes the CRM NAME list immediately to that branch's CRM-department staff; someone on leave today shows "(NOT AVAILABLE TODAY)". LOAD QUEUE opens that queue; reopening CRM later restores it.
+- [ ] Add a person to the CRM department in JewelOS Users (login on, CRM access on): after the staff sync they appear in CRM NAME on every CRM branch. Rename, move out of CRM, deactivate or delete: they disappear after the sync. A non-CRM department person never appears.
+- [ ] As a Super Admin with a CRM-department person whose CRM login is off: CLIENT QUEUE explains the missing person ("not synced: CRM login or CRM permission is off in JewelOS Users"); the list is never silently blank.
+- [ ] Dropdown Master → CRM Branches: the list holds one entry per active branch (value = branch code). Rename an entry's label: the BRANCH choice shows the new label after sync. Deactivate an entry: the branch is no longer offered. Add an entry with an unknown code: managers see it under "Not offered".
+- [ ] REGISTER CLIENT with the same mobile number twice on the same day in the same branch: the second attempt shows "already has a pending queue entry today (token …)" with "Open that entry"; only one queue row exists. After that entry's walk-in form is saved, registering again creates a new entry.
+- [ ] MAKE WALK-IN ENTRY on a queue row opens the full walk-in form; save it (with a photo on the phone) and the row moves to Recently submitted.
+- [ ] REGISTER LEAD opens the lead form (or the linked Form Builder lead form via OPEN LEAD FORM); "Back to queue" returns with the branch kept. Runo push still reports as before.
+- [ ] CLIENT DATABASE at 1440 px and 1920 px: one vertical scroll bar (the page), the table uses the width, 8 columns (Client, Phone, Location, Visits, Last status, Commercial classification, Activity, Action). On a phone the rows are cards; a wide table scrolls sideways only inside its box.
+- [ ] Views All clients / Not Bought / Referrals received / Referrals given; each view and its tab, filters, search and page survive reload, Back/Forward and a copied link.
+- [ ] Not Bought: Due today, Overdue, Pending, In progress, Done counts match their lists. A client who bought earlier and then did not buy shows "EARLIER BUYER, NOT BOUGHT THIS VISIT"; a client who never bought shows "NO PURCHASE ON RECORD". Save two follow-ups on one case: VIEW HISTORY lists both, newest first, with who and when.
+- [ ] Referrals received / given show the referrer's MKC, MKF and MKREF codes, the relation ("Not recorded" when blank) and the referred person's client ID once converted; a pending referral says "Not yet a client (pending referral)". FOLLOW UP FORM saves; the Converted tab lists converted people once.
+- [ ] Old links: `/crm/followups?tab=done&crm=NAME` opens CLIENT DATABASE → Not Bought → Done filtered by NAME; `/crm/referrals` opens Referrals received.
+- [ ] DASHBOARD opens on the operations cards (Today). Each card's number matches what its drill-down opens (for example Overdue = Not Bought → Overdue count; Purchase visits = the records drawer). This week / This month and Branch change the numbers. No sales value is shown. Sync health is visible to Super Admins only, below.
+- [ ] FMS: with a published FMS workflow using Automatic Trigger "CRM Walk-In Visit" and condition Visit status Equals NO, save a not-bought walk-in: one run starts; saving the client's next not-bought visit while the run is open starts none (Trigger history shows Duplicate). With no such workflow, saving the walk-in works and starts nothing. The client profile's "FMS workflows" shows the run, its current step, assignee and due time, and "Open this work" opens it in Tasks.
+- [ ] A salesperson of branch A sees only branch A in BRANCH, no roster diagnostics and no Not offered list; a user without `crm.view` cannot open `/crm/...` or read client runs.
 
 ### CRM forms from the Form Builder - 2026-11-03
 
