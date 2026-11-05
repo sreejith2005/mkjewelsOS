@@ -86,8 +86,25 @@ class S3Objects:
             raise Fault(503,'object_unavailable') from None
 
     async def signed_read(self, key: str) -> str:
-        # Internal worker-only access; no playback route. Exact canonical key checked by Worker.
+        # Worker-only access. Browser playback never receives a signed URL (see Ingestion.playback).
         return await asyncio.to_thread(self.client.generate_presigned_url,'get_object',Params={'Bucket':self.bucket,'Key':self.key(key)},ExpiresIn=120)
+
+    async def get(self, key: str, maximum: int) -> bytes:
+        # Evidence playback only: Ingestion.playback re-derives the exact canonical key; the read is bounded.
+        key=self.key(key)
+        def read() -> bytes:
+            body=self.client.get_object(Bucket=self.bucket,Key=key)['Body']
+            try:
+                return body.read(maximum+1)
+            finally:
+                body.close()
+        try:
+            data=await asyncio.to_thread(read)
+        except Exception:
+            raise Fault(503,'object_unavailable') from None
+        if len(data)>maximum:
+            raise Fault(409,'audio_integrity')
+        return data
 
     async def health(self) -> bool:
         try:

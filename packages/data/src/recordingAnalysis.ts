@@ -91,3 +91,27 @@ export async function fetchAnalysisSettings(): Promise<AnalysisSettings> {
     || typeof data.can_configure !== "boolean" || typeof data.can_manage_versions !== "boolean") throw new AnalysisActionError("Settings could not be read.");
   return { analysis_enabled: data.analysis_enabled, analysis_job_version: data.analysis_job_version, can_configure: data.can_configure, can_manage_versions: data.can_manage_versions };
 }
+
+/**
+ * Evidence playback (migration 0381). The server authorizes the reviewer, audits the
+ * listen and returns a single-use ticket; the private recorder service exchanges it
+ * for that window only. The browser never sees a storage key or signed URL.
+ * Returns an object URL the caller must revoke.
+ */
+export async function fetchEvidenceAudio(sessionId: string, startMs: number, endMs: number): Promise<{ url: string; clipStartMs: number }> {
+  const unavailable = () => new AnalysisActionError("Audio for this moment is unavailable, has passed its retention period, or access was refused.");
+  const { data, error } = await supabase.functions.invoke("recorder-session", { body: { action: "playback", session_id: sessionId, start_ms: Math.round(startMs), end_ms: Math.round(endMs) } });
+  if (error || !data || typeof data !== "object" || Array.isArray(data)) throw unavailable();
+  const grant = data as Record<string, unknown>;
+  const ticket = grant.ticket; const clipStartMs = grant.start_ms; const origin = grant.upload_url;
+  if (typeof ticket !== "string" || !/^[0-9a-f]{64}$/.test(ticket) || typeof clipStartMs !== "number" || typeof origin !== "string") throw unavailable();
+  let base: URL;
+  try { base = new URL(origin); } catch { throw unavailable(); }
+  if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) throw unavailable();
+  let response: Response;
+  try {
+    response = await fetch(new URL("/v1/playback", base), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ticket }), cache: "no-store", credentials: "omit", referrerPolicy: "no-referrer" });
+  } catch { throw unavailable(); }
+  if (!response.ok || !(response.headers.get("content-type") ?? "").startsWith("audio/wav")) throw unavailable();
+  return { url: URL.createObjectURL(await response.blob()), clipStartMs };
+}

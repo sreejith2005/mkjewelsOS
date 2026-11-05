@@ -207,7 +207,10 @@ sets added by the owner; until measured they are not called production quality.
 
 ## Not in Phase 1
 
-Manager review UI and evidence click-to-seek screen; real STT/diarization
+Manager review UI (Phase 2, migration 0380) and evidence click-to-seek audio
+(Phase 3, migration 0381: audited single-use playback grants, served by the
+recorder service; see `services/recorder/README.md`) are now built. Still open:
+real STT/diarization
 model deployment and latency numbers; loading MK Jewels SOP text as an approved
 version (owner review step); Ask Kiara read tool (none added; Kiara gets no
 transcript or score access); CRM delivery of next actions.

@@ -150,10 +150,27 @@ Objects are immutable conditional puts at
 S3 stores an actual SHA256 checksum and exact PCM format metadata. Canonical
 metadata is in Supabase. Configure Supabase retention to match bucket lifecycle;
 object expiration is asynchronous, so do not promise deletion at an exact time.
-Only workers mint two-minute signed reads for exact canonical object keys. No
-public playback route is implemented; a future playback feature requires an
-authorized audited Edge grant, never accepting an arbitrary object key. Keep
+Only workers mint two-minute signed reads for exact canonical object keys. Keep
 bucket versioning off unless noncurrent-version expiration is also reviewed.
+
+## Evidence playback (migration 0381)
+
+A reviewer (manager authority, `recording.review`, same branch) asks
+`recorder-session` for `{action:'playback',session_id,start_ms,end_ms}`. SQL
+`recording_playback_ticket` checks the recording is Ready / Needs attention and
+inside retention, limits the window to 60 s (snapped to 2-second chunks) and 60
+listens per 10 minutes, writes an `recording_audio_played` audit row and returns
+a single-use 60-second ticket plus `upload_url`. The browser posts `{ticket}` to
+`POST /v1/playback` on this service. Ingestion redeems it through
+`recorder-ingest` action `playback_redeem` (`recording_playback_ingest`, service
+role only), re-derives every object key from the returned session scope (a
+mismatch is refused), reads each object with a bounded S3 `GetObject`, verifies
+size and SHA-256, and returns `audio/wav` (`Cache-Control: no-store`). Partial or
+missing chunks are padded with silence so the clip timeline matches transcript
+times. The browser never receives an object key or signed URL. The service
+needs the existing `s3:GetObject` + `kms:Decrypt` permissions on the ingestion
+role (already in `infra/storage.tf`) and the web origin in `RECORDER_ORIGINS`.
+Per-IP limit: 60 playback requests per minute per process.
 
 ## Optional GPU protocol, incremental events and alerts
 

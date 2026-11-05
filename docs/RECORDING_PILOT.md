@@ -133,6 +133,13 @@ from evidence needs a reviewed playback route and is not built yet.
 - AI output is a recommendation. Nothing writes CRM, marks a purchase or changes
   reports. Ask Kiara has no access to transcripts or scores.
 
+Evidence playback (0381): managers who can review hear the moment behind an
+evidence button or **Play** beside a transcript line. Each listen is a single-use
+grant written to the audit log (`recording_audio_played`); the recorded employee
+cannot pull audio, and nothing plays after retention. It needs 0381, both
+`recorder-session` and `recorder-ingest` redeployed, and the recorder service
+image that has `POST /v1/playback`.
+
 Enable order: apply 0379, deploy `recorder-ingest`, set
 `RECORDER_FINALIZE_TRANSCRIPTS=true` on the recorder worker, load and approve an
 SOP version, start the analysis worker, run the evaluation report with the chosen

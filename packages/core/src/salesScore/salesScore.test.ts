@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   MK_SALES_MIN_ASSESSED_WEIGHT, MK_SALES_RUBRIC_V1, compareSalesAnalyses, computeSalesScore, deriveSalesAnalysisStatus,
-  evidenceSeekTargets, formatAudioOffset, redactSensitiveText, validateSalesRubric,
+  EVIDENCE_PLAYBACK_MAX_MS, evidenceClipOffset, evidencePlaybackWindow, evidenceSeekTargets, formatAudioOffset, redactSensitiveText, validateSalesRubric,
   type AnalysisTranscriptSegment, type SalesDimensionInput, type SalesDimensionStatus, type StoredSalesAnalysis,
 } from "./index";
 
@@ -103,5 +103,20 @@ describe("evidence and history", () => {
     expect(change.status).toBeNull();
     expect(change.inputs).toEqual([{ field: "transcript_revision", from: "r1", to: "r2" }]);
     expect(change.dimensions).toHaveLength(1);
+  });
+});
+
+describe("evidence playback window", () => {
+  it("adds a lead-in and tail and keeps a short line audible", () => {
+    expect(evidencePlaybackWindow({ start_ms: 61000, end_ms: 61900 })).toEqual({ start_ms: 59500, end_ms: 63500, lead_ms: 1500 });
+    expect(evidencePlaybackWindow({ start_ms: 500, end_ms: 9000 })).toEqual({ start_ms: 0, end_ms: 10500, lead_ms: 500 });
+  });
+  it("never asks for more than the server allows", () => {
+    const w = evidencePlaybackWindow({ start_ms: 10000, end_ms: 200000 });
+    expect(w.end_ms - w.start_ms).toBe(EVIDENCE_PLAYBACK_MAX_MS);
+  });
+  it("finds the line inside a clip snapped to 2-second chunks", () => {
+    expect(evidenceClipOffset(58000, 59500)).toBe(1.5);
+    expect(evidenceClipOffset(60000, 59500)).toBe(0);
   });
 });

@@ -2621,6 +2621,64 @@ export type Database = {
           },
         ]
       }
+      recording_playback_grants: {
+        Row: {
+          actor_id: string
+          created_at: string
+          expires_at: string
+          first_sequence: number
+          hash: string
+          last_sequence: number
+          session_id: string
+          tenant_id: string
+          used_at: string | null
+        }
+        Insert: {
+          actor_id: string
+          created_at?: string
+          expires_at: string
+          first_sequence: number
+          hash: string
+          last_sequence: number
+          session_id: string
+          tenant_id: string
+          used_at?: string | null
+        }
+        Update: {
+          actor_id?: string
+          created_at?: string
+          expires_at?: string
+          first_sequence?: number
+          hash?: string
+          last_sequence?: number
+          session_id?: string
+          tenant_id?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recording_playback_grants_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_playback_grants_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "recorder_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_playback_grants_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recording_rubric_versions: {
         Row: {
           activated_at: string | null
@@ -13221,6 +13279,14 @@ export type Database = {
       recording_list_versions: { Args: never; Returns: Json }
       recording_norm: { Args: { p: string }; Returns: string }
       recording_redact: { Args: { p: string }; Returns: string }
+      recording_playback_ingest: {
+        Args: { p_action: string; p_payload: Json }
+        Returns: Json
+      }
+      recording_playback_ticket: {
+        Args: { p_end_ms: number; p_session_id: string; p_start_ms: number }
+        Returns: Json
+      }
       recording_request_reprocess: {
         Args: { p_note: string; p_session_id: string }
         Returns: Json

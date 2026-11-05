@@ -472,6 +472,11 @@ Backend (0379) plus Conversation review screen and 0380 settings call.
 - A transcript correction creates revision 2 with the same segment IDs and
   times; revision 1 is unchanged. Rescore keeps the earlier analysis.
 - Live recording, pause/resume, Stop and provisional text behave as before.
+- Evidence playback (0381): a manager's evidence button plays that moment and
+  **Play** beside a line plays it; **Close** stops it. Each listen adds a
+  `recording_audio_played` audit row. The recorded employee sees no **Play**;
+  an other-branch manager is refused; an expired recording plays nothing.
+  Android app: playback works inside the WebView.
 
 ### Notifications
 
