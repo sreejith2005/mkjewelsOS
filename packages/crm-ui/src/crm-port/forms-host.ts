@@ -44,6 +44,10 @@ export type CrmFormsHost = Readonly<{
     /** CRM lookups, branch lists and CRM uploads for CRM questions. */
     crm?: FormCrmServices | undefined;
     submitLabel?: string | undefined;
+    /** Saved draft answers (as the form stores them); they replace the matching initialText answers. */
+    initialAnswers?: FormAnswers | undefined;
+    /** Called after each change people make, so CRM can keep a draft. */
+    onAnswersChange?: ((answers: FormAnswers) => void) | undefined;
   }) => ReactNode;
   /** The CRM Form Settings dialog (people allowed to manage CRM forms). */
   renderSettings: (props: { links: CrmFormLinks; targets: Readonly<Record<"queue" | "lead" | "walkin", readonly CrmFormTarget[]>>; leadSetup: CrmLeadSetup; onClose: () => void; onSaved: () => void }) => ReactNode;

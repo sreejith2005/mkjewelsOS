@@ -142,3 +142,29 @@ describe("consolidated client walk-in queue", () => {
     expect(rows.find((row) => row.textContent?.includes("Returning"))?.querySelector(".crm-queue-badge")?.textContent).toBe("Returning");
   });
 });
+
+describe("walk-in form opened over the queue (owner request 2026-11-06)", () => {
+  const items = [
+    { id: "queue-a", token: "T-A", client_name: "Started Client", mobile: "9012345611", assigned_crm_name: "Test CRM", status: "pending", created_at: "2026-11-06T04:00:00Z", client_id: "c-a" },
+    { id: "queue-b", token: "T-B", client_name: "Fresh Client", mobile: "9012345612", assigned_crm_name: "Test CRM", status: "pending", created_at: "2026-11-06T04:05:00Z", client_id: "c-b" },
+    { id: "queue-c", token: "T-C", client_name: "Offline Client", mobile: "9012345613", assigned_crm_name: "Test CRM", status: "pending", created_at: "2026-11-06T04:10:00Z", client_id: "c-c" },
+  ];
+  it("marks started forms, offers Continue form and Start over, and opens the form in place", () => {
+    const open = vi.fn(); const startOver = vi.fn();
+    const markers = new Map([
+      ["queue-a", { queueId: "queue-a", startedBy: "PRIYA", updatedBy: "PRIYA", updatedAt: "2026-11-06T05:30:00.000Z", state: "draft" as const, onThisDevice: false }],
+      ["queue-c", { queueId: "queue-c", startedBy: null, updatedBy: null, updatedAt: "2026-11-06T05:40:00.000Z", state: "waiting" as const, onThisDevice: true }],
+    ]);
+    render(<EntryQueue profile={{ role: "salesperson", branchId }} selectedBranchId={branchId} selectedCrm="" branches={[{ id: branchId, name: "Test Branch" }]} crms={[]} queueCrms={[]} initialItems={items} draftMarkers={markers} onOpenWalkin={open} onStartOver={startOver} />);
+    expect(screen.getByText(/Form started, not finished · saved .* by PRIYA/)).toBeTruthy();
+    expect(screen.getByText(/sends automatically when the network is back/)).toBeTruthy();
+    expect(screen.getByText("Waiting to send")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Walk-in form" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Continue form" }));
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({ id: "queue-a" }));
+    fireEvent.click(screen.getByRole("button", { name: "Walk-in form" }));
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({ id: "queue-b" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start over" }));
+    expect(startOver).toHaveBeenCalledWith(expect.objectContaining({ id: "queue-a" }));
+  });
+});

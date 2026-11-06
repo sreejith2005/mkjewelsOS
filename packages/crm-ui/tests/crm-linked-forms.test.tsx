@@ -54,7 +54,7 @@ function host(links: CrmFormLinks): CrmFormsHost {
 function renderStart(links: CrmFormLinks | null) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={client}><CrmFormsHostContext.Provider value={links ? host(links) : null}>
-    <WalkinStart entryQueueProps={{} as never} fields={leadFields} options={[]} lookupOptions={{}} actorId="actor" />
+    <WalkinStart entryQueueProps={{ initialItems: [] } as never} fields={leadFields} options={[]} lookupOptions={{}} actorId="actor" />
   </CrmFormsHostContext.Provider></QueryClientProvider>);
 }
 

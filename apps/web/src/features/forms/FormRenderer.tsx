@@ -73,7 +73,7 @@ function FileFieldControl({ preview = false, describedBy, disabled, field, label
   </div>;
 }
 
-export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extraAction, initialAnswers = {}, onSubmit, preview = false, readOnly = false, submitLabel = "Submit form", templateId, crm: crmProp }: { definition: FormTemplateDefinition; /** The final button, e.g. "Register client". */ submitLabel?: string; /** CRM forms only: lookups, branch lists and CRM uploads (CRM Form Settings). */ crm?: FormCrmServices | undefined; dynamicOptions?: DynamicOptions; /** One more button for the bottom bar, kept within thumb reach (for example "Earlier answers"). */ extraAction?: ReactNode; initialAnswers?: FormAnswers; onSubmit?: (answers: FormAnswers) => Promise<void | boolean>; preview?: boolean; readOnly?: boolean; templateId?: string }) {
+export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extraAction, initialAnswers = {}, onAnswersChange, onSubmit, preview = false, readOnly = false, submitLabel = "Submit form", templateId, crm: crmProp }: { definition: FormTemplateDefinition; /** Called after each change people make (not on opening), e.g. to save a draft. */ onAnswersChange?: ((answers: FormAnswers) => void) | undefined; /** The final button, e.g. "Register client". */ submitLabel?: string; /** CRM forms only: lookups, branch lists and CRM uploads (CRM Form Settings). */ crm?: FormCrmServices | undefined; dynamicOptions?: DynamicOptions; /** One more button for the bottom bar, kept within thumb reach (for example "Earlier answers"). */ extraAction?: ReactNode; initialAnswers?: FormAnswers; onSubmit?: (answers: FormAnswers) => Promise<void | boolean>; preview?: boolean; readOnly?: boolean; templateId?: string }) {
   const uid = useId();
   // Client lookups everywhere for people with CRM access; a form CRM opens brings its own services.
   const appCrm = useFormCrmServices();
@@ -128,6 +128,16 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
   const otherRef = (key: string) => (node: HTMLInputElement | null) => { if (node) otherInputs.current.set(key, node); else otherInputs.current.delete(key); };
   // When "Other" is picked, a missing-answer error focuses its text box, not the first listed choice.
   const otherFocusRef = (key: string) => (node: HTMLInputElement | null) => { otherRef(key)(node); if (node) fieldRefs.current.set(key, node); };
+
+  // Report changes (not the opening answers) so a caller can keep a draft.
+  const reportedAnswers = useRef(answers);
+  const onAnswersChangeRef = useRef(onAnswersChange);
+  onAnswersChangeRef.current = onAnswersChange;
+  useEffect(() => {
+    if (preview || readOnly || reportedAnswers.current === answers) return;
+    reportedAnswers.current = answers;
+    onAnswersChangeRef.current?.(answers);
+  }, [answers, preview, readOnly]);
 
   // A live preview follows an editor: sample answers the edited Form can no longer
   // hold (a removed question or choice, a changed type) are dropped.

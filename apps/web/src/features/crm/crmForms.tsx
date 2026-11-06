@@ -3,7 +3,7 @@
 // shared FormRenderer, and owns CRM Form Settings, where a Super Admin picks a published form
 // for each CRM registration and links its questions to CRM answers. Dialogs render into
 // document.body: the CRM stylesheet resets every element inside the CRM root.
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "@jewelos/api-client";
 import type { CrmFormLink, CrmFormLinks, CrmLeadSetup, CrmLinkedForm, CrmSubmittedForm } from "@jewelos/crm-ui";
@@ -12,7 +12,7 @@ import {
   normalizeFormDefinition, resolveFormOptions, suggestCrmFieldMap,
   type CrmFieldMap, type CrmFormCopy, type CrmFormTarget, type FormAnswer, type FormAnswers, type FormCrmServices, type FormFieldDefinition, type FormSectionDefinition, type FormTemplateDefinition, type Json,
 } from "@jewelos/core";
-import { CheckCircle2, Copy, ExternalLink, Eye, EyeOff, Sparkles, TriangleAlert } from "lucide-react";
+import { CheckCircle2, Copy, ExternalLink, Eye, EyeOff, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Modal, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -43,13 +43,29 @@ export async function loadCrmFormLinks(): Promise<CrmFormLinks> {
 }
 
 let dynamicOptionsRequest: Promise<DynamicOptions> | null = null;
+/** The last loaded choices, kept on the device so a CRM form still opens when the network drops (no customer data). */
+const FORM_CHOICES_CACHE_KEY = "jewelos.forms.choices.v1";
+async function loadChoicesWithOfflineCopy(): Promise<DynamicOptions> {
+  try {
+    const loaded = await loadFormDynamicOptions();
+    try { window.localStorage.setItem(FORM_CHOICES_CACHE_KEY, JSON.stringify(loaded)); } catch { /* storage full or unavailable: the online copy still works */ }
+    return loaded;
+  } catch (caught) {
+    try {
+      const stored = window.localStorage.getItem(FORM_CHOICES_CACHE_KEY);
+      // Written above from a loaded DynamicOptions value on this device.
+      if (stored) return JSON.parse(stored) as DynamicOptions;
+    } catch { /* unreadable copy: report the original problem */ }
+    throw caught;
+  }
+}
 /** People, branches, departments and Dropdown Master choices, loaded once per page visit. */
 function useFormChoices(): { options: DynamicOptions | null; error: string | null } {
   const [options, setOptions] = useState<DynamicOptions | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
-    dynamicOptionsRequest ??= loadFormDynamicOptions();
+    dynamicOptionsRequest ??= loadChoicesWithOfflineCopy();
     dynamicOptionsRequest.then((loaded) => { if (active) setOptions(loaded); }).catch((caught: unknown) => {
       dynamicOptionsRequest = null;
       if (active) setError(caught instanceof Error ? caught.message : "Could not load the form's choices.");
@@ -116,12 +132,14 @@ function rowLabels(definition: FormTemplateDefinition, answers: FormAnswers, opt
   return result;
 }
 
-export function LinkedFormDialog({ title, description, form, onClose, onSubmit, initialText, crm, submitLabel }: { title: string; description?: string | undefined; form: CrmLinkedForm; onClose: () => void; onSubmit: (submitted: CrmSubmittedForm) => Promise<void>; initialText?: Readonly<Record<string, string>> | undefined; crm?: FormCrmServices | undefined; submitLabel?: string | undefined }) {
+export function LinkedFormDialog({ title, description, form, onClose, onSubmit, initialText, initialAnswers, onAnswersChange, crm, submitLabel }: { title: string; description?: string | undefined; form: CrmLinkedForm; onClose: () => void; onSubmit: (submitted: CrmSubmittedForm) => Promise<void>; initialText?: Readonly<Record<string, string>> | undefined; initialAnswers?: FormAnswers | undefined; onAnswersChange?: ((answers: FormAnswers) => void) | undefined; crm?: FormCrmServices | undefined; submitLabel?: string | undefined }) {
   const { options, error } = useFormChoices();
+  // A saved draft wins over the prefill for the questions it answered.
+  const startAnswers = useMemo(() => options ? { ...(initialText ? answersFromText(form.definition, initialText, options) : {}), ...(initialAnswers ?? {}) } : {}, [form.definition, initialAnswers, initialText, options]);
   return <Portal><Modal mobileFullscreen onClose={onClose} stickyHeader title={title} wide>
     {description ? <p className="-mt-3 mb-4 text-sm text-soft-grey">{description}</p> : null}
     {error ? <Notice tone="danger">{error}</Notice>
-      : options ? <FormRenderer crm={crm} definition={form.definition} dynamicOptions={options} initialAnswers={initialText ? answersFromText(form.definition, initialText, options) : {}} onSubmit={async (answers) => { await onSubmit({ answers, display: displayAnswers(form.definition, answers, options), rowDisplay: rowLabels(form.definition, answers, options) }); return true; }} submitLabel={submitLabel ?? title} templateId={form.templateId} />
+      : options ? <FormRenderer crm={crm} definition={form.definition} dynamicOptions={options} initialAnswers={startAnswers} onAnswersChange={onAnswersChange} onSubmit={async (answers) => { await onSubmit({ answers, display: displayAnswers(form.definition, answers, options), rowDisplay: rowLabels(form.definition, answers, options) }); return true; }} submitLabel={submitLabel ?? title} templateId={form.templateId} />
       : <div aria-label="Loading the form" className="grid gap-3"><div className="skeleton h-24 rounded-2xl" /><div className="skeleton h-24 rounded-2xl" /></div>}
   </Modal></Portal>;
 }
@@ -314,7 +332,7 @@ export function CrmFormSettingsDialog({ links, targets, leadSetup, onClose, onSa
       </section>
 
       {chosen ? <section aria-labelledby="crm-form-link" className="grid gap-3">
-        <div className="flex flex-wrap items-end justify-between gap-2"><h3 className="text-base font-semibold text-task-text" id="crm-form-link">2. Link the questions to CRM answers</h3><Button className="min-h-10" onClick={() => { setFieldMap(suggestCrmFieldMap(chosen.definition, purposeTargets)); setChecked(false); }} type="button" variant="ghost"><Sparkles aria-hidden className="size-4" />Suggest links</Button></div>
+        <div><h3 className="text-base font-semibold text-task-text" id="crm-form-link">2. Link the questions to CRM answers</h3><p className="mt-1 text-xs text-task-text-muted">Questions with matching names are linked for you when you choose the form. Change any link below.</p></div>
         <ul className="grid gap-2">
           {purposeTargets.map((target) => {
             const candidates = crmTargetCandidates(chosen.definition, target);

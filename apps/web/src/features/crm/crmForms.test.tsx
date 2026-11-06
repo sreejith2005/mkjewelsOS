@@ -81,6 +81,8 @@ describe("CRM Form Settings", () => {
     await waitFor(() => expect((screen.getByRole("combobox", { name: "Question for Mobile number" }) as HTMLSelectElement).value).toBe("phone"));
     expect((screen.getByRole("combobox", { name: "Question for Client name" }) as HTMLSelectElement).value).toBe("customer");
     expect(screen.getByText(/Every CRM answer is linked/)).toBeTruthy();
+    // Choosing the form links matching questions; there is no separate "Suggest links" button (2026-11-06).
+    expect(screen.queryByRole("button", { name: /Suggest links/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Save and use this form" }));
     await waitFor(() => expect(db.rpc).toHaveBeenCalledWith("save_crm_form_binding", { p_purpose: "queue", p_form_family_id: "f1-family", p_field_map: { client_name: "customer", mobile: "phone" } }));
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
@@ -184,5 +186,19 @@ describe("linked CRM forms", () => {
     fireEvent.change(within(dialog).getByRole("combobox"), { target: { value: "insta" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Register lead" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ answers: { who: "Ravi", src: "insta" }, display: { src: "Instagram" } })));
+  });
+
+  it("starts from saved draft answers over the prefill and reports each change for the draft (2026-11-06)", async () => {
+    const onAnswersChange = vi.fn();
+    render(<LinkedFormDialog form={{ templateId: "f1", familyId: "f1-family", version: 1, name: "Walk-in", definition: { name: "Walk-in", fields: [
+      { key: "who", label: "Name", type: "text", sortOrder: 0, required: true, validation: { width: "half" } },
+      { key: "note", label: "Remark", type: "text", sortOrder: 1, validation: { width: "half" } },
+    ] } }} initialAnswers={{ note: "Liked bangles" }} initialText={{ who: "Asha", note: "from the queue" }} onAnswersChange={onAnswersChange} onClose={vi.fn()} onSubmit={vi.fn(async () => undefined)} title="Walk-in visit form" />);
+    const dialog = screen.getByRole("dialog", { name: "Walk-in visit form" });
+    await waitFor(() => expect(within(dialog).getByDisplayValue("Liked bangles")).toBeTruthy());
+    expect(within(dialog).getByDisplayValue("Asha")).toBeTruthy();
+    expect(onAnswersChange).not.toHaveBeenCalled();
+    fireEvent.change(within(dialog).getByDisplayValue("Liked bangles"), { target: { value: "Liked chains" } });
+    await waitFor(() => expect(onAnswersChange).toHaveBeenLastCalledWith(expect.objectContaining({ who: "Asha", note: "Liked chains" })));
   });
 });

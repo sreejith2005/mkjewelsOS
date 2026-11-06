@@ -16,10 +16,29 @@ import type { Json } from "@/lib/supabase/crm-project.types";
 
 export const CRM_FORM_LINKS_QUERY = ["crm-form-links"] as const;
 
+/** The last links read, kept on this device so linked forms still open when the network drops (form layouts only, no customer data). */
+const LINKS_CACHE_KEY = "jewelos.crm.form-links.v1";
+async function loadLinksWithOfflineCopy(host: CrmFormsHost): Promise<CrmFormLinks> {
+  try {
+    const links = await host.loadLinks();
+    try { window.localStorage.setItem(LINKS_CACHE_KEY, JSON.stringify(links)); } catch { /* no room: the online links still work */ }
+    return links;
+  } catch (caught) {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      try {
+        const stored = window.localStorage.getItem(LINKS_CACHE_KEY);
+        // Written above from a CrmFormLinks value on this device.
+        if (stored) return JSON.parse(stored) as CrmFormLinks;
+      } catch { /* unreadable copy: report the original problem */ }
+    }
+    throw caught;
+  }
+}
+
 /** The active links, or null while loading, when the host has none, or when they cannot be read (the standard forms then stay). */
 export function useCrmFormLinks(): { host: CrmFormsHost | null; links: CrmFormLinks | null; loading: boolean } {
   const host = useCrmFormsHost();
-  const query = useQuery({ queryKey: CRM_FORM_LINKS_QUERY, queryFn: () => host!.loadLinks(), enabled: host !== null, staleTime: 30_000, retry: 1 });
+  const query = useQuery({ queryKey: CRM_FORM_LINKS_QUERY, queryFn: () => loadLinksWithOfflineCopy(host!), enabled: host !== null, staleTime: 30_000, retry: 1 });
   return { host, links: query.data ?? null, loading: host !== null && query.isPending };
 }
 

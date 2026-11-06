@@ -3169,6 +3169,28 @@ export type Database = {
         Args: { p_payload: Json; p_source: Json; p_submission_key: string }
         Returns: Json
       }
+      save_walkin_visit_draft: {
+        Args: { p_answers: Json; p_entry_queue_id: string; p_form_family_id: string; p_form_version: number; p_meta: Json }
+        Returns: Json
+      }
+      get_walkin_visit_draft: {
+        Args: { p_entry_queue_id: string }
+        Returns: Json
+      }
+      get_walkin_visit_draft_markers: {
+        Args: { p_entry_queue_ids: string[] }
+        Returns: {
+          entry_queue_id: string
+          started_at: string
+          started_by_name: string | null
+          updated_at: string
+          updated_by_name: string | null
+        }[]
+      }
+      discard_walkin_visit_draft: {
+        Args: { p_entry_queue_id: string }
+        Returns: boolean
+      }
       submit_walkin_visit: {
         Args: { p_payload: Json }
         Returns: {

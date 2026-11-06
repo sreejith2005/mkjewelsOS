@@ -9,8 +9,9 @@ import { PhoneNumberInput } from "@/components/phone-number-input";
 import { composePhone, DEFAULT_COUNTRY_CODE, formatPhone, phoneError } from "@/lib/phone";
 import { normalizeRosterValue } from "@/lib/roster";
 import { createClient } from "@/lib/supabase/client";
+import type { DraftMarker } from "@/lib/walkin-drafts";
 
-type Item = { id: string; token: string; client_name: string; mobile: string; assigned_crm_name: string | null; status: string; created_at: string; client_id: string | null; client_is_new?: boolean; branch_id?: string };
+export type Item = { id: string; token: string; client_name: string; mobile: string; assigned_crm_name: string | null; status: string; created_at: string; client_id: string | null; client_is_new?: boolean; branch_id?: string };
 type Branch = { id: string; name: string };
 /** One person on a branch's CRM roster (JewelOS Users, CRM department) and whether they are in today. */
 export type RosterPerson = { crm_name: string; available: boolean };
@@ -47,7 +48,15 @@ function readStoredSelection(): { branch?: string; crm?: string } {
   try { const value: unknown = JSON.parse(window.localStorage.getItem(QUEUE_SELECTION_KEY) ?? "{}"); return value && typeof value === "object" ? value as { branch?: string; crm?: string } : {}; } catch { return {}; }
 }
 
-export function EntryQueue({ profile, selectedBranchId, selectedCrm, branches, crms, queueCrms, initialItems, completedName, paging, registration, rosterByBranch, requestedBranch, rosterHealth }: {
+/** What a queue row says about a walk-in form that was started (owner request 2026-11-06). */
+export function draftMarkerText(marker: DraftMarker, now = new Date()): string {
+  if (marker.state === "waiting") return "Submitted without network · sends automatically when the network is back";
+  if (marker.state === "failed") return `Could not send the visit: ${marker.error ?? "open it to check the answers"}`;
+  const who = marker.updatedBy ?? marker.startedBy;
+  return `Form started, not finished · saved ${queueTime(marker.updatedAt, now)}${who ? ` by ${who}` : marker.onThisDevice ? " on this device" : ""}`;
+}
+
+export function EntryQueue({ profile, selectedBranchId, selectedCrm, branches, crms, queueCrms, initialItems, completedName, paging, registration, rosterByBranch, requestedBranch, rosterHealth, onOpenWalkin, onStartOver, draftMarkers }: {
   profile: { role: string; branchId: string | null }; selectedBranchId: string; selectedCrm: string; branches: Branch[];
   /** CRM people present today in the selected branch (legacy prop, used when rosterByBranch is absent). */
   crms: string[]; queueCrms: string[]; initialItems: Item[]; completedName?: string; paging?: { page: number; total: number; tab: "active" | "recent" }; registration?: QueueRegistrationSlot | undefined;
@@ -57,6 +66,12 @@ export function EntryQueue({ profile, selectedBranchId, selectedCrm, branches, c
   requestedBranch?: string | undefined;
   /** Branch-list source and issues (supabase-crm 20261104000300); kept for the page contract, not shown on the queue (owner 2026-11-05). */
   branchSetup?: BranchSetup | undefined; rosterHealth?: RosterHealth | undefined;
+  /** Opens the walk-in form over the queue; without it the row links to the walk-in page (standard form). */
+  onOpenWalkin?: ((item: Item) => void) | undefined;
+  /** Removes a started form's saved answers. */
+  onStartOver?: ((item: Item) => void) | undefined;
+  /** Started-but-not-finished forms by queue entry. */
+  draftMarkers?: ReadonlyMap<string, DraftMarker> | undefined;
 }) {
   const router = useRouter(); const queueRef = useRef<HTMLElement>(null);
   const [name, setName] = useState(""); const [mobile, setMobile] = useState(""); const [countryCode, setCountryCode] = useState(DEFAULT_COUNTRY_CODE); const [branch, setBranch] = useState(selectedBranchId); const [queueCrm, setQueueCrm] = useState(selectedCrm); const [queueTab, setQueueTab] = useState<"active" | "recent">(paging?.tab ?? "active"); const [message, setMessage] = useState(""); const [autoFilled, setAutoFilled] = useState(false); const [saving, setSaving] = useState(false);
@@ -130,13 +145,13 @@ export function EntryQueue({ profile, selectedBranchId, selectedCrm, branches, c
   const choosableBranches = branches.filter((item) => profile.role === "super_admin" || item.id === profile.branchId);
   const branchSelect = (id: string, onChange: (value: string) => void, label: string) => <label className="block text-sm"><span>{label}</span><select aria-label={label} title={profile.role === "super_admin" ? "Choose branch" : "Your assigned branch"} className="mt-1 w-full rounded border border-stone-300 bg-white p-2" value={id} onChange={(event) => onChange(event.target.value)}>{!id ? <option value="">SELECT BRANCH</option> : null}{choosableBranches.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>;
   const notOnRoster = rosterHealth?.not_on_roster.filter((row) => row.count > 0) ?? [];
-  return <div className="space-y-5">
-    {!choosableBranches.length ? <p role="alert" className="crm-notice crm-notice--error">No branch available. {manager ? "Add it in Dropdown Master > CRM Branches." : "Ask an administrator."}</p> : null}
-    <section className="crm-flat-section" aria-labelledby="register-client-entry"><h2 id="register-client-entry" className="crm-flat-heading">Register client</h2>
-      {duplicate ? <p role="alert" className="crm-notice mt-3">{duplicate.client_name || "This client"} is already waiting in the queue today (token {duplicate.token}). <Link href={`/visits/new?queue=${duplicate.id}`}>Open that entry</Link></p> : null}
+  return <div className="crm-queue-layout space-y-5">
+    {!choosableBranches.length ? <p role="alert" className="crm-notice crm-notice--error crm-queue-span">No branch available. {manager ? "Add it in Dropdown Master > CRM Branches." : "Ask an administrator."}</p> : null}
+    <section className="crm-flat-section crm-queue-register" aria-labelledby="register-client-entry"><h2 id="register-client-entry" className="crm-flat-heading">Register client</h2>
+      {duplicate ? <p role="alert" className="crm-notice mt-3">{duplicate.client_name || "This client"} is already waiting in the queue today (token {duplicate.token}). {onOpenWalkin ? <button type="button" onClick={() => onOpenWalkin(duplicate)}>Open that entry</button> : <Link href={`/visits/new?queue=${duplicate.id}`}>Open that entry</Link>}</p> : null}
       {registration ? <>{registration({ branch, branchSelect: branchSelect(branch, setBranch, "BRANCH"), onRegistered: afterRegistered })}{message ? <p role="status" className="mt-3 text-sm text-green-800">{message}</p> : null}</> : <form onSubmit={submit} className="mt-4 grid gap-4 md:grid-cols-3">{branchSelect(branch, setBranch, "BRANCH")}<label className="block text-sm"><span>CLIENT NAME</span><input className={`mt-1 w-full rounded border p-2 ${autoFilled ? "border-amber-400 bg-amber-50" : "border-stone-300 bg-white"}`} value={name} onChange={(event) => { setName(event.target.value); setAutoFilled(false); }} />{autoFilled ? <small className="mt-1 block text-amber-800">Auto-filled from client history — editable</small> : null}</label><PhoneNumberInput label="MOBILE NUMBER" ariaLabel="Mobile Number" countryLabel="COUNTRY CODE *" countryCode={countryCode} number={mobile} onCountryCodeChange={(code) => { setCountryCode(code); setAutoFilled(false); }} onNumberChange={(value) => { setMobile(value); setAutoFilled(false); }} /><div className="flex flex-wrap items-end gap-3 md:col-span-3"><button disabled={saving} className="rounded bg-amber-800 px-4 py-2 font-medium text-white disabled:opacity-50">{saving ? "REGISTERING…" : "REGISTER CLIENT"}</button>{message ? <p role="status" className="text-sm text-green-800">{message}</p> : null}</div></form>}
     </section>
-    <section ref={queueRef} className="crm-flat-section" aria-labelledby="crm-queue"><div><h2 id="crm-queue" className="crm-flat-heading">Queue</h2>
+    <section ref={queueRef} className="crm-flat-section crm-queue-board" aria-labelledby="crm-queue"><div><h2 id="crm-queue" className="crm-flat-heading">Queue</h2>
       {/* Always visible (owner request 2026-11-04): no Filters disclosure on the queue. */}
       <div className="crm-queue-toolbar mt-4" role="group" aria-label="Queue selection">
         <label>CRM NAME<select aria-label="CRM NAME" className="rounded border border-stone-300 bg-white p-2" value={queueCrm} onChange={(event) => setQueueCrm(event.target.value)}><option value="">ALL CRM</option>{toolbarRoster.map((person) => <option value={normalizeRosterValue(person.crm_name)} key={person.crm_name}>{normalizeRosterValue(person.crm_name)}{person.available ? "" : " (NOT AVAILABLE TODAY)"}</option>)}</select></label>
@@ -148,13 +163,17 @@ export function EntryQueue({ profile, selectedBranchId, selectedCrm, branches, c
       <div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={() => changeTab("active")} aria-pressed={queueTab === "active"} className={queueTab === "active" ? "rounded bg-amber-800 px-3 py-2 text-xs font-semibold text-white" : "rounded border px-3 py-2 text-xs font-semibold"}>Active queue</button><button type="button" onClick={() => changeTab("recent")} aria-pressed={queueTab === "recent"} className={queueTab === "recent" ? "rounded bg-amber-800 px-3 py-2 text-xs font-semibold text-white" : "rounded border px-3 py-2 text-xs font-semibold"}>Recently submitted</button></div>
       {completedName ? <p role="status" className="mt-3 text-sm font-medium text-green-800">Visit saved for {completedName}. It is under Recently submitted.</p> : null}</div>
       {/* One plain row per person (owner 2026-11-05): who, when, which CRM, and one clear action. No inner scroller. */}
-      {visibleItems.length ? <ul className="crm-queue-list" aria-label={queueTab === "active" ? "Waiting clients" : "Recently submitted"}>{visibleItems.map((item) => <li key={item.id} className="crm-queue-row">
+      {visibleItems.length ? <ul className="crm-queue-list" aria-label={queueTab === "active" ? "Waiting clients" : "Recently submitted"}>{visibleItems.map((item) => { const marker = item.status === "complete" ? undefined : draftMarkers?.get(item.id); return <li key={item.id} className={`crm-queue-row${marker ? ` has-draft is-${marker.state}` : ""}`}>
         <div className="crm-queue-who">
           <p className="crm-queue-name">{item.client_name}<span className={`crm-queue-badge${item.client_is_new || !item.client_id ? " is-new" : ""}`}>{/* crm-port fix (owner 2026-10-05): registration always creates the client, so client_id alone always read EXISTING. */}{item.client_is_new || !item.client_id ? "New" : "Returning"}</span></p>
           <p className="crm-queue-meta"><span>{formatPhone(item.mobile)}</span><span>{queueTime(item.created_at)}</span><span>{item.assigned_crm_name ? `CRM: ${item.assigned_crm_name}` : "No CRM yet"}</span></p>
+          {marker ? <p className="crm-queue-draft" role="status"><span aria-hidden className="crm-queue-draft-dot" />{draftMarkerText(marker)}</p> : null}
         </div>
-        <div className="crm-queue-act">{item.status === "complete" ? item.client_id ? <Link className="crm-queue-link" href={`/clients/${item.client_id}`}>View client</Link> : <span className="crm-status crm-status--done">Done</span> : <Link className="crm-queue-go" href={`/visits/new?queue=${item.id}`}>Walk-in form</Link>}</div>
-      </li>)}</ul> : <p className="crm-flat-empty">{selectedBranchId ? "No one is waiting." : "Choose a branch and press LOAD QUEUE."}</p>}
+        <div className="crm-queue-act">{item.status === "complete" ? item.client_id ? <Link className="crm-queue-link" href={`/clients/${item.client_id}`}>View client</Link> : <span className="crm-status crm-status--done">Done</span>
+          : marker?.state === "waiting" ? <span className="crm-queue-waiting">Waiting to send</span>
+          : onOpenWalkin ? <>{marker?.state === "draft" && onStartOver ? <button type="button" className="crm-queue-link crm-queue-startover" onClick={() => onStartOver(item)}>Start over</button> : null}<button type="button" className="crm-queue-go" onClick={() => onOpenWalkin(item)}>{marker?.state === "failed" ? "Check and send" : marker ? "Continue form" : "Walk-in form"}</button></>
+          : <Link className="crm-queue-go" href={`/visits/new?queue=${item.id}`}>Walk-in form</Link>}</div>
+      </li>; })}</ul> : <p className="crm-flat-empty">{selectedBranchId ? "No one is waiting." : "Choose a branch and press LOAD QUEUE."}</p>}
       {paging && <nav aria-label="Queue pages" className="flex flex-wrap gap-3 p-4 text-xs text-stone-600"><span>PAGE {paging.page} OF {Math.max(1, Math.ceil(paging.total / 50))} | {paging.total} ENTRIES</span>{paging.page > 1 && <Link className="rounded border px-3 py-1" href={queueHref(queueTab, paging.page - 1)}>PREVIOUS</Link>}{paging.page * 50 < paging.total && <Link className="rounded border px-3 py-1" href={queueHref(queueTab, paging.page + 1)}>NEXT</Link>}</nav>}
     </section>
   </div>;

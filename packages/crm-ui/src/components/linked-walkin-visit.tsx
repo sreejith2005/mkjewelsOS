@@ -4,8 +4,11 @@
 // standard walk-in form, gives the form CRM's lookups (client history by mobile, address by
 // pincode), the branch's CRM people and salespeople, and uploads to CRM documents storage, then
 // saves through submit_walkin_visit_from_form, which calls submit_walkin_visit unchanged.
-import { useMemo, useRef, useState } from "react";
-import { crmLinkedQuestions, type FormCrmFile, type FormCrmServices } from "@jewelos/core";
+// Drafts (owner request 2026-11-06): every change is kept on this device at once and in CRM a
+// moment later (lib/walkin-drafts), so a closed form keeps its answers; a visit submitted
+// without network waits on the device and is sent with the same submission key when it returns.
+import { useEffect, useMemo, useRef, useState } from "react";
+import { crmLinkedQuestions, type FormAnswers, type FormCrmFile, type FormCrmServices } from "@jewelos/core";
 
 import { walkInSubmitErrorMessage, istDateTimeLocal } from "@/components/walk-in-form";
 import type { CrmFormLink, CrmFormsHost, CrmSubmittedForm } from "@/crm-port/forms-host";
@@ -15,6 +18,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Client } from "@/lib/supabase/app-types";
 import { WALKIN_WEDDING_MONTHS } from "@/lib/walkin-profile-defaults";
 import { walkinPayloadFromForm } from "@/lib/walkin-form-payload";
+import { readLocalDraft, saveServerDraft, writeLocalDraft, type LocalWalkinDraft, type WalkinDraftMeta } from "@/lib/walkin-drafts";
 import { useRouter } from "@/next-shim/navigation"; // crm-port: next/navigation -> local shim (same paths, /crm base path added)
 
 type Queue = { id: string; client_name: string; mobile: string; branch_id: string; assigned_crm_name: string | null; client_id: string | null; client_is_new?: boolean; status: string };
@@ -28,9 +32,25 @@ function typedPhone(stored: string | null | undefined): string {
 }
 const monthName = (value: string | undefined) => WALKIN_WEDDING_MONTHS[Number(value) - 1] ?? value ?? "";
 
-export function LinkedWalkinVisit({ host, link, queue, client, profileName, crmByBranch, salespeopleByBranch }: {
+/** Where the form ends: opened from the Client Queue it closes back into the queue. */
+export type WalkinVisitExit = {
+  onClose: () => void;
+  onSaved: (saved: { primaryName: string; clientId: string }) => void;
+  onQueuedOffline: (primaryName: string) => void;
+};
+
+/** True when a failed call never reached CRM (no network), so the visit can wait on the device. */
+function looksOffline(): boolean { return typeof navigator !== "undefined" && navigator.onLine === false; }
+
+const SERVER_SAVE_DELAY_MS = 1200;
+
+export function LinkedWalkinVisit({ host, link, queue, client, profileName, crmByBranch, salespeopleByBranch, draft, exit }: {
   host: CrmFormsHost; link: CrmFormLink; queue: Queue; client: Client | null; profileName: string;
   crmByBranch: Record<string, string[]>; salespeopleByBranch: Record<string, Array<{ id: string; name: string }>>;
+  /** Answers and ids saved earlier for this queue entry with this form (device or CRM copy, whichever is newer). */
+  draft?: { answers: FormAnswers; meta: Partial<WalkinDraftMeta> } | null | undefined;
+  /** Opened from the queue: closing and saving go back to the queue instead of navigating. */
+  exit?: WalkinVisitExit | undefined;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(true);
@@ -39,9 +59,44 @@ export function LinkedWalkinVisit({ host, link, queue, client, profileName, crmB
   const anchorPhone = useMemo(() => anchorClientId ? phoneKey(client?.primary_phone ? `+${client.primary_phone}` : composePhone(splitPhone(queue.mobile).countryCode, splitPhone(queue.mobile).number)) : null, [anchorClientId, client?.primary_phone, queue.mobile]);
   // The client this visit is for: the queue's, or whoever the mobile number lookup finds.
   const resolved = useRef<{ clientId: string; clientType: "new" | "existing" }>({ clientId: anchorClientId, clientType: queue.client_is_new || !anchorClientId ? "new" : "existing" });
-  const proposedClientId = useRef(anchorClientId || crypto.randomUUID());
-  const proposedTimelineId = useRef(crypto.randomUUID());
-  const submissionKey = useRef(crypto.randomUUID());
+  const proposedClientId = useRef(draft?.meta.proposedClientId || anchorClientId || crypto.randomUUID());
+  const proposedTimelineId = useRef(draft?.meta.proposedTimelineId || crypto.randomUUID());
+  const submissionKey = useRef(draft?.meta.submissionKey || crypto.randomUUID());
+  const form = link.form!;
+  const draftAnswers = useRef<FormAnswers | null>(draft?.answers ?? null);
+  /** The answers the dialog opened with; fixed while it is open so lookups do not re-run on each change. */
+  const openingAnswers = useRef<FormAnswers | undefined>(draft?.answers);
+  const serverTimer = useRef<number | undefined>(undefined);
+  const [draftState, setDraftState] = useState<"" | "saving" | "saved" | "device">(draft ? "saved" : "");
+
+  const meta = (): WalkinDraftMeta => ({ proposedClientId: proposedClientId.current, proposedTimelineId: proposedTimelineId.current, submissionKey: submissionKey.current });
+  const localDraft = (answers: FormAnswers, extra?: Partial<LocalWalkinDraft>): LocalWalkinDraft => ({
+    v: 1, queueId: queue.id, branchId: queue.branch_id, clientName: queue.client_name, formFamilyId: form.familyId, formVersion: form.version,
+    answers, meta: meta(), updatedAt: new Date().toISOString(), serverSaved: false, ...extra,
+  });
+  const saveToServer = async () => {
+    window.clearTimeout(serverTimer.current); serverTimer.current = undefined;
+    const current = readLocalDraft(queue.id);
+    if (!current || current.pending || current.serverSaved) return;
+    setDraftState("saving");
+    const result = await saveServerDraft(current);
+    setDraftState(result === "saved" ? "saved" : "device");
+  };
+  /** Each change: on the device now, in CRM shortly after typing pauses. */
+  const keepDraft = (answers: FormAnswers) => {
+    draftAnswers.current = answers;
+    writeLocalDraft(localDraft(answers));
+    window.clearTimeout(serverTimer.current);
+    serverTimer.current = window.setTimeout(() => { void saveToServer(); }, SERVER_SAVE_DELAY_MS);
+  };
+  // Leaving the page sends what is still waiting.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => () => { if (serverTimer.current !== undefined) void saveToServer(); }, []);
+  const close = () => {
+    setOpen(false);
+    if (serverTimer.current !== undefined) void saveToServer();
+    exit?.onClose();
+  };
   const salespeople = salespeopleByBranch[queue.branch_id] ?? [];
   const question = (target: string) => crmLinkedQuestions(link.fieldMap, target)[0];
 
@@ -114,12 +169,21 @@ export function LinkedWalkinVisit({ host, link, queue, client, profileName, crmB
     const { payload, files } = walkinPayloadFromForm(link.fieldMap, submitted, context);
     const targetClientId = context.clientId || proposedClientId.current;
     if (files.some((file) => file.clientId !== targetClientId)) throw new Error("The mobile number changed after a photo was uploaded. Remove and add that photo again before submitting.");
-    const form = link.form!;
     const source = JSON.parse(JSON.stringify({ formFamilyId: form.familyId, formTemplateId: form.templateId, formVersion: form.version, bindingVersionId: link.versionId, answers: { answers: submitted.answers, display: submitted.display } }));
+    const primaryName = (submitted.display[question("primary_name") ?? ""] ?? queue.client_name).trim();
+    const plainPayload = JSON.parse(JSON.stringify(payload));
+    window.clearTimeout(serverTimer.current); serverTimer.current = undefined;
     let response: { data: unknown; error: { code?: string; message?: string } | null };
     try {
-      response = await createClient().rpc("submit_walkin_visit_from_form", { p_submission_key: submissionKey.current, p_payload: JSON.parse(JSON.stringify(payload)), p_source: source });
-    } catch { throw new Error("Could not confirm the visit. Check your connection and press Submit again: the visit will not be saved twice."); }
+      response = await createClient().rpc("submit_walkin_visit_from_form", { p_submission_key: submissionKey.current, p_payload: plainPayload, p_source: source });
+    } catch {
+      if (!looksOffline()) throw new Error("Could not confirm the visit. Check your connection and press Submit again: the visit will not be saved twice.");
+      // No network: the visit waits on this device and is sent with the same key when the network returns.
+      if (!writeLocalDraft(localDraft(submitted.answers, { pending: { payload: plainPayload, source, primaryName, queuedAt: new Date().toISOString() } }))) throw new Error("No network, and this device has no room to keep the visit. Connect and press Submit again.");
+      setSaved(true); setOpen(false);
+      exit?.onQueuedOffline(primaryName);
+      return;
+    }
     const { data, error } = response;
     const result = data && typeof data === "object" && "client_id" in data ? data as { client_id: string } : null;
     if (error || !result) {
@@ -128,14 +192,17 @@ export function LinkedWalkinVisit({ host, link, queue, client, profileName, crmB
     }
     setSaved(true);
     setOpen(false);
-    const primaryName = (submitted.display[question("primary_name") ?? ""] ?? queue.client_name).trim();
+    if (exit) { exit.onSaved({ primaryName, clientId: result.client_id }); return; }
     router.push(`/queue?branch=${encodeURIComponent(queue.branch_id)}&completed=${encodeURIComponent(primaryName)}&completedClientId=${encodeURIComponent(result.client_id)}`);
   }
 
+  const status = draftState === "saving" ? "Saving…" : draftState === "saved" ? "Progress saved. You can close and continue later." : draftState === "device" ? "Saved on this device. It syncs when the network is back." : "Answers are saved as you type.";
+  const dialog = host.renderForm({ title: "Walk-in visit form", description: `${queue.client_name} · ${status}`, form, initialText, initialAnswers: openingAnswers.current, onAnswersChange: keepDraft, crm: services, submitLabel: "Submit complete visit", onClose: close, onSubmit: submit });
+  if (exit) return open && !saved ? dialog : null;
   return <section className="mt-6 max-w-4xl rounded-xl border bg-white p-5">
     <h2 className="text-lg font-semibold">CLIENT DETAILS {resolved.current.clientType === "existing" ? <span className="text-sm font-normal text-green-700">Existing client detected</span> : <span className="text-sm font-normal text-amber-700">New client</span>}</h2>
     <p className="mt-2 text-sm text-stone-600">{queue.client_name} · {formatPhone(queue.mobile)}</p>
-    <div className="mt-4 flex flex-wrap items-end gap-3"><button type="button" disabled={saved} className="rounded bg-amber-800 px-4 py-2 font-medium text-white disabled:opacity-50" onClick={() => setOpen(true)}>{saved ? "Visit saved" : "OPEN WALK-IN FORM"}</button></div>
-    {open && !saved ? host.renderForm({ title: "Walk-in visit form", description: `${link.form!.name} · ${queue.client_name}`, form: link.form!, initialText, crm: services, submitLabel: "Submit complete visit", onClose: () => setOpen(false), onSubmit: submit }) : null}
+    <div className="mt-4 flex flex-wrap items-end gap-3"><button type="button" disabled={saved} className="rounded bg-amber-800 px-4 py-2 font-medium text-white disabled:opacity-50" onClick={() => { openingAnswers.current = draftAnswers.current ?? undefined; setOpen(true); }}>{saved ? "Visit saved" : "OPEN WALK-IN FORM"}</button></div>
+    {open && !saved ? dialog : null}
   </section>;
 }

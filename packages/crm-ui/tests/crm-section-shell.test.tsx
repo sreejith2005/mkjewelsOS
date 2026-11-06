@@ -114,7 +114,7 @@ describe("CRM inside the JewelOS shell", () => {
 });
 
 describe("Client Queue landing (no registration chooser)", () => {
-  const props = { entryQueueProps: {} as never, fields: [], options: [], lookupOptions: {}, actorId: "actor" };
+  const props = { entryQueueProps: { initialItems: [] } as never, fields: [], options: [], lookupOptions: {}, actorId: "actor" };
 
   it("opens straight on the queue with small Register client and Register lead buttons side by side", () => {
     render(<WalkinStart {...props} />);

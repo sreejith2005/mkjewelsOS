@@ -562,3 +562,36 @@ html[data-theme="dark"] #crm-theme .crm-app .bg-emerald-100 { background: rgb(va
   #crm-theme .crm-app .crm-record-table td[data-label="Referral number"] .mt-1, #crm-theme .crm-app .crm-record-table td[data-label="Number"] .mt-1 { display: inline-block; margin: 0 0 0 .5rem; vertical-align: middle; }
   #crm-theme .crm-row-sub { font-size: .78rem; }
 }
+
+/* ---- 2026-11-06: Client Queue uses the whole screen on computers; started-form markers. ---- */
+/* Computers: registration on the left, the queue on the right, both full height of the content. */
+#crm-theme .crm-queue-span { grid-column: 1 / -1; }
+@media (min-width: 1024px) {
+  #crm-theme .crm-queue-layout { display: grid; grid-template-columns: minmax(20rem, 24rem) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+  #crm-theme .crm-queue-layout > * + * { margin-top: 0 !important; }
+  #crm-theme .crm-queue-layout > .crm-flat-section + .crm-flat-section { padding-top: .25rem; border-top: 0; }
+  #crm-theme .crm-queue-register { position: sticky; top: 1rem; padding: 1.25rem; border: 1px solid var(--crm-line); border-radius: 1rem; background: var(--crm-card); }
+  /* The registration fields stack in the narrow column, with full-width buttons. */
+  #crm-theme .crm-queue-register .grid { grid-template-columns: minmax(0, 1fr) !important; }
+  #crm-theme .crm-queue-register .grid > * { grid-column: auto !important; }
+  #crm-theme .crm-queue-register .grid > .flex > button { flex: 1 1 100%; min-height: 2.75rem; }
+  #crm-theme .crm-queue-board { min-width: 0; padding: 1.25rem; border: 1px solid var(--crm-line); border-radius: 1rem; background: var(--crm-card); }
+  /* Rows: the person on the left, their action aligned on the right edge. */
+  #crm-theme .crm-queue-row { justify-content: space-between; gap: 1.5rem; padding: .8rem .25rem; }
+  #crm-theme .crm-queue-who { flex: 1 1 auto; }
+  #crm-theme .crm-queue-toolbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
+}
+#crm-theme .crm-queue-act { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .5rem; }
+#crm-theme .crm-app button.crm-queue-go { border: 0; cursor: pointer; letter-spacing: 0; }
+#crm-theme .crm-app button.crm-queue-link { min-height: 2.25rem; padding: .25rem .5rem; border: 0; background: transparent; box-shadow: none; letter-spacing: 0; cursor: pointer; }
+#crm-theme .crm-queue-draft { display: flex; align-items: center; gap: .4rem; margin: .3rem 0 0; color: rgb(var(--color-gold-secondary)); font-size: .78rem; font-weight: 600; line-height: 1.35; }
+#crm-theme .crm-queue-draft-dot { flex: 0 0 auto; width: .5rem; height: .5rem; border-radius: 999px; background: rgb(var(--color-gold)); }
+#crm-theme .crm-queue-row.is-failed .crm-queue-draft { color: rgb(var(--color-task-overdue)); }
+#crm-theme .crm-queue-row.is-failed .crm-queue-draft-dot { background: rgb(var(--color-task-overdue)); }
+#crm-theme .crm-queue-waiting { display: inline-flex; align-items: center; min-height: 2.25rem; padding: .25rem .8rem; border: 1px dashed rgb(var(--color-gold) / .6); border-radius: 999px; color: var(--crm-muted); font-size: .8rem; font-weight: 600; white-space: nowrap; }
+@media (max-width: 767px) {
+  /* Phones: the marker and buttons wrap under the person instead of squeezing the name. */
+  #crm-theme .crm-queue-row.has-draft { flex-wrap: wrap; }
+  #crm-theme .crm-queue-row.has-draft .crm-queue-act { flex: 1 1 100%; justify-content: flex-start; }
+  #crm-theme .crm-queue-draft { font-size: .74rem; }
+}
