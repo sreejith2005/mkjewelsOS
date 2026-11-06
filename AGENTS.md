@@ -28,6 +28,7 @@ maintained documents:
 | `docs/CRM_TWO_PROJECT_PRODUCTION_RUNBOOK.md`, `docs/CRM_SHEETS_INGEST_CUTOVER.md`, `docs/CRM_WALKIN_FIELD_MAP.md` | CRM project operations and walk-in data |
 | `docs/architecture/` | Hosted data inventory and the Forms/FMS -> CRM customer integration design and mappings |
 | `docs/FMS_AI_ASSISTANT.md`, `docs/LEAVE_APPLICATIONS.md` | Feature notes still in use |
+| `docs/RECORDING_PILOT.md`, `docs/STORE_INTELLIGENCE_ACTIVATION_RUNBOOK.md` | Store Intelligence pilot rules, AWS processing build, secrets, device matrix and activation |
 | `docs/REPORTS.md` | Reports catalogue, data sources and every KPI formula |
 | `docs/superpowers/specs/` | The designs that code comments cite (CRM embed, CRM two projects, task scores, Ask Kiara, CRM as a native section) |
 | `apps/mobile/README.md` | Android shell rules and toolchain |
