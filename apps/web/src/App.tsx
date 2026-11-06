@@ -100,7 +100,7 @@ const PAGE_PRELOADS: Partial<Record<PageId, readonly (() => Promise<void>)[]>> =
   settings: [SettingsPage.preload],
   ask_kiara: [AskKiaraPage.preload],
   crm: [CrmApp.preload],
-  sales_recording: [SalesRecordingPage.preload],
+  sales_recording: [StoreIntelligencePage.preload],
 };
 
 const PAGE_ICONS: Record<PageId, typeof Home> = {
