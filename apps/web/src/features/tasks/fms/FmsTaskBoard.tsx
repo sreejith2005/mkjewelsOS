@@ -213,7 +213,7 @@ function BoardColumn({ active, column, familyId, effective, showVersion, wide, o
         {column.dueToday ? <span className="rounded-full bg-task-accent-soft px-2 py-0.5 tabular-nums">{column.dueToday} today</span> : null}
       </p>
     </header>
-    <div className={cn("space-y-2 p-2", wide && "max-h-[65dvh] overflow-y-auto")}>
+    <div className="space-y-2 p-2">
       {!records.length ? <p className="px-2 py-6 text-center text-sm text-task-text-muted">No pending work.</p> : null}
       {records.map((record) => <BoardCard key={record.id} onOpen={onOpen} record={record} showAssignee={effective.scope === "all" || record.assignees.length > 1} />)}
       {error ? <p className="px-2 text-xs text-danger" role="alert">{error}</p> : null}

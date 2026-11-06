@@ -1,3 +1,4 @@
+import { revealPageDetail } from "@/lib/revealPageDetail";
 import { DepartmentPermissionsTab } from "./DepartmentPermissionsTab";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Lock, RotateCcw, Save, Search } from "lucide-react";
@@ -144,6 +145,7 @@ function UserPermissionsTab({ context, onSaved, selfId }: { context: PermissionA
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectionRevision, setSelectionRevision] = useState(0);
+  const detailsRef = useRef<HTMLDivElement>(null);
   const selection = useRef(selectedId);
   selection.current = selectedId;
   const readEpoch = useRef(0);
@@ -155,6 +157,9 @@ function UserPermissionsTab({ context, onSaved, selfId }: { context: PermissionA
   const setAuthority = authorityDraft.setValue;
   const [draft, setDraft] = useState<Partial<Record<PermissionKey, PermissionEffect | null>>>({});
   const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (selectedId && !loading) revealPageDetail(detailsRef.current);
+  }, [selectedId, loading]);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const users = useMemo(() => {
@@ -162,6 +167,7 @@ function UserPermissionsTab({ context, onSaved, selfId }: { context: PermissionA
     return context.users.filter((user) => !needle || `${user.employeeName} ${user.employeeCode}`.toLowerCase().includes(needle)).slice(0, 60);
   }, [context.users, query]);
   const select = useCallback((id: string) => {
+    revealPageDetail(detailsRef.current);
     if (id === selectedId && (breakdown || loading)) return;
     readEpoch.current++; saveEpoch.current++; setSaving(false);
     setSelectionRevision((revision) => revision + 1);
@@ -213,12 +219,12 @@ function UserPermissionsTab({ context, onSaved, selfId }: { context: PermissionA
   return <div className="grid gap-4 lg:grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)]">
     <Panel title="Users" description={`${context.users.length} people`}>
       <label className="relative mb-3 block"><Search className="absolute left-3 top-2.5 size-4 text-task-text-muted" /><input aria-label="Search users" className="task-field pl-9" onChange={(event) => setQuery(event.target.value)} placeholder="Name or employee code" value={query} /></label>
-      <ul className="-mx-4 -mb-3 max-h-[60dvh] divide-y divide-task-border overflow-y-auto">{users.map((user) => <li key={user.id}><button aria-current={user.id === selectedId} className={`flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-task-muted ${user.id === selectedId ? "bg-task-accent-soft" : ""}`} onClick={() => void select(user.id)} type="button">
+      <ul className="-mx-4 -mb-3 divide-y divide-task-border">{users.map((user) => <li key={user.id}><button aria-current={user.id === selectedId} className={`flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-task-muted ${user.id === selectedId ? "bg-task-accent-soft" : ""}`} onClick={() => void select(user.id)} type="button">
         <span className="min-w-0"><span className="block truncate text-sm font-medium">{user.employeeName}</span><span className="block truncate text-xs text-task-text-muted">{titleCase(user.role)}{user.dashboardAuthority ? ` · ${titleCase(user.dashboardAuthority)} authority` : ""}{user.employeeCode ? ` · ${user.employeeCode}` : ""}</span></span>
         {user.overrideCount ? <span className="shrink-0 rounded-full bg-task-muted px-2 py-0.5 text-[11px] text-task-text-muted">{user.overrideCount}</span> : null}
       </button></li>)}</ul>
     </Panel>
-    <div className="min-w-0">
+    <div className="min-w-0 scroll-mt-32" ref={detailsRef}>
       <FeedbackNotice feedback={feedback} />
       {loading ? <LoadingPanels count={2} /> : !breakdown || !subject ? <Notice>Select a user to see and change their access.</Notice> : <div className="flex flex-col gap-4">
         <Panel title={breakdown.employeeName} description={`Role: ${titleCase(breakdown.baseRole)} · Department: ${breakdown.departmentName ?? "None"} · Designation: ${breakdown.designationLabel ?? "None"} · Effective role: ${titleCase(authority ?? breakdown.baseRole)}`}>

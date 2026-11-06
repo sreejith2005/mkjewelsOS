@@ -1,6 +1,4 @@
 import {useState} from "react";
-import {useFillViewport} from "@/lib/useFillViewport";
-import {useMediaQuery} from "@/lib/useMediaQuery";
 import {humanizeReportValue,type ReportColumn} from "@jewelos/core";
 import {Modal} from "@/components/ui";
 import {StatusDot} from "@/features/analytics/components";
@@ -55,23 +53,20 @@ function rowKey(row:ReportRow,index:number):string{
 
 function answers(row:ReportRow):ReportAnswer[]|null{const value=row.answer_list;return Array.isArray(value)?value:null;}
 
-/** Desktop table and phone cards over the same rows; long answers open in a full view. */
+/** Natural-height desktop table and phone rows; long answers open in a full view. */
 export function ReportTable({columns,rows}:{columns:readonly ReportColumn[];rows:readonly ReportRow[]}){
   const [open,setOpen]=useState<{title:string;answers:ReportAnswer[]}|null>(null);
   const [record,setRecord]=useState<ReportRow|null>(null);
-  // On a computer the table is the page's working area: it fills the window and scrolls inside, headers pinned.
-  const desktop=useMediaQuery("(min-width: 640px)");
-  const box=useFillViewport<HTMLDivElement>({enabled:desktop,minHeight:280,reserve:72});
   const [lead,...rest]=columns;
   const viewAnswers=(row:ReportRow)=>{const list=answers(row);if(list)setOpen({title:String(row.form_name??"Form answers"),answers:list});};
   return <>
-    <div className="-mx-4 hidden overflow-auto overscroll-contain border-y border-task-border bg-task-bg sm:-mx-6 sm:block" ref={box.ref} style={rows.length>8?box.style:undefined}><table className="w-full min-w-[48rem] border-separate border-spacing-0 text-left text-sm">
-      <thead className="text-xs uppercase tracking-wide text-task-text-muted"><tr>{columns.map((column)=><th className="sticky top-0 z-10 whitespace-nowrap border-b border-task-border bg-task-muted px-3 py-2.5 font-semibold first:pl-4 sm:first:pl-6" key={column.key} scope="col">{column.label}</th>)}</tr></thead>
+    <div className="-mx-4 hidden overflow-x-auto border-y border-task-border sm:-mx-6 sm:block"><table className="w-full min-w-[48rem] border-separate border-spacing-0 text-left text-sm">
+      <thead className="text-xs uppercase tracking-wide text-task-text-muted"><tr>{columns.map((column)=><th className="whitespace-nowrap border-b border-task-border bg-task-muted px-3 py-2.5 font-semibold first:pl-4 sm:first:pl-6" key={column.key} scope="col">{column.label}</th>)}</tr></thead>
       <tbody>{rows.map((row,index)=><tr className="hover:bg-gold/5 even:bg-task-muted/30" key={rowKey(row,index)}>{columns.map((column)=><td className="max-w-80 truncate border-b border-task-border px-3 py-2 first:pl-4 sm:first:pl-6" key={column.key}>
         {column.key==="answers"&&answers(row)?.length?<button className="max-w-72 truncate text-left underline-offset-2 hover:underline" onClick={()=>viewAnswers(row)} type="button"><Cell column={column} value={row[column.key]}/></button>:<Cell column={column} value={row[column.key]}/>}
       </td>)}</tr>)}</tbody>
     </table></div>
-    <ul className="-mx-4 divide-y divide-task-border border-y border-task-border bg-task-bg sm:hidden">{rows.map((row,index)=><li key={rowKey(row,index)}><button className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-task-muted" onClick={()=>setRecord(row)} type="button">
+    <ul className="-mx-4 divide-y divide-task-border border-y border-task-border sm:hidden">{rows.map((row,index)=><li key={rowKey(row,index)}><button className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-task-muted" onClick={()=>setRecord(row)} type="button">
       <span className="min-w-0 flex-1">{lead?<span className="block truncate text-[15px] font-semibold"><Cell column={lead} value={row[lead.key]}/></span>:null}
         <span className="mt-0.5 block truncate text-xs text-task-text-muted">{rest.slice(0,3).map((column)=>reportCellText(row[column.key],column.format)).filter((text)=>text!=="—").join(" · ")||"Open for details"}</span></span>
       <ChevronRight aria-hidden className="size-4 shrink-0 text-task-text-muted"/>

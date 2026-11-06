@@ -1,6 +1,6 @@
 import { returnFromFmsWork } from "@/features/tasks/fms/boardReturn";
 import { FmsStartingForm } from "@/features/forms/FmsStartingForm";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, Archive, ArrowLeft, BookOpen, ChevronRight, ClipboardList, Contact, Copy, FileText, History, Pencil, Plus, Search, Send, Trash2, Workflow } from "lucide-react";
 import { formatKolkataDateTime, groupFormSubmissions, groupFmsBuiltForms, type FmsBuiltForm, formMatchesLifecycle, hasPermission, presentFormSubmission, WORK_UPLOAD_FORM_NAME, type FormMasterOption, type SubmissionRecord, type SubmissionTemplate } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthContext";
@@ -13,8 +13,8 @@ import { FormBuilder } from "@/features/forms/FormBuilder";
 import { type DynamicOptions } from "@/features/forms/FormRenderer";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { cn } from "@/lib/utils";
+import { revealPageDetail } from "@/lib/revealPageDetail";
 import { useMediaQuery } from "@/lib/useMediaQuery";
-import { useFillViewport } from "@/lib/useFillViewport";
 import { CRM_FORM_PURPOSE_LABELS, type CrmFormPurpose } from "@jewelos/core";
 import { crmFormFillPath, loadCrmLinkedFamilies } from "@/features/crm/crmFormLinks";
 
@@ -31,8 +31,8 @@ export function FormsPage() {
   const [crmForms, setCrmForms] = useState<ReadonlyMap<string, CrmFormPurpose>>(new Map());
   /** The form family whose versions and actions are open; wide screens show it beside the list. */
   const [selectedFamily, setSelectedFamily] = useState<string | null>(null);
+  const detailsRef = useRef<HTMLElement>(null);
   const sideDetails = useMediaQuery("(min-width: 1280px)");
-  const panes = useFillViewport<HTMLDivElement>({ enabled: sideDetails, minHeight: 420 });
   const starter = useMemo(() => { const params = new URLSearchParams(window.location.search); const id = params.get("fmsStarter"); const formTemplateId = params.get("form"); return id && formTemplateId ? { id, formTemplateId } : null; }, []);
   const selectedSubmissionId=new URLSearchParams(window.location.search).get("submission_id");
   const canSeeCrm = hasPermission(access, "crm.view");
@@ -83,7 +83,7 @@ export function FormsPage() {
   const sourceNote = source === "library" ? null : source === "crm" ? `Forms CRM uses to register people: ${[...new Set(crmForms.values())].map((purpose) => CRM_FORM_PURPOSE_LABELS[purpose].toLowerCase()).join(", ")}. ${author ? "Edit and publish them here like any form; CRM uses each new published version. Choose which form CRM uses in CRM → REGISTRATION → CRM FORM SETTINGS." : ""} Fill form opens CRM registration.` : author ? "Questions built inside FMS workflow steps. People fill them through their workflow. To change one, open the workflow in FMS and edit that step's Questions & Form, so the workflow uses the new version." : "Forms that belong to FMS workflows. You fill them from Tasks → FMS when a step is assigned to you.";
   const libraryActions: LibraryActions = { author, built, onVisibilitySaved: refresh, onVisibilityError: setError, onFill: fillForm, onEdit: setEdit, onPublish: runPublish, onPublishAsNew: runPublishAsNew, onCreateVersion: runCreateVersion, onDelete: setRemove, onArchive: (id) => void archiveForm(id).then(refresh).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Archive failed")), onEditPublished: (id) => { const form = data?.bundles.find((item) => item.id === id); if (form?.lifecycle === "published") setEdit(form); else setError("Archived forms cannot be edited."); } };
   const list = !data ? <div className="grid gap-2"><div className="skeleton h-16 rounded-xl" /><div className="skeleton h-16 rounded-xl" /><div className="skeleton h-16 rounded-xl" /></div>
-    : tab === "templates" ? <Library {...libraryActions} emptyText={fmsSource ? "No FMS workflow forms match. Forms built inside an FMS step appear here." : source === "crm" ? "No CRM forms match these filters." : "No forms match these filters."} families={shownFamilies} inlineDetails={!sidePanel} onSelect={setSelectedFamily} searching={query.trim() !== ""} selectedId={selectedId} workflowGroups={fmsSource ? workflowGroups : undefined} />
+    : tab === "templates" ? <Library {...libraryActions} emptyText={fmsSource ? "No FMS workflow forms match. Forms built inside an FMS step appear here." : source === "crm" ? "No CRM forms match these filters." : "No forms match these filters."} families={shownFamilies} inlineDetails={!sidePanel} onSelect={(id) => { setSelectedFamily(id); revealPageDetail(detailsRef.current); }} searching={query.trim() !== ""} selectedId={selectedId} workflowGroups={fmsSource ? workflowGroups : undefined} />
     : <SubmissionList bundles={data.bundles} onView={setView} submissions={data.submissions} />;
   return <><section className="mx-auto w-full max-w-[100rem]">
     <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -105,9 +105,9 @@ export function FormsPage() {
       {built && sourceNote ? <p className="px-1 text-xs leading-relaxed text-task-text-muted">{sourceNote}</p> : null}
     </div> : null}
     {error ? <div className="mb-4"><Notice tone="danger">{error === "Publish form: Form version is pinned by an active FMS stage" ? "This version is in an active FMS stage. Use Publish as separate form to preserve in-progress work and publish your edited copy." : error} <button className="underline" onClick={() => void refresh()} type="button">Retry</button></Notice></div> : null}
-    {sidePanel && data ? <div className="-mx-4 grid grid-cols-[minmax(0,1fr)_minmax(22rem,30rem)] border-y border-task-border bg-task-bg sm:-mx-6" ref={panes.ref} style={panes.style}>
-      <div className="min-h-0 min-w-0 overflow-y-auto overscroll-contain">{list}</div>
-      <aside aria-label="Selected form" className="min-h-0 overflow-y-auto overscroll-contain border-l border-task-border bg-task-muted/30 p-4 sm:p-5">
+    {sidePanel && data ? <div className="-mx-4 grid grid-cols-[minmax(0,1fr)_minmax(22rem,30rem)] border-y border-task-border sm:-mx-6">
+      <div className="min-w-0">{list}</div>
+      <aside aria-label="Selected form" ref={detailsRef} className="min-w-0 scroll-mt-32 border-l border-task-border p-4 sm:p-5">
         {selectedVersions ? <><div className="mb-3 flex items-start gap-3"><span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-xl bg-gold/10 text-gold-secondary"><FileText className="size-5" /></span><div className="min-w-0"><h2 className="break-words text-lg font-semibold leading-snug text-task-text">{selectedVersions[0]!.name}</h2><p className="text-xs text-task-text-muted">{plural(selectedVersions.length, "version")}</p></div></div><FormFamilyDetails {...libraryActions} placeText={fmsPlaceText(undefined, built?.get(selectedVersions[0]!.family_id))} versions={selectedVersions} /></> : <p className="text-sm text-task-text-muted">Select a form to see its versions and actions.</p>}
       </aside>
     </div> : list}

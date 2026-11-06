@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ErrorPanel, LoadingPanels } from "./components";
+import { ReportTable } from "../reports/ReportTable";
 import { asyncPresentation, dashboardSectionsForRole, exportActionsForStatus, homeSectionsForRole, reportSearch, settingsSectionsForRole } from "./presentation";
 
 describe("dashboard and report presentation contracts", () => {
@@ -49,12 +50,13 @@ describe("dashboard and report presentation contracts", () => {
     expect(exportActionsForStatus("cancelled")).toEqual([]);
   });
 
-  it("keeps responsive report layouts represented by both table and card breakpoints", async () => {
-    const source = await import("../reports/ReportTable?raw").then((module) => module.default as string);
-    // From sm up a scrolling table with pinned headers; below it, compact rows that open the whole record.
-    expect(source).toMatch(/hidden overflow-auto[^"]*sm:block/);
-    expect(source).toMatch(/<ul className="[^"]*sm:hidden"/);
-    expect(source).toContain("sticky top-0");
+  it("renders long reports as natural-height desktop tables and compact phone rows", () => {
+    const rows = Array.from({ length: 12 }, (_, index) => ({ employee_name: `Employee ${index + 1}` }));
+    const markup = renderToStaticMarkup(<ReportTable columns={[{ key: "employee_name", label: "Employee" }]} rows={rows} />);
+    expect(markup).toMatch(/hidden overflow-x-auto[^"]*sm:block/);
+    expect(markup).toMatch(/<ul class="[^"]*sm:hidden"/);
+    expect(markup).toContain("Employee 12");
+    expect(markup).not.toMatch(/style="[^"]*(?:height|max-height):/);
   });
 
   it("keeps trend values readable without hover", async () => {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { revealPageDetail } from "@/lib/revealPageDetail";
 import { useMediaQuery } from "@/lib/useMediaQuery";
-import { useFillViewport } from "@/lib/useFillViewport";
 import { ArrowLeft, Eye, EyeOff, FileText, ListFilter, Pencil, Plus, Search } from "lucide-react";
 import { supabase } from "@jewelos/api-client";
 import { useAuth } from "@/auth/AuthContext";
@@ -106,6 +106,8 @@ export function DropdownMasterPage() {
   // null = the overview of every list. "Open in Dropdown Master" in the form
   // builder links straight to one list with ?category=<list>.
   const [category, setCategoryState] = useState<string | null>(() => new URLSearchParams(window.location.search).get("category")?.trim() || null);
+  const detailsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (category) revealPageDetail(detailsRef.current); }, [category]);
   const [editing, setEditing] = useState<DropdownMaster | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -117,6 +119,7 @@ export function DropdownMasterPage() {
   useEffect(() => () => { generation.current += 1; }, []);
 
   const setCategory = (next: string | null) => {
+    if (next === category) revealPageDetail(detailsRef.current);
     setCategoryState(next); setSearch(""); setStatus("all");
     const params = new URLSearchParams(window.location.search);
     if (next) params.set("category", next); else params.delete("category");
@@ -194,7 +197,6 @@ export function DropdownMasterPage() {
   };
 
   const wide = useMediaQuery("(min-width: 1280px)");
-  const panes = useFillViewport<HTMLDivElement>({ enabled: wide, minHeight: 420 });
   /** "New list" starts a list even while another list is open. */
   const [newList, setNewList] = useState(false);
   if (!hasPermission(access, "dropdowns.manage")) {
@@ -248,20 +250,20 @@ export function DropdownMasterPage() {
       </header>
       {error ? <div className="mb-3"><Notice tone="danger">{error}</Notice><Button className="mt-3" onClick={() => void load()} variant="secondary">Retry</Button></div> : null}
 
-      {/* Wide screens: two panes that fill the window and scroll on their own, so switching lists never means scrolling back up. */}
-      {wide ? <div className="-mx-4 grid grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)] border-y border-task-border bg-task-bg sm:-mx-6" ref={panes.ref} style={panes.style}>
+      {/* Both columns grow with their content and share the page scroll. */}
+      {wide ? <div className="-mx-4 grid grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)] border-y border-task-border sm:-mx-6">
         <div className="flex min-h-0 flex-col border-r border-task-border">
           <div className="border-b border-task-border p-3">{listTools}</div>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{listRows}</div>
+          <div className="min-w-0">{listRows}</div>
         </div>
-        <div className="flex min-h-0 min-w-0 flex-col">{category === null ? <p className="m-auto p-10 text-center text-soft-grey">Select a list to see and edit its options.</p> : <>
+        <div className="flex min-h-0 min-w-0 scroll-mt-32 flex-col" ref={detailsRef}>{category === null ? <p className="m-auto p-10 text-center text-soft-grey">Select a list to see and edit its options.</p> : <>
           {detailHead}
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{optionRows}</div>
+          <div className="min-w-0">{optionRows}</div>
         </>}</div>
       </div> : category === null ? <div className="-mx-4 border-y border-task-border bg-task-bg sm:-mx-6">
         <div className="border-b border-task-border p-3">{listTools}</div>
         {listRows}
-      </div> : <div className="-mx-4 border-y border-task-border bg-task-bg sm:-mx-6">
+      </div> : <div className="-mx-4 scroll-mt-32 border-y border-task-border bg-task-bg sm:-mx-6" ref={detailsRef}>
         <div className="px-2 pt-2"><Button className="min-h-10 px-2" onClick={() => setCategory(null)} variant="ghost"><ArrowLeft className="h-4 w-4" />All lists</Button></div>
         {detailHead}
         {optionRows}
