@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, BarChart3, GitBranch, History, ListChecks, Pause, Pencil, Play, Plus, RotateCcw, Search, Settings2, Trash2, Zap } from "lucide-react";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
@@ -11,6 +11,8 @@ import {
   deleteFmsWorkflow,
   eraseFmsFlow,
   loadFmsBuilderData,
+  loadFmsLibraryData,
+  type FmsLibraryData,
   loadFmsFlowDeletionImpact,
   loadFmsWorkflowDeletionImpact,
   restoreFmsFlow,
@@ -54,9 +56,16 @@ export function FMSBuilderPage() {
   const canManage = hasPermission(access, "fms.manage");
   // Managers, admins and super admins see the stage board; staff keep the run list.
   const canSeeTeam = hasPermission(access, "tasks.manage_team") || hasPermission(access, "tasks.view_all");
-  const [data, setData] = useState<FmsData>();
+  const [data, setData] = useState<FmsLibraryData>();
+  const [builderData, setBuilderData] = useState<FmsData>();
+  const refreshRequest = useRef(0);
+  const builderRequest = useRef(0);
+  const editorOpen = useRef(false);
   // Server-counted runs and outcomes per workflow family; the library never downloads the runtime.
   const [outcomes, setOutcomes] = useState<ReadonlyMap<string, FmsLibraryOutcome>>();
+  const [outcomesPending, setOutcomesPending] = useState(true);
+  const [outcomesError, setOutcomesError] = useState(false);
+  const countsAvailable = outcomes !== undefined && !outcomesError;
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -76,14 +85,49 @@ export function FMSBuilderPage() {
   useEffect(() => { if (canManage) void loadFmsAiSettings().then(setAiSettings); }, [canManage]);
 
   const refresh = useCallback(async () => {
+    const request = ++refreshRequest.current;
+    setError(null);
+    // Optional counts must not hold the workflow list behind a runtime aggregation.
+    setOutcomesPending(true);
+    void loadFmsLibraryOutcomes().then((counts) => {
+      if (request === refreshRequest.current) { setOutcomes(counts); setOutcomesError(false); }
+    }).catch(() => {
+      if (request === refreshRequest.current) setOutcomesError(true);
+    }).finally(() => { if (request === refreshRequest.current) setOutcomesPending(false); });
     try {
-      setError(null);
-      const [builder, counts] = await Promise.all([loadFmsBuilderData(), loadFmsLibraryOutcomes().catch(() => undefined)]);
-      setData(builder);
-      setOutcomes(counts);
-    } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to load FMS"); }
+      const authoringRequest = editorOpen.current ? ++builderRequest.current : null;
+      const [library, builder] = await Promise.all([
+        loadFmsLibraryData(),
+        authoringRequest === null ? Promise.resolve(undefined) : loadFmsBuilderData(),
+      ]);
+      if (request === refreshRequest.current) setData(library);
+      if (authoringRequest === builderRequest.current && builder) setBuilderData(builder);
+    } catch (caught) {
+      if (request === refreshRequest.current) setError(caught instanceof Error ? caught.message : "Unable to load FMS");
+    }
   }, []);
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    void refresh();
+    return () => { ++refreshRequest.current; ++builderRequest.current; };
+  }, [refresh]);
+
+  const closeBuilder = () => { editorOpen.current = false; ++builderRequest.current; setEdit(undefined); setBuilderData(undefined); };
+  const openBuilder = async (flow: FmsFlowRow | null) => {
+    const request = ++builderRequest.current;
+    editorOpen.current = false;
+    setError(null); setBuilderData(undefined); setEdit(flow);
+    try {
+      const builder = await loadFmsBuilderData();
+      if (request !== builderRequest.current) return;
+      editorOpen.current = true;
+      setBuilderData(builder);
+      setEdit(flow ? builder.flows.find((item) => item.id === flow.id) ?? flow : null);
+    } catch (caught) {
+      if (request !== builderRequest.current) return;
+      editorOpen.current = false; setEdit(undefined);
+      setError(caught instanceof Error ? caught.message : "Unable to load FMS builder");
+    }
+  };
   useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["fms", "forms", "organization"], refresh });
 
   const families = useMemo<FlowFamily[]>(() => {
@@ -128,13 +172,16 @@ export function FMSBuilderPage() {
 
 
 
-  const revise = (flow: FmsFlowRow) => run(flow.id, async () => {
-    const draftId = await reviseFmsFlow(flow.id);
-    const builder = await loadFmsBuilderData();
-    setData(builder);
-    const draft = builder.flows.find((item) => item.id === draftId);
-    if (draft) setEdit(draft);
-  });
+  const revise = (flow: FmsFlowRow) => {
+    const request = ++builderRequest.current;
+    return run(flow.id, async () => {
+      const draftId = await reviseFmsFlow(flow.id);
+      const builder = await loadFmsBuilderData();
+      if (request !== builderRequest.current) return;
+      const draft = builder.flows.find((item) => item.id === draftId);
+      if (draft) { editorOpen.current = true; setBuilderData(builder); setEdit(draft); }
+    });
+  };
 
   // The card's Delete removes the whole workflow, every version included.
   const removeWorkflow = (family: FlowFamily) => void run(family.primary.id, async () => {
@@ -185,17 +232,18 @@ export function FMSBuilderPage() {
   };
 
   const publishedFor = (flow: FmsFlowRow | null) => {
-    if (!flow || !data) return null;
-    const published = data.flows.find((item) => item.family_id === flow.family_id && item.status === "published" && item.id !== flow.id);
-    return published ? flowToDefinition(published, data) : null;
+    if (!flow || !builderData) return null;
+    const published = builderData.flows.find((item) => item.family_id === flow.family_id && item.status === "published" && item.id !== flow.id);
+    return published ? flowToDefinition(published, builderData) : null;
   };
   const aiEnabled = !!aiSettings && (aiSettings.debuggerEnabled || aiSettings.builderEnabled);
 
-  if (edit !== undefined && data) return (
+  if (edit !== undefined) return (
     <section>
       {/* The builder carries its own Back to FMS control in its toolbar and details screen. */}
-      <FmsFlowBuilder data={data} flow={edit} canManageForms={hasPermission(access, "forms.manage")} onClose={() => setEdit(undefined)} onSaved={refresh}
+      {builderData ? <FmsFlowBuilder data={builderData} flow={edit} canManageForms={hasPermission(access, "forms.manage")} onClose={closeBuilder} onSaved={refresh}
         {...(aiSettings && aiEnabled ? { ai: { settings: aiSettings, published: publishedFor(edit) } } : {})} />
+        : <><Button onClick={closeBuilder} variant="ghost"><ArrowLeft className="size-4" />Back to FMS</Button><p role="status" className="p-4 text-soft-grey">Loading workflow editor...</p></> }
     </section>
   );
 
@@ -223,7 +271,7 @@ export function FMSBuilderPage() {
         {canManage ? <div className="flex w-full flex-wrap gap-2 sm:w-auto">
           {aiSettings?.canConfigure ? <Button aria-label="AI assistant settings" onClick={() => setAiSettingsOpen(true)} variant="secondary"><Settings2 className="size-4" /><span className="hidden sm:inline">AI assistant</span></Button> : null}
           <Button aria-label="Trigger history" onClick={() => setHistoryOpen(true)} variant="secondary"><Zap className="size-4" /><span className="hidden sm:inline">Trigger history</span></Button>
-          <Button className="flex-1 sm:flex-none" onClick={() => setEdit(null)}><Plus className="size-4" />New workflow</Button>
+          <Button className="flex-1 sm:flex-none" onClick={() => void openBuilder(null)}><Plus className="size-4" />New workflow</Button>
         </div> : null}
       </header>
       {historyOpen ? <FmsTriggerHistory onClose={() => setHistoryOpen(false)} /> : null}
@@ -254,6 +302,7 @@ export function FMSBuilderPage() {
       {notice ? <Notice tone="success">{notice}</Notice> : null}
 
       {!data ? <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3"><div className="skeleton h-48 rounded-2xl" /><div className="skeleton h-48 rounded-2xl" /></div>
+        : filter === "mine" && !countsAvailable ? outcomesPending ? <p role="status" className="p-4 text-soft-grey">Loading assigned workflow counts...</p> : <Notice>Workflow counts are unavailable. <button className="underline" onClick={() => void refresh()} type="button">Retry</button></Notice>
         : visible.length === 0 ? <Notice>No workflows match this view.{canManage ? " Create one with New workflow." : ""}</Notice>
         : <div className="-mx-4 border-y border-task-border bg-task-bg sm:-mx-6">
           <div aria-hidden className="hidden grid-cols-[minmax(0,1fr)_7.5rem_minmax(14rem,0.8fr)_auto] gap-4 border-b border-task-border bg-task-muted px-6 py-2 text-xs font-semibold uppercase tracking-wide text-task-text-muted lg:grid">
@@ -293,16 +342,16 @@ export function FMSBuilderPage() {
                     <FlowDescription text={flow.description} />
                   </div>
                   <div className="hidden lg:block"><span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase ${STATE_STYLES[state]}`}>{state}</span></div>
-                  <dl aria-label={`${flow.name} counts`} className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                  <dl aria-busy={outcomesPending} aria-label={`${flow.name} counts`} className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
                     {([["Running", counts.running, "text-gold-secondary"], [FMS_TERMINAL_OUTCOME_LABELS.won, counts.won, "text-success"], [FMS_TERMINAL_OUTCOME_LABELS.lost, counts.lost, "text-danger"], ["Other endings", counts.other, "text-champagne"]] as const).map(([label, value, tone]) =>
-                      <div className={`flex gap-1 ${tone}`} key={label}><dt className="text-soft-grey">{label}</dt><dd className="font-semibold tabular-nums">{value}</dd></div>)}
+                      <div className={`flex gap-1 ${tone}`} key={label}><dt className="text-soft-grey">{label}</dt><dd className="font-semibold tabular-nums">{countsAvailable ? value : outcomesPending ? "…" : "—"}</dd></div>)}
                   </dl>
                   <div className="flex flex-wrap items-center gap-1.5 lg:flex-nowrap lg:justify-end">
                     {/* Managers: Tasks opens the stage board, Runs the run list. Staff: Tasks keeps the run list as before. */}
                     {canStart ? <Button className="min-h-10 px-3" onClick={() => setManualStart(flow)}><Play className="size-4" />Start</Button> : null}
-                    <Button className="min-h-10 px-3" onClick={() => canSeeTeam ? openUrl(fmsTaskBoardPath(family.key)) : setTasksFor(family)} variant="secondary"><ListChecks className="size-4" />Tasks{counts.mine ? ` (${counts.mine})` : ""}</Button>
+                    <Button className="min-h-10 px-3" onClick={() => canSeeTeam ? openUrl(fmsTaskBoardPath(family.key)) : setTasksFor(family)} variant="secondary"><ListChecks className="size-4" />Tasks{countsAvailable && counts.mine ? ` (${counts.mine})` : ""}</Button>
                     {canSeeTeam ? <Button className="min-h-10 px-3" onClick={() => setTasksFor(family)} variant="secondary"><BarChart3 className="size-4" />Runs</Button> : null}
-                    {canManage && draft ? <Button className="min-h-10 px-3" disabled={busy} onClick={() => setEdit(draft)} variant="secondary"><Pencil className="size-4" />Edit draft</Button> : null}
+                    {canManage && draft ? <Button className="min-h-10 px-3" disabled={busy} onClick={() => void openBuilder(draft)} variant="secondary"><Pencil className="size-4" />Edit draft</Button> : null}
                     {canManage && !draft && flow.status !== "draft" ? <Button className="min-h-10 px-3" disabled={busy} onClick={() => void revise(flow)} variant="secondary"><Pencil className="size-4" />New version</Button> : null}
                     <ActionMenu className="ml-auto lg:ml-0" items={more} label={`More actions for ${flow.name}`} />
                   </div>

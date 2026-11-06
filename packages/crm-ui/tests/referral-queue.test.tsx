@@ -52,3 +52,23 @@ describe("ReferralQueue roster, sorting and finding (owner request 2026-10-08)",
     expect(screen.getByText("Called")).toBeTruthy(); expect(screen.queryByText("Waiting")).toBeNull();
   });
 });
+
+describe("ReferralQueue readable rows (owner 2026-11-05)", () => {
+  const withContext: ReferralItem = { ...item, referral_context: { relationship: "SISTER", given_by_client_code: "MKC-1", given_by_household_code: "MKF-1", given_by_referral_code: "MKREF-1", referred_client_code: null } };
+  it("Received: one line says who referred the person; codes, dates and pending notes are kept for Details", () => {
+    render(<ReferralQueue role="salesperson" branchId="branch-1" enteredByName="Test CRM" items={[withContext]} view="received" embedded />);
+    expect(screen.getByText("Referred by Anita (SISTER)")).toBeTruthy();
+    expect(screen.getByText("MKC-1 · MKF-1 · MKREF-1").closest("td")?.getAttribute("data-secondary")).toBe("true");
+    expect(screen.getByText("Not yet a client (pending referral)").className).toContain("crm-hide-phone");
+  });
+  it("Given: the referrer leads, with one line naming whom they referred; the referral column moves to Details", () => {
+    render(<ReferralQueue role="salesperson" branchId="branch-1" enteredByName="Test CRM" items={[withContext]} view="given" embedded />);
+    expect(screen.getByText("Referred Bina (SISTER)")).toBeTruthy();
+    expect(screen.getByText("MKC-1 · MKF-1 · MKREF-1").className).toContain("crm-hide-phone");
+    expect(screen.getAllByText("Bina").map((element) => element.closest("td")?.getAttribute("data-secondary"))).toContain("true");
+  });
+  it("leaves out an unrecorded relation instead of printing Not recorded in the summary", () => {
+    render(<ReferralQueue role="salesperson" branchId="branch-1" enteredByName="Test CRM" items={[item]} view="received" embedded />);
+    expect(screen.getByText("Referred by Anita")).toBeTruthy();
+  });
+});

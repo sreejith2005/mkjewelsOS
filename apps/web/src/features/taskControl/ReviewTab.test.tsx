@@ -1,18 +1,21 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RecurringInstance, RecurringWorkspace } from "@/features/recurringTodo/api";
 import { ReviewTab } from "./ReviewTab";
 import { defaultFilters } from "./filters";
 
-const { loadRecurringWorkspace, verifyRecurringTask } = vi.hoisted(() => ({
+const { loadRecurringWorkspace, verifyRecurringTask, loadTaskForms, loadFormDynamicOptions } = vi.hoisted(() => ({
   loadRecurringWorkspace: vi.fn(),
   verifyRecurringTask: vi.fn(),
+  loadTaskForms: vi.fn().mockResolvedValue({ bundles: [] }),
+  loadFormDynamicOptions: vi.fn(),
 }));
 
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ profile: { id: "admin-1", tenant_id: "t1", user_role: "admin" } }) }));
 vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealtimeRefresh: () => undefined }));
-vi.mock("@/features/forms/api", () => ({ loadTaskForms: vi.fn().mockResolvedValue({ bundles: [] }), loadFormDynamicOptions: vi.fn() }));
+vi.mock("@/features/forms/api", () => ({ loadTaskForms, loadFormDynamicOptions }));
+vi.mock("@/features/tasks/TaskRequiredForm", () => ({ TaskRequiredForm: ({ taskId, templateId }: { taskId: string; templateId: string }) => <p>Required {taskId} / {templateId}</p> }));
 vi.mock("@/features/tasks/api", () => ({ updateTask: vi.fn(), uploadTaskAttachment: vi.fn(), completeRecurringTaskWithImage: vi.fn() }));
 vi.mock("@/features/recurringTodo/api", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -24,6 +27,7 @@ vi.mock("@/features/recurringTodo/api", async (importOriginal) => ({
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  window.history.replaceState({}, "", "/task-templates?tab=review");
 });
 
 function occurrence(overrides: Partial<RecurringInstance>): RecurringInstance {
@@ -47,6 +51,29 @@ const workspace: RecurringWorkspace = {
 };
 
 describe("Task Control Review tab", () => {
+  it("loads only the selected work item's exact required form when opened", async () => {
+    loadRecurringWorkspace.mockResolvedValue({ ...workspace, instances: [occurrence({ id: "chosen", title: "Chosen work", status: "rejected", verification_status: "rejected", form_template_id: "form-chosen", requires_form: true }), occurrence({ id: "other", form_template_id: "form-other", requires_form: true })] });
+    let finish!: (value: { bundles: { id: string; name: string; fields: never[]; sections: never[] }[] }) => void;
+    loadTaskForms.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    loadFormDynamicOptions.mockResolvedValue({ users: [], branches: [], departments: [], masters: [] });
+    render(<ReviewTab filters={defaultFilters("2026-10-21")} onOpenRecurringTasks={vi.fn()} reloadKey={0} />);
+    await screen.findByText("Vault audit");
+    fireEvent.click(screen.getByRole("button", { name: /^Rejected · 1/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Complete form" }));
+    await waitFor(() => expect(loadTaskForms).toHaveBeenCalledWith(["form-chosen"], ["chosen"]));
+    expect(screen.queryByText("Required chosen / form-chosen")).toBeNull();
+    await act(async () => { finish({ bundles: [{ id: "form-chosen", name: "Chosen form", fields: [], sections: [] }] }); });
+    expect(await screen.findByText("Required chosen / form-chosen")).toBeTruthy();
+  });
+  it("shows verification immediately without downloading every required form", async () => {
+    loadRecurringWorkspace.mockResolvedValue({ ...workspace, instances: [occurrence({ form_template_id: "form-1", requires_form: true })] });
+    loadTaskForms.mockReturnValue(new Promise(() => {}));
+    render(<ReviewTab filters={defaultFilters("2026-10-21")} onOpenRecurringTasks={vi.fn()} reloadKey={0} />);
+    await act(async () => {});
+    expect(screen.queryByText("Vault audit")).toBeTruthy();
+    expect(loadTaskForms).not.toHaveBeenCalled();
+    expect(loadFormDynamicOptions).not.toHaveBeenCalled();
+  });
   it("lists work awaiting verification and verifies it through the audited RPC", async () => {
     loadRecurringWorkspace.mockResolvedValue(workspace);
     verifyRecurringTask.mockResolvedValue(undefined);

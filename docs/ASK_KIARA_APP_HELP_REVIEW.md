@@ -44,10 +44,16 @@ fill. Overdue and high-priority tasks appear under **Needs attention now** (2026
 - [ ] Fill a form linked to a task: on Home the task shows a **Form: form name** tag; tap the task to open it and fill the form.
 
 ## Dashboard
-**What it is:** task, FMS and form numbers for your own scope and a period you choose, with
-the formula behind each number.
-- [ ] Change the period: pick today, this week, this month, etc. at the top of Dashboard.
-- [ ] Understand a number: each card explains its formula.
+**What it is:** opens on **Employee performance** (2026-11-05): your assigned tasks and FMS steps due in a
+period, completed / pending / in progress / overdue, on time / late, and the Task Control scores.
+Leaders granted **View every employee's task performance** switch to **All employees**. The earlier
+views are under **Management insights**.
+- [ ] Change the period: **Today**, **This week**, **This month**, **Week**, **Month**, **Year**, **Custom** at the top. Week/Month/Year cover the whole chosen week (Mon–Sun), month or year; India time.
+- [ ] Scores: **Work not done %** = completed ÷ assigned × 100 − 100 (75 of 100 → −25.0%); **Work not done on time %** = on time ÷ completed × 100 − 100 (40 of 50 → −20.0%). Nothing assigned → **No data**. Same numbers as Task Control and Reports › Employee Task Performance.
+- [ ] Every number opens its records (same assignments it counted), with deadline, completion time, overdue/late duration and a link to the task or FMS step.
+- [ ] **Task work lifecycle** shows completed + remaining = assigned; **Outside the score** lists rejected/skipped/stopped/cancelled work, overdue from before the period and waiting FMS start forms.
+- [ ] Leaders: **Employee task performance** table (search, sort, **View all**, click a name for detail, **Export this report**), **FMS performance** with **Stages**, comparison charts. **Employee accountability** (CRM access) shows the CRM sales and calling reports; calls and sales are not tasks.
+- [ ] Kiara: no new read tool in this change; Kiara's dashboard tool still reads `get_dashboard_metrics`, which this change does not alter, so Kiara can explain the new screen but not yet quote its employee table. Candidate follow-up: a read-only tool over `get_task_performance_dashboard_v1` called as the asker, offered with `dashboard.view` (team scope only with `dashboard.view_team_performance`), with allowed and denied eval cases.
 
 ## Tasks
 **What it is:** work given to you, tasks you gave to others, and tasks you are watching.
@@ -185,6 +191,7 @@ who build workflows, the designs.
 - [ ] Dropdown Master **CRM Branches** (2026-11-04): value = JewelOS branch code; label and order are what CRM shows. Kiara: no new read tool.
 - [ ] CRM screens tidy-up (2026-11-05): queue headings **Register client** and **Queue**, **In today: …**, **No CRM staff for this branch**, duplicate message "… is already waiting in the queue today (token …)" with **Open that entry**; branch-list setup notes are no longer shown on the queue. Kiara: no new read tool.
 - [ ] CRM menu and queue rows (2026-11-05): the three tabs became one menu button named after the open page (**Dashboard**, **Client queue**, **Client database** with **Not Bought**, **Referrals received**, **Referrals given**); queue rows show name with **New**/**Returning**, phone, time and CRM with one **Walk-in form** button (**View client** when submitted); **Register client** / **Register lead** buttons; Sync and Refresh in the **⋯** menu; phone filters behind **Filters**. Kiara: no new read tool.
+- [ ] Referral and Not Bought rows (2026-11-05): referral rows lead with **Referred by …** (received) or **Referred …** (given); codes and dates under **Details** on phones; Not Bought rows no longer show **VISIT REF**. Kiara: no new read tool.
 - [ ] Register someone (2026-11-04): CRM opens on **CLIENT QUEUE** with **REGISTER CLIENT** (customer in the store) and **REGISTER LEAD** (remote enquiry) side by side; REGISTER LEAD opens the full lead form and **Back to queue** returns. The **Who are you registering?** chooser is gone.
 - [ ] Client walk-in: **REGISTER CLIENT** (**BRANCH**, **CLIENT NAME**, **MOBILE NUMBER**, **REGISTER CLIENT**), then **MAKE WALK-IN ENTRY** on the client's row in the **Queue** opens the walk-in visit form. A same-day pending entry for the same mobile number shows **Open that entry** instead of a second entry.
 - [ ] Find a client: the search box at the top of the CRM page (name, client id or phone), or **CLIENT DATABASE**.

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, ListChecks, Plus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -73,6 +73,11 @@ export function TaskTemplatesPage() {
 
   const [tab, setTab] = useState<TaskControlTab>(() => initialTab(tabs));
   const [filters, setFilters] = useState<TaskControlFilters>(() => initialFiltersFromSearch(window.location.search));
+  const [search, setSearch] = useState(filters.search);
+  useEffect(() => { const timer = setTimeout(() => setSearch(filters.search), 250); return () => clearTimeout(timer); }, [filters.search]);
+  const requestFilters = useMemo(() => ({ ...filters, search }), [filters.preset, filters.from, filters.to, filters.branch_id, filters.department_id, filters.user_profile_id, search]);
+  const snapshotGeneration = useRef(0);
+  const templatesGeneration = useRef(0);
   const [view, setView] = useState<TaskView>("all");
   const [kind, setKind] = useState<TaskWorkKindFilter>("all");
   const [page, setPage] = useState(1);
@@ -117,7 +122,7 @@ export function TaskTemplatesPage() {
   }, [authorized]);
 
   const loadSnapshot = useCallback(async () => {
-    if (!authorized) return;
+    if (!authorized || tab === "review" || tab === "templates") return;
     if (!rangeIsValid(filters)) {
       setSnapshotError("Choose a date range that ends on or after it starts and spans at most 366 days.");
       setSnapshotLoading(false);
@@ -125,35 +130,34 @@ export function TaskTemplatesPage() {
     }
     setSnapshotLoading(true);
     setSnapshotError(null);
+    const request = ++snapshotGeneration.current;
     try {
-      setSnapshot(await fetchTaskControlSnapshot(filters, view, page, pageSize, kind));
+      const next = await fetchTaskControlSnapshot(requestFilters, view, page, pageSize, kind);
+      if (request === snapshotGeneration.current) setSnapshot(next);
     } catch (caught) {
-      setSnapshotError(errorMessage(caught));
+      if (request === snapshotGeneration.current) setSnapshotError(errorMessage(caught));
     } finally {
-      setSnapshotLoading(false);
+      if (request === snapshotGeneration.current) setSnapshotLoading(false);
     }
-  }, [authorized, filters, kind, page, pageSize, view]);
+  }, [authorized, requestFilters, kind, page, pageSize, view, tab]);
 
   const loadTemplates = useCallback(async () => {
-    if (!canManageTemplates) return;
+    if (!canManageTemplates || tab !== "templates") return;
     setTemplatesLoading(true);
     setTemplatesError(null);
+    const request = ++templatesGeneration.current;
     try {
-      const [directory, nextReferences] = await Promise.all([
-        loadTaskTemplateDirectory({ search: filters.search }),
-        loadTaskAuthoringReferenceData(),
-      ]);
-      setTemplates(directory.templates);
-      setReferences(nextReferences);
+      const directory = await loadTaskTemplateDirectory({ search });
+      if (request === templatesGeneration.current) setTemplates(directory.templates);
     } catch (caught) {
-      setTemplatesError(errorMessage(caught));
+      if (request === templatesGeneration.current) setTemplatesError(errorMessage(caught));
     } finally {
-      setTemplatesLoading(false);
+      if (request === templatesGeneration.current) setTemplatesLoading(false);
     }
-  }, [canManageTemplates, filters.search]);
+  }, [canManageTemplates, search, tab]);
 
-  useEffect(() => { void loadSnapshot(); }, [loadSnapshot]);
-  useEffect(() => { void loadTemplates(); }, [loadTemplates]);
+  useEffect(() => { void loadSnapshot(); return () => { snapshotGeneration.current += 1; }; }, [loadSnapshot]);
+  useEffect(() => { void loadTemplates(); return () => { templatesGeneration.current += 1; }; }, [loadTemplates]);
 
   const refresh = useCallback(async () => { setReviewReload((value) => value + 1); await Promise.all([loadSnapshot(), loadTemplates()]); }, [loadSnapshot, loadTemplates]);
   useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["tasks", "organization"], refresh });
@@ -193,15 +197,26 @@ export function TaskTemplatesPage() {
   const openEdit = async (row: TaskTemplateDirectoryRow) => {
     setBusyId(row.id);
     setTemplatesError(null);
-    const { data, error: loadError } = await supabase.from("task_templates").select("*").eq("id", row.id).maybeSingle();
-    setBusyId(null);
-    if (loadError || !data) {
-      const message = loadError ? loadError.message : "This task template is no longer available.";
+    try {
+      const [{ data, error: loadError }, nextReferences] = await Promise.all([
+        supabase.from("task_templates").select("*").eq("id", row.id).maybeSingle(),
+        loadTaskAuthoringReferenceData(),
+      ]);
+      if (loadError || !data) throw new Error(loadError?.message ?? "This task template is no longer available.");
+      setReferences(nextReferences);
+      setEditing(data);
+    } catch (cause) {
+      const message = errorMessage(cause);
       setTemplatesError(message);
       toast.error(message);
-      return;
-    }
-    setEditing(data);
+    } finally { setBusyId(null); }
+  };
+
+  const openNew = async () => {
+    setBusyId("new");
+    try { setReferences(await loadTaskAuthoringReferenceData()); setEditing(null); }
+    catch (cause) { toast.error(errorMessage(cause)); }
+    finally { setBusyId(null); }
   };
 
   const save = async (id: string | null, payload: Json) => {
@@ -295,7 +310,7 @@ export function TaskTemplatesPage() {
           </div>
           <div className="flex gap-2">
             {canManageTemplates ? (
-              <Button disabled={!references} className="bg-gold text-on-gold hover:bg-gold/90" onClick={() => setEditing(null)}>
+              <Button disabled={busyId === "new"} className="bg-gold text-on-gold hover:bg-gold/90" onClick={() => void openNew()}>
                 <Plus className="size-4" />
                 Add Task
               </Button>
@@ -350,7 +365,7 @@ export function TaskTemplatesPage() {
               rows={visibleTemplates}
             />
           ) : tab === "review" ? (
-            <ReviewTab filters={filters} onOpenRecurringTasks={openRecurringTasks} reloadKey={reviewReload} />
+            <ReviewTab filters={requestFilters} onOpenRecurringTasks={openRecurringTasks} reloadKey={reviewReload} />
           ) : snapshot ? (
             tab === "overview" ? (
               <OverviewTab

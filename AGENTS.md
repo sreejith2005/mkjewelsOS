@@ -208,8 +208,8 @@ pnpm.cmd exec turbo run build --force --concurrency=1
 git diff --check
 ```
 
-CI (`.github/workflows/ci.yml`) runs the core and web tests, typecheck, build,
-and `git diff --check`. If Docker, a browser, a device, or hosted credentials are
+CI (`.github/workflows/ci.yml`) runs the core, data, CRM and web tests, typecheck,
+build, bundle budgets and `git diff --check`. If Docker, a browser, a device, or hosted credentials are
 unavailable, say exactly what was and was not proven: static/type/build checks
 do not prove Postgres, RLS, RPC, Storage, edge-runtime, or rendered behaviour.
 
@@ -264,6 +264,22 @@ Authorization:
   availability stay conceptually separate.
 - Test every permission change for both allowed and denied access, including
   direct URL/API access. Client-supplied role values never decide access.
+
+### Loading performance
+
+- Load only the active section/tab's data; fetch editor/reference details when
+  they are opened. Keep unrelated optional metadata off the main loading path.
+- Start independent reads together. Keep dependent reads in order and retain
+  server authorization, exact work identity, and fresh mutation results.
+- Debounce search requests, discard obsolete responses after filter/identity
+  changes, and use the shared realtime refresh hook instead of adding duplicate
+  focus listeners. Do not persist sensitive page data as a speed shortcut.
+- Add deferred-response regression tests for loading dependencies you change.
+  Check desktop and phone navigation, slow/failing optional requests, and saves.
+- After the production build run `pnpm.cmd check:web-performance`. CI enforces
+  gzip budgets: startup JS/CSS 300 KiB, each JS chunk 280 KiB, total JS 1400 KiB.
+  Do not raise budgets to make a regression pass; investigate the import graph.
+  Bundle checks do not prove authenticated API/database or interaction timing.
 
 ### Protected cross-surface workflows
 

@@ -9,8 +9,12 @@ you did not run.
 
 ```powershell
 pnpm.cmd --filter @jewelos/core test         # includes permission resolver + SQL catalog parity
+pnpm.cmd --filter @jewelos/data test
+pnpm.cmd --filter @jewelos/crm-ui test
 pnpm.cmd --filter web test
 pnpm.cmd exec turbo run typecheck --force --concurrency=1
+pnpm.cmd exec turbo run build --force --concurrency=1
+pnpm.cmd check:web-performance
 supabase.cmd db reset                        # local only
 supabase.cmd test db                         # pgTAP, incl. 0156_granular_permissions
 supabase.cmd db lint --local --level warning
@@ -18,6 +22,15 @@ git diff --check
 ```
 
 ## Manual pass
+
+For loading changes, test a cold visit and a repeat visit on desktop and phone,
+then change tabs/filters quickly, save, and return through browser Back. In Task
+Control cover Overview, People, Tasks, Review (all buckets) and Templates. In
+CRM cover Registration, Queue, Clients, a client profile, Follow-ups and Settings
+as permitted. Slow or failing optional metadata must not block the primary list.
+Check that obsolete requests never replace the current filter or identity.
+After building, run `pnpm.cmd check:web-performance`; record network/interaction
+timings separately from bundle size. Use authorized synthetic data for automation.
 
 Use one test account per row of the **Accounts** table. Every "denied" check
 must be tried three ways: the UI, a typed URL, and a direct API call (browser
@@ -339,6 +352,14 @@ migration 20261104000300 must be applied first (see the handoff deployment order
 - [ ] Client database on a phone: no view chips and no Register Client button; one "Filters" button shows the filters; records are short rows (name, ID, phone, status, Call / Walk-in / Details); no "View Client Profile" (tap the name).
 - [ ] Not Bought and Referrals: no duplicate heading; Sync and Refresh are under ⋯; counts read "N of M".
 - [ ] Phone text is comfortably small (not zoomed); nothing pans sideways at 360 px.
+
+### CRM queue spacing and phone rows - 2026-11-05 (3)
+
+- [ ] Desktop Client queue: the "Walk-in form" button sits next to each person (no wide gap). "Register lead" shows the form centred on the page.
+- [ ] Phone Client database: each record fills the screen width; its buttons share the row evenly.
+- [ ] Phone Not Bought: no "VISIT REF" line; name, status and case label, number with Call, next follow-up, then the buttons.
+- [ ] Phone Referrals received: the person's name and "Referred by <client> (<relation>)"; codes, date added and pending notes only under Details.
+- [ ] Phone Referrals given: the client's name and "Referred <person> (<relation>)"; codes and the referral column only under Details.
 
 ### CRM forms from the Form Builder - 2026-11-03
 

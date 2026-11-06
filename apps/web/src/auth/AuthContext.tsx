@@ -61,15 +61,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const generation = identityGeneration.current;
     const { data } = await supabase.from("user_preferences").select("preferences").maybeSingle();
     if (generation !== identityGeneration.current) return;
-    setPreferences((data?.preferences as UserPreferences | undefined) ?? DEFAULT_USER_PREFERENCES);
+    const next = (data?.preferences as UserPreferences | undefined) ?? DEFAULT_USER_PREFERENCES;
+    setPreferences((current) => JSON.stringify(current) === JSON.stringify(next) ? current : next);
   }, []);
 
   const applyProfile = useCallback(async (nextProfile: UserProfile) => {
     const generation = identityGeneration.current;
     const nextAccess = await fetchAccessContext(nextProfile);
     if (generation !== identityGeneration.current) return;
-    setAccess(nextAccess);
-    setProfile({ ...nextProfile, user_role: nextAccess.effectiveRole });
+    // Revalidation still reaches the server. Preserve unchanged snapshots so
+    // profile-dependent pages do not restart their reads on focus/auth events.
+    setAccess((current) => JSON.stringify(current) === JSON.stringify(nextAccess) ? current : nextAccess);
+    const resolved = { ...nextProfile, user_role: nextAccess.effectiveRole };
+    setProfile((current) => JSON.stringify(current) === JSON.stringify(resolved) ? current : resolved);
   }, []);
 
   const loadProfile = useCallback(async (nextSession: Session) => {
@@ -126,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshPreferences(),
     ]);
     if (generation !== identityGeneration.current) return;
-    setBranch(nextBranch);
+    setBranch((current) => JSON.stringify(current) === JSON.stringify(nextBranch) ? current : nextBranch);
     setStatusMessage(null);
     setStatus("authenticated");
   }, [applyProfile, refreshPreferences]);

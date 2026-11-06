@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "turbo run build",
+    "check:web-performance": "node --test scripts/check-web-performance.test.mjs && node scripts/check-web-performance.mjs",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "mobile:android": "npm --prefix apps/mobile run android",

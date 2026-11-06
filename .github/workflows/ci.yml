@@ -21,7 +21,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @jewelos/core test
+      - run: pnpm --filter @jewelos/data test
+      - run: pnpm --filter @jewelos/crm-ui test
       - run: pnpm --filter web test
       - run: pnpm exec turbo run typecheck --force --concurrency=1
       - run: pnpm exec turbo run build --force --concurrency=1
+      - run: pnpm check:web-performance
       - run: git diff --check

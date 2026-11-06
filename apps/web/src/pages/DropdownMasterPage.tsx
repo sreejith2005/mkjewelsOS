@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { useFillViewport } from "@/lib/useFillViewport";
 import { ArrowLeft, Eye, EyeOff, FileText, ListFilter, Pencil, Plus, Search } from "lucide-react";
@@ -101,6 +101,8 @@ export function DropdownMasterPage() {
   const { access, profile } = useAuth();
   const [items, setItems] = useState<DropdownMaster[]>([]);
   const [insights, setInsights] = useState<DropdownListInsights>(EMPTY_INSIGHTS);
+  const [insightsPending, setInsightsPending] = useState(true);
+  const metadataReady = !insightsPending && insights.complete;
   // null = the overview of every list. "Open in Dropdown Master" in the form
   // builder links straight to one list with ?category=<list>.
   const [category, setCategoryState] = useState<string | null>(() => new URLSearchParams(window.location.search).get("category")?.trim() || null);
@@ -111,6 +113,8 @@ export function DropdownMasterPage() {
   const [listSearch, setListSearch] = useState("");
   const [originFilter, setOriginFilter] = useState<DropdownListOrigin | "all">("all");
   const [status, setStatus] = useState<"all" | "active" | "inactive">("all");
+  const generation = useRef(0);
+  useEffect(() => () => { generation.current += 1; }, []);
 
   const setCategory = (next: string | null) => {
     setCategoryState(next); setSearch(""); setStatus("all");
@@ -121,11 +125,18 @@ export function DropdownMasterPage() {
   };
 
   const load = useCallback(async () => {
+    const request = ++generation.current;
     setLoading(true); setError(null);
+    setInsightsPending(true);
+    // Audit and form usage scans enrich the list without delaying its options.
+    void loadDropdownListInsights().catch(() => ({ ...EMPTY_INSIGHTS, complete: false })).then((facts) => {
+      if (request === generation.current) { setInsights(facts); setInsightsPending(false); }
+    });
     try {
-      const [rows, facts] = await Promise.all([loadDropdownMasterRows(), loadDropdownListInsights().catch(() => ({ ...EMPTY_INSIGHTS, complete: false }))]);
-      setItems(rows); setInsights(facts);
-    } catch (caught) { setError(errorMessage(caught)); } finally { setLoading(false); }
+      const rows = await loadDropdownMasterRows();
+      if (request === generation.current) setItems(rows);
+    } catch (caught) { if (request === generation.current) setError(errorMessage(caught)); }
+    finally { if (request === generation.current) setLoading(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
   useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["organization", "settings"], refresh: load });
@@ -194,26 +205,27 @@ export function DropdownMasterPage() {
   const currentOrigin = category ? listOrigin(category, currentRows, insights) : null;
   const currentForms = category ? insights.usedBy.get(category) ?? [] : [];
 
-  const statLine = <p className="text-xs text-soft-grey tabular-nums">{[["lists", totals.lists], ["options", totals.options], ["made here", totals.madeHere], ["made in forms", totals.madeInForms], ["built-in", totals.builtIn], ["used by forms", totals.usedByForms]].map(([label, value]) => `${value} ${label}`).join(" · ")}</p>;
+  const statLine = <p className="text-xs text-soft-grey tabular-nums">{(metadataReady ? [["lists", totals.lists], ["options", totals.options], ["made here", totals.madeHere], ["made in forms", totals.madeInForms], ["built-in", totals.builtIn], ["used by forms", totals.usedByForms]] : [["lists", totals.lists], ["options", totals.options]]).map(([label, value]) => `${value} ${label}`).join(" · ")}</p>;
   const listTools = <div className="space-y-2">
     <label className="relative block"><Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-soft-grey" /><input aria-label="Search lists and options" className="field pl-9" onChange={(event) => setListSearch(event.target.value)} placeholder="Search lists and options" type="search" value={listSearch} /></label>
-    <div className="scroll-x no-scrollbar flex gap-1.5" role="group" aria-label="Filter lists by origin">{ORIGIN_FILTERS.map((filter) => <button aria-pressed={originFilter === filter.value} className={`min-h-9 shrink-0 rounded-full border px-3 text-xs font-medium ${originFilter === filter.value ? "border-gold bg-gold/15 text-gold-secondary" : "border-task-border text-soft-grey hover:text-champagne"}`} key={filter.value} onClick={() => setOriginFilter(filter.value)} type="button">{filter.label}</button>)}</div>
+    <div className="scroll-x no-scrollbar flex gap-1.5" role="group" aria-label="Filter lists by origin">{ORIGIN_FILTERS.map((filter) => <button aria-pressed={originFilter === filter.value} disabled={filter.value !== "all" && !metadataReady} className={`min-h-9 shrink-0 rounded-full border px-3 text-xs font-medium ${originFilter === filter.value ? "border-gold bg-gold/15 text-gold-secondary" : "border-task-border text-soft-grey hover:text-champagne"}`} key={filter.value} onClick={() => setOriginFilter(filter.value)} type="button">{filter.label}</button>)}</div>
+    {insightsPending ? <p className="text-xs text-soft-grey" role="status">Loading list details...</p> : null}
     {!insights.complete ? <p className="text-xs text-soft-grey">Some details (where a list came from or which forms use it) could not be loaded. The lists themselves are complete.</p> : null}
   </div>;
   // One compact row per list; the open one is highlighted.
-  const listRows = loading ? <p className="py-10 text-center text-gold-secondary">Loading dropdowns…</p> : summaries.length === 0 ? <p className="p-10 text-center text-soft-grey">No lists match.</p> : (
+  const listRows = loading ? <p className="py-10 text-center text-gold-secondary">Loading dropdowns…</p> : originFilter !== "all" && !metadataReady ? <p className="p-10 text-center text-soft-grey">{insightsPending ? "Loading list details..." : "List origin details are unavailable. Choose All lists to browse."}</p> : summaries.length === 0 ? <p className="p-10 text-center text-soft-grey">No lists match.</p> : (
     <ul className="divide-y divide-task-border">{summaries.map((list) => <li key={list.key}>
       <button aria-current={category === list.key ? "true" : undefined} aria-label={`Open ${titleCase(list.key)}`} className={`relative flex w-full flex-col gap-0.5 px-4 py-2.5 text-left transition-colors hover:bg-gold/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold ${category === list.key ? "bg-gold/10 before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-full before:bg-gold" : ""}`} onClick={() => setCategory(list.key)} type="button">
-        <span className="flex w-full items-center justify-between gap-2"><span className="min-w-0 truncate text-sm font-semibold text-white">{titleCase(list.key)}</span>{originBadge(list.origin)}</span>
+        <span className="flex w-full items-center justify-between gap-2"><span className="min-w-0 truncate text-sm font-semibold text-white">{titleCase(list.key)}</span>{metadataReady ? originBadge(list.origin) : null}</span>
         <span className="text-xs text-soft-grey">{list.active} active{list.total > list.active ? ` · ${list.total - list.active} off` : ""}{list.forms ? ` · used in ${list.forms} form${list.forms === 1 ? "" : "s"}` : ""}{list.createdAt ? ` · created ${formatDate(list.createdAt)}` : ""}</span>
         {list.matches.length ? <span className="truncate text-xs text-gold-secondary">Matches: {list.matches.slice(0, 4).join(", ")}{list.matches.length > 4 ? "…" : ""}</span> : null}
       </button>
     </li>)}</ul>
   );
   const detailHead = category === null ? null : <div className="space-y-2 border-b border-task-border px-4 py-3">
-    <div className="flex flex-wrap items-center gap-2"><h2 className="min-w-0 flex-1 truncate font-display text-lg font-semibold text-champagne">{titleCase(category)}</h2>{currentOrigin ? originBadge(currentOrigin) : null}<Button className="min-h-10" onClick={() => { setNewList(false); setEditing(null); }}><Plus className="h-4 w-4" />Add item</Button></div>
+    <div className="flex flex-wrap items-center gap-2"><h2 className="min-w-0 flex-1 truncate font-display text-lg font-semibold text-champagne">{titleCase(category)}</h2>{metadataReady && currentOrigin ? originBadge(currentOrigin) : null}<Button className="min-h-10" onClick={() => { setNewList(false); setEditing(null); }}><Plus className="h-4 w-4" />Add item</Button></div>
     {currentForms.length ? <div className="flex flex-wrap items-center gap-1.5"><span className="text-xs font-semibold uppercase tracking-wide text-soft-grey">Used in forms</span>{currentForms.map((form) => <span className="inline-flex items-center gap-1 rounded-full bg-gold/10 px-2.5 py-0.5 text-xs text-champagne" key={form.formTemplateId} title={`Questions: ${form.questions.join(", ")}`}><FileText className="size-3" />{form.name}{form.lifecycle === "draft" ? " (draft)" : ""}</span>)}</div>
-      : <p className="text-xs text-soft-grey">No form questions use this list yet. It may still be used by Tasks, Users, Leave or CRM.</p>}
+      : metadataReady ? <p className="text-xs text-soft-grey">No form questions use this list yet. It may still be used by Tasks, Users, Leave or CRM.</p> : null}
     <div className="flex flex-wrap items-center gap-2"><label className="relative min-w-[12rem] flex-1"><Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-soft-grey" /><input aria-label="Search this list" className="field pl-9" onChange={(event) => setSearch(event.target.value)} placeholder="Search label or code" type="search" value={search} /></label><select aria-label="Status" className="field w-auto" onChange={(event) => setStatus(event.target.value as typeof status)} value={status}><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select><span className="text-xs text-soft-grey tabular-nums">{counts.total} total · <span className="text-success">{counts.active} active</span> · {counts.inactive} inactive</span></div>
   </div>;
   // Options as compact rows: order, label and code, status, then Edit and on/off in one place.

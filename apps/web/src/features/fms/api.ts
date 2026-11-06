@@ -35,6 +35,8 @@ function dateInKolkata(date: Date): string {
   return `${value("year")}-${value("month")}-${value("day")}`;
 }
 
+export { loadFmsLibraryData, type FmsLibraryData } from "@jewelos/data/fms/api";
+
 export async function loadFmsBuilderData(): Promise<FmsData> {
   const kolkataDate = dateInKolkata(new Date());
   const results = await Promise.all([

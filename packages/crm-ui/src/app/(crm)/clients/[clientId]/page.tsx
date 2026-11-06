@@ -59,10 +59,6 @@ export default async function ClientPage({ params,searchParams=Promise.resolve({
 
   if (clientResult.error || !clientResult.data) notFound();
 
-  const { data: currentUser } = authResult.data.user
-    ? assertCrmRead(await supabase.from("users").select("branch_id").eq("id", authResult.data.user.id).single())
-    : { data: null };
-
   const historyPaging={visits:visitPage,activity:activityPage,audit:auditPage,hasMoreVisits:(timelineResult.data?.length??0)>100,hasMoreActivity:(activityResult.data?.length??0)>100,hasMoreAudit:(auditResult.data?.length??0)>100,journey};
   timelineResult.data=timelineResult.data?.slice(0,100)??null;
   activityResult.data=activityResult.data?.slice(0,100)??null;
@@ -72,23 +68,21 @@ export default async function ClientPage({ params,searchParams=Promise.resolve({
   const branchIds = [...new Set([clientResult.data.last_branch_id, ...(timelineResult.data ?? []).map((item) => item.branch_id), ...(activityResult.data ?? []).map(item=>item.branch_id)].filter(Boolean))] as string[];
   const editorIds = [...new Set((auditResult.data ?? []).map((item) => item.edited_by).filter(Boolean))] as string[];
   const salespersonIds = [...new Set([clientResult.data.last_salesperson_id, ...(timelineResult.data ?? []).map((item) => item.salesperson_id)].filter(Boolean))] as string[];
-  const [{ data: branches }, { data: users }] = await readCrmResults([
-    branchIds.length ? supabase.from("branches").select("id,name").in("id", branchIds) : Promise.resolve({ data: [] }),
-    [...editorIds, ...salespersonIds].length ? supabase.from("users").select("id,name").in("id", [...new Set([...editorIds, ...salespersonIds])]) : Promise.resolve({ data: [] }),
-  ]);
   // Approved identity extension: codes, referrer and family (company-wide read, as clients).
   const { data: identity } = identityResult;
-  const { data: family } = identity?.household_id
-    ? assertCrmRead(await supabase.from("clients").select("client_id,client_code,primary_name").eq("household_id", identity.household_id).neq("client_id", clientId).order("client_code"))
-    : { data: [] };
-  const branchNames = new Map((branches ?? []).map((item) => [item.id, item.name]));
-  const userNames = new Map((users ?? []).map((item) => [item.id, item.name]));
   const timelineIds = [...new Set([...(timelineResult.data ?? []).map(item=>item.id),...(latestVisit??[]).map(item=>item.id)])];
   const timelineBatches = Array.from({length:Math.ceil(timelineIds.length/100)},(_,index)=>timelineIds.slice(index*100,(index+1)*100));
-  const [{data: forms},{data: documents}] = await readCrmResults([
+  // These reads depend only on the first batch, so one slow detail must not delay the others.
+  const [{ data: currentUser }, { data: branches }, { data: users }, { data: family }, {data: forms}, {data: documents}] = await readCrmResults([
+    authResult.data.user ? supabase.from("users").select("branch_id").eq("id", authResult.data.user.id).single() : Promise.resolve({ data: null }),
+    branchIds.length ? supabase.from("branches").select("id,name").in("id", branchIds) : Promise.resolve({ data: [] }),
+    [...editorIds, ...salespersonIds].length ? supabase.from("users").select("id,name").in("id", [...new Set([...editorIds, ...salespersonIds])]) : Promise.resolve({ data: [] }),
+    identity?.household_id ? supabase.from("clients").select("client_id,client_code,primary_name").eq("household_id", identity.household_id).neq("client_id", clientId).order("client_code") : Promise.resolve({ data: [] }),
     Promise.all(timelineBatches.map(ids=>supabase.from('visit_forms').select('*').in('client_timeline_id',ids).then(assertCrmRead))).then(results=>({data:results.flatMap(result=>result.data ?? [])})),
     timelineIds.length ? readAllCrmRows((from,to)=>supabase.from('documents').select('id,client_timeline_id,file_name,storage_path,mime_type').eq('client_id',clientId).in('client_timeline_id',timelineIds).order('created_at',{ascending:false}).order('id',{ascending:false}).range(from,to)) : Promise.resolve({data:[]}),
   ]);
+  const branchNames = new Map((branches ?? []).map((item) => [item.id, item.name]));
+  const userNames = new Map((users ?? []).map((item) => [item.id, item.name]));
   const formsByTimeline = new Map((forms ?? []).map(form=>[form.client_timeline_id,form]));
   function mediaPurpose(form: {additional_fields: Json} | undefined, path: string): string | null {
     const fields = form?.additional_fields;

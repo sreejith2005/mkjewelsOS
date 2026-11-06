@@ -62,7 +62,7 @@ describe("Task Control workspace", () => {
     }
     // One snapshot call, so the progress and evidence panels can never render
     // numbers taken from two different filter states.
-    expect(source).toContain("fetchTaskControlSnapshot(filters, view, page, pageSize, kind)");
+    expect(source).toContain("fetchTaskControlSnapshot(requestFilters, view, page, pageSize, kind)");
     expect(source).toContain("Add Task");
     expect(source).toContain("Refresh");
   });

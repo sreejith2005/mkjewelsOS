@@ -31,6 +31,7 @@ function sourceRootAlias(): Plugin {
 }
 
 export default defineConfig({
+  build: { manifest: true },
   plugins: [sourceRootAlias(), react()],
   test: {
     env: {

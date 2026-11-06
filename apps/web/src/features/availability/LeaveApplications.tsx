@@ -76,11 +76,6 @@ export function LeaveApplications() {
     });
     return () => window.cancelAnimationFrame(frame);
   }, [handoverFocus]);
-  useEffect(() => {
-    const refresh = () => { void load(); };
-    window.addEventListener("focus", refresh);
-    return () => window.removeEventListener("focus", refresh);
-  }, [load]);
 
   const myRows = useMemo(() => rows.filter((row) => row.applicant_id === profile?.id), [rows, profile?.id]);
   const handoverRows = useMemo(() => myRows.filter(leaveNeedsHandover), [myRows]);
