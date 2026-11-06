@@ -2268,6 +2268,39 @@ export type Database = {
   }
   public: {
     Tables: CustomerIntegrationTables & {
+      recording_action_tasks: {
+        Row: {
+          action_index: number
+          analysis_id: string
+          created_at: string
+          created_by: string
+          id: string
+          session_id: string
+          task_id: string
+          tenant_id: string
+        }
+        Insert: {
+          action_index: number
+          analysis_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          session_id: string
+          task_id: string
+          tenant_id: string
+        }
+        Update: {
+          action_index?: number
+          analysis_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          session_id?: string
+          task_id?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       recording_analyses: {
         Row: {
           analyzer_model: string
@@ -13247,6 +13280,10 @@ export type Database = {
         Args: { p_revision_id?: string; p_session_id: string }
         Returns: Json
       }
+      recording_coaching_lists: {
+        Args: { p_from: string; p_to: string }
+        Returns: Json
+      }
       recording_compute_score: {
         Args: { p_dims: Json; p_min_assessed: number; p_rubric: Json }
         Returns: Json
@@ -13255,12 +13292,30 @@ export type Database = {
         Args: { p_enabled: boolean; p_job_version?: string }
         Returns: Json
       }
+      recording_conversation_card: { Args: { p_session_id: string }; Returns: Json }
+      recording_conversations_page: {
+        Args: {
+          p_before?: string
+          p_before_id?: string
+          p_filters?: Json
+          p_limit?: number
+        }
+        Returns: Json
+      }
       recording_correct_transcript: {
         Args: {
           p_base_revision_id: string
           p_changes: Json
           p_reason: string
           p_session_id: string
+        }
+        Returns: Json
+      }
+      recording_create_action_task: {
+        Args: {
+          p_action_index: number
+          p_analysis_id: string
+          p_planned_at: string
         }
         Returns: Json
       }
@@ -13274,6 +13329,19 @@ export type Database = {
       }
       recording_create_sop_version: {
         Args: { p_clauses: Json; p_title: string }
+        Returns: Json
+      }
+      recording_devices_page: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_q?: string
+          p_status?: string
+        }
+        Returns: Json
+      }
+      recording_insights: {
+        Args: { p_employee_id?: string; p_from: string; p_to: string }
         Returns: Json
       }
       recording_list_versions: { Args: never; Returns: Json }
@@ -13311,6 +13379,7 @@ export type Database = {
         }
         Returns: Json
       }
+      recording_session_action_tasks: { Args: { p_session_id: string }; Returns: Json }
       recording_set_sop_status: {
         Args: { p_sop_version_id: string; p_status: string }
         Returns: Json
@@ -13376,6 +13445,8 @@ export type Database = {
         Args: { p_limit?: number; p_source: Json }
         Returns: Json
       }
+      recording_today: { Args: never; Returns: Json }
+      recording_workspace_settings: { Args: never; Returns: Json }
       retry_fms_trigger_event_with_audit: {
         Args: { p_event_id: string }
         Returns: Json

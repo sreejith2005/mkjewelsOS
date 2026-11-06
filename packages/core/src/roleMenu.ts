@@ -65,7 +65,7 @@ export const ALL_MENU_ITEMS: readonly MenuItem[] = [
   { id: "dropdown_master", label: "Dropdown Master", path: "/dropdown-master" },
   { id: "ask_kiara", label: "Ask Kiara", path: "/ask-kiara" },
   { id: "settings", label: "Settings", path: "/settings" },
-  { id: "sales_recording", label: "Sales Recording", path: "/sales-recording" },
+  { id: "sales_recording", label: "Store Intelligence", path: "/sales-recording" },
 ] as const;
 
 export const IMPLEMENTED_PAGE_IDS: readonly PageId[] = [
@@ -103,7 +103,7 @@ const APP_DESCRIPTIONS: Partial<Readonly<Record<PageId, string>>> = {
   reports: "Preview fixed reports and manage private CSV exports.",
   settings: "Manage account preferences and authorized organization defaults.",
   ask_kiara: "Ask about your work, using JewelOS, and company SOPs.",
-  sales_recording: "Record an authorized conversation and follow saving and transcription.",
+  sales_recording: "Record customer conversations, see summaries and coaching, and (managers) review the team.",
 };
 
 const COMMON_WORK_PAGES: readonly PageId[] = [

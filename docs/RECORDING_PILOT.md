@@ -108,10 +108,9 @@ job leases. Job retries back off and dead-letter after five attempts.
 Design: `docs/superpowers/specs/2026-11-05-store-intelligence-processing-design.md`.
 Dark until **Turn analysis on** in **Sales score settings** (Developer Mode
 authority; `recording_configure_analysis`) and the analysis worker runs. On the
-Sales Recording page a Ready recording shows **Conversation review** (score,
-evidence, review actions, transcript corrections); migration 0380 adds the
-read-only settings call. Evidence jumps to the transcript line; audio playback
-from evidence needs a reviewed playback route and is not built yet.
+conversation screen a Ready recording shows the score, evidence, review actions
+and transcript corrections; migration 0380 adds the read-only settings call.
+Evidence plays the moment for managers (0381).
 
 - Final transcripts become immutable revisions with speaker, offsets, language,
   display/translation text and STT confidence. Manager corrections
@@ -145,13 +144,36 @@ Enable order: apply 0379, deploy `recorder-ingest`, set
 SOP version, start the analysis worker, run the evaluation report with the chosen
 analyzer, then enable analysis for the pilot tenant.
 
+## Store Intelligence workspace (migration 0383)
+
+The menu entry is now **Store Intelligence** (same page id `sales_recording` and
+path `/sales-recording`). Screens: Today, the recording flow
+(`/sales-recording/record`), Conversations and a conversation's Summary /
+Transcript / Coaching / Actions tabs (`/sales-recording/conversations/<id>?tab=`),
+and for managers Coaching, Insights, Devices; Settings for managers and admins.
+0383 adds read-only, branch-scoped functions behind them
+(`recording_today`, `recording_conversations_page`, `recording_conversation_card`,
+`recording_devices_page`, `recording_insights`, `recording_coaching_lists`,
+`recording_workspace_settings`, `recording_session_action_tasks`) that reuse
+`recorder_can_read` and the 0379 rule that employees see only approved or edited
+analyses. The one write, `recording_create_action_task`, turns a suggested next
+action into a checklist task for the recorded employee through
+`create_manual_task_with_mode_with_audit` and records the link in
+`recording_action_tasks` (unique per analysis and action, so a second tap returns
+the same task); it is audited as `recording_action_task_created`.
+
+Outcomes shown are what the conversation said, never a CRM sale: walk-in linking
+records only the queue reference, and the CRM purchase result is not synced to
+JewelOS. Device status is from heartbeats only; battery and location are not
+collected. The conversation player reuses the 0381 audited one-minute windows and
+asks for the next window when one ends.
 ## Validation and release gates
 
 Focused commands, from the repository root:
 
 ```powershell
 pnpm.cmd --filter @jewelos/core exec vitest run src/recording.test.ts src/permissions/catalog.migration.test.ts
-pnpm.cmd --filter web exec vitest run src/features/recording src/pages/SalesRecordingPage.test.tsx
+pnpm.cmd --filter web exec vitest run src/features/recording src/features/storeIntelligence
 deno test supabase/functions/_shared/recorder/boundary.test.ts
 ```
 
