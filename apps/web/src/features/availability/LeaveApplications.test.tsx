@@ -1,5 +1,5 @@
 ﻿// @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LeaveApplications } from "./LeaveApplications";
 
@@ -17,7 +17,7 @@ const api = vi.hoisted(() => ({
 }));
 const actor = vi.hoisted(() => ({ role: "staff" as "staff" | "super_admin" }));
 vi.mock("@jewelos/data/leave/api", () => api);
-vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealtimeRefresh: vi.fn() }));
+vi.mock("@/features/realtime/api", () => ({ subscribeToTenantRealtime: () => () => undefined }));
 vi.mock("@/auth/AuthContext", async () => {
   const { builtinAccessContext } = await vi.importActual<typeof import("@jewelos/core")>("@jewelos/core");
   const staffProfile = { id: "me", tenant_id: "t", employee_name: "Richelle", user_role: "staff" as const };
@@ -39,6 +39,17 @@ describe("LeaveApplications handover", () => {
     api.leaveHandoverCandidates.mockResolvedValue([{ id: "me", employee_name: "Richelle" }, { id: "peer", employee_name: "Asha" }]);
     api.leaveSummaryApplicants.mockResolvedValue([{ id: "peer", employee_name: "Asha" }]);
     api.listLeaveRequests.mockResolvedValue([leave("one", "RICHELLE-25-SEP-2026-100000"), leave("two", "RICHELLE-25-SEP-2026-110000")]);
+  });
+
+  it("refreshes leave data once through the central coordinator on window focus", async () => {
+    render(<LeaveApplications />);
+    await waitFor(() => expect(api.listLeaveRequests).toHaveBeenCalledTimes(1));
+    vi.useFakeTimers();
+    try {
+      fireEvent.focus(window);
+      await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+      expect(api.listLeaveRequests).toHaveBeenCalledTimes(2);
+    } finally { vi.useRealTimers(); }
   });
 
   it("shows office totals and another employee's request to a Super Admin", async () => {

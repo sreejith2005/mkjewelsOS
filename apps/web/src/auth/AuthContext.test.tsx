@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 type Listener = (event: string, session: unknown) => void;
@@ -57,9 +58,23 @@ function Probe() {
   return <p>{status}|{branch?.name ?? "-"}|{session?.access_token ?? "-"}</p>;
 }
 
-afterEach(() => { mocks.state.profileReads = 0; mocks.state.listener = null; });
+afterEach(() => { cleanup(); mocks.state.profileReads = 0; mocks.state.listener = null; });
 
 describe("AuthProvider boot", () => {
+  it("revalidates a confirmed session without restarting every profile-dependent page", async () => {
+    const changed = vi.fn();
+    function Page() {
+      const { profile, access, preferences, branch } = useAuth();
+      useEffect(changed, [profile, access, preferences, branch]);
+      return <Probe />;
+    }
+    render(<AuthProvider><Page /></AuthProvider>);
+    await screen.findByText(/^authenticated\|Main\|b$/);
+    const before = changed.mock.calls.length;
+    await act(async () => { mocks.state.listener?.("SIGNED_IN", { user: { id: "auth-1" }, access_token: "b", refresh_token: "r" }); });
+    expect(mocks.state.profileReads).toBe(2);
+    expect(changed.mock.calls.length).toBe(before);
+  });
   it("opens with one profile load when only the token refreshed", async () => {
     await act(async () => { render(<AuthProvider><Probe /></AuthProvider>); });
     await waitFor(() => expect(screen.getByText(/^authenticated\|Main\|b$/)).toBeTruthy());

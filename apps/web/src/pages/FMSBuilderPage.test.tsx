@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FmsData } from "@/features/fms/api";
@@ -8,6 +8,7 @@ import { FMSBuilderPage } from "./FMSBuilderPage";
 
 const mocks = vi.hoisted(() => ({
   loadFmsBuilderData: vi.fn(),
+  loadFmsLibraryData: vi.fn(),
   loadFmsRuntime: vi.fn(),
   startFmsInstance: vi.fn(),
   setFmsFlowActive: vi.fn(),
@@ -27,6 +28,7 @@ vi.mock("@/auth/AuthContext", async () => {
 });
 vi.mock("@/features/fms/api", async () => ({
   loadFmsBuilderData: mocks.loadFmsBuilderData,
+  loadFmsLibraryData: mocks.loadFmsLibraryData,
   loadFmsRuntime: mocks.loadFmsRuntime,
   startFmsInstance: mocks.startFmsInstance,
   setFmsFlowActive: mocks.setFmsFlowActive,
@@ -54,9 +56,82 @@ const data = {
 const runtime = { instances: [], stages: [], definitions: [], flows: [flow], checklist: [], evidence: [], logs: [], users: [] };
 
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
-beforeEach(() => { mocks.loadFmsLibraryOutcomes.mockResolvedValue(new Map()); });
+beforeEach(() => { window.history.replaceState({}, "", "/fms"); mocks.loadFmsLibraryData.mockResolvedValue(data); mocks.loadFmsLibraryOutcomes.mockResolvedValue(new Map()); });
 
 describe("unified FMS console", () => {
+  it("shows the library without downloading authoring data", async () => {
+    mocks.loadFmsBuilderData.mockImplementation(() => new Promise(() => undefined));
+    render(<FMSBuilderPage />);
+    await screen.findByText("Sales intake");
+    expect(mocks.loadFmsBuilderData).not.toHaveBeenCalled();
+  });
+
+  it("shows workflows while optional run counts are still loading", async () => {
+    mocks.loadFmsBuilderData.mockResolvedValue(data);
+    mocks.loadFmsLibraryOutcomes.mockImplementation(() => new Promise(() => undefined));
+    render(<FMSBuilderPage />);
+    await screen.findByText("Sales intake");
+    expect(screen.getByLabelText("Sales intake counts").textContent).not.toContain("Running0");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Assigned to me" }));
+    expect(screen.queryByText(/No workflows match this view/)).toBeNull();
+    expect(screen.getByRole("status").textContent).toMatch(/loading/i);
+  });
+
+  it("loads full authoring data only when New workflow is opened", async () => {
+    mocks.loadFmsBuilderData.mockResolvedValue({ ...data, formFields: {} });
+    render(<FMSBuilderPage />);
+    await screen.findByText("Sales intake");
+    expect(mocks.loadFmsBuilderData).not.toHaveBeenCalled();
+    await userEvent.setup().click(screen.getByRole("button", { name: "New workflow" }));
+    await screen.findByRole("heading", { name: "Name this workflow" });
+    expect(mocks.loadFmsBuilderData).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps failed assignment counts distinct from an empty assignment list", async () => {
+    mocks.loadFmsLibraryOutcomes.mockRejectedValueOnce(new Error("Counts unavailable"));
+    render(<FMSBuilderPage />);
+    await screen.findByText("Sales intake");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Assigned to me" }));
+    expect(await screen.findByText("Workflow counts are unavailable.")).toBeTruthy();
+    expect(screen.queryByText(/No workflows match this view/)).toBeNull();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText(/No workflows match this view/)).toBeTruthy();
+  });
+
+  it("keeps the library usable after an authoring load fails and allows retry", async () => {
+    mocks.loadFmsBuilderData.mockRejectedValueOnce(new Error("Builder unavailable")).mockResolvedValue({ ...data, formFields: {} });
+    render(<FMSBuilderPage />);
+    await screen.findByText("Sales intake");
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "New workflow" }));
+    await screen.findByText("Builder unavailable", { exact: false });
+    expect(screen.getByText("Sales intake")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "New workflow" }));
+    await screen.findByRole("heading", { name: "Name this workflow" });
+  });
+
+  it("does not reopen the editor when a cancelled authoring request finishes", async () => {
+    let finish: ((value: FmsData) => void) | undefined;
+    mocks.loadFmsBuilderData.mockImplementation(() => new Promise<FmsData>((resolve) => { finish = resolve; }));
+    render(<FMSBuilderPage />);
+    await screen.findByText("Sales intake");
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "New workflow" }));
+    await screen.findByText("Loading workflow editor...");
+    await user.click(screen.getByRole("button", { name: /Back to FMS/ }));
+    await act(async () => { finish?.({ ...data, formFields: {} }); });
+    expect(screen.getByText("Sales intake")).toBeTruthy();
+    expect(screen.queryByText("Loading workflow editor...")).toBeNull();
+  });
+
+  it("opens assigned instance links without waiting for authoring data", async () => {
+    window.history.replaceState({}, "", "/tasks/fms?instance=assigned-run&stage=assigned-stage");
+    mocks.loadFmsBuilderData.mockImplementation(() => new Promise(() => undefined));
+    render(<FMSBuilderPage />);
+    await screen.findByText("Live instance assigned-run");
+    expect(mocks.loadFmsBuilderData).not.toHaveBeenCalled();
+  });
+
   it("shows server-counted running and outcome totals on the workflow card without loading the runtime", async () => {
     mocks.loadFmsBuilderData.mockResolvedValue(data);
     mocks.loadFmsLibraryOutcomes.mockResolvedValue(new Map([["family", { familyId: "family", started: 100, running: 38, onHold: 2, completed: 60, cancelled: 0, won: 30, lost: 20, doNotContact: 10, other: 0, unspecified: 0, mine: 3 }]]));

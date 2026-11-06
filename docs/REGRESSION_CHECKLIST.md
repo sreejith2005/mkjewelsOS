@@ -9,8 +9,12 @@ you did not run.
 
 ```powershell
 pnpm.cmd --filter @jewelos/core test         # includes permission resolver + SQL catalog parity
+pnpm.cmd --filter @jewelos/data test
+pnpm.cmd --filter @jewelos/crm-ui test
 pnpm.cmd --filter web test
 pnpm.cmd exec turbo run typecheck --force --concurrency=1
+pnpm.cmd exec turbo run build --force --concurrency=1
+pnpm.cmd check:web-performance
 supabase.cmd db reset                        # local only
 supabase.cmd test db                         # pgTAP, incl. 0156_granular_permissions
 supabase.cmd db lint --local --level warning
@@ -18,6 +22,15 @@ git diff --check
 ```
 
 ## Manual pass
+
+For loading changes, test a cold visit and a repeat visit on desktop and phone,
+then change tabs/filters quickly, save, and return through browser Back. In Task
+Control cover Overview, People, Tasks, Review (all buckets) and Templates. In
+CRM cover Registration, Queue, Clients, a client profile, Follow-ups and Settings
+as permitted. Slow or failing optional metadata must not block the primary list.
+Check that obsolete requests never replace the current filter or identity.
+After building, run `pnpm.cmd check:web-performance`; record network/interaction
+timings separately from bundle size. Use authorized synthetic data for automation.
 
 Use one test account per row of the **Accounts** table. Every "denied" check
 must be tried three ways: the UI, a typed URL, and a direct API call (browser

@@ -1,5 +1,5 @@
-import { rememberFmsBoardReturn } from "@/features/tasks/fms/boardReturn";
-import { startTransition, Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { usePathname } from "@/lib/usePathname";
 import {
   Building2,
   CalendarCheck,
@@ -100,6 +100,7 @@ const PAGE_PRELOADS: Partial<Record<PageId, readonly (() => Promise<void>)[]>> =
   settings: [SettingsPage.preload],
   ask_kiara: [AskKiaraPage.preload],
   crm: [CrmApp.preload],
+  sales_recording: [SalesRecordingPage.preload],
 };
 
 const PAGE_ICONS: Record<PageId, typeof Home> = {
@@ -144,33 +145,6 @@ const FULL_WIDTH_PAGES = new Set<PageId>([
   "dropdown_master",
   "ask_kiara",
 ]);
-
-function usePathname() {
-  // The whole URL is tracked, not just the pathname, because pages addressed by
-  // query alone — assigned FMS work is one — move between destinations without
-  // the pathname changing. Storing only the pathname made React bail out of the
-  // identical state update, so the URL advanced while the view did not.
-  const [href, setHref] = useState(window.location.href);
-  useEffect(() => {
-    const onPopState = () => startTransition(() => setHref(window.location.href));
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, []);
-  const navigate = (nextPath: string) => {
-    const nextUrl = new URL(nextPath, window.location.origin);
-    const next = `${nextUrl.pathname}${nextUrl.search}`;
-    if (next !== `${window.location.pathname}${window.location.search}`) {
-      if (nextUrl.pathname === "/tasks/fms" && window.location.pathname !== "/tasks/fms") rememberFmsBoardReturn(`${window.location.pathname}${window.location.search}`, next);
-      window.history.pushState({}, "", next);
-    }
-    // A transition keeps the current screen on view while the next section's
-    // code finishes downloading, instead of flashing the loading skeleton.
-    startTransition(() => setHref(nextUrl.href));
-  };
-  // Every existing route comparison is pathname-only, so keep `path` that shape.
-  const path = new URL(href, window.location.origin).pathname;
-  return { navigate, path, search: new URL(href, window.location.origin).search };
-}
 
 function LoginPage() {
   const { signIn, statusMessage } = useAuth();

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ClipboardCheck } from "lucide-react";
 import {
   canManageRecurringWorkspace,
@@ -93,9 +93,13 @@ export function ReviewTab({ filters, reloadKey, onOpenRecurringTasks }: {
   const [formTarget, setFormTarget] = useState<RecurringInstance | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [formLoading, setFormLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const generation = useRef(0);
 
   const load = useCallback(async () => {
     if (!canManage) return;
+    const request = ++generation.current;
     setLoading(true);
     setError(null);
     try {
@@ -103,22 +107,29 @@ export function ReviewTab({ filters, reloadKey, onOpenRecurringTasks }: {
         date_from: filters.from, date_to: filters.to, search: filters.search, priority, schedule_kind: frequency,
         branch_id: filters.branch_id, department_id: filters.department_id,
       });
-      const formIds = [...new Set(next.instances.flatMap((task) => (task.form_template_id ? [task.form_template_id] : [])))];
-      setWorkspace(next);
-      if (formIds.length) {
-        const [forms, options] = await Promise.all([loadTaskForms(formIds, next.instances.map((task) => task.id)), loadFormDynamicOptions()]);
-        setFormBundles(forms.bundles);
-        setFormOptions(options);
-      }
+      if (request === generation.current) setWorkspace(next);
     } catch (caught) {
-      setError(errorMessage(caught));
+      if (request === generation.current) setError(errorMessage(caught));
     } finally {
-      setLoading(false);
+      if (request === generation.current) setLoading(false);
     }
   }, [canManage, filters.branch_id, filters.department_id, filters.from, filters.search, filters.to, frequency, priority]);
 
-  useEffect(() => { void load(); }, [load, reloadKey]);
+  useEffect(() => { void load(); return () => { generation.current += 1; }; }, [load, reloadKey]);
   useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["tasks", "forms"], refresh: load });
+
+  // Review needs occurrences, not every form's questions and option directory.
+  // Resolve only the exact selected work item when Complete form is opened.
+  useEffect(() => {
+    if (!formTarget?.form_template_id) return;
+    let active = true;
+    setFormLoading(true); setFormError(null); setFormBundles([]);
+    void Promise.all([loadTaskForms([formTarget.form_template_id], [formTarget.id]), loadFormDynamicOptions()])
+      .then(([forms, options]) => { if (active) { setFormBundles(forms.bundles); setFormOptions(options); } })
+      .catch((cause: unknown) => { if (active) setFormError(errorMessage(cause)); })
+      .finally(() => { if (active) setFormLoading(false); });
+    return () => { active = false; };
+  }, [formTarget]);
 
   const changeBucket = (next: ReviewBucket) => {
     setBucket(next);
@@ -165,8 +176,8 @@ export function ReviewTab({ filters, reloadKey, onOpenRecurringTasks }: {
         Recurring occurrences planned in the selected dates. Each occurrence counts once; Performance counts each assignee of a shared occurrence.
       </p>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <nav aria-label="Review lists" className="no-scrollbar flex flex-1 gap-2 overflow-x-auto pb-1">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <nav aria-label="Review lists" className="no-scrollbar flex w-full min-w-0 gap-2 overflow-x-auto pb-1 sm:w-auto sm:flex-1">
           {REVIEW_BUCKETS.map(([value, label]) => (
             <button
               aria-current={bucket === value ? "page" : undefined}
@@ -179,6 +190,7 @@ export function ReviewTab({ filters, reloadKey, onOpenRecurringTasks }: {
             </button>
           ))}
         </nav>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
         <select aria-label="Priority" className="task-field w-auto" onChange={(event) => setPriority(event.target.value)} value={priority}>
           <option value="">All priorities</option>
           {RECURRING_PRIORITY_FILTERS.map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}
@@ -187,6 +199,7 @@ export function ReviewTab({ filters, reloadKey, onOpenRecurringTasks }: {
           <option value="">All frequencies</option>
           {RECURRING_FREQUENCY_FILTERS.map((value) => <option key={value} value={value}>{titleCase(value.replace("_", " "))}</option>)}
         </select>
+        </div>
       </div>
 
       {loading ? <LoadingPanels count={2} /> : bucket === "performance" ? (
@@ -243,7 +256,7 @@ export function ReviewTab({ filters, reloadKey, onOpenRecurringTasks }: {
 
       {formTarget?.form_template_id ? (() => {
         const form = formBundles.find((item) => item.id === formTarget.form_template_id);
-        return form ? (
+        return formLoading ? <Modal onClose={() => setFormTarget(null)} title="Required form"><LoadingPanels count={1} /></Modal> : formError ? <Modal onClose={() => setFormTarget(null)} title="Required form"><Notice tone="danger">{formError}</Notice></Modal> : form ? (
           <Modal onClose={() => setFormTarget(null)} title={`Required form: ${form.name}`} wide>
             <TaskRequiredForm
               definition={{ name: form.name, description: form.description ?? undefined, sections: form.sections, fields: form.fields }}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Bell, FileText, History, RefreshCw, Settings, ShieldCheck } from "lucide-react";
 import { Button, Notice } from "@/components/ui";
 import { useAuth } from "@/auth/AuthContext";
@@ -18,12 +18,27 @@ export function NotificationsPage({ onNavigate }: { onNavigate: (path: string) =
   const { access, profile } = useAuth();
   const isAdmin = hasPermission(access, "notifications.manage");
   const [tab,setTab]=useState<Tab>("inbox"); const [items,setItems]=useState<InboxNotification[]>([]); const [templates,setTemplates]=useState<NotificationTemplateRow[]>([]); const [rules,setRules]=useState<NotificationRuleRow[]>([]); const [providers,setProviders]=useState<ProviderAvailability[]>([]); const [profiles,setProfiles]=useState<Array<{id:string;employee_name:string;user_role:string}>>([]); const [loading,setLoading]=useState(true); const [error,setError]=useState<string|null>(null); const [adminError,setAdminError]=useState<string|null>(null);
+  const adminGeneration=useRef(0);
+  const activeTab=useRef(tab);activeTab.current=tab;
   const refreshInbox=useCallback(async()=>{if(!profile)return;setError(null);try{setItems(await loadInbox(profile.id));}catch(caught){setError(caught instanceof Error?caught.message:"Notifications could not be loaded");}},[profile]);
-  const refreshAdmin=useCallback(async()=>{if(!isAdmin)return;setAdminError(null);try{const [nextTemplates,nextRules,nextProviders,nextProfiles]=await Promise.all([loadTemplates(),loadRules(),loadProviders(),loadActiveRecipientProfiles()]);setTemplates(nextTemplates);setRules(nextRules);setProviders(nextProviders);setProfiles(nextProfiles);}catch(caught){setAdminError(caught instanceof Error?caught.message:"Notification administration could not be loaded");}},[isAdmin]);
+  const refreshAdmin=useCallback(async()=>{
+    if(!isAdmin)return;const request=++adminGeneration.current;const currentTab=activeTab.current;setAdminError(null);
+    try{
+      // Provider status stays visible in the header; other data belongs to its tab.
+      const [nextTemplates,nextRules,nextProviders,nextProfiles]=await Promise.all([
+        currentTab==="templates"||currentTab==="rules"?loadTemplates():Promise.resolve(null),
+        currentTab==="rules"?loadRules():Promise.resolve(null),
+        loadProviders(),
+        currentTab==="rules"?loadActiveRecipientProfiles():Promise.resolve(null),
+      ]);
+      if(request!==adminGeneration.current)return;
+      if(nextTemplates)setTemplates(nextTemplates);if(nextRules)setRules(nextRules);setProviders(nextProviders);if(nextProfiles)setProfiles(nextProfiles);
+    }catch(caught){if(request===adminGeneration.current)setAdminError(caught instanceof Error?caught.message:"Notification administration could not be loaded");}
+  },[isAdmin]);
   const refreshAll=useCallback(async()=>{setLoading(true);setError(null);await refreshInbox();setLoading(false);},[refreshInbox]);
   const requestRefresh = useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["tasks", "fms", "forms", "organization", "settings"], refresh: async () => { await Promise.all([refreshInbox(), refreshAdmin()]); } });
   useEffect(()=>{void refreshAll();},[refreshAll]);
-  useEffect(()=>{if(isAdmin&&tab!=="inbox")void refreshAdmin();},[isAdmin,refreshAdmin,tab]);
+  useEffect(()=>{void refreshAdmin();return()=>{adminGeneration.current+=1;};},[refreshAdmin,tab]);
   useEffect(()=>profile?subscribeToInbox(profile.id,requestRefresh):undefined,[profile?.id,requestRefresh]);
   if(!profile)return null;
   const tabs:Array<{id:Tab;label:string;Icon:typeof Bell;admin?:boolean}>=[{id:"inbox",label:"Inbox",Icon:Bell},{id:"templates",label:"Templates",Icon:FileText,admin:true},{id:"rules",label:"Rules",Icon:Settings,admin:true},{id:"logs",label:"Delivery logs",Icon:History,admin:true}];

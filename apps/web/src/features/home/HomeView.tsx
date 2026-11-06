@@ -16,7 +16,7 @@ function completion(summary:HomeSummary){const tasks=summary.tasks;return tasks.
 function when(value:string|null|undefined,fallback="Any time"){return value?new Date(value).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}):fallback;}
 
 export function HomeView({onNavigate}:{onNavigate:(path:string)=>void}){
-  const {branch,profile}=useAuth(); const {data,error,loading,retry}=useAsyncData(fetchHomeSummary,[]); const {team,refresh:refreshTeam}=useTeamToday(profile?.user_role);
+  const {branch,profile}=useAuth(); const {data,error,loading,retry}=useAsyncData(fetchHomeSummary,[profile?.id]); const {team,refresh:refreshTeam}=useTeamToday(profile?.user_role);
   useEffect(()=>profile?.id ? subscribeToInbox(profile.id,()=>{void retry();}) : undefined,[profile?.id,retry]);
   useTenantRealtimeRefresh({tenantId:profile?.tenant_id,topics:["tasks","fms","crm","organization","settings"],refresh:()=>{refreshTeam();return retry();}});
   if(loading)return <section className="-m-4 min-h-[calc(100dvh-7.875rem)] bg-task-muted p-4 sm:-m-6 sm:p-6"><LoadingPanels count={6}/></section>;

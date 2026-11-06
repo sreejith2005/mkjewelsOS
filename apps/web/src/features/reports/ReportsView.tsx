@@ -47,6 +47,7 @@ export function ReportsView(){
   const [definition,setDefinition]=useState<ReportDefinition|undefined>(()=>{const requested=new URLSearchParams(window.location.search).get("report");return catalog.find((item)=>item.key===requested)??catalog[0];});
   const [filters,setFilters]=useState<ReportFilters>(()=>definition?startingFilters(definition,new URLSearchParams(window.location.search)):{page:1,page_size:25});
   const [data,setData]=useState<ReportPayload|null>(null);const [history,setHistory]=useState<ReportPayload|null>(null);
+  const [historyLoading,setHistoryLoading]=useState(false);const [historyError,setHistoryError]=useState<string|null>(null);
   const [loading,setLoading]=useState(true);const [error,setError]=useState<string|null>(null);const [message,setMessage]=useState<string|null>(null);const [exporting,setExporting]=useState(false);
   const [places,setPlaces]=useState<ReportingOptions>({branches:[],departments:[]});
   const [choices,setChoices]=useState<ReportFilterOptions>({forms:[],flows:[],stages:[],employees:[]});
@@ -57,7 +58,8 @@ export function ReportsView(){
   const [filtersOpen,setFiltersOpen]=useState(()=>typeof window==="undefined"||typeof window.matchMedia!=="function"||!window.matchMedia("(max-width: 639px)").matches);
   const [customerSearch,setCustomerSearch]=useState("");const [customers,setCustomers]=useState<CrmReportCustomer[]>([]);const [customer,setCustomer]=useState<CrmReportCustomer|null>(null);
   const generation=useRef(0);
-  useEffect(()=>()=>{generation.current+=1;},[]);
+  const historyGeneration=useRef(0);
+  useEffect(()=>()=>{generation.current+=1;historyGeneration.current+=1;},[]);
   const elevated=["super_admin","admin","manager","hr"].includes(role);
   const canSelectBranch=["super_admin","admin"].includes(role);
   const isCrm=definition?.source==="crm";
@@ -73,20 +75,30 @@ export function ReportsView(){
     if(!definition)return;
     const request=++generation.current;if(showLoading)setLoading(true);setError(null);
     try{
-      const today=istDay(new Date());
       const offset=(filters.page-1)*filters.page_size;
       const preview:Promise<ReportPayload>=definition.source==="crm"
         ?(needsCustomer&&!filters.client_id||!crmReader?Promise.resolve({report_key:definition.key,rows:[],total:0}):crmReader.report(definition.key,crmReportFilters(filters),offset,filters.page_size).then((page)=>({report_key:definition.key,...page})))
         :fetchReport(definition.key,jewelosReportFilters(filters));
-      const [rows,exports]=await Promise.all([preview,fetchReport("export_history",jewelosReportFilters({from:shiftDay(today,-29),to:today,page:1,page_size:25}))]);
-      if(request!==generation.current)return;setData(rows);setHistory(exports);
+      const rows=await preview;
+      if(request!==generation.current)return;setData(rows);
     }catch(caught){if(request===generation.current)setError(caught instanceof Error?caught.message:"Report request failed");}
     finally{if(request===generation.current)setLoading(false);}
   },[definition,filters,crmReader,needsCustomer]);
-  const requestRefresh=useTenantRealtimeRefresh({tenantId:profile?.tenant_id,topics:["tasks","fms","forms","organization","settings"],refresh:()=>load(false)});
+  const loadHistory=useCallback(async()=>{
+    const request=++historyGeneration.current;setHistoryLoading(true);
+    try{
+      const today=istDay(new Date());
+      const exports=await fetchReport("export_history",jewelosReportFilters({from:shiftDay(today,-29),to:today,page:1,page_size:25}));
+      if(request!==historyGeneration.current)return;setHistory(exports);setHistoryError(null);
+    }catch(caught){if(request===historyGeneration.current)setHistoryError(caught instanceof Error?caught.message:"Export history request failed");}
+    finally{if(request===historyGeneration.current)setHistoryLoading(false);}
+  },[]);
+  const hasReports=!!definition;
+  useEffect(()=>{if(hasReports)void loadHistory();},[hasReports,loadHistory]);
+  useTenantRealtimeRefresh({tenantId:profile?.tenant_id,topics:["tasks","fms","forms","organization","settings"],refresh:async()=>{await Promise.all([load(false),loadHistory()]);}});
   useEffect(()=>{if(!definition)return;writeUrl(definition.key,filters);void load();},[definition,filters,load]);
   const pending=history?.rows.some((row)=>row.status==="queued"||row.status==="processing")??false;
-  useEffect(()=>{if(!pending)return;const timer=window.setInterval(requestRefresh,5000);return()=>window.clearInterval(timer);},[pending,requestRefresh]);
+  useEffect(()=>{if(!pending||historyLoading)return;const timer=window.setInterval(()=>void loadHistory(),5000);return()=>window.clearInterval(timer);},[pending,historyLoading,loadHistory]);
 
   const changeReport=(next:ReportDefinition|undefined)=>{if(!next||next.key===definition?.key)return;setDefinition(next);setData(null);setSearchText("");setCustomer(null);setCustomerSearch("");
     setFilters((current)=>startingFilters(next,{...(current.from&&current.to?{from:current.from,to:current.to}:{}),...(next.family&&next.family===definition?.family?Object.fromEntries(Object.entries(current).filter(([key,value])=>next.filters.includes(key as ReportFilterKey)&&value!==undefined).map(([key,value])=>[key,String(value)])):{}),page_size:String(current.page_size)}));};
@@ -94,8 +106,8 @@ export function ReportsView(){
   const doExport=async()=>{if(!definition)return;setExporting(true);setMessage(null);setError(null);try{
     if(definition.source==="crm"){await requestCrmExport(definition.key,crmReportFilters(filters));setMessage("Your CSV is being prepared and appears under “Your exports” below. Customer exports need CRM administrator access; without it the file shows as failed.");}
     else{await requestExport(definition.key,jewelosReportFilters(filters));setMessage("Your CSV is being prepared. It appears under “Your exports” below, usually within a minute.");}
-    await load(false);}catch(caught){setError(caught instanceof Error?caught.message:"Export request failed");}finally{setExporting(false);}};
-  const lifecycle=async(action:"cancel"|"retry"|"download",id:string)=>{setMessage(null);try{if(action==="cancel")await cancelExport(id);else if(action==="retry")await retryExport(id);else{window.location.assign(await signedExportUrl(id));return;}setMessage(action==="cancel"?"Export cancelled.":"Export queued again.");await load(false);}catch(caught){setError(caught instanceof Error?caught.message:"Export action failed");}};
+    await loadHistory();}catch(caught){setError(caught instanceof Error?caught.message:"Export request failed");}finally{setExporting(false);}};
+  const lifecycle=async(action:"cancel"|"retry"|"download",id:string)=>{setMessage(null);try{if(action==="cancel")await cancelExport(id);else if(action==="retry")await retryExport(id);else{window.location.assign(await signedExportUrl(id));return;}setMessage(action==="cancel"?"Export cancelled.":"Export queued again.");await loadHistory();}catch(caught){setError(caught instanceof Error?caught.message:"Export action failed");}};
 
   if(!definition)return <PageSurface><PageHeading title="Reports" description="Business reports and CSV exports."/><EmptyMessage>No reports are available for your access. Ask an administrator if you need one.</EmptyMessage></PageSurface>;
 
@@ -121,7 +133,7 @@ export function ReportsView(){
   return <PageSurface>
     <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
       <div className="min-w-0"><h1 className="font-display text-[1.6rem] font-semibold leading-tight sm:text-[1.85rem]">Reports</h1></div>
-      <div className="flex flex-wrap items-center gap-2"><Button className="border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={()=>setExportsOpen(true)} variant="secondary"><History/>Your exports{pendingExports?<span className="rounded-full bg-gold/20 px-1.5 text-xs text-gold-secondary tabular-nums">{pendingExports}</span>:null}</Button>{canExport?<Button disabled={exportDisabled} onClick={()=>void doExport()}><FileSpreadsheet/>{exporting?"Preparing…":"Export CSV"}</Button>:null}</div>
+      <div className="flex flex-wrap items-center gap-2"><Button className="border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={()=>{setExportsOpen(true);void loadHistory();}} variant="secondary"><History/>Your exports{pendingExports?<span className="rounded-full bg-gold/20 px-1.5 text-xs text-gold-secondary tabular-nums">{pendingExports}</span>:null}</Button>{canExport?<Button disabled={exportDisabled} onClick={()=>void doExport()}><FileSpreadsheet/>{exporting?"Preparing…":"Export CSV"}</Button>:null}</div>
     </header>
 
     <div className="-mx-4 border-y border-task-border bg-task-bg px-4 py-2.5 sm:-mx-6 sm:px-6">
@@ -180,6 +192,7 @@ export function ReportsView(){
       </section>
     </details>
 
+    {historyError&&!exportsOpen?<div className="mt-3"><ErrorPanel message={historyError} onRetry={()=>void loadHistory()}/></div>:null}
     {message?<p aria-live="polite" className="mt-3 rounded-xl border border-success/40 bg-task-bg p-3 text-sm text-success">{message}</p>:null}
 
     {loading&&!data?<div className="mt-4"><LoadingPanels count={2}/></div>:error?<div className="mt-4"><ErrorPanel message={error} onRetry={()=>void load()}/></div>:data?<section aria-label={definition.name} className="mt-3">
@@ -202,7 +215,8 @@ export function ReportsView(){
     </section>:null}
 
     {exportsOpen?<Modal onClose={()=>setExportsOpen(false)} title="Your exports" tone="light" wide><p className="mb-3 text-sm text-task-text-muted">CSV files from the last 30 days. Each file is private to you and expires automatically.</p>
-      {!history?.rows.length?<EmptyMessage>No exports yet. Use “Export CSV” above to create one.</EmptyMessage>:<ul className="flex flex-col gap-2">{history.rows.map((row)=>{const status=String(row.status) as ExportStatus;const actions=exportActionsForStatus(status);const progress=Number(row.progress_percent??0);return <li className="rounded-xl border border-task-border p-3 text-sm" key={String(row.export_id)}>
+      {historyError?<ErrorPanel message={historyError} onRetry={()=>void loadHistory()}/>:null}
+      {historyLoading&&!history?<LoadingPanels count={1}/>:historyError&&!history?null:!history?.rows.length?<EmptyMessage>No exports yet. Use “Export CSV” above to create one.</EmptyMessage>:<ul className="flex flex-col gap-2">{history.rows.map((row)=>{const status=String(row.status) as ExportStatus;const actions=exportActionsForStatus(status);const progress=Number(row.progress_percent??0);return <li className="rounded-xl border border-task-border p-3 text-sm" key={String(row.export_id)}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0"><p className="font-medium">{reportDisplayName(String(row.report_key))}</p><p className="text-xs text-task-text-muted">Requested {reportCellText(typeof row.requested_at==="string"?row.requested_at:null,"instant")}{status==="completed"?` · ${reportCellText(typeof row.row_count==="number"?row.row_count:null,"number")} rows · expires ${reportCellText(typeof row.expires_at==="string"?row.expires_at:null,"instant")}`:""}</p></div>
             <div className="flex items-center gap-2">
@@ -214,7 +228,7 @@ export function ReportsView(){
           </div>
           {status==="queued"||status==="processing"?<div aria-label={`Export ${progress}% ready`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={progress} className="mt-2 h-1.5 overflow-hidden rounded-full bg-task-muted" role="progressbar"><div className="h-full rounded-full bg-gold transition-[width]" style={{width:`${Math.max(4,progress)}%`}}/></div>:null}
         </li>;})}</ul>}
-        <Button className="mt-3 border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={()=>void load(false)} variant="secondary"><RefreshCw/>Refresh</Button>
+        <Button className="mt-3 border-task-border bg-task-bg text-task-text hover:bg-task-muted" onClick={()=>void loadHistory()} variant="secondary"><RefreshCw/>Refresh</Button>
     </Modal>:null}
   </PageSurface>;
 }

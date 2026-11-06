@@ -36,6 +36,18 @@ function dateInKolkata(date: Date): string {
   return `${value("year")}-${value("month")}-${value("day")}`;
 }
 
+/** Library metadata and run-filter people; authoring questions and stages load only on edit. */
+export type FmsLibraryData = Pick<FmsData, "flows" | "users">;
+export async function loadFmsLibraryData(): Promise<FmsLibraryData> {
+  const [flows, users] = await Promise.all([
+    db().from("fms_flows").select("*").order("name").order("version", { ascending: false }).limit(300),
+    db().from("user_profiles").select("id,employee_name,employee_code,account_status,user_role,branch_id,department_id,working_status,is_login_enabled").order("employee_name").limit(500),
+  ]);
+  fail("Load FMS library", flows.error);
+  fail("Load FMS people", users.error);
+  return { flows: (flows.data ?? []) as FmsFlowRow[], users: users.data ?? [] };
+}
+
 export async function loadFmsBuilderData(): Promise<FmsData> {
   const kolkataDate = dateInKolkata(new Date());
   const results = await Promise.all([
