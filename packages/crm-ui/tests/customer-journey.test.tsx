@@ -59,3 +59,24 @@ it('marks legacy client records that have no recorded visit', () => {
   render(<CustomerLifecycle clientId="c" lifecycleStage="visited" totalVisits={0} />);
   expect(screen.getByText(/client record without a recorded store visit/)).toBeTruthy();
 });
+
+const store: ClientActivityRow = { ...base, is_contact: false, activity_id: 'store:l1', occurred_at: '2026-11-05T05:00:00Z', kind: 'STORE_CONVERSATION', channel: 'IN_PERSON', note: 'Store conversation recorded',
+  source_table: 'crm_store_conversations', source_id: 'l1', details: { jewelosPath: '/sales-recording/conversations/33333333-3333-4333-8333-333333333333', durationSeconds: 420, salespersonName: 'Synthetic seller' } };
+
+it('shows a Store Intelligence conversation as a read-only visit entry that links back to JewelOS', () => {
+  render(<ClientActivity clientId="c" activity={[store]} />);
+  expect(screen.getAllByText(/Store conversation/).length).toBeGreaterThan(0);
+  expect(screen.getByText(/about 7 min · Synthetic seller/)).toBeTruthy();
+  expect(screen.getByRole('link', { name: 'Open conversation' }).getAttribute('href')).toBe('/sales-recording/conversations/33333333-3333-4333-8333-333333333333');
+  expect(screen.queryByText(/transcript:/i)).toBeNull();
+  expect(journeyTitle('STORE_CONVERSATION', 'crm_store_conversations', null)).toBe('Store conversation');
+  expect(journeySources('visits')).toContain('crm_store_conversations');
+});
+
+it('never renders a link the CRM row did not prove to be a Store Intelligence conversation', () => {
+  for (const jewelosPath of ['https://example.invalid/sales-recording/conversations/33333333-3333-4333-8333-333333333333', '/sales-recording/conversations/../../admin', 'javascript:alert(1)']) {
+    cleanup();
+    render(<ClientActivity clientId="c" activity={[{ ...store, details: { ...(store.details as object), jewelosPath } }]} />);
+    expect(screen.queryByRole('link', { name: 'Open conversation' })).toBeNull();
+  }
+});

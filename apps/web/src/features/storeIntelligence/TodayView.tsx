@@ -1,13 +1,12 @@
-import { useState } from "react";
 import { ArrowRight, Lightbulb, Mic } from "lucide-react";
-import { conversationFiltersToQuery, conversationStatus, formatDuration, formatRecordedTotal, followUpChoices, istDateKey, istTime, type ConversationCard, type NextAction } from "@jewelos/core";
-import { createActionTask, fetchToday } from "@jewelos/data";
+import { conversationFiltersToQuery, conversationStatus, formatDuration, formatRecordedTotal, istDateKey, istTime, type ConversationCard, type NextAction } from "@jewelos/core";
+import { fetchToday } from "@jewelos/data";
 import { useAuth } from "@/auth/AuthContext";
-import { Button, Notice } from "@/components/ui";
+import { Button } from "@/components/ui";
 import { useRecorder } from "@/features/recording/useRecorder";
 import { cn } from "@/lib/utils";
 import { siPath } from "./routes";
-import { EmptyState, ErrorState, Panel, ScoreBadge, SkeletonRows, StatusPill, useFlash } from "./ui";
+import { EmptyState, ErrorState, Panel, ScoreBadge, SkeletonRows, StatusPill } from "./ui";
 import { useLoad } from "./useLoad";
 
 export function ConversationRow({ card, showEmployee, onOpen }: { card: ConversationCard; showEmployee: boolean; onOpen: (id: string) => void }) {
@@ -38,27 +37,16 @@ export function ConversationRow({ card, showEmployee, onOpen }: { card: Conversa
 }
 const outcomeWords = (outcome: string) => ({ reported_purchase: "Purchase mentioned", follow_up: "Follow-up agreed", enquiry: "Enquiry", no_purchase: "No purchase" } as Record<string, string>)[outcome] ?? "";
 
-export function NextActionItem({ item, onOpen, onDone }: { item: NextAction; onOpen: () => void; onDone: (message: string) => void }) {
-  const [choosing, setChoosing] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const create = async (at: string) => {
-    setBusy(true); setError(null);
-    try { const result = await createActionTask(item.analysis_id, item.action_index, at); onDone(result.alreadyCreated ? "That task already exists. Find it in Tasks." : "Follow-up task created. Find it in Tasks."); setChoosing(false); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "The task could not be created."); }
-    finally { setBusy(false); }
-  };
+/**
+ * A suggested next action. Follow-ups are reviewed before they are created (owner, method, due
+ * half-day, optional workflow), so this opens the conversation's Actions tab instead of creating
+ * a task with a preset time.
+ */
+export function NextActionItem({ item, onOpen }: { item: NextAction; onOpen: () => void }) {
   return <li className="rounded-xl border border-task-border p-3">
     <p className="text-sm font-semibold text-task-text">{item.action}</p>
     {item.reason ? <p className="mt-0.5 text-sm text-task-text-muted">{item.reason}</p> : null}
-    {error ? <p className="mt-2 text-sm text-danger" role="alert">{error}</p> : null}
-    {choosing ? <fieldset className="mt-3"><legend className="mb-2 text-xs font-semibold text-task-text-muted">When should it be done?</legend>
-      <div className="flex flex-wrap gap-2">{followUpChoices().map((choice) => <Button disabled={busy} key={choice.key} onClick={() => void create(choice.at)} type="button" variant="secondary">{choice.label}</Button>)}
-        <Button disabled={busy} onClick={() => setChoosing(false)} type="button" variant="ghost">Cancel</Button></div></fieldset>
-      : <div className="mt-2 flex flex-wrap gap-2">
-        <Button onClick={() => setChoosing(true)} type="button">Create follow-up task</Button>
-        <Button onClick={onOpen} type="button" variant="ghost">Open conversation</Button>
-      </div>}
+    <div className="mt-2 flex flex-wrap gap-2"><Button onClick={onOpen} type="button">Review follow-up</Button></div>
   </li>;
 }
 
@@ -66,7 +54,6 @@ export function TodayView({ navigate, canRecordUi }: { navigate: (path: string) 
   const { profile } = useAuth();
   const rec = useRecorder(profile?.id);
   const today = useLoad(fetchToday, [], 15000);
-  const [flash, setFlash] = useFlash();
   const day = istDateKey(new Date());
   const stageLink = (stage: string) => siPath.conversations(conversationFiltersToQuery({ stage: stage as "ready", date_from: day, date_to: day, ...(today.data?.is_reviewer && profile ? { employee_id: profile.id } : {}) }));
   const live = ["recording", "paused", "saving", "needs_attention"].includes(rec.state);
@@ -77,7 +64,6 @@ export function TodayView({ navigate, canRecordUi }: { navigate: (path: string) 
       <p className="text-sm text-task-text-muted">{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Kolkata" })}</p>
       <h1 className="text-2xl font-semibold text-task-text">Today</h1>
     </header>
-    {flash ? <Notice tone="success">{flash}</Notice> : null}
 
     {live ? <Panel className="border-danger/30">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -111,7 +97,7 @@ export function TodayView({ navigate, canRecordUi }: { navigate: (path: string) 
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Panel title="Next actions" description="Follow-ups suggested from your reviewed conversations.">
-          {data.next_actions.length ? <ul className="space-y-2">{data.next_actions.map((item) => <NextActionItem item={item} key={`${item.analysis_id}-${item.action_index}`} onDone={(message) => { setFlash(message); today.reload(); }} onOpen={() => navigate(siPath.conversation(item.session_id, "actions"))} />)}</ul>
+          {data.next_actions.length ? <ul className="space-y-2">{data.next_actions.map((item) => <NextActionItem item={item} key={`${item.analysis_id}-${item.action_index}`} onOpen={() => navigate(siPath.conversation(item.session_id, "actions"))} />)}</ul>
             : <p className="text-sm text-task-text-muted">Nothing to follow up right now.</p>}
         </Panel>
         <Panel title="My coaching" description="From the last 30 days of reviewed conversations.">

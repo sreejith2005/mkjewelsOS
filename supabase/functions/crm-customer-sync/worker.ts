@@ -1,4 +1,5 @@
 import { secretMatches } from "../crm-staff-sync/worker.ts";
+import { syncRecordings, type RecordingCounts, type RecordingGateway } from "./recording.ts";
 
 export type CustomerDeliveryEvent = { id: string; lease_token: string; mapping_id: string; mapping_digest: string; descriptor: Record<string, unknown>; payload: Record<string, unknown> & { eventId: string } };
 type DeliveryResult = Record<string, unknown> & { outcome?: string };
@@ -11,6 +12,8 @@ export type CustomerSyncDeps = {
   claimMappings?(limit: number): Promise<readonly CustomerMappingRegistration[]>;
   recordMapping?(id: string, outcome: MappingOutcome): Promise<number> };
  receiver: null | { post(body: Record<string, unknown>): Promise<{ status: number; body: unknown }> };
+ /** 0384: Store Intelligence links and CRM purchase evidence, over the same receiver. */
+ recording?: RecordingGateway | null;
 };
 function record(value: unknown): Record<string, unknown> | null { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null; }
 const MAPPING_OUTCOMES: readonly MappingOutcome[] = ["source_unapproved", "mapping_unapproved", "accepted"];
@@ -77,6 +80,9 @@ export async function handleCustomerSync(request: Request, deps: CustomerSyncDep
    }
    if(failure || events.length<10)break;
   }
-  return json(200,counts);
+  // Isolated: a recording failure never changes the customer-event counts or response above.
+  let recording: RecordingCounts | { error: string } | null = null;
+  if (deps.recording) { try { recording = await syncRecordings(deps.recording, deps.receiver); } catch { recording = { error: "recording_sync_failed" }; } }
+  return json(200,recording ? {...counts,recording} : counts);
  } catch { return json(500,{error:"Customer delivery failed"}); }
 }

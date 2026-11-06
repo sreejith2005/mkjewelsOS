@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { hasPermission, REDACTION_RULES, relativeTime, type WorkspaceSettings } from "@jewelos/core";
-import { fetchWorkspaceSettings, saveRecordingAccess } from "@jewelos/data";
+import { hasPermission, REDACTION_RULES, relativeTime, type IntegrationHealth, type WorkspaceSettings } from "@jewelos/core";
+import { fetchIntegrationHealth, fetchWorkspaceSettings, saveCrmOutcomeSettings, saveRecordingAccess, WorkspaceError } from "@jewelos/data";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
 import { ScoreSettings } from "@/features/recording/ScoreSettings";
@@ -45,6 +45,9 @@ export function SettingsView({ navigate }: { navigate: (path: string) => void })
     </div>
 
     <ScoreSettings />
+
+    <CrmOutcomeSettings onSaved={() => { setFlash("CRM outcome settings saved."); settings.reload(); }} settings={s} />
+    <IntegrationHealthPanel />
 
     <Panel description="How the recording pipeline is doing." title="System health">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -97,4 +100,57 @@ function AccessDrawer({ settings, onClose, onSaved }: { settings: WorkspaceSetti
       <p className="text-xs text-task-text-muted">Changes are recorded in the audit log. People also need the recording permission.</p>
     </div>
   </Drawer>;
+}
+
+/** Attribution window and the optional average ticket. Changes are audited server-side. */
+function CrmOutcomeSettings({ settings, onSaved }: { settings: WorkspaceSettings; onSaved: () => void }) {
+  const current = settings.crm_outcomes;
+  const [editing, setEditing] = useState(false);
+  const [days, setDays] = useState(String(current.attribution_days));
+  const [ticket, setTicket] = useState(current.estimated_ticket_inr === null ? "" : String(current.estimated_ticket_inr));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const save = async () => {
+    setBusy(true); setError(null);
+    try { await saveCrmOutcomeSettings(Number(days), ticket.trim() ? Number(ticket) : null); setEditing(false); onSaved(); }
+    catch (cause) { setError(cause instanceof WorkspaceError ? cause.message : "Settings did not save."); }
+    finally { setBusy(false); }
+  };
+  return <Panel action={current.can_change && !editing ? <Button onClick={() => setEditing(true)} type="button" variant="secondary">Change</Button> : null}
+    description="How a conversation is matched to a purchase recorded in the CRM." title="CRM outcomes">
+    {editing ? <form className="grid gap-3 text-sm sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+      <label className="block"><span className="label">Count CRM purchases within (days)</span>
+        <input className="field" inputMode="numeric" max={90} min={1} onChange={(e) => setDays(e.target.value)} required type="number" value={days} /></label>
+      <label className="block"><span className="label">Average ticket for estimates (₹, blank = no estimate)</span>
+        <input className="field" inputMode="decimal" min={1} onChange={(e) => setTicket(e.target.value)} step="any" type="number" value={ticket} /></label>
+      {error ? <p className="text-danger sm:col-span-2" role="alert">{error}</p> : null}
+      <div className="flex gap-2 sm:col-span-2"><Button disabled={busy} type="submit">Save</Button><Button disabled={busy} onClick={() => setEditing(false)} type="button" variant="ghost">Cancel</Button></div>
+    </form> : <dl className="grid gap-4 text-sm sm:grid-cols-2">
+      <div><dt className="text-task-text-muted">Attribution window</dt><dd className="font-semibold text-task-text">{current.attribution_days} days from the conversation day</dd></div>
+      <div><dt className="text-task-text-muted">Estimated revenue</dt><dd className="text-task-text">{current.estimated_ticket_inr === null ? "Off (no average ticket set)" : `CRM-confirmed purchases × ₹${current.estimated_ticket_inr.toLocaleString("en-IN")}, always labelled Estimated`}</dd></div>
+      <div className="sm:col-span-2"><dt className="text-task-text-muted">Rule</dt><dd className="text-task-text">A purchase counts only when the CRM records a verified purchase visit (the Reports rule). The CRM does not record sale amounts, so there is no verified revenue figure.</dd></div>
+    </dl>}
+  </Panel>;
+}
+
+const HEALTH_ROWS: readonly (readonly [keyof IntegrationHealth, string, readonly (readonly [string, string])[]])[] = [
+  ["client_match", "Client match", [["verified", "Confirmed by CRM"], ["pending", "Waiting for CRM"], ["refused", "Refused"]]],
+  ["crm_sync", "CRM activity", [["synced", "In CRM history"], ["queued", "Sending"], ["waiting_for_crm_approval", "Waiting for CRM approval"], ["failed", "Failed"]]],
+  ["work", "Task / FMS", [["created", "Created"], ["open", "Open"], ["overdue", "Overdue"], ["via_fms", "Through FMS"]]],
+  ["notifications", "Notification", [["delivered", "Delivered"], ["pending", "Waiting"], ["failed", "Failed"]]],
+];
+/** Branch readiness for each integration (last 30 days). Counts only, never customer details. */
+function IntegrationHealthPanel() {
+  const health = useLoad(async () => { try { return await fetchIntegrationHealth(); } catch (cause) { if (cause instanceof WorkspaceError && cause.kind === "denied") return null; throw cause; } }, []);
+  if (health.data === null && !health.error) return null;
+  const h = health.data;
+  return <Panel description="Your branch, last 30 days." title="Integrations">
+    {health.error && !h ? <ErrorState message={health.error} onRetry={health.reload} /> : h ? <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {HEALTH_ROWS.map(([key, label, items]) => <div className="rounded-xl border border-task-border p-3" key={key}>
+        <p className="text-sm font-semibold text-task-text">{label}</p>
+        <dl className="mt-1 space-y-0.5 text-sm">{items.map(([field, word]) => <div className="flex justify-between gap-2" key={field}><dt className="text-task-text-muted">{word}</dt><dd className={`tabular-nums ${["failed", "refused", "overdue"].includes(field) && Number(h[key][field] ?? 0) > 0 ? "font-semibold text-danger" : "text-task-text"}`}>{h[key][field] ?? 0}</dd></div>)}</dl>
+      </div>)}
+    </div> : null}
+    {h && typeof h.crm_outcomes.last_checked_at === "string" ? <p className="mt-3 text-xs text-task-text-muted">CRM purchases last checked {relativeTime(h.crm_outcomes.last_checked_at)}.</p> : null}
+  </Panel>;
 }

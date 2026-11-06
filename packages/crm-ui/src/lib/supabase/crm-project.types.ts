@@ -883,6 +883,109 @@ export type Database = {
           },
         ]
       }
+      crm_store_conversations: {
+        Row: {
+          actor_id: string
+          branch_id: string | null
+          client_id: string | null
+          duration_seconds: number | null
+          jewelos_path: string
+          lead_id: string | null
+          link_id: string
+          linked_event_id: string
+          occurred_at: string
+          received_at: string
+          salesperson_name: string | null
+          session_id: string
+          source_tenant: string
+          visit_id: string | null
+          withdrawn_at: string | null
+          withdrawn_event_id: string | null
+          withdrawn_reason: string | null
+        }
+        Insert: {
+          actor_id: string
+          branch_id?: string | null
+          client_id?: string | null
+          duration_seconds?: number | null
+          jewelos_path: string
+          lead_id?: string | null
+          link_id: string
+          linked_event_id: string
+          occurred_at: string
+          received_at?: string
+          salesperson_name?: string | null
+          session_id: string
+          source_tenant: string
+          visit_id?: string | null
+          withdrawn_at?: string | null
+          withdrawn_event_id?: string | null
+          withdrawn_reason?: string | null
+        }
+        Update: {
+          actor_id?: string
+          branch_id?: string | null
+          client_id?: string | null
+          duration_seconds?: number | null
+          jewelos_path?: string
+          lead_id?: string | null
+          link_id?: string
+          linked_event_id?: string
+          occurred_at?: string
+          received_at?: string
+          salesperson_name?: string | null
+          session_id?: string
+          source_tenant?: string
+          visit_id?: string | null
+          withdrawn_at?: string | null
+          withdrawn_event_id?: string | null
+          withdrawn_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_store_conversations_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_store_conversations_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_store_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_identity"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "crm_store_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "crm_store_conversations_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_store_conversations_visit_id_fkey"
+            columns: ["visit_id"]
+            isOneToOne: false
+            referencedRelation: "client_timeline"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           client_id: string
@@ -2644,6 +2747,10 @@ export type Database = {
       }
       crm_sheet_sync: {
         Args: { p_action: string; p_payload: Json }
+        Returns: Json
+      }
+      crm_store_conversation_candidates: {
+        Args: { p_query: string }
         Returns: Json
       }
       crm_sync_claim_events: {

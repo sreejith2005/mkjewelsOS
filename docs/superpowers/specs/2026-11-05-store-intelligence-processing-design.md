@@ -213,4 +213,5 @@ recorder service; see `services/recorder/README.md`) are now built. Still open:
 real STT/diarization
 model deployment and latency numbers; loading MK Jewels SOP text as an approved
 version (owner review step); Ask Kiara read tool (none added; Kiara gets no
-transcript or score access); CRM delivery of next actions.
+transcript or score access). CRM customer links, CRM-confirmed outcomes and follow-up
+Tasks/FMS are in `2026-11-06-store-intelligence-integration-design.md` (migration 0384).

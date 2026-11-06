@@ -6,3 +6,4 @@ export type { CrmProjectConfig } from "./crm-port/crm-project";
 export { CRM_BASE_PATH, type CrmAuth } from "./crm-port/runtime";
 export type { CrmClientRun, CrmFormLink, CrmFormLinks, CrmFormsHost, CrmLeadSetup, CrmLinkedForm, CrmSubmittedForm } from "./crm-port/forms-host";
 export { createCrmClientLookup, type CrmClientLookup } from "./crm-port/client-lookup";
+export { createCrmCandidateSearch, CrmSearchError, type CrmCandidateSearch } from "./crm-port/store-conversations";

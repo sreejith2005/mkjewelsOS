@@ -6,7 +6,7 @@
 import type { Json } from "@/lib/supabase/database.types";
 
 export const JOURNEY_GROUPS = {
-  visits: { label: "Store visits", sources: ["client_timeline", "entry_queue"] },
+  visits: { label: "Store visits", sources: ["client_timeline", "entry_queue", "crm_store_conversations"] },
   enquiries: { label: "Enquiries & leads", sources: ["leads", "lead_stage_history"] },
   calls: { label: "Calls & follow-ups", sources: ["lead_call_history", "not_bought_history", "referral_calling_history", "crm_contacts"] },
   fms: { label: "FMS work", sources: ["crm_customer_workflow_events"] },
@@ -28,6 +28,7 @@ export function journeyTitle(kind: string | null, sourceTable: string | null, st
   if (sourceTable === "crm_customer_workflow_events") return stageName ? `FMS · ${stageName}` : "FMS · Customer enquiry";
   if (sourceTable === "client_timeline") return `Store visit · ${(kind ?? "Visit").replaceAll("_", " ")}`;
   if (sourceTable === "entry_queue") return "Walk-in registered";
+  if (sourceTable === "crm_store_conversations") return "Store conversation";
   if (kind === "LEAD_REGISTERED") return "Enquiry registered";
   if (kind === "LEAD_CALL") return "Lead call";
   if (kind === "LEAD_STAGE_CHANGED") return "Lead stage changed";
@@ -56,4 +57,19 @@ export function journeyFmsDetails(details: Json | null): JourneyFmsDetails | nul
   }) : [];
   return { stageName: text(workflow.stageName), actorName: text(workflow.actorName), assigned, instanceId: text(workflow.instanceId),
     instanceStageId: text(workflow.instanceStageId), reference: text(workflow.referenceNumber), answers };
+}
+
+const STORE_PATH = /^\/sales-recording\/conversations\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export type JourneyStoreConversation = { path: string | null; minutes: number | null; salesperson: string | null };
+/**
+ * Reads a Store Intelligence entry of `crm_client_activity` ({jewelosPath, durationSeconds,
+ * salespersonName}). The CRM holds no audio or transcript; the link opens the conversation in
+ * JewelOS, where Store Intelligence's own access rules decide whether the viewer may see it.
+ */
+export function journeyStoreConversation(details: Json | null): JourneyStoreConversation | null {
+  const row = record(details);
+  if (!row) return null;
+  const path = text(row.jewelosPath);
+  const seconds = typeof row.durationSeconds === "number" && Number.isFinite(row.durationSeconds) ? row.durationSeconds : null;
+  return { path: path && STORE_PATH.test(path) ? path : null, minutes: seconds === null ? null : Math.max(1, Math.round(seconds / 60)), salesperson: text(row.salespersonName) };
 }

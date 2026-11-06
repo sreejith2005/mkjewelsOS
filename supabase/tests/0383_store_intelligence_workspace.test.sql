@@ -158,7 +158,8 @@ select is((recording_insights(current_date-7,current_date+1)#>>'{totals,conversa
 select is((recording_insights(current_date-7,current_date+1)#>>'{outcomes,reported_purchase}')::integer,1,'AI-heard outcomes counted');
 select is((recording_insights(current_date-7,current_date+1)#>>'{signals,price_concern}')::integer,1,'signals counted');
 select is((recording_insights(current_date-7,current_date+1)#>>'{follow_ups,created}')::integer,1,'follow-up effectiveness counts tasks');
-select is((recording_insights(current_date-7,current_date+1)->>'crm_outcomes_connected')::boolean,false,'CRM outcomes are not claimed');
+-- 0384 connected CRM outcomes; without CRM evidence nothing is claimed.
+select is((recording_insights(current_date-7,current_date+1)#>>'{crm,crm,confirmed_purchases}')::integer,0,'CRM outcomes are not claimed');
 select is(recording_insights(current_date-7,current_date+1)#>>'{top_mentions,products,0,text}','gold chain','product mentions aggregated');
 select is((recording_insights(current_date-7,current_date+1,pg_temp.wid('peer'))#>>'{totals,conversations}')::integer,1,'employee filter');
 select throws_ok($$select recording_insights(current_date,current_date-1)$$,'22023','recording_invalid_filter','reversed range refused');

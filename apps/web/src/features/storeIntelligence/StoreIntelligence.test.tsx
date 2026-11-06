@@ -1,16 +1,18 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AnalysisSnapshot, ConversationCard, StoredSalesAnalysis } from "@jewelos/core";
+import { parseConversationIntegration, type AnalysisSnapshot, type ConversationCard, type StoredSalesAnalysis } from "@jewelos/core";
 import {
-  correctTranscript, createActionTask, fetchActionTasks, fetchAnalysisSnapshot, fetchConversationCard, fetchConversationPage, fetchEvidenceAudio, fetchToday,
-  requestRescore, reviewAnalysis,
+  correctTranscript, createFollowUp, fetchAnalysisSnapshot, fetchConversationCard, fetchConversationIntegration, fetchConversationPage, fetchEvidenceAudio,
+  fetchToday, linkCrmCustomer, requestRescore, reviewAnalysis,
 } from "@jewelos/data";
+import { searchCrmCandidates } from "./crmCandidateSearch";
 import { StoreIntelligencePage } from "@/pages/StoreIntelligencePage";
 import { BarChart } from "./charts";
 import { ConversationDetail } from "./ConversationDetail";
 import { ConversationsView } from "./ConversationsView";
 import { RecordFlow } from "./RecordFlow";
+import { TodayView } from "./TodayView";
 
 const auth = vi.hoisted(() => ({ role: "staff", perms: new Set<string>() }));
 const rec = vi.hoisted(() => ({ value: {} as Record<string, unknown> }));
@@ -20,6 +22,7 @@ vi.mock("@jewelos/core", async (original) => {
   return { ...actual, hasPermission: (access: { perms: Set<string> } | null, key: string) => Boolean(access?.perms.has(key)) };
 });
 vi.mock("@/features/recording/useRecorder", () => ({ useRecorder: () => rec.value }));
+vi.mock("./crmCandidateSearch", () => ({ CandidateSearchFailure: class extends Error {}, searchCrmCandidates: vi.fn() }));
 vi.mock("@jewelos/data", () => {
   class AnalysisActionError extends Error {}
   class WorkspaceError extends Error { kind = "unavailable"; }
@@ -30,6 +33,9 @@ vi.mock("@jewelos/data", () => {
     reviewAnalysis: vi.fn(), requestRescore: vi.fn(async () => ({ alreadyRequested: false })), requestReprocess: vi.fn(), correctTranscript: vi.fn(),
     recordingSnapshot: vi.fn(async () => ({ session: {}, segments: [], alerts: [] })), recordingWalkins: vi.fn(async () => []), linkRecordingWalkin: vi.fn(),
     fetchWorkspaceSettings: vi.fn(async () => ({ config: { employees: [] } })), fetchInsights: vi.fn(), fetchCoachingLists: vi.fn(), fetchDevices: vi.fn(),
+    fetchConversationIntegration: vi.fn(), linkCrmCustomer: vi.fn(async () => ({ linkId: "l1", alreadyLinked: false })), unlinkCrmCustomer: vi.fn(), retryCrmSync: vi.fn(),
+    createFollowUp: vi.fn(async () => ({ followUpId: "f1", taskId: "t1", fmsInstanceId: null, fmsReference: null, alreadyCreated: false })),
+    fetchFollowUpOptions: vi.fn(async () => ({ owners: [{ id: "me", name: "Asha", is_salesperson: true }], supervisors: [], flows: [], default_due: null })),
   };
 });
 
@@ -75,6 +81,12 @@ const snapshot = (over: Partial<AnalysisSnapshot> = {}): AnalysisSnapshot => ({
   analyses: [analysis], jobs: [], ...over,
 });
 const navigate = vi.fn();
+const integration = (patch: Record<string, unknown> = {}) => parseConversationIntegration({
+  can_link: true, can_create_follow_up: true, is_reviewer: true, customer: null, history: [],
+  outcome: { ai_label: "converted", crm: { state: "pending_crm_confirmation", reason: "not_linked" } }, follow_ups: [],
+  suggestions: [{ analysis_id: "a1", action_index: 0, action: "Call back with designs", reason: "Asked for options", existing: null }],
+  readiness: { client_match: "not_linked", crm_sync: "not_linked", crm_outcome: "pending_crm_confirmation", work: "none", notifications: "none" }, outcome_window_days: 30, ...patch,
+});
 
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn(); URL.revokeObjectURL = vi.fn();
@@ -82,6 +94,7 @@ beforeEach(() => {
   auth.role = "staff"; auth.perms = new Set(["recording.capture"]);
   rec.value = recorder();
   vi.mocked(fetchToday).mockResolvedValue(today());
+  vi.mocked(fetchConversationIntegration).mockResolvedValue(integration());
 });
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
@@ -208,16 +221,69 @@ describe("Conversation detail", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save correction" }));
     await waitFor(() => expect(correctTranscript).toHaveBeenCalledWith("sess", "r1", [{ segment_id: "s2", speaker: "customer" }], "Customer voice"));
   });
-  it("creates one follow-up task and then shows its status instead of the button", async () => {
+  it("reviews a follow-up before creating it, on a first-half / second-half deadline, and then shows it instead of the button", async () => {
     render(<ConversationDetail navigate={navigate} sessionId="sess" tab="actions" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Create follow-up task" }));
-    fireEvent.click(screen.getByRole("button", { name: /Tomorrow, 11 AM/ }));
-    await waitFor(() => expect(createActionTask).toHaveBeenCalledWith("a1", 0, expect.stringMatching(/T05:30:00.000Z$/)));
-    vi.mocked(fetchActionTasks).mockResolvedValue([{ analysis_id: "a1", action_index: 0, task_id: "t1", created_at: "x", task_status: "pending", planned_datetime: null, deleted: false }]);
+    fireEvent.click(await screen.findByRole("button", { name: "Review follow-up" }));
+    expect(screen.getAllByText(/Nothing is sent to the customer from here/).length).toBeGreaterThan(0);
+    fireEvent.change(screen.getByLabelText("Recommended follow-up"), { target: { value: "whatsapp" } });
+    fireEvent.change(screen.getByLabelText("Due day"), { target: { value: "2026-11-09" } });
+    fireEvent.click(screen.getByRole("radio", { name: /First half \(3 PM\)/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Create task" }));
+    await waitFor(() => expect(createFollowUp).toHaveBeenCalledWith(expect.objectContaining({ analysisId: "a1", actionIndex: 0, channel: "whatsapp", dueDate: "2026-11-09", dueHalf: "first_half", fmsFlowId: null, title: "Follow up: Call back with designs" })));
+    const firstKey = vi.mocked(createFollowUp).mock.calls[0]![0].requestKey;
+    expect(firstKey).toMatch(/^[0-9a-f-]{36}$/);
+    vi.mocked(fetchConversationIntegration).mockResolvedValue(integration({
+      suggestions: [{ analysis_id: "a1", action_index: 0, action: "Call back with designs", reason: "Asked for options", existing: { task_id: "t1" } }],
+      follow_ups: [{ follow_up_id: "f1", title: "Follow up: Call back with designs", created_at: "2026-11-06T06:00:00Z", channel: "whatsapp", status: "pending", task_id: "t1", due_at: "2026-11-09T09:30:00Z", due_half: "first_half", owner_name: "Asha" }],
+    }));
     cleanup();
     render(<ConversationDetail navigate={navigate} sessionId="sess" tab="actions" />);
-    expect(await screen.findByText("Task open")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Create follow-up task" })).toBeNull();
+    expect(await screen.findByText(/Follow-up created/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Review follow-up" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Open task" }).getAttribute("href")).toBe("/tasks?task_id=t1");
+    expect(screen.getByText(/WhatsApp message · Asha/)).toBeTruthy();
+  });
+  it("keeps the AI's reading apart from the CRM result and shows readiness for each integration", async () => {
+    render(<ConversationDetail navigate={navigate} sessionId="sess" tab="summary" />);
+    expect(await screen.findByText("Converted (AI-suggested)")).toBeTruthy();
+    expect(screen.getByText("Pending CRM confirmation")).toBeTruthy();
+    const ready = screen.getByRole("list", { name: "Integration status" });
+    expect(within(ready).getAllByRole("listitem").map((item) => item.firstChild?.textContent)).toEqual(["Client match", "CRM activity", "Task / FMS", "Notification"]);
+  });
+  it("makes a person choose between customers sharing a phone, and links the chosen one as unconfirmed", async () => {
+    vi.mocked(searchCrmCandidates).mockResolvedValue({ query_kind: "phone", candidates: [
+      { kind: "client", target_id: "c1", client_id: "c1", client_code: "MKC-1", name: "Asha Family", phone_hint: "••1111", last_visit_at: null, total_visits: 2, visit_at: null, visit_reference: null },
+      { kind: "client", target_id: "c2", client_id: "c2", client_code: "MKC-2", name: "Ravi Family", phone_hint: "••1111", last_visit_at: null, total_visits: 1, visit_at: null, visit_reference: null },
+    ] });
+    render(<ConversationDetail navigate={navigate} sessionId="sess" tab="summary" />);
+    fireEvent.click(await screen.findByRole("button", { name: /Customer details/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Link customer" }));
+    const search = screen.getByRole("button", { name: /Search/ }) as HTMLButtonElement;
+    fireEvent.change(screen.getByLabelText(/Client code, visit reference or full phone number/), { target: { value: "Ravi" } });
+    expect(search.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText(/Client code, visit reference or full phone number/), { target: { value: "98111 11111" } });
+    fireEvent.click(search);
+    expect(await screen.findByText(/2 people share this number/)).toBeTruthy();
+    const link = screen.getByRole("button", { name: "Link this customer" }) as HTMLButtonElement;
+    expect(link.disabled).toBe(true);
+    fireEvent.click(screen.getByRole("radio", { name: /Ravi Family/ }));
+    fireEvent.click(link);
+    await waitFor(() => expect(linkCrmCustomer).toHaveBeenCalledWith("sess",
+      { kind: "client", target_id: "c2", match_basis: "phone", candidate_count: 2, display_code: "MKC-2", display_name: "Ravi Family" }, expect.stringMatching(/^[0-9a-f-]{36}$/), undefined));
+    expect(await screen.findByText(/confirmed once the CRM accepts it/)).toBeTruthy();
+  });
+  it("shows the CRM link truthfully and needs a reason to change it", async () => {
+    vi.mocked(fetchConversationIntegration).mockResolvedValue(integration({
+      customer: { link_id: "l1", kind: "client", target_id: "c1", crm_client_id: "c1", code: "MKC-1", name: "Asha Family", display_source: "crm_ack", match_basis: "phone", candidate_count: 2,
+        state: "verified", linked_at: "2026-11-05T10:00:00Z", sync: "failed", sync_attempts: 10 },
+      readiness: { client_match: "verified", crm_sync: "failed", crm_outcome: "no_crm_purchase_yet", work: "none", notifications: "none" },
+    }));
+    render(<ConversationDetail navigate={navigate} sessionId="sess" tab="summary" />);
+    fireEvent.click(await screen.findByRole("button", { name: /Customer details/ }));
+    expect(await screen.findByText("Sending to CRM failed")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Send again/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Open CRM profile/ }));
+    expect(navigate).toHaveBeenCalledWith("/crm/clients/c1");
   });
   it("explains a missing score instead of guessing, and notes retention expiry", async () => {
     vi.mocked(fetchConversationCard).mockResolvedValue(card({ retention_expired: true }));
@@ -227,6 +293,16 @@ describe("Conversation detail", () => {
     expect(screen.getByText("Too little speech to judge")).toBeTruthy();
     expect(screen.getByText(/removed after the retention period/)).toBeTruthy();
     expect(screen.queryByRole("region", { name: "Conversation audio" })).toBeNull();
+  });
+});
+
+describe("Today", () => {
+  it("sends suggested next actions to review instead of creating work with a preset time", async () => {
+    vi.mocked(fetchToday).mockResolvedValue(today({ next_actions: [{ session_id: "sess", analysis_id: "a1", action_index: 0, action: "Call back with designs", reason: null, created_at: "2026-11-05T06:00:00Z" }] }));
+    render(<TodayView canRecordUi navigate={navigate} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Review follow-up" }));
+    expect(navigate).toHaveBeenCalledWith("/sales-recording/conversations/sess?tab=actions");
+    expect(createFollowUp).not.toHaveBeenCalled();
   });
 });
 

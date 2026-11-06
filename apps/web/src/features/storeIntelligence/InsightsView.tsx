@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { formatRecordedTotal, istDateRange, OUTCOME_LABEL, RANKING_MIN_SCORED, SALES_OUTCOMES, share, type Insights } from "@jewelos/core";
+import { formatRecordedTotal, istDateRange, OUTCOME_LABEL, RANKING_MIN_SCORED, SALES_OUTCOMES, share, type CrmInsights, type Insights } from "@jewelos/core";
 import { fetchInsights } from "@jewelos/data";
 import { Notice } from "@/components/ui";
 import { BarChart, LineChart, RankedBars } from "./charts";
@@ -62,6 +62,7 @@ function SalesView({ data }: { data: Insights }) {
       <Stat hint={`of ${analysed} with a summary`} label="Purchase mentioned" value={pct(share(data.outcomes.reported_purchase, analysed))} />
       <Stat hint={`of ${analysed} with a summary`} label="Follow-up agreed" value={pct(share(data.outcomes.follow_up, analysed))} />
     </div>
+    {data.crm ? <CrmResults crm={data.crm} /> : null}
     <Panel><BarChart points={points} title="Conversations per day" valueLabel="Conversations" /></Panel>
     <Section title="Busiest hours">
       <BarChart format={(value) => String(value)} points={Array.from({ length: 13 }, (_, i) => i + 9).map((hour) => ({ key: String(hour), label: `${hour % 12 || 12}${hour < 12 ? "am" : "pm"}`, value: data.by_hour.find((h) => h.hour === hour)?.conversations ?? 0 }))} title="Conversations by hour (9am–9pm)" valueLabel="Conversations" />
@@ -105,6 +106,25 @@ function CustomerView({ data }: { data: Insights }) {
   </div>;
 }
 
+const inr = (value: number) => `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+/** What the AI heard next to what the CRM confirms; each CRM purchase visit counts once. */
+function CrmResults({ crm }: { crm: CrmInsights }) {
+  const r = crm.revenue;
+  return <Panel description={`Purchases come from the CRM's verified purchase rule, within ${crm.window_days} days of the conversation.`} title="AI-suggested vs CRM-confirmed">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <Stat hint="from what was said" label="Converted (AI-suggested)" value={crm.ai_suggested.converted} />
+      <Stat hint="each purchase once" label="Confirmed in CRM" value={crm.crm.confirmed_purchases} />
+      <Stat hint="no linked, confirmed customer" label="Pending CRM confirmation" value={crm.crm.pending_confirmation} />
+      <Stat hint="AI said converted, CRM shows no purchase" label="Not confirmed yet" value={crm.crm.ai_converted_not_confirmed} />
+    </div>
+    <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+      <div><dt className="font-semibold text-task-text">Revenue realised</dt><dd className="text-task-text-muted">{r.verified === null ? r.verified_note || "Not recorded in the CRM." : inr(r.verified)}</dd></div>
+      <div><dt className="font-semibold text-task-text">Estimated revenue</dt><dd className="text-task-text-muted">{r.estimated === null ? "No estimate: set an average ticket in Settings to see one." : <><span className="font-semibold text-task-text">Estimated {inr(r.estimated)}</span> = {crm.crm.confirmed_purchases} confirmed × {inr(r.ticket_inr ?? 0)} average ticket</>}</dd></div>
+    </dl>
+    <p className="mt-3 text-xs text-task-text-muted">{r.formula}. Repairs, exchanges, returns, price checks, order pickups and follow-ups are never counted as new sales unless the CRM's rule says so. Repeat conversations about one purchase count it once, credited to the latest conversation before it.</p>
+  </Panel>;
+}
+
 function LeadershipView({ data }: { data: Insights }) {
   const q = data.quality; const total = data.totals.conversations;
   const issues: [string, number][] = [["Not yet summarised", q.not_analysed], ["Recording interrupted", q.interrupted], ["Audio hard to hear", q.low_audio], ["Could not tell speakers apart", q.speakers_unverified], ["Too little speech", q.too_little_speech], ["Backup reviewer used", q.backup_model]];
@@ -115,7 +135,8 @@ function LeadershipView({ data }: { data: Insights }) {
       <Stat label="Reviews approved" value={pct(share(data.totals.approved, data.totals.analysed))} hint="of summarised" />
       <Stat label="Follow-ups done" value={pct(share(data.follow_ups.completed, data.follow_ups.created))} hint={`${data.follow_ups.created} created`} />
     </div>
-    {!data.crm_outcomes_connected ? <Notice tone="task">CRM-confirmed purchases are not connected to recordings yet. Outcomes here come from what was said and are signals, not sales figures.</Notice> : null}
+    {!data.crm_outcomes_connected ? <Notice tone="task">CRM-confirmed purchases are not connected to recordings yet. Outcomes here come from what was said and are signals, not sales figures.</Notice>
+      : <Notice tone="task">“Purchase mentioned” and AI-suggested outcomes come from what was said. Only “Confirmed in CRM” counts verified purchases.</Notice>}
     <Panel description="Things that make these numbers less reliable." title="Data quality">
       <ul className="divide-y divide-task-border text-sm">{issues.map(([label, count]) => <li className="flex justify-between gap-3 py-2" key={label}><span className="text-task-text">{label}</span><span className="tabular-nums text-task-text-muted">{count} {count ? `(${share(count, total)}%)` : ""}</span></li>)}</ul>
     </Panel>

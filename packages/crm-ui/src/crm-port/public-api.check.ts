@@ -15,3 +15,5 @@ export const formsHostMatches: Same<Declared.CrmFormsHost, Implemented.CrmFormsH
 export const clientRunMatches: Same<Declared.CrmClientRun, Implemented.CrmClientRun> = true;
 export const formLinksMatch: Same<Declared.CrmFormLinks, Implemented.CrmFormLinks> = true;
 export const clientLookupMatches: typeof Declared.createCrmClientLookup = Implemented.createCrmClientLookup;
+export const candidateSearchMatches: typeof Declared.createCrmCandidateSearch = Implemented.createCrmCandidateSearch;
+export const searchErrorMatches: typeof Declared.CrmSearchError = Implemented.CrmSearchError;

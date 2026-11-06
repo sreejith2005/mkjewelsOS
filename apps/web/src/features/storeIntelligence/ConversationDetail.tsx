@@ -1,19 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, ChevronDown, ChevronUp, Link2, Lightbulb, UserRound } from "lucide-react";
 import {
-  compareSalesAnalyses, conversationStatus, evidenceSeekTargets, followUpChoices, formatAudioOffset, formatDuration, hasAnalysisOutput, hasPermission, istTime,
-  OUTCOME_LABEL, QUALITY_REASON, SALES_SIGNAL_KEYS, taskStatusLabel,
-  type ActionTaskLink, type AnalysisSnapshot, type AnalysisTranscriptSegment, type ConversationCard, type EvidenceRef, type SalesDimensionStatus,
+  compareSalesAnalyses, conversationStatus, evidenceSeekTargets, formatAudioOffset, formatDuration, hasAnalysisOutput, hasPermission, istTime,
+  OUTCOME_LABEL, QUALITY_REASON, SALES_SIGNAL_KEYS,
+  type AnalysisSnapshot, type AnalysisTranscriptSegment, type ConversationCard, type ConversationIntegration, type EvidenceRef, type SalesDimensionStatus,
   type SpeakerRole, type StoredSalesAnalysis,
 } from "@jewelos/core";
 import {
-  AnalysisActionError, correctTranscript, createActionTask, fetchActionTasks, fetchAnalysisSnapshot, fetchConversationCard, linkRecordingWalkin, recordingSnapshot,
-  recordingWalkins, requestReprocess, requestRescore, reviewAnalysis, type DimensionOverride,
+  AnalysisActionError, correctTranscript, fetchAnalysisSnapshot, fetchConversationCard, fetchConversationIntegration, recordingSnapshot,
+  requestReprocess, requestRescore, reviewAnalysis, type DimensionOverride,
 } from "@jewelos/data";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { AudioPlayer, type AudioPlayerHandle } from "./AudioPlayer";
+import { CustomerLinkSection, FollowUpsPanel, OutcomeStrip, ReadinessStrip } from "./IntegrationPanels";
 import { siPath, type DetailTab } from "./routes";
 import { Disclosure, Drawer, ErrorState, Meter, Panel, ScoreBadge, SkeletonRows, StatusPill, TabBar, Tag, useFlash } from "./ui";
 import { useLoad } from "./useLoad";
@@ -48,7 +49,8 @@ export function ConversationDetail({ sessionId, tab, navigate }: { sessionId: st
   const card = useLoad(() => fetchConversationCard(sessionId), [sessionId], 10_000);
   const [revisionId, setRevisionId] = useState<string | undefined>(undefined);
   const snap = useLoad(() => fetchAnalysisSnapshot(sessionId, revisionId), [sessionId, revisionId], 15_000);
-  const tasks = useLoad(() => fetchActionTasks(sessionId), [sessionId]);
+  // Customer link, CRM outcome, follow-ups and readiness; refreshes so sync status stays truthful.
+  const integration = useLoad(() => fetchConversationIntegration(sessionId), [sessionId], 20_000);
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [active, setActive] = useState<string | null>(null);
   const [drawer, setDrawer] = useState(false);
@@ -99,8 +101,10 @@ export function ConversationDetail({ sessionId, tab, navigate }: { sessionId: st
           <p className="text-sm text-task-text-muted">{new Date(c.created_at).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kolkata" })}, {istTime(c.created_at)} · {c.duration_ms ? formatDuration(c.duration_ms) : "no audio"}{c.branch_name ? ` · ${c.branch_name}` : ""}</p>
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <StatusPill status={status} />
-            {outcome && outcome !== "unknown" ? <Tag>{OUTCOME_LABEL[outcome]}<span className="text-task-text-muted"> · from the conversation</span></Tag> : null}
-            {c.customer_linked ? <Tag tone="success"><Link2 aria-hidden className="size-3" />CRM walk-in</Tag> : null}
+            {integration.data ? <OutcomeStrip integration={integration.data} />
+              : outcome && outcome !== "unknown" ? <Tag>{OUTCOME_LABEL[outcome]}<span className="text-task-text-muted"> · from the conversation</span></Tag> : null}
+            {integration.data?.customer ? <Tag tone={integration.data.customer.state === "verified" ? "success" : "progress"}><Link2 aria-hidden className="size-3" />{integration.data.customer.name ?? "CRM customer"}</Tag>
+              : c.customer_linked ? <Tag tone="success"><Link2 aria-hidden className="size-3" />CRM walk-in</Tag> : null}
           </div>
         </div>
         <div className="flex flex-col items-start gap-2 sm:items-end">
@@ -110,6 +114,7 @@ export function ConversationDetail({ sessionId, tab, navigate }: { sessionId: st
       </div>
     </Panel>
 
+    {integration.data ? <ReadinessStrip integration={integration.data} /> : null}
     {status.detail && c.stage !== "ready" ? <Notice tone={status.tone === "attention" ? "danger" : "task"}>{status.detail}</Notice> : null}
     {c.stage === "ready" && c.awaiting_review ? <Notice tone="task">Your manager reviews the summary and coaching before you see them.</Notice> : null}
     {c.retention_expired ? <Notice tone="task">Audio and transcript were removed after the retention period. The score and summary remain.</Notice> : null}
@@ -128,10 +133,11 @@ export function ConversationDetail({ sessionId, tab, navigate }: { sessionId: st
         : tab === "summary" ? <SummaryTab analysis={analysis} card={c} onSeek={seek} reviewer={reviewer} segments={segments} snapshot={snapshot} />
         : tab === "transcript" ? <TranscriptTab active={active} onRefresh={snap.reload} onRevision={setRevisionId} onSeek={seek} playable={playable} reviewer={reviewer} sessionId={sessionId} snapshot={snapshot} />
         : tab === "coaching" ? <CoachingTab analyses={analyses} analysis={analysis} card={c} onAnalysis={setAnalysisId} onChanged={() => { snap.reload(); card.reload(); }} onSeek={seek} reviewer={reviewer} segments={segments} sessionId={sessionId} snapshot={snapshot} />
-        : <ActionsTab analysis={analysis} card={c} links={tasks.data ?? []} onChanged={() => { tasks.reload(); snap.reload(); card.reload(); }} onSeek={seek} reviewer={reviewer} segments={segments} />}
+        : <ActionsTab analyses={analyses} analysis={analysis} card={c} integration={integration.data} integrationError={integration.error} navigate={navigate}
+            onChanged={() => { integration.reload(); snap.reload(); card.reload(); }} onSeek={seek} reviewer={reviewer} segments={segments} />}
     </div>
 
-    {drawer ? <CustomerDrawer analysis={analysis} card={c} onClose={() => setDrawer(false)} onLinked={card.reload} onSeek={(id) => { setDrawer(false); seek(id); }} segments={segments} /> : null}
+    {drawer ? <CustomerDrawer analysis={analysis} card={c} integration={integration.data} navigate={navigate} onClose={() => setDrawer(false)} onLinked={() => { integration.reload(); card.reload(); }} onSeek={(id) => { setDrawer(false); seek(id); }} segments={segments} /> : null}
   </div>;
 }
 
@@ -367,69 +373,47 @@ function ManagerReview({ analysis, analyses, snapshot, sessionId, onChanged }: {
   </Panel>;
 }
 
-function ActionsTab({ analysis, card, links, segments, onSeek, onChanged, reviewer }: { analysis: StoredSalesAnalysis | null; card: ConversationCard; links: readonly ActionTaskLink[]; segments: readonly AnalysisTranscriptSegment[]; onSeek: (id: string) => void; onChanged: () => void; reviewer: boolean }) {
-  const [choosing, setChoosing] = useState<number | null>(null);
+function ActionsTab({ analyses, analysis, card, integration, integrationError, segments, onSeek, onChanged, reviewer, navigate }: {
+  analyses: readonly StoredSalesAnalysis[]; analysis: StoredSalesAnalysis | null; card: ConversationCard; integration: ConversationIntegration | null; integrationError: string | null;
+  segments: readonly AnalysisTranscriptSegment[]; onSeek: (id: string) => void; onChanged: () => void; reviewer: boolean; navigate: (path: string) => void;
+}) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useFlash();
   const [error, setError] = useState<string | null>(null);
   if (!analysis || !hasAnalysisOutput(analysis)) return <Panel><p className="text-sm text-task-text-muted">{card.awaiting_review ? "Suggested follow-ups appear after your manager reviews this conversation." : "No suggested follow-ups yet."}</p></Panel>;
-  const actions = analysis.output.next_best_actions;
   const released = analysis.review_state === "approve" || analysis.review_state === "edit";
-  const create = async (index: number, at: string) => {
-    setBusy(true); setError(null);
-    try { const result = await createActionTask(analysis.id, index, at); setMessage(result.alreadyCreated ? "This follow-up already has a task." : "Follow-up task created. It is in Tasks for the salesperson."); setChoosing(null); onChanged(); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "The task could not be created."); }
-    finally { setBusy(false); }
+  // Evidence comes from the stored analysis the suggestion belongs to, never re-typed by the screen.
+  const evidenceFor = (analysisId: string, index: number): readonly EvidenceRef[] => {
+    const source = analyses.find((item) => item.id === analysisId);
+    return source && hasAnalysisOutput(source) ? source.output.next_best_actions[index]?.evidence ?? [] : [];
   };
   return <div className="space-y-4">
     {reviewer && !released ? <Panel><div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-task-text">Approve this review so the salesperson can see these suggestions.</p>
       <Button disabled={busy} onClick={() => void (async () => { setBusy(true); setError(null); try { await reviewAnalysis(analysis.id, "approve", null); setMessage("Approved. The salesperson can now see this review."); onChanged(); } catch (cause) { setError(cause instanceof AnalysisActionError ? cause.message : "Approval did not save."); } finally { setBusy(false); } })()} type="button">Approve review</Button></div></Panel> : null}
     {message ? <Notice tone="success">{message}</Notice> : null}
     {error ? <Notice tone="danger">{error}</Notice> : null}
-    {card.retention_expired ? <Notice tone="task">This conversation is past its retention period, so new tasks cannot be created from it.</Notice> : null}
-    {actions.length ? <ul className="space-y-3">{actions.map((item, index) => {
-      const link = links.find((l) => l.analysis_id === analysis.id && l.action_index === index);
-      return <li key={index}><Panel>
-        <p className="text-base font-semibold text-task-text">{item.action}</p>
-        <p className="mt-0.5 text-sm text-task-text-muted">{item.reason}</p>
-        <Evidence onSeek={onSeek} refs={item.evidence} segments={segments} />
-        <div className="mt-3">
-          {link ? <Tag tone={link.task_status === "completed" ? "success" : "progress"}>{taskStatusLabel(link)}{link.planned_datetime ? ` · due ${new Date(link.planned_datetime).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" })}` : ""}</Tag>
-            : choosing === index ? <fieldset><legend className="mb-2 text-xs font-semibold text-task-text-muted">When should it be done?</legend>
-              <div className="flex flex-wrap gap-2">{followUpChoices().map((choice) => <Button disabled={busy} key={choice.key} onClick={() => void create(index, choice.at)} type="button" variant="secondary">{choice.label}</Button>)}
-                <Button disabled={busy} onClick={() => setChoosing(null)} type="button" variant="ghost">Cancel</Button></div></fieldset>
-            : <Button disabled={card.retention_expired || (!reviewer && !released)} onClick={() => setChoosing(index)} type="button">Create follow-up task</Button>}
-        </div>
-      </Panel></li>; })}</ul>
-      : <Panel><p className="text-sm text-task-text-muted">No follow-ups were suggested for this conversation.</p></Panel>}
-    <p className="text-xs text-task-text-muted">Each suggestion can become one task, assigned to the salesperson. Tapping again never creates a duplicate.</p>
+    {integration ? <FollowUpsPanel integration={integration} navigate={navigate} onChanged={onChanged}
+        onSeekEvidence={(suggestion) => <Evidence onSeek={onSeek} refs={evidenceFor(suggestion.analysis_id, suggestion.action_index)} segments={segments} />}
+        retentionExpired={card.retention_expired} sessionId={card.id} />
+      : integrationError ? <ErrorState message="Follow-ups could not be loaded." /> : <SkeletonRows label="Loading follow-ups" rows={2} />}
   </div>;
 }
 
-function CustomerDrawer({ card, analysis, segments, onClose, onSeek, onLinked }: { card: ConversationCard; analysis: StoredSalesAnalysis | null; segments: readonly AnalysisTranscriptSegment[]; onClose: () => void; onSeek: (id: string) => void; onLinked: () => void }) {
-  const { access } = useAuth();
-  const canLink = hasPermission(access, "crm.view") && !card.customer_linked && !card.retention_expired;
-  const walkins = useLoad(async () => (canLink ? recordingWalkins() : []), [canLink]);
-  const [choice, setChoice] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+function CustomerDrawer({ card, analysis, integration, segments, onClose, onSeek, onLinked, navigate }: {
+  card: ConversationCard; analysis: StoredSalesAnalysis | null; integration: ConversationIntegration | null; segments: readonly AnalysisTranscriptSegment[];
+  onClose: () => void; onSeek: (id: string) => void; onLinked: () => void; navigate: (path: string) => void;
+}) {
   const o = analysis && hasAnalysisOutput(analysis) ? analysis.output : null;
   return <Drawer onClose={onClose} title="Customer details">
     <div className="space-y-5 text-sm">
-      <section className="space-y-1.5"><h3 className="font-semibold text-task-text">CRM</h3>
-        {card.customer_linked ? <p className="text-task-text">Linked to a CRM walk-in.</p> : <p className="text-task-text-muted">Not linked to a CRM walk-in.</p>}
-        {canLink ? <div className="space-y-2">
-          <select aria-label="CRM walk-in" className="field" onChange={(event) => setChoice(event.target.value)} value={choice}><option value="">Choose a walk-in</option>{(walkins.data ?? []).map((w) => <option key={w.ref} value={w.ref}>{w.label}</option>)}</select>
-          {error ? <p className="text-danger" role="alert">{error}</p> : null}
-          <Button disabled={!choice || busy} onClick={() => void (async () => { setBusy(true); setError(null); try { await linkRecordingWalkin(card.id, choice); onLinked(); onClose(); } catch { setError("The walk-in could not be linked."); } finally { setBusy(false); } })()} type="button">Link walk-in</Button>
-          {walkins.data && !walkins.data.length ? <p className="text-xs text-task-text-muted">No CRM walk-ins you can link right now.</p> : null}
-        </div> : null}
-      </section>
+      {integration ? <CustomerLinkSection integration={integration} navigate={(path) => { onClose(); navigate(path); }} onChanged={onLinked} retentionExpired={card.retention_expired} sessionId={card.id} />
+        : <p className="text-task-text-muted">Loading the CRM link…</p>}
       {o ? <>
         <section className="space-y-1.5"><h3 className="font-semibold text-task-text">Looking for</h3>
           {o.product_interests.length || o.customer_requirements.requirements.length ? <ul className="space-y-1.5 text-task-text">{[...o.product_interests, ...o.customer_requirements.requirements].map((c, i) => <li key={i}>{c.text}<Evidence onSeek={onSeek} refs={c.evidence} segments={segments} /></li>)}</ul> : <p className="text-task-text-muted">Not stated.</p>}</section>
         <section className="space-y-1.5"><h3 className="font-semibold text-task-text">Occasion</h3>{o.customer_requirements.occasion ? <p className="text-task-text">{o.customer_requirements.occasion.text}</p> : <p className="text-task-text-muted">Not stated.</p>}</section>
         <section className="space-y-1.5"><h3 className="font-semibold text-task-text">Budget</h3>{o.customer_requirements.budget ? <p className="text-task-text">{o.customer_requirements.budget.text} <span className="text-task-text-muted">(as the customer said it)</span></p> : <p className="text-task-text-muted">Not stated. We never guess a budget.</p>}</section>
+        <p className="text-xs text-task-text-muted">These come from what was said. They are never written to the CRM profile.</p>
       </> : <p className="text-task-text-muted">Details appear after the conversation is reviewed.</p>}
     </div>
   </Drawer>;

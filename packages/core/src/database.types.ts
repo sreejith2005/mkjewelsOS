@@ -2654,6 +2654,447 @@ export type Database = {
           },
         ]
       }
+      recording_crm_outcomes: {
+        Row: {
+          check_count: number
+          checked_at: string
+          crm_client_id: string | null
+          link_id: string
+          next_check_at: string
+          purchase_outcome: string | null
+          purchase_visit_at: string | null
+          purchase_visit_id: string | null
+          session_id: string
+          state: string
+          tenant_id: string
+          visits: number
+          window_from: string
+          window_until: string
+        }
+        Insert: {
+          check_count?: number
+          checked_at: string
+          crm_client_id?: string | null
+          link_id: string
+          next_check_at: string
+          purchase_outcome?: string | null
+          purchase_visit_at?: string | null
+          purchase_visit_id?: string | null
+          session_id: string
+          state: string
+          tenant_id: string
+          visits?: number
+          window_from: string
+          window_until: string
+        }
+        Update: {
+          check_count?: number
+          checked_at?: string
+          crm_client_id?: string | null
+          link_id?: string
+          next_check_at?: string
+          purchase_outcome?: string | null
+          purchase_visit_at?: string | null
+          purchase_visit_id?: string | null
+          session_id?: string
+          state?: string
+          tenant_id?: string
+          visits?: number
+          window_from?: string
+          window_until?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recording_crm_outcomes_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: true
+            referencedRelation: "recording_customer_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_crm_outcomes_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "recorder_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_crm_outcomes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recording_customer_links: {
+        Row: {
+          candidate_count: number
+          crm_client_id: string | null
+          display_cached_at: string
+          display_code: string | null
+          display_expires_at: string
+          display_name: string | null
+          display_source: string
+          end_kind: string | null
+          end_reason: string | null
+          ended_at: string | null
+          ended_by: string | null
+          id: string
+          link_reason: string | null
+          linked_at: string
+          linked_by: string
+          match_basis: string
+          replaces_link_id: string | null
+          request_key: string
+          session_id: string
+          state: string
+          state_reason: string | null
+          target_id: string
+          target_kind: string
+          tenant_id: string
+          verified_at: string | null
+        }
+        Insert: {
+          candidate_count: number
+          crm_client_id?: string | null
+          display_cached_at?: string
+          display_code?: string | null
+          display_expires_at: string
+          display_name?: string | null
+          display_source: string
+          end_kind?: string | null
+          end_reason?: string | null
+          ended_at?: string | null
+          ended_by?: string | null
+          id?: string
+          link_reason?: string | null
+          linked_at?: string
+          linked_by: string
+          match_basis: string
+          replaces_link_id?: string | null
+          request_key: string
+          session_id: string
+          state?: string
+          state_reason?: string | null
+          target_id: string
+          target_kind: string
+          tenant_id: string
+          verified_at?: string | null
+        }
+        Update: {
+          candidate_count?: number
+          crm_client_id?: string | null
+          display_cached_at?: string
+          display_code?: string | null
+          display_expires_at?: string
+          display_name?: string | null
+          display_source?: string
+          end_kind?: string | null
+          end_reason?: string | null
+          ended_at?: string | null
+          ended_by?: string | null
+          id?: string
+          link_reason?: string | null
+          linked_at?: string
+          linked_by?: string
+          match_basis?: string
+          replaces_link_id?: string | null
+          request_key?: string
+          session_id?: string
+          state?: string
+          state_reason?: string | null
+          target_id?: string
+          target_kind?: string
+          tenant_id?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recording_customer_links_ended_by_fkey"
+            columns: ["ended_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_customer_links_ended_by_fkey"
+            columns: ["ended_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_customer_links_ended_by_fkey"
+            columns: ["ended_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_customer_links_ended_by_fkey"
+            columns: ["ended_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_customer_links_linked_by_fkey"
+            columns: ["linked_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_customer_links_linked_by_fkey"
+            columns: ["linked_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_customer_links_linked_by_fkey"
+            columns: ["linked_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_customer_links_linked_by_fkey"
+            columns: ["linked_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_customer_links_replaces_link_id_fkey"
+            columns: ["replaces_link_id"]
+            isOneToOne: false
+            referencedRelation: "recording_customer_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_customer_links_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "recorder_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_customer_links_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recording_follow_ups: {
+        Row: {
+          action_index: number
+          action_key: string
+          analysis_id: string
+          channel: string
+          created_at: string
+          created_by: string
+          customer_link_id: string | null
+          due_at: string
+          due_half: string | null
+          fms_instance_id: string | null
+          fms_reference: string | null
+          id: string
+          note: string | null
+          owner_id: string
+          request_key: string
+          session_id: string
+          source_text: string
+          supervisor_id: string | null
+          task_id: string | null
+          tenant_id: string
+          title: string
+        }
+        Insert: {
+          action_index: number
+          action_key: string
+          analysis_id: string
+          channel: string
+          created_at?: string
+          created_by: string
+          customer_link_id?: string | null
+          due_at: string
+          due_half?: string | null
+          fms_instance_id?: string | null
+          fms_reference?: string | null
+          id?: string
+          note?: string | null
+          owner_id: string
+          request_key: string
+          session_id: string
+          source_text: string
+          supervisor_id?: string | null
+          task_id?: string | null
+          tenant_id: string
+          title: string
+        }
+        Update: {
+          action_index?: number
+          action_key?: string
+          analysis_id?: string
+          channel?: string
+          created_at?: string
+          created_by?: string
+          customer_link_id?: string | null
+          due_at?: string
+          due_half?: string | null
+          fms_instance_id?: string | null
+          fms_reference?: string | null
+          id?: string
+          note?: string | null
+          owner_id?: string
+          request_key?: string
+          session_id?: string
+          source_text?: string
+          supervisor_id?: string | null
+          task_id?: string | null
+          tenant_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recording_follow_ups_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "recording_analyses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_follow_ups_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_follow_ups_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_follow_ups_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_follow_ups_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_follow_ups_customer_link_id_fkey"
+            columns: ["customer_link_id"]
+            isOneToOne: false
+            referencedRelation: "recording_customer_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_follow_ups_fms_instance_id_fkey"
+            columns: ["fms_instance_id"]
+            isOneToOne: false
+            referencedRelation: "fms_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_follow_ups_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_follow_ups_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_follow_ups_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_follow_ups_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_follow_ups_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "recorder_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_follow_ups_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_follow_ups_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_follow_ups_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_follow_ups_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_follow_ups_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "task_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_follow_ups_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "task_instances_live"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_follow_ups_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recording_playback_grants: {
         Row: {
           actor_id: string
@@ -3433,8 +3874,10 @@ export type Database = {
           analysis_job_version: string
           branch_ids: string[]
           coaching_enabled: boolean
+          crm_attribution_days: number
           employee_ids: string[]
           enabled: boolean
+          estimated_ticket_inr: number | null
           retention_days: number
           tenant_id: string
         }
@@ -3443,8 +3886,10 @@ export type Database = {
           analysis_job_version?: string
           branch_ids?: string[]
           coaching_enabled?: boolean
+          crm_attribution_days?: number
           employee_ids?: string[]
           enabled?: boolean
+          estimated_ticket_inr?: number | null
           retention_days?: number
           tenant_id: string
         }
@@ -3453,8 +3898,10 @@ export type Database = {
           analysis_job_version?: string
           branch_ids?: string[]
           coaching_enabled?: boolean
+          crm_attribution_days?: number
           employee_ids?: string[]
           enabled?: boolean
+          estimated_ticket_inr?: number | null
           retention_days?: number
           tenant_id?: string
         }
@@ -13820,6 +14267,10 @@ export type Database = {
         Args: { p_enabled: boolean; p_job_version?: string }
         Returns: Json
       }
+      recording_configure_crm_outcomes: {
+        Args: { p_attribution_days: number; p_estimated_ticket_inr: number }
+        Returns: Json
+      }
       recording_conversation_card: { Args: { p_session_id: string }; Returns: Json }
       recording_conversations_page: {
         Args: {
@@ -13847,6 +14298,7 @@ export type Database = {
         }
         Returns: Json
       }
+      recording_create_follow_up: { Args: { p_input: Json }; Returns: Json }
       recording_create_rubric_version: {
         Args: {
           p_dimensions: Json
@@ -13868,8 +14320,22 @@ export type Database = {
         }
         Returns: Json
       }
+      recording_follow_up_options: {
+        Args: { p_session_id: string }
+        Returns: Json
+      }
       recording_insights: {
         Args: { p_employee_id?: string; p_from: string; p_to: string }
+        Returns: Json
+      }
+      recording_integration_health: { Args: never; Returns: Json }
+      recording_link_crm_customer: {
+        Args: {
+          p_reason?: string
+          p_request_key: string
+          p_session_id: string
+          p_target: Json
+        }
         Returns: Json
       }
       recording_list_versions: { Args: never; Returns: Json }
@@ -13898,6 +14364,10 @@ export type Database = {
         }
         Returns: Json
       }
+      recording_retry_crm_sync: {
+        Args: { p_session_id: string }
+        Returns: Json
+      }
       recording_review_analysis: {
         Args: {
           p_action: string
@@ -13908,6 +14378,10 @@ export type Database = {
         Returns: Json
       }
       recording_session_action_tasks: { Args: { p_session_id: string }; Returns: Json }
+      recording_session_integration: {
+        Args: { p_session_id: string }
+        Returns: Json
+      }
       recording_set_sop_status: {
         Args: { p_sop_version_id: string; p_status: string }
         Returns: Json
@@ -13979,6 +14453,10 @@ export type Database = {
         Returns: Json
       }
       recording_today: { Args: never; Returns: Json }
+      recording_unlink_crm_customer: {
+        Args: { p_reason: string; p_session_id: string }
+        Returns: Json
+      }
       recording_workspace_settings: { Args: never; Returns: Json }
       retry_fms_trigger_event_with_audit: {
         Args: { p_event_id: string }

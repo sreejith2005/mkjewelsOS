@@ -5,7 +5,7 @@ import type {Database} from '@/lib/supabase/database.types';
 import { HistoryFields, HistoryValue, RecentHistory, historyDate } from '@/components/profile-history-display';
 import { withBasePath } from '@/crm-port/runtime';
 import { fmsAssignedWorkPath } from '@jewelos/core';
-import { JOURNEY_GROUPS, journeyFmsDetails, journeyTitle, type JourneyGroup } from '@/lib/customer-journey';
+import { JOURNEY_GROUPS, journeyFmsDetails, journeyStoreConversation, journeyTitle, type JourneyGroup } from '@/lib/customer-journey';
 export type ClientActivityRow=Database['public']['Views']['crm_client_activity']['Row'];
 export function ClientActivity({clientId,activity,fieldLabels={},actorNames={},branchNames={},summary,journey=null}:{clientId:string;activity:ClientActivityRow[];fieldLabels?:Record<string,string>;actorNames?:Record<string,string>;branchNames?:Record<string,string>;summary?:{first_recorded_at:string|null;latest_interaction_at:string|null};journey?:JourneyGroup|null}) {
  const router=useRouter();const [saving,setSaving]=useState(false);const [message,setMessage]=useState('');
@@ -38,7 +38,7 @@ export function ClientActivity({clientId,activity,fieldLabels={},actorNames={},b
    {message?<p role="status">{message}</p>:null}
   </form>
   </details>
-  <RecentHistory key={`${clientId}:${activity[0]?.activity_id ?? ''}`} noun="entries">{activity.map(item=>{const fms=item.source_table==='crm_customer_workflow_events'?journeyFmsDetails(item.details):null;return <details key={item.activity_id} className="crm-history-entry" data-testid="contact-history-entry">
+  <RecentHistory key={`${clientId}:${activity[0]?.activity_id ?? ''}`} noun="entries">{activity.map(item=>{const fms=item.source_table==='crm_customer_workflow_events'?journeyFmsDetails(item.details):null;const store=item.source_table==='crm_store_conversations'?journeyStoreConversation(item.details):null;return <details key={item.activity_id} className="crm-history-entry" data-testid="contact-history-entry">
    <summary><span className="crm-history-summary"><strong>{journeyTitle(item.kind,item.source_table,fms?.stageName??null)}{item.channel?` · ${item.channel.replaceAll('_',' ')}`:''}</strong><span className="crm-history-meta">{historyDate(item.occurred_at)} · {item.actor_id?(actorNames[item.actor_id] ?? 'Former staff member'):fms?.actorName??'Staff not recorded'}{item.branch_id?` · ${branchNames[item.branch_id] ?? 'Former branch'}`:''}</span>{item.note?<span className="crm-history-preview">{item.note.length > 120 ? `${item.note.slice(0,120)}…` : item.note}</span>:null}</span></summary>
    <div className="crm-history-body">{item.note?<p className="crm-history-note">{item.note}</p>:null}
    {fms?<div className="crm-journey-fms">
@@ -46,6 +46,9 @@ export function ClientActivity({clientId,activity,fieldLabels={},actorNames={},b
     {fms.reference?<p>Workflow reference: {fms.reference}</p>:null}
     {fms.answers.length?<dl>{fms.answers.map(answer=><div className="crm-customer-answer" key={answer.key}><dt>{answer.label}</dt><dd>{answer.labels.length?answer.labels.join(', '):<HistoryValue value={answer.value}/>}</dd></div>)}</dl>:null}
     {fms.instanceId?<a href={fmsAssignedWorkPath({kind:'stage',instanceId:fms.instanceId,instanceStageId:fms.instanceStageId})}>Open this FMS work</a>:null}
+   </div>:store?<div className="crm-journey-fms">
+    <p>Recorded with the customer's consent in Store Intelligence{store.minutes?` · about ${store.minutes} min`:''}{store.salesperson?` · ${store.salesperson}`:''}. Audio and transcript stay in Store Intelligence.</p>
+    {store.path?<a href={store.path}>Open conversation</a>:null}
    </div>:item.details && typeof item.details==='object' && !Array.isArray(item.details)?<HistoryFields fields={item.details} fieldLabels={fieldLabels}/>:null}
    </div>
   </details>;})}</RecentHistory>

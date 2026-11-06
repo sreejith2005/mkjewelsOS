@@ -21,6 +21,16 @@ function gateway(): CrmSyncGateway | null {
       if(error)throw new Error('customer_apply_failed');
       return data ?? {};
     },
+    async applyStoreConversation(eventId,payload) {
+      const {data,error}=await admin.rpc('crm_apply_store_conversation_event',{p_event_id:eventId,p_payload:payload});
+      if(error)throw new Error('store_conversation_apply_failed');
+      return (data ?? {}) as Record<string,unknown>;
+    },
+    async storeConversationOutcomes(tenantId,items) {
+      const {data,error}=await admin.rpc('crm_store_conversation_outcomes',{p_tenant:tenantId,p_items:items});
+      if(error)throw new Error('store_conversation_outcomes_failed');
+      return (data ?? {}) as Record<string,unknown>;
+    },
     async registerCustomerMapping(mappingId,descriptor,digest) {
       const {data,error}=await admin.rpc('crm_register_customer_mapping',{p_mapping_id:mappingId,p_descriptor:descriptor,p_digest:digest});
       if(error)throw new Error('customer_mapping_failed');

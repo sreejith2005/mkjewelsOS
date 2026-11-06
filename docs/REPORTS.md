@@ -57,6 +57,15 @@ past exports downloadable, and stay available to Ask Kiara.
 …_AND_BUYING_NEW_PRODUCT, or a saved visit form saying the customer bought). A store visit,
 a price check, or a completed FMS negotiation step is never a sale.
 
+**Store Intelligence conversations (migration 0384).** A recorded conversation linked to a
+CRM customer appears in the customer's history (`crm_client_activity`, source
+`crm_store_conversations`, kind `STORE_CONVERSATION`), so it is in Customer 360° Journey. It is
+never a purchase and never a contact. Store Intelligence's "Purchase confirmed in CRM" uses the
+purchase rule above, for visits from the recording's India day through the attribution window
+(30 days by default); one purchase visit is credited once. The CRM records no sale amounts, so
+there is no verified revenue; an estimate (confirmed purchases × configured average ticket) is
+shown only in Store Intelligence and always labelled Estimated.
+
 **Customer Master.** One row per CRM customer. *Lead or client*: CRM lifecycle `lead` or
 `engaged` → Lead, otherwise Client. *Returning*: more than one recorded store visit.
 *Purchase status*: `customer_commercial_summary` (Buyer, Non-Buyer/Prospect, Repair-only

@@ -1,8 +1,10 @@
 import { supabase, type Json } from "@jewelos/api-client";
 import {
-  parseActionTaskLinks, parseCoachingLists, parseConversationCard, parseConversationPage, parseDevicePage, parseInsights, parseToday, parseWorkspaceSettings,
-  type ActionTaskLink, type CoachingLists, type ConversationCard, type ConversationFilters, type ConversationPage, type DevicePage, type DeviceStatus,
-  type Insights, type TodayView, type WorkspaceSettings,
+  followUpPayload, parseActionTaskLinks, parseCoachingLists, parseConversationCard, parseConversationIntegration, parseConversationPage, parseDevicePage,
+  parseFollowUpOptions, parseInsights, parseIntegrationHealth, parseToday, parseWorkspaceSettings,
+  type ActionTaskLink, type CoachingLists, type ConversationCard, type ConversationFilters, type ConversationIntegration, type ConversationPage,
+  type CustomerLinkTarget, type DevicePage, type DeviceStatus, type FollowUpInput, type FollowUpOptions, type Insights, type IntegrationHealth,
+  type TodayView, type WorkspaceSettings,
 } from "@jewelos/core";
 
 /**
@@ -23,6 +25,16 @@ const MESSAGES: Readonly<Record<string, [string, WorkspaceErrorKind]>> = {
   recording_action_not_found: ["That suggestion is no longer available.", "invalid"],
   recording_invalid_due: ["Choose a due date within the next 90 days.", "invalid"],
   recording_retention_expired: ["This conversation has passed its retention period.", "expired"],
+  // 0384: customer links and follow-ups.
+  recording_link_denied: ["Only the salesperson or a branch manager with CRM access can change this conversation's customer.", "denied"],
+  recording_invalid_link: ["That customer could not be used. Search again and choose from the list.", "invalid"],
+  recording_reason_required: ["Write a short reason for the change.", "invalid"],
+  recording_request_reused: ["That request was already used for something else. Refresh and try again.", "invalid"],
+  recording_owner_denied: ["You can give a follow-up only to yourself or the salesperson.", "denied"],
+  recording_supervisor_denied: ["Choose a branch manager other than yourself and the owner for the coaching reminder.", "denied"],
+  recording_flow_not_startable: ["That workflow cannot be started by hand. Choose another or create a task.", "invalid"],
+  recording_invalid_follow_up: ["Check the follow-up details and try again.", "invalid"],
+  recording_invalid_config: ["Use 1 to 90 days and a positive average ticket, or leave the ticket blank.", "invalid"],
 };
 function fail(error: { message?: string; code?: string } | null): never {
   const key = Object.keys(MESSAGES).find((code) => error?.message?.includes(code));
@@ -96,4 +108,70 @@ export async function saveRecordingAccess(input: Readonly<{ enabled: boolean; em
     p_enabled: input.enabled, p_employee_ids: [...input.employeeIds], p_branch_ids: [...input.branchIds], p_retention_days: input.retentionDays, p_coaching_enabled: input.coachingEnabled,
   });
   if (error) throw new WorkspaceError(error.message?.includes("recorder_invalid_config") ? "Check the people, branches and retention days (1 to 90)." : "Only a Super Admin can change recording access.", error.message?.includes("recorder_invalid_config") ? "invalid" : "denied");
+}
+
+// ---------------------------------------------------------------------------
+// 0384: CRM customer link, outcomes, follow-ups and readiness.
+
+/** Customer link, AI vs CRM outcome, suggestions with their work, and readiness for one conversation. */
+export async function fetchConversationIntegration(sessionId: string): Promise<ConversationIntegration> {
+  const { data, error } = await supabase.rpc("recording_session_integration", { p_session_id: sessionId });
+  if (error) fail(error);
+  return parsed(parseConversationIntegration, data);
+}
+/**
+ * Links the customer a person chose from the CRM search. It stays "waiting for CRM" until the CRM
+ * acknowledges it; changing an existing link needs `reason` and withdraws the old CRM entry.
+ */
+export async function linkCrmCustomer(sessionId: string, target: CustomerLinkTarget, requestKey: string, reason?: string): Promise<{ linkId: string; alreadyLinked: boolean }> {
+  const { data, error } = await supabase.rpc("recording_link_crm_customer", {
+    p_session_id: sessionId, p_target: target as unknown as Json, // Built by linkTargetFor from a CRM-offered candidate; the server re-validates every key.
+    p_request_key: requestKey, ...(reason?.trim() ? { p_reason: reason.trim() } : {}),
+  });
+  if (error) fail(error);
+  if (!data || typeof data !== "object" || Array.isArray(data) || typeof data.link_id !== "string") throw new WorkspaceError("The link could not be confirmed. Refresh to check.", "unavailable");
+  return { linkId: data.link_id, alreadyLinked: data.already_linked === true };
+}
+export async function unlinkCrmCustomer(sessionId: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc("recording_unlink_crm_customer", { p_session_id: sessionId, p_reason: reason.trim() });
+  if (error) fail(error);
+}
+/** Sends a held or failed CRM entry again (same event; the CRM ignores repeats). */
+export async function retryCrmSync(sessionId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("recording_retry_crm_sync", { p_session_id: sessionId });
+  if (error) fail(error);
+  return data && typeof data === "object" && !Array.isArray(data) && typeof data.requeued === "number" ? data.requeued : 0;
+}
+export async function fetchFollowUpOptions(sessionId: string): Promise<FollowUpOptions> {
+  const { data, error } = await supabase.rpc("recording_follow_up_options", { p_session_id: sessionId });
+  if (error) fail(error);
+  return parsed(parseFollowUpOptions, data);
+}
+export type FollowUpResult = Readonly<{ followUpId: string | null; taskId: string | null; fmsInstanceId: string | null; fmsReference: string | null; alreadyCreated: boolean }>;
+/** One Task (or one manual FMS run) per suggestion; a repeat, retry or rescore returns the existing one. */
+export async function createFollowUp(input: FollowUpInput): Promise<FollowUpResult> {
+  const { data, error } = await supabase.rpc("recording_create_follow_up", { p_input: followUpPayload(input) });
+  if (error) {
+    // The task / FMS contracts' own refusals (section off, authoring scope) carry no recording code.
+    if (!Object.keys(MESSAGES).some((code) => error.message?.includes(code))) throw new WorkspaceError("The follow-up could not be created. You may not be allowed to create this task or start this workflow.", "denied");
+    fail(error);
+  }
+  if (!data || typeof data !== "object" || Array.isArray(data)) throw new WorkspaceError("The follow-up could not be confirmed. Refresh to check.", "unavailable");
+  const text = (value: unknown) => (typeof value === "string" ? value : null);
+  if (!text(data.task_id) && !text(data.fms_instance_id)) throw new WorkspaceError("The follow-up could not be confirmed. Refresh to check.", "unavailable");
+  return { followUpId: text(data.follow_up_id), taskId: text(data.task_id), fmsInstanceId: text(data.fms_instance_id), fmsReference: text(data.fms_reference), alreadyCreated: data.already_created === true };
+}
+export async function fetchIntegrationHealth(): Promise<IntegrationHealth> {
+  const { data, error } = await supabase.rpc("recording_integration_health");
+  if (error) fail(error);
+  return parsed(parseIntegrationHealth, data);
+}
+/** Attribution window and the optional average ticket for estimates (Super Admin / Admin; audited). */
+export async function saveCrmOutcomeSettings(attributionDays: number, estimatedTicketInr: number | null): Promise<void> {
+  const { error } = await supabase.rpc("recording_configure_crm_outcomes", {
+    p_attribution_days: attributionDays,
+    // The SQL argument accepts NULL ("no estimate"); the generated type marks it required.
+    p_estimated_ticket_inr: estimatedTicketInr as number,
+  });
+  if (error) fail(error);
 }

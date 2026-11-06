@@ -1,4 +1,5 @@
 import type { SalesOutcome } from "./analysis";
+import { parseCrmInsights, type CrmInsights } from "./integration";
 import type { SalesAnalysisStatus, SalesStatusReason } from "./score";
 
 /**
@@ -320,6 +321,8 @@ export type Insights = Readonly<{
   quality: Readonly<{ not_analysed: number; low_audio: number; speakers_unverified: number; too_little_speech: number; backup_model: number; interrupted: number }>;
   follow_ups: Readonly<{ created: number; completed: number; open: number; overdue: number }>;
   crm_outcomes_connected: boolean;
+  /** 0384: AI-suggested intent next to CRM-confirmed results (null before the CRM link exists). */
+  crm: CrmInsights | null;
 }>;
 function numbers<K extends string>(raw: unknown, keys: readonly K[]): Record<K, number> {
   const value = isObject(raw) ? raw : {};
@@ -347,8 +350,10 @@ export function parseInsights(raw: unknown): Insights {
     }] : [])),
     top_mentions: { products: mentions(top.products), concerns: mentions(top.concerns), competitors: mentions(top.competitors) },
     quality: numbers(raw.quality, ["not_analysed", "low_audio", "speakers_unverified", "too_little_speech", "backup_model", "interrupted"] as const),
-    follow_ups: numbers(raw.follow_ups, ["created", "completed", "open", "overdue"] as const),
+    // 0384 counts follow-ups from both the older button and the reviewed form.
+    follow_ups: numbers(isObject(raw.follow_ups_all) ? raw.follow_ups_all : raw.follow_ups, ["created", "completed", "open", "overdue"] as const),
     crm_outcomes_connected: raw.crm_outcomes_connected === true,
+    crm: parseCrmInsights(raw.crm),
   };
 }
 /** Percentage of a whole, or null when there is nothing to divide. */
@@ -386,6 +391,8 @@ export type WorkspaceSettings = Readonly<{
   health: Readonly<{ transcription_waiting: number; transcription_failed_7d: number; analysis_waiting: number; analysis_failed_7d: number; oldest_waiting_at: string | null; last_transcript_at: string | null; last_analysis_at: string | null }>;
   models: readonly Readonly<{ provider: string; model: string; analyses: number; backup_used: number }>[];
   cost_tracked: boolean;
+  /** 0384: attribution window and optional average ticket for estimates. */
+  crm_outcomes: Readonly<{ attribution_days: number; estimated_ticket_inr: number | null; can_change: boolean }>;
 }>;
 const refs = (raw: unknown): NamedRef[] => (Array.isArray(raw) ? raw.flatMap((r) => (isObject(r) && isString(r.id) && isString(r.name) ? [{ id: r.id, name: r.name }] : [])) : []);
 export function parseWorkspaceSettings(raw: unknown): WorkspaceSettings {
@@ -410,6 +417,8 @@ export function parseWorkspaceSettings(raw: unknown): WorkspaceSettings {
     },
     models: Array.isArray(raw.models) ? raw.models.flatMap((m) => (isObject(m) && isString(m.model) ? [{ provider: String(m.provider), model: m.model, analyses: num(m.analyses) ?? 0, backup_used: num(m.backup_used) ?? 0 }] : [])) : [],
     cost_tracked: raw.cost_tracked === true,
+    crm_outcomes: { attribution_days: num(isObject(raw.crm_outcomes) ? raw.crm_outcomes.attribution_days : null) ?? 30,
+      estimated_ticket_inr: num(isObject(raw.crm_outcomes) ? raw.crm_outcomes.estimated_ticket_inr : null), can_change: isObject(raw.crm_outcomes) && raw.crm_outcomes.can_change === true },
   };
 }
 /** The fixed redaction rules (recording_redact, 0379), described for people. */
