@@ -1,0 +1,11 @@
+# Terraform working files and state never belong in Git (state can hold resource
+# identifiers; tfvars and backend overrides can hold account details).
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+*_override.tf
+*_override.tf.json
+crash.log

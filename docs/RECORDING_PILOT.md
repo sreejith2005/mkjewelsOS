@@ -32,6 +32,8 @@ Edge server configuration:
 - `RECORDER_INGEST_SECRET`: backend-only shared boundary secret, same value as
   ingestion's `RECORDER_BACKEND_SECRET`; configure through secret management.
 
+The step-by-step AWS build, exact secret names and where each one lives, the device
+matrix and the activation order are in `docs/STORE_INTELLIGENCE_ACTIVATION_RUNBOOK.md`.
 See `services/recorder/README.md` for AWS instance-role/S3/KMS/TLS/queue limits,
 worker deployment, optional private GPU adapter and alert signal contract. AWS
 never receives a Supabase service-role key. The Edge worker exposes only narrow
