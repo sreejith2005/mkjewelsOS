@@ -20,18 +20,21 @@ Tasks entry updated against the screens: 2026-10-21 (Anytime duties, task order)
 
 ---
 
-## Sales Recording (pilot; requires server configuration and permission)
-
-- [ ] Confirm recording consent, press **Start recording**, allow microphone permission. **Recording** is red; timer and **Audio input** meter show capture. **Pause** stops capture but keeps the session; **Resume** continues it.
-- [ ] **Stop** shows **Saving**, then **Processing**, then **Ready** or **Needs attention**. **Retry saving** preserves the conversation/session and queued audio. No customer selection is required.
-- [ ] Browser background capture depends on support and never continues after closing the tab. Android uses a foreground recording notification with **Stop**; physical-device evidence is a separate release gate.
-- [ ] Transcript text is marked **Provisional** until final text replaces it. **Critical coaching alerts** is an optional authorized-manager feed based on final unambiguous evidence. Pilot p50/p95 lag is unmeasured until a real load pilot.
-- [ ] **Live transcript** shows provisional text; after **Ready**, **Conversation review** shows the MK Sales Score, scores by area, evidence buttons that jump to the **Final transcript** line (**Readable** / **Original language** / **English**), and "No score" / **Needs review** explanations.
-- [ ] Managers: an evidence button also plays that moment of the recording, and **Play** beside a Final transcript line listens to it (player shows **Playing** with **Close**). Each listen is written to the audit log; the recorded employee has no Play button; audio is unavailable after retention. Evidence playback uses no Kiara tool (Kiara gets no audio or transcript access).
-- [ ] Managers: **Reason or note**, **Approve**, **Flag** / **Remove flag**, **Comment**, **Edit scores** â†’ **Save manager scores**, **Request rescore**, **Transcribe audio again**, **Correct transcript** â†’ **Save correction**. The employee sees a review only after approval or edit.
-- [ ] **Sales score settings**: **Turn analysis on/off**, rubric **Activate** / **Save draft rubric**, SOP **Approve** / **Retire** / **Save draft SOP**.
-- [ ] No new Kiara read tool (also for scores and reviews): recording/transcript content is sensitive and outside this capture pilot's assistant scope. Kiara explains controls only; it cannot read audio/transcripts or mutate sessions.
-
+## Store Intelligence (menu: Store Intelligence; path /sales-recording; pilot needs server configuration and permission)
+Updated 2026-11-06 for the Store Intelligence workspace (migration 0383).
+- [ ] Tabs: **Today**, **Conversations** for everyone; **Coaching**, **Insights**, **Devices** for managers with **Review branch recordings**; **Settings** for managers and admins. Opening a manager tab by URL as a salesperson shows "That view is for managers" and Today.
+- [ ] **Today**: **Start conversation**, **Recorded today**, **Processing**, **Ready**, **Needs attention** (tap to open the filtered list), **My coaching** (**Doing well**, **Work on**, **Try this**), **Next actions** with **Create follow-up task**. Managers see the review count with **Review now**.
+- [ ] Recording: salesperson fixed from sign-in, **Customer (optional)** CRM walk-in, consent tick box, **Start recording**; then timer, **Microphone level**, connection line, **Pause** / **Resume** / **Finish**, **Retry upload**, **Live transcript** (**Show**). **Saving…** until every upload is acknowledged; **Saved** with **Open conversation** only after the server confirms. Blocked microphone, offline and unsupported-browser notices appear before Start.
+- [ ] **Conversations**: day groups, search box, **Filters** drawer (Date, Salesperson, Status, What the customer said happened, Score, Length, Product mentioned, Only CRM-linked walk-ins, Only flagged) ? **Show results**; removable chips, **Clear all**, **Load more**. Filters are kept in the link.
+- [ ] Conversation: score with Strong / Good / Needs work, outcome "from the conversation", **Customer details** drawer (**Link walk-in**), tabs **Summary**, **Transcript**, **Coaching**, **Actions**. Managers get the player (**Play**/**Pause**, **Back 10 seconds**, **Forward 10 seconds**, position slider, 1×–2× speed); every listen is audited; salespeople cannot play audio.
+- [ ] **Transcript**: **Search transcript** with match count, Readable / Original language / English, versions, speaker names only when confident. Managers: **Correct transcript** ? **Save correction**, **Transcribe audio again**.
+- [ ] **Coaching** tab: **Scores by area** (**Expand all** / **Collapse all**), **Done well**, **To improve**, **Try saying**, **SOP checks**; managers' **Manager review**: **Approve**, **Flag** / **Remove flag**, **Comment**, **Edit scores** ? **Save manager scores**, **Request rescore**. Staff see reviews only after approval or edit.
+- [ ] **Actions** tab: **Create follow-up task** ? **When should it be done?** (Today, 6 PM / Tomorrow, 11 AM / In 3 days, 11 AM); one task per suggestion, then **Task open** / **Task done**. Managers can **Approve review** here.
+- [ ] **Coaching** (managers): **Waiting for your review**, **Team priorities**, **People**, **Flagged conversations**, **Strongest examples**, **Follow-up effectiveness**, **Coaching notes**; 7 / 30 / 90 days.
+- [ ] **Insights**: **Sales & Demand**, **Coaching**, **Customer Insights**, **Leadership**, **Rankings**; **Show as table** on charts; **How these are counted**; data quality list; CRM-confirmed purchases not connected notice; rankings need 5 scored conversations.
+- [ ] **Devices**: statuses **Interrupted**, **Recording now**, **Paused**, **Saving**, **Not recording**, **Not seen recently**; last contact; today's recordings; **Previous** / **Next**; no battery or location.
+- [ ] **Settings**: **Who can record** (**Change**, Super Admin only), **Consent**, **Privacy**, **Sales score settings** (analysis on/off, rubric and SOP versions), **System health**.
+- [ ] No Kiara read tool: recording, transcript, score and insight data stay outside Kiara (sensitive customer conversations). Kiara explains controls only and cannot read or change recordings.
 ## Home (menu: Home)
 **What it is:** your own work for today: open and overdue tasks, your FMS stages, forms to
 fill. Overdue and high-priority tasks appear under **Needs attention now** (2026-11-04: the Recent Activity panel was removed from Home).

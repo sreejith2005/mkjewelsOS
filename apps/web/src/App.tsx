@@ -60,7 +60,7 @@ import wordmarkUrl from "@/assets/mk-jewels-wordmark.png";
 import { Toaster, toast } from "sonner";
 
 const AvailabilityPage = lazyPage("availability", () => import("@/pages/AvailabilityPage").then((module) => ({ default: module.AvailabilityPage })));
-const SalesRecordingPage = lazyPage("sales-recording", () => import("@/pages/SalesRecordingPage").then((module) => ({ default: module.SalesRecordingPage })));
+const StoreIntelligencePage = lazyPage("sales-recording", () => import("@/pages/StoreIntelligencePage").then((module) => ({ default: module.StoreIntelligencePage })));
 const HomePage = lazyPage("home", () => import("@/pages/HomePage").then((module) => ({ default: module.HomePage })));
 const DashboardPage = lazyPage("dashboard", () => import("@/pages/DashboardPage").then((module) => ({ default: module.DashboardPage })));
 const DropdownMasterPage = lazyPage("dropdown-master", () => import("@/pages/DropdownMasterPage").then((module) => ({ default: module.DropdownMasterPage })));
@@ -100,7 +100,7 @@ const PAGE_PRELOADS: Partial<Record<PageId, readonly (() => Promise<void>)[]>> =
   settings: [SettingsPage.preload],
   ask_kiara: [AskKiaraPage.preload],
   crm: [CrmApp.preload],
-  sales_recording: [SalesRecordingPage.preload],
+  sales_recording: [StoreIntelligencePage.preload],
 };
 
 const PAGE_ICONS: Record<PageId, typeof Home> = {
@@ -339,7 +339,8 @@ function AppShell() {
     }
   };
   // Every /crm/* path belongs to the CRM section (web only; the shared path map is unchanged).
-  const requestedPage = path === "/crm" || path.startsWith("/crm/") ? "crm" : getPageForPath(path) ?? "home";
+  // Every /sales-recording/* path belongs to Store Intelligence (screens inside the section).
+  const requestedPage = path === "/crm" || path.startsWith("/crm/") ? "crm" : path.startsWith("/sales-recording/") ? "sales_recording" : getPageForPath(path) ?? "home";
   // Permission management sits under Settings but depends only on the
   // protected permission, so a Super Admin can never be locked out of it.
   const showPermissionManagement = path === "/settings/permissions" && hasPermission(effectiveAccess, "permissions.manage");
@@ -361,7 +362,7 @@ function AppShell() {
     : pageAccess === "disabled" ? <SectionMaintenanceNotice section={currentPage === "checklist_tasks" ? "Tasks" : currentPage === "forms_library" ? "Forms Library" : currentPage === "fms_builder" ? "FMS" : currentPage === "dropdown_master" ? "Dropdown Master" : currentPage === "task_templates" ? "Task Control" : currentPage.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())} /> : currentPage === "home" ? <HomePage onNavigate={navigate} />
     : currentPage === "dashboard" ? <DashboardPage />
     : currentPage === "reports" ? <ReportsPage />
-    : currentPage === "sales_recording" ? <SalesRecordingPage />
+    : currentPage === "sales_recording" ? <StoreIntelligencePage navigate={navigate} path={path} search={search} />
     : currentPage === "settings" ? <><SettingsPage /><div className="pb-8 pt-4"><DailyChecklistManager /></div></>
     : currentPage === "users" ? <TeamDirectoryPage />
     : currentPage === "dropdown_master" ? <DropdownMasterPage />
@@ -400,7 +401,7 @@ function AppShell() {
       onThemeChange={setTheme}
       fullBleed={FULL_WIDTH_PAGES.has(currentPage)}
     >
-      <RecordingBanner employeeId={profile.id} onOpen={() => navigate("/sales-recording")} />
+      <RecordingBanner employeeId={profile.id} onOpen={() => navigate("/sales-recording/record")} />
       <LazyPageErrorBoundary onNavigate={navigate} resetKey={path}><Suspense fallback={<PageLoading />}>{pageContent}</Suspense></LazyPageErrorBoundary>
     </ApplicationShell>
     {canUseGlobalVoice ? <GlobalVoiceTaskButton profile={profile} raised={currentPage === "checklist_tasks"} /> : null}
