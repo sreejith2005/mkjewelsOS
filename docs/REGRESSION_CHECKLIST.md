@@ -373,7 +373,8 @@ migration 20261104000300 must be applied first (see the handoff deployment order
 - [ ] Remove a linked question in the Form Builder and publish: CRM falls back to the standard queue form; a Super Admin sees the "needs attention" line with **Open CRM Form Settings**.
 - [ ] Lead: link a lead form (starter or own); **OPEN LEAD FORM** → **Register lead** saves one lead with the mapped answers, shows "Lead saved and pushed to Runo." (or the Runo-not-configured line), and the lead appears in CLIENT DATABASE; a duplicate phone shows "A lead with this mobile number already exists."
 - [ ] A Dropdown Master choice question linked to a CRM lead dropdown saves the label CRM expects (for example Source of lead).
-- [ ] **Use the standard CRM form** returns each registration to the original CRM form; earlier clients, leads and links are unchanged.
+- [ ] (2026-11-07) CRM FORM SETTINGS on each tab offers only **Choose a form from the Form Builder**: no **Copy today's CRM form** and no **Use the standard CRM form**.
+- [ ] (2026-11-07) FMS Start trigger → Automatic Trigger shows one **Form** list (no Source list), each form once; CRM forms are marked CRM client queue / CRM lead / CRM walk-in. Choosing the CRM walk-in form shows the walk-in fields (Visit status...) under **If**; choosing the queue or lead form shows its questions; a workflow saved earlier with a CRM source still opens and keeps working.
 - [ ] Walk-in visit form, client profiles, follow-ups and referrals are unchanged.
 - [ ] Phone: the linked form opens full screen; half-width questions stack one per row; desktop shows them side by side.
 
@@ -387,7 +388,7 @@ migration 20261104000300 must be applied first (see the handoff deployment order
 - [ ] Visit status YES / NO / repair / order / exchange / store visit / price calculation each show the same follow-up questions as before; NO requires reasons and Next visit date; STORE VISIT and PRICE CALCULATION skip CRM APPROACH.
 - [ ] Engagement asks: YES requires a proof photo (testimonial also accepts a video), NO asks for a reason; Referrals YES asks "How many referrals?" with name and number per referral. Photos upload to the client's CRM documents and appear on the client profile.
 - [ ] **Submit complete visit**: one visit saved, queue entry completed, "Walk-in saved" message, walk-in task closed in JewelOS Tasks; pressing Submit again after a dropped connection does not save a second visit.
-- [ ] Without a walk-in link (or after **Use the standard CRM form**) the standard walk-in form opens exactly as before.
+- [ ] Without a usable walk-in link the built-in walk-in form still opens, so walk-ins are never blocked.
 - [ ] Form Builder: **Repeating group (CRM)** and **CRM photo / video** are in the question types; there is no "In CRM forms" or width setting; a Forms Library form with a CRM photo question says "This question works in CRM forms only." and cannot be submitted outside CRM.
 - [ ] Lead form linked earlier: a date question (for example Date of birth) now saves (it is sent as YYYY-MM-DD).
 
