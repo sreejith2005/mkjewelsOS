@@ -1,15 +1,18 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { parseSiAnalytics, type SiAnalytics } from "@jewelos/core";
-import { fetchSiAnalytics, fetchSiOptions, fetchSiSessions } from "@jewelos/data";
+import { parseSiAnalytics, type SiAnalytics } from "@jewelos/core/salesScore/analytics";
+import { fetchSiAnalytics, fetchSiOptions, fetchSiSessions } from "@jewelos/data/recordingAnalytics";
 import { InsightsView } from "./InsightsView";
 import { createLatestGate, useRevisionQuery } from "./useRevisionQuery";
 
 vi.mock("@jewelos/data", () => {
   class WorkspaceError extends Error { kind = "unavailable"; }
+  return { WorkspaceError };
+});
+vi.mock("@jewelos/data/recordingAnalytics", () => {
   class SupersededError extends Error {}
-  return { WorkspaceError, SupersededError, fetchSiAnalytics: vi.fn(), fetchSiOptions: vi.fn(), fetchSiSessions: vi.fn(), fetchSiDeviceDays: vi.fn() };
+  return { SupersededError, fetchSiAnalytics: vi.fn(), fetchSiOptions: vi.fn(), fetchSiSessions: vi.fn(), fetchSiDeviceDays: vi.fn() };
 });
 
 const B1 = "11111111-1111-4111-8111-111111111111";

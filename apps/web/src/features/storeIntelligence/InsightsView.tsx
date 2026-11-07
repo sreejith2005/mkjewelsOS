@@ -1,11 +1,8 @@
 import { useMemo, useState } from "react";
 import { SlidersHorizontal, X } from "lucide-react";
-import {
-  CONVERSATION_STAGES, formatDuration, formatRecordedTotal, OUTCOME_LABEL, SALES_OUTCOMES, SI_CATEGORIES, SI_CATEGORY_LABEL, SI_CRM_CLASSES, SI_CRM_CLASS_LABEL, SI_DEFINITIONS,
-  SI_ELEMENTS, SI_ELEMENT_LABEL, SI_PERIOD_LABEL, SI_PERIODS, siActiveFilterCount, siChange, siDaysBetween, siFilterKey, siFiltersFromQuery, siFiltersToQuery, siFreshnessText,
-  siPeriodRange, siRank, siRate, siRateText, siServerFilters, STAGE_LABEL, type SiAnalytics, type SiFilters, type SiOptions, type SiPeriod, type SiServerFilters,
-} from "@jewelos/core";
-import { fetchSiAnalytics, fetchSiDeviceDays, fetchSiOptions } from "@jewelos/data";
+import { CONVERSATION_STAGES, formatDuration, formatRecordedTotal, OUTCOME_LABEL, SALES_OUTCOMES, STAGE_LABEL } from "@jewelos/core";
+import { SI_CATEGORIES, SI_CATEGORY_LABEL, SI_CRM_CLASSES, SI_CRM_CLASS_LABEL, SI_DEFINITIONS, SI_ELEMENTS, SI_ELEMENT_LABEL, SI_PERIOD_LABEL, SI_PERIODS, siActiveFilterCount, siChange, siDaysBetween, siFilterKey, siFiltersFromQuery, siFiltersToQuery, siFreshnessText, siPeriodRange, siRank, siRate, siRateText, siServerFilters, type SiAnalytics, type SiFilters, type SiOptions, type SiPeriod, type SiServerFilters } from "@jewelos/core/salesScore/analytics";
+import { fetchSiAnalytics, fetchSiDeviceDays, fetchSiOptions } from "@jewelos/data/recordingAnalytics";
 import { Button, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { BreakdownList, dailyPoints, dayLabel, DrillContext, DrillDrawer, Figure, incompleteNote, periodText, scoreText, type DrillRequest } from "./analyticsUi";

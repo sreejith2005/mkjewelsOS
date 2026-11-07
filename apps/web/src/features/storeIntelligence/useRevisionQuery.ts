@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SupersededError, WorkspaceError, type WorkspaceErrorKind } from "@jewelos/data";
+import { WorkspaceError, type WorkspaceErrorKind } from "@jewelos/data";
+import { SupersededError } from "@jewelos/data/recordingAnalytics";
 
 /**
  * "Latest wins" for one stream of requests. Each begin() aborts the request before it and
