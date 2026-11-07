@@ -72,10 +72,10 @@ function renderSettings(links = { canManage: true, links: [] as never[] }) {
 }
 
 describe("CRM Form Settings", () => {
-  it("starts on the standard CRM form and links a published form with suggested questions", async () => {
+  it("starts with no form chosen and links a published form with suggested questions", async () => {
     db.rpc.mockImplementation(async (name: string) => name === "save_crm_form_binding" ? { data: { versionId: "v1" }, error: null } : { data: { canManage: true, bindings: [] }, error: null });
     const { onSaved, dialog } = renderSettings();
-    expect(within(dialog).getByText("Standard CRM form")).toBeTruthy();
+    expect(within(dialog).getByText("No form chosen yet")).toBeTruthy();
     await waitFor(() => expect(screen.getByRole("option", { name: "Front desk queue (version 1)" })).toBeTruthy());
     fireEvent.change(screen.getByRole("combobox", { name: "Published form" }), { target: { value: "f1-family" } });
     await waitFor(() => expect((screen.getByRole("combobox", { name: "Question for Mobile number" }) as HTMLSelectElement).value).toBe("phone"));
@@ -100,65 +100,21 @@ describe("CRM Form Settings", () => {
     expect(screen.getByText(/also listed in Forms Library/)).toBeTruthy();
   });
 
-  it("copies today's CRM lead form into Forms Library and makes CRM use it in one step", async () => {
-    formsApi.saveDraft.mockImplementation(async () => {
-      db.tables.form_templates.push(template("f3", "Lead registration"));
-      return "f3";
-    });
-    db.rpc.mockImplementation(async (name: string) => name === "save_crm_form_binding" ? { data: { versionId: "v9" }, error: null } : { data: { canManage: true, bindings: [] }, error: null });
-    const { onSaved } = renderSettings();
-    fireEvent.click(screen.getByRole("button", { name: "Lead" }));
-    await waitFor(() => expect((screen.getByRole("button", { name: /Copy today's CRM form/ }) as HTMLButtonElement).disabled).toBe(false));
-    fireEvent.click(screen.getByRole("button", { name: /Copy today's CRM form/ }));
-    await waitFor(() => expect(formsApi.publishForm).toHaveBeenCalledWith("f3"));
-    expect(formsApi.setFormLibraryVisibility).toHaveBeenCalledWith("f3", false);
-    const [, payload, fields] = formsApi.saveDraft.mock.calls[0] as [null, { name: string; permissions: { roles: string[] } }, Array<{ key: string; label: string; type: string; optionSource?: unknown; rule?: unknown; options?: unknown }>];
-    expect(payload.name).toBe("Lead registration");
-    expect(payload.permissions.roles.length).toBeGreaterThan(0);
-    // The same questions, labels and order as the CRM lead form; Source of lead appears after LEAD TYPE = REMOTE.
-    expect(fields.map((item) => [item.key, item.label, item.type])).toEqual([["name", "NAME", "text"], ["mobile_no", "MOBILE NO", "phone"], ["lead_type", "LEAD TYPE", "select"], ["source_of_lead", "SOURCE OF LEAD", "select"]]);
-    expect(fields[2]!.options).toEqual([{ value: "remote", label: "REMOTE" }, { value: "walk_in", label: "WALK-IN" }]);
-    expect(fields[3]!.optionSource).toEqual({ kind: "master", masterType: "crm_source" });
-    expect(fields[3]!.rule).toEqual({ kind: "predicate", fieldKey: "lead_type", operator: "equals", value: "remote" });
-    await waitFor(() => expect(db.rpc).toHaveBeenCalledWith("save_crm_form_binding", { p_purpose: "lead", p_form_family_id: "f3-family", p_field_map: { name: "name", mobile_no: "mobile_no", lead_type: "lead_type", source_of_lead: "source_of_lead" } }));
-    await waitFor(() => expect(onSaved).toHaveBeenCalled());
-  });
-
-  it("copies today's client queue form: CLIENT NAME and MOBILE NUMBER", async () => {
-    formsApi.saveDraft.mockImplementation(async () => { db.tables.form_templates.push(template("f4", "Client queue registration")); return "f4"; });
-    db.rpc.mockImplementation(async (name: string) => name === "save_crm_form_binding" ? { data: { versionId: "v1" }, error: null } : { data: { canManage: true, bindings: [] }, error: null });
-    renderSettings();
-    await waitFor(() => expect(screen.getByRole("option", { name: "Front desk queue (version 1)" })).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: /Copy today's CRM form/ }));
-    await waitFor(() => expect(db.rpc).toHaveBeenCalledWith("save_crm_form_binding", { p_purpose: "queue", p_form_family_id: "f4-family", p_field_map: { client_name: "client_name", mobile: "mobile" } }));
-    const fields = formsApi.saveDraft.mock.calls[0]![2] as Array<{ label: string; type: string; required: boolean }>;
-    expect(fields.map((item) => [item.label, item.type, item.required])).toEqual([["CLIENT NAME", "text", true], ["MOBILE NUMBER", "phone", true]]);
-  });
-
-  it("copies today's walk-in visit form with its six sections and links it", async () => {
-    formsApi.saveDraft.mockImplementation(async () => { db.tables.form_templates.push(template("f5", "Client walk-in visit")); return "f5"; });
-    db.rpc.mockImplementation(async (name: string) => name === "save_crm_form_binding" ? { data: { versionId: "v1" }, error: null } : { data: { canManage: true, bindings: [] }, error: null });
-    renderSettings();
-    fireEvent.click(screen.getByRole("button", { name: /Walk-in visit/ }));
-    await waitFor(() => expect((screen.getByRole("button", { name: /Copy today's CRM form/ }) as HTMLButtonElement).disabled).toBe(false));
-    fireEvent.click(screen.getByRole("button", { name: /Copy today's CRM form/ }));
-    await waitFor(() => expect(formsApi.publishForm).toHaveBeenCalledWith("f5"));
-    const [, payload, fields] = formsApi.saveDraft.mock.calls[0] as [null, { sections: Array<{ title: string }> }, Array<{ key: string; type: string }>];
-    expect(payload.sections.map((section) => section.title)).toEqual(["CLIENT DETAILS", "FAMILY / FRIENDS WITH CLIENT", "VISIT DETAILS", "CRM APPROACH", "PREFERENCES", "REMARK"]);
-    expect(fields.find((field) => field.key === "companions")?.type).toBe("repeat");
-    expect(fields.find((field) => field.key === "engagement_google_review_proof")?.type).toBe("crm_photo");
-    await waitFor(() => expect(db.rpc).toHaveBeenCalledWith("save_crm_form_binding", expect.objectContaining({ p_purpose: "walkin", p_form_family_id: "f5-family" })));
-  });
-
-  it("returns to the standard CRM form on request", async () => {
+  it("offers only Form Builder forms: no copy of the CRM form and no standard form", async () => {
     const link = { purpose: "queue" as const, versionId: "v1", fieldMap: { client_name: "customer", mobile: "phone" }, savedAt: "2026-11-03T10:00:00Z", savedBy: "Owner",
       form: { templateId: "f1", familyId: "f1-family", version: 1, name: "Front desk queue", definition: { name: "Front desk queue", fields: [
         { key: "customer", label: "Client name", type: "text" as const, sortOrder: 0, required: true }, { key: "phone", label: "Mobile number", type: "phone" as const, sortOrder: 1, required: true }] } } };
     db.rpc.mockResolvedValue({ data: { canManage: true, bindings: [] }, error: null });
     renderSettings({ canManage: true, links: [link] as never[] });
     expect(screen.getByText("Active in CRM")).toBeTruthy();
-    fireEvent.click(screen.getAllByRole("button", { name: "Use the standard CRM form" })[0]!);
-    await waitFor(() => expect(db.rpc).toHaveBeenCalledWith("clear_crm_form_binding", { p_purpose: "queue", p_expected_version_id: "v1" }));
+    for (const tab of ["Client queue", "Lead", "Walk-in visit"]) {
+      fireEvent.click(screen.getByRole("button", { name: tab }));
+      await waitFor(() => expect(screen.getByRole("option", { name: "Front desk queue (version 1)" })).toBeTruthy());
+      expect(screen.queryByRole("button", { name: /Copy today's CRM form/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /standard CRM form/ })).toBeNull();
+    }
+    expect(formsApi.saveDraft).not.toHaveBeenCalled();
+    expect(db.rpc).not.toHaveBeenCalledWith("clear_crm_form_binding", expect.anything());
   });
 });
 

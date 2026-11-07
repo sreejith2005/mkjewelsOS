@@ -5,9 +5,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { newFmsStartTrigger, type FmsFlowDefinition } from "@jewelos/core";
 import type { FmsData } from "./api";
 
-const mocks = vi.hoisted(() => ({ saveFmsDraft: vi.fn(), publishFmsFlow: vi.fn(), test: vi.fn(), samples: vi.fn(), source: vi.fn() }));
+const mocks = vi.hoisted(() => ({ saveFmsDraft: vi.fn(), publishFmsFlow: vi.fn(), test: vi.fn(), samples: vi.fn(), source: vi.fn(), crmForms: vi.fn(async () => ({})) }));
 vi.mock("./api", () => ({ saveFmsDraft: mocks.saveFmsDraft, publishFmsFlow: mocks.publishFmsFlow, saveFmsContextAssigneeDefault: vi.fn() }));
-vi.mock("./triggerApi", () => ({ testFmsStartTrigger: mocks.test, listFmsTriggerSamples: mocks.samples, loadFmsInstanceTriggerSource: mocks.source }));
+vi.mock("./triggerApi", () => ({ testFmsStartTrigger: mocks.test, listFmsTriggerSamples: mocks.samples, loadFmsInstanceTriggerSource: mocks.source, loadCrmFormFamilies: mocks.crmForms }));
 let latest: FmsFlowDefinition | null = null;
 vi.mock("./FmsGraphCanvas", async () => {
   const { forwardRef } = await import("react");
@@ -15,10 +15,10 @@ vi.mock("./FmsGraphCanvas", async () => {
 });
 
 import { FmsFlowBuilder } from "./FmsFlowBuilder";
-import { FmsStartTriggerPanel } from "./FmsStartTriggerPanel";
+import { FmsStartTriggerPanel, triggerFormFamily, triggerSourceForForm } from "./FmsStartTriggerPanel";
 import { FmsTriggerSource } from "./FmsTriggerSource";
 
-afterEach(() => { cleanup(); vi.clearAllMocks(); latest = null; });
+afterEach(() => { cleanup(); vi.clearAllMocks(); mocks.crmForms.mockImplementation(async () => ({})); latest = null; });
 
 const data = {
   flows: [], stages: [], assignees: [], branchRules: [], forms: [], formFields: {},
@@ -38,7 +38,9 @@ describe("new automatic workflow", () => {
 
     const panel = await screen.findByTestId("fms-start-trigger");
     expect(within(panel).getByRole("radio", { name: /Automatic Trigger/ })).toHaveProperty("checked", true);
-    expect(within(panel).getByLabelText("Trigger source")).toHaveProperty("value", "crm_walkin");
+    // One picker: Form Builder forms only. With no walk-in form linked in CRM it shows none chosen.
+    expect(within(panel).queryByLabelText("Trigger source")).toBeNull();
+    expect(within(panel).getByLabelText("Trigger form")).toHaveProperty("value", "");
     expect(within(panel).getAllByTestId("trigger-rule")).toHaveLength(1);
     await user.click(within(panel).getByRole("button", { name: "Use these start settings" }));
 
@@ -131,5 +133,38 @@ describe("work page source", () => {
     const { container } = render(<FmsTriggerSource instanceId="i3" />);
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(container.textContent).toBe("");
+  });
+});
+
+describe("trigger form picker", () => {
+  const crm = { queue: "fam-queue", lead: "fam-lead", walkin: "fam-walkin" };
+  it("wires a CRM-linked form to its CRM save and any other form to Forms Library submissions", () => {
+    expect(triggerSourceForForm("fam-walkin", "t-w", crm)).toEqual({ type: "crm_walkin" });
+    expect(triggerSourceForForm("fam-queue", "t-q", crm)).toEqual({ type: "crm_linked_form", formFamilyId: "fam-queue", formTemplateId: "t-q", purpose: "queue" });
+    expect(triggerSourceForForm("fam-lead", "t-l", crm)).toEqual({ type: "crm_linked_form", formFamilyId: "fam-lead", formTemplateId: "t-l", purpose: "lead" });
+    expect(triggerSourceForForm("fam-other", "t-o", crm)).toEqual({ type: "jewelos_form", formFamilyId: "fam-other", formTemplateId: "t-o" });
+    expect(triggerSourceForForm("fam-queue", "t-q", {})).toEqual({ type: "jewelos_form", formFamilyId: "fam-queue", formTemplateId: "t-q" });
+  });
+
+  it("shows saved CRM starts as the form CRM uses for them", () => {
+    expect(triggerFormFamily({ type: "crm_walkin" }, crm)).toBe("fam-walkin");
+    expect(triggerFormFamily({ type: "crm_queue" }, crm)).toBe("fam-queue");
+    expect(triggerFormFamily({ type: "crm_lead" }, {})).toBe("");
+    expect(triggerFormFamily({ type: "crm_linked_form", formFamilyId: "fam-lead", purpose: "lead" }, crm)).toBe("fam-lead");
+  });
+
+  it("lists each form once, marks the CRM ones, and picks the CRM event when a CRM form is chosen", async () => {
+    const user = userEvent.setup();
+    mocks.crmForms.mockImplementation(async () => crm);
+    const form = (id: string, family: string, name: string, version: number) => ({ id, family_id: family, name, version, lifecycle: "published" });
+    const withForms = { ...data, forms: [form("t-q1", "fam-queue", "Client queue", 1), form("t-q2", "fam-queue", "Client queue", 2), form("t-o", "fam-other", "Repair intake", 1)], formFields: {} } as unknown as FmsData;
+    const onApply = vi.fn();
+    const definition = { name: "Flow", stages: [{ key: "s1", name: "Call", type: "task" }] } as unknown as FmsFlowDefinition;
+    render(<FmsStartTriggerPanel data={withForms} definition={{ ...definition, startMode: "automatic", startTrigger: newFmsStartTrigger("jewelos_form", () => crypto.randomUUID()) }} flowId={null} onApply={onApply} onClose={() => undefined} />);
+    const picker = await screen.findByLabelText("Trigger form");
+    await screen.findByRole("option", { name: "Client queue (v2) · CRM client queue" });
+    expect(within(picker).getAllByRole("option").map((option) => option.textContent)).toEqual(["Choose a form from the Form Builder", "Client queue (v2) · CRM client queue", "Repair intake (v1)"]);
+    await user.selectOptions(picker, "fam-queue");
+    expect(picker).toHaveProperty("value", "fam-queue");
   });
 });

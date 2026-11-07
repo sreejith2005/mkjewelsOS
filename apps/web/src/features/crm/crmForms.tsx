@@ -8,16 +8,16 @@ import { createPortal } from "react-dom";
 import { supabase } from "@jewelos/api-client";
 import type { CrmFormLink, CrmFormLinks, CrmLeadSetup, CrmLinkedForm, CrmSubmittedForm } from "@jewelos/crm-ui";
 import {
-  CRM_FORM_PURPOSE_LABELS, FORM_LIBRARY_ROLES, checkCrmFormBinding, crmLeadFormCopy, crmLinkedQuestions, crmQueueFormCopy, crmTargetCandidates, crmWalkinFormCopy, displayFormAnswer, formChoiceValueFromText, isFormRepeatAnswer, validateFormDefinition,
-  normalizeFormDefinition, resolveFormOptions, suggestCrmFieldMap,
-  type CrmFieldMap, type CrmFormCopy, type CrmFormTarget, type FormAnswer, type FormAnswers, type FormCrmServices, type FormFieldDefinition, type FormSectionDefinition, type FormTemplateDefinition, type Json,
+  CRM_FORM_PURPOSE_LABELS, checkCrmFormBinding, crmLinkedQuestions, crmTargetCandidates, displayFormAnswer, formChoiceValueFromText, isFormRepeatAnswer,
+  resolveFormOptions, suggestCrmFieldMap,
+  type CrmFieldMap, type CrmFormTarget, type FormAnswer, type FormAnswers, type FormCrmServices, type FormFieldDefinition, type FormTemplateDefinition, type Json,
 } from "@jewelos/core";
-import { CheckCircle2, Copy, ExternalLink, Eye, EyeOff, TriangleAlert } from "lucide-react";
+import { CheckCircle2, ExternalLink, Eye, EyeOff, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Modal, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer";
-import { loadFormDynamicOptions, publishForm, saveDraft, setFormLibraryVisibility, toDefinition, type FormField, type FormTemplate } from "@/features/forms/api";
+import { loadFormDynamicOptions, setFormLibraryVisibility, toDefinition, type FormField, type FormTemplate } from "@/features/forms/api";
 
 type LinkablePurpose = "queue" | "lead" | "walkin";
 type Targets = Readonly<Record<LinkablePurpose, readonly CrmFormTarget[]>>;
@@ -161,41 +161,19 @@ async function loadPublishedDefinition(templateId: string): Promise<CrmLinkedFor
   return linkedForm(template.data!, fields.data ?? []);
 }
 
-/**
- * Publishes today's CRM form as an ordinary Forms Library form (shown to form authors under
- * CRM forms; hidden from staff browsing, because answers given there would not register anyone
- * in CRM) and returns it with the matching question links.
- */
-async function createCrmFormCopy(purpose: LinkablePurpose, leadSetup: CrmLeadSetup, masters: DynamicOptions["masters"], existingNames: ReadonlySet<string>): Promise<{ templateId: string; fieldMap: Record<string, string | string[]>; name: string }> {
-  const copy: CrmFormCopy & { sections?: FormSectionDefinition[] } = purpose === "queue" ? crmQueueFormCopy()
-    : purpose === "lead" ? crmLeadFormCopy(leadSetup.fields, leadSetup.routes, leadSetup.lookupOptions, masters)
-    : crmWalkinFormCopy(leadSetup.lookupOptions, masters);
-  if (!copy.fields.length) throw new Error("CRM has no lead fields to copy yet.");
-  let name = copy.name;
-  for (let round = 2; existingNames.has(name.toLowerCase()); round += 1) name = `${copy.name} ${round}`;
-  const definition = normalizeFormDefinition({ name, description: copy.description, fields: copy.fields, ...(copy.sections ? { sections: copy.sections } : {}) });
-  const issues = validateFormDefinition(definition);
-  if (issues.length) throw new Error(`The copy of today's CRM form is not valid: ${issues[0]!.message}`);
-  const payload = { name: definition.name, description: definition.description ?? "", record_name_field_key: null, sections: definition.sections ?? [], permissions: { roles: [...FORM_LIBRARY_ROLES] } } as unknown as Json;
-  // Same draft shape the Form Builder saves (no ids or sort order; the server orders by position).
-  const fields = definition.fields.map(({ id: _id, sortOrder: _sortOrder, ...field }) => field) as unknown as Json;
-  const templateId = await saveDraft(null, payload, fields);
-  await publishForm(templateId);
-  await setFormLibraryVisibility(templateId, false);
-  return { templateId, fieldMap: copy.fieldMap, name: definition.name };
-}
-
 const TYPE_NAMES: Partial<Record<FormFieldDefinition["type"], string>> = { text: "Short text", textarea: "Long text", phone: "Phone", select: "Dropdown", radio: "Single choice", date: "Date", number: "Number", currency: "Amount", email: "Email" };
 const typeName = (field: FormFieldDefinition) => TYPE_NAMES[field.type] ?? field.type.replaceAll("_", " ");
 
-export function CrmFormSettingsDialog({ links, targets, leadSetup, onClose, onSaved, onEditForm }: { links: CrmFormLinks; targets: Targets; leadSetup: CrmLeadSetup; onClose: () => void; onSaved: () => void; onEditForm: (familyId: string) => void }) {
+// CRM uses only Form Builder forms here (owner request 2026-11-07): the "Copy today's CRM form" and
+// "Use the standard CRM form" choices were removed. `leadSetup` stays in the forms host contract.
+export function CrmFormSettingsDialog({ links, targets, onClose, onSaved, onEditForm }: { links: CrmFormLinks; targets: Targets; leadSetup?: CrmLeadSetup; onClose: () => void; onSaved: () => void; onEditForm: (familyId: string) => void }) {
   const [purpose, setPurpose] = useState<LinkablePurpose>("queue");
   const [forms, setForms] = useState<PublishedForm[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [familyId, setFamilyId] = useState("");
   const [chosen, setChosen] = useState<CrmLinkedForm | null>(null);
   const [fieldMap, setFieldMap] = useState<Record<string, string | readonly string[]>>({});
-  const [busy, setBusy] = useState<"" | "load" | "save" | "clear" | "starter" | "hide">("");
+  const [busy, setBusy] = useState<"" | "load" | "save" | "hide">("");
   const [error, setError] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
   const [preview, setPreview] = useState(false);
@@ -252,36 +230,6 @@ export function CrmFormSettingsDialog({ links, targets, leadSetup, onClose, onSa
     finally { setBusy(""); }
   };
 
-  const useStandard = async () => {
-    if (!linkable || !active) return;
-    if (!window.confirm(`Go back to the standard CRM form for ${CRM_FORM_PURPOSE_LABELS[linkable].toLowerCase()}? Saved clients, leads and form answers are kept.`)) return;
-    setBusy("clear"); setError(null);
-    try {
-      const { error: clearError } = await supabase.rpc("clear_crm_form_binding", { p_purpose: linkable, p_expected_version_id: active.versionId });
-      fail("Use the standard CRM form", clearError);
-      await reloadLinks();
-      toast.success("CRM is using its standard form again.");
-    } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not change the form."); }
-    finally { setBusy(""); }
-  };
-
-  /** One step: today's CRM form becomes a Forms Library form, and CRM uses it. */
-  const copyCrmForm = async () => {
-    if (!linkable) return;
-    setBusy("starter"); setError(null);
-    try {
-      const created = await createCrmFormCopy(linkable, leadSetup, options?.masters ?? [], new Set((forms ?? []).map((form) => form.name.toLowerCase())));
-      const rows = await loadPublishedForms(); setForms(rows);
-      const family = rows.find((form) => form.id === created.templateId)?.family_id;
-      if (!family) throw new Error("The new form is not visible yet. Reload and choose it from the list.");
-      const { error: saveError } = await supabase.rpc("save_crm_form_binding", { p_purpose: linkable, p_form_family_id: family, p_field_map: created.fieldMap as unknown as Json, ...(active ? { p_expected_version_id: active.versionId } : {}) });
-      fail("Use the copied form", saveError);
-      await reloadLinks();
-      toast.success(`"${created.name}" is now in Forms Library (CRM forms) and CRM uses it. Edit it there like any form.`);
-    } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not copy the CRM form."); }
-    finally { setBusy(""); }
-  };
-
   const hideFromLibrary = async () => {
     if (!publishedRow) return;
     setBusy("hide");
@@ -306,21 +254,18 @@ export function CrmFormSettingsDialog({ links, targets, leadSetup, onClose, onSa
         {active?.form ? <>
           <p className="mt-1 font-semibold text-task-text">{active.form.name} <span className="font-normal text-task-text-muted">· version {active.form.version}</span></p>
           <p className="text-sm text-task-text-muted">Linked{active.savedBy ? ` by ${active.savedBy}` : ""} on {new Date(active.savedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
-          {activeIssues.length ? <p className="mt-2 flex items-start gap-1.5 text-sm text-danger"><TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />Needs attention, so CRM shows its standard form: {activeIssues[0]!.message}</p>
+          {activeIssues.length ? <p className="mt-2 flex items-start gap-1.5 text-sm text-danger"><TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />Needs attention: {activeIssues[0]!.message}</p>
             : <p className="mt-2 flex items-center gap-1.5 text-sm text-success"><CheckCircle2 aria-hidden className="size-4" />Active in CRM</p>}
-        </> : <p className="mt-1 font-semibold text-task-text">Standard CRM form <span className="font-normal text-task-text-muted">· no Form Builder form linked</span></p>}
+        </> : <p className="mt-1 font-semibold text-task-text">No form chosen yet <span className="font-normal text-task-text-muted">· choose a Form Builder form below</span></p>}
       </section>
 
       <section aria-labelledby="crm-form-choose" className="grid gap-3">
         <h3 className="text-base font-semibold text-task-text" id="crm-form-choose">1. Choose the form</h3>
-        <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-          <select aria-label="Published form" className="field min-h-12" disabled={!forms || busy !== ""} onChange={(event) => void choose(event.target.value)} value={familyId}>
-            <option value="">{forms ? "Choose a published form" : "Loading forms…"}</option>
-            {(forms ?? []).map((form) => <option key={form.family_id} value={form.family_id}>{form.name} (version {form.version})</option>)}
-          </select>
-          <Button className="min-h-12" disabled={busy !== "" || (linkable === "lead" && !options)} onClick={() => void copyCrmForm()} type="button" variant="secondary"><Copy aria-hidden className="size-4" />{busy === "starter" ? "Copying…" : "Copy today's CRM form"}</Button>
-        </div>
-        <p className="text-xs text-task-text-muted">"Copy today's CRM form" creates the same form CRM shows now (same questions, labels, order, choices and conditions) in Forms Library under CRM forms, and CRM starts using it. Change it there like any other form; each published version is used here from its next opening.</p>
+        <select aria-label="Published form" className="field min-h-12" disabled={!forms || busy !== ""} onChange={(event) => void choose(event.target.value)} value={familyId}>
+          <option value="">{forms ? "Choose a form from the Form Builder" : "Loading forms…"}</option>
+          {(forms ?? []).map((form) => <option key={form.family_id} value={form.family_id}>{form.name} (version {form.version})</option>)}
+        </select>
+        <p className="text-xs text-task-text-muted">Build or change the form in Forms Library → Form Builder, publish it, then choose it here. Each published version is used from its next opening.</p>
         {listError ? <Notice tone="danger">{listError}</Notice> : null}
         {chosen ? <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm text-task-text-muted">Version {chosen.version} · {chosen.definition.fields.filter((field) => field.type !== "section_header" && field.type !== "divider").length} questions</span>
@@ -354,11 +299,10 @@ export function CrmFormSettingsDialog({ links, targets, leadSetup, onClose, onSa
           : <Notice tone="success">Every CRM answer is linked. {unchanged ? "This is what CRM uses now." : "Ready to use."}</Notice> : null}</div>
         {error ? <div role="alert"><Notice tone="danger">{error}</Notice></div> : null}
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          {active ? <Button className="min-h-12" disabled={busy !== ""} onClick={() => void useStandard()} type="button" variant="secondary">{busy === "clear" ? "Changing…" : "Use the standard CRM form"}</Button> : null}
           <Button className="min-h-12" disabled={busy !== ""} onClick={() => setChecked(true)} type="button" variant="secondary">Validate mapping</Button>
           <Button className="min-h-12" disabled={busy !== "" || issues.length > 0 || unchanged} onClick={() => void save()} type="button">{busy === "save" ? "Saving…" : unchanged ? "In use" : "Save and use this form"}</Button>
         </div>
-      </section> : active ? <div className="flex justify-end"><Button className="min-h-12" disabled={busy !== ""} onClick={() => void useStandard()} type="button" variant="secondary">Use the standard CRM form</Button></div> : null}
+      </section> : null}
     </div>}
   </Modal></Portal>;
 }
