@@ -15917,6 +15917,16 @@ export type Database = {
         Returns: boolean
       }
       can_manage_fms_flow: { Args: { p_flow_id?: string }; Returns: boolean }
+      can_edit_fms_flow: { Args: { p_flow_id: string }; Returns: boolean }
+      can_publish_fms_flow: { Args: { p_flow_id: string }; Returns: boolean }
+      fms_my_flow_access: { Args: { p_family_id: string }; Returns: string }
+      list_fms_flow_access: {
+        Args: { p_flow_id: string }
+        Returns: { grant_id: string; user_profile_id: string; employee_name: string; employee_code: string | null; access_level: string; granted_at: string; granted_by_name: string | null; account_active: boolean }[]
+      }
+      grant_fms_flow_access_with_audit: { Args: { p_flow_id: string; p_user_profile_id: string; p_access_level: string }; Returns: string }
+      revoke_fms_flow_access_with_audit: { Args: { p_grant_id: string; p_reason?: string }; Returns: undefined }
+      list_my_fms_flow_access: { Args: never; Returns: { family_id: string; access_level: string }[] }
       can_manage_form_template: {
         Args: { p_template_id: string }
         Returns: boolean
