@@ -7,6 +7,7 @@ import { signedFormFileUrl, uploadFormFile } from "./api";
 import { RatingField } from "./RatingField";
 import { CrmChoiceField, CrmPhotoField, RepeatField } from "./CrmQuestions";
 import { useFormCrmServices } from "./crmServicesContext";
+import { CrossLocationEmployeePicker } from "@/features/users/CrossLocationEmployeePicker";
 
 export type DynamicOptions = { users: Array<{ id: string; label: string }>; branches: Array<{ id: string; label: string }>; departments: Array<{ id: string; branchId: string | null; label: string }>; masters: FormMasterOption[] };
 const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: [], masters: [] };
@@ -255,6 +256,10 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
     </fieldset>);
     if (field.type === "crm_photo") return shell(<div><QuestionText field={field} id={labelId} />{helper}
       <CrmPhotoField crm={crm} describedBy={describedBy} disabled={disabled || preview} field={field} onBusyChange={(busy) => setUploadsBusy((count) => Math.max(0, count + (busy ? 1 : -1)))} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} value={value} />{errorText}
+    </div>);
+    // A Users question that allows other locations: Location -> Store -> Employee (migration 0386).
+    if (field.type === "user_dropdown" && field.assignmentScope === "cross_location") return shell(<div><QuestionText field={field} id={labelId} />{helper}
+      <CrossLocationEmployeePicker context={templateId && !preview ? { kind: "form", formTemplateId: templateId, fieldKey: field.key } : null} describedBy={describedBy} disabled={disabled} knownNames={sorted.users} labelledBy={labelId} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} value={typeof value === "string" ? value : ""} />{errorText}
     </div>);
     const crmChoices = field.type === "text" ? crm?.choices?.(field.key) ?? null : null;
     if (crmChoices) return shell(<label className="block"><span className="mb-1.5 block"><QuestionText field={field} /></span>{helper}

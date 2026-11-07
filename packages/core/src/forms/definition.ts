@@ -109,6 +109,7 @@ export function normalizeFormDefinition(template: FormTemplateDefinition): FormT
         ...(branches ? { branches } : {}),
         ...(field.validation ? { validation: Object.freeze({ ...field.validation }) } : {}),
         ...(rule ? { rule } : field.condition ? { condition: Object.freeze({ ...field.condition, fieldKey: requiredText(field.condition.fieldKey).toLowerCase() }) } : {}),
+        ...(field.type === "user_dropdown" && field.assignmentScope === "cross_location" ? { assignmentScope: "cross_location" as const } : {}),
       });
     });
   return Object.freeze({

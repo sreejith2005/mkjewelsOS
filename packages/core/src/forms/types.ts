@@ -158,7 +158,16 @@ export type FormFieldDefinition = Readonly<{
   validation?: FormValidation | undefined;
   condition?: FormCondition | undefined;
   rule?: FormRule | undefined;
+  /**
+   * Users questions only: "Allow selecting employees from other locations"
+   * (migration 0386, `form_fields.assignment_scope`). Absent means the person
+   * filling the form picks from their own location only.
+   */
+  assignmentScope?: FormAssignmentScope | undefined;
 }>;
+
+/** Only the non-default value is ever stored on a definition. */
+export type FormAssignmentScope = "cross_location";
 
 export type FormTemplateDefinition = Readonly<{
   name: string;
