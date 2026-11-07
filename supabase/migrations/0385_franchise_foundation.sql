@@ -255,7 +255,7 @@ update permission_catalog set default_scope_authorities = '{director,regional_ad
 do $$
 declare body text; old_text text;
 begin
-  select pg_get_functiondef('public.permission_effective_for(uuid,text)'::regprocedure) into body;
+  select replace(pg_get_functiondef('public.permission_effective_for(uuid,text)'::regprocedure), E'\r', '') into body;
   old_text := '  return coalesce(v_allowed,v_role=any(v_catalog.default_roles));';
   if position(old_text in body) = 0 then raise exception 'Permission resolver contract changed'; end if;
   body := replace(body, old_text,
@@ -351,7 +351,7 @@ end $$;
 do $$
 declare body text; old_text text;
 begin
-  select pg_get_functiondef('public.invite_profile_with_audit_v3(uuid,uuid,text,text,text,text,uuid,uuid,uuid,text,text,text[],public.user_role,uuid)'::regprocedure) into body;
+  select replace(pg_get_functiondef('public.invite_profile_with_audit_v3(uuid,uuid,text,text,text,text,uuid,uuid,uuid,text,text,text[],public.user_role,uuid)'::regprocedure), E'\r', '') into body;
   old_text := 'not public.permission_effective_for(v_creator.id,''users.manage'')';
   if position(old_text in body) = 0 then raise exception 'Invite authorization contract changed'; end if;
   body := replace(body, old_text, 'not (public.permission_effective_for(v_creator.id,''users.manage'') or public.permission_effective_for(v_creator.id,''users.manage_scoped''))');
@@ -360,7 +360,7 @@ begin
   body := replace(body, old_text, '  perform public.assert_org_user_write(v_creator.id,null,p_branch_id,p_user_role);' || chr(10) || old_text);
   execute body;
 
-  select pg_get_functiondef('public.configure_invited_profile_coverage_with_audit(uuid,uuid,uuid,uuid)'::regprocedure) into body;
+  select replace(pg_get_functiondef('public.configure_invited_profile_coverage_with_audit(uuid,uuid,uuid,uuid)'::regprocedure), E'\r', '') into body;
   old_text := 'not public.permission_effective_for(v_creator.id,''users.manage'')';
   if position(old_text in body) = 0 then raise exception 'Invited coverage authorization contract changed'; end if;
   body := replace(body, old_text, 'not (public.permission_effective_for(v_creator.id,''users.manage'') or public.permission_effective_for(v_creator.id,''users.manage_scoped''))');
@@ -369,7 +369,7 @@ begin
   body := replace(body, old_text, '  perform public.assert_org_user_write(v_creator.id,p_profile_id,null,null);' || chr(10) || old_text);
   execute body;
 
-  select pg_get_functiondef('public.update_user_profile_with_audit(uuid,jsonb)'::regprocedure) into body;
+  select replace(pg_get_functiondef('public.update_user_profile_with_audit(uuid,jsonb)'::regprocedure), E'\r', '') into body;
   old_text := 'not has_permission(''users.manage'')';
   if position(old_text in body) = 0 then raise exception 'User editor authorization contract changed'; end if;
   body := replace(body, old_text, 'not (has_permission(''users.manage'') or has_permission(''users.manage_scoped''))');
@@ -378,12 +378,12 @@ begin
   body := replace(body, old_text, '  perform public.assert_org_user_write(v_actor.id,v_old.id,v_branch,case when v_role<>v_old.user_role then v_role end);' || chr(10) || old_text);
   execute body;
 
-  select pg_get_functiondef('public.prepare_unused_user_deletion(uuid)'::regprocedure) into body;
+  select replace(pg_get_functiondef('public.prepare_unused_user_deletion(uuid)'::regprocedure), E'\r', '') into body;
   old_text := '  if v_target.id = v_actor.id then';
   if position(old_text in body) = 0 then raise exception 'User deletion contract changed'; end if;
   execute replace(body, old_text, '  perform public.assert_org_user_target_scope(v_actor.id,v_target.id);' || chr(10) || old_text);
 
-  select pg_get_functiondef('public.remove_employee_with_audit(uuid)'::regprocedure) into body;
+  select replace(pg_get_functiondef('public.remove_employee_with_audit(uuid)'::regprocedure), E'\r', '') into body;
   old_text := '  if v_target.id = v_actor.id then';
   if position(old_text in body) = 0 then raise exception 'Employee removal contract changed'; end if;
   execute replace(body, old_text, '  perform public.assert_org_user_target_scope(v_actor.id,v_target.id);' || chr(10) || old_text);
