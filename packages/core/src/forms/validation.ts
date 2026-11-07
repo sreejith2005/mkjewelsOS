@@ -1,4 +1,5 @@
 import { validateFormDefinition } from "./definition.ts";
+import { isCompletePhone } from "../phone.ts";
 import { normalizeFormAnswer } from "./answers.ts";
 import { FORM_OTHER_MAX_LENGTH, formFieldAllowsOther, formOptionValues } from "./options.ts";
 import { evaluateFormNavigation } from "./sections.ts";
@@ -68,6 +69,8 @@ export function validateFormField(field: FormFieldDefinition, value: FormAnswer 
     if (field.type === "email" && !EMAIL.test(canonicalValue)) return { code: "invalid_email", fieldKey: field.key, message: `${field.label} must be a valid email` };
     const digits = canonicalValue.replace(/\D/g, "");
     if (field.type === "phone" && (!PHONE.test(canonicalValue) || digits.length < 7 || digits.length > 15)) return { code: "invalid_phone", fieldKey: field.key, message: `${field.label} must be a valid phone number` };
+    // A number with its country code ("+..."), as the phone input saves it, must pass that country's rule (10 digits for India).
+    if (field.type === "phone" && canonicalValue.trim().startsWith("+") && !isCompletePhone(canonicalValue)) return { code: "invalid_phone", fieldKey: field.key, message: `${field.label} must be a valid phone number for its country` };
     if (field.type === "date" && !isValidCalendarDate(canonicalValue)) return { code: "invalid_date", fieldKey: field.key, message: `${field.label} must be a valid date` };
     if (field.type === "datetime" && (!DATETIME.test(canonicalValue) || !isValidCalendarDate(canonicalValue.slice(0, 10)) || Number.isNaN(Date.parse(canonicalValue)))) return { code: "invalid_datetime", fieldKey: field.key, message: `${field.label} must be a valid datetime` };
     if ((field.type === "select" || field.type === "radio") && !allowsOther && !formOptionValues(field.options).includes(canonicalValue)) return { code: "invalid_option", fieldKey: field.key, message: `${field.label} contains an invalid option` };

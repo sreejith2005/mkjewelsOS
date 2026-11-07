@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, Paperclip } from "lucide-react";
-import { describeFormRule, formUserMatchesFilter, evaluateFormNavigation, displayFormAnswer, FORM_OTHER_MAX_LENGTH, formFieldAllowsOther, formOptionValues, reconcileFormPreviewAnswers, formCompletionProgress, formUsesSteps, isFinalFormStep, nextFormStepKey, normalizeFormAnswers, previousFormStepKey, resolveFormOptions, updateVisibleFormAnswers, validateCompleteForm, validateFormStep, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition, type FormValidationIssue, type FormCrmServices, clientDetailsForForm, formChoiceValueFromText, isClientPhoneQuestion, isPincodeQuestion } from "@jewelos/core";
+import { describeFormRule, formUserMatchesFilter, isCompletePhone, evaluateFormNavigation, displayFormAnswer, FORM_OTHER_MAX_LENGTH, formFieldAllowsOther, formOptionValues, reconcileFormPreviewAnswers, formCompletionProgress, formUsesSteps, isFinalFormStep, nextFormStepKey, normalizeFormAnswers, previousFormStepKey, resolveFormOptions, updateVisibleFormAnswers, validateCompleteForm, validateFormStep, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition, type FormValidationIssue, type FormCrmServices, clientDetailsForForm, formChoiceValueFromText, isClientPhoneQuestion, isPincodeQuestion } from "@jewelos/core";
 import { Button, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { signedFormFileUrl, uploadFormFile } from "./api";
@@ -8,6 +8,7 @@ import { RatingField } from "./RatingField";
 import { CrmChoiceField, CrmPhotoField, RepeatField } from "./CrmQuestions";
 import { useFormCrmServices } from "./crmServicesContext";
 import { CrossLocationEmployeePicker } from "@/features/users/CrossLocationEmployeePicker";
+import { FormPhoneInput } from "./FormPhoneInput";
 
 /**
  * Choices for Users, branch and department questions. A person carries what a Users question's
@@ -219,7 +220,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
       const raw = answers[field.key];
       const text = typeof raw === "string" ? raw.trim() : typeof raw === "number" ? String(raw) : "";
       const kind = isClientPhoneQuestion(field) ? "client_phone" as const : "pincode" as const;
-      const ready = kind === "pincode" ? /^\d{6}$/.test(text) : text.replace(/\D/g, "").length >= 10;
+      const ready = kind === "pincode" ? /^\d{6}$/.test(text) : isCompletePhone(text);
       if (!ready || lookedUp.current.get(field.key) === text) continue;
       timers.push(window.setTimeout(() => {
         lookedUp.current.set(field.key, text);
@@ -323,7 +324,9 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
         {otherChosen ? <OtherAnswerInput disabled={disabled} inputRef={otherFocusRef(field.key)} label={field.label} onChange={(text) => set(field.key, text)} value={otherText} /> : null}</>
       : field.type === "checkbox" ? <span className={OPTION_ROW}><input {...aria} checked={value === true} disabled={disabled} onChange={(event) => set(field.key, event.target.checked)} ref={register(field.key)} type="checkbox" /><span>{field.placeholder ?? "Yes"}</span></span>
       : field.type === "currency" ? <span className="relative block"><span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-task-text-muted">₹</span><input {...aria} className="field pl-7" disabled={disabled} inputMode="decimal" onChange={onText} placeholder={field.placeholder} ref={register(field.key)} step="any" type="number" value={textValue} /></span>
-      : <input {...aria} autoComplete={field.type === "phone" ? "tel" : field.type === "email" ? "email" : undefined} className="field" disabled={disabled} inputMode={inputMode} maxLength={field.validation?.maxLength} onChange={onText} placeholder={field.placeholder} ref={register(field.key)} step={NUMBER_TYPES.has(field.type) ? "any" : undefined} type={inputType} value={textValue} />;
+      : <input {...aria} autoComplete={field.type === "email" ? "email" : undefined} className="field" disabled={disabled} inputMode={inputMode} maxLength={field.validation?.maxLength} onChange={onText} placeholder={field.placeholder} ref={register(field.key)} step={NUMBER_TYPES.has(field.type) ? "any" : undefined} type={inputType} value={textValue} />;
+    // Phone: country code + number. Not wrapped in <label>, which would name the country picker; the number is named by the question.
+    if (field.type === "phone") return shell(<div><span className="mb-1.5 block"><QuestionText field={field} id={labelId} /></span>{helper}<FormPhoneInput disabled={disabled} inputProps={{ ...aria, "aria-labelledby": labelId, placeholder: field.placeholder }} inputRef={register(field.key)} label={field.label} onChange={(next) => set(field.key, next)} value={typeof value === "string" ? value : ""} />{autoFilled.has(field.key) ? <span className="mt-1.5 block text-xs font-medium text-gold-secondary">Auto-filled from client history — editable</span> : null}{errorText}</div>);
     return shell(<label className="block"><span className="mb-1.5 block"><QuestionText field={field} /></span>{helper}{control}{autoFilled.has(field.key) ? <span className="mt-1.5 block text-xs font-medium text-gold-secondary">Auto-filled from client history — editable</span> : null}{errorText}</label>);
   };
 
