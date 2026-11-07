@@ -4,3 +4,4 @@ export * from "./redact";
 export * from "./analysis";
 export * from "./workspace";
 export * from "./integration";
+export * from "./analytics";
