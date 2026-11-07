@@ -190,6 +190,8 @@ who build workflows, the designs.
 - Kiara: no new read tool. The new reports are not offered to Kiara's `run_report` (pinned to the earlier work reports) until they have allowed and denied eval cases.
 
 ## CRM
+- [ ] Archive / restore a client (2026-11-07, CRM 20261107000200; CRM Super Admin): profile **Archive client** › reason › **Archive client**; banner **This client is archived** with **Restore client**; Client Database filter **Archived** › **Active clients** / **Archived clients only**. Phone search still finds archived clients. Direct client deletion through the API is closed.
+- [ ] Kiara tool decision (2026-11-07): no new Kiara tool; Kiara never archives or restores.
 
 - [ ] Returning-client prefill (2026-10-23): **REGISTER CLIENT** (formerly REGISTER CLIENT ENTRY) uses the most recently visited profile for the full phone number. Profile details accumulate from saved answers; newer nonblank answers win conflicts, while blanks preserve known details. Client profiles use the same details. Original client records and visit histories are retained. This repairs existing CRM reads; Kiara needs no new read tool.
 **What it is:** client records, walk-ins, interactions and follow-ups, for CRM users.
