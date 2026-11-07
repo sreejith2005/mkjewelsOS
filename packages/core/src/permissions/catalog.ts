@@ -1,4 +1,5 @@
 import { ROLE_PAGES, USER_ROLES, type PageId, type UserRole } from "../roleMenu.ts";
+import type { OrgScopeAuthority } from "../organization/franchiseScope.ts";
 
 /**
  * How a permission may be configured.
@@ -42,7 +43,15 @@ export type PermissionDefinition = Readonly<{
   description: string;
   defaultRoles: readonly UserRole[];
   pageId: PageId | null;
+  /**
+   * While franchise isolation is on, holding one of these scope authorities
+   * also grants the permission by default (migration 0385). Explicit
+   * department, designation and user overrides still decide first.
+   */
+  scopeAuthorities?: readonly OrgScopeAuthority[];
 }>;
+
+const SCOPE_MANAGERS: readonly OrgScopeAuthority[] = ["director", "regional_admin", "hr", "store_manager"];
 
 const ALL_ROLES: readonly UserRole[] = USER_ROLES;
 const rolesWithPage = (page: PageId): readonly UserRole[] => USER_ROLES.filter((role) => ROLE_PAGES[role].includes(page));
@@ -63,6 +72,7 @@ export const PERMISSION_CATALOG = [
   { key: "dashboard.view_team_performance", kind: "action", category: "Home & Dashboard", label: "View every employee's task performance", description: "Company-wide Employee Task Performance on the Dashboard: every employee's assigned, completed, pending and overdue work and FMS workflow performance. Grants no CRM or administrative access.", defaultRoles: ["super_admin", "admin"], pageId: null },
   modulePermission("tasks.view", "checklist_tasks", "Tasks", "Open Tasks", "Assigned tasks, manual tasks, and task import."),
   { key: "tasks.assign_others", kind: "action", category: "Tasks", label: "Assign tasks to other users", description: "Allow assigning and transferring tasks to other users within the existing branch, department or company scope. Deny restricts task assignment to yourself.", defaultRoles: ALL_ROLES, pageId: null },
+  { key: "tasks.assign_cross_location", kind: "action", category: "Tasks", label: "Assign work to other stores and franchises", description: "Choose an employee from another store or franchise when creating a task (Someone at another store). Form Users questions follow their own builder setting instead. The recipient sees only that work. Deny keeps task assignment inside the person's own location.", defaultRoles: ["super_admin", "admin", "manager", "hr", "crm", "staff"], pageId: null },
   { key: "tasks.manage_team", kind: "authority", category: "Tasks", label: "Manage team tasks", description: "Create, edit, and delegate tasks for others. Follows Manager authority or higher.", defaultRoles: ["super_admin", "admin", "manager"], pageId: null },
   { key: "tasks.voice_assign", kind: "action", category: "Tasks", label: "Assign tasks by voice", description: "Record a voice note that fills in the Assign Task form. Assignee scope is unchanged.", defaultRoles: ["super_admin", "admin", "manager", "hr"], pageId: null },
   { key: "tasks.view_all", kind: "authority", category: "Tasks", label: "View all tasks", description: "Tenant-wide task visibility. Follows Admin authority or higher.", defaultRoles: ["super_admin", "admin"], pageId: null },
@@ -76,7 +86,7 @@ export const PERMISSION_CATALOG = [
   { key: "crm.manage_forms", kind: "action", category: "CRM", label: "Manage CRM forms", description: "Choose which Form Builder forms CRM uses to register queue clients and leads, and link their questions to CRM answers.", defaultRoles: ["super_admin"], pageId: null },
   modulePermission("notifications.view", "notifications", "Notifications", "Open Notifications", "The notification inbox."),
   { key: "notifications.manage", kind: "action", category: "Notifications", label: "Manage notification rules", description: "Templates, rules, and delivery logs.", defaultRoles: ["super_admin", "admin"], pageId: null },
-  modulePermission("users.view", "users", "People", "Open Users", "Employee directory."),
+  { ...modulePermission("users.view", "users", "People", "Open Users", "Employee directory."), scopeAuthorities: SCOPE_MANAGERS },
   { key: "users.manage", kind: "action", category: "People", label: "Create and edit users", description: "Invite employees and edit their profiles.", defaultRoles: ["super_admin", "admin"], pageId: null },
   { key: "users.delete", kind: "action", category: "People", label: "Delete users", description: "Delete an employee for good: login removed, personal details wiped, hidden from Users. Past work stays as Removed employee.", defaultRoles: ["super_admin"], pageId: null },
   modulePermission("availability.view", "availability", "People", "Open Availability", "Record and view working availability."),
@@ -107,6 +117,8 @@ export const PERMISSION_CATALOG = [
   { key: "recording.review", kind: "action", category: "Workflows", label: "Review branch recordings", description: "Review recordings within manager authority and branch scope.", defaultRoles: ["super_admin", "admin", "manager"], pageId: null },
   { key: "recording.coach", kind: "action", category: "Workflows", label: "Receive critical coaching alerts", description: "Opt in to rate-limited alerts from final, unambiguous transcript evidence within manager scope.", defaultRoles: ["super_admin", "admin", "manager"], pageId: null },
   { key: "recording.manage_rubric", kind: "action", category: "Workflows", label: "Manage sales score rubric and SOP versions", description: "Create MK Sales Score rubric versions and SOP versions, activate a rubric and approve SOP text written by someone else.", defaultRoles: ["super_admin", "admin"], pageId: null },
+  { key: "franchise.manage", kind: "protected", category: "Administration", label: "Manage franchises and data scope", description: "Create franchises, map stores to them, grant Director, Regional Admin, HR and store scope, transfer employees between franchises and switch franchise isolation. Super Admin authority only.", defaultRoles: ["super_admin"], pageId: null },
+  { key: "users.manage_scoped", kind: "action", category: "People", label: "Create and edit users in own scope", description: "Create and edit ordinary employees only in the franchise or stores the person is responsible for. Never administrators, other franchises or company-wide settings.", defaultRoles: ["super_admin"], pageId: null, scopeAuthorities: SCOPE_MANAGERS },
 ] as const satisfies readonly PermissionDefinition[];
 
 export type PermissionKey = (typeof PERMISSION_CATALOG)[number]["key"];

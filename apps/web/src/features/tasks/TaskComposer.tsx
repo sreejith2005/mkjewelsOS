@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import { ChipSelector } from "./ChipSelector";
 import type { TaskReferenceData } from "./api";
 import { AssigneePicker } from "@/components/assignees/AssigneePicker";
+import { CrossLocationEmployeePicker } from "@/features/users/CrossLocationEmployeePicker";
+import type { AssignmentRecipient } from "@jewelos/core";
 import { VoiceTaskCapture } from "./VoiceTaskCapture";
 import type { VoiceTaskInterpretation } from "./voiceApi";
 import { ScheduleFields, type CalendarTiming } from "./schedule/ScheduleFields";
@@ -66,9 +68,15 @@ function TaskSelector({ children, id, open, panel }: { children: ReactNode; id: 
   </div>;
 }
 
-export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, onSave, onSaveSchedule, onUploadAttachment, profile }: {
+export function TaskComposer({ canAssignOtherStores = false, canUseVoice = false, data, onClose, onCreated, onSave, onSaveSchedule, onUploadAttachment, profile }: {
   /** Saves one schedule template (and creates a due first occurrence); returns its id. */
   onSaveSchedule?: (payload: Json) => Promise<string>;
+  /**
+   * Offers "Someone at another store" (Franchise -> Store -> Employee) for one-time
+   * tasks. Shown to holders of tasks.assign_cross_location and tasks.assign_others;
+   * the server re-checks the request and every doer's store on save.
+   */
+  canAssignOtherStores?: boolean;
   /** Voice capture is offered only to authors the database grants `tasks.voice_assign`. */
   canUseVoice?: boolean;
   data: TaskReferenceData;
@@ -85,6 +93,9 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
   const [planned, setPlanned] = useState("");
   const [priority, setPriority] = useState<Enums<"task_priority">>("high");
   const [doers, setDoers] = useState<string[]>([]);
+  /** People chosen from another store; they are not in the author's own people list. */
+  const [otherStorePeople, setOtherStorePeople] = useState<readonly OtherStorePerson[]>([]);
+  const [otherStoreOpen, setOtherStoreOpen] = useState(false);
   const [assignmentMode, setAssignmentMode] = useState<ManualTaskAssignmentMode>("separate");
   const [watchers, setWatchers] = useState<string[]>([]);
   const [formTemplateId, setFormTemplateId] = useState("");
@@ -127,7 +138,23 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
   // The assignment RPC resolves effective authority, overrides and scope.
   const eligiblePeople = useMemo(() => data.users.filter(user => user.id && user.tenant_id === profile.tenant_id), [data.users, profile.tenant_id]);
   const priorityLabel = priorityOptions.find((option) => option.value === priority)?.label ?? priority;
-  const selectedDoers = useMemo(() => doers.flatMap((id) => eligiblePeople.filter((person) => person.id === id)), [doers, eligiblePeople]);
+  const pickablePeople = useMemo<readonly OtherStorePerson[]>(() => [
+    ...eligiblePeople.flatMap((person) => person.id ? [{ id: person.id, employee_name: person.employee_name, branch_id: person.branch_id, department_id: person.department_id, storeName: null }] : []),
+    ...otherStorePeople.filter((person) => !eligiblePeople.some((local) => local.id === person.id)),
+  ], [eligiblePeople, otherStorePeople]);
+  const selectedDoers = useMemo(() => doers.flatMap((id) => pickablePeople.filter((person) => person.id === id)), [doers, pickablePeople]);
+  const hasOtherStoreDoer = selectedDoers.some((person) => person.storeName !== null);
+  const addOtherStorePerson = (recipient: AssignmentRecipient) => {
+    if (!recipient.departmentId) return setError(`${recipient.name} has no department yet, so a task cannot be assigned to them.`);
+    setError(null);
+    setOtherStorePeople((current) => current.some((person) => person.id === recipient.id) ? current : [...current, {
+      id: recipient.id, employee_name: recipient.name, branch_id: recipient.storeId, department_id: recipient.departmentId,
+      storeName: recipient.franchiseName ? `${recipient.franchiseName} · ${recipient.storeName}` : recipient.storeName,
+    }]);
+    setDoers((current) => current.includes(recipient.id) ? current : [...current, recipient.id]);
+    setWatchers((current) => current.filter((id) => id !== recipient.id));
+    setOtherStoreOpen(false);
+  };
   // The server requires every doer of one task to share its branch and department.
   const canShare = canShareManualTask(selectedDoers.map((person) => ({ branchId: person.branch_id, departmentId: person.department_id })));
   const effectiveAssignmentMode: ManualTaskAssignmentMode = canShare ? assignmentMode : "separate";
@@ -220,6 +247,7 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
       timing: scheduleType === "as_needed" ? { type: "as_required", triggerLabel } : timing,
       ...scheduleOptions, active: true, personalPerformance: true,
     };
+    if (hasOtherStoreDoer) return setError("Repeating schedules are for your own store. Assign one-time work to another store.");
     const invalid = validateScheduledTaskDraft(draft, people);
     if (invalid) return setError(invalid);
     const saved = [...(savedScheduleFor ?? [])];
@@ -259,7 +287,7 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
     if (scheduling) return void await submitSchedule();
     let current = submission;
     if (!current) {
-      const built = buildManualTaskCreateRequests({ title, description, plannedDatetime: planned, priority, mode: taskMode, selectedDoerIds: doers, selectedWatcherIds: watchers, assignmentMode: effectiveAssignmentMode, formTemplateId, checklistItems: checklist, eligiblePeople: eligiblePeople.flatMap((person) => person.id ? [{ id: person.id, branchId: person.branch_id, departmentId: person.department_id, eligible: true }] : []) });
+      const built = buildManualTaskCreateRequests({ title, description, plannedDatetime: planned, priority, mode: taskMode, selectedDoerIds: doers, selectedWatcherIds: watchers, assignmentMode: effectiveAssignmentMode, formTemplateId, checklistItems: checklist, eligiblePeople: pickablePeople.map((person) => ({ id: person.id, branchId: person.branch_id, departmentId: person.department_id, eligible: true })) });
       if ("error" in built) return setError(built.error.message);
       current = { requests: built.requests, taskIds: [], uploadedTaskIds: [] };
     }
@@ -303,8 +331,15 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
 
   const assignmentChoice = (mode: ManualTaskAssignmentMode, label: string, hint: string, disabled = false) => <label className={cn("flex min-h-11 items-start gap-3 rounded-lg border px-3 py-2 text-sm", effectiveAssignmentMode === mode ? "border-task-accent bg-task-accent-soft" : "border-task-border bg-task-bg", disabled && "opacity-60")}><input checked={effectiveAssignmentMode === mode} className="mt-0.5 size-4 accent-task-accent" disabled={disabled} name="task-assignment-mode" onChange={() => setAssignmentMode(mode)} type="radio" /><span className="min-w-0"><span className="block font-medium text-task-text">{label}</span><span className="block text-xs text-task-text-muted">{hint}</span></span></label>;
   const usersPanel = <div className="space-y-3">
-    {selectedDoers.length ? <div aria-label="Selected users" className="flex flex-wrap gap-2">{selectedDoers.map((person) => <button aria-label={`Remove ${person.employee_name ?? "user"}`} className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg border border-task-border bg-task-bg px-3 text-sm" key={person.id} onClick={() => updateDoers(doers.filter((id) => id !== person.id))} type="button"><span className="break-words">{person.employee_name}</span><X className="size-4 shrink-0" /></button>)}</div> : null}
+    {selectedDoers.length ? <div aria-label="Selected users" className="flex flex-wrap gap-2">{selectedDoers.map((person) => <button aria-label={`Remove ${person.employee_name ?? "user"}`} className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg border border-task-border bg-task-bg px-3 text-sm" key={person.id} onClick={() => updateDoers(doers.filter((id) => id !== person.id))} type="button"><span className="break-words">{person.employee_name}{person.storeName ? <span className="text-task-text-muted"> · {person.storeName}</span> : null}</span><X className="size-4 shrink-0" /></button>)}</div> : null}
     <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} label="Assign users" multiple onChange={updateDoers} people={eligiblePeople.flatMap((person) => person.id ? [{ ...person, id: person.id }] : [])} selectedIds={doers} />
+    {canAssignOtherStores && !scheduling ? <div className="space-y-2" data-testid="task-other-store">
+      {otherStoreOpen
+        ? <CrossLocationEmployeePicker context={{ kind: "task" }} onChange={() => undefined} onPick={addOtherStorePerson} value="" />
+        : <Button className="min-h-11" onClick={() => setOtherStoreOpen(true)} type="button" variant="secondary">Someone at another store</Button>}
+      <p className="text-xs text-task-text-muted">Franchise, then store, then employee. They get this task only, not your store&apos;s other work.</p>
+    </div> : null}
+    {scheduling && hasOtherStoreDoer ? <p className="text-xs text-task-text-muted">Repeating schedules are for your own store. Remove the person from another store or make it a one-time task.</p> : null}
     {scheduling && doers.length > 1 ? <p className="text-xs text-task-text-muted" data-testid="schedule-separate-note">Each selected user gets their own {scheduleType === "as_needed" ? "duty" : "schedule"}. A shared schedule is not available: a schedule has one owner.</p> : null}
     {!scheduling && doers.length > 1 ? <fieldset className="space-y-2" data-testid="task-assignment-mode"><legend className="mb-1 text-xs font-semibold text-task-text">How should {doers.length} users get this task?</legend>
       {assignmentChoice("separate", "Separate task for each user", "Everyone gets their own copy and completes it themselves.")}
@@ -411,3 +446,6 @@ export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, on
     </Modal>
   );
 }
+
+/** A person who can be a doer: from the author's own list, or picked at another store (storeName set). */
+type OtherStorePerson = Readonly<{ id: string; employee_name: string | null; branch_id: string | null; department_id: string | null; storeName: string | null }>;
