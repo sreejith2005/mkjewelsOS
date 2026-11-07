@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { newFmsStartTrigger, type FmsFlowDefinition } from "@jewelos/core";
 import type { FmsData } from "./api";
 
-const mocks = vi.hoisted(() => ({ saveFmsDraft: vi.fn(), publishFmsFlow: vi.fn(), test: vi.fn(), samples: vi.fn(), source: vi.fn(), crmForms: vi.fn(async () => ({})) }));
+const mocks = vi.hoisted(() => ({ saveFmsDraft: vi.fn(), publishFmsFlow: vi.fn(), test: vi.fn(), samples: vi.fn(), source: vi.fn(), crmForms: vi.fn(async () => ({})), stepForms: vi.fn(async () => new Set<string>()) }));
 vi.mock("./api", () => ({ saveFmsDraft: mocks.saveFmsDraft, publishFmsFlow: mocks.publishFmsFlow, saveFmsContextAssigneeDefault: vi.fn() }));
-vi.mock("./triggerApi", () => ({ testFmsStartTrigger: mocks.test, listFmsTriggerSamples: mocks.samples, loadFmsInstanceTriggerSource: mocks.source, loadCrmFormFamilies: mocks.crmForms }));
+vi.mock("./triggerApi", () => ({ testFmsStartTrigger: mocks.test, listFmsTriggerSamples: mocks.samples, loadFmsInstanceTriggerSource: mocks.source, loadCrmFormFamilies: mocks.crmForms, loadFmsStepFormFamilies: mocks.stepForms }));
 let latest: FmsFlowDefinition | null = null;
 vi.mock("./FmsGraphCanvas", async () => {
   const { forwardRef } = await import("react");
@@ -18,7 +18,7 @@ import { FmsFlowBuilder } from "./FmsFlowBuilder";
 import { FmsStartTriggerPanel, triggerFormFamily, triggerSourceForForm } from "./FmsStartTriggerPanel";
 import { FmsTriggerSource } from "./FmsTriggerSource";
 
-afterEach(() => { cleanup(); vi.clearAllMocks(); mocks.crmForms.mockImplementation(async () => ({})); latest = null; });
+afterEach(() => { cleanup(); vi.clearAllMocks(); mocks.crmForms.mockImplementation(async () => ({})); mocks.stepForms.mockImplementation(async () => new Set<string>()); latest = null; });
 
 const data = {
   flows: [], stages: [], assignees: [], branchRules: [], forms: [], formFields: {},
@@ -156,13 +156,15 @@ describe("trigger form picker", () => {
   it("lists each form once, marks the CRM ones, and picks the CRM event when a CRM form is chosen", async () => {
     const user = userEvent.setup();
     mocks.crmForms.mockImplementation(async () => crm);
+    mocks.stepForms.mockImplementation(async () => new Set(["fam-step"]));
     const form = (id: string, family: string, name: string, version: number) => ({ id, family_id: family, name, version, lifecycle: "published" });
-    const withForms = { ...data, forms: [form("t-q1", "fam-queue", "Client queue", 1), form("t-q2", "fam-queue", "Client queue", 2), form("t-o", "fam-other", "Repair intake", 1)], formFields: {} } as unknown as FmsData;
+    const withForms = { ...data, forms: [form("t-q1", "fam-queue", "Client queue", 1), form("t-q2", "fam-queue", "Client queue", 2), form("t-o", "fam-other", "Repair intake", 1), form("t-s", "fam-step", "INTRODUCTION CALL — INSTAGRAM LEADS", 1)], formFields: {} } as unknown as FmsData;
     const onApply = vi.fn();
     const definition = { name: "Flow", stages: [{ key: "s1", name: "Call", type: "task" }] } as unknown as FmsFlowDefinition;
     render(<FmsStartTriggerPanel data={withForms} definition={{ ...definition, startMode: "automatic", startTrigger: newFmsStartTrigger("jewelos_form", () => crypto.randomUUID()) }} flowId={null} onApply={onApply} onClose={() => undefined} />);
     const picker = await screen.findByLabelText("Trigger form");
     await screen.findByRole("option", { name: "Client queue (v2) · CRM client queue" });
+    await waitFor(() => expect(screen.queryByRole("option", { name: /INTRODUCTION CALL/ })).toBeNull());
     expect(within(picker).getAllByRole("option").map((option) => option.textContent)).toEqual(["Choose a form from the Form Builder", "Client queue (v2) · CRM client queue", "Repair intake (v1)"]);
     await user.selectOptions(picker, "fam-queue");
     expect(picker).toHaveProperty("value", "fam-queue");

@@ -8,7 +8,7 @@ import {
 } from "@jewelos/core";
 import { Button, Modal, Notice } from "@/components/ui";
 import type { FmsData } from "./api";
-import { listFmsTriggerSamples, loadCrmFormFamilies, testFmsStartTrigger, type CrmFormFamilies, type FmsTriggerSample, type FmsTriggerTestResult } from "./triggerApi";
+import { listFmsTriggerSamples, loadCrmFormFamilies, loadFmsStepFormFamilies, testFmsStartTrigger, type CrmFormFamilies, type FmsTriggerSample, type FmsTriggerTestResult } from "./triggerApi";
 
 const newId = () => crypto.randomUUID().replaceAll("-", "").slice(0, 16);
 
@@ -88,10 +88,17 @@ export function FmsStartTriggerPanel({ definition, data, flowId, onApply, onClos
   const [trigger, setTrigger] = useState<FmsStartTrigger>(() => definition.startTrigger ?? newFmsStartTrigger("crm_walkin", newId));
   const fields = useMemo(() => fmsTriggerFields(trigger, data), [trigger, data]);
   const issues = mode === "automatic" ? validateFmsStartTrigger(trigger, fields, definition.stages[0]?.type) : [];
-  const forms = useMemo(() => latestFormVersions(data.forms), [data.forms]);
   const [crmForms, setCrmForms] = useState<CrmFormFamilies>({});
-  useEffect(() => { let active = true; void loadCrmFormFamilies().then((loaded) => { if (active) setCrmForms(loaded); }); return () => { active = false; }; }, []);
+  const [stepForms, setStepForms] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    let active = true;
+    void loadCrmFormFamilies().then((loaded) => { if (active) setCrmForms(loaded); });
+    void loadFmsStepFormFamilies().then((loaded) => { if (active) setStepForms(loaded); });
+    return () => { active = false; };
+  }, []);
   const chosenFamily = triggerFormFamily(trigger.source, crmForms);
+  // Forms built inside FMS steps belong to their workflow, not the Form Builder list (owner 2026-11-07); one already chosen stays visible.
+  const forms = useMemo(() => latestFormVersions(data.forms).filter((form) => !stepForms.has(form.family_id) || form.family_id === chosenFamily), [data.forms, stepForms, chosenFamily]);
   const chooseForm = (familyId: string) => {
     const form = forms.find((item) => item.family_id === familyId);
     const source = familyId ? triggerSourceForForm(familyId, form?.id, crmForms) : { type: "jewelos_form" as const };
