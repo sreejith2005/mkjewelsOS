@@ -12,8 +12,12 @@ select ok(has_function_privilege('authenticated','set_fms_flow_active_with_audit
 select ok(has_function_privilege('authenticated','restore_fms_flow_with_audit(uuid,text)','EXECUTE'),'authenticated callers can restore an archived flow');
 select ok(not has_function_privilege('anon','set_fms_flow_active_with_audit(uuid,boolean,text)','EXECUTE'),'anonymous callers cannot pause or resume a flow');
 
+-- 0390: pause/resume accepts FMS builders or a per-workflow Publish grant; can_publish_fms_flow
+-- starts from the builder check (can_manage_fms_flow).
 select ok((select pg_get_functiondef('set_fms_flow_active_with_audit(uuid,boolean,text)'::regprocedure)
-  like '%can_manage_fms_flow(p_flow_id)%'),'pause/resume reuses the FMS builder authorization check');
+  like '%can_publish_fms_flow(p_flow_id)%')
+  and (select pg_get_functiondef('can_publish_fms_flow(uuid)'::regprocedure) like '%can_manage_fms_flow(p_flow_id)%'),
+  'pause/resume reuses the FMS builder authorization check');
 select ok((select pg_get_functiondef('restore_fms_flow_with_audit(uuid,text)'::regprocedure)
   like '%family_id=v_flow.family_id and status=''published''%'),'restoring a version archives the family''s current published version');
 

@@ -30,7 +30,7 @@
 
 -- Validates and normalises one filter. Null / absent means "no filter".
 create function normalize_form_user_filter(p_filter jsonb)
-returns jsonb language plpgsql immutable set search_path = public as $$
+returns jsonb language plpgsql stable set search_path = public as $$
 declare v_rule jsonb; v_rules jsonb := '[]'::jsonb; v_values jsonb; v_attr text; v_op text; v_value jsonb;
 begin
   if p_filter is null or p_filter = 'null'::jsonb then return null; end if;
