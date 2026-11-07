@@ -175,16 +175,21 @@ export async function revokeScope(grantId: string, reason: string): Promise<void
 // ---------------------------------------------------------------------------
 
 /** Counts, module coverage and organisation history for the Super Admin panel. */
-export async function loadFranchiseInsights(): Promise<{ branchCounts: ReadonlyMap<string, number>; coverage: FranchiseModuleCoverage[]; history: OrgAuditEntry[] }> {
-  const [counts, coverage, history] = await Promise.all([
+export async function loadFranchiseInsights(): Promise<{ branchCounts: ReadonlyMap<string, number>; coverage: FranchiseModuleCoverage[] }> {
+  const [counts, coverage] = await Promise.all([
     db().rpc("get_franchise_branch_counts"),
     db().rpc("get_franchise_module_coverage"),
-    db().rpc("get_franchise_audit_history", { p_limit: 50 }),
   ]);
   fail("Load employee counts", counts.error);
   fail("Load module coverage", coverage.error);
-  fail("Load organisation history", history.error);
-  return { branchCounts: parseBranchCounts(counts.data), coverage: parseFranchiseModuleCoverage(coverage.data), history: parseOrgAuditHistory(history.data) };
+  return { branchCounts: parseBranchCounts(counts.data), coverage: parseFranchiseModuleCoverage(coverage.data) };
+}
+
+/** Organisation history, loaded on its own so it can never block the store list. */
+export async function loadFranchiseHistory(): Promise<OrgAuditEntry[]> {
+  const { data, error } = await db().rpc("get_franchise_audit_history", { p_limit: 50 });
+  fail("Load organisation history", error);
+  return parseOrgAuditHistory(data);
 }
 
 /** Franchises and stores the cross-location picker may offer (names only). */

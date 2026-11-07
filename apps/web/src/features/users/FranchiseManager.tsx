@@ -16,6 +16,7 @@ import {
   assignBranchFranchise,
   grantScope,
   loadFranchiseAdmin,
+  loadFranchiseHistory,
   loadFranchiseInsights,
   revokeScope,
   saveFranchise,
@@ -27,7 +28,7 @@ import {
 import { Button, Field, Modal, Notice } from "@/components/ui";
 
 type Person = Readonly<{ id: string; employee_name: string; account_status: string | null }>;
-type Insights = Readonly<{ branchCounts: ReadonlyMap<string, number>; coverage: FranchiseModuleCoverage[]; history: OrgAuditEntry[] }>;
+type Insights = Readonly<{ branchCounts: ReadonlyMap<string, number>; coverage: FranchiseModuleCoverage[] }>;
 type Editor =
   | { kind: "franchise"; franchise: FranchiseGroup | null }
   | { kind: "branch"; branch: FranchiseBranch }
@@ -154,8 +155,13 @@ export function FranchiseManager({ people, onChanged }: { people: readonly Perso
   const [insights, setInsights] = useState<Insights | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editor, setEditor] = useState<Editor | null>(null);
+  const [history, setHistory] = useState<OrgAuditEntry[] | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const load = useCallback(async () => {
     setError(null);
+    // History loads on its own: a slow history never hides the stores.
+    setHistoryError(null);
+    void loadFranchiseHistory().then(setHistory, (caught: unknown) => setHistoryError(errorText(caught, "Unable to load organisation history.")));
     try {
       const [admin, extra] = await Promise.all([loadFranchiseAdmin(), loadFranchiseInsights()]);
       setState(admin); setInsights(extra);
@@ -240,10 +246,11 @@ export function FranchiseManager({ people, onChanged }: { people: readonly Perso
 
         <details>
           <summary className="cursor-pointer text-sm font-semibold text-champagne">History</summary>
-          <ul className="mt-2 divide-y divide-gold/10">{(insights?.history ?? []).map((entry) => <li className="flex flex-wrap justify-between gap-2 py-1.5 text-sm" key={entry.id}>
+          <ul className="mt-2 divide-y divide-gold/10">{(history ?? []).map((entry) => <li className="flex flex-wrap justify-between gap-2 py-1.5 text-sm" key={entry.id}>
             <span className="text-white">{entry.label}</span><span className="text-xs text-soft-grey">{entry.actorName ?? "System"} · {new Date(entry.createdAt).toLocaleString()}</span>
           </li>)}</ul>
-          {insights && insights.history.length === 0 ? <p className="mt-2 text-sm text-soft-grey">No organisation changes yet.</p> : null}
+          {historyError ? <p className="mt-2 text-sm text-soft-grey">{historyError}</p> : null}
+          {history && history.length === 0 ? <p className="mt-2 text-sm text-soft-grey">No organisation changes yet.</p> : null}
         </details>
       </>}
     </div>
