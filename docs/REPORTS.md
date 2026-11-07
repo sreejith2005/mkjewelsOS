@@ -66,6 +66,51 @@ purchase rule above, for visits from the recording's India day through the attri
 there is no verified revenue; an estimate (confirmed purchases × configured average ticket) is
 shown only in Store Intelligence and always labelled Estimated.
 
+**Store Intelligence analytics (migration 0389).** Store Intelligence › Insights, for managers with
+*Review branch recordings*. It is not a report key and has no export.
+- Source: `recording_session_facts`, one row per recorded conversation, kept current by a queue
+  (`recording_fact_queue`) that triggers fill and every read drains (at most 2,000 rows per read).
+  The page shows when figures were taken and what is still being counted, transcribed or waiting
+  for AI review. The summary is fetched once per filter combination; drill-downs are keyset pages
+  of 25 (`recording_analytics_sessions`, metadata only: no summary, transcript, audio or customer).
+- Scope: own branch; every branch with `recording.analytics_all_branches` (default Super Admin and
+  Admin). Another branch's conversation is listed but cannot be opened from analytics.
+- Period: India business days (Asia/Kolkata), inclusive, at most 366 days. Today, This week (from
+  Monday), This month (from the 1st) or Custom. The prior period is the same number of days
+  immediately before.
+- Conversations = recordings started in the period. Customers are never counted from transcript
+  chunks or messages.
+- Average score = sum of effective scores (manager edit, else AI) ÷ scored conversations. Analysed
+  but unscored, not yet analysed, and **removed after retention** (past expiry; their analysis is
+  deleted by the 0379 retention rule) are counted separately, never as 0.
+- Average length = saved audio ÷ conversations with audio.
+- CRM outcome per conversation (0384 rules): *Confirmed* (credited purchase visit; one visit, one
+  conversation), *Credited to a later conversation*, *Lost* (verified link, CRM checked, attribution
+  window closed, no purchase), *Window still open*, *Waiting for CRM* (link not yet verified or
+  not checked) and *No customer linked*. **Eligible** = confirmed + credited elsewhere + lost +
+  open. **Confirmed conversion** = confirmed ÷ eligible. Not linked is unknown, not lost.
+- Stages need quoted transcript evidence: *Engaged* = analysed without "too little speech";
+  *Interest* = engaged with an evidenced product interest; *Price discussed* = interest with an
+  evidenced budget or price concern; *Confirmed converted* = engaged and CRM-confirmed (not nested
+  under Price). Drop-off = previous stage − stage.
+- Product type and metal/design come from fixed keyword rules on the product words
+  (`recording_product_categories`, `recording_product_elements`); price band from the evidenced
+  budget (`recording_price_band`, a bare number under ₹1,000 gives no band). Personal traits are
+  never inferred; CRM demographics are not shared with recordings.
+- Minimum sample 5: averages, rates, ranks and tiers below it show "Too few"; no denominator shows
+  "No data". Tiers: Strong 80+, Good 60–79, Needs coaching under 60.
+- Score vs conversion: Pearson r per conversation (score against confirmed 0/1, eligible and
+  scored) and per person (5+ scored and 5+ eligible), with N. Correlation is not causation.
+- Verified revenue: none (the CRM records no amounts). Estimated revenue = confirmed × configured
+  average ticket. **Opportunity at risk** (hypothetical benchmark) = conversations with evidenced
+  interest, a linked customer and no CRM purchase × confirmed conversion × average ticket; shown
+  only with a ticket and 5+ eligible.
+- Connected time (Device time) = sum of gaps of at most 2 minutes between a phone's contacts, by
+  India day, logged from 0389 onward (`recorder_device_days`). Battery is not transmitted.
+- Branch priorities are rules in `siBranchActions` (`@jewelos/core`): interrupted recordings,
+  5+ waiting reviews, average score under 60, conversion 10+ points under the branches shown,
+  interested customers without a purchase, half or more conversations without a linked customer.
+
 **Customer Master.** One row per CRM customer. *Lead or client*: CRM lifecycle `lead` or
 `engaged` → Lead, otherwise Client. *Returning*: more than one recorded store visit.
 *Purchase status*: `customer_commercial_summary` (Buyer, Non-Buyer/Prospect, Repair-only
