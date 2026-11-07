@@ -110,3 +110,16 @@ it("lets open FMS work be selected in bulk but never finished FMS history", () =
   fireEvent.click(screen.getByRole("button", { name: "Select this page" }));
   expect(onChange).toHaveBeenCalledWith(["task", "step", "start"]);
 });
+it("offers an Anytime duties chip that shows the duties instead of dated tasks", () => {
+  const select = vi.fn();
+  const { rerender } = render(<TasksTab {...props} selection={{ ids: [], onChange: vi.fn() }} onBulkDelete={vi.fn()} anytime={{ selected: false, count: 3, onSelect: select, content: <p>Duty list</p> }} />);
+  expect(screen.queryByText("Duty list")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Anytime duties · 3" }));
+  expect(select).toHaveBeenCalled();
+  rerender(<TasksTab {...props} selection={{ ids: [], onChange: vi.fn() }} onBulkDelete={vi.fn()} anytime={{ selected: true, count: 3, onSelect: select, content: <p>Duty list</p> }} />);
+  expect(screen.getByText("Duty list")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Anytime duties · 3" }).getAttribute("aria-pressed")).toBe("true");
+  expect(screen.getByRole("button", { name: "All tasks" }).getAttribute("aria-pressed")).toBe("false");
+  expect(screen.queryByText("Wrong task")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Delete all matching" })).toBeNull();
+});

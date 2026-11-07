@@ -51,11 +51,21 @@ export type FranchiseScopeGrant = Readonly<{
   reason: string | null;
 }>;
 
+/** Franchise scope a person has automatically from their role and store (0390). */
+export type FranchiseAutomaticScope = Readonly<{
+  userProfileId: string;
+  employeeName: string;
+  authority: OrgScopeAuthority;
+  franchiseGroupId: string;
+  branchId: string | null;
+}>;
+
 export type FranchiseAdminContext = Readonly<{
   enforcementEnabled: boolean;
   franchises: FranchiseGroup[];
   branches: FranchiseBranch[];
   grants: FranchiseScopeGrant[];
+  automaticScopes: FranchiseAutomaticScope[];
 }>;
 
 export type FranchiseReadiness = Readonly<{
@@ -99,6 +109,14 @@ export function parseFranchiseAdminContext(input: unknown): FranchiseAdminContex
       return [{
         id: text(row.id), userProfileId: text(row.user_profile_id), employeeName: text(row.employee_name), authority: row.authority, scopeLevel: level,
         franchiseGroupId: optionalText(row.franchise_group_id), branchId: optionalText(row.branch_id), reason: optionalText(row.reason),
+      }];
+    }),
+    automaticScopes: list(value.automatic_scopes).flatMap((row) => {
+      const franchiseGroupId = optionalText(row.franchise_group_id);
+      if (!isOrgScopeAuthority(row.authority) || !franchiseGroupId) return [];
+      return [{
+        userProfileId: text(row.user_profile_id), employeeName: text(row.employee_name), authority: row.authority,
+        franchiseGroupId, branchId: optionalText(row.branch_id),
       }];
     }),
   };

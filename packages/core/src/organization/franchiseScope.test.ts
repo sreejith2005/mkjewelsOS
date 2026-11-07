@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { branchesOfferedForUserManagement, parseMyOrgScope, resolveOrgScope, scopeLevelForAuthority, type ScopeActor, type ScopeBranch } from "./franchiseScope";
+import { automaticScopeAuthority, branchesOfferedForUserManagement, parseMyOrgScope, resolveOrgScope, scopeLevelForAuthority, type ScopeActor, type ScopeBranch } from "./franchiseScope";
 
 const branches: ScopeBranch[] = [
   { id: "bandra", franchiseGroupId: "mum", managerId: "mgr" },
@@ -10,6 +10,34 @@ const branches: ScopeBranch[] = [
 ];
 const active = new Set(["mum", "ahd"]);
 const actor = (overrides: Partial<ScopeActor>): ScopeActor => ({ profileId: "p", branchId: "andheri", active: true, superAdmin: false, grants: [], ...overrides });
+
+describe("automatic franchise scope (mirror of org_automatic_scope, 0390)", () => {
+  it("maps Admin and HR to their franchise authority and nobody else", () => {
+    expect(automaticScopeAuthority("admin")).toBe("regional_admin");
+    expect(automaticScopeAuthority("hr")).toBe("hr");
+    for (const role of ["manager", "staff", "crm", "super_admin", null, undefined]) expect(automaticScopeAuthority(role)).toBeNull();
+  });
+
+  it("covers every store of the Admin's own franchise without a grant", () => {
+    const scope = resolveOrgScope(actor({ effectiveRole: "admin" }), branches, active);
+    expect(scope.readableBranchIds).toEqual(["andheri", "bandra", "zaveri"]);
+    expect(scope.manageableBranchIds).toEqual(["andheri", "bandra", "zaveri"]);
+    expect(scope.authorities).toEqual(["regional_admin"]);
+  });
+
+  it("covers HR's franchise, and nothing at a store with no franchise or an inactive one", () => {
+    expect(resolveOrgScope(actor({ effectiveRole: "hr", branchId: "ahd1" }), branches, active).readableBranchIds).toEqual(["ahd1"]);
+    expect(resolveOrgScope(actor({ effectiveRole: "hr", branchId: "ahd1" }), branches, active).authorities).toEqual(["hr"]);
+    expect(resolveOrgScope(actor({ effectiveRole: "admin", branchId: "expo" }), branches, active).readableBranchIds).toEqual(["expo"]);
+    expect(resolveOrgScope(actor({ effectiveRole: "admin" }), branches, new Set(["ahd"])).readableBranchIds).toEqual(["andheri"]);
+  });
+
+  it("leaves staff on their own store", () => {
+    const scope = resolveOrgScope(actor({ effectiveRole: "staff" }), branches, active);
+    expect(scope.readableBranchIds).toEqual(["andheri"]);
+    expect(scope.authorities).toEqual([]);
+  });
+});
 
 describe("resolveOrgScope (mirror of org_scope_branch_ids)", () => {
   it("gives Super Admin every branch, including unmapped ones", () => {

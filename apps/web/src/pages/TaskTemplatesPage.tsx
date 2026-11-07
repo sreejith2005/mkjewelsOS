@@ -5,7 +5,7 @@ import {
   canManageTaskTemplates, canSelectTaskControlBranch, canViewTaskControl,
   taskControlShowsSearch, taskControlTabsFor,
   TASK_CONTROL_TAB_DESCRIPTIONS,
-  type Json, type TaskWorkKindFilter, hasPermission, taskWorkKind,
+  type Json, type TaskWorkKindFilter, hasPermission, isOnDemandSchedule, taskWorkKind,
 } from "@jewelos/core";
 import { supabase } from "@jewelos/api-client";
 import { useAuth } from "@/auth/AuthContext";
@@ -79,6 +79,8 @@ export function TaskTemplatesPage() {
   const snapshotGeneration = useRef(0);
   const templatesGeneration = useRef(0);
   const [view, setView] = useState<TaskView>("all");
+  // Tasks > "Anytime duties": the standing as-needed duties (templates), which have no dated task until started.
+  const [dutiesSelected, setDutiesSelected] = useState(false);
   const [kind, setKind] = useState<TaskWorkKindFilter>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -142,7 +144,7 @@ export function TaskTemplatesPage() {
   }, [authorized, requestFilters, kind, page, pageSize, view, tab]);
 
   const loadTemplates = useCallback(async () => {
-    if (!canManageTemplates || tab !== "templates") return;
+    if (!canManageTemplates || !(tab === "templates" || (tab === "tasks" && dutiesSelected))) return;
     setTemplatesLoading(true);
     setTemplatesError(null);
     const request = ++templatesGeneration.current;
@@ -154,7 +156,7 @@ export function TaskTemplatesPage() {
     } finally {
       if (request === templatesGeneration.current) setTemplatesLoading(false);
     }
-  }, [canManageTemplates, search, tab]);
+  }, [canManageTemplates, dutiesSelected, search, tab]);
 
   useEffect(() => { void loadSnapshot(); return () => { snapshotGeneration.current += 1; }; }, [loadSnapshot]);
   useEffect(() => { void loadTemplates(); return () => { templatesGeneration.current += 1; }; }, [loadTemplates]);
@@ -178,6 +180,9 @@ export function TaskTemplatesPage() {
       (!filters.user_profile_id || row.assignee_user_id === filters.user_profile_id)),
     [templates, filters.branch_id, filters.department_id, filters.user_profile_id],
   );
+
+  const dutyRows = useMemo(() => visibleTemplates.filter((row) => isOnDemandSchedule(row)), [visibleTemplates]);
+  const showDuties = tab === "tasks" && dutiesSelected && canManageTemplates;
 
   const run = async (row: TaskTemplateDirectoryRow, action: () => Promise<void>) => {
     setBusyId(row.id);
@@ -291,8 +296,8 @@ export function TaskTemplatesPage() {
   if (!authorized) return <Notice tone="danger">Task Control is available only to authorized leaders.</Notice>;
 
   // Review loads and reports its own data.
-  const loading = tab === "templates" ? templatesLoading : tab === "review" ? false : snapshotLoading;
-  const error = tab === "templates" ? templatesError : tab === "review" ? null : snapshotError;
+  const loading = tab === "templates" ? templatesLoading : tab === "review" ? false : snapshotLoading || (showDuties && templatesLoading);
+  const error = tab === "templates" ? templatesError : tab === "review" ? null : snapshotError ?? (showDuties ? templatesError : null);
 
   return (
     <section className="-m-4 min-h-[calc(100dvh-7.875rem)] bg-task-bg pb-24 text-task-text sm:-m-6 md:min-h-[calc(100vh-4rem)] md:pb-10">
@@ -386,7 +391,30 @@ export function TaskTemplatesPage() {
                 evidence={snapshot.evidence}
                 onPage={setPage}
                 onPageSize={(size) => { setPageSize(size); setPage(1); }}
-                onView={(next) => { setView(next); setPage(1); }}
+                onView={(next) => { setView(next); setPage(1); setDutiesSelected(false); }}
+                anytime={canManageTemplates ? {
+                  selected: showDuties,
+                  count: showDuties || templates.length ? dutyRows.length : null,
+                  onSelect: () => setDutiesSelected(true),
+                  content: (
+                    <div className="space-y-3">
+                      <p className="text-sm text-task-text-muted">
+                        Standing duties without a fixed time (As Required, Per Customer, After Visit and similar). Each person sees them under &quot;Anytime duties&quot; in My Tasks and starts one whenever it applies. Press &quot;Assign now&quot; to give one as high priority, &quot;Edit&quot; to change it, or &quot;Delete&quot; to remove it (open occurrences are removed; completed work is kept).
+                      </p>
+                      <TemplatesTab
+                        busyId={busyId}
+                        onDelete={remove}
+                        onEdit={(row) => void openEdit(row)}
+                        onSchedule={openSchedule}
+                        onToggle={toggle}
+                        onAssignNow={assignNow}
+                        onRunNow={runNow}
+                        rows={dutyRows}
+                        emptyText="No anytime duties match these filters."
+                      />
+                    </div>
+                  ),
+                } : undefined}
                 kind={kind}
                 onKind={(next) => { setKind(next); setPage(1); }}
                 page={page}

@@ -127,7 +127,7 @@ function GrantEditor({ context, people, onClose, onSaved }: { context: Franchise
     } catch (caught) { setError(errorText(caught, "Unable to grant scope.")); }
     finally { setBusy(false); }
   };
-  return <Modal onClose={onClose} title="Grant scope">
+  return <Modal onClose={onClose} title="Add extra scope">
     <form className="space-y-4" onSubmit={(event) => void submit(event)}>
       {error ? <Notice tone="danger">{error}</Notice> : null}
       <Field label="Employee"><select className="field" onChange={(event) => setProfileId(event.target.value)} value={profileId}><option value="">Choose…</option>{people.filter((person) => person.account_status === "active").map((person) => <option key={person.id} value={person.id}>{person.employee_name}</option>)}</select></Field>
@@ -139,7 +139,7 @@ function GrantEditor({ context, people, onClose, onSaved }: { context: Franchise
           {company ? null : <Field label="Franchise"><select className="field" onChange={(event) => setFranchiseId(event.target.value)} value={franchiseId}><option value="">Choose…</option>{context.franchises.filter((item) => item.is_active).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>}
         </>}
       <Field label="Reason"><input className="field" onChange={(event) => setReason(event.target.value)} required value={reason} /></Field>
-      <p className="text-xs text-soft-grey">Scope decides which franchise or stores the person covers. What they can do still comes from their role and permissions.</p>
+      <p className="text-xs text-soft-grey">Admin and HR already cover their own store&apos;s franchise automatically. Extra scope adds to that. What they can do still comes from their role and section access.</p>
       <div className="flex justify-end gap-2"><Button onClick={onClose} type="button" variant="secondary">Cancel</Button><Button disabled={busy} type="submit">{busy ? "Saving…" : "Grant"}</Button></div>
     </form>
   </Modal>;
@@ -217,12 +217,20 @@ export function FranchiseManager({ people, onChanged }: { people: readonly Perso
         </div>
 
         <div>
-          <div className="flex items-center justify-between gap-2"><h3 className="text-sm font-semibold text-champagne">Scope</h3><Button onClick={() => setEditor({ kind: "grant" })} type="button">Grant scope</Button></div>
+          <h3 className="text-sm font-semibold text-champagne">Scope</h3>
+          <p className="mt-1 text-xs text-soft-grey">Worked out automatically from each person&apos;s store: Admin and HR cover every store of their store&apos;s franchise, a store&apos;s manager covers that store, and everyone else sees their own store. Changing someone&apos;s store or role in Users moves it at once.</p>
+          <p className="mt-3 text-sm text-champagne">Automatic</p>
+          <ul className="mt-1 divide-y divide-gold/10">{context.automaticScopes.map((item) => <li className="py-2" key={item.userProfileId}>
+            <p className="text-sm text-white">{item.employeeName}</p><p className="text-xs text-soft-grey">{ORG_SCOPE_AUTHORITY_LABELS[item.authority]} · {franchiseName(item.franchiseGroupId)} (from {branchName(item.branchId)})</p>
+          </li>)}</ul>
+          {context.automaticScopes.length === 0 ? <p className="mt-1 text-sm text-soft-grey">Nobody yet. Admin and HR accounts appear here once their store is in a franchise.</p> : null}
+          <div className="mt-3 flex items-center justify-between gap-2"><p className="text-sm text-champagne">Extra scope (optional)</p><Button onClick={() => setEditor({ kind: "grant" })} type="button" variant="secondary">Add extra scope</Button></div>
+          <p className="text-xs text-soft-grey">Only for exceptions: the whole company, another franchise, or a Director who keeps the manager role.</p>
           <ul className="mt-2 divide-y divide-gold/10">{context.grants.map((grant) => <li className="flex items-center justify-between gap-2 py-2" key={grant.id}>
             <div><p className="text-sm text-white">{grant.employeeName}</p><p className="text-xs text-soft-grey">{ORG_SCOPE_AUTHORITY_LABELS[grant.authority]} · {grant.scopeLevel === "company" ? "Whole company" : grant.scopeLevel === "franchise" ? franchiseName(grant.franchiseGroupId) : branchName(grant.branchId)}</p></div>
             <Button aria-label={`Remove scope from ${grant.employeeName}`} className="h-9 min-h-9 px-2" onClick={() => void revoke(grant.id, grant.employeeName)} type="button" variant="ghost">Remove</Button>
           </li>)}</ul>
-          {context.grants.length === 0 ? <p className="mt-2 text-sm text-soft-grey">No scope granted yet. Store managers set on a store already count for that store.</p> : null}
+          {context.grants.length === 0 ? <p className="mt-2 text-sm text-soft-grey">No extra scope.</p> : null}
         </div>
 
         <div>
@@ -230,7 +238,7 @@ export function FranchiseManager({ people, onChanged }: { people: readonly Perso
           <ul className="mt-2 space-y-1 text-sm text-soft-grey">
             <li>{readiness.mappingsComplete ? "Every active store has a franchise." : `Stores without a franchise: ${readiness.unmappedActiveBranches.map((item) => item.name).join(", ")}`}</li>
             {readiness.exhibitionLikeBranches.length ? <li>Exhibitions (no franchise needed): {readiness.exhibitionLikeBranches.map((item) => `${item.name} (${franchiseName(item.franchiseGroupId)})`).join(", ")}</li> : null}
-            {readiness.leadersWithoutScope.length ? <li>Leaders who would see only their own store: {readiness.leadersWithoutScope.map((item) => item.employeeName).join(", ")}</li> : null}
+            {readiness.leadersWithoutScope.length ? <li>Leaders who would see only their own store (their store has no franchise, or their role covers one store): {readiness.leadersWithoutScope.map((item) => item.employeeName).join(", ")}</li> : null}
             {Object.entries(readiness.recordsWithoutBranch).filter(([, value]) => value > 0).map(([key, value]) => <li key={key}>{RECORD_LABELS[key] ?? key} with no store: {value} (company scope only once isolation is on)</li>)}
             {readiness.usersDepartmentBranchMismatch ? <li>Employees whose department belongs to another store: {readiness.usersDepartmentBranchMismatch}</li> : null}
           </ul>

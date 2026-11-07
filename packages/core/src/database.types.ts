@@ -14966,6 +14966,8 @@ export type Database = {
         }
       }
       get_franchise_admin_context: { Args: never; Returns: Json }
+      get_section_access_matrix: { Args: never; Returns: Json }
+      save_section_access_bulk_with_audit: { Args: { p_changes: Json }; Returns: Json }
       get_franchise_audit_history: { Args: { p_limit: number }; Returns: Json }
       get_franchise_branch_counts: { Args: never; Returns: Json }
       get_franchise_module_coverage: { Args: never; Returns: Json }

@@ -284,9 +284,14 @@ select is((select count(*)::int from task_instances where title = 'Help at Andhe
 update org_scope_grants set revoked_at = now(), revoked_by = pg_temp.p('sa') where user_profile_id = pg_temp.p('adm_ahd');
 set local role authenticated;
 select pg_temp.login('adm_ahd');
-select ok(not ((task_workspace_page('{"subsection":"all","mode":"explore"}', 0, 50)->'ids') @> to_jsonb(array[pg_temp.r('t_ahd2')])),
-  'a revoked Regional Admin loses the franchise and keeps only their own store (AHD1)');
+-- 0390: an Admin covers their own store's franchise automatically, so revoking
+-- the grant keeps it; the franchise goes once the role no longer confers it.
+select ok((task_workspace_page('{"subsection":"all","mode":"explore"}', 0, 50)->'ids') @> to_jsonb(array[pg_temp.r('t_ahd2')]),
+  'a revoked Regional Admin with the Admin role keeps their franchise automatically (0390)');
 reset role;
+update user_profiles set user_role = 'staff' where id = pg_temp.p('adm_ahd');
+select is(org_scope_branch_ids(pg_temp.p('adm_ahd'), false), array[pg_temp.b('AHD1')],
+  'without the grant and without an Admin role the person keeps only their own store (AHD1)');
 
 select * from finish();
 rollback;

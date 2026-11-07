@@ -23,6 +23,7 @@ const admin = {
       { id: "expo", name: "Exhibition", code: "EXPO", city: null, isActive: true, franchiseGroupId: null, locationKind: "store" as const, managerId: null },
     ],
     grants: [{ id: "g1", userProfileId: "p1", employeeName: "Asha", authority: "director" as const, scopeLevel: "franchise" as const, franchiseGroupId: "mum", branchId: null, reason: "x" }],
+    automaticScopes: [{ userProfileId: "p3", employeeName: "Meera", authority: "hr" as const, franchiseGroupId: "mum", branchId: "bandra" }],
   },
   readiness: {
     enforcementEnabled: false, enforcementSupported: false, mappingsComplete: false,
@@ -55,10 +56,16 @@ describe("FranchiseManager", () => {
     render(<FranchiseManager people={people} />);
     expect(await screen.findByText(/Stores without a franchise: Exhibition/)).toBeTruthy();
     expect(screen.getByText("Off")).toBeTruthy();
-    expect(screen.getByText(/Leaders who would see only their own store: Ravi/)).toBeTruthy();
+    expect(screen.getByText(/Leaders who would see only their own store (.*): Ravi/)).toBeTruthy();
     expect(screen.getByText(/Tasks with no store: 3/)).toBeTruthy();
     expect(screen.queryByText(/Clients \(old CRM tables\) with no store/)).toBeNull();
     expect(screen.getByText(/Director · Mumbai/)).toBeTruthy();
+  });
+
+  it("lists automatic franchise scope from each person's store without a grant", async () => {
+    render(<FranchiseManager people={people} />);
+    expect(await screen.findByText("Meera")).toBeTruthy();
+    expect(screen.getByText("HR · Mumbai (from Bandra)")).toBeTruthy();
   });
 
   it("maps a store through the audited API with its location type and reason", async () => {
@@ -102,7 +109,7 @@ describe("FranchiseManager", () => {
   it("shows the server's reason when a grant is refused", async () => {
     api.grantScope.mockRejectedValue(new Error("Grant scope: This scope is already granted"));
     render(<FranchiseManager people={people} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Grant scope" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Add extra scope" }));
     fireEvent.change(screen.getByLabelText("Employee"), { target: { value: "p1" } });
     fireEvent.change(screen.getByLabelText("Franchise"), { target: { value: "mum" } });
     fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "Director" } });
