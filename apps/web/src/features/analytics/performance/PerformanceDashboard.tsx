@@ -227,31 +227,19 @@ function Lifecycle({ data, onOpen }: { data: PerformancePayload; onOpen: Open })
   const d = performanceScores(s);
   const reconciled = performanceReconciles(s);
   return (
-    <div className="grid gap-4 xl:grid-cols-[1.25fr_1fr_1fr]">
-      <Panel description="Every assignment due in the period, in exactly one row." title="Task work lifecycle">
-        <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
-          <div>
-            <p className="mb-1 px-2 text-[0.6875rem] font-semibold uppercase tracking-wider text-task-text-muted">Total</p>
-            <Line label="Assigned" onClick={() => onOpen("assigned", "All assigned work", d.assigned)} strong value={d.assigned} />
-            <Line label="Completed" onClick={() => onOpen("completed", "Completed work", d.completed)} tone="completed" value={d.completed} />
-            <Line label="Remaining" onClick={() => onOpen("remaining", "Work not completed", d.remaining)} tone="remaining" value={d.remaining} />
-            <Line label={`${TASK_PENDING_SCORE_LABEL} %`} value={formatTaskPerformanceScore(d.pendingScore)} />
-          </div>
-          <div>
-            <p className="mb-1 px-2 text-[0.6875rem] font-semibold uppercase tracking-wider text-task-text-muted">Completion</p>
-            <Line label="Completed" onClick={() => onOpen("completed", "Completed work", d.completed)} strong value={d.completed} />
-            <Line label="On time" onClick={() => onOpen("on_time", "Completed on time", d.onTime)} tone="on_time" value={d.onTime} />
-            <Line label="Late" onClick={() => onOpen("late", "Completed late", d.late)} tone="late" value={d.late} />
-            {d.untimed ? <Line label="No completion time" onClick={() => onOpen("completed_untimed", "Completed without a recorded time", d.untimed)} tone="completed_untimed" value={d.untimed} /> : null}
-            <Line label={`${TASK_DELAYED_SCORE_LABEL} %`} value={formatTaskPerformanceScore(d.delayedScore)} />
-          </div>
-          <div>
-            <p className="mb-1 px-2 text-[0.6875rem] font-semibold uppercase tracking-wider text-task-text-muted">Pending and overdue</p>
-            <Line label="Pending, not overdue" onClick={() => onOpen("pending", "Pending, not overdue", d.pending)} tone="pending" value={d.pending} />
-            <Line label="In progress" onClick={() => onOpen("in_progress", "In progress or in review", d.inProgress)} tone="in_progress" value={d.inProgress} />
-            <Line label="Overdue" onClick={() => onOpen("overdue", "Overdue work", d.overdue)} tone="overdue" value={d.overdue} />
-            <Line label="Total remaining" onClick={() => onOpen("remaining", "Work not completed", d.remaining)} strong value={d.remaining} />
-          </div>
+    <div className="grid items-start gap-4 lg:grid-cols-2">
+      <Panel className="lg:col-span-2" description="Every assignment due in the period, in exactly one row." title="Task work lifecycle">
+        <div className="overflow-x-auto">
+          <table aria-label="Task work lifecycle" className="w-full text-left text-sm tabular-nums">
+            <thead><tr className="border-b border-task-border text-xs text-task-text-muted">
+              {["Assigned", "Completed", "On time", "Late", ...(d.untimed ? ["No completion time"] : []), "Pending, not overdue", "In progress", "Overdue", "Remaining", `${TASK_PENDING_SCORE_LABEL} %`, `${TASK_DELAYED_SCORE_LABEL} %`].map((label) => <th className="min-w-28 px-3 py-3 font-medium align-bottom" key={label} scope="col">{label}</th>)}
+            </tr></thead>
+            <tbody><tr>
+              {([["assigned", "All assigned work", d.assigned], ["completed", "Completed work", d.completed], ["on_time", "Completed on time", d.onTime], ["late", "Completed late", d.late], ...(d.untimed ? [["completed_untimed", "Completed without a recorded time", d.untimed] as const] : []), ["pending", "Pending, not overdue", d.pending], ["in_progress", "In progress or in review", d.inProgress], ["overdue", "Overdue work", d.overdue], ["remaining", "Work not completed", d.remaining]] as const).map(([selector, label, count]) => <td className="px-3 py-3" key={selector}><button className="min-h-10 rounded-lg px-2 font-semibold hover:bg-task-muted focus-visible:outline-task-accent" onClick={() => onOpen(selector, label, count)} type="button">{count.toLocaleString("en-IN")}<span className="sr-only"> {label}</span></button></td>)}
+              <td className="px-3 py-3 font-semibold text-task-overdue">{formatTaskPerformanceScore(d.pendingScore)}</td>
+              <td className="px-3 py-3 font-semibold text-task-overdue">{formatTaskPerformanceScore(d.delayedScore)}</td>
+            </tr></tbody>
+          </table>
         </div>
         <p className={`mt-3 rounded-lg px-3 py-2 text-xs ${reconciled ? "bg-success/10 text-task-text" : "bg-task-overdue/10 text-task-overdue"}`}>
           {reconciled
@@ -403,7 +391,7 @@ function Comparisons({ data, filter, onOpen, onGranularity }: { data: Performanc
   };
 
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
+    <div className="grid items-start gap-4 xl:grid-cols-2">
       <Panel description={`Assigned work by deadline (${data.granularity}). Cohort measure: each bar is work due in that ${data.granularity}, split by its outcome now.`} title="Task trend">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <Legend items={[["on_time", "On time"], ["late", "Late"], ["completed_untimed", "No completion time"], ["remaining", "Remaining"]]} />

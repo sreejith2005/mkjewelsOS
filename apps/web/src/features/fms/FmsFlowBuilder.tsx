@@ -24,7 +24,7 @@ import { readAppFmsClipboard, readFmsClipboard, writeFmsClipboard } from "./clip
 import { FmsImportSectionDialog } from "./FmsImportSectionDialog";
 import { FmsQuestionnairePreview, FmsQuestionnaireStudio } from "./FmsQuestionnaireStudio";
 import { FmsWorkflowTransfer, type FmsImportRequest } from "./FmsWorkflowTransfer";
-import { blankQuestionnaire, discardQuestionnaireDraft } from "./questionnaire";
+import { blankQuestionnaire } from "./questionnaire";
 import { loadFmsFlowReport } from "@jewelos/data/fms/outcomes";
 
 function issueControlSelector(code: string, message: string): string {
@@ -410,10 +410,11 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
     preview: () => setPreviewKey(stage.key),
     discardDraft: () => {
       const draftId = stage.sla.questionnaire?.draftFormId;
-      if (!draftId || !window.confirm("Discard the unpublished questionnaire changes for this step? The version in use stays.")) return;
+      if (!draftId || !window.confirm("Discard the unpublished questionnaire changes for this step? The version in use stays. The draft form is kept in Forms.")) return;
       setBusy("form"); setError(null);
-      void discardQuestionnaireDraft(draftId)
-        .then(() => updateStageAndSave(stage.key, (item) => ({ ...item, sla: { ...item.sla, questionnaire: item.formTemplateId && item.sla.questionnaire?.origin ? { origin: item.sla.questionnaire.origin } : undefined } })))
+      // Keep the abandoned draft, but edit a private copy next time: revising
+      // the pinned family would conflict with the draft we deliberately kept.
+      void updateStageAndSave(stage.key, (item) => ({ ...item, sla: { ...item.sla, questionnaire: item.formTemplateId ? { origin: "copied" } : undefined } }))
         .then(() => setSuccess("Questionnaire changes discarded"))
         .catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not discard the draft"))
         .finally(() => setBusy(null));
@@ -482,6 +483,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
     {studio && studioStage ? <FmsQuestionnaireStudio
       data={data}
       onClose={() => setStudio(null)}
+      onForgetDraft={() => updateStageAndSave(studioStage.key, (stage) => ({ ...stage, sla: { ...stage.sla, questionnaire: stage.formTemplateId ? { origin: "copied" } : undefined } }))}
       onDraftAttached={(draftId) => updateStageAndSave(studioStage.key, (stage) => ({ ...stage, sla: { ...stage.sla, questionnaire: { origin: "stage", draftFormId: draftId } } }))}
       onUse={async (formId) => {
         await updateStageAndSave(studioStage.key, (stage) => ({ ...stage, formTemplateId: formId, sla: { ...stage.sla, formSectionKey: undefined, questionnaire: { origin: "stage" } } }));

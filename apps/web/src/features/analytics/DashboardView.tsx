@@ -27,7 +27,7 @@ export function DashboardView(){
  useEffect(()=>{const restore=()=>setSection(dashboardSectionFromSearch(window.location.search));window.addEventListener("popstate",restore);return()=>window.removeEventListener("popstate",restore);},[]);
  const choose=(next:DashboardSection)=>{if(next===section)return;window.history.pushState({},"",`${window.location.pathname}?view=${next}`);setSection(next);};
  const crmAllowed=!!access&&hasPermission(access,"crm.view");
- return <section className="-m-4 min-h-screen bg-task-muted p-4 text-task-text sm:-m-6 sm:p-6"><div className="mx-auto max-w-[110rem] space-y-4">
+ return <section className="-m-4 min-h-screen bg-task-muted p-4 text-task-text sm:-m-6 sm:p-6"><div className="w-full min-w-0 space-y-4">
   <nav aria-label="Dashboard sections" className="flex gap-1 border-b border-task-border">
    {([["performance","Employee performance"],["insights","Management insights"]] as const).map(([id,label])=><button aria-current={section===id?"page":undefined} className={`-mb-px min-h-11 border-b-2 px-4 text-sm transition-colors ${section===id?"border-task-accent font-semibold text-task-text":"border-transparent text-task-text-muted hover:text-task-text"}`} key={id} onClick={()=>choose(id)} type="button">{label}</button>)}
   </nav>

@@ -85,7 +85,7 @@ export function FormsPage() {
   const list = !data ? <div className="grid gap-2"><div className="skeleton h-16 rounded-xl" /><div className="skeleton h-16 rounded-xl" /><div className="skeleton h-16 rounded-xl" /></div>
     : tab === "templates" ? <Library {...libraryActions} emptyText={fmsSource ? "No FMS workflow forms match. Forms built inside an FMS step appear here." : source === "crm" ? "No CRM forms match these filters." : "No forms match these filters."} families={shownFamilies} inlineDetails={!sidePanel} onSelect={(id) => { setSelectedFamily(id); revealPageDetail(detailsRef.current); }} searching={query.trim() !== ""} selectedId={selectedId} workflowGroups={fmsSource ? workflowGroups : undefined} />
     : <SubmissionList bundles={data.bundles} onView={setView} submissions={data.submissions} />;
-  return <><section className="mx-auto w-full max-w-[100rem]">
+  return <><section className="flex min-h-[calc(100dvh-10rem)] w-full flex-col">
     <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
       <div className="min-w-0"><h1 className="font-display text-[1.75rem] font-semibold leading-tight text-gold-secondary sm:text-[2rem]">Forms Library</h1>{author ? null : <p className="mt-0.5 text-sm text-soft-grey">Pick a form, answer the questions, and press Submit.</p>}</div>
       <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
@@ -105,9 +105,9 @@ export function FormsPage() {
       {built && sourceNote ? <p className="px-1 text-xs leading-relaxed text-task-text-muted">{sourceNote}</p> : null}
     </div> : null}
     {error ? <div className="mb-4"><Notice tone="danger">{error === "Publish form: Form version is pinned by an active FMS stage" ? "This version is in an active FMS stage. Use Publish as separate form to preserve in-progress work and publish your edited copy." : error} <button className="underline" onClick={() => void refresh()} type="button">Retry</button></Notice></div> : null}
-    {sidePanel && data ? <div className="-mx-4 grid grid-cols-[minmax(0,1fr)_minmax(22rem,30rem)] border-y border-task-border sm:-mx-6">
+    {sidePanel && data ? <div className="grid flex-1 items-start gap-4 rounded-2xl border border-task-border bg-task-bg p-3 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)] sm:p-4">
       <div className="min-w-0">{list}</div>
-      <aside aria-label="Selected form" ref={detailsRef} className="min-w-0 scroll-mt-32 border-l border-task-border p-4 sm:p-5">
+      <aside aria-label="Selected form" ref={detailsRef} className="min-w-0 scroll-mt-32 rounded-xl border border-task-border p-4">
         {selectedVersions ? <><div className="mb-3 flex items-start gap-3"><span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-xl bg-gold/10 text-gold-secondary"><FileText className="size-5" /></span><div className="min-w-0"><h2 className="break-words text-lg font-semibold leading-snug text-task-text">{selectedVersions[0]!.name}</h2><p className="text-xs text-task-text-muted">{plural(selectedVersions.length, "version")}</p></div></div><FormFamilyDetails {...libraryActions} placeText={fmsPlaceText(undefined, built?.get(selectedVersions[0]!.family_id))} versions={selectedVersions} /></> : <p className="text-sm text-task-text-muted">Select a form to see its versions and actions.</p>}
       </aside>
     </div> : list}
@@ -157,7 +157,7 @@ function FormLibraryList({ families, place, emptyText, selectedId, onSelect, inl
   // inlineDetails: the row opens the full-screen details view instead of the side pane.
   if (families.length === 0) return <Notice>{emptyText}</Notice>;
   const { author, built, onFill, onEdit } = actions;
-  return <div className={inlineDetails && !place ? "-mx-4 border-y border-task-border bg-task-bg sm:-mx-6" : inlineDetails ? "overflow-hidden rounded-xl border border-task-border bg-task-bg" : ""}><ul className="divide-y divide-task-border border-b border-task-border">{families.map((versions) => {
+  return <div className={cn("rounded-2xl bg-task-bg p-2", !place && "min-h-[calc(100dvh-20rem)]")}><ul className="grid items-start gap-3 sm:grid-cols-2 2xl:grid-cols-3">{families.map((versions) => {
     const latest = versions[0]!;
     const live = versions.find((item) => item.lifecycle === "published");
     const shown = live ?? latest;
@@ -167,13 +167,13 @@ function FormLibraryList({ families, place, emptyText, selectedId, onSelect, inl
     const draft = versions.find((item) => item.lifecycle === "draft");
     const submissions = versions.reduce((total, item) => total + (item.submissionCount ?? 0), 0);
     const selected = selectedId === latest.family_id;
-    return <li key={latest.family_id}><article className={cn("transition-colors", selected && "bg-gold/5")}>
-      <div className="relative flex min-h-16 items-center gap-3 px-3 py-2.5 sm:px-4">
+    return <li key={latest.family_id}><article className={cn("h-full rounded-xl border border-task-border transition-colors hover:border-gold/50", selected && "bg-gold/5")}>
+      <div className="relative flex h-full flex-wrap items-start gap-3 p-4">
         <span aria-hidden="true" className={cn("hidden size-9 shrink-0 place-items-center rounded-lg sm:grid", selected ? "bg-gold/20 text-gold-secondary" : "bg-gold/10 text-gold-secondary")}><FileText className="size-4" /></span>
-        {author ? <div className="group min-w-0 flex-1">
+        {author ? <div className="group min-w-0 basis-[calc(100%-4rem)] flex-1">
           <FormRowText badge={badge} draft={!!draft && draft !== shown} latest={latest} placeText={placeText} questionCount={questionCount(shown)} sharedWith={where?.sharedWith} submissions={submissions} versions={versions.length}>
-            {/* The whole row opens the form's versions; the heading's button carries the name for assistive tech. */}
-            <button aria-haspopup={inlineDetails ? "dialog" : undefined} aria-pressed={inlineDetails ? undefined : selected} className="min-w-0 truncate text-left after:absolute after:inset-0 after:content-[''] focus-visible:ring-offset-task-bg" onClick={() => onSelect(latest.family_id)} title="Show versions and actions" type="button">{latest.name}</button>
+            {/* The tile opens the editor; explicit actions sit above its stretched hit area. */}
+            <button className="min-w-0 break-words text-left after:absolute after:inset-0 after:content-[''] focus-visible:ring-offset-task-bg" onClick={() => shown.lifecycle === "archived" ? onSelect(latest.family_id) : onEdit(draft ?? shown)} title={shown.lifecycle === "archived" ? "Show versions and actions" : "Open form builder"} type="button">{latest.name}</button>
           </FormRowText>
         </div> : <div className="min-w-0 flex-1">
           <h2 className="break-words text-[15px] font-semibold leading-snug text-task-text">{latest.name}</h2>
@@ -182,7 +182,7 @@ function FormLibraryList({ families, place, emptyText, selectedId, onSelect, inl
         </div>}
         {live ? <Button className="relative z-10 min-h-10 shrink-0 px-3" onClick={() => onFill(live)} type="button"><Send className="size-4" /><span className="hidden sm:inline">Fill form</span><span className="sr-only sm:hidden">Fill form</span></Button>
           : author && draft ? <Button className="relative z-10 min-h-10 shrink-0 px-3" onClick={() => onEdit(draft)} type="button" variant="secondary"><Pencil className="size-4" /><span className="hidden sm:inline">Edit draft</span><span className="sr-only sm:hidden">Edit draft</span></Button> : null}
-        {author ? <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-task-text-muted" /> : null}
+        {author ? <Button aria-label={`Versions and actions for ${latest.name}`} className="relative z-10 min-h-10 px-3" onClick={() => onSelect(latest.family_id)} type="button" variant="ghost"><History className="size-4" />Versions & actions</Button> : null}
       </div>
     </article></li>;
   })}</ul></div>;

@@ -57,13 +57,14 @@ export function Donut({
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
   const visible = segments.filter((s) => s.value > 0);
+  const concentrated = total > 0 && visible.some((segment) => segment.value / total >= 0.9);
   const gap = visible.length > 1 ? 2 : 0;
   let offset = 0;
   const shown = hover ?? null;
 
   return (
     <figure className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
-      <div className="relative shrink-0" style={{ width: size, height: size }}>
+      {!concentrated ? <div className="relative shrink-0" style={{ width: size, height: size }}>
         <svg aria-label={`${title}: ${segments.map((s) => `${s.label} ${s.value}`).join(", ")} of ${total}`} height={size} role="img" viewBox={`0 0 ${size} ${size}`} width={size}>
           <defs>
             <pattern height="6" id={`${id}-hatch-overdue`} patternTransform="rotate(45)" patternUnits="userSpaceOnUse" width="6">
@@ -117,21 +118,22 @@ export function Donut({
           <span className="text-2xl font-semibold tabular-nums">{(shown ? shown.value : total).toLocaleString("en-IN")}</span>
           <span className="max-w-[6.5rem] text-[0.6875rem] leading-tight text-task-text-muted">{shown ? `${shown.label} · ${pct(shown.value, total)}` : centerLabel}</span>
         </div>
-      </div>
+      </div> : null}
       <ul className="grid w-full min-w-0 gap-1">
         {segments.map((segment) => (
           <li key={segment.key}>
             <button
-              className="flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-sm hover:bg-task-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-task-accent"
+              className="flex min-h-11 w-full flex-wrap items-center gap-2 rounded-lg px-2 py-2 text-left text-sm hover:bg-task-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-task-accent"
               onClick={() => onSelect(segment.key)}
               onMouseEnter={() => setHover(segment.value > 0 ? segment : null)}
               onMouseLeave={() => setHover(null)}
               type="button"
             >
               <span aria-hidden className="size-3 shrink-0 rounded-sm" style={swatchStyle(segment.key)} />
-              <span className="min-w-0 flex-1 truncate">{segment.label}</span>
+              <span className="min-w-0 flex-1 break-words">{segment.label}</span>
               <span className="tabular-nums font-medium">{segment.value.toLocaleString("en-IN")}</span>
               <span className="w-14 text-right text-xs tabular-nums text-task-text-muted">{pct(segment.value, total)}</span>
+              {concentrated ? <span aria-hidden className="h-2 w-full overflow-hidden rounded-full bg-task-muted"><span className="block h-full" style={{ ...swatchStyle(segment.key), width: `${segment.value / total * 100}%` }} /></span> : null}
             </button>
           </li>
         ))}
@@ -176,7 +178,7 @@ export function StackedBars({
       {rows.map((row) => {
         const total = row.segments.reduce((sum, s) => sum + s.value, 0);
         return (
-          <li className="grid grid-cols-[minmax(6rem,11rem)_1fr_2.75rem] items-center gap-3" key={row.id}>
+          <li className="grid grid-cols-[minmax(6rem,11rem)_1fr_2.75rem] items-center gap-3 rounded-lg border border-task-border p-3" key={row.id}>
             <span className="min-w-0">
               <span className="block truncate text-sm font-medium" title={row.label}>{row.label}</span>
               {row.sublabel ? <span className="block truncate text-[0.6875rem] text-task-text-muted">{row.sublabel}</span> : null}
@@ -195,6 +197,9 @@ export function StackedBars({
               ))}
             </span>
             <span className="text-right text-xs tabular-nums text-task-text-muted">{total}</span>
+            <span className="col-span-3 flex flex-wrap gap-x-4 gap-y-1">
+              {row.segments.filter((segment) => segment.value > 0).map((segment) => <button className="inline-flex min-h-9 items-center gap-1.5 rounded px-1 text-xs hover:bg-task-muted focus-visible:outline-task-accent" key={segment.key} onClick={() => onSelect(row.id, segment.key)} type="button"><span aria-hidden className="size-2 rounded-sm" style={swatchStyle(segment.key)} />{segment.label}: <strong className="tabular-nums">{segment.value.toLocaleString("en-IN")}</strong><span className="text-task-text-muted">({pct(segment.value, total)})</span></button>)}
+            </span>
           </li>
         );
       })}

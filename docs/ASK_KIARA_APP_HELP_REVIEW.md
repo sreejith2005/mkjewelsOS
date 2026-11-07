@@ -320,3 +320,8 @@ Kiara tool decision: no new read tool. Configuration/navigation extends existing
 2026-11-02 bulk reassign (0369): Task Control Tasks tab **Reassign selected** and **Reassign all open work**; Users **Reassign tasks**. Server `task_reassignment_candidates` + `reassign_task_work_with_audit` (View all tasks permission). No new Kiara read tool: task assignment is already visible through the existing task reads, and Kiara cannot reassign anything.
 
 2026-11-05 forms and task counts: successful form submission closes the form and shows a brief confirmation notice, returning to the originating library view, task subsection or workflow board. Unloaded status counts show a loading indicator. Subsection badges load with each destination's default date and team scope; FMS board filters do not replace the whole FMS subsection count. No new Kiara read tool is needed: existing section reads and submission contracts are reused.
+
+### Dashboard and library layout (2026-11-06)
+- [ ] Dashboard uses available width. Task work lifecycle is a table with both score columns on the right. Concentrated distributions show labeled bars; comparisons show exact counts and percentages.
+- [ ] Forms and FMS use responsive tiles in a full-height workspace. Authors open the builder by clicking a form tile; Fill form remains separate. Versions & actions opens visibility, history and management actions.
+- [ ] Questionnaire recovery: Remove unavailable draft link removes only the draft reference, retaining the pinned form and answers. An already published draft offers Use in workflow to finish attachment. Valid drafts still require publication. Discard detaches the draft and keeps its form; the next edit uses a private copy. No new Kiara read tool is needed.

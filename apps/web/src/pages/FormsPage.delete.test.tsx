@@ -49,7 +49,7 @@ const openDeleteDialog = async () => {
   mocks.formDeletionImpact.mockResolvedValue(impact);
   const user = userEvent.setup();
   render(<FormsPage />);
-  await user.click(await screen.findByRole("button", { name: "Enquiry" }));
+  await user.click(await screen.findByRole("button", { name: "Versions and actions for Enquiry" }));
   await user.click(await screen.findByRole("button", { name: /Delete/ }));
   return user;
 };
@@ -100,7 +100,7 @@ describe("Deleting a form that is in use", () => {
     const user = userEvent.setup();
     render(<FormsPage />);
 
-    await user.click(await screen.findByRole("button", { name: "Enquiry" }));
+    await user.click(await screen.findByRole("button", { name: "Versions and actions for Enquiry" }));
     await user.click(await screen.findByRole("button", { name: /Delete/ }));
 
     expect(await screen.findByText(/Nobody has filled this form in/)).toBeTruthy();
@@ -126,7 +126,7 @@ describe("Opening the Forms workspace", () => {
     render(<FormsPage />);
 
     // Versions and their actions open from the form's row.
-    await user.click(await screen.findByRole("button", { name: "Enquiry" }));
+    await user.click(await screen.findByRole("button", { name: "Versions and actions for Enquiry" }));
     await user.click(await screen.findByRole("button", { name: "Edit" }));
 
     expect(mocks.reviseForm).not.toHaveBeenCalled();
@@ -141,7 +141,7 @@ describe("Opening the Forms workspace", () => {
     const user = userEvent.setup();
     render(<FormsPage />);
 
-    await user.click(await screen.findByRole("button", { name: "Enquiry" }));
+    await user.click(await screen.findByRole("button", { name: "Versions and actions for Enquiry" }));
     await user.click(await screen.findByRole("button", { name: "Create new version" }));
 
     expect(mocks.reviseForm).toHaveBeenCalledWith("enquiry");
