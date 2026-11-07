@@ -1,5 +1,5 @@
 import { supabase, type Json } from "@jewelos/api-client";
-import type { FmsStartTrigger, FmsTriggerRuleResult, FmsTriggerSourceType } from "@jewelos/core";
+import { parseFmsBuiltForms, type FmsStartTrigger, type FmsTriggerRuleResult, type FmsTriggerSourceType } from "@jewelos/core";
 
 /** Start trigger RPCs (migration 0374). The database evaluates; these only read results back. */
 
@@ -138,4 +138,15 @@ export async function loadCrmFormFamilies(): Promise<CrmFormFamilies> {
     if (family && (purpose === "queue" || purpose === "lead" || purpose === "walkin")) families[purpose] = family;
   }
   return families;
+}
+
+/**
+ * Form families built inside FMS workflow steps (list_fms_built_forms, the list Forms Library uses
+ * for "FMS workflow forms"). The trigger picker leaves them out. If the list cannot be read, it
+ * returns none and every form stays offered.
+ */
+export async function loadFmsStepFormFamilies(): Promise<ReadonlySet<string>> {
+  const { data, error } = await supabase.rpc("list_fms_built_forms");
+  if (error) return new Set();
+  return new Set(parseFmsBuiltForms(data).keys());
 }
