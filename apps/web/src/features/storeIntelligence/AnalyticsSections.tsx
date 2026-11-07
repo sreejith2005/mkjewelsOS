@@ -1,8 +1,5 @@
 import { useState, type ReactNode } from "react";
-import {
-  SI_CATEGORY_LABEL, SI_DEFINITIONS, SI_ELEMENT_LABEL, SI_PRICE_BAND_LABEL, SI_PRICE_BANDS, SI_RANK_METRIC_LABEL, SI_SIGNAL_LABEL, SI_TIER_LABEL, siBranchActions, siChange,
-  siCorrelationText, siOpportunity, siRank, siRate, siRateText, siSlotKey, siTier, type SiAnalytics, type SiBranchRow, type SiEmployeeRow, type SiRankMetric, type SiTier,
-} from "@jewelos/core";
+import { SI_CATEGORY_LABEL, SI_DEFINITIONS, SI_ELEMENT_LABEL, SI_PRICE_BAND_LABEL, SI_PRICE_BANDS, SI_RANK_METRIC_LABEL, SI_SIGNAL_LABEL, SI_TIER_LABEL, siBranchActions, siChange, siCorrelationText, siOpportunity, siRank, siRate, siRateText, siSlotKey, siTier, type SiAnalytics, type SiBranchRow, type SiEmployeeRow, type SiRankMetric, type SiTier } from "@jewelos/core/salesScore/analytics";
 import { Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { BreakdownList, dailyPoints, dayLabel, Figure, Heatmap, incompleteNote, Scatter, scoreText, useDrill, type DrillTarget } from "./analyticsUi";

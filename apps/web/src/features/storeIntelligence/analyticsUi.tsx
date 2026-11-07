@@ -1,9 +1,8 @@
 import { createContext, useContext, useId, useState, type ReactNode } from "react";
 import { Info } from "lucide-react";
-import {
-  formatDuration, istTime, OUTCOME_LABEL, SI_CRM_CLASS_LABEL, SI_DOW_LABEL, SI_TIMEZONE, type SiAnalytics, type SiChange, type SiDefinition, type SiServerFilters, type SiSessionRow,
-} from "@jewelos/core";
-import { fetchSiSessions, type SiCursor } from "@jewelos/data";
+import { formatDuration, istTime, OUTCOME_LABEL } from "@jewelos/core";
+import { SI_CRM_CLASS_LABEL, SI_DOW_LABEL, SI_TIMEZONE, type SiAnalytics, type SiChange, type SiDefinition, type SiServerFilters, type SiSessionRow } from "@jewelos/core/salesScore/analytics";
+import { fetchSiSessions, type SiCursor } from "@jewelos/data/recordingAnalytics";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import type { ChartPoint } from "./charts";
