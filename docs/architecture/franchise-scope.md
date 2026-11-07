@@ -12,7 +12,7 @@ Owner decisions (2026-11-06):
 - Exhibitions are temporary event locations (a new one most months), not
   stores. They need no franchise and never block activation; their work
   reaches the people who do it, and Super Admin sees everything.
-- Roles are set in Users. Since 0390 (owner request 2026-11-07) the franchise
+- Roles are set in Users. Since 0393 (owner request 2026-11-07) the franchise
   comes from the person's own store: Admin and HR cover their store's
   franchise automatically (see "Automatic scope" below). Users > Franchises >
   Add extra scope (formerly Grant scope) is only for exceptions.
@@ -60,7 +60,7 @@ Company (tenant) -> Franchise group -> Branch (store / exhibition / office / war
 A permission override never widens data scope: scope comes only from grants,
 `manager_id` and the person's own branch.
 
-## Automatic scope (migration 0390)
+## Automatic scope (migration 0393, numbered 0390 before deploy)
 
 `org_automatic_scope(profile)` derives one franchise authority from the
 person's effective role (dashboard authority, else role) and the franchise of
@@ -83,7 +83,7 @@ Director who keeps the manager role, store access). The Franchises panel lists
 it under **Automatic**; readiness no longer flags a covered leader. Mirror:
 `automaticScopeAuthority()` / `resolveOrgScope()` in
 `packages/core/src/organization/franchiseScope.ts`. Tests:
-`supabase/tests/0390_automatic_franchise_scope_and_section_matrix.test.sql`.
+`supabase/tests/0393_automatic_franchise_scope_and_section_matrix.test.sql`.
 
 ## Scope authorities (`org_scope_grants`)
 

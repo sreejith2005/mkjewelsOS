@@ -190,7 +190,7 @@ export async function saveDepartmentPermissions(departmentId: string, changes: O
   if (error) throw error;
 }
 
-/** One employee in Users > Section access (all employees), migration 0390. */
+/** One employee in Users > Section access (all employees), migration 0393. */
 export type SectionAccessMatrixUser = Readonly<{
   id: string;
   employeeName: string;

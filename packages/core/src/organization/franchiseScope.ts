@@ -43,7 +43,7 @@ export function isBranchLocationKind(value: unknown): value is BranchLocationKin
 }
 
 /**
- * Mirrors `org_automatic_scope()` (migration 0390): the franchise authority a
+ * Mirrors `org_automatic_scope()` (migration 0393): the franchise authority a
  * person's own effective role (dashboard authority, else role) confers through
  * the franchise of their own store. Admin -> Regional Admin, HR -> HR; any other
  * role confers nothing (a store manager comes from the store's manager).
@@ -75,7 +75,7 @@ export type ScopeActor = Readonly<{
   active: boolean;
   /** Super Admin dashboard authority. */
   superAdmin: boolean;
-  /** Effective role (dashboard authority, else role); Admin and HR cover their store's franchise (0390). */
+  /** Effective role (dashboard authority, else role); Admin and HR cover their store's franchise (0393). */
   effectiveRole?: string | null;
   grants: readonly OrgScopeGrant[];
 }>;
@@ -89,7 +89,7 @@ export type ResolvedOrgScope = Readonly<{
 
 /**
  * Mirrors `org_has_company_scope()`, `org_scope_branch_ids()` and
- * `org_scope_authorities()`, including the automatic franchise scope of 0390. `activeFranchiseIds` lists franchises that are
+ * `org_scope_authorities()`, including the automatic franchise scope of 0393. `activeFranchiseIds` lists franchises that are
  * active; a grant on an inactive franchise confers nothing.
  */
 export function resolveOrgScope(actor: ScopeActor, branches: readonly ScopeBranch[], activeFranchiseIds: ReadonlySet<string>): ResolvedOrgScope {

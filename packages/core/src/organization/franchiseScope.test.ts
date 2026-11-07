@@ -11,7 +11,7 @@ const branches: ScopeBranch[] = [
 const active = new Set(["mum", "ahd"]);
 const actor = (overrides: Partial<ScopeActor>): ScopeActor => ({ profileId: "p", branchId: "andheri", active: true, superAdmin: false, grants: [], ...overrides });
 
-describe("automatic franchise scope (mirror of org_automatic_scope, 0390)", () => {
+describe("automatic franchise scope (mirror of org_automatic_scope, 0393)", () => {
   it("maps Admin and HR to their franchise authority and nobody else", () => {
     expect(automaticScopeAuthority("admin")).toBe("regional_admin");
     expect(automaticScopeAuthority("hr")).toBe("hr");

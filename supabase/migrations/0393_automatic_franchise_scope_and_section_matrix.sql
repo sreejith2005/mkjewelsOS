@@ -31,7 +31,7 @@ begin
   body := replace(pg_get_functiondef(p_signature::regprocedure), E'\r', '');
   found := (length(body) - length(replace(body, p_old, ''))) / length(p_old);
   if found <> p_expected then
-    raise exception '0390: expected % match(es) in %, found %: %', p_expected, p_signature, found, left(p_old, 80);
+    raise exception '0393: expected % match(es) in %, found %: %', p_expected, p_signature, found, left(p_old, 80);
   end if;
   execute replace(body, p_old, p_new);
 end $$;

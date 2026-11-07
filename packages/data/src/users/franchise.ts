@@ -51,7 +51,7 @@ export type FranchiseScopeGrant = Readonly<{
   reason: string | null;
 }>;
 
-/** Franchise scope a person has automatically from their role and store (0390). */
+/** Franchise scope a person has automatically from their role and store (0393). */
 export type FranchiseAutomaticScope = Readonly<{
   userProfileId: string;
   employeeName: string;
