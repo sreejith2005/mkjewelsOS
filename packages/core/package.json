@@ -9,6 +9,10 @@
     ".": {
       "types": "./src/index.ts",
       "import": "./src/index.ts"
+    },
+    "./salesScore/analytics": {
+      "types": "./src/salesScore/analytics.ts",
+      "import": "./src/salesScore/analytics.ts"
     }
   },
   "scripts": {

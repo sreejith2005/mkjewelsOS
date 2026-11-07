@@ -65,7 +65,7 @@ export function StoreIntelligencePage({ path, search, navigate }: { path: string
           : view === "conversations" ? <ConversationsView isReviewer={isReviewer} navigate={navigate} search={search} />
           : view === "conversation" && route.sessionId ? <ConversationDetail key={route.sessionId} navigate={navigate} sessionId={route.sessionId} tab={route.tab} />
           : view === "coaching" ? <CoachingView navigate={navigate} range={route.range} />
-          : view === "insights" ? <InsightsView navigate={navigate} range={route.range} view={route.insight} />
+          : view === "insights" ? <InsightsView navigate={navigate} search={search} view={route.insight} />
           : view === "devices" ? <DevicesView navigate={navigate} />
           : <SettingsView navigate={navigate} />}
       </div>
