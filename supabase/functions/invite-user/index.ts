@@ -118,7 +118,9 @@ Deno.serve(async (request: Request) => {
   const { data: callerAccessData, error: accessError } = await callerClient.rpc("get_my_access_context");
   const callerAccess = callerAccessData as { effective_role?: unknown; permissions?: Record<string, unknown> } | null;
   if (accessError || !callerAccess) return json(500, { error: "Unable to verify inviter permissions" });
-  if (callerAccess.permissions?.["users.manage"] !== true) {
+  // users.manage_scoped holders may invite only inside their franchise or
+  // stores; create_user_profile_with_coverage_and_audit enforces that scope.
+  if (callerAccess.permissions?.["users.manage"] !== true && callerAccess.permissions?.["users.manage_scoped"] !== true) {
     return json(403, { error: "Only users with user-management permission can invite users" });
   }
   const { error: sectionError } = await callerClient.rpc("assert_module_enabled", { p_page: "users" });

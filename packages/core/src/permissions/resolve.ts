@@ -1,3 +1,4 @@
+import type { OrgScopeAuthority } from "../organization/franchiseScope.ts";
 import { ALL_MENU_ITEMS, USER_ROLES, canAccessPage, isImplementedPage, type MenuItem, type PageId, type UserRole } from "../roleMenu.ts";
 import type { SectionControls } from "../settings/sectionAvailability.ts";
 import {
@@ -26,9 +27,13 @@ export type AccessSubject = Readonly<{
   departmentOverrides?: PermissionOverrides;
   designationOverrides?: PermissionOverrides;
   userOverrides?: PermissionOverrides;
+  /** Scope authorities held (grants and branches.manager_id). */
+  scopeAuthorities?: readonly OrgScopeAuthority[];
+  /** Whether franchise isolation is on for the tenant. */
+  scopeEnforced?: boolean;
 }>;
 
-export type PermissionDecisionSource = "role" | "department" | "designation" | "user" | "authority" | "protected";
+export type PermissionDecisionSource = "role" | "department" | "designation" | "user" | "authority" | "protected" | "scope";
 
 export type PermissionExplanation = Readonly<{
   key: PermissionKey;
@@ -49,7 +54,7 @@ export function effectiveRoleFor(subject: Pick<AccessSubject, "role" | "dashboar
 
 /**
  * Mirrors `permission_effective_for()` as evolved through migrations 0156, 0171,
- * 0181 and 0199. The database is the
+ * 0181, 0199 and 0385. The database is the
  * authority; this copy exists for live previews and must stay in parity.
  */
 export function explainPermission(subject: AccessSubject, key: PermissionKey): PermissionExplanation {
@@ -73,7 +78,9 @@ export function explainPermission(subject: AccessSubject, key: PermissionKey): P
   const department = isDepartmentConfigurablePermission(key) ? subject.departmentOverrides?.[key] ?? null : null;
   const designation = subject.designationOverrides?.[key] ?? null;
   const user = subject.userOverrides?.[key] ?? null;
-  const effective = user ? user === "grant" : department ? department === "grant" : designation ? designation === "grant" : roleDefault;
+  const scopeDefault = !user && !department && !designation && !roleDefault && subject.scopeEnforced === true
+    && (definition.scopeAuthorities ?? []).some((authority) => subject.scopeAuthorities?.includes(authority) ?? false);
+  const effective = user ? user === "grant" : department ? department === "grant" : designation ? designation === "grant" : roleDefault || scopeDefault;
   return {
     key,
     effectiveRole,
@@ -83,7 +90,7 @@ export function explainPermission(subject: AccessSubject, key: PermissionKey): P
     designation,
     user,
     effective,
-    decidedBy: user ? "user" : department ? "department" : designation ? "designation" : "role",
+    decidedBy: user ? "user" : department ? "department" : designation ? "designation" : scopeDefault ? "scope" : "role",
   };
 }
 

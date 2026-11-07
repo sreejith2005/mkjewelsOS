@@ -87,7 +87,7 @@ describe("permission catalog", () => {
     expect(isConfigurablePermission("users.manage")).toBe(true);
     expect(isConfigurablePermission("tasks.view_all")).toBe(false);
     expect(isConfigurablePermission("permissions.manage")).toBe(false);
-    expect(PERMISSION_CATALOG.filter((item) => item.kind === "protected").map((item) => item.key).sort()).toEqual(["assistant.manage_limits", "availability.delete_leave", "developer_mode.manage", "organization.manage", "permissions.manage"]);
+    expect(PERMISSION_CATALOG.filter((item) => item.kind === "protected").map((item) => item.key).sort()).toEqual(["assistant.manage_limits", "availability.delete_leave", "developer_mode.manage", "franchise.manage", "organization.manage", "permissions.manage"]);
   });
 });
 
@@ -264,5 +264,23 @@ describe("department section access", () => {
   });
   it("keeps Super Admin section access despite department deny", () => {
     expect(explainPermission({ role: "super_admin", dashboardAuthority: null, departmentOverrides: { "crm.view": "deny" } }, "crm.view").effective).toBe(true);
+  });
+});
+
+describe("franchise scope authority defaults (migration 0385)", () => {
+  const director = { role: "manager" as const, dashboardAuthority: null, scopeAuthorities: ["director" as const] };
+  it("confers scoped user management only while isolation is on", () => {
+    expect(explainPermission({ ...director, scopeEnforced: false }, "users.manage_scoped").effective).toBe(false);
+    expect(explainPermission({ ...director, scopeEnforced: true }, "users.manage_scoped")).toMatchObject({ effective: true, decidedBy: "scope" });
+  });
+  it("never confers company-wide or protected power", () => {
+    expect(explainPermission({ ...director, scopeEnforced: true }, "users.manage").effective).toBe(false);
+    expect(explainPermission({ ...director, scopeEnforced: true }, "franchise.manage").effective).toBe(false);
+  });
+  it("lets an explicit user deny win over a scope authority", () => {
+    expect(explainPermission({ ...director, scopeEnforced: true, userOverrides: { "users.manage_scoped": "deny" } }, "users.manage_scoped").effective).toBe(false);
+  });
+  it("store access is read scope only and confers no capability", () => {
+    expect(explainPermission({ role: "staff", dashboardAuthority: null, scopeEnforced: true, scopeAuthorities: ["store_access"] }, "users.manage_scoped").effective).toBe(false);
   });
 });

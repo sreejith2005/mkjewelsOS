@@ -169,5 +169,11 @@ demonstrations and response times are not recorded and are not shown.
   runs.
 - Every queued export re-checks the requester when it runs (`reports.view` +
   `reports.export`, active login), not only when it was requested.
+- Franchise isolation (0387, inert while off): rows are limited to the viewer's franchise
+  or stores before any count or total, so a Mumbai Director never sees Ahmedabad rows and
+  a cross-location task is counted once. Directors, HR and Store Managers report across
+  their scope; store and person filters outside it are refused. A queued export runs with
+  the requester's scope, never company-wide and never empty for lack of a signed-in person.
+  CRM customer data stays company-wide (owner decision 2026-11-06).
 - Form answers come from the saved submission snapshot; hidden-by-condition answers export
   blank; attachments export file names only (never a storage path or signed URL).
