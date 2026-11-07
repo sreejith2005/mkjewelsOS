@@ -313,5 +313,47 @@ select throws_ok($$select get_crm_client_fms_runs('11111111-1111-4111-8111-11111
 reset role;
 select ok(not has_function_privilege('anon','get_crm_client_fms_runs(uuid)','execute'),'anonymous callers cannot read runs');
 
+-- All linked CRM purposes use the same published questions and original option values.
+reset role;
+create temporary table linked_checks(purpose text,run_count integer,phone_removed boolean,replay_count integer,invalid_outcome text,record_only_kept boolean,cancel_closed boolean);
+do $$
+declare purpose text; flow uuid; cancel_flow uuid; trigger jsonb; event jsonb; result jsonb; runs integer; private_answer_removed boolean; case_id uuid;
+begin
+  foreach purpose in array array['walkin','lead','queue'] loop
+    trigger:=jsonb_build_object('source',jsonb_build_object('type','crm_linked_form','formFamilyId',pg_temp.fx('form_family'),'formTemplateId',pg_temp.fx('form'),'purpose',purpose),
+      'conditions','{"id":"g","kind":"group","combinator":"and","enabled":true,"children":[{"id":"r","kind":"rule","field":"urgency","operator":"equals","value":"high","enabled":true}]}'::jsonb,
+      'mapping','[]'::jsonb,'assignment','{"mode":"stage_rules","onUnresolved":"stage_rules"}'::jsonb,'reentry','one_per_event','onCaseClosed','record_only');
+    flow:=pg_temp.draft('Linked '||purpose,'automatic',trigger);
+    perform pg_temp.act('admin');
+    perform public.publish_fms_flow_with_audit(flow);
+    if purpose='walkin' then
+      cancel_flow:=pg_temp.draft('Linked walk-in cancel','automatic',trigger||'{"onCaseClosed":"cancel_run"}'::jsonb);
+      perform public.publish_fms_flow_with_audit(cancel_flow);
+    end if;
+    perform pg_temp.as_service();
+    case_id:=gen_random_uuid();
+    event:=jsonb_build_object('kind','crm.form_submission_saved','record_id',gen_random_uuid(),'client_id',gen_random_uuid(),'case_id',case_id,
+      'jewelos_branch_id',pg_temp.fx('branch'),'form',trigger->'source','answers','{"urgency":"high","mobile":"9100000000"}'::jsonb);
+    -- The transport envelope uses purpose/family/template from the immutable CRM submission.
+    result:=public.crm_sync_apply_submission_event('linked-'||purpose,event);
+    select count(*)::int into runs from fms_instances where fms_flow_id=flow;
+    private_answer_removed:=not exists(select 1 from fms_trigger_events where event_key='linked-'||purpose and payload ? 'mobile');
+    perform public.crm_sync_apply_submission_event('linked-'||purpose,event);
+    result:=public.crm_sync_apply_submission_event('wrong-template-'||purpose,jsonb_set(event,'{form,formTemplateId}',to_jsonb(gen_random_uuid())));
+    if purpose='walkin' then
+      perform public.fms_trigger_reconcile_crm_case(pg_temp.fx('tenant'),case_id,'DONE','linked-case-closed');
+    end if;
+    insert into linked_checks values(purpose,runs,private_answer_removed,(select count(*)::int from fms_instances where fms_flow_id=flow),result->>'outcome',
+      (select status='active' from fms_instances where fms_flow_id=flow),
+      (select status='cancelled' from fms_instances where fms_flow_id=cancel_flow));
+  end loop;
+end $$;
+select is(run_count,1,purpose||' linked answer starts its workflow') from linked_checks;
+select ok(phone_removed,purpose||' phone answer is removed') from linked_checks;
+select is(replay_count,1,purpose||' event replay creates no duplicate') from linked_checks;
+select is(invalid_outcome,'invalid_form',purpose||' refuses a template outside the source family') from linked_checks;
+select ok(record_only_kept,'linked walk-in record-only policy keeps work active when the case closes') from linked_checks where purpose='walkin';
+select ok(cancel_closed,'linked walk-in cancel policy cancels work when the case closes') from linked_checks where purpose='walkin';
+
 select * from finish();
 rollback;

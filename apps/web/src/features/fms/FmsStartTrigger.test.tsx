@@ -139,7 +139,7 @@ describe("work page source", () => {
 describe("trigger form picker", () => {
   const crm = { queue: "fam-queue", lead: "fam-lead", walkin: "fam-walkin" };
   it("wires a CRM-linked form to its CRM save and any other form to Forms Library submissions", () => {
-    expect(triggerSourceForForm("fam-walkin", "t-w", crm)).toEqual({ type: "crm_walkin" });
+    expect(triggerSourceForForm("fam-walkin", "t-w", crm)).toEqual({ type: "crm_linked_form", formFamilyId: "fam-walkin", formTemplateId: "t-w", purpose: "walkin" });
     expect(triggerSourceForForm("fam-queue", "t-q", crm)).toEqual({ type: "crm_linked_form", formFamilyId: "fam-queue", formTemplateId: "t-q", purpose: "queue" });
     expect(triggerSourceForForm("fam-lead", "t-l", crm)).toEqual({ type: "crm_linked_form", formFamilyId: "fam-lead", formTemplateId: "t-l", purpose: "lead" });
     expect(triggerSourceForForm("fam-other", "t-o", crm)).toEqual({ type: "jewelos_form", formFamilyId: "fam-other", formTemplateId: "t-o" });
@@ -151,6 +151,41 @@ describe("trigger form picker", () => {
     expect(triggerFormFamily({ type: "crm_queue" }, crm)).toBe("fam-queue");
     expect(triggerFormFamily({ type: "crm_lead" }, {})).toBe("");
     expect(triggerFormFamily({ type: "crm_linked_form", formFamilyId: "fam-lead", purpose: "lead" }, crm)).toBe("fam-lead");
+  });
+
+  it("offers the walk-in form's actual question and all its options when selected", async () => {
+    const user = userEvent.setup();
+    mocks.crmForms.mockImplementation(async () => crm);
+    const withForms: FmsData = { ...data, forms: [{ id: "t-w", family_id: "fam-walkin", name: "Client walk-in visit", version: 1, lifecycle: "published" }], formFields: { "t-w": [
+      { key: "visit_status", label: "Client bought any product?", type: "select", options: [{ value: "yes", label: "YES" }, { value: "no", label: "NO" }, { value: "repair_placed", label: "REPAIR PLACED" }, { value: "store_visit", label: "STORE VISIT" }] },
+      { key: "custom_interest", label: "Custom interest", type: "text" },
+    ] } };
+    render(<FmsStartTriggerPanel data={withForms} definition={{ name: "Flow", scope: "tenant", manualTrigger: true, startMode: "automatic", stages: [] }} flowId={null} onApply={vi.fn()} onClose={() => undefined} />);
+    await screen.findByRole("option", { name: /Client walk-in visit.*CRM walk-in/ });
+    await user.selectOptions(screen.getByLabelText("Trigger form"), "fam-walkin");
+    await user.click(screen.getByRole("button", { name: /Add condition/ }));
+    await user.selectOptions(screen.getByLabelText("Condition field"), "visit_status");
+    expect(within(screen.getByLabelText("Condition value")).getAllByRole("option").map((item) => [item.getAttribute("value"), item.textContent])).toEqual([
+      ["", "Choose"], ["yes", "YES"], ["no", "NO"], ["repair_placed", "REPAIR PLACED"], ["store_visit", "STORE VISIT"],
+    ]);
+    expect(screen.queryByRole("option", { name: "Visit status (bought?)" })).toBeNull();
+    expect(within(screen.getByLabelText("Condition field")).getByRole("option", { name: "Custom interest" })).toBeTruthy();
+  });
+
+  it("keeps a saved legacy trigger until the author explicitly switches to form questions", async () => {
+    const user = userEvent.setup();
+    mocks.crmForms.mockImplementation(async () => crm);
+    const legacy = { ...newFmsStartTrigger("crm_walkin", () => crypto.randomUUID()), onCaseClosed: "cancel_run" as const };
+    const withForms: FmsData = { ...data, forms: [{ id: "t-w", family_id: "fam-walkin", name: "Client walk-in visit", version: 1, lifecycle: "published" }], formFields: { "t-w": [{ key: "visit_status", label: "Client bought any product?", type: "select", options: [{ value: "store_visit", label: "STORE VISIT" }] }] } };
+    render(<FmsStartTriggerPanel data={withForms} definition={{ name: "Flow", scope: "tenant", manualTrigger: true, startMode: "automatic", startTrigger: legacy, stages: [] }} flowId={null} onApply={vi.fn()} onClose={() => undefined} />);
+    await user.click(await screen.findByRole("button", { name: "Use this form's questions" }));
+    expect(screen.getByLabelText("When the case closes")).toHaveProperty("value", "cancel_run");
+    expect(screen.getByLabelText("Repeat submissions")).toHaveProperty("value", "one_active_per_case");
+    expect(screen.getByLabelText("First step assignee")).toHaveProperty("value", "source_staff");
+    expect(screen.queryAllByTestId("trigger-rule")).toHaveLength(0);
+    await user.click(screen.getByRole("button", { name: /Add condition/ }));
+    expect(within(screen.getByLabelText("Condition field")).getByRole("option", { name: "Client bought any product?" })).toBeTruthy();
+    expect(screen.queryByRole("option", { name: "Visit status (bought?)" })).toBeNull();
   });
 
   it("lists each form once, marks the CRM ones, and picks the CRM event when a CRM form is chosen", async () => {

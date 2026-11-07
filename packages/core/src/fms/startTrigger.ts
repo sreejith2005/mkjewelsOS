@@ -61,8 +61,8 @@ export type FmsTriggerSource = Readonly<{
   formFamilyId?: string | undefined;
   /** The published version the conditions were written against (shown in the builder). */
   formTemplateId?: string | undefined;
-  /** `crm_linked_form` only: which CRM registration the form is linked to. */
-  purpose?: "queue" | "lead" | undefined;
+  /** `crm_linked_form` only: which CRM save the form is linked to. */
+  purpose?: "queue" | "lead" | "walkin" | undefined;
 }>;
 
 /** One value copied from the saved submission into the run's context. */
@@ -361,7 +361,7 @@ export function validateFmsStartTrigger(trigger: FmsStartTrigger | undefined, fi
   const source = fmsTriggerSource(trigger.source.type);
   if (!source) add("trigger_source", "Choose a supported start source");
   if ((trigger.source.type === "jewelos_form" || trigger.source.type === "crm_linked_form") && !UUID.test(trigger.source.formFamilyId ?? "")) add("trigger_form", "Choose the form that starts this workflow");
-  if (trigger.source.type === "crm_linked_form" && trigger.source.purpose !== "queue" && trigger.source.purpose !== "lead") add("trigger_form", "Choose whether the form is the queue or the lead registration form");
+  if (trigger.source.type === "crm_linked_form" && trigger.source.purpose !== "queue" && trigger.source.purpose !== "lead" && trigger.source.purpose !== "walkin") add("trigger_form", "Choose whether the CRM form is for a client queue registration, lead or walk-in visit");
   const byKey = new Map(fields.map((field) => [field.key, field]));
   if (fmsTriggerRuleCount(trigger.conditions) > FMS_TRIGGER_MAX_RULES) add("trigger_too_many_rules", `Use at most ${FMS_TRIGGER_MAX_RULES} conditions`);
   if (enabledRuleCount(trigger.conditions) === 0) add("trigger_no_rules", "Add at least one switched-on condition, so the workflow does not start for every submission");

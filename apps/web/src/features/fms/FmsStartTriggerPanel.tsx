@@ -40,12 +40,11 @@ export function triggerFormFamily(source: FmsTriggerSource, crm: CrmFormFamilies
 
 /**
  * One choice for every start: a Form Builder form. A form linked in CRM listens to CRM saves (a
- * walk-in form to the saved walk-in visit, which carries the visit answers); any other form to its
+ * walk-in form to its linked saved submission, which carries the original question answers); any other form to its
  * Forms Library submissions.
  */
 export function triggerSourceForForm(familyId: string, templateId: string | undefined, crm: CrmFormFamilies): FmsTriggerSource {
   const purpose = crmPurposeOfForm(familyId, crm);
-  if (purpose === "walkin") return { type: "crm_walkin" };
   if (purpose) return { type: "crm_linked_form", formFamilyId: familyId, formTemplateId: templateId, purpose };
   return { type: "jewelos_form", formFamilyId: familyId, formTemplateId: templateId };
 }
@@ -97,15 +96,22 @@ export function FmsStartTriggerPanel({ definition, data, flowId, onApply, onClos
     return () => { active = false; };
   }, []);
   const chosenFamily = triggerFormFamily(trigger.source, crmForms);
+  const supportsCase = fmsTriggerSource(trigger.source.type)?.supportsCase || (trigger.source.type === "crm_linked_form" && trigger.source.purpose === "walkin");
   // Forms built inside FMS steps belong to their workflow, not the Form Builder list (owner 2026-11-07); one already chosen stays visible.
   const forms = useMemo(() => latestFormVersions(data.forms).filter((form) => !stepForms.has(form.family_id) || form.family_id === chosenFamily), [data.forms, stepForms, chosenFamily]);
   const chooseForm = (familyId: string) => {
     const form = forms.find((item) => item.family_id === familyId);
     const source = familyId ? triggerSourceForForm(familyId, form?.id, crmForms) : { type: "jewelos_form" as const };
     // A different event has different fields, so its conditions start fresh; the same event keeps them.
-    setTrigger((current) => current.source.type === source.type && (source.type === "crm_walkin" || current.source.formFamilyId === source.formFamilyId)
-      ? { ...current, source }
-      : { ...newFmsStartTrigger(source.type, newId), source });
+    setTrigger((current) => {
+      if (current.source.type === source.type && current.source.formFamilyId === source.formFamilyId && current.source.purpose === source.purpose) return { ...current, source };
+      const next = { ...newFmsStartTrigger(source.type, newId), source };
+      // Switching an existing walk-in to its questions changes field references, not case policy
+      // or who receives the work. Old conditions/mappings/deadline fields must be configured anew.
+      return current.source.type === "crm_walkin" && source.type === "crm_linked_form" && source.purpose === "walkin"
+        ? { ...next, assignment: current.assignment, reentry: current.reentry, onCaseClosed: current.onCaseClosed, title: current.title?.prefix ? { prefix: current.title.prefix } : undefined }
+        : next;
+    });
   };
   const firstIsStartForm = (definition.startMode ?? "form") === "form" && definition.stages[0]?.type === "form";
   return <Modal mobileFullscreen onClose={onClose} title="Start trigger" wide>
@@ -130,6 +136,10 @@ export function FmsStartTriggerPanel({ definition, data, flowId, onApply, onClos
               {forms.map((form) => { const purpose = crmPurposeOfForm(form.family_id, crmForms); return <option key={form.family_id} value={form.family_id}>{form.name} (v{form.version}){purpose ? ` · ${CRM_FORM_NAMES[purpose]}` : ""}</option>; })}
             </select>
           </label>
+          {chosenFamily && (trigger.source.type === "crm_walkin" || trigger.source.type === "crm_queue" || trigger.source.type === "crm_lead") ? <Notice>
+            <p>This saved trigger uses CRM summary fields. To use the published form's questions and choices, switch below and set its conditions again.</p>
+            <Button onClick={() => chooseForm(chosenFamily)} variant="secondary">Use this form's questions</Button>
+          </Notice> : null}
           {!chosenFamily && (trigger.source.type === "crm_walkin" || trigger.source.type === "crm_queue" || trigger.source.type === "crm_lead")
             ? <Notice>This start listens to every saved {fmsTriggerSource(trigger.source.type)?.label}. Link a Form Builder form for it in CRM Form Settings, or choose a form above.</Notice> : null}
           <p className="text-xs text-soft-grey">{fmsTriggerSource(trigger.source.type)?.event}. Only submissions saved after you publish can start this workflow.</p>
@@ -159,11 +169,11 @@ export function FmsStartTriggerPanel({ definition, data, flowId, onApply, onClos
             <label className="block"><span className="label">First deadline from</span><FieldSelect ariaLabel="Deadline field" emptyLabel="The first step's own timing" fields={fields.filter((field) => field.type === "date")} onChange={(dueField) => setTrigger({ ...trigger, dueField })} value={trigger.dueField} /></label>
             <label className="block"><span className="label">Repeat submissions</span>
               <select aria-label="Repeat submissions" className="field" onChange={(event) => setTrigger({ ...trigger, reentry: event.target.value === "one_per_event" ? "one_per_event" : "one_active_per_case" })} value={trigger.reentry}>
-                <option value="one_active_per_case">{fmsTriggerSource(trigger.source.type)?.supportsCase ? "One open run per Not Bought case (or client)" : "One open run per client or record"}</option>
+                <option value="one_active_per_case">{supportsCase ? "One open run per Not Bought case (or client)" : "One open run per client or record"}</option>
                 <option value="one_per_event">A new run for every matching submission</option>
               </select>
             </label>
-            {trigger.source.type === "crm_walkin" ? <label className="block"><span className="label">When the CRM closes the follow-up case</span>
+            {supportsCase ? <label className="block"><span className="label">When the CRM closes the follow-up case</span>
               <select aria-label="When the case closes" className="field" onChange={(event) => setTrigger({ ...trigger, onCaseClosed: event.target.value === "cancel_run" ? "cancel_run" : "record_only" })} value={trigger.onCaseClosed}>
                 <option value="record_only">Note it on the open run (work continues)</option><option value="cancel_run">Cancel the open run</option>
               </select>
