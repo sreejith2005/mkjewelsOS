@@ -1,4 +1,5 @@
 import type { UserRole } from "../roleMenu.ts";
+import type { FormUserFilter } from "./userFilter.ts";
 
 export const FORM_FIELD_TYPES = [
   "text", "textarea", "number", "currency", "email", "phone", "date",
@@ -104,6 +105,8 @@ export type FormValidation = Readonly<{
   repeat?: FormRepeatConfig | undefined;
   /** CRM forms only: CRM lookups, CRM choice lists and CRM upload settings. */
   crm?: FormCrmBehaviour | undefined;
+  /** Users questions only: who can be chosen (migration 0391). Absent = every person the filler may see. */
+  userFilter?: FormUserFilter | undefined;
 }>;
 
 export const FORM_REPEAT_SUBFIELD_TYPES = ["text", "phone", "select"] as const;

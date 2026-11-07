@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, Paperclip } from "lucide-react";
-import { describeFormRule, evaluateFormNavigation, displayFormAnswer, FORM_OTHER_MAX_LENGTH, formFieldAllowsOther, formOptionValues, reconcileFormPreviewAnswers, formCompletionProgress, formUsesSteps, isFinalFormStep, nextFormStepKey, normalizeFormAnswers, previousFormStepKey, resolveFormOptions, updateVisibleFormAnswers, validateCompleteForm, validateFormStep, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition, type FormValidationIssue, type FormCrmServices, clientDetailsForForm, formChoiceValueFromText, isClientPhoneQuestion, isPincodeQuestion } from "@jewelos/core";
+import { describeFormRule, formUserMatchesFilter, evaluateFormNavigation, displayFormAnswer, FORM_OTHER_MAX_LENGTH, formFieldAllowsOther, formOptionValues, reconcileFormPreviewAnswers, formCompletionProgress, formUsesSteps, isFinalFormStep, nextFormStepKey, normalizeFormAnswers, previousFormStepKey, resolveFormOptions, updateVisibleFormAnswers, validateCompleteForm, validateFormStep, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition, type FormValidationIssue, type FormCrmServices, clientDetailsForForm, formChoiceValueFromText, isClientPhoneQuestion, isPincodeQuestion } from "@jewelos/core";
 import { Button, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { signedFormFileUrl, uploadFormFile } from "./api";
@@ -9,7 +9,19 @@ import { CrmChoiceField, CrmPhotoField, RepeatField } from "./CrmQuestions";
 import { useFormCrmServices } from "./crmServicesContext";
 import { CrossLocationEmployeePicker } from "@/features/users/CrossLocationEmployeePicker";
 
-export type DynamicOptions = { users: Array<{ id: string; label: string }>; branches: Array<{ id: string; label: string }>; departments: Array<{ id: string; branchId: string | null; label: string }>; masters: FormMasterOption[] };
+/**
+ * Choices for Users, branch and department questions. A person carries what a Users question's
+ * filter reads (migration 0391); older cached copies without those details simply match no
+ * attribute rule. `designations` and `franchises` are only needed by the form builder.
+ */
+export type DynamicOptions = {
+  users: Array<{ id: string; label: string; branchId?: string | null; departmentId?: string | null; designationId?: string | null; franchiseId?: string | null; role?: string | null }>;
+  branches: Array<{ id: string; label: string; franchiseId?: string | null }>;
+  departments: Array<{ id: string; branchId: string | null; label: string }>;
+  masters: FormMasterOption[];
+  designations?: Array<{ id: string; label: string }>;
+  franchises?: Array<{ id: string; label: string }>;
+};
 const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: [], masters: [] };
 const NUMBER_TYPES = new Set(["number", "currency", "rating"]);
 const SELECT_TYPES = new Set(["select", "user_dropdown", "branch_dropdown", "department_dropdown"]);
@@ -121,7 +133,8 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
   }), [dynamicOptions]);
   // People, branches and departments are always listed A to Z, whatever order they were loaded in.
   const sorted = useMemo(() => ({ users: byLabel(dynamicOptions.users), branches: byLabel(dynamicOptions.branches), departments: byLabel(dynamicOptions.departments) }), [dynamicOptions]);
-  const optionsFor = (type: string) => type === "user_dropdown" ? sorted.users : type === "branch_dropdown" ? sorted.branches : type === "department_dropdown" ? sorted.departments.filter((item) => !branchFieldKey || !answers[branchFieldKey] || item.branchId === answers[branchFieldKey]) : [];
+  // A Users question lists only the people its filter allows; the server refuses anyone else.
+  const optionsFor = (type: string, field?: FormFieldDefinition) => type === "user_dropdown" ? sorted.users.filter((person) => formUserMatchesFilter(field?.validation?.userFilter, person)) : type === "branch_dropdown" ? sorted.branches : type === "department_dropdown" ? sorted.departments.filter((item) => !branchFieldKey || !answers[branchFieldKey] || item.branchId === answers[branchFieldKey]) : [];
   const openOther = (key: string, open: boolean) => {
     setOtherOpen((current) => ({ ...current, [key]: open }));
     if (open) requestAnimationFrame(() => otherInputs.current.get(key)?.focus());
@@ -268,7 +281,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
     if (field.type === "file") return shell(<div><QuestionText field={field} id={labelId} />{helper}
       <FileFieldControl preview={preview} describedBy={describedBy} disabled={disabled} field={field} labelledBy={labelId} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} templateId={templateId} value={answers[field.key]} />{errorText}
     </div>);
-    const dynamic = optionsFor(field.type); const staticOptions = field.options ?? [];
+    const dynamic = optionsFor(field.type, field); const staticOptions = field.options ?? [];
     const checkboxOptions = staticOptions.length ? staticOptions : dynamic.map((option) => ({ value: option.id, label: option.label }));
     // Multi-answer questions are a tappable list on every device: a native multi-select is unusable on Android.
     if ((field.type === "checkbox" && checkboxOptions.length) || field.type === "multiselect") {

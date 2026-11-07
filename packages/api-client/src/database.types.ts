@@ -13944,6 +13944,7 @@ export type Database = {
           branch_id: string | null
           buddy_id: string | null
           department_id: string | null
+          designation_id: string | null
           employee_code: string | null
           employee_name: string | null
           id: string | null

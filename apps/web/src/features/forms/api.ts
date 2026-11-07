@@ -121,23 +121,49 @@ export async function loadTaskForms(templateIds: string[], taskIds: string[]): P
   const submissionRows = submissionBatches.flatMap((batch) => batch.data ?? []); const counts = countByTemplate(submissionRows);
   return { bundles: (templates.data ?? []).map((item) => ({ ...item, fields: toDefinition(item, fieldsByTemplate.get(item.id) ?? []).fields as FormFieldDefinition[], sections: parseSections(item.sections), submissionCount: counts.get(item.id) ?? 0 })), submissions: submissionRows };
 }
+type FormPersonRow = { id: string | null; employee_name: string | null; branch_id?: string | null; department_id?: string | null; designation_id?: string | null; user_role?: string | null };
+/**
+ * People for Users questions with what a question's filter reads (migration 0391). If the
+ * database does not have `v_task_users.designation_id` yet (web deployed before the migration),
+ * the list still loads without it.
+ */
+async function loadFormPeople(): Promise<FormPersonRow[]> {
+  const read = async (columns: string) => {
+    const rows: FormPersonRow[] = [];
+    for (let offset = 0; ; offset += 500) {
+      const { data, error } = await supabase.from("v_task_users").select(columns).eq("working_status", "active").order("employee_name").order("id").range(offset, offset + 499);
+      if (error) return { rows, error };
+      // The column list above is a runtime string, so the generated row type is not inferred.
+      rows.push(...((data ?? []) as unknown as FormPersonRow[]));
+      if ((data?.length ?? 0) < 500) return { rows, error: null };
+    }
+  };
+  const full = await read("id,employee_name,branch_id,department_id,user_role,designation_id");
+  if (!full.error) return full.rows;
+  const basic = await read("id,employee_name,branch_id,department_id,user_role");
+  fail("Load form users", basic.error);
+  return basic.rows;
+}
 export async function loadFormDynamicOptions() {
-  const [users, branches, departments, masters] = await Promise.all([
-    (async () => {
-      const rows: Array<{ id: string | null; employee_name: string | null }> = [];
-      for (let offset = 0; ; offset += 500) {
-        const { data, error } = await supabase.from("v_task_users").select("id,employee_name").eq("working_status", "active").order("employee_name").order("id").range(offset, offset + 499);
-        fail("Load form users", error);
-        rows.push(...(data ?? []));
-        if ((data?.length ?? 0) < 500) return rows;
-      }
-    })(),
-    supabase.from("branches").select("id,name").eq("is_active", true).order("name").limit(100),
+  const [users, branches, departments, masters, designations, franchises] = await Promise.all([
+    loadFormPeople(),
+    supabase.from("branches").select("id,name,franchise_group_id").eq("is_active", true).order("name").limit(100),
     supabase.from("departments").select("id,name,branch_id").eq("is_active", true).order("name").limit(500),
     loadMasterOptions([], true).catch(() => []),
+    // Builder-only lists for Users question filters; optional, so a failure leaves them empty.
+    supabase.from("dropdown_masters").select("id,label").eq("master_type", "designation").eq("is_active", true).order("label").limit(300),
+    supabase.from("franchise_groups").select("id,name").order("name").limit(100),
   ]);
   fail("Load form branches", branches.error); fail("Load form departments", departments.error);
-  return { users: users.flatMap((row) => row.id && row.employee_name ? [{ id: row.id, label: row.employee_name }] : []), branches: (branches.data ?? []).map((row) => ({ id: row.id, label: row.name })), departments: (departments.data ?? []).map((row) => ({ id: row.id, branchId: row.branch_id, label: row.name })), masters: toFormMasterOptions(masters) };
+  const franchiseOfBranch = new Map((branches.data ?? []).map((row) => [row.id, row.franchise_group_id ?? null]));
+  return {
+    users: users.flatMap((row) => row.id && row.employee_name ? [{ id: row.id, label: row.employee_name, branchId: row.branch_id ?? null, departmentId: row.department_id ?? null,
+      designationId: row.designation_id ?? null, role: row.user_role ?? null, franchiseId: row.branch_id ? franchiseOfBranch.get(row.branch_id) ?? null : null }] : []),
+    branches: (branches.data ?? []).map((row) => ({ id: row.id, label: row.name, franchiseId: row.franchise_group_id ?? null })),
+    departments: (departments.data ?? []).map((row) => ({ id: row.id, branchId: row.branch_id, label: row.name })), masters: toFormMasterOptions(masters),
+    designations: designations.error ? [] : (designations.data ?? []).map((row) => ({ id: row.id, label: row.label })),
+    franchises: franchises.error ? [] : (franchises.data ?? []).map((row) => ({ id: row.id, label: row.name })),
+  };
 }
 export const saveDraft = async (id: string | null, payload: Json, fields: Json): Promise<string> => { const { data, error } = await supabase.rpc("save_form_draft_with_audit", { p_template_id: id as string, p_payload: payload, p_fields: fields }); fail("Save form draft", error); if (!data) throw new Error("Save form draft: the server did not return the draft id"); return data; };
 export const savePublishedForm = async (id: string, payload: Json, fields: Json) => { const { error } = await supabase.rpc("save_published_form_with_audit", { p_template_id: id, p_payload: payload, p_fields: fields }); fail("Save published form", error); };
