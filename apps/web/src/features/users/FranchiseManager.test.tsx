@@ -6,6 +6,7 @@ import { FranchiseManager } from "./FranchiseManager";
 const api = vi.hoisted(() => ({
   loadFranchiseAdmin: vi.fn(),
   loadFranchiseInsights: vi.fn(),
+  loadFranchiseHistory: vi.fn(),
   saveFranchise: vi.fn(),
   assignBranchFranchise: vi.fn(),
   grantScope: vi.fn(),
@@ -45,6 +46,7 @@ describe("FranchiseManager", () => {
     vi.clearAllMocks();
     api.loadFranchiseAdmin.mockResolvedValue(admin);
     api.loadFranchiseInsights.mockResolvedValue(insights);
+    api.loadFranchiseHistory.mockResolvedValue(insights.history);
     api.assignBranchFranchise.mockResolvedValue(undefined);
   });
   afterEach(cleanup);
@@ -88,6 +90,13 @@ describe("FranchiseManager", () => {
     fireEvent.change(screen.getByLabelText("Franchise"), { target: { value: "mum" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+  });
+
+  it("still shows the stores and Set franchise when the history fails to load", async () => {
+    api.loadFranchiseHistory.mockRejectedValue(new Error("canceling statement due to statement timeout"));
+    render(<FranchiseManager people={people} />);
+    expect(await screen.findByRole("button", { name: "Set franchise for Bandra" })).toBeTruthy();
+    expect(await screen.findByText(/statement timeout/)).toBeTruthy();
   });
 
   it("shows the server's reason when a grant is refused", async () => {
