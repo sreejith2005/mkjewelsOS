@@ -18,6 +18,7 @@ export function removeFmsStage(stages: readonly FmsStageDefinition[], key: strin
       ...stage.sla,
       ...(stage.sla.triggerStageKey === key ? { triggerStageKey: undefined } : {}),
       ...(stage.sla.conditional && !("field" in stage.sla.conditional) && stage.sla.conditional.decisionStageKey === key ? { conditional: undefined } : {}),
+      ...(stage.sla.followUpGroup?.parentStageKey === key ? { followUpGroup: { groupId: stage.sla.followUpGroup.groupId, number: stage.sla.followUpGroup.number } } : {}),
     },
   }));
 }

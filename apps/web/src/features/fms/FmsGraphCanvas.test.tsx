@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { FmsFlowDefinition } from "@jewelos/core";
+import { insertFmsFollowUpGroup, type FmsFlowDefinition } from "@jewelos/core";
 import { FmsGraphCanvas } from "./FmsGraphCanvas";
 import { newFmsStage } from "./definition";
 
@@ -377,5 +377,27 @@ describe("FMS canvas on a phone", () => {
     fireEvent.pointerUp(follow, { pointerId: 2, button: 0, clientX: 520, clientY: 140, pointerType: "touch" });
     expect(input.onSelectionChange).toHaveBeenLastCalledWith(["start", "follow"]);
     expect(input.onOpen).not.toHaveBeenCalled();
+  });
+});
+
+describe("FMS canvas Follow-Up Groups", () => {
+  const grouped = insertFmsFollowUpGroup(definition, { afterKey: "start", newId: () => crypto.randomUUID() }).definition;
+  it("marks each grouped step with a subtle chip naming its main step, and leaves a step merely named Follow up unmarked", () => {
+    const { container } = render(<FmsGraphCanvas {...props()} definition={grouped} />);
+    const chips = screen.getAllByTestId("fms-follow-up-chip");
+    expect(chips.map((chip) => chip.textContent)).toEqual(["Follow-Up 1/3", "Follow-Up 2/3", "Follow-Up 3/3"]);
+    expect(chips.every((chip) => chip.getAttribute("title") === "Follow-Up Group of Start")).toBe(true);
+    expect(within(container.querySelector<HTMLElement>('[data-node-key="follow"]')!).queryByTestId("fms-follow-up-chip")).toBeNull();
+  });
+  it("offers Add Follow-Up Group after a step from its menu only when the builder allows it", () => {
+    const input = { ...props(), onAddFollowUpAfter: vi.fn() };
+    const { container, unmount } = render(<FmsGraphCanvas {...input} />);
+    fireEvent.contextMenu(container.querySelector('[data-node-key="follow"]')!, { clientX: 520, clientY: 140 });
+    fireEvent.click(within(screen.getByRole("menu", { name: "Canvas actions" })).getByRole("menuitem", { name: "Add Follow-Up Group after" }));
+    expect(input.onAddFollowUpAfter).toHaveBeenCalledWith("follow");
+    unmount();
+    const viewOnly = render(<FmsGraphCanvas {...props()} />);
+    fireEvent.contextMenu(viewOnly.container.querySelector('[data-node-key="follow"]')!, { clientX: 520, clientY: 140 });
+    expect(within(screen.getByRole("menu", { name: "Canvas actions" })).queryByRole("menuitem", { name: "Add Follow-Up Group after" })).toBeNull();
   });
 });

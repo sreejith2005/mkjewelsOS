@@ -31,6 +31,7 @@ export * from "./aiContract";
 export * from "./aiOperations";
 export * from "./aiContext";
 export * from "./transfer";
+export * from "./followUpGroup";
 export * from "./workflowForms";
 
 export * from "./outcomes";

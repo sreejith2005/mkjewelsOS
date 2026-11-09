@@ -4,7 +4,7 @@ import type { UserRole } from "../roleMenu.ts";
 import { validateFmsAssignmentConfig } from "./assignmentConfig.ts";
 import { validateFmsFormSections } from "./formSections.ts";
 import { fmsFormDueIssues, normalizeFmsFormDue } from "./formDue.ts";
-import { FMS_ASSIGNEE_TYPES, FMS_BRANCH_OPERATORS, FMS_STAGE_TYPES, FMS_TERMINAL_OUTCOMES, type FmsTerminalConfig, type FmsTerminalOutcome, type FmsAssignmentCandidate, type FmsAssigneeRule, type FmsBranchRule, type FmsChecklistItemDefinition, type FmsDecisionOption, type FmsFlowDefinition, type FmsFormFieldOption, type FmsFormFieldRef, type FmsInstanceStatus, type FmsStageActorState, type FmsStageDefinition, type FmsStageStatus, type FmsTimingMethod, type FmsTransitionCapability, type FmsValidationContext, type FmsValidationIssue } from "./types.ts";
+import { FMS_ASSIGNEE_TYPES, FMS_BRANCH_OPERATORS, FMS_STAGE_TYPES, FMS_TERMINAL_OUTCOMES, type FmsFollowUpGroupTag, type FmsTerminalConfig, type FmsTerminalOutcome, type FmsAssignmentCandidate, type FmsAssigneeRule, type FmsBranchRule, type FmsChecklistItemDefinition, type FmsDecisionOption, type FmsFlowDefinition, type FmsFormFieldOption, type FmsFormFieldRef, type FmsInstanceStatus, type FmsStageActorState, type FmsStageDefinition, type FmsStageStatus, type FmsTimingMethod, type FmsTransitionCapability, type FmsValidationContext, type FmsValidationIssue } from "./types.ts";
 
 const KEY = /^[a-z][a-z0-9_]{0,63}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -43,6 +43,17 @@ export function normalizeFmsTerminal(raw: unknown): FmsTerminalConfig {
   const outcome = text(value.outcome).toLowerCase() || "other";
   const reasonCode = text(value.reasonCode).toLowerCase();
   return { outcome: outcome as FmsTerminalOutcome, ...(reasonCode ? { reasonCode } : {}) };
+}
+const FOLLOW_UP_GROUP_ID = /^[A-Za-z0-9_-]{1,64}$/;
+/** A valid Follow-Up Group tag, or undefined. Only an explicitly tagged step is ever a follow-up; a name never makes one. */
+export function normalizeFmsFollowUpGroupTag(raw: unknown): FmsFollowUpGroupTag | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const value = raw as Record<string, unknown>;
+  const groupId = text(value.groupId);
+  const number = value.number;
+  if (!FOLLOW_UP_GROUP_ID.test(groupId) || (number !== 1 && number !== 2 && number !== 3)) return undefined;
+  const parentStageKey = text(value.parentStageKey).toLowerCase();
+  return { groupId, number, ...(parentStageKey ? { parentStageKey } : {}) };
 }
 export const isFmsTerminalOutcome = (value: unknown): value is FmsTerminalOutcome => typeof value === "string" && (FMS_TERMINAL_OUTCOMES as readonly string[]).includes(value);
 /** True for an explicit End Node: an automatic terminal destination that never creates work. */
@@ -87,6 +98,7 @@ export function normalizeFmsDefinition(input: FmsFlowDefinition): FmsFlowDefinit
       ...(text(stage.sla?.clockTime) ? { clockTime: text(stage.sla.clockTime) } : {}),
       ...(text(stage.sla?.triggerStageKey) ? { triggerStageKey: text(stage.sla.triggerStageKey).toLowerCase() } : {}),
       ...(stage.type === "end" ? { terminal: normalizeFmsTerminal(stage.sla?.terminal) } : {}),
+      ...(() => { const followUpGroup = stage.type === "end" ? undefined : normalizeFmsFollowUpGroupTag(stage.sla?.followUpGroup); return followUpGroup ? { followUpGroup } : {}; })(),
       ...(stage.sla?.conditional && "decisionStageKey" in stage.sla.conditional ? (() => { const decisionOptionKey = text("decisionOptionKey" in stage.sla.conditional ? stage.sla.conditional.decisionOptionKey : stage.sla.conditional.outcome).toLowerCase(); return { conditional: { decisionStageKey: text(stage.sla.conditional.decisionStageKey).toLowerCase(), decisionOptionKey, outcome: decisionOptionKey } }; })() : {}),
     },
   }));
