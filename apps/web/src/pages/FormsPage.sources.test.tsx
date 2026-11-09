@@ -51,7 +51,7 @@ describe("Forms Library and FMS workflow forms", () => {
     expect(fms.getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByText("Introduction Call — Instagram Leads")).toBeTruthy();
     expect(screen.queryByText("Instagram Assignee Form")).toBeNull();
-    expect(screen.getByText("FMS: INSTAGRAM LEADS · Step: Introduction Call")).toBeTruthy();
+    expect(screen.getByText("Used in INSTAGRAM LEADS · Step: Introduction Call")).toBeTruthy();
   });
 
   it("searches within the chosen group", async () => {
