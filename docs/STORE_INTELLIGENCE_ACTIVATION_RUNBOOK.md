@@ -89,7 +89,7 @@ Do these first; several involve waiting for AWS.
    a real DNS name you control, for example `rec.<your-domain>`. If the company has
    no domain, buy one (Route 53 or any registrar). You need to be able to add an
    `A` record. For the GPU load balancer you also need a certificate name such as
-   `gpu.<your-domain>` (DNS-validated in ACM; the record stays private).
+   `gpu.internal.<your-domain>` (DNS-validated in ACM; the record stays private).
 7. **Hugging Face.** Create an account at <https://huggingface.co>, accept the
    terms of the pyannote speaker-diarization models named in
    `services/recorder-processor/README.md` (PR #64), and create a **read** token.
@@ -144,9 +144,9 @@ secrets. Do not copy recorder secrets to CRM.
 | `RECORDER_BUCKET` | Terraform output `bucket` |
 | `RECORDER_KMS_KEY_ARN` | Terraform output `kms_key_arn` |
 | `RECORDER_ORIGINS` | `https://mkjewels-os.vercel.app` (same list as `RECORDER_ALLOWED_ORIGINS`) |
-| `RECORDER_GPU_URL` | `https://gpu.<your-domain>/v1/transcribe` (worker) |
+| `RECORDER_GPU_URL` | `https://gpu.internal.<your-domain>/v1/transcribe` (worker) |
 | `RECORDER_GPU_TOKEN` | **S2** (worker) |
-| `RECORDER_GPU_HOSTS` | `gpu.<your-domain>` exact (worker) |
+| `RECORDER_GPU_HOSTS` | `gpu.internal.<your-domain>` exact (worker) |
 | `RECORDER_FINALIZE_TRANSCRIPTS` | `true` once the benchmark passes (worker) |
 | `RECORDER_COACHING_ENABLED` | leave unset (live coaching off for the pilot) |
 | `RECORDER_ANALYZER_KIND` | `bedrock` (PR #64) |
@@ -271,8 +271,8 @@ Put-Plain  /jewelos/recorder/app/RECORDER_BUCKET '<terraform output bucket>'
 Put-Plain  /jewelos/recorder/app/RECORDER_KMS_KEY_ARN '<terraform output kms_key_arn>'
 Put-Plain  /jewelos/recorder/app/RECORDER_ORIGINS 'https://mkjewels-os.vercel.app'
 Put-Plain  /jewelos/recorder/app/RECORDER_DOMAIN 'rec.<your-domain>'
-Put-Plain  /jewelos/recorder/app/RECORDER_GPU_URL 'https://gpu.<your-domain>/v1/transcribe'
-Put-Plain  /jewelos/recorder/app/RECORDER_GPU_HOSTS 'gpu.<your-domain>'
+Put-Plain  /jewelos/recorder/app/RECORDER_GPU_URL 'https://gpu.internal.<your-domain>/v1/transcribe'
+Put-Plain  /jewelos/recorder/app/RECORDER_GPU_HOSTS 'gpu.internal.<your-domain>'
 Put-Plain  /jewelos/recorder/app/RECORDER_ANALYZER_KIND 'bedrock'
 Put-Plain  /jewelos/recorder/app/RECORDER_ANALYZER_REGION '<approved region>'
 Put-Plain  /jewelos/recorder/app/RECORDER_ANALYZER_MODEL '<approved model or profile id>'
@@ -291,9 +291,9 @@ Put-Plain  /jewelos/recorder/gpu/PROCESSOR_DIARIZATION 'true'
 
 ### 6.5 Network
 
-Console **VPC -> Create VPC -> "VPC and more"**: 1 availability zone where the
-GPU type is offered, 1 public + 1 private subnet, NAT gateway "In 1 AZ" (temporary),
-S3 gateway endpoint "Yes". Then security groups:
+Console **VPC -> Create VPC -> "VPC and more"**: **2** availability zones (one of
+them offers the GPU type; an internal load balancer needs two), 2 public + 2 private
+subnets, NAT gateway "In 1 AZ", S3 gateway endpoint "Yes". Then security groups:
 
 | Group | Inbound | Used by |
 | --- | --- | --- |
@@ -302,8 +302,8 @@ S3 gateway endpoint "Yes". Then security groups:
 | `sg-gpu` | 8443 from `sg-gpu-lb` only | GPU host |
 
 No SSH anywhere: use **Systems Manager -> Session Manager** to get a shell.
-After the GPU host has downloaded its models once (6.6), delete the NAT gateway
-and its Elastic IP (about USD 35 a month saved).
+Keep the NAT gateway: the private GPU host needs it on every start to reach ECR,
+SSM and Session Manager (interface VPC endpoints instead cost about the same).
 
 ### 6.6 Container images (operator machine)
 
@@ -374,12 +374,13 @@ curl -s http://127.0.0.1:8443/healthz      # 200 once the models are loaded (fir
 ```
 
 5. **Certificate and load balancer.** **ACM -> Request public certificate** for
-   `gpu.<your-domain>`, DNS validation (add the CNAME it shows at your DNS provider).
+   `gpu.internal.<your-domain>`, DNS validation (add the CNAME it shows at your DNS provider).
    **EC2 -> Target groups**: HTTP, port 8443, health check `/healthz`, register the
-   GPU instance. **Load balancers -> Application, Internal**, private subnet(s),
-   `sg-gpu-lb`, HTTPS:443 listener with that certificate forwarding to the target group.
-   **Route 53 -> Hosted zones -> Create private hosted zone** `<your-domain>` attached
-   to the VPC, alias record `gpu.<your-domain>` -> the internal load balancer.
+   GPU instance. **Load balancers -> Application, Internal**, both private subnets,
+   `sg-gpu-lb`, HTTPS:443 listener with that certificate forwarding to the target
+   group; idle timeout 120 s. **Route 53 -> Hosted zones -> Create private hosted
+   zone** `internal.<your-domain>` attached to the VPC, alias record `gpu` -> the
+   internal load balancer.
 
 ### 6.8 Ingestion + workers host
 
@@ -627,7 +628,7 @@ Base matrix: `apps/mobile/README.md` "Physical test matrix". Add:
 | GPU `g6.xlarge`/`g5.xlarge` on-demand | Roughly USD 0.9-1.3 per hour -> about USD 650-950 for 24x7, about half if stopped outside store hours (6.9) |
 | Ingestion `t3.small` + 30 GB gp3 + Elastic IP | About USD 25-35 |
 | Internal ALB | About USD 20-25 + LCU |
-| NAT gateway (only while downloading models) | About USD 35 per month if left running - remove after first start |
+| NAT gateway (GPU host's outbound access) | About USD 35-45 |
 | S3 + KMS | 16 kHz PCM is about 115 MB per recorded hour; 7-day retention keeps this to a few dollars; KMS key USD 1 + requests |
 | CloudWatch + Route 53 health check | About USD 5-15 |
 | Bedrock Claude | Per-token price for the chosen model/region; budget about 15k input + 2k output tokens per 30-minute conversation |
