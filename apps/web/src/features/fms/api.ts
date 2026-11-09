@@ -147,6 +147,18 @@ export async function submitFmsFormAndProgress(input: { formTemplateId: string; 
 }
 export const reviewFmsStage = async (id: string, decision: "approved" | "rejected" | "revision_requested", remark: string, nextAssigneeId: string | null) => { const { error } = await supabase.rpc("review_fms_stage_with_audit", { p_instance_stage_id: id, p_decision: decision, ...(remark ? { p_remark: remark } : {}), ...(nextAssigneeId ? { p_next_assignee_id: nextAssigneeId } : {}) }); fail("Review FMS stage", error); };
 export const reassignFmsStage = async (id: string, from: string, to: string, reason: string) => { const { error } = await supabase.rpc("reassign_fms_stage_with_audit", { p_instance_stage_id: id, p_from_user_id: from, p_to_user_id: to, p_reason: reason }); fail("Reassign FMS stage", error); };
+/** CRM-started work: the people this step can be handed over to (empty when the viewer may not hand it over). */
+export type FmsHandoverCandidate = { id: string; employee_name: string; team: "crm" | "sales"; branch_id: string | null };
+export const listFmsHandoverCandidates = async (instanceStageId: string): Promise<FmsHandoverCandidate[]> => {
+  const { data, error } = await supabase.rpc("fms_crm_handover_candidates", { p_instance_stage_id: instanceStageId });
+  if (error) throw new Error(error.message);
+  return (data ?? []).flatMap((row) => row.team === "crm" || row.team === "sales" ? [{ id: row.id, employee_name: row.employee_name, team: row.team, branch_id: row.branch_id }] : []);
+};
+/** The person doing a CRM-started step passes it to another CRM or a salesperson (audited on the server). */
+export const handOverFmsStep = async (instanceStageId: string, toUserId: string, reason: string) => {
+  const { error } = await supabase.rpc("handover_fms_step_with_audit", { p_instance_stage_id: instanceStageId, p_to_user_id: toUserId, p_reason: reason });
+  if (error) throw new Error(error.message);
+};
 export const moveFmsStageBackward = async (id: string, target: string, reason: string, assignee: string | null) => { const { error } = await supabase.rpc("move_fms_stage_backward_with_audit", { p_instance_stage_id: id, p_target_stage_id: target, p_reason: reason, ...(assignee ? { p_assignee_id: assignee } : {}) }); fail("Move FMS stage backward", error); };
 export const requestFmsRevision = async (id: string, target: string, reason: string, assignee: string | null) => { const { error } = await supabase.rpc("request_fms_revision_with_audit", { p_instance_stage_id: id, p_target_stage_id: target, p_reason: reason, ...(assignee ? { p_assignee_id: assignee } : {}) }); fail("Request FMS revision", error); };
 export const escalateFmsStage = async (id: string, reason: string) => { const { error } = await supabase.rpc("escalate_fms_stage_with_audit", { p_instance_stage_id: id, p_reason: reason }); fail("Escalate FMS stage", error); };

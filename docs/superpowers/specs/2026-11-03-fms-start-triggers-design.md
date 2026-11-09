@@ -83,6 +83,27 @@ into; a closed case (purchase auto-close or a done call status) sends
 `crm.not_bought_case_closed`, which either notes the closure on the open run's journey
 (`record_only`, default) or cancels the run (`cancel_run`), audited.
 
+## The client's CRM gets CRM work (2026-11-09, JewelOS 0395, CRM 20261109000100)
+
+Owner request: work started by a CRM form goes to the CRM who attends the client, not the
+salesperson.
+
+- CRM events carry `crm_jewelos_user_id`: the CRM recorded on the walk-in visit, else the CRM the
+  Client Queue chose for that client today (round robin); a queue registration names its queue
+  CRM; leads have no CRM. `staff_jewelos_user_id` (salesperson) is unchanged.
+- `crm_sync_apply_submission_event` stores it as `crm_profile_id` (same tenant only). For CRM
+  sources, `source_staff` ("The client's CRM (from the Client Queue)") resolves that active CRM
+  first and the salesperson only when no active CRM is known. Forms Library sources are unchanged.
+  New CRM-source triggers default to `source_staff`. The builder's test panel previews the same.
+- Hand over: whoever holds an open step of a CRM-started run can pass it to another CRM (any
+  branch) or a salesperson of the run's branch (`fms_crm_handover_candidates`,
+  `handover_fms_step_with_audit`: audited, logged on the journey, old alert closed, new person
+  notified). "CRM" and "Sales" use the CRM roster's department rule (`crm_department_choice`).
+  Managers keep Reassign.
+- Names: when nothing names the work, `fms_work_record_name` falls back to the CRM client's
+  name, a written run title, then "Workflow — Step" (`fms_run_display_name`) instead of the FMS
+  reference. Task cards never show the long reference; a generic title gets a short "#1234".
+
 ## Security
 
 - No browser writes to either project for triggers; CRM and JewelOS keep separate homes.

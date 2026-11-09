@@ -51,7 +51,8 @@ export async function fetchHomeSummary():Promise<HomeSummary>{
     fms_stages:base.fms_stages.map((stage)=>{
       const formTemplateId=formByDefinition.get(definitionByRuntime.get(stage.stage_id)??"")??null;
       const context=displayContexts.get(stage.stage_id);
-      return {...stage,record_name:context?.recordName?presentFmsWorkContext(context).title:null,form_template_id:formTemplateId,form_name:formTemplateId?nameByForm.get(formTemplateId)??null:null};
+      const work=context?.recordName?presentFmsWorkContext(context):null;
+      return {...stage,record_name:work?.title??null,record_name_generic:work?.generic??true,form_template_id:formTemplateId,form_name:formTemplateId?nameByForm.get(formTemplateId)??null:null};
     }),
     fms_starters:starterRows.map((starter)=>({
       ...starter,
