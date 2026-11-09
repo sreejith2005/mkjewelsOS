@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, FlaskConical, Plus, Trash2 } from "lucide-react";
 import {
   FMS_TRIGGER_OPERATOR_LABELS, fmsTriggerFieldTypeForQuestion, fmsTriggerOperatorsFor, fmsTriggerSource,
-  newFmsStartTrigger, validateFmsStartTrigger,
+  fmsTriggerSourcePersonLabel, newFmsStartTrigger, validateFmsStartTrigger,
   type FmsFlowDefinition, type FmsStartMode, type FmsStartTrigger, type FmsTriggerField, type FmsTriggerGroup, type FmsTriggerNode,
   type FmsTriggerOperator, type FmsTriggerRule, type FmsTriggerSource,
 } from "@jewelos/core";
@@ -158,8 +158,10 @@ export function FmsStartTriggerPanel({ definition, data, flowId, onApply, onClos
             <label className="block"><span className="label">First step goes to</span>
               <select aria-label="First step assignee" className="field" onChange={(event) => setTrigger({ ...trigger, assignment: { ...trigger.assignment, mode: event.target.value === "source_staff" ? "source_staff" : "stage_rules" } })} value={trigger.assignment.mode}>
                 <option value="stage_rules">The first step's own assignee</option>
-                <option value="source_staff">{trigger.source.type === "jewelos_form" ? "The person who submitted the form" : "The CRM salesperson of this entry"}</option>
+                <option value="source_staff">{fmsTriggerSourcePersonLabel(trigger.source.type)}</option>
               </select>
+              {trigger.assignment.mode === "source_staff" && trigger.source.type !== "jewelos_form" && trigger.source.type !== "crm_lead"
+                ? <span className="mt-1 block text-xs text-soft-grey">If the client has no CRM, the salesperson gets it. The person who gets it can hand it over to another CRM.</span> : null}
             </label>
             {trigger.assignment.mode === "source_staff" ? <label className="block"><span className="label">If that person is not an active JewelOS user</span>
               <select aria-label="When the person is not found" className="field" onChange={(event) => setTrigger({ ...trigger, assignment: { ...trigger.assignment, onUnresolved: event.target.value === "stage_rules" ? "stage_rules" : "review" } })} value={trigger.assignment.onUnresolved}>

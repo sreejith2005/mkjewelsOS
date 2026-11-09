@@ -340,3 +340,11 @@ Kiara tool decision: no new read tool. Configuration/navigation extends existing
 - [ ] Dashboard uses available width. Task work lifecycle is a table with both score columns on the right. Concentrated distributions show labeled bars; comparisons show exact counts and percentages.
 - [ ] Forms and FMS use responsive tiles in a full-height workspace. Authors open the builder by clicking a form tile; Fill form remains separate. Versions & actions opens visibility, history and management actions.
 - [ ] Questionnaire recovery: Remove unavailable draft link removes only the draft reference, retaining the pinned form and answers. An already published draft offers Use in workflow to finish attachment. Valid drafts still require publication. Discard detaches the draft and keeps its form; the next edit uses a private copy. No new Kiara read tool is needed.
+
+## 2026-11-09 CRM tasks go to the client's CRM, Hand over, friendly task names (0395)
+
+- [ ] CRM-started work: a workflow started automatically by a CRM form gives its first task to the client's CRM (the CRM on the walk-in visit, else today's Client Queue round-robin CRM); the salesperson only when no CRM is found; leads go to the person who saved them. Builder label: **The client's CRM (from the Client Queue)**.
+- [ ] Tasks > FMS work page: **Hand over** (only the person who has a CRM-started task) opens **Hand over this task** with **CRM team** / **Salespeople**, reasons **I did not attend this client**, **I am busy with another client**, **I am not in the store today** or a written reason, then **Hand over to <name>**. Managers keep **Reassign** under **More actions**.
+- [ ] Task names: the customer or record name when known; otherwise **Workflow - Step** with a short number like **#1234**. The long FMS reference is no longer shown in task titles.
+
+No new Kiara read tool: task assignees are already visible through the existing task reads, and Kiara cannot hand over or reassign anything.

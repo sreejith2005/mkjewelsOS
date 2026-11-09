@@ -157,6 +157,9 @@ export const APP_HELP: Readonly<Partial<Record<PageId, AppHelpEntry>>> = {
     summary: "Tasks -> FMS groups the user's assigned starter forms and stage visits by workflow family and published stage (managers, admins and super admins get a stage-column board with counts instead); each record's action (Fill form, Start form, Open work) uses the existing protected runner.",
     recipes: [
       "Open an assigned stage: tap it from Home or Tasks; it opens that exact stage. Use \"My work\" at the top to go back to Tasks.",
+      "Who gets work started by a CRM form: when a CRM form (client queue, walk-in or a linked CRM form) starts a workflow automatically, the first task goes to the client's CRM: the CRM named on the walk-in visit, otherwise the CRM the Client Queue chose for that client today. The salesperson gets it only when no CRM can be found. For a CRM lead it goes to the person who saved the lead.",
+      "Hand over a CRM task: if you did not attend the client or are busy, open the task and press \"Hand over\" under the main buttons. Pick a person under \"CRM team\" or \"Salespeople\" (salespeople of the same branch), tap a reason such as \"I did not attend this client\" or write your own, then press \"Hand over to <name>\". The task moves to their task list straight away, they get a notification, and the hand-over is recorded. Only the person who has the task sees the button; managers can still use \"Reassign\" under \"More actions\".",
+      "Task names: a task is named after the customer or record when the workflow knows one (for example the client's name from a CRM form, or the name question chosen in Task naming). When nothing names it, it shows \"Workflow — Step\" with a short number such as #1234 so two similar tasks can be told apart.",
     ],
   },
   forms_library: {

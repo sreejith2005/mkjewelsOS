@@ -1,5 +1,6 @@
 import {FmsCustomerLink} from "./FmsCustomerLink";
 import { FmsTriggerSource } from "./FmsTriggerSource";
+import { FmsCrmHandover } from "./FmsCrmHandover";
 import { fmsOutcomeReplacesStage } from "@jewelos/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Circle, FileText, History, Paperclip } from "lucide-react";
@@ -198,6 +199,8 @@ export function FmsStageRunner({ instance, instanceStages, stage, definition, de
         {capability.canReject ? <Button className="min-h-12" disabled={busy} onClick={() => void work(() => completeWork({ kind: "review", instanceStageId: stage.id, decision: "rejected", remark, ...(nextAssignee ? { nextAssigneeId: nextAssignee } : {}) }))} variant="danger">Reject</Button> : null}
       </> : null}
     </div>
+    {/* CRM-started work: the person doing it can pass it to another CRM or a salesperson. */}
+    {canAct && (stage.assigned_to ?? []).includes(profile.id) ? <FmsCrmHandover instanceStageId={stage.id} onDone={onRefresh} /> : null}
     {!canAct ? <p className="text-sm text-task-text-muted">{capability.reason}</p> : null}
     {(canAct && ((capability.canRequestRevision || capability.canMoveBackward) && priorStages.length || capability.canEscalate)) || (capability.canReassign && (stage.assigned_to?.length ?? 0) > 0) ? <details className="rounded-xl border border-task-border px-3">
       <summary className="min-h-11 cursor-pointer content-center text-sm font-medium text-task-text-muted">More actions</summary>

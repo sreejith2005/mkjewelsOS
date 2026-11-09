@@ -14272,6 +14272,11 @@ export type Database = {
       submit_form_and_start_fms_idempotent: { Args: { p_form_template_id: string; p_answers: Json; p_idempotency_key: string; p_flow_id?: string }; Returns: Json }
 
       preview_fms_work_transition: { Args: { p_request: Json; p_handoffs?: Json }; Returns: Json }
+      fms_crm_handover_candidates: {
+        Args: { p_instance_stage_id: string }
+        Returns: { id: string; employee_name: string; team: string; branch_id: string | null }[]
+      }
+      handover_fms_step_with_audit: { Args: { p_instance_stage_id: string; p_to_user_id: string; p_reason: string }; Returns: Json }
       test_fms_start_trigger: {
         Args: { p_answers: Json; p_flow_id: string; p_trigger: Json }
         Returns: Json
