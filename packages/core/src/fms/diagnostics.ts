@@ -161,7 +161,8 @@ export function diagnoseFmsDefinition(raw: FmsFlowDefinition, catalog: FmsDiagno
       }
     }
     if (definition.assignmentVersion === 2 && config?.mode === "manual_handoff" && !config.fallbackRule) add({ severity: "suggestion", code: "handoff_without_fallback", stageKey: stage.key, title: "Manual handoff has no fallback", evidence: ["If the previous employee does not choose someone, this step waits for a manager."], fix: "Add a fallback (for example the previous step's employee)." });
-    if (onCycle.has(stage.key) && !stage.sla.followUp) add({ severity: "suggestion", code: "loop_without_visit_limit", stageKey: stage.key, title: "This step can repeat without a visit limit", evidence: ["A route returns to this step, and no follow-up limit is set."], fix: "Set a visit limit with Hold or Escalate so a repeating loop is noticed." });
+    // A Follow-Up Group repeats by design, one employee decision per visit, until the customer proceeds or declines.
+    if (onCycle.has(stage.key) && !stage.sla.followUp && !stage.sla.followUpGroup) add({ severity: "suggestion", code: "loop_without_visit_limit", stageKey: stage.key, title: "This step can repeat without a visit limit", evidence: ["A route returns to this step, and no follow-up limit is set."], fix: "Set a visit limit with Hold or Escalate so a repeating loop is noticed." });
   }
   for (const stage of definition.stages.filter((item) => item.type === "parallel_start")) {
     const unjoined = stage.parallelTargetStageKeys.filter((key) => !reaches(definition.stages, key, (item) => item.type === "parallel_join"));

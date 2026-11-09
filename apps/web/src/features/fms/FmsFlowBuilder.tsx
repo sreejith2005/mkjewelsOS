@@ -2,9 +2,11 @@ import { upgradeFmsAssignmentContract } from "@jewelos/core";
 import { FmsSimulation } from "./FmsSimulation";
 import { suggestFmsAssignment } from "@jewelos/core";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { ArrowDownUp, ArrowLeft, CheckCircle2, ChevronDown, FileText, FlaskConical, PanelLeftOpen, Plus, Redo2, Save, Send, Sparkles, TestTube2, Undo2, UserRoundPlus, X, Zap } from "lucide-react";
+import { ArrowDownUp, ArrowLeft, CheckCircle2, ChevronDown, FileText, FlaskConical, PanelLeftOpen, Plus, Redo2, Repeat, Save, Send, Sparkles, TestTube2, Undo2, UserRoundPlus, X, Zap } from "lucide-react";
 import { describeFmsStartTrigger, validateFmsStartTrigger, type FmsStartMode } from "@jewelos/core";
 import { FmsStartTriggerPanel, fmsTriggerFields, latestFormVersions } from "./FmsStartTriggerPanel";
+import { insertFmsFollowUpGroup, setFmsFollowUpGroupParent } from "@jewelos/core";
+import { FmsFollowUpGroupPanel } from "./FmsFollowUpGroupPanel";
 import { copyFirstFmsAssigneeToHumanStages, createFmsFragment, defaultFmsReportFilters, fmsOutgoingStageKeys, importFormSectionCopy, describeFmsPasteReport, fmsConnectionsTouching, fmsStageFormFields, FmsTransferError, normalizeFmsDefinition, parseFmsTransfer, pasteFmsFragment, removeFmsStages, validateFmsDefinition, type FmsFlowDefinition, type FmsStageDefinition, type FormTemplateDefinition } from "@jewelos/core";
 import { Button, Modal, Notice } from "@/components/ui";
 import { AssigneePicker } from "@/components/assignees/AssigneePicker";
@@ -248,6 +250,26 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
     });
     setSelectedKey(stage.key); setSelectedKeys([stage.key]); setRightPanel("inspector"); setToolsOpen(false); setError(null);
   };
+  /**
+   * Adds Follow-Up 1, 2 and 3 after the given or selected step as one undo step.
+   * The steps are ordinary Decision steps; Add Step is unchanged.
+   */
+  const addFollowUpGroup = (after?: string) => {
+    if (!normalized.stages.length) { setError("Add the first step before adding a Follow-Up Group."); return; }
+    const afterKey = after ?? (selected && !["branch", "parallel_start", "end"].includes(selected.type) ? selected.key : undefined);
+    const result = insertFmsFollowUpGroup(normalized, { afterKey, newId: () => crypto.randomUUID(), formFields: data.formFields, assigneeRules: contextDefaultAssigneeId ? [{ type: "specific_user" as const, userProfileId: contextDefaultAssigneeId }] : undefined });
+    commit(result.definition);
+    const first = result.stageKeys[0]!;
+    setSelectedKey(first); setSelectedKeys(result.stageKeys); setRightPanel("inspector"); setToolsOpen(false); setError(null);
+    const parentName = result.parentStageKey ? normalized.stages.find((stage) => stage.key === result.parentStageKey)?.name || "the selected step" : null;
+    const todo = [
+      !result.parentStageKey ? "connect the main step to Follow-Up 1" : !result.linkedFromParent ? `connect a route of ${parentName} to Follow-Up 1` : "",
+      !result.proceedStageKey ? "choose where \"Interested, proceed\" goes" : "",
+      !result.closeStageKey ? "choose where \"Not interested, close\" goes (for example a Lost End Node)" : "",
+    ].filter(Boolean);
+    setSuccess(`Follow-Up Group added${parentName ? ` after ${parentName}` : ""}. Follow-Up 3 returns to Follow-Up 1 until the customer proceeds or declines.${todo.length ? ` Next: ${todo.join("; ")}.` : ""} Use Undo to remove it.`);
+  };
+  const setFollowUpParent = (groupId: string, parentStageKey: string | undefined) => commit((current) => ({ ...current, stages: setFmsFollowUpGroupParent(normalizeFmsDefinition(current).stages, groupId, parentStageKey) }));
   const replace = (key: string, value: FmsStageDefinition) => commit((current) => ({ ...current, stages: current.stages.map((stage) => stage.key === key ? value : stage) }));
   /** The single-step delete keeps its historical behaviour: the step's neighbours are joined where possible. */
   const remove = (key: string) => {
@@ -445,7 +467,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
   const showAi = !!aiPanel && (rightPanel === "ai" || !selected);
   const showInspector = !!selected && !showAi;
   const stageIssues = selected ? issues.filter((issue) => issue.stageKey === selected.key) : [];
-  const editor = selected ? <FmsStageEditor assignmentVersion={normalized.assignmentVersion} startMode={normalized.startMode} data={data} endCounts={endCounts} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); setSelectedKeys([value.key]); }} onDelete={() => remove(selected.key)} questionnaire={questionnaireActions(selected)} stage={selected} stages={normalized.stages} /> : null;
+  const editor = selected ? <>{selected.sla.followUpGroup ? <FmsFollowUpGroupPanel onOpenStage={openStage} onSetParent={setFollowUpParent} readOnly={readOnly} stage={selected} stages={normalized.stages} /> : null}<FmsStageEditor assignmentVersion={normalized.assignmentVersion} startMode={normalized.startMode} data={data} endCounts={endCounts} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); setSelectedKeys([value.key]); }} onDelete={() => remove(selected.key)} questionnaire={questionnaireActions(selected)} stage={selected} stages={normalized.stages} /></> : null;
   const inspectorHeader = selected ? <div className="min-w-0"><p className="text-xs text-gold-secondary">{selected.key === triggerKey ? "Start form" : !formStart && selected.key === normalized.stages[0]?.key ? (normalized.startMode === "automatic" ? "First step (after the automatic start)" : "First step") : selected.type === "task" ? "Step" : selected.type.replaceAll("_", " ")}</p><h3 className="truncate text-lg font-semibold text-white">{selected.name || "Untitled step"}</h3></div> : null;
   const inspector = selected ? <>
     <div aria-hidden="true" className="fixed inset-0 z-40 bg-obsidian/60 md:hidden" onClick={() => setSelectedKey(null)} />
@@ -477,7 +499,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
     {startLines.map((line, index) => <span className={cn("mt-1 block text-xs", index === 1 ? "text-champagne" : "font-semibold text-white")} key={`${line}-${index}`}>{line}</span>)}
     <span className="mt-2 block text-[11px] text-soft-grey">→ {normalized.stages[0]?.name || "First step"} · tap to edit</span>
   </button>;
-  const canvas = <FmsGraphCanvas definition={normalized} endCounts={endCounts} fill={!isPhone} formFields={data.formFields} focusRequest={focusRequest} inspectedKey={selected?.key ?? null} invalidKeys={invalidKeys} onAddAfter={(key) => add("task", key)} onCommand={runCommand} onConnect={connect} onDelete={(key) => requestDelete([key])} onDisconnect={disconnect} onDuplicate={duplicateStage} onEditRoute={editRoute} onMove={moveStages} onOpen={openStage} onReconnect={reconnect} onSelectionChange={changeSelection} ref={canvasRef} selectedKeys={selectedKeys} />;
+  const canvas = <FmsGraphCanvas definition={normalized} endCounts={endCounts} fill={!isPhone} formFields={data.formFields} focusRequest={focusRequest} inspectedKey={selected?.key ?? null} invalidKeys={invalidKeys} onAddAfter={(key) => add("task", key)} onAddFollowUpAfter={readOnly ? undefined : (key) => addFollowUpGroup(key)} onCommand={runCommand} onConnect={connect} onDelete={(key) => requestDelete([key])} onDisconnect={disconnect} onDuplicate={duplicateStage} onEditRoute={editRoute} onMove={moveStages} onOpen={openStage} onReconnect={reconnect} onSelectionChange={changeSelection} ref={canvasRef} selectedKeys={selectedKeys} />;
   const studioStage = studio ? normalized.stages.find((stage) => stage.key === studio.stageKey) : undefined;
   const sectionStage = sectionPicker ? normalized.stages.find((stage) => stage.key === sectionPicker.stageKey) : undefined;
   const previewStage = previewKey ? normalized.stages.find((stage) => stage.key === previewKey) : undefined;
@@ -543,7 +565,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
     {emptyStart ?? <div className="relative">
       {canvas}
       {startAnchor}
-      {readOnly ? null : <Button className="absolute bottom-3 left-3 z-30 shadow-lg" onClick={() => add("task")} type="button"><Plus className="size-4" />Add Step</Button>}
+      {readOnly ? null : <div className="absolute bottom-3 left-3 z-30 flex gap-2"><Button className="shadow-lg" onClick={() => add("task")} type="button"><Plus className="size-4" />Add Step</Button><Button aria-label="Add Follow-Up Group" className="shadow-lg" onClick={() => addFollowUpGroup()} type="button" variant="secondary"><Repeat className="size-4" />Follow-Up</Button></div>}
     </div>}
     <section className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 -mx-2 mt-auto rounded-t-2xl border border-b-0 border-gold/30 bg-charcoal/95 backdrop-blur">
       <button aria-expanded={issues.length ? issuesOpen : undefined} className="flex w-full flex-wrap items-center gap-3 px-4 py-3 text-left" onClick={() => { if (issues.length) setIssuesOpen((open) => !open); else checkWorkflow(); }} type="button">
@@ -589,6 +611,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
       <nav aria-label="Workflow tools" className="z-30 flex w-12 shrink-0 flex-col items-center gap-2 border-r border-gold/15 bg-charcoal/80 py-3">
         <button aria-controls="fms-workflow-tools" aria-expanded={toolsOpen} aria-label="Open workflow tools" className={cn("grid size-9 place-items-center rounded-lg border text-gold-secondary transition hover:bg-gold/10", toolsOpen ? "border-gold bg-gold/15" : "border-gold/25")} onClick={() => setToolsOpen((open) => !open)} ref={toolsButtonRef} title="Workflow tools" type="button"><PanelLeftOpen className="size-4" /></button>
         {readOnly ? null : <button aria-label="Add Step" className="grid size-9 place-items-center rounded-lg bg-gold text-on-gold shadow transition hover:brightness-110" onClick={() => add("task")} title="Add Step" type="button"><Plus className="size-4" /></button>}
+        {readOnly ? null : <button aria-label="Add Follow-Up Group" className="grid size-9 place-items-center rounded-lg border border-gold/40 bg-charcoal text-gold-secondary shadow transition hover:bg-gold/15" onClick={() => addFollowUpGroup()} title="Add Follow-Up Group after the selected step" type="button"><Repeat className="size-4" /></button>}
       </nav>
       <div className="relative min-w-0 flex-1" style={{ "--fms-canvas-overlay-bottom": "5rem" } as CSSProperties}>
         {emptyStart ? <div className="grid h-full place-items-center overflow-y-auto p-6"><div className="max-w-md">{emptyStart}</div></div> : <>{canvas}{startAnchor}</>}
@@ -604,6 +627,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
             <header className="flex shrink-0 items-center justify-between gap-2 border-b border-gold/15 px-3 py-2.5"><p className="text-sm font-semibold text-white">Workflow tools</p><Button aria-label="Close workflow tools" autoFocus className="shrink-0 px-2" onClick={() => { setToolsOpen(false); toolsButtonRef.current?.focus(); }} variant="ghost"><X className="size-5" /></Button></header>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
               {readOnly ? <p className="rounded-xl border border-gold/20 p-3 text-xs text-champagne">View only: you can open steps, routes and assignees but not change them.</p> : <button className="flex w-full items-center gap-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-left text-gold-secondary hover:bg-gold/20" onClick={() => add("task")} type="button"><span className="grid size-8 place-items-center rounded-lg bg-gold text-on-gold"><Plus className="size-4" /></span><span><b className="block text-sm">Add Step</b><span className="text-[11px] text-champagne">Questions, routing and assignee</span></span></button>}
+              {readOnly ? null : <button className="mt-2 flex w-full items-center gap-3 rounded-xl border border-gold/25 p-3 text-left text-gold-secondary hover:border-gold hover:bg-gold/10" onClick={() => addFollowUpGroup()} type="button"><span className="grid size-8 place-items-center rounded-lg border border-gold/40 text-gold-secondary"><Repeat className="size-4" /></span><span><b className="block text-sm">Add Follow-Up Group</b><span className="text-[11px] text-champagne">Follow-Up 1, 2 and 3 after the selected step, repeating until the customer proceeds or declines</span></span></button>}
               {formStart ? <section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Process form</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/15 p-3 text-left hover:border-gold" onClick={() => { if (normalized.stages[0]) { openStage(normalized.stages[0].key); setToolsOpen(false); } }} type="button"><span className="grid size-8 place-items-center rounded-lg bg-champagne/20 text-champagne"><FileText className="size-4" /></span><span><b className="block text-sm text-white">{processFormName}</b><span className="text-[11px] text-soft-grey">The form that starts the workflow</span></span></button></section> : <section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Start trigger</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/15 p-3 text-left hover:border-gold" onClick={() => { setTriggerOpen(true); setToolsOpen(false); }} type="button"><span className="grid size-8 place-items-center rounded-lg bg-champagne/20 text-champagne"><Zap className="size-4" /></span><span><b className="block text-sm text-white">{normalized.startMode === "automatic" ? "Automatic trigger" : "Manual start"}</b><span className="text-[11px] text-soft-grey">{startLines[0] ?? "Choose how runs start"}</span></span></button></section>}
               {readOnly ? null : <section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Default assignees</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/15 p-3 text-left hover:border-gold" onClick={() => { setAssigning(true); setToolsOpen(false); }} type="button"><span className="grid size-8 place-items-center rounded-lg bg-champagne/20 text-champagne"><UserRoundPlus className="size-4" /></span><span><b className="block text-sm text-white">{assigneeSummary}</b><span className="text-[11px] text-soft-grey">Pre-assign people to steps</span></span></button></section>}
               <section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Shortcuts</p><dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px] text-soft-grey">{[["Ctrl+C / X / V", "Copy, cut, paste steps"], ["Ctrl+D", "Duplicate"], ["Del", "Delete"], ["Ctrl+A", "Select all"], ["Ctrl+Z", "Undo"], ["Space+drag", "Pan"], ["1", "Fit workflow"], ["Esc", "Clear selection"]].flatMap(([keys, label]) => [<dt className="font-semibold text-champagne" key={`${keys}-k`}>{keys}</dt>, <dd key={`${keys}-v`}>{label}</dd>])}</dl></section>

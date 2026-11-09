@@ -550,3 +550,90 @@ describe("FMS builder on a phone", () => {
     expect(screen.getAllByRole("listitem").length).toBeGreaterThan(0);
   });
 });
+
+/** Add Follow-Up Group: three ordinary Decision steps, one undo step, Add Step unchanged. */
+describe("FMS builder Follow-Up Groups", () => {
+  const outcomeTarget = (key: string, outcome: string) => stage(key).branchRules.find((rule) => rule.value === outcome)?.nextStageKey;
+
+  it("Add Step still adds one plain step with no follow-up metadata", async () => {
+    const { a, b } = await openBuilder();
+    expect(latest!.stages).toHaveLength(3);
+    for (const key of [a, b]) expect(stage(key).sla.followUpGroup).toBeUndefined();
+    expect(stage(a).branchRules).toEqual([]);
+    expect(screen.queryByRole("region", { name: "Follow-Up Group" })).toBeNull();
+  });
+
+  it("adds Follow-Up 1, 2 and 3 after the selected step, loops 3 back to 1, and undo restores the workflow exactly", async () => {
+    const { user, a, b } = await openBuilder();
+    await user.click(screen.getByRole("button", { name: "open first step" }));
+    const before = JSON.stringify(latest);
+    await user.click(screen.getByRole("button", { name: "Add Follow-Up Group" }));
+    expect(latest!.stages).toHaveLength(6);
+    const [f1, f2, f3] = latest!.stages.slice(3).map((item) => item.key) as [string, string, string];
+    expect([f1, f2, f3].map((key) => stage(key).name)).toEqual(["Follow-Up 1", "Follow-Up 2", "Follow-Up 3"]);
+    expect(stage(a).defaultNextStageKey).toBe(f1);
+    expect([f1, f2, f3].map((key) => outcomeTarget(key, "proceed"))).toEqual([b, b, b]);
+    expect([f1, f2, f3].map((key) => outcomeTarget(key, "follow_up_again"))).toEqual([f2, f3, f1]);
+    const groupIds = new Set([f1, f2, f3].map((key) => stage(key).sla.followUpGroup?.groupId));
+    expect(groupIds.size).toBe(1);
+    // Follow-Up 1 opens with its group summary above the ordinary step settings.
+    const panel = screen.getByRole("region", { name: "Follow-Up Group" });
+    expect(within(panel).getByText("Follow-Up 1 of 3")).toBeTruthy();
+    expect(within(panel).getAllByText(/choose where "Not interested, close" goes/).length).toBe(3);
+    expect(screen.getByText(/Follow-Up Group added after/)).toBeTruthy();
+    // Without an End Node the close route needs a destination before publishing.
+    expect(screen.getAllByText(/"Not interested, close" has no destination step/).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("button", { name: "Undo" }));
+    expect(JSON.stringify(latest)).toBe(before);
+  });
+
+  it("keeps two groups apart, lets the author open any member and set the main step for the whole group, and saves the tags", async () => {
+    mocks.saveFmsDraft.mockResolvedValue(flowId);
+    const { user, a, b } = await openBuilder();
+    await user.click(screen.getByRole("button", { name: "open first step" }));
+    await user.click(screen.getByRole("button", { name: "Add Follow-Up Group" }));
+    const first = latest!.stages.slice(3).map((item) => item.key);
+    await user.click(screen.getByRole("button", { name: "Add Follow-Up Group" }));
+    const second = latest!.stages.slice(6).map((item) => item.key);
+    expect(stage(first[0]!).sla.followUpGroup!.groupId).not.toBe(stage(second[0]!).sla.followUpGroup!.groupId);
+    expect(second.map((key) => stage(key).sla.followUpGroup!.parentStageKey)).toEqual([first[0], first[0], first[0]]);
+    const panel = () => screen.getByRole("region", { name: "Follow-Up Group" });
+    await user.click(within(panel()).getByRole("button", { name: "Follow-Up 2" }));
+    expect(within(panel()).getByText("Follow-Up 2 of 3")).toBeTruthy();
+    await user.selectOptions(within(panel()).getByLabelText("Follows up"), b);
+    expect(second.map((key) => stage(key).sla.followUpGroup!.parentStageKey)).toEqual([b, b, b]);
+    expect(first.map((key) => stage(key).sla.followUpGroup!.parentStageKey)).toEqual([a, a, a]);
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+    const saved = mocks.saveFmsDraft.mock.calls.at(-1)![1] as FmsFlowDefinition;
+    expect(saved.stages.filter((item) => item.sla.followUpGroup).map((item) => [item.sla.followUpGroup!.number, item.sla.followUpGroup!.parentStageKey])).toEqual([[1, a], [2, a], [3, a], [1, b], [2, b], [3, b]]);
+  });
+
+  it("never treats an existing step named Follow up as a group, and hides the action when viewing only", async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<FmsFlowBuilder data={savedFlowData} flow={savedFlowData.flows[0]!} onClose={() => undefined} onSaved={async () => undefined} />);
+    await user.click(screen.getByRole("button", { name: "open first step" }));
+    expect(screen.queryByRole("region", { name: "Follow-Up Group" })).toBeNull();
+    expect(latest!.stages.every((item) => !item.sla.followUpGroup)).toBe(true);
+    unmount();
+    render(<FmsFlowBuilder data={savedFlowData} flow={savedFlowData.flows[0]!} onClose={() => undefined} onSaved={async () => undefined} readOnly />);
+    expect(screen.queryByRole("button", { name: "Add Follow-Up Group" })).toBeNull();
+  });
+
+  describe("on a phone", () => {
+    beforeEach(() => { vi.stubGlobal("matchMedia", (query: string) => ({ matches: true, media: query, addEventListener: () => undefined, removeEventListener: () => undefined })); });
+    afterEach(() => { vi.unstubAllGlobals(); });
+    it("adds a group from the floating Follow-Up button beside Add Step", async () => {
+      const user = userEvent.setup();
+      render(<FmsFlowBuilder data={data} flow={null} onClose={() => undefined} onSaved={async () => undefined} />);
+      await user.type(screen.getByLabelText("Workflow name *"), "Qualification");
+      await user.type(screen.getByLabelText("Purpose *"), "Route by customer type");
+      await user.click(screen.getByRole("button", { name: /Open builder/ }));
+      expect(screen.getByRole("button", { name: "Add Step" })).toBeTruthy();
+      await user.click(screen.getByRole("button", { name: "Add Follow-Up Group" }));
+      expect(latest!.stages.map((item) => item.name)).toEqual(["Start form", "Follow-Up 1", "Follow-Up 2", "Follow-Up 3"]);
+      // Like Add Step, nothing selected means nothing is rewired; the author is told to connect it.
+      expect(stage(latest!.stages[0]!.key).defaultNextStageKey).toBeUndefined();
+      expect(screen.getByText(/connect the main step to Follow-Up 1/)).toBeTruthy();
+    });
+  });
+});

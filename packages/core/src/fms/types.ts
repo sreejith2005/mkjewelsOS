@@ -60,6 +60,14 @@ export type FmsFormDueSource = Readonly<{ stageKey: string; dateFieldKey: string
  * the previous step's submission until the date is entered.
  */
 export type FmsFormDueRule = Readonly<{ sources: readonly FmsFormDueSource[]; defaultTime?: string | undefined; onMissing: "fallback" | "none" | "require" }>;
+/**
+ * Marks an ordinary step as one of the three steps of a Follow-Up Group. The
+ * runtime never reads it: the steps run, route and loop like any Decision
+ * step. It only identifies the group (`groupId`, stable across revisions),
+ * the step's place in it (1-3) and the main step it follows up, so reports can
+ * count attempts and rounds per group from the recorded visits.
+ */
+export type FmsFollowUpGroupTag = Readonly<{ groupId: string; number: 1 | 2 | 3; parentStageKey?: string | undefined }>;
 export type FmsSlaRule = Readonly<{
   pipelineName?: string | undefined;
   assignment?: FmsAssignmentConfig | undefined;
@@ -103,6 +111,8 @@ export type FmsSlaRule = Readonly<{
   conditional?: FmsConditionalRule | undefined;
   /** End Nodes only: the terminal business outcome recorded when the workflow reaches this node. */
   terminal?: FmsTerminalConfig | undefined;
+  /** Follow-Up Group membership. Absent on every other step, so older workflows are unchanged. */
+  followUpGroup?: FmsFollowUpGroupTag | undefined;
 }>;
 /**
  * An ordered outgoing route. `branch` stages have always used these rules; since

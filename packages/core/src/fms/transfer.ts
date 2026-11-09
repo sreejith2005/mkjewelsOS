@@ -1,4 +1,4 @@
-import { fmsOutgoingStageKeys } from "./engine.ts";
+import { fmsOutgoingStageKeys, normalizeFmsFollowUpGroupTag } from "./engine.ts";
 import { FMS_ASSIGNEE_TYPES, FMS_AUTHORING_STAGE_TYPES, FMS_TERMINAL_OUTCOMES, FMS_BRANCH_OPERATORS, type FmsAssigneeRule, type FmsBranchRule, type FmsFlowDefinition, type FmsSlaRule, type FmsStageDefinition } from "./types.ts";
 import { FMS_ASSIGNMENT_MODES, type FmsAssignmentConfig, type FmsAssignmentSource, type FmsTaskDisplay } from "./workContracts.ts";
 
@@ -181,7 +181,7 @@ function parseBranchRule(raw: unknown, path: string): FmsBranchRule {
   };
 }
 
-const SLA_KEYS = ["pipelineName", "assignment", "completionFormRequired", "taskDisplay", "followUp", "assignmentFieldKey", "formSectionKey", "questionnaire", "timingMethod", "deadlineEnabled", "dueDate", "tatHours", "tatMinutes", "tatUnit", "futureDate", "daysBefore", "clockTime", "triggerStageKey", "decisionMode", "decisionOptions", "conditional", "terminal", "formDue", "autoFormDue"] as const;
+const SLA_KEYS = ["pipelineName", "assignment", "completionFormRequired", "taskDisplay", "followUp", "assignmentFieldKey", "formSectionKey", "questionnaire", "timingMethod", "deadlineEnabled", "dueDate", "tatHours", "tatMinutes", "tatUnit", "futureDate", "daysBefore", "clockTime", "triggerStageKey", "decisionMode", "decisionOptions", "conditional", "terminal", "formDue", "autoFormDue", "followUpGroup"] as const;
 
 function parseSla(raw: unknown, path: string): FmsSlaRule {
   if (raw === undefined || raw === null) return { dueDate: "" };
@@ -245,6 +245,14 @@ function parseSla(raw: unknown, path: string): FmsSlaRule {
       };
     }
     sla.followUp = { maxVisits: numberValue(followUp.maxVisits, `${path}.followUp.maxVisits`) ?? 1, onLimit: oneOf(followUp.onLimit, ["hold", "escalate"] as const, `${path}.followUp.onLimit`), ...(schedule ? { schedule } : {}) };
+  }
+  if (raw.followUpGroup !== undefined && raw.followUpGroup !== null) {
+    const group = raw.followUpGroup;
+    if (!isRecord(group)) fail(`${path}.followUpGroup`, "must be an object");
+    onlyKeys(group, ["groupId", "number", "parentStageKey"], `${path}.followUpGroup`);
+    const tag = normalizeFmsFollowUpGroupTag(group);
+    if (!tag) fail(`${path}.followUpGroup`, "needs a group id and a follow-up number from 1 to 3");
+    sla.followUpGroup = tag;
   }
   if (raw.questionnaire !== undefined && raw.questionnaire !== null) {
     const questionnaire = raw.questionnaire;
@@ -406,6 +414,8 @@ export function pasteFmsFragment(target: FmsFlowDefinition, source: readonly Fms
     const routeRuleId = item.routeRuleId ? ruleMap.get(item.routeRuleId) : undefined;
     return { ...item, sourceStageKey: sourceKey, ...(item.routeRuleId ? { routeRuleId } : {}) };
   };
+  // A pasted Follow-Up Group is a new group: its reports never mix with the group it was copied from.
+  const groupMap = new Map([...new Set(ordered.flatMap((stage) => stage.sla.followUpGroup ? [stage.sla.followUpGroup.groupId] : []))].map((id) => [id, options.newId()] as const));
   const baseOrder = Math.max(-1, ...target.stages.map((stage) => stage.order)) + 1;
   // Fragments are already relative; a whole-workflow export is not. Either way the group's corner lands on the anchor.
   const placed = ordered.flatMap((stage) => stage.position ? [stage.position] : []);
@@ -462,6 +472,11 @@ export function pasteFmsFragment(target: FmsFlowDefinition, source: readonly Fms
         } } } : {}),
         conditional: conditionKey && sla.conditional ? { ...sla.conditional, decisionStageKey: conditionKey } : undefined,
         ...(sla.formDue ? { formDue: { ...sla.formDue, sources: sla.formDue.sources.flatMap((item) => { const mapped = mapKey(item.stageKey); return mapped ? [{ ...item, stageKey: mapped }] : []; }) } } : {}),
+        ...(sla.followUpGroup ? (() => {
+          const { parentStageKey, ...tag } = sla.followUpGroup;
+          const parent = parentStageKey ? keyMap.get(parentStageKey) : undefined;
+          return { followUpGroup: { ...tag, groupId: groupMap.get(tag.groupId) ?? options.newId(), ...(parent ? { parentStageKey: parent } : {}) } };
+        })() : {}),
       },
     };
   });
@@ -523,6 +538,7 @@ export function removeFmsStages(stages: readonly FmsStageDefinition[], keys: Ite
         ...(sla.conditional && gone(sla.conditional.decisionStageKey) ? { conditional: undefined } : {}),
         ...(sla.assignment ? { assignment: { ...sla.assignment, sources: sla.assignment.sources.filter((item) => !gone(item.sourceStageKey)) } } : {}),
         ...(sla.formDue ? { formDue: { ...sla.formDue, sources: sla.formDue.sources.filter((item) => !gone(item.stageKey)) } } : {}),
+        ...(sla.followUpGroup?.parentStageKey && gone(sla.followUpGroup.parentStageKey) ? { followUpGroup: { groupId: sla.followUpGroup.groupId, number: sla.followUpGroup.number } } : {}),
         ...(sla.taskDisplay ? { taskDisplay: { ...sla.taskDisplay, fields: sla.taskDisplay.fields.filter((item) => !gone(item.sourceStageKey)), referenceField: keepSource(sla.taskDisplay.referenceField), recordNaming: sla.taskDisplay.recordNaming?.mode === "field" && gone(sla.taskDisplay.recordNaming.source?.sourceStageKey) ? undefined : sla.taskDisplay.recordNaming } } : {}),
       },
     };

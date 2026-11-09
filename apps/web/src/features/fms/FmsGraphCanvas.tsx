@@ -1,6 +1,6 @@
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { CheckSquare, CircleHelp, ClipboardPaste, Copy, CopyPlus, FileText, Flag, GitBranch, Hand, Info, Layers, LayoutGrid, Maximize, Merge, Minus, MousePointer2, Pencil, Plus, Scissors, ShieldCheck, Trash2, Waypoints, X, Zap } from "lucide-react";
-import { FMS_MIN_ZOOM as MIN_ZOOM, FMS_MAX_ZOOM as MAX_ZOOM, fmsWheelZoomFactor, routeFmsGraphEdges, fmsOutgoingStageKeys, hasFmsStageRouting, zoomFmsViewport, type FmsFlowDefinition, type FmsFormFieldRef, type FmsStageDefinition, type FmsViewport } from "@jewelos/core";
+import { CheckSquare, CircleHelp, ClipboardPaste, Copy, CopyPlus, FileText, Flag, GitBranch, Hand, Info, Layers, LayoutGrid, Maximize, Merge, Minus, MousePointer2, Pencil, Plus, Repeat, Scissors, ShieldCheck, Trash2, Waypoints, X, Zap } from "lucide-react";
+import { FMS_MIN_ZOOM as MIN_ZOOM, FMS_MAX_ZOOM as MAX_ZOOM, fmsFollowUpGroups, fmsWheelZoomFactor, routeFmsGraphEdges, fmsOutgoingStageKeys, hasFmsStageRouting, zoomFmsViewport, type FmsFlowDefinition, type FmsFormFieldRef, type FmsStageDefinition, type FmsViewport } from "@jewelos/core";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { fmsCanvasOvershoot, fmsGraphEdges, fmsStageSummary, fmsTimingSummary, layoutFmsDefinition, type FmsGraphEdge, type FmsGraphPosition } from "./graph";
@@ -78,6 +78,8 @@ type CanvasProps = Readonly<{
   onDelete: (key: string) => void;
   onDuplicate: (key: string) => void;
   onAddAfter: (key: string) => void;
+  /** Adds a Follow-Up Group after this step. Absent (view only) hides the menu entry. */
+  onAddFollowUpAfter?: ((key: string) => void) | undefined;
   /** Unique finished instances per End Node key, shown as a small count on published End Nodes. */
   endCounts?: ReadonlyMap<string, number> | undefined;
   onConnect: (from: string, to: string) => void;
@@ -100,6 +102,14 @@ export const FmsGraphCanvas = forwardRef<FmsCanvasHandle, CanvasProps>(function 
   const hasCenteredRef = useRef(false);
   const layout = useMemo(() => layoutFmsDefinition(definition), [definition]);
   const edges = useMemo(() => fmsGraphEdges(definition.stages, formFields), [definition.stages, formFields]);
+  /** "Follow-Up 2 of 3 · Introduction Call" per grouped step; untagged steps get nothing. */
+  const followUpLabels = useMemo(() => {
+    const names = new Map(definition.stages.map((stage) => [stage.key, stage.name]));
+    return new Map(fmsFollowUpGroups(definition.stages).flatMap((group) => group.members.map((stage) => [stage.key, {
+      chip: `Follow-Up ${stage.sla.followUpGroup?.number ?? ""}/3`,
+      title: `Follow-Up Group${group.parentStageKey ? ` of ${names.get(group.parentStageKey) || "a step"}` : ""}`,
+    }] as const)));
+  }, [definition.stages]);
   const [offsets, setOffsets] = useState<Record<string, FmsGraphPosition>>({});
   /** Pan and zoom live together so a pointer-anchored zoom is one consistent update. */
   const [camera, setCamera] = useState<FmsViewport>({ x: 0, y: 0, zoom: 1 });
@@ -634,6 +644,7 @@ export const FmsGraphCanvas = forwardRef<FmsCanvasHandle, CanvasProps>(function 
             actions={actions}
             dropTarget={dropTarget === stage.key}
             endCount={stage.type === "end" ? props.endCounts?.get(stage.key) : undefined}
+            followUp={followUpLabels.get(stage.key)}
             highlighted={edgeDetails?.from === stage.key || edgeDetails?.to === stage.key || retarget?.from === stage.key}
             inspected={stage.key === inspectedKey}
             invalid={invalidKeys.has(stage.key)}
@@ -670,6 +681,7 @@ export const FmsGraphCanvas = forwardRef<FmsCanvasHandle, CanvasProps>(function 
     {menu ? <div aria-label="Canvas actions" className="absolute z-40 min-w-44 rounded-lg border border-gold/30 bg-charcoal p-1 text-sm shadow-2xl" data-canvas-control role="menu" style={{ left: clamp(menu.x, 4, Math.max(4, viewportWidth - 184)), top: menu.y }}>
       {menu.kind === "node" ? <>
         <MenuItem icon={Pencil} label="Open settings" onClick={() => { setMenu(null); if (menu.key) actions.current.onOpen(menu.key); }} />
+        {actions.current.onAddFollowUpAfter && menu.key && !["end", "branch", "parallel_start"].includes(definition.stages.find((stage) => stage.key === menu.key)?.type ?? "end") ? <MenuItem icon={Repeat} label="Add Follow-Up Group after" onClick={() => { setMenu(null); if (menu.key) actions.current.onAddFollowUpAfter?.(menu.key); }} /> : null}
         <MenuItem icon={Copy} label="Copy" shortcut="Ctrl+C" onClick={() => command("copy")} />
         <MenuItem icon={Scissors} label="Cut" shortcut="Ctrl+X" onClick={() => command("cut")} />
         <MenuItem icon={CopyPlus} label="Duplicate" shortcut="Ctrl+D" onClick={() => command("duplicate")} />
@@ -702,8 +714,9 @@ function MenuItem({ icon: Icon, label, shortcut, onClick, danger = false }: { ic
  * One workflow step. Memoised on its own data and position, so dragging one
  * step or panning re-renders only what moved, even in a 100-step workflow.
  */
-const StageCard = memo(function StageCard({ stage, x, y, selected, inspected, highlighted, invalid, dropTarget, isFirst, actions, endCount }: {
+const StageCard = memo(function StageCard({ stage, x, y, selected, inspected, highlighted, invalid, dropTarget, isFirst, actions, endCount, followUp }: {
   stage: FmsStageDefinition; x: number; y: number; selected: boolean; inspected: boolean; highlighted: boolean; invalid: boolean; dropTarget: boolean; isFirst: boolean; endCount?: number | undefined;
+  followUp?: Readonly<{ chip: string; title: string }> | undefined;
   actions: Readonly<{ current: Pick<CanvasProps, "onDuplicate" | "onDelete" | "onAddAfter"> }>;
 }) {
   const item = appearance[stage.type];
@@ -737,6 +750,7 @@ const StageCard = memo(function StageCard({ stage, x, y, selected, inspected, hi
       : isLeaf ? <span className="pointer-events-none absolute -bottom-7 left-0 rounded-md border border-success/30 bg-charcoal px-2 py-1 text-[10px] font-semibold text-success">Completes here</span> : null}
     <div className="mb-1.5 flex h-6 items-center justify-between gap-1">
       {endStyle ? <span className={cn("inline-flex min-w-0 items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide", endStyle)}><item.Icon className="size-3 shrink-0" />End · {END_BADGE[stage.sla.terminal?.outcome ?? "other"] ?? "Other"}</span>
+        : followUp ? <span className="inline-flex min-w-0 items-center gap-1 whitespace-nowrap rounded-full border border-gold/30 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold-secondary" data-testid="fms-follow-up-chip" title={followUp.title}><Repeat className="size-3 shrink-0" />{followUp.chip}</span>
         : badge ? <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide", item.className)}><item.Icon className="size-3" />{badge}</span> : <item.Icon aria-hidden className="size-4 text-gold-secondary" />}
       {endStyle && endCount !== undefined ? <span className="rounded-full border border-gold/30 bg-charcoal px-2 py-0.5 text-[10px] font-semibold tabular-nums text-white" title="Finished workflows that reached this ending">{endCount}</span> : null}
       <span className="flex gap-0.5" data-canvas-control>
