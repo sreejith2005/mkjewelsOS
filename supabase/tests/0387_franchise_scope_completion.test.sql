@@ -141,12 +141,12 @@ select throws_ok($$select set_franchise_enforcement_with_audit(true, 'try')$$, '
 reset role;
 
 -- ===========================================================================
--- B. Isolation off: existing behaviour (Ahmedabad admin still sees every store).
+-- B. Isolation off: the Ahmedabad Director (0397) is still scoped (0398).
 -- ===========================================================================
 set local role authenticated;
 select pg_temp.login('adm_ahd');
-select ok((task_workspace_page('{"subsection":"all","mode":"explore"}', 0, 50)->>'total')::int >= 3, 'off: Task Control lists every store''s tasks');
-select ok(exists (select 1 from user_availability where user_profile_id = pg_temp.p('staff_bandra')), 'off: availability of every store, as before');
+select ok((task_workspace_page('{"subsection":"all","mode":"explore"}', 0, 50)->>'total')::int < 3, 'off: a Director''s Task Control lists only their franchise (0398)');
+select ok(not exists (select 1 from user_availability where user_profile_id = pg_temp.p('staff_bandra')), 'off: a Director does not see another franchise''s availability (0398)');
 reset role;
 
 select pg_temp.isolation(true);

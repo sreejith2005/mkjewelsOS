@@ -2,8 +2,8 @@ import type { ComponentType, ReactNode } from "react";
 import { Menu, PanelLeftClose } from "lucide-react";
 import type { PageId } from "@jewelos/core";
 import { Button } from "@/components/ui";
-import { titleCase } from "@/lib/format";
 import { AccountMenu } from "./AccountMenu";
+import { useRoleLabel } from "./useRoleLabel";
 import type { Branch, UserProfile } from "@/types";
 import { cn } from "@/lib/utils";
 import { useKeyboardOpen } from "@/lib/useKeyboardOpen";
@@ -79,6 +79,7 @@ export function ApplicationShell({
   fullBleed?: boolean;
 }) {
   useKeyboardOpen();
+  const roleLabel = useRoleLabel(profile);
   const sidebarNavigation = getSidebarNavigation(nav);
   const navigateFromSidebar = (destination: string) => {
     navigate(destination);
@@ -117,10 +118,10 @@ export function ApplicationShell({
           {developerModeControl}
           <ThemeToggle onChange={onThemeChange} theme={theme} />
           <NotificationBell onNavigate={navigate} profileId={profile.id} />
-          <AccountMenu branchName={branch?.name ?? "Branch unavailable"} navigate={navigate} onLogout={onLogout} profile={profile} settingsPath={nav.find((item) => item.id === "settings")?.path} />
+          <AccountMenu branchName={branch?.name ?? "Branch unavailable"} navigate={navigate} onLogout={onLogout} profile={profile} roleLabel={roleLabel} settingsPath={nav.find((item) => item.id === "settings")?.path} />
           <div className="hidden sm:block">
             <p className="max-w-36 truncate text-xs font-semibold text-white">{profile.employee_name}</p>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-gold-secondary">{titleCase(profile.user_role)}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-gold-secondary">{roleLabel}</p>
           </div>
         </div>
         </div>
@@ -172,7 +173,7 @@ export function ApplicationShell({
       </main>
 
       <MobileBottomNav menuOpen={drawerOpen} onNavigate={navigate} onOpenMenu={() => onDrawerOpenChange(true)} path={path} />
-      {drawerOpen ? <MobileNavigationDrawer badges={badges} branchName={branch?.name ?? "Branch unavailable"} currentPath={path} items={launcherItems} onClose={() => onDrawerOpenChange(false)} onLogout={onLogout} onNavigate={navigate} profileName={profile.employee_name} roleLabel={titleCase(profile.user_role)} /> : null}
+      {drawerOpen ? <MobileNavigationDrawer badges={badges} branchName={branch?.name ?? "Branch unavailable"} currentPath={path} items={launcherItems} onClose={() => onDrawerOpenChange(false)} onLogout={onLogout} onNavigate={navigate} profileName={profile.employee_name} roleLabel={roleLabel} /> : null}
     </div>
   );
 }

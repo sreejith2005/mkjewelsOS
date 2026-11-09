@@ -276,7 +276,7 @@ export function FranchiseManager({ people, onChanged }: { people: readonly Perso
     <div className="mt-4 space-y-5">
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {!context || !readiness ? (error ? null : <p className="text-sm text-soft-grey">Loading…</p>) : <>
-        <Notice tone="neutral">Franchise isolation: <strong>{context.enforcementEnabled ? "On" : "Off"}</strong>. {context.enforcementEnabled ? "People below company scope see only their franchise or stores." : "Everyone keeps today's access until isolation is switched on."}</Notice>
+        <Notice tone="neutral">Franchise isolation: <strong>{context.enforcementEnabled ? "On" : "Off"}</strong>. {context.enforcementEnabled ? "People below company scope see only their franchise or stores." : "Directors always see only their own franchises and stores. Everyone else keeps today's access until isolation is switched on."}</Notice>
 
         <div>
           <h3 className="text-sm font-semibold text-champagne">Organisation</h3>
