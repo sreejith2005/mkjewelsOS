@@ -49,7 +49,8 @@ begin
   update branches set manager_id = (select id from fx where kind = 'mgr_ahd2') where id = (select id from fx_branch where code = 'AHD2');
   insert into org_scope_grants(tenant_id, user_profile_id, authority, scope_level, franchise_group_id, reason) values
     (t, (select id from fx where kind = 'dir_mum'), 'director', 'franchise', mum, 'test'),
-    (t, (select id from fx where kind = 'adm_ahd'), 'regional_admin', 'franchise', ahd, 'test'),
+    -- Since 0397 an Admin limited to one franchise is a Director (an Admin without one sees every franchise).
+    (t, (select id from fx where kind = 'adm_ahd'), 'director', 'franchise', ahd, 'test'),
     (t, (select id from fx where kind = 'hr_mum'), 'hr', 'franchise', mum, 'test');
   insert into user_permission_overrides(user_profile_id, tenant_id, permission_key, effect)
   values ((select id from fx where kind = 'dir_mum'), t, 'dashboard.view_team_performance', 'grant');

@@ -64,7 +64,8 @@ function RowActions({
   onToggle: () => void;
   onAssignNow: () => void;
   onRunNow: () => void;
-  onDelete: () => void;
+  /** Absent when the viewer may not delete tasks (tasks.delete). */
+  onDelete?: (() => void) | undefined;
 }) {
   const activateBlocked = !row.is_active && !templateCanActivate(row);
   const style = "min-h-7 whitespace-nowrap rounded-md px-2.5 py-1 text-[11px] font-semibold";
@@ -108,9 +109,11 @@ function RowActions({
           Run now
         </Button>
       ) : null}
-      <Button className={style} disabled={busy} onClick={onDelete} variant="danger">
-        Delete
-      </Button>
+      {onDelete ? (
+        <Button className={style} disabled={busy} onClick={onDelete} variant="danger">
+          Delete
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -138,7 +141,7 @@ export function TemplatesTab({
   onToggle: (row: TaskTemplateDirectoryRow) => void;
   onAssignNow: (row: TaskTemplateDirectoryRow) => void;
   onRunNow: (row: TaskTemplateDirectoryRow) => void;
-  onDelete: (row: TaskTemplateDirectoryRow) => void;
+  onDelete?: ((row: TaskTemplateDirectoryRow) => void) | undefined;
 }) {
   const today = kolkataDateKey(new Date());
   const nextLabel = (row: TaskTemplateDirectoryRow) => {
@@ -149,7 +152,7 @@ export function TemplatesTab({
     <RowActions
       busy={busyId === row.id}
       compact={compact}
-      onDelete={() => onDelete(row)}
+      onDelete={onDelete ? () => onDelete(row) : undefined}
       onEdit={() => onEdit(row)}
       onSchedule={() => onSchedule(row)}
       onToggle={() => onToggle(row)}

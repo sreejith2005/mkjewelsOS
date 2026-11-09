@@ -10,7 +10,9 @@ type SeedRow = { key: string; kind: string; pageId: string | null; defaultRoles:
 /**
  * Migration 0156 seeds the catalog and later migrations append to it. Every
  * migration carrying the seed markers is read, and rows are ordered by their
- * `sort_order`, which is the order the client catalog lists them in.
+ * `sort_order`, which is the order the client catalog lists them in. A later
+ * migration may restate an existing key (`on conflict (key) do update`, as
+ * 0397 does for the Admin defaults); the latest statement wins.
  */
 function seededCatalog(): SeedRow[] {
   const blocks = readdirSync(migrationsDir)
@@ -20,12 +22,14 @@ function seededCatalog(): SeedRow[] {
     .filter((sql) => sql.includes("-- permission-catalog:begin"))
     .map((sql) => sql.split("-- permission-catalog:begin")[1]?.split("-- permission-catalog:end")[0] ?? "");
   if (blocks.length === 0 || blocks.some((block) => !block)) throw new Error("Permission catalog seed markers are missing");
-  return blocks
-    .flatMap((block) => [...block.matchAll(/^\('([a-z_.]+)', '([a-z]+)', (?:'([a-z_]+)'|null), '\{([a-z_,]*)\}', (\d+)\)[,;]$/gm)])
-    .map((match) => ({
+  const byKey = new Map<string, { sortOrder: number; row: SeedRow }>();
+  for (const match of blocks.flatMap((block) => [...block.matchAll(/^\('([a-z_.]+)', '([a-z]+)', (?:'([a-z_]+)'|null), '\{([a-z_,]*)\}', (\d+)\)[,;]?$/gm)])) {
+    byKey.set(match[1]!, {
       sortOrder: Number(match[5]),
       row: { key: match[1]!, kind: match[2]!, pageId: match[3] ?? null, defaultRoles: match[4]!.split(",").filter(Boolean).sort() },
-    }))
+    });
+  }
+  return [...byKey.values()]
     .sort((left, right) => left.sortOrder - right.sortOrder)
     .map(({ row }) => row);
 }

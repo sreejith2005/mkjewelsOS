@@ -2,6 +2,8 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions;
 select no_plan();
+-- Migration 0397 withdrew forms.manage from Admin by default; this test keeps an Admin as the form author.
+update permission_catalog set default_roles = array_append(default_roles, 'admin') where key = 'forms.manage' and not ('admin' = any(default_roles));
 create temporary table visibility_fixture(name text primary key,id uuid);
 grant all on visibility_fixture to authenticated;
 do $$

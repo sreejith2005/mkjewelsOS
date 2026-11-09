@@ -13,17 +13,20 @@ import {
   type OrgScopeAuthority,
 } from "@jewelos/core";
 import {
+  addStoreToFranchise,
   assignBranchFranchise,
   grantScope,
   loadFranchiseAdmin,
   loadFranchiseHistory,
   loadFranchiseInsights,
+  loadOrgLocations,
   revokeScope,
   saveFranchise,
   type FranchiseAdminContext,
   type FranchiseBranch,
   type FranchiseGroup,
   type FranchiseReadiness,
+  type OrgLocations,
 } from "@jewelos/data/users/franchise";
 import { Button, Field, Modal, Notice } from "@/components/ui";
 
@@ -32,6 +35,7 @@ type Insights = Readonly<{ branchCounts: ReadonlyMap<string, number>; coverage: 
 type Editor =
   | { kind: "franchise"; franchise: FranchiseGroup | null }
   | { kind: "branch"; branch: FranchiseBranch }
+  | { kind: "store"; franchise: FranchiseGroup }
   | { kind: "grant" };
 
 const RECORD_LABELS: Readonly<Record<string, string>> = {
@@ -76,6 +80,86 @@ function FranchiseEditor({ franchise, onClose, onSaved }: { franchise: Franchise
       <div className="flex justify-end gap-2"><Button onClick={onClose} type="button" variant="secondary">Cancel</Button><Button disabled={busy} type="submit">{busy ? "Saving…" : "Save"}</Button></div>
     </form>
   </Modal>;
+}
+
+/** Add a store to a franchise (migration 0397). Its manager is set later, once employees join. */
+function StoreEditor({ franchise, onClose, onSaved }: { franchise: FranchiseGroup; onClose: () => void; onSaved: () => Promise<void> }) {
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [city, setCity] = useState(franchise.city ?? "");
+  const [state, setState] = useState(franchise.state ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!name.trim() || !/^[A-Za-z0-9_-]{2,32}$/.test(code.trim())) return setError("Enter a store name and a code of 2–32 letters, numbers, underscores, or hyphens.");
+    setBusy(true); setError(null);
+    try { await addStoreToFranchise(franchise.id, { name: name.trim(), code: code.trim().toUpperCase(), city: city.trim() || null, state: state.trim() || null }); await onSaved(); onClose(); }
+    catch (caught) { setError(errorText(caught, "Unable to add the store.")); }
+    finally { setBusy(false); }
+  };
+  return <Modal onClose={onClose} title={`Add store to ${franchise.name}`}>
+    <form className="space-y-4" onSubmit={(event) => void submit(event)}>
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Store name"><input className="field" maxLength={120} onChange={(event) => setName(event.target.value)} required value={name} /></Field>
+        <Field label="Store code"><input className="field" maxLength={32} onChange={(event) => setCode(event.target.value)} required value={code} /></Field>
+        <Field label="City"><input className="field" onChange={(event) => setCity(event.target.value)} value={city} /></Field>
+        <Field label="State"><input className="field" onChange={(event) => setState(event.target.value)} value={state} /></Field>
+      </div>
+      <p className="text-xs text-soft-grey">Add employees with Add user, then Super Admin can set the store manager.</p>
+      <div className="flex justify-end gap-2"><Button onClick={onClose} type="button" variant="secondary">Cancel</Button><Button disabled={busy} type="submit">{busy ? "Adding…" : "Add store"}</Button></div>
+    </form>
+  </Modal>;
+}
+
+/**
+ * Admin and Director view (migration 0397): the franchises and stores they may
+ * see, Add franchise (Admin) and Add store (Admin anywhere, a Director in the
+ * franchise they oversee). Editing, moving and scope stay with Super Admin.
+ */
+export function LocationsManager({ people, onChanged }: { people: readonly (Person & { branch_id?: string | null })[]; onChanged?: (() => Promise<void> | void) | undefined }) {
+  const [locations, setLocations] = useState<OrgLocations | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [editor, setEditor] = useState<Editor | null>(null);
+  const load = useCallback(async () => {
+    setError(null);
+    try { setLocations(await loadOrgLocations()); } catch (caught) { setError(errorText(caught, "Unable to load franchises.")); }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+  const saved = useCallback(async () => { await load(); await onChanged?.(); }, [load, onChanged]);
+  const counts = new Map<string, number>();
+  for (const person of people) if (person.account_status === "active" && person.branch_id) counts.set(person.branch_id, (counts.get(person.branch_id) ?? 0) + 1);
+  const groups = locations ? [
+    ...locations.franchises.map((franchise) => ({ franchise, branches: locations.branches.filter((branch) => branch.franchiseGroupId === franchise.id) })),
+    ...(locations.branches.some((branch) => !branch.franchiseGroupId) ? [{ franchise: null, branches: locations.branches.filter((branch) => !branch.franchiseGroupId) }] : []),
+  ] : [];
+  return <section aria-label="Franchises" className="glass-card mb-4 rounded-xl p-4">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div><h2 className="font-semibold text-champagne">Franchises</h2><p className="text-xs text-soft-grey">{locations?.companyScope ? "Every franchise and store." : "The franchises and stores you oversee."}</p></div>
+      {locations?.canAddFranchise ? <Button onClick={() => setEditor({ kind: "franchise", franchise: null })} type="button">Add franchise</Button> : null}
+    </div>
+    <div className="mt-4 space-y-3">
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {!locations ? (error ? null : <p className="text-sm text-soft-grey">Loading…</p>) : <div className="grid gap-2 xl:grid-cols-2">{groups.map(({ franchise, branches }) => {
+        const active = branches.filter((branch) => branch.isActive);
+        return <div className="rounded-lg border border-gold/15 p-3" key={franchise?.id ?? "unmapped"}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="min-w-0"><span className="block font-medium text-white">{franchise?.name ?? "Stores not in a franchise"}</span>
+              <span className="block text-xs text-soft-grey">{active.length} {active.length === 1 ? "store" : "stores"} · {active.reduce((sum, branch) => sum + (counts.get(branch.id) ?? 0), 0)} employees</span></span>
+            {franchise && locations.addableFranchiseIds.includes(franchise.id) ? <Button aria-label={`Add store to ${franchise.name}`} className="h-9 min-h-9 px-2" onClick={() => setEditor({ kind: "store", franchise })} type="button" variant="secondary">Add store</Button> : null}
+          </div>
+          <ul className="mt-2 divide-y divide-gold/10">{branches.map((branch) => <li className="py-2" key={branch.id}>
+            <p className="text-sm text-white">{branch.name}{branch.isActive ? "" : " (inactive)"}</p>
+            <p className="text-xs text-soft-grey">{BRANCH_LOCATION_KIND_LABELS[branch.locationKind]} · {counts.get(branch.id) ?? 0} employees</p>
+          </li>)}</ul>
+          {branches.length === 0 ? <p className="mt-2 text-xs text-soft-grey">No stores yet.</p> : null}
+        </div>;
+      })}</div>}
+    </div>
+    {editor?.kind === "franchise" ? <FranchiseEditor franchise={null} onClose={() => setEditor(null)} onSaved={saved} /> : null}
+    {editor?.kind === "store" ? <StoreEditor franchise={editor.franchise} onClose={() => setEditor(null)} onSaved={saved} /> : null}
+  </section>;
 }
 
 function BranchAssignEditor({ branch, franchises, onClose, onSaved }: { branch: FranchiseBranch; franchises: readonly FranchiseGroup[]; onClose: () => void; onSaved: () => Promise<void> }) {
@@ -139,7 +223,7 @@ function GrantEditor({ context, people, onClose, onSaved }: { context: Franchise
           {company ? null : <Field label="Franchise"><select className="field" onChange={(event) => setFranchiseId(event.target.value)} value={franchiseId}><option value="">Choose…</option>{context.franchises.filter((item) => item.is_active).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>}
         </>}
       <Field label="Reason"><input className="field" onChange={(event) => setReason(event.target.value)} required value={reason} /></Field>
-      <p className="text-xs text-soft-grey">Admin and HR already cover their own store&apos;s franchise automatically. Extra scope adds to that. What they can do still comes from their role and section access.</p>
+      <p className="text-xs text-soft-grey">Admin already sees every franchise and HR covers their own store&apos;s franchise. Set up Directors in Users with System role Director. Extra scope adds to that; what people can do still comes from their role and section access.</p>
       <div className="flex justify-end gap-2"><Button onClick={onClose} type="button" variant="secondary">Cancel</Button><Button disabled={busy} type="submit">{busy ? "Saving…" : "Grant"}</Button></div>
     </form>
   </Modal>;
@@ -202,7 +286,10 @@ export function FranchiseManager({ people, onChanged }: { people: readonly Perso
               <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2">
                 <span className="min-w-0"><span className="block font-medium text-white">{franchise?.name ?? "Stores not mapped yet"}</span>
                   <span className="block text-xs text-soft-grey">{franchise ? `${franchise.code}${franchise.city ? ` · ${franchise.city}` : ""}${franchise.state ? `, ${franchise.state}` : ""} · ` : ""}{active.length} {active.length === 1 ? "store" : "stores"} · {employeesIn(active.map((branch) => branch.id))} employees{franchise && !franchise.is_active ? " · Inactive" : ""}</span></span>
-                {franchise ? <Button aria-label={`Edit ${franchise.name}`} className="h-9 min-h-9 px-2" onClick={(event) => { event.preventDefault(); setEditor({ kind: "franchise", franchise }); }} type="button" variant="ghost">Edit</Button> : null}
+                {franchise ? <span className="flex gap-1">
+                  {franchise.is_active ? <Button aria-label={`Add store to ${franchise.name}`} className="h-9 min-h-9 px-2" onClick={(event) => { event.preventDefault(); setEditor({ kind: "store", franchise }); }} type="button" variant="ghost">Add store</Button> : null}
+                  <Button aria-label={`Edit ${franchise.name}`} className="h-9 min-h-9 px-2" onClick={(event) => { event.preventDefault(); setEditor({ kind: "franchise", franchise }); }} type="button" variant="ghost">Edit</Button>
+                </span> : null}
               </summary>
               <ul className="mt-2 divide-y divide-gold/10">{branches.map((branch) => <li className="flex flex-wrap items-center justify-between gap-2 py-2" key={branch.id}>
                 <div className="min-w-0"><p className="text-sm text-white">{branch.name}{branch.isActive ? "" : " (inactive)"}</p>
@@ -218,14 +305,14 @@ export function FranchiseManager({ people, onChanged }: { people: readonly Perso
 
         <div>
           <h3 className="text-sm font-semibold text-champagne">Scope</h3>
-          <p className="mt-1 text-xs text-soft-grey">Worked out automatically from each person&apos;s store: Admin and HR cover every store of their store&apos;s franchise, a store&apos;s manager covers that store, and everyone else sees their own store. Changing someone&apos;s store or role in Users moves it at once.</p>
+          <p className="mt-1 text-xs text-soft-grey">Admin sees every franchise. A Director sees the franchises and stores chosen for them in Users. HR covers every store of their store&apos;s franchise, a store&apos;s manager covers that store, and everyone else sees their own store. Changing someone&apos;s store or role in Users moves it at once.</p>
           <p className="mt-3 text-sm text-champagne">Automatic</p>
           <ul className="mt-1 divide-y divide-gold/10">{context.automaticScopes.map((item) => <li className="py-2" key={item.userProfileId}>
             <p className="text-sm text-white">{item.employeeName}</p><p className="text-xs text-soft-grey">{ORG_SCOPE_AUTHORITY_LABELS[item.authority]} · {franchiseName(item.franchiseGroupId)} (from {branchName(item.branchId)})</p>
           </li>)}</ul>
-          {context.automaticScopes.length === 0 ? <p className="mt-1 text-sm text-soft-grey">Nobody yet. Admin and HR accounts appear here once their store is in a franchise.</p> : null}
+          {context.automaticScopes.length === 0 ? <p className="mt-1 text-sm text-soft-grey">Nobody yet. HR accounts appear here once their store is in a franchise.</p> : null}
           <div className="mt-3 flex items-center justify-between gap-2"><p className="text-sm text-champagne">Extra scope (optional)</p><Button onClick={() => setEditor({ kind: "grant" })} type="button" variant="secondary">Add extra scope</Button></div>
-          <p className="text-xs text-soft-grey">Only for exceptions: the whole company, another franchise, or a Director who keeps the manager role.</p>
+          <p className="text-xs text-soft-grey">Only for exceptions: the whole company, another franchise, or store access. Directors appear here with what they oversee.</p>
           <ul className="mt-2 divide-y divide-gold/10">{context.grants.map((grant) => <li className="flex items-center justify-between gap-2 py-2" key={grant.id}>
             <div><p className="text-sm text-white">{grant.employeeName}</p><p className="text-xs text-soft-grey">{ORG_SCOPE_AUTHORITY_LABELS[grant.authority]} · {grant.scopeLevel === "company" ? "Whole company" : grant.scopeLevel === "franchise" ? franchiseName(grant.franchiseGroupId) : branchName(grant.branchId)}</p></div>
             <Button aria-label={`Remove scope from ${grant.employeeName}`} className="h-9 min-h-9 px-2" onClick={() => void revoke(grant.id, grant.employeeName)} type="button" variant="ghost">Remove</Button>
@@ -264,6 +351,7 @@ export function FranchiseManager({ people, onChanged }: { people: readonly Perso
     </div>
     {editor?.kind === "franchise" ? <FranchiseEditor franchise={editor.franchise} onClose={() => setEditor(null)} onSaved={saved} /> : null}
     {editor?.kind === "branch" && context ? <BranchAssignEditor branch={editor.branch} franchises={context.franchises} onClose={() => setEditor(null)} onSaved={saved} /> : null}
+    {editor?.kind === "store" ? <StoreEditor franchise={editor.franchise} onClose={() => setEditor(null)} onSaved={saved} /> : null}
     {editor?.kind === "grant" && context ? <GrantEditor context={context} onClose={() => setEditor(null)} onSaved={saved} people={people} /> : null}
   </section>;
 }

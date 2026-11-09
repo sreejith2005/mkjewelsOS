@@ -34,7 +34,22 @@ type InviteBody = {
   secondary_buddy_id?: unknown;
   reports_to_user_id?: unknown;
   initial_password?: unknown;
+  /** Director only (migration 0397): the franchises and single stores they oversee. */
+  director_franchise_ids?: unknown;
+  director_branch_ids?: unknown;
 };
+
+/** "Director" is the Admin role limited to chosen franchises and stores (migration 0397). */
+const DIRECTOR_ROLE = "director";
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function idList(value: unknown, field: string): string[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.length > 100 || value.some((item) => typeof item !== "string" || !UUID_PATTERN.test(item))) {
+    throw new Error(`${field} must be a list of ids`);
+  }
+  return [...new Set(value as string[])];
+}
 
 const ADMIN_SET_PASSWORD_LENGTH = 6;
 
@@ -144,7 +159,13 @@ Deno.serve(async (request: Request) => {
     if (existingProfileError) return json(500, { error: "Unable to check the existing employee" });
     if (existingProfile) return json(200, { user_profile_id: existingProfile.id, already_exists: true });
     const userRole = requiredString(body.user_role, "user_role");
-    if (!USER_ROLES.has(userRole)) throw new Error("user_role is invalid");
+    const isDirector = userRole === DIRECTOR_ROLE;
+    if (!isDirector && !USER_ROLES.has(userRole)) throw new Error("user_role is invalid");
+    const directorFranchiseIds = isDirector ? idList(body.director_franchise_ids, "director_franchise_ids") : [];
+    const directorBranchIds = isDirector ? idList(body.director_branch_ids, "director_branch_ids") : [];
+    if (isDirector && directorFranchiseIds.length + directorBranchIds.length === 0) {
+      throw new Error("Choose at least one franchise or store for this Director");
+    }
     if (callerAccess.effective_role !== "super_admin" && userRole === "super_admin") {
       return json(403, { error: "Only a super_admin can create a super_admin" });
     }
@@ -158,8 +179,9 @@ Deno.serve(async (request: Request) => {
     const workEmail = `${compactIdentity(firstName)}${compactIdentity(lastName ?? "")}mkjewels@gmail.com`;
     const officialEmail = optionalString(body.official_email);
     if (officialEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(officialEmail)) throw new Error("official email is invalid");
-    const branchId = requiredString(body.branch_id, "branch_id");
-    const departmentId = requiredString(body.department_id, "department_id");
+    // A Director's home store and department are chosen by the server.
+    const branchId = isDirector ? optionalString(body.branch_id) : requiredString(body.branch_id, "branch_id");
+    const departmentId = isDirector ? null : requiredString(body.department_id, "department_id");
     const designationId = optionalString(body.designation_id);
     const personalMobile = optionalString(body.personal_mobile);
     const officialMobile = optionalString(body.official_mobile);
@@ -184,7 +206,22 @@ Deno.serve(async (request: Request) => {
       return json(400, { error: createError?.message ?? "Unable to create auth user" });
     }
 
-    const { data: profileId, error: insertError } = await adminClient.rpc(
+    const { data: profileId, error: insertError } = isDirector
+      ? await adminClient.rpc("create_director_profile_with_audit", {
+        p_auth_user_id: created.user.id,
+        p_creator_profile_id: callerProfile.id,
+        p_personal_email: workEmail,
+        p_first_name: firstName,
+        p_last_name: lastName ?? "",
+        p_official_email: officialEmail ?? "",
+        p_home_branch_id: branchId,
+        p_personal_mobile: personalMobile ?? "",
+        p_official_mobile: officialMobile,
+        p_week_off: body.week_off as string[],
+        p_franchise_ids: directorFranchiseIds,
+        p_branch_ids: directorBranchIds,
+      })
+      : await adminClient.rpc(
       "create_user_profile_with_coverage_and_audit",
       {
         p_auth_user_id: created.user.id,

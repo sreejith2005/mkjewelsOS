@@ -61,17 +61,18 @@ grant execute on function pg_temp.p(text), pg_temp.b(text), pg_temp.login(text) 
 -- A. Automatic franchise scope (no grant rows exist).
 -- ===========================================================================
 select is((select count(*)::int from org_scope_grants g join fx on fx.id = g.user_profile_id), 0, 'the fixture has no scope grants');
-select ok(pg_temp.reads('adm_mum', array['BANDRA','ANDHERI','ZAVERI']), 'an Admin reads every store of their own franchise');
-select ok(not pg_temp.reads_any('adm_mum', array['AHD1','AHD2','EXPO']), 'an Admin reads no store of another franchise');
-select ok(org_scope_branch_ids(pg_temp.p('adm_mum'), true) @> array[pg_temp.b('BANDRA'), pg_temp.b('ZAVERI')], 'an Admin manages the stores of their franchise');
-select is(org_scope_authorities(pg_temp.p('adm_mum')), array['regional_admin'], 'an Admin is a Regional Admin of their franchise automatically');
+-- Since 0397 an Admin (not a Director) has company scope instead of their store's franchise.
+select ok(pg_temp.reads('adm_mum', array['BANDRA','ANDHERI','ZAVERI','AHD1','AHD2','EXPO']), 'an Admin reads every store (0397)');
+select ok(org_has_company_scope(pg_temp.p('adm_mum')), 'an Admin has company scope (0397)');
+select ok(org_scope_branch_ids(pg_temp.p('adm_mum'), true) @> array[pg_temp.b('BANDRA'), pg_temp.b('AHD1')], 'an Admin manages every store (0397)');
+select is(org_scope_authorities(pg_temp.p('adm_mum')), '{}'::text[], 'an Admin needs no franchise authority (0397)');
 select ok(pg_temp.reads('hr_ahd', array['AHD1','AHD2']), 'HR reads every store of their own franchise');
 select ok(not pg_temp.reads_any('hr_ahd', array['BANDRA','ANDHERI']), 'HR reads no store of another franchise');
 select is(org_scope_authorities(pg_temp.p('hr_ahd')), array['hr'], 'HR is HR of their franchise automatically');
 select is(org_scope_branch_ids(pg_temp.p('staff_bandra'), false), array[pg_temp.b('BANDRA')], 'staff keep only their own store');
 select is(org_scope_authorities(pg_temp.p('staff_bandra')), '{}'::text[], 'staff hold no scope authority');
 select is(org_scope_branch_ids(pg_temp.p('mgr_bandra'), true), array[pg_temp.b('BANDRA')], 'a store manager still manages only their store');
-select is(org_scope_branch_ids(pg_temp.p('adm_expo'), false), array[pg_temp.b('EXPO')], 'an Admin at a store with no franchise keeps only that store');
+select ok(org_has_company_scope(pg_temp.p('adm_expo')), 'an Admin at a store with no franchise still has company scope (0397)');
 select is((select count(*)::int from org_automatic_scope(pg_temp.p('ot_admin')) s where s.franchise_group_id in (pg_temp.b('MUM'), pg_temp.b('AHD'))), 0,
   'another tenant''s Admin never covers this tenant''s franchise');
 
@@ -81,10 +82,10 @@ select ok(pg_temp.reads('staff_andheri', array['BANDRA','ZAVERI']), 'admin dashb
 delete from user_access_profiles where user_profile_id = pg_temp.p('staff_andheri');
 
 -- It is derived on every call: store, role and franchise state move it at once.
-update user_profiles set branch_id = pg_temp.b('AHD2') where id = pg_temp.p('adm_mum');
-select ok(pg_temp.reads('adm_mum', array['AHD1','AHD2']) and not pg_temp.reads_any('adm_mum', array['BANDRA','ANDHERI']),
-  'moving an Admin to another franchise''s store moves their scope');
-update user_profiles set branch_id = pg_temp.b('ANDHERI') where id = pg_temp.p('adm_mum');
+update user_profiles set branch_id = pg_temp.b('BANDRA') where id = pg_temp.p('hr_ahd');
+select ok(pg_temp.reads('hr_ahd', array['BANDRA','ZAVERI']) and not pg_temp.reads_any('hr_ahd', array['AHD1','AHD2']),
+  'moving HR to another franchise''s store moves their scope');
+update user_profiles set branch_id = pg_temp.b('AHD1') where id = pg_temp.p('hr_ahd');
 update user_profiles set user_role = 'staff' where id = pg_temp.p('hr_ahd');
 select is(org_scope_branch_ids(pg_temp.p('hr_ahd'), false), array[pg_temp.b('AHD1')], 'a changed role drops the automatic franchise');
 update user_profiles set user_role = 'hr' where id = pg_temp.p('hr_ahd');
@@ -115,15 +116,16 @@ delete from tenant_franchise_controls where tenant_id = pg_temp.b('tenant');
 set local role authenticated;
 select pg_temp.login('sa');
 select ok((get_franchise_admin_context()->'automatic_scopes') @> jsonb_build_array(
-    jsonb_build_object('user_profile_id', pg_temp.p('adm_mum'), 'authority', 'regional_admin', 'franchise_group_id', pg_temp.b('MUM')),
     jsonb_build_object('user_profile_id', pg_temp.p('hr_ahd'), 'authority', 'hr', 'franchise_group_id', pg_temp.b('AHD'))),
   'the Franchises panel lists automatic scope');
+select ok(not ((get_franchise_admin_context()->'automatic_scopes') @> jsonb_build_array(jsonb_build_object('user_profile_id', pg_temp.p('adm_mum')))),
+  'an Admin is not listed as automatic franchise scope (company scope, 0397)');
 select ok(not ((get_franchise_admin_context()->'automatic_scopes') @> jsonb_build_array(jsonb_build_object('user_profile_id', pg_temp.p('staff_bandra')))),
   'staff are not listed as automatic scope');
 select ok(not (get_franchise_readiness_report()->'leaders_without_scope') @> jsonb_build_array(jsonb_build_object('id', pg_temp.p('adm_mum'))),
   'readiness no longer flags a covered Admin');
-select ok((get_franchise_readiness_report()->'leaders_without_scope') @> jsonb_build_array(jsonb_build_object('id', pg_temp.p('adm_expo'))),
-  'readiness still flags an Admin whose store has no franchise');
+select ok(not (get_franchise_readiness_report()->'leaders_without_scope') @> jsonb_build_array(jsonb_build_object('id', pg_temp.p('adm_expo'))),
+  'readiness does not flag an Admin whose store has no franchise (company scope, 0397)');
 reset role;
 select ok(not has_function_privilege('authenticated', 'org_automatic_scope(uuid)', 'execute'), 'the internal resolver is not callable by clients');
 

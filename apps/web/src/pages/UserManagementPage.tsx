@@ -32,8 +32,22 @@ import { useAuth } from "@/auth/AuthContext";
 import { Button, Field, Modal, Notice } from "@/components/ui";
 import { refreshSessionForSensitiveAction } from "@/lib/edgeSession";
 import { OrganizationManager } from "@/features/users/OrganizationManager";
+import { DIRECTOR_CHOICE, DirectorScopePicker, EMPTY_DIRECTOR_SCOPE, directorScopeIsEmpty } from "@/features/users/DirectorScopePicker";
+import { endDirector, saveDirector, type DirectorScope } from "@jewelos/data/users/franchise";
 import { edgeFunctionErrorMessage, initials, PHONE_PATTERN, titleCase } from "@/lib/format";
 import type { Branch, Department, DropdownMaster, UserProfile } from "@/types";
+
+/** A System role choice: a stored role, or Director (the Admin role limited to chosen franchises and stores). */
+type RoleChoice = UserRole | typeof DIRECTOR_CHOICE;
+function toRoleChoice(value: string): RoleChoice | null {
+  if (value === DIRECTOR_CHOICE) return DIRECTOR_CHOICE;
+  return (USER_ROLES as readonly string[]).includes(value) ? (value as UserRole) : null;
+}
+const roleChoiceLabel = (role: RoleChoice) => (role === DIRECTOR_CHOICE ? "Director" : titleCase(role));
+/** Role choices in hierarchy order, with Director right after Admin when offered. */
+function roleChoices(roles: readonly UserRole[], director: boolean): RoleChoice[] {
+  return roles.flatMap((role): RoleChoice[] => (director && role === "admin" ? [role, DIRECTOR_CHOICE] : [role]));
+}
 
 const ACCOUNT_STATUSES = [
   "active",
@@ -94,6 +108,7 @@ export function EditUser({
   onClose,
   onSaved,
   sectionAccess,
+  directorScope = null,
 }: {
   user: UserProfile;
   data: Data;
@@ -102,8 +117,15 @@ export function EditUser({
   onSaved: () => Promise<void>;
   /** The Section access editor, shown as a second tab when the viewer may manage sections. */
   sectionAccess?: ReactNode;
+  /** What this employee oversees when they are a Director (list_director_scopes); null otherwise. */
+  directorScope?: DirectorScope | null;
 }) {
   const { access } = useAuth();
+  // Only company scope (Super Admin, Admin) changes a Director's franchises and stores.
+  const canSetUpDirectors = hasPermission(access, "users.manage") && data.scope?.companyScope === true;
+  const wasDirector = directorScope !== null;
+  const [scopeDraft, setScopeDraft] = useState<DirectorScope>(directorScope ?? EMPTY_DIRECTOR_SCOPE);
+  const initialRole: RoleChoice = wasDirector ? DIRECTOR_CHOICE : user.user_role;
   const [editorTab, setEditorTab] = useState<"details" | "access">("details");
   const canDelete = hasPermission(access, "users.delete");
   const canReassign = hasPermission(access, "tasks.view_all");
@@ -123,11 +145,16 @@ export function EditUser({
     secondary_buddy_id: user.secondary_buddy_id ?? "",
     reports_to_user_id: user.reports_to_user_id ?? "",
     account_status: user.account_status,
-    user_role: user.user_role,
+    user_role: initialRole,
     personal_mobile: user.personal_mobile ?? "",
     official_mobile: user.official_mobile ?? "",
     week_off: user.week_off.map((day) => day.toLowerCase()),
   });
+  const isDirector = draft.user_role === DIRECTOR_CHOICE;
+  // Super Admin changes any role; an Admin may only turn a Director into an Admin. Others see the current role.
+  const roleOptions: RoleChoice[] = superAdmin
+    ? roleChoices(USER_ROLES, canSetUpDirectors || wasDirector)
+    : wasDirector && canSetUpDirectors ? ["admin", DIRECTOR_CHOICE] : [initialRole];
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -174,20 +201,39 @@ export function EditUser({
       );
       return;
     }
+    if (isDirector && directorScopeIsEmpty(scopeDraft)) {
+      setError("Choose at least one franchise or store for this Director.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
-      const { week_off, ...profileChanges } = draft;
-      const { error: rpcError } = await supabase.rpc(
-        "update_user_profile_with_audit",
-        {
+      const { week_off, user_role, ...profileChanges } = draft;
+      if (user_role === DIRECTOR_CHOICE) {
+        // Details first; the Director contract then sets the Admin role, the
+        // Leadership department, the home store and what they oversee.
+        const { employee_name, employee_code, personal_mobile, official_mobile, account_status } = profileChanges;
+        const details = { employee_name, employee_code, personal_mobile, official_mobile, account_status };
+        const { error: rpcError } = await supabase.rpc("update_user_profile_with_audit", {
           p_profile_id: user.id,
-          p_changes: (superAdmin
-            ? { ...profileChanges, week_off }
-            : profileChanges) as Json,
-        },
-      );
-      if (rpcError) throw rpcError;
+          p_changes: (superAdmin ? { ...details, week_off } : details) as Json,
+        });
+        if (rpcError) throw rpcError;
+        if (canSetUpDirectors) await saveDirector(user.id, scopeDraft, null, wasDirector ? "Changed in Users" : "Made Director in Users");
+      } else {
+        const { error: rpcError } = await supabase.rpc(
+          "update_user_profile_with_audit",
+          {
+            p_profile_id: user.id,
+            p_changes: (superAdmin
+              ? { ...profileChanges, user_role, week_off }
+              : { ...profileChanges, user_role }) as Json,
+          },
+        );
+        if (rpcError) throw rpcError;
+        // A Director made Admin sees every franchise again. Another role ends Director scope on the server.
+        if (wasDirector && user_role === "admin") await endDirector(user.id, "Changed to Admin in Users");
+      }
       await onSaved();
       onClose();
     } catch (caught) {
@@ -283,6 +329,7 @@ export function EditUser({
               onChange={(event) => set("personal_mobile", event.target.value)}
             />
           </Field>
+          {isDirector ? null : <>
           {currentFranchiseName ? (
             <Field label="Franchise">
               <input className="field" disabled value={currentFranchiseName} />
@@ -400,6 +447,7 @@ export function EditUser({
               Fallback order: primary, secondary, then reporting manager.
             </p>
           </Field>
+          </>}
           <Field label="Account status">
             <select
               className="field"
@@ -420,19 +468,23 @@ export function EditUser({
           <Field label="System role">
             <select
               className="field"
-              disabled={!superAdmin}
+              disabled={!superAdmin && !(canSetUpDirectors && wasDirector)}
               value={draft.user_role}
-              onChange={(event) =>
-                set("user_role", event.target.value as UserRole)
-              }
+              onChange={(event) => {
+                const next = toRoleChoice(event.target.value);
+                if (next) set("user_role", next);
+              }}
             >
-              {USER_ROLES.map((role) => (
-                <option key={role} value={role}>
-                  {titleCase(role)}
-                </option>
-              ))}
+              {roleOptions.map((role) => (
+                  <option key={role} value={role}>
+                    {roleChoiceLabel(role)}
+                  </option>
+                ))}
             </select>
           </Field>
+          {isDirector ? (
+            <DirectorScopePicker branches={data.branches} disabled={!canSetUpDirectors} franchises={data.franchises ?? []} onChange={setScopeDraft} value={scopeDraft} />
+          ) : null}
           {superAdmin ? (
             <Field label="Week off">
               <select
@@ -538,7 +590,7 @@ export function AddUserForm({
     secondary_buddy_id: "",
     reports_to_user_id: "",
     week_off: [] as string[],
-    user_role: "staff" as UserRole,
+    user_role: "staff" as RoleChoice,
     initial_password: "",
     confirm_password: "",
   });
@@ -548,6 +600,10 @@ export function AddUserForm({
   const { access } = useAuth();
   // Scoped managers (users.manage_scoped only) create ordinary employees; the server refuses administrators.
   const fullUserManagement = hasPermission(access, "users.manage");
+  // Only company scope (Super Admin, Admin) sets up Directors; a Director cannot create Admins or Directors.
+  const companyUserManagement = fullUserManagement && data.scope?.companyScope === true;
+  const [directorScope, setDirectorScope] = useState<DirectorScope>(EMPTY_DIRECTOR_SCOPE);
+  const isDirector = form.user_role === DIRECTOR_CHOICE;
   const errorRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (error) errorRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" }); }, [error]);
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
@@ -587,7 +643,16 @@ export function AddUserForm({
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
-    if (
+    if (isDirector) {
+      if (!form.first_name.trim() || !form.personal_email.trim()) {
+        setError("First name and personal email are required.");
+        return;
+      }
+      if (directorScopeIsEmpty(directorScope)) {
+        setError("Choose at least one franchise or store for this Director.");
+        return;
+      }
+    } else if (
       !form.first_name.trim() ||
       !form.personal_email.trim() ||
       !form.branch_id ||
@@ -618,7 +683,11 @@ export function AddUserForm({
       await refreshSessionForSensitiveAction();
       const { data: result, error: invokeError } =
         await supabase.functions.invoke<{ already_exists?: boolean }>("invite-user", {
-          body: form,
+          // A Director's home store, department and coverage are set by the server.
+          body: isDirector
+            ? { ...form, branch_id: "", department_id: "", designation_id: "", buddy_id: "", secondary_buddy_id: "", reports_to_user_id: "",
+              director_franchise_ids: directorScope.franchiseGroupIds, director_branch_ids: directorScope.branchIds }
+            : form,
         });
       if (invokeError) throw invokeError;
       await onDone();
@@ -677,7 +746,7 @@ export function AddUserForm({
               onChange={(event) => set("last_name", event.target.value)}
             />
           </Field>
-          {showFranchise ? (
+          {showFranchise && !isDirector ? (
             <Field label="Franchise / location">
               <select
                 className="field"
@@ -695,7 +764,7 @@ export function AddUserForm({
               </select>
             </Field>
           ) : null}
-          <Field label={showFranchise ? "Store / branch" : "Branch"}>
+          {isDirector ? null : <Field label={showFranchise ? "Store / branch" : "Branch"}>
             <select
               className="field"
               disabled={showFranchise && !franchiseKey}
@@ -716,7 +785,7 @@ export function AddUserForm({
                 </option>
               ))}
             </select>
-          </Field>
+          </Field>}
           <Field label="Personal phone number">
             <input
               className="field"
@@ -750,6 +819,7 @@ export function AddUserForm({
               onChange={(event) => set("official_email", event.target.value)}
             />
           </Field>
+          {isDirector ? null : <>
           <Field label="Department">
             <select
               className="field"
@@ -855,26 +925,34 @@ export function AddUserForm({
               Fallback order: primary, secondary, then reporting manager.
             </p>
           </Field>
+          </>}
           <Field label="System role">
             <select
               className="field"
               value={form.user_role}
               onChange={(event) => {
-                set("user_role", event.target.value as UserRole);
+                const next = toRoleChoice(event.target.value);
+                if (!next) return;
+                set("user_role", next);
                 set("buddy_id", "");
                 set("secondary_buddy_id", "");
               }}
             >
-              {(role === "super_admin"
-                ? USER_ROLES
-                : USER_ROLES.filter((item) => item !== "super_admin" && (fullUserManagement || item !== "admin"))
+              {roleChoices(
+                role === "super_admin"
+                  ? USER_ROLES
+                  : USER_ROLES.filter((item) => item !== "super_admin" && (companyUserManagement || item !== "admin")),
+                companyUserManagement,
               ).map((item) => (
                 <option key={item} value={item}>
-                  {titleCase(item)}
+                  {roleChoiceLabel(item)}
                 </option>
               ))}
             </select>
           </Field>
+          {isDirector ? (
+            <DirectorScopePicker branches={data.branches} franchises={data.franchises ?? []} onChange={setDirectorScope} value={directorScope} />
+          ) : null}
           <Field label="Set login password">
             <input autoComplete="new-password" className="field" maxLength={ADMIN_SET_PASSWORD_LENGTH} minLength={ADMIN_SET_PASSWORD_LENGTH} onChange={(event) => set("initial_password", event.target.value)} required type="password" value={form.initial_password} />
           </Field>

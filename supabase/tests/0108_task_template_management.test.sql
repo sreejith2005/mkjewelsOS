@@ -1,5 +1,7 @@
 begin;
 select plan(24);
+-- Migration 0397 withdrew tasks.delete from Admin by default; this test keeps an Admin as the task administrator who deletes.
+update permission_catalog set default_roles = array_append(default_roles, 'admin') where key = 'tasks.delete' and not ('admin' = any(default_roles));
 
 -- Contract surface -----------------------------------------------------------
 

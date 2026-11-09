@@ -10,9 +10,10 @@ function InlineDialog({ title, children }: Readonly<{ title: string; children: R
   return <section className="mt-4"><h2 className="mb-3 font-semibold">{title}</h2>{children}</section>;
 }
 
-export function TaskAdminControls({ task, onChanged, embedded = false, initialMode = null }: Readonly<{ task: ManagedTask; onChanged: () => Promise<void>; embedded?: boolean; initialMode?: "delete" | null }>) {
+/** canDelete: the viewer holds tasks.delete (Super Admin by default, migration 0397). The server re-checks. */
+export function TaskAdminControls({ task, onChanged, embedded = false, initialMode = null, canDelete = false }: Readonly<{ task: ManagedTask; onChanged: () => Promise<void>; embedded?: boolean; initialMode?: "delete" | null; canDelete?: boolean }>) {
   const Dialog = embedded ? InlineDialog : Modal;
-  const [mode, setMode] = useState<"edit" | "delete" | null>(initialMode);
+  const [mode, setMode] = useState<"edit" | "delete" | null>(canDelete ? initialMode : null);
   const [edit, setEdit] = useState<TaskAdminEdit>(() => taskAdminInitialEdit(task));
   const [series, setSeries] = useState(false);
   const [reason, setReason] = useState("");
@@ -45,7 +46,7 @@ export function TaskAdminControls({ task, onChanged, embedded = false, initialMo
   return <>
     <div className="flex flex-wrap gap-2">
       <Button variant="secondary" onClick={() => open("edit")}>Edit task</Button>
-      <Button variant="danger" onClick={() => open("delete")}>Delete task</Button>
+      {canDelete ? <Button variant="danger" onClick={() => open("delete")}>Delete task</Button> : null}
     </div>
     {mode ? <Dialog title={mode === "edit" ? "Edit task" : "Delete task"} onClose={() => { if (!busy) setMode(null); }}>
       <form className="grid gap-3" onSubmit={(event) => { event.preventDefault(); void save(); }}>

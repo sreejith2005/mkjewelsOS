@@ -14974,6 +14974,28 @@ export type Database = {
       get_franchise_module_coverage: { Args: never; Returns: Json }
       get_franchise_readiness_report: { Args: never; Returns: Json }
       get_my_org_scope: { Args: never; Returns: Json }
+      end_director_with_audit: {
+        Args: { p_profile_id: string; p_reason: string }
+        Returns: undefined
+      }
+      get_org_locations: { Args: never; Returns: Json }
+      list_director_scopes: { Args: never; Returns: Json }
+      save_director_with_audit: {
+        Args: {
+          p_branch_ids: string[]
+          p_franchise_ids: string[]
+          p_home_branch_id: string | null
+          p_profile_id: string
+          p_reason: string
+        }
+        Returns: Database["public"]["Tables"]["user_profiles"]["Row"]
+        SetofOptions: {
+          from: "*"
+          to: "user_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       list_assignment_locations: { Args: { p_context: Json }; Returns: Json }
       search_assignment_recipients: {
         Args: {

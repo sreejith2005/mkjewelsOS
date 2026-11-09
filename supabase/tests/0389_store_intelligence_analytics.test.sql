@@ -223,7 +223,8 @@ select pg_temp.aact('admin');
 select is((select (recording_analytics(pg_temp.period())#>>'{current,sessions}')::int),5,'admin sees every branch');
 select is((select jsonb_array_length(recording_analytics(pg_temp.period())->'by_branch')),2,'two branch rows to compare');
 select is((select (recording_analytics(pg_temp.period()||jsonb_build_object('branch_ids',jsonb_build_array(pg_temp.aid('b2'))))#>>'{current,sessions}')::int),1,'admin can narrow to one branch');
-select is((select x->>'can_open' from jsonb_array_elements(recording_analytics_sessions(pg_temp.period()||jsonb_build_object('branch_ids',jsonb_build_array(pg_temp.aid('b2'))),'sessions',null,null,5)->'rows') x),'false','another branch''s conversation cannot be opened from analytics');
+-- Since 0397 an Admin (not a Director) has company scope, so they may open every branch's conversations, as Super Admin does.
+select is((select x->>'can_open' from jsonb_array_elements(recording_analytics_sessions(pg_temp.period()||jsonb_build_object('branch_ids',jsonb_build_array(pg_temp.aid('b2'))),'sessions',null,null,5)->'rows') x),'true','an Admin opens another branch''s conversation from analytics (company scope, 0397)');
 select is((select jsonb_array_length(recording_analytics_options()->'branches')),2,'admin options list both branches');
 select pg_temp.aact('farmanager');
 select is((select (recording_analytics(pg_temp.period())#>>'{current,sessions}')::int),1,'the other branch manager sees only their branch');

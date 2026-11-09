@@ -43,15 +43,36 @@ export function isBranchLocationKind(value: unknown): value is BranchLocationKin
 }
 
 /**
- * Mirrors `org_automatic_scope()` (migration 0393): the franchise authority a
- * person's own effective role (dashboard authority, else role) confers through
- * the franchise of their own store. Admin -> Regional Admin, HR -> HR; any other
- * role confers nothing (a store manager comes from the store's manager).
+ * Mirrors `org_automatic_scope()` (migrations 0393, 0397): the franchise
+ * authority a person's own effective role (dashboard authority, else role)
+ * confers through the franchise of their own store. Only HR does since 0397:
+ * an Admin has company scope instead, and a store manager comes from the
+ * store's manager.
  */
 export function automaticScopeAuthority(effectiveRole: string | null | undefined): OrgScopeAuthority | null {
-  if (effectiveRole === "admin") return "regional_admin";
-  if (effectiveRole === "hr") return "hr";
-  return null;
+  return effectiveRole === "hr" ? "hr" : null;
+}
+
+/**
+ * Mirrors `org_is_director()` (migration 0397): a Director is the Admin role
+ * with at least one franchise or store Director grant.
+ */
+export function isDirectorScope(effectiveRole: string | null | undefined, grants: readonly Pick<OrgScopeGrant, "authority" | "scopeLevel">[]): boolean {
+  return effectiveRole === "admin" && grants.some((grant) => grant.authority === "director" && grant.scopeLevel !== "company");
+}
+
+/**
+ * Every store a Director covers: the stores of each chosen franchise plus each
+ * chosen store. Used to preview the Director picker; the server re-checks.
+ */
+export function directorCoveredStoreIds<B extends { id: string; franchise_group_id?: string | null }>(
+  branches: readonly B[],
+  franchiseIds: readonly string[],
+  branchIds: readonly string[],
+): string[] {
+  const franchises = new Set(franchiseIds);
+  const stores = new Set(branchIds);
+  return branches.filter((branch) => stores.has(branch.id) || (branch.franchise_group_id != null && franchises.has(branch.franchise_group_id))).map((branch) => branch.id);
 }
 
 export function scopeLevelForAuthority(authority: OrgScopeAuthority, company: boolean): OrgScopeLevel {
@@ -75,7 +96,7 @@ export type ScopeActor = Readonly<{
   active: boolean;
   /** Super Admin dashboard authority. */
   superAdmin: boolean;
-  /** Effective role (dashboard authority, else role); Admin and HR cover their store's franchise (0393). */
+  /** Effective role (dashboard authority, else role): Admin is company-wide unless a Director (0397); HR covers their store's franchise (0393). */
   effectiveRole?: string | null;
   grants: readonly OrgScopeGrant[];
 }>;
@@ -95,7 +116,9 @@ export type ResolvedOrgScope = Readonly<{
 export function resolveOrgScope(actor: ScopeActor, branches: readonly ScopeBranch[], activeFranchiseIds: ReadonlySet<string>): ResolvedOrgScope {
   const empty: ResolvedOrgScope = { company: false, readableBranchIds: [], manageableBranchIds: [], authorities: [] };
   if (!actor.active) return empty;
-  const company = actor.superAdmin || actor.grants.some((grant) => grant.scopeLevel === "company");
+  // An Admin who is not a Director has company scope (0397).
+  const company = actor.superAdmin || actor.grants.some((grant) => grant.scopeLevel === "company")
+    || (actor.effectiveRole === "admin" && !isDirectorScope(actor.effectiveRole, actor.grants));
   const franchiseIds = new Set(
     actor.grants.filter((grant) => grant.scopeLevel === "franchise" && grant.franchiseGroupId && activeFranchiseIds.has(grant.franchiseGroupId)).map((grant) => grant.franchiseGroupId as string),
   );
@@ -109,7 +132,7 @@ export function resolveOrgScope(actor: ScopeActor, branches: readonly ScopeBranc
     || (!manage && branch.id === actor.branchId)
     || branch.managerId === actor.profileId
     || (branch.franchiseGroupId !== null && franchiseIds.has(branch.franchiseGroupId))
-    || storeGrants.some((grant) => grant.branchId === branch.id && (!manage || grant.authority === "store_manager"));
+    || storeGrants.some((grant) => grant.branchId === branch.id && (!manage || grant.authority === "store_manager" || grant.authority === "director"));
   const authorities = new Set<OrgScopeAuthority>(actor.grants.map((grant) => grant.authority));
   if (branches.some((branch) => branch.managerId === actor.profileId)) authorities.add("store_manager");
   if (automaticApplies) authorities.add(automatic);
