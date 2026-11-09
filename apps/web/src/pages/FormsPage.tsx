@@ -2,13 +2,13 @@ import { returnFromFmsWork } from "@/features/tasks/fms/boardReturn";
 import { FmsStartingForm } from "@/features/forms/FmsStartingForm";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, Archive, ArrowLeft, BookOpen, ChevronRight, ClipboardList, Contact, Copy, FileText, History, Pencil, Plus, Search, Send, Trash2, Workflow } from "lucide-react";
-import { formatKolkataDateTime, groupFormSubmissions, groupFmsBuiltForms, type FmsBuiltForm, formMatchesLifecycle, hasPermission, presentFormSubmission, WORK_UPLOAD_FORM_NAME, type FormMasterOption, type SubmissionRecord, type SubmissionTemplate } from "@jewelos/core";
+import { formatKolkataDateTime, groupFormSubmissions, type FmsBuiltForm, formMatchesLifecycle, hasPermission, presentFormSubmission, WORK_UPLOAD_FORM_NAME, type FormMasterOption, type SubmissionRecord, type SubmissionTemplate } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Modal, Notice } from "@/components/ui";
 import { archiveForm, deletedFormBundle, deleteForm, formDeletionImpact, loadFmsBuiltForms, loadFormDynamicOptions, loadForms, publishAsNewForm, publishForm, reviseForm, reviewSubmission, type FormBundle, type FormDeletionImpact, type FormSubmission } from "@/features/forms/api";
 import {loadFormSubmissionDetail} from "@jewelos/data/forms/api";
 import { FormLibraryVisibility, FormPlacementControl } from "@/features/forms/FormLibraryVisibility";
-import { FmsWorkflowFormList, type FmsFormPlace } from "@/features/forms/FmsWorkflowFormList";
+import type { FmsFormPlace } from "@/features/forms/FmsWorkflowFormList";
 import { FormBuilder } from "@/features/forms/FormBuilder";
 import { type DynamicOptions } from "@/features/forms/FormRenderer";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
@@ -60,9 +60,9 @@ export function FormsPage() {
     window.dispatchEvent(new PopStateEvent("popstate"));
   };
   const fmsFamilies = useMemo(() => built ? families.filter((versions) => built.has(versions[0]!.family_id)) : [], [built, families]);
-  const workflowForms = useMemo(() => (data?.bundles ?? []).filter(item => author || item.library_visible !== false), [data, author]);
-  const workflowGroups = useMemo(() => groupFmsBuiltForms(workflowForms, built ?? new Map(), { query, lifecycle: life }), [workflowForms, built, query, life]);
-  const fmsFamilyCount = new Set(workflowGroups.flatMap(group => [...group.stages.flatMap(item => item.families), ...group.elsewhere].map(family => family[0]!.family_id))).size;
+  // One card per FMS form (owner 2026-11-09): not repeated per workflow, step or version. Editing the
+  // live version saves it in place, so every FMS step using it shows the change.
+  const fmsFamilyCount = fmsFamilies.length;
   if (!profile) return null;
   const runPublish = (id: string) => void publishForm(id).then(refresh).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Publish failed"));
   const runPublishAsNew = (id: string) => void publishAsNewForm(id).then(refresh).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Publish as separate form failed"));
@@ -80,10 +80,10 @@ export function FormsPage() {
   const selectedVersions = sidePanel ? shownFamilies.find((versions) => versions[0]!.family_id === selectedFamily) ?? shownFamilies[0] : undefined;
   const selectedId = sidePanel ? selectedVersions?.[0]!.family_id ?? null : selectedFamily;
   const narrowVersions = sidePanel ? undefined : shownFamilies.find((versions) => versions[0]!.family_id === selectedFamily);
-  const sourceNote = source === "library" ? null : source === "crm" ? `Forms CRM uses to register people: ${[...new Set(crmForms.values())].map((purpose) => CRM_FORM_PURPOSE_LABELS[purpose].toLowerCase()).join(", ")}. ${author ? "Edit and publish them here like any form; CRM uses each new published version. Choose which form CRM uses in CRM → REGISTRATION → CRM FORM SETTINGS." : ""} Fill form opens CRM registration.` : author ? "Questions built inside FMS workflow steps. People fill them through their workflow. To change one, open the workflow in FMS and edit that step's Questions & Form, so the workflow uses the new version." : "Forms that belong to FMS workflows. You fill them from Tasks → FMS when a step is assigned to you.";
+  const sourceNote = source === "library" ? null : source === "crm" ? `Forms CRM uses to register people: ${[...new Set(crmForms.values())].map((purpose) => CRM_FORM_PURPOSE_LABELS[purpose].toLowerCase()).join(", ")}. ${author ? "Edit and publish them here like any form; CRM uses each new published version. Choose which form CRM uses in CRM → REGISTRATION → CRM FORM SETTINGS." : ""} Fill form opens CRM registration.` : author ? "One card per FMS form. Tap a form to edit it: Save changes updates it in every workflow step that uses it. People fill them through their workflow." : "Forms that belong to FMS workflows. You fill them from Tasks → FMS when a step is assigned to you.";
   const libraryActions: LibraryActions = { author, built, onVisibilitySaved: refresh, onVisibilityError: setError, onFill: fillForm, onEdit: setEdit, onPublish: runPublish, onPublishAsNew: runPublishAsNew, onCreateVersion: runCreateVersion, onDelete: setRemove, onArchive: (id) => void archiveForm(id).then(refresh).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Archive failed")), onEditPublished: (id) => { const form = data?.bundles.find((item) => item.id === id); if (form?.lifecycle === "published") setEdit(form); else setError("Archived forms cannot be edited."); } };
   const list = !data ? <div className="grid gap-2"><div className="skeleton h-16 rounded-xl" /><div className="skeleton h-16 rounded-xl" /><div className="skeleton h-16 rounded-xl" /></div>
-    : tab === "templates" ? <Library {...libraryActions} emptyText={fmsSource ? "No FMS workflow forms match. Forms built inside an FMS step appear here." : source === "crm" ? "No CRM forms match these filters." : "No forms match these filters."} families={shownFamilies} inlineDetails={!sidePanel} onSelect={(id) => { setSelectedFamily(id); revealPageDetail(detailsRef.current); }} searching={query.trim() !== ""} selectedId={selectedId} workflowGroups={fmsSource ? workflowGroups : undefined} />
+    : tab === "templates" ? <Library {...libraryActions} emptyText={fmsSource ? "No FMS workflow forms match. Forms built inside an FMS step appear here." : source === "crm" ? "No CRM forms match these filters." : "No forms match these filters."} families={shownFamilies} inlineDetails={!sidePanel} onSelect={(id) => { setSelectedFamily(id); revealPageDetail(detailsRef.current); }} selectedId={selectedId} editLive={fmsSource} />
     : <SubmissionList bundles={data.bundles} onView={setView} submissions={data.submissions} />;
   return <><section className="flex min-h-[calc(100dvh-10rem)] w-full flex-col">
     <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -134,18 +134,25 @@ const LIFECYCLE_BADGE: Readonly<Record<string, { label: string; tone: string }>>
 const roleList = (item: FormBundle) => Array.isArray((item.permissions as { roles?: unknown })?.roles) ? ((item.permissions as { roles: string[] }).roles.map((role) => role.replaceAll("_", " ")).join(", ") || "none") : "none";
 
 type LibraryActions = Readonly<{ author: boolean; built: ReadonlyMap<string, FmsBuiltForm> | null; onVisibilitySaved: () => Promise<void>; onVisibilityError: (message: string) => void; onFill: (item: FormBundle) => void; onEdit: (item: FormBundle) => void; onPublish: (id: string) => void; onPublishAsNew: (id: string) => void; onEditPublished: (id: string) => void; onCreateVersion: (id: string) => void; onArchive: (id: string) => void; onDelete: (item: FormBundle) => void }>;
-type LibraryListProps = LibraryActions & { families: FormBundle[][]; place?: (familyId: string) => FmsFormPlace; emptyText: string; selectedId: string | null; onSelect: (familyId: string | null) => void; inlineDetails: boolean };
+type LibraryListProps = LibraryActions & { families: FormBundle[][]; /** FMS forms: the tile opens the live version, whose Save changes reaches every step using it. */ editLive?: boolean; place?: (familyId: string) => FmsFormPlace; emptyText: string; selectedId: string | null; onSelect: (familyId: string | null) => void; inlineDetails: boolean };
 
-function Library({ workflowGroups, searching, ...props }: LibraryListProps & { searching: boolean; workflowGroups?: ReturnType<typeof groupFmsBuiltForms<FormBundle>> | undefined }) {
-  if (!workflowGroups) return <FormLibraryList {...props} />;
-  return <FmsWorkflowFormList emptyText={props.emptyText} groups={workflowGroups} renderForms={(families, place) => <FormLibraryList {...props} families={families} place={place} />} searching={searching} />;
+function Library(props: LibraryListProps) {
+  return <FormLibraryList {...props} />;
 }
 
 /** Where an FMS-built form is used, in one line. */
 function fmsPlaceText(where: FmsFormPlace | undefined, fms: FmsBuiltForm | undefined): string | null {
   if (where?.workflow) return `${where.workflow}${where.step ? ` · ${where.step}` : ""}`;
   if (!fms) return null;
-  return fms.workflows.length ? `FMS: ${fms.workflows.join(", ")}${fms.steps.length ? ` · Step: ${fms.steps.join(", ")}` : ""}` : "Built inside an FMS workflow";
+  if (fms.unlinked) return "Not used by a workflow step yet";
+  // The live workflow versions first; older versions only when no live version uses the form.
+  const links = fms.links ?? [];
+  const live = links.filter((link) => link.isCurrent !== false);
+  const shown = live.length ? live : links;
+  const byWorkflow = new Map<string, Set<string>>();
+  for (const link of shown) byWorkflow.set(link.workflowName, (byWorkflow.get(link.workflowName) ?? new Set()).add(link.stageName));
+  if (byWorkflow.size) return `Used in ${[...byWorkflow].map(([workflow, steps]) => `${workflow} (${[...steps].join(", ")})`).join("; ")}`;
+  return fms.workflows.length ? `Used in ${fms.workflows.join(", ")}${fms.steps.length ? ` · Step: ${fms.steps.join(", ")}` : ""}` : "Built inside an FMS workflow";
 }
 
 /**
@@ -153,7 +160,7 @@ function fmsPlaceText(where: FmsFormPlace | undefined, fms: FmsBuiltForm | undef
  * counts follow in one line, and the main action sits in the same place on every
  * row. Versions, permissions and the less frequent actions open on demand.
  */
-function FormLibraryList({ families, place, emptyText, selectedId, onSelect, inlineDetails, ...actions }: LibraryListProps) {
+function FormLibraryList({ families, place, emptyText, selectedId, onSelect, inlineDetails, editLive = false, ...actions }: LibraryListProps) {
   // inlineDetails: the row opens the full-screen details view instead of the side pane.
   if (families.length === 0) return <Notice>{emptyText}</Notice>;
   const { author, built, onFill, onEdit } = actions;
@@ -173,7 +180,7 @@ function FormLibraryList({ families, place, emptyText, selectedId, onSelect, inl
         {author ? <div className="group min-w-0 basis-[calc(100%-4rem)] flex-1">
           <FormRowText badge={badge} draft={!!draft && draft !== shown} latest={latest} placeText={placeText} questionCount={questionCount(shown)} sharedWith={where?.sharedWith} submissions={submissions} versions={versions.length}>
             {/* The tile opens the editor; explicit actions sit above its stretched hit area. */}
-            <button className="min-w-0 break-words text-left after:absolute after:inset-0 after:content-[''] focus-visible:ring-offset-task-bg" onClick={() => shown.lifecycle === "archived" ? onSelect(latest.family_id) : onEdit(draft ?? shown)} title={shown.lifecycle === "archived" ? "Show versions and actions" : "Open form builder"} type="button">{latest.name}</button>
+            <button className="min-w-0 break-words text-left after:absolute after:inset-0 after:content-[''] focus-visible:ring-offset-task-bg" onClick={() => shown.lifecycle === "archived" ? onSelect(latest.family_id) : onEdit(editLive && live ? live : draft ?? shown)} title={shown.lifecycle === "archived" ? "Show versions and actions" : "Open form builder"} type="button">{latest.name}</button>
           </FormRowText>
         </div> : <div className="min-w-0 flex-1">
           <h2 className="break-words text-[15px] font-semibold leading-snug text-task-text">{latest.name}</h2>

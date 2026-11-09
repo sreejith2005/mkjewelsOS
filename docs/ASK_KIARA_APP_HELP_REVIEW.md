@@ -285,7 +285,7 @@ recipient. No new Kiara read tool: the data shown is unchanged.
 ### Forms Library visibility (2026-10-23)
 
 - [ ] Authors can use **Visible in Forms Library** on each form version. Hidden forms stay available in assigned Tasks/FMS and existing submission history, while staff cannot browse or fill them independently. Authors retain management access. Existing forms start visible; revisions and duplicates inherit visibility.
-- [ ] Forms Library / FMS workflow forms placement (2026-11-09, migration 0399; form authors): **Versions & actions** shows **Listed under Forms Library** or **Listed under FMS workflow forms** with **Move to FMS workflow forms** / **Move to Forms Library**. Forms made in FMS stay under FMS workflow forms; ones no step uses are grouped under **Not used by a workflow step yet** (**Not linked to a step**). No Kiara tool needed: placement is not data people ask about.
+- [ ] Forms Library / FMS workflow forms placement (2026-11-09, migration 0399; form authors): **Versions & actions** shows **Listed under Forms Library** or **Listed under FMS workflow forms** with **Move to FMS workflow forms** / **Move to Forms Library**. Forms made in FMS stay under FMS workflow forms; ones no step uses say **Not used by a workflow step yet**. No Kiara tool needed: placement is not data people ask about.
 - No additional Kiara read tool: existing app help explains this setting without a new data source. Local implementation is not evidence of production deployment.
 
 ## FMS work page - 2026-10-23 (lean page)
@@ -315,7 +315,7 @@ assigned stage" recipe is updated. No new read tool.
 - [ ] Conditions & Routing: independent Visibility Conditions, nested Add AND group / Add OR group, Ordered IF routes and Set OTHERWISE.
 - [ ] Manage sections: Section Visibility and After this section. Explicit question routes override the end action; eligibility still applies.
 - [ ] Routing simulation, Test validation and Reset simulation use the production evaluator without writing or uploading.
-- [ ] (2026-11-02) **FMS workflow forms** shows each workflow once as a collapsible card (status **Live** / **Draft** / **Turned off**), not once per saved version. Tapping it shows **Step 1**, **Step 2**, ... with that step's forms; **Expand all** / **Collapse all** and search (opens matching workflows). Cards carry a workflow · step tag and **Also used in ...** for shared forms; forms only in a draft or older version sit under **Not in the live version**. The Workflow filter and Stage filter were removed.
+- [ ] (2026-11-09, replaces the 2026-11-02 workflow cards) **FMS workflow forms** lists each FMS form once, with **Used in <workflow> (<steps>)**. Tapping a form opens its live version; **Save changes** updates every workflow step using it.
 - [ ] Tasks Today uses the Asia/Kolkata calendar date; Overall includes future work; Overdue separately lists earlier unfinished work. Counts and pages share server scope.
 - [ ] Automatic follow-up scheduling extends existing FMS timing and assignment with next-day 11:00 defaults and requested date/time overrides.
 

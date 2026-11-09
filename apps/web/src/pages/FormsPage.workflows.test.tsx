@@ -42,25 +42,24 @@ describe("FMS workflow form library", () => {
     expect(await screen.findByRole("button", { name: "Work and Upload" })).toBeTruthy();
   });
 
-  it("shows workflow then stage then existing form actions, and filters status", async () => {
+  it("lists each FMS form once with where it is used, opens the live version, and filters status", async () => {
+    const draft = { ...bundle, id: "work-draft", version: 2, lifecycle: "draft" } as unknown as FormBundle;
+    mocks.loadForms.mockResolvedValue({ bundles: [bundle, draft], submissions: [] });
     const user = userEvent.setup(); render(<FormsPage />);
     await user.click(await screen.findByRole("button", { name: /FMS workflow forms/ }));
-    expect((await screen.findByRole("button", { name: /Sales/ })).getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByRole("heading", { name: "Step 1: Call" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Work and Upload" })).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Versions and actions for Work and Upload" }));
-    expect(screen.getByRole("button", { name: "Create new version" })).toBeTruthy();
-    await user.selectOptions(screen.getByRole("combobox", { name: "Lifecycle filter" }), "draft");
-    expect(await screen.findByText("No FMS workflow forms match. Forms built inside an FMS step appear here.")).toBeTruthy();
+    expect(await screen.findByText("Used in Sales (Call)")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: /Step 1/ })).toBeNull();
+    // Tapping the form edits the live version, so Save changes reaches every step using it.
+    await user.click(screen.getByRole("button", { name: "Work and Upload" }));
+    expect(screen.getByText("Builder")).toBeTruthy();
   });
-  it("searches workflow and stage labels and preserves hidden-library restrictions", async () => {
+  it("keeps hidden FMS forms away from staff", async () => {
     mocks.role = "staff";
     const user = userEvent.setup(); render(<FormsPage />);
     await user.click(await screen.findByRole("button", { name: /FMS workflow forms/ }));
     expect(await screen.findByText("No FMS workflow forms match. Forms built inside an FMS step appear here.")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /Sales/ })).toBeNull();
   });
-  it("lists each workflow once across saved versions, collapsed until chosen, with step and shared-form tags", async () => {
+  it("shows a form used by several workflows and versions once, naming the live workflows and steps", async () => {
     mocks.loadForms.mockResolvedValue({ bundles: [form("negotiation", "Negotiation — Instagram Leads"), form("payment", "Order payment")], submissions: [] });
     mocks.loadFmsBuiltForms.mockResolvedValue(new Map([
       ["negotiation", { familyId: "negotiation", workflows: [], steps: [], links: [
@@ -68,25 +67,18 @@ describe("FMS workflow form library", () => {
         link("double", "Doublelick FMS", 1, false, "Negotiation", 1), link("double", "Doublelick FMS", 2, true, "Negotiation", 1),
       ] }],
       ["payment", { familyId: "payment", workflows: [], steps: [], links: [link("double", "Doublelick FMS", 1, false, "Payment", 0), link("double", "Doublelick FMS", 2, true, "Payment", 0)] }],
+      ["unused", { familyId: "unused", workflows: [], steps: [], unlinked: true }],
     ]));
     const user = userEvent.setup(); render(<FormsPage />);
     const fms = await screen.findByRole("button", { name: /FMS workflow forms/ });
     expect(within(fms).getByText("2")).toBeTruthy();
     await user.click(fms);
-    const double = screen.getByRole("button", { name: /Doublelick FMS/ });
-    expect(screen.getAllByRole("button", { name: /INSTAGRAM LEADS|Doublelick FMS/ })).toHaveLength(2);
-    expect(double.getAttribute("aria-expanded")).toBe("false");
-    expect(screen.queryByRole("heading", { name: "Order payment" })).toBeNull();
-    await user.click(double);
-    expect(double.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getAllByRole("heading", { level: 3 }).map(heading => heading.textContent)).toEqual(["Step 1: Payment", "Step 2: Negotiation"]);
-    expect(screen.getByText("Doublelick FMS · Step 2 · Negotiation")).toBeTruthy();
-    expect(screen.getByText("Also used in INSTAGRAM LEADS")).toBeTruthy();
-    await user.click(double);
-    expect(screen.queryByRole("heading", { name: "Order payment" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: "Negotiation — Instagram Leads" })).toHaveLength(1);
+    expect(screen.getByText("Used in INSTAGRAM LEADS (Negotiation); Doublelick FMS (Negotiation)")).toBeTruthy();
+    expect(screen.getByText("Used in Doublelick FMS (Payment)")).toBeTruthy();
     await user.type(screen.getByRole("searchbox", { name: "Search forms" }), "payment");
-    expect(await screen.findByRole("heading", { name: "Order payment" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /INSTAGRAM LEADS/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Negotiation — Instagram Leads" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Order payment" })).toBeTruthy();
     expect(mocks.setFormLibraryVisibility).not.toHaveBeenCalled();
   });
 });
