@@ -7,6 +7,8 @@ select no_plan();
 select ok(has_function_privilege('authenticated','recorder_can_read(uuid,uuid,uuid)','execute'),'signed-in users keep execute');
 select ok(not has_function_privilege('anon','recorder_can_read(uuid,uuid,uuid)','execute'),'anon still cannot execute');
 select ok((select prosecdef from pg_proc where oid='recorder_can_read(uuid,uuid,uuid)'::regprocedure),'still security definer');
+select ok(position('org_has_company_scope' in pg_get_functiondef('recorder_can_read(uuid,uuid,uuid)'::regprocedure))>0,'0387 company-scope rule is kept');
+select ok(position('a.working_status=''active''' in pg_get_functiondef('recorder_can_read(uuid,uuid,uuid)'::regprocedure))>0,'working status is required');
 
 create temporary table af(name text primary key,id uuid);
 grant all on af to authenticated;
