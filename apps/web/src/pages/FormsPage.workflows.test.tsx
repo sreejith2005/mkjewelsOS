@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FormBundle } from "@/features/forms/api";
 import type { UserProfile } from "@/types";
 import { FormsPage } from "./FormsPage";
 
-const mocks = vi.hoisted(() => ({ loadFmsBuiltForms: vi.fn(), loadForms: vi.fn(), setFormLibraryVisibility: vi.fn(), role: "super_admin" }));
+const mocks = vi.hoisted(() => ({ loadFmsBuiltForms: vi.fn(), loadForms: vi.fn(), setFormLibraryVisibility: vi.fn(), setFormFamilyPlacement: vi.fn(), role: "super_admin" }));
 vi.mock("@/auth/AuthContext", async () => {
   const { builtinAccessContext } = await vi.importActual<typeof import("@jewelos/core")>("@jewelos/core");
   return { useAuth: () => { const profile = { id: "user", tenant_id: "tenant", user_role: mocks.role } as UserProfile; return { profile, access: builtinAccessContext(profile) }; } };
@@ -15,7 +15,7 @@ vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealti
 vi.mock("@/features/forms/FormBuilder", () => ({ FormBuilder: () => <div>Builder</div> }));
 vi.mock("@/features/forms/FmsStartingForm", () => ({ FmsStartingForm: () => <div>Assigned form</div> }));
 vi.mock("@/features/forms/api", () => ({
-  loadForms: mocks.loadForms, loadFmsBuiltForms: mocks.loadFmsBuiltForms, setFormLibraryVisibility: mocks.setFormLibraryVisibility,
+  loadForms: mocks.loadForms, loadFmsBuiltForms: mocks.loadFmsBuiltForms, setFormLibraryVisibility: mocks.setFormLibraryVisibility, setFormFamilyPlacement: mocks.setFormFamilyPlacement,
   loadFormDynamicOptions: async () => ({ users: [], branches: [], departments: [], masters: [] }),
   deletedFormBundle: () => null,
 }));
@@ -29,6 +29,19 @@ const link = (flow: string, name: string, version: number, isCurrent: boolean, s
 const form = (id: string, name: string) => ({ ...bundle, id, family_id: id, name }) as FormBundle;
 
 describe("FMS workflow form library", () => {
+  it("moves a form between FMS workflow forms and Forms Library (0399)", async () => {
+    mocks.setFormFamilyPlacement.mockResolvedValue(undefined);
+    const user = userEvent.setup(); render(<FormsPage />);
+    await user.click(await screen.findByRole("button", { name: /FMS workflow forms/ }));
+    await user.click(await screen.findByRole("button", { name: "Versions and actions for Work and Upload" }));
+    expect(screen.getByText("FMS workflow forms", { selector: "span.font-semibold" })).toBeTruthy();
+    mocks.loadFmsBuiltForms.mockResolvedValue(new Map());
+    await user.click(screen.getByRole("button", { name: "Move to Forms Library" }));
+    await waitFor(() => expect(mocks.setFormFamilyPlacement).toHaveBeenCalledWith("work", "library"));
+    await user.click(screen.getByRole("button", { name: /^Forms Library/ }));
+    expect(await screen.findByRole("button", { name: "Work and Upload" })).toBeTruthy();
+  });
+
   it("shows workflow then stage then existing form actions, and filters status", async () => {
     const user = userEvent.setup(); render(<FormsPage />);
     await user.click(await screen.findByRole("button", { name: /FMS workflow forms/ }));

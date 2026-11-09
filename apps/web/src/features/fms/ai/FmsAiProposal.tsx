@@ -7,7 +7,7 @@ import {
 } from "@jewelos/core";
 import { Button, Notice } from "@/components/ui";
 import type { FmsData } from "../api";
-import { saveDraft } from "@/features/forms/api";
+import { saveDraft, setFormFamilyPlacement } from "@/features/forms/api";
 import { fmsAiCatalogFromData } from "./catalog";
 
 export type FmsAiProposalSource = Readonly<{
@@ -47,7 +47,9 @@ export function FmsAiProposalReview({ source, current, data, readOnly, canManage
     setFormState((state) => ({ ...state, [spec.ref]: "Creating draft…" }));
     try {
       const payload = { name: definition.name, description: definition.description ?? "", record_name_field_key: null, sections: definition.sections ?? [], permissions: { roles: definition.permissions?.roles ?? [] } } as unknown as Json; // the same payload shape FormBuilder sends
-      await saveDraft(null, payload, definition.fields.map(({ id: _id, sortOrder: _sortOrder, ...field }) => field) as unknown as Json);
+      const draftId = await saveDraft(null, payload, definition.fields.map(({ id: _id, sortOrder: _sortOrder, ...field }) => field) as unknown as Json);
+      // Made for this workflow: listed under FMS workflow forms, not Forms Library (0399).
+      await setFormFamilyPlacement(draftId, "fms").catch(() => undefined);
       setFormState((state) => ({ ...state, [spec.ref]: "Draft created. Open Forms to review and publish it; then ask me to link it, or link it in the step." }));
     } catch (caught) {
       setFormState((state) => ({ ...state, [spec.ref]: caught instanceof Error ? caught.message : "Could not create the Form draft." }));

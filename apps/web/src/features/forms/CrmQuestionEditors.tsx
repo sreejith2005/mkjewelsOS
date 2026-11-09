@@ -23,7 +23,7 @@ export function RepeatEditor({ field, masterOptions, onChange }: { field: FormFi
   const patchSub = (index: number, next: Partial<FormRepeatSubfield>) => patch({ fields: config.fields.map((sub, at) => at === index ? { ...sub, ...next } : sub) });
   return <div className="grid gap-3 rounded-lg border border-gold/15 bg-obsidian/30 p-3 sm:col-span-2">
     <p className="text-sm font-semibold text-champagne">Repeating group</p>
-    <p className="-mt-2 text-xs text-soft-grey">People first choose how many, then answer the questions below once for each. Works in CRM forms.</p>
+    <p className="-mt-2 text-xs text-soft-grey">People first choose how many, then answer the questions below once for each. Works in every form.</p>
     <div className="grid gap-3 sm:grid-cols-[1fr_6rem_6rem]">
       <Field label="&quot;How many?&quot; question"><input className="field" onChange={(event) => patch({ countLabel: event.target.value })} value={config.countLabel} /></Field>
       <Field label="From"><input className="field" inputMode="numeric" max={20} min={0} onChange={(event) => patch({ min: Math.max(0, Math.min(20, Number(event.target.value) || 0)) })} type="number" value={config.min} /></Field>
@@ -49,7 +49,7 @@ export function RepeatEditor({ field, masterOptions, onChange }: { field: FormFi
 export function CrmPhotoEditor({ field, onChange }: { field: FormFieldDefinition; onChange: (crm: FormCrmBehaviour) => void }) {
   const crm = field.validation?.crm ?? {};
   return <div className="grid gap-3 rounded-lg border border-gold/15 bg-obsidian/30 p-3 sm:col-span-2 sm:grid-cols-2">
-    <p className="text-xs text-soft-grey sm:col-span-2">Photos go straight to the CRM client&apos;s private documents. Works in CRM forms.</p>
+    <p className="text-xs text-soft-grey sm:col-span-2">Works in every form: in CRM forms photos go to the CRM client&apos;s private documents; in other forms they are kept privately with the submission.</p>
     <label className="min-h-11 content-center text-sm text-champagne"><input checked={crm.video === true} onChange={(event) => onChange({ ...crm, video: event.target.checked || undefined })} type="checkbox" /> Also accept videos</label>
     <Field label="Files allowed"><select className="field" onChange={(event) => onChange({ ...crm, maxFiles: Number(event.target.value) })} value={crm.maxFiles ?? 1}>{Array.from({ length: 10 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}</select></Field>
   </div>;

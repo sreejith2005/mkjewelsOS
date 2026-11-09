@@ -33,7 +33,7 @@ export function validateCustomerMapping(form: FormTemplateDefinition, mapping: C
     const field = form.fields.find(f => f.key === item.fieldKey);
     if (!field) { issues.push(`Unknown question: ${item.fieldKey}`); continue; }
     if (item.mode === "operational") continue;
-    if (["user_dropdown", "branch_dropdown", "department_dropdown", "section_header", "divider", "file"].includes(field.type)) issues.push(`Question ${item.fieldKey} is operational`);
+    if (["user_dropdown", "branch_dropdown", "department_dropdown", "section_header", "divider", "file", "repeat", "crm_photo"].includes(field.type)) issues.push(`Question ${item.fieldKey} is operational`);
     if (!CUSTOMER_DESTINATIONS.includes(item.destination) || !accepts(field, item.destination)) issues.push(`Question ${item.fieldKey} cannot supply ${item.destination}`);
     if (item.contactConfirmedValues?.some(value => item.destination !== "contact_outcome" || !field.options?.some(option => option.value === value))) issues.push(`Review the confirmed contact options for ${item.fieldKey}`);
     if (item.contactConfirmedValues?.length && (!item.contactKind || !item.contactChannel)) issues.push(`Choose the actual contact kind and channel for ${item.fieldKey}`);

@@ -1,6 +1,7 @@
 // CRM question types in the shared form renderer (owner request 2026-11-03): a repeating group,
-// a CRM photo / video upload, and the branch choice lists. They need what CRM gives a form it
-// opens (FormCrmServices); anywhere else they explain that they only work in CRM forms.
+// a CRM photo / video upload, and the branch choice lists. A form CRM opens sends photos to CRM
+// documents (FormCrmServices); any other saved form uploads them to its own private storage
+// (migration 0399). Only a preview or an unsaved form cannot take uploads.
 import { useRef, useState } from "react";
 import { Camera, Paperclip, X } from "lucide-react";
 import { formRepeatRowCount, isFormCrmFilesAnswer, isFormRepeatAnswer, type FormAnswer, type FormCrmFile, type FormCrmServices, type FormFieldDefinition, type FormRepeatAnswer, type FormRepeatRow } from "@jewelos/core";
@@ -10,7 +11,7 @@ const IMAGE_TYPES = ".jpg,.jpeg,.png,.webp,.heic,.heif";
 const VIDEO_TYPES = ".mp4,.webm,.mov";
 const ALLOWED_IMAGE_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
 const ALLOWED_VIDEO_MIME = new Set(["video/mp4", "video/webm", "video/quicktime"]);
-export const CRM_ONLY_NOTICE = "This question works in CRM forms only.";
+export const CRM_ONLY_NOTICE = "Photo uploads work when the form is filled, not in this preview.";
 
 /** "How many?" followed by one set of row questions per person or item. */
 export function RepeatField({ field, value, disabled, onChange, registerRef }: { field: FormFieldDefinition; value: FormAnswer | undefined; disabled: boolean; onChange: (value: FormRepeatAnswer) => void; registerRef: (node: HTMLElement | null) => void; labelId?: string }) {
@@ -52,11 +53,13 @@ export function CrmPhotoField({ field, value, disabled, crm, onChange, onBusyCha
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement | null>(null);
-  if (!crm?.upload || !crm.remove) return <Notice>{CRM_ONLY_NOTICE}</Notice>;
+  const files: readonly FormCrmFile[] = isFormCrmFilesAnswer(value) ? value.files : [];
+  if (!crm?.upload || !crm.remove) return files.length
+    ? <ul className="space-y-1 text-sm text-task-text">{files.map((file) => <li className="flex items-center gap-2" key={file.path}><Paperclip aria-hidden className="size-4 shrink-0 text-success" /><span className="min-w-0 break-words">{file.fileName}</span></li>)}</ul>
+    : <Notice>{CRM_ONLY_NOTICE}</Notice>;
   const upload = crm.upload; const removeFile = crm.remove;
   const video = field.validation?.crm?.video === true;
   const max = field.validation?.crm?.maxFiles ?? 1;
-  const files: readonly FormCrmFile[] = isFormCrmFilesAnswer(value) ? value.files : [];
   const choose = async (file: File | undefined) => {
     if (!file) return;
     const type = file.type.toLowerCase();

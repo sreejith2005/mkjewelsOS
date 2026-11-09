@@ -77,6 +77,9 @@ export function EntryQueue({ profile, selectedBranchId, selectedCrm, branches, c
   const [name, setName] = useState(""); const [mobile, setMobile] = useState(""); const [countryCode, setCountryCode] = useState(DEFAULT_COUNTRY_CODE); const [branch, setBranch] = useState(selectedBranchId); const [queueCrm, setQueueCrm] = useState(selectedCrm); const [queueTab, setQueueTab] = useState<"active" | "recent">(paging?.tab ?? "active"); const [message, setMessage] = useState(""); const [autoFilled, setAutoFilled] = useState(false); const [saving, setSaving] = useState(false);
   const [duplicate, setDuplicate] = useState<Registered | null>(null);
   const manager = profile.role === "super_admin" || profile.role === "branch_manager";
+  // Super Admin removes demo or mistaken entries (supabase-crm 20261109000200); the server checks the role again.
+  const canDelete = profile.role === "super_admin";
+  const [selecting, setSelecting] = useState(false); const [selected, setSelected] = useState<ReadonlySet<string>>(new Set()); const [deleting, setDeleting] = useState(false); const [removedIds, setRemovedIds] = useState<ReadonlySet<string>>(new Set()); const [queueMessage, setQueueMessage] = useState("");
   useEffect(() => { if (paging) setQueueTab(paging.tab); }, [paging?.tab]);
   function queueHref(tab: string, page = 1, branchId = selectedBranchId, crmName = selectedCrm) { const params = new URLSearchParams(); if (branchId) params.set("branch", branchId); if (crmName) params.set("crm", crmName); if (tab === "recent") params.set("tab", tab); if (page > 1) params.set("page", String(page)); return `/queue${params.size ? `?${params}` : ""}`; }
   function changeTab(tab: "active" | "recent") { setQueueTab(tab); if (paging) router.push(queueHref(tab)); }
@@ -141,7 +144,26 @@ export function EntryQueue({ profile, selectedBranchId, selectedCrm, branches, c
   const items = [...committedItems.filter((item) => !acknowledgedIds.has(item.id)
     && item.branch_id === (selectedBranchId || branch)
     && (!selectedCrm || item.assigned_crm_name === selectedCrm)), ...initialItems];
-  const visibleItems = items.filter((item) => queueTab === "active" ? item.status !== "complete" : item.status === "complete");
+  const visibleItems = items.filter((item) => !removedIds.has(item.id) && (queueTab === "active" ? item.status !== "complete" : item.status === "complete"));
+  function toggleSelected(id: string) { setSelected((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; }); }
+  function stopSelecting() { setSelecting(false); setSelected(new Set()); }
+  async function deleteSelected() {
+    const ids = visibleItems.filter((item) => selected.has(item.id)).map((item) => item.id);
+    if (!ids.length || deleting) return;
+    if (!window.confirm(`Delete ${ids.length} queue ${ids.length === 1 ? "entry" : "entries"}? They leave the queue for good. Client records and saved visits are kept.`)) return;
+    setDeleting(true); setQueueMessage("");
+    try {
+      const { data, error } = await createClient().rpc("delete_queue_entries", { p_entry_ids: ids, p_reason: "Deleted from the client queue" });
+      if (error) { setQueueMessage(`Could not delete: ${error.message}`); return; }
+      const count = data && typeof data === "object" && !Array.isArray(data) && typeof data.deleted === "number" ? data.deleted : ids.length;
+      setRemovedIds((current) => new Set([...current, ...ids]));
+      setCommittedItems((current) => current.filter((item) => !ids.includes(item.id)));
+      stopSelecting();
+      setQueueMessage(`${count} queue ${count === 1 ? "entry" : "entries"} deleted.`);
+      router.refresh();
+    } catch { setQueueMessage("Could not confirm the delete. Refresh the queue before retrying."); }
+    finally { setDeleting(false); }
+  }
   const choosableBranches = branches.filter((item) => profile.role === "super_admin" || item.id === profile.branchId);
   const branchSelect = (id: string, onChange: (value: string) => void, label: string) => <label className="block text-sm"><span>{label}</span><select aria-label={label} title={profile.role === "super_admin" ? "Choose branch" : "Your assigned branch"} className="mt-1 w-full rounded border border-stone-300 bg-white p-2" value={id} onChange={(event) => onChange(event.target.value)}>{!id ? <option value="">SELECT BRANCH</option> : null}{choosableBranches.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>;
   const notOnRoster = rosterHealth?.not_on_roster.filter((row) => row.count > 0) ?? [];
@@ -160,10 +182,13 @@ export function EntryQueue({ profile, selectedBranchId, selectedCrm, branches, c
       </div>
       {branch && !toolbarRoster.length ? <p role="status" className="crm-notice mt-3">No CRM staff for this branch.{manager && notOnRoster.length ? ` ${notOnRoster.map((row) => `${row.count} missing: ${ROSTER_REASONS[row.reason] ?? (row.reason || row.outcome)}`).join("; ")}.` : ""}</p> : null}
       {presentToday.length ? <p className="crm-flat-meta mt-3">In today: {presentToday.join(", ")}</p> : branch && toolbarRoster.length ? <p className="crm-flat-meta mt-3">No CRM staff in today.</p> : null}
-      <div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={() => changeTab("active")} aria-pressed={queueTab === "active"} className={queueTab === "active" ? "rounded bg-amber-800 px-3 py-2 text-xs font-semibold text-white" : "rounded border px-3 py-2 text-xs font-semibold"}>Active queue</button><button type="button" onClick={() => changeTab("recent")} aria-pressed={queueTab === "recent"} className={queueTab === "recent" ? "rounded bg-amber-800 px-3 py-2 text-xs font-semibold text-white" : "rounded border px-3 py-2 text-xs font-semibold"}>Recently submitted</button></div>
+      <div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={() => changeTab("active")} aria-pressed={queueTab === "active"} className={queueTab === "active" ? "rounded bg-amber-800 px-3 py-2 text-xs font-semibold text-white" : "rounded border px-3 py-2 text-xs font-semibold"}>Active queue</button><button type="button" onClick={() => changeTab("recent")} aria-pressed={queueTab === "recent"} className={queueTab === "recent" ? "rounded bg-amber-800 px-3 py-2 text-xs font-semibold text-white" : "rounded border px-3 py-2 text-xs font-semibold"}>Recently submitted</button>{canDelete && visibleItems.length && !selecting ? <button type="button" onClick={() => { setSelecting(true); setSelected(new Set()); }} className="ml-auto rounded border px-3 py-2 text-xs font-semibold">Select to delete</button> : null}</div>
+      {canDelete && selecting ? <div className="crm-queue-select-bar mt-3 flex flex-wrap items-center gap-2 rounded border border-stone-300 p-3 text-sm" role="group" aria-label="Delete queue entries"><span className="font-semibold">{selected.size} selected</span><button type="button" className="rounded border px-3 py-2 text-xs font-semibold" onClick={() => setSelected(selected.size === visibleItems.length ? new Set() : new Set(visibleItems.map((item) => item.id)))}>{selected.size === visibleItems.length ? "Clear selection" : "Select all on this page"}</button><button type="button" className="crm-queue-delete rounded px-3 py-2 text-xs font-semibold disabled:opacity-50" disabled={!selected.size || deleting} onClick={() => void deleteSelected()}>{deleting ? "Deleting…" : "Delete selected"}</button><button type="button" className="rounded px-3 py-2 text-xs font-semibold" disabled={deleting} onClick={stopSelecting}>Cancel</button></div> : null}
+      {queueMessage ? <p role="status" className="mt-3 text-sm font-medium text-green-800">{queueMessage}</p> : null}
       {completedName ? <p role="status" className="mt-3 text-sm font-medium text-green-800">Visit saved for {completedName}. It is under Recently submitted.</p> : null}</div>
       {/* One plain row per person (owner 2026-11-05): who, when, which CRM, and one clear action. No inner scroller. */}
       {visibleItems.length ? <ul className="crm-queue-list" aria-label={queueTab === "active" ? "Waiting clients" : "Recently submitted"}>{visibleItems.map((item) => { const marker = item.status === "complete" ? undefined : draftMarkers?.get(item.id); return <li key={item.id} className={`crm-queue-row${marker ? ` has-draft is-${marker.state}` : ""}`}>
+        {canDelete && selecting ? <label className="crm-queue-check flex min-h-11 min-w-11 cursor-pointer items-center justify-center"><input type="checkbox" className="size-5" aria-label={`Select ${item.client_name}`} checked={selected.has(item.id)} onChange={() => toggleSelected(item.id)} /></label> : null}
         <div className="crm-queue-who">
           <p className="crm-queue-name">{item.client_name}<span className={`crm-queue-badge${item.client_is_new || !item.client_id ? " is-new" : ""}`}>{/* crm-port fix (owner 2026-10-05): registration always creates the client, so client_id alone always read EXISTING. */}{item.client_is_new || !item.client_id ? "New" : "Returning"}</span></p>
           <p className="crm-queue-meta"><span>{formatPhone(item.mobile)}</span><span>{queueTime(item.created_at)}</span><span>{item.assigned_crm_name ? `CRM: ${item.assigned_crm_name}` : "No CRM yet"}</span></p>
