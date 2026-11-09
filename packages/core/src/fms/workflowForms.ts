@@ -19,6 +19,8 @@ export type FmsWorkflowFormGroup<T> = {
   familyCount: number;
 };
 const UNAVAILABLE_WORKFLOW = "Workflow unavailable in your access";
+/** Forms made in FMS (or moved there) that no workflow step uses now (0399). */
+export const FMS_FORMS_WITHOUT_STEP = "Not used by a workflow step yet";
 
 /**
  * One group per workflow (not per saved version), the current version's steps in
@@ -34,7 +36,7 @@ export function groupFmsBuiltForms<T extends WorkflowForm>(forms: readonly T[], 
   for (const form of forms) {
     const source = built.get(form.family_id);
     if (!source || !formMatchesLifecycle(form.lifecycle, filters.lifecycle ?? "active")) continue;
-    const links = source.links?.length ? source.links : [{ workflowId: "", workflowName: UNAVAILABLE_WORKFLOW, stageId: "", stageName: "Stage unavailable" }];
+    const links = source.links?.length ? source.links : source.unlinked ? [{ workflowId: "unlinked", workflowName: FMS_FORMS_WITHOUT_STEP, stageId: "", stageName: "", isCurrent: false }] : [{ workflowId: "", workflowName: UNAVAILABLE_WORKFLOW, stageId: "", stageName: "Stage unavailable" }];
     for (const link of links) {
       const current = link.isCurrent !== false;
       const searchable = `${link.workflowName} ${current ? link.stageName : ""} ${form.name} ${form.description ?? ""}`.toLowerCase();
@@ -62,7 +64,7 @@ export function groupFmsBuiltForms<T extends WorkflowForm>(forms: readonly T[], 
     return { id: group.id, name: group.name, ...(group.status ? { status: group.status } : {}), ...(group.version !== undefined ? { version: group.version } : {}),
       stages: [...group.stages].map(([id, stage]) => ({ id, name: stage.name, order: stage.order, families: families(stage.families.values()) })).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name)),
       elsewhere, familyCount: shown.size + elsewhere.length };
-  }).sort((a, b) => Number(a.name === UNAVAILABLE_WORKFLOW) - Number(b.name === UNAVAILABLE_WORKFLOW) || a.name.localeCompare(b.name));
+  }).sort((a, b) => Number(a.name === UNAVAILABLE_WORKFLOW || a.name === FMS_FORMS_WITHOUT_STEP) - Number(b.name === UNAVAILABLE_WORKFLOW || b.name === FMS_FORMS_WITHOUT_STEP) || a.name.localeCompare(b.name));
 }
 
 /** Presentation hierarchy only: never creates records or infers assignment eligibility. */

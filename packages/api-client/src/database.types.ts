@@ -8283,6 +8283,30 @@ export type Database = {
           },
         ]
       }
+      form_family_placements: {
+        Row: {
+          family_id: string
+          placement: string
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          family_id: string
+          placement: string
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          family_id?: string
+          placement?: string
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       form_fields: {
         Row: {
           branch_logic: Json | null
@@ -14769,6 +14793,10 @@ export type Database = {
       can_open_form_from_library: {
         Args: { p_template_id: string }
         Returns: boolean
+      }
+      set_form_family_placement: {
+        Args: { p_placement: string; p_template_id: string }
+        Returns: Json
       }
       set_form_library_visibility_with_audit: {
         Args: { p_template_id: string; p_visible: boolean }

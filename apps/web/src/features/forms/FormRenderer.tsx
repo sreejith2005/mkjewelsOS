@@ -92,6 +92,21 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
   // Client lookups everywhere for people with CRM access; a form CRM opens brings its own services.
   const appCrm = useFormCrmServices();
   const crm = crmProp ?? appCrm;
+  // CRM photo questions outside CRM (migration 0399): photos upload to the form's private
+  // storage like a file question; CRM's own forms keep sending them to CRM documents.
+  const photoServices = useMemo<FormCrmServices | undefined>(() => {
+    if (crm?.upload && crm.remove) return crm;
+    if (!templateId || preview || readOnly) return crm;
+    return {
+      lookup: crm?.lookup ?? (async () => null),
+      upload: async (fieldKey, file, options) => {
+        const uploaded = await uploadFormFile(templateId, fieldKey, file, { video: options.video });
+        return { path: uploaded.id, clientId: "", fileName: uploaded.name, mimeType: file.type };
+      },
+      // An unused upload stays private to its uploader and is never linked to a submission.
+      remove: async () => undefined,
+    };
+  }, [crm, preview, readOnly, templateId]);
   const [answers, setAnswers] = useState<Record<string, FormAnswer>>(() => Object.fromEntries(Object.entries(initialAnswers).filter((entry): entry is [string, FormAnswer] => entry[1] !== null && entry[1] !== undefined)));
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Readonly<Record<string, string>>>({});
@@ -269,7 +284,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
       <RepeatField disabled={disabled} field={field} labelId={labelId} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} value={value} />{errorText}
     </fieldset>);
     if (field.type === "crm_photo") return shell(<div><QuestionText field={field} id={labelId} />{helper}
-      <CrmPhotoField crm={crm} describedBy={describedBy} disabled={disabled || preview} field={field} onBusyChange={(busy) => setUploadsBusy((count) => Math.max(0, count + (busy ? 1 : -1)))} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} value={value} />{errorText}
+      <CrmPhotoField crm={photoServices} describedBy={describedBy} disabled={disabled || preview} field={field} onBusyChange={(busy) => setUploadsBusy((count) => Math.max(0, count + (busy ? 1 : -1)))} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} value={value} />{errorText}
     </div>);
     // A Users question that allows other locations: Location -> Store -> Employee (migration 0386).
     if (field.type === "user_dropdown" && field.assignmentScope === "cross_location") return shell(<div><QuestionText field={field} id={labelId} />{helper}

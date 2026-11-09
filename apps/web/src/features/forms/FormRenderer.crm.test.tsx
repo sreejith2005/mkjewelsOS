@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FormCrmServices, FormTemplateDefinition } from "@jewelos/core";
 import { FormRenderer } from "./FormRenderer";
 import { FormCrmServicesContext } from "./crmServicesContext";
+import { uploadFormFile } from "./api";
 
 vi.mock("./api", () => ({ uploadFormFile: vi.fn(), signedFormFileUrl: vi.fn() }));
 afterEach(cleanup);
@@ -107,9 +108,28 @@ describe("CRM questions in a form CRM opens", () => {
     expect((screen.getByLabelText("Customer name") as HTMLInputElement).value).toBe("");
   });
 
-  it("says CRM questions work in CRM forms only when the form is opened elsewhere", () => {
+  it("submits a repeating group and uploads CRM photos to the form's own storage in an ordinary form (0399)", async () => {
+    vi.mocked(uploadFormFile).mockResolvedValue({ id: "11111111-1111-4111-8111-111111111111", name: "proof.jpg" });
+    const onSubmit = vi.fn(async () => true);
+    const plain: FormTemplateDefinition = { name: "Visit log", fields: definition.fields.filter((field) => field.key === "companions" || field.key === "proof").map((field, sortOrder) => ({ ...field, sortOrder })) };
+    render(<FormRenderer definition={plain} onSubmit={onSubmit} templateId="form-1" />);
+    fireEvent.change(screen.getByLabelText("How many are with them?"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("Name 1"), { target: { value: " Ravi " } });
+    const file = new File(["x"], "proof.jpg", { type: "image/jpeg" });
+    fireEvent.change(screen.getByLabelText("Google review proof"), { target: { files: [file] } });
+    await waitFor(() => expect(screen.getByText("proof.jpg uploaded")).toBeTruthy());
+    expect(uploadFormFile).toHaveBeenCalledWith("form-1", "proof", file, { video: false });
+    fireEvent.click(screen.getByRole("button", { name: "Submit form" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit).toHaveBeenCalledWith({
+      companions: { kind: "repeat", count: "1", rows: [{ name: "Ravi" }] },
+      proof: { kind: "crm_files", files: [{ path: "11111111-1111-4111-8111-111111111111", clientId: "", fileName: "proof.jpg", mimeType: "image/jpeg" }] },
+    });
+  });
+
+  it("explains that photo uploads need a saved form, and keeps CRM lists out of other forms", () => {
     render(<FormRenderer definition={definition} />);
-    expect(screen.getByText("This question works in CRM forms only.")).toBeTruthy();
+    expect(screen.getByText("Photo uploads work when the form is filled, not in this preview.")).toBeTruthy();
     // Outside CRM the salesperson question is an ordinary text box.
     expect((screen.getByLabelText(/^Salesperson/) as HTMLInputElement).tagName).toBe("INPUT");
   });

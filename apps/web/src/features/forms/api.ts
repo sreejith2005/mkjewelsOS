@@ -12,6 +12,11 @@ export const setFormLibraryVisibility = async (id: string, visible: boolean): Pr
   fail("Change form visibility", error);
   if (data !== id) throw new Error("Change form visibility: the server did not confirm the change");
 };
+/** Lists a form family under FMS workflow forms or Forms Library (migration 0399; form authors, audited). */
+export const setFormFamilyPlacement = async (templateId: string, placement: "fms" | "library"): Promise<void> => {
+  const { error } = await supabase.rpc("set_form_family_placement", { p_template_id: templateId, p_placement: placement });
+  fail("Move form", error);
+};
 /** Which form families were built inside FMS workflow steps, so Forms Library can list them apart. */
 export const loadFmsBuiltForms = async (): Promise<ReadonlyMap<string, FmsBuiltForm>> => {
   const { data, error } = await supabase.rpc("list_fms_built_forms");
@@ -251,9 +256,23 @@ export function validateFormUploadFile(file: Pick<File, "name" | "size" | "type"
     : "Use a JPG, PNG, WebP, or PDF up to 10 MB.";
 }
 
-/** Uploaded before the form is submitted; `submit_form_with_audit` links the file to the submission it ends up in. */
-export async function uploadFormFile(templateId: string, fieldKey: string, file: File): Promise<{ id: string; name: string }> {
-  const validationError = validateFormUploadFile(file); if (validationError) throw new Error(validationError);
+const PHOTO_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
+const VIDEO_MIME_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);
+/** A CRM photo / video question in a JewelOS form (migration 0399): the same types CRM accepts. */
+export function validateFormPhotoFile(file: Pick<File, "name" | "size" | "type">, video: boolean): string | null {
+  const photo = PHOTO_MIME_TYPES.has(file.type) && /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name);
+  const clip = video && VIDEO_MIME_TYPES.has(file.type) && /\.(mp4|webm|mov)$/i.test(file.name);
+  return (photo || clip) && file.size >= 1 && file.size <= 10 * 1024 * 1024
+    ? null
+    : `Use a JPEG, PNG, WebP, HEIC or HEIF image${video ? ", or an MP4, MOV or WebM video" : ""} up to 10 MB.`;
+}
+
+/**
+ * Uploaded before the form is submitted; `submit_form_with_audit` links the file to the submission it ends up in.
+ * `photo` is set for a CRM photo / video question, which accepts photos (and videos when allowed) instead of PDFs.
+ */
+export async function uploadFormFile(templateId: string, fieldKey: string, file: File, photo?: Readonly<{ video: boolean }>): Promise<{ id: string; name: string }> {
+  const validationError = photo ? validateFormPhotoFile(file, photo.video) : validateFormUploadFile(file); if (validationError) throw new Error(validationError);
   const safeName = file.name.replace(/[^A-Za-z0-9._-]/g, "_").slice(-120);
   const tenant = (await supabase.rpc("current_tenant_id")).data; if (!tenant) throw new Error("Tenant context is unavailable.");
   const path = `${tenant}/${templateId}/${crypto.randomUUID()}_${safeName}`;

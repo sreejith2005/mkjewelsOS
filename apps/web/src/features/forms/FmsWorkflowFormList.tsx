@@ -87,7 +87,9 @@ export function FmsWorkflowFormList<T extends Family>({ groups, searching, empty
           {group.elsewhere.length ? <div className="min-w-0">
             <div className="mb-2 flex items-start gap-2 px-1">
               <History aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-task-text-muted" />
-              <div className="min-w-0"><h3 className="font-semibold text-task-text">Not in the live version</h3><p className="text-xs text-task-text-muted">Used only by a draft or an older version of this workflow.</p></div>
+              {group.id === "unlinked"
+                ? <div className="min-w-0"><h3 className="font-semibold text-task-text">Not linked to a step</h3><p className="text-xs text-task-text-muted">Made in FMS or moved here. Link one in an FMS step, or use Versions &amp; actions → Move to Forms Library.</p></div>
+                : <div className="min-w-0"><h3 className="font-semibold text-task-text">Not in the live version</h3><p className="text-xs text-task-text-muted">Used only by a draft or an older version of this workflow.</p></div>}
             </div>
             {renderForms(group.elsewhere, familyId => ({ workflow: group.name, sharedWith: others(familyId) }))}
           </div> : null}

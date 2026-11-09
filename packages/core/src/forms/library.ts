@@ -12,7 +12,13 @@ export type FmsBuiltFormLink = Readonly<{
   /** Since 0364: this row is the workflow's current version (published, else newest). */
   isCurrent?: boolean;
 }>;
-export type FmsBuiltForm = Readonly<{ familyId: string; workflows: readonly string[]; steps: readonly string[]; links?: readonly FmsBuiltFormLink[] }>;
+export type FmsBuiltForm = Readonly<{
+  familyId: string; workflows: readonly string[]; steps: readonly string[]; links?: readonly FmsBuiltFormLink[];
+  /** Since 0399 (authors only): an author or the FMS builder marked this family as an FMS workflow form. */
+  placement?: "fms";
+  /** Since 0399 (authors only): no workflow step uses this family now. */
+  unlinked?: boolean;
+}>;
 const FLOW_STATUSES = ["draft", "published", "archived"] as const;
 
 const names = (value: unknown): readonly string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim() !== "") : [];
@@ -36,7 +42,7 @@ export function parseFmsBuiltForms(raw: unknown): ReadonlyMap<string, FmsBuiltFo
         ...(typeof link.stageOrder === "number" && Number.isFinite(link.stageOrder) ? { stageOrder: link.stageOrder } : {}),
         ...(typeof link.isCurrent === "boolean" ? { isCurrent: link.isCurrent } : {}) }];
     }) : [];
-    built.set(record.familyId, { familyId: record.familyId, workflows: names(record.workflows), steps: names(record.steps), ...(links.length ? { links } : {}) });
+    built.set(record.familyId, { familyId: record.familyId, workflows: names(record.workflows), steps: names(record.steps), ...(links.length ? { links } : {}), ...(record.placement === "fms" ? { placement: "fms" as const } : {}), ...(record.unlinked === true ? { unlinked: true } : {}) });
   }
   return built;
 }

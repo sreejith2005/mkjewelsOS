@@ -139,7 +139,7 @@ who build workflows, the designs.
 - [ ] Question layout (2026-11-04): one question after another, like Google Forms, on every screen (the earlier width setting is gone; saved widths are ignored). Each question in the editor shows how it will look (**Short answer**, **Phone number**, its choices). No Kiara tool needed.
 - [ ] Client details fill in by themselves (2026-11-04): for people with CRM access, a phone number of a registered client or lead in any form fills the recognised questions; a pincode fills city, state and country; "Auto-filled from client history — editable". No setup per question. Kiara: no new read tool (the lookup runs as the person filling the form, through CRM's own rules).
 - [ ] Client history from every form (2026-11-04): a submitted form whose phone number belongs to a registered client or lead appears in that client's **Customer journey** / **Workflow history** with all its answers; unknown numbers add nothing and create no client; profile details are not changed. No setup. Kiara: no new read tool (CRM history reads are unchanged).
-- [ ] CRM questions (2026-11-04): **Repeating group (CRM)** ("How many?" question, **From** / **Up to**, **Also offer "NA"**, **Add a question per row**) and **CRM photo / video** (**Also accept videos**, **Files allowed**). The walk-in form's Salesperson / CRM questions list the branch's people automatically. Outside CRM a CRM photo question says "This question works in CRM forms only." No Kiara tool needed.
+- [ ] CRM questions (2026-11-04): **Repeating group (CRM)** ("How many?" question, **From** / **Up to**, **Also offer "NA"**, **Add a question per row**) and **CRM photo / video** (**Also accept videos**, **Files allowed**). The walk-in form's Salesperson / CRM questions list the branch's people automatically. Since 2026-11-09 (migration 0399) both submit in every form: outside CRM the photos are kept privately with the submission; only the Form Builder preview says "Photo uploads work when the form is filled, not in this preview." No Kiara tool needed.
 - [ ] CRM forms (2026-11-03): authors with CRM access get a **CRM forms** button under **Forms to fill** listing the forms CRM uses; edit/publish as usual; **Fill form** opens CRM registration. No Kiara tool needed.
 - [ ] See what I sent: **My submissions** shows each one and whether it was reviewed.
 - [ ] Make a form: **New form** (form makers only), then **Publish** when ready.
@@ -197,6 +197,7 @@ who build workflows, the designs.
 
 ## CRM
 - [ ] Archive / restore a client (2026-11-07, CRM 20261107000200; CRM Super Admin): profile **Archive client** › reason › **Archive client**; banner **This client is archived** with **Restore client**; Client Database filter **Archived** › **Active clients** / **Archived clients only**. Phone search still finds archived clients. Direct client deletion through the API is closed.
+- [ ] Delete client queue entries (2026-11-09, CRM 20261109000200; CRM Super Admin): CLIENT QUEUE › **Select to delete** › tick people or **Select all on this page** › **Delete selected** › confirm; **Cancel** leaves selection. Clients and saved visits are kept; the entries' open walk-in tasks close. No Kiara tool needed (Kiara never writes).
 - [ ] Kiara tool decision (2026-11-07): no new Kiara tool; Kiara never archives or restores.
 
 - [ ] Returning-client prefill (2026-10-23): **REGISTER CLIENT** (formerly REGISTER CLIENT ENTRY) uses the most recently visited profile for the full phone number. Profile details accumulate from saved answers; newer nonblank answers win conflicts, while blanks preserve known details. Client profiles use the same details. Original client records and visit histories are retained. This repairs existing CRM reads; Kiara needs no new read tool.
@@ -284,6 +285,7 @@ recipient. No new Kiara read tool: the data shown is unchanged.
 ### Forms Library visibility (2026-10-23)
 
 - [ ] Authors can use **Visible in Forms Library** on each form version. Hidden forms stay available in assigned Tasks/FMS and existing submission history, while staff cannot browse or fill them independently. Authors retain management access. Existing forms start visible; revisions and duplicates inherit visibility.
+- [ ] Forms Library / FMS workflow forms placement (2026-11-09, migration 0399; form authors): **Versions & actions** shows **Listed under Forms Library** or **Listed under FMS workflow forms** with **Move to FMS workflow forms** / **Move to Forms Library**. Forms made in FMS stay under FMS workflow forms; ones no step uses are grouped under **Not used by a workflow step yet** (**Not linked to a step**). No Kiara tool needed: placement is not data people ask about.
 - No additional Kiara read tool: existing app help explains this setting without a new data source. Local implementation is not evidence of production deployment.
 
 ## FMS work page - 2026-10-23 (lean page)

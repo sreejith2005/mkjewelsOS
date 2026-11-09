@@ -78,3 +78,22 @@ describe("workflow form hierarchy", () => {
     expect(groups.map(group => group.id)).toEqual(["flow"]);
   });
 });
+
+describe("forms made in FMS that no step uses (0399)", () => {
+  it("groups them under one card after the workflows, and parses the author-only marks", async () => {
+    const { parseFmsBuiltForms } = await import("../forms/library");
+    const built = parseFmsBuiltForms([
+      { familyId: "orphan", workflows: [], steps: [], links: [], placement: "fms", unlinked: true },
+      { familyId: "used", workflows: ["Sales"], steps: ["Call"], links: [{ workflowId: "w", workflowName: "Sales", stageId: "s", stageName: "Call" }] },
+    ]);
+    expect(built.get("orphan")).toEqual({ familyId: "orphan", workflows: [], steps: [], placement: "fms", unlinked: true });
+    const forms = [
+      { id: "o1", family_id: "orphan", name: "Old call questions", lifecycle: "published", version: 1 },
+      { id: "u1", family_id: "used", name: "Call questions", lifecycle: "published", version: 1 },
+    ];
+    const groups = groupFmsBuiltForms(forms, built);
+    expect(groups.map((group) => group.name)).toEqual(["Sales", "Not used by a workflow step yet"]);
+    expect(groups[1]!.id).toBe("unlinked");
+    expect(groups[1]!.elsewhere.map((family) => family[0]!.id)).toEqual(["o1"]);
+  });
+});

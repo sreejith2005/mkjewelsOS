@@ -8,9 +8,9 @@ import { fmsAiCatalogFromData } from "./catalog";
 import { FmsAiPanel, type FmsAiPanelProps } from "./FmsAiPanel";
 import { FmsAiCallError, type FmsAiSettings } from "./api";
 
-const mocks = vi.hoisted(() => ({ askFmsAi: vi.fn(), saveDraft: vi.fn() }));
+const mocks = vi.hoisted(() => ({ askFmsAi: vi.fn(), saveDraft: vi.fn(), setFormFamilyPlacement: vi.fn(async () => undefined) }));
 vi.mock("./api", async (importOriginal) => ({ ...(await importOriginal<typeof import("./api")>()), askFmsAi: mocks.askFmsAi }));
-vi.mock("@/features/forms/api", () => ({ saveDraft: mocks.saveDraft }));
+vi.mock("@/features/forms/api", () => ({ saveDraft: mocks.saveDraft, setFormFamilyPlacement: mocks.setFormFamilyPlacement }));
 
 const FORM = "00000000-0000-4000-8000-000000000001";
 const NEHA = "00000000-0000-4000-8000-0000000000aa";

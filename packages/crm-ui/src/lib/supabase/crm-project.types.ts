@@ -2777,6 +2777,7 @@ export type Database = {
       archive_client: { Args: { p_client_id: string; p_reason: string }; Returns: undefined }
       get_client_archive_state: { Args: { p_client_id: string }; Returns: Json }
       restore_client: { Args: { p_client_id: string; p_reason?: string }; Returns: undefined }
+      delete_queue_entries: { Args: { p_entry_ids: string[]; p_reason?: string }; Returns: Json }
       get_client_profile: {
         Args: { p_client_id: string }
         Returns: {

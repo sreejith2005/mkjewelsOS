@@ -7,7 +7,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { Button, Modal, Notice } from "@/components/ui";
 import { archiveForm, deletedFormBundle, deleteForm, formDeletionImpact, loadFmsBuiltForms, loadFormDynamicOptions, loadForms, publishAsNewForm, publishForm, reviseForm, reviewSubmission, type FormBundle, type FormDeletionImpact, type FormSubmission } from "@/features/forms/api";
 import {loadFormSubmissionDetail} from "@jewelos/data/forms/api";
-import { FormLibraryVisibility } from "@/features/forms/FormLibraryVisibility";
+import { FormLibraryVisibility, FormPlacementControl } from "@/features/forms/FormLibraryVisibility";
 import { FmsWorkflowFormList, type FmsFormPlace } from "@/features/forms/FmsWorkflowFormList";
 import { FormBuilder } from "@/features/forms/FormBuilder";
 import { type DynamicOptions } from "@/features/forms/FormRenderer";
@@ -197,12 +197,13 @@ function FormRowText({ children, latest, badge, draft, questionCount: questions,
 }
 
 /** Everything about one form family: its versions, who can fill each, and every lifecycle action. */
-function FormFamilyDetails({ versions, placeText, author, onVisibilitySaved, onVisibilityError, onFill, onEdit, onPublish, onPublishAsNew, onEditPublished, onCreateVersion, onArchive, onDelete }: LibraryActions & { versions: FormBundle[]; placeText: string | null }) {
+function FormFamilyDetails({ versions, placeText, author, built, onVisibilitySaved, onVisibilityError, onFill, onEdit, onPublish, onPublishAsNew, onEditPublished, onCreateVersion, onArchive, onDelete }: LibraryActions & { versions: FormBundle[]; placeText: string | null }) {
   const latest = versions[0]!;
   if (!author) return null;
   return <div className="space-y-3">
     {latest.description ? <p className="whitespace-pre-wrap break-words text-sm text-task-text-muted">{latest.description}</p> : null}
     {placeText ? <p className="inline-flex max-w-full items-start gap-1.5 rounded-lg bg-gold/10 px-2 py-1 text-xs text-gold-secondary"><Workflow aria-hidden="true" className="mt-px size-3.5 shrink-0" /><span className="min-w-0 break-words">{placeText}</span></p> : null}
+    {built ? <FormPlacementControl inFms={built.has(latest.family_id)} onError={onVisibilityError} onSaved={onVisibilitySaved} templateId={latest.id} /> : null}
     <ul aria-label={`${latest.name} versions`} className="space-y-2">{versions.map((item) => {
       const badge = LIFECYCLE_BADGE[item.lifecycle] ?? { label: item.lifecycle, tone: "bg-task-muted text-task-text-muted" };
       return <li className="space-y-2.5 rounded-xl border border-task-border bg-task-bg p-3" key={item.id}>

@@ -54,11 +54,11 @@ insert into r select 'family', to_jsonb(family_id) from form_templates where id=
 create function pg_temp.family() returns uuid language sql stable as $$ select (v #>> '{}')::uuid from r where k='family' $$;
 grant execute on function pg_temp.family() to authenticated;
 
--- JewelOS form submission still refuses answers only CRM can save.
+-- Since 0399 a repeating group answer submits in JewelOS forms too (owner request 2026-11-09).
 select pg_temp.as_user('staff'); set local role authenticated;
-select throws_ok(format('select submit_form_with_audit(%L,%L::jsonb)',(select v #>> '{}' from r where k='walkin_form'),
+select lives_ok(format('select submit_form_with_audit(%L,%L::jsonb)',(select v #>> '{}' from r where k='walkin_form'),
   '{"primary_name":"Asha","primary_phone":"9876543210","visit_status":"yes","companions":{"kind":"repeat","count":"1","rows":[{"name":"Ravi"}]}}'),
-  '0A000', null, 'a repeating group answer cannot be submitted outside CRM');
+  'a repeating group answer submits outside CRM (0399)');
 reset role;
 
 -- Walk-in links.

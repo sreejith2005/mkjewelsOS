@@ -168,3 +168,43 @@ describe("walk-in form opened over the queue (owner request 2026-11-06)", () => 
     expect(startOver).toHaveBeenCalledWith(expect.objectContaining({ id: "queue-a" }));
   });
 });
+
+describe("Super Admin deletes queue entries (supabase-crm 20261109000200)", () => {
+  const items = [
+    { id: "queue-1", token: "T1", client_name: "Demo One", mobile: "9012345601", assigned_crm_name: "Test CRM", status: "pending", created_at: "2026-07-25T09:00:00Z", client_id: null },
+    { id: "queue-3", token: "T3", client_name: "Demo Two", mobile: "9012345603", assigned_crm_name: "Test CRM", status: "pending", created_at: "2026-07-25T09:30:00Z", client_id: null },
+  ];
+  it("is not offered to other roles", () => {
+    render(<EntryQueue profile={{ role: "branch_manager", branchId }} selectedBranchId={branchId} selectedCrm="" branches={[{ id: branchId, name: "Test Branch" }]} crms={[]} queueCrms={[]} initialItems={items} />);
+    expect(screen.queryByRole("button", { name: "Select to delete" })).toBeNull();
+  });
+  it("selects several entries and deletes them through the audited function", async () => {
+    rpc.mockResolvedValue({ data: { deleted: 2, ids: ["queue-1", "queue-3"], not_found: 0 }, error: null });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<EntryQueue profile={{ role: "super_admin", branchId }} selectedBranchId={branchId} selectedCrm="" branches={[{ id: branchId, name: "Test Branch" }]} crms={[]} queueCrms={[]} initialItems={items} />);
+    fireEvent.click(screen.getByRole("button", { name: "Select to delete" }));
+    expect((screen.getByRole("button", { name: "Delete selected" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Select all on this page" }));
+    expect(screen.getByText("2 selected")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Select Demo Two"));
+    fireEvent.click(screen.getByLabelText("Select Demo Two"));
+    fireEvent.click(screen.getByRole("button", { name: "Delete selected" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("delete_queue_entries", { p_entry_ids: ["queue-1", "queue-3"], p_reason: "Deleted from the client queue" }));
+    expect(confirm).toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByText("2 queue entries deleted.")).toBeTruthy());
+    expect(screen.queryByText("Demo One")).toBeNull();
+    expect(refresh).toHaveBeenCalled();
+    confirm.mockRestore();
+  });
+  it("keeps the entries and says why when the server refuses", async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: "Only a CRM Super Admin can delete queue entries" } });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<EntryQueue profile={{ role: "super_admin", branchId }} selectedBranchId={branchId} selectedCrm="" branches={[{ id: branchId, name: "Test Branch" }]} crms={[]} queueCrms={[]} initialItems={items} />);
+    fireEvent.click(screen.getByRole("button", { name: "Select to delete" }));
+    fireEvent.click(screen.getByLabelText("Select Demo One"));
+    fireEvent.click(screen.getByRole("button", { name: "Delete selected" }));
+    await waitFor(() => expect(screen.getByText("Could not delete: Only a CRM Super Admin can delete queue entries")).toBeTruthy());
+    expect(screen.getByText("Demo One")).toBeTruthy();
+    confirm.mockRestore();
+  });
+});

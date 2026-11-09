@@ -1,5 +1,5 @@
 import { approvedFormRoles, FORM_LIBRARY_ROLES, type FmsStageDefinition, type FormTemplateDefinition, type Json } from "@jewelos/core";
-import { duplicateForm, loadTaskForms, publishForm, reviseForm, saveDraft, setFormLibraryVisibility, type FormBundle } from "@/features/forms/api";
+import { duplicateForm, loadTaskForms, publishForm, reviseForm, saveDraft, setFormFamilyPlacement, setFormLibraryVisibility, type FormBundle } from "@/features/forms/api";
 
 /**
  * A step's questionnaire is a real Forms Library form, created and edited from
@@ -68,13 +68,18 @@ export async function saveQuestionnaireDraft(target: QuestionnaireTarget, rawPay
   if (target.kind === "new") {
     const id = await saveDraft(null, payload, fields);
     await onCreated(id);
-    // Stage questionnaires are filled through their workflow, not picked from the staff library.
+    // Stage questionnaires are filled through their workflow, not picked from the staff library,
+    // and stay listed under FMS workflow forms even if the step later lets go of them (0399).
     await setFormLibraryVisibility(id, false).catch(() => undefined);
+    await setFormFamilyPlacement(id, "fms").catch(() => undefined);
     return id;
   }
   const id = target.kind === "revise" ? await reviseForm(target.publishedId) : await duplicateForm(target.publishedId, name);
   await onCreated(id);
-  if (target.kind === "copy") await setFormLibraryVisibility(id, false).catch(() => undefined);
+  if (target.kind === "copy") {
+    await setFormLibraryVisibility(id, false).catch(() => undefined);
+    await setFormFamilyPlacement(id, "fms").catch(() => undefined);
+  }
   await saveDraft(id, payload, fields);
   return id;
 }
