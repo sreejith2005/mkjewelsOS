@@ -118,9 +118,13 @@ Supersedes the Admin rows of "Automatic scope" below and the Director row of
   `director_department_unchanged`).
 - **Store Intelligence.** Company scope lets an Admin open every branch's
   conversations, as Super Admin does (`recording_is_reviewer`).
-- **Still needs isolation On.** Reads narrow to a Director's scope only while
-  franchise isolation is on (Users > Franchises), exactly as for every other
-  scope authority.
+- **Directors are always scoped (migration 0398).** `org_scope_enforced(tenant)`
+  is true while the tenant's switch is on *or* the signed-in person is a
+  Director of that tenant (`org_isolation_switch_on()` is the switch alone).
+  Every franchise rule therefore narrows a Director's directory, tasks, Task
+  Control, FMS, forms, dashboards, reports and exports with the switch off.
+  Everyone else, and work with no signed-in person, is unchanged until the
+  switch is on. Tests: `supabase/tests/0398_director_scope_always_on.test.sql`.
 - Tests: `supabase/tests/0397_leadership_hierarchy.test.sql`; franchise tests
   0385-0387 now model the franchise-limited Admin as a Director.
 

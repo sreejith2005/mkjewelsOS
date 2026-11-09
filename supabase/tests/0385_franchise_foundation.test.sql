@@ -268,7 +268,7 @@ select is((select franchise_group_id from branches where code = 'POWAI'), pg_tem
 -- Rollback lever: switching isolation off restores today's behaviour.
 select lives_ok($$select set_franchise_enforcement_with_audit(false, 'rollback drill')$$, 'Super Admin can always switch isolation off');
 select pg_temp.login('adm_ahd');
-select is(pg_temp.visible(array['staff_bandra','staff_ahd']), 2, 'off again: Admin sees the whole tenant');
+select is(pg_temp.visible(array['staff_bandra','staff_ahd']), 1, 'off again: a Director still sees only their franchise (0398)');
 reset role;
 
 select ok((select count(*) from user_profiles where tenant_id = (select tenant_id from fx where kind = 'sa')) = 12, 'no employee row was removed (10 fixtures + 2 created)');

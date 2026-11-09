@@ -3,8 +3,10 @@ import { LogOut, Settings } from "lucide-react";
 import { initials, titleCase } from "@/lib/format";
 import type { UserProfile } from "@/types";
 
-export function AccountMenu({ profile, branchName, settingsPath, navigate, onLogout }: {
+export function AccountMenu({ profile, branchName, roleLabel, settingsPath, navigate, onLogout }: {
   profile: UserProfile;
+  /** Shown instead of the stored role (a Director is stored as Admin). */
+  roleLabel?: string | undefined;
   branchName: string;
   settingsPath: string | undefined;
   navigate: (path: string) => void;
@@ -59,7 +61,7 @@ export function AccountMenu({ profile, branchName, settingsPath, navigate, onLog
     {open ? <section aria-label="Your account" className="absolute right-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-task-border bg-task-bg text-task-text shadow-lift" id={panelId}>
       <div className="border-b border-task-border p-4">
         <p className="break-words font-semibold">{profile.employee_name}</p>
-        <p className="mt-1 text-xs text-task-text-muted">{titleCase(profile.user_role)} · {branchName}</p>
+        <p className="mt-1 text-xs text-task-text-muted">{roleLabel ?? titleCase(profile.user_role)} · {branchName}</p>
         <p className="mt-1 break-words text-xs text-task-text-muted">{profile.email}</p>
       </div>
       {settingsPath ? <button className="flex min-h-11 w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-task-muted" onClick={() => { setOpen(false); navigate(settingsPath); trigger.current?.focus(); }} type="button"><Settings aria-hidden className="size-4"/>Settings</button> : null}
