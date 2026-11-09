@@ -2268,6 +2268,92 @@ export type Database = {
   }
   public: {
     Tables: CustomerIntegrationTables & {
+      recorder_device_days: {
+        Row: {
+          branch_id: string
+          connected_ms: number
+          contacts: number
+          device_id: string
+          employee_id: string
+          first_contact_at: string
+          last_contact_at: string
+          local_date: string
+          tenant_id: string
+        }
+        Insert: {
+          branch_id: string
+          connected_ms?: number
+          contacts?: number
+          device_id: string
+          employee_id: string
+          first_contact_at: string
+          last_contact_at: string
+          local_date: string
+          tenant_id: string
+        }
+        Update: {
+          branch_id?: string
+          connected_ms?: number
+          contacts?: number
+          device_id?: string
+          employee_id?: string
+          first_contact_at?: string
+          last_contact_at?: string
+          local_date?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recorder_device_days_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_device_days_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "recorder_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_device_days_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_device_days_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_device_days_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_device_days_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_device_days_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recording_action_tasks: {
         Row: {
           action_index: number
@@ -2889,6 +2975,39 @@ export type Database = {
           },
         ]
       }
+      recording_fact_queue: {
+        Row: {
+          queued_at: string
+          session_id: string
+          tenant_id: string
+        }
+        Insert: {
+          queued_at?: string
+          session_id: string
+          tenant_id: string
+        }
+        Update: {
+          queued_at?: string
+          session_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recording_fact_queue_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: true
+            referencedRelation: "recorder_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_fact_queue_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recording_follow_ups: {
         Row: {
           action_index: number
@@ -3302,6 +3421,186 @@ export type Database = {
             columns: ["analysis_id"]
             isOneToOne: false
             referencedRelation: "recording_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recording_session_facts: {
+        Row: {
+          ai_outcome: string | null
+          analysis_id: string | null
+          analysis_status: string | null
+          branch_id: string
+          categories: string[]
+          competitors: string[]
+          concerns: string[]
+          created_at: string
+          crm_purchase_visit_id: string | null
+          crm_state: string | null
+          crm_window_until: string | null
+          device_id: string
+          dimensions: Json
+          duration_ms: number
+          elements: string[]
+          employee_id: string
+          engaged: boolean
+          error_reason: string | null
+          expires_at: string
+          fallback_used: boolean
+          interest: boolean
+          link_state: string | null
+          local_date: string
+          local_dow: number
+          local_hour: number
+          manager_scored: boolean
+          price_band: string | null
+          price_discussed: boolean
+          products: string[]
+          quality_reasons: string[]
+          refreshed_at: string
+          review_state: string | null
+          score: number | null
+          session_id: string
+          signals: string[]
+          stage: string
+          strengths: string[]
+          tenant_id: string
+        }
+        Insert: {
+          ai_outcome?: string | null
+          analysis_id?: string | null
+          analysis_status?: string | null
+          branch_id: string
+          categories?: string[]
+          competitors?: string[]
+          concerns?: string[]
+          created_at: string
+          crm_purchase_visit_id?: string | null
+          crm_state?: string | null
+          crm_window_until?: string | null
+          device_id: string
+          dimensions?: Json
+          duration_ms?: number
+          elements?: string[]
+          employee_id: string
+          engaged?: boolean
+          error_reason?: string | null
+          expires_at: string
+          fallback_used?: boolean
+          interest?: boolean
+          link_state?: string | null
+          local_date: string
+          local_dow: number
+          local_hour: number
+          manager_scored?: boolean
+          price_band?: string | null
+          price_discussed?: boolean
+          products?: string[]
+          quality_reasons?: string[]
+          refreshed_at?: string
+          review_state?: string | null
+          score?: number | null
+          session_id: string
+          signals?: string[]
+          stage: string
+          strengths?: string[]
+          tenant_id: string
+        }
+        Update: {
+          ai_outcome?: string | null
+          analysis_id?: string | null
+          analysis_status?: string | null
+          branch_id?: string
+          categories?: string[]
+          competitors?: string[]
+          concerns?: string[]
+          created_at?: string
+          crm_purchase_visit_id?: string | null
+          crm_state?: string | null
+          crm_window_until?: string | null
+          device_id?: string
+          dimensions?: Json
+          duration_ms?: number
+          elements?: string[]
+          employee_id?: string
+          engaged?: boolean
+          error_reason?: string | null
+          expires_at?: string
+          fallback_used?: boolean
+          interest?: boolean
+          link_state?: string | null
+          local_date?: string
+          local_dow?: number
+          local_hour?: number
+          manager_scored?: boolean
+          price_band?: string | null
+          price_discussed?: boolean
+          products?: string[]
+          quality_reasons?: string[]
+          refreshed_at?: string
+          review_state?: string | null
+          score?: number | null
+          session_id?: string
+          signals?: string[]
+          stage?: string
+          strengths?: string[]
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recording_session_facts_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_session_facts_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "recorder_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_session_facts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_session_facts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_session_facts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_session_facts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_session_facts_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: true
+            referencedRelation: "recorder_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_session_facts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -13645,6 +13944,7 @@ export type Database = {
           branch_id: string | null
           buddy_id: string | null
           department_id: string | null
+          designation_id: string | null
           employee_code: string | null
           employee_name: string | null
           id: string | null
@@ -13727,6 +14027,18 @@ export type Database = {
         Args: { p_revision_id?: string; p_session_id: string }
         Returns: Json
       }
+      recording_analytics: { Args: { p_filters: Json }; Returns: Json }
+      recording_analytics_options: { Args: never; Returns: Json }
+      recording_analytics_sessions: {
+        Args: {
+          p_before?: string
+          p_before_id?: string
+          p_filters: Json
+          p_limit?: number
+          p_metric?: string
+        }
+        Returns: Json
+      }
       recording_coaching_lists: {
         Args: { p_from: string; p_to: string }
         Returns: Json
@@ -13781,6 +14093,10 @@ export type Database = {
       }
       recording_create_sop_version: {
         Args: { p_clauses: Json; p_title: string }
+        Returns: Json
+      }
+      recording_device_days_page: {
+        Args: { p_filters: Json; p_limit?: number; p_offset?: number }
         Returns: Json
       }
       recording_devices_page: {
@@ -13956,6 +14272,11 @@ export type Database = {
       submit_form_and_start_fms_idempotent: { Args: { p_form_template_id: string; p_answers: Json; p_idempotency_key: string; p_flow_id?: string }; Returns: Json }
 
       preview_fms_work_transition: { Args: { p_request: Json; p_handoffs?: Json }; Returns: Json }
+      fms_crm_handover_candidates: {
+        Args: { p_instance_stage_id: string }
+        Returns: { id: string; employee_name: string; team: string; branch_id: string | null }[]
+      }
+      handover_fms_step_with_audit: { Args: { p_instance_stage_id: string; p_to_user_id: string; p_reason: string }; Returns: Json }
       test_fms_start_trigger: {
         Args: { p_answers: Json; p_flow_id: string; p_trigger: Json }
         Returns: Json
@@ -14466,6 +14787,16 @@ export type Database = {
         Returns: boolean
       }
       can_manage_fms_flow: { Args: { p_flow_id?: string }; Returns: boolean }
+      can_edit_fms_flow: { Args: { p_flow_id: string }; Returns: boolean }
+      can_publish_fms_flow: { Args: { p_flow_id: string }; Returns: boolean }
+      fms_my_flow_access: { Args: { p_family_id: string }; Returns: string }
+      list_fms_flow_access: {
+        Args: { p_flow_id: string }
+        Returns: { grant_id: string; user_profile_id: string; employee_name: string; employee_code: string | null; access_level: string; granted_at: string; granted_by_name: string | null; account_active: boolean }[]
+      }
+      grant_fms_flow_access_with_audit: { Args: { p_flow_id: string; p_user_profile_id: string; p_access_level: string }; Returns: string }
+      revoke_fms_flow_access_with_audit: { Args: { p_grant_id: string; p_reason?: string }; Returns: undefined }
+      list_my_fms_flow_access: { Args: never; Returns: { family_id: string; access_level: string }[] }
       can_manage_form_template: {
         Args: { p_template_id: string }
         Returns: boolean

@@ -1,16 +1,12 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { AlertTriangle, CheckCircle2, Clock3, RefreshCw, Users, User } from "lucide-react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { RefreshCw, Users, User } from "lucide-react";
 import {
-  completionSegments,
   decodePerformanceSearch,
   encodePerformanceSearch,
   formatTaskPerformanceScore,
   hasPermission,
-  performanceAttentionOrder,
-  performanceReconciles,
   performanceScores,
   selectorCount,
-  timingSegments,
   TASK_DELAYED_SCORE_LABEL,
   TASK_PENDING_SCORE_LABEL,
   type PerformanceCounts,
@@ -26,11 +22,12 @@ import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeR
 import { Panel } from "../components";
 import { usePerformanceRequest } from "./usePerformanceRequest";
 import { PerformanceFilters } from "./PerformanceFilters";
-import { Donut, Legend, ScoreBars, StackedBars, TrendColumns, swatchStyle, type StackedRow } from "./charts";
+import { Legend, StackedBars, TrendColumns, swatchStyle, type StackedRow } from "./charts";
 import { EmployeeTable } from "./EmployeeTable";
 import { FmsPerformance } from "./FmsPerformance";
 import { RecordsDrawer, performanceRecordPath, type RecordsSelection } from "./RecordsDrawer";
 import { Accountability } from "./Accountability";
+import { PerformanceOverview } from "./PerformanceOverview";
 
 const REALTIME_TOPICS = ["tasks", "fms"] as const;
 const time = (date: Date) => date.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" });
@@ -121,8 +118,7 @@ export function PerformanceDashboard({ onOpenInsights }: { onOpenInsights: () =>
       {main.loading && !data ? <Skeleton /> : null}
       {data ? (
         <div className={`space-y-4 transition-opacity ${main.refreshing ? "opacity-90" : ""}`}>
-          <KpiRow data={data} onOpen={open} />
-          <Lifecycle data={data} onOpen={open} />
+          <PerformanceOverview data={data} onOpen={open} />
           {team ? (
             <Panel description="Every employee in scope, worst first: overdue work, then unfinished work. Click a name for their detail, or any number for the matching records." title="Employee task performance">
               <EmployeeTable
@@ -167,8 +163,7 @@ function StatusLine({ updatedAt, refreshing, stale }: { updatedAt: Date | null; 
 function Skeleton() {
   return (
     <div aria-label="Loading performance" className="space-y-4" role="status">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">{Array.from({ length: 8 }, (_, i) => <div className="skeleton h-24 rounded-2xl" key={i} />)}</div>
-      <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr_1fr]">{Array.from({ length: 3 }, (_, i) => <div className="skeleton h-64 rounded-2xl" key={i} />)}</div>
+      <div className="grid gap-4 2xl:grid-cols-[1.65fr_1fr]">{Array.from({ length: 2 }, (_, i) => <div className="skeleton h-64 rounded-2xl" key={i} />)}</div>
       <div className="skeleton h-80 rounded-2xl" />
     </div>
   );
@@ -189,93 +184,6 @@ function Kpi({ label, value, hint, tone, onClick, icon }: { label: string; value
   return onClick ? (
     <button className={`${className} transition-colors hover:border-task-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-task-accent`} onClick={onClick} type="button">{body}</button>
   ) : <div className={className}>{body}</div>;
-}
-
-function KpiRow({ data, onOpen }: { data: PerformancePayload; onOpen: Open }) {
-  const d = performanceScores(data.summary);
-  const n = (value: number) => value.toLocaleString("en-IN");
-  return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
-      <Kpi hint="Due in this period" label="Tasks assigned" onClick={() => onOpen("assigned", "All assigned work", d.assigned)} value={n(d.assigned)} />
-      <Kpi hint="Any completion time" label="Completed" onClick={() => onOpen("completed", "Completed work", d.completed)} tone="good" value={n(d.completed)} />
-      <Kpi hint="Pending, in progress or overdue" label="Not completed" onClick={() => onOpen("remaining", "Work not completed", d.remaining)} value={n(d.remaining)} />
-      <Kpi hint="Past the deadline, still open" icon={d.overdue ? <AlertTriangle className="size-3.5 text-task-overdue" /> : null} label="Overdue" onClick={() => onOpen("overdue", "Overdue work", d.overdue)} tone={d.overdue ? "bad" : undefined} value={n(d.overdue)} />
-      <Kpi hint="By the deadline" icon={<CheckCircle2 className="size-3.5 text-success" />} label="Completed on time" onClick={() => onOpen("on_time", "Completed on time", d.onTime)} tone="good" value={n(d.onTime)} />
-      <Kpi hint="After the deadline" icon={<Clock3 className="size-3.5 text-warning" />} label="Completed late" onClick={() => onOpen("late", "Completed late", d.late)} tone={d.late ? "warn" : undefined} value={n(d.late)} />
-      <Kpi hint="Completed ÷ assigned × 100 − 100" label={`${TASK_PENDING_SCORE_LABEL} %`} tone={d.pendingScore === null ? undefined : "score"} value={formatTaskPerformanceScore(d.pendingScore)} />
-      <Kpi hint="On time ÷ completed × 100 − 100" label={`${TASK_DELAYED_SCORE_LABEL} %`} tone={d.delayedScore === null ? undefined : "score"} value={formatTaskPerformanceScore(d.delayedScore)} />
-    </div>
-  );
-}
-
-// ------------------------------------------------------------------------------------ lifecycle
-
-function Line({ label, value, onClick, strong, tone }: { label: string; value: string | number; onClick?: (() => void) | undefined; strong?: boolean; tone?: string }) {
-  const content = (
-    <>
-      <span className={`flex min-w-0 items-center gap-2 ${strong ? "font-semibold" : ""}`}>{tone ? <span aria-hidden className="size-2.5 shrink-0 rounded-sm" style={swatchStyle(tone)} /> : null}<span className="truncate">{label}</span></span>
-      <span className={`tabular-nums ${strong ? "font-semibold" : ""}`}>{typeof value === "number" ? value.toLocaleString("en-IN") : value}</span>
-    </>
-  );
-  return onClick ? (
-    <button className="flex min-h-9 w-full items-center justify-between gap-3 rounded-lg px-2 text-left text-sm hover:bg-task-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-task-accent" onClick={onClick} type="button">{content}</button>
-  ) : <div className="flex min-h-9 items-center justify-between gap-3 px-2 text-sm">{content}</div>;
-}
-
-function Lifecycle({ data, onOpen }: { data: PerformancePayload; onOpen: Open }) {
-  const s = data.summary;
-  const d = performanceScores(s);
-  const reconciled = performanceReconciles(s);
-  return (
-    <div className="grid gap-4 xl:grid-cols-[1.25fr_1fr_1fr]">
-      <Panel description="Every assignment due in the period, in exactly one row." title="Task work lifecycle">
-        <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
-          <div>
-            <p className="mb-1 px-2 text-[0.6875rem] font-semibold uppercase tracking-wider text-task-text-muted">Total</p>
-            <Line label="Assigned" onClick={() => onOpen("assigned", "All assigned work", d.assigned)} strong value={d.assigned} />
-            <Line label="Completed" onClick={() => onOpen("completed", "Completed work", d.completed)} tone="completed" value={d.completed} />
-            <Line label="Remaining" onClick={() => onOpen("remaining", "Work not completed", d.remaining)} tone="remaining" value={d.remaining} />
-            <Line label={`${TASK_PENDING_SCORE_LABEL} %`} value={formatTaskPerformanceScore(d.pendingScore)} />
-          </div>
-          <div>
-            <p className="mb-1 px-2 text-[0.6875rem] font-semibold uppercase tracking-wider text-task-text-muted">Completion</p>
-            <Line label="Completed" onClick={() => onOpen("completed", "Completed work", d.completed)} strong value={d.completed} />
-            <Line label="On time" onClick={() => onOpen("on_time", "Completed on time", d.onTime)} tone="on_time" value={d.onTime} />
-            <Line label="Late" onClick={() => onOpen("late", "Completed late", d.late)} tone="late" value={d.late} />
-            {d.untimed ? <Line label="No completion time" onClick={() => onOpen("completed_untimed", "Completed without a recorded time", d.untimed)} tone="completed_untimed" value={d.untimed} /> : null}
-            <Line label={`${TASK_DELAYED_SCORE_LABEL} %`} value={formatTaskPerformanceScore(d.delayedScore)} />
-          </div>
-          <div>
-            <p className="mb-1 px-2 text-[0.6875rem] font-semibold uppercase tracking-wider text-task-text-muted">Pending and overdue</p>
-            <Line label="Pending, not overdue" onClick={() => onOpen("pending", "Pending, not overdue", d.pending)} tone="pending" value={d.pending} />
-            <Line label="In progress" onClick={() => onOpen("in_progress", "In progress or in review", d.inProgress)} tone="in_progress" value={d.inProgress} />
-            <Line label="Overdue" onClick={() => onOpen("overdue", "Overdue work", d.overdue)} tone="overdue" value={d.overdue} />
-            <Line label="Total remaining" onClick={() => onOpen("remaining", "Work not completed", d.remaining)} strong value={d.remaining} />
-          </div>
-        </div>
-        <p className={`mt-3 rounded-lg px-3 py-2 text-xs ${reconciled ? "bg-success/10 text-task-text" : "bg-task-overdue/10 text-task-overdue"}`}>
-          {reconciled
-            ? `Reconciled: ${d.completed.toLocaleString("en-IN")} completed + ${d.remaining.toLocaleString("en-IN")} remaining = ${d.assigned.toLocaleString("en-IN")} assigned (${s.work_items.toLocaleString("en-IN")} distinct tasks and FMS steps; shared work counts once per person).`
-            : "These counts do not add up. Refresh; if it persists, report it."}
-        </p>
-        <div className="mt-3 border-t border-task-border pt-2">
-          <p className="mb-1 px-2 text-[0.6875rem] font-semibold uppercase tracking-wider text-task-text-muted">Outside the score</p>
-          <Line label="Overdue from before this period (current backlog)" onClick={data.backlog.overdue_before_period ? () => onOpen("backlog", "Overdue from before this period", data.backlog.overdue_before_period) : undefined} value={data.backlog.overdue_before_period} />
-          <Line label={`Not counted: rejected ${s.excluded_rejected}, skipped ${s.excluded_skipped}, stopped ${s.excluded_stopped}, cancelled runs ${s.excluded_cancelled_run}`} onClick={s.excluded ? () => onOpen("excluded", "Due in the period but not counted", s.excluded) : undefined} value={s.excluded} />
-          <Line label="FMS start forms waiting (standing assignments, current)" value={data.pendingStartForms} />
-        </div>
-      </Panel>
-      <Panel description="Click a segment for its records." title="Completed vs remaining">
-        <Donut centerLabel="assigned" onSelect={(key) => onOpen(key, key === "completed" ? "Completed work" : key === "overdue" ? "Overdue work" : key === "pending" ? "Pending, not overdue" : "In progress or in review")} segments={completionSegments(s)} title="Completed vs remaining" total={s.assigned} />
-      </Panel>
-      <Panel description="Completed work only, by its deadline." title="On time vs delayed">
-        <Donut centerLabel="completed" onSelect={(key) => onOpen(key, key === "on_time" ? "Completed on time" : key === "late" ? "Completed late" : "Completed without a recorded time")} segments={timingSegments(s)} title="On time vs delayed" total={d.completed} />
-        <p className="mt-3 text-xs text-task-text-muted">
-          {TASK_DELAYED_SCORE_LABEL}: <span className="font-semibold text-task-overdue">{formatTaskPerformanceScore(d.delayedScore)}</span>. The score is on time ÷ completed × 100 − 100; it is not the share of late completions.
-        </p>
-      </Panel>
-    </div>
-  );
 }
 
 // ------------------------------------------------------------------------------------ personal
@@ -377,22 +285,8 @@ function trendLabel(point: PerformanceTrendPoint, granularity: string): string {
 }
 
 function Comparisons({ data, filter, onOpen, onGranularity }: { data: PerformancePayload; filter: PerformanceFilter; onOpen: Open; onGranularity: (g: "day" | "week" | "month") => void }) {
-  const [allPeople, setAllPeople] = useState(false);
   const team = filter.scope === "team";
-  const ranked = useMemo(() => performanceAttentionOrder(data.employees.filter((e) => e.assigned > 0)), [data.employees]);
-  const people = allPeople ? ranked : ranked.slice(0, 12);
-  const personRows: StackedRow[] = people.map((e) => ({ id: e.user_profile_id, label: e.employee_name, sublabel: e.branch_name ?? undefined, segments: stacked(e) }));
-  const byId = new Map(data.employees.map((e) => [e.user_profile_id, e]));
-  const openPerson = (id: string, key: PerformanceRecordSelector) => {
-    const person = byId.get(id);
-    onOpen(key, person?.employee_name ?? "Employee", person ? selectorCount(person, key) : undefined, { user_profile_id: id });
-  };
-  const scoreRows = (pick: "pendingScore" | "delayedScore") =>
-    ranked.map((e) => ({ id: e.user_profile_id, label: e.employee_name, score: performanceScores(e)[pick], basis: `${performanceScores(e).completed} of ${e.assigned} completed` }))
-      .sort((a, b) => (a.score ?? 1) - (b.score ?? 1)).slice(0, allPeople ? undefined : 12);
-  const flowRows: StackedRow[] = data.flows.filter((f) => f.assigned > 0).map((f) => ({ id: f.flow_id, label: f.flow_name, sublabel: `${f.visits} visits`, segments: stacked(f) }));
   const rollupRows = (rows: PerformancePayload["branches"], prefix: string): StackedRow[] => rows.map((r) => ({ id: `${prefix}:${r.id ?? "none"}`, label: r.name, segments: stacked(r) }));
-  const legend = <Legend items={PERSON_SEGMENTS} />;
   // Branch/department bars narrow the same filter; "No branch/department" rows cannot be
   // expressed as a filter, so their segments open nothing rather than a wrong list.
   const openRollup = (rows: PerformancePayload["branches"], id: string, key: PerformanceRecordSelector, field: "branch_id" | "department_id") => {
@@ -403,7 +297,7 @@ function Comparisons({ data, filter, onOpen, onGranularity }: { data: Performanc
   };
 
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
+    <div className="grid items-start gap-4 xl:grid-cols-2">
       <Panel description={`Assigned work by deadline (${data.granularity}). Cohort measure: each bar is work due in that ${data.granularity}, split by its outcome now.`} title="Task trend">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <Legend items={[["on_time", "On time"], ["late", "Late"], ["completed_untimed", "No completion time"], ["remaining", "Remaining"]]} />
@@ -422,22 +316,8 @@ function Comparisons({ data, filter, onOpen, onGranularity }: { data: Performanc
           </table>
         </details>
       </Panel>
-      <Panel description="Assignments per workflow by outcome. Click a segment for its records." title="FMS comparison">
-        <div className="mb-3">{legend}</div>
-        <StackedBars empty="No FMS step work due in this period." onSelect={(id, key) => { const flow = data.flows.find((f) => f.flow_id === id); onOpen(key, flow?.flow_name ?? "Workflow", flow ? selectorCount(flow, key) : undefined, { flow_id: id, kind: "fms" }); }} rows={flowRows} />
-      </Panel>
       {team ? (
         <>
-          <Panel className="xl:col-span-2" description="Each bar is one person's assigned work, by outcome, on one shared scale. Worst first. Click a segment for that person's records." title="Employee performance comparison">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">{legend}{ranked.length > 12 ? <button className="min-h-9 text-xs font-medium text-task-accent" onClick={() => setAllPeople(!allPeople)} type="button">{allPeople ? "Show top 12" : `Show all ${ranked.length}`}</button> : null}</div>
-            <StackedBars onSelect={openPerson} rows={personRows} />
-          </Panel>
-          <Panel description="Completed ÷ assigned × 100 − 100. 0 is everything done; −100 is nothing done." title={`${TASK_PENDING_SCORE_LABEL} by employee`}>
-            <ScoreBars onSelect={(id) => openPerson(id, "remaining")} rows={scoreRows("pendingScore")} />
-          </Panel>
-          <Panel description="On time ÷ completed × 100 − 100. Nothing completed reads −100." title={`${TASK_DELAYED_SCORE_LABEL} by employee`}>
-            <ScoreBars onSelect={(id) => openPerson(id, "late")} rows={scoreRows("delayedScore")} />
-          </Panel>
           {data.branches.length > 1 ? (
             <Panel description="Assignments grouped by each employee's branch." title="By branch">
               <StackedBars onSelect={(id, key) => openRollup(data.branches, id, key, "branch_id")} rows={rollupRows(data.branches, "b")} />

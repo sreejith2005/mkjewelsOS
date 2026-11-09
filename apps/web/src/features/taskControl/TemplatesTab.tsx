@@ -128,8 +128,10 @@ export function TemplatesTab({
   onAssignNow,
   onRunNow,
   onDelete,
+  emptyText = "No templates found.",
 }: {
   rows: readonly TaskTemplateDirectoryRow[];
+  emptyText?: string;
   busyId: string | null;
   onEdit: (row: TaskTemplateDirectoryRow) => void;
   onSchedule: (row: TaskTemplateDirectoryRow) => void;
@@ -192,7 +194,7 @@ export function TemplatesTab({
             ))}
           </tbody>
         </table>
-        {rows.length === 0 ? <p className="p-10 text-center text-soft-grey">No templates found.</p> : null}
+        {rows.length === 0 ? <p className="p-10 text-center text-soft-grey">{emptyText}</p> : null}
       </div>
 
       <div className="grid gap-3 lg:hidden">
@@ -223,7 +225,7 @@ export function TemplatesTab({
         {rows.length === 0 ? (
           <div className="rounded-2xl border border-task-border bg-charcoal py-16 text-center">
             <ListChecks className="mx-auto size-10 text-gold-secondary" />
-            <p className="mt-3 text-soft-grey">No templates found.</p>
+            <p className="mt-3 text-soft-grey">{emptyText}</p>
           </div>
         ) : null}
       </div>

@@ -24,7 +24,7 @@ import { readAppFmsClipboard, readFmsClipboard, writeFmsClipboard } from "./clip
 import { FmsImportSectionDialog } from "./FmsImportSectionDialog";
 import { FmsQuestionnairePreview, FmsQuestionnaireStudio } from "./FmsQuestionnaireStudio";
 import { FmsWorkflowTransfer, type FmsImportRequest } from "./FmsWorkflowTransfer";
-import { blankQuestionnaire, discardQuestionnaireDraft } from "./questionnaire";
+import { blankQuestionnaire } from "./questionnaire";
 import { loadFmsFlowReport } from "@jewelos/data/fms/outcomes";
 
 function issueControlSelector(code: string, message: string): string {
@@ -76,7 +76,12 @@ type Studio = Readonly<{ stageKey: string; seed?: FormTemplateDefinition | undef
 type PendingDelete = Readonly<{ keys: readonly string[]; connections: number }>;
 const COPY_OFFSET = { x: 40, y: 140 };
 
-export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canManageForms = false, ai }: { flow: FmsFlowRow | null; data: FmsData; duplicate?: boolean; onClose: () => void; onSaved: () => Promise<void>; canManageForms?: boolean; ai?: FmsBuilderAiOptions | undefined }) {
+/**
+ * `readOnly`: a per-workflow View grant (migration 0390). Every change goes through `commit` and
+ * `persist`, which refuse, and the controls that change or save are not shown. The server refuses
+ * any write regardless. `canPublish` false hides Publish (an Edit grant).
+ */
+export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canManageForms = false, ai, readOnly = false, canPublish = true }: { flow: FmsFlowRow | null; data: FmsData; duplicate?: boolean; onClose: () => void; onSaved: () => Promise<void>; canManageForms?: boolean; ai?: FmsBuilderAiOptions | undefined; readOnly?: boolean; canPublish?: boolean }) {
   const initial = useMemo(() => { const value = flowToDefinition(flow, data); return duplicate ? { ...value, id: undefined, familyId: undefined, version: 1, lifecycle: "draft" as const, name: `${value.name} (Copy)` } : value; }, [data, duplicate, flow]);
   const [definition, setDefinition] = useState<FmsFlowDefinition>(initial);
   const [past, setPast] = useState<FmsFlowDefinition[]>([]);
@@ -197,6 +202,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
   }, [routeFocus, selected?.key]);
 
   const commit = (next: FmsFlowDefinition | ((current: FmsFlowDefinition) => FmsFlowDefinition)) => {
+    if (readOnly) return;
     setDefinition((current) => { const value = typeof next === "function" ? next(current) : next; setPast((items) => [...items.slice(-49), current]); setFuture([]); return value; });
     setSuccess(null);
   };
@@ -385,7 +391,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
   const changeSelection = (keys: readonly string[]) => { setSelectedKeys(keys); if (keys.length > 1 || (selectedKey && !keys.includes(selectedKey) && keys.length)) setSelectedKey(null); };
   const openStage = (key: string) => { setSelectedKeys([key]); selectStage(key); };
   const ensureFirstForm = () => { if (normalized.stages.length) return; if (!formStart) { add("task"); return; } const template = newFmsStage("form", 0); const first = { ...template, key: "start_form", name: "Start form", assigneeRules: contextDefaultAssigneeId ? [{ type: "specific_user" as const, userProfileId: contextDefaultAssigneeId }] : [], sla: { ...template.sla, deadlineEnabled: false } }; commit({ ...definition, stages: [first] }); setSelectedKey(isPhone ? null : first.key); };
-  const persist = async (value: FmsFlowDefinition = normalized) => { const id = await saveFmsDraft(persistedRef.current, value); setPersistedId(id); persistedRef.current = id; setSavedSnapshot(JSON.stringify(value)); await onSaved(); return id; };
+  const persist = async (value: FmsFlowDefinition = normalized) => { if (readOnly) throw new Error("You can view this workflow but not change it."); const id = await saveFmsDraft(persistedRef.current, value); setPersistedId(id); persistedRef.current = id; setSavedSnapshot(JSON.stringify(value)); await onSaved(); return id; };
   const save = async () => { setBusy("save"); setError(null); setSuccess(null); try { await persist(); setSuccess("Draft saved"); } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to save FMS draft"); } finally { setBusy(null); } };
   const publish = async () => { if (issues.length) { setError("Resolve the publish-readiness issues below before publishing."); return; } setBusy("publish"); setError(null); try { const id = await persist(); await publishFmsFlow(id); await onSaved(); setSuccess("Workflow published and ready to run"); onClose(); } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to publish workflow"); } finally { setBusy(null); } };
 
@@ -410,10 +416,11 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
     preview: () => setPreviewKey(stage.key),
     discardDraft: () => {
       const draftId = stage.sla.questionnaire?.draftFormId;
-      if (!draftId || !window.confirm("Discard the unpublished questionnaire changes for this step? The version in use stays.")) return;
+      if (!draftId || !window.confirm("Discard the unpublished questionnaire changes for this step? The version in use stays. The draft form is kept in Forms.")) return;
       setBusy("form"); setError(null);
-      void discardQuestionnaireDraft(draftId)
-        .then(() => updateStageAndSave(stage.key, (item) => ({ ...item, sla: { ...item.sla, questionnaire: item.formTemplateId && item.sla.questionnaire?.origin ? { origin: item.sla.questionnaire.origin } : undefined } })))
+      // Keep the abandoned draft, but edit a private copy next time: revising
+      // the pinned family would conflict with the draft we deliberately kept.
+      void updateStageAndSave(stage.key, (item) => ({ ...item, sla: { ...item.sla, questionnaire: item.formTemplateId ? { origin: "copied" } : undefined } }))
         .then(() => setSuccess("Questionnaire changes discarded"))
         .catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not discard the draft"))
         .finally(() => setBusy(null));
@@ -482,6 +489,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
     {studio && studioStage ? <FmsQuestionnaireStudio
       data={data}
       onClose={() => setStudio(null)}
+      onForgetDraft={() => updateStageAndSave(studioStage.key, (stage) => ({ ...stage, sla: { ...stage.sla, questionnaire: stage.formTemplateId ? { origin: "copied" } : undefined } }))}
       onDraftAttached={(draftId) => updateStageAndSave(studioStage.key, (stage) => ({ ...stage, sla: { ...stage.sla, questionnaire: { origin: "stage", draftFormId: draftId } } }))}
       onUse={async (formId) => {
         await updateStageAndSave(studioStage.key, (stage) => ({ ...stage, formTemplateId: formId, sla: { ...stage.sla, formSectionKey: undefined, questionnaire: { origin: "stage" } } }));
@@ -517,17 +525,17 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
       <div className="flex items-center gap-1">
         <Button aria-label="Back" className="shrink-0 px-2" onClick={onClose} type="button" variant="ghost"><ArrowLeft className="size-5" /></Button>
         <div className="min-w-0 flex-1"><h2 className="truncate text-base font-semibold text-white">{normalized.name}</h2><p className="truncate text-xs text-soft-grey">{dirty ? "Unsaved changes" : "Draft saved"}</p></div>
-        <Button aria-label={busy === "save" ? "Saving..." : "Save draft"} className="shrink-0 px-3" disabled={!!busy} onClick={() => void save()} variant="secondary"><Save className="size-4" /></Button>
-        <Button className="shrink-0 px-3" disabled={!!busy || issues.length > 0} onClick={() => void publish()}><Send className="size-4" />{busy === "publish" ? "Publishing..." : "Publish"}</Button>
+        {readOnly ? <span className="shrink-0 rounded-full border border-gold/30 px-2 py-1 text-xs font-semibold text-champagne">View only</span> : <Button aria-label={busy === "save" ? "Saving..." : "Save draft"} className="shrink-0 px-3" disabled={!!busy} onClick={() => void save()} variant="secondary"><Save className="size-4" /></Button>}
+        {!readOnly && canPublish ? <Button className="shrink-0 px-3" disabled={!!busy || issues.length > 0} onClick={() => void publish()}><Send className="size-4" />{busy === "publish" ? "Publishing..." : "Publish"}</Button> : null}
       </div>
       <div className="flex items-center gap-1">
-        <Button aria-label="Undo" className="shrink-0 px-3" disabled={!past.length} onClick={undo} variant="ghost"><Undo2 className="size-5" /></Button>
-        <Button aria-label="Redo" className="shrink-0 px-3" disabled={!future.length} onClick={redo} variant="ghost"><Redo2 className="size-5" /></Button>
+        {readOnly ? null : <><Button aria-label="Undo" className="shrink-0 px-3" disabled={!past.length} onClick={undo} variant="ghost"><Undo2 className="size-5" /></Button>
+        <Button aria-label="Redo" className="shrink-0 px-3" disabled={!future.length} onClick={redo} variant="ghost"><Redo2 className="size-5" /></Button></>}
         {aiAvailable ? <Button aria-label="AI assistant" aria-pressed={aiOpen} className="shrink-0 px-3" onClick={toggleAi} variant={aiOpen ? "primary" : "ghost"}><Sparkles className="size-5" /></Button> : null}
         <Button aria-label="Start trigger" className="shrink-0 px-3" onClick={() => setTriggerOpen(true)} variant="ghost"><Zap className="size-5" /></Button>
         <Button aria-label="Simulate workflow" className="shrink-0 px-3" onClick={() => setSimulating(true)} variant="ghost"><FlaskConical className="size-5" /></Button>
-        <Button aria-label="Import or export" className="shrink-0 px-3" onClick={() => setTransfer("import")} variant="ghost"><ArrowDownUp className="size-5" /></Button>
-        <Button aria-label="Default assignees" className="ml-auto shrink-0 px-3" onClick={() => setAssigning(true)} variant="ghost"><UserRoundPlus className="size-5" /></Button>
+        {readOnly ? null : <><Button aria-label="Import or export" className="shrink-0 px-3" onClick={() => setTransfer("import")} variant="ghost"><ArrowDownUp className="size-5" /></Button>
+        <Button aria-label="Default assignees" className="ml-auto shrink-0 px-3" onClick={() => setAssigning(true)} variant="ghost"><UserRoundPlus className="size-5" /></Button></>}
       </div>
     </header>
     {normalized.assignmentVersion !== 2 ? <Notice>This draft uses legacy assignment behavior. Existing running workflows keep their published contract. <Button variant="secondary" onClick={() => commit(upgradeFmsAssignmentContract(normalized, data.formFields))}>Upgrade this draft to stage-specific assignment</Button></Notice> : null}
@@ -535,7 +543,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
     {emptyStart ?? <div className="relative">
       {canvas}
       {startAnchor}
-      <Button className="absolute bottom-3 left-3 z-30 shadow-lg" onClick={() => add("task")} type="button"><Plus className="size-4" />Add Step</Button>
+      {readOnly ? null : <Button className="absolute bottom-3 left-3 z-30 shadow-lg" onClick={() => add("task")} type="button"><Plus className="size-4" />Add Step</Button>}
     </div>}
     <section className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 -mx-2 mt-auto rounded-t-2xl border border-b-0 border-gold/30 bg-charcoal/95 backdrop-blur">
       <button aria-expanded={issues.length ? issuesOpen : undefined} className="flex w-full flex-wrap items-center gap-3 px-4 py-3 text-left" onClick={() => { if (issues.length) setIssuesOpen((open) => !open); else checkWorkflow(); }} type="button">
@@ -560,15 +568,16 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
     <header className="scroll-x no-scrollbar z-40 flex shrink-0 items-center gap-1.5 border-b border-gold/20 bg-charcoal/95 px-3 py-2 backdrop-blur">
       <Button aria-label="Back to FMS" className={toolbarButton} onClick={onClose} type="button" variant="ghost"><ArrowLeft className="size-4" /><span className="hidden xl:inline">Back to FMS</span></Button>
       <div className="mr-auto min-w-0 max-w-[40vw] px-1"><h2 className="truncate text-sm font-semibold text-white lg:text-base">{normalized.name}</h2><p className="truncate text-xs text-soft-grey">{dirty ? "Unsaved changes" : "All changes saved"}</p></div>
+      {readOnly ? <span className="shrink-0 rounded-full border border-gold/30 px-3 py-1 text-xs font-semibold text-champagne" title="You can open this workflow but not change it">View only</span> : <>
       <Button aria-label="Undo" className={toolbarButton} disabled={!past.length} onClick={undo} title="Undo (Ctrl+Z)" variant="ghost"><Undo2 className="size-4" /></Button>
       <Button aria-label="Redo" className={toolbarButton} disabled={!future.length} onClick={redo} title="Redo (Ctrl+Shift+Z)" variant="ghost"><Redo2 className="size-4" /></Button>
-      <Button aria-label="Import or export" className={toolbarButton} onClick={() => setTransfer("import")} title="Import or export workflow" variant="ghost"><ArrowDownUp className="size-4" /><span className="hidden xl:inline">Import / Export</span></Button>
+      <Button aria-label="Import or export" className={toolbarButton} onClick={() => setTransfer("import")} title="Import or export workflow" variant="ghost"><ArrowDownUp className="size-4" /><span className="hidden xl:inline">Import / Export</span></Button></>}
       {aiAvailable ? <Button aria-label="AI assistant" aria-pressed={showAi} className={toolbarButton} onClick={toggleAi} variant={showAi ? "primary" : "secondary"}><Sparkles className="size-4" /><span className="hidden md:inline">AI assistant</span></Button> : null}
       <Button aria-label="Start trigger" className={toolbarButton} onClick={() => setTriggerOpen(true)} title="How this workflow starts" variant="secondary"><Zap className="size-4" /><span className="hidden xl:inline">Start trigger</span></Button>
       <Button aria-label="Check workflow" className={toolbarButton} onClick={checkWorkflow} variant="secondary"><TestTube2 className="size-4" /><span className="hidden xl:inline">Check workflow</span></Button>
       <Button aria-label="Simulate workflow" className={toolbarButton} onClick={() => setSimulating(true)} variant="secondary"><FlaskConical className="size-4" /><span className="hidden xl:inline">Simulate</span></Button>
-      <Button aria-label={busy === "save" ? "Saving..." : "Save draft"} className={toolbarButton} disabled={!!busy} onClick={() => void save()} variant="secondary"><Save className="size-4" /><span aria-hidden className="hidden lg:inline">{busy === "save" ? "Saving..." : "Save draft"}</span></Button>
-      <Button className={toolbarButton} disabled={!!busy || issues.length > 0} onClick={() => void publish()}><Send className="size-4" />{busy === "publish" ? "Publishing..." : "Publish"}</Button>
+      {readOnly ? null : <Button aria-label={busy === "save" ? "Saving..." : "Save draft"} className={toolbarButton} disabled={!!busy} onClick={() => void save()} variant="secondary"><Save className="size-4" /><span aria-hidden className="hidden lg:inline">{busy === "save" ? "Saving..." : "Save draft"}</span></Button>}
+      {!readOnly && canPublish ? <Button className={toolbarButton} disabled={!!busy || issues.length > 0} onClick={() => void publish()}><Send className="size-4" />{busy === "publish" ? "Publishing..." : "Publish"}</Button> : null}
     </header>
     {normalized.assignmentVersion !== 2 || error || success ? <div className="shrink-0 space-y-2 border-b border-gold/15 px-3 py-2">
       {normalized.assignmentVersion !== 2 ? <Notice>This draft uses legacy assignment behavior. Existing running workflows keep their published contract. <Button variant="secondary" onClick={() => commit(upgradeFmsAssignmentContract(normalized, data.formFields))}>Upgrade this draft to stage-specific assignment</Button></Notice> : null}
@@ -579,7 +588,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
     {workspaceHeight === undefined ? null : <div className="relative flex min-h-0 flex-1">
       <nav aria-label="Workflow tools" className="z-30 flex w-12 shrink-0 flex-col items-center gap-2 border-r border-gold/15 bg-charcoal/80 py-3">
         <button aria-controls="fms-workflow-tools" aria-expanded={toolsOpen} aria-label="Open workflow tools" className={cn("grid size-9 place-items-center rounded-lg border text-gold-secondary transition hover:bg-gold/10", toolsOpen ? "border-gold bg-gold/15" : "border-gold/25")} onClick={() => setToolsOpen((open) => !open)} ref={toolsButtonRef} title="Workflow tools" type="button"><PanelLeftOpen className="size-4" /></button>
-        <button aria-label="Add Step" className="grid size-9 place-items-center rounded-lg bg-gold text-on-gold shadow transition hover:brightness-110" onClick={() => add("task")} title="Add Step" type="button"><Plus className="size-4" /></button>
+        {readOnly ? null : <button aria-label="Add Step" className="grid size-9 place-items-center rounded-lg bg-gold text-on-gold shadow transition hover:brightness-110" onClick={() => add("task")} title="Add Step" type="button"><Plus className="size-4" /></button>}
       </nav>
       <div className="relative min-w-0 flex-1" style={{ "--fms-canvas-overlay-bottom": "5rem" } as CSSProperties}>
         {emptyStart ? <div className="grid h-full place-items-center overflow-y-auto p-6"><div className="max-w-md">{emptyStart}</div></div> : <>{canvas}{startAnchor}</>}
@@ -594,9 +603,9 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
           <aside aria-label="Workflow tools drawer" className="absolute inset-y-0 left-0 z-40 flex w-[min(18rem,calc(100%-1rem))] flex-col border-r border-gold/30 bg-charcoal shadow-2xl" id="fms-workflow-tools">
             <header className="flex shrink-0 items-center justify-between gap-2 border-b border-gold/15 px-3 py-2.5"><p className="text-sm font-semibold text-white">Workflow tools</p><Button aria-label="Close workflow tools" autoFocus className="shrink-0 px-2" onClick={() => { setToolsOpen(false); toolsButtonRef.current?.focus(); }} variant="ghost"><X className="size-5" /></Button></header>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
-              <button className="flex w-full items-center gap-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-left text-gold-secondary hover:bg-gold/20" onClick={() => add("task")} type="button"><span className="grid size-8 place-items-center rounded-lg bg-gold text-on-gold"><Plus className="size-4" /></span><span><b className="block text-sm">Add Step</b><span className="text-[11px] text-champagne">Questions, routing and assignee</span></span></button>
+              {readOnly ? <p className="rounded-xl border border-gold/20 p-3 text-xs text-champagne">View only: you can open steps, routes and assignees but not change them.</p> : <button className="flex w-full items-center gap-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-left text-gold-secondary hover:bg-gold/20" onClick={() => add("task")} type="button"><span className="grid size-8 place-items-center rounded-lg bg-gold text-on-gold"><Plus className="size-4" /></span><span><b className="block text-sm">Add Step</b><span className="text-[11px] text-champagne">Questions, routing and assignee</span></span></button>}
               {formStart ? <section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Process form</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/15 p-3 text-left hover:border-gold" onClick={() => { if (normalized.stages[0]) { openStage(normalized.stages[0].key); setToolsOpen(false); } }} type="button"><span className="grid size-8 place-items-center rounded-lg bg-champagne/20 text-champagne"><FileText className="size-4" /></span><span><b className="block text-sm text-white">{processFormName}</b><span className="text-[11px] text-soft-grey">The form that starts the workflow</span></span></button></section> : <section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Start trigger</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/15 p-3 text-left hover:border-gold" onClick={() => { setTriggerOpen(true); setToolsOpen(false); }} type="button"><span className="grid size-8 place-items-center rounded-lg bg-champagne/20 text-champagne"><Zap className="size-4" /></span><span><b className="block text-sm text-white">{normalized.startMode === "automatic" ? "Automatic trigger" : "Manual start"}</b><span className="text-[11px] text-soft-grey">{startLines[0] ?? "Choose how runs start"}</span></span></button></section>}
-              <section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Default assignees</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/15 p-3 text-left hover:border-gold" onClick={() => { setAssigning(true); setToolsOpen(false); }} type="button"><span className="grid size-8 place-items-center rounded-lg bg-champagne/20 text-champagne"><UserRoundPlus className="size-4" /></span><span><b className="block text-sm text-white">{assigneeSummary}</b><span className="text-[11px] text-soft-grey">Pre-assign people to steps</span></span></button></section>
+              {readOnly ? null : <section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Default assignees</p><button className="flex w-full items-center gap-3 rounded-xl border border-gold/15 p-3 text-left hover:border-gold" onClick={() => { setAssigning(true); setToolsOpen(false); }} type="button"><span className="grid size-8 place-items-center rounded-lg bg-champagne/20 text-champagne"><UserRoundPlus className="size-4" /></span><span><b className="block text-sm text-white">{assigneeSummary}</b><span className="text-[11px] text-soft-grey">Pre-assign people to steps</span></span></button></section>}
               <section className="mt-5 border-t border-gold/15 pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-champagne">Shortcuts</p><dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px] text-soft-grey">{[["Ctrl+C / X / V", "Copy, cut, paste steps"], ["Ctrl+D", "Duplicate"], ["Del", "Delete"], ["Ctrl+A", "Select all"], ["Ctrl+Z", "Undo"], ["Space+drag", "Pan"], ["1", "Fit workflow"], ["Esc", "Clear selection"]].flatMap(([keys, label]) => [<dt className="font-semibold text-champagne" key={`${keys}-k`}>{keys}</dt>, <dd key={`${keys}-v`}>{label}</dd>])}</dl></section>
             </div>
           </aside>

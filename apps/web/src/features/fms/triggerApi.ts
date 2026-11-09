@@ -1,5 +1,5 @@
 import { supabase, type Json } from "@jewelos/api-client";
-import type { FmsStartTrigger, FmsTriggerRuleResult, FmsTriggerSourceType } from "@jewelos/core";
+import { parseFmsBuiltForms, type FmsStartTrigger, type FmsTriggerRuleResult, type FmsTriggerSourceType } from "@jewelos/core";
 
 /** Start trigger RPCs (migration 0374). The database evaluates; these only read results back. */
 
@@ -116,4 +116,37 @@ export async function startFmsWithoutForm(input: Readonly<{ flowId: string; titl
   const row = Array.isArray(data) ? data[0] : null;
   if (!row) throw new Error("Start workflow returned no reference");
   return { instanceId: row.instance_id, referenceNumber: row.reference_number };
+}
+
+/** The Form Builder form CRM uses for each registration, by Form family id. */
+export type CrmFormFamilies = Readonly<Partial<Record<"queue" | "lead" | "walkin", string>>>;
+
+/**
+ * Reads which forms are linked in CRM Form Settings (get_crm_form_bindings, migration 0373), so the
+ * trigger form picker can wire a CRM form to its CRM event. Without CRM access it returns none and
+ * every form is offered as an ordinary Forms Library form; the server still validates the trigger.
+ */
+export async function loadCrmFormFamilies(): Promise<CrmFormFamilies> {
+  const { data, error } = await supabase.rpc("get_crm_form_bindings");
+  if (error) return {};
+  const bindings = record(data).bindings;
+  const families: Partial<Record<"queue" | "lead" | "walkin", string>> = {};
+  for (const item of Array.isArray(bindings) ? bindings : []) {
+    const row = record(item);
+    const purpose = text(row.purpose);
+    const family = text(row.formFamilyId);
+    if (family && (purpose === "queue" || purpose === "lead" || purpose === "walkin")) families[purpose] = family;
+  }
+  return families;
+}
+
+/**
+ * Form families built inside FMS workflow steps (list_fms_built_forms, the list Forms Library uses
+ * for "FMS workflow forms"). The trigger picker leaves them out. If the list cannot be read, it
+ * returns none and every form stays offered.
+ */
+export async function loadFmsStepFormFamilies(): Promise<ReadonlySet<string>> {
+  const { data, error } = await supabase.rpc("list_fms_built_forms");
+  if (error) return new Set();
+  return new Set(parseFmsBuiltForms(data).keys());
 }

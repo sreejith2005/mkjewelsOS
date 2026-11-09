@@ -7,9 +7,8 @@ import type { FmsData } from "./api";
 import type { FmsCanvasCommand } from "./FmsGraphCanvas";
 import { FmsFlowBuilder } from "./FmsFlowBuilder";
 
-const mocks = vi.hoisted(() => ({ saveFmsDraft: vi.fn(), publishFmsFlow: vi.fn(), saveFmsContextAssigneeDefault: vi.fn(), discard: vi.fn() }));
+const mocks = vi.hoisted(() => ({ saveFmsDraft: vi.fn(), publishFmsFlow: vi.fn(), saveFmsContextAssigneeDefault: vi.fn() }));
 vi.mock("./api", () => ({ saveFmsDraft: mocks.saveFmsDraft, publishFmsFlow: mocks.publishFmsFlow, saveFmsContextAssigneeDefault: mocks.saveFmsContextAssigneeDefault }));
-vi.mock("./questionnaire", async (importOriginal) => ({ ...await importOriginal<typeof import("./questionnaire")>(), discardQuestionnaireDraft: mocks.discard }));
 
 /**
  * The questionnaire editor talks to the Forms RPCs; here it is two buttons that
@@ -38,7 +37,7 @@ let latestSelection: readonly string[] = [];
 vi.mock("./FmsGraphCanvas", async () => {
   const { forwardRef } = await import("react");
   return {
-    FmsGraphCanvas: forwardRef(function Canvas({ definition, focusRequest, selectedKeys, onSelectionChange, onCommand, onConnect, onDisconnect, onReconnect, onMove, onEditRoute }: {
+    FmsGraphCanvas: forwardRef(function Canvas({ definition, focusRequest, selectedKeys, onSelectionChange, onCommand, onConnect, onDisconnect, onReconnect, onMove, onEditRoute, onOpen }: {
       definition: FmsFlowDefinition;
       focusRequest?: { key: string; id: number } | null;
       selectedKeys: readonly string[];
@@ -49,6 +48,7 @@ vi.mock("./FmsGraphCanvas", async () => {
       onReconnect: (from: string, previousTo: string, nextTo: string, ruleId?: string) => void;
       onMove: (positions: Record<string, { x: number; y: number }>) => void;
       onEditRoute?: (from: string, ruleId?: string) => void;
+      onOpen?: (key: string) => void;
     }, _ref) {
       latest = definition;
       latestFocusRequest = focusRequest ?? null;
@@ -58,6 +58,7 @@ vi.mock("./FmsGraphCanvas", async () => {
       const b = definition.stages[2]?.key ?? "";
       const routeId = start?.branchRules[0]?.id;
       return <div>
+        <button onClick={() => onOpen?.(a)}>open first step</button>
         <button onClick={() => onConnect(start!.key, a)}>connect a</button>
         <button onClick={() => onConnect(start!.key, b)}>connect b</button>
         <button onClick={() => onConnect(b, start!.key)}>make cycle</button>
@@ -354,6 +355,31 @@ describe("FMS builder selection, clipboard and bulk actions", () => {
 });
 
 describe("FMS builder questionnaires", () => {
+  it("discards the draft link and preserves the pinned questionnaire", async () => {
+    mocks.saveFmsDraft.mockResolvedValue(flowId);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { user, b } = await openBuilder();
+    await user.click(screen.getByRole("button", { name: "Create questionnaire" }));
+    await user.click(screen.getByRole("button", { name: "attach draft" }));
+    await user.click(screen.getByRole("button", { name: "close studio" }));
+    const pinned = stage(b).formTemplateId;
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+    await vi.waitFor(() => expect(stage(b).sla.questionnaire?.draftFormId).toBeUndefined());
+    expect(stage(b).formTemplateId).toBe(pinned);
+    confirm.mockRestore();
+  });
+  it("edits a private copy after discarding a draft of a pinned questionnaire", async () => {
+    mocks.saveFmsDraft.mockResolvedValue(flowId);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const linked = { ...savedFlowData, stages: savedFlowData.stages.map((item) => item.stage_key === "follow_up" ? { ...item, form_template_id: formId, planned_time_rule: { questionnaire: { origin: "stage", draftFormId: DRAFT_ID } } } : item) };
+    const user = userEvent.setup();
+    render(<FmsFlowBuilder canManageForms data={linked} flow={linked.flows[0]!} onClose={() => undefined} onSaved={async () => undefined} />);
+    await user.click(screen.getByRole("button", { name: "open first step" }));
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
+    await vi.waitFor(() => expect(stage("follow_up").sla.questionnaire).toEqual({ origin: "copied" }));
+    expect(stage("follow_up").formTemplateId).toBe(formId);
+    confirm.mockRestore();
+  });
   it("keeps the editor inside the builder and records the draft on the step so a reload finds it", async () => {
     mocks.saveFmsDraft.mockResolvedValue(flowId);
     const { user, b } = await openBuilder();

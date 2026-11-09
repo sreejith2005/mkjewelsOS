@@ -67,6 +67,7 @@ export function toDefinition(template: FormTemplate, fields: FormField[]): FormT
         ...(sections.length && field.group_name ? { sectionKey: field.group_name } : {}),
         ...(optionSource ? { optionSource } : { options: parseFormOptions(field.options) }),
         ...(branches.length ? { branches } : {}),
+        ...(field.field_type === "user_dropdown" && field.assignment_scope === "cross_location" ? { assignmentScope: "cross_location" as const } : {}),
         validation: object(field.validation) as FormFieldDefinition["validation"], ...visibility };
     }) });
 }

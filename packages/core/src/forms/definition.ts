@@ -1,3 +1,4 @@
+import { formUserFilterProblem } from "./userFilter.ts";
 import { FORM_OPTION_TYPES, FORM_OTHER_TYPES, parseFormOptions } from "./options.ts";
 import { FORM_RULE_OPERATORS, formRuleFieldKeys, formRuleHasIncompletePredicate, normalizeFormRule, validateFormRule } from "./rules.ts";
 import { FORM_QUESTION_TARGET_PREFIX, FORM_CONTINUE_TARGET, FORM_STAGE_END_TARGET, fieldSectionKey, formSections } from "./sections.ts";
@@ -109,6 +110,7 @@ export function normalizeFormDefinition(template: FormTemplateDefinition): FormT
         ...(branches ? { branches } : {}),
         ...(field.validation ? { validation: Object.freeze({ ...field.validation }) } : {}),
         ...(rule ? { rule } : field.condition ? { condition: Object.freeze({ ...field.condition, fieldKey: requiredText(field.condition.fieldKey).toLowerCase() }) } : {}),
+        ...(field.type === "user_dropdown" && field.assignmentScope === "cross_location" ? { assignmentScope: "cross_location" as const } : {}),
       });
     });
   return Object.freeze({
@@ -275,6 +277,10 @@ export function validateFormDefinition(template: FormTemplateDefinition): readon
         issues.push({ code: "invalid_validation", fieldKey: field.key, message: "A question's width must be full, half or a third" });
       }
       if (validation.crm !== undefined) issues.push(...validateCrmBehaviour(field));
+      if (validation.userFilter !== undefined) {
+        const problem = field.type === "user_dropdown" ? formUserFilterProblem(validation.userFilter) : "Only a Users question can filter people";
+        if (problem) issues.push({ code: "invalid_validation", fieldKey: field.key, message: `${field.label || field.key}: ${problem}` });
+      }
     }
     if (field.type === "repeat") issues.push(...validateRepeatConfig(field));
     else if (field.validation?.repeat !== undefined) issues.push({ code: "invalid_validation", fieldKey: field.key, message: "Only a repeating group can list questions per row" });

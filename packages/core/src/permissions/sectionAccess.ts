@@ -36,3 +36,18 @@ export function sectionOverrideChanges(saved: PermissionOverrides, draft: Sectio
   }
   return changes;
 }
+
+/** Short column heading for a section ("Open Task Control" -> "Task Control"). */
+export function sectionShortLabel(item: Readonly<{ label: string; category: string }>): string {
+  return item.category === "CRM" ? "CRM" : item.label.replace(/^Open /, "");
+}
+
+/**
+ * One cell of the Users section-access matrix: the saved or pending individual
+ * choice over the inherited state the server reports (department, then
+ * designation, then role default). Super Admin always has every section.
+ */
+export function sectionMatrixCell(inherited: boolean, choice: PermissionEffect | null, effectiveRole: UserRole): Readonly<{ effective: boolean; inherited: boolean; choice: SectionAccessChoice }> {
+  if (effectiveRole === "super_admin") return { effective: true, inherited: true, choice: choice ?? "inherit" };
+  return { effective: choice ? choice === "grant" : inherited, inherited, choice: choice ?? "inherit" };
+}

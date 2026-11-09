@@ -2268,6 +2268,551 @@ export type Database = {
   }
   public: {
     Tables: CustomerIntegrationTables & {
+      recorder_device_days: {
+        Row: {
+          branch_id: string
+          connected_ms: number
+          contacts: number
+          device_id: string
+          employee_id: string
+          first_contact_at: string
+          last_contact_at: string
+          local_date: string
+          tenant_id: string
+        }
+        Insert: {
+          branch_id: string
+          connected_ms?: number
+          contacts?: number
+          device_id: string
+          employee_id: string
+          first_contact_at: string
+          last_contact_at: string
+          local_date: string
+          tenant_id: string
+        }
+        Update: {
+          branch_id?: string
+          connected_ms?: number
+          contacts?: number
+          device_id?: string
+          employee_id?: string
+          first_contact_at?: string
+          last_contact_at?: string
+          local_date?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recorder_device_days_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_device_days_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "recorder_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_device_days_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_device_days_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_device_days_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_device_days_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recorder_device_days_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recording_fact_queue: {
+        Row: {
+          queued_at: string
+          session_id: string
+          tenant_id: string
+        }
+        Insert: {
+          queued_at?: string
+          session_id: string
+          tenant_id: string
+        }
+        Update: {
+          queued_at?: string
+          session_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recording_fact_queue_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: true
+            referencedRelation: "recorder_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_fact_queue_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recording_session_facts: {
+        Row: {
+          ai_outcome: string | null
+          analysis_id: string | null
+          analysis_status: string | null
+          branch_id: string
+          categories: string[]
+          competitors: string[]
+          concerns: string[]
+          created_at: string
+          crm_purchase_visit_id: string | null
+          crm_state: string | null
+          crm_window_until: string | null
+          device_id: string
+          dimensions: Json
+          duration_ms: number
+          elements: string[]
+          employee_id: string
+          engaged: boolean
+          error_reason: string | null
+          expires_at: string
+          fallback_used: boolean
+          interest: boolean
+          link_state: string | null
+          local_date: string
+          local_dow: number
+          local_hour: number
+          manager_scored: boolean
+          price_band: string | null
+          price_discussed: boolean
+          products: string[]
+          quality_reasons: string[]
+          refreshed_at: string
+          review_state: string | null
+          score: number | null
+          session_id: string
+          signals: string[]
+          stage: string
+          strengths: string[]
+          tenant_id: string
+        }
+        Insert: {
+          ai_outcome?: string | null
+          analysis_id?: string | null
+          analysis_status?: string | null
+          branch_id: string
+          categories?: string[]
+          competitors?: string[]
+          concerns?: string[]
+          created_at: string
+          crm_purchase_visit_id?: string | null
+          crm_state?: string | null
+          crm_window_until?: string | null
+          device_id: string
+          dimensions?: Json
+          duration_ms?: number
+          elements?: string[]
+          employee_id: string
+          engaged?: boolean
+          error_reason?: string | null
+          expires_at: string
+          fallback_used?: boolean
+          interest?: boolean
+          link_state?: string | null
+          local_date: string
+          local_dow: number
+          local_hour: number
+          manager_scored?: boolean
+          price_band?: string | null
+          price_discussed?: boolean
+          products?: string[]
+          quality_reasons?: string[]
+          refreshed_at?: string
+          review_state?: string | null
+          score?: number | null
+          session_id: string
+          signals?: string[]
+          stage: string
+          strengths?: string[]
+          tenant_id: string
+        }
+        Update: {
+          ai_outcome?: string | null
+          analysis_id?: string | null
+          analysis_status?: string | null
+          branch_id?: string
+          categories?: string[]
+          competitors?: string[]
+          concerns?: string[]
+          created_at?: string
+          crm_purchase_visit_id?: string | null
+          crm_state?: string | null
+          crm_window_until?: string | null
+          device_id?: string
+          dimensions?: Json
+          duration_ms?: number
+          elements?: string[]
+          employee_id?: string
+          engaged?: boolean
+          error_reason?: string | null
+          expires_at?: string
+          fallback_used?: boolean
+          interest?: boolean
+          link_state?: string | null
+          local_date?: string
+          local_dow?: number
+          local_hour?: number
+          manager_scored?: boolean
+          price_band?: string | null
+          price_discussed?: boolean
+          products?: string[]
+          quality_reasons?: string[]
+          refreshed_at?: string
+          review_state?: string | null
+          score?: number | null
+          session_id?: string
+          signals?: string[]
+          stage?: string
+          strengths?: string[]
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recording_session_facts_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_session_facts_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "recorder_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_session_facts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_session_facts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_session_facts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_session_facts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_session_facts_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: true
+            referencedRelation: "recorder_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recording_session_facts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      franchise_groups: {
+        Row: {
+          city: string | null
+          code: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          state: string | null
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          city?: string | null
+          code: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          state?: string | null
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          city?: string | null
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          state?: string | null
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "franchise_groups_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "franchise_groups_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "franchise_groups_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "franchise_groups_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "franchise_groups_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "franchise_groups_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "franchise_groups_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "franchise_groups_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "franchise_groups_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      org_scope_grants: {
+        Row: {
+          authority: string
+          branch_id: string | null
+          franchise_group_id: string | null
+          granted_at: string
+          granted_by: string | null
+          id: string
+          reason: string | null
+          revoke_reason: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          scope_level: string
+          tenant_id: string
+          user_profile_id: string
+        }
+        Insert: {
+          authority: string
+          branch_id?: string | null
+          franchise_group_id?: string | null
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          reason?: string | null
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          scope_level: string
+          tenant_id: string
+          user_profile_id: string
+        }
+        Update: {
+          authority?: string
+          branch_id?: string | null
+          franchise_group_id?: string | null
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          reason?: string | null
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          scope_level?: string
+          tenant_id?: string
+          user_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_scope_grants_branch_fk"
+            columns: ["tenant_id", "branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["tenant_id", "id"]
+          },
+          {
+            foreignKeyName: "org_scope_grants_franchise_fk"
+            columns: ["tenant_id", "franchise_group_id"]
+            isOneToOne: false
+            referencedRelation: "franchise_groups"
+            referencedColumns: ["tenant_id", "id"]
+          },
+          {
+            foreignKeyName: "org_scope_grants_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_scope_grants_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_scope_grants_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_scope_grants_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_scope_grants_profile_fk"
+            columns: ["tenant_id", "user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["tenant_id", "id"]
+          },
+          {
+            foreignKeyName: "org_scope_grants_profile_fk"
+            columns: ["tenant_id", "user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["tenant_id", "id"]
+          },
+          {
+            foreignKeyName: "org_scope_grants_revoked_by_fkey"
+            columns: ["revoked_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_scope_grants_revoked_by_fkey"
+            columns: ["revoked_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_scope_grants_revoked_by_fkey"
+            columns: ["revoked_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_scope_grants_revoked_by_fkey"
+            columns: ["revoked_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_scope_grants_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recording_action_tasks: {
         Row: {
           action_index: number
@@ -4206,8 +4751,10 @@ export type Database = {
           code: string
           created_at: string | null
           created_by: string | null
+          franchise_group_id: string | null
           id: string
           is_active: boolean | null
+          location_kind: string
           manager_id: string | null
           name: string
           pincode: string | null
@@ -4224,8 +4771,10 @@ export type Database = {
           code: string
           created_at?: string | null
           created_by?: string | null
+          franchise_group_id?: string | null
           id?: string
           is_active?: boolean | null
+          location_kind?: string
           manager_id?: string | null
           name: string
           pincode?: string | null
@@ -4242,8 +4791,10 @@ export type Database = {
           code?: string
           created_at?: string | null
           created_by?: string | null
+          franchise_group_id?: string | null
           id?: string
           is_active?: boolean | null
+          location_kind?: string
           manager_id?: string | null
           name?: string
           pincode?: string | null
@@ -4256,10 +4807,31 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "branches_franchise_group_fk"
+            columns: ["tenant_id", "franchise_group_id"]
+            isOneToOne: false
+            referencedRelation: "franchise_groups"
+            referencedColumns: ["tenant_id", "id"]
+          },
+          {
             foreignKeyName: "branches_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_branch_manager"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_branch_manager"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
             referencedColumns: ["id"]
           },
           {
@@ -7312,6 +7884,7 @@ export type Database = {
           is_active: boolean | null
           module_context: string | null
           name: string
+          owner_franchise_group_id: string | null
           published_by: string | null
           scope_type: string
           start_mode: string
@@ -7339,6 +7912,7 @@ export type Database = {
           is_active?: boolean | null
           module_context?: string | null
           name: string
+          owner_franchise_group_id?: string | null
           published_by?: string | null
           scope_type?: string
           start_mode?: string
@@ -7366,6 +7940,7 @@ export type Database = {
           is_active?: boolean | null
           module_context?: string | null
           name?: string
+          owner_franchise_group_id?: string | null
           published_by?: string | null
           scope_type?: string
           start_mode?: string
@@ -8511,6 +9086,7 @@ export type Database = {
       }
       form_fields: {
         Row: {
+          assignment_scope: string
           branch_logic: Json | null
           conditional_logic: Json | null
           created_at: string | null
@@ -8536,6 +9112,7 @@ export type Database = {
           validation: Json
         }
         Insert: {
+          assignment_scope?: string
           branch_logic?: Json | null
           conditional_logic?: Json | null
           created_at?: string | null
@@ -8561,6 +9138,7 @@ export type Database = {
           validation?: Json
         }
         Update: {
+          assignment_scope?: string
           branch_logic?: Json | null
           conditional_logic?: Json | null
           created_at?: string | null
@@ -8858,6 +9436,7 @@ export type Database = {
           library_visible: boolean
           lifecycle: Database["public"]["Enums"]["form_template_lifecycle"]
           name: string
+          owner_franchise_group_id: string | null
           permissions: Json
           published_at: string | null
           published_by: string | null
@@ -8882,6 +9461,7 @@ export type Database = {
           lifecycle?: Database["public"]["Enums"]["form_template_lifecycle"]
           record_name_field_key?: string | null
           name: string
+          owner_franchise_group_id?: string | null
           permissions?: Json
           published_at?: string | null
           published_by?: string | null
@@ -8906,6 +9486,7 @@ export type Database = {
           lifecycle?: Database["public"]["Enums"]["form_template_lifecycle"]
           record_name_field_key?: string | null
           name?: string
+          owner_franchise_group_id?: string | null
           permissions?: Json
           published_at?: string | null
           published_by?: string | null
@@ -10986,6 +11567,7 @@ export type Database = {
       permission_catalog: {
         Row: {
           default_roles: Database["public"]["Enums"]["user_role"][]
+          default_scope_authorities: string[]
           key: string
           kind: string
           page_id: string | null
@@ -10993,6 +11575,7 @@ export type Database = {
         }
         Insert: {
           default_roles: Database["public"]["Enums"]["user_role"][]
+          default_scope_authorities?: string[]
           key: string
           kind: string
           page_id?: string | null
@@ -11000,6 +11583,7 @@ export type Database = {
         }
         Update: {
           default_roles?: Database["public"]["Enums"]["user_role"][]
+          default_scope_authorities?: string[]
           key?: string
           kind?: string
           page_id?: string | null
@@ -12390,6 +12974,66 @@ export type Database = {
             columns: ["user_profile_id"]
             isOneToOne: false
             referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_franchise_controls: {
+        Row: {
+          change_reason: string | null
+          changed_at: string
+          changed_by: string | null
+          enforcement_enabled: boolean
+          tenant_id: string
+        }
+        Insert: {
+          change_reason?: string | null
+          changed_at?: string
+          changed_by?: string | null
+          enforcement_enabled?: boolean
+          tenant_id: string
+        }
+        Update: {
+          change_reason?: string | null
+          changed_at?: string
+          changed_by?: string | null
+          enforcement_enabled?: boolean
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_franchise_controls_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "leave_handover_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_franchise_controls_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "leave_summary_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_franchise_controls_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_franchise_controls_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "v_task_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_franchise_controls_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -14173,6 +14817,7 @@ export type Database = {
           branch_id: string | null
           buddy_id: string | null
           department_id: string | null
+          designation_id: string | null
           employee_code: string | null
           employee_name: string | null
           id: string | null
@@ -14242,6 +14887,148 @@ export type Database = {
       }
     }
     Functions: CustomerIntegrationFunctions & {
+      recording_analytics: { Args: { p_filters: Json }; Returns: Json }
+      recording_analytics_options: { Args: never; Returns: Json }
+      recording_analytics_sessions: {
+        Args: {
+          p_before?: string
+          p_before_id?: string
+          p_filters: Json
+          p_limit?: number
+          p_metric?: string
+        }
+        Returns: Json
+      }
+      recording_device_days_page: {
+        Args: { p_filters: Json; p_limit?: number; p_offset?: number }
+        Returns: Json
+      }
+      assign_branch_franchise_with_audit: {
+        Args: {
+          p_branch_id: string
+          p_franchise_group_id: string | null
+          p_location_kind: string
+          p_reason: string
+        }
+        Returns: {
+          address: string | null
+          city: string | null
+          code: string
+          created_at: string | null
+          created_by: string | null
+          franchise_group_id: string | null
+          id: string
+          is_active: boolean | null
+          location_kind: string
+          manager_id: string | null
+          name: string
+          pincode: string | null
+          settings: Json
+          settings_version: number
+          state: string | null
+          tenant_id: string
+          updated_at: string | null
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "branches"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_branch_in_franchise_with_audit: {
+        Args: { p_franchise_group_id: string; p_payload: Json }
+        Returns: {
+          address: string | null
+          city: string | null
+          code: string
+          created_at: string | null
+          created_by: string | null
+          franchise_group_id: string | null
+          id: string
+          is_active: boolean | null
+          location_kind: string
+          manager_id: string | null
+          name: string
+          pincode: string | null
+          settings: Json
+          settings_version: number
+          state: string | null
+          tenant_id: string
+          updated_at: string | null
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "branches"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      get_franchise_admin_context: { Args: never; Returns: Json }
+      get_section_access_matrix: { Args: never; Returns: Json }
+      save_section_access_bulk_with_audit: { Args: { p_changes: Json }; Returns: Json }
+      get_franchise_audit_history: { Args: { p_limit: number }; Returns: Json }
+      get_franchise_branch_counts: { Args: never; Returns: Json }
+      get_franchise_module_coverage: { Args: never; Returns: Json }
+      get_franchise_readiness_report: { Args: never; Returns: Json }
+      get_my_org_scope: { Args: never; Returns: Json }
+      list_assignment_locations: { Args: { p_context: Json }; Returns: Json }
+      search_assignment_recipients: {
+        Args: {
+          p_branch_id: string
+          p_context: Json
+          p_limit: number
+          p_offset: number
+          p_search: string
+        }
+        Returns: Json
+      }
+      set_definition_owner_franchise_with_audit: {
+        Args: {
+          p_family_id: string
+          p_franchise_group_id: string | null
+          p_kind: string
+          p_reason: string
+        }
+        Returns: number
+      }
+      grant_org_scope_with_audit: {
+        Args: {
+          p_authority: string
+          p_branch_id: string | null
+          p_company: boolean
+          p_franchise_group_id: string | null
+          p_profile_id: string
+          p_reason: string
+        }
+        Returns: {
+          authority: string
+          branch_id: string | null
+          franchise_group_id: string | null
+          granted_at: string
+          granted_by: string | null
+          id: string
+          reason: string | null
+          revoke_reason: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          scope_level: string
+          tenant_id: string
+          user_profile_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "org_scope_grants"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      org_branch_in_data_scope: {
+        Args: { p_branch_id: string }
+        Returns: boolean
+      }
       recording_activate_rubric_version: {
         Args: { p_rubric_version_id: string }
         Returns: Json
@@ -14462,9 +15249,55 @@ export type Database = {
         Args: { p_event_id: string }
         Returns: Json
       }
+      revoke_org_scope_with_audit: {
+        Args: { p_grant_id: string; p_reason: string }
+        Returns: {
+          authority: string
+          branch_id: string | null
+          franchise_group_id: string | null
+          granted_at: string
+          granted_by: string | null
+          id: string
+          reason: string | null
+          revoke_reason: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          scope_level: string
+          tenant_id: string
+          user_profile_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "org_scope_grants"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       save_crm_form_binding: {
         Args: { p_expected_version_id?: string; p_field_map: Json; p_form_family_id: string; p_purpose: string }
         Returns: Json
+      }
+      save_franchise_group_with_audit: {
+        Args: { p_franchise_group_id: string | null; p_payload: Json }
+        Returns: {
+          city: string | null
+          code: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          state: string | null
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "franchise_groups"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       set_fms_flow_start_with_audit: {
         Args: {
@@ -14473,6 +15306,10 @@ export type Database = {
           p_start_trigger?: Json
         }
         Returns: undefined
+      }
+      set_franchise_enforcement_with_audit: {
+        Args: { p_enabled: boolean; p_reason: string }
+        Returns: Json
       }
       start_fms_manual_with_audit: {
         Args: {
@@ -14493,9 +15330,60 @@ export type Database = {
       submit_form_and_start_fms_idempotent: { Args: { p_form_template_id: string; p_answers: Json; p_idempotency_key: string; p_flow_id?: string }; Returns: Json }
 
       preview_fms_work_transition: { Args: { p_request: Json; p_handoffs?: Json }; Returns: Json }
+      fms_crm_handover_candidates: {
+        Args: { p_instance_stage_id: string }
+        Returns: { id: string; employee_name: string; team: string; branch_id: string | null }[]
+      }
+      handover_fms_step_with_audit: { Args: { p_instance_stage_id: string; p_to_user_id: string; p_reason: string }; Returns: Json }
       test_fms_start_trigger: {
         Args: { p_answers: Json; p_flow_id: string; p_trigger: Json }
         Returns: Json
+      }
+      transfer_employee_franchise_with_audit: {
+        Args: {
+          p_branch_id: string
+          p_department_id: string
+          p_profile_id: string
+          p_reason: string
+        }
+        Returns: {
+          account_status: Database["public"]["Enums"]["user_account_status"]
+          auth_user_id: string
+          branch_id: string
+          buddy_id: string | null
+          created_at: string | null
+          created_by: string | null
+          department_id: string
+          designation_id: string | null
+          email: string
+          employee_code: string
+          employee_name: string
+          first_name: string | null
+          id: string
+          is_login_enabled: boolean | null
+          last_name: string | null
+          official_email: string | null
+          official_mobile: string | null
+          personal_email: string | null
+          personal_mobile: string | null
+          removed_at: string | null
+          removed_by: string | null
+          reports_to_user_id: string | null
+          secondary_buddy_id: string | null
+          tenant_id: string
+          updated_at: string | null
+          updated_by: string | null
+          user_role: Database["public"]["Enums"]["user_role"]
+          username: string | null
+          week_off: string[]
+          working_status: Database["public"]["Enums"]["working_status"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       transition_fms_work_with_audit: { Args: { p_request: Json; p_idempotency_key: string; p_handoffs: Json; p_preview_fingerprint: string }; Returns: Json }
       get_fms_ai_settings: { Args: never; Returns: Json }
@@ -15035,6 +15923,16 @@ export type Database = {
         Returns: boolean
       }
       can_manage_fms_flow: { Args: { p_flow_id?: string }; Returns: boolean }
+      can_edit_fms_flow: { Args: { p_flow_id: string }; Returns: boolean }
+      can_publish_fms_flow: { Args: { p_flow_id: string }; Returns: boolean }
+      fms_my_flow_access: { Args: { p_family_id: string }; Returns: string }
+      list_fms_flow_access: {
+        Args: { p_flow_id: string }
+        Returns: { grant_id: string; user_profile_id: string; employee_name: string; employee_code: string | null; access_level: string; granted_at: string; granted_by_name: string | null; account_active: boolean }[]
+      }
+      grant_fms_flow_access_with_audit: { Args: { p_flow_id: string; p_user_profile_id: string; p_access_level: string }; Returns: string }
+      revoke_fms_flow_access_with_audit: { Args: { p_grant_id: string; p_reason?: string }; Returns: undefined }
+      list_my_fms_flow_access: { Args: never; Returns: { family_id: string; access_level: string }[] }
       can_manage_form_template: {
         Args: { p_template_id: string }
         Returns: boolean
@@ -16801,8 +17699,10 @@ export type Database = {
           code: string
           created_at: string | null
           created_by: string | null
+          franchise_group_id: string | null
           id: string
           is_active: boolean | null
+          location_kind: string
           manager_id: string | null
           name: string
           pincode: string | null
@@ -16828,8 +17728,10 @@ export type Database = {
           code: string
           created_at: string | null
           created_by: string | null
+          franchise_group_id: string | null
           id: string
           is_active: boolean | null
+          location_kind: string
           manager_id: string | null
           name: string
           pincode: string | null

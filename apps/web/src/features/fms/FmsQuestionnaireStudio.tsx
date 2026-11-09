@@ -7,7 +7,7 @@ import { FormRenderer, type DynamicOptions } from "@/features/forms/FormRenderer
 import { loadFormDynamicOptions, type FormBundle } from "@/features/forms/api";
 import type { FmsData } from "./api";
 import { FmsImportSectionDialog } from "./FmsImportSectionDialog";
-import { blankQuestionnaire, loadFormDefinition, loadStageQuestionnaire, publishQuestionnaireDraft, questionnaireTarget, saveQuestionnaireDraft } from "./questionnaire";
+import { blankQuestionnaire, loadFormDefinition, loadStageQuestionnaire, publishQuestionnaireDraft, questionnaireTarget, saveQuestionnaireDraft, UnavailableQuestionnaireError } from "./questionnaire";
 
 /**
  * The questionnaire editor for one FMS step, opened over the canvas so the
@@ -17,7 +17,7 @@ import { blankQuestionnaire, loadFormDefinition, loadStageQuestionnaire, publish
  * saving: Save draft keeps the work on the step; Use in workflow publishes it
  * and pins the published version to the step.
  */
-export function FmsQuestionnaireStudio({ stage, workflowName, data, seed, onClose, onDraftAttached, onUse }: {
+export function FmsQuestionnaireStudio({ stage, workflowName, data, seed, onClose, onDraftAttached, onUse, onForgetDraft }: {
   stage: FmsStageDefinition;
   workflowName: string;
   data: FmsData;
@@ -28,10 +28,14 @@ export function FmsQuestionnaireStudio({ stage, workflowName, data, seed, onClos
   onDraftAttached: (draftId: string) => Promise<void>;
   /** The draft is published: pin it to the step, save the workflow and refresh question data. */
   onUse: (formId: string) => Promise<void>;
+  onForgetDraft: () => Promise<void>;
 }) {
   const [bundle, setBundle] = useState<FormBundle | null | undefined>(undefined);
   const [options, setOptions] = useState<DynamicOptions | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [openedDraftId] = useState(() => stage.sla.questionnaire?.draftFormId);
+  const [unavailable, setUnavailable] = useState(false);
+  const [recovering, setRecovering] = useState(false);
   const [importing, setImporting] = useState<((next: FormTemplateDefinition) => void) | null>(null);
   const [current, setCurrent] = useState<FormTemplateDefinition | null>(null);
   const target = questionnaireTarget(stage);
@@ -40,7 +44,7 @@ export function FmsQuestionnaireStudio({ stage, workflowName, data, seed, onClos
     let active = true;
     void Promise.all([seed ? Promise.resolve(null) : loadStageQuestionnaire(stage), loadFormDynamicOptions()])
       .then(([loaded, dynamic]) => { if (!active) return; setBundle(loaded); setOptions(dynamic); })
-      .catch((caught: unknown) => { if (active) setError(caught instanceof Error ? caught.message : "Could not open the questionnaire"); });
+      .catch((caught: unknown) => { if (active) { setUnavailable(caught instanceof UnavailableQuestionnaireError); setError(caught instanceof Error ? caught.message : "Could not open the questionnaire"); } });
     return () => { active = false; };
     // The studio loads once per opening; later stage edits (the attached draft id) must not reload it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -58,7 +62,13 @@ export function FmsQuestionnaireStudio({ stage, workflowName, data, seed, onClos
   }, [bundle, seed, stage.name, stage.sla.formSectionKey, target.kind, workflowName]);
 
   const dialog = (content: ReactNode) => <div aria-label={`Questionnaire for ${stage.name || "step"}`} aria-modal="true" className="fixed inset-0 z-[70] overflow-y-auto overscroll-contain bg-obsidian px-2 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6" role="dialog">{content}</div>;
-  if (error) return dialog(<div className="mx-auto max-w-xl space-y-3 py-10"><Notice tone="danger">{error}</Notice><Button onClick={onClose}>Back to the workflow</Button></div>);
+  const recover = async (action: () => Promise<void>) => {
+    setRecovering(true);
+    try { await action(); onClose(); } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not save the workflow change"); } finally { setRecovering(false); }
+  };
+  const publishedRecovery = bundle?.lifecycle === "published" && bundle.id === openedDraftId;
+  if (error && !publishedRecovery) return dialog(<div className="mx-auto max-w-xl space-y-3 py-10"><Notice tone="danger">{error}</Notice>{unavailable && openedDraftId ? <><p className="text-sm text-soft-grey">Remove this unavailable draft link to continue editing the step. The questionnaire version already in use stays attached. No form or answers are deleted.</p><Button disabled={recovering} onClick={() => void recover(onForgetDraft)}>Remove unavailable draft link</Button></> : null}<Button disabled={recovering} onClick={onClose}>Back to the workflow</Button></div>);
+  if (publishedRecovery && bundle) return dialog(<div className="mx-auto max-w-xl space-y-3 py-10"><Notice>This questionnaire was published, but its workflow link was not updated. Use the published version to finish.</Notice>{error ? <Notice tone="danger">{error}</Notice> : null}<Button disabled={recovering} onClick={() => void recover(() => onUse(bundle.id))}>Use in workflow</Button><Button disabled={recovering} onClick={onClose}>Back to the workflow</Button></div>);
   if (!initial || !options) return dialog(<div className="mx-auto max-w-xl py-10"><Notice>Opening the questionnaire…</Notice></div>);
 
   const subtitle = target.kind === "copy" ? "Editing a copy for this step. The original Form is not changed."

@@ -1,4 +1,5 @@
 import type { UserRole } from "../roleMenu.ts";
+import type { FormUserFilter } from "./userFilter.ts";
 
 export const FORM_FIELD_TYPES = [
   "text", "textarea", "number", "currency", "email", "phone", "date",
@@ -104,6 +105,8 @@ export type FormValidation = Readonly<{
   repeat?: FormRepeatConfig | undefined;
   /** CRM forms only: CRM lookups, CRM choice lists and CRM upload settings. */
   crm?: FormCrmBehaviour | undefined;
+  /** Users questions only: who can be chosen (migration 0391). Absent = every person the filler may see. */
+  userFilter?: FormUserFilter | undefined;
 }>;
 
 export const FORM_REPEAT_SUBFIELD_TYPES = ["text", "phone", "select"] as const;
@@ -158,7 +161,16 @@ export type FormFieldDefinition = Readonly<{
   validation?: FormValidation | undefined;
   condition?: FormCondition | undefined;
   rule?: FormRule | undefined;
+  /**
+   * Users questions only: "Allow selecting employees from other locations"
+   * (migration 0386, `form_fields.assignment_scope`). Absent means the person
+   * filling the form picks from their own location only.
+   */
+  assignmentScope?: FormAssignmentScope | undefined;
 }>;
+
+/** Only the non-default value is ever stored on a definition. */
+export type FormAssignmentScope = "cross_location";
 
 export type FormTemplateDefinition = Readonly<{
   name: string;

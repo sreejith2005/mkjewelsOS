@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fmsOutcomeReplacesStage, fmsWorkTitle, presentFmsWorkContext, type FmsWorkContext } from "./workPresentation";
+import { fmsGenericWorkTitle, fmsOutcomeReplacesStage, fmsShortReference, fmsWorkTitle, presentFmsWorkContext, type FmsWorkContext } from "./workPresentation";
 
 const context: FmsWorkContext = { workflowName: "Jewellery enquiry", stageName: "Introduction Call", reference: "FMS-TEST",
   instructions: "Call the client", expectedResult: "Record response", dueAt: null, assignedNames: ["Employee B"],
@@ -41,10 +41,22 @@ describe("FMS work presentation", () => {
 
 });
 
-it("distinguishes identical stage titles using the durable workflow reference", () => {
-  expect(fmsWorkTitle("Instagram leads - Introduction call", "FMS-000041")).toBe("Instagram leads - Introduction call | FMS-000041");
-  expect(fmsWorkTitle("Instagram leads - Introduction call", "FMS-000042")).not.toBe(fmsWorkTitle("Instagram leads - Introduction call", "FMS-000041"));
-  expect(fmsWorkTitle("Call FMS-000041", "FMS-000041")).toBe("Call FMS-000041");
+it("never shows the long run reference; generic titles get a short number", () => {
+  expect(fmsShortReference("FMS-20261109-00001234")).toBe("#1234");
+  expect(fmsShortReference("FMS-000000")).toBe("#0");
+  expect(fmsShortReference("REF")).toBe("REF");
+  expect(fmsWorkTitle("Instagram leads — Introduction call", "FMS-20261109-00000041")).toBe("Instagram leads — Introduction call · #41");
+  expect(fmsWorkTitle("Instagram leads — Introduction call", "FMS-20261109-00000042")).not.toBe(fmsWorkTitle("Instagram leads — Introduction call", "FMS-20261109-00000041"));
+  expect(fmsWorkTitle("Rahul Shah", "FMS-20261109-00000041", false)).toBe("Rahul Shah");
+  expect(fmsWorkTitle("FMS-20261109-00000041", "FMS-20261109-00000041", false)).toBe("#41");
+  expect(fmsWorkTitle("Call FMS-20261109-00000041", "FMS-20261109-00000041")).toBe("Call #41");
+});
+
+it("marks only the Workflow — Step fallback as generic", () => {
+  expect(presentFmsWorkContext({ ...context, titleTemplate: "" }).generic).toBe(true);
+  expect(presentFmsWorkContext({ ...context, recordName: "Rahul Shah" }).generic).toBe(false);
+  expect(presentFmsWorkContext({ ...context, titleTemplate: "", recordName: fmsGenericWorkTitle("Jewellery enquiry", "Introduction Call") }).generic).toBe(true);
+  expect(presentFmsWorkContext(context).generic).toBe(false);
 });
 
 it("retains deferred requirements and approval controls", () => {

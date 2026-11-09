@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from "react";
+import { useState, type ComponentType, type ReactNode } from "react";
 import { CircleDot, Contact, FileText, Image as ImageIcon, Paperclip, Repeat, Video, Workflow } from "lucide-react";
 import { Button } from "@/components/ui";
 import { EmptyMessage, Panel, StatusDot } from "@/features/analytics/components";
@@ -140,6 +140,14 @@ function TaskCard({ row, onOpen, onManage, onDelete, selection }: { row: TaskRow
   );
 }
 
+export type AnytimeDutiesView = Readonly<{
+  selected: boolean;
+  /** Duties in the current filters, or null before they load. */
+  count: number | null;
+  onSelect: () => void;
+  content: ReactNode;
+}>;
+
 /**
  * Every piece of work assigned in the current scope -- one-time, recurring, FMS
  * and CRM together. The view and type chips narrow the same server-paginated
@@ -160,6 +168,7 @@ export function TasksTab({
   selection,
   onBulkDelete,
   onReassign,
+  anytime,
 }: {
   evidence: EvidenceWorkspace;
   view: TaskView;
@@ -175,7 +184,10 @@ export function TasksTab({
   selection?: TaskSelection | undefined;
   onBulkDelete?: ((ids: readonly string[] | null) => void) | undefined;
   onReassign?: ((ids: readonly string[] | null) => void) | undefined;
+  /** The "Anytime duties" chip: standing as-needed duties have no dated task until started, so they are listed here from their templates. */
+  anytime?: AnytimeDutiesView | undefined;
 }) {
+  const dutiesShown = anytime?.selected === true;
   const [openError, setOpenError] = useState<string | null>(null);
   const totalPages = Math.max(1, Math.ceil(evidence.tasks_total / pageSize));
 
@@ -187,7 +199,7 @@ export function TasksTab({
 
   return (
     <div className="space-y-4">
-      {selection && onBulkDelete ? <div className="flex flex-wrap items-center gap-2">
+      {selection && onBulkDelete && !dutiesShown ? <div className="flex flex-wrap items-center gap-2">
         <Button variant="secondary" onClick={() => selection.onChange([...new Set([...selection.ids, ...evidence.tasks.filter(canDeleteTaskControlRow).map((row) => row.task_id)])])}>Select this page</Button>
         <Button variant="secondary" disabled={!selection.ids.length} onClick={() => selection.onChange([])}>Clear selection</Button>
         <span className="text-sm">{selection.ids.length} selected</span>
@@ -199,9 +211,9 @@ export function TasksTab({
       <div className="scroll-x no-scrollbar flex gap-2 pb-1" role="group" aria-label="Task view">
         {TASK_VIEW_LABELS.map(([value, label]) => (
           <button
-            aria-pressed={view === value}
+            aria-pressed={!dutiesShown && view === value}
             className={
-              view === value
+              !dutiesShown && view === value
                 ? "min-h-9 shrink-0 rounded-full bg-gold px-4 text-xs font-semibold text-on-gold"
                 : "min-h-9 shrink-0 rounded-full bg-task-muted px-4 text-xs font-medium text-task-text hover:bg-gold/10"
             }
@@ -212,9 +224,25 @@ export function TasksTab({
             {label}
           </button>
         ))}
+        {anytime ? (
+          <button
+            aria-pressed={dutiesShown}
+            className={
+              dutiesShown
+                ? "min-h-9 shrink-0 rounded-full bg-gold px-4 text-xs font-semibold text-on-gold"
+                : "min-h-9 shrink-0 rounded-full bg-task-muted px-4 text-xs font-medium text-task-text hover:bg-gold/10"
+            }
+            onClick={anytime.onSelect}
+            type="button"
+          >
+            Anytime duties{anytime.count === null ? "" : ` · ${anytime.count.toLocaleString("en-IN")}`}
+          </button>
+        ) : null}
       </div>
 
-      {onKind ? (
+      {dutiesShown ? anytime?.content : null}
+
+      {onKind && !dutiesShown ? (
         <div className="scroll-x no-scrollbar flex items-center gap-2 pb-1" role="group" aria-label="Work type">
           <span className="shrink-0 text-xs font-semibold text-task-text-muted">Type</span>
           {TASK_WORK_KIND_FILTERS.map(([value, label]) => {
@@ -238,6 +266,7 @@ export function TasksTab({
         </div>
       ) : null}
 
+      {dutiesShown ? null : <>
       {openError ? (
         <p aria-live="polite" className="rounded-lg border border-task-overdue/40 bg-task-bg p-3 text-sm text-task-overdue" role="alert">{openError}</p>
       ) : null}
@@ -267,6 +296,7 @@ export function TasksTab({
           </>
         )}
       </Panel>
+      </>}
     </div>
   );
 }

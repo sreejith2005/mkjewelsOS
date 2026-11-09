@@ -1,5 +1,5 @@
 import { approvedFormRoles, FORM_LIBRARY_ROLES, type FmsStageDefinition, type FormTemplateDefinition, type Json } from "@jewelos/core";
-import { deleteForm, duplicateForm, loadTaskForms, publishForm, reviseForm, saveDraft, setFormLibraryVisibility, type FormBundle } from "@/features/forms/api";
+import { duplicateForm, loadTaskForms, publishForm, reviseForm, saveDraft, setFormLibraryVisibility, type FormBundle } from "@/features/forms/api";
 
 /**
  * A step's questionnaire is a real Forms Library form, created and edited from
@@ -33,7 +33,7 @@ export async function loadStageQuestionnaire(stage: FmsStageDefinition): Promise
   if (!id) return null;
   const { bundles } = await loadTaskForms([id], []);
   const bundle = bundles.find((item) => item.id === id);
-  if (!bundle) throw new Error("This questionnaire is not visible in your authorized scope.");
+  if (!bundle) throw new UnavailableQuestionnaireError();
   return bundle;
 }
 
@@ -85,9 +85,8 @@ export async function publishQuestionnaireDraft(draftId: string): Promise<string
   return draftId;
 }
 
-/** Deletes an unpublished draft the author no longer wants. */
-export async function discardQuestionnaireDraft(draftId: string): Promise<void> {
-  await deleteForm(draftId);
+export class UnavailableQuestionnaireError extends Error {
+  constructor() { super("This questionnaire could not be found in your authorized scope. It may have been deleted or your access may have changed."); }
 }
 
 /** A blank questionnaire named after its step. */

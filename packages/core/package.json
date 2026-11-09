@@ -9,6 +9,10 @@
     ".": {
       "types": "./src/index.ts",
       "import": "./src/index.ts"
+    },
+    "./salesScore/analytics": {
+      "types": "./src/salesScore/analytics.ts",
+      "import": "./src/salesScore/analytics.ts"
     }
   },
   "scripts": {
@@ -23,6 +27,6 @@
   },
   "dependencies": {
     "rrule": "^2.8.1",
-    "xlsx": "0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   }
 }

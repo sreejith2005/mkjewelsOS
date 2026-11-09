@@ -77,5 +77,9 @@ select throws_ok($$select save_crm_lead_from_form(gen_random_uuid(),'9199009003'
 reset role;
 select throws_ok($$update crm_private.form_submission_links set result='{}'$$,'42501',null,'recorded links cannot be changed');
 
+set constraints all immediate;
+select is((select payload#>>'{answers,x}' from crm_private.submission_outbox where kind='crm.form_submission_saved' and record_id='20261103-7777-4000-8000-000000000002'),'1','lead trigger receives the original flat question answer');
+select is((select payload#>>'{form,purpose}' from crm_private.submission_outbox where kind='crm.form_submission_saved' and record_id='20261103-7777-4000-8000-000000000002'),'lead','lead event keeps the linked purpose');
+
 select * from finish();
 rollback;

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const CLIENT_FILTER_KEYS = ['type','stage','branch','city','state','source','potential','purchase','commercial','min_visits','max_visits','created_from','created_to','interaction_from','interaction_to','sort'] as const;
+export const CLIENT_FILTER_KEYS = ['type','stage','branch','city','state','source','potential','purchase','commercial','min_visits','max_visits','created_from','created_to','interaction_from','interaction_to','sort','archived'] as const;
 export type ClientFilters = Partial<Record<typeof CLIENT_FILTER_KEYS[number],string>>;
 export function clientListHref(search: string,page: number,filters: ClientFilters = {}) {
   const params=new URLSearchParams();

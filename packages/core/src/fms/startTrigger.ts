@@ -61,8 +61,8 @@ export type FmsTriggerSource = Readonly<{
   formFamilyId?: string | undefined;
   /** The published version the conditions were written against (shown in the builder). */
   formTemplateId?: string | undefined;
-  /** `crm_linked_form` only: which CRM registration the form is linked to. */
-  purpose?: "queue" | "lead" | undefined;
+  /** `crm_linked_form` only: which CRM save the form is linked to. */
+  purpose?: "queue" | "lead" | "walkin" | undefined;
 }>;
 
 /** One value copied from the saved submission into the run's context. */
@@ -88,9 +88,11 @@ export type FmsStartTrigger = Readonly<{
   mapping: readonly FmsTriggerMapping[];
   /**
    * `stage_rules`: the first step's own assignment decides. `source_staff`: the person the source
-   * names (CRM salesperson resolved through the roster link, or the form submitter) gets the first
-   * step. When that person cannot be resolved, `review` keeps the event for an administrator and
-   * `stage_rules` falls back to the step's own assignment.
+   * names gets the first step. For CRM sources that is the client's CRM (the CRM on the visit, else
+   * the Client Queue's round-robin CRM), falling back to the salesperson or the person who saved the
+   * entry (migration 0395); for Forms Library sources it is the submitter. People are resolved
+   * through the roster link. When nobody can be resolved, `review` keeps the event for an
+   * administrator and `stage_rules` falls back to the step's own assignment.
    */
   assignment: Readonly<{ mode: "stage_rules" | "source_staff"; onUnresolved: "review" | "stage_rules" }>;
   /** A date field whose value becomes the first step's deadline (day-half rule). Blank or past dates fall back to the step's timing. */
@@ -361,7 +363,7 @@ export function validateFmsStartTrigger(trigger: FmsStartTrigger | undefined, fi
   const source = fmsTriggerSource(trigger.source.type);
   if (!source) add("trigger_source", "Choose a supported start source");
   if ((trigger.source.type === "jewelos_form" || trigger.source.type === "crm_linked_form") && !UUID.test(trigger.source.formFamilyId ?? "")) add("trigger_form", "Choose the form that starts this workflow");
-  if (trigger.source.type === "crm_linked_form" && trigger.source.purpose !== "queue" && trigger.source.purpose !== "lead") add("trigger_form", "Choose whether the form is the queue or the lead registration form");
+  if (trigger.source.type === "crm_linked_form" && trigger.source.purpose !== "queue" && trigger.source.purpose !== "lead" && trigger.source.purpose !== "walkin") add("trigger_form", "Choose whether the CRM form is for a client queue registration, lead or walk-in visit");
   const byKey = new Map(fields.map((field) => [field.key, field]));
   if (fmsTriggerRuleCount(trigger.conditions) > FMS_TRIGGER_MAX_RULES) add("trigger_too_many_rules", `Use at most ${FMS_TRIGGER_MAX_RULES} conditions`);
   if (enabledRuleCount(trigger.conditions) === 0) add("trigger_no_rules", "Add at least one switched-on condition, so the workflow does not start for every submission");
@@ -443,6 +445,13 @@ export function fmsTriggerDue(trigger: FmsStartTrigger, answers: Readonly<Record
   return Number.isNaN(due.getTime()) || due.getTime() <= now.getTime() ? null : due;
 }
 
+/** Who "the person the source names" (`source_staff`) is, in the builder's words. */
+export function fmsTriggerSourcePersonLabel(type: FmsTriggerSourceType): string {
+  if (type === "jewelos_form") return "The person who submitted the form";
+  if (type === "crm_lead") return "The person who saved the lead";
+  return "The client's CRM (from the Client Queue)";
+}
+
 /** A new, valid automatic trigger for a source, used by the builder's Start Trigger panel. */
 export function newFmsStartTrigger(type: FmsTriggerSourceType, id: () => string): FmsStartTrigger {
   const walkin = type === "crm_walkin";
@@ -458,7 +467,8 @@ export function newFmsStartTrigger(type: FmsTriggerSourceType, id: () => string)
       { key: "requirement", label: "Product requirement", field: "product_requirement" },
       { key: "next_visit_date", label: "Next visit date", field: "next_visit_date" },
     ] : [],
-    assignment: { mode: walkin ? "source_staff" : "stage_rules", onUnresolved: "review" },
+    // CRM entries go to the client's CRM by default (see FmsStartTrigger.assignment).
+    assignment: { mode: type === "jewelos_form" ? "stage_rules" : "source_staff", onUnresolved: "review" },
     dueField: walkin ? "next_visit_date" : undefined,
     reentry: walkin ? "one_active_per_case" : "one_per_event",
     onCaseClosed: "record_only",

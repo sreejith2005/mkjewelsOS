@@ -1,3 +1,4 @@
+import { formatPhone } from "../phone.ts";
 import { formRepeatRowCount, isFormCrmFilesAnswer, isFormRepeatAnswer } from "./structuredAnswers.ts";
 import { formatFormAnswer } from "./format";
 import { formOptionLabel } from "./options";
@@ -97,6 +98,8 @@ export function displayFormAnswer(field: FormFieldDefinition, raw: unknown, look
   if (value === null || value === "" || (Array.isArray(value) && value.length === 0)) return "";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (field.type === "file") return typeof raw === "object" && raw !== null && !Array.isArray(raw) ? namedValue(raw) ?? "File attached" : "File attached";
+  // "+919876543210" reads as "+91 9876543210"; an answer saved without its country code is shown as stored.
+  if (field.type === "phone" && typeof value === "string" && value.trim().startsWith("+")) return formatPhone(value);
   if (field.type === "user_dropdown" && typeof value === "string") return referenceLabel(value, lookups.users);
   if (field.type === "branch_dropdown" && typeof value === "string") return referenceLabel(value, lookups.branches);
   if (field.type === "department_dropdown" && typeof value === "string") return referenceLabel(value, lookups.departments);

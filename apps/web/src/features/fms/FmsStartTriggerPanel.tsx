@@ -1,14 +1,14 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, FlaskConical, Plus, Trash2 } from "lucide-react";
 import {
-  FMS_TRIGGER_OPERATOR_LABELS, FMS_TRIGGER_SOURCES, fmsTriggerFieldTypeForQuestion, fmsTriggerOperatorsFor, fmsTriggerSource,
-  newFmsStartTrigger, validateFmsStartTrigger,
+  FMS_TRIGGER_OPERATOR_LABELS, fmsTriggerFieldTypeForQuestion, fmsTriggerOperatorsFor, fmsTriggerSource,
+  fmsTriggerSourcePersonLabel, newFmsStartTrigger, validateFmsStartTrigger,
   type FmsFlowDefinition, type FmsStartMode, type FmsStartTrigger, type FmsTriggerField, type FmsTriggerGroup, type FmsTriggerNode,
-  type FmsTriggerOperator, type FmsTriggerRule, type FmsTriggerSourceType,
+  type FmsTriggerOperator, type FmsTriggerRule, type FmsTriggerSource,
 } from "@jewelos/core";
 import { Button, Modal, Notice } from "@/components/ui";
 import type { FmsData } from "./api";
-import { listFmsTriggerSamples, testFmsStartTrigger, type FmsTriggerSample, type FmsTriggerTestResult } from "./triggerApi";
+import { listFmsTriggerSamples, loadCrmFormFamilies, loadFmsStepFormFamilies, testFmsStartTrigger, type CrmFormFamilies, type FmsTriggerSample, type FmsTriggerTestResult } from "./triggerApi";
 
 const newId = () => crypto.randomUUID().replaceAll("-", "").slice(0, 16);
 
@@ -17,6 +17,36 @@ export function latestFormVersions(forms: FmsData["forms"]): FmsData["forms"] {
   const best = new Map<string, FmsData["forms"][number]>();
   for (const form of forms) if (form.lifecycle === "published" && (!best.get(form.family_id) || best.get(form.family_id)!.version < form.version)) best.set(form.family_id, form);
   return [...best.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+const CRM_FORM_NAMES = { queue: "CRM client queue", lead: "CRM lead", walkin: "CRM walk-in" } as const;
+type CrmPurpose = keyof typeof CRM_FORM_NAMES;
+
+/** The CRM registration a Form family is linked to in CRM Form Settings, if any. */
+export function crmPurposeOfForm(familyId: string, crm: CrmFormFamilies): CrmPurpose | null {
+  return (["queue", "lead", "walkin"] as const).find((purpose) => crm[purpose] === familyId) ?? null;
+}
+
+/**
+ * The form shown as chosen. Triggers saved on a CRM registration itself (walk-in, queue or lead)
+ * show the form CRM uses for it now.
+ */
+export function triggerFormFamily(source: FmsTriggerSource, crm: CrmFormFamilies): string {
+  if (source.type === "crm_walkin") return crm.walkin ?? "";
+  if (source.type === "crm_queue") return crm.queue ?? "";
+  if (source.type === "crm_lead") return crm.lead ?? "";
+  return source.formFamilyId ?? "";
+}
+
+/**
+ * One choice for every start: a Form Builder form. A form linked in CRM listens to CRM saves (a
+ * walk-in form to its linked saved submission, which carries the original question answers); any other form to its
+ * Forms Library submissions.
+ */
+export function triggerSourceForForm(familyId: string, templateId: string | undefined, crm: CrmFormFamilies): FmsTriggerSource {
+  const purpose = crmPurposeOfForm(familyId, crm);
+  if (purpose) return { type: "crm_linked_form", formFamilyId: familyId, formTemplateId: templateId, purpose };
+  return { type: "jewelos_form", formFamilyId: familyId, formTemplateId: templateId };
 }
 
 /**
@@ -57,8 +87,32 @@ export function FmsStartTriggerPanel({ definition, data, flowId, onApply, onClos
   const [trigger, setTrigger] = useState<FmsStartTrigger>(() => definition.startTrigger ?? newFmsStartTrigger("crm_walkin", newId));
   const fields = useMemo(() => fmsTriggerFields(trigger, data), [trigger, data]);
   const issues = mode === "automatic" ? validateFmsStartTrigger(trigger, fields, definition.stages[0]?.type) : [];
-  const forms = useMemo(() => latestFormVersions(data.forms), [data.forms]);
-  const changeSource = (type: FmsTriggerSourceType) => setTrigger(newFmsStartTrigger(type, newId));
+  const [crmForms, setCrmForms] = useState<CrmFormFamilies>({});
+  const [stepForms, setStepForms] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    let active = true;
+    void loadCrmFormFamilies().then((loaded) => { if (active) setCrmForms(loaded); });
+    void loadFmsStepFormFamilies().then((loaded) => { if (active) setStepForms(loaded); });
+    return () => { active = false; };
+  }, []);
+  const chosenFamily = triggerFormFamily(trigger.source, crmForms);
+  const supportsCase = fmsTriggerSource(trigger.source.type)?.supportsCase || (trigger.source.type === "crm_linked_form" && trigger.source.purpose === "walkin");
+  // Forms built inside FMS steps belong to their workflow, not the Form Builder list (owner 2026-11-07); one already chosen stays visible.
+  const forms = useMemo(() => latestFormVersions(data.forms).filter((form) => !stepForms.has(form.family_id) || form.family_id === chosenFamily), [data.forms, stepForms, chosenFamily]);
+  const chooseForm = (familyId: string) => {
+    const form = forms.find((item) => item.family_id === familyId);
+    const source = familyId ? triggerSourceForForm(familyId, form?.id, crmForms) : { type: "jewelos_form" as const };
+    // A different event has different fields, so its conditions start fresh; the same event keeps them.
+    setTrigger((current) => {
+      if (current.source.type === source.type && current.source.formFamilyId === source.formFamilyId && current.source.purpose === source.purpose) return { ...current, source };
+      const next = { ...newFmsStartTrigger(source.type, newId), source };
+      // Switching an existing walk-in to its questions changes field references, not case policy
+      // or who receives the work. Old conditions/mappings/deadline fields must be configured anew.
+      return current.source.type === "crm_walkin" && source.type === "crm_linked_form" && source.purpose === "walkin"
+        ? { ...next, assignment: current.assignment, reentry: current.reentry, onCaseClosed: current.onCaseClosed, title: current.title?.prefix ? { prefix: current.title.prefix } : undefined }
+        : next;
+    });
+  };
   const firstIsStartForm = (definition.startMode ?? "form") === "form" && definition.stages[0]?.type === "form";
   return <Modal mobileFullscreen onClose={onClose} title="Start trigger" wide>
     <div className="space-y-5" data-testid="fms-start-trigger">
@@ -76,22 +130,18 @@ export function FmsStartTriggerPanel({ definition, data, flowId, onApply, onClos
       {mode === "automatic" ? <>
         <section className="space-y-3 rounded-2xl border border-gold/20 p-4">
           <h4 className="font-semibold text-white">When</h4>
-          <label className="block"><span className="label">Source</span>
-            <select aria-label="Trigger source" className="field" onChange={(event) => changeSource(event.target.value as FmsTriggerSourceType)} value={trigger.source.type}>
-              {FMS_TRIGGER_SOURCES.map((source) => <option key={source.type} value={source.type}>{source.label}</option>)}
+          <label className="block"><span className="label">Form</span>
+            <select aria-label="Trigger form" className="field" onChange={(event) => chooseForm(event.target.value)} value={chosenFamily}>
+              <option value="">Choose a form from the Form Builder</option>
+              {forms.map((form) => { const purpose = crmPurposeOfForm(form.family_id, crmForms); return <option key={form.family_id} value={form.family_id}>{form.name} (v{form.version}){purpose ? ` · ${CRM_FORM_NAMES[purpose]}` : ""}</option>; })}
             </select>
           </label>
-          {trigger.source.type === "jewelos_form" || trigger.source.type === "crm_linked_form" ? <label className="block"><span className="label">Form</span>
-            <select aria-label="Trigger form" className="field" onChange={(event) => { const form = forms.find((item) => item.family_id === event.target.value); setTrigger({ ...trigger, source: { ...trigger.source, formFamilyId: event.target.value || undefined, formTemplateId: form?.id } }); }} value={trigger.source.formFamilyId ?? ""}>
-              <option value="">Choose a published form</option>
-              {forms.map((form) => <option key={form.family_id} value={form.family_id}>{form.name} (v{form.version})</option>)}
-            </select>
-          </label> : null}
-          {trigger.source.type === "crm_linked_form" ? <label className="block"><span className="label">Linked to</span>
-            <select aria-label="CRM form purpose" className="field" onChange={(event) => setTrigger({ ...trigger, source: { ...trigger.source, purpose: event.target.value === "lead" ? "lead" : event.target.value === "queue" ? "queue" : undefined } })} value={trigger.source.purpose ?? ""}>
-              <option value="">Choose</option><option value="queue">Client queue registration</option><option value="lead">Lead registration</option>
-            </select>
-          </label> : null}
+          {chosenFamily && (trigger.source.type === "crm_walkin" || trigger.source.type === "crm_queue" || trigger.source.type === "crm_lead") ? <Notice>
+            <p>This saved trigger uses CRM summary fields. To use the published form's questions and choices, switch below and set its conditions again.</p>
+            <Button onClick={() => chooseForm(chosenFamily)} variant="secondary">Use this form's questions</Button>
+          </Notice> : null}
+          {!chosenFamily && (trigger.source.type === "crm_walkin" || trigger.source.type === "crm_queue" || trigger.source.type === "crm_lead")
+            ? <Notice>This start listens to every saved {fmsTriggerSource(trigger.source.type)?.label}. Link a Form Builder form for it in CRM Form Settings, or choose a form above.</Notice> : null}
           <p className="text-xs text-soft-grey">{fmsTriggerSource(trigger.source.type)?.event}. Only submissions saved after you publish can start this workflow.</p>
         </section>
 
@@ -108,8 +158,10 @@ export function FmsStartTriggerPanel({ definition, data, flowId, onApply, onClos
             <label className="block"><span className="label">First step goes to</span>
               <select aria-label="First step assignee" className="field" onChange={(event) => setTrigger({ ...trigger, assignment: { ...trigger.assignment, mode: event.target.value === "source_staff" ? "source_staff" : "stage_rules" } })} value={trigger.assignment.mode}>
                 <option value="stage_rules">The first step's own assignee</option>
-                <option value="source_staff">{trigger.source.type === "jewelos_form" ? "The person who submitted the form" : "The CRM salesperson of this entry"}</option>
+                <option value="source_staff">{fmsTriggerSourcePersonLabel(trigger.source.type)}</option>
               </select>
+              {trigger.assignment.mode === "source_staff" && trigger.source.type !== "jewelos_form" && trigger.source.type !== "crm_lead"
+                ? <span className="mt-1 block text-xs text-soft-grey">If the client has no CRM, the salesperson gets it. The person who gets it can hand it over to another CRM.</span> : null}
             </label>
             {trigger.assignment.mode === "source_staff" ? <label className="block"><span className="label">If that person is not an active JewelOS user</span>
               <select aria-label="When the person is not found" className="field" onChange={(event) => setTrigger({ ...trigger, assignment: { ...trigger.assignment, onUnresolved: event.target.value === "stage_rules" ? "stage_rules" : "review" } })} value={trigger.assignment.onUnresolved}>
@@ -119,11 +171,11 @@ export function FmsStartTriggerPanel({ definition, data, flowId, onApply, onClos
             <label className="block"><span className="label">First deadline from</span><FieldSelect ariaLabel="Deadline field" emptyLabel="The first step's own timing" fields={fields.filter((field) => field.type === "date")} onChange={(dueField) => setTrigger({ ...trigger, dueField })} value={trigger.dueField} /></label>
             <label className="block"><span className="label">Repeat submissions</span>
               <select aria-label="Repeat submissions" className="field" onChange={(event) => setTrigger({ ...trigger, reentry: event.target.value === "one_per_event" ? "one_per_event" : "one_active_per_case" })} value={trigger.reentry}>
-                <option value="one_active_per_case">{fmsTriggerSource(trigger.source.type)?.supportsCase ? "One open run per Not Bought case (or client)" : "One open run per client or record"}</option>
+                <option value="one_active_per_case">{supportsCase ? "One open run per Not Bought case (or client)" : "One open run per client or record"}</option>
                 <option value="one_per_event">A new run for every matching submission</option>
               </select>
             </label>
-            {trigger.source.type === "crm_walkin" ? <label className="block"><span className="label">When the CRM closes the follow-up case</span>
+            {supportsCase ? <label className="block"><span className="label">When the CRM closes the follow-up case</span>
               <select aria-label="When the case closes" className="field" onChange={(event) => setTrigger({ ...trigger, onCaseClosed: event.target.value === "cancel_run" ? "cancel_run" : "record_only" })} value={trigger.onCaseClosed}>
                 <option value="record_only">Note it on the open run (work continues)</option><option value="cancel_run">Cancel the open run</option>
               </select>

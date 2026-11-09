@@ -38,16 +38,36 @@ export function presentFmsWorkContext(context: FmsWorkContext) {
     if (value === undefined) { unresolved = true; return ""; }
     return value;
   }).trim();
-  return { title: normalizeRecordName(context.recordName) ?? (!unresolved && substituted ? substituted.slice(0, 250) : `${context.workflowName} — ${context.stageName}`),
+  const title = normalizeRecordName(context.recordName) ?? (!unresolved && substituted ? substituted.slice(0, 250) : fmsGenericWorkTitle(context.workflowName, context.stageName));
+  return { title, generic: title === fmsGenericWorkTitle(context.workflowName, context.stageName),
     reference, answers, instructions: context.instructions, expectedResult: context.expectedResult, shortDescription: context.shortDescription,
     dueAt: context.dueAt, dueLabel: context.dueLabel || "Due", assignedNames: context.assignedNames,
     journey: context.journey, nextCursor: context.nextCursor };
 }
 
-/** Keep configured wording, with a durable identifier for otherwise identical work. */
-export function fmsWorkTitle(title: string, reference: string): string {
+/** "Workflow — Step": the name used when nothing names the work (the database's fms_run_display_name matches it). */
+export function fmsGenericWorkTitle(workflowName: string, stageName: string): string {
+  return `${workflowName} — ${stageName}`;
+}
+
+/** "FMS-20261109-00001234" -> "#1234": short enough to read out to a colleague. */
+export function fmsShortReference(reference: string): string {
   const identifier = reference.trim();
-  return !identifier || title.includes(identifier) ? title : `${title} | ${identifier}`;
+  const digits = /(\d+)\D*$/.exec(identifier)?.[1];
+  return digits ? `#${digits.replace(/^0+(?=\d)/, "")}` : identifier;
+}
+
+/**
+ * The title people read. The long run reference never shows; it becomes a short number. A named
+ * title (a customer, an order) is shown as is. A generic "Workflow — Step" title gets the short
+ * number so two otherwise identical tasks can still be told apart.
+ */
+export function fmsWorkTitle(title: string, reference: string, generic = true): string {
+  const identifier = reference.trim();
+  if (!identifier) return title;
+  const short = fmsShortReference(identifier);
+  const shown = title.split(identifier).join(short).trim();
+  return !generic || shown.includes(short) ? shown || short : `${shown} · ${short}`;
 }
 
 /** Approval and deferred forms still need their server-authorized stage controls. */

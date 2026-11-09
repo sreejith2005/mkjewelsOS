@@ -2774,6 +2774,9 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       get_walkin_profile_defaults: { Args: { p_client_id: string }; Returns: Json }
+      archive_client: { Args: { p_client_id: string; p_reason: string }; Returns: undefined }
+      get_client_archive_state: { Args: { p_client_id: string }; Returns: Json }
+      restore_client: { Args: { p_client_id: string; p_reason?: string }; Returns: undefined }
       get_client_profile: {
         Args: { p_client_id: string }
         Returns: {

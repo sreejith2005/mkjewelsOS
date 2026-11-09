@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { ChevronRight, X } from "lucide-react";
 import {
   formatTaskPerformanceScore,
+  performanceAttentionOrder,
   performanceScores,
   TASK_DELAYED_SCORE_LABEL,
   TASK_PENDING_SCORE_LABEL,
@@ -24,6 +25,7 @@ function Count({ value, onClick, tone }: { value: number; onClick: () => void; t
 
 export function FmsPerformance({ flows, filter, onOpen }: { flows: PerformanceFlow[]; filter: PerformanceFilter; onOpen: Open }) {
   const [selected, setSelected] = useState<PerformanceFlow | null>(null);
+  const ranked = useMemo(() => performanceAttentionOrder(flows.map((flow) => ({ ...flow, employee_name: flow.flow_name }))), [flows]);
   if (!flows.length) return <p className="py-6 text-center text-sm text-task-text-muted">No FMS workflows with work in this scope.</p>;
   return (
     <div className="grid gap-4">
@@ -32,17 +34,17 @@ export function FmsPerformance({ flows, filter, onOpen }: { flows: PerformanceFl
           <thead className="bg-task-muted text-[0.6875rem] uppercase tracking-wider text-task-text-muted">
             <tr>
               {["FMS", "Step assignments", "Done", "Pending", "In progress", "Overdue", "On time", "Delayed", TASK_PENDING_SCORE_LABEL, TASK_DELAYED_SCORE_LABEL, ""].map((label, index) => (
-                <th className={`whitespace-nowrap px-2.5 py-2 font-semibold ${index > 0 ? "text-right" : ""}`} key={label || index} scope="col">{label}</th>
+                <th className={`whitespace-nowrap px-2.5 py-2 font-semibold ${index > 0 ? "text-right" : "sticky left-0 z-10 min-w-48 bg-task-muted"}`} key={label || index} scope="col">{label}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {flows.map((flow) => {
+            {ranked.map((flow) => {
               const d = performanceScores(flow);
               const open = (selector: PerformanceRecordSelector, label: string, count: number) => onOpen(selector, `${flow.flow_name} · ${label}`, count, flow.flow_id);
               return (
                 <tr className={`border-t border-task-border ${selected?.flow_id === flow.flow_id ? "bg-task-accent-soft/60" : "hover:bg-task-muted/60"}`} key={flow.flow_id}>
-                  <th className="px-2.5 py-2 text-left font-medium" scope="row">
+                  <th className="sticky left-0 z-10 min-w-48 max-w-64 bg-task-bg px-2.5 py-2 text-left font-medium" scope="row">
                     <button className="text-left hover:text-task-accent hover:underline" onClick={() => setSelected(flow)} type="button">{flow.flow_name}</button>
                     <span className="block text-[0.625rem] font-normal text-task-text-muted">{flow.visits} stage visit{flow.visits === 1 ? "" : "s"}</span>
                   </th>

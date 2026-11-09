@@ -189,3 +189,68 @@ export async function saveDepartmentPermissions(departmentId: string, changes: O
   const { error } = await db().rpc("save_department_permissions_with_audit", { p_department_id: departmentId, p_overrides: changes });
   if (error) throw error;
 }
+
+/** One employee in Users > Section access (all employees), migration 0393. */
+export type SectionAccessMatrixUser = Readonly<{
+  id: string;
+  employeeName: string;
+  employeeCode: string;
+  branchId: string | null;
+  departmentId: string | null;
+  accountStatus: string;
+  workingStatus: string;
+  effectiveRole: UserRole;
+  /** Saved individual choices; a missing key means Inherit. */
+  overrides: Readonly<Partial<Record<PermissionKey, PermissionEffect>>>;
+  /** What each section resolves to without the individual choice. */
+  inherited: Readonly<Partial<Record<PermissionKey, boolean>>>;
+}>;
+
+export type SectionAccessMatrix = Readonly<{ sections: readonly PermissionKey[]; users: readonly SectionAccessMatrixUser[] }>;
+
+export function parseSectionAccessMatrix(input: unknown): SectionAccessMatrix {
+  const value = asRecord(input);
+  const users = asArray(value.users).map(asRecord).flatMap((row): SectionAccessMatrixUser[] => {
+    const id = asString(row.id);
+    const employeeName = asString(row.employee_name);
+    if (!id || !employeeName || !isRole(row.effective_role)) return [];
+    const overrides: Partial<Record<PermissionKey, PermissionEffect>> = {};
+    for (const [key, effect] of Object.entries(asRecord(row.overrides))) if (isPermissionKey(key) && isEffect(effect)) overrides[key] = effect;
+    const inherited: Partial<Record<PermissionKey, boolean>> = {};
+    for (const [key, allowed] of Object.entries(asRecord(row.inherited))) if (isPermissionKey(key) && typeof allowed === "boolean") inherited[key] = allowed;
+    return [{
+      id, employeeName,
+      employeeCode: asString(row.employee_code) ?? "",
+      branchId: asString(row.branch_id),
+      departmentId: asString(row.department_id),
+      accountStatus: asString(row.account_status) ?? "",
+      workingStatus: asString(row.working_status) ?? "",
+      effectiveRole: row.effective_role,
+      overrides, inherited,
+    }];
+  });
+  return { sections: asArray(value.sections).filter(isPermissionKey), users };
+}
+
+export async function fetchSectionAccessMatrix(): Promise<SectionAccessMatrix> {
+  const { data, error } = await db().rpc("get_section_access_matrix");
+  if (error) throw error;
+  return parseSectionAccessMatrix(data);
+}
+
+/**
+ * Saves section choices for many employees: `{ profileId: { key: grant | deny | null } }`.
+ * Each batch of up to 500 employees is one transaction on the server (one refusal
+ * saves nothing in that batch); every employee gets its own audit row.
+ */
+export async function saveSectionAccessBulk(changes: Readonly<Record<string, OverrideChanges>>): Promise<number> {
+  const entries = Object.entries(changes).filter(([, value]) => Object.keys(value).length > 0);
+  let saved = 0;
+  for (let start = 0; start < entries.length; start += 500) {
+    const { data, error } = await db().rpc("save_section_access_bulk_with_audit", { p_changes: Object.fromEntries(entries.slice(start, start + 500)) });
+    if (error) throw error;
+    const count = asRecord(data).saved;
+    saved += typeof count === "number" ? count : 0;
+  }
+  return saved;
+}

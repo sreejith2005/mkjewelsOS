@@ -124,7 +124,7 @@ describe("guided form filling", () => {
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("button", { name: "Submit form" }));
 
-    expect(submitted).toEqual([{ name: "Synthetic Customer", phone: "9876543210", items: ["chain"], visit_date: "2026-10-22" }]);
+    expect(submitted).toEqual([{ name: "Synthetic Customer", phone: "+919876543210", items: ["chain"], visit_date: "2026-10-22" }]);
   }, 20000);
 
   it("keeps short forms on one page and marks required questions accessibly", () => {

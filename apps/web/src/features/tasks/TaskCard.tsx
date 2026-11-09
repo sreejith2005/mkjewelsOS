@@ -167,7 +167,7 @@ export function TaskCard({ management, capability, categoryLabel, onAction, task
         <StatusIcon className={cn("mt-0.5 size-5 shrink-0", completed ? "text-success" : blocked ? "text-task-warning" : overdue ? "text-task-overdue" : "text-task-accent")} />
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
-            <span className={cn("text-[15px] font-semibold leading-snug text-task-text sm:text-sm", completed && "line-through text-task-text-muted")}>{fmsWork && task.fmsWorkContext ? fmsWorkTitle(fmsWork.title, task.fmsWorkContext.reference) : task.title}</span>
+            <span className={cn("text-[15px] font-semibold leading-snug text-task-text sm:text-sm", completed && "line-through text-task-text-muted")}>{fmsWork && task.fmsWorkContext ? fmsWorkTitle(fmsWork.title, task.fmsWorkContext.reference, fmsWork.generic) : task.title}</span>
             <span className={cn("rounded-full border px-2 py-0.5 text-[11px] font-semibold sm:text-[10px]", completed ? "border-success/40 bg-success/10 text-success" : blocked ? "border-task-warning/50 bg-task-warning/10 text-task-text" : overdue ? "border-task-overdue/40 bg-task-overdue/10 text-task-overdue" : "border-task-border bg-task-muted text-task-text-muted")}>{statusLabel}</span>
             {capability.watcherLabel ? <span className="inline-flex items-center gap-1 rounded-full bg-task-accent-soft px-2 py-0.5 text-[11px] font-semibold sm:text-[10px] text-task-text"><Eye className="size-3" />{capability.watcherLabel}</span> : null}
             {task.task_type === "fms" ? <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[11px] font-semibold sm:text-[10px] text-gold-secondary">FMS</span> : null}

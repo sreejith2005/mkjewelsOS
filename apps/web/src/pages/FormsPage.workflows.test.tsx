@@ -35,7 +35,7 @@ describe("FMS workflow form library", () => {
     expect((await screen.findByRole("button", { name: /Sales/ })).getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByRole("heading", { name: "Step 1: Call" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Work and Upload" })).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Work and Upload" }));
+    await user.click(screen.getByRole("button", { name: "Versions and actions for Work and Upload" }));
     expect(screen.getByRole("button", { name: "Create new version" })).toBeTruthy();
     await user.selectOptions(screen.getByRole("combobox", { name: "Lifecycle filter" }), "draft");
     expect(await screen.findByText("No FMS workflow forms match. Forms built inside an FMS step appear here.")).toBeTruthy();

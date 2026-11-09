@@ -1,14 +1,28 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, Paperclip } from "lucide-react";
-import { describeFormRule, evaluateFormNavigation, displayFormAnswer, FORM_OTHER_MAX_LENGTH, formFieldAllowsOther, formOptionValues, reconcileFormPreviewAnswers, formCompletionProgress, formUsesSteps, isFinalFormStep, nextFormStepKey, normalizeFormAnswers, previousFormStepKey, resolveFormOptions, updateVisibleFormAnswers, validateCompleteForm, validateFormStep, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition, type FormValidationIssue, type FormCrmServices, clientDetailsForForm, formChoiceValueFromText, isClientPhoneQuestion, isPincodeQuestion } from "@jewelos/core";
+import { describeFormRule, formUserMatchesFilter, isCompletePhone, evaluateFormNavigation, displayFormAnswer, FORM_OTHER_MAX_LENGTH, formFieldAllowsOther, formOptionValues, reconcileFormPreviewAnswers, formCompletionProgress, formUsesSteps, isFinalFormStep, nextFormStepKey, normalizeFormAnswers, previousFormStepKey, resolveFormOptions, updateVisibleFormAnswers, validateCompleteForm, validateFormStep, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition, type FormValidationIssue, type FormCrmServices, clientDetailsForForm, formChoiceValueFromText, isClientPhoneQuestion, isPincodeQuestion } from "@jewelos/core";
 import { Button, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { signedFormFileUrl, uploadFormFile } from "./api";
 import { RatingField } from "./RatingField";
 import { CrmChoiceField, CrmPhotoField, RepeatField } from "./CrmQuestions";
 import { useFormCrmServices } from "./crmServicesContext";
+import { CrossLocationEmployeePicker } from "@/features/users/CrossLocationEmployeePicker";
+import { FormPhoneInput } from "./FormPhoneInput";
 
-export type DynamicOptions = { users: Array<{ id: string; label: string }>; branches: Array<{ id: string; label: string }>; departments: Array<{ id: string; branchId: string | null; label: string }>; masters: FormMasterOption[] };
+/**
+ * Choices for Users, branch and department questions. A person carries what a Users question's
+ * filter reads (migration 0391); older cached copies without those details simply match no
+ * attribute rule. `designations` and `franchises` are only needed by the form builder.
+ */
+export type DynamicOptions = {
+  users: Array<{ id: string; label: string; branchId?: string | null; departmentId?: string | null; designationId?: string | null; franchiseId?: string | null; role?: string | null }>;
+  branches: Array<{ id: string; label: string; franchiseId?: string | null }>;
+  departments: Array<{ id: string; branchId: string | null; label: string }>;
+  masters: FormMasterOption[];
+  designations?: Array<{ id: string; label: string }>;
+  franchises?: Array<{ id: string; label: string }>;
+};
 const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: [], masters: [] };
 const NUMBER_TYPES = new Set(["number", "currency", "rating"]);
 const SELECT_TYPES = new Set(["select", "user_dropdown", "branch_dropdown", "department_dropdown"]);
@@ -120,7 +134,8 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
   }), [dynamicOptions]);
   // People, branches and departments are always listed A to Z, whatever order they were loaded in.
   const sorted = useMemo(() => ({ users: byLabel(dynamicOptions.users), branches: byLabel(dynamicOptions.branches), departments: byLabel(dynamicOptions.departments) }), [dynamicOptions]);
-  const optionsFor = (type: string) => type === "user_dropdown" ? sorted.users : type === "branch_dropdown" ? sorted.branches : type === "department_dropdown" ? sorted.departments.filter((item) => !branchFieldKey || !answers[branchFieldKey] || item.branchId === answers[branchFieldKey]) : [];
+  // A Users question lists only the people its filter allows; the server refuses anyone else.
+  const optionsFor = (type: string, field?: FormFieldDefinition) => type === "user_dropdown" ? sorted.users.filter((person) => formUserMatchesFilter(field?.validation?.userFilter, person)) : type === "branch_dropdown" ? sorted.branches : type === "department_dropdown" ? sorted.departments.filter((item) => !branchFieldKey || !answers[branchFieldKey] || item.branchId === answers[branchFieldKey]) : [];
   const openOther = (key: string, open: boolean) => {
     setOtherOpen((current) => ({ ...current, [key]: open }));
     if (open) requestAnimationFrame(() => otherInputs.current.get(key)?.focus());
@@ -205,7 +220,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
       const raw = answers[field.key];
       const text = typeof raw === "string" ? raw.trim() : typeof raw === "number" ? String(raw) : "";
       const kind = isClientPhoneQuestion(field) ? "client_phone" as const : "pincode" as const;
-      const ready = kind === "pincode" ? /^\d{6}$/.test(text) : text.replace(/\D/g, "").length >= 10;
+      const ready = kind === "pincode" ? /^\d{6}$/.test(text) : isCompletePhone(text);
       if (!ready || lookedUp.current.get(field.key) === text) continue;
       timers.push(window.setTimeout(() => {
         lookedUp.current.set(field.key, text);
@@ -256,6 +271,10 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
     if (field.type === "crm_photo") return shell(<div><QuestionText field={field} id={labelId} />{helper}
       <CrmPhotoField crm={crm} describedBy={describedBy} disabled={disabled || preview} field={field} onBusyChange={(busy) => setUploadsBusy((count) => Math.max(0, count + (busy ? 1 : -1)))} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} value={value} />{errorText}
     </div>);
+    // A Users question that allows other locations: Location -> Store -> Employee (migration 0386).
+    if (field.type === "user_dropdown" && field.assignmentScope === "cross_location") return shell(<div><QuestionText field={field} id={labelId} />{helper}
+      <CrossLocationEmployeePicker context={templateId && !preview ? { kind: "form", formTemplateId: templateId, fieldKey: field.key } : null} describedBy={describedBy} disabled={disabled} knownNames={sorted.users} labelledBy={labelId} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} value={typeof value === "string" ? value : ""} />{errorText}
+    </div>);
     const crmChoices = field.type === "text" ? crm?.choices?.(field.key) ?? null : null;
     if (crmChoices) return shell(<label className="block"><span className="mb-1.5 block"><QuestionText field={field} /></span>{helper}
       <CrmChoiceField aria={aria} choices={crmChoices} disabled={disabled} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} value={value} />{errorText}
@@ -263,7 +282,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
     if (field.type === "file") return shell(<div><QuestionText field={field} id={labelId} />{helper}
       <FileFieldControl preview={preview} describedBy={describedBy} disabled={disabled} field={field} labelledBy={labelId} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} templateId={templateId} value={answers[field.key]} />{errorText}
     </div>);
-    const dynamic = optionsFor(field.type); const staticOptions = field.options ?? [];
+    const dynamic = optionsFor(field.type, field); const staticOptions = field.options ?? [];
     const checkboxOptions = staticOptions.length ? staticOptions : dynamic.map((option) => ({ value: option.id, label: option.label }));
     // Multi-answer questions are a tappable list on every device: a native multi-select is unusable on Android.
     if ((field.type === "checkbox" && checkboxOptions.length) || field.type === "multiselect") {
@@ -305,7 +324,9 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
         {otherChosen ? <OtherAnswerInput disabled={disabled} inputRef={otherFocusRef(field.key)} label={field.label} onChange={(text) => set(field.key, text)} value={otherText} /> : null}</>
       : field.type === "checkbox" ? <span className={OPTION_ROW}><input {...aria} checked={value === true} disabled={disabled} onChange={(event) => set(field.key, event.target.checked)} ref={register(field.key)} type="checkbox" /><span>{field.placeholder ?? "Yes"}</span></span>
       : field.type === "currency" ? <span className="relative block"><span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-task-text-muted">₹</span><input {...aria} className="field pl-7" disabled={disabled} inputMode="decimal" onChange={onText} placeholder={field.placeholder} ref={register(field.key)} step="any" type="number" value={textValue} /></span>
-      : <input {...aria} autoComplete={field.type === "phone" ? "tel" : field.type === "email" ? "email" : undefined} className="field" disabled={disabled} inputMode={inputMode} maxLength={field.validation?.maxLength} onChange={onText} placeholder={field.placeholder} ref={register(field.key)} step={NUMBER_TYPES.has(field.type) ? "any" : undefined} type={inputType} value={textValue} />;
+      : <input {...aria} autoComplete={field.type === "email" ? "email" : undefined} className="field" disabled={disabled} inputMode={inputMode} maxLength={field.validation?.maxLength} onChange={onText} placeholder={field.placeholder} ref={register(field.key)} step={NUMBER_TYPES.has(field.type) ? "any" : undefined} type={inputType} value={textValue} />;
+    // Phone: country code + number. Not wrapped in <label>, which would name the country picker; the number is named by the question.
+    if (field.type === "phone") return shell(<div><span className="mb-1.5 block"><QuestionText field={field} id={labelId} /></span>{helper}<FormPhoneInput disabled={disabled} inputProps={{ ...aria, "aria-labelledby": labelId, placeholder: field.placeholder }} inputRef={register(field.key)} label={field.label} onChange={(next) => set(field.key, next)} value={typeof value === "string" ? value : ""} />{autoFilled.has(field.key) ? <span className="mt-1.5 block text-xs font-medium text-gold-secondary">Auto-filled from client history — editable</span> : null}{errorText}</div>);
     return shell(<label className="block"><span className="mb-1.5 block"><QuestionText field={field} /></span>{helper}{control}{autoFilled.has(field.key) ? <span className="mt-1.5 block text-xs font-medium text-gold-secondary">Auto-filled from client history — editable</span> : null}{errorText}</label>);
   };
 

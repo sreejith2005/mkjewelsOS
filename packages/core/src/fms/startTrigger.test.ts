@@ -68,6 +68,10 @@ describe("condition groups", () => {
 });
 
 describe("validation", () => {
+  it("accepts walk-in linked form questions just like lead and queue questions", () => {
+    const trigger = { ...newFmsStartTrigger("crm_linked_form", id), source: { type: "crm_linked_form" as const, formFamilyId: "11111111-1111-4111-8111-111111111111", purpose: "walkin" as const }, conditions: { id: "g", kind: "group" as const, combinator: "and" as const, enabled: true, children: [{ id: "r", kind: "rule" as const, field: "visit_status", operator: "equals" as const, value: "repair_placed", enabled: true }] } };
+    expect(validateFmsStartTrigger(trigger, [{ key: "visit_status", label: "Client bought any product?", type: "choice", options: [{ value: "repair_placed", label: "REPAIR PLACED" }] }], "task")).toEqual([]);
+  });
   const notBought = newFmsStartTrigger("crm_walkin", id);
   it("accepts the default Not Bought trigger", () => {
     expect(validateFmsStartTrigger(notBought, walkin.fields, "task")).toEqual([]);

@@ -37,7 +37,7 @@ describe("CRM questions in a form CRM opens", () => {
     render(<FormRenderer crm={crm} definition={definition} onSubmit={onSubmit} submitLabel="Submit complete visit" />);
 
     fireEvent.change(screen.getByLabelText(/^Mobile/), { target: { value: "9876543210" } });
-    await waitFor(() => expect(crm.lookup).toHaveBeenCalledWith("client_phone", "9876543210"), { timeout: 2000 });
+    await waitFor(() => expect(crm.lookup).toHaveBeenCalledWith("client_phone", "+919876543210"), { timeout: 2000 });
     await waitFor(() => expect((screen.getByLabelText(/^Client name/) as HTMLInputElement).value).toBe("Asha"));
     expect((screen.getByLabelText(/^Gender/) as HTMLSelectElement).value).toBe("female");
     expect(screen.getAllByText("Auto-filled from client history — editable")).toHaveLength(2);
@@ -95,7 +95,7 @@ describe("CRM questions in a form CRM opens", () => {
     fireEvent.change(screen.getByLabelText("City"), { target: { value: "Thrissur" } });
     fireEvent.change(screen.getByLabelText("Phone number"), { target: { value: "+91 98765 43210" } });
     await waitFor(() => expect((screen.getByLabelText(/^Customer name/) as HTMLInputElement).value).toBe("Asha"), { timeout: 2000 });
-    expect(lookup).toHaveBeenCalledWith("client_phone", "+91 98765 43210");
+    expect(lookup).toHaveBeenCalledWith("client_phone", "+919876543210");
     expect((screen.getByLabelText(/^City/) as HTMLInputElement).value).toBe("Thrissur");
   });
 

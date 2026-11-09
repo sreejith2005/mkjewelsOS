@@ -108,11 +108,12 @@ it("labels due times relative to today in the company timezone", () => {
   expect(dueLabel(null, "Asia/Kolkata", now)).toBe("No due time");
 });
 
-it("distinguishes otherwise identical FMS actions by their persisted reference", () => {
-  const stages = ["FMS-41", "FMS-42"].map((reference_number, index) => ({ stage_id: `visit-${index}`, instance_id: `instance-${index}`, form_template_id: "form", form_name: "Call form", reference_number, instance_title: "Instagram leads", stage_name: "Introduction call", status: "pending", planned_datetime: null, sla_breached: false }));
+it("distinguishes otherwise identical FMS actions by a short number, never the long reference", () => {
+  const stages = ["FMS-20261109-00000041", "FMS-20261109-00000042"].map((reference_number, index) => ({ stage_id: `visit-${index}`, instance_id: `instance-${index}`, form_template_id: "form", form_name: "Call form", reference_number, instance_title: "Instagram leads", stage_name: "Introduction call", status: "pending", planned_datetime: null, sla_breached: false }));
   summary.fms_stages = stages;
   render(<HomeView onNavigate={vi.fn()} />);
-  expect(screen.getByText("Instagram leads - Introduction call | FMS-41")).toBeTruthy();
-  expect(screen.getByText("Instagram leads - Introduction call | FMS-42")).toBeTruthy();
+  expect(screen.getByText("Instagram leads — Introduction call · #41")).toBeTruthy();
+  expect(screen.getByText("Instagram leads — Introduction call · #42")).toBeTruthy();
+  expect(screen.queryByText(/FMS-2026/)).toBeNull();
   summary.fms_stages = [];
 });

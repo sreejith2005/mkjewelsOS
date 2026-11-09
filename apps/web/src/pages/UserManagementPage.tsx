@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { hasPermission,
   ADMIN_SET_PASSWORD_LENGTH,
+  userFormLocationChoices,
+  type MyOrgScope,
   eligibleBuddies,
   USER_ROLES,
   validateAdminSetPassword,
@@ -55,7 +57,14 @@ export type Data = {
   branches: Branch[];
   departments: Department[];
   dropdowns: DropdownMaster[];
+  /** Franchise groups (0385); empty until the owner creates them. */
+  franchises?: { id: string; name: string; is_active: boolean }[];
+  /** The caller's own scope snapshot; shapes choices only, the server decides. */
+  scope?: MyOrgScope | null;
 };
+
+/** Select value for stores not yet mapped to a franchise. */
+const UNMAPPED = "__unmapped__";
 const EMPTY: Data = {
   profiles: [],
   branches: [],
@@ -103,7 +112,7 @@ export function EditUser({
     window.dispatchEvent(new PopStateEvent("popstate"));
     onClose();
   };
-  const canManage = hasPermission(access, "users.manage");
+  const canManage = hasPermission(access, "users.manage") || hasPermission(access, "users.manage_scoped");
   const [draft, setDraft] = useState({
     employee_name: user.employee_name,
     employee_code: user.employee_code,
@@ -139,6 +148,13 @@ export function EditUser({
     (department) =>
       !department.branch_id || department.branch_id === draft.branch_id,
   );
+  // A franchise change is the separate, audited transfer (Franchises panel); here
+  // the store list stays inside the employee's current franchise.
+  const currentFranchiseId = data.branches.find((item) => item.id === user.branch_id)?.franchise_group_id ?? null;
+  const currentFranchiseName = data.franchises?.find((item) => item.id === currentFranchiseId)?.name ?? null;
+  const editableBranches = currentFranchiseId
+    ? data.branches.filter((item) => item.franchise_group_id === currentFranchiseId)
+    : data.branches;
   const set = <K extends keyof typeof draft>(
     key: K,
     value: (typeof draft)[K],
@@ -267,6 +283,11 @@ export function EditUser({
               onChange={(event) => set("personal_mobile", event.target.value)}
             />
           </Field>
+          {currentFranchiseName ? (
+            <Field label="Franchise">
+              <input className="field" disabled value={currentFranchiseName} />
+            </Field>
+          ) : null}
           <Field label="Branch">
             <select
               className="field"
@@ -279,7 +300,7 @@ export function EditUser({
                 set("reports_to_user_id", "");
               }}
             >
-              {data.branches.map((item) => (
+              {editableBranches.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name}
                 </option>
@@ -524,6 +545,9 @@ export function AddUserForm({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [created, setCreated] = useState(false);
+  const { access } = useAuth();
+  // Scoped managers (users.manage_scoped only) create ordinary employees; the server refuses administrators.
+  const fullUserManagement = hasPermission(access, "users.manage");
   const errorRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (error) errorRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" }); }, [error]);
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
@@ -531,6 +555,31 @@ export function AddUserForm({
   const departments = data.departments.filter(
     (item) => !item.branch_id || item.branch_id === form.branch_id,
   );
+  const location = useMemo(
+    () => userFormLocationChoices(data.branches, data.franchises ?? [], data.scope ?? null),
+    [data.branches, data.franchises, data.scope],
+  );
+  const showFranchise = (data.franchises?.length ?? 0) > 0;
+  const initialFranchise = location.lockedFranchiseId !== undefined
+    ? location.lockedFranchiseId
+    : location.franchises.length === 1 ? location.franchises[0]!.id : undefined;
+  const [franchiseKey, setFranchiseKey] = useState<string>(
+    initialFranchise === undefined ? "" : initialFranchise ?? UNMAPPED,
+  );
+  const stores = useMemo(
+    () => (showFranchise && franchiseKey ? location.storesOf(franchiseKey === UNMAPPED ? null : franchiseKey) : []),
+    [showFranchise, franchiseKey, location],
+  );
+  // One store in the chosen franchise (for example a Store Manager's own store) is chosen for them.
+  useEffect(() => {
+    if (showFranchise && stores.length === 1 && form.branch_id !== stores[0]!.id) {
+      setForm((current) => ({ ...current, branch_id: stores[0]!.id, department_id: "", buddy_id: "", secondary_buddy_id: "", reports_to_user_id: "" }));
+    }
+  }, [showFranchise, stores, form.branch_id]);
+  const chooseFranchise = (value: string) => {
+    setFranchiseKey(value);
+    setForm((current) => ({ ...current, branch_id: "", department_id: "", buddy_id: "", secondary_buddy_id: "", reports_to_user_id: "" }));
+  };
   const buddies = eligibleBuddies(data.profiles, {
     branchId: form.branch_id,
     departmentId: form.department_id,
@@ -628,9 +677,28 @@ export function AddUserForm({
               onChange={(event) => set("last_name", event.target.value)}
             />
           </Field>
-          <Field label="Branch">
+          {showFranchise ? (
+            <Field label="Franchise / location">
+              <select
+                className="field"
+                disabled={location.lockedFranchiseId !== undefined}
+                required
+                value={franchiseKey}
+                onChange={(event) => chooseFranchise(event.target.value)}
+              >
+                <option value="">Select</option>
+                {location.franchises.map((item) => (
+                  <option key={item.id ?? UNMAPPED} value={item.id ?? UNMAPPED}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
+          <Field label={showFranchise ? "Store / branch" : "Branch"}>
             <select
               className="field"
+              disabled={showFranchise && !franchiseKey}
               required
               value={form.branch_id}
               onChange={(event) => {
@@ -641,8 +709,8 @@ export function AddUserForm({
                 set("reports_to_user_id", "");
               }}
             >
-              <option value="">Select</option>
-              {data.branches.map((item) => (
+              <option value="">{showFranchise && !franchiseKey ? "Choose a franchise first" : "Select"}</option>
+              {(showFranchise ? stores : data.branches).map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name}
                 </option>
@@ -799,7 +867,7 @@ export function AddUserForm({
             >
               {(role === "super_admin"
                 ? USER_ROLES
-                : USER_ROLES.filter((item) => item !== "super_admin")
+                : USER_ROLES.filter((item) => item !== "super_admin" && (fullUserManagement || item !== "admin"))
               ).map((item) => (
                 <option key={item} value={item}>
                   {titleCase(item)}

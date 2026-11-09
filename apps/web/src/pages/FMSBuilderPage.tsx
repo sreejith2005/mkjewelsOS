@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, BarChart3, GitBranch, History, ListChecks, Pause, Pencil, Play, Plus, RotateCcw, Search, Settings2, Trash2, Zap } from "lucide-react";
+import { ArrowLeft, BarChart3, Eye, GitBranch, History, ListChecks, Pause, Pencil, Play, Plus, RotateCcw, Search, Settings2, Trash2, UserCog, Zap } from "lucide-react";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
 import { ActionMenu, type ActionMenuItem } from "@/components/ActionMenu";
@@ -22,11 +22,13 @@ import {
   type FmsFlowRow,
 } from "@/features/fms/api";
 import { FmsFlowBuilder } from "@/features/fms/FmsFlowBuilder";
+import { FmsFlowAccessDialog } from "@/features/fms/FmsFlowAccessDialog";
+import { loadMyFmsFlowAccess } from "@/features/fms/flowAccessApi";
 import { FmsManualStart } from "@/features/fms/FmsManualStart";
 import { FmsTriggerHistory } from "@/features/fms/FmsTriggerHistory";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
 import { FMSTasksPage } from "./FMSTasksPage";
-import { FMS_TERMINAL_OUTCOME_LABELS, fmsTaskBoardPath, hasPermission, parseFmsAssignedWorkPath, type FmsLibraryOutcome } from "@jewelos/core";
+import { FMS_TERMINAL_OUTCOME_LABELS, fmsFlowCapabilities, fmsTaskBoardPath, hasPermission, parseFmsAssignedWorkPath, type FmsFlowAccessLevel, type FmsFlowCapabilities, type FmsLibraryOutcome } from "@jewelos/core";
 import { loadFmsLibraryOutcomes } from "@jewelos/data/fms/outcomes";
 
 type FlowState = "live" | "paused" | "draft" | "archived";
@@ -71,6 +73,11 @@ export function FMSBuilderPage() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [edit, setEdit] = useState<FmsFlowRow | null | undefined>();
+  /** What the open workflow allows: builders get everything, others their per-workflow grant (migration 0390). */
+  const [editCaps, setEditCaps] = useState<FmsFlowCapabilities>(() => fmsFlowCapabilities(true, null));
+  // Per-workflow grants of the signed-in person; builders do not need them. Missing on error = no extra access.
+  const [myAccess, setMyAccess] = useState<ReadonlyMap<string, FmsFlowAccessLevel>>(new Map());
+  const [accessFor, setAccessFor] = useState<FmsFlowRow | null>(null);
   const [tasksFor, setTasksFor] = useState<FlowFamily | "all" | null>(() => parseFmsAssignedWorkPath(window.location.href) ? "all" : null);
   // A work link opens that run directly.
   const [linkedInstanceId] = useState(() => { const link = parseFmsAssignedWorkPath(window.location.href); return link && "instanceId" in link ? link.instanceId : ""; });
@@ -83,6 +90,8 @@ export function FMSBuilderPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [manualStart, setManualStart] = useState<FmsFlowRow | null>(null);
   useEffect(() => { if (canManage) void loadFmsAiSettings().then(setAiSettings); }, [canManage]);
+  useEffect(() => { if (!canManage) void loadMyFmsFlowAccess().then(setMyAccess).catch(() => setMyAccess(new Map())); }, [canManage]);
+  const capsFor = useCallback((familyId: string) => fmsFlowCapabilities(canManage, myAccess.get(familyId)), [canManage, myAccess]);
 
   const refresh = useCallback(async () => {
     const request = ++refreshRequest.current;
@@ -114,6 +123,7 @@ export function FMSBuilderPage() {
   const closeBuilder = () => { editorOpen.current = false; ++builderRequest.current; setEdit(undefined); setBuilderData(undefined); };
   const openBuilder = async (flow: FmsFlowRow | null) => {
     const request = ++builderRequest.current;
+    setEditCaps(flow ? capsFor(flow.family_id) : fmsFlowCapabilities(canManage, null));
     editorOpen.current = false;
     setError(null); setBuilderData(undefined); setEdit(flow);
     try {
@@ -179,7 +189,7 @@ export function FMSBuilderPage() {
       const builder = await loadFmsBuilderData();
       if (request !== builderRequest.current) return;
       const draft = builder.flows.find((item) => item.id === draftId);
-      if (draft) { editorOpen.current = true; setBuilderData(builder); setEdit(draft); }
+      if (draft) { editorOpen.current = true; setEditCaps(capsFor(draft.family_id)); setBuilderData(builder); setEdit(draft); }
     });
   };
 
@@ -241,8 +251,8 @@ export function FMSBuilderPage() {
   if (edit !== undefined) return (
     <section>
       {/* The builder carries its own Back to FMS control in its toolbar and details screen. */}
-      {builderData ? <FmsFlowBuilder data={builderData} flow={edit} canManageForms={hasPermission(access, "forms.manage")} onClose={closeBuilder} onSaved={refresh}
-        {...(aiSettings && aiEnabled ? { ai: { settings: aiSettings, published: publishedFor(edit) } } : {})} />
+      {builderData ? <FmsFlowBuilder canPublish={editCaps.publish} data={builderData} flow={edit} canManageForms={hasPermission(access, "forms.manage") && editCaps.edit} onClose={closeBuilder} onSaved={refresh} readOnly={!editCaps.edit}
+        {...(aiSettings && aiEnabled && editCaps.edit ? { ai: { settings: aiSettings, published: publishedFor(edit) } } : {})} />
         : <><Button onClick={closeBuilder} variant="ghost"><ArrowLeft className="size-4" />Back to FMS</Button><p role="status" className="p-4 text-soft-grey">Loading workflow editor...</p></> }
     </section>
   );
@@ -259,7 +269,7 @@ export function FMSBuilderPage() {
   );
 
   return (
-    <section className="mx-auto w-full max-w-[110rem] space-y-4">
+    <section className="w-full space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <span className="rounded-xl bg-gold-sheen p-2.5 text-on-gold shadow-gold"><GitBranch className="size-5" /></span>
@@ -275,6 +285,7 @@ export function FMSBuilderPage() {
         </div> : null}
       </header>
       {historyOpen ? <FmsTriggerHistory onClose={() => setHistoryOpen(false)} /> : null}
+      {accessFor ? <FmsFlowAccessDialog currentUserId={profile?.id} flowId={accessFor.id} onClose={() => setAccessFor(null)} people={data?.users ?? []} workflowName={accessFor.name} /> : null}
       {manualStart ? <FmsManualStart flow={manualStart} onClose={() => setManualStart(null)} onStarted={() => void refresh()} /> : null}
       {aiSettingsOpen && aiSettings ? <FmsAiSettingsDialog onClose={() => setAiSettingsOpen(false)} onSaved={setAiSettings} settings={aiSettings} /> : null}
 
@@ -304,11 +315,8 @@ export function FMSBuilderPage() {
       {!data ? <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3"><div className="skeleton h-48 rounded-2xl" /><div className="skeleton h-48 rounded-2xl" /></div>
         : filter === "mine" && !countsAvailable ? outcomesPending ? <p role="status" className="p-4 text-soft-grey">Loading assigned workflow counts...</p> : <Notice>Workflow counts are unavailable. <button className="underline" onClick={() => void refresh()} type="button">Retry</button></Notice>
         : visible.length === 0 ? <Notice>No workflows match this view.{canManage ? " Create one with New workflow." : ""}</Notice>
-        : <div className="-mx-4 border-y border-task-border bg-task-bg sm:-mx-6">
-          <div aria-hidden className="hidden grid-cols-[minmax(0,1fr)_7.5rem_minmax(14rem,0.8fr)_auto] gap-4 border-b border-task-border bg-task-muted px-6 py-2 text-xs font-semibold uppercase tracking-wide text-task-text-muted lg:grid">
-            <span>Workflow</span><span>Status</span><span>Runs</span><span className="text-right">Actions</span>
-          </div>
-          <ul className="divide-y divide-task-border">
+        : <div className="min-h-[calc(100dvh-17rem)] rounded-2xl border border-task-border bg-task-bg p-4">
+          <ul className="grid items-start gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {visible.map((family) => {
             const flow = family.primary;
             const state = flowState(flow);
@@ -318,21 +326,25 @@ export function FMSBuilderPage() {
             const older = family.versions.filter((item) => item.id !== flow.id && item.id !== draft?.id);
             const historyOpen = openHistory === family.key;
             const canStart = flow.start_mode === "manual" && flow.status === "published" && flow.is_active;
+            const caps = capsFor(family.key);
             // One row per workflow: name and a short description, status, run counts, then the
             // actions in a fixed place. Less frequent actions sit in the row's "⋯" menu.
-            const more: ActionMenuItem[] = canManage ? [
-              ...(flow.status === "published" ? [{ label: flow.is_active ? "Pause" : "Resume", icon: flow.is_active ? Pause : Play, onSelect: () => toggleActive(flow), disabled: busy }] : []),
+            const more: ActionMenuItem[] = [
+              ...(caps.publish && flow.status === "published" ? [{ label: flow.is_active ? "Pause" : "Resume", icon: flow.is_active ? Pause : Play, onSelect: () => toggleActive(flow), disabled: busy }] : []),
+              ...(canManage ? [{ label: "Access", icon: UserCog, onSelect: () => setAccessFor(flow) }] : []),
+              ...(canManage ? [
               ...(state === "archived" ? [{ label: "Restore", icon: RotateCcw, onSelect: () => void run(flow.id, () => restoreFmsFlow(flow.id)), disabled: busy }] : []),
               ...(older.length ? [{ label: historyOpen ? "Hide version history" : `Version history (${older.length})`, icon: History, onSelect: () => setOpenHistory(historyOpen ? null : family.key) }] : []),
               { label: `Delete ${flow.name}`, icon: Trash2, onSelect: () => removeWorkflow(family), disabled: busy, danger: true },
-            ] : [];
+              ] : []),
+            ];
             return (
               <li key={family.key}>
-                <article aria-label={flow.name} className="grid gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-gold/5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_7.5rem_minmax(14rem,0.8fr)_auto] lg:items-center">
+                <article aria-label={flow.name} className="flex h-full min-w-0 flex-col gap-4 rounded-xl border border-task-border p-4 transition-colors hover:border-gold/50">
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2">
-                      <h2 className="min-w-0 truncate text-[15px] font-semibold leading-snug text-white" title={flow.name}>{flow.name}</h2>
-                      <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase lg:hidden ${STATE_STYLES[state]}`}>{state}</span>
+                      <h2 className="min-w-0 break-words text-[15px] font-semibold leading-snug text-white" title={flow.name}>{flow.name}</h2>
+                      <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase ${STATE_STYLES[state]}`}>{state}</span>
                     </div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-soft-grey">
                       {flow.start_mode === "automatic" ? <span className="inline-flex items-center gap-1 text-gold-secondary"><Zap className="size-3" />Starts automatically</span> : flow.start_mode === "manual" ? <span className="text-gold-secondary">Manual start</span> : null}
@@ -341,19 +353,20 @@ export function FMSBuilderPage() {
                     </div>
                     <FlowDescription text={flow.description} />
                   </div>
-                  <div className="hidden lg:block"><span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase ${STATE_STYLES[state]}`}>{state}</span></div>
+                  <div className="hidden"><span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase ${STATE_STYLES[state]}`}>{state}</span></div>
                   <dl aria-busy={outcomesPending} aria-label={`${flow.name} counts`} className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
                     {([["Running", counts.running, "text-gold-secondary"], [FMS_TERMINAL_OUTCOME_LABELS.won, counts.won, "text-success"], [FMS_TERMINAL_OUTCOME_LABELS.lost, counts.lost, "text-danger"], ["Other endings", counts.other, "text-champagne"]] as const).map(([label, value, tone]) =>
                       <div className={`flex gap-1 ${tone}`} key={label}><dt className="text-soft-grey">{label}</dt><dd className="font-semibold tabular-nums">{countsAvailable ? value : outcomesPending ? "…" : "—"}</dd></div>)}
                   </dl>
-                  <div className="flex flex-wrap items-center gap-1.5 lg:flex-nowrap lg:justify-end">
+                  <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-task-border pt-3">
                     {/* Managers: Tasks opens the stage board, Runs the run list. Staff: Tasks keeps the run list as before. */}
                     {canStart ? <Button className="min-h-10 px-3" onClick={() => setManualStart(flow)}><Play className="size-4" />Start</Button> : null}
                     <Button className="min-h-10 px-3" onClick={() => canSeeTeam ? openUrl(fmsTaskBoardPath(family.key)) : setTasksFor(family)} variant="secondary"><ListChecks className="size-4" />Tasks{countsAvailable && counts.mine ? ` (${counts.mine})` : ""}</Button>
                     {canSeeTeam ? <Button className="min-h-10 px-3" onClick={() => setTasksFor(family)} variant="secondary"><BarChart3 className="size-4" />Runs</Button> : null}
-                    {canManage && draft ? <Button className="min-h-10 px-3" disabled={busy} onClick={() => void openBuilder(draft)} variant="secondary"><Pencil className="size-4" />Edit draft</Button> : null}
-                    {canManage && !draft && flow.status !== "draft" ? <Button className="min-h-10 px-3" disabled={busy} onClick={() => void revise(flow)} variant="secondary"><Pencil className="size-4" />New version</Button> : null}
-                    <ActionMenu className="ml-auto lg:ml-0" items={more} label={`More actions for ${flow.name}`} />
+                    {caps.edit && draft ? <Button className="min-h-10 px-3" disabled={busy} onClick={() => void openBuilder(draft)} variant="secondary"><Pencil className="size-4" />Edit draft</Button> : null}
+                    {caps.view && !caps.edit ? <Button className="min-h-10 px-3" disabled={busy} onClick={() => void openBuilder(draft ?? flow)} variant="secondary"><Eye className="size-4" />View workflow</Button> : null}
+                    {caps.edit && !draft && flow.status !== "draft" ? <Button className="min-h-10 px-3" disabled={busy} onClick={() => void revise(flow)} variant="secondary"><Pencil className="size-4" />New version</Button> : null}
+                    {more.length ? <ActionMenu className="ml-auto lg:ml-0" items={more} label={`More actions for ${flow.name}`} /> : null}
                   </div>
                   {canManage && older.length && historyOpen ? (
                     <div className="rounded-xl bg-task-muted/60 px-3 py-2 lg:col-span-4">

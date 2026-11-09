@@ -1,5 +1,6 @@
 /**
- * The desktop sidebar is a hamburger: choosing a section closes it. A deploy can
+ * The desktop sidebar toggles between names and an icon rail; choosing a section shrinks it
+ * to icons (MK1 audit 2026-11-07, previously it hid completely). A deploy can
  * make the next page chunk stale, and `lazyPage` then reloads the browser; the
  * open/closed choice is kept for the browser session so that reload does not
  * reopen it. Storage is a convenience only, so any failure means "open".
