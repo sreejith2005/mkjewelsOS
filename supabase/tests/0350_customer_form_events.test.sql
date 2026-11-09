@@ -2,6 +2,10 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions;
 select no_plan();
+-- Migration 0397 withdrew settings.manage_organization from Admin by default; this test keeps an Admin as the integration administrator.
+update permission_catalog set default_roles = array_append(default_roles, 'admin') where key = 'settings.manage_organization' and not ('admin' = any(default_roles));
+-- Migration 0397 withdrew forms.manage from Admin by default; this test keeps an Admin as the form author.
+update permission_catalog set default_roles = array_append(default_roles, 'admin') where key = 'forms.manage' and not ('admin' = any(default_roles));
 -- Schema-only validation DB: seed the maintained catalog row, never bypass the resolver.
 insert into permission_catalog(key,kind,page_id,default_roles,sort_order) values('forms.manage','action',null,'{super_admin,admin,manager}',110) on conflict do nothing;
 select has_table('crm_sync','customer_events','customer events are persisted');

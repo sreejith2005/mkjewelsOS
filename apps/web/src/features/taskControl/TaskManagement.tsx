@@ -4,8 +4,11 @@ import type { Tables } from "@jewelos/core";
 import { Notice } from "@/components/ui";
 import { TaskAdminControls } from "@/features/tasks/TaskAdminControls";
 
-/** Fetch current editable fields only when a filtered task is selected. RLS applies. */
-export function TaskManagement({ taskId, onChanged, initialMode = null }: Readonly<{ taskId: string; onChanged: () => Promise<void>; initialMode?: "delete" | null }>) {
+/**
+ * Fetch current editable fields only when a filtered task is selected. RLS applies.
+ * canDelete: the viewer holds tasks.delete (migration 0397); the server re-checks.
+ */
+export function TaskManagement({ taskId, onChanged, initialMode = null, canDelete = false }: Readonly<{ taskId: string; onChanged: () => Promise<void>; initialMode?: "delete" | null; canDelete?: boolean }>) {
   const [result, setResult] = useState<{ id: string; task: Tables<"task_instances"> | null; error: string | null } | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -21,5 +24,5 @@ export function TaskManagement({ taskId, onChanged, initialMode = null }: Readon
   }, [taskId]);
   if (!result || result.id !== taskId) return <p role="status">Loading task…</p>;
   if (result.error) return <Notice tone="danger">{result.error}</Notice>;
-  return result.task ? <TaskAdminControls embedded initialMode={initialMode} key={taskId} task={result.task} onChanged={onChanged} /> : null;
+  return result.task ? <TaskAdminControls canDelete={canDelete} embedded initialMode={initialMode} key={taskId} task={result.task} onChanged={onChanged} /> : null;
 }

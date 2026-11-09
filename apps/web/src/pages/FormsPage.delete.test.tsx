@@ -15,7 +15,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/auth/AuthContext", async () => {
   const { builtinAccessContext } = await vi.importActual<typeof import("@jewelos/core")>("@jewelos/core");
-  const profile = { id: "admin", tenant_id: "tenant", user_role: "admin" } as UserProfile;
+  // Migration 0397: building forms and FMS workflows is Super Admin's by default (Admin views only).
+  const profile = { id: "admin", tenant_id: "tenant", user_role: "super_admin" } as UserProfile;
   return { useAuth: () => ({ profile, access: builtinAccessContext(profile) }) };
 });
 vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealtimeRefresh: () => undefined }));

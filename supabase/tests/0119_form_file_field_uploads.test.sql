@@ -2,6 +2,8 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 select plan(28);
+-- Migration 0397 withdrew forms.manage from Admin by default; this test keeps an Admin as the form author.
+update permission_catalog set default_roles = array_append(default_roles, 'admin') where key = 'forms.manage' and not ('admin' = any(default_roles));
 
 -- Synthetic fixtures only. No production rows or personal information.
 insert into auth.users(id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)

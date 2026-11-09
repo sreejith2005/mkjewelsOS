@@ -87,8 +87,10 @@ reset role;
 -- B. Super Admin organisation tools.
 -- ===========================================================================
 set local role authenticated;
+-- Since 0397 an Admin may add a franchise (0397_leadership_hierarchy.test.sql); a Manager may not.
+select pg_temp.login('dir_mum');
+select throws_ok($$select save_franchise_group_with_audit(null, '{"name":"Rogue","code":"ROGUE"}')$$, '42501', null, 'a Manager cannot create a franchise');
 select pg_temp.login('adm_ahd');
-select throws_ok($$select save_franchise_group_with_audit(null, '{"name":"Rogue","code":"ROGUE"}')$$, '42501', null, 'an Admin cannot create a franchise');
 select throws_ok($$select get_franchise_readiness_report()$$, '42501', null, 'an Admin cannot read the readiness report');
 select pg_temp.login('sa');
 insert into fx_franchise select 'MUM', (save_franchise_group_with_audit(null, '{"name":"Mumbai","code":"mum","city":"Mumbai","state":"Maharashtra"}')).id;
@@ -113,7 +115,8 @@ set local role authenticated;
 select throws_ok($$select set_franchise_enforcement_with_audit(true, 'try')$$, '55000', null, 'isolation cannot be switched on while a section is not covered');
 select throws_ok($$select save_franchise_group_with_audit(pg_temp.f('AHD'), '{"is_active":false}')$$, '23514', null, 'a franchise with active branches cannot be deactivated');
 select lives_ok($$select grant_org_scope_with_audit(pg_temp.p('dir_mum'), 'director', pg_temp.f('MUM'), null, false, 'Mumbai director')$$, 'Director scope granted');
-select lives_ok($$select grant_org_scope_with_audit(pg_temp.p('adm_ahd'), 'regional_admin', pg_temp.f('AHD'), null, false, 'Ahmedabad admin')$$, 'Regional Admin scope granted');
+-- Since 0397 an Admin limited to one franchise is a Director (an Admin without one sees every franchise).
+select lives_ok($$select grant_org_scope_with_audit(pg_temp.p('adm_ahd'), 'director', pg_temp.f('AHD'), null, false, 'Ahmedabad admin')$$, 'Ahmedabad Admin made a Director');
 select lives_ok($$select grant_org_scope_with_audit(pg_temp.p('hr_mum'), 'hr', pg_temp.f('MUM'), null, false, 'Mumbai HR')$$, 'HR scope granted');
 select lives_ok($$select grant_org_scope_with_audit(pg_temp.p('ahd_dir'), 'director', pg_temp.f('AHD'), null, false, 'Ahmedabad director')$$, 'second Director granted');
 select throws_ok($$select grant_org_scope_with_audit(pg_temp.p('dir_mum'), 'director', pg_temp.f('MUM'), null, false, 'again')$$, '23505', null, 'duplicate grants are refused');

@@ -60,6 +60,70 @@ Company (tenant) -> Franchise group -> Branch (store / exhibition / office / war
 A permission override never widens data scope: scope comes only from grants,
 `manager_id` and the person's own branch.
 
+## Leadership hierarchy (migration 0397, owner request 2026-11-09)
+
+Supersedes the Admin rows of "Automatic scope" below and the Director row of
+"Scope authorities".
+
+| Role | Sees | Can change |
+|---|---|---|
+| Super Admin | everything | everything |
+| Admin (no Director grant) | every franchise and store (`org_has_company_scope`) | users (add, edit; not delete), franchises and stores (add only), tasks and Task Control templates (create, assign, edit), leave and availability |
+| Director (Admin role + `director` grants) | only the franchises and single stores granted | as Admin, but only inside that scope; adds stores only to a whole franchise they oversee; never creates or edits Admin or Director accounts |
+
+- **Capabilities.** Admin's defaults no longer include `fms.manage`,
+  `forms.manage`, `notifications.manage`, `settings.manage_organization`,
+  `settings.manage_branch` or `recording.manage_rubric`; role-level grants of
+  these (and of `tasks.delete` and `users.delete`) to Admin were removed
+  (audited `role_permission_reset`). Individual
+  user overrides set by Super Admin stay. New `tasks.delete` (Super Admin) is
+  required by `delete_task_lifecycle_with_audit` and
+  `admin_delete_task_series_with_audit`, so every task, series and template
+  delete path needs it. New `organization.add_locations` (Super Admin, Admin)
+  gates adding franchises and stores. Users, leave and every other delete was
+  already Super Admin only. Manager keeps form authoring and branch defaults.
+- **Director identity.** No `user_role` value was added (about 420 checks
+  treat `super_admin, admin` as one group, and a Director must keep every
+  Admin read path). `org_is_director(profile)` = effective role Admin and an
+  active non-company `director` grant. Director grants may now be franchise or
+  single-store (`org_scope_grants_authority_level` relaxed for `director`);
+  store grants count as manageable for a Director.
+- **Company scope.** `org_has_company_scope` = Super Admin, a company grant,
+  or an Admin who is not a Director. `org_automatic_scope` now confers HR only.
+  `assert_org_user_write` never treats a Director as company scope (even with
+  isolation off) and lets only company scope create or edit Admin and
+  Director accounts.
+- **Contracts.** `create_director_profile_with_audit` (service role, from
+  `invite-user` when `user_role` is `director`): account, Leadership
+  department, home store and grants in one transaction.
+  `save_director_with_audit` (company scope with `users.manage`; changing
+  someone's role stays Super Admin): Admin role, Leadership department, no
+  designation, buddies or reporting manager, home store inside the scope, grants
+  replaced. `end_director_with_audit` makes a Director a company-wide Admin;
+  leaving the Admin role in `update_user_profile_with_audit` revokes Director
+  grants. `list_director_scopes` labels Directors in Users.
+  `get_org_locations` lists the franchises and stores the viewer may see and
+  where they may add. `save_franchise_group_with_audit` (new franchise) and
+  `create_branch_in_franchise_with_audit` accept `organization.add_locations`
+  holders through `org_assert_location_creator`; editing stays Super Admin.
+- **Leadership department.** `org_leadership_department(tenant)` finds or
+  creates one company-wide department named Leadership (department is NOT NULL
+  on `user_profiles`). A Director's home store is the requested store inside
+  the scope, else the first chosen store, else the first store of the first
+  chosen franchise.
+- **Existing Directors.** The migration made every active Admin whose
+  designation is "Director" a Director of their own store's franchise and
+  moved them to Leadership with no designation (narrowing only; a profile
+  that cannot move keeps its department and is logged as
+  `director_department_unchanged`).
+- **Store Intelligence.** Company scope lets an Admin open every branch's
+  conversations, as Super Admin does (`recording_is_reviewer`).
+- **Still needs isolation On.** Reads narrow to a Director's scope only while
+  franchise isolation is on (Users > Franchises), exactly as for every other
+  scope authority.
+- Tests: `supabase/tests/0397_leadership_hierarchy.test.sql`; franchise tests
+  0385-0387 now model the franchise-limited Admin as a Director.
+
 ## Automatic scope (migration 0393, numbered 0390 before deploy)
 
 `org_automatic_scope(profile)` derives one franchise authority from the

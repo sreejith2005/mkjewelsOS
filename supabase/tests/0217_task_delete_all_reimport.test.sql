@@ -2,6 +2,8 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions;
 select plan(13);
+-- Migration 0397 withdrew tasks.delete from Admin by default; this test keeps an Admin as the task administrator who deletes.
+update permission_catalog set default_roles = array_append(default_roles, 'admin') where key = 'tasks.delete' and not ('admin' = any(default_roles));
 insert into auth.users(id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
 values('20800000-0000-4000-8000-000000000001','authenticated','authenticated','admin-208@example.invalid',crypt('local-test-only',gen_salt('bf')),now(),'{}','{}',now(),now());
 insert into public.tenants(id,name,slug) values('20810000-0000-4000-8000-000000000001','Import 208','import-208');

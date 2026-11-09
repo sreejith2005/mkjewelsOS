@@ -6,7 +6,7 @@ import type { FormBundle } from "@/features/forms/api";
 import type { UserProfile } from "@/types";
 import { FormsPage } from "./FormsPage";
 
-const mocks = vi.hoisted(() => ({ loadForms: vi.fn(), setFormLibraryVisibility: vi.fn(), role: "admin" }));
+const mocks = vi.hoisted(() => ({ loadForms: vi.fn(), setFormLibraryVisibility: vi.fn(), role: "super_admin" }));
 vi.mock("@/auth/AuthContext", async () => {
   const { builtinAccessContext } = await vi.importActual<typeof import("@jewelos/core")>("@jewelos/core");
   return { useAuth: () => { const profile = { id: "user", tenant_id: "tenant", user_role: mocks.role } as UserProfile; return { profile, access: builtinAccessContext(profile) }; } };
@@ -20,7 +20,7 @@ vi.mock("@/features/forms/api", () => ({
   deletedFormBundle: () => null,
 }));
 const bundle = { id: "work", family_id: "family", name: "Work and Upload", version: 1, lifecycle: "published", library_visible: false, permissions: { roles: ["staff"] }, fields: [], sections: [], submissionCount: 0 } as unknown as FormBundle;
-beforeEach(() => { mocks.role = "admin"; mocks.loadForms.mockResolvedValue({ bundles: [bundle], submissions: [] }); mocks.setFormLibraryVisibility.mockResolvedValue(undefined); window.history.replaceState({}, "", "/forms"); });
+beforeEach(() => { mocks.role = "super_admin"; /* 0397: form authoring is Super Admin's by default */ mocks.loadForms.mockResolvedValue({ bundles: [bundle], submissions: [] }); mocks.setFormLibraryVisibility.mockResolvedValue(undefined); window.history.replaceState({}, "", "/forms"); });
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
 describe("Form library visibility", () => {

@@ -66,6 +66,8 @@ function rememberTab(tab: TaskControlTab) {
 export function TaskTemplatesPage() {
   const { profile, access } = useAuth();
   const canAdministerTasks = access ? hasPermission(access, "tasks.view_all") : false;
+  // Deleting tasks and templates is Super Admin's by default (tasks.delete, migration 0397); the server re-checks.
+  const canDeleteTasks = access ? hasPermission(access, "tasks.delete") : false;
   const role = profile?.user_role ?? "staff";
   const authorized = canViewTaskControl(role);
   const canManageTemplates = canManageTaskTemplates(role);
@@ -361,7 +363,7 @@ export function TaskTemplatesPage() {
           : tab === "templates" ? (
             <TemplatesTab
               busyId={busyId}
-              onDelete={remove}
+              onDelete={canDeleteTasks ? remove : undefined}
               onEdit={(row) => void openEdit(row)}
               onSchedule={openSchedule}
               onToggle={toggle}
@@ -384,10 +386,10 @@ export function TaskTemplatesPage() {
             ) : (
               <TasksTab
                 selection={canAdministerTasks ? { ids: selectedTaskIds, onChange: setSelectedTaskIds } : undefined}
-                onBulkDelete={canAdministerTasks ? (selected) => setBulkDelete({ filter: evidenceFilter(filters, view, 1, 100, kind), selected, scopeLabel: filters.user_profile_id ? (users.find((user) => user.id === filters.user_profile_id)?.employee_name ?? "Selected employee") : "All employees matching these filters" }) : undefined}
+                onBulkDelete={canAdministerTasks && canDeleteTasks ? (selected) => setBulkDelete({ filter: evidenceFilter(filters, view, 1, 100, kind), selected, scopeLabel: filters.user_profile_id ? (users.find((user) => user.id === filters.user_profile_id)?.employee_name ?? "Selected employee") : "All employees matching these filters" }) : undefined}
                 onReassign={canAdministerTasks ? (selected) => setReassign({ selectedIds: selected, fromUserId: filters.user_profile_id }) : undefined}
                 onManage={canAdministerTasks ? setManagedTaskId : undefined}
-                onDelete={canAdministerTasks ? setDeletingRow : undefined}
+                onDelete={canAdministerTasks && canDeleteTasks ? setDeletingRow : undefined}
                 evidence={snapshot.evidence}
                 onPage={setPage}
                 onPageSize={(size) => { setPageSize(size); setPage(1); }}
@@ -403,7 +405,7 @@ export function TaskTemplatesPage() {
                       </p>
                       <TemplatesTab
                         busyId={busyId}
-                        onDelete={remove}
+                        onDelete={canDeleteTasks ? remove : undefined}
                         onEdit={(row) => void openEdit(row)}
                         onSchedule={openSchedule}
                         onToggle={toggle}
@@ -450,11 +452,11 @@ export function TaskTemplatesPage() {
         const done = async () => { setDeletingRow(null); if (page === 1) await refresh(); else { setPage(1); await loadTemplates(); } };
         return kind === "fms_step" || kind === "fms_start"
           ? <FmsWorkCancelDialog kind={kind} row={deletingRow} onClose={() => setDeletingRow(null)} onDone={done} />
-          : <Modal title="Delete task" onClose={() => setDeletingRow(null)}><TaskManagement initialMode="delete" taskId={deletingRow.task_id} onChanged={done} /></Modal>;
+          : <Modal title="Delete task" onClose={() => setDeletingRow(null)}><TaskManagement canDelete={canDeleteTasks} initialMode="delete" taskId={deletingRow.task_id} onChanged={done} /></Modal>;
       })() : null}
 
       {managedTaskId && canAdministerTasks ? <Modal title="Manage assigned task" onClose={() => setManagedTaskId(null)}>
-        <TaskManagement taskId={managedTaskId} onChanged={async () => { setManagedTaskId(null); if (page === 1) await refresh(); else { setPage(1); await loadTemplates(); } }} />
+        <TaskManagement canDelete={canDeleteTasks} taskId={managedTaskId} onChanged={async () => { setManagedTaskId(null); if (page === 1) await refresh(); else { setPage(1); await loadTemplates(); } }} />
       </Modal> : null}
 
       {scheduling ? (

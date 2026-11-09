@@ -189,6 +189,79 @@ export async function revokeScope(grantId: string, reason: string): Promise<void
 }
 
 // ---------------------------------------------------------------------------
+// Leadership hierarchy (migration 0397): Directors and adding locations
+// ---------------------------------------------------------------------------
+
+/** What a Director oversees: whole franchises and single stores. */
+export type DirectorScope = Readonly<{ franchiseGroupIds: string[]; branchIds: string[] }>;
+
+const ids = (value: unknown): string[] => (Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []);
+
+export function parseDirectorScopes(input: unknown): Map<string, DirectorScope> {
+  return new Map(list(input).flatMap((row) => {
+    const profileId = text(row.user_profile_id);
+    return profileId ? [[profileId, { franchiseGroupIds: ids(row.franchise_group_ids), branchIds: ids(row.branch_ids) }] as const] : [];
+  }));
+}
+
+/** Directors among the employees the viewer may see (Users section). */
+export async function loadDirectorScopes(): Promise<Map<string, DirectorScope>> {
+  const { data, error } = await db().rpc("list_director_scopes");
+  fail("Load Directors", error);
+  return parseDirectorScopes(data);
+}
+
+/** Make an employee a Director, or change a Director's franchises and stores (Super Admin, Admin). */
+export async function saveDirector(profileId: string, scope: DirectorScope, homeBranchId: string | null, reason: string): Promise<void> {
+  const { error } = await db().rpc("save_director_with_audit", {
+    p_profile_id: profileId, p_franchise_ids: [...scope.franchiseGroupIds], p_branch_ids: [...scope.branchIds],
+    p_home_branch_id: homeBranchId, p_reason: reason,
+  });
+  fail("Save Director", error);
+}
+
+/** A Director becomes a company-wide Admin. */
+export async function endDirector(profileId: string, reason: string): Promise<void> {
+  const { error } = await db().rpc("end_director_with_audit", { p_profile_id: profileId, p_reason: reason });
+  fail("Change Director to Admin", error);
+}
+
+export type OrgLocations = Readonly<{
+  companyScope: boolean;
+  canAddFranchise: boolean;
+  addableFranchiseIds: string[];
+  franchises: FranchiseGroup[];
+  branches: FranchiseBranch[];
+}>;
+
+export function parseOrgLocations(input: unknown): OrgLocations {
+  const value = record(input);
+  const context = parseFranchiseAdminContext({ franchises: value.franchises, branches: value.branches });
+  return {
+    companyScope: value.company_scope === true,
+    canAddFranchise: value.can_add_franchise === true,
+    addableFranchiseIds: ids(value.addable_franchise_ids),
+    franchises: context.franchises,
+    branches: context.branches,
+  };
+}
+
+/** The franchises and stores the viewer may see, and where they may add (Admin, Director). */
+export async function loadOrgLocations(): Promise<OrgLocations> {
+  const { data, error } = await db().rpc("get_org_locations");
+  fail("Load franchises", error);
+  return parseOrgLocations(data);
+}
+
+export type NewStore = Readonly<{ name: string; code: string; city?: string | null; state?: string | null; address?: string | null }>;
+
+/** Add a store to a franchise (Super Admin, Admin, or a Director of that franchise). */
+export async function addStoreToFranchise(franchiseGroupId: string, store: NewStore): Promise<void> {
+  const { error } = await db().rpc("create_branch_in_franchise_with_audit", { p_franchise_group_id: franchiseGroupId, p_payload: store as Json });
+  fail("Add store", error);
+}
+
+// ---------------------------------------------------------------------------
 // Phase 2 (migration 0386)
 // ---------------------------------------------------------------------------
 

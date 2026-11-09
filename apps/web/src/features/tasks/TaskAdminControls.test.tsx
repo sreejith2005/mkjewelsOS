@@ -12,9 +12,14 @@ describe("task administration", () => {
     verifierId: "", buddyAssignmentAllowed: false, branchId: "", departmentId: "", categoryId: "", coreTaskLabel: "",
     doerIds: [], watcherIds: [], checklist: [] };
   const reference = { users: [], branches: [], departments: [], categories: [], forms: [] };
+  it("offers deletion only to people who may delete tasks", () => {
+    render(<TaskAdminControls task={task} onChanged={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: "Delete task" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Edit task" })).toBeTruthy();
+  });
   it("requires explicit series selection and confirmation", async () => {
     const changed = vi.fn();
-    render(<TaskAdminControls task={task} onChanged={changed} />);
+    render(<TaskAdminControls canDelete task={task} onChanged={changed} />);
     fireEvent.click(screen.getByRole("button", { name: "Delete task" }));
     expect(api.remove).not.toHaveBeenCalled();
     fireEvent.click(screen.getByLabelText("Delete entire recurring series"));

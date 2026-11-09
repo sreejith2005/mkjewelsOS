@@ -2,6 +2,8 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions;
 select plan(77);
+-- Migration 0397 withdrew tasks.delete from Admin by default; this test keeps an Admin as the task administrator who deletes.
+update permission_catalog set default_roles = array_append(default_roles, 'admin') where key = 'tasks.delete' and not ('admin' = any(default_roles));
 select has_function('public','task_feed_page',array['text','text','integer','integer'],'tasks have a bounded server page');
 select has_function('public','admin_edit_task_with_audit',array['uuid','jsonb'],'administrators edit through an audited contract');
 select has_function('public','admin_delete_task_with_audit',array['uuid','boolean','text'],'administrators delete an occurrence or series');

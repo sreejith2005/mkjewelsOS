@@ -6,7 +6,7 @@ import type { FormBundle } from "@/features/forms/api";
 import type { UserProfile } from "@/types";
 import { FormsPage } from "./FormsPage";
 
-const mocks = vi.hoisted(() => ({ loadForms: vi.fn(), loadFmsBuiltForms: vi.fn(), role: "admin" }));
+const mocks = vi.hoisted(() => ({ loadForms: vi.fn(), loadFmsBuiltForms: vi.fn(), role: "super_admin" }));
 vi.mock("@/auth/AuthContext", async () => {
   const { builtinAccessContext } = await vi.importActual<typeof import("@jewelos/core")>("@jewelos/core");
   return { useAuth: () => { const profile = { id: "user", tenant_id: "tenant", user_role: mocks.role } as UserProfile; return { profile, access: builtinAccessContext(profile) }; } };
@@ -22,7 +22,7 @@ vi.mock("@/features/forms/api", () => ({
 const form = (id: string, name: string, visible = true) => ({ id, family_id: `family-${id}`, name, version: 1, lifecycle: "published", library_visible: visible, permissions: { roles: ["staff"] }, fields: [], sections: [], submissionCount: 0 }) as unknown as FormBundle;
 const bundles = [form("assignee", "Instagram Assignee Form"), form("call", "Introduction Call — Instagram Leads", false)];
 beforeEach(() => {
-  mocks.role = "admin";
+  mocks.role = "super_admin"; // 0397: form authoring is Super Admin's by default
   mocks.loadForms.mockResolvedValue({ bundles, submissions: [] });
   mocks.loadFmsBuiltForms.mockResolvedValue(new Map([["family-call", { familyId: "family-call", workflows: ["INSTAGRAM LEADS"], steps: ["Introduction Call"] }]]));
   window.history.replaceState({}, "", "/forms");

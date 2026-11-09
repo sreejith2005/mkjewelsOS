@@ -14,7 +14,9 @@ select ok(not has_table_privilege('authenticated','recording_analyses','select')
 select ok(not has_table_privilege('service_role','recording_transcript_segments','insert'),'no direct transcript writes');
 select ok((select relrowsecurity from pg_class where oid='recording_score_dimensions'::regclass),'dimension RLS');
 select throws_ok($$select recording_analysis_ingest('analysis_health','{}')$$,'42501','recording_service_only','database owner without service claims denied');
-select is((select default_roles from permission_catalog where key='recording.manage_rubric'),'{super_admin,admin}'::user_role[],'rubric management defaults to admins');
+select is((select default_roles from permission_catalog where key='recording.manage_rubric'),'{super_admin}'::user_role[],'rubric management defaults to Super Admin (0397)');
+-- Migration 0397 withdrew recording.manage_rubric from Admin by default; the SOP flow below keeps an Admin author.
+update permission_catalog set default_roles = array_append(default_roles, 'admin') where key = 'recording.manage_rubric' and not ('admin' = any(default_roles));
 
 -- Score formula parity vectors (mirrored in packages/core/src/salesScore/score.test.ts).
 create temporary table rubric_v1 as select recording_default_rubric_dimensions() d;
