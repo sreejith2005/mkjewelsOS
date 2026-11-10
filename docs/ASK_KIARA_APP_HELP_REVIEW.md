@@ -238,6 +238,7 @@ who build workflows, the designs.
 - [ ] Change the theme or table density: open Settings and change your preferences.
 - [ ] Change your own password (2026-11-02, 0367; every employee): Settings > **Change password**: **Current password**, **New password** (6 to 72 characters), **Confirm new password**, **Show passwords**, then **Change password**. Forgot it: ask a Super Admin to use **Set login password**, sign in, then change it in Settings.
 - [ ] Manage permissions: Settings, then **Open permission management** (Super Admin only). *(changed in Phase 9; it used to say "Settings > Permissions")*
+- [ ] Company-wide task assignment (2026-11-10, 0402): **Open permission management** > **Users** > the person > **Assign tasks to other users** and **Assign tasks to anyone in the company** both **Grant** > **Save access** (also per **Designations**, **Departments**, **Roles**). Without the second, people below Manager assign only their own department. Never offers Admin, Director, Owner or Super Admin. Kiara: no new read tool (no new data; assigned tasks already appear in existing task tools).
 
 ## Ask Kiara itself *(rewritten in Phase 9)*
 **What it is:** answers about your own work, your Dashboard, Task Control and Reports numbers,

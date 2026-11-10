@@ -164,8 +164,9 @@ function UserPermissionsTab({ context, onSaved, selfId }: { context: PermissionA
   const [feedback, setFeedback] = useState<Feedback>(null);
   const users = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return context.users.filter((user) => !needle || `${user.employeeName} ${user.employeeCode}`.toLowerCase().includes(needle)).slice(0, 60);
+    return context.users.filter((user) => !needle || `${user.employeeName} ${user.employeeCode}`.toLowerCase().includes(needle));
   }, [context.users, query]);
+  const shownUsers = users.slice(0, 60);
   const select = useCallback((id: string) => {
     revealPageDetail(detailsRef.current);
     if (id === selectedId && (breakdown || loading)) return;
@@ -219,7 +220,8 @@ function UserPermissionsTab({ context, onSaved, selfId }: { context: PermissionA
   return <div className="grid gap-4 lg:grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)]">
     <Panel title="Users" description={`${context.users.length} people`}>
       <label className="relative mb-3 block"><Search className="absolute left-3 top-2.5 size-4 text-task-text-muted" /><input aria-label="Search users" className="task-field pl-9" onChange={(event) => setQuery(event.target.value)} placeholder="Name or employee code" value={query} /></label>
-      <ul className="-mx-4 -mb-3 divide-y divide-task-border">{users.map((user) => <li key={user.id}><button aria-current={user.id === selectedId} className={`flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-task-muted ${user.id === selectedId ? "bg-task-accent-soft" : ""}`} onClick={() => void select(user.id)} type="button">
+      {users.length > shownUsers.length ? <p className="mb-2 text-xs text-task-text-muted">Showing {shownUsers.length} of {users.length}. Search by name or employee code to find others.</p> : null}
+      <ul className="-mx-4 -mb-3 divide-y divide-task-border">{shownUsers.map((user) => <li key={user.id}><button aria-current={user.id === selectedId} className={`flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-task-muted ${user.id === selectedId ? "bg-task-accent-soft" : ""}`} onClick={() => void select(user.id)} type="button">
         <span className="min-w-0"><span className="block truncate text-sm font-medium">{user.employeeName}</span><span className="block truncate text-xs text-task-text-muted">{titleCase(user.role)}{user.dashboardAuthority ? ` · ${titleCase(user.dashboardAuthority)} authority` : ""}{user.employeeCode ? ` · ${user.employeeCode}` : ""}</span></span>
         {user.overrideCount ? <span className="shrink-0 rounded-full bg-task-muted px-2 py-0.5 text-[11px] text-task-text-muted">{user.overrideCount}</span> : null}
       </button></li>)}</ul>
@@ -248,7 +250,7 @@ function UserPermissionsTab({ context, onSaved, selfId }: { context: PermissionA
                 return <tr key={item.key}>
                   <td className="px-4 py-2"><span className="font-medium">{item.label}</span></td>
                   <td className="px-3 py-2"><Allowed value={explanation.roleDefault} /><span className="block text-[11px] text-task-text-muted">{explanation.decidedBy === "protected" || explanation.decidedBy === "authority" ? lockedReason(item) : `${titleCase(explanation.effectiveRole)}${explanation.roleConfigured ? " · customised" : ""}`}</span></td>
-                  <td className="px-3 py-2 text-xs">{explanation.department ? titleCase(explanation.department) : "?"}</td>
+                  <td className="px-3 py-2 text-xs">{explanation.department ? titleCase(explanation.department) : <span className="text-task-text-muted">—</span>}</td>
                   <td className="px-3 py-2 text-xs">{explanation.designation ? titleCase(explanation.designation) : <span className="text-task-text-muted">—</span>}</td>
                   <td className="px-3 py-2">{isConfigurablePermission(item.key) && explanation.effectiveRole !== "super_admin" ? <EffectSelect disabled={isSelf} label={`${item.label} override for ${breakdown.employeeName}`} onChange={(value) => setDraft((current) => ({ ...current, [item.key]: value }))} value={explanation.user} /> : <Lock aria-label="Locked" className="size-3.5 text-task-text-muted" />}</td>
                   <td className="px-3 py-2"><Allowed value={explanation.effective} />{pending ? <span className="block text-[11px] text-task-text-muted">unsaved</span> : null}</td>

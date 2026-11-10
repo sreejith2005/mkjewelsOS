@@ -47,6 +47,16 @@ describe("permission catalog", () => {
     expect(explainPermission({ ...subject, userOverrides: { "tasks.assign_others": "grant" } }, "tasks.assign_others").effective).toBe(true);
     expect(explainPermission({ ...subject, role: "super_admin" }, "tasks.assign_others").effective).toBe(true);
   });
+  it("lets role, department, designation and user settings grant company-wide assignment (0402)", () => {
+    const staff = { role: "staff" as const, dashboardAuthority: null };
+    expect(isConfigurablePermission("tasks.assign_company_wide")).toBe(true);
+    expect(explainPermission(staff, "tasks.assign_company_wide").effective).toBe(false);
+    expect(explainPermission({ role: "admin", dashboardAuthority: null }, "tasks.assign_company_wide").effective).toBe(true);
+    expect(explainPermission({ ...staff, userOverrides: { "tasks.assign_company_wide": "grant" } }, "tasks.assign_company_wide").effective).toBe(true);
+    expect(explainPermission({ ...staff, departmentOverrides: { "tasks.assign_company_wide": "grant" } }, "tasks.assign_company_wide").effective).toBe(true);
+    expect(explainPermission({ ...staff, designationOverrides: { "tasks.assign_company_wide": "grant" } }, "tasks.assign_company_wide").effective).toBe(true);
+    expect(explainPermission({ ...staff, departmentOverrides: { "tasks.assign_company_wide": "grant" }, userOverrides: { "tasks.assign_company_wide": "deny" } }, "tasks.assign_company_wide").effective).toBe(false);
+  });
   it("requires an explicit user grant for the leadership leave application exception", () => {
     const base = { role: "super_admin" as const, dashboardAuthority: null };
     expect(explainPermission(base, "availability.apply_leave_exception").effective).toBe(false);

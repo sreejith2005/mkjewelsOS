@@ -339,7 +339,7 @@ cases and setting its row to `enforced`.
 
 | Path | Local rule (isolation on) | Cross-location rule |
 |---|---|---|
-| Task recipients (`task_assignment_user_in_scope`) | today's tenant / branch / department scope **and** the recipient in a franchise the actor reads | a delegation request naming a store in **another mapped franchise** whose doers all belong to it, by someone holding `tasks.assign_cross_location` + `tasks.assign_others`; inside one franchise today's rules are unchanged |
+| Task recipients (`task_assignment_user_in_scope`) | today's tenant / branch / department scope (tenant also for holders of `tasks.assign_company_wide`, 0402) **and** the recipient in a franchise the actor reads | a delegation request naming a store in **another mapped franchise** whose doers all belong to it, by someone holding `tasks.assign_cross_location` + `tasks.assign_others`; inside one franchise today's rules are unchanged |
 | FMS explicit handoff (`assert_fms_handoff_recipient`) | recipient in the actor's franchise | only a recipient validated in the same transaction by a cross-location Users question |
 | FMS "Assigned To from the form" (`fms_assignment_user_from_submission`) | recipient in the run's franchise | the saved answer of a cross-location question |
 | Users answer on submit (`assert_form_user_answer`) | recipient in the submitter's franchise | question saved with **Allow selecting employees from other locations**, submitter holds `tasks.assign_cross_location`, recipient eligible |
