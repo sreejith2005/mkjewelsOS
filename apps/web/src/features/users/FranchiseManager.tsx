@@ -22,6 +22,7 @@ import {
   loadOrgLocations,
   revokeScope,
   saveFranchise,
+  setFranchiseIsolation,
   type FranchiseAdminContext,
   type FranchiseBranch,
   type FranchiseGroup,
@@ -36,7 +37,8 @@ type Editor =
   | { kind: "franchise"; franchise: FranchiseGroup | null }
   | { kind: "branch"; branch: FranchiseBranch }
   | { kind: "store"; franchise: FranchiseGroup }
-  | { kind: "grant" };
+  | { kind: "grant" }
+  | { kind: "isolation"; enable: boolean };
 
 const RECORD_LABELS: Readonly<Record<string, string>> = {
   task_instances: "Tasks",
@@ -229,6 +231,31 @@ function GrantEditor({ context, people, onClose, onSaved }: { context: Franchise
   </Modal>;
 }
 
+/** Confirm switching franchise isolation on or off, with the audited reason. */
+function IsolationEditor({ enable, onClose, onSaved }: { enable: boolean; onClose: () => void; onSaved: () => Promise<void> }) {
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!reason.trim()) return setError("Give a reason.");
+    setBusy(true); setError(null);
+    try { await setFranchiseIsolation(enable, reason.trim()); await onSaved(); onClose(); }
+    catch (caught) { setError(errorText(caught, "Unable to change franchise isolation.")); }
+    finally { setBusy(false); }
+  };
+  return <Modal onClose={onClose} title={enable ? "Switch franchise isolation on" : "Switch franchise isolation off"}>
+    <form className="space-y-4" onSubmit={(event) => void submit(event)}>
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      <p className="text-sm text-soft-grey">{enable
+        ? "HR will see only their franchise, store managers only their store, and everyone else only their own store's people and work. Super Admin and Admin keep seeing every franchise. Customers in CRM stay shared by every store."
+        : "Everyone goes back to the access they had before franchises were added. Directors still see only their own franchises and stores."}</p>
+      <Field label="Reason"><input className="field" onChange={(event) => setReason(event.target.value)} required value={reason} /></Field>
+      <div className="flex justify-end gap-2"><Button onClick={onClose} type="button" variant="secondary">Cancel</Button><Button disabled={busy} type="submit">{busy ? "Saving…" : enable ? "Switch on" : "Switch off"}</Button></div>
+    </form>
+  </Modal>;
+}
+
 /**
  * Super Admin only (franchise.manage): Company -> Franchise -> Store, with
  * employee counts, store managers, scope grants, readiness and history. The
@@ -260,6 +287,8 @@ export function FranchiseManager({ people, onChanged }: { people: readonly Perso
   };
   const context = state?.context;
   const readiness = state?.readiness;
+  // Mirrors the server's checks so the button explains itself; the server still decides.
+  const canSwitchOn = Boolean(readiness?.mappingsComplete && readiness.enforcementSupported);
   const franchiseName = (id: string | null) => (id ? context?.franchises.find((item) => item.id === id)?.name ?? "Unknown franchise" : "Not mapped");
   const branchName = (id: string | null) => context?.branches.find((item) => item.id === id)?.name ?? "Unknown store";
   const personName = (id: string | null) => (id ? people.find((person) => person.id === id)?.employee_name ?? "Unknown" : null);
@@ -276,7 +305,22 @@ export function FranchiseManager({ people, onChanged }: { people: readonly Perso
     <div className="mt-4 space-y-5">
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {!context || !readiness ? (error ? null : <p className="text-sm text-soft-grey">Loading…</p>) : <>
-        <Notice tone="neutral">Franchise isolation: <strong>{context.enforcementEnabled ? "On" : "Off"}</strong>. {context.enforcementEnabled ? "People below company scope see only their franchise or stores." : "Directors always see only their own franchises and stores. Everyone else keeps today's access until isolation is switched on."}</Notice>
+        <div className="rounded-lg border border-gold/15 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm text-white">Franchise isolation: <strong>{context.enforcementEnabled ? "On" : "Off"}</strong></p>
+              <p className="text-xs text-soft-grey">{context.enforcementEnabled
+                ? "Super Admin and Admin see every franchise. Directors and HR see their franchises, store managers their store, and everyone else their own store."
+                : "Directors already see only their own franchises and stores. Everyone else still sees what they saw before franchises were added. Switch it on to limit each person to their own franchise or store."}</p>
+            </div>
+            <Button disabled={!context.enforcementEnabled && !canSwitchOn} onClick={() => setEditor({ kind: "isolation", enable: !context.enforcementEnabled })} type="button" variant={context.enforcementEnabled ? "secondary" : "primary"}>
+              {context.enforcementEnabled ? "Switch isolation off" : "Switch isolation on"}
+            </Button>
+          </div>
+          {!context.enforcementEnabled && !canSwitchOn ? <p className="mt-2 text-xs text-gold-secondary">{readiness.mappingsComplete
+            ? "Some sections are not ready yet (see Readiness)."
+            : `Before switching on, use Set franchise to put every store in a franchise: ${readiness.unmappedActiveBranches.map((item) => item.name).join(", ")}.`}</p> : null}
+        </div>
 
         <div>
           <h3 className="text-sm font-semibold text-champagne">Organisation</h3>
@@ -300,7 +344,8 @@ export function FranchiseManager({ people, onChanged }: { people: readonly Perso
             </details>;
           })}</div>
           {context.franchises.length === 0 ? <p className="mt-2 text-sm text-soft-grey">No franchises yet. Add Mumbai and Ahmedabad, then set each store's franchise.</p> : null}
-          <p className="mt-2 text-xs text-soft-grey">Change a store manager in Branches &amp; departments. A store manager covers their own store once isolation is on.</p>
+          <p className="mt-2 text-xs text-soft-grey">Every employee belongs to their store&apos;s franchise automatically: putting a store in a franchise moves all its employees with it, and changing someone&apos;s store in Users moves them too.</p>
+          <p className="mt-1 text-xs text-soft-grey">Change a store manager in Branches &amp; departments. A store manager covers their own store once isolation is on.</p>
         </div>
 
         <div>
@@ -353,5 +398,6 @@ export function FranchiseManager({ people, onChanged }: { people: readonly Perso
     {editor?.kind === "branch" && context ? <BranchAssignEditor branch={editor.branch} franchises={context.franchises} onClose={() => setEditor(null)} onSaved={saved} /> : null}
     {editor?.kind === "store" ? <StoreEditor franchise={editor.franchise} onClose={() => setEditor(null)} onSaved={saved} /> : null}
     {editor?.kind === "grant" && context ? <GrantEditor context={context} onClose={() => setEditor(null)} onSaved={saved} people={people} /> : null}
+    {editor?.kind === "isolation" ? <IsolationEditor enable={editor.enable} onClose={() => setEditor(null)} onSaved={saved} /> : null}
   </section>;
 }

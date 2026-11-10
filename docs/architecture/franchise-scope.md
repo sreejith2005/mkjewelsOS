@@ -458,6 +458,16 @@ forward-only and additive; the Store Intelligence Super Admin widening and the
 form-question rule apply regardless of isolation. To undo app behaviour,
 redeploy the previous web build.
 
+## Isolation switch in the web app (2026-11-10)
+
+Users > Franchises shows **Franchise isolation** On / Off with **Switch isolation
+on** / **Switch isolation off** (Super Admin; Reason required) calling
+`set_franchise_enforcement_with_audit` through `setFranchiseIsolation`. The
+button is greyed out, naming the stores still without a franchise, until
+readiness reports every active store mapped and every section ready; the server
+re-checks both. Before this the switch existed only on the server. Employees
+are never mapped one by one: a person's franchise is always their store's.
+
 ## Owner decisions still open
 
 - When to switch franchise isolation on.

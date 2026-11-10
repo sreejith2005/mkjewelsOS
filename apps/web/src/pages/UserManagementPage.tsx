@@ -731,21 +731,7 @@ export function AddUserForm({
           branch and department at the same or lower hierarchy.
         </p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="First name">
-            <input
-              className="field"
-              required
-              value={form.first_name}
-              onChange={(event) => set("first_name", event.target.value)}
-            />
-          </Field>
-          <Field label="Last name">
-            <input
-              className="field"
-              value={form.last_name}
-              onChange={(event) => set("last_name", event.target.value)}
-            />
-          </Field>
+          {/* Where they work comes first: Franchise, Store, Department, Designation. */}
           {showFranchise && !isDirector ? (
             <Field label="Franchise / location">
               <select
@@ -786,39 +772,6 @@ export function AddUserForm({
               ))}
             </select>
           </Field>}
-          <Field label="Personal phone number">
-            <input
-              className="field"
-              type="tel"
-              value={form.personal_mobile}
-              onChange={(event) => set("personal_mobile", event.target.value)}
-            />
-          </Field>
-          <Field label="Official phone number">
-            <input
-              className="field"
-              type="tel"
-              value={form.official_mobile}
-              onChange={(event) => set("official_mobile", event.target.value)}
-            />
-          </Field>
-          <Field label="Personal email">
-            <input
-              className="field"
-              required
-              type="email"
-              value={form.personal_email}
-              onChange={(event) => set("personal_email", event.target.value)}
-            />
-          </Field>
-          <Field label="Official email">
-            <input
-              className="field"
-              type="email"
-              value={form.official_email}
-              onChange={(event) => set("official_email", event.target.value)}
-            />
-          </Field>
           {isDirector ? null : <>
           <Field label="Department">
             <select
@@ -862,6 +815,56 @@ export function AddUserForm({
                 ))}
             </select>
           </Field>
+          </>}
+          <Field label="First name">
+            <input
+              className="field"
+              required
+              value={form.first_name}
+              onChange={(event) => set("first_name", event.target.value)}
+            />
+          </Field>
+          <Field label="Last name">
+            <input
+              className="field"
+              value={form.last_name}
+              onChange={(event) => set("last_name", event.target.value)}
+            />
+          </Field>
+          <Field label="Personal phone number">
+            <input
+              className="field"
+              type="tel"
+              value={form.personal_mobile}
+              onChange={(event) => set("personal_mobile", event.target.value)}
+            />
+          </Field>
+          <Field label="Official phone number">
+            <input
+              className="field"
+              type="tel"
+              value={form.official_mobile}
+              onChange={(event) => set("official_mobile", event.target.value)}
+            />
+          </Field>
+          <Field label="Personal email">
+            <input
+              className="field"
+              required
+              type="email"
+              value={form.personal_email}
+              onChange={(event) => set("personal_email", event.target.value)}
+            />
+          </Field>
+          <Field label="Official email">
+            <input
+              className="field"
+              type="email"
+              value={form.official_email}
+              onChange={(event) => set("official_email", event.target.value)}
+            />
+          </Field>
+          {isDirector ? null : <>
           <Field label="Reports to">
             <select
               className="field"
