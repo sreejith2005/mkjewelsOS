@@ -4,6 +4,9 @@ create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
 select plan(245);
+-- Migration 0401 lets Admins and Managers view every workflow and form design; this test keeps
+-- checking the base read policies, so those view keys are switched off here.
+update permission_catalog set default_roles = array['super_admin']::user_role[] where key in ('fms.view_designs', 'forms.view_designs');
 
 -- Fixed synthetic identities and records only. No production data is queried.
 insert into auth.users (

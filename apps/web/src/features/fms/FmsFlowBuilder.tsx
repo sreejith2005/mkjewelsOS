@@ -2,7 +2,7 @@ import { upgradeFmsAssignmentContract } from "@jewelos/core";
 import { FmsSimulation } from "./FmsSimulation";
 import { suggestFmsAssignment } from "@jewelos/core";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { ArrowDownUp, ArrowLeft, CheckCircle2, ChevronDown, FileText, FlaskConical, PanelLeftOpen, Plus, Redo2, Repeat, Save, Send, Sparkles, TestTube2, Undo2, UserRoundPlus, X, Zap } from "lucide-react";
+import { ArrowDownUp, ArrowLeft, CheckCircle2, ChevronDown, Eye, FileText, FlaskConical, PanelLeftOpen, Plus, Redo2, Repeat, Save, Send, Sparkles, TestTube2, Undo2, UserRoundPlus, X, Zap } from "lucide-react";
 import { describeFmsStartTrigger, validateFmsStartTrigger, type FmsStartMode } from "@jewelos/core";
 import { FmsStartTriggerPanel, fmsTriggerFields, latestFormVersions } from "./FmsStartTriggerPanel";
 import { insertFmsFollowUpGroup, setFmsFollowUpGroupParent } from "@jewelos/core";
@@ -15,6 +15,7 @@ import { publishFmsFlow, saveFmsContextAssigneeDefault, saveFmsDraft } from "./a
 import { flowToDefinition, newFmsStage, removeFmsStage } from "./definition";
 import { FmsGraphCanvas, type FmsCanvasCommand, type FmsCanvasHandle } from "./FmsGraphCanvas";
 import { FmsStageEditor, type FmsStageQuestionnaireActions } from "./FmsStageEditor";
+import { FmsViewOnlyContext } from "./viewOnly";
 import { fmsDepartmentLabel } from "./departments";
 import { layoutFmsDefinition, type FmsGraphPosition } from "./graph";
 import { useIsMobile } from "@/lib/useMediaQuery";
@@ -463,7 +464,13 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
   const showAi = !!aiPanel && (rightPanel === "ai" || !selected);
   const showInspector = !!selected && !showAi;
   const stageIssues = selected ? issues.filter((issue) => issue.stageKey === selected.key) : [];
-  const editor = selected ? <>{selected.sla.followUpGroup ? <FmsFollowUpGroupPanel onOpenStage={openStage} onSetParent={setFollowUpParent} readOnly={readOnly} stage={selected} stages={normalized.stages} /> : null}<FmsStageEditor assignmentVersion={normalized.assignmentVersion} startMode={normalized.startMode} data={data} endCounts={endCounts} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); setSelectedKeys([value.key]); }} onDelete={() => remove(selected.key)} questionnaire={questionnaireActions(selected)} stage={selected} stages={normalized.stages} /></> : null;
+  const stageEditor = selected ? <FmsStageEditor assignmentVersion={normalized.assignmentVersion} startMode={normalized.startMode} data={data} endCounts={endCounts} onChange={(value) => { replace(selected.key, value); setSelectedKey(value.key); setSelectedKeys([value.key]); }} onDelete={() => remove(selected.key)} questionnaire={questionnaireActions(selected)} stage={selected} stages={normalized.stages} /> : null;
+  // View only: every setting stays visible but locked (a disabled fieldset), routes open in full,
+  // and the step's questions open from a Preview button outside the locked area.
+  const editor = selected ? <>{selected.sla.followUpGroup ? <FmsFollowUpGroupPanel onOpenStage={openStage} onSetParent={setFollowUpParent} readOnly={readOnly} stage={selected} stages={normalized.stages} /> : null}{readOnly ? <FmsViewOnlyContext.Provider value>
+    {selected.formTemplateId ? <Button className="mb-3 min-h-10 w-full" onClick={() => setPreviewKey(selected.key)} type="button" variant="secondary"><Eye className="size-4" />Preview questions</Button> : null}
+    <fieldset aria-label="Step settings (view only)" className="m-0 min-w-0 border-0 p-0" disabled>{stageEditor}</fieldset>
+  </FmsViewOnlyContext.Provider> : stageEditor}</> : null;
   const inspectorHeader = selected ? <div className="min-w-0"><p className="text-xs text-gold-secondary">{selected.key === triggerKey ? "Start form" : !formStart && selected.key === normalized.stages[0]?.key ? (normalized.startMode === "automatic" ? "First step (after the automatic start)" : "First step") : selected.type === "task" ? "Step" : selected.type.replaceAll("_", " ")}</p><h3 className="truncate text-lg font-semibold text-white">{selected.name || "Untitled step"}</h3></div> : null;
   const inspector = selected ? <>
     <div aria-hidden="true" className="fixed inset-0 z-40 bg-obsidian/60 md:hidden" onClick={() => setSelectedKey(null)} />
@@ -495,7 +502,7 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
     {startLines.map((line, index) => <span className={cn("mt-1 block text-xs", index === 1 ? "text-champagne" : "font-semibold text-white")} key={`${line}-${index}`}>{line}</span>)}
     <span className="mt-2 block text-[11px] text-soft-grey">→ {normalized.stages[0]?.name || "First step"} · tap to edit</span>
   </button>;
-  const canvas = <FmsGraphCanvas definition={normalized} endCounts={endCounts} fill={!isPhone} formFields={data.formFields} focusRequest={focusRequest} inspectedKey={selected?.key ?? null} invalidKeys={invalidKeys} onAddAfter={(key) => add("task", key)} onAddFollowUpAfter={readOnly ? undefined : (key) => addFollowUpGroup(key)} onCommand={runCommand} onConnect={connect} onDelete={(key) => requestDelete([key])} onDisconnect={disconnect} onDuplicate={duplicateStage} onEditRoute={editRoute} onMove={moveStages} onOpen={openStage} onReconnect={reconnect} onSelectionChange={changeSelection} ref={canvasRef} selectedKeys={selectedKeys} />;
+  const canvas = <FmsGraphCanvas readOnly={readOnly} definition={normalized} endCounts={endCounts} fill={!isPhone} formFields={data.formFields} focusRequest={focusRequest} inspectedKey={selected?.key ?? null} invalidKeys={invalidKeys} onAddAfter={(key) => add("task", key)} onAddFollowUpAfter={readOnly ? undefined : (key) => addFollowUpGroup(key)} onCommand={runCommand} onConnect={connect} onDelete={(key) => requestDelete([key])} onDisconnect={disconnect} onDuplicate={duplicateStage} onEditRoute={editRoute} onMove={moveStages} onOpen={openStage} onReconnect={reconnect} onSelectionChange={changeSelection} ref={canvasRef} selectedKeys={selectedKeys} />;
   const studioStage = studio ? normalized.stages.find((stage) => stage.key === studio.stageKey) : undefined;
   const sectionStage = sectionPicker ? normalized.stages.find((stage) => stage.key === sectionPicker.stageKey) : undefined;
   const previewStage = previewKey ? normalized.stages.find((stage) => stage.key === previewKey) : undefined;

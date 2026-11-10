@@ -76,7 +76,7 @@ select ok(not permission_effective_for(pg_temp.p('dir_mum'), 'fms.manage') and p
   'a Director has the Admin capabilities');
 select ok(permission_effective_for(pg_temp.p('sa'), k), 'Super Admin keeps ' || k)
 from unnest(array['fms.manage','forms.manage','tasks.delete','users.delete','franchise.manage','organization.manage']) k;
-select ok(permission_effective_for(pg_temp.p('mgr_bandra'), 'forms.manage'), 'a Manager keeps form authoring (unchanged)');
+select ok(not permission_effective_for(pg_temp.p('mgr_bandra'), 'forms.manage') and permission_effective_for(pg_temp.p('mgr_bandra'), 'forms.view_designs'), 'a Manager views forms but no longer authors them (0401)');
 select ok(not permission_effective_for(pg_temp.p('mgr_bandra'), 'tasks.delete') and not permission_effective_for(pg_temp.p('staff_bandra'), 'organization.add_locations'),
   'new permissions are not given to Managers or Staff');
 

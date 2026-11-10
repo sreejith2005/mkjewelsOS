@@ -199,9 +199,8 @@ export function DropdownMasterPage() {
   const wide = useMediaQuery("(min-width: 1280px)");
   /** "New list" starts a list even while another list is open. */
   const [newList, setNewList] = useState(false);
-  if (!hasPermission(access, "dropdowns.manage")) {
-    return <Notice tone="danger">Changing dropdown values requires the Dropdown Master permission. The database rejects writes from everyone else.</Notice>;
-  }
+  // Leaders open Dropdown Master to look up lists and codes; only dropdowns.manage changes them (the database enforces it).
+  const canManage = hasPermission(access, "dropdowns.manage");
 
   const currentRows = category ? byList.get(category) ?? [] : [];
   const currentOrigin = category ? listOrigin(category, currentRows, insights) : null;
@@ -225,7 +224,7 @@ export function DropdownMasterPage() {
     </li>)}</ul>
   );
   const detailHead = category === null ? null : <div className="space-y-2 border-b border-task-border px-4 py-3">
-    <div className="flex flex-wrap items-center gap-2"><h2 className="min-w-0 flex-1 truncate font-display text-lg font-semibold text-champagne">{titleCase(category)}</h2>{metadataReady && currentOrigin ? originBadge(currentOrigin) : null}<Button className="min-h-10" onClick={() => { setNewList(false); setEditing(null); }}><Plus className="h-4 w-4" />Add item</Button></div>
+    <div className="flex flex-wrap items-center gap-2"><h2 className="min-w-0 flex-1 truncate font-display text-lg font-semibold text-champagne">{titleCase(category)}</h2>{metadataReady && currentOrigin ? originBadge(currentOrigin) : null}{canManage ? <Button className="min-h-10" onClick={() => { setNewList(false); setEditing(null); }}><Plus className="h-4 w-4" />Add item</Button> : <span className="rounded-full border border-gold/30 px-2.5 py-1 text-xs font-semibold text-champagne">View only</span>}</div>
     {currentForms.length ? <div className="flex flex-wrap items-center gap-1.5"><span className="text-xs font-semibold uppercase tracking-wide text-soft-grey">Used in forms</span>{currentForms.map((form) => <span className="inline-flex items-center gap-1 rounded-full bg-gold/10 px-2.5 py-0.5 text-xs text-champagne" key={form.formTemplateId} title={`Questions: ${form.questions.join(", ")}`}><FileText className="size-3" />{form.name}{form.lifecycle === "draft" ? " (draft)" : ""}</span>)}</div>
       : metadataReady ? <p className="text-xs text-soft-grey">No form questions use this list yet. It may still be used by Tasks, Users, Leave or CRM.</p> : null}
     <div className="flex flex-wrap items-center gap-2"><label className="relative min-w-[12rem] flex-1"><Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-soft-grey" /><input aria-label="Search this list" className="field pl-9" onChange={(event) => setSearch(event.target.value)} placeholder="Search label or code" type="search" value={search} /></label><select aria-label="Status" className="field w-auto" onChange={(event) => setStatus(event.target.value as typeof status)} value={status}><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select><span className="text-xs text-soft-grey tabular-nums">{counts.total} total · <span className="text-success">{counts.active} active</span> · {counts.inactive} inactive</span></div>
@@ -236,9 +235,9 @@ export function DropdownMasterPage() {
       <span className="w-8 shrink-0 text-center text-xs font-semibold text-gold-secondary tabular-nums">{item.sort_order ?? 0}</span>
       <div className="min-w-0 flex-1"><h3 className="break-words text-sm font-semibold text-white">{item.label}</h3><p className="truncate font-mono text-xs text-soft-grey">{item.value}</p></div>
       <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] uppercase ${item.is_active === false ? "bg-soft-grey/10 text-soft-grey" : "bg-success/10 text-success"}`}>{item.is_active === false ? "Inactive" : "Active"}</span>
-      <div className="flex shrink-0 gap-1"><Button aria-label={`Edit ${item.label}`} className="size-10 min-h-10 p-0" onClick={() => setEditing(item)} variant="ghost"><Pencil className="h-4 w-4" /></Button>{item.is_active === false
+      {canManage ? <div className="flex shrink-0 gap-1"><Button aria-label={`Edit ${item.label}`} className="size-10 min-h-10 p-0" onClick={() => setEditing(item)} variant="ghost"><Pencil className="h-4 w-4" /></Button>{item.is_active === false
         ? <Button aria-label={`Turn on ${item.label}`} className="size-10 min-h-10 p-0" onClick={() => void toggleActive(item)} variant="ghost"><Eye className="h-4 w-4" /></Button>
-        : <Button aria-label={`Turn off ${item.label}`} className="size-10 min-h-10 p-0" onClick={() => void toggleActive(item)} variant="ghost"><EyeOff className="h-4 w-4 text-danger" /></Button>}</div>
+        : <Button aria-label={`Turn off ${item.label}`} className="size-10 min-h-10 p-0" onClick={() => void toggleActive(item)} variant="ghost"><EyeOff className="h-4 w-4 text-danger" /></Button>}</div> : null}
     </li>)}</ul>
   );
 
@@ -246,7 +245,7 @@ export function DropdownMasterPage() {
     <section className="w-full">
       <header className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3"><span className="rounded-xl bg-gold-sheen p-2 text-on-gold shadow-gold"><ListFilter className="h-5 w-5" /></span><div className="min-w-0"><h1 className="font-display text-[1.6rem] font-semibold leading-tight text-gold-secondary sm:text-[1.85rem]">Dropdown Master</h1>{statLine}</div></div>
-        {wide || category === null ? <Button className="w-full sm:w-auto" onClick={() => { setNewList(true); setEditing(null); }}><Plus className="h-4 w-4" />New list</Button> : null}
+        {canManage && (wide || category === null) ? <Button className="w-full sm:w-auto" onClick={() => { setNewList(true); setEditing(null); }}><Plus className="h-4 w-4" />New list</Button> : null}
       </header>
       {error ? <div className="mb-3"><Notice tone="danger">{error}</Notice><Button className="mt-3" onClick={() => void load()} variant="secondary">Retry</Button></div> : null}
 
@@ -256,7 +255,7 @@ export function DropdownMasterPage() {
           <div className="border-b border-task-border p-3">{listTools}</div>
           <div className="min-w-0">{listRows}</div>
         </div>
-        <div className="flex min-h-0 min-w-0 scroll-mt-32 flex-col" ref={detailsRef}>{category === null ? <p className="m-auto p-10 text-center text-soft-grey">Select a list to see and edit its options.</p> : <>
+        <div className="flex min-h-0 min-w-0 scroll-mt-32 flex-col" ref={detailsRef}>{category === null ? <p className="m-auto p-10 text-center text-soft-grey">{canManage ? "Select a list to see and edit its options." : "Select a list to see its options."}</p> : <>
           {detailHead}
           <div className="min-w-0">{optionRows}</div>
         </>}</div>
@@ -268,7 +267,7 @@ export function DropdownMasterPage() {
         {detailHead}
         {optionRows}
       </div>}
-      {editing !== undefined ? <DropdownEditor category={newList ? null : category} existingLists={listKeys} item={editing} onClose={() => setEditing(undefined)} onSaved={async (list) => { await load(); if (newList || !category) setCategory(list); }} /> : null}
+      {canManage && editing !== undefined ? <DropdownEditor category={newList ? null : category} existingLists={listKeys} item={editing} onClose={() => setEditing(undefined)} onSaved={async (list) => { await load(); if (newList || !category) setCategory(list); }} /> : null}
     </section>
   );
 }

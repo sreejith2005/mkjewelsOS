@@ -1,5 +1,6 @@
 import { FmsAssignmentEditor } from "./FmsAssignmentEditor";
 import { FmsTaskNaming } from "./FmsTaskNaming";
+import { useFmsViewOnly } from "./viewOnly";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, ChevronRight, CornerDownRight, Eye, FilePlus2, GitBranch, Import, Link2, Pencil, Plus, Trash2, X } from "lucide-react";
 import {
@@ -341,7 +342,10 @@ function StageRouting({ stage, others, fields, allFields, decision, update, upda
   </section>;
 }
 
-function RouteRow({ rule, index, stage, others, fields, allFields, decision, expanded, toggle, changeRule, moveRule, remove }: { rule: FmsBranchRule; index: number; stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; fields: readonly FmsFormFieldRef[]; allFields: readonly FmsFormFieldRef[]; decision: boolean; expanded: boolean; toggle: () => void; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void; remove: () => void }) {
+function RouteRow({ rule, index, stage, others, fields, allFields, decision, expanded: expandedProp, toggle, changeRule, moveRule, remove }: { rule: FmsBranchRule; index: number; stage: FmsStageDefinition; others: readonly FmsStageDefinition[]; fields: readonly FmsFormFieldRef[]; allFields: readonly FmsFormFieldRef[]; decision: boolean; expanded: boolean; toggle: () => void; changeRule: (index: number, patch: Partial<FmsBranchRule>) => void; moveRule: (index: number, direction: -1 | 1) => void; remove: () => void }) {
+  // View only: every route shows its full rule, since the toggle sits in the locked editor.
+  const viewOnly = useFmsViewOnly();
+  const expanded = expandedProp || viewOnly;
   const field = rule.source === "form_answer" ? fields.find((item) => item.key === rule.sourceKey) : undefined;
   /** A saved question outside the section stays selected and flagged until the author picks another. */
   const outside = rule.source === "form_answer" && !field ? allFields.find((item) => item.key === rule.sourceKey) : undefined;

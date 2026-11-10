@@ -1,5 +1,5 @@
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { CheckSquare, CircleHelp, ClipboardPaste, Copy, CopyPlus, FileText, Flag, GitBranch, Hand, Info, Layers, LayoutGrid, Maximize, Merge, Minus, MousePointer2, Pencil, Plus, Repeat, Scissors, ShieldCheck, Trash2, Waypoints, X, Zap } from "lucide-react";
+import { CheckSquare, CircleHelp, ClipboardPaste, Copy, CopyPlus, FileText, Flag, GitBranch, Hand, Eye, Info, Layers, LayoutGrid, Maximize, Merge, Minus, MousePointer2, Pencil, Plus, Repeat, Scissors, ShieldCheck, Trash2, Waypoints, X, Zap } from "lucide-react";
 import { FMS_MIN_ZOOM as MIN_ZOOM, FMS_MAX_ZOOM as MAX_ZOOM, fmsFollowUpGroups, fmsWheelZoomFactor, routeFmsGraphEdges, fmsOutgoingStageKeys, hasFmsStageRouting, zoomFmsViewport, type FmsFlowDefinition, type FmsFormFieldRef, type FmsStageDefinition, type FmsViewport } from "@jewelos/core";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
@@ -90,6 +90,8 @@ type CanvasProps = Readonly<{
   onEditRoute?: ((from: string, ruleId: string | undefined) => void) | undefined;
   /** Fill the parent workspace edge to edge (desktop builder) instead of the bounded card. */
   fill?: boolean;
+  /** View only: steps and routes open on click, but nothing drags, connects, adds or deletes. */
+  readOnly?: boolean | undefined;
 }>;
 
 export const FmsGraphCanvas = forwardRef<FmsCanvasHandle, CanvasProps>(function FmsGraphCanvas(props, handleRef) {
@@ -352,7 +354,8 @@ export const FmsGraphCanvas = forwardRef<FmsCanvasHandle, CanvasProps>(function 
     event.currentTarget.setPointerCapture(event.pointerId);
     // Middle button, Space held, or Hand mode: the canvas moves whatever was pressed.
     if (event.button === 1 || spaceRef.current) { event.preventDefault(); beginPan(event.clientX, event.clientY); return; }
-    const endpoint = target.closest<HTMLElement>("[data-edge-from]");
+    const readOnly = actions.current.readOnly === true;
+    const endpoint = readOnly ? null : target.closest<HTMLElement>("[data-edge-from]");
     if (endpoint?.dataset.edgeFrom && endpoint.dataset.edgeTo) {
       const from = endpoint.dataset.edgeFrom;
       const point = position(from);
@@ -363,7 +366,7 @@ export const FmsGraphCanvas = forwardRef<FmsCanvasHandle, CanvasProps>(function 
     const edgeHit = target.closest<SVGElement>("[data-edge-hit]")?.dataset.edgeHit;
     if (edgeHit) { setSelectedEdge(edgeHit); setEdgeInfo(false); setHoveredEdge(edgeHit); dragRef.current = null; return; }
     setSelectedEdge(null);
-    const handle = target.closest<HTMLElement>("[data-node-output]");
+    const handle = readOnly ? null : target.closest<HTMLElement>("[data-node-output]");
     if (handle?.dataset.nodeOutput) {
       const from = handle.dataset.nodeOutput;
       const point = position(from);
@@ -381,7 +384,8 @@ export const FmsGraphCanvas = forwardRef<FmsCanvasHandle, CanvasProps>(function 
       const current = actions.current.selectedKeys;
       const chosen = additive ? (current.includes(key) ? current.filter((item) => item !== key) : [...current, key]) : (current.includes(key) ? current : [key]);
       if (additive || !current.includes(key)) onSelectionChange(chosen);
-      const keys = chosen.includes(key) ? chosen : [];
+      // View only: a press selects and opens the step but never moves it.
+      const keys = readOnly ? [] : chosen.includes(key) ? chosen : [];
       dragRef.current = { kind: "node", keys, origins: new Map(keys.map((item) => [item, position(item)])), worldX: world.x, worldY: world.y, moved: false, primary: key, additive };
       if (event.pointerType !== "mouse") {
         // A long press adds the step to the selection, the phone's Shift+click.
@@ -599,7 +603,7 @@ export const FmsGraphCanvas = forwardRef<FmsCanvasHandle, CanvasProps>(function 
       <span className="hidden min-w-11 place-items-center text-xs text-champagne sm:grid">{Math.round(zoom * 100)}%</span>
       <button aria-label="Zoom in" className="rounded p-2 text-gold-secondary hover:bg-gold/10 max-md:p-2.5" onClick={() => zoomAt(ZOOM_STEP)} title="Zoom in" type="button"><Plus className="size-4" /></button>
       <button aria-label="Fit workflow to view" className="rounded p-2 text-gold-secondary hover:bg-gold/10 max-md:p-2.5" onClick={fitView} title="Fit workflow (1)" type="button"><Maximize className="size-4" /></button>
-      <button aria-label="Auto-arrange workflow" className="hidden rounded p-2 text-gold-secondary hover:bg-gold/10 sm:block" onClick={() => { setOffsets({}); actions.current.onMove(Object.fromEntries(layout)); }} title="Auto-arrange" type="button"><LayoutGrid className="size-4" /></button>
+      {props.readOnly ? null : <button aria-label="Auto-arrange workflow" className="hidden rounded p-2 text-gold-secondary hover:bg-gold/10 sm:block" onClick={() => { setOffsets({}); actions.current.onMove(Object.fromEntries(layout)); }} title="Auto-arrange" type="button"><LayoutGrid className="size-4" /></button>}
       <button aria-expanded={tipOpen} aria-label="Canvas tips" className={cn("rounded p-2 text-gold-secondary hover:bg-gold/10 max-md:p-2.5", tipOpen && "bg-gold/15")} onClick={() => setTipOpen((open) => !open)} title="Tips" type="button"><CircleHelp className="size-4" /></button>
     </div>
     {tipOpen ? <div className="absolute left-3 top-3 z-30 flex max-w-[min(26rem,calc(100%-1.5rem))] items-start gap-2 rounded-xl border border-gold/25 bg-charcoal/95 px-3 py-2 text-xs leading-relaxed text-soft-grey shadow-xl max-sm:top-16" data-canvas-control role="note">
@@ -659,7 +663,7 @@ export const FmsGraphCanvas = forwardRef<FmsCanvasHandle, CanvasProps>(function 
       </div>
     </div>
 
-    {selectionBar && !marquee && !dragRef.current ? <div aria-label={`${selectedKeys.length} selected`} className="absolute z-30 flex -translate-x-1/2 -translate-y-full items-center gap-0.5 rounded-lg border border-gold/30 bg-charcoal p-1 shadow-xl" data-canvas-control role="toolbar" style={{ left: selectionBar.x, top: selectionBar.y }}>
+    {selectionBar && !marquee && !dragRef.current && !props.readOnly ? <div aria-label={`${selectedKeys.length} selected`} className="absolute z-30 flex -translate-x-1/2 -translate-y-full items-center gap-0.5 rounded-lg border border-gold/30 bg-charcoal p-1 shadow-xl" data-canvas-control role="toolbar" style={{ left: selectionBar.x, top: selectionBar.y }}>
       <span className="px-1.5 text-xs font-semibold text-champagne">{selectedKeys.length}</span>
       <ToolButton icon={Copy} label="Copy selected steps" onClick={() => command("copy")} />
       <ToolButton icon={CopyPlus} label="Duplicate selected steps" onClick={() => command("duplicate")} />
@@ -670,29 +674,33 @@ export const FmsGraphCanvas = forwardRef<FmsCanvasHandle, CanvasProps>(function 
 
     {edgePopover && edgeDetails ? <div aria-label="Connection actions" className="absolute z-30 -translate-x-1/2 -translate-y-full rounded-lg border border-gold/30 bg-charcoal p-1 shadow-xl" data-canvas-control role="toolbar" style={{ left: edgePopover.x, top: edgePopover.y }}>
       <div className="flex items-center gap-0.5">
-        {actions.current.onEditRoute ? <ToolButton icon={Pencil} label="Edit route" onClick={() => { actions.current.onEditRoute?.(edgeDetails.from, edgeDetails.ruleId); setSelectedEdge(null); }} /> : null}
-        <ToolButton icon={Waypoints} label="Change destination" onClick={() => { setRetarget({ from: edgeDetails.from, to: edgeDetails.to, ruleId: edgeDetails.ruleId }); setSelectedEdge(null); }} />
+        {actions.current.onEditRoute ? <ToolButton icon={props.readOnly ? Eye : Pencil} label={props.readOnly ? "View route" : "Edit route"} onClick={() => { actions.current.onEditRoute?.(edgeDetails.from, edgeDetails.ruleId); setSelectedEdge(null); }} /> : null}
+        {props.readOnly ? null : <ToolButton icon={Waypoints} label="Change destination" onClick={() => { setRetarget({ from: edgeDetails.from, to: edgeDetails.to, ruleId: edgeDetails.ruleId }); setSelectedEdge(null); }} />}
         <ToolButton icon={Info} label="Route details" onClick={() => setEdgeInfo((open) => !open)} pressed={edgeInfo} />
-        <ToolButton danger icon={Trash2} label="Delete route" onClick={() => { actions.current.onDisconnect(edgeDetails.from, edgeDetails.to, edgeDetails.ruleId); setSelectedEdge(null); }} />
+        {props.readOnly ? null : <ToolButton danger icon={Trash2} label="Delete route" onClick={() => { actions.current.onDisconnect(edgeDetails.from, edgeDetails.to, edgeDetails.ruleId); setSelectedEdge(null); }} />}
       </div>
       {edgeInfo ? <div className="max-w-64 border-t border-gold/15 px-2 pb-1 pt-1.5 text-xs"><p className="font-semibold text-champagne">{nameOf(edgeDetails.from)} → {nameOf(edgeDetails.to)}</p><p className="text-soft-grey">{edgeDetails.label || (edgeDetails.kind === "parallel" ? "Runs in parallel" : "Continue to next step")}</p></div> : <p className="sr-only">{nameOf(edgeDetails.from)} → {nameOf(edgeDetails.to)}</p>}
     </div> : null}
 
     {menu ? <div aria-label="Canvas actions" className="absolute z-40 min-w-44 rounded-lg border border-gold/30 bg-charcoal p-1 text-sm shadow-2xl" data-canvas-control role="menu" style={{ left: clamp(menu.x, 4, Math.max(4, viewportWidth - 184)), top: menu.y }}>
       {menu.kind === "node" ? <>
-        <MenuItem icon={Pencil} label="Open settings" onClick={() => { setMenu(null); if (menu.key) actions.current.onOpen(menu.key); }} />
+        <MenuItem icon={props.readOnly ? Eye : Pencil} label="Open settings" onClick={() => { setMenu(null); if (menu.key) actions.current.onOpen(menu.key); }} />
+        {props.readOnly ? null : <>
         {actions.current.onAddFollowUpAfter && menu.key && !["end", "branch", "parallel_start"].includes(definition.stages.find((stage) => stage.key === menu.key)?.type ?? "end") ? <MenuItem icon={Repeat} label="Add Follow-Up Group after" onClick={() => { setMenu(null); if (menu.key) actions.current.onAddFollowUpAfter?.(menu.key); }} /> : null}
         <MenuItem icon={Copy} label="Copy" shortcut="Ctrl+C" onClick={() => command("copy")} />
         <MenuItem icon={Scissors} label="Cut" shortcut="Ctrl+X" onClick={() => command("cut")} />
         <MenuItem icon={CopyPlus} label="Duplicate" shortcut="Ctrl+D" onClick={() => command("duplicate")} />
         <MenuItem danger icon={Trash2} label="Delete" shortcut="Del" onClick={() => command("delete")} />
+        </>}
       </> : menu.kind === "edge" && edgeDetails ? <>
-        {actions.current.onEditRoute ? <MenuItem icon={Pencil} label="Edit route" onClick={() => { setMenu(null); actions.current.onEditRoute?.(edgeDetails.from, edgeDetails.ruleId); }} /> : null}
+        {actions.current.onEditRoute ? <MenuItem icon={props.readOnly ? Eye : Pencil} label={props.readOnly ? "View route" : "Edit route"} onClick={() => { setMenu(null); actions.current.onEditRoute?.(edgeDetails.from, edgeDetails.ruleId); }} /> : null}
+        {props.readOnly ? null : <>
         <MenuItem icon={Waypoints} label="Change destination" onClick={() => { setMenu(null); setRetarget({ from: edgeDetails.from, to: edgeDetails.to, ruleId: edgeDetails.ruleId }); setSelectedEdge(null); }} />
         <MenuItem danger icon={Trash2} label="Delete route" onClick={() => { setMenu(null); actions.current.onDisconnect(edgeDetails.from, edgeDetails.to, edgeDetails.ruleId); setSelectedEdge(null); }} />
+        </>}
       </> : <>
-        <MenuItem icon={ClipboardPaste} label="Paste here" shortcut="Ctrl+V" onClick={() => command("paste", menu.world)} />
-        <MenuItem icon={MousePointer2} label="Select all" shortcut="Ctrl+A" onClick={() => command("selectAll")} />
+        {props.readOnly ? null : <MenuItem icon={ClipboardPaste} label="Paste here" shortcut="Ctrl+V" onClick={() => command("paste", menu.world)} />}
+        {props.readOnly ? null : <MenuItem icon={MousePointer2} label="Select all" shortcut="Ctrl+A" onClick={() => command("selectAll")} />}
         <MenuItem icon={Maximize} label="Fit workflow" shortcut="1" onClick={() => { setMenu(null); fitView(); }} />
       </>}
     </div> : null}
@@ -717,11 +725,11 @@ function MenuItem({ icon: Icon, label, shortcut, onClick, danger = false }: { ic
 const StageCard = memo(function StageCard({ stage, x, y, selected, inspected, highlighted, invalid, dropTarget, isFirst, actions, endCount, followUp }: {
   stage: FmsStageDefinition; x: number; y: number; selected: boolean; inspected: boolean; highlighted: boolean; invalid: boolean; dropTarget: boolean; isFirst: boolean; endCount?: number | undefined;
   followUp?: Readonly<{ chip: string; title: string }> | undefined;
-  actions: Readonly<{ current: Pick<CanvasProps, "onDuplicate" | "onDelete" | "onAddAfter"> }>;
+  actions: Readonly<{ current: Pick<CanvasProps, "onDuplicate" | "onDelete" | "onAddAfter" | "readOnly"> }>;
 }) {
   const item = appearance[stage.type];
-  const canOutput = stage.type !== "end";
-  const canAppend = !["end", "branch", "parallel_start"].includes(stage.type);
+  const canOutput = stage.type !== "end" && actions.current.readOnly !== true;
+  const canAppend = !["end", "branch", "parallel_start"].includes(stage.type) && actions.current.readOnly !== true;
   const isLeaf = fmsOutgoingStageKeys(stage).length === 0 && stage.type !== "end";
   // A last human step still needs Mark as done; only an End Node closes the run by itself.
   const manualLast = isLeaf && ["form", "task", "approval"].includes(stage.type);

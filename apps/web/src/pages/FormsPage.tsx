@@ -1,7 +1,7 @@
 import { returnFromFmsWork } from "@/features/tasks/fms/boardReturn";
 import { FmsStartingForm } from "@/features/forms/FmsStartingForm";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, Archive, ArrowLeft, BookOpen, ChevronRight, ClipboardList, Contact, Copy, FileText, History, Pencil, Plus, Search, Send, Trash2, Workflow } from "lucide-react";
+import { AlertTriangle, Archive, ArrowLeft, BookOpen, ChevronRight, ClipboardList, Contact, Copy, Eye, FileText, History, Pencil, Plus, Search, Send, Trash2, Workflow } from "lucide-react";
 import { formatKolkataDateTime, groupFormSubmissions, type FmsBuiltForm, formMatchesLifecycle, hasPermission, presentFormSubmission, WORK_UPLOAD_FORM_NAME, type FormMasterOption, type SubmissionRecord, type SubmissionTemplate } from "@jewelos/core";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Modal, Notice } from "@/components/ui";
@@ -40,6 +40,9 @@ export function FormsPage() {
   useEffect(() => { if (!starter || !data) return; const pinned = data.bundles.find((bundle) => bundle.id === starter.formTemplateId); if (pinned) setFill(pinned); }, [data, starter]);
   useTenantRealtimeRefresh({ tenantId: profile?.tenant_id, topics: ["forms", "tasks", "fms", "organization"], refresh });
   const author = hasPermission(access, "forms.manage");
+  // Leaders (Forms: View every form's design) open any form read-only: questions, settings and routes.
+  const viewer = !author && hasPermission(access, "forms.view_designs");
+  const [viewing, setViewing] = useState<FormBundle>();
   // "Edit in Form Builder" from CRM Form Settings: /forms?editForm=<form family> opens that form's draft, or its published version.
   const editFamily = useMemo(() => new URLSearchParams(window.location.search).get("editForm"), []);
   useEffect(() => {
@@ -49,7 +52,7 @@ export function FormsPage() {
     window.history.replaceState({}, "", `${window.location.pathname}${params.size ? `?${params}` : ""}`);
     const target = versions.find((bundle) => bundle.lifecycle === "draft") ?? versions[0];
     if (target) setEdit(target);
-  }, [author, data, editFamily]); const families = useMemo(() => { const groups = new Map<string, FormBundle[]>(); for (const item of data?.bundles ?? []) { if (!author && item.library_visible === false) continue; groups.set(item.family_id, [...(groups.get(item.family_id) ?? []), item]); } return [...groups.values()].map((items) => items.sort((a, b) => b.version - a.version)).filter((items) => items.some((item) => `${item.name} ${item.description ?? ""}`.toLowerCase().includes(query.toLowerCase()) && formMatchesLifecycle(item.lifecycle, life))).sort((a, b) => a[0]!.name.localeCompare(b[0]!.name)); }, [data, life, query, author]);
+  }, [author, data, editFamily]); const families = useMemo(() => { const groups = new Map<string, FormBundle[]>(); for (const item of data?.bundles ?? []) { if (!author && !viewer && item.library_visible === false) continue; groups.set(item.family_id, [...(groups.get(item.family_id) ?? []), item]); } return [...groups.values()].map((items) => items.sort((a, b) => b.version - a.version)).filter((items) => items.some((item) => `${item.name} ${item.description ?? ""}`.toLowerCase().includes(query.toLowerCase()) && formMatchesLifecycle(item.lifecycle, life))).sort((a, b) => a[0]!.name.localeCompare(b[0]!.name)); }, [data, life, query, author, viewer]);
   const libraryFamilies = useMemo(() => families.filter((versions) => !built?.has(versions[0]!.family_id) && !crmForms.has(versions[0]!.family_id)), [built, crmForms, families]);
   const crmFamilies = useMemo(() => families.filter((versions) => crmForms.has(versions[0]!.family_id)), [crmForms, families]);
   /** A CRM form is filled in CRM, where submitting registers the client or lead. */
@@ -73,6 +76,7 @@ export function FormsPage() {
     if (!draft) throw new Error("The new version is not visible in Forms Library");
     setEdit(draft);
   }).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Create form version failed"));
+  if (viewing) return <FormBuilder bundle={viewing} dynamicOptions={options} onClose={() => setViewing(undefined)} onSaved={refresh} readOnly />;
   if (edit !== undefined) return <FormBuilder bundle={edit ?? undefined} dynamicOptions={options} onClose={() => setEdit(undefined)} onSaved={refresh} />;
   const fmsSource = !!built && source === "fms";
   const shownFamilies = fmsSource ? fmsFamilies : source === "crm" ? crmFamilies : built ? libraryFamilies : families.filter((versions) => !crmForms.has(versions[0]!.family_id));
@@ -81,7 +85,7 @@ export function FormsPage() {
   const selectedId = sidePanel ? selectedVersions?.[0]!.family_id ?? null : selectedFamily;
   const narrowVersions = sidePanel ? undefined : shownFamilies.find((versions) => versions[0]!.family_id === selectedFamily);
   const sourceNote = source === "library" ? null : source === "crm" ? `Forms CRM uses to register people: ${[...new Set(crmForms.values())].map((purpose) => CRM_FORM_PURPOSE_LABELS[purpose].toLowerCase()).join(", ")}. ${author ? "Edit and publish them here like any form; CRM uses each new published version. Choose which form CRM uses in CRM → REGISTRATION → CRM FORM SETTINGS." : ""} Fill form opens CRM registration.` : author ? "One card per FMS form. Tap a form to edit it: Save changes updates it in every workflow step that uses it. People fill them through their workflow." : "Forms that belong to FMS workflows. You fill them from Tasks → FMS when a step is assigned to you.";
-  const libraryActions: LibraryActions = { author, built, onVisibilitySaved: refresh, onVisibilityError: setError, onFill: fillForm, onEdit: setEdit, onPublish: runPublish, onPublishAsNew: runPublishAsNew, onCreateVersion: runCreateVersion, onDelete: setRemove, onArchive: (id) => void archiveForm(id).then(refresh).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Archive failed")), onEditPublished: (id) => { const form = data?.bundles.find((item) => item.id === id); if (form?.lifecycle === "published") setEdit(form); else setError("Archived forms cannot be edited."); } };
+  const libraryActions: LibraryActions = { author, viewer, onView: setViewing, built, onVisibilitySaved: refresh, onVisibilityError: setError, onFill: fillForm, onEdit: setEdit, onPublish: runPublish, onPublishAsNew: runPublishAsNew, onCreateVersion: runCreateVersion, onDelete: setRemove, onArchive: (id) => void archiveForm(id).then(refresh).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Archive failed")), onEditPublished: (id) => { const form = data?.bundles.find((item) => item.id === id); if (form?.lifecycle === "published") setEdit(form); else setError("Archived forms cannot be edited."); } };
   const list = !data ? <div className="grid gap-2"><div className="skeleton h-16 rounded-xl" /><div className="skeleton h-16 rounded-xl" /><div className="skeleton h-16 rounded-xl" /></div>
     : tab === "templates" ? <Library {...libraryActions} emptyText={fmsSource ? "No FMS workflow forms match. Forms built inside an FMS step appear here." : source === "crm" ? "No CRM forms match these filters." : "No forms match these filters."} families={shownFamilies} inlineDetails={!sidePanel} onSelect={(id) => { setSelectedFamily(id); revealPageDetail(detailsRef.current); }} selectedId={selectedId} editLive={fmsSource} />
     : <SubmissionList bundles={data.bundles} onView={setView} submissions={data.submissions} />;
@@ -100,7 +104,7 @@ export function FormsPage() {
         {built ? <div aria-label="Which forms" className="scroll-x no-scrollbar -mx-1 flex gap-1.5 px-1 lg:mx-0 lg:px-0" role="group">
           {([["library", "Forms Library", BookOpen, libraryFamilies.length], ["fms", "FMS workflow forms", Workflow, fmsFamilyCount], ...(crmFamilies.length ? [["crm", "CRM forms", Contact, crmFamilies.length] as const] : [])] as const).map(([key, label, Icon, count]) => <button aria-pressed={source === key} className={cn("inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 text-sm font-semibold transition", source === key ? "border-gold bg-gold/10 text-task-text" : "border-task-border bg-task-bg text-task-text-muted hover:border-gold/50 hover:text-task-text")} key={key} onClick={() => setSource(key)} type="button"><Icon aria-hidden="true" className={cn("size-4 shrink-0", source === key && "text-gold-secondary")} /><span className="whitespace-nowrap">{label}</span><span className={cn("rounded-full px-2 py-0.5 text-xs tabular-nums", source === key ? "bg-gold/20 text-gold-secondary" : "bg-task-muted")}>{count}</span></button>)}
         </div> : null}
-        <div className={cn("grid flex-1 gap-2", author && "sm:grid-cols-[1fr_auto]")}><label className="relative block"><Search aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-soft-grey" /><input aria-label="Search forms" className="field min-h-11 pl-10" enterKeyHint="search" onChange={(event) => setQuery(event.target.value)} placeholder="Search forms" type="search" value={query} /></label>{author ? <select aria-label="Lifecycle filter" className="field min-h-11 sm:w-52" onChange={(event) => setLife(event.target.value)} value={life}><option value="active">Current and drafts</option><option value="published">Published</option><option value="draft">Drafts</option><option value="archived">Archived history</option><option value="all">All lifecycle</option></select> : null}</div>
+        <div className={cn("grid flex-1 gap-2", author && "sm:grid-cols-[1fr_auto]")}><label className="relative block"><Search aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-soft-grey" /><input aria-label="Search forms" className="field min-h-11 pl-10" enterKeyHint="search" onChange={(event) => setQuery(event.target.value)} placeholder="Search forms" type="search" value={query} /></label>{author || viewer ? <select aria-label="Lifecycle filter" className="field min-h-11 sm:w-52" onChange={(event) => setLife(event.target.value)} value={life}><option value="active">Current and drafts</option><option value="published">Published</option><option value="draft">Drafts</option><option value="archived">Archived history</option><option value="all">All lifecycle</option></select> : null}</div>
       </div>
       {built && sourceNote ? <p className="px-1 text-xs leading-relaxed text-task-text-muted">{sourceNote}</p> : null}
     </div> : null}
@@ -133,7 +137,7 @@ const LIFECYCLE_BADGE: Readonly<Record<string, { label: string; tone: string }>>
 };
 const roleList = (item: FormBundle) => Array.isArray((item.permissions as { roles?: unknown })?.roles) ? ((item.permissions as { roles: string[] }).roles.map((role) => role.replaceAll("_", " ")).join(", ") || "none") : "none";
 
-type LibraryActions = Readonly<{ author: boolean; built: ReadonlyMap<string, FmsBuiltForm> | null; onVisibilitySaved: () => Promise<void>; onVisibilityError: (message: string) => void; onFill: (item: FormBundle) => void; onEdit: (item: FormBundle) => void; onPublish: (id: string) => void; onPublishAsNew: (id: string) => void; onEditPublished: (id: string) => void; onCreateVersion: (id: string) => void; onArchive: (id: string) => void; onDelete: (item: FormBundle) => void }>;
+type LibraryActions = Readonly<{ author: boolean; viewer: boolean; onView: (item: FormBundle) => void; built: ReadonlyMap<string, FmsBuiltForm> | null; onVisibilitySaved: () => Promise<void>; onVisibilityError: (message: string) => void; onFill: (item: FormBundle) => void; onEdit: (item: FormBundle) => void; onPublish: (id: string) => void; onPublishAsNew: (id: string) => void; onEditPublished: (id: string) => void; onCreateVersion: (id: string) => void; onArchive: (id: string) => void; onDelete: (item: FormBundle) => void }>;
 type LibraryListProps = LibraryActions & { families: FormBundle[][]; /** FMS forms: the tile opens the live version, whose Save changes reaches every step using it. */ editLive?: boolean; place?: (familyId: string) => FmsFormPlace; emptyText: string; selectedId: string | null; onSelect: (familyId: string | null) => void; inlineDetails: boolean };
 
 function Library(props: LibraryListProps) {
@@ -163,7 +167,7 @@ function fmsPlaceText(where: FmsFormPlace | undefined, fms: FmsBuiltForm | undef
 function FormLibraryList({ families, place, emptyText, selectedId, onSelect, inlineDetails, editLive = false, ...actions }: LibraryListProps) {
   // inlineDetails: the row opens the full-screen details view instead of the side pane.
   if (families.length === 0) return <Notice>{emptyText}</Notice>;
-  const { author, built, onFill, onEdit } = actions;
+  const { author, viewer, onView, built, onFill, onEdit } = actions;
   return <div className={cn("rounded-2xl bg-task-bg p-2", !place && "min-h-[calc(100dvh-20rem)]")}><ul className="grid items-start gap-3 sm:grid-cols-2 2xl:grid-cols-3">{families.map((versions) => {
     const latest = versions[0]!;
     const live = versions.find((item) => item.lifecycle === "published");
@@ -189,6 +193,7 @@ function FormLibraryList({ families, place, emptyText, selectedId, onSelect, inl
         </div>}
         {live ? <Button className="relative z-10 min-h-10 shrink-0 px-3" onClick={() => onFill(live)} type="button"><Send className="size-4" /><span className="hidden sm:inline">Fill form</span><span className="sr-only sm:hidden">Fill form</span></Button>
           : author && draft ? <Button className="relative z-10 min-h-10 shrink-0 px-3" onClick={() => onEdit(draft)} type="button" variant="secondary"><Pencil className="size-4" /><span className="hidden sm:inline">Edit draft</span><span className="sr-only sm:hidden">Edit draft</span></Button> : null}
+        {viewer ? <Button aria-label={`View ${latest.name}`} className="relative z-10 min-h-10 shrink-0 px-3" onClick={() => onView(draft ?? shown)} type="button" variant="secondary"><Eye className="size-4" /><span className="hidden sm:inline">View form</span><span className="sr-only sm:hidden">View form</span></Button> : null}
         {author ? <Button aria-label={`Versions and actions for ${latest.name}`} className="relative z-10 min-h-10 px-3" onClick={() => onSelect(latest.family_id)} type="button" variant="ghost"><History className="size-4" />Versions & actions</Button> : null}
       </div>
     </article></li>;
