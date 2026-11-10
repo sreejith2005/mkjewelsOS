@@ -43,8 +43,9 @@ it('explains and focuses missing fields instead of silently blocking submission'
  render(<AddUserForm data={data} role="hr" onClose={() => {}} onDone={async () => {}} />);
  const field=screen.getByLabelText('First name');
  fireEvent.invalid(field);
- expect(screen.getByText(/Complete the required fields: First name/)).toBeTruthy();
- expect(document.activeElement).toBe(field);
+ // Missing fields are listed and focused in form order: where they work comes first.
+ expect(screen.getByText(/Complete the required fields: Branch, Department, First name/)).toBeTruthy();
+ expect(document.activeElement).toBe(screen.getByLabelText('Branch'));
  expect(field.getAttribute('aria-invalid')).toBe('true');
  fireEvent.change(field,{target:{value:'Employee'}});
  fireEvent.input(field);

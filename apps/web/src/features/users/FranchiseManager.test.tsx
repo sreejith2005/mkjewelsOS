@@ -11,6 +11,7 @@ const api = vi.hoisted(() => ({
   assignBranchFranchise: vi.fn(),
   grantScope: vi.fn(),
   revokeScope: vi.fn(),
+  setFranchiseIsolation: vi.fn(),
 }));
 vi.mock("@jewelos/data/users/franchise", () => api);
 
@@ -116,5 +117,32 @@ describe("FranchiseManager", () => {
     fireEvent.click(screen.getByRole("button", { name: "Grant" }));
     expect(await screen.findByText("Grant scope: This scope is already granted")).toBeTruthy();
     expect(api.grantScope).toHaveBeenCalledWith({ profileId: "p1", authority: "director", company: false, franchiseGroupId: "mum", branchId: null, reason: "Director" });
+  });
+  it("keeps Switch isolation on disabled until every store has a franchise, and says why", async () => {
+    render(<FranchiseManager people={people} />);
+    const button = await screen.findByRole("button", { name: "Switch isolation on" });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/use Set franchise to put every store in a franchise: Exhibition/)).toBeTruthy();
+  });
+
+  it("switches isolation on through the audited API with a reason once ready", async () => {
+    api.loadFranchiseAdmin.mockResolvedValue({ ...admin, readiness: { ...admin.readiness, enforcementSupported: true, mappingsComplete: true, unmappedActiveBranches: [] } });
+    api.setFranchiseIsolation.mockResolvedValue(undefined);
+    render(<FranchiseManager people={people} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Switch isolation on" }));
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "Stores mapped" } });
+    fireEvent.click(screen.getByRole("button", { name: "Switch on" }));
+    await waitFor(() => expect(api.setFranchiseIsolation).toHaveBeenCalledWith(true, "Stores mapped"));
+    await waitFor(() => expect(api.loadFranchiseAdmin).toHaveBeenCalledTimes(2));
+  });
+
+  it("always offers Switch isolation off while it is on", async () => {
+    api.loadFranchiseAdmin.mockResolvedValue({ ...admin, context: { ...admin.context, enforcementEnabled: true } });
+    api.setFranchiseIsolation.mockResolvedValue(undefined);
+    render(<FranchiseManager people={people} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Switch isolation off" }));
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "Rollback" } });
+    fireEvent.click(screen.getByRole("button", { name: "Switch off" }));
+    await waitFor(() => expect(api.setFranchiseIsolation).toHaveBeenCalledWith(false, "Rollback"));
   });
 });

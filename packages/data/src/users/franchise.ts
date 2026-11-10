@@ -152,6 +152,16 @@ export async function loadFranchiseAdmin(): Promise<{ context: FranchiseAdminCon
   return { context: parseFranchiseAdminContext(context.data), readiness: parseFranchiseReadiness(readiness.data) };
 }
 
+/**
+ * Super Admin switches franchise isolation on or off (audited). The server
+ * refuses "on" until every active store has a franchise and every section is
+ * ready; "off" is always allowed.
+ */
+export async function setFranchiseIsolation(enabled: boolean, reason: string): Promise<void> {
+  const { error } = await db().rpc("set_franchise_enforcement_with_audit", { p_enabled: enabled, p_reason: reason });
+  fail(enabled ? "Switch isolation on" : "Switch isolation off", error);
+}
+
 export type FranchiseChanges = Readonly<{ name: string; code: string; city?: string | null; state?: string | null; is_active: boolean }>;
 
 export async function saveFranchise(id: string | null, changes: FranchiseChanges): Promise<void> {
