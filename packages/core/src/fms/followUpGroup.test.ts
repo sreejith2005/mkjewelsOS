@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalizeFmsDefinition, validateFmsDefinition } from "./engine";
-import { FMS_FOLLOW_UP_OUTCOME, fmsFollowUpAttempts, fmsFollowUpGroups, insertFmsFollowUpGroup, setFmsFollowUpGroupParent, summarizeFmsFollowUps, type FmsFollowUpStageRow, type FmsFollowUpVisitRow } from "./followUpGroup";
+import { fmsFollowUpAttempts, fmsFollowUpGroups, insertFmsFollowUpGroup, setFmsFollowUpGroupParent, summarizeFmsFollowUps, type FmsFollowUpStageRow, type FmsFollowUpVisitRow } from "./followUpGroup";
 import { simulateFmsDefinition } from "./simulation";
 import { fmsStageTemplate } from "./stageTemplate";
 import { exportFmsWorkflow, parseFmsTransfer, pasteFmsFragment, removeFmsStages } from "./transfer";
@@ -31,31 +31,20 @@ const byKey = (flow: FmsFlowDefinition, key: string) => flow.stages.find((stage)
 const target = (stage: FmsStageDefinition, outcome: string) => stage.branchRules.find((rule) => rule.value === outcome)?.nextStageKey;
 
 describe("Add Follow-Up Group", () => {
-  it("adds exactly three connected native Decision steps after the main step", () => {
-    const before = normalizeFmsDefinition(sales());
+  it("adds three plain steps, exactly like Add Step, chained between the main step and its next step", () => {
+    const before = normalizeFmsDefinition(sales(false));
     const result = insertFmsFollowUpGroup(before, { afterKey: "intro", newId });
     const [k1, k2, k3] = result.stageKeys as [string, string, string];
     expect(result.definition.stages).toHaveLength(before.stages.length + 3);
     const group = [k1, k2, k3].map((key) => byKey(result.definition, key));
-    expect(group.map((stage) => [stage.name, stage.type, stage.sla.decisionMode, stage.sla.followUpGroup])).toEqual([1, 2, 3].map((number) =>
-      [`Follow-Up ${number}`, "task", "yes_no", { groupId: result.groupId, number, parentStageKey: "intro" }]));
+    expect(group.map((stage) => [stage.name, stage.type, stage.sla.decisionMode, stage.sla.decisionOptions, stage.branchRules, stage.sla.followUpGroup])).toEqual([1, 2, 3].map((number) =>
+      [`Follow-Up ${number}`, "task", "normal", undefined, [], { groupId: result.groupId, number, parentStageKey: "intro" }]));
     expect(new Set(result.stageKeys).size).toBe(3);
-    // Main step now leads to Follow-Up 1; "proceed" continues to its former next step.
     expect(byKey(result.definition, "intro").defaultNextStageKey).toBe(k1);
-    expect(group.map((stage) => target(stage, FMS_FOLLOW_UP_OUTCOME.proceed))).toEqual(["demo", "demo", "demo"]);
-    expect(group.map((stage) => target(stage, FMS_FOLLOW_UP_OUTCOME.again))).toEqual([k2, k3, k1]);
-    expect(group.map((stage) => target(stage, FMS_FOLLOW_UP_OUTCOME.close))).toEqual(["lost", "lost", "lost"]);
+    expect(group.map((stage) => stage.defaultNextStageKey)).toEqual([k2, k3, "demo"]);
     // Nothing else changed.
     for (const stage of before.stages.filter((item) => item.key !== "intro")) expect(byKey(result.definition, stage.key)).toEqual(stage);
     expect(validateFmsDefinition(result.definition)).toEqual([]);
-  });
-
-  it("leaves a missing close destination for the author, and validation blocks publishing until it is chosen", () => {
-    const result = insertFmsFollowUpGroup(sales(false), { afterKey: "intro", newId });
-    expect(result.closeStageKey).toBeUndefined();
-    const issues = validateFmsDefinition(result.definition);
-    expect(issues.filter((issue) => issue.code === "route_without_destination").map((issue) => issue.stageKey)).toEqual(result.stageKeys);
-    expect(fmsFollowUpGroups(result.definition.stages)[0]!.problems.some((problem) => problem.includes("Not interested, close"))).toBe(true);
   });
 
   it("never rewires a main step that already routes; the group is added unconnected and reported", () => {
@@ -64,18 +53,18 @@ describe("Add Follow-Up Group", () => {
     const result = insertFmsFollowUpGroup(routed, { afterKey: "intro", newId });
     expect(result.linkedFromParent).toBe(false);
     expect(byKey(result.definition, "intro")).toEqual(byKey(normalizeFmsDefinition(routed), "intro"));
+    expect(byKey(result.definition, result.stageKeys[2]!).defaultNextStageKey).toBeUndefined();
     expect(validateFmsDefinition(result.definition).some((issue) => issue.code === "unreachable_stage" && issue.stageKey === result.stageKeys[0])).toBe(true);
-    expect(validateFmsDefinition(result.definition).some((issue) => issue.code === "route_without_destination" && issue.message.includes("Interested, proceed"))).toBe(true);
   });
 
   it("keeps two groups in one workflow separate", () => {
-    const first = insertFmsFollowUpGroup(sales(), { afterKey: "intro", newId });
+    const first = insertFmsFollowUpGroup(sales(false), { afterKey: "intro", newId });
     const second = insertFmsFollowUpGroup(first.definition, { afterKey: "demo", newId });
     expect(second.groupId).not.toBe(first.groupId);
     const groups = fmsFollowUpGroups(second.definition.stages);
     expect(groups.map((group) => [group.groupId, group.parentStageKey, group.members.map((stage) => stage.key), group.proceedStageKeys, group.loopsBack, group.problems])).toEqual([
-      [first.groupId, "intro", first.stageKeys, ["demo"], true, []],
-      [second.groupId, "demo", second.stageKeys, ["store"], true, []],
+      [first.groupId, "intro", first.stageKeys, ["demo"], false, []],
+      [second.groupId, "demo", second.stageKeys, ["store"], false, []],
     ]);
     expect(validateFmsDefinition(second.definition)).toEqual([]);
   });
@@ -118,20 +107,34 @@ describe("Add Follow-Up Group", () => {
   });
 });
 
-describe("Follow-Up Group loop in simulation", () => {
-  it("returns from Follow-Up 3 to Follow-Up 1 and proceeds on a positive outcome", () => {
-    const result = insertFmsFollowUpGroup(sales(), { afterKey: "intro", newId });
-    const [k1, k2, k3] = result.stageKeys as [string, string, string];
-    const run = simulateFmsDefinition(result.definition, { answers: {}, starterId: userId, outcomes: {
-      [k1]: [FMS_FOLLOW_UP_OUTCOME.again, FMS_FOLLOW_UP_OUTCOME.proceed], [k2]: [FMS_FOLLOW_UP_OUTCOME.again], [k3]: [FMS_FOLLOW_UP_OUTCOME.again],
-    } });
+/** The author routes the follow-ups like any step: here on a "Result" question each follow-up asks. */
+function routedGroup() {
+  const result = insertFmsFollowUpGroup(sales(), { afterKey: "intro", newId });
+  const [k1, k2, k3] = result.stageKeys as [string, string, string];
+  const rule = (value: string, nextStageKey: string, order: number) => ({ id: newId(), source: "form_answer" as const, sourceKey: "result", operator: "equals" as const, value, nextStageKey, order });
+  const definition: FmsFlowDefinition = { ...result.definition, stages: result.definition.stages.map((stage) => [k1, k2, k3].includes(stage.key) ? {
+    ...stage, formTemplateId: formId, assigneeRules: [{ type: "specific_user" as const, userProfileId: userId }], sla: { ...stage.sla, assignment: { mode: "fixed_employee" as const, sources: [], allowHandoff: false } }, branchRules: [rule("interested", "demo", 0), rule("not_interested", "lost", 1)],
+    // No answer: the plain next step; the author points Follow-Up 3 back to Follow-Up 1.
+    defaultNextStageKey: stage.key === k1 ? k2 : stage.key === k2 ? k3 : k1,
+  } : stage) };
+  return { definition, keys: [k1, k2, k3] as const };
+}
+const resultField = { formFields: { [formId]: [{ key: "result", label: "Result", type: "dropdown", options: ["interested", "no_answer", "not_interested"].map((value) => ({ value, label: value })), optionValues: ["interested", "no_answer", "not_interested"] }] } };
+
+describe("Follow-Up Group loop the author configured", () => {
+  it("validates, reports the loop, and returns from Follow-Up 3 to Follow-Up 1 until the customer proceeds", () => {
+    const { definition, keys: [k1, k2, k3] } = routedGroup();
+    expect(validateFmsDefinition(definition, resultField)).toEqual([]);
+    const view = fmsFollowUpGroups(normalizeFmsDefinition(definition).stages)[0]!;
+    expect([view.loopsBack, view.proceedStageKeys, view.closeStageKeys]).toEqual([true, ["demo"], ["lost"]]);
+    const noAnswer = { result: "no_answer" };
+    const run = simulateFmsDefinition(definition, { answers: { [k1]: [noAnswer, { result: "interested" }], [k2]: [noAnswer], [k3]: [noAnswer] }, starterId: userId });
     expect(run.events.map((event) => [event.stageKey, event.visit])).toEqual([["start", 1], ["intro", 1], [k1, 1], [k2, 1], [k3, 1], [k1, 2], ["demo", 1], ["store", 1]]);
   });
 
   it("closes on rejection and creates no further follow-up", () => {
-    const result = insertFmsFollowUpGroup(sales(), { afterKey: "intro", newId });
-    const [k1, k2] = result.stageKeys as [string, string, string];
-    const run = simulateFmsDefinition(result.definition, { answers: {}, starterId: userId, outcomes: { [k1]: [FMS_FOLLOW_UP_OUTCOME.again], [k2]: [FMS_FOLLOW_UP_OUTCOME.close] } });
+    const { definition, keys: [k1, k2] } = routedGroup();
+    const run = simulateFmsDefinition(definition, { answers: { [k1]: [{ result: "no_answer" }], [k2]: [{ result: "not_interested" }] }, starterId: userId });
     expect(run.events.map((event) => event.stageKey)).toEqual(["start", "intro", k1, k2, "lost"]);
     expect(run.terminal?.outcome).toBe("lost");
   });
@@ -170,6 +173,27 @@ describe("Follow-Up analytics from recorded visits", () => {
     ]);
     expect(rows.at(-1)!.nextStageKey).toBe("demo");
     expect(fmsFollowUpAttempts(visits, stageRows).some((row) => row.instanceStageId === "l1")).toBe(false);
+  });
+
+  it("reads exits from where each run went next when the follow-ups have no preset outcome", () => {
+    const rows: FmsFollowUpStageRow[] = [
+      { id: "demo", fms_flow_id: "v2", stage_key: "demo", name: "Product Demonstration", planned_time_rule: {} },
+      { id: "end_lost", fms_flow_id: "v2", stage_key: "lost", name: "Lost", planned_time_rule: { terminal: { outcome: "lost" } }, step_type: "end" },
+      ...[1, 2, 3].map((number) => ({ id: `f${number}`, fms_flow_id: "v2", stage_key: `f${number}`, name: `Follow-Up ${number}`, planned_time_rule: { followUpGroup: { groupId: "g", number, parentStageKey: "intro" } } })),
+    ];
+    const plain = (id: string, instance: string, stage: string, previous?: string): FmsFollowUpVisitRow => ({ id, fms_instance_id: instance, fms_stage_id: stage, status: "completed", activated_at: `2026-11-03T10:${String(++minute).padStart(2, "0")}:00Z`, completed_by: "emp_9", previous_instance_stage_id: previous ?? null });
+    const runs = [
+      plain("p1", "r1", "f1"), plain("p2", "r1", "f2", "p1"), plain("p3", "r1", "f3", "p2"), plain("p4", "r1", "f1", "p3"), plain("p5", "r1", "demo", "p4"),
+      plain("q1", "r2", "f1"), plain("q2", "r2", "end_lost", "q1"),
+      plain("z1", "r3", "f1"),
+    ];
+    const attempts = fmsFollowUpAttempts(runs, rows, { r3: "do_not_contact" });
+    expect(attempts.map((row) => [row.instanceId, row.followUpNumber, row.round, row.attempt, row.exit])).toEqual([
+      ["r1", 1, 1, 1, "follow_up"], ["r1", 2, 1, 2, "follow_up"], ["r1", 3, 1, 3, "follow_up"], ["r1", 1, 2, 4, "proceed"],
+      ["r2", 1, 1, 1, "close"],
+      ["r3", 1, 1, 1, "close"],
+    ]);
+    expect(summarizeFmsFollowUps(attempts)[0]).toMatchObject({ proceeded: 1, closed: 2, averageAttemptsToProceed: 4, proceededAt: { followUp1: 0, followUp2: 0, followUp3: 0, laterRounds: 1 } });
   });
 
   it("summarises each group separately", () => {

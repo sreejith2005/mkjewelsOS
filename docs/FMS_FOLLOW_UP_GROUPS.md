@@ -1,20 +1,19 @@
 # FMS Follow-Up Groups
 
-Builder shortcut (2026-11-09) that adds **Follow-Up 1**, **Follow-Up 2** and
-**Follow-Up 3** after a main step. No migration, no new runtime stage type.
+Builder shortcut (2026-11-09; plain steps since 2026-11-10) that adds
+**Follow-Up 1**, **Follow-Up 2** and **Follow-Up 3** after a main step. No
+migration, no new runtime stage type.
 
 ## What is created
 
 `insertFmsFollowUpGroup` (`packages/core/src/fms/followUpGroup.ts`) adds three
-ordinary `task` stages, built with the same defaults as **Add Step** (suggested
-assignment, deadline opt-in, workflow-context default person). Each is a
-Decision step with three stable outcome keys:
-
-| Key | Label | Route |
-|---|---|---|
-| `proceed` | Interested, proceed | the main step's former next step |
-| `follow_up_again` | No answer, follow up again | next follow-up; Follow-Up 3 -> Follow-Up 1 |
-| `not_interested` | Not interested, close | existing Do not contact / Lost End Node, else unset |
+ordinary `task` stages, each exactly what **Add Step** creates (suggested
+assignment, deadline opt-in, workflow-context default person, no decision, no
+routes). They are chained main step -> Follow-Up 1 -> 2 -> 3 -> the main step's
+former next step. The author then configures and routes each one like any
+step: questions, conditions (for example Result is Interested -> Product
+Demonstration, Result is Not interested -> a Lost End Node) and the loop back
+to Follow-Up 1 (a condition or Follow-Up 3's next step).
 
 Each stage carries `sla.followUpGroup = { groupId, number, parentStageKey? }`,
 stored in `fms_stages.planned_time_rule` like the rest of `sla`. The runtime
@@ -23,25 +22,25 @@ never reads it.
 Safety rules:
 
 - Only a main step with a plain single next step is rewired (to Follow-Up 1).
-  A main step with routes, a branch, a parallel split or an End Node keeps
+  A main step with conditions, a branch, a parallel split or an End Node keeps
   every connection; the group is added unconnected and validation reports it.
-- An unset proceed or close destination is a `route_without_destination`
-  issue, so the workflow cannot publish until the author chooses it.
 - One insert is one `commit`, so one Undo removes the whole group.
 - Paste/duplicate gives the copy a new `groupId`; a parent that was not copied
   is dropped. Deleting the main step clears `parentStageKey`.
 - Only a tagged step is a follow-up. A step merely named "Follow-up" (for
   example in the Instagram or Not Bought workflows) is never reinterpreted.
+- Groups added on 2026-11-09 were Decision steps with three preset outcomes
+  (`proceed`, `follow_up_again`, `not_interested`). They stay valid and fully
+  editable; reports still read those outcome keys.
 
 ## Loop and exits at runtime
 
 Unchanged engine (migration 0212, `execution_version` 2 for every publish):
-the employee's submitted outcome selects the route; returning to Follow-Up 1
-inserts a new `fms_instance_stages` row with the next `visit_number` and audits
-`fms_stage_revisited`. A next follow-up is created only when the previous visit
-completes; automatic-only loops are still refused by client and server
-validation. "Not interested, close" reaching an End Node closes the run and
-creates no further work.
+the employee's submission selects the route; returning to Follow-Up 1 inserts
+a new `fms_instance_stages` row with the next `visit_number` and audits
+`fms_stage_revisited`. A next follow-up is created only when the previous
+visit completes; automatic-only loops are still refused by client and server
+validation.
 
 Customer-requested dates: leave a follow-up without its own deadline. If the
 previous step's form has a follow-up/next/due date question, the follow-up is
@@ -49,12 +48,19 @@ due on that answer (`fmsAutoFormDueApplies`, migration 0361).
 
 ## Analytics
 
-`fmsFollowUpAttempts(visits, stageRows)` reads `fms_instance_stages` rows and
-the `fms_stages` rows of the versions used, and returns per visit: workflow
-version, run (customer), group, parent step, follow-up number, `round`
-(increases when the run returns to an earlier follow-up), total `attempt`,
-employee (`completed_by`), assignees, activated/due/completed times, outcome,
-exit (`proceed` / `follow_up` / `close` / `other`) and the next step.
+`fmsFollowUpAttempts(visits, stageRows, runOutcomes?)` reads
+`fms_instance_stages` rows and the `fms_stages` rows (include `step_type`) of
+the versions used, and returns per visit: workflow version, run (customer),
+group, parent step, follow-up number, `round` (increases when the run returns
+to an earlier follow-up), total `attempt`, employee (`completed_by`),
+assignees, activated/due/completed times, outcome, next step and exit:
+
+- `follow_up`: the next visit is another follow-up of the same group;
+- `close`: the next step is a Lost / Do not contact End Node, or the run's
+  recorded ending (`runOutcomes`, from `fms_instance_outcomes.outcome`) is one;
+- `proceed`: any other next step, or a Won ending;
+- `other`: the path finished with no recorded next step or ending.
+
 `summarizeFmsFollowUps` totals per group: runs, completed/open/overdue attempts,
 proceeded/closed/still following up, average attempts and rounds to proceed,
 proceeded at Follow-Up 1/2/3 or a later round, and completed attempts per

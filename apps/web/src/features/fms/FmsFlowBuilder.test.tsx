@@ -553,8 +553,6 @@ describe("FMS builder on a phone", () => {
 
 /** Add Follow-Up Group: three ordinary Decision steps, one undo step, Add Step unchanged. */
 describe("FMS builder Follow-Up Groups", () => {
-  const outcomeTarget = (key: string, outcome: string) => stage(key).branchRules.find((rule) => rule.value === outcome)?.nextStageKey;
-
   it("Add Step still adds one plain step with no follow-up metadata", async () => {
     const { a, b } = await openBuilder();
     expect(latest!.stages).toHaveLength(3);
@@ -563,7 +561,7 @@ describe("FMS builder Follow-Up Groups", () => {
     expect(screen.queryByRole("region", { name: "Follow-Up Group" })).toBeNull();
   });
 
-  it("adds Follow-Up 1, 2 and 3 after the selected step, loops 3 back to 1, and undo restores the workflow exactly", async () => {
+  it("adds Follow-Up 1, 2 and 3 as plain steps the author configures and routes freely; undo restores the workflow exactly", async () => {
     const { user, a, b } = await openBuilder();
     await user.click(screen.getByRole("button", { name: "open first step" }));
     const before = JSON.stringify(latest);
@@ -571,18 +569,22 @@ describe("FMS builder Follow-Up Groups", () => {
     expect(latest!.stages).toHaveLength(6);
     const [f1, f2, f3] = latest!.stages.slice(3).map((item) => item.key) as [string, string, string];
     expect([f1, f2, f3].map((key) => stage(key).name)).toEqual(["Follow-Up 1", "Follow-Up 2", "Follow-Up 3"]);
+    // No preset decision or routes: exactly what Add Step creates, chained main -> 1 -> 2 -> 3 -> former next.
+    expect([f1, f2, f3].map((key) => [stage(key).sla.decisionMode, stage(key).branchRules])).toEqual([["normal", []], ["normal", []], ["normal", []]]);
     expect(stage(a).defaultNextStageKey).toBe(f1);
-    expect([f1, f2, f3].map((key) => outcomeTarget(key, "proceed"))).toEqual([b, b, b]);
-    expect([f1, f2, f3].map((key) => outcomeTarget(key, "follow_up_again"))).toEqual([f2, f3, f1]);
-    const groupIds = new Set([f1, f2, f3].map((key) => stage(key).sla.followUpGroup?.groupId));
-    expect(groupIds.size).toBe(1);
-    // Follow-Up 1 opens with its group summary above the ordinary step settings.
+    expect([f1, f2, f3].map((key) => stage(key).defaultNextStageKey)).toEqual([f2, f3, b]);
+    expect(new Set([f1, f2, f3].map((key) => stage(key).sla.followUpGroup?.groupId)).size).toBe(1);
     const panel = screen.getByRole("region", { name: "Follow-Up Group" });
-    expect(within(panel).getByText("Follow-Up 1 of 3")).toBeTruthy();
-    expect(within(panel).getAllByText(/choose where "Not interested, close" goes/).length).toBe(3);
+    expect(within(panel).getByText("This step is follow-up 1 of 3")).toBeTruthy();
+    expect(within(panel).getByText(/add a condition on Follow-Up 3 that goes back to Follow-Up 1/)).toBeTruthy();
     expect(screen.getByText(/Follow-Up Group added after/)).toBeTruthy();
-    // Without an End Node the close route needs a destination before publishing.
-    expect(screen.getAllByText(/"Not interested, close" has no destination step/).length).toBeGreaterThan(0);
+    // The ordinary step editor is right below: the author adds a condition like on any step.
+    await user.click(screen.getByRole("button", { name: "Add conditional route" }));
+    expect(stage(f1).branchRules).toHaveLength(1);
+    await user.selectOptions(screen.getByLabelText("Route 1 then go to"), f3);
+    expect(stage(f1).branchRules[0]!.nextStageKey).toBe(f3);
+    await user.click(screen.getByRole("button", { name: "Undo" }));
+    await user.click(screen.getByRole("button", { name: "Undo" }));
     await user.click(screen.getByRole("button", { name: "Undo" }));
     expect(JSON.stringify(latest)).toBe(before);
   });
@@ -598,8 +600,8 @@ describe("FMS builder Follow-Up Groups", () => {
     expect(stage(first[0]!).sla.followUpGroup!.groupId).not.toBe(stage(second[0]!).sla.followUpGroup!.groupId);
     expect(second.map((key) => stage(key).sla.followUpGroup!.parentStageKey)).toEqual([first[0], first[0], first[0]]);
     const panel = () => screen.getByRole("region", { name: "Follow-Up Group" });
-    await user.click(within(panel()).getByRole("button", { name: "Follow-Up 2" }));
-    expect(within(panel()).getByText("Follow-Up 2 of 3")).toBeTruthy();
+    await user.click(within(panel()).getByRole("button", { name: /^Follow-Up 2/ }));
+    expect(within(panel()).getByText("This step is follow-up 2 of 3")).toBeTruthy();
     await user.selectOptions(within(panel()).getByLabelText("Follows up"), b);
     expect(second.map((key) => stage(key).sla.followUpGroup!.parentStageKey)).toEqual([b, b, b]);
     expect(first.map((key) => stage(key).sla.followUpGroup!.parentStageKey)).toEqual([a, a, a]);
@@ -633,7 +635,7 @@ describe("FMS builder Follow-Up Groups", () => {
       expect(latest!.stages.map((item) => item.name)).toEqual(["Start form", "Follow-Up 1", "Follow-Up 2", "Follow-Up 3"]);
       // Like Add Step, nothing selected means nothing is rewired; the author is told to connect it.
       expect(stage(latest!.stages[0]!.key).defaultNextStageKey).toBeUndefined();
-      expect(screen.getByText(/connect the main step to Follow-Up 1/)).toBeTruthy();
+      expect(screen.getAllByText(/Connect the main step to Follow-Up 1/).length).toBe(2);
     });
   });
 });
