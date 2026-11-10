@@ -4,11 +4,11 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DropdownMasterPage } from "./DropdownMasterPage";
 
-const state = vi.hoisted(() => ({ rpc: vi.fn() }));
+const state = vi.hoisted(() => ({ rpc: vi.fn(), manage: true }));
 vi.mock("@jewelos/api-client", () => ({ supabase: { rpc: state.rpc } }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ access: { permissions: ["dropdowns.manage"] }, profile: { tenant_id: "t1" } }) }));
 vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealtimeRefresh: () => undefined }));
-vi.mock("@jewelos/core", async (importOriginal) => ({ ...await importOriginal<typeof import("@jewelos/core")>(), hasPermission: () => true }));
+vi.mock("@jewelos/core", async (importOriginal) => ({ ...await importOriginal<typeof import("@jewelos/core")>(), hasPermission: (_access: unknown, key: string) => key !== "dropdowns.manage" || state.manage }));
 
 const row = (id: string, master_type: string, label: string, extra: Record<string, unknown> = {}) => ({
   id, tenant_id: "t1", master_type, label, value: label.toLowerCase().replace(/\W+/g, "_"), sort_order: 0, is_active: true,
@@ -30,7 +30,7 @@ vi.mock("@/features/dropdowns/api", () => ({
 }));
 
 describe("Dropdown Master overview", () => {
-  beforeEach(() => { window.history.replaceState({}, "", "/dropdown-master"); state.rpc.mockReset(); state.rpc.mockResolvedValue({ error: null }); });
+  beforeEach(() => { window.history.replaceState({}, "", "/dropdown-master"); state.manage = true; state.rpc.mockReset(); state.rpc.mockResolvedValue({ error: null }); });
   afterEach(() => cleanup());
 
   it("shows every list with counts, origin and form usage", async () => {
@@ -85,5 +85,23 @@ describe("Dropdown Master overview", () => {
     await user.type(screen.getByLabelText("Label"), "Coin");
     await user.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(state.rpc).toHaveBeenCalledWith("change_dropdown_with_audit", expect.objectContaining({ p_operation: "create", p_master_type: "gift_type", p_label: "Coin", p_value: "coin" })));
+  });
+});
+
+describe("Dropdown Master for leaders (0401)", () => {
+  beforeEach(() => { window.history.replaceState({}, "", "/dropdown-master"); state.manage = false; state.rpc.mockReset(); });
+  afterEach(() => { cleanup(); state.manage = true; });
+
+  it("lets a leader browse lists and options without any way to change them", async () => {
+    const user = userEvent.setup();
+    render(<DropdownMasterPage />);
+    await user.click(await screen.findByRole("button", { name: "Open Occasion" }));
+    expect(await screen.findByText("Wedding")).toBeTruthy();
+    expect(screen.getByText("View only")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Add item/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /New list/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Edit Wedding" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Turn off Wedding" })).toBeNull();
+    expect(state.rpc).not.toHaveBeenCalled();
   });
 });

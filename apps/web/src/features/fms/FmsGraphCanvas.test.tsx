@@ -192,6 +192,20 @@ describe("FMS canvas navigation and selection", () => {
     expect(input.onMove).toHaveBeenCalledWith({ start: { x: 120, y: 160 } });
   });
 
+  it("view only: opens a step on click but never drags, connects, adds or arranges", () => {
+    const input = props();
+    const { container } = render(<FmsGraphCanvas {...input} readOnly />);
+    const card = container.querySelector<HTMLElement>('[data-node-key="start"]')!;
+    drag(card, { x: 100, y: 140 }, { x: 180, y: 200 });
+    expect(input.onMove).not.toHaveBeenCalled();
+    fireEvent.pointerDown(card, { pointerId: 2, button: 0, clientX: 100, clientY: 140, pointerType: "mouse" });
+    fireEvent.pointerUp(card, { pointerId: 2, button: 0, clientX: 100, clientY: 140, pointerType: "mouse" });
+    expect(input.onOpen).toHaveBeenCalledWith("start");
+    expect(screen.queryByRole("button", { name: /Drag to connect/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Add next step after/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Auto-arrange workflow" })).toBeNull();
+  });
+
   it("lets a card go past the left edge: the layout and camera shift together, so nothing jumps", () => {
     const input = props();
     const { container } = render(<FmsGraphCanvas {...input} />);

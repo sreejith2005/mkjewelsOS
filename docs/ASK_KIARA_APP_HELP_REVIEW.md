@@ -355,3 +355,12 @@ Kiara tool decision: no new read tool. Configuration/navigation extends existing
 - [ ] Task names: the customer or record name when known; otherwise **Workflow - Step** with a short number like **#1234**. The long FMS reference is no longer shown in task titles.
 
 No new Kiara read tool: task assignees are already visible through the existing task reads, and Kiara cannot hand over or reassign anything.
+
+## 2026-11-10 Leaders view every design read-only (0401)
+
+- [ ] FMS: Admins, Directors and Managers see **View workflow** on every workflow. The builder shows **View only**; tapping a step shows its settings locked, **Preview questions** opens the step's form, and a route offers **View route** and **Route details**. Nothing drags, connects, adds, saves or publishes.
+- [ ] Forms Library: Admins, Directors and Managers see **View form** on every form (drafts and older versions included through the lifecycle filter). The form opens **View only**; the eye button on a question shows its settings, conditions and routes locked. Managers no longer author forms by default (**Author forms** is Super Admin's unless granted).
+- [ ] Dropdown Master: Admins, Directors and Managers can open it; lists show **View only** and have no **Add item**, **New list**, edit or on/off buttons.
+- [ ] Settings: Admins, Directors and Managers see a read-only **Organization settings** panel (tenant name, currency, timezone, export history kept, most rows per export).
+
+No new Kiara read tool: Kiara answers how to view these screens; it reads no workflow, form, dropdown or settings data, and writes nothing.

@@ -12,7 +12,7 @@ vi.mock("@/auth/AuthContext", async () => {
   return { useAuth: () => { const profile = { id: "user", tenant_id: "tenant", user_role: mocks.role } as UserProfile; return { profile, access: builtinAccessContext(profile) }; } };
 });
 vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealtimeRefresh: () => undefined }));
-vi.mock("@/features/forms/FormBuilder", () => ({ FormBuilder: () => <div>Builder</div> }));
+vi.mock("@/features/forms/FormBuilder", () => ({ FormBuilder: ({ readOnly }: { readOnly?: boolean }) => <div>{readOnly ? "Builder (view only)" : "Builder"}</div> }));
 vi.mock("@/features/forms/FmsStartingForm", () => ({ FmsStartingForm: () => <div>Assigned form</div> }));
 vi.mock("@/features/forms/api", () => ({
   loadForms: mocks.loadForms, setFormLibraryVisibility: mocks.setFormLibraryVisibility,
@@ -65,5 +65,26 @@ describe("Form library visibility", () => {
     render(<FormsPage />);
     expect(await screen.findByText("Assigned form")).toBeTruthy();
     expect(screen.getByText("No forms match these filters.")).toBeTruthy();
+  });
+});
+
+describe("Form designs for leaders (0401)", () => {
+  it("lets a Manager open every form, hidden ones included, view only", async () => {
+    mocks.role = "manager";
+    const user = userEvent.setup(); render(<FormsPage />);
+    await user.click(await screen.findByRole("button", { name: "View Work and Upload" }));
+    expect(screen.getByText("Builder (view only)")).toBeTruthy();
+  });
+  it("gives a Manager no authoring actions", async () => {
+    mocks.role = "manager"; render(<FormsPage />);
+    expect(await screen.findByRole("button", { name: "View Work and Upload" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /New form/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Versions and actions for Work and Upload" })).toBeNull();
+  });
+  it("offers staff no View form", async () => {
+    mocks.role = "staff"; mocks.loadForms.mockResolvedValue({ bundles: [{ ...bundle, library_visible: true }], submissions: [] });
+    render(<FormsPage />);
+    expect(await screen.findByText("Work and Upload")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "View Work and Upload" })).toBeNull();
   });
 });

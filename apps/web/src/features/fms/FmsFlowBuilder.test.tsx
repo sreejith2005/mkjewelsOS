@@ -621,6 +621,22 @@ describe("FMS builder Follow-Up Groups", () => {
     expect(screen.queryByRole("button", { name: "Add Follow-Up Group" })).toBeNull();
   });
 
+  it("opens every step's settings locked when viewing only, with the questions one tap away", async () => {
+    const user = userEvent.setup();
+    render(<FmsFlowBuilder data={savedFlowData} flow={savedFlowData.flows[0]!} onClose={() => undefined} onSaved={async () => undefined} readOnly />);
+    expect(screen.getAllByText("View only").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: /Save draft/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Publish/ })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "open first step" }));
+    const settings = screen.getByRole("group", { name: "Step settings (view only)" });
+    expect((settings as HTMLFieldSetElement).disabled).toBe(true);
+    // Every field inside is shown but cannot be used.
+    for (const control of within(settings).queryAllByRole("textbox")) expect((control as HTMLInputElement).matches(":disabled")).toBe(true);
+    // "Follow up" has no form, so there are no questions to preview.
+    expect(screen.queryByRole("button", { name: "Preview questions" })).toBeNull();
+    expect(mocks.saveFmsDraft).not.toHaveBeenCalled();
+  });
+
   describe("on a phone", () => {
     beforeEach(() => { vi.stubGlobal("matchMedia", (query: string) => ({ matches: true, media: query, addEventListener: () => undefined, removeEventListener: () => undefined })); });
     afterEach(() => { vi.unstubAllGlobals(); });

@@ -81,7 +81,18 @@ Supersedes the Admin rows of "Automatic scope" below and the Director row of
   `admin_delete_task_series_with_audit`, so every task, series and template
   delete path needs it. New `organization.add_locations` (Super Admin, Admin)
   gates adding franchises and stores. Users, leave and every other delete was
-  already Super Admin only. Manager keeps form authoring and branch defaults.
+  already Super Admin only. Manager keeps branch defaults; form authoring
+  moved to Super Admin only in 0401.
+- **View-only designs (migration 0401, owner 2026-11-10).** Admins, Directors
+  and Managers hold `fms.view_designs`, `forms.view_designs`,
+  `settings.view_organization` and the Dropdown Master page (`dropdowns.view`).
+  `fms_my_flow_access` reports `view` on every workflow the person can see
+  (`org_definition_visible`), so the 0390 View path (RLS reads, builder in view
+  mode) serves them; an explicit grant wins and `view` never passes
+  `can_edit_fms_flow`. `can_access_form_template` lets `forms.view_designs`
+  read drafts and archived versions where `forms.manage` could. No write path
+  checks the new keys. The Manager role grant of `forms.manage` was removed
+  (audited).
 - **Director identity.** No `user_role` value was added (about 420 checks
   treat `super_admin, admin` as one group, and a Director must keep every
   Admin read path). `org_is_director(profile)` = effective role Admin and an
