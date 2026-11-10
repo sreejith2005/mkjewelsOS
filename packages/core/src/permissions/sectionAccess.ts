@@ -1,9 +1,9 @@
 import { isImplementedPage, type UserRole } from "../roleMenu";
-import { PERMISSION_CATALOG, type PermissionKey, type PermissionDefinition } from "./catalog";
+import { DEPARTMENT_ACTION_PERMISSIONS, PERMISSION_CATALOG, type PermissionKey, type PermissionDefinition } from "./catalog";
 import type { PermissionEffect, PermissionOverrides } from "./resolve";
 
 export const SECTION_PERMISSIONS = PERMISSION_CATALOG.filter(item => item.kind === "module" && item.pageId !== null && isImplementedPage(item.pageId));
-export const DEPARTMENT_PERMISSIONS = PERMISSION_CATALOG.filter(item => SECTION_PERMISSIONS.some(section => section.key === item.key) || item.key === "tasks.assign_others");
+export const DEPARTMENT_PERMISSIONS = PERMISSION_CATALOG.filter(item => SECTION_PERMISSIONS.some(section => section.key === item.key) || DEPARTMENT_ACTION_PERMISSIONS.includes(item.key));
 export const ASSIGNMENT_ACCESS_OPTIONS = [
   { value: "inherit", label: "Inherit" },
   { value: "grant", label: "Allow" },

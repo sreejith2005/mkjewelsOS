@@ -71,8 +71,10 @@ export const PERMISSION_CATALOG = [
   modulePermission("dashboard.view", "dashboard", "Home & Dashboard", "Open Dashboard", "Operational analytics for the user's authorized scope."),
   { key: "dashboard.view_team_performance", kind: "action", category: "Home & Dashboard", label: "View every employee's task performance", description: "Company-wide Employee Task Performance on the Dashboard: every employee's assigned, completed, pending and overdue work and FMS workflow performance. Grants no CRM or administrative access.", defaultRoles: ["super_admin", "admin"], pageId: null },
   modulePermission("tasks.view", "checklist_tasks", "Tasks", "Open Tasks", "Assigned tasks, manual tasks, and task import."),
-  { key: "tasks.assign_others", kind: "action", category: "Tasks", label: "Assign tasks to other users", description: "Allow assigning and transferring tasks to other users within the existing branch, department or company scope. Deny restricts task assignment to yourself.", defaultRoles: ALL_ROLES, pageId: null },
+  { key: "tasks.assign_others", kind: "action", category: "Tasks", label: "Assign tasks to other users", description: "Allow assigning and transferring tasks to other users within the existing branch, department or company scope. Below Manager that is the person's own department; add \"Assign tasks to anyone in the company\" to widen it. Deny restricts task assignment to yourself.", defaultRoles: ALL_ROLES, pageId: null },
   { key: "tasks.assign_cross_location", kind: "action", category: "Tasks", label: "Assign work to other stores and franchises", description: "Choose an employee from another store or franchise when creating a task (Someone at another store). Form Users questions follow their own builder setting instead. The recipient sees only that work. Deny keeps task assignment inside the person's own location.", defaultRoles: ["super_admin", "admin", "manager", "hr", "crm", "staff"], pageId: null },
+  // Migration 0402: widens "Assign tasks to other users" from own department to the whole company (Managers and HR included).
+  { key: "tasks.assign_company_wide", kind: "action", category: "Tasks", label: "Assign tasks to anyone in the company", description: "With \"Assign tasks to other users\", the Users list shows every active employee in every store and department, including Managers and HR. Admin, Director, Owner and Super Admin accounts are never offered. Franchise isolation still applies.", defaultRoles: ["super_admin", "admin"], pageId: null },
   { key: "tasks.manage_team", kind: "authority", category: "Tasks", label: "Manage team tasks", description: "Create, edit, and delegate tasks for others. Follows Manager authority or higher.", defaultRoles: ["super_admin", "admin", "manager"], pageId: null },
   { key: "tasks.voice_assign", kind: "action", category: "Tasks", label: "Assign tasks by voice", description: "Record a voice note that fills in the Assign Task form. Assignee scope is unchanged.", defaultRoles: ["super_admin", "admin", "manager", "hr"], pageId: null },
   { key: "tasks.view_all", kind: "authority", category: "Tasks", label: "View all tasks", description: "Tenant-wide task visibility. Follows Admin authority or higher.", defaultRoles: ["super_admin", "admin"], pageId: null },
@@ -145,9 +147,12 @@ export function isConfigurablePermission(key: PermissionKey): boolean {
   return kind === "module" || kind === "action";
 }
 
-/** Departments configure sections and this explicitly approved task action only. */
+/** The task actions departments may grant or deny, besides sections (0221, 0402). */
+export const DEPARTMENT_ACTION_PERMISSIONS: readonly string[] = ["tasks.assign_others", "tasks.assign_company_wide"];
+
+/** Departments configure sections and the explicitly approved task actions only. */
 export function isDepartmentConfigurablePermission(key: PermissionKey): boolean {
-  return CATALOG_BY_KEY.get(key)?.kind === "module" || key === "tasks.assign_others";
+  return CATALOG_BY_KEY.get(key)?.kind === "module" || DEPARTMENT_ACTION_PERMISSIONS.includes(key);
 }
 
 /** The section-access permission for each page that has one. */
