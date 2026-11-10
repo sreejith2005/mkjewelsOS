@@ -125,6 +125,18 @@ Supersedes the Admin rows of "Automatic scope" below and the Director row of
   Control, FMS, forms, dashboards, reports and exports with the switch off.
   Everyone else, and work with no signed-in person, is unchanged until the
   switch is on. Tests: `supabase/tests/0398_director_scope_always_on.test.sql`.
+- **Scope answers are remembered per transaction (migration 0400).** The
+  per-row helpers `org_scope_enforced`, `org_has_company_scope`,
+  `org_scope_branch_ids` and `org_branch_visible` keep their last answer in a
+  transaction-local setting keyed by their arguments, the signed-in user and a
+  generation number. Statement triggers on `org_scope_grants`, `user_profiles`,
+  `user_access_profiles`, `branches`, `franchise_groups` and
+  `tenant_franchise_controls` bump the generation, so a change in the same
+  transaction is seen at once; nothing outlives the transaction. Without this, a
+  Director's Home, Dashboard and Reports ran past the request time limit. Home's
+  recent activity reads each in-scope person's latest entries through
+  `idx_audit_logs_home`. A new scope input table needs the same trigger. Tests:
+  `supabase/tests/0400_director_scope_speed.test.sql`.
 - Tests: `supabase/tests/0397_leadership_hierarchy.test.sql`; franchise tests
   0385-0387 now model the franchise-limited Admin as a Director.
 
