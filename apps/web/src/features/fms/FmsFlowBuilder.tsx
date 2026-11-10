@@ -262,12 +262,8 @@ export function FmsFlowBuilder({ flow, data, duplicate, onClose, onSaved, canMan
     const first = result.stageKeys[0]!;
     setSelectedKey(first); setSelectedKeys(result.stageKeys); setRightPanel("inspector"); setToolsOpen(false); setError(null);
     const parentName = result.parentStageKey ? normalized.stages.find((stage) => stage.key === result.parentStageKey)?.name || "the selected step" : null;
-    const todo = [
-      !result.parentStageKey ? "connect the main step to Follow-Up 1" : !result.linkedFromParent ? `connect a route of ${parentName} to Follow-Up 1` : "",
-      !result.proceedStageKey ? "choose where \"Interested, proceed\" goes" : "",
-      !result.closeStageKey ? "choose where \"Not interested, close\" goes (for example a Lost End Node)" : "",
-    ].filter(Boolean);
-    setSuccess(`Follow-Up Group added${parentName ? ` after ${parentName}` : ""}. Follow-Up 3 returns to Follow-Up 1 until the customer proceeds or declines.${todo.length ? ` Next: ${todo.join("; ")}.` : ""} Use Undo to remove it.`);
+    const connect = !result.parentStageKey ? " Connect the main step to Follow-Up 1." : !result.linkedFromParent ? ` Connect a route of ${parentName} to Follow-Up 1.` : "";
+    setSuccess(`Follow-Up Group added${parentName ? ` after ${parentName}` : ""}: three ordinary steps, Follow-Up 1 → 2 → 3.${connect} Configure and route each one like any step, for example a condition on Follow-Up 3 that goes back to Follow-Up 1. Use Undo to remove it.`);
   };
   const setFollowUpParent = (groupId: string, parentStageKey: string | undefined) => commit((current) => ({ ...current, stages: setFmsFollowUpGroupParent(normalizeFmsDefinition(current).stages, groupId, parentStageKey) }));
   const replace = (key: string, value: FmsStageDefinition) => commit((current) => ({ ...current, stages: current.stages.map((stage) => stage.key === key ? value : stage) }));
