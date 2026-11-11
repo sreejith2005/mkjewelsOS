@@ -43,7 +43,7 @@ Updated 2026-11-06 for the Store Intelligence workspace (migration 0383), its CR
 fill. Overdue and high-priority tasks appear under **Needs attention now** (2026-11-04: the Recent Activity panel was removed from Home).
 - [ ] See today's work: open Home from the menu. Overdue items are listed first.
 - [ ] Leaders: **Team today** shows Assigned, Done, Pending and Overdue for today; with no tasks of your own the top card shows **Team completion today**. Tap a person under **Needs follow-up** to open their tasks in Task Control.
-- [ ] Left menu on a computer (2026-11-07): choosing a section shrinks the menu to an icon rail (names on hover, dot for open questions); **Toggle sidebar** shows the names again. Phones unchanged.
+- [ ] Left menu on a computer (2026-11-11): the menu is hidden until the hamburger (**Toggle sidebar**) opens it over the page; choosing a section opens it and closes the menu; a click outside or Escape closes it. No icon rail; pages use the full width. Phones unchanged.
 - [ ] Under **Your work**, Home shows three cards: **Daily Checklist**, **My Tasks** and **FMS Tasks**, each with a count and overdue total. On a phone, swipe between them or tap Checklist / My Tasks / FMS at the top (a red dot marks overdue work); tap a task to open it, or **Open all tasks** / **Open FMS tasks** for the full list. On a computer the cards sit side by side. No new Kiara read tool is needed; the cards use the existing Home summary (2026-10-31).
 - [ ] Fill a form linked to a task: on Home the task shows a **Form: form name** tag; tap the task to open it and fill the form.
 

@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from "react";
+import { useEffect, type ComponentType, type ReactNode } from "react";
 import { Menu, PanelLeftClose } from "lucide-react";
 import type { PageId } from "@jewelos/core";
 import { Button } from "@/components/ui";
@@ -85,12 +85,19 @@ export function ApplicationShell({
     navigate(destination);
     setSidebarOpen(false);
   };
-  // Closed on a computer = an icon rail (MK1 audit 2026-11-07): every section stays one click away and
-  // the page gains the width. Each icon is named for screen readers and shows its name on hover.
-  const rail = !sidebarOpen;
+  // On a computer the menu is a hamburger drawer (owner request 2026-11-11): closed, it is gone
+  // completely and every page uses the full width; open, it floats over the page and closes itself
+  // when a section is chosen, on a click outside it, or on Escape.
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSidebarOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [setSidebarOpen, sidebarOpen]);
   const sidebarItemClass = (selected: boolean) => cn(
-    "group relative flex w-full items-center gap-3 rounded-xl py-2.5 text-left text-sm transition-[background-color,color,box-shadow] duration-150 active:scale-[0.99]",
-    rail ? "justify-center px-0" : "px-3",
+    "group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-[background-color,color,box-shadow] duration-150 active:scale-[0.99]",
     selected ? "bg-gold-sheen font-semibold text-on-gold shadow-gold" : "text-champagne hover:bg-gold/10 hover:text-gold-secondary",
   );
   const sidebarIconClass = (selected: boolean) => cn("size-[18px] shrink-0 transition-colors", selected ? "text-on-gold" : "text-soft-grey group-hover:text-gold-secondary");
@@ -103,7 +110,7 @@ export function ApplicationShell({
     <div className="min-h-screen overflow-x-clip bg-obsidian">
       <header className={cn("sticky top-0 z-30 flex items-center bg-task-bg/90 px-3 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] backdrop-blur-xl supports-[backdrop-filter]:bg-task-bg/75 md:fixed md:inset-x-0 md:bg-charcoal/85 md:px-5", developerModeActive ? "min-h-[calc(3.5rem_+_env(safe-area-inset-top))] flex-wrap pb-2 pt-[calc(0.5rem_+_env(safe-area-inset-top))] md:min-h-16 md:py-2" : "h-[calc(3.5rem_+_env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] md:h-16 md:pt-0")}>
         <div className="flex w-full min-w-0 items-center">
-        <Button aria-expanded={sidebarOpen} aria-label="Toggle sidebar" className="mr-3 hidden size-10 p-0 md:inline-flex" onClick={() => setSidebarOpen(!sidebarOpen)} title={sidebarOpen ? "Show icons only" : "Show section names"} variant="ghost">
+        <Button aria-expanded={sidebarOpen} aria-label="Toggle sidebar" className="mr-3 hidden size-10 p-0 md:inline-flex" onClick={() => setSidebarOpen(!sidebarOpen)} title={sidebarOpen ? "Close menu" : "Open menu"} variant="ghost">
           {sidebarOpen ? <PanelLeftClose /> : <Menu />}
         </Button>
         <Button aria-label="Open navigation" className="-ml-1 mr-1 size-10 p-0 md:hidden" onClick={() => onDrawerOpenChange(true)} variant="ghost">
@@ -131,44 +138,43 @@ export function ApplicationShell({
         <span aria-hidden className="gold-rule pointer-events-none absolute inset-x-0 bottom-0 h-px opacity-70" />
       </header>
 
-      <aside className={cn("fixed bottom-0 left-0 top-16 z-20 hidden flex-col border-r border-task-border bg-charcoal transition-[width] duration-300 ease-out md:flex", sidebarOpen ? "w-64 p-3" : "w-16 px-2 py-3")} data-rail={rail ? "" : undefined}>
-        <nav aria-label="Primary navigation" className="flex flex-1 flex-col gap-1 overflow-y-auto">
-          {rail ? null : <p aria-hidden className="px-3 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-soft-grey">Workspace</p>}
-          {sidebarNavigation.primary.map(({ Icon, ...item }) => (
-            <button
-              aria-current={currentPage === item.id ? "page" : undefined}
-              aria-label={rail ? item.label : undefined}
-              className={sidebarItemClass(currentPage === item.id)}
-              key={item.id}
-              onClick={() => navigateFromSidebar(item.path)}
-              title={rail ? item.label : undefined}
-              type="button"
-            >
-              <Icon className={sidebarIconClass(currentPage === item.id)} />{rail ? null : item.label}
-              {rail ? (badges?.[item.id] ?? 0) > 0 ? <span aria-hidden className="absolute right-2 top-1.5 size-2 rounded-full bg-danger" /> : null : <NavCountBadge count={badges?.[item.id]} label="open questions for you" />}
-            </button>
-          ))}
-        </nav>
-        {sidebarNavigation.bottom.length > 0 ? <nav aria-label="System navigation" className="mt-3 flex flex-col gap-1 border-t border-task-border pt-3">
-          {rail ? null : <p aria-hidden className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-soft-grey">System</p>}
-          {sidebarNavigation.bottom.map(({ Icon, ...item }) => (
-            <button
-              aria-current={currentPage === item.id ? "page" : undefined}
-              aria-label={rail ? item.label : undefined}
-              className={sidebarItemClass(currentPage === item.id)}
-              key={item.id}
-              onClick={() => navigateFromSidebar(item.path)}
-              title={rail ? item.label : undefined}
-              type="button"
-            >
-              <Icon className={sidebarIconClass(currentPage === item.id)} />{rail ? null : item.label}
-            </button>
-          ))}
-        </nav> : null}
-        {rail ? null : <p className="mt-3 px-3 text-[10px] uppercase tracking-[0.2em] text-soft-grey/80">JewelOS · MK Jewels</p>}
-      </aside>
+      {sidebarOpen ? <>
+        <div aria-hidden className="fixed inset-x-0 bottom-0 top-16 z-20 hidden bg-obsidian/50 backdrop-blur-[2px] duration-200 animate-in fade-in md:block" data-testid="sidebar-backdrop" onMouseDown={() => setSidebarOpen(false)} />
+        <aside className="fixed bottom-0 left-0 top-16 z-20 hidden w-64 flex-col border-r border-task-border bg-charcoal p-3 shadow-2xl duration-300 ease-out animate-in slide-in-from-left md:flex">
+          <nav aria-label="Primary navigation" className="flex flex-1 flex-col gap-1 overflow-y-auto">
+            <p aria-hidden className="px-3 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-soft-grey">Workspace</p>
+            {sidebarNavigation.primary.map(({ Icon, ...item }) => (
+              <button
+                aria-current={currentPage === item.id ? "page" : undefined}
+                className={sidebarItemClass(currentPage === item.id)}
+                key={item.id}
+                onClick={() => navigateFromSidebar(item.path)}
+                type="button"
+              >
+                <Icon className={sidebarIconClass(currentPage === item.id)} />{item.label}
+                <NavCountBadge count={badges?.[item.id]} label="open questions for you" />
+              </button>
+            ))}
+          </nav>
+          {sidebarNavigation.bottom.length > 0 ? <nav aria-label="System navigation" className="mt-3 flex flex-col gap-1 border-t border-task-border pt-3">
+            <p aria-hidden className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-soft-grey">System</p>
+            {sidebarNavigation.bottom.map(({ Icon, ...item }) => (
+              <button
+                aria-current={currentPage === item.id ? "page" : undefined}
+                className={sidebarItemClass(currentPage === item.id)}
+                key={item.id}
+                onClick={() => navigateFromSidebar(item.path)}
+                type="button"
+              >
+                <Icon className={sidebarIconClass(currentPage === item.id)} />{item.label}
+              </button>
+            ))}
+          </nav> : null}
+          <p className="mt-3 px-3 text-[10px] uppercase tracking-[0.2em] text-soft-grey/80">JewelOS · MK Jewels</p>
+        </aside>
+      </> : null}
 
-      <main className={cn("pb-mobile-nav min-h-[calc(100dvh_-_3.5rem_-_env(safe-area-inset-top))] md:min-h-screen md:pt-16 md:transition-[padding]", developerModeActive && "md:pt-28", sidebarOpen ? "md:pl-64" : "md:pl-16")}>
+      <main className={cn("pb-mobile-nav min-h-[calc(100dvh_-_3.5rem_-_env(safe-area-inset-top))] md:min-h-screen md:pt-16", developerModeActive && "md:pt-28")}>
         <div className={cn(fullBleed ? "w-full p-4 sm:p-6 [&>section]:max-w-none [&>section]:mx-0" : "mx-auto max-w-7xl p-4 sm:p-6 [&:has(>[data-wide-page])]:max-w-none")}>{children}</div>
       </main>
 
