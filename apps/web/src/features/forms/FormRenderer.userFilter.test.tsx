@@ -26,3 +26,22 @@ it("a Users question without a filter is unchanged", () => {
     dynamicOptions={{ users, branches: [], departments: [], masters: [] }} onSubmit={vi.fn()} />);
   expect(within(screen.getByRole("combobox")).getAllByRole("option")).toHaveLength(4);
 });
+
+it("a Users question whose filter matches nobody says so instead of showing an empty list", () => {
+  render(<FormRenderer definition={{ name: "Lead", fields: [{ key: "assigned", label: "Assigned to", type: "user_dropdown", sortOrder: 0,
+    validation: { userFilter: { match: "all", rules: [{ attribute: "designation", operator: "equals", values: [SALES] }] } } }] }}
+    dynamicOptions={{ users, branches: [], departments: [], masters: [] }} onSubmit={vi.fn()} />);
+  expect(screen.getByRole("status").textContent).toMatch(/No one you can see matches/);
+});
+
+it("a Users question with no people loaded says the list did not load", () => {
+  render(<FormRenderer definition={{ name: "Lead", fields: [{ key: "assigned", label: "Assigned to", type: "user_dropdown", sortOrder: 0 }] }}
+    dynamicOptions={{ users: [], branches: [], departments: [], masters: [] }} onSubmit={vi.fn()} />);
+  expect(screen.getByRole("status").textContent).toMatch(/people list did not load/);
+});
+
+it("a Users question with people to choose shows no warning", () => {
+  render(<FormRenderer definition={{ name: "Lead", fields: [{ key: "anyone", label: "Anyone", type: "user_dropdown", sortOrder: 0 }] }}
+    dynamicOptions={{ users, branches: [], departments: [], masters: [] }} onSubmit={vi.fn()} />);
+  expect(screen.queryByRole("status")).toBeNull();
+});

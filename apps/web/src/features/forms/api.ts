@@ -128,26 +128,27 @@ export async function loadTaskForms(templateIds: string[], taskIds: string[]): P
 }
 type FormPersonRow = { id: string | null; employee_name: string | null; branch_id?: string | null; department_id?: string | null; designation_id?: string | null; user_role?: string | null };
 /**
- * People for Users questions with what a question's filter reads (migration 0391). If the
- * database does not have `v_task_users.designation_id` yet (web deployed before the migration),
- * the list still loads without it.
+ * People for Users questions with what a question's filter reads (migration 0391).
+ * Every column is required: a list missing a person's designation, store or role
+ * would make a filtered Users question silently list nobody (owner report
+ * 2026-11-11). One failed page is retried once; after that the load fails loudly
+ * so the page shows an error with Retry instead of an empty dropdown.
  */
 async function loadFormPeople(): Promise<FormPersonRow[]> {
-  const read = async (columns: string) => {
+  const read = async () => {
     const rows: FormPersonRow[] = [];
     for (let offset = 0; ; offset += 500) {
-      const { data, error } = await supabase.from("v_task_users").select(columns).eq("working_status", "active").order("employee_name").order("id").range(offset, offset + 499);
+      const { data, error } = await supabase.from("v_task_users").select("id,employee_name,branch_id,department_id,user_role,designation_id").eq("working_status", "active").order("employee_name").order("id").range(offset, offset + 499);
       if (error) return { rows, error };
-      // The column list above is a runtime string, so the generated row type is not inferred.
-      rows.push(...((data ?? []) as unknown as FormPersonRow[]));
+      rows.push(...(data ?? []));
       if ((data?.length ?? 0) < 500) return { rows, error: null };
     }
   };
-  const full = await read("id,employee_name,branch_id,department_id,user_role,designation_id");
-  if (!full.error) return full.rows;
-  const basic = await read("id,employee_name,branch_id,department_id,user_role");
-  fail("Load form users", basic.error);
-  return basic.rows;
+  const first = await read();
+  if (!first.error) return first.rows;
+  const second = await read();
+  fail("Load form users", second.error);
+  return second.rows;
 }
 export async function loadFormDynamicOptions() {
   const [users, branches, departments, masters, designations, franchises] = await Promise.all([

@@ -122,23 +122,48 @@ export async function loadFormSubmissionDetail(submissionId: string): Promise<{ 
   const forms = result.data.form_template_id ? await loadTaskForms([result.data.form_template_id], []) : { bundles: [], submissions: [] };
   return { submission: result.data, bundle: forms.bundles.find((bundle) => bundle.id === result.data?.form_template_id) ?? null };
 }
+type FormPersonRow = { id: string | null; employee_name: string | null; branch_id: string | null; department_id: string | null; designation_id: string | null; user_role: string | null };
+/**
+ * People for Users questions with every attribute a question's filter reads (migration 0391).
+ * Kept identical to the web loader: a person without designation, store or role would make
+ * a filtered Users question list nobody. One failed page is retried, then the load fails loudly.
+ */
+async function loadFormPeople(): Promise<FormPersonRow[]> {
+  const read = async () => {
+    const rows: FormPersonRow[] = [];
+    for (let offset = 0; ; offset += 500) {
+      const { data, error } = await db().from("v_task_users").select("id,employee_name,branch_id,department_id,user_role,designation_id").eq("working_status", "active").order("employee_name").order("id").range(offset, offset + 499);
+      if (error) return { rows, error };
+      rows.push(...(data ?? []));
+      if ((data?.length ?? 0) < 500) return { rows, error: null };
+    }
+  };
+  const first = await read();
+  if (!first.error) return first.rows;
+  const second = await read();
+  fail("Load form users", second.error);
+  return second.rows;
+}
 export async function loadFormDynamicOptions() {
-  const [users, branches, departments, masters] = await Promise.all([
-    (async () => {
-      const rows: Array<{ id: string | null; employee_name: string | null }> = [];
-      for (let offset = 0; ; offset += 500) {
-        const { data, error } = await db().from("v_task_users").select("id,employee_name").eq("working_status", "active").order("employee_name").order("id").range(offset, offset + 499);
-        fail("Load form users", error);
-        rows.push(...(data ?? []));
-        if ((data?.length ?? 0) < 500) return rows;
-      }
-    })(),
-    db().from("branches").select("id,name").eq("is_active", true).order("name").limit(100),
+  const [users, branches, departments, masters, designations, franchises] = await Promise.all([
+    loadFormPeople(),
+    db().from("branches").select("id,name,franchise_group_id").eq("is_active", true).order("name").limit(100),
     db().from("departments").select("id,name,branch_id").eq("is_active", true).order("name").limit(500),
     loadMasterOptions([], true).catch(() => []),
+    // Builder-only lists for Users question filters; optional, so a failure leaves them empty.
+    db().from("dropdown_masters").select("id,label").eq("master_type", "designation").eq("is_active", true).order("label").limit(300),
+    db().from("franchise_groups").select("id,name").order("name").limit(100),
   ]);
   fail("Load form branches", branches.error); fail("Load form departments", departments.error);
-  return { users: users.flatMap((row) => row.id && row.employee_name ? [{ id: row.id, label: row.employee_name }] : []), branches: (branches.data ?? []).map((row) => ({ id: row.id, label: row.name })), departments: (departments.data ?? []).map((row) => ({ id: row.id, branchId: row.branch_id, label: row.name })), masters: toFormMasterOptions(masters) };
+  const franchiseOfBranch = new Map((branches.data ?? []).map((row) => [row.id, row.franchise_group_id ?? null]));
+  return {
+    users: users.flatMap((row) => row.id && row.employee_name ? [{ id: row.id, label: row.employee_name, branchId: row.branch_id ?? null, departmentId: row.department_id ?? null,
+      designationId: row.designation_id ?? null, role: row.user_role ?? null, franchiseId: row.branch_id ? franchiseOfBranch.get(row.branch_id) ?? null : null }] : []),
+    branches: (branches.data ?? []).map((row) => ({ id: row.id, label: row.name, franchiseId: row.franchise_group_id ?? null })),
+    departments: (departments.data ?? []).map((row) => ({ id: row.id, branchId: row.branch_id, label: row.name })), masters: toFormMasterOptions(masters),
+    designations: designations.error ? [] : (designations.data ?? []).map((row) => ({ id: row.id, label: row.label })),
+    franchises: franchises.error ? [] : (franchises.data ?? []).map((row) => ({ id: row.id, label: row.name })),
+  };
 }
 export const saveDraft = async (id: string | null, payload: Json, fields: Json) => { const { data, error } = await db().rpc("save_form_draft_with_audit", { p_template_id: id as string, p_payload: payload, p_fields: fields }); fail("Save form draft", error); if (!data) throw new Error("Save form draft: the server did not return the draft id"); return data as string; };
 export const savePublishedForm = async (id: string, payload: Json, fields: Json) => { const { error } = await db().rpc("save_published_form_with_audit", { p_template_id: id, p_payload: payload, p_fields: fields }); fail("Save published form", error); };
