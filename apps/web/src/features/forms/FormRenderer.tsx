@@ -150,7 +150,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
   // People, branches and departments are always listed A to Z, whatever order they were loaded in.
   const sorted = useMemo(() => ({ users: byLabel(dynamicOptions.users), branches: byLabel(dynamicOptions.branches), departments: byLabel(dynamicOptions.departments) }), [dynamicOptions]);
   // A Users question lists only the people its filter allows; the server refuses anyone else.
-  const optionsFor = (type: string, field?: FormFieldDefinition) => type === "user_dropdown" ? sorted.users.filter((person) => formUserMatchesFilter(field?.validation?.userFilter, person)) : type === "branch_dropdown" ? sorted.branches : type === "department_dropdown" ? sorted.departments.filter((item) => !branchFieldKey || !answers[branchFieldKey] || item.branchId === answers[branchFieldKey]) : [];
+  const optionsFor = (type: string, field?: FormFieldDefinition) => type === "user_dropdown" ? sorted.users.filter((person) => formUserMatchesFilter(field?.validation?.userFilter, person, lookups.departments)) : type === "branch_dropdown" ? sorted.branches : type === "department_dropdown" ? sorted.departments.filter((item) => !branchFieldKey || !answers[branchFieldKey] || item.branchId === answers[branchFieldKey]) : [];
   const openOther = (key: string, open: boolean) => {
     setOtherOpen((current) => ({ ...current, [key]: open }));
     if (open) requestAnimationFrame(() => otherInputs.current.get(key)?.focus());

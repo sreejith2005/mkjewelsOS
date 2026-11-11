@@ -12,7 +12,13 @@ const NO_VALUE: ReadonlySet<FormUserFilterOperator> = new Set(["is_empty", "is_n
 
 function choicesFor(attribute: FormUserFilterAttribute, options: DynamicOptions): Array<{ id: string; label: string }> {
   switch (attribute) {
-    case "department": return options.departments.map(({ id, label }) => ({ id, label }));
+    // One choice per department name: every store has its own Sales, CRM, ... and a rule
+    // matches the name in all of them (migration 0403).
+    case "department": {
+      const byName = new Map<string, { id: string; label: string }>();
+      for (const { id, label } of options.departments) { const key = label.trim().toLowerCase(); if (!byName.has(key)) byName.set(key, { id, label: label.trim() }); }
+      return [...byName.values()].sort((a, b) => a.label.localeCompare(b.label));
+    }
     case "designation": return options.designations ?? [];
     case "store": return options.branches.map(({ id, label }) => ({ id, label }));
     case "franchise": return options.franchises ?? [];
@@ -31,7 +37,11 @@ export function UserFilterEditor({ value, options, onChange }: { value: FormUser
   const set = (rules: readonly FormUserFilterRule[], match = filter.match) => onChange(rules.length ? { match, rules } : undefined);
   const update = (index: number, patch: Partial<FormUserFilterRule>) => set(filter.rules.map((rule, at) => at === index ? { ...rule, ...patch } : rule));
   const problem = formUserFilterProblem(value);
-  const matching = value ? options.users.filter((person) => formUserMatchesFilter(value, person)).length : options.users.length;
+  const departmentNames = new Map(options.departments.map((item) => [item.id, item.label]));
+  const matching = value ? options.users.filter((person) => formUserMatchesFilter(value, person, departmentNames)).length : options.users.length;
+  // A saved department id stands for its name, so tick the one choice listed for that name.
+  const chosen = (rule: FormUserFilterRule, id: string) => rule.attribute !== "department" ? rule.values.includes(id)
+    : rule.values.some((value) => (departmentNames.get(value) ?? value).trim().toLowerCase() === (departmentNames.get(id) ?? id).trim().toLowerCase());
 
   return <details className="rounded-lg border border-gold/15 bg-obsidian/30 p-3 sm:col-span-2" open={!!value}>
     <summary className="cursor-pointer text-sm font-semibold text-champagne">Who can be chosen{value ? ` (${filter.rules.length} rule${filter.rules.length === 1 ? "" : "s"})` : ": everyone"}</summary>
@@ -56,9 +66,9 @@ export function UserFilterEditor({ value, options, onChange }: { value: FormUser
           {NO_VALUE.has(rule.operator) ? <span className="self-center text-xs text-soft-grey">No value needed</span>
             : rule.attribute === "name" ? <input aria-label={`Rule ${index + 1} value`} className="field" maxLength={100} onChange={(event) => update(index, { values: event.target.value ? [event.target.value] : [] })} placeholder="Part of a name" value={rule.values[0] ?? ""} />
             : MULTI.has(rule.operator) ? <div aria-label={`Rule ${index + 1} values`} className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-task-border p-2" role="group">
-              {choices.length ? choices.map((choice) => <label className="flex items-center gap-2 text-sm text-champagne" key={choice.id}><input checked={rule.values.includes(choice.id)} onChange={(event) => update(index, { values: event.target.checked ? [...rule.values, choice.id] : rule.values.filter((item) => item !== choice.id) })} type="checkbox" />{choice.label}</label>) : <p className="text-xs text-soft-grey">Nothing to choose from.</p>}
+              {choices.length ? choices.map((choice) => <label className="flex items-center gap-2 text-sm text-champagne" key={choice.id}><input checked={chosen(rule, choice.id)} onChange={(event) => update(index, { values: event.target.checked ? [...rule.values, choice.id] : rule.values.filter((item) => !chosen({ ...rule, values: [item] }, choice.id)) })} type="checkbox" />{choice.label}</label>) : <p className="text-xs text-soft-grey">Nothing to choose from.</p>}
             </div>
-            : <select aria-label={`Rule ${index + 1} value`} className="field" onChange={(event) => update(index, { values: event.target.value ? [event.target.value] : [] })} value={rule.values[0] ?? ""}>
+            : <select aria-label={`Rule ${index + 1} value`} className="field" onChange={(event) => update(index, { values: event.target.value ? [event.target.value] : [] })} value={rule.attribute === "department" ? choices.find((choice) => chosen(rule, choice.id))?.id ?? "" : rule.values[0] ?? ""}>
               <option value="">Choose</option>{choices.map((choice) => <option key={choice.id} value={choice.id}>{choice.label}</option>)}
             </select>}
           <Button aria-label={`Remove rule ${index + 1}`} className="px-2" onClick={() => set(filter.rules.filter((_, at) => at !== index))} type="button" variant="ghost"><Trash2 className="size-4" /></Button>
