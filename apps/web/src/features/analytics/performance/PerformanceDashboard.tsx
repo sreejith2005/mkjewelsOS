@@ -163,7 +163,7 @@ function StatusLine({ updatedAt, refreshing, stale }: { updatedAt: Date | null; 
 function Skeleton() {
   return (
     <div aria-label="Loading performance" className="space-y-4" role="status">
-      <div className="grid gap-4 2xl:grid-cols-[1.65fr_1fr]">{Array.from({ length: 2 }, (_, i) => <div className="skeleton h-64 rounded-2xl" key={i} />)}</div>
+      <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-[1.6fr_1fr_1fr]">{Array.from({ length: 3 }, (_, i) => <div className={`skeleton h-64 rounded-2xl ${i === 0 ? "lg:col-span-2 2xl:col-span-1" : ""}`} key={i} />)}</div>
       <div className="skeleton h-80 rounded-2xl" />
     </div>
   );

@@ -17,3 +17,11 @@ it("opens a small comparison outcome from its printed count", () => {
   fireEvent.click(screen.getByRole("button", { name: /Late: 1.*1.0%/ }));
   expect(onSelect).toHaveBeenCalledWith("person", "late");
 });
+
+it("draws a reference donut even when one outcome occupies 99 percent", () => {
+  const onSelect = vi.fn();
+  render(<Donut title="Completed vs Pending" total={100} centerLabel="Total Task" variant="ring" onSelect={onSelect} segments={[{key:"completed",label:"Completed",value:1},{key:"remaining",label:"Pending",value:99}]} />);
+  expect(screen.getByRole("img", {name:/Completed vs Pending/})).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", {name:"Completed: 1 (1.0%). Open records."}));
+  expect(onSelect).toHaveBeenCalledWith("completed");
+});

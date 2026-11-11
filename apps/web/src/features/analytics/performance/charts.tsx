@@ -21,7 +21,7 @@ export const SEGMENT_TONES: Readonly<Record<string, Tone>> = {
   in_progress: { color: v("gold") },
   pending: { color: v("task-text-muted"), hollow: true },
   overdue: { color: v("task-overdue"), hatch: true },
-  remaining: { color: v("task-text-muted"), hollow: true },
+  remaining: { color: v("task-text-muted") },
   due: { color: v("task-text-muted", 0.4) },
 };
 
@@ -43,16 +43,18 @@ export function Donut({
   total,
   centerLabel,
   onSelect,
+  variant = "adaptive",
 }: {
   title: string;
   segments: DonutSegment[];
   total: number;
   centerLabel: string;
   onSelect: (key: PerformanceRecordSelector) => void;
+  variant?: "adaptive" | "ring";
 }) {
   const id = useId().replace(/:/g, "");
   const [hover, setHover] = useState<DonutSegment | null>(null);
-  const size = 168;
+  const size = variant === "ring" ? 192 : 168;
   const stroke = 22;
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -63,8 +65,8 @@ export function Donut({
   const shown = hover ?? null;
 
   return (
-    <figure className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
-      {!concentrated ? <div className="relative shrink-0" style={{ width: size, height: size }}>
+    <figure className={`flex flex-col items-center gap-4 ${variant === "adaptive" ? "sm:flex-row sm:items-center" : ""}`}>
+      {variant === "ring" || !concentrated ? <div className="relative shrink-0" style={{ width: size, height: size }}>
         <svg aria-label={`${title}: ${segments.map((s) => `${s.label} ${s.value}`).join(", ")} of ${total}`} height={size} role="img" viewBox={`0 0 ${size} ${size}`} width={size}>
           <defs>
             <pattern height="6" id={`${id}-hatch-overdue`} patternTransform="rotate(45)" patternUnits="userSpaceOnUse" width="6">
@@ -115,7 +117,7 @@ export function Donut({
           </g>
         </svg>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-          <span className="text-2xl font-semibold tabular-nums">{(shown ? shown.value : total).toLocaleString("en-IN")}</span>
+          <span className="text-2xl font-semibold tabular-nums">{variant === "ring" && total === 0 ? "No data" : (shown ? shown.value : total).toLocaleString("en-IN")}</span>
           <span className="max-w-[6.5rem] text-[0.6875rem] leading-tight text-task-text-muted">{shown ? `${shown.label} · ${pct(shown.value, total)}` : centerLabel}</span>
         </div>
       </div> : null}
@@ -133,7 +135,7 @@ export function Donut({
               <span className="min-w-0 flex-1 break-words">{segment.label}</span>
               <span className="tabular-nums font-medium">{segment.value.toLocaleString("en-IN")}</span>
               <span className="w-14 text-right text-xs tabular-nums text-task-text-muted">{pct(segment.value, total)}</span>
-              {concentrated ? <span aria-hidden className="h-2 w-full overflow-hidden rounded-full bg-task-muted"><span className="block h-full" style={{ ...swatchStyle(segment.key), width: `${segment.value / total * 100}%` }} /></span> : null}
+              {concentrated && variant === "adaptive" ? <span aria-hidden className="h-2 w-full overflow-hidden rounded-full bg-task-muted"><span className="block h-full" style={{ ...swatchStyle(segment.key), width: `${segment.value / total * 100}%` }} /></span> : null}
             </button>
           </li>
         ))}

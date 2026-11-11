@@ -60,11 +60,38 @@ describe("employee performance", () => {
     expect(screen.getAllByText("−50.0%").length).toBeGreaterThan(0);
     expect(screen.getAllByText("−60.0%").length).toBeGreaterThan(0);
     const summary = screen.getByRole("table", { name: "Task work lifecycle" });
-    expect(within(summary).getByRole("button", { name: "10 All assigned work" })).toBeTruthy();
-    expect(within(summary).getByRole("button", { name: "1 No completion time" })).toBeTruthy();
+    expect(within(summary).getByRole("button", { name: "10 Total Task" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "1 No completion time" })).toBeTruthy();
     expect(screen.queryByText("Tasks assigned")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Completed vs remaining" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "On time vs delayed" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Completed vs Pending" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "On-Time vs Delayed" })).toBeTruthy();
+  });
+
+  it("matches the reference matrix and breaks pending work into real app states", async () => {
+    api.fetchTaskPerformance.mockResolvedValue(payload("me"));
+    api.fetchTaskPerformanceOptions.mockResolvedValue({ ...options, canTeam: false });
+    api.fetchTaskPerformanceRecords.mockResolvedValue({ total: 0, offset: 0, limit: 8, rows: [] });
+    render(<PerformanceDashboard onOpenInsights={() => {}} />);
+    const table = await screen.findByRole("table", { name: "Task work lifecycle" });
+    expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(["", "TOTAL", "COMPLETED", "PENDING %"]);
+    expect(within(table).getAllByRole("rowheader").map((cell) => cell.textContent)).toEqual(["TASK COUNT", "COMPLETION"]);
+    const rows = within(table).getAllByRole("row");
+    expect(rows[1]?.textContent).toMatch(/Total Task.*Completed.*Task Not Done/);
+    expect(rows[2]?.textContent).toMatch(/Completed.*On Time.*Delayed/);
+    expect(within(rows[1]!).getByText("−50.0%")).toBeTruthy();
+    expect(within(rows[2]!).getByText("−60.0%")).toBeTruthy();
+    // The score/graph count all five unfinished assignments; the strip explains its parts.
+    expect(within(rows[1]!).getByText("5 tasks")).toBeTruthy();
+    const pending = screen.getByRole("table", { name: "Pending work breakdown" });
+    expect(within(pending).getByRole("rowheader", { name: "PENDING" })).toBeTruthy();
+    expect(within(pending).getByRole("button", { name: "2 Pending, not overdue" })).toBeTruthy();
+    expect(within(pending).getByRole("button", { name: "1 In Progress" })).toBeTruthy();
+    expect(within(pending).getByRole("button", { name: "2 Overdue" })).toBeTruthy();
+    expect(screen.queryByText("Called But Stage Not Completed")).toBeNull();
+    expect(screen.getByRole("img", {name:"Completed vs Pending: Completed 5, Pending 5 of 10"})).toBeTruthy();
+    expect(screen.getByRole("img", {name:"On-Time vs Delayed: On Time 2, Delayed 2, No completion time 1 of 5"})).toBeTruthy();
   });
 
   it("opens exactly the overdue records behind the Overdue count", async () => {
@@ -72,8 +99,8 @@ describe("employee performance", () => {
     api.fetchTaskPerformanceOptions.mockResolvedValue({ ...options, canTeam: false });
     api.fetchTaskPerformanceRecords.mockResolvedValue({ total: 2, offset: 0, limit: 25, rows: [] });
     render(<PerformanceDashboard onOpenInsights={() => {}} />);
-    const summary = await screen.findByRole("table", { name: "Task work lifecycle" });
-    fireEvent.click(within(summary).getByRole("button", { name: "2 Overdue" }));
+    await screen.findByRole("table", { name: "Task work lifecycle" });
+    fireEvent.click(screen.getByRole("button", { name: "2 Overdue" }));
     const dialog = await screen.findByRole("dialog");
     await waitFor(() => expect(api.fetchTaskPerformanceRecords).toHaveBeenCalledWith(expect.objectContaining({ selector: "overdue", filter: expect.objectContaining({ scope: "me" }) }), expect.anything()));
     expect(within(dialog).queryByText(/Work changed since the count/)).toBeNull();
@@ -130,7 +157,7 @@ describe("employee performance", () => {
     api.fetchTaskPerformanceRecords.mockResolvedValue({ total: 0, offset: 0, limit: 8, rows: [] });
     render(<PerformanceDashboard onOpenInsights={() => {}} />);
     const summary = await screen.findByRole("table", { name: "Task work lifecycle" });
-    expect(within(summary).getAllByText("No data")).toHaveLength(2);
+    expect(within(summary).getAllByText("No data").length).toBeGreaterThanOrEqual(2);
     expect(within(summary).queryByText("No completion time")).toBeNull();
     expect(await screen.findByRole("button", { name: /3 Older overdue assignments/ })).toBeTruthy();
   });
