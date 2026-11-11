@@ -6,7 +6,7 @@ const { client } = vi.hoisted(() => ({ client: {} as Record<string, unknown> }))
 vi.mock("@jewelos/api-client", () => ({ supabase: client }));
 vi.mock("@jewelos/api-client/client", () => ({ getSupabase: () => client }));
 
-import { deletedFormBundle, deleteForm, publishAsNewForm, savePublishedForm, setFormLibraryVisibility, startFmsFromFormSubmission, submitStandaloneFormAndStartFms, toDefinition, type FormField, type FormSubmission, type FormTemplate } from "./api";
+import { deletedFormBundle, deleteForm, loadFormDynamicOptions, publishAsNewForm, savePublishedForm, setFormLibraryVisibility, startFmsFromFormSubmission, submitStandaloneFormAndStartFms, toDefinition, type FormField, type FormSubmission, type FormTemplate } from "./api";
 
 describe("setFormLibraryVisibility", () => {
   it("saves through the audited contract and checks confirmation", async () => {
@@ -124,5 +124,31 @@ describe("submitStandaloneFormAndStartFms", () => {
     await expect(submitStandaloneFormAndStartFms("form-1", { assigned_to: "user-1" })).resolves.toEqual({ instanceId: "instance-1", referenceNumber: "FMS-1" });
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(rpc).toHaveBeenCalledWith("submit_form_and_start_fms_idempotent", { p_form_template_id: "form-1", p_answers: { assigned_to: "user-1" }, p_idempotency_key: expect.any(String) });
+  });
+});
+
+describe("loadFormDynamicOptions people", () => {
+  /** A chainable query that answers every call with the next queued result for its table. */
+  const fakeFrom = (answers: Record<string, Array<{ data: unknown; error: { message: string } | null }>>, selects: string[]) => (table: string) => {
+    const query: Record<string, unknown> = {};
+    for (const method of ["eq", "order", "range", "limit", "in", "is", "or"]) query[method] = () => query;
+    query.select = (columns: string) => { if (table === "v_task_users") selects.push(columns); return query; };
+    query.then = (resolve: (value: unknown) => unknown) => resolve(answers[table]?.shift() ?? { data: [], error: null });
+    return query;
+  };
+  const person = { id: "p1", employee_name: "Asha", branch_id: "b1", department_id: "d1", user_role: "staff", designation_id: "g1" };
+
+  it("never drops designation: a failed read is retried with the full column list", async () => {
+    const selects: string[] = [];
+    Object.assign(client, { from: fakeFrom({ v_task_users: [{ data: null, error: { message: "statement timeout" } }, { data: [person], error: null }] }, selects) });
+    const options = await loadFormDynamicOptions();
+    expect(selects).toHaveLength(2);
+    for (const columns of selects) expect(columns).toContain("designation_id");
+    expect(options.users).toEqual([expect.objectContaining({ id: "p1", designationId: "g1", departmentId: "d1", branchId: "b1", role: "staff" })]);
+  });
+
+  it("fails loudly instead of returning an incomplete people list", async () => {
+    Object.assign(client, { from: fakeFrom({ v_task_users: [{ data: null, error: { message: "timeout" } }, { data: null, error: { message: "timeout" } }] }, []) });
+    await expect(loadFormDynamicOptions()).rejects.toThrow("Load form users: timeout");
   });
 });

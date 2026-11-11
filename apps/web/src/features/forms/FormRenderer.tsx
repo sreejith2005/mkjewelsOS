@@ -330,12 +330,19 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
     </fieldset>);
 
     const selectOptions = dynamic.length ? dynamic : staticOptions.map((option) => ({ id: option.value, label: option.label }));
+    // A Users question with nobody to choose must say why, never show an empty list (owner report 2026-11-11).
+    const noPeople = field.type === "user_dropdown" && !readOnly && dynamic.length === 0
+      ? dynamicOptions.users.length === 0
+        ? "The people list did not load. Close this form and open it again."
+        : "No one you can see matches who this question allows. Ask a form admin to check the question's people filter."
+      : null;
     const onText = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => { const raw = event.target.value; set(field.key, NUMBER_TYPES.has(field.type) ? (raw === "" ? "" : Number(raw)) : raw); };
     const inputType = NUMBER_TYPES.has(field.type) ? "number" : field.type === "datetime" ? "datetime-local" : field.type === "phone" ? "tel" : field.type;
     const inputMode = field.type === "phone" ? "tel" : field.type === "email" ? "email" : NUMBER_TYPES.has(field.type) ? "decimal" : undefined;
     const textValue = typeof value === "string" || typeof value === "number" ? value : "";
     const control = field.type === "textarea" ? <textarea {...aria} className="field min-h-24" disabled={disabled} maxLength={field.validation?.maxLength} onChange={onText} placeholder={field.placeholder} ref={register(field.key)} rows={3} value={typeof value === "string" ? value : ""} />
       : SELECT_TYPES.has(field.type) ? <><select {...aria} className="field" disabled={disabled} onChange={(event) => { if (event.target.value === OTHER_CHOICE) { openOther(field.key, true); set(field.key, ""); } else chooseListed(event.target.value); }} ref={register(field.key)} value={otherChosen ? OTHER_CHOICE : typeof value === "string" ? value : ""}><option value="">Choose an answer</option>{selectOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}{singleOther ? <option value={OTHER_CHOICE}>Other (type your answer)</option> : null}</select>
+        {noPeople ? <span className="mt-1.5 block text-sm font-medium text-danger" role="status">{noPeople}</span> : null}
         {otherChosen ? <OtherAnswerInput disabled={disabled} inputRef={otherFocusRef(field.key)} label={field.label} onChange={(text) => set(field.key, text)} value={otherText} /> : null}</>
       : field.type === "checkbox" ? <span className={OPTION_ROW}><input {...aria} checked={value === true} disabled={disabled} onChange={(event) => set(field.key, event.target.checked)} ref={register(field.key)} type="checkbox" /><span>{field.placeholder ?? "Yes"}</span></span>
       : field.type === "currency" ? <span className="relative block"><span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-task-text-muted">₹</span><input {...aria} className="field pl-7" disabled={disabled} inputMode="decimal" onChange={onText} placeholder={field.placeholder} ref={register(field.key)} step="any" type="number" value={textValue} /></span>
