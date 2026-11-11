@@ -70,4 +70,3 @@ describe("department rules match the department name in every store (0403)", () 
     expect(formUserMatchesFilter(inSales, { label: "Andheri seller", departmentId: ANDHERI_SALES })).toBe(false);
   });
 });
-
