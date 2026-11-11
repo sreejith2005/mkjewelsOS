@@ -96,7 +96,7 @@ beforeEach(() => {
   vi.mocked(fetchToday).mockResolvedValue(today());
   vi.mocked(fetchConversationIntegration).mockResolvedValue(integration());
 });
-afterEach(() => { cleanup(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks(); });
 
 describe("Store Intelligence navigation", () => {
   it("shows a salesperson only Today and Conversations", async () => {
@@ -222,6 +222,9 @@ describe("Conversation detail", () => {
     await waitFor(() => expect(correctTranscript).toHaveBeenCalledWith("sess", "r1", [{ segment_id: "s2", speaker: "customer" }], "Customer voice"));
   });
   it("reviews a follow-up before creating it, on a first-half / second-half deadline, and then shows it instead of the button", async () => {
+    // Keep the fixture's deadline in the future without faking async UI timers.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-06T06:00:00Z"));
     render(<ConversationDetail navigate={navigate} sessionId="sess" tab="actions" />);
     fireEvent.click(await screen.findByRole("button", { name: "Review follow-up" }));
     expect(screen.getAllByText(/Nothing is sent to the customer from here/).length).toBeGreaterThan(0);
