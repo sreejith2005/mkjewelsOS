@@ -33,7 +33,7 @@ const nav: readonly ShellNavItem[] = [
 afterEach(cleanup);
 
 function ShellHarness({ navigate, onLogout = async () => {} }: { navigate: (path: string) => void; onLogout?: () => Promise<void> }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   return (
     <ApplicationShell
       branch={null} currentPage="home" drawerOpen={false} launcherItems={[]}
@@ -72,27 +72,43 @@ describe("desktop sidebar selection", () => {
     expect(navigate).toHaveBeenCalledWith("/settings");
     expect(screen.queryByRole("region", { name: "Your account" })).toBeNull();
   });
-  it.each(nav)("opens $label, shrinks the sidebar to icons, and lets the hamburger reopen it", async (item) => {
+  it("starts closed: no menu or icons take space, and the page uses the full width", () => {
+    const { container } = render(<ShellHarness navigate={vi.fn()} />);
+    expect(container.querySelector("aside")).toBeNull();
+    expect(screen.queryByRole("navigation", { name: "Primary navigation" })).toBeNull();
+    expect([...screen.getByRole("main").classList].some((name) => name.startsWith("md:pl-"))).toBe(false);
+    expect(screen.getByRole("button", { name: "Toggle sidebar" }).getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it.each(nav)("opens $label from the hamburger and closes the menu by itself", async (item) => {
     const user = userEvent.setup();
     const navigate = vi.fn();
     const { container } = render(<ShellHarness navigate={navigate} />);
     const group = ["reports", "dropdown_master", "settings"].includes(item.id)
       ? "System navigation" : "Primary navigation";
 
+    await user.click(screen.getByRole("button", { name: "Toggle sidebar" }));
+    expect(screen.getByRole("button", { name: "Toggle sidebar" }).getAttribute("aria-expanded")).toBe("true");
     await user.click(within(screen.getByRole("navigation", { name: group })).getByRole("button", { name: item.label }));
 
     expect(navigate).toHaveBeenCalledExactlyOnceWith(item.path);
-    // Closed is an icon rail: the page gains the width and every section stays one click away by name.
-    expect(container.querySelector("aside")?.hasAttribute("data-rail")).toBe(true);
-    expect(screen.getByRole("main").classList.contains("md:pl-16")).toBe(true);
-    const railButton = within(screen.getByRole("navigation", { name: group })).getByRole("button", { name: item.label });
-    expect(railButton.getAttribute("title")).toBe(item.label);
-    expect(railButton.textContent).not.toContain(item.label);
+    expect(container.querySelector("aside")).toBeNull();
+    expect(screen.getByRole("button", { name: "Toggle sidebar" }).getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("closes on a click outside the menu and on Escape without navigating", async () => {
+    const user = userEvent.setup();
+    const navigate = vi.fn();
+    const { container } = render(<ShellHarness navigate={navigate} />);
 
     await user.click(screen.getByRole("button", { name: "Toggle sidebar" }));
+    await user.click(screen.getByTestId("sidebar-backdrop"));
+    expect(container.querySelector("aside")).toBeNull();
 
-    expect(container.querySelector("aside")?.hasAttribute("data-rail")).toBe(false);
-    expect(screen.getByRole("main").classList.contains("md:pl-64")).toBe(true);
-    expect(screen.getByRole("button", { name: "Toggle sidebar" }).getAttribute("aria-expanded")).toBe("true");
+    await user.click(screen.getByRole("button", { name: "Toggle sidebar" }));
+    expect(container.querySelector("aside")).not.toBeNull();
+    await user.keyboard("{Escape}");
+    expect(container.querySelector("aside")).toBeNull();
+    expect(navigate).not.toHaveBeenCalled();
   });
 });
