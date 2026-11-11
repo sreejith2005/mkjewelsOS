@@ -47,3 +47,27 @@ describe("formUserFilterProblem", () => {
     expect(issues.some((issue) => /Only a Users question/.test(issue.message))).toBe(true);
   });
 });
+
+describe("department rules match the department name in every store (0403)", () => {
+  const BANDRA_SALES = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const ANDHERI_SALES = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const BANDRA_CRM = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  const names = new Map([[BANDRA_SALES, "Sales"], [ANDHERI_SALES, " sales "], [BANDRA_CRM, "CRM"]]);
+  const inSales: FormUserFilter = { match: "all", rules: [{ attribute: "department", operator: "in", values: [BANDRA_SALES] }] };
+
+  it("Sales chosen from one store lists Sales people from another store", () => {
+    expect(formUserMatchesFilter(inSales, { label: "Andheri seller", departmentId: ANDHERI_SALES }, names)).toBe(true);
+    expect(formUserMatchesFilter(inSales, { label: "Bandra CRM", departmentId: BANDRA_CRM }, names)).toBe(false);
+  });
+
+  it("not in excludes the same name in every store", () => {
+    const notSales: FormUserFilter = { match: "all", rules: [{ attribute: "department", operator: "not_in", values: [BANDRA_SALES] }] };
+    expect(formUserMatchesFilter(notSales, { label: "Andheri seller", departmentId: ANDHERI_SALES }, names)).toBe(false);
+    expect(formUserMatchesFilter(notSales, { label: "Bandra CRM", departmentId: BANDRA_CRM }, names)).toBe(true);
+  });
+
+  it("without department names, ids are compared exactly", () => {
+    expect(formUserMatchesFilter(inSales, { label: "Andheri seller", departmentId: ANDHERI_SALES })).toBe(false);
+  });
+});
+

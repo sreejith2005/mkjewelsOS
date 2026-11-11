@@ -66,13 +66,26 @@ function attributeValue(person: FormUserFilterPerson, attribute: FormUserFilterA
   return value ? value : null;
 }
 
+/**
+ * Department rules match by department name in every store (migration 0403): each store has
+ * its own Sales, CRM, ... rows, and a rule value is one of those ids standing for its name.
+ * `departmentNames` maps department id to name; without it, ids are compared exactly.
+ */
+export type FormDepartmentNames = ReadonlyMap<string, string>;
+const departmentKey = (id: string | null | undefined, names: FormDepartmentNames | undefined): string | null => {
+  if (!id) return null;
+  const name = names?.get(id) ?? names?.get(id.toLowerCase());
+  return name ? `name:${name.trim().toLowerCase()}` : id.toLowerCase();
+};
+
 /** Does one person match? No filter, or a filter with no rules, matches everyone. */
-export function formUserMatchesFilter(filter: FormUserFilter | undefined, person: FormUserFilterPerson): boolean {
+export function formUserMatchesFilter(filter: FormUserFilter | undefined, person: FormUserFilterPerson, departmentNames?: FormDepartmentNames): boolean {
   if (!filter || filter.rules.length === 0) return true;
   const results = filter.rules.map((rule) => {
-    const raw = attributeValue(person, rule.attribute);
+    const department = rule.attribute === "department";
+    const raw = department ? departmentKey(person.departmentId, departmentNames) : attributeValue(person, rule.attribute);
     const have = rule.attribute === "name" ? (raw ?? "").toLowerCase() : raw?.toLowerCase() ?? null;
-    const want = rule.values.map((value) => value.toLowerCase());
+    const want = rule.values.map((value) => department ? departmentKey(value, departmentNames) ?? "" : value.toLowerCase());
     switch (rule.operator) {
       case "is_empty": return have === null;
       case "is_not_empty": return have !== null;

@@ -45,3 +45,14 @@ it("a Users question with people to choose shows no warning", () => {
     dynamicOptions={{ users, branches: [], departments: [], masters: [] }} onSubmit={vi.fn()} />);
   expect(screen.queryByRole("status")).toBeNull();
 });
+
+it("Department is in Sales or CRM lists those departments from every store", () => {
+  const ANDHERI_SALES = "33333333-3333-4333-8333-333333333333";
+  const people = [...users, { id: "4", label: "Kiran (Andheri sales)", departmentId: ANDHERI_SALES, role: "staff" }, { id: "5", label: "Zoya (Accounts)", departmentId: null, role: "staff" }];
+  const departments = [{ id: SALES, branchId: "b1", label: "Sales" }, { id: CRM, branchId: "b1", label: "CRM" }, { id: ANDHERI_SALES, branchId: "b2", label: "Sales" }];
+  render(<FormRenderer definition={{ name: "Instagram", fields: [{ key: "assigned", label: "Assigned to", type: "user_dropdown", sortOrder: 0,
+    validation: { userFilter: { match: "all", rules: [{ attribute: "department", operator: "in", values: [SALES, CRM] }] } } }] }}
+    dynamicOptions={{ users: people, branches: [], departments, masters: [] }} onSubmit={vi.fn()} />);
+  const names = within(screen.getByRole("combobox")).getAllByRole("option").map((option) => option.textContent);
+  expect(names).toEqual(["Choose an answer", "Asha (Sales)", "Kiran (Andheri sales)", "Meera (Sales manager)", "Ravi (CRM)"]);
+});
