@@ -51,29 +51,42 @@ packages/api-client   Typed Supabase browser client
 packages/crm-ui       CRM screens rendered by the web app at /crm
 packages/ui-tokens    Shared design tokens
 supabase/             JewelOS project: migrations, pgTAP tests, Edge Functions, local seed
-supabase-crm/         CRM project: migrations, pgTAP tests, Edge Functions, Apps Script feed
+supabase-crm/         Frozen CRM project (being retired): migrations, pgTAP tests, Edge Functions
 scripts/              Controlled operational helpers (release, CRM/FMS reconcile, audits)
 ```
 
-### Two Supabase projects (owner decision 2026-10-01, live since 2026-10-06)
+### One Supabase project (owner decision 2026-11-12; migration in progress)
 
-- **JewelOS project** (production ref starts `yima`): users, roster, tasks, FMS,
-  forms, leave, notifications, reports, Ask Kiara.
-- **CRM project**: the client database. `/crm` reads and writes it through the
-  JewelOS login bridge (`crm-session-exchange`); JewelOS login is the only login.
-- The projects are never merged. Each record has one home project; the other
-  project receives events only through the audited outbox/inbox sync (roster
-  `crm-staff-sync`, walk-in -> task `sync-deliver`/`crm-sync-receive`, customer
-  answers `crm-customer-sync`).
-- The old JewelOS `crm` schema and `public` legacy CRM tables are retired: add
-  no features to them. New CRM schema work goes in `supabase-crm/`.
-- The CRM keeps field, label, order, vocabulary, flow, validation, and
-  calculation parity with the original MK Jewels CRM, with these approved
-  extensions: `MKC-`/`MKF-`/`MKREF-` identifiers and search, optional client
-  phone, walk-in -> JewelOS task, and channel/FMS contributions to the client
-  record. Its presentation uses the JewelOS theme through
+The 2026-10-01 two-project decision is reversed. The target is a single
+Supabase project, the JewelOS project (production ref starts `yima`), holding
+users, tasks, FMS, forms and the customer master database.
+
+- **New customer work goes in the JewelOS project**, in a new `customer` schema
+  under `supabase/migrations/`, linked directly to JewelOS users, branches and
+  permissions (`has_permission`). Add no tables, functions or features to
+  `supabase-crm/`.
+- **The CRM project is frozen, not deleted.** `/crm` still reads it through the
+  login bridge (`crm-session-exchange`) and the outbox/inbox sync
+  (`crm-staff-sync`, `sync-deliver`/`crm-sync-receive`, `crm-customer-sync`)
+  until each screen is re-pointed to the `customer` schema. The CRM section is
+  switched off for staff; the project holds demo and stale Sheet data only.
+  Remove the bridge, the sync functions, their cron jobs and `supabase-crm/`
+  only in the cutover change, after the owner confirms.
+- The old JewelOS `crm` schema and `public` legacy CRM tables stay retired: add
+  no features to them. They are dropped by a reviewed forward migration after a
+  backup, never ad hoc.
+- **Customer identity (owner decision 2026-11-12):** one phone number is one
+  client. The newest name is the main name; every other name and number seen is
+  kept (other names, other phones). The same name with a different phone is a
+  different client. This replaces the 2026-10-06 phone + name rule.
+  `MKC-`/`MKF-`/`MKREF-` identifiers and search are kept.
+- Re-pointed CRM screens keep field, label, order, vocabulary, flow and
+  validation parity with the current `/crm` screens unless the owner asks for a
+  change. Presentation keeps using the JewelOS theme through
   `packages/crm-ui/src/crm-port/jewelos-theme.css`; map colours to JewelOS
   `--color-*` variables there.
+- Hosted staging is the free project `jewelos-staging` (synthetic data only).
+  Apply every migration there before production.
 
 The Vite client may contain only `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`,
 `VITE_CRM_SUPABASE_URL`, and `VITE_CRM_SUPABASE_ANON_KEY`. An anon key is safe
