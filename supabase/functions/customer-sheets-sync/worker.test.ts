@@ -75,6 +75,23 @@ Deno.test("a Google failure is reported as a short code, without content", async
   assertEquals(fake.errors, ["sheet_not_shared"]);
 });
 
+Deno.test("rows are applied in small batches so no database call runs long", async () => {
+  const data = Array.from({ length: 450 }, (_, i) => [`c${i}`, "9820000001", "A", "Interested"]);
+  const fake = fakeGateway(); const limits: number[] = [];
+  const apply = fake.gateway.apply.bind(fake.gateway);
+  fake.gateway.apply = (source, limit) => { limits.push(limit); return apply(source, limit); };
+  const response = await handleSyncRequest(post(), { secret: "s", reader: fakeSheet(data), gateway: fake.gateway });
+  assertEquals((await response.json()).applied, 450);
+  assertEquals(limits, [100, 100, 100, 100, 100]);
+});
+
+Deno.test("a database failure code is passed through", async () => {
+  const fake = fakeGateway();
+  fake.gateway.apply = () => Promise.reject(new Error("apply_failed_57014"));
+  const response = await handleSyncRequest(post(), { secret: "s", reader: fakeSheet([["c1", "9820000001", "A", "Interested"]]), gateway: fake.gateway });
+  assertEquals(await response.json(), { error: "apply_failed_57014" });
+});
+
 Deno.test("a sheet without the key column is refused", async () => {
   const reader: SheetReader = { rows: () => Promise.resolve([["Name", "Status"]]) };
   const fake = fakeGateway();

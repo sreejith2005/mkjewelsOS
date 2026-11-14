@@ -2,22 +2,30 @@ import { createClient } from "@supabase/supabase-js";
 import { googleSheetReader } from "./google.ts";
 import { handleSyncRequest, type IngestGateway, type SyncDeps } from "./worker.ts";
 
+// A failed database call is reported as "<step>_failed_<postgres code>", for
+// example apply_failed_57014 (statement cancelled). The code says what went
+// wrong without exposing any row content.
+function failure(step: string, error: { code?: string }): Error {
+  const code = String(error.code ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return new Error(code ? `${step}_failed_${code}` : `${step}_failed`);
+}
+
 function gateway(url: string, key: string): IngestGateway {
   const admin = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
   return {
     async state(source) {
       const { data, error } = await admin.rpc("customer_ingest_state", { p_source: source });
-      if (error) throw new Error("state_failed");
+      if (error) throw failure("state", error);
       return data as { next_row: number; pending: number };
     },
     async store(source, rows, nextRow) {
       const { data, error } = await admin.rpc("customer_ingest_sheet_rows", { p_source: source, p_rows: rows, p_next_row: nextRow });
-      if (error) throw new Error("store_failed");
+      if (error) throw failure("store", error);
       return data as { new: number; changed: number };
     },
     async apply(source, limit) {
       const { data, error } = await admin.rpc("customer_ingest_apply", { p_source: source, p_limit: limit });
-      if (error) throw new Error("apply_failed");
+      if (error) throw failure("apply", error);
       return data as { applied: number; rejected: number; pending: number };
     },
     async noteError(source, message) {

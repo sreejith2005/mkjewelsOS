@@ -14,8 +14,13 @@ export const responseHeaders = {
 export const CHUNK_ROWS = 1000;
 /** Rows re-read before the cursor on every run, to catch recent edits. */
 export const OVERLAP_ROWS = 300;
-/** Rows applied per database call. */
-export const APPLY_BATCH = 1000;
+/**
+ * Rows applied per database call. Kept small on purpose: a database call made
+ * through the API is cancelled after about 8 seconds, and one row costs a few
+ * milliseconds (more while the tables are new). 1000 per call failed in
+ * production on 2026-11-14.
+ */
+export const APPLY_BATCH = 100;
 
 export interface SheetReader {
   /** Values of rows [fromRow, toRow] (1-based, inclusive), as shown in the sheet. */
