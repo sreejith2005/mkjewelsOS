@@ -64,3 +64,8 @@ verify_jwt = true
 # Dedicated server-only constant-time shared secret; never an AWS service-role key.
 [functions.recorder-ingest]
 verify_jwt = false
+
+# Dedicated scheduler secret is verified before body parsing, Google access or
+# database work. Reads Google Sheets with a read-only scope.
+[functions.customer-sheets-sync]
+verify_jwt = false
