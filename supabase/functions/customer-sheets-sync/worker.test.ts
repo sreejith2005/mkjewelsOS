@@ -66,6 +66,15 @@ Deno.test("restart re-reads from the top", async () => {
   assertEquals((await handleSyncRequest(post("s", '{"restart": "yes"}'), { secret: "s", reader: sheet, gateway: fake.gateway })).status, 400);
 });
 
+Deno.test("deleted sheet rows are noticed and the sheet is read again from the top", async () => {
+  const data = Array.from({ length: 40 }, (_, i) => [`c${i}`, "9820000001", "A", "Interested"]);
+  const sheet = fakeSheet(data); const fake = fakeGateway(500);
+  const response = await handleSyncRequest(post(), { secret: "s", reader: sheet, gateway: fake.gateway });
+  assertEquals(sheet.reads.slice(1), [[200, 199 + CHUNK_ROWS], [2, CHUNK_ROWS + 1]]);
+  assertEquals((await response.json()).rows_read, 40);
+  assertEquals(fake.cursor(), 42);
+});
+
 Deno.test("a Google failure is reported as a short code, without content", async () => {
   const reader: SheetReader = { rows: () => Promise.reject(new Error("sheet_not_shared")) };
   const fake = fakeGateway();

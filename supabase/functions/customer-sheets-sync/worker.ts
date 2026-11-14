@@ -116,8 +116,16 @@ export async function syncSheet(
   const state = await gateway.state(source);
   // restart re-reads the sheet from the top over the next runs; unchanged rows cost nothing.
   let from = options.restart ? 2 : Math.max(2, state.next_row - OVERLAP_ROWS);
+  let shrinkChecked = options.restart === true || from === 2;
   for (let chunk = 0; chunk < options.maxChunks; chunk++) {
     const rows = await reader.rows(from, from + CHUNK_ROWS - 1);
+    // Rows that were read before are gone: rows were deleted from the sheet, so
+    // everything below moved up. Read again from the top; unchanged rows cost
+    // nothing and rows that moved keep their key.
+    if (!shrinkChecked) {
+      shrinkChecked = true;
+      if (rows.length < state.next_row - from) { from = 2; chunk--; continue; }
+    }
     const ingest = toIngestRows(names, rows, from, keyColumn);
     // Google omits trailing empty rows, so rows.length is the last filled row read.
     const nextRow = from + rows.length;
