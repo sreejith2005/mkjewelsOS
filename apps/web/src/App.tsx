@@ -71,6 +71,8 @@ const NotificationsPage = lazyPage("notifications", () => import("@/pages/Notifi
 // Since 2026-11-03 it renders inside the JewelOS shell like every other section (layout
 // "section"): JewelOS keeps its header, sidebar and theme switch; the CRM shows its own tabs.
 const CrmApp = lazyPage("crm", () => import("@jewelos/crm-ui").then((module) => ({ default: module.CrmApp })));
+// The customer master (customer schema in this project) is a screen of the CRM section at /crm/master.
+const CustomerMasterPage = lazyPage("customer-master", () => import("@/pages/CustomerMasterPage").then((module) => ({ default: module.CustomerMasterPage })));
 const TasksPage = lazyPage("tasks", () => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
 const FmsAssignedWorkPage = lazyPage("fms-assigned-work", () => import("@/pages/FmsAssignedWorkPage").then((module) => ({ default: module.FmsAssignedWorkPage })));
 const TaskTemplatesPage = lazyPage("task-templates", () => import("@/pages/TaskTemplatesPage").then((module) => ({ default: module.TaskTemplatesPage })));
@@ -372,6 +374,7 @@ function AppShell() {
               : currentPage === "fms_builder" ? <FMSBuilderPage />
                 : currentPage === "notifications" ? <NotificationsPage onNavigate={navigate} />
                 : currentPage === "ask_kiara" ? <AskKiaraPage onNavigate={navigate} search={search} />
+                : currentPage === "crm" && (path === "/crm/master" || path.startsWith("/crm/master/")) ? <CustomerMasterPage onOpenCrm={() => navigate("/crm")} />
                 : currentPage === "crm" ? <CrmApp crmProject={crmProjectConfig} forms={crmFormsHost} jewelosHomePath="/" layout="section" navigate={navigate} onSignOut={logout} path={path} search={search} supabase={supabase} />
             : <DashboardPage />;
 

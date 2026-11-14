@@ -170,3 +170,4 @@ export {
   type ReassignWorkCandidate,
 } from "./taskReassignment";
 export * from "./phone";
+export * from "./customerMaster";

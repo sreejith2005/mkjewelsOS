@@ -1,4 +1,5 @@
 import type { CustomerIntegrationFunctions,CustomerIntegrationTables } from "./forms/customerIntegrationRpc";
+import type { CustomerMasterFunctions } from "./customerMaster/rpc";
 export type Json =
   | string
   | number
@@ -14910,7 +14911,7 @@ export type Database = {
         ]
       }
     }
-    Functions: CustomerIntegrationFunctions & {
+    Functions: CustomerIntegrationFunctions & CustomerMasterFunctions & {
       recording_analytics: { Args: { p_filters: Json }; Returns: Json }
       recording_analytics_options: { Args: never; Returns: Json }
       recording_analytics_sessions: {

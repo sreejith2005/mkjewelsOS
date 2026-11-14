@@ -1,4 +1,5 @@
 import type { CustomerIntegrationFunctions,CustomerIntegrationTables } from "@jewelos/core";
+import type { CustomerMasterFunctions } from "@jewelos/core";
 export type Json =
   | string
   | number
@@ -14037,7 +14038,7 @@ export type Database = {
         ]
       }
     }
-    Functions: CustomerIntegrationFunctions & {
+    Functions: CustomerIntegrationFunctions & CustomerMasterFunctions & {
       recording_activate_rubric_version: {
         Args: { p_rubric_version_id: string }
         Returns: Json
