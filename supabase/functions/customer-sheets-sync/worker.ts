@@ -58,7 +58,12 @@ export interface IngestGateway {
 /** One sheet to import. */
 export interface SheetSource {
   source: string;
-  keyColumn: string;
+  /**
+   * The columns that together identify one row. More than one when no single
+   * column is unique: in the old Runo sheet "Unique id" repeats across calls
+   * (36,577 rows, 20,707 ids), and id + Interaction Date is unique.
+   */
+  keyColumns: readonly string[];
   /** A sheet nobody edits any more: read once to the end, then left alone. */
   oneTime: boolean;
   /** Null when the sheet's secrets are not set; the source is then skipped. */
@@ -105,10 +110,10 @@ export function headerNames(header: string[]): string[] {
 
 /**
  * Sheet rows -> payload objects keyed by header. Empty cells are left out and a
- * fully empty row is skipped. The row key is the key column, or "row:<n>" when
- * that cell is empty.
+ * fully empty row is skipped. The row key is the key columns joined by "|", or
+ * "row:<n>" when all of them are empty.
  */
-export function toIngestRows(names: string[], rows: string[][], firstRow: number, keyColumn: string): IngestRow[] {
+export function toIngestRows(names: string[], rows: string[][], firstRow: number, keyColumns: readonly string[]): IngestRow[] {
   const out: IngestRow[] = [];
   rows.forEach((cells, index) => {
     const payload: Record<string, string> = {};
@@ -118,7 +123,8 @@ export function toIngestRows(names: string[], rows: string[][], firstRow: number
     });
     if (Object.keys(payload).length === 0) return;
     const sheetRow = firstRow + index;
-    out.push({ row_key: payload[keyColumn] || `row:${sheetRow}`, sheet_row: sheetRow, payload });
+    const parts = keyColumns.map((column) => payload[column] ?? "");
+    out.push({ row_key: parts.some(Boolean) ? parts.join("|") : `row:${sheetRow}`, sheet_row: sheetRow, payload });
   });
   return out;
 }
@@ -152,7 +158,7 @@ interface RunOptions { maxChunks: number; scanChunks: number; deadline: number; 
  *  3. Apply queued rows until the time budget is used.
  */
 export async function syncSheet(config: SheetSource & { reader: SheetReader }, gateway: IngestGateway, options: RunOptions): Promise<SyncResult> {
-  const { source, keyColumn, reader } = config;
+  const { source, keyColumns, reader } = config;
   const result: SyncResult = {
     source, rows_read: 0, new: 0, changed: 0, applied: 0, rejected: 0, pending: 0, removed: 0, reached_end: false, full_pass_done: false,
   };
@@ -165,7 +171,7 @@ export async function syncSheet(config: SheetSource & { reader: SheetReader }, g
   } else {
     const header = await reader.rows(1, 1);
     const names = headerNames(header[0] ?? []);
-    if (!names.includes(keyColumn)) throw new Error("key_column_missing");
+    if (!keyColumns.every((column) => names.includes(column))) throw new Error("key_column_missing");
     const headers = names.filter(Boolean);
 
     // Some regions of a large sheet answer slowly. A read that times out is
@@ -200,7 +206,7 @@ export async function syncSheet(config: SheetSource & { reader: SheetReader }, g
         shrinkChecked = true;
         if (rows.length < state.next_row - from) { from = 2; chunk--; continue; }
       }
-      const ingest = toIngestRows(names, rows, from, keyColumn);
+      const ingest = toIngestRows(names, rows, from, keyColumns);
       // Google omits trailing empty rows, so rows.length is the last filled row read.
       const nextRow = from + rows.length;
       const stored = await gateway.store(source, ingest, { headers, next_row: nextRow, completed: config.oneTime && atEnd ? true : undefined });
@@ -216,7 +222,7 @@ export async function syncSheet(config: SheetSource & { reader: SheetReader }, g
       let scanFrom = Math.max(2, state.scan_row);
       for (let chunk = 0; chunk < options.scanChunks && timeLeft() > 40_000; chunk++) {
         const { rows, atEnd } = await read(scanFrom);
-        const ingest = toIngestRows(names, rows, scanFrom, keyColumn);
+        const ingest = toIngestRows(names, rows, scanFrom, keyColumns);
         scanFrom += rows.length;
         const stored = await gateway.store(source, ingest, { headers, scan: true, scan_row: scanFrom });
         result.rows_read += ingest.length;
