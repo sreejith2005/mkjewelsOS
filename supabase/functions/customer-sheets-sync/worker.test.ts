@@ -1,13 +1,19 @@
 import { assertEquals } from "@std/assert";
 import {
-  CHUNK_ROWS, handleSyncRequest, headerNames, toIngestRows,
+  CHUNK_ROWS, handleSyncRequest, headerNames, readChunk, toIngestRows,
   type IngestGateway, type IngestRow, type SheetReader, type SheetSource, type StoreOptions, type SyncDeps,
 } from "./worker.ts";
 
 function fakeSheet(dataRows: string[][], key = "callId"): SheetReader & { reads: Array<[number, number]> } {
   const all = [[key, "Mobile Number", "Name", "Status", "Status"], ...dataRows];
   const reads: Array<[number, number]> = [];
-  return { reads, rows(from, to) { reads.push([from, to]); return Promise.resolve(all.slice(from - 1, to)); } };
+  // Like Google: empty rows at the end of the requested range are left out.
+  return { reads, rows(from, to) {
+    reads.push([from, to]);
+    const rows = all.slice(from - 1, to);
+    while (rows.length && rows[rows.length - 1].length === 0) rows.pop();
+    return Promise.resolve(rows);
+  } };
 }
 
 function fakeGateway(initial: Record<string, { next_row?: number; scan_row?: number; completed?: boolean }> = {}) {
@@ -54,6 +60,19 @@ Deno.test("headers and rows become keyed payloads", () => {
   ]);
 });
 
+Deno.test("blank rows at the end of a read are not mistaken for the end of the sheet", async () => {
+  // Rows 2-999 filled, 1000-1001 blank, 1002-1003 filled.
+  const data = [...calls(998), [], [], ...calls(2, "z")];
+  const first = await readChunk(fakeSheet(data), 2);
+  assertEquals([first.rows.length, first.atEnd], [1002, false]);
+  assertEquals(first.rows.at(-1)?.[0], "z1");
+  assertEquals((await readChunk(fakeSheet(data), 1004)).atEnd, true);
+  const exact = await readChunk(fakeSheet(calls(CHUNK_ROWS)), 2);
+  assertEquals([exact.rows.length, exact.atEnd], [CHUNK_ROWS, false]);
+  const empty = await readChunk(fakeSheet(calls(3)), 5);
+  assertEquals([empty.rows.length, empty.atEnd], [0, true]);
+});
+
 Deno.test("authorization is checked before any read", async () => {
   const sheet = fakeSheet([]); const { gateway } = fakeGateway();
   assertEquals((await handleSyncRequest(post("wrong"), deps([live(sheet)], gateway))).status, 401);
@@ -78,7 +97,9 @@ Deno.test("once the tail is caught up, the full pass reads the whole sheet and c
   const sheet = fakeSheet(calls(CHUNK_ROWS + 5)); const fake = fakeGateway({ runo: { next_row: CHUNK_ROWS + 7 } });
   const response = await handleSyncRequest(post(), deps([live(sheet)], fake.gateway));
   const [result] = (await response.json()).sources;
-  assertEquals(sheet.reads, [[1, 1], [CHUNK_ROWS - 293, 2 * CHUNK_ROWS - 294], [2, CHUNK_ROWS + 1], [CHUNK_ROWS + 2, 2 * CHUNK_ROWS + 1]]);
+  // Each short read is followed by one check that the sheet really ends there.
+  assertEquals(sheet.reads, [[1, 1], [CHUNK_ROWS - 293, 2 * CHUNK_ROWS - 294], [CHUNK_ROWS + 7, 2 * CHUNK_ROWS + 6],
+    [2, CHUNK_ROWS + 1], [CHUNK_ROWS + 2, 2 * CHUNK_ROWS + 1], [CHUNK_ROWS + 7, 2 * CHUNK_ROWS + 6]]);
   assertEquals(fake.stored.map((call) => [call.options.scan ?? false, call.options.scan_row ?? null]), [[false, null], [true, CHUNK_ROWS + 2], [true, CHUNK_ROWS + 7]]);
   assertEquals(fake.finished, ["runo"]);
   assertEquals([result.full_pass_done, result.removed], [true, 1]);
@@ -87,7 +108,7 @@ Deno.test("once the tail is caught up, the full pass reads the whole sheet and c
 Deno.test("the full pass continues from where the last run stopped", async () => {
   const sheet = fakeSheet(calls(8 * CHUNK_ROWS)); const fake = fakeGateway({ runo: { next_row: 8 * CHUNK_ROWS + 2, scan_row: CHUNK_ROWS + 2 } });
   await handleSyncRequest(post(), deps([live(sheet)], fake.gateway));
-  assertEquals(sheet.reads[2], [CHUNK_ROWS + 2, 2 * CHUNK_ROWS + 1]);
+  assertEquals(sheet.reads[3], [CHUNK_ROWS + 2, 2 * CHUNK_ROWS + 1]);
   assertEquals(fake.of("runo").scan_row, 6 * CHUNK_ROWS + 2);
   assertEquals(fake.finished, []);
 });
@@ -102,7 +123,7 @@ Deno.test("the full pass waits until the first load has reached the end", async 
 Deno.test("deleted sheet rows are noticed and the tail is read again from the top", async () => {
   const sheet = fakeSheet(calls(40)); const fake = fakeGateway({ runo: { next_row: 500 } });
   await handleSyncRequest(post(), deps([live(sheet)], fake.gateway));
-  assertEquals(sheet.reads.slice(1, 3), [[200, 199 + CHUNK_ROWS], [2, CHUNK_ROWS + 1]]);
+  assertEquals([sheet.reads[1], sheet.reads[3]], [[200, 199 + CHUNK_ROWS], [2, CHUNK_ROWS + 1]]);
   assertEquals(fake.of("runo").next_row, 42);
 });
 

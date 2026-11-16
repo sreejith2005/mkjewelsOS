@@ -119,6 +119,23 @@ export function toIngestRows(names: string[], rows: string[][], firstRow: number
   return out;
 }
 
+/**
+ * Read one chunk starting at `from`, and say whether the sheet ends there.
+ * Google leaves out empty rows at the end of the range it is asked for, so a
+ * short answer can also mean "blank rows here, more data below". A short answer
+ * is therefore checked by reading on: only an empty follow-up read is the end.
+ * (A gap of more than CHUNK_ROWS blank rows is treated as the end.)
+ */
+export async function readChunk(reader: SheetReader, from: number): Promise<{ rows: string[][]; atEnd: boolean }> {
+  let rows = await reader.rows(from, from + CHUNK_ROWS - 1);
+  while (rows.length < CHUNK_ROWS) {
+    const more = await reader.rows(from + rows.length, from + rows.length + CHUNK_ROWS - 1);
+    if (more.length === 0) return { rows, atEnd: true };
+    rows = rows.concat(more);
+  }
+  return { rows, atEnd: false };
+}
+
 interface RunOptions { maxChunks: number; scanChunks: number; deadline: number; now: () => number; restart?: boolean }
 
 /**
@@ -151,7 +168,7 @@ export async function syncSheet(config: SheetSource & { reader: SheetReader }, g
     let from = options.restart ? 2 : Math.max(2, state.next_row - OVERLAP_ROWS);
     let shrinkChecked = options.restart === true || from === 2;
     for (let chunk = 0; chunk < options.maxChunks; chunk++) {
-      const rows = await reader.rows(from, from + CHUNK_ROWS - 1);
+      const { rows, atEnd } = await readChunk(reader, from);
       // Rows that were read before are gone: rows were deleted from the sheet, so
       // everything below moved up. Read again from the top; rows that moved keep their key.
       if (!shrinkChecked) {
@@ -161,7 +178,6 @@ export async function syncSheet(config: SheetSource & { reader: SheetReader }, g
       const ingest = toIngestRows(names, rows, from, keyColumn);
       // Google omits trailing empty rows, so rows.length is the last filled row read.
       const nextRow = from + rows.length;
-      const atEnd = rows.length < CHUNK_ROWS;
       const stored = await gateway.store(source, ingest, { headers, next_row: nextRow, completed: config.oneTime && atEnd ? true : undefined });
       result.rows_read += ingest.length;
       result.new += stored.new;
@@ -174,14 +190,14 @@ export async function syncSheet(config: SheetSource & { reader: SheetReader }, g
     if (!config.oneTime && result.reached_end) {
       let scanFrom = Math.max(2, state.scan_row);
       for (let chunk = 0; chunk < options.scanChunks && timeLeft() > 40_000; chunk++) {
-        const rows = await reader.rows(scanFrom, scanFrom + CHUNK_ROWS - 1);
+        const { rows, atEnd } = await readChunk(reader, scanFrom);
         const ingest = toIngestRows(names, rows, scanFrom, keyColumn);
         scanFrom += rows.length;
         const stored = await gateway.store(source, ingest, { headers, scan: true, scan_row: scanFrom });
         result.rows_read += ingest.length;
         result.new += stored.new;
         result.changed += stored.changed;
-        if (rows.length < CHUNK_ROWS) {
+        if (atEnd) {
           // The pass has read the whole sheet.
           let finished = await gateway.finishScan(source);
           result.removed += finished.removed;
