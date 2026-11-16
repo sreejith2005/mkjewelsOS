@@ -5,6 +5,8 @@ import type { SheetReader } from "./worker.ts";
 
 const SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
+/** How long one read may take. A slow read is retried with fewer rows. */
+const READ_TIMEOUT_MS = 30_000;
 
 function base64url(input: ArrayBuffer | string): string {
   const bytes = typeof input === "string" ? new TextEncoder().encode(input) : new Uint8Array(input);
@@ -57,7 +59,14 @@ export function googleSheetReader(keyJson: string, spreadsheetId: string, tab: s
       const range = encodeURIComponent(`${quotedTab}!${fromRow}:${toRow}`);
       const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${range}` +
         "?majorDimension=ROWS&valueRenderOption=FORMATTED_VALUE";
-      const response = await fetch(url, { headers: { Authorization: `Bearer ${await token}` }, signal: AbortSignal.timeout(40_000) });
+      let response: Response;
+      try {
+        response = await fetch(url, { headers: { Authorization: `Bearer ${await token}` }, signal: AbortSignal.timeout(READ_TIMEOUT_MS) });
+      } catch (error) {
+        // A slow answer gets its own code so the caller can ask for fewer rows.
+        if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) throw new Error("sheet_read_timeout");
+        throw error;
+      }
       if (response.status === 403) throw new Error("sheet_not_shared");
       if (response.status === 404) throw new Error("sheet_not_found");
       if (response.status === 400) {
@@ -71,7 +80,11 @@ export function googleSheetReader(keyJson: string, spreadsheetId: string, tab: s
         throw new Error("sheet_range_refused");
       }
       if (!response.ok) throw new Error("sheet_read_failed");
-      const data = await response.json() as { values?: unknown[][] };
+      let data: { values?: unknown[][] };
+      try { data = await response.json() as { values?: unknown[][] }; } catch (error) {
+        if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) throw new Error("sheet_read_timeout");
+        throw error;
+      }
       return (data.values ?? []).map((row) => row.map((cell) => String(cell ?? "")));
     },
   };

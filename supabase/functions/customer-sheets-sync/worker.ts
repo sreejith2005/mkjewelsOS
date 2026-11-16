@@ -21,6 +21,10 @@ export const OVERLAP_ROWS = 300;
  * production on 2026-11-14.
  */
 export const APPLY_BATCH = 100;
+/** A one-time (large, old) sheet starts each run with this many rows per read and grows while reads are fast. */
+export const ONE_TIME_START_ROWS = 250;
+/** The fewest rows asked for when reads are slow. */
+export const MIN_READ_ROWS = 25;
 /** Chunks of the whole-sheet pass read per run. The pass finds edits and deletions anywhere. */
 export const SCAN_CHUNKS = 5;
 
@@ -126,10 +130,10 @@ export function toIngestRows(names: string[], rows: string[][], firstRow: number
  * is therefore checked by reading on: only an empty follow-up read is the end.
  * (A gap of more than CHUNK_ROWS blank rows is treated as the end.)
  */
-export async function readChunk(reader: SheetReader, from: number): Promise<{ rows: string[][]; atEnd: boolean }> {
-  let rows = await reader.rows(from, from + CHUNK_ROWS - 1);
-  while (rows.length < CHUNK_ROWS) {
-    const more = await reader.rows(from + rows.length, from + rows.length + CHUNK_ROWS - 1);
+export async function readChunk(reader: SheetReader, from: number, size: number = CHUNK_ROWS): Promise<{ rows: string[][]; atEnd: boolean }> {
+  let rows = await reader.rows(from, from + size - 1);
+  while (rows.length < size) {
+    const more = await reader.rows(from + rows.length, from + rows.length + size - 1);
     if (more.length === 0) return { rows, atEnd: true };
     rows = rows.concat(more);
   }
@@ -164,11 +168,32 @@ export async function syncSheet(config: SheetSource & { reader: SheetReader }, g
     if (!names.includes(keyColumn)) throw new Error("key_column_missing");
     const headers = names.filter(Boolean);
 
+    // Some regions of a large sheet answer slowly. A read that times out is
+    // repeated with half the rows; a read that works doubles the next one.
+    let size = config.oneTime ? ONE_TIME_START_ROWS : CHUNK_ROWS;
+    const read = async (start: number) => {
+      for (;;) {
+        try {
+          const chunk = await readChunk(reader, start, size);
+          const used = size;
+          size = Math.min(CHUNK_ROWS, size * 2);
+          return { ...chunk, used };
+        } catch (error) {
+          if (!(error instanceof Error) || error.message !== "sheet_read_timeout") throw error;
+          if (size <= MIN_READ_ROWS) throw new Error(`sheet_read_timeout_row_${start}`);
+          size = Math.max(MIN_READ_ROWS, Math.floor(size / 2));
+          if (timeLeft() < 35_000) throw new Error(`sheet_read_timeout_row_${start}`);
+        }
+      }
+    };
+
     // restart re-reads the sheet from the top over the next runs; unchanged rows cost nothing.
     let from = options.restart ? 2 : Math.max(2, state.next_row - OVERLAP_ROWS);
     let shrinkChecked = options.restart === true || from === 2;
-    for (let chunk = 0; chunk < options.maxChunks; chunk++) {
-      const { rows, atEnd } = await readChunk(reader, from);
+    // A one-time sheet reads as many chunks as the time allows; they start small.
+    const tailChunks = config.oneTime && options.maxChunks > 0 ? 500 : options.maxChunks;
+    for (let chunk = 0; chunk < tailChunks; chunk++) {
+      const { rows, atEnd } = await read(from);
       // Rows that were read before are gone: rows were deleted from the sheet, so
       // everything below moved up. Read again from the top; rows that moved keep their key.
       if (!shrinkChecked) {
@@ -190,7 +215,7 @@ export async function syncSheet(config: SheetSource & { reader: SheetReader }, g
     if (!config.oneTime && result.reached_end) {
       let scanFrom = Math.max(2, state.scan_row);
       for (let chunk = 0; chunk < options.scanChunks && timeLeft() > 40_000; chunk++) {
-        const { rows, atEnd } = await readChunk(reader, scanFrom);
+        const { rows, atEnd } = await read(scanFrom);
         const ingest = toIngestRows(names, rows, scanFrom, keyColumn);
         scanFrom += rows.length;
         const stored = await gateway.store(source, ingest, { headers, scan: true, scan_row: scanFrom });
@@ -257,6 +282,9 @@ export async function handleSyncRequest(request: Request, deps: SyncDeps): Promi
   let failed = false;
   for (const config of deps.sources) {
     if (only && config.source !== only) continue;
+    // A one-time sheet is large and slow; it runs only when asked for by name,
+    // so it never takes time from the live sheets.
+    if (!only && config.oneTime) continue;
     if (!config.reader) continue;
     if (deadline - now() < 20_000) break;
     try {
