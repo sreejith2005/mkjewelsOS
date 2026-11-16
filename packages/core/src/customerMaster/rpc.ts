@@ -1,7 +1,7 @@
 import type { Json } from "../database.types";
 
 /**
- * Public signatures of the customer master RPCs (migrations 0405-0408). Kept
+ * Public signatures of the customer master RPCs (migrations 0405-0409). Kept
  * separate from the generated bulk types, like the customer integration
  * signatures. The customer_ingest_* functions are service-role only.
  */
@@ -24,6 +24,8 @@ export type CustomerMasterFunctions = {
   customer_list_filters: { Args: Record<never, never>; Returns: Json };
   customer_ingest_state: { Args: { p_source: string }; Returns: Json };
   customer_ingest_sheet_rows: { Args: { p_source: string; p_rows: Json; p_next_row?: number | null }; Returns: Json };
+  customer_ingest_store: { Args: { p_source: string; p_rows: Json; p_options?: Json }; Returns: Json };
+  customer_ingest_finish_scan: { Args: { p_source: string; p_limit?: number }; Returns: Json };
   customer_ingest_apply: { Args: { p_source: string; p_limit?: number }; Returns: Json };
   customer_ingest_note_error: { Args: { p_source: string; p_error: string }; Returns: undefined };
 };

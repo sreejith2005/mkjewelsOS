@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { googleSheetReader } from "./google.ts";
-import { handleSyncRequest, type IngestGateway, type SyncDeps } from "./worker.ts";
+import { handleSyncRequest, type IngestGateway, type SheetSource, type SyncDeps } from "./worker.ts";
 
 // A failed database call is reported as "<step>_failed_<postgres code>", for
 // example apply_failed_57014 (statement cancelled). The code says what went
@@ -16,10 +16,10 @@ function gateway(url: string, key: string): IngestGateway {
     async state(source) {
       const { data, error } = await admin.rpc("customer_ingest_state", { p_source: source });
       if (error) throw failure("state", error);
-      return data as { next_row: number; pending: number };
+      return data as { next_row: number; scan_row: number; pending: number; completed: boolean };
     },
-    async store(source, rows, nextRow) {
-      const { data, error } = await admin.rpc("customer_ingest_sheet_rows", { p_source: source, p_rows: rows, p_next_row: nextRow });
+    async store(source, rows, options) {
+      const { data, error } = await admin.rpc("customer_ingest_store", { p_source: source, p_rows: rows, p_options: options });
       if (error) throw failure("store", error);
       return data as { new: number; changed: number };
     },
@@ -28,19 +28,37 @@ function gateway(url: string, key: string): IngestGateway {
       if (error) throw failure("apply", error);
       return data as { applied: number; rejected: number; pending: number };
     },
+    async finishScan(source) {
+      const { data, error } = await admin.rpc("customer_ingest_finish_scan", { p_source: source });
+      if (error) throw failure("finish", error);
+      return data as { removed: number; remaining: boolean; blocked: boolean };
+    },
     async noteError(source, message) {
       await admin.rpc("customer_ingest_note_error", { p_source: source, p_error: message });
     },
   };
 }
 
+// Each sheet: its source name in the database, the secret holding its sheet id,
+// its tab, the column that identifies a row, and whether it is read only once.
+const SHEETS = [
+  { source: "runo", idSecret: "RUNO_SHEET_ID", tabSecret: "RUNO_SHEET_TAB", tab: "Interactions", keyColumn: "callId", oneTime: false },
+  { source: "runo_old", idSecret: "RUNO_OLD_SHEET_ID", tabSecret: "RUNO_OLD_SHEET_TAB", tab: "25-26", keyColumn: "Unique id", oneTime: true },
+] as const;
+
 function dependencies(): SyncDeps {
   const url = Deno.env.get("SUPABASE_URL"), key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const googleKey = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY"), sheetId = Deno.env.get("RUNO_SHEET_ID");
-  const tab = Deno.env.get("RUNO_SHEET_TAB") ?? "Interactions";
+  const googleKey = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY");
+  const sources: SheetSource[] = SHEETS.map((sheet) => {
+    const sheetId = Deno.env.get(sheet.idSecret);
+    return {
+      source: sheet.source, keyColumn: sheet.keyColumn, oneTime: sheet.oneTime,
+      reader: googleKey && sheetId ? googleSheetReader(googleKey, sheetId, Deno.env.get(sheet.tabSecret) ?? sheet.tab) : null,
+    };
+  });
   return {
     secret: Deno.env.get("CUSTOMER_SHEETS_SYNC_CRON_SECRET"),
-    reader: googleKey && sheetId ? googleSheetReader(googleKey, sheetId, tab) : null,
+    sources,
     gateway: url && key ? gateway(url, key) : null,
   };
 }

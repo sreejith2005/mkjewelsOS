@@ -1,4 +1,4 @@
-// Reads a Google Sheet (read-only) and hands its rows to the customer schema.
+// Reads Google Sheets (read-only) and hands their rows to the customer schema.
 // Pure logic with injected dependencies, so it is tested without Google or a
 // database. Nothing here ever writes to a sheet, and no row content is logged
 // or returned: responses carry counts only.
@@ -12,7 +12,7 @@ export const responseHeaders = {
 
 /** Sheet rows per read. One read is one Google request. */
 export const CHUNK_ROWS = 1000;
-/** Rows re-read before the cursor on every run, to catch recent edits. */
+/** Rows re-read before the cursor on every run, to catch recent edits quickly. */
 export const OVERLAP_ROWS = 300;
 /**
  * Rows applied per database call. Kept small on purpose: a database call made
@@ -21,17 +21,12 @@ export const OVERLAP_ROWS = 300;
  * production on 2026-11-14.
  */
 export const APPLY_BATCH = 100;
+/** Chunks of the whole-sheet pass read per run. The pass finds edits and deletions anywhere. */
+export const SCAN_CHUNKS = 5;
 
 export interface SheetReader {
   /** Values of rows [fromRow, toRow] (1-based, inclusive), as shown in the sheet. */
   rows(fromRow: number, toRow: number): Promise<string[][]>;
-}
-
-export interface IngestGateway {
-  state(source: string): Promise<{ next_row: number; pending: number }>;
-  store(source: string, rows: IngestRow[], nextRow: number): Promise<{ new: number; changed: number }>;
-  apply(source: string, limit: number): Promise<{ applied: number; rejected: number; pending: number }>;
-  noteError(source: string, message: string): Promise<void>;
 }
 
 export interface IngestRow {
@@ -40,9 +35,35 @@ export interface IngestRow {
   payload: Record<string, string>;
 }
 
+export interface StoreOptions {
+  headers?: string[];
+  next_row?: number;
+  scan?: boolean;
+  scan_row?: number;
+  completed?: boolean;
+}
+
+export interface IngestGateway {
+  state(source: string): Promise<{ next_row: number; scan_row: number; pending: number; completed: boolean }>;
+  store(source: string, rows: IngestRow[], options: StoreOptions): Promise<{ new: number; changed: number }>;
+  apply(source: string, limit: number): Promise<{ applied: number; rejected: number; pending: number }>;
+  finishScan(source: string): Promise<{ removed: number; remaining: boolean; blocked: boolean }>;
+  noteError(source: string, message: string): Promise<void>;
+}
+
+/** One sheet to import. */
+export interface SheetSource {
+  source: string;
+  keyColumn: string;
+  /** A sheet nobody edits any more: read once to the end, then left alone. */
+  oneTime: boolean;
+  /** Null when the sheet's secrets are not set; the source is then skipped. */
+  reader: SheetReader | null;
+}
+
 export interface SyncDeps {
   secret: string | undefined;
-  reader: SheetReader | null;
+  sources: SheetSource[];
   gateway: IngestGateway | null;
   now?: () => number;
 }
@@ -55,7 +76,11 @@ export interface SyncResult {
   applied: number;
   rejected: number;
   pending: number;
+  removed: number;
   reached_end: boolean;
+  full_pass_done: boolean;
+  skipped?: string;
+  error?: string;
 }
 
 function json(status: number, body: unknown): Response {
@@ -94,52 +119,86 @@ export function toIngestRows(names: string[], rows: string[][], firstRow: number
   return out;
 }
 
+interface RunOptions { maxChunks: number; scanChunks: number; deadline: number; now: () => number; restart?: boolean }
+
 /**
- * One run: continue reading where the last run stopped (re-reading a small
- * overlap for edits), store the rows, then apply queued rows until the time
- * budget is used. Safe to call again at any time.
+ * One run for one sheet. Safe to call again at any time.
+ *  1. Tail: continue where the last run stopped, re-reading a small overlap,
+ *     so new rows and recent edits arrive within one run.
+ *  2. Full pass (live sheets, once the tail is caught up): read the next slice
+ *     of the whole sheet. When the pass reaches the end, rows that were not
+ *     seen in it are gone from the sheet and are removed.
+ *  3. Apply queued rows until the time budget is used.
  */
-export async function syncSheet(
-  source: string,
-  keyColumn: string,
-  reader: SheetReader,
-  gateway: IngestGateway,
-  options: { maxChunks: number; budgetMs: number; now: () => number; restart?: boolean },
-): Promise<SyncResult> {
-  const started = options.now();
-  const result: SyncResult = { source, rows_read: 0, new: 0, changed: 0, applied: 0, rejected: 0, pending: 0, reached_end: false };
-
-  const header = await reader.rows(1, 1);
-  const names = headerNames(header[0] ?? []);
-  if (!names.includes(keyColumn)) throw new Error("key_column_missing");
-
+export async function syncSheet(config: SheetSource & { reader: SheetReader }, gateway: IngestGateway, options: RunOptions): Promise<SyncResult> {
+  const { source, keyColumn, reader } = config;
+  const result: SyncResult = {
+    source, rows_read: 0, new: 0, changed: 0, applied: 0, rejected: 0, pending: 0, removed: 0, reached_end: false, full_pass_done: false,
+  };
   const state = await gateway.state(source);
-  // restart re-reads the sheet from the top over the next runs; unchanged rows cost nothing.
-  let from = options.restart ? 2 : Math.max(2, state.next_row - OVERLAP_ROWS);
-  let shrinkChecked = options.restart === true || from === 2;
-  for (let chunk = 0; chunk < options.maxChunks; chunk++) {
-    const rows = await reader.rows(from, from + CHUNK_ROWS - 1);
-    // Rows that were read before are gone: rows were deleted from the sheet, so
-    // everything below moved up. Read again from the top; unchanged rows cost
-    // nothing and rows that moved keep their key.
-    if (!shrinkChecked) {
-      shrinkChecked = true;
-      if (rows.length < state.next_row - from) { from = 2; chunk--; continue; }
+  const timeLeft = () => options.deadline - options.now();
+
+  if (config.oneTime && state.completed && !options.restart) {
+    result.skipped = "already_imported";
+    result.reached_end = true;
+  } else {
+    const header = await reader.rows(1, 1);
+    const names = headerNames(header[0] ?? []);
+    if (!names.includes(keyColumn)) throw new Error("key_column_missing");
+    const headers = names.filter(Boolean);
+
+    // restart re-reads the sheet from the top over the next runs; unchanged rows cost nothing.
+    let from = options.restart ? 2 : Math.max(2, state.next_row - OVERLAP_ROWS);
+    let shrinkChecked = options.restart === true || from === 2;
+    for (let chunk = 0; chunk < options.maxChunks; chunk++) {
+      const rows = await reader.rows(from, from + CHUNK_ROWS - 1);
+      // Rows that were read before are gone: rows were deleted from the sheet, so
+      // everything below moved up. Read again from the top; rows that moved keep their key.
+      if (!shrinkChecked) {
+        shrinkChecked = true;
+        if (rows.length < state.next_row - from) { from = 2; chunk--; continue; }
+      }
+      const ingest = toIngestRows(names, rows, from, keyColumn);
+      // Google omits trailing empty rows, so rows.length is the last filled row read.
+      const nextRow = from + rows.length;
+      const atEnd = rows.length < CHUNK_ROWS;
+      const stored = await gateway.store(source, ingest, { headers, next_row: nextRow, completed: config.oneTime && atEnd ? true : undefined });
+      result.rows_read += ingest.length;
+      result.new += stored.new;
+      result.changed += stored.changed;
+      from = nextRow;
+      if (atEnd) { result.reached_end = true; break; }
+      if (timeLeft() < 40_000) break;
     }
-    const ingest = toIngestRows(names, rows, from, keyColumn);
-    // Google omits trailing empty rows, so rows.length is the last filled row read.
-    const nextRow = from + rows.length;
-    const stored = await gateway.store(source, ingest, nextRow);
-    result.rows_read += ingest.length;
-    result.new += stored.new;
-    result.changed += stored.changed;
-    from = nextRow;
-    if (rows.length < CHUNK_ROWS) { result.reached_end = true; break; }
-    if (options.now() - started > options.budgetMs / 2) break;
+
+    if (!config.oneTime && result.reached_end) {
+      let scanFrom = Math.max(2, state.scan_row);
+      for (let chunk = 0; chunk < options.scanChunks && timeLeft() > 40_000; chunk++) {
+        const rows = await reader.rows(scanFrom, scanFrom + CHUNK_ROWS - 1);
+        const ingest = toIngestRows(names, rows, scanFrom, keyColumn);
+        scanFrom += rows.length;
+        const stored = await gateway.store(source, ingest, { headers, scan: true, scan_row: scanFrom });
+        result.rows_read += ingest.length;
+        result.new += stored.new;
+        result.changed += stored.changed;
+        if (rows.length < CHUNK_ROWS) {
+          // The pass has read the whole sheet.
+          let finished = await gateway.finishScan(source);
+          result.removed += finished.removed;
+          while (finished.remaining && timeLeft() > 30_000) {
+            finished = await gateway.finishScan(source);
+            result.removed += finished.removed;
+          }
+          result.full_pass_done = !finished.remaining;
+          if (finished.blocked) result.error = "too_many_rows_missing";
+          break;
+        }
+      }
+    }
   }
 
   result.pending = state.pending + result.new + result.changed;
-  while (result.pending > 0 && options.now() - started < options.budgetMs) {
+  while (result.pending > 0 && timeLeft() > 0) {
     const applied = await gateway.apply(source, APPLY_BATCH);
     result.applied += applied.applied;
     result.rejected += applied.rejected;
@@ -152,15 +211,19 @@ export async function syncSheet(
 export async function handleSyncRequest(request: Request, deps: SyncDeps): Promise<Response> {
   if (request.method === "OPTIONS") return new Response("ok", { headers: responseHeaders });
   if (request.method !== "POST") return json(405, { error: "Method not allowed" });
-  if (!deps.secret || !deps.reader || !deps.gateway) return json(500, { error: "Function secrets are not configured" });
+  if (!deps.secret || !deps.gateway || !deps.sources.some((item) => item.reader)) return json(500, { error: "Function secrets are not configured" });
   if (request.headers.get("x-cron-secret") !== deps.secret) return json(401, { error: "Scheduler authorization required" });
 
-  let maxChunks = 5, restart = false;
+  let maxChunks = 5, restart = false, only: string | null = null;
   try {
-    const body = request.headers.get("content-length") === "0" ? {} : await request.json() as { max_chunks?: unknown; restart?: unknown };
+    const body = request.headers.get("content-length") === "0" ? {} : await request.json() as { max_chunks?: unknown; restart?: unknown; source?: unknown };
     if (body.restart !== undefined) {
       if (typeof body.restart !== "boolean") return json(400, { error: "restart must be true or false" });
       restart = body.restart;
+    }
+    if (body.source !== undefined) {
+      if (typeof body.source !== "string" || !deps.sources.some((item) => item.source === body.source)) return json(400, { error: "Unknown source" });
+      only = body.source;
     }
     if (body.max_chunks !== undefined) {
       if (!Number.isInteger(body.max_chunks) || (body.max_chunks as number) < 0 || (body.max_chunks as number) > 20) {
@@ -172,15 +235,26 @@ export async function handleSyncRequest(request: Request, deps: SyncDeps): Promi
     return json(400, { error: "Invalid JSON body" });
   }
 
-  try {
-    const result = await syncSheet("runo", "callId", deps.reader, deps.gateway, {
-      maxChunks, restart, budgetMs: 100_000, now: deps.now ?? Date.now,
-    });
-    return json(200, result);
-  } catch (error) {
-    // Only a short code is stored or returned; never sheet content.
-    const code = error instanceof Error && /^[a-z_0-9]+$/.test(error.message) ? error.message : "sync_failed";
-    try { await deps.gateway.noteError("runo", code); } catch { /* The response still reports the failure. */ }
-    return json(502, { error: code });
+  const now = deps.now ?? Date.now;
+  const deadline = now() + 100_000;
+  const results: SyncResult[] = [];
+  let failed = false;
+  for (const config of deps.sources) {
+    if (only && config.source !== only) continue;
+    if (!config.reader) continue;
+    if (deadline - now() < 20_000) break;
+    try {
+      results.push(await syncSheet({ ...config, reader: config.reader }, deps.gateway, {
+        maxChunks, scanChunks: maxChunks === 0 ? 0 : SCAN_CHUNKS, deadline, now, restart,
+      }));
+    } catch (error) {
+      // Only a short code is stored or returned; never sheet content.
+      const code = error instanceof Error && /^[a-z_0-9]+$/.test(error.message) ? error.message : "sync_failed";
+      try { await deps.gateway.noteError(config.source, code); } catch { /* The response still reports the failure. */ }
+      results.push({ source: config.source, rows_read: 0, new: 0, changed: 0, applied: 0, rejected: 0, pending: 0, removed: 0, reached_end: false, full_pass_done: false, error: code });
+      failed = true;
+    }
   }
+  // One sheet failing does not stop the others; the status says whether any did.
+  return json(failed ? 502 : 200, { sources: results });
 }
