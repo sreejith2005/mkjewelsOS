@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { formatPhone } from "@jewelos/core";
 import type { CustomerClientPage, CustomerInteractionPage, CustomerTimelineEntry } from "./api";
 
 const mocks = vi.hoisted(() => ({ clientPage: vi.fn(), interactionPage: vi.fn(), timeline: vi.fn(), wide: true }));
@@ -54,7 +55,7 @@ it("shows every detail of a customer on one page", async () => {
   expect(mocks.timeline).toHaveBeenCalledWith("c1");
   for (const text of ["MKF-100001", "MKREF-100001", "RUNO-77", "Runo live interactions: 2 rows", "12 April", "Calendar"]) expect(screen.getByText(text)).toBeTruthy();
   expect(screen.getByText(/Earlier: Thane \(Runo calling/)).toBeTruthy();
-  expect(screen.getByText(/\+91 98200 08002 \(billing\)|98200 08002 \(billing\)/)).toBeTruthy();
+  expect(screen.getByText(`${formatPhone("919820008002")} (billing)`)).toBeTruthy();
   expect(screen.getByText("Other details")).toBeTruthy();
   expect(await screen.findByText("Wants a bridal set")).toBeTruthy();
   expect(screen.getByText(/Led to: Hot follow-up on/)).toBeTruthy();
