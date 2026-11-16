@@ -40,10 +40,10 @@ function gateway(url: string, key: string): IngestGateway {
 }
 
 // Each sheet: its source name in the database, the secret holding its sheet id,
-// its tab, the column that identifies a row, and whether it is read only once.
+// its tab, the columns that together identify a row, and whether it is read only once.
 const SHEETS = [
-  { source: "runo", idSecret: "RUNO_SHEET_ID", tabSecret: "RUNO_SHEET_TAB", tab: "Interactions", keyColumn: "callId", oneTime: false },
-  { source: "runo_old", idSecret: "RUNO_OLD_SHEET_ID", tabSecret: "RUNO_OLD_SHEET_TAB", tab: "25-26", keyColumn: "Unique id", oneTime: true },
+  { source: "runo", idSecret: "RUNO_SHEET_ID", tabSecret: "RUNO_SHEET_TAB", tab: "Interactions", keyColumns: ["callId"], oneTime: false },
+  { source: "runo_old", idSecret: "RUNO_OLD_SHEET_ID", tabSecret: "RUNO_OLD_SHEET_TAB", tab: "25-26", keyColumns: ["Unique id", "Interaction Date"], oneTime: true },
 ] as const;
 
 function dependencies(): SyncDeps {
@@ -52,7 +52,7 @@ function dependencies(): SyncDeps {
   const sources: SheetSource[] = SHEETS.map((sheet) => {
     const sheetId = Deno.env.get(sheet.idSecret);
     return {
-      source: sheet.source, keyColumn: sheet.keyColumn, oneTime: sheet.oneTime,
+      source: sheet.source, keyColumns: sheet.keyColumns, oneTime: sheet.oneTime,
       reader: googleKey && sheetId ? googleSheetReader(googleKey, sheetId, Deno.env.get(sheet.tabSecret) ?? sheet.tab) : null,
     };
   });

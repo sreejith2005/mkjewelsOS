@@ -43,8 +43,8 @@ function fakeGateway(initial: Record<string, { next_row?: number; scan_row?: num
   return { gateway, stored, errors, finished, applyLimits, of };
 }
 
-const live = (reader: SheetReader | null): SheetSource => ({ source: "runo", keyColumn: "callId", oneTime: false, reader });
-const old = (reader: SheetReader | null): SheetSource => ({ source: "runo_old", keyColumn: "Unique id", oneTime: true, reader });
+const live = (reader: SheetReader | null): SheetSource => ({ source: "runo", keyColumns: ["callId"], oneTime: false, reader });
+const old = (reader: SheetReader | null): SheetSource => ({ source: "runo_old", keyColumns: ["Unique id"], oneTime: true, reader });
 const deps = (sources: SheetSource[], gateway: IngestGateway): SyncDeps => ({ secret: "s", sources, gateway });
 const post = (secret = "s", body = "{}") =>
   new Request("http://x", { method: "POST", headers: { "x-cron-secret": secret, "content-type": "application/json" }, body });
@@ -54,7 +54,7 @@ const calls = (count: number, prefix = "c") => Array.from({ length: count }, (_,
 Deno.test("headers and rows become keyed payloads", () => {
   const names = headerNames(["callId", " Name ", "", "Status", "Status"]);
   assertEquals(names, ["callId", "Name", "", "Status", "Status (2)"]);
-  const rows = toIngestRows(names, [["c1", " Meera ", "x", "Interested"], [], ["", "No Key"]], 2, "callId");
+  const rows = toIngestRows(names, [["c1", " Meera ", "x", "Interested"], [], ["", "No Key"]], 2, ["callId"]);
   assertEquals(rows, [
     { row_key: "c1", sheet_row: 2, payload: { callId: "c1", Name: "Meera", Status: "Interested" } },
     { row_key: "row:4", sheet_row: 4, payload: { Name: "No Key" } },
@@ -216,4 +216,20 @@ Deno.test("a sheet without the key column is refused with a short code", async (
   const fake = fakeGateway();
   const body = await (await handleSyncRequest(post(), deps([live(reader)], fake.gateway))).json();
   assertEquals(body.sources[0].error, "key_column_missing");
+});
+
+Deno.test("a row is identified by several columns when one is not unique", () => {
+  const names = headerNames(["Unique id", "Interaction Date", "Name"]);
+  const rows = toIngestRows(names, [
+    ["u1", "16/07/2025, 11:52:43", "Meera"], ["u1", "18/07/2025, 10:00:00", "Meera"], ["u2", "", "No Date"], ["", "", "No Key"],
+  ], 2, ["Unique id", "Interaction Date"]);
+  assertEquals(rows.map((row) => row.row_key), ["u1|16/07/2025, 11:52:43", "u1|18/07/2025, 10:00:00", "u2|", "row:5"]);
+});
+
+Deno.test("every key column must be in the header", async () => {
+  const reader: SheetReader = { rows: () => Promise.resolve([["Unique id", "Name"]]) };
+  const fake = fakeGateway();
+  const source: SheetSource = { source: "runo_old", keyColumns: ["Unique id", "Interaction Date"], oneTime: true, reader };
+  const response = await handleSyncRequest(post("s", OLD), deps([source], fake.gateway));
+  assertEquals((await response.json()).sources[0].error, "key_column_missing");
 });
