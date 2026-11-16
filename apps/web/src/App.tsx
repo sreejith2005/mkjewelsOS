@@ -374,7 +374,7 @@ function AppShell() {
               : currentPage === "fms_builder" ? <FMSBuilderPage />
                 : currentPage === "notifications" ? <NotificationsPage onNavigate={navigate} />
                 : currentPage === "ask_kiara" ? <AskKiaraPage onNavigate={navigate} search={search} />
-                : currentPage === "crm" && (path === "/crm/master" || path.startsWith("/crm/master/")) ? <CustomerMasterPage onOpenCrm={() => navigate("/crm")} />
+                : currentPage === "crm" && (path === "/crm/master" || path.startsWith("/crm/master/")) ? <CustomerMasterPage navigate={navigate} path={path} />
                 : currentPage === "crm" ? <CrmApp crmProject={crmProjectConfig} forms={crmFormsHost} jewelosHomePath="/" layout="section" navigate={navigate} onSignOut={logout} path={path} search={search} supabase={supabase} />
             : <DashboardPage />;
 

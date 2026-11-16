@@ -1,27 +1,28 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, Search, Users } from "lucide-react";
-import { Button, Modal, Notice } from "@/components/ui";
+import { Button, Notice } from "@/components/ui";
 import { errorMessage, titleCase } from "@/lib/format";
-import {
-  CUSTOMER_LIST_PAGE_SIZE, loadCustomerList, loadCustomerListFilters, loadCustomerProfile, loadCustomerTimeline,
-  type CustomerProfile, type CustomerTimelineEntry,
-} from "@/features/customers/api";
+import { CUSTOMER_LIST_PAGE_SIZE, loadCustomerList, loadCustomerListFilters } from "@/features/customers/api";
+import { CustomerInteractionView } from "@/features/customers/CustomerInteractionView";
+import { CustomerProfileView } from "@/features/customers/CustomerProfileView";
+import { formatDate, formatDateTime } from "@/features/customers/format";
 import {
   activeCustomerFilterCount, CUSTOMER_CONTACT_LABELS, CUSTOMER_SEGMENT_LABELS, CUSTOMER_SORT_LABELS, CUSTOMER_STAGE_LABELS,
-  daysAgoLabel, EMPTY_CUSTOMER_LIST_FILTERS, formatPhone,
+  CUSTOMER_MASTER_PATH, customerInteractionPath, customerProfilePath, daysAgoLabel, EMPTY_CUSTOMER_LIST_FILTERS, formatPhone,
+  parseCustomerMasterPath,
   type CustomerContactWindow, type CustomerLifecycleStage, type CustomerListFilterOptions, type CustomerListFilters,
-  type CustomerListPage, type CustomerListRow, type CustomerListSort, type CustomerSegment,
+  type CustomerListPage, type CustomerListSort, type CustomerSegment,
 } from "@jewelos/core";
 
 const SEARCH_DEBOUNCE_MS = 350;
-const formatDateTime = (iso: string | null) => iso
-  ? new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }) : "";
-const formatDate = (iso: string | null) => iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "";
-const RESULT_LABEL: Record<CustomerTimelineEntry["result"], string> = { positive: "Positive", negative: "Negative", not_connected: "Not connected", neutral: "Neutral" };
-const RESULT_TONE: Record<CustomerTimelineEntry["result"], string> = {
-  positive: "border-success/40 text-success", negative: "border-danger/40 text-danger",
-  not_connected: "border-task-border text-soft-grey", neutral: "border-gold/30 text-champagne",
-};
+
+/**
+ * The list a person left is the list they come back to: filters, search text
+ * and page are kept in memory while the app is open (never stored).
+ */
+let remembered: { filters: CustomerListFilters; searchText: string; page: number } | null = null;
+/** Test hook: forget the remembered list state. */
+export function resetCustomerMasterListState(): void { remembered = null; }
 
 function sourceLabel(options: CustomerListFilterOptions | null, source: string | null): string {
   if (!source) return "";
@@ -38,115 +39,27 @@ function SelectFilter<T extends string>({ label, value, onChange, children }: { 
   );
 }
 
-function CustomerDetail({ row, options, onClose }: { row: CustomerListRow; options: CustomerListFilterOptions | null; onClose: () => void }) {
-  const [profile, setProfile] = useState<CustomerProfile | null>(null);
-  const [timeline, setTimeline] = useState<CustomerTimelineEntry[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [reachedEnd, setReachedEnd] = useState(false);
-
-  useEffect(() => {
-    let current = true;
-    setProfile(null); setTimeline(null); setError(null); setReachedEnd(false);
-    // Independent reads start together; the timeline does not wait for the profile.
-    loadCustomerProfile(row.client_id).then((value) => { if (current) setProfile(value); }).catch((reason: unknown) => { if (current) setError(errorMessage(reason)); });
-    loadCustomerTimeline(row.client_id).then((value) => { if (current) { setTimeline(value); setReachedEnd(value.length < 50); } })
-      .catch((reason: unknown) => { if (current) setError(errorMessage(reason)); });
-    return () => { current = false; };
-  }, [row.client_id]);
-
-  const loadMore = async () => {
-    const last = timeline?.at(-1);
-    if (!last) return;
-    setLoadingMore(true);
-    try {
-      const more = await loadCustomerTimeline(row.client_id, last.occurred_at);
-      setTimeline((existing) => [...(existing ?? []), ...more]);
-      setReachedEnd(more.length < 50);
-    } catch (reason) { setError(errorMessage(reason)); } finally { setLoadingMore(false); }
-  };
-
-  const client = profile?.client;
-  const text = (key: string) => { const value = client?.[key]; return typeof value === "string" && value ? value : null; };
-  const facts: [string, string | null][] = [
-    ["City", text("city")], ["Community", text("community")], ["Email", text("email")],
-    ["Date of birth", text("dob") ? (client?.dob_year_known === false ? new Date(`${text("dob")}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "long" }) : formatDate(`${text("dob")}T00:00:00`)) : null],
-    ["Anniversary", text("anniversary") ? (client?.anniversary_year_known === false ? new Date(`${text("anniversary")}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "long" }) : formatDate(`${text("anniversary")}T00:00:00`)) : null],
-    ["Marital status", text("marital_status")], ["Address", text("address")], ["Beverage", text("beverage")], ["Snack", text("snack")],
-    ["First source", sourceLabel(options, row.first_source) || null], ["First seen", formatDate(row.first_seen_at) || null],
-    ["Referral ID", text("referral_code")], ["Referred by", profile?.referred_by ? `${profile.referred_by.name ?? "Unnamed"} (${profile.referred_by.client_code})` : null],
-  ];
-  const otherNames = profile?.names.filter((item) => item.name !== row.primary_name).map((item) => item.name) ?? [];
-  const otherPhones = profile?.phones.filter((item) => item.kind !== "primary") ?? [];
-  const family = profile?.family?.members.filter((member) => member.client_id !== row.client_id) ?? [];
-
-  return (
-    <Modal mobileFullscreen onClose={onClose} title={row.primary_name ?? "Unnamed customer"} wide>
-      <div className="space-y-4">
-        <p className="text-sm text-soft-grey">
-          <span className="font-mono text-champagne">{row.client_code}</span>
-          {row.household_code ? <> · Family <span className="font-mono text-champagne">{row.household_code}</span></> : null}
-          {row.primary_phone ? <> · {formatPhone(row.primary_phone)}</> : null}
-          {" · "}{CUSTOMER_SEGMENT_LABELS[row.segment]} · {CUSTOMER_STAGE_LABELS[row.lifecycle_stage]}
-        </p>
-        {error ? <Notice tone="danger">{error}</Notice> : null}
-        {profile === null && !error ? <p className="text-sm text-soft-grey">Loading profile…</p> : null}
-        {profile ? <>
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
-            {facts.filter(([, value]) => value).map(([label, value]) => (
-              <div className="min-w-0" key={label}><dt className="text-xs font-semibold uppercase tracking-wide text-soft-grey">{label}</dt><dd className="break-words text-sm text-champagne">{value}</dd></div>
-            ))}
-          </dl>
-          {otherNames.length ? <p className="text-sm text-soft-grey">Other names: <span className="text-champagne">{otherNames.join(", ")}</span></p> : null}
-          {otherPhones.length ? <p className="text-sm text-soft-grey">Other phones: <span className="text-champagne">{otherPhones.map((item) => `${formatPhone(item.phone)} (${item.kind})`).join(", ")}</span></p> : null}
-          {family.length ? <p className="text-sm text-soft-grey">Family: <span className="text-champagne">{family.map((member) => `${member.name ?? "Unnamed"} (${member.client_code})`).join(", ")}</span></p> : null}
-          {profile.needs_review_count > 0 ? <Notice>{profile.needs_review_count} newer answer{profile.needs_review_count === 1 ? "" : "s"} from a lower-priority source need a check.</Notice> : null}
-        </> : null}
-
-        <section aria-label="Timeline">
-          <h3 className="mb-2 font-display text-lg font-semibold text-gold-secondary">Timeline</h3>
-          {timeline === null && !error ? <p className="text-sm text-soft-grey">Loading timeline…</p> : null}
-          {timeline?.length === 0 ? <p className="text-sm text-soft-grey">No interactions recorded yet.</p> : null}
-          <ol className="space-y-2">
-            {timeline?.map((entry) => (
-              <li className="rounded-lg border border-task-border p-3" key={entry.interaction_id}>
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                  <span className="font-semibold text-champagne">{formatDateTime(entry.occurred_at)}</span>
-                  <span className="text-soft-grey">{titleCase(entry.channel)} · {titleCase(entry.purpose)}</span>
-                  <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${RESULT_TONE[entry.result]}`}>{RESULT_LABEL[entry.result]}</span>
-                  <span className="ml-auto font-mono text-xs text-soft-grey">{entry.interaction_code}</span>
-                </div>
-                <p className="mt-1 text-sm text-champagne">
-                  {entry.outcome ?? (entry.successful ? "Reached" : "Not reached")}
-                  {entry.non_contact_reason ? ` (${entry.non_contact_reason})` : ""}
-                </p>
-                <p className="text-xs text-soft-grey">
-                  {[entry.staff ? `By ${entry.staff}` : null, entry.attended_by ? `Attended by ${entry.attended_by}` : null, entry.branch, sourceLabel(options, entry.source)].filter(Boolean).join(" · ")}
-                </p>
-                {entry.notes ? <p className="mt-1 whitespace-pre-wrap break-words text-sm text-soft-grey">{entry.notes}</p> : null}
-                {entry.products.length ? <p className="mt-1 text-xs text-soft-grey">Products: {entry.products.map((product) => [product.code, product.category].filter(Boolean).join(" ")).join(", ")}</p> : null}
-                {entry.follow_ups.map((followUp) => <p className="mt-1 text-xs text-soft-grey" key={followUp.code}>Follow-up {followUp.code}: {titleCase(followUp.kind)}, due {formatDate(followUp.due_at)} ({followUp.status})</p>)}
-                {entry.appointments.map((appointment) => <p className="mt-1 text-xs text-soft-grey" key={appointment.code}>Appointment {appointment.code}: {titleCase(appointment.type)}, {formatDateTime(appointment.scheduled_at)} ({titleCase(appointment.status)})</p>)}
-              </li>
-            ))}
-          </ol>
-          {timeline && timeline.length > 0 && !reachedEnd ? <Button className="mt-3" disabled={loadingMore} onClick={() => void loadMore()} variant="secondary">{loadingMore ? "Loading…" : "Show older"}</Button> : null}
-        </section>
-      </div>
-    </Modal>
-  );
+/** Customer master: the list, one customer's page, or one interaction's page, by address. */
+export function CustomerMasterPage({ path, navigate }: { path: string; navigate: (to: string) => void }) {
+  const route = parseCustomerMasterPath(path) ?? { view: "list" as const };
+  const openClient = (code: string) => navigate(customerProfilePath(code));
+  const openInteraction = (code: string) => navigate(customerInteractionPath(code));
+  const backToList = () => navigate(CUSTOMER_MASTER_PATH);
+  if (route.view === "client") return <CustomerProfileView clientCode={route.code} key={route.code} onBack={backToList} onOpenClient={openClient} onOpenInteraction={openInteraction} />;
+  if (route.view === "interaction") return <CustomerInteractionView interactionCode={route.code} key={route.code} onBack={backToList} onOpenClient={openClient} onOpenInteraction={openInteraction} />;
+  return <CustomerMasterList onOpenClient={openClient} onOpenCrm={() => navigate("/crm")} />;
 }
 
-/** Customer master: every client and lead in one filtered list (/crm/master). */
-export function CustomerMasterPage({ onOpenCrm }: { onOpenCrm: () => void }) {
-  const [filters, setFilters] = useState<CustomerListFilters>(EMPTY_CUSTOMER_LIST_FILTERS);
-  const [searchText, setSearchText] = useState("");
-  const [page, setPage] = useState(0);
+/** Every client and lead in one filtered list (/crm/master). */
+function CustomerMasterList({ onOpenCrm, onOpenClient }: { onOpenCrm: () => void; onOpenClient: (clientCode: string) => void }) {
+  const [filters, setFilters] = useState<CustomerListFilters>(() => remembered?.filters ?? EMPTY_CUSTOMER_LIST_FILTERS);
+  const [searchText, setSearchText] = useState(() => remembered?.searchText ?? "");
+  const [page, setPage] = useState(() => remembered?.page ?? 0);
+  useEffect(() => { remembered = { filters, searchText, page }; }, [filters, searchText, page]);
   const [result, setResult] = useState<CustomerListPage | null>(null);
   const [options, setOptions] = useState<CustomerListFilterOptions | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<CustomerListRow | null>(null);
   const requestRef = useRef(0);
 
   const load = useCallback(async () => {
@@ -173,12 +86,14 @@ export function CustomerMasterPage({ onOpenCrm }: { onOpenCrm: () => void }) {
   }, []);
 
   useEffect(() => {
+    // Nothing to do when the box already matches the applied search (first load, or coming back to the list).
+    if (filters.query === searchText) return;
     const timer = window.setTimeout(() => {
-      setFilters((existing) => existing.query === searchText ? existing : { ...existing, query: searchText });
+      setFilters((existing) => ({ ...existing, query: searchText }));
       setPage(0);
     }, SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [searchText]);
+  }, [searchText, filters.query]);
 
   const change = (patch: Partial<CustomerListFilters>) => { setFilters((existing) => ({ ...existing, ...patch })); setPage(0); };
   const clear = () => { setSearchText(""); setFilters(EMPTY_CUSTOMER_LIST_FILTERS); setPage(0); };
@@ -256,7 +171,7 @@ export function CustomerMasterPage({ onOpenCrm }: { onOpenCrm: () => void }) {
       <ul className="divide-y divide-task-border rounded-xl border border-task-border">
         {result?.rows.map((row) => (
           <li key={row.client_id}>
-            <button aria-label={`Open ${row.primary_name ?? row.client_code}`} className="grid w-full grid-cols-1 gap-x-4 gap-y-1 p-3 text-left hover:bg-gold/5 sm:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1.3fr)_minmax(0,1.5fr)]" onClick={() => setSelected(row)} type="button">
+            <button aria-label={`Open ${row.primary_name ?? row.client_code}`} className="grid w-full grid-cols-1 gap-x-4 gap-y-1 p-3 text-left hover:bg-gold/5 sm:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1.3fr)_minmax(0,1.5fr)]" onClick={() => onOpenClient(row.client_code)} type="button">
               <span className="min-w-0">
                 <span className="block truncate font-semibold text-champagne">{row.primary_name ?? "Unnamed"}</span>
                 <span className="block text-xs text-soft-grey"><span className="font-mono">{row.client_code}</span>{row.primary_phone ? ` · ${formatPhone(row.primary_phone)}` : ""}</span>
@@ -287,7 +202,6 @@ export function CustomerMasterPage({ onOpenCrm }: { onOpenCrm: () => void }) {
         </nav>
       ) : null}
 
-      {selected ? <CustomerDetail onClose={() => setSelected(null)} options={options} row={selected} /> : null}
     </section>
   );
 }

@@ -3,13 +3,19 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { CustomerListFilterOptions, CustomerListPage, CustomerListRow } from "@jewelos/core";
 
-const mocks = vi.hoisted(() => ({ list: vi.fn(), filters: vi.fn(), profile: vi.fn(), timeline: vi.fn() }));
+const mocks = vi.hoisted(() => ({ list: vi.fn(), filters: vi.fn(), clientPage: vi.fn(), interactionPage: vi.fn(), timeline: vi.fn() }));
 vi.mock("@/features/customers/api", () => ({
   CUSTOMER_LIST_PAGE_SIZE: 50,
-  loadCustomerList: mocks.list, loadCustomerListFilters: mocks.filters, loadCustomerProfile: mocks.profile, loadCustomerTimeline: mocks.timeline,
+  loadCustomerList: mocks.list, loadCustomerListFilters: mocks.filters, loadCustomerClientPage: mocks.clientPage,
+  loadCustomerInteractionPage: mocks.interactionPage, loadCustomerTimeline: mocks.timeline,
 }));
+vi.mock("@/lib/useMediaQuery", () => ({ useMediaQuery: () => true }));
 
-import { CustomerMasterPage } from "./CustomerMasterPage";
+import { CustomerMasterPage as RoutedPage, resetCustomerMasterListState } from "./CustomerMasterPage";
+
+const navigate = vi.fn();
+/** The list address; the old prop is ignored so the earlier cases read unchanged. */
+function CustomerMasterPage(_props: { onOpenCrm?: () => void }) { return <RoutedPage navigate={navigate} path="/crm/master" />; }
 
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>((yes) => { resolve = yes; }); return { promise, resolve }; }
 const row = (name: string, code: string): CustomerListRow => ({
@@ -24,13 +30,9 @@ const options: CustomerListFilterOptions = {
 };
 
 beforeEach(() => {
+  resetCustomerMasterListState();
   mocks.list.mockResolvedValue(pageOf([row("Asha Jain", "MKC-100001")], 120));
   mocks.filters.mockResolvedValue(options);
-  mocks.profile.mockResolvedValue({ client: { city: "Mumbai", referral_code: "MKREF-100001" }, family: null, phones: [{ phone: "919820000001", kind: "primary" }, { phone: "919820000002", kind: "billing" }],
-    names: [{ name: "Asha Jain", source: "runo", last_seen_at: "2026-11-02T06:30:00Z" }, { name: "Asha J", source: "runo", last_seen_at: "2026-10-01T06:30:00Z" }], identifiers: [], referred_by: null, field_sources: {}, needs_review_count: 0 });
-  mocks.timeline.mockResolvedValue([{ interaction_id: "i1", interaction_code: "MKI-1000001", occurred_at: "2026-11-02T06:30:00Z", channel: "call", direction: "outbound", purpose: "enquiry",
-    outcome: "Not contacted", result: "not_connected", successful: false, non_contact_reason: "Not picking", notes: null, source: "runo", staff: "Priya Nair", attended_by: null, branch: "MK Bandra",
-    products: [], follow_ups: [{ code: "MKFU-100001", kind: "retry", due_at: "2026-11-03T06:30:00Z", status: "pending" }], appointments: [] }]);
 });
 afterEach(() => { cleanup(); vi.resetAllMocks(); vi.useRealTimers(); });
 
@@ -88,14 +90,22 @@ it("drops an older response that arrives after a newer one", async () => {
   expect(screen.queryByRole("button", { name: "Open Older Result" })).toBeNull();
 });
 
-it("opens a customer with profile and timeline", async () => {
-  render(<CustomerMasterPage onOpenCrm={() => undefined} />);
+it("opens a customer on their own page address", async () => {
+  render(<CustomerMasterPage />);
   fireEvent.click(await screen.findByRole("button", { name: "Open Asha Jain" }));
-  expect(await screen.findByText("MKI-1000001")).toBeTruthy();
-  expect(screen.getByText("Not contacted (Not picking)")).toBeTruthy();
-  expect(screen.getByText(/Follow-up MKFU-100001: Retry/)).toBeTruthy();
-  expect(await screen.findByText("Asha J")).toBeTruthy();
-  expect(mocks.profile).toHaveBeenCalledWith("MKC-100001");
+  expect(navigate).toHaveBeenCalledWith("/crm/master/c/MKC-100001");
+});
+
+it("comes back to the same filters and page", async () => {
+  const first = render(<CustomerMasterPage />);
+  await screen.findByRole("button", { name: "Open Asha Jain" });
+  fireEvent.change(await screen.findByLabelText("City"), { target: { value: "Pune" } });
+  await waitFor(() => expect(mocks.list).toHaveBeenLastCalledWith(expect.objectContaining({ city: "Pune" }), 0));
+  first.unmount();
+  mocks.list.mockClear();
+  render(<CustomerMasterPage />);
+  await waitFor(() => expect(mocks.list).toHaveBeenCalledWith(expect.objectContaining({ city: "Pune" }), 0));
+  expect(mocks.list).toHaveBeenCalledTimes(1);
 });
 
 it("shows a failed list load with a retry", async () => {
