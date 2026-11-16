@@ -48,6 +48,7 @@ const old = (reader: SheetReader | null): SheetSource => ({ source: "runo_old", 
 const deps = (sources: SheetSource[], gateway: IngestGateway): SyncDeps => ({ secret: "s", sources, gateway });
 const post = (secret = "s", body = "{}") =>
   new Request("http://x", { method: "POST", headers: { "x-cron-secret": secret, "content-type": "application/json" }, body });
+const OLD = '{"source": "runo_old"}';
 const calls = (count: number, prefix = "c") => Array.from({ length: count }, (_, i) => [`${prefix}${i}`, "9820000001", "A", "Interested"]);
 
 Deno.test("headers and rows become keyed payloads", () => {
@@ -129,25 +130,53 @@ Deno.test("deleted sheet rows are noticed and the tail is read again from the to
 
 Deno.test("a one-time sheet is read to the end once and then left alone", async () => {
   const sheet = fakeSheet(calls(3, "o"), "Unique id"); const fake = fakeGateway();
-  const first = (await (await handleSyncRequest(post(), deps([old(sheet)], fake.gateway))).json()).sources[0];
+  const first = (await (await handleSyncRequest(post("s", OLD), deps([old(sheet)], fake.gateway))).json()).sources[0];
   assertEquals([first.rows_read, first.applied, first.reached_end], [3, 3, true]);
   assertEquals(fake.stored[0].options.completed, true);
   assertEquals(fake.finished, []);
   const reads = sheet.reads.length;
-  const second = (await (await handleSyncRequest(post(), deps([old(sheet)], fake.gateway))).json()).sources[0];
+  const second = (await (await handleSyncRequest(post("s", OLD), deps([old(sheet)], fake.gateway))).json()).sources[0];
   assertEquals(second.skipped, "already_imported");
   assertEquals(sheet.reads.length, reads);
 });
 
-Deno.test("sheets are handled one after another and one failure does not stop the next", async () => {
+Deno.test("the scheduled run handles live sheets only; a one-time sheet runs when named", async () => {
+  const sheet = fakeSheet(calls(1)); const oldSheet = fakeSheet(calls(2, "o"), "Unique id"); const fake = fakeGateway();
+  const scheduled = await (await handleSyncRequest(post(), deps([live(sheet), old(oldSheet)], fake.gateway))).json();
+  assertEquals(scheduled.sources.map((item: { source: string }) => item.source), ["runo"]);
+  assertEquals(oldSheet.reads.length, 0);
+});
+
+Deno.test("a failing sheet is reported with its code and noted", async () => {
   const broken: SheetReader = { rows: () => Promise.reject(new Error("sheet_not_shared")) };
-  const sheet = fakeSheet(calls(2, "o"), "Unique id"); const fake = fakeGateway();
-  const response = await handleSyncRequest(post(), deps([live(broken), old(sheet)], fake.gateway));
+  const fake = fakeGateway();
+  const response = await handleSyncRequest(post(), deps([live(broken)], fake.gateway));
   assertEquals(response.status, 502);
-  const body = await response.json();
-  assertEquals(body.sources.map((item: { source: string; error?: string; applied: number }) => [item.source, item.error ?? null, item.applied]),
-    [["runo", "sheet_not_shared", 0], ["runo_old", null, 2]]);
+  assertEquals((await response.json()).sources[0].error, "sheet_not_shared");
   assertEquals(fake.errors, ["runo:sheet_not_shared"]);
+});
+
+Deno.test("a slow region is read in smaller pieces, then the size grows back", async () => {
+  // Rows 300-399 of the sheet answer only when at most 60 rows are asked for.
+  const inner = fakeSheet(calls(900, "o"), "Unique id"); const asked: number[] = [];
+  const slow: SheetReader = { rows(from, to) {
+    if (from > 1) asked.push(to - from + 1);
+    if (from > 1 && from <= 399 && to >= 300 && to - from + 1 > 60) return Promise.reject(new Error("sheet_read_timeout"));
+    return inner.rows(from, to);
+  } };
+  const fake = fakeGateway();
+  const result = (await (await handleSyncRequest(post("s", OLD), deps([old(slow)], fake.gateway))).json()).sources[0];
+  assertEquals([result.rows_read, result.applied, result.reached_end, result.error ?? null], [900, 900, true, null]);
+  assertEquals(asked.slice(0, 4), [250, 500, 250, 125]);
+  assertEquals(Math.min(...asked) >= 31, true);
+  assertEquals(new Set(fake.stored.flatMap((call) => call.rows.map((row) => row.row_key))).size, 900);
+});
+
+Deno.test("a row that cannot be read at all is named", async () => {
+  const stuck: SheetReader = { rows: (from) => from === 1 ? Promise.resolve([["Unique id", "Name"]]) : Promise.reject(new Error("sheet_read_timeout")) };
+  const fake = fakeGateway({ runo_old: { next_row: 4402 } });
+  const result = (await (await handleSyncRequest(post("s", OLD), deps([old(stuck)], fake.gateway))).json()).sources[0];
+  assertEquals(result.error, "sheet_read_timeout_row_4102");
 });
 
 Deno.test("an error without a code is reported by its type, never by its text", async () => {
@@ -160,8 +189,8 @@ Deno.test("an error without a code is reported by its type, never by its text", 
 
 Deno.test("a source without its secret is skipped; one source can be chosen", async () => {
   const sheet = fakeSheet(calls(1)); const oldSheet = fakeSheet(calls(1, "o"), "Unique id"); const fake = fakeGateway();
-  const skipped = await (await handleSyncRequest(post(), deps([live(sheet), old(null)], fake.gateway))).json();
-  assertEquals(skipped.sources.map((item: { source: string }) => item.source), ["runo"]);
+  const skipped = await (await handleSyncRequest(post("s", OLD), deps([live(sheet), old(null)], fake.gateway))).json();
+  assertEquals(skipped.sources, []);
   const chosen = await (await handleSyncRequest(post("s", '{"source": "runo_old"}'), deps([live(sheet), old(oldSheet)], fake.gateway))).json();
   assertEquals(chosen.sources.map((item: { source: string }) => item.source), ["runo_old"]);
   assertEquals((await handleSyncRequest(post("s", '{"source": "nope"}'), deps([live(sheet)], fake.gateway))).status, 400);
@@ -169,7 +198,7 @@ Deno.test("a source without its secret is skipped; one source can be chosen", as
 
 Deno.test("rows are applied in small batches so no database call runs long", async () => {
   const fake = fakeGateway();
-  const response = await handleSyncRequest(post(), deps([old(fakeSheet(calls(450, "o"), "Unique id"))], fake.gateway));
+  const response = await handleSyncRequest(post("s", OLD), deps([old(fakeSheet(calls(450, "o"), "Unique id"))], fake.gateway));
   assertEquals((await response.json()).sources[0].applied, 450);
   assertEquals(fake.applyLimits, [100, 100, 100, 100, 100]);
 });
