@@ -60,7 +60,16 @@ export function googleSheetReader(keyJson: string, spreadsheetId: string, tab: s
       const response = await fetch(url, { headers: { Authorization: `Bearer ${await token}` }, signal: AbortSignal.timeout(40_000) });
       if (response.status === 403) throw new Error("sheet_not_shared");
       if (response.status === 404) throw new Error("sheet_not_found");
-      if (response.status === 400) throw new Error("sheet_tab_not_found");
+      if (response.status === 400) {
+        // Google answers 400 both for a tab that does not exist and for a range
+        // that starts below the last row of the grid. The second simply means
+        // "no rows there". Only Google's own error text is read, never cell values.
+        let message = "";
+        try { message = String(((await response.json()) as { error?: { message?: unknown } }).error?.message ?? ""); } catch { /* keep "" */ }
+        if (/exceeds grid limits/i.test(message)) return [];
+        if (/unable to parse range/i.test(message)) throw new Error("sheet_tab_not_found");
+        throw new Error("sheet_range_refused");
+      }
       if (!response.ok) throw new Error("sheet_read_failed");
       const data = await response.json() as { values?: unknown[][] };
       return (data.values ?? []).map((row) => row.map((cell) => String(cell ?? "")));

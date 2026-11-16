@@ -150,6 +150,14 @@ Deno.test("sheets are handled one after another and one failure does not stop th
   assertEquals(fake.errors, ["runo:sheet_not_shared"]);
 });
 
+Deno.test("an error without a code is reported by its type, never by its text", async () => {
+  const reader: SheetReader = { rows: () => Promise.reject(new DOMException("Signal timed out. Meera 9820000001", "TimeoutError")) };
+  const fake = fakeGateway();
+  const body = await (await handleSyncRequest(post(), deps([live(reader)], fake.gateway))).json();
+  assertEquals(body.sources[0].error, "sync_failed_timeouterror");
+  assertEquals(fake.errors, ["runo:sync_failed_timeouterror"]);
+});
+
 Deno.test("a source without its secret is skipped; one source can be chosen", async () => {
   const sheet = fakeSheet(calls(1)); const oldSheet = fakeSheet(calls(1, "o"), "Unique id"); const fake = fakeGateway();
   const skipped = await (await handleSyncRequest(post(), deps([live(sheet), old(null)], fake.gateway))).json();
