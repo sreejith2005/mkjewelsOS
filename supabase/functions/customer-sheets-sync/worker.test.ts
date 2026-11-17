@@ -258,3 +258,24 @@ Deno.test("the scheduled run skips a sheet that is not switched on; naming it ru
   const named = await (await handleSyncRequest(post("s", '{"source": "runo", "max_chunks": 1}'), deps([live(sheet)], gateway))).json();
   assertEquals([named.sources[0].skipped, stored.length > 0], [undefined, true]);
 });
+
+Deno.test("a batch cancelled for time is retried smaller; a heavy sheet starts small", async () => {
+  const { gateway, applyLimits, of } = fakeGateway();
+  const original = gateway.apply;
+  gateway.apply = (source, limit) => limit > 25 ? Promise.reject(new Error("apply_failed_57014")) : original(source, limit);
+  const heavy: SheetSource = { ...live(fakeSheet(calls(60))), applyBatch: 100 };
+  const body = await (await handleSyncRequest(post("s", '{"source": "runo", "max_chunks": 1}'), deps([heavy], gateway))).json();
+  assertEquals([body.sources[0].error, body.sources[0].applied, of("runo").pending], [undefined, 60, 0]);
+  assertEquals(applyLimits.slice(0, 2), [25, 25]); // the call with 100 was cancelled before it recorded anything
+  const small: SheetSource = { ...live(fakeSheet(calls(3))), applyBatch: 20 };
+  const second = fakeGateway();
+  await handleSyncRequest(post("s", '{"source": "runo", "max_chunks": 1}'), deps([small], second.gateway));
+  assertEquals(second.applyLimits[0], 20);
+});
+
+Deno.test("a cancelled batch at the smallest size is reported", async () => {
+  const { gateway, errors } = fakeGateway();
+  gateway.apply = () => Promise.reject(new Error("apply_failed_57014"));
+  const body = await (await handleSyncRequest(post("s", '{"source": "runo", "max_chunks": 1}'), deps([live(fakeSheet(calls(3)))], gateway))).json();
+  assertEquals([body.sources[0].error, errors], ["apply_failed_57014", ["runo:apply_failed_57014"]]);
+});

@@ -23,6 +23,8 @@ export const OVERLAP_ROWS = 300;
  * production on 2026-11-14.
  */
 export const APPLY_BATCH = 100;
+/** The smallest batch: a batch that is cancelled for time is retried four times smaller, down to this. */
+export const MIN_APPLY_BATCH = 5;
 /** A one-time (large, old) sheet starts each run with this many rows per read and grows while reads are fast. */
 export const ONE_TIME_START_ROWS = 250;
 /** The fewest rows asked for when reads are slow. */
@@ -71,6 +73,8 @@ export interface SheetSource {
   oneTime: boolean;
   /** The row holding the headers (default 1). Data starts on the next row. */
   headerRow?: number;
+  /** Rows applied per database call when a row is heavy (default APPLY_BATCH). */
+  applyBatch?: number;
   /** Null when the sheet's secrets are not set; the source is then skipped. */
   reader: SheetReader | null;
 }
@@ -259,8 +263,20 @@ export async function syncSheet(config: SheetSource & { reader: SheetReader }, g
   }
 
   result.pending = state.pending + result.new + result.changed;
+  // A database call through the API is cancelled after about 8 seconds
+  // (code 57014). A cancelled batch changed nothing, so it is retried smaller.
+  let batch = config.applyBatch ?? APPLY_BATCH;
   while (result.pending > 0 && timeLeft() > 0) {
-    const applied = await gateway.apply(source, APPLY_BATCH);
+    let applied: { applied: number; rejected: number; pending: number };
+    try {
+      applied = await gateway.apply(source, batch);
+    } catch (error) {
+      if (error instanceof Error && error.message === "apply_failed_57014" && batch > MIN_APPLY_BATCH) {
+        batch = Math.max(MIN_APPLY_BATCH, Math.floor(batch / 4));
+        continue;
+      }
+      throw error;
+    }
     result.applied += applied.applied;
     result.rejected += applied.rejected;
     result.pending = applied.pending;
