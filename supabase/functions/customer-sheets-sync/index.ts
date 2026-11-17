@@ -50,6 +50,9 @@ const SHEETS = [
   { source: "instagram_ads_fms", idSecret: "FMS_SHEET_ID", tabSecret: "INSTAGRAM_ADS_FMS_TAB", tab: "INSTAGRAM ADDS FMS", keyColumns: ["COMBO"], oneTime: false, headerRow: 2 },
   { source: "doubletick_fms", idSecret: "FMS_SHEET_ID", tabSecret: "DOUBLETICK_FMS_TAB", tab: "DOUBLE TICK FMS", keyColumns: ["COMBO"], oneTime: false, headerRow: 2 },
   { source: "website_chat_fms", idSecret: "FMS_SHEET_ID", tabSecret: "WEBSITE_CHAT_FMS_TAB", tab: "WEBSITE CHAT FMS", keyColumns: ["COMBO"], oneTime: false, headerRow: 2 },
+  { source: "not_bought_fms", idSecret: "FMS_SHEET_ID", tabSecret: "NOT_BOUGHT_FMS_TAB", tab: "NOT BOUGHT FMS", keyColumns: ["COMBO"], oneTime: false, headerRow: 2 },
+  // Same key values as the REFERRALS tab of the walk-in sheet (COMBO repeats).
+  { source: "references_calling_fms", idSecret: "FMS_SHEET_ID", tabSecret: "REFERENCES_CALLING_FMS_TAB", tab: "REFERENCES CALLING FMS", keyColumns: ["TIMESTAMP", "NUMBER OF THE REFERENCE", "NAME OF THE REFERENCE"], oneTime: false, headerRow: 2 },
   // "01 WALKIN DATA": headers on row 1.
   { source: "walkin", idSecret: "WALKIN_SHEET_ID", tabSecret: "WALKIN_SHEET_TAB", tab: "WALKIN DATASET", keyColumns: ["REFERENCE NUMBER"], oneTime: false, applyBatch: 20 },
   { source: "walkin_family", idSecret: "WALKIN_SHEET_ID", tabSecret: "WALKIN_FAMILY_TAB", tab: "FAMILY DATA", keyColumns: ["CLIENT ID", "TIMESTAMP"], oneTime: false },
