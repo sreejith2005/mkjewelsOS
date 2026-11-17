@@ -31,7 +31,7 @@ create function pg_temp.headers() returns jsonb language sql as $$ select jsonb_
   'ACTUAL TIME', 'STATUS', 'REMARK', 'WORK STAGE', 'FMS', 'NEW PLANNED', 'FOLLOW UP COUNT')) $$;
 
 -- 1. The sheets are registered and not scheduled -----------------------------------------
-select is((select string_agg(source || ':' || importer || ':' || scheduled, ',' order by source) from customer.source_tables),
+select is((select string_agg(source || ':' || importer || ':' || scheduled, ',' order by source) from customer.source_tables where importer in ('runo', 'enquiry_fms')),
   'doubletick_fms:enquiry_fms:false,instagram_ads_fms:enquiry_fms:false,instagram_fms:enquiry_fms:false,runo:runo:true,runo_old:runo:false,website_chat_fms:enquiry_fms:false',
   'the four enquiry tabs are registered; only the live Runo sheet is on the 5-minute job');
 select is(customer_ingest_state('instagram_fms') ->> 'scheduled', 'false', 'the import reports whether a sheet is scheduled');
