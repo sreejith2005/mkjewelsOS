@@ -7,7 +7,7 @@ import { loadCustomerInteractionPage, type CustomerInteractionPage } from "./api
 import { CodeLink, Fact, Section } from "./CustomerProfileView";
 import { appointmentLabel, channelLabel, followUpLabel, formatDate, formatDateTime, RESULT_LABEL, RESULT_TONE } from "./format";
 
-const DIRECTION_LABEL: Record<string, string> = { inbound: "Customer contacted us", outbound: "We contacted the customer", in_person: "In person" };
+const DIRECTION_LABEL: Record<string, string> = { inbound: "Customer contacted us", outbound: "We contacted the customer", in_person: "In person", not_recorded: "Not recorded in the sheet" };
 
 /** One interaction on a full page: who, when, how it ended, what it led to, and its whole sheet row (/crm/master/i/MKI-...). */
 export function CustomerInteractionView({ interactionCode, onBack, onOpenClient, onOpenInteraction }: {
