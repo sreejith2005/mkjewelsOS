@@ -20,6 +20,8 @@ export type CustomerMasterFunctions = {
     Args: { p_day?: string | null };
     Returns: { staff_user_id: string | null; staff_name: string | null; calls: number; reached: number; positive: number; negative: number; not_connected: number }[];
   };
+  customer_get_client_page: { Args: { p_client_code: string }; Returns: Json };
+  customer_get_interaction_page: { Args: { p_interaction_code: string }; Returns: Json };
   customer_list: { Args: { p_filters?: Json; p_limit?: number; p_offset?: number }; Returns: Json };
   customer_list_filters: { Args: Record<never, never>; Returns: Json };
   customer_ingest_state: { Args: { p_source: string }; Returns: Json };
