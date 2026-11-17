@@ -50,7 +50,8 @@ export interface StoreOptions {
 }
 
 export interface IngestGateway {
-  state(source: string): Promise<{ next_row: number; scan_row: number; pending: number; completed: boolean }>;
+  /** scheduled: false when the sheet is not switched on for the scheduled job (missing = on, for older databases). */
+  state(source: string): Promise<{ next_row: number; scan_row: number; pending: number; completed: boolean; scheduled?: boolean }>;
   store(source: string, rows: IngestRow[], options: StoreOptions): Promise<{ new: number; changed: number }>;
   apply(source: string, limit: number): Promise<{ applied: number; rejected: number; pending: number }>;
   finishScan(source: string): Promise<{ removed: number; remaining: boolean; blocked: boolean }>;
@@ -68,6 +69,8 @@ export interface SheetSource {
   keyColumns: readonly string[];
   /** A sheet nobody edits any more: read once to the end, then left alone. */
   oneTime: boolean;
+  /** The row holding the headers (default 1). Data starts on the next row. */
+  headerRow?: number;
   /** Null when the sheet's secrets are not set; the source is then skipped. */
   reader: SheetReader | null;
 }
@@ -150,7 +153,7 @@ export async function readChunk(reader: SheetReader, from: number, size: number 
   return { rows, atEnd: false };
 }
 
-interface RunOptions { maxChunks: number; scanChunks: number; deadline: number; now: () => number; restart?: boolean }
+interface RunOptions { maxChunks: number; scanChunks: number; deadline: number; now: () => number; restart?: boolean; scheduledOnly?: boolean }
 
 /**
  * One run for one sheet. Safe to call again at any time.
@@ -168,12 +171,19 @@ export async function syncSheet(config: SheetSource & { reader: SheetReader }, g
   };
   const state = await gateway.state(source);
   const timeLeft = () => options.deadline - options.now();
+  const headerRow = config.headerRow ?? 1;
+  const firstRow = headerRow + 1;
 
+  if (options.scheduledOnly && state.scheduled === false) {
+    // Switched off for the scheduled job: a new sheet is run by hand first.
+    result.skipped = "not_scheduled";
+    return result;
+  }
   if (config.oneTime && state.completed && !options.restart) {
     result.skipped = "already_imported";
     result.reached_end = true;
   } else {
-    const header = await reader.rows(1, 1);
+    const header = await reader.rows(headerRow, headerRow);
     const names = headerNames(header[0] ?? []);
     if (!keyColumns.every((column) => names.includes(column))) throw new Error("key_column_missing");
     const headers = names.filter(Boolean);
@@ -198,8 +208,8 @@ export async function syncSheet(config: SheetSource & { reader: SheetReader }, g
     };
 
     // restart re-reads the sheet from the top over the next runs; unchanged rows cost nothing.
-    let from = options.restart ? 2 : Math.max(2, state.next_row - OVERLAP_ROWS);
-    let shrinkChecked = options.restart === true || from === 2;
+    let from = options.restart ? firstRow : Math.max(firstRow, state.next_row - OVERLAP_ROWS);
+    let shrinkChecked = options.restart === true || from === firstRow;
     // A one-time sheet reads as many chunks as the time allows; they start small.
     const tailChunks = config.oneTime && options.maxChunks > 0 ? 500 : options.maxChunks;
     for (let chunk = 0; chunk < tailChunks; chunk++) {
@@ -208,7 +218,7 @@ export async function syncSheet(config: SheetSource & { reader: SheetReader }, g
       // everything below moved up. Read again from the top; rows that moved keep their key.
       if (!shrinkChecked) {
         shrinkChecked = true;
-        if (rows.length < state.next_row - from) { from = 2; chunk--; continue; }
+        if (rows.length < state.next_row - from) { from = firstRow; chunk--; continue; }
       }
       const ingest = toIngestRows(names, rows, from, keyColumns);
       // Google omits trailing empty rows, so rows.length is the last filled row read.
@@ -223,7 +233,7 @@ export async function syncSheet(config: SheetSource & { reader: SheetReader }, g
     }
 
     if (!config.oneTime && result.reached_end) {
-      let scanFrom = Math.max(2, state.scan_row);
+      let scanFrom = Math.max(firstRow, state.scan_row);
       for (let chunk = 0; chunk < options.scanChunks && timeLeft() > 40_000; chunk++) {
         const { rows, atEnd } = await read(scanFrom);
         const ingest = toIngestRows(names, rows, scanFrom, keyColumns);
@@ -320,7 +330,7 @@ export async function handleSyncRequest(request: Request, deps: SyncDeps): Promi
     if (deadline - now() < 20_000) break;
     try {
       results.push(await syncSheet({ ...config, reader: config.reader }, deps.gateway, {
-        maxChunks, scanChunks: maxChunks === 0 ? 0 : SCAN_CHUNKS, deadline, now, restart,
+        maxChunks, scanChunks: maxChunks === 0 ? 0 : SCAN_CHUNKS, deadline, now, restart, scheduledOnly: !only,
       }));
     } catch (error) {
       // Only a short code is stored or returned; never sheet content. An error

@@ -44,6 +44,12 @@ function gateway(url: string, key: string): IngestGateway {
 const SHEETS = [
   { source: "runo", idSecret: "RUNO_SHEET_ID", tabSecret: "RUNO_SHEET_TAB", tab: "Interactions", keyColumns: ["callId"], oneTime: false },
   { source: "runo_old", idSecret: "RUNO_OLD_SHEET_ID", tabSecret: "RUNO_OLD_SHEET_TAB", tab: "25-26", keyColumns: ["Unique id", "Interaction Date"], oneTime: true },
+  // "ALL FMS MASTER DATABASE": row 1 holds column numbers, the headers are on row 2.
+  // COMBO (reference number + stage) is unique per row.
+  { source: "instagram_fms", idSecret: "FMS_SHEET_ID", tabSecret: "INSTAGRAM_FMS_TAB", tab: "INSTAGRAM FMS", keyColumns: ["COMBO"], oneTime: false, headerRow: 2 },
+  { source: "instagram_ads_fms", idSecret: "FMS_SHEET_ID", tabSecret: "INSTAGRAM_ADS_FMS_TAB", tab: "INSTAGRAM ADDS FMS", keyColumns: ["COMBO"], oneTime: false, headerRow: 2 },
+  { source: "doubletick_fms", idSecret: "FMS_SHEET_ID", tabSecret: "DOUBLETICK_FMS_TAB", tab: "DOUBLE TICK FMS", keyColumns: ["COMBO"], oneTime: false, headerRow: 2 },
+  { source: "website_chat_fms", idSecret: "FMS_SHEET_ID", tabSecret: "WEBSITE_CHAT_FMS_TAB", tab: "WEBSITE CHAT FMS", keyColumns: ["COMBO"], oneTime: false, headerRow: 2 },
 ] as const;
 
 // Spreadsheet files a probe may look at: short name -> the secret holding the
@@ -63,7 +69,7 @@ function dependencies(): SyncDeps {
   const sources: SheetSource[] = SHEETS.map((sheet) => {
     const sheetId = Deno.env.get(sheet.idSecret);
     return {
-      source: sheet.source, keyColumns: sheet.keyColumns, oneTime: sheet.oneTime,
+      source: sheet.source, keyColumns: sheet.keyColumns, oneTime: sheet.oneTime, headerRow: "headerRow" in sheet ? sheet.headerRow : 1,
       reader: googleKey && sheetId ? googleSheetReader(googleKey, sheetId, Deno.env.get(sheet.tabSecret) ?? sheet.tab) : null,
     };
   });

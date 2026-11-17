@@ -16,11 +16,11 @@ function fakeSheet(dataRows: string[][], key = "callId"): SheetReader & { reads:
   } };
 }
 
-function fakeGateway(initial: Record<string, { next_row?: number; scan_row?: number; completed?: boolean }> = {}) {
+function fakeGateway(initial: Record<string, { next_row?: number; scan_row?: number; completed?: boolean; scheduled?: boolean }> = {}) {
   const stored: Array<{ source: string; rows: IngestRow[]; options: StoreOptions }> = [];
-  const state = new Map<string, { next_row: number; scan_row: number; pending: number; completed: boolean }>();
+  const state = new Map<string, { next_row: number; scan_row: number; pending: number; completed: boolean; scheduled?: boolean }>();
   const of = (source: string) => {
-    if (!state.has(source)) state.set(source, { next_row: initial[source]?.next_row ?? 2, scan_row: initial[source]?.scan_row ?? 2, pending: 0, completed: initial[source]?.completed ?? false });
+    if (!state.has(source)) state.set(source, { next_row: initial[source]?.next_row ?? 2, scan_row: initial[source]?.scan_row ?? 2, pending: 0, completed: initial[source]?.completed ?? false, scheduled: initial[source]?.scheduled });
     return state.get(source)!;
   };
   const errors: string[] = []; const finished: string[] = []; const applyLimits: number[] = [];
@@ -232,4 +232,29 @@ Deno.test("every key column must be in the header", async () => {
   const source: SheetSource = { source: "runo_old", keyColumns: ["Unique id", "Interaction Date"], oneTime: true, reader };
   const response = await handleSyncRequest(post("s", OLD), deps([source], fake.gateway));
   assertEquals((await response.json()).sources[0].error, "key_column_missing");
+});
+
+Deno.test("headers below row 1: the header row is read and data starts under it", async () => {
+  // Like the FMS tabs: row 1 holds column numbers, row 2 the headers.
+  const rows = [["1", "2", "3"], ["COMBO", "Mobile Number", "STATUS"], ["R1-2", "9820000001", "YES"], ["R1-3", "9820000001", "NO"]];
+  const sheet: SheetReader & { reads: Array<[number, number]> } = { reads: [], rows(from, to) { this.reads.push([from, to]); return Promise.resolve(rows.slice(from - 1, to)); } };
+  const { gateway, stored } = fakeGateway({ fms: { next_row: 2, scan_row: 2 } });
+  const source: SheetSource = { source: "fms", keyColumns: ["COMBO"], oneTime: false, reader: sheet, headerRow: 2 };
+  const response = await handleSyncRequest(post("s", '{"source": "fms", "max_chunks": 1}'), deps([source], gateway));
+  assertEquals(response.status, 200);
+  assertEquals(sheet.reads[0], [2, 2]);
+  assertEquals(stored[0].options.headers, ["COMBO", "Mobile Number", "STATUS"]);
+  assertEquals(stored[0].rows.map((row) => [row.row_key, row.sheet_row]), [["R1-2", 3], ["R1-3", 4]]);
+  // The full pass also starts under the header row.
+  const scan = stored.find((call) => call.options.scan);
+  assertEquals(scan?.rows.map((row) => row.sheet_row), [3, 4]);
+});
+
+Deno.test("the scheduled run skips a sheet that is not switched on; naming it runs it", async () => {
+  const sheet = fakeSheet(calls(3));
+  const { gateway, stored } = fakeGateway({ runo: { scheduled: false } });
+  const scheduled = await (await handleSyncRequest(post(), deps([live(sheet)], gateway))).json();
+  assertEquals([scheduled.sources[0].skipped, stored.length, sheet.reads.length], ["not_scheduled", 0, 0]);
+  const named = await (await handleSyncRequest(post("s", '{"source": "runo", "max_chunks": 1}'), deps([live(sheet)], gateway))).json();
+  assertEquals([named.sources[0].skipped, stored.length > 0], [undefined, true]);
 });
