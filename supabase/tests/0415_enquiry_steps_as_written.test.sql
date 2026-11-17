@@ -7,8 +7,8 @@ select plan(5);
 select is((select string_agg(s || '=' || r.result || '/' || r.successful || '/' || coalesce(r.ends, '-'), ', ' order by s)
              from unnest(array['NO', 'CUSTOMER DECLINED', 'ORDER CLOSE', 'BUSY', 'YES, THE CLIENT BOUGHT THE PRODUCT', 'NOT INTERESTED CLOSE THIS LEAD']) s,
                   customer.enquiry_status_reading(s) r),
-  'BUSY=not_connected/false/-, CUSTOMER DECLINED=neutral/true/-, NO=neutral/true/-, NOT INTERESTED CLOSE THIS LEAD=negative/true/lost, ORDER CLOSE=neutral/true/-, YES, THE CLIENT BOUGHT THE PRODUCT=positive/true/won',
-  'a status is read only where its own words say it; NO, CUSTOMER DECLINED and ORDER CLOSE are kept as written');
+  'BUSY=not_connected/false/-, CUSTOMER DECLINED=negative/true/-, NO=neutral/true/-, NOT INTERESTED CLOSE THIS LEAD=negative/true/lost, ORDER CLOSE=neutral/true/-, YES, THE CLIENT BOUGHT THE PRODUCT=positive/true/won',
+  'a status is read only where its own words say it; NO and ORDER CLOSE are kept as written (CUSTOMER DECLINED = said no, 0420)');
 
 create temp table fx(label text primary key, id uuid);
 do $$
