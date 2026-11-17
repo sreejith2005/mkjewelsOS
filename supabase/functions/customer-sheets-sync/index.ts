@@ -71,6 +71,7 @@ const PROBE_FILES: Record<string, string> = {
   fms: "FMS_SHEET_ID",
   walkin: "WALKIN_SHEET_ID",
   exhibition: "EXHIBITION_SHEET_ID",
+  exhibition_old: "EXHIBITION_OLD_SHEET_ID",
   client_database: "CLIENT_DATABASE_SHEET_ID",
   zoho: "ZOHO_SHEET_ID",
   customer_data: "CUSTOMER_DATA_SHEET_ID",

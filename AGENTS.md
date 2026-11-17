@@ -30,7 +30,7 @@ maintained documents:
 | `docs/FMS_AI_ASSISTANT.md`, `docs/FMS_FOLLOW_UP_GROUPS.md`, `docs/LEAVE_APPLICATIONS.md` | Feature notes still in use |
 | `docs/RECORDING_PILOT.md`, `docs/STORE_INTELLIGENCE_ACTIVATION_RUNBOOK.md` | Store Intelligence pilot rules, AWS processing build, secrets, device matrix and activation |
 | `docs/REPORTS.md` | Reports catalogue, data sources and every KPI formula |
-| `docs/superpowers/specs/` | The designs that code comments cite (CRM embed, CRM two projects, task scores, Ask Kiara, CRM as a native section) |
+| `docs/superpowers/specs/` | The designs that code comments cite (CRM embed, CRM two projects, task scores, Ask Kiara, CRM as a native section, customer master) |
 | `apps/mobile/README.md` | Android shell rules and toolchain |
 
 Finished plans, release notes, and verification reports are not kept in the
