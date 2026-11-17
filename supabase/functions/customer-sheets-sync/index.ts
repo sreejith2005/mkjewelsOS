@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { googleSheetReader } from "./google.ts";
+import { googleProbeFile, googleSheetReader } from "./google.ts";
 import { handleSyncRequest, type IngestGateway, type SheetSource, type SyncDeps } from "./worker.ts";
 
 // A failed database call is reported as "<step>_failed_<postgres code>", for
@@ -46,6 +46,17 @@ const SHEETS = [
   { source: "runo_old", idSecret: "RUNO_OLD_SHEET_ID", tabSecret: "RUNO_OLD_SHEET_TAB", tab: "25-26", keyColumns: ["Unique id", "Interaction Date"], oneTime: true },
 ] as const;
 
+// Spreadsheet files a probe may look at: short name -> the secret holding the
+// file's id. A probe is read-only and returns headers, counts and shapes.
+const PROBE_FILES: Record<string, string> = {
+  runo: "RUNO_SHEET_ID",
+  runo_old: "RUNO_OLD_SHEET_ID",
+  fms: "FMS_SHEET_ID",
+  walkin: "WALKIN_SHEET_ID",
+  exhibition: "EXHIBITION_SHEET_ID",
+  client_database: "CLIENT_DATABASE_SHEET_ID",
+};
+
 function dependencies(): SyncDeps {
   const url = Deno.env.get("SUPABASE_URL"), key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const googleKey = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY");
@@ -60,6 +71,11 @@ function dependencies(): SyncDeps {
     secret: Deno.env.get("CUSTOMER_SHEETS_SYNC_CRON_SECRET"),
     sources,
     gateway: url && key ? gateway(url, key) : null,
+    probeFile(file) {
+      if (!Object.hasOwn(PROBE_FILES, file)) return undefined;
+      const sheetId = Deno.env.get(PROBE_FILES[file]);
+      return googleKey && sheetId ? googleProbeFile(googleKey, sheetId) : null;
+    },
   };
 }
 
