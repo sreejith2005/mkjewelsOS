@@ -3,6 +3,8 @@
 // database. Nothing here ever writes to a sheet, and no row content is logged
 // or returned: responses carry counts only.
 
+import { parseProbe, runProbe, type ProbeFile, type ProbeRequest } from "./probe.ts";
+
 export const responseHeaders = {
   "Access-Control-Allow-Headers": "content-type,x-cron-secret",
   "Access-Control-Allow-Methods": "POST,OPTIONS",
@@ -74,6 +76,8 @@ export interface SyncDeps {
   secret: string | undefined;
   sources: SheetSource[];
   gateway: IngestGateway | null;
+  /** A spreadsheet file by its short name, for a read-only probe. Null when its secret is not set. */
+  probeFile?: (file: string) => ProbeFile | null | undefined;
   now?: () => number;
 }
 
@@ -262,8 +266,14 @@ export async function handleSyncRequest(request: Request, deps: SyncDeps): Promi
   if (request.headers.get("x-cron-secret") !== deps.secret) return json(401, { error: "Scheduler authorization required" });
 
   let maxChunks = 5, restart = false, only: string | null = null;
+  let probe: ProbeRequest | null = null;
   try {
-    const body = request.headers.get("content-length") === "0" ? {} : await request.json() as { max_chunks?: unknown; restart?: unknown; source?: unknown };
+    const body = request.headers.get("content-length") === "0" ? {} : await request.json() as { max_chunks?: unknown; restart?: unknown; source?: unknown; probe?: unknown };
+    if (body.probe !== undefined) {
+      const parsed = parseProbe(body.probe);
+      if (typeof parsed === "string") return json(400, { error: parsed });
+      probe = parsed;
+    }
     if (body.restart !== undefined) {
       if (typeof body.restart !== "boolean") return json(400, { error: "restart must be true or false" });
       restart = body.restart;
@@ -284,6 +294,21 @@ export async function handleSyncRequest(request: Request, deps: SyncDeps): Promi
 
   const now = deps.now ?? Date.now;
   const deadline = now() + 100_000;
+
+  // A probe only looks at a sheet. It never stores or applies anything, and a
+  // request that carries one does no import.
+  if (probe) {
+    const file = deps.probeFile?.(probe.file);
+    if (file === undefined) return json(400, { error: "Unknown file" });
+    if (file === null) return json(400, { error: "The secret for this file is not set" });
+    try {
+      return json(200, await runProbe(file, probe, deadline, now));
+    } catch (error) {
+      const code = error instanceof Error && /^[a-z_0-9]+$/.test(error.message) ? error.message : "probe_failed";
+      return json(502, { probe: probe.tab ? "tab" : "tabs", file: probe.file, error: code });
+    }
+  }
+
   const results: SyncResult[] = [];
   let failed = false;
   for (const config of deps.sources) {

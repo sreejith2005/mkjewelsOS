@@ -2,6 +2,7 @@
 // spreadsheets.readonly: this code cannot change a sheet even if the account
 // were given edit access by mistake.
 import type { SheetReader } from "./worker.ts";
+import type { ProbeFile, TabInfo } from "./probe.ts";
 
 const SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -87,5 +88,32 @@ export function googleSheetReader(keyJson: string, spreadsheetId: string, tab: s
       }
       return (data.values ?? []).map((row) => row.map((cell) => String(cell ?? "")));
     },
+  };
+}
+
+/** One spreadsheet file for a probe: the names and grid sizes of its tabs, and a reader per tab. */
+export function googleProbeFile(keyJson: string, spreadsheetId: string): ProbeFile {
+  return {
+    async tabs() {
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}` +
+        "?fields=sheets.properties(title,gridProperties(rowCount,columnCount))";
+      let response: Response;
+      try {
+        response = await fetch(url, { headers: { Authorization: `Bearer ${await accessToken(keyJson)}` }, signal: AbortSignal.timeout(READ_TIMEOUT_MS) });
+      } catch (error) {
+        if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) throw new Error("sheet_read_timeout");
+        throw error;
+      }
+      if (response.status === 403) throw new Error("sheet_not_shared");
+      if (response.status === 404) throw new Error("sheet_not_found");
+      if (!response.ok) throw new Error("sheet_read_failed");
+      const data = await response.json() as { sheets?: Array<{ properties?: { title?: unknown; gridProperties?: { rowCount?: unknown; columnCount?: unknown } } }> };
+      return (data.sheets ?? []).map((sheet): TabInfo => ({
+        title: String(sheet.properties?.title ?? ""),
+        rows: Number(sheet.properties?.gridProperties?.rowCount ?? 0),
+        columns: Number(sheet.properties?.gridProperties?.columnCount ?? 0),
+      }));
+    },
+    reader: (tab) => googleSheetReader(keyJson, spreadsheetId, tab),
   };
 }
