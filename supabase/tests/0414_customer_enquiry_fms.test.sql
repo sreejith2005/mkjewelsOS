@@ -51,8 +51,8 @@ select is((select received_at from pg_temp.enq('MK-INS-1001')), '2026-11-05 10:1
   'the enquiry is dated by the form time on the DM day');
 select is((select string_agg(i.direction || ':' || i.channel || ':' || coalesce(i.outcome, '') || ':' || i.result, ',' order by i.occurred_at)
              from customer.interactions i where i.client_id = pg_temp.client('9820014001')),
-  'inbound:instagram:Enquiry received:neutral,outbound:call:YES (INTERESTED):positive,outbound:video_call:NOT INTERESTED CLOSE THIS LEAD:negative',
-  'the timeline: the message, then each completed stage; the closer is not a contact');
+  'inbound:instagram:Enquiry received:neutral,not_recorded:not_recorded:YES (INTERESTED):positive,not_recorded:not_recorded:NOT INTERESTED CLOSE THIS LEAD:negative',
+  'the timeline: the message, then each completed stage as the sheet wrote it; the closer is not a contact');
 select is((select notes || '|' || staff_user_id::text from customer.interactions where external_ref = 'MK-INS-1001-2. INTRODUCTION CALL'),
   'wants polki set|' || (select id from fx where label = 'mitu'), 'a stage contact carries its remark and the person who did it');
 select is((select parent_interaction_id = e.opened_interaction_id and lead_id = e.id from customer.interactions i, pg_temp.enq('MK-INS-1001') e

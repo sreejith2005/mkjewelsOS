@@ -26,7 +26,7 @@ export const RESULT_TONE: Record<CustomerTimelineEntry["result"], string> = {
 
 const CHANNEL_LABEL: Record<string, string> = {
   call: "Phone call", video_call: "Video call", whatsapp: "WhatsApp", instagram: "Instagram", instagram_ads: "Instagram ad",
-  website: "Website", walk_in: "Store visit", exhibition: "Exhibition", software: "Billing",
+  website: "Website", walk_in: "Store visit", exhibition: "Exhibition", software: "Billing", not_recorded: "Not recorded in the sheet",
 };
 export const channelLabel = (channel: string) => CHANNEL_LABEL[channel] ?? titleCase(channel);
 
