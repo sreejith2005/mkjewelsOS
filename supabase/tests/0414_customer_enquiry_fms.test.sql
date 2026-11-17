@@ -94,14 +94,15 @@ select customer_ingest_store('instagram_fms', jsonb_build_array(
   pg_temp.r(9, 'MK-INS-1005', '2. INTRODUCTION CALL', '{"CUSTOMER NAME": "Dev", "CUSTOMER CONTACT NUMBER": "", "INSTAGRAM ID": ""}'),
   pg_temp.r(10, 'MK-INS-1006', '2. INTRODUCTION CALL', '{"CUSTOMER NAME": "Esha", "CUSTOMER CONTACT NUMBER": "12345", "INSTAGRAM ID": ""}')),
   '{"next_row": 11}');
-select is(customer_ingest_apply('instagram_fms', 100) - 'pending', '{"applied": 2, "rejected": 2}'::jsonb, 'two rows without a usable phone or Instagram ID are rejected');
+select is(customer_ingest_apply('instagram_fms', 100) - 'pending', '{"applied": 4, "rejected": 0}'::jsonb, 'rows without a usable phone are kept too (0416)');
 select is((select client_id from pg_temp.enq('MK-INS-1003')), pg_temp.client('9820014001'), 'no phone: matched on the Instagram ID of an earlier row');
 select is((select occurred_at || '|' || successful || '|' || result || '|' || non_contact_reason from customer.interactions where external_ref = 'MK-INS-1003-2. INTRODUCTION CALL'),
   ('2026-11-09 12:00:00+05:30'::timestamptz)::text || '|false|not_connected|BUSY', 'a date written as a day number is read; BUSY is not reached');
 select is((select primary_name || '|' || (select count(*) from customer.client_phones p where p.client_id = c.id) from customer.clients c join pg_temp.enq('MK-INS-1004') e on e.client_id = c.id),
   'Chetan|0', 'no phone and a new Instagram ID: a customer without a phone, found again by the Instagram ID');
-select is((select string_agg(reject_reason, ',' order by sheet_row) from customer.ingest_rows where source = 'instagram_fms' and status = 'rejected'),
-  'No phone number or Instagram ID,Not a valid phone number', 'the rejected rows keep their reason');
+select is((select string_agg(e.reference_number || ':' || coalesce(c.primary_name, '-') || ':' || (select count(*) from customer.client_phones p where p.client_id = c.id), ',' order by e.reference_number)
+             from customer.enquiries e join customer.clients c on c.id = e.client_id where e.reference_number in ('MK-INS-1005', 'MK-INS-1006')),
+  'MK-INS-1005:Dev:0,MK-INS-1006:Esha:0', 'a row with no phone or an invalid one becomes its own customer, without a phone');
 
 -- 5. A row deleted from the sheet, and back ------------------------------------------------------
 select customer.remove_source_row(id) from customer.ingest_rows where row_key = 'MK-INS-1001-3. PROPOSAL PRODUCT DEMONSTRATION';
@@ -121,7 +122,7 @@ select is((select outcome || '|' || step_count from pg_temp.enq('MK-INS-1001')),
 select is((select (e.archived_at is null) and (c.archived_at is null) and (o.archived_at is null)
              from pg_temp.enq('MK-INS-1004') e join customer.clients c on c.id = e.client_id join customer.interactions o on o.id = e.opened_interaction_id),
   true, 'with its enquiry, message and customer');
-select is((select count(*)::int from customer.interactions where source = 'instagram_fms' and archived_at is null), 7, 'nothing is duplicated');
+select is((select count(*)::int from customer.interactions where source = 'instagram_fms' and archived_at is null), 9, 'nothing is duplicated');
 
 -- 6. Won, and an edit that undoes a stage ------------------------------------------------------------
 select customer_ingest_store('doubletick_fms', jsonb_build_array(
