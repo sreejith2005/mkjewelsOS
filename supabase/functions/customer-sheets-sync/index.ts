@@ -59,6 +59,8 @@ const SHEETS = [
   { source: "zoho", idSecret: "ZOHO_SHEET_ID", tabSecret: "ZOHO_SHEET_TAB", tab: "ZOHO DATA", keyColumns: ["Sr. No"], oneTime: true },
   // "EXHIBITION WALKIN DATASET (FOR PORTAL)". REFERENCE NUMBER is the exhibition's code, not the row's.
   { source: "exhibition", idSecret: "EXHIBITION_SHEET_ID", tabSecret: "EXHIBITION_SHEET_TAB", tab: "Master", keyColumns: ["TIMESTAMP", "PHONE 1"], oneTime: false },
+  // "OLD EXHIBITION DATA MASTER": a merged old sheet, no longer filled. Read once.
+  { source: "exhibition_old", idSecret: "EXHIBITION_OLD_SHEET_ID", tabSecret: "EXHIBITION_OLD_SHEET_TAB", tab: "UNIQUE MASTER", keyColumns: ["MOBILE NUMBER"], oneTime: true },
   // "01 WALKIN DATA": headers on row 1.
   { source: "walkin", idSecret: "WALKIN_SHEET_ID", tabSecret: "WALKIN_SHEET_TAB", tab: "WALKIN DATASET", keyColumns: ["REFERENCE NUMBER"], oneTime: false, applyBatch: 20 },
   { source: "walkin_family", idSecret: "WALKIN_SHEET_ID", tabSecret: "WALKIN_FAMILY_TAB", tab: "FAMILY DATA", keyColumns: ["CLIENT ID", "TIMESTAMP"], oneTime: false },
