@@ -71,6 +71,12 @@ const SHEETS = [
   { source: "master_dont_contact", idSecret: "CLIENT_DATABASE_SHEET_ID", tabSecret: "CLIENT_DATABASE_DONT_CONTACT_TAB", tab: "DONT CONTACT ANYMORE", keyColumns: ["CONTACT NUMBER"], oneTime: false, headerRow: 1 },
   { source: "master_buyer_list", idSecret: "CLIENT_DATABASE_SHEET_ID", tabSecret: "CLIENT_DATABASE_BUYER_LIST_TAB", tab: "ALL BUYER LIST", keyColumns: ["CONTACT NUMBER"], oneTime: false, headerRow: 1 },
   { source: "master_old_final", idSecret: "CLIENT_DATABASE_SHEET_ID", tabSecret: "CLIENT_DATABASE_OLD_FINAL_TAB", tab: "ALL OLD FINAL DATA", keyColumns: ["CONTACT NUMBER"], oneTime: true, headerRow: 1, applyBatch: 25 },
+  // Migration 0430: more tabs of the same file, all one-time. SCOT and CHIRAYU APP have no unique column, so they are read by row number.
+  { source: "master_no_name", idSecret: "CLIENT_DATABASE_SHEET_ID", tabSecret: "CLIENT_DATABASE_NO_NAME_TAB", tab: "NO NAME", keyColumns: ["CONTACT NUMBER"], oneTime: true, headerRow: 1, applyBatch: 25 },
+  { source: "master_no_number", idSecret: "CLIENT_DATABASE_SHEET_ID", tabSecret: "CLIENT_DATABASE_NO_NUMBER_TAB", tab: "NO NUMBER", keyColumns: ["CLIENT ID"], oneTime: true, headerRow: 1, applyBatch: 25 },
+  { source: "master_bangalore_buyers", idSecret: "CLIENT_DATABASE_SHEET_ID", tabSecret: "CLIENT_DATABASE_BANGALORE_TAB", tab: "BANGALORE BUYER LIST", keyColumns: ["CONTACT NUMBER"], oneTime: true, headerRow: 1 },
+  { source: "master_scot", idSecret: "CLIENT_DATABASE_SHEET_ID", tabSecret: "CLIENT_DATABASE_SCOT_TAB", tab: "SCOT", keyColumns: [], oneTime: true, headerRow: 1, applyBatch: 25 },
+  { source: "master_chirayu_app", idSecret: "CLIENT_DATABASE_SHEET_ID", tabSecret: "CLIENT_DATABASE_CHIRAYU_TAB", tab: "CHIRAYU APP", keyColumns: [], oneTime: true, headerRow: 1, applyBatch: 25 },
   // "01 WALKIN DATA": headers on row 1.
   { source: "walkin", idSecret: "WALKIN_SHEET_ID", tabSecret: "WALKIN_SHEET_TAB", tab: "WALKIN DATASET", keyColumns: ["REFERENCE NUMBER"], oneTime: false, applyBatch: 20 },
   { source: "walkin_family", idSecret: "WALKIN_SHEET_ID", tabSecret: "WALKIN_FAMILY_TAB", tab: "FAMILY DATA", keyColumns: ["CLIENT ID", "TIMESTAMP"], oneTime: false },
