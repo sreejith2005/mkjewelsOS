@@ -32,16 +32,16 @@ export const CUSTOMER_SEGMENT_LABELS: Record<CustomerSegment, string> = { buyer:
 export const CUSTOMER_STAGE_LABELS: Record<CustomerLifecycleStage, string> = { lead: "New lead", engaged: "Spoken to", visited: "Visited" };
 export const CUSTOMER_CONTACT_LABELS: Record<CustomerContactWindow, string> = {
   any: "Any time",
-  not_30: "Not reached in 30 days",
-  not_90: "Not reached in 90 days",
-  not_180: "Not reached in 180 days",
-  within_30: "Reached in the last 30 days",
+  not_30: "No contact in 30 days",
+  not_90: "No contact in 90 days",
+  not_180: "No contact in 180 days",
+  within_30: "Contacted in the last 30 days",
 };
 export const CUSTOMER_SORT_LABELS: Record<CustomerListSort, string> = {
-  recent: "Last reached: newest first",
-  least_recent: "Last reached: oldest first",
+  recent: "Last contact, newest",
+  least_recent: "Last contact, oldest",
   name: "Name",
-  newest: "Newest record",
+  newest: "Newest added",
 };
 
 export type CustomerListRow = Readonly<{
@@ -56,6 +56,10 @@ export type CustomerListRow = Readonly<{
   community: string | null;
   first_source: string | null;
   first_seen_at: string | null;
+  /** City, else the place named last in the address, else state or country (migration 0428). */
+  place?: string | null;
+  /** Category keys from customer.client_tags (migration 0428); see customerTag. */
+  tags?: readonly string[];
   last_contacted_at: string | null;
   last_attempt_at: string | null;
   interaction_count: number;

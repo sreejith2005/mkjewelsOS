@@ -89,6 +89,8 @@ export type CustomerClientPage = CustomerProfile & Readonly<{
   appointments: readonly CustomerAppointment[];
   products: readonly CustomerProduct[];
   sheet_rows: readonly Readonly<{ source: string; label: string; rows: number }>[];
+  /** Category keys (migration 0428); absent before it is applied. */
+  tags?: readonly string[];
   archived: boolean;
   archive_reason: string | null;
 }>;
