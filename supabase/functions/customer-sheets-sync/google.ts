@@ -80,7 +80,9 @@ export function googleSheetReader(keyJson: string, spreadsheetId: string, tab: s
         if (/unable to parse range/i.test(message)) throw new Error("sheet_tab_not_found");
         throw new Error("sheet_range_refused");
       }
-      if (!response.ok) throw new Error("sheet_read_failed");
+      // The HTTP status says why (429 too many requests, 500/503 Google could not
+      // serve the range). Only the number is kept, never the response text.
+      if (!response.ok) throw new Error(`sheet_read_failed_${response.status}`);
       let data: { values?: unknown[][] };
       try { data = await response.json() as { values?: unknown[][] }; } catch (error) {
         if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) throw new Error("sheet_read_timeout");
@@ -106,7 +108,7 @@ export function googleProbeFile(keyJson: string, spreadsheetId: string): ProbeFi
       }
       if (response.status === 403) throw new Error("sheet_not_shared");
       if (response.status === 404) throw new Error("sheet_not_found");
-      if (!response.ok) throw new Error("sheet_read_failed");
+      if (!response.ok) throw new Error(`sheet_read_failed_${response.status}`);
       const data = await response.json() as { sheets?: Array<{ properties?: { title?: unknown; gridProperties?: { rowCount?: unknown; columnCount?: unknown } } }> };
       return (data.sheets ?? []).map((sheet): TabInfo => ({
         title: String(sheet.properties?.title ?? ""),
