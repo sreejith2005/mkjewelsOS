@@ -129,7 +129,7 @@ function CustomerMasterList({ onOpenCrm, onOpenClient }: { onOpenCrm: () => void
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <SelectFilter<CustomerSegment | ""> label="Type" onChange={(segment) => change({ segment })} value={filters.segment}>
             <option value="">All types</option>
-            {(Object.keys(CUSTOMER_SEGMENT_LABELS) as CustomerSegment[]).map((key) => <option key={key} value={key}>{CUSTOMER_SEGMENT_LABELS[key]}{options?.segments[key] !== undefined ? ` (${options.segments[key]})` : ""}</option>)}
+            {(["buyer", "lead"] as CustomerSegment[]).map((key) => <option key={key} value={key}>{CUSTOMER_SEGMENT_LABELS[key]}{options?.segments[key] !== undefined ? ` (${options.segments[key]})` : ""}</option>)}
           </SelectFilter>
           <SelectFilter<CustomerLifecycleStage | ""> label="Stage" onChange={(lifecycleStage) => change({ lifecycleStage })} value={filters.lifecycleStage}>
             <option value="">All stages</option>
