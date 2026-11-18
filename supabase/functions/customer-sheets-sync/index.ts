@@ -64,6 +64,8 @@ const SHEETS = [
   // "Database CUSTOMER DATA": dead, read once. MOBILE NO repeats and is #N/A on many rows: rows are keyed by row number.
   { source: "customer_data", idSecret: "CUSTOMER_DATA_SHEET_ID", tabSecret: "CUSTOMER_DATA_TAB", tab: "Masterdata", keyColumns: [], oneTime: true },
   { source: "customer_data_abroad", idSecret: "CUSTOMER_DATA_SHEET_ID", tabSecret: "CUSTOMER_DATA_ABROAD_TAB", tab: "Abroad", keyColumns: [], oneTime: true },
+  // "MK CENTRALIZED CLIENT DATABASE": live, headers on row 3, one row per number. Rows are heavy (about 35 answers).
+  { source: "master_sheet", idSecret: "CLIENT_DATABASE_SHEET_ID", tabSecret: "CLIENT_DATABASE_TAB", tab: "MASTER DATABASE", keyColumns: ["CONTACT NUMBER"], oneTime: false, headerRow: 3, applyBatch: 25 },
   // "01 WALKIN DATA": headers on row 1.
   { source: "walkin", idSecret: "WALKIN_SHEET_ID", tabSecret: "WALKIN_SHEET_TAB", tab: "WALKIN DATASET", keyColumns: ["REFERENCE NUMBER"], oneTime: false, applyBatch: 20 },
   { source: "walkin_family", idSecret: "WALKIN_SHEET_ID", tabSecret: "WALKIN_FAMILY_TAB", tab: "FAMILY DATA", keyColumns: ["CLIENT ID", "TIMESTAMP"], oneTime: false },

@@ -39,8 +39,8 @@ select is((select channel || '|' || purpose || '|' || outcome || '|' || result |
   'walk_in|purchase|Yes|positive|CG Road Ahmedabad|' || ('2024-04-03 00:00:00+05:30'::timestamptz)::text, 'a visit date is a store visit; Yes is a purchase');
 select is((select segment from customer.clients where id = pg_temp.client('9820022002')), 'buyer', 'and the customer is a buyer');
 select is((select count(*)::int from customer.interactions where source = 'zoho' and client_id = pg_temp.client('9820022001')), 0, 'no visit date: no visit');
-select is((select source_rank from customer.sources where source = 'zoho') - (select source_rank from customer.sources where source = 'master_sheet'), 1,
-  'Zoho ranks just above the old master sheet');
+select ok((select source_rank from customer.sources where source = 'zoho') < (select source_rank from customer.sources where source = 'runo'),
+  'Zoho ranks below every live source (the centralized sheet moved up in 0427)');
 
 select * from finish();
 rollback;
