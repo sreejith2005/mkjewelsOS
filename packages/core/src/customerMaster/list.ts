@@ -27,7 +27,8 @@ export const EMPTY_CUSTOMER_LIST_FILTERS: CustomerListFilters = {
   contact: "any", followUpDue: false, sort: "recent",
 };
 
-export const CUSTOMER_SEGMENT_LABELS: Record<CustomerSegment, string> = { buyer: "Buyer", "non-buyer": "Non-buyer", lead: "Lead" };
+// Owner, 2026-11-18: a client has bought from us; everyone else is a lead.
+export const CUSTOMER_SEGMENT_LABELS: Record<CustomerSegment, string> = { buyer: "Client", "non-buyer": "Lead", lead: "Lead" };
 export const CUSTOMER_STAGE_LABELS: Record<CustomerLifecycleStage, string> = { lead: "New lead", engaged: "Spoken to", visited: "Visited" };
 export const CUSTOMER_CONTACT_LABELS: Record<CustomerContactWindow, string> = {
   any: "Any time",
