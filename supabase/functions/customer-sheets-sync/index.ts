@@ -66,6 +66,11 @@ const SHEETS = [
   { source: "customer_data_abroad", idSecret: "CUSTOMER_DATA_SHEET_ID", tabSecret: "CUSTOMER_DATA_ABROAD_TAB", tab: "Abroad", keyColumns: [], oneTime: true },
   // "MK CENTRALIZED CLIENT DATABASE": live, headers on row 3, one row per number. Rows are heavy (about 35 answers).
   { source: "master_sheet", idSecret: "CLIENT_DATABASE_SHEET_ID", tabSecret: "CLIENT_DATABASE_TAB", tab: "MASTER DATABASE", keyColumns: ["CONTACT NUMBER"], oneTime: false, headerRow: 3, applyBatch: 25 },
+  // Other tabs of the same file (migration 0429), headers on row 1, one row per number.
+  { source: "master_wrong_number", idSecret: "CLIENT_DATABASE_SHEET_ID", tabSecret: "CLIENT_DATABASE_WRONG_NUMBER_TAB", tab: "WRONG NUMBER", keyColumns: ["CONTACT NUMBER"], oneTime: false, headerRow: 1 },
+  { source: "master_dont_contact", idSecret: "CLIENT_DATABASE_SHEET_ID", tabSecret: "CLIENT_DATABASE_DONT_CONTACT_TAB", tab: "DONT CONTACT ANYMORE", keyColumns: ["CONTACT NUMBER"], oneTime: false, headerRow: 1 },
+  { source: "master_buyer_list", idSecret: "CLIENT_DATABASE_SHEET_ID", tabSecret: "CLIENT_DATABASE_BUYER_LIST_TAB", tab: "ALL BUYER LIST", keyColumns: ["CONTACT NUMBER"], oneTime: false, headerRow: 1 },
+  { source: "master_old_final", idSecret: "CLIENT_DATABASE_SHEET_ID", tabSecret: "CLIENT_DATABASE_OLD_FINAL_TAB", tab: "ALL OLD FINAL DATA", keyColumns: ["CONTACT NUMBER"], oneTime: true, headerRow: 1, applyBatch: 25 },
   // "01 WALKIN DATA": headers on row 1.
   { source: "walkin", idSecret: "WALKIN_SHEET_ID", tabSecret: "WALKIN_SHEET_TAB", tab: "WALKIN DATASET", keyColumns: ["REFERENCE NUMBER"], oneTime: false, applyBatch: 20 },
   { source: "walkin_family", idSecret: "WALKIN_SHEET_ID", tabSecret: "WALKIN_FAMILY_TAB", tab: "FAMILY DATA", keyColumns: ["CLIENT ID", "TIMESTAMP"], oneTime: false },
