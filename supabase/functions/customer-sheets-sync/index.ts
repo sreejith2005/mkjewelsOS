@@ -53,7 +53,8 @@ const SHEETS = [
   { source: "not_bought_fms", idSecret: "FMS_SHEET_ID", tabSecret: "NOT_BOUGHT_FMS_TAB", tab: "NOT BOUGHT FMS", keyColumns: ["COMBO"], oneTime: false, headerRow: 2 },
   // Same key values as the REFERRALS tab of the walk-in sheet (COMBO repeats).
   { source: "references_calling_fms", idSecret: "FMS_SHEET_ID", tabSecret: "REFERENCES_CALLING_FMS_TAB", tab: "REFERENCES CALLING FMS", keyColumns: ["TIMESTAMP", "NUMBER OF THE REFERENCE", "NAME OF THE REFERENCE"], oneTime: false, headerRow: 2 },
-  { source: "order_fms", idSecret: "FMS_SHEET_ID", tabSecret: "ORDER_FMS_TAB", tab: "ORDER FMS", keyColumns: ["WORK ORDER NO", "DESIGN NO", "WORK STAGE"], oneTime: false, headerRow: 2 },
+  // One row per order and stage; DESIGN NO can be edited, so it is not part of the key (migration 0431).
+  { source: "order_fms", idSecret: "FMS_SHEET_ID", tabSecret: "ORDER_FMS_TAB", tab: "ORDER FMS", keyColumns: ["WORK ORDER NO", "WORK STAGE"], oneTime: false, headerRow: 2 },
   { source: "repair_fms", idSecret: "FMS_SHEET_ID", tabSecret: "REPAIR_FMS_TAB", tab: "REPAIR FMS", keyColumns: ["UNIQUE ID", "REPAIR NUMBER", "WORK STAGE"], oneTime: false, headerRow: 2 },
   // "Zoho Clients - DATA": the old CRM, no longer filled. Read once.
   { source: "zoho", idSecret: "ZOHO_SHEET_ID", tabSecret: "ZOHO_SHEET_TAB", tab: "ZOHO DATA", keyColumns: ["Sr. No"], oneTime: true },
