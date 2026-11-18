@@ -23,6 +23,13 @@ export const OVERLAP_ROWS = 300;
  * production on 2026-11-14.
  */
 export const APPLY_BATCH = 100;
+/**
+ * Google allows one account about 60 sheet reads a minute; past that it
+ * answers 429. One run reads at most this many times across all sheets.
+ */
+export const READS_PER_RUN = 40;
+/** Waits before retrying a read refused with 429. */
+export const RATE_LIMIT_WAITS_MS = [2_000, 5_000, 10_000];
 /** The smallest batch: a batch that is cancelled for time is retried four times smaller, down to this. */
 export const MIN_APPLY_BATCH = 5;
 /** A one-time (large, old) sheet starts each run with this many rows per read and grows while reads are fast. */
@@ -83,6 +90,8 @@ export interface SyncDeps {
   secret: string | undefined;
   sources: SheetSource[];
   gateway: IngestGateway | null;
+  /** Waits, for the retry after a 429. Tests pass a stand-in. */
+  sleep?: (ms: number) => Promise<void>;
   /** A spreadsheet file by its short name, for a read-only probe. Null when its secret is not set. */
   probeFile?: (file: string) => ProbeFile | null | undefined;
   now?: () => number;
@@ -160,6 +169,44 @@ export async function readChunk(reader: SheetReader, from: number, size: number 
 interface RunOptions { maxChunks: number; scanChunks: number; deadline: number; now: () => number; restart?: boolean; scheduledOnly?: boolean }
 
 /**
+ * Sheet reads shared by every sheet of one run: at most READS_PER_RUN, and a
+ * read refused with 429 is retried after a wait. When the reads are used up,
+ * or Google keeps refusing, the run reads nothing more ("read_limit"); rows
+ * already stored are still applied. That is a pause, not a failure.
+ */
+export class ReadLimiter {
+  private used = 0;
+  private stopped = false;
+  private readonly budget: number;
+  private readonly sleep: (ms: number) => Promise<void>;
+  private readonly timeLeft: () => number;
+  constructor(budget: number, sleep: (ms: number) => Promise<void>, timeLeft: () => number) {
+    this.budget = budget;
+    this.sleep = sleep;
+    this.timeLeft = timeLeft;
+  }
+  get reads(): number { return this.used; }
+  wrap(reader: SheetReader): SheetReader {
+    return {
+      rows: async (from, to) => {
+        for (let attempt = 0; ; attempt++) {
+          if (this.stopped || this.used >= this.budget) throw new Error("read_limit");
+          this.used++;
+          try {
+            return await reader.rows(from, to);
+          } catch (error) {
+            if (!(error instanceof Error) || error.message !== "sheet_read_failed_429") throw error;
+            const wait = RATE_LIMIT_WAITS_MS[attempt];
+            if (wait === undefined || this.timeLeft() < wait + 30_000) { this.stopped = true; throw new Error("read_limit"); }
+            await this.sleep(wait);
+          }
+        }
+      },
+    };
+  }
+}
+
+/**
  * One run for one sheet. Safe to call again at any time.
  *  1. Tail: continue where the last run stopped, re-reading a small overlap,
  *     so new rows and recent edits arrive within one run.
@@ -186,7 +233,7 @@ export async function syncSheet(config: SheetSource & { reader: SheetReader }, g
   if (config.oneTime && state.completed && !options.restart) {
     result.skipped = "already_imported";
     result.reached_end = true;
-  } else {
+  } else try {
     const header = await reader.rows(headerRow, headerRow);
     const names = headerNames(header[0] ?? []);
     if (!keyColumns.every((column) => names.includes(column))) throw new Error("key_column_missing");
@@ -260,6 +307,11 @@ export async function syncSheet(config: SheetSource & { reader: SheetReader }, g
         }
       }
     }
+  } catch (error) {
+    // Out of reads for this run: what was stored is applied below; the next
+    // run carries on from the stored position.
+    if (!(error instanceof Error) || error.message !== "read_limit") throw error;
+    result.skipped = "read_limit";
   }
 
   result.pending = state.pending + result.new + result.changed;
@@ -337,7 +389,12 @@ export async function handleSyncRequest(request: Request, deps: SyncDeps): Promi
 
   const results: SyncResult[] = [];
   let failed = false;
-  for (const config of deps.sources) {
+  const limiter = new ReadLimiter(READS_PER_RUN, deps.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))), () => deadline - now());
+  // The scheduled run starts with a different sheet every 5 minutes, so a
+  // sheet late in the list is not always the one left without reads.
+  const turn = Math.floor(now() / 300_000) % Math.max(1, deps.sources.length);
+  const ordered = only ? deps.sources : [...deps.sources.slice(turn), ...deps.sources.slice(0, turn)];
+  for (const config of ordered) {
     if (only && config.source !== only) continue;
     // A one-time sheet is large and slow; it runs only when asked for by name,
     // so it never takes time from the live sheets.
@@ -345,7 +402,7 @@ export async function handleSyncRequest(request: Request, deps: SyncDeps): Promi
     if (!config.reader) continue;
     if (deadline - now() < 20_000) break;
     try {
-      results.push(await syncSheet({ ...config, reader: config.reader }, deps.gateway, {
+      results.push(await syncSheet({ ...config, reader: limiter.wrap(config.reader) }, deps.gateway, {
         maxChunks, scanChunks: maxChunks === 0 ? 0 : SCAN_CHUNKS, deadline, now, restart, scheduledOnly: !only,
       }));
     } catch (error) {

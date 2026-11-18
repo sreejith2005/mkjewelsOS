@@ -1,6 +1,6 @@
 import { assertEquals } from "@std/assert";
 import {
-  CHUNK_ROWS, handleSyncRequest, headerNames, readChunk, toIngestRows,
+  CHUNK_ROWS, READS_PER_RUN, handleSyncRequest, headerNames, readChunk, toIngestRows,
   type IngestGateway, type IngestRow, type SheetReader, type SheetSource, type StoreOptions, type SyncDeps,
 } from "./worker.ts";
 
@@ -278,4 +278,38 @@ Deno.test("a cancelled batch at the smallest size is reported", async () => {
   gateway.apply = () => Promise.reject(new Error("apply_failed_57014"));
   const body = await (await handleSyncRequest(post("s", '{"source": "runo", "max_chunks": 1}'), deps([live(fakeSheet(calls(3)))], gateway))).json();
   assertEquals([body.sources[0].error, errors], ["apply_failed_57014", ["runo:apply_failed_57014"]]);
+});
+
+Deno.test("a read refused with 429 waits and retries; the rows are read", async () => {
+  let refusals = 2;
+  const inner = fakeSheet(calls(3));
+  const reader: SheetReader = { rows(from, to) { if (refusals > 0) { refusals--; return Promise.reject(new Error("sheet_read_failed_429")); } return inner.rows(from, to); } };
+  const waits: number[] = [];
+  const { gateway } = fakeGateway();
+  const body = await (await handleSyncRequest(post("s", '{"source": "runo", "max_chunks": 1}'),
+    { ...deps([live(reader)], gateway), sleep: (ms) => { waits.push(ms); return Promise.resolve(); } })).json();
+  assertEquals([body.sources[0].error, body.sources[0].applied, waits], [undefined, 3, [2000, 5000]]);
+});
+
+Deno.test("when Google keeps refusing, the run stops reading without an error and still applies stored rows", async () => {
+  const reader: SheetReader = { rows: () => Promise.reject(new Error("sheet_read_failed_429")) };
+  const { gateway, errors, of } = fakeGateway();
+  of("runo").pending = 4;
+  const response = await handleSyncRequest(post("s", '{"source": "runo", "max_chunks": 1}'),
+    { ...deps([live(reader)], gateway), sleep: () => Promise.resolve() });
+  const body = await response.json();
+  assertEquals([response.status, body.sources[0].skipped, body.sources[0].error, body.sources[0].applied, errors], [200, "read_limit", undefined, 4, []]);
+});
+
+Deno.test("one run reads at most READS_PER_RUN times across all sheets", async () => {
+  let reads = 0;
+  const sheets: SheetSource[] = Array.from({ length: 30 }, (_, i) => {
+    const inner = fakeSheet(calls(3));
+    return { ...live({ rows(from, to) { reads++; return inner.rows(from, to); } }), source: `s${i}` };
+  });
+  const { gateway } = fakeGateway();
+  const body = await (await handleSyncRequest(post(), deps(sheets, gateway))).json();
+  assertEquals(reads <= READS_PER_RUN, true);
+  assertEquals(body.sources.some((item: { skipped?: string }) => item.skipped === "read_limit"), true);
+  assertEquals(body.sources.every((item: { error?: string }) => item.error === undefined), true);
 });
