@@ -20,7 +20,7 @@ const client: CustomerClientPage = {
   phones: [{ phone: "919820008001", kind: "primary" }, { phone: "919820008002", kind: "billing" }],
   names: [{ name: "Asha Jain", source: "runo", last_seen_at: "2026-11-02T11:00:00Z" }, { name: "Asha", source: "runo", last_seen_at: "2026-11-01T04:30:00Z" }],
   identifiers: [{ type: "runo_customer_id", value: "RUNO-77" }], referred_by: { client_id: "c9", client_code: "MKC-100009", name: "Kiran Rao" }, field_sources: {}, needs_review_count: 0,
-  answers: [answer("city", "City", "Mumbai"), answer("city", "City", "Thane", false), answer("dob", "Date of birth", "--04-12"), answer("gift_given", "Gift Given", "Calendar", true, false)],
+  answers: [answer("city", "City", "Mumbai"), answer("city", "City", "Thane", false), answer("dob", "Date of birth", "--04-12"), answer("instagram_status", "Instagram Status", "Calendar", true, false)],
   follow_ups: [{ code: "MKFU-100002", kind: "hot", due_at: "2026-11-06T00:00:00Z", status: "pending", reason: null, assigned_to: "Priya Nair", origin_interaction_code: "MKI-1000002", closed_at: null, closed_by_interaction_code: null }],
   appointments: [{ code: "MKA-100001", type: "store", scheduled_at: "2026-11-08T11:30:00Z", status: "booked", branch: "MK Bandra", origin_interaction_code: "MKI-1000002", visit_interaction_code: null }],
   products: [{ code: "MK-NK-1015", category: "Necklace", interest: "interested", interaction_code: "MKI-1000002", occurred_at: "2026-11-02T11:00:00Z" }],
@@ -53,10 +53,22 @@ it("shows every detail of a customer on one page", async () => {
   expect(await screen.findByRole("heading", { name: "Asha Jain" })).toBeTruthy();
   expect(mocks.clientPage).toHaveBeenCalledWith("MKC-100001");
   expect(mocks.timeline).toHaveBeenCalledWith("c1");
-  for (const text of ["MKF-100001", "MKREF-100001", "RUNO-77", "Runo live interactions: 2 rows", "12 April", "Calendar"]) expect(screen.getByText(text)).toBeTruthy();
-  expect(screen.getByText(/Earlier: Thane \(Runo calling/)).toBeTruthy();
-  expect(screen.getByText(`${formatPhone("919820008002")} (billing)`)).toBeTruthy();
-  expect(screen.getByText("Other details")).toBeTruthy();
+  for (const text of ["MKREF-100001", "RUNO-77", "12 April"]) expect(screen.getByText(text)).toBeTruthy();
+  expect(screen.getAllByText("MKF-100001").length).toBeGreaterThan(0);
+  expect(screen.getByText(formatPhone("919820008002"))).toBeTruthy();
+  expect(screen.getByText("Billing phone")).toBeTruthy();
+  // Earlier values stay folded until asked for.
+  expect(screen.queryByText("Thane")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "1 earlier value" }));
+  expect(screen.getByText("Thane")).toBeTruthy();
+  // Answers without a card of their own fold into Other details.
+  expect(screen.queryByText("Calendar")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: /Other details/ }));
+  expect(screen.getByText("Calendar")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /Where this comes from/ }));
+  expect(screen.getByText("2 rows")).toBeTruthy();
+  expect(screen.getByRole("link", { name: /Call/ }).getAttribute("href")).toBe("tel:+919820008001");
+  fireEvent.click(screen.getByRole("tab", { name: /Timeline/ }));
   expect(await screen.findByText("Wants a bridal set")).toBeTruthy();
   expect(screen.getByText(/Led to: Hot follow-up on/)).toBeTruthy();
 });
@@ -64,22 +76,22 @@ it("shows every detail of a customer on one page", async () => {
 it("opens an interaction, a family member and the referrer from the customer page", async () => {
   const on = handlers();
   render(<CustomerProfileView clientCode="MKC-100001" {...on} />);
-  fireEvent.click(await screen.findByRole("button", { name: "Open interaction MKI-1000002" }));
-  expect(on.onOpenInteraction).toHaveBeenCalledWith("MKI-1000002");
-  fireEvent.click(screen.getByRole("button", { name: "MKC-100002" }));
+  fireEvent.click(await screen.findByRole("button", { name: "MKC-100002" }));
   fireEvent.click(screen.getByRole("button", { name: "MKC-100009" }));
   expect(on.onOpenClient.mock.calls).toEqual([["MKC-100002"], ["MKC-100009"]]);
+  fireEvent.click(screen.getByRole("tab", { name: /Timeline/ }));
+  fireEvent.click(await screen.findByRole("button", { name: "Open interaction MKI-1000002" }));
+  expect(on.onOpenInteraction).toHaveBeenCalledWith("MKI-1000002");
   fireEvent.click(screen.getByRole("button", { name: /All customers/ }));
   expect(on.onBack).toHaveBeenCalled();
 });
 
-it("uses three large tabs on a phone", async () => {
-  mocks.wide = false;
+it("splits the page into three tabs", async () => {
   render(<CustomerProfileView clientCode="MKC-100001" {...handlers()} />);
   await screen.findByRole("heading", { name: "Asha Jain" });
   expect(screen.getByRole("tab", { name: "Details" }).getAttribute("aria-selected")).toBe("true");
   expect(screen.queryByRole("button", { name: "Open interaction MKI-1000002" })).toBeNull();
-  fireEvent.click(screen.getByRole("tab", { name: "Timeline" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Timeline (2)" }));
   expect(await screen.findByRole("button", { name: "Open interaction MKI-1000002" })).toBeTruthy();
   fireEvent.click(screen.getByRole("tab", { name: "Follow-ups (1)" }));
   expect(screen.getByText("Store appointment")).toBeTruthy();
@@ -89,6 +101,7 @@ it("loads older interactions on request", async () => {
   mocks.timeline.mockResolvedValueOnce(Array.from({ length: 50 }, (_, index) => ({ ...entry, interaction_id: `i${index}`, interaction_code: `MKI-10000${String(index).padStart(2, "0")}` })));
   mocks.timeline.mockResolvedValueOnce([{ ...entry, interaction_id: "old", interaction_code: "MKI-999" }]);
   render(<CustomerProfileView clientCode="MKC-100001" {...handlers()} />);
+  fireEvent.click(await screen.findByRole("tab", { name: /Timeline/ }));
   fireEvent.click(await screen.findByRole("button", { name: "Show older" }));
   expect(await screen.findByRole("button", { name: "Open interaction MKI-999" })).toBeTruthy();
   expect(mocks.timeline).toHaveBeenLastCalledWith("c1", "2026-11-02T11:00:00Z");

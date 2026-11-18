@@ -1,45 +1,55 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ArrowLeft, CalendarClock, Phone, UserRound } from "lucide-react";
+import { ArrowLeft, CalendarClock, MessageCircle, Phone } from "lucide-react";
 import { Button, Notice } from "@/components/ui";
 import { errorMessage, titleCase } from "@/lib/format";
-import { useMediaQuery } from "@/lib/useMediaQuery";
-import { CUSTOMER_SEGMENT_LABELS, CUSTOMER_STAGE_LABELS, daysAgoLabel, formatPhone, type CustomerLifecycleStage, type CustomerSegment } from "@jewelos/core";
+import { cn } from "@/lib/utils";
+import { CUSTOMER_STAGE_LABELS, daysAgoLabel, formatPhone, type CustomerLifecycleStage } from "@jewelos/core";
 import { loadCustomerClientPage, loadCustomerTimeline, type CustomerAnswer, type CustomerClientPage, type CustomerTimelineEntry } from "./api";
 import { appointmentLabel, channelLabel, followUpLabel, formatDate, formatDateTime, formatProfileDate, RESULT_LABEL, RESULT_TONE } from "./format";
+import { InfoCard, InfoRow, Tags, type EarlierValue } from "./parts";
 
 type Tab = "details" | "timeline" | "follow_ups";
-const TABS: { key: Tab; label: string }[] = [{ key: "details", label: "Details" }, { key: "timeline", label: "Timeline" }, { key: "follow_ups", label: "Follow-ups" }];
 const TIMELINE_PAGE = 50;
 
-/** Profile answers grouped the way staff look for them. Anything not named here goes under "Other details". */
-const GROUPS: { title: string; keys: string[] }[] = [
-  { title: "Contact", keys: ["email", "address", "city", "state", "country", "pincode", "communication_preference", "marketing_message"] },
-  { title: "Personal", keys: ["gender", "dob", "dob_status", "anniversary", "marital_status", "community", "occupation"] },
-  { title: "Hospitality", keys: ["beverage", "sugar", "snack"] },
+/**
+ * The customer page groups every answer into fixed cards, so each customer's
+ * page has the same shape. A field listed here always shows (a dash when
+ * empty); answers not listed anywhere go to "Other details".
+ */
+type FieldSpec = Readonly<{ key: string; label: string }>;
+type CardSpec = Readonly<{ title: string; fields: readonly FieldSpec[]; always?: boolean }>;
+const CARDS: readonly CardSpec[] = [
+  { title: "Personal", always: true, fields: [
+    { key: "gender", label: "Gender" }, { key: "dob", label: "Date of birth" }, { key: "anniversary", label: "Anniversary" },
+    { key: "marital_status", label: "Marital status" }, { key: "wedding_month", label: "Wedding month" }, { key: "wedding_year", label: "Wedding year" },
+    { key: "community", label: "Community" }, { key: "occupation", label: "Occupation" },
+  ] },
+  { title: "Address", always: true, fields: [
+    { key: "address", label: "Address" }, { key: "city", label: "City" }, { key: "state", label: "State" },
+    { key: "country", label: "Country" }, { key: "pincode", label: "Pincode" },
+  ] },
+  { title: "Store and sales", fields: [
+    { key: "store", label: "Store" }, { key: "salesperson", label: "Salesperson" }, { key: "lead_source", label: "How they came" },
+    { key: "first_interaction_source", label: "First contact through" }, { key: "buyer_status", label: "Buyer status (as written)" },
+    { key: "client_bought_any_product", label: "Bought any product" }, { key: "not_bought_reasons", label: "Why not bought" },
+  ] },
+  { title: "Product interests", fields: [
+    { key: "seen_categories", label: "Seen categories" }, { key: "bought_categories", label: "Bought categories" },
+    { key: "seen_tags", label: "Seen tags" }, { key: "bought_tags", label: "Bought tags" },
+  ] },
+  { title: "Hospitality", fields: [
+    { key: "beverage", label: "Beverage" }, { key: "sugar", label: "Sugar" }, { key: "snack", label: "Snack" }, { key: "gift_given", label: "Gift given" },
+  ] },
+  { title: "Feedback and reviews", fields: [
+    { key: "google_review", label: "Google review" }, { key: "testimonial", label: "Testimonial" }, { key: "feedback", label: "Feedback" },
+    { key: "thank_you_note", label: "Thank-you note" }, { key: "referrals_given", label: "Referrals given" },
+  ] },
+  { title: "Data checks", fields: [
+    { key: "data_status", label: "Data status" }, { key: "contact_type", label: "Script status" },
+  ] },
 ];
-
-export function Section({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
-  return (
-    <section className="rounded-xl border border-task-border p-4">
-      <h2 className="mb-3 font-display text-lg font-semibold text-gold-secondary">{title}{count !== undefined ? <span className="ml-2 text-sm font-normal text-soft-grey">{count}</span> : null}</h2>
-      {children}
-    </section>
-  );
-}
-
-export function Fact({ label, children, caption }: { label: string; children: ReactNode; caption?: string | null }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-xs font-semibold uppercase tracking-wide text-soft-grey">{label}</dt>
-      <dd className="break-words text-base text-champagne">{children}</dd>
-      {caption ? <dd className="text-xs text-soft-grey">{caption}</dd> : null}
-    </div>
-  );
-}
-
-export function CodeLink({ code, onOpen, label }: { code: string; onOpen: (code: string) => void; label?: string }) {
-  return <button className="font-mono text-sm text-gold-secondary underline underline-offset-2" onClick={() => onOpen(code)} type="button">{label ?? code}</button>;
-}
+/** Shown in the Contact card, not in Other details. */
+const CONTACT_KEYS = ["email", "communication_preference", "marketing_message"];
 
 function answerValue(answer: CustomerAnswer): string {
   if (answer.field_key === "dob" || answer.field_key === "anniversary") {
@@ -49,48 +59,72 @@ function answerValue(answer: CustomerAnswer): string {
   return answer.value;
 }
 
-function AnswerFacts({ answers, keys }: { answers: readonly CustomerAnswer[]; keys: readonly string[] | null }) {
-  const current = answers.filter((answer) => answer.is_current && (keys ? keys.includes(answer.field_key) : true));
-  const ordered = keys ? [...current].sort((a, b) => keys.indexOf(a.field_key) - keys.indexOf(b.field_key)) : current;
-  if (ordered.length === 0) return <p className="text-sm text-soft-grey">Nothing recorded yet.</p>;
+/** The current answer for a field and the different values seen before it. */
+function fieldOf(answers: readonly CustomerAnswer[], key: string): { current: CustomerAnswer | null; earlier: EarlierValue[] } {
+  const all = answers.filter((answer) => answer.field_key === key);
+  const current = all.find((answer) => answer.is_current) ?? null;
+  const seen = new Set(current ? [answerValue(current).toLowerCase()] : []);
+  const earlier: EarlierValue[] = [];
+  for (const answer of all) {
+    const value = answerValue(answer);
+    if (answer === current || seen.has(value.toLowerCase())) continue;
+    seen.add(value.toLowerCase());
+    earlier.push({ value, source: answer.source_label, date: formatDate(answer.observed_at) });
+  }
+  return { current, earlier };
+}
+
+function AnswerRow({ answers, field }: { answers: readonly CustomerAnswer[]; field: FieldSpec }) {
+  const { current, earlier } = fieldOf(answers, field.key);
   return (
-    <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-      {ordered.map((answer) => {
-        const earlier = answers.filter((other) => other.field_key === answer.field_key && !other.is_current && other.value.toLowerCase() !== answer.value.toLowerCase());
-        return (
-          <div className="min-w-0" key={answer.field_key}>
-            <Fact caption={`${answer.source_label}, ${formatDate(answer.observed_at)}`} label={answer.label}>{answerValue(answer)}</Fact>
-            {earlier.length ? <p className="text-xs text-soft-grey">Earlier: {earlier.map((item) => `${answerValue(item)} (${item.source_label}, ${formatDate(item.observed_at)})`).join("; ")}</p> : null}
-            {earlier.some((item) => item.needs_review) ? <p className="text-xs text-danger">A newer answer from a lower-priority source needs a check.</p> : null}
-          </div>
-        );
-      })}
-    </dl>
+    <InfoRow current={current ? `${current.source_label}, ${formatDate(current.observed_at)}` : null} earlier={earlier} empty={!current} label={field.label}>
+      {current ? answerValue(current) : null}
+    </InfoRow>
   );
 }
 
+/** Old name kept for the interaction page: a titled card. */
+export function Section({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
+  return <InfoCard count={count} title={title}>{children}</InfoCard>;
+}
+
+/** Old name kept for the interaction page: one label and value. */
+export function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return <InfoRow label={label}>{children}</InfoRow>;
+}
+
+export function CodeLink({ code, onOpen, label }: { code: string; onOpen: (code: string) => void; label?: string }) {
+  return <button className="font-semibold text-gold-secondary underline underline-offset-2" onClick={() => onOpen(code)} type="button">{label ?? code}</button>;
+}
+
 export function TimelineEntry({ entry, onOpen }: { entry: CustomerTimelineEntry; onOpen: (code: string) => void }) {
+  const led = [...entry.follow_ups.map((item) => `${followUpLabel(item.kind)} on ${formatDate(item.due_at)}`), ...entry.appointments.map((item) => `${appointmentLabel(item.type)} on ${formatDate(item.scheduled_at)}`)];
+  const who = [entry.staff ? `By ${entry.staff}` : null, entry.attended_by ? `Attended by ${entry.attended_by}` : null, entry.branch].filter(Boolean).join(", ");
   return (
-    <li>
-      <button aria-label={`Open interaction ${entry.interaction_code}`} className="w-full rounded-lg border border-task-border p-3 text-left hover:border-gold/50 hover:bg-gold/5" onClick={() => onOpen(entry.interaction_code)} type="button">
-        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-          <span className="font-semibold text-champagne">{formatDateTime(entry.occurred_at)}</span>
-          <span className="text-soft-grey">{channelLabel(entry.channel)}</span>
-          <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${RESULT_TONE[entry.result]}`}>{RESULT_LABEL[entry.result]}</span>
-          <span className="ml-auto font-mono text-xs text-soft-grey">{entry.interaction_code}</span>
+    <li className="relative pl-6">
+      <span aria-hidden className={cn("absolute left-0 top-5 h-3 w-3 rounded-full border-2 border-task-bg", entry.result === "positive" ? "bg-success" : entry.result === "negative" ? "bg-danger" : "bg-gold")} />
+      <button aria-label={`Open interaction ${entry.interaction_code}`} className="w-full rounded-xl border border-task-border bg-task-bg p-3 text-left shadow-card hover:border-gold/50" onClick={() => onOpen(entry.interaction_code)} type="button">
+        <span className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-sm font-semibold text-task-text">{formatDateTime(entry.occurred_at)}</span>
+          <span className={cn("rounded-full border px-2 py-0.5 text-xs font-semibold", RESULT_TONE[entry.result])}>{RESULT_LABEL[entry.result]}</span>
         </span>
-        <span className="mt-1 block text-base text-champagne">
+        <span className="mt-1 block text-[15px] font-medium text-task-text">
           {entry.outcome ?? (entry.successful ? "Reached" : "Not reached")}{entry.non_contact_reason ? ` (${entry.non_contact_reason})` : ""}
         </span>
-        <span className="block text-xs text-soft-grey">{[entry.staff ? `By ${entry.staff}` : null, entry.attended_by ? `Attended by ${entry.attended_by}` : null, entry.branch].filter(Boolean).join(" · ")}</span>
-        {entry.notes ? <span className="mt-1 block whitespace-pre-wrap break-words text-sm text-soft-grey">{entry.notes}</span> : null}
-        {entry.follow_ups.length + entry.appointments.length > 0 ? (
-          <span className="mt-1 block text-xs text-soft-grey">
-            Led to: {[...entry.follow_ups.map((item) => `${followUpLabel(item.kind)} on ${formatDate(item.due_at)}`), ...entry.appointments.map((item) => `${appointmentLabel(item.type)} on ${formatDate(item.scheduled_at)}`)].join(", ")}
-          </span>
-        ) : null}
+        <span className="mt-0.5 block text-sm text-task-text-muted">{channelLabel(entry.channel)}{who ? `, ${who}` : ""}</span>
+        {entry.notes ? <span className="mt-2 block whitespace-pre-wrap break-words rounded-lg bg-task-muted p-2 text-sm text-task-text">{entry.notes}</span> : null}
+        {led.length > 0 ? <span className="mt-2 block text-sm text-task-text-muted">Led to: {led.join(", ")}</span> : null}
       </button>
     </li>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="min-w-0 rounded-lg bg-task-muted px-3 py-2">
+      <dt className="text-[13px] text-task-text-muted">{label}</dt>
+      <dd className="truncate text-[15px] font-semibold text-task-text">{value}</dd>
+    </div>
   );
 }
 
@@ -104,7 +138,6 @@ export function CustomerProfileView({ clientCode, onBack, onOpenClient, onOpenIn
   const [loadingMore, setLoadingMore] = useState(false);
   const [reachedEnd, setReachedEnd] = useState(false);
   const [tab, setTab] = useState<Tab>("details");
-  const wide = useMediaQuery("(min-width: 1024px)");
 
   useEffect(() => {
     let current = true;
@@ -130,9 +163,9 @@ export function CustomerProfileView({ clientCode, onBack, onOpenClient, onOpenIn
     } catch (reason) { setError(errorMessage(reason)); } finally { setLoadingMore(false); }
   };
 
-  const back = <Button onClick={onBack} variant="ghost"><ArrowLeft className="h-4 w-4" />All customers</Button>;
+  const back = <Button className="-ml-2" onClick={onBack} variant="ghost"><ArrowLeft className="h-4 w-4" />All customers</Button>;
   if (error && !data) return <section className="w-full">{back}<div className="mt-3"><Notice tone="danger">{error}</Notice></div></section>;
-  if (!data) return <section className="w-full">{back}<p className="mt-6 text-center text-soft-grey">Loading customer…</p></section>;
+  if (!data) return <section className="w-full">{back}<p className="mt-6 text-center text-task-text-muted">Loading customer…</p></section>;
 
   const client = data.client;
   const text = (key: string) => { const value = client[key]; return typeof value === "string" && value ? value : null; };
@@ -142,138 +175,181 @@ export function CustomerProfileView({ clientCode, onBack, onOpenClient, onOpenIn
   const otherPhones = data.phones.filter((item) => item.kind !== "primary");
   const otherNames = data.names.filter((item) => item.name !== text("primary_name"));
   const family = data.family?.members.filter((member) => member.client_id !== client.id) ?? [];
-  const grouped = new Set(GROUPS.flatMap((group) => group.keys));
-  const otherAnswers = data.answers.filter((answer) => !grouped.has(answer.field_key));
-  const pendingFollowUps = data.follow_ups.filter((item) => item.status === "pending");
-  // The database constrains both columns to exactly these values (migration 0405 check constraints).
-  const segment = text("segment") as CustomerSegment | null;
+  const listed = new Set([...CARDS.flatMap((card) => card.fields.map((field) => field.key)), ...CONTACT_KEYS]);
+  const otherKeys = [...new Set(data.answers.filter((answer) => !listed.has(answer.field_key)).map((answer) => answer.field_key))];
+  const pendingFollowUps = [...data.follow_ups.filter((item) => item.status === "pending")].sort((a, b) => a.due_at.localeCompare(b.due_at));
+  // The database constrains this column to exactly these values (migration 0405 check constraint).
   const stage = text("lifecycle_stage") as CustomerLifecycleStage | null;
   const lastReached = text("last_contacted_at");
+  const email = fieldOf(data.answers, "email");
+  const firstSourceLabel = text("first_source") ? data.sheet_rows.find((item) => item.source === text("first_source"))?.label ?? titleCase(text("first_source") ?? "") : null;
 
   const details = (
-    <div className="space-y-4">
-      <Section title="Identity">
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-          <Fact label="Client ID"><span className="font-mono">{text("client_code")}</span></Fact>
-          {data.family ? <Fact label="Family ID"><span className="font-mono">{data.family.household_code}</span></Fact> : null}
-          <Fact label="Referral ID"><span className="font-mono">{text("referral_code")}</span></Fact>
-          <Fact label="Mobile number">{primaryPhone ? formatPhone(primaryPhone) : "No phone number"}</Fact>
-          {otherPhones.length ? <Fact label="Other phones">{otherPhones.map((item) => `${formatPhone(item.phone)} (${item.kind})`).join(", ")}</Fact> : null}
-          {otherNames.length ? <Fact label="Other names">{otherNames.map((item) => item.name).join(", ")}</Fact> : null}
-          {data.identifiers.filter((item) => item.type !== "email").map((item) => <Fact key={`${item.type}:${item.value}`} label={titleCase(item.type)}>{item.value}</Fact>)}
-          <Fact label="First seen">{formatDate(text("first_seen_at")) || "Not known"}</Fact>
-          {text("first_source") ? <Fact label="First source">{data.sheet_rows.find((item) => item.source === text("first_source"))?.label ?? titleCase(text("first_source") ?? "")}</Fact> : null}
+    <div className="columns-1 gap-4 lg:columns-2 2xl:columns-3">
+      <InfoCard title="Contact">
+        <dl>
+          <InfoRow empty={!primaryPhone} label="Mobile">{primaryPhone ? formatPhone(primaryPhone) : null}</InfoRow>
+          {otherPhones.map((item) => <InfoRow key={item.phone} label={item.kind === "billing" ? "Billing phone" : item.kind === "whatsapp" ? "WhatsApp" : "Other phone"}>{formatPhone(item.phone)}</InfoRow>)}
+          <InfoRow current={email.current ? `${email.current.source_label}, ${formatDate(email.current.observed_at)}` : null} earlier={email.earlier} empty={!email.current} label="Email">{email.current?.value}</InfoRow>
+          <AnswerRow answers={data.answers} field={{ key: "communication_preference", label: "Prefers" }} />
+          <AnswerRow answers={data.answers} field={{ key: "marketing_message", label: "Marketing messages" }} />
+          {otherNames.length ? <InfoRow label="Also known as">{otherNames.map((item) => item.name).join(", ")}</InfoRow> : null}
         </dl>
-      </Section>
-      {GROUPS.map((group) => <Section key={group.title} title={group.title}><AnswerFacts answers={data.answers} keys={group.keys} /></Section>)}
-      {otherAnswers.length ? <Section title="Other details"><AnswerFacts answers={otherAnswers} keys={null} /></Section> : null}
-      <Section title="Family and referral">
-        {family.length === 0 && !data.referred_by ? <p className="text-sm text-soft-grey">No family members or referrer recorded.</p> : null}
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-          {family.length ? <Fact label="Family members">{family.map((member, index) => <span key={member.client_id}>{index ? ", " : ""}{member.name ?? "Unnamed"} <CodeLink code={member.client_code} onOpen={onOpenClient} /></span>)}</Fact> : null}
-          {data.referred_by ? <Fact label="Referred by">{data.referred_by.name ?? "Unnamed"} <CodeLink code={data.referred_by.client_code} onOpen={onOpenClient} /></Fact> : null}
+      </InfoCard>
+
+      <InfoCard title="Visits and purchases">
+        <dl>
+          <InfoRow empty={!text("first_seen_at")} label="First seen">{formatDate(text("first_seen_at"))}</InfoRow>
+          <InfoRow empty={!firstSourceLabel} label="First source">{firstSourceLabel}</InfoRow>
+          <InfoRow empty={!text("first_purchase_at")} label="First purchase">{formatDate(text("first_purchase_at"))}</InfoRow>
+          <InfoRow empty={!text("last_purchase_at")} label="Last purchase">{formatDate(text("last_purchase_at"))}</InfoRow>
+          <InfoRow label="Contacts">{`${count("interaction_count")} (${count("successful_interaction_count")} reached)`}</InfoRow>
+          <InfoRow empty={!stage} label="Stage">{stage ? CUSTOMER_STAGE_LABELS[stage] : null}</InfoRow>
         </dl>
-      </Section>
+      </InfoCard>
+
+      {CARDS.filter((card) => card.always || card.fields.some((field) => data.answers.some((answer) => answer.field_key === field.key))).map((card) => (
+        <InfoCard key={card.title} title={card.title}>
+          <dl>{card.fields.map((field) => <AnswerRow answers={data.answers} field={field} key={field.key} />)}</dl>
+        </InfoCard>
+      ))}
+
+      <InfoCard title="Family and referral">
+        <dl>
+          <InfoRow empty={!data.family} label="Family ID">{data.family?.household_code}</InfoRow>
+          <InfoRow empty={family.length === 0} label="Family members" stacked>
+            {family.map((member) => <span className="block" key={member.client_id}>{member.name ?? "Unnamed"} <CodeLink code={member.client_code} onOpen={onOpenClient} /></span>)}
+          </InfoRow>
+          <InfoRow empty={!data.referred_by} label="Referred by">
+            {data.referred_by ? <>{data.referred_by.name ?? "Unnamed"} <CodeLink code={data.referred_by.client_code} onOpen={onOpenClient} /></> : null}
+          </InfoRow>
+          <InfoRow label="Referral ID">{text("referral_code")}</InfoRow>
+          {data.identifiers.filter((item) => item.type !== "email").map((item) => <InfoRow key={`${item.type}:${item.value}`} label={titleCase(item.type)}>{item.value}</InfoRow>)}
+        </dl>
+      </InfoCard>
+
       {data.products.length ? (
-        <Section count={data.products.length} title="Products">
-          <ul className="space-y-2">{data.products.map((product, index) => (
-            <li className="text-sm text-champagne" key={`${product.interaction_code}:${index}`}>
-              {[product.code, product.category].filter(Boolean).join(" · ")} <span className="text-soft-grey">({titleCase(product.interest)}, {formatDate(product.occurred_at)})</span>{" "}
-              <CodeLink code={product.interaction_code} onOpen={onOpenInteraction} />
-            </li>
-          ))}</ul>
-        </Section>
+        <InfoCard collapsible count={data.products.length} defaultOpen={data.products.length <= 5} title="Products looked at">
+          <dl>{data.products.map((product, index) => (
+            <InfoRow key={`${product.interaction_code}:${index}`} label={formatDate(product.occurred_at)}>
+              {[product.code, product.category].filter(Boolean).join(", ")} ({titleCase(product.interest)})
+            </InfoRow>
+          ))}</dl>
+        </InfoCard>
       ) : null}
-      <Section title="Where this comes from">
-        {data.sheet_rows.length === 0 ? <p className="text-sm text-soft-grey">No sheet rows are linked to this customer.</p> : (
-          <ul className="space-y-1 text-sm text-champagne">{data.sheet_rows.map((item) => <li key={item.source}>{item.label}: {item.rows} row{item.rows === 1 ? "" : "s"}</li>)}</ul>
+
+      {otherKeys.length ? (
+        <InfoCard collapsible count={otherKeys.length} defaultOpen={false} title="Other details">
+          <dl>{otherKeys.map((key) => <AnswerRow answers={data.answers} field={{ key, label: data.answers.find((answer) => answer.field_key === key)?.label ?? titleCase(key) }} key={key} />)}</dl>
+        </InfoCard>
+      ) : null}
+
+      <InfoCard collapsible count={data.sheet_rows.length} defaultOpen={false} title="Where this comes from">
+        {data.sheet_rows.length === 0 ? <p className="py-3 text-sm text-task-text-muted">No sheet rows are linked to this customer.</p> : (
+          <dl>{data.sheet_rows.map((item) => <InfoRow key={item.source} label={item.label}>{`${item.rows} row${item.rows === 1 ? "" : "s"}`}</InfoRow>)}</dl>
         )}
-      </Section>
+      </InfoCard>
     </div>
   );
 
   const followUps = (
-    <div className="space-y-4">
-      <Section count={data.follow_ups.length} title="Follow-ups">
-        {data.follow_ups.length === 0 ? <p className="text-sm text-soft-grey">No follow-ups.</p> : (
-          <ul className="space-y-2">{data.follow_ups.map((item) => (
-            <li className="rounded-lg border border-task-border p-3 text-sm" key={item.code}>
-              <span className="font-semibold text-champagne">{followUpLabel(item.kind)}</span> <span className="text-soft-grey">due {formatDate(item.due_at)} · {titleCase(item.status)}</span>
-              <span className="block text-xs text-soft-grey">
-                {[item.assigned_to ? `For ${item.assigned_to}` : null, item.reason].filter(Boolean).join(" · ")}
-                {item.origin_interaction_code ? <> · From <CodeLink code={item.origin_interaction_code} onOpen={onOpenInteraction} /></> : null}
-                {item.closed_by_interaction_code ? <> · Closed by <CodeLink code={item.closed_by_interaction_code} onOpen={onOpenInteraction} /></> : null}
+    <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+      <InfoCard count={data.follow_ups.length} title="Follow-ups">
+        {data.follow_ups.length === 0 ? <p className="py-3 text-sm text-task-text-muted">No follow-ups.</p> : (
+          <ul>{data.follow_ups.map((item) => (
+            <li className="border-b border-dashed border-task-border py-3 last:border-b-0" key={item.code}>
+              <span className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="text-[15px] font-semibold text-task-text">{followUpLabel(item.kind)}</span>
+                <span className="text-sm text-task-text">{formatDate(item.due_at)}, {titleCase(item.status)}</span>
+              </span>
+              <span className="block text-sm text-task-text-muted">
+                {[item.assigned_to ? `For ${item.assigned_to}` : null, item.reason].filter(Boolean).join(", ")}
+                {item.origin_interaction_code ? <> From <CodeLink code={item.origin_interaction_code} onOpen={onOpenInteraction} /></> : null}
+                {item.closed_by_interaction_code ? <> Closed by <CodeLink code={item.closed_by_interaction_code} onOpen={onOpenInteraction} /></> : null}
               </span>
             </li>
           ))}</ul>
         )}
-      </Section>
-      <Section count={data.appointments.length} title="Appointments">
-        {data.appointments.length === 0 ? <p className="text-sm text-soft-grey">No appointments.</p> : (
-          <ul className="space-y-2">{data.appointments.map((item) => (
-            <li className="rounded-lg border border-task-border p-3 text-sm" key={item.code}>
-              <span className="font-semibold text-champagne">{appointmentLabel(item.type)}</span> <span className="text-soft-grey">{formatDateTime(item.scheduled_at)} · {titleCase(item.status)}{item.branch ? ` · ${item.branch}` : ""}</span>
-              {item.origin_interaction_code ? <span className="block text-xs text-soft-grey">Booked in <CodeLink code={item.origin_interaction_code} onOpen={onOpenInteraction} /></span> : null}
+      </InfoCard>
+      <InfoCard count={data.appointments.length} title="Appointments">
+        {data.appointments.length === 0 ? <p className="py-3 text-sm text-task-text-muted">No appointments.</p> : (
+          <ul>{data.appointments.map((item) => (
+            <li className="border-b border-dashed border-task-border py-3 last:border-b-0" key={item.code}>
+              <span className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="text-[15px] font-semibold text-task-text">{appointmentLabel(item.type)}</span>
+                <span className="text-sm text-task-text">{formatDateTime(item.scheduled_at)}</span>
+              </span>
+              <span className="block text-sm text-task-text-muted">{titleCase(item.status)}{item.branch ? `, ${item.branch}` : ""}
+                {item.origin_interaction_code ? <> Booked in <CodeLink code={item.origin_interaction_code} onOpen={onOpenInteraction} /></> : null}</span>
             </li>
           ))}</ul>
         )}
-      </Section>
+      </InfoCard>
     </div>
   );
 
   const timelineBlock = (
-    <Section count={count("interaction_count")} title="Timeline">
-      {timeline === null ? <p className="text-sm text-soft-grey">Loading timeline…</p> : null}
-      {timeline?.length === 0 ? <p className="text-sm text-soft-grey">No interactions recorded yet.</p> : null}
-      <ol className="space-y-2">{timeline?.map((entry) => <TimelineEntry entry={entry} key={entry.interaction_id} onOpen={onOpenInteraction} />)}</ol>
+    <div className="max-w-3xl">
+      {timeline === null ? <p className="text-sm text-task-text-muted">Loading timeline…</p> : null}
+      {timeline?.length === 0 ? <p className="rounded-xl border border-task-border p-6 text-center text-sm text-task-text-muted">No contacts recorded yet.</p> : null}
+      <ol className="relative space-y-3 before:absolute before:bottom-2 before:left-[5px] before:top-2 before:w-0.5 before:bg-task-border">
+        {timeline?.map((entry) => <TimelineEntry entry={entry} key={entry.interaction_id} onOpen={onOpenInteraction} />)}
+      </ol>
       {timeline && timeline.length > 0 && !reachedEnd ? <Button className="mt-3" disabled={loadingMore} onClick={() => void loadMore()} variant="secondary">{loadingMore ? "Loading…" : "Show older"}</Button> : null}
-    </Section>
+    </div>
   );
+
+  const tabs: { key: Tab; label: string }[] = [
+    { key: "details", label: "Details" },
+    { key: "timeline", label: `Timeline (${count("interaction_count")})` },
+    { key: "follow_ups", label: pendingFollowUps.length ? `Follow-ups (${pendingFollowUps.length})` : "Follow-ups" },
+  ];
+  const digits = primaryPhone?.replace(/\D/g, "") ?? "";
 
   return (
     <section className="w-full">
       {back}
-      <header className="mb-4 mt-2 rounded-xl border border-task-border p-4">
-        <div className="flex flex-wrap items-start gap-3">
-          <span className="rounded-xl bg-gold-sheen p-3 text-on-gold shadow-gold"><UserRound className="h-6 w-6" /></span>
-          <div className="min-w-0 flex-1">
-            <h1 className="break-words font-display text-[1.6rem] font-semibold leading-tight text-gold-secondary sm:text-[2rem]">{name}</h1>
-            <p className="text-sm text-soft-grey">
-              <span className="font-mono text-champagne">{text("client_code")}</span>
-              {text("city") ? ` · ${text("city")}` : ""}
-              {segment ? ` · ${CUSTOMER_SEGMENT_LABELS[segment]}` : ""}{stage ? ` · ${CUSTOMER_STAGE_LABELS[stage]}` : ""}
+      <header className="mb-4 mt-1 rounded-2xl border border-task-border bg-task-bg p-4 shadow-card sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="break-words font-display text-[2rem] font-semibold leading-tight text-task-text sm:text-[2.4rem]">{name}</h1>
+            <Tags className="mt-2" keys={data.tags} segment={text("segment")} />
+            <p className="mt-2 text-sm text-task-text-muted">
+              Client ID <span className="font-semibold text-task-text">{text("client_code")}</span>
+              {data.family ? <> &nbsp;Family ID <span className="font-semibold text-task-text">{data.family.household_code}</span></> : null}
             </p>
           </div>
-          {primaryPhone ? <a className="inline-flex min-h-12 items-center gap-2 rounded-lg border border-gold/30 px-4 text-base font-semibold text-champagne hover:bg-gold/10" href={`tel:+${primaryPhone}`}><Phone className="h-5 w-5" />{formatPhone(primaryPhone)}</a> : null}
+          {primaryPhone ? (
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+              <a className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-gold-sheen px-4 text-base font-semibold text-on-gold shadow-gold" href={`tel:+${digits}`}>
+                <Phone aria-hidden className="h-5 w-5" />Call
+              </a>
+              <a className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-task-border bg-task-bg px-4 text-base font-semibold text-task-text hover:border-gold/60" href={`https://wa.me/${digits}`} rel="noreferrer" target="_blank">
+                <MessageCircle aria-hidden className="h-5 w-5" />WhatsApp
+              </a>
+              <p className="col-span-2 text-center text-sm font-medium text-task-text sm:hidden">{formatPhone(primaryPhone)}</p>
+            </div>
+          ) : null}
         </div>
-        <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Fact label="Last reached">{lastReached ? daysAgoLabel(lastReached) : text("last_attempt_at") ? "Tried, never reached" : "Never contacted"}</Fact>
-          <Fact label="Interactions">{count("interaction_count")} <span className="text-sm text-soft-grey">({count("successful_interaction_count")} reached)</span></Fact>
-          <Fact label="Follow-ups pending">{pendingFollowUps.length}</Fact>
-          <Fact label="Next follow-up">{pendingFollowUps.length ? <span className="inline-flex items-center gap-1"><CalendarClock className="h-4 w-4" />{formatDate([...pendingFollowUps].sort((a, b) => a.due_at.localeCompare(b.due_at))[0]?.due_at)}</span> : "None"}</Fact>
+        <dl className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+          <Stat label="Last contact" value={lastReached ? daysAgoLabel(lastReached) : text("last_attempt_at") ? "Tried, not reached" : "Never"} />
+          <Stat label="Contacts" value={count("interaction_count")} />
+          <Stat label="Last purchase" value={formatDate(text("last_purchase_at")) || "None"} />
+          <Stat label="Next follow-up" value={pendingFollowUps[0] ? <span className="inline-flex items-center gap-1"><CalendarClock aria-hidden className="h-4 w-4" />{formatDate(pendingFollowUps[0].due_at)}</span> : "None"} />
         </dl>
         {data.archived ? <div className="mt-3"><Notice>This customer is archived{data.archive_reason ? ` (${titleCase(data.archive_reason)})` : ""}.</Notice></div> : null}
         {client.do_not_call === true ? <div className="mt-3"><Notice tone="danger">Do not call this customer.</Notice></div> : null}
       </header>
       {error ? <div className="mb-3"><Notice tone="danger">{error}</Notice></div> : null}
 
-      {wide ? (
-        <div className="grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] items-start gap-4">
-          <div className="space-y-4">{details}{followUps}</div>
-          {timelineBlock}
-        </div>
-      ) : (
-        <>
-          <div aria-label="Customer sections" className="mb-3 grid grid-cols-3 gap-2" role="tablist">
-            {TABS.map((item) => (
-              <button aria-selected={tab === item.key} className={`min-h-12 rounded-lg border px-2 text-sm font-semibold ${tab === item.key ? "border-gold bg-gold/10 text-gold-secondary" : "border-task-border text-soft-grey"}`} key={item.key} onClick={() => setTab(item.key)} role="tab" type="button">
-                {item.label}{item.key === "follow_ups" && pendingFollowUps.length ? ` (${pendingFollowUps.length})` : ""}
-              </button>
-            ))}
-          </div>
-          {tab === "details" ? details : tab === "timeline" ? timelineBlock : followUps}
-        </>
-      )}
+      <div aria-label="Customer sections" className="sticky top-[calc(3.5rem_+_env(safe-area-inset-top))] z-20 -mx-1 md:top-16 mb-4 flex gap-1 overflow-x-auto bg-obsidian/95 px-1 py-2 backdrop-blur" role="tablist">
+        {tabs.map((item) => (
+          <button aria-selected={tab === item.key} className={cn("min-h-11 shrink-0 rounded-full border px-4 text-sm font-semibold", tab === item.key ? "border-gold bg-gold/15 text-task-text" : "border-task-border bg-task-bg text-task-text-muted hover:text-task-text")} key={item.key} onClick={() => setTab(item.key)} role="tab" type="button">
+            {item.label}
+          </button>
+        ))}
+      </div>
+      {tab === "details" ? details : tab === "timeline" ? timelineBlock : followUps}
     </section>
   );
 }

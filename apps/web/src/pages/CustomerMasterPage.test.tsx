@@ -41,8 +41,10 @@ it("lists customers with the total and works before the filter values arrive", a
   render(<CustomerMasterPage onOpenCrm={() => undefined} />);
   expect(await screen.findByRole("button", { name: "Open Asha Jain" })).toBeTruthy();
   expect(screen.getByText("1–50 of 120")).toBeTruthy();
-  expect(screen.getByText("Tried, never reached")).toBeTruthy();
+  expect(screen.getAllByText("Not reached").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("Lead").length).toBeGreaterThan(0);
   await act(async () => slow.resolve(options));
+  fireEvent.click(screen.getByRole("button", { name: /Filters/ }));
   expect(await screen.findByRole("option", { name: "Mumbai (80)" })).toBeTruthy();
 });
 
@@ -58,9 +60,10 @@ it("sends a chosen filter and returns to the first page", async () => {
   await screen.findByRole("button", { name: "Open Asha Jain" });
   fireEvent.click(screen.getByRole("button", { name: /Next/ }));
   await waitFor(() => expect(mocks.list).toHaveBeenLastCalledWith(expect.objectContaining({ city: "" }), 1));
+  fireEvent.click(screen.getByRole("button", { name: /Filters/ }));
   fireEvent.change(await screen.findByLabelText("City"), { target: { value: "Pune" } });
   await waitFor(() => expect(mocks.list).toHaveBeenLastCalledWith(expect.objectContaining({ city: "Pune" }), 0));
-  fireEvent.click(screen.getByRole("button", { name: "Clear filters (1)" }));
+  fireEvent.click(screen.getByRole("button", { name: "Remove filter Pune" }));
   await waitFor(() => expect(mocks.list).toHaveBeenLastCalledWith(expect.objectContaining({ city: "" }), 0));
 });
 
@@ -82,12 +85,24 @@ it("drops an older response that arrives after a newer one", async () => {
   await screen.findByRole("button", { name: "Open Asha Jain" });
   const older = deferred<CustomerListPage>(); const newer = deferred<CustomerListPage>();
   mocks.list.mockReturnValueOnce(older.promise).mockReturnValueOnce(newer.promise);
+  fireEvent.click(screen.getByRole("button", { name: /Filters/ }));
   fireEvent.change(screen.getByLabelText("City"), { target: { value: "Pune" } });
   fireEvent.change(screen.getByLabelText("City"), { target: { value: "Mumbai" } });
   await act(async () => newer.resolve(pageOf([row("Newer Result", "MKC-100003")])));
   await act(async () => older.resolve(pageOf([row("Older Result", "MKC-100002")])));
   expect(screen.getByRole("button", { name: "Open Newer Result" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Open Older Result" })).toBeNull();
+});
+
+it("shows clients and leads apart with coloured tags and the place", async () => {
+  mocks.list.mockResolvedValue(pageOf([{ ...row("Sara Khan", "MKC-100005"), segment: "buyer", city: null, place: "Dubai", tags: ["abroad", "store:Bandra"] }]));
+  render(<CustomerMasterPage />);
+  await screen.findByRole("button", { name: "Open Sara Khan" });
+  for (const text of ["Client", "Abroad", "Bandra"]) expect(screen.getAllByText(text).length).toBeGreaterThan(0);
+  expect(screen.getAllByText("Dubai").length).toBeGreaterThan(0);
+  expect(screen.queryByText("No city")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: /^Clients/ }));
+  await waitFor(() => expect(mocks.list).toHaveBeenLastCalledWith(expect.objectContaining({ segment: "buyer" }), 0));
 });
 
 it("opens a customer on their own page address", async () => {
@@ -99,6 +114,7 @@ it("opens a customer on their own page address", async () => {
 it("comes back to the same filters and page", async () => {
   const first = render(<CustomerMasterPage />);
   await screen.findByRole("button", { name: "Open Asha Jain" });
+  fireEvent.click(screen.getByRole("button", { name: /Filters/ }));
   fireEvent.change(await screen.findByLabelText("City"), { target: { value: "Pune" } });
   await waitFor(() => expect(mocks.list).toHaveBeenLastCalledWith(expect.objectContaining({ city: "Pune" }), 0));
   first.unmount();
