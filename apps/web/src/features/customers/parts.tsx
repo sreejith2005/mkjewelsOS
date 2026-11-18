@@ -16,6 +16,11 @@ const TONE: Record<CustomerTagTone, string> = {
   warning: "border-warning/45 bg-warning/10 text-task-text",
   gold: "border-gold/50 bg-gold/15 text-task-text",
   neutral: "border-task-border bg-task-muted text-task-text",
+  // Ticket size, from the deepest gold down to plain.
+  tier_top: "border-gold bg-gold-sheen text-on-gold shadow-gold",
+  tier_high: "border-gold bg-gold/35 text-task-text",
+  tier_mid: "border-gold/60 bg-gold/15 text-task-text",
+  tier_base: "border-task-border bg-task-bg text-task-text",
 };
 
 export function Tag({ tag }: { tag: CustomerTag }) {

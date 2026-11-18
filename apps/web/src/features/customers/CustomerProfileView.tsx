@@ -29,7 +29,7 @@ const CARDS: readonly CardSpec[] = [
     { key: "country", label: "Country" }, { key: "pincode", label: "Pincode" },
   ] },
   { title: "Store and sales", fields: [
-    { key: "store", label: "Store" }, { key: "salesperson", label: "Salesperson" }, { key: "lead_source", label: "How they came" },
+    { key: "client_category", label: "Ticket size" }, { key: "store", label: "Store" }, { key: "salesperson", label: "Salesperson" }, { key: "lead_source", label: "How they came" },
     { key: "first_interaction_source", label: "First contact through" }, { key: "buyer_status", label: "Buyer status (as written)" },
     { key: "client_bought_any_product", label: "Bought any product" }, { key: "not_bought_reasons", label: "Why not bought" },
   ] },
@@ -43,6 +43,12 @@ const CARDS: readonly CardSpec[] = [
   { title: "Feedback and reviews", fields: [
     { key: "google_review", label: "Google review" }, { key: "testimonial", label: "Testimonial" }, { key: "feedback", label: "Feedback" },
     { key: "thank_you_note", label: "Thank-you note" }, { key: "referrals_given", label: "Referrals given" },
+  ] },
+  { title: "Calling", fields: [
+    { key: "do_not_contact_reason", label: "Do not contact, why" }, { key: "do_not_contact_date", label: "Do not contact since" },
+    { key: "do_not_contact_noted_by", label: "Do not contact, noted by" },
+    { key: "wrong_number_reason", label: "Wrong number, why" }, { key: "wrong_number_call_status", label: "Wrong number, call status" },
+    { key: "wrong_number_remark", label: "Wrong number, remark" }, { key: "wrong_number_date", label: "Wrong number, noted on" },
   ] },
   { title: "Data checks", fields: [
     { key: "data_status", label: "Data status" }, { key: "contact_type", label: "Script status" },
@@ -337,8 +343,10 @@ export function CustomerProfileView({ clientCode, onBack, onOpenClient, onOpenIn
           <Stat label="Last purchase" value={formatDate(text("last_purchase_at")) || "None"} />
           <Stat label="Next follow-up" value={pendingFollowUps[0] ? <span className="inline-flex items-center gap-1"><CalendarClock aria-hidden className="h-4 w-4" />{formatDate(pendingFollowUps[0].due_at)}</span> : "None"} />
         </dl>
-        {data.archived ? <div className="mt-3"><Notice>This customer is archived{data.archive_reason ? ` (${titleCase(data.archive_reason)})` : ""}.</Notice></div> : null}
-        {client.do_not_call === true ? <div className="mt-3"><Notice tone="danger">Do not call this customer.</Notice></div> : null}
+        {data.archive_reason === "do_not_contact"
+          ? <div className="mt-3"><Notice tone="danger">Do not contact this customer. They asked not to be contacted, so they are hidden from the list and from calling.</Notice></div>
+          : data.archived ? <div className="mt-3"><Notice>This customer is archived{data.archive_reason ? ` (${titleCase(data.archive_reason)})` : ""}.</Notice></div> : null}
+        {client.do_not_call === true && data.archive_reason !== "do_not_contact" ? <div className="mt-3"><Notice tone="danger">Do not call this customer.</Notice></div> : null}
       </header>
       {error ? <div className="mb-3"><Notice tone="danger">{error}</Notice></div> : null}
 
