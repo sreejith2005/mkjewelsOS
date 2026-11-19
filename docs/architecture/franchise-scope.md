@@ -19,8 +19,11 @@ Owner decisions (2026-11-06):
 - Picking employees from other locations in a form is switched on per Users
   question in the form builder ("Allow selecting employees from other
   locations"); no separate permission is needed.
-- CRM customer details, visits and history are shared by every store,
-  branch and city: no franchise filter applies to CRM customer data.
+- ~~CRM customer details, visits and history are shared by every store,
+  branch and city: no franchise filter applies to CRM customer data.~~
+  Replaced 2026-11-19 for the customer master database (`customer` schema,
+  migration 0433): see "Customer master" below. The frozen CRM project is
+  unchanged.
 - Super Admin sees and does everything in every store, including Store
   Intelligence.
 
@@ -483,3 +486,24 @@ are never mapped one by one: a person's franchise is always their store's.
 ## Owner decisions still open
 
 - When to switch franchise isolation on.
+
+## Customer master (migration 0433, owner request 2026-11-19)
+
+Mumbai and Ahmedabad customers are kept apart, like tasks, forms and FMS.
+
+- Every customer belongs to one franchise (`customer.clients.franchise_group_id`)
+  and every imported sheet to one franchise (`customer.source_tables.franchise_code`);
+  what a sheet imports belongs to the sheet's franchise. A customer is not tied
+  to one store: the franchise is stored on the customer, not derived from a branch.
+- A phone number or sheet id is unique within a franchise only: the same
+  number in both cities is two customers. An import matches only inside its
+  franchise (`customer.same_franchise`), and customers of different franchises
+  are never merged.
+- Reading: company-wide authority (`org_has_company_scope`) reads every
+  franchise; the customer list opens on the person's own franchise and offers
+  the other franchise and "All franchises". Everyone else, Directors included,
+  reads only the franchises of the stores in `org_scope_branch_ids`. This does
+  not wait for the isolation switch. Every customer read (list, filter counts,
+  search, customer page, timeline, interaction page, calls by staff) applies
+  `customer.franchise_visible` / `customer.franchises_in_view`.
+- Everything imported before 2026-11-19 came from Mumbai sheets and belongs to Mumbai.

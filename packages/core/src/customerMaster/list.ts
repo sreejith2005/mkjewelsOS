@@ -20,11 +20,13 @@ export type CustomerListFilters = Readonly<{
   contact: CustomerContactWindow;
   followUpDue: boolean;
   sort: CustomerListSort;
+  /** Which franchise to show: "" (the person's own), "all", or a franchise id (migration 0433). */
+  franchise: string;
 }>;
 
 export const EMPTY_CUSTOMER_LIST_FILTERS: CustomerListFilters = {
   query: "", segment: "", lifecycleStage: "", city: "", community: "", firstSource: "",
-  contact: "any", followUpDue: false, sort: "recent",
+  contact: "any", followUpDue: false, sort: "recent", franchise: "",
 };
 
 // Owner, 2026-11-18: a client has bought from us; everyone else is a lead.
@@ -65,6 +67,8 @@ export type CustomerListRow = Readonly<{
   interaction_count: number;
   successful_interaction_count: number;
   next_follow_up_at: string | null;
+  /** The franchise the customer belongs to (migration 0433). */
+  franchise?: string | null;
 }>;
 
 export type CustomerListPage = Readonly<{ total: number; rows: readonly CustomerListRow[] }>;
@@ -77,6 +81,10 @@ export type CustomerListFilterOptions = Readonly<{
   first_sources: readonly CustomerFilterValue[];
   segments: Readonly<Partial<Record<CustomerSegment, number>>>;
   import: readonly Readonly<{ source: string; last_run_at: string | null; rows_received: number; failed: boolean }>[];
+  /** Franchises the person may read (migration 0433); more than one only with company-wide authority. */
+  franchises?: readonly Readonly<{ id: string; name: string }>[];
+  /** The franchises the counts cover; null means all of them. */
+  franchise_view?: readonly string[] | null;
 }>;
 
 /** The p_filters object for public.customer_list. Unset filters are left out. */
@@ -95,6 +103,7 @@ export function customerListFilterPayload(filters: CustomerListFilters): Record<
   if (filters.contact === "within_30") payload.contacted_within_days = 30;
   if (filters.followUpDue) payload.follow_up_due = true;
   if (filters.sort !== "recent") payload.sort = filters.sort;
+  if (filters.franchise) payload.franchise = filters.franchise;
   return payload;
 }
 

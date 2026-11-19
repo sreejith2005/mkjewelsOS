@@ -80,12 +80,12 @@ function CustomerMasterList({ onOpenCrm, onOpenClient }: { onOpenCrm: () => void
 
   useEffect(() => { void load(); }, [load]);
 
-  // Filter values are optional detail: the list works without them.
+  // Filter values are optional detail: the list works without them. They follow the franchise shown.
   useEffect(() => {
     let current = true;
-    loadCustomerListFilters().then((value) => { if (current) setOptions(value); }).catch(() => undefined);
+    loadCustomerListFilters(filters.franchise).then((value) => { if (current) setOptions(value); }).catch(() => undefined);
     return () => { current = false; };
-  }, []);
+  }, [filters.franchise]);
 
   useEffect(() => {
     // Nothing to do when the box already matches the applied search (first load, or coming back to the list).
@@ -105,6 +105,10 @@ function CustomerMasterList({ onOpenCrm, onOpenClient }: { onOpenCrm: () => void
   const activeFilters = activeCustomerFilterCount({ ...filters, query: searchText });
   const lastImport = options?.import.map((item) => item.last_run_at).filter((value): value is string => Boolean(value)).sort().at(-1) ?? null;
 
+  const franchises = options?.franchises ?? [];
+  // The franchise buttons: only for people who may read more than one franchise.
+  const activeFranchise = filters.franchise || (options?.franchise_view?.length === 1 ? options.franchise_view[0] : "all");
+  const showingSeveralFranchises = franchises.length > 1 && activeFranchise === "all";
   const segmentCount = (key: CustomerSegment) => options?.segments[key];
   const leadCount = options ? (options.segments.lead ?? 0) + (options.segments["non-buyer"] ?? 0) : undefined;
   type Chip = { label: string; clear: Partial<CustomerListFilters> };
@@ -143,6 +147,15 @@ function CustomerMasterList({ onOpenCrm, onOpenClient }: { onOpenCrm: () => void
             {panelFilters ? <span className="rounded-full bg-gold px-1.5 text-xs text-on-gold">{panelFilters}</span> : null}
           </button>
         </div>
+        {franchises.length > 1 ? (
+          <div aria-label="Franchise" className="flex gap-1.5 overflow-x-auto" role="group">
+            {[...franchises.map((item) => [item.id, item.name] as const), ["all", "All franchises"] as const].map(([key, label]) => (
+              <button aria-pressed={activeFranchise === key} className={`min-h-10 shrink-0 rounded-lg border px-3 text-sm font-semibold ${activeFranchise === key ? "border-gold bg-gold text-on-gold" : "border-task-border bg-task-bg text-task-text hover:border-gold/60"}`} key={key} onClick={() => change({ franchise: key, city: "", community: "", firstSource: "" })} type="button">
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div aria-label="Type" className="flex gap-1.5 overflow-x-auto" role="group">
           {([["", "All", options?.total], ["buyer", "Clients", segmentCount("buyer")], ["lead", "Leads", leadCount]] as const).map(([key, label, n]) => (
             <button aria-pressed={filters.segment === key} className={`min-h-10 shrink-0 rounded-full border px-4 text-sm font-semibold ${filters.segment === key ? "border-gold bg-gold/15 text-task-text" : "border-task-border bg-task-bg text-task-text-muted hover:text-task-text"}`} key={label} onClick={() => change({ segment: key })} type="button">
@@ -226,7 +239,7 @@ function CustomerMasterList({ onOpenCrm, onOpenClient }: { onOpenCrm: () => void
                   {row.next_follow_up_at ? <span className="block text-[13px] text-task-text-muted">Follow-up {formatDate(row.next_follow_up_at)}</span> : null}
                 </span>
                 <span className="col-span-2 flex min-w-0 flex-wrap items-center gap-1.5 lg:col-span-1">
-                  <Tags keys={row.tags} segment={row.segment} />
+                  <Tags keys={showingSeveralFranchises && row.franchise ? [...(row.tags ?? []), `franchise:${row.franchise}`] : row.tags} segment={row.segment} />
                   {row.place ?? row.city ? <span className="inline-flex items-center gap-1 text-sm text-task-text lg:hidden"><MapPin aria-hidden className="h-3.5 w-3.5 text-task-text-muted" />{row.place ?? row.city}</span> : null}
                 </span>
                 <span className="hidden truncate text-sm text-task-text lg:block">{row.place ?? row.city ?? ""}</span>

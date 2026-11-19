@@ -29,4 +29,10 @@ describe("customer master list filters", () => {
     expect(daysAgoLabel(new Date(2026, 10, 2, 9, 0).toISOString(), now)).toBe("12 days ago");
     expect(daysAgoLabel(new Date(2026, 0, 5, 9, 0).toISOString(), now)).toContain("2026");
   });
+
+  it("sends the chosen franchise and leaves the own franchise to the database", () => {
+    expect(customerListFilterPayload({ ...EMPTY_CUSTOMER_LIST_FILTERS, franchise: "all" })).toEqual({ franchise: "all" });
+    expect(customerListFilterPayload(EMPTY_CUSTOMER_LIST_FILTERS)).not.toHaveProperty("franchise");
+    expect(activeCustomerFilterCount({ ...EMPTY_CUSTOMER_LIST_FILTERS, franchise: "all" })).toBe(0);
+  });
 });
