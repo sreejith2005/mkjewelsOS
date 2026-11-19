@@ -31,7 +31,7 @@ select customer_ingest_store('master_dont_contact', jsonb_build_array(
 select customer_ingest_store('master_buyer_list', jsonb_build_array(
   jsonb_build_object('row_key', '9820029003', 'sheet_row', 2, 'payload', '{"CLIENT NAME": "Meera", "CONTACT NUMBER": "9820029003", "SALES PERSON": "Neha", "TYPE OF CLIENT": "ROCKET"}'::jsonb)), '{"next_row": 3}');
 select customer_ingest_store('master_old_final', jsonb_build_array(
-  jsonb_build_object('row_key', '9820029004', 'sheet_row', 2, 'payload', '{"CLIENT ID": "M100001", "FAMILY ID": "M100001", "FIRST INTERACTION SOURCE": "Zaveri Bazaar Customer", "BUYER / NON BUYER": "BUYER", "CLIENT NAME": "Old Kiran", "CONTACT NUMBER": "9820029004", "DATE OF BIRTH": "12/4/", "ANNIVERSARY": "05/06/2001", "COMMUNITY / CASTE": "Sindhi"}'::jsonb),
+  jsonb_build_object('row_key', '9820029004', 'sheet_row', 2, 'payload', '{"CLIENT ID": "M100001", "FAMILY ID": "M100001", "FIRST INTERACTION SOURCE": "Zaveri Bazaar Customer", "SOURCE OF WALK-IN": "Zaveri Bazaar Customer", "BUYER / NON BUYER": "BUYER", "CLIENT NAME": "Old Kiran", "CONTACT NUMBER": "9820029004", "DATE OF BIRTH": "12/4/", "ANNIVERSARY": "05/06/2001", "COMMUNITY / CASTE": "Sindhi"}'::jsonb),
   jsonb_build_object('row_key', '982002900', 'sheet_row', 3, 'payload', '{"CLIENT NAME": "Chetan P", "CONTACT NUMBER": "982002900", "CITY": "Thane"}'::jsonb),
   jsonb_build_object('row_key', '9820029001', 'sheet_row', 4, 'payload', '{"CLIENT NAME": "Asha", "CONTACT NUMBER": "9820029001", "CITY": "Mumbai", "COMMUNITY / CASTE": "Gujarati"}'::jsonb)), '{"next_row": 5}');
 select is(customer_ingest_apply('master_wrong_number', 100) - 'pending', '{"applied": 1, "rejected": 0}'::jsonb, 'wrong number rows apply');

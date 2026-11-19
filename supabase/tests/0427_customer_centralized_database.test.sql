@@ -1,4 +1,4 @@
--- 0427: MK CENTRALIZED CLIENT DATABASE.
+-- 0427: MK CENTRALIZED CLIENT DATABASE. Since 0434 the real source is SOURCE OF WALK-IN.
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
@@ -21,9 +21,9 @@ select customer_ingest_store('runo', jsonb_build_array(jsonb_build_object('row_k
 select customer_ingest_apply('runo', 100);
 
 select customer_ingest_store('master_sheet', jsonb_build_array(
-  jsonb_build_object('row_key', '9820027001', 'sheet_row', 4, 'payload', '{"CLIENT ID": "MKC-100777", "FAMILY ID": "MKF-100777", "FIRST  INTERACTION SOURCE": "GUPSHUP", "BUYER / NON BUYER": "BUYER", "CLIENT NAME": "Asha Mehta", "CONTACT NUMBER": "9820027001", "FIRST PURCHASE DATE": "14-Mar-2025", "RECENT PURCHASE DATE": "02-Nov-2026", "LAST INTERACTION DATE": "05-Nov-2026", "CITY": "Mumbai", "DATE OF BIRTH": "12-Apr-1990", "COMMUNITY / CASTE": "GUJARATI", "SCRIPT STATUS": "CLIENT - NO KEYWORD FOUND", "STATUS": "Jewels DATA", "SUGAR": "COFFEE", "GOOGLE REVIEW": "ALREADY_DONE"}'::jsonb),
+  jsonb_build_object('row_key', '9820027001', 'sheet_row', 4, 'payload', '{"CLIENT ID": "MKC-100777", "FAMILY ID": "MKF-100777", "FIRST  INTERACTION SOURCE": "GUPSHUP", "SOURCE OF WALK-IN": "GUPSHUP", "BUYER / NON BUYER": "BUYER", "CLIENT NAME": "Asha Mehta", "CONTACT NUMBER": "9820027001", "FIRST PURCHASE DATE": "14-Mar-2025", "RECENT PURCHASE DATE": "02-Nov-2026", "LAST INTERACTION DATE": "05-Nov-2026", "CITY": "Mumbai", "DATE OF BIRTH": "12-Apr-1990", "COMMUNITY / CASTE": "GUJARATI", "SCRIPT STATUS": "CLIENT - NO KEYWORD FOUND", "STATUS": "Jewels DATA", "SUGAR": "COFFEE", "GOOGLE REVIEW": "ALREADY_DONE"}'::jsonb),
   jsonb_build_object('row_key', '9820027002', 'sheet_row', 5, 'payload', '{"CLIENT ID": "MKC-A2000001", "FAMILY ID": "MKF-100777", "BUYER / NON BUYER": "NON BUYER", "CLIENT NAME": "Ravi Mehta", "CONTACT NUMBER": "9820027002", "FIRST PURCHASE DATE": "01-Jan-2025", "RECENT PURCHASE DATE": "01-Jan-2025", "SCRIPT STATUS": "NON-CLIENT - COURIER / DELIVERY"}'::jsonb),
-  jsonb_build_object('row_key', '982002700', 'sheet_row', 6, 'payload', '{"CLIENT NAME": "Chetan", "CONTACT NUMBER": "982002700", "FIRST INTERACTION SOURCE": "EXCEL"}'::jsonb)),
+  jsonb_build_object('row_key', '982002700', 'sheet_row', 6, 'payload', '{"CLIENT NAME": "Chetan", "CONTACT NUMBER": "982002700", "FIRST INTERACTION SOURCE": "EXCEL", "SOURCE OF WALK-IN": "EXCEL"}'::jsonb)),
   '{"headers": ["CLIENT ID", "FAMILY ID", "FIRST INTERACTION SOURCE", "BUYER / NON BUYER", "CLIENT NAME", "CONTACT NUMBER"], "next_row": 7}');
 select is(customer_ingest_apply('master_sheet', 100) - 'pending', '{"applied": 3, "rejected": 0}'::jsonb, 'every row applied, an invalid number too');
 
@@ -49,7 +49,7 @@ select is((select source from customer.origins where origin = 'EXCEL') is null a
 -- The recent purchase date is cleared in the sheet: that purchase goes.
 update customer.ingest_rows set updated_at = now() - interval '1 minute' where row_key = '9820027001';
 select customer_ingest_store('master_sheet', jsonb_build_array(
-  jsonb_build_object('row_key', '9820027001', 'sheet_row', 4, 'payload', '{"CONTACT NUMBER": "9820027001", "CLIENT NAME": "Asha Mehta", "FIRST PURCHASE DATE": "14-Mar-2025", "FIRST INTERACTION SOURCE": "GUPSHUP"}'::jsonb)), '{"next_row": 7}');
+  jsonb_build_object('row_key', '9820027001', 'sheet_row', 4, 'payload', '{"CONTACT NUMBER": "9820027001", "CLIENT NAME": "Asha Mehta", "FIRST PURCHASE DATE": "14-Mar-2025", "FIRST INTERACTION SOURCE": "GUPSHUP", "SOURCE OF WALK-IN": "GUPSHUP"}'::jsonb)), '{"next_row": 7}');
 select customer_ingest_apply('master_sheet', 100);
 select is((select count(*)::int from customer.interactions where source = 'master_sheet' and client_id = pg_temp.client('9820027001')), 1,
   'a purchase date removed from the row removes that purchase');

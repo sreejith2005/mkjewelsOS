@@ -188,7 +188,9 @@ export function CustomerProfileView({ clientCode, onBack, onOpenClient, onOpenIn
   const stage = text("lifecycle_stage") as CustomerLifecycleStage | null;
   const lastReached = text("last_contacted_at");
   const email = fieldOf(data.answers, "email");
-  const firstSourceLabel = text("first_source") ? data.sheet_rows.find((item) => item.source === text("first_source"))?.label ?? titleCase(text("first_source") ?? "") : null;
+  // The real source (migration 0434); the sheet's own name only when no real source is recorded.
+  const firstSourceLabel = text("first_origin")
+    ?? (text("first_source") ? data.sheet_rows.find((item) => item.source === text("first_source"))?.label ?? titleCase(text("first_source") ?? "") : null);
 
   const details = (
     <div className="columns-1 gap-4 lg:columns-2 2xl:columns-3">
