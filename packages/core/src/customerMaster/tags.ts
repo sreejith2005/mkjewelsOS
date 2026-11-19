@@ -19,6 +19,8 @@ const TAGS: Record<string, Omit<CustomerTag, "key">> = {
   staff: { label: "Staff", tone: "warning" },
   wrong_data: { label: "Wrong data", tone: "danger" },
   referred: { label: "Referred", tone: "neutral" },
+  // Two records share a name and appeared together on one sheet row (migration 0436).
+  possible_duplicate: { label: "Possibly same person", tone: "warning" },
 };
 
 /**

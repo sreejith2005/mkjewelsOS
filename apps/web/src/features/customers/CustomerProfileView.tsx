@@ -231,6 +231,11 @@ export function CustomerProfileView({ clientCode, onBack, onOpenClient, onOpenIn
           <InfoRow empty={!data.referred_by} label="Referred by">
             {data.referred_by ? <>{data.referred_by.name ?? "Unnamed"} <CodeLink code={data.referred_by.client_code} onOpen={onOpenClient} /></> : null}
           </InfoRow>
+          {data.possibly_same_as?.length ? (
+            <InfoRow label="Possibly same person" stacked>
+              {data.possibly_same_as.map((other) => <span className="block" key={other.client_code}>{other.name ?? "Unnamed"} <CodeLink code={other.client_code} onOpen={onOpenClient} /></span>)}
+            </InfoRow>
+          ) : null}
           <InfoRow label="Referral ID">{text("referral_code")}</InfoRow>
           {data.identifiers.filter((item) => item.type !== "email").map((item) => <InfoRow key={`${item.type}:${item.value}`} label={titleCase(item.type)}>{item.value}</InfoRow>)}
         </dl>

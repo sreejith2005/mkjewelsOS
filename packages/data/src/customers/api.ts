@@ -92,6 +92,8 @@ export type CustomerClientPage = CustomerProfile & Readonly<{
   sheet_rows: readonly Readonly<{ source: string; label: string; rows: number }>[];
   /** The customer's franchise (migration 0433). */
   franchise?: string | null;
+  /** Records that may be the same person (migration 0436); absent before it is applied. */
+  possibly_same_as?: readonly Readonly<{ client_code: string; name: string | null }>[];
   /** Category keys (migration 0428); absent before it is applied. */
   tags?: readonly string[];
   archived: boolean;
