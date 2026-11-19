@@ -69,7 +69,8 @@ phone, PHONE 1 and PHONE 2, and so on; `customer.identity_phone_columns`)
 and they belong to two customers, after each import batch:
 
 - **Joined into one customer** only when their numbers appear together on at
-  least 2 different sheet rows of the same franchise *and* they share a name.
+  least 2 different sheet rows of the same franchise *and* their main names
+  are the same (migration 0437; a shared old or other name is not enough).
   The older record is kept. A name alone never joins anyone.
 - **Otherwise one family**: the customer who has no family of their own joins
   the other's. Two existing families are never joined by one number.
