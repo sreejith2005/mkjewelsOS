@@ -507,3 +507,10 @@ Mumbai and Ahmedabad customers are kept apart, like tasks, forms and FMS.
   search, customer page, timeline, interaction page, calls by staff) applies
   `customer.franchise_visible` / `customer.franchises_in_view`.
 - Everything imported before 2026-11-19 came from Mumbai sheets and belongs to Mumbai.
+- Walk-ins decide the city (migration 0435, owner 2026-11-19). A person who
+  walked in at both cities has a record in each. A record that is in a city
+  only because a list put it there (no walk-in in that city) moves to the city
+  of the person's first walk-in elsewhere (audited `customer_moved_franchise`).
+  A list row looks in its own city first and otherwise uses the person's
+  record in the city where they walked in, so lists never recreate a person
+  in the wrong city.

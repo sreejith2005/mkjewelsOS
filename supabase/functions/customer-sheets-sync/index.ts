@@ -83,6 +83,10 @@ const SHEETS = [
   // "01 WALKIN DATA": headers on row 1.
   { source: "walkin", idSecret: "WALKIN_SHEET_ID", tabSecret: "WALKIN_SHEET_TAB", tab: "WALKIN DATASET", keyColumns: ["REFERENCE NUMBER"], oneTime: false, applyBatch: 20 },
   { source: "walkin_family", idSecret: "WALKIN_SHEET_ID", tabSecret: "WALKIN_FAMILY_TAB", tab: "FAMILY DATA", keyColumns: ["CLIENT ID", "TIMESTAMP"], oneTime: false },
+  // "WALKIN DATA (AHMEDABAD)" (migration 0435): Ahmedabad's walk-in form, family data and referrals.
+  { source: "ahd_walkin", idSecret: "AHMEDABAD_WALKIN_SHEET_ID", tabSecret: "AHMEDABAD_WALKIN_TAB", tab: "WALKIN DATASET", keyColumns: ["REFERENCE NUMBER"], oneTime: false, headerRow: 3, applyBatch: 20 },
+  { source: "ahd_walkin_family", idSecret: "AHMEDABAD_WALKIN_SHEET_ID", tabSecret: "AHMEDABAD_FAMILY_TAB", tab: "FAMILY DATA", keyColumns: ["CLIENT ID", "TIMESTAMP"], oneTime: false, headerRow: 1 },
+  { source: "ahd_referral", idSecret: "AHMEDABAD_WALKIN_SHEET_ID", tabSecret: "AHMEDABAD_REFERRALS_TAB", tab: "REFERRALS", keyColumns: ["NUMBER", "REFERRAL NAME"], oneTime: false, headerRow: 1 },
   { source: "referral", idSecret: "WALKIN_SHEET_ID", tabSecret: "WALKIN_REFERRALS_TAB", tab: "REFERRALS", keyColumns: ["TIMESTAMP", "REFERRAL NUMBER", "REFERRAL NAME"], oneTime: false },
 ] as const;
 
