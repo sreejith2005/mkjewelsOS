@@ -499,11 +499,14 @@ Mumbai and Ahmedabad customers are kept apart, like tasks, forms and FMS.
   number in both cities is two customers. An import matches only inside its
   franchise (`customer.same_franchise`), and customers of different franchises
   are never merged.
-- Reading: company-wide authority (`org_has_company_scope`) reads every
-  franchise; the customer list opens on the person's own franchise and offers
-  the other franchise and "All franchises". Everyone else, Directors included,
-  reads only the franchises of the stores in `org_scope_branch_ids`. This does
-  not wait for the isolation switch. Every customer read (list, filter counts,
+- Reading (migration 0437, owner 2026-11-19: "everyone should be able to view
+  the client database ... no restriction by store or franchisee"): every
+  signed-in person with "Use CRM" (`crm.view`) reads every franchise
+  (`customer.readable_franchise_ids()` returns null). The list opens on the
+  person's own franchise and offers the other franchise and "All franchises".
+  Super Admin switches the section off per department, designation or person
+  in Users > Permissions. (0433's rule, which limited everyone without
+  company-wide authority to their stores' franchises, is replaced.) Every customer read (list, filter counts,
   search, customer page, timeline, interaction page, calls by staff) applies
   `customer.franchise_visible` / `customer.franchises_in_view`.
 - Everything imported before 2026-11-19 came from Mumbai sheets and belongs to Mumbai.
