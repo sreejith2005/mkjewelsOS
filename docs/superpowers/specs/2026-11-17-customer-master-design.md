@@ -62,6 +62,25 @@ with the same purpose land in one field:
 from (`source` on every answer, contact and customer; decides priority) and
 how the customer found us (`lead_source`).
 
+## One person, two numbers (owner, 2026-11-19; migration 0436)
+
+When one sheet row shows two of a person's own numbers (phone and billing
+phone, PHONE 1 and PHONE 2, and so on; `customer.identity_phone_columns`)
+and they belong to two customers, after each import batch:
+
+- **Joined into one customer** only when their numbers appear together on at
+  least 2 different sheet rows of the same franchise *and* they share a name.
+  The older record is kept. A name alone never joins anyone.
+- **Otherwise one family**: the customer who has no family of their own joins
+  the other's. Two existing families are never joined by one number.
+- **Same name, only one row**: one family, plus an open
+  `possible_same_person` review shown as the "Possibly same person" tag and
+  on the customer page.
+- Never across franchises. A do-not-contact person can be joined and the
+  joined customer stays do not contact.
+- Every join (`customer_same_person_joined`) and family link
+  (`customer_family_linked`) is audited with the rows that proved it.
+
 ## Still to build
 
 - Standard vocabularies, mapped from the values as written (kept beside them):

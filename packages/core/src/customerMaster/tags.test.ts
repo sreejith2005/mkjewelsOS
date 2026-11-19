@@ -20,6 +20,7 @@ describe("customer tags", () => {
     expect(customerTag("tier:PLATINUM")).toMatchObject({ label: "Platinum", tone: "gold" });
     expect(customerTag("wrong_number").label).toBe("Wrong number");
     expect(customerTag("invalid_number").label).toBe("Invalid number");
+    expect(customerTag("possible_duplicate").label).toBe("Possibly same person");
     expect(customerTag("do_not_contact").label).toBe("Do not contact");
   });
 });
