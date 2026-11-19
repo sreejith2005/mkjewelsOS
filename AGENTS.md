@@ -76,7 +76,8 @@ users, tasks, FMS, forms and the customer master database.
   no features to them. They are dropped by a reviewed forward migration after a
   backup, never ad hoc.
 - **Customer identity (owner decision 2026-11-12):** one phone number is one
-  client. The newest name is the main name; every other name and number seen is
+  client within a franchise (2026-11-19, migration 0433: Mumbai and Ahmedabad
+  customers are kept apart; see `docs/architecture/franchise-scope.md`). The newest name is the main name; every other name and number seen is
   kept (other names, other phones). The same name with a different phone is a
   different client. This replaces the 2026-10-06 phone + name rule.
   `MKC-`/`MKF-`/`MKREF-` identifiers and search are kept.

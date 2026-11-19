@@ -33,6 +33,8 @@ const TIER_TONE: Record<(typeof CUSTOMER_TIERS)[number], CustomerTagTone> = {
 /** The tag for one key from the database. Store tags ("store:Bandra") show the store's name; "tier:ROCKET" shows Rocket. */
 export function customerTag(key: string): CustomerTag {
   if (key.startsWith("store:")) return { key, label: key.slice("store:".length), tone: "neutral" };
+  // The franchise a customer belongs to, shown when both franchises are on screen (migration 0433).
+  if (key.startsWith("franchise:")) return { key, label: key.slice("franchise:".length), tone: "gold" };
   if (key.startsWith("tier:")) {
     const tier = key.slice("tier:".length).toUpperCase();
     const tone = (CUSTOMER_TIERS as readonly string[]).includes(tier) ? TIER_TONE[tier as (typeof CUSTOMER_TIERS)[number]] : "gold";

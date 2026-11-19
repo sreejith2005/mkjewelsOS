@@ -105,6 +105,26 @@ it("shows clients and leads apart with coloured tags and the place", async () =>
   await waitFor(() => expect(mocks.list).toHaveBeenLastCalledWith(expect.objectContaining({ segment: "buyer" }), 0));
 });
 
+it("offers the franchises only to someone who may read both, and shows each row's city when both are on screen", async () => {
+  mocks.filters.mockResolvedValue({ ...options, franchises: [{ id: "f-mum", name: "Mumbai" }, { id: "f-ahd", name: "Ahmedabad" }], franchise_view: ["f-mum"] });
+  mocks.list.mockResolvedValue(pageOf([{ ...row("Sara Khan", "MKC-100005"), franchise: "Ahmedabad" }]));
+  render(<CustomerMasterPage />);
+  const mumbai = await screen.findByRole("button", { name: "Mumbai" });
+  expect(mumbai.getAttribute("aria-pressed")).toBe("true");
+  expect(screen.queryByText("Ahmedabad", { selector: "span span" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "All franchises" }));
+  await waitFor(() => expect(mocks.list).toHaveBeenLastCalledWith(expect.objectContaining({ franchise: "all" }), 0));
+  await waitFor(() => expect(mocks.filters).toHaveBeenLastCalledWith("all"));
+  expect((await screen.findAllByText("Ahmedabad", { selector: "span span" })).length).toBeGreaterThan(0);
+});
+
+it("shows no franchise buttons to someone who reads one franchise", async () => {
+  mocks.filters.mockResolvedValue({ ...options, franchises: [{ id: "f-mum", name: "Mumbai" }], franchise_view: ["f-mum"] });
+  render(<CustomerMasterPage />);
+  await screen.findByRole("button", { name: "Open Asha Jain" });
+  expect(screen.queryByRole("group", { name: "Franchise" })).toBeNull();
+});
+
 it("opens a customer on their own page address", async () => {
   render(<CustomerMasterPage />);
   fireEvent.click(await screen.findByRole("button", { name: "Open Asha Jain" }));

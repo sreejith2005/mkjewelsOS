@@ -321,7 +321,7 @@ export function CustomerProfileView({ clientCode, onBack, onOpenClient, onOpenIn
             <h1 className="break-words font-display text-[2rem] font-semibold leading-tight text-task-text sm:text-[2.4rem]">{name}</h1>
             <Tags className="mt-2" keys={data.tags} segment={text("segment")} />
             <p className="mt-2 text-sm text-task-text-muted">
-              Client ID <span className="font-semibold text-task-text">{text("client_code")}</span>
+              {data.franchise ? <>{data.franchise} &nbsp;</> : null}Client ID <span className="font-semibold text-task-text">{text("client_code")}</span>
               {data.family ? <> &nbsp;Family ID <span className="font-semibold text-task-text">{data.family.household_code}</span></> : null}
             </p>
           </div>

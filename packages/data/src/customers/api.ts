@@ -46,8 +46,9 @@ export async function loadCustomerList(filters: CustomerListFilters, page: numbe
   return data as unknown as CustomerListPage;
 }
 
-export async function loadCustomerListFilters(): Promise<CustomerListFilterOptions> {
-  const { data, error } = await db().rpc("customer_list_filters");
+/** Counts for the list's filters, for the chosen franchise ("" = own, "all", or an id; migration 0433). */
+export async function loadCustomerListFilters(franchise = ""): Promise<CustomerListFilterOptions> {
+  const { data, error } = await db().rpc("customer_list_filters", { p_franchise: franchise || null });
   if (error) throw error;
   // Shape fixed by migration 0408.
   return data as unknown as CustomerListFilterOptions;
@@ -89,6 +90,8 @@ export type CustomerClientPage = CustomerProfile & Readonly<{
   appointments: readonly CustomerAppointment[];
   products: readonly CustomerProduct[];
   sheet_rows: readonly Readonly<{ source: string; label: string; rows: number }>[];
+  /** The customer's franchise (migration 0433). */
+  franchise?: string | null;
   /** Category keys (migration 0428); absent before it is applied. */
   tags?: readonly string[];
   archived: boolean;

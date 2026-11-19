@@ -23,7 +23,7 @@ export type CustomerMasterFunctions = {
   customer_get_client_page: { Args: { p_client_code: string }; Returns: Json };
   customer_get_interaction_page: { Args: { p_interaction_code: string }; Returns: Json };
   customer_list: { Args: { p_filters?: Json; p_limit?: number; p_offset?: number }; Returns: Json };
-  customer_list_filters: { Args: Record<never, never>; Returns: Json };
+  customer_list_filters: { Args: { p_franchise?: string | null }; Returns: Json };
   customer_ingest_state: { Args: { p_source: string }; Returns: Json };
   customer_ingest_sheet_rows: { Args: { p_source: string; p_rows: Json; p_next_row?: number | null }; Returns: Json };
   customer_ingest_store: { Args: { p_source: string; p_rows: Json; p_options?: Json }; Returns: Json };
