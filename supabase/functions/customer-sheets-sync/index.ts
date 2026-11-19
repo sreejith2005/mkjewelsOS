@@ -96,6 +96,7 @@ const PROBE_FILES: Record<string, string> = {
   client_database: "CLIENT_DATABASE_SHEET_ID",
   zoho: "ZOHO_SHEET_ID",
   customer_data: "CUSTOMER_DATA_SHEET_ID",
+  ahmedabad_walkin: "AHMEDABAD_WALKIN_SHEET_ID",
 };
 
 function dependencies(): SyncDeps {
