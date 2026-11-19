@@ -78,6 +78,8 @@ const SHEETS = [
   { source: "master_bangalore_buyers", idSecret: "CLIENT_DATABASE_SHEET_ID", tabSecret: "CLIENT_DATABASE_BANGALORE_TAB", tab: "BANGALORE BUYER LIST", keyColumns: ["CONTACT NUMBER"], oneTime: true, headerRow: 1 },
   { source: "master_scot", idSecret: "CLIENT_DATABASE_SHEET_ID", tabSecret: "CLIENT_DATABASE_SCOT_TAB", tab: "SCOT", keyColumns: [], oneTime: true, headerRow: 1, applyBatch: 25 },
   { source: "master_chirayu_app", idSecret: "CLIENT_DATABASE_SHEET_ID", tabSecret: "CLIENT_DATABASE_CHIRAYU_TAB", tab: "CHIRAYU APP", keyColumns: [], oneTime: true, headerRow: 1, applyBatch: 25 },
+  // "Account List": Mumbai's billing software (migration 0434). No unique column, so read by row number.
+  { source: "software_account_list", idSecret: "CLIENT_DATABASE_SHEET_ID", tabSecret: "CLIENT_DATABASE_ACCOUNT_LIST_TAB", tab: "Account List", keyColumns: [], oneTime: true, headerRow: 1, applyBatch: 25 },
   // "01 WALKIN DATA": headers on row 1.
   { source: "walkin", idSecret: "WALKIN_SHEET_ID", tabSecret: "WALKIN_SHEET_TAB", tab: "WALKIN DATASET", keyColumns: ["REFERENCE NUMBER"], oneTime: false, applyBatch: 20 },
   { source: "walkin_family", idSecret: "WALKIN_SHEET_ID", tabSecret: "WALKIN_FAMILY_TAB", tab: "FAMILY DATA", keyColumns: ["CLIENT ID", "TIMESTAMP"], oneTime: false },

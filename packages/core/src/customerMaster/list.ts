@@ -58,6 +58,8 @@ export type CustomerListRow = Readonly<{
   community: string | null;
   first_source: string | null;
   first_seen_at: string | null;
+  /** The real first source, as the sheet names it (migration 0434). */
+  first_origin?: string | null;
   /** City, else the place named last in the address, else state or country (migration 0428). */
   place?: string | null;
   /** Category keys from customer.client_tags (migration 0428); see customerTag. */
