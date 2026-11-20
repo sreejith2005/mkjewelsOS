@@ -66,6 +66,8 @@ const WEEK_OFF_DAYS = [
   "sunday",
 ] as const;
 type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
+/** The account states Users offers; Left comes only from the resignation workflow. */
+const EDITABLE_ACCOUNT_STATUSES = ["active", "inactive"] as const satisfies readonly AccountStatus[];
 export type Data = {
   profiles: UserProfile[];
   branches: Branch[];
@@ -456,12 +458,15 @@ export function EditUser({
                 set("account_status", event.target.value as AccountStatus)
               }
             >
-              {ACCOUNT_STATUSES.filter((status) => status !== "left").map(
-                (status) => (
-                  <option key={status} value={status}>
-                    {titleCase(status)}
-                  </option>
-                ),
+              {/* Users offers only Active and Inactive. An older Invited or
+                  Suspended account keeps its value listed until it is changed. */}
+              {EDITABLE_ACCOUNT_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {titleCase(status)}
+                </option>
+              ))}
+              {(EDITABLE_ACCOUNT_STATUSES as readonly string[]).includes(user.account_status) || user.account_status === "left" ? null : (
+                <option value={user.account_status}>{titleCase(user.account_status)} (old status)</option>
               )}
             </select>
           </Field>

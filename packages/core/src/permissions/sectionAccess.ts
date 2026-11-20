@@ -51,3 +51,13 @@ export function sectionMatrixCell(inherited: boolean, choice: PermissionEffect |
   if (effectiveRole === "super_admin") return { effective: true, inherited: true, choice: choice ?? "inherit" };
   return { effective: choice ? choice === "grant" : inherited, inherited, choice: choice ?? "inherit" };
 }
+
+/**
+ * The individual choice a single On/Off switch stores. Switching a section to
+ * what the department, designation and role already give clears the personal
+ * choice (Inherit); switching it the other way stores Enable or Disable.
+ */
+export function sectionToggleChoice(inherited: boolean, on: boolean): PermissionEffect | null {
+  if (on === inherited) return null;
+  return on ? "grant" : "deny";
+}
