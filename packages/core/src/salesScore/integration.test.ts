@@ -8,7 +8,6 @@ import {
 } from "./integration";
 
 const migration = readFileSync(new URL("../../../../supabase/migrations/0384_store_intelligence_integration.sql", import.meta.url), "utf8");
-const crmMigration = readFileSync(new URL("../../../../supabase-crm/supabase/migrations/20261106000200_crm_store_conversations.sql", import.meta.url), "utf8");
 
 describe("finding a CRM customer", () => {
   it("accepts only exact identifiers, never a name", () => {
@@ -20,11 +19,6 @@ describe("finding a CRM customer", () => {
     expect(candidateQueryKind("Meera")).toBe("invalid");
     expect(candidateQueryKind("Meera 9811")).toBe("invalid");
     expect(candidateQueryKind("123")).toBe("invalid");
-  });
-
-  it("matches the CRM's code and reference patterns", () => {
-    expect(crmMigration).toContain("q ~ '^MKC-?[0-9]{1,12}$'");
-    expect(crmMigration).toContain("q ~ '^MKREF-[A-Z0-9-]{1,40}$'");
   });
 
   it("records how many people the choice was made from", () => {

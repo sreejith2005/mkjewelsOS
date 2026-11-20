@@ -87,10 +87,6 @@ select ok(not leave_half_day_absent_at('17740000-0000-4000-8000-000000000001',
   (timestamptz '2026-01-06 12:59 Asia/Kolkata')),'second half leave keeps employee available before cutoff');
 select ok(leave_half_day_absent_at('17740000-0000-4000-8000-000000000001',
   (timestamptz '2026-01-06 13:00 Asia/Kolkata')),'second half leave starts at 13:00');
-insert into clients(id,tenant_id,branch_id,phone,first_name,assigned_crm_id)
-values('17770000-0000-4000-8000-000000000001','17710000-0000-4000-8000-000000000001','17720000-0000-4000-8000-000000000001','0000017705','Leave client','17740000-0000-4000-8000-000000000001');
-insert into client_followups(id,client_id,tenant_id,branch_id,assigned_to,due_date,status,subject,created_by)
-values('17780000-0000-4000-8000-000000000001','17770000-0000-4000-8000-000000000001','17710000-0000-4000-8000-000000000001','17720000-0000-4000-8000-000000000001','17740000-0000-4000-8000-000000000001',date '2026-01-06','open','Leave follow-up','17740000-0000-4000-8000-000000000003');
 insert into fms_flows(id,tenant_id,name,created_by)
 values('17790000-0000-4000-8000-000000000001','17710000-0000-4000-8000-000000000001','Leave flow','17740000-0000-4000-8000-000000000003');
 insert into fms_stages(id,fms_flow_id,name,sort_order)
@@ -124,8 +120,6 @@ select is((select effective_assignee_id from resolve_task_coverage_at(
   '17740000-0000-4000-8000-000000000002'::uuid,'new assignment resolver targets buddy during absent half');
 select sync_leave_half_day_tasks((timestamptz '2026-01-06 13:00 Asia/Kolkata'));
 select is((select count(*)::integer from audit_logs where record_id='17760000-0000-4000-8000-000000000001' and action='absence_coverage_assigned'),1,'repeat scheduler run does not duplicate transfer');
-select is((select assigned_to from client_followups where id='17780000-0000-4000-8000-000000000001'),
-  '17740000-0000-4000-8000-000000000002'::uuid,'CRM follow-up moves to primary buddy');
 select is((select assigned_to[1] from fms_instance_stages where id='177c0000-0000-4000-8000-000000000001'),
   '17740000-0000-4000-8000-000000000002'::uuid,'single-doer FMS work moves to primary buddy');
 select ok((select assigned_to @> array['17740000-0000-4000-8000-000000000002'::uuid,'17740000-0000-4000-8000-000000000003'::uuid]
@@ -134,8 +128,6 @@ select ok((select assigned_to @> array['17740000-0000-4000-8000-000000000002'::u
 update leave_requests set duration='FULL DAY',work_start_date=leave_start,work_start_in='2ND HALF'
 where id='17750000-0000-4000-8000-000000000001';
 select sync_leave_half_day_tasks((timestamptz '2026-01-06 13:00 Asia/Kolkata'));
-select is((select assigned_to from client_followups where id='17780000-0000-4000-8000-000000000001'),
-  '17740000-0000-4000-8000-000000000001'::uuid,'open CRM follow-up returns at cutoff');
 select is((select assigned_to[1] from fms_instance_stages where id='177c0000-0000-4000-8000-000000000001'),
   '17740000-0000-4000-8000-000000000001'::uuid,'open FMS work returns at cutoff');
 select ok((select assigned_to @> array['17740000-0000-4000-8000-000000000001'::uuid,'17740000-0000-4000-8000-000000000003'::uuid]

@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(20);
+select plan(19);
 
 select has_table('public', 'production_demo_data_retirements', 'retirement operation ledger exists');
 select has_column('public', 'production_demo_data_retirements', 'tenant_id', 'operations are tenant scoped');
@@ -26,8 +26,6 @@ insert into public.task_import_identity_aliases(tenant_id, normalized_label, sou
 values ('10610000-0000-4000-8000-000000000001', 'retirement super admin', 'Retirement Super Admin', '10640000-0000-4000-8000-000000000001', '10640000-0000-4000-8000-000000000001', '10640000-0000-4000-8000-000000000001');
 insert into public.user_availability(tenant_id, user_profile_id, date, status, logged_by)
 values ('10610000-0000-4000-8000-000000000001', '10640000-0000-4000-8000-000000000001', current_date, 'present', '10640000-0000-4000-8000-000000000001');
-insert into public.clients(tenant_id, branch_id, phone, first_name)
-values ('10610000-0000-4000-8000-000000000001', '10620000-0000-4000-8000-000000000001', '9000000106', 'Retained CRM Client');
 insert into public.task_instances(tenant_id, branch_id, department_id, task_type, title, planned_datetime, created_by)
 values ('10610000-0000-4000-8000-000000000001', '10620000-0000-4000-8000-000000000001', '10630000-0000-4000-8000-000000000001', 'checklist', 'Demo task', now(), '10640000-0000-4000-8000-000000000001');
 insert into public.task_import_batches(tenant_id, created_by, import_hash, source_headers, requested_count)
@@ -58,7 +56,6 @@ select is((select count(*)::integer from public.task_instances where tenant_id='
 select is((select count(*)::integer from public.task_import_row_registry where tenant_id='10610000-0000-4000-8000-000000000001'), 0, 'task import registry rows cannot block retirement');
 select is((select count(*)::integer from public.fms_flows where tenant_id='10610000-0000-4000-8000-000000000001'), 0, 'used demo workflows are removed through the guarded retirement path');
 select is((select count(*)::integer from public.notifications where tenant_id='10610000-0000-4000-8000-000000000001'), 0, 'demo notifications are removed');
-select is((select count(*)::integer from public.clients where tenant_id='10610000-0000-4000-8000-000000000001'), 1, 'CRM remains intact');
 select is((select count(*)::integer from public.user_availability where tenant_id='10610000-0000-4000-8000-000000000001'), 1, 'Availability remains intact');
 select is((select count(*)::integer from public.task_import_identity_aliases where tenant_id='10610000-0000-4000-8000-000000000001'), 1, 'identity aliases remain intact');
 

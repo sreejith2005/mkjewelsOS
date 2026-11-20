@@ -3,7 +3,7 @@ import {
   followUpPayload, parseActionTaskLinks, parseCoachingLists, parseConversationCard, parseConversationIntegration, parseConversationPage, parseDevicePage,
   parseFollowUpOptions, parseInsights, parseIntegrationHealth, parseToday, parseWorkspaceSettings,
   type ActionTaskLink, type CoachingLists, type ConversationCard, type ConversationFilters, type ConversationIntegration, type ConversationPage,
-  type CustomerLinkTarget, type DevicePage, type DeviceStatus, type FollowUpInput, type FollowUpOptions, type Insights, type IntegrationHealth,
+  type DevicePage, type DeviceStatus, type FollowUpInput, type FollowUpOptions, type Insights, type IntegrationHealth,
   type TodayView, type WorkspaceSettings,
 } from "@jewelos/core";
 
@@ -121,29 +121,6 @@ export async function fetchConversationIntegration(sessionId: string): Promise<C
   const { data, error } = await supabase.rpc("recording_session_integration", { p_session_id: sessionId });
   if (error) recordingFail(error);
   return recordingParsed(parseConversationIntegration, data);
-}
-/**
- * Links the customer a person chose from the CRM search. It stays "waiting for CRM" until the CRM
- * acknowledges it; changing an existing link needs `reason` and withdraws the old CRM entry.
- */
-export async function linkCrmCustomer(sessionId: string, target: CustomerLinkTarget, requestKey: string, reason?: string): Promise<{ linkId: string; alreadyLinked: boolean }> {
-  const { data, error } = await supabase.rpc("recording_link_crm_customer", {
-    p_session_id: sessionId, p_target: target as unknown as Json, // Built by linkTargetFor from a CRM-offered candidate; the server re-validates every key.
-    p_request_key: requestKey, ...(reason?.trim() ? { p_reason: reason.trim() } : {}),
-  });
-  if (error) recordingFail(error);
-  if (!data || typeof data !== "object" || Array.isArray(data) || typeof data.link_id !== "string") throw new WorkspaceError("The link could not be confirmed. Refresh to check.", "unavailable");
-  return { linkId: data.link_id, alreadyLinked: data.already_linked === true };
-}
-export async function unlinkCrmCustomer(sessionId: string, reason: string): Promise<void> {
-  const { error } = await supabase.rpc("recording_unlink_crm_customer", { p_session_id: sessionId, p_reason: reason.trim() });
-  if (error) recordingFail(error);
-}
-/** Sends a held or failed CRM entry again (same event; the CRM ignores repeats). */
-export async function retryCrmSync(sessionId: string): Promise<number> {
-  const { data, error } = await supabase.rpc("recording_retry_crm_sync", { p_session_id: sessionId });
-  if (error) recordingFail(error);
-  return data && typeof data === "object" && !Array.isArray(data) && typeof data.requeued === "number" ? data.requeued : 0;
 }
 export async function fetchFollowUpOptions(sessionId: string): Promise<FollowUpOptions> {
   const { data, error } = await supabase.rpc("recording_follow_up_options", { p_session_id: sessionId });

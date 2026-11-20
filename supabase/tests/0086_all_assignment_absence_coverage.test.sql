@@ -1,5 +1,5 @@
 begin;
-select plan(12);
+select plan(11);
 
 -- The approved contract never auto-assigns a reporting manager. It routes an
 -- absent original through primary then secondary buddy for the exact work date,
@@ -39,11 +39,6 @@ insert into task_assignees(task_instance_id,user_profile_id,role_at_task,is_orig
 values('86500000-0000-4000-8000-000000000001','86400000-0000-4000-8000-000000000002','doer',true,true);
 select ok(exists(select 1 from task_assignees where task_instance_id='86500000-0000-4000-8000-000000000001' and user_profile_id='86400000-0000-4000-8000-000000000004' and is_active), 'future ordinary task activates secondary buddy');
 
-insert into clients(id,tenant_id,branch_id,phone,first_name,assigned_crm_id)
-values('86600000-0000-4000-8000-000000000001','86100000-0000-4000-8000-000000000001','86200000-0000-4000-8000-000000000001','0000008605','Coverage 86 Client','86400000-0000-4000-8000-000000000002');
-insert into client_followups(id,client_id,tenant_id,branch_id,assigned_to,due_date,status,subject,created_by)
-values('86700000-0000-4000-8000-000000000001','86600000-0000-4000-8000-000000000001','86100000-0000-4000-8000-000000000001','86200000-0000-4000-8000-000000000001','86400000-0000-4000-8000-000000000002',(now() at time zone 'Asia/Kolkata')::date+2,'open','Future coverage follow-up','86400000-0000-4000-8000-000000000001');
-select is((select assigned_to from client_followups where id='86700000-0000-4000-8000-000000000001'), '86400000-0000-4000-8000-000000000004'::uuid, 'future CRM follow-up activates secondary buddy');
 
 insert into user_availability(tenant_id,user_profile_id,date,status,reason,logged_by)
 values('86100000-0000-4000-8000-000000000001','86400000-0000-4000-8000-000000000004',(now() at time zone 'Asia/Kolkata')::date+2,'absent','fixture', '86400000-0000-4000-8000-000000000001');

@@ -147,7 +147,6 @@ insert into targeted values
  ('pause another tenant''s live recording',format('select recorder_control_session(%L,''pause'',null)',pg_temp.xid('a.open'))),
  ('stop another tenant''s live recording',format('select recorder_control_session(%L,''stop'',0)',pg_temp.xid('a.open'))),
  ('renew an ingestion ticket for another tenant''s session',format('select recorder_issue_ticket(%L,null,%L,false,null)',pg_temp.xid('a.device2'),pg_temp.xid('a.open'))),
- ('link a customer to another tenant''s recording',format('select recorder_link_customer(%L,''walkin:''||gen_random_uuid())',pg_temp.xid('a.session'))),
  ('analysis snapshot',format('select recording_analysis_snapshot(%L,null)',pg_temp.xid('a.session'))),
  ('analysis snapshot at a pinned revision',format('select recording_analysis_snapshot(%L,%L)',pg_temp.xid('a.session'),pg_temp.xid('a.revision'))),
  ('conversation card',format('select recording_conversation_card(%L)',pg_temp.xid('a.session'))),
@@ -161,9 +160,6 @@ insert into targeted values
  ('list follow-up tasks',format('select recording_session_action_tasks(%L)',pg_temp.xid('a.session'))),
  ('read CRM integration',format('select recording_session_integration(%L)',pg_temp.xid('a.session'))),
  ('read follow-up options',format('select recording_follow_up_options(%L)',pg_temp.xid('a.session'))),
- ('link a CRM customer',format('select recording_link_crm_customer(%L,''{"kind":"walkin"}''::jsonb,gen_random_uuid(),null)',pg_temp.xid('a.session'))),
- ('unlink a CRM customer',format('select recording_unlink_crm_customer(%L,''x'')',pg_temp.xid('a.session'))),
- ('retry CRM sync',format('select recording_retry_crm_sync(%L)',pg_temp.xid('a.session'))),
  ('create a CRM follow-up',format('select recording_create_follow_up(jsonb_build_object(''analysis_id'',%L::uuid,''action_index'',0,''request_key'',gen_random_uuid(),''title'',''x'',''due_date'',current_date+1,''due_half'',''first''))',pg_temp.xid('a.analysis'))),
  ('activate another tenant''s rubric',format('select recording_activate_rubric_version(%L)',pg_temp.xid('a.rubric')));
 select is(pg_temp.refused(actor,stmt),'refused','tenant B '||replace(actor,'b.','')||': '||label)

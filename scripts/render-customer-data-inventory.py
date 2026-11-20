@@ -35,7 +35,7 @@ def safe(value):
 
 
 sources = []
-for base in ("apps/web/src", "packages/core/src", "packages/data/src", "packages/api-client/src", "supabase/migrations", "supabase/functions", "supabase-crm/supabase/migrations", "supabase-crm/supabase/functions"):
+for base in ("apps/web/src", "packages/core/src", "packages/data/src", "packages/api-client/src", "supabase/migrations", "supabase/functions"):
     folder = ROOT / base
     if folder.exists():
         for path in folder.rglob("*"):
