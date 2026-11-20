@@ -32,6 +32,14 @@ export const READS_PER_RUN = 40;
 export const RATE_LIMIT_WAITS_MS = [2_000, 5_000, 10_000];
 /** The smallest batch: a batch that is cancelled for time is retried four times smaller, down to this. */
 export const MIN_APPLY_BATCH = 5;
+/**
+ * Rows removed per database call at the end of a full pass. Removing a row
+ * recalculates its customers, so 200 at once ran past the API's 8-second limit
+ * (MASTER DATABASE, 2026-11-20: "finish_failed_57014" on every pass, so rows
+ * deleted from the sheet were never taken out). A cancelled call changed
+ * nothing and is retried smaller, down to one row.
+ */
+export const FINISH_BATCH = 25;
 /** A one-time (large, old) sheet starts each run with this many rows per read and grows while reads are fast. */
 export const ONE_TIME_START_ROWS = 250;
 /** The fewest rows asked for when reads are slow. */
@@ -63,7 +71,7 @@ export interface IngestGateway {
   state(source: string): Promise<{ next_row: number; scan_row: number; pending: number; completed: boolean; scheduled?: boolean }>;
   store(source: string, rows: IngestRow[], options: StoreOptions): Promise<{ new: number; changed: number }>;
   apply(source: string, limit: number): Promise<{ applied: number; rejected: number; pending: number }>;
-  finishScan(source: string): Promise<{ removed: number; remaining: boolean; blocked: boolean }>;
+  finishScan(source: string, limit: number): Promise<{ removed: number; remaining: boolean; blocked: boolean }>;
   noteError(source: string, message: string): Promise<void>;
 }
 
@@ -295,10 +303,24 @@ export async function syncSheet(config: SheetSource & { reader: SheetReader }, g
         result.changed += stored.changed;
         if (atEnd) {
           // The pass has read the whole sheet.
-          let finished = await gateway.finishScan(source);
+          let finishBatch = FINISH_BATCH;
+          const finish = async () => {
+            for (;;) {
+              try {
+                return await gateway.finishScan(source, finishBatch);
+              } catch (error) {
+                if (error instanceof Error && error.message === "finish_failed_57014" && finishBatch > 1) {
+                  finishBatch = Math.max(1, Math.floor(finishBatch / 4));
+                  continue;
+                }
+                throw error;
+              }
+            }
+          };
+          let finished = await finish();
           result.removed += finished.removed;
           while (finished.remaining && timeLeft() > 30_000) {
-            finished = await gateway.finishScan(source);
+            finished = await finish();
             result.removed += finished.removed;
           }
           result.full_pass_done = !finished.remaining;

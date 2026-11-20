@@ -1,6 +1,6 @@
 import { assertEquals } from "@std/assert";
 import {
-  CHUNK_ROWS, READS_PER_RUN, handleSyncRequest, headerNames, readChunk, toIngestRows,
+  CHUNK_ROWS, FINISH_BATCH, READS_PER_RUN, handleSyncRequest, headerNames, readChunk, toIngestRows,
   type IngestGateway, type IngestRow, type SheetReader, type SheetSource, type StoreOptions, type SyncDeps,
 } from "./worker.ts";
 
@@ -37,7 +37,7 @@ function fakeGateway(initial: Record<string, { next_row?: number; scan_row?: num
       return Promise.resolve({ new: fresh, changed: 0 });
     },
     apply(source, limit) { applyLimits.push(limit); const current = of(source); const n = Math.min(limit, current.pending); current.pending -= n; return Promise.resolve({ applied: n, rejected: 0, pending: current.pending }); },
-    finishScan(source) { finished.push(source); of(source).scan_row = 2; return Promise.resolve({ removed: 1, remaining: false, blocked: false }); },
+    finishScan(source, _limit) { finished.push(source); of(source).scan_row = 2; return Promise.resolve({ removed: 1, remaining: false, blocked: false }); },
     noteError(source, message) { errors.push(`${source}:${message}`); return Promise.resolve(); },
   };
   return { gateway, stored, errors, finished, applyLimits, of };
@@ -271,6 +271,21 @@ Deno.test("a batch cancelled for time is retried smaller; a heavy sheet starts s
   const second = fakeGateway();
   await handleSyncRequest(post("s", '{"source": "runo", "max_chunks": 1}'), deps([small], second.gateway));
   assertEquals(second.applyLimits[0], 20);
+});
+
+Deno.test("removing rows gone from the sheet is retried smaller when cancelled for time, and carries on", async () => {
+  const sheet = fakeSheet(calls(CHUNK_ROWS + 5)); const fake = fakeGateway({ runo: { next_row: CHUNK_ROWS + 7 } });
+  const limits: number[] = [];
+  let missing = 10;
+  fake.gateway.finishScan = (_source, limit) => {
+    limits.push(limit);
+    if (limit > 6) return Promise.reject(new Error("finish_failed_57014"));
+    const removed = Math.min(limit, missing); missing -= removed;
+    return Promise.resolve({ removed, remaining: missing > 0, blocked: false });
+  };
+  const [result] = (await (await handleSyncRequest(post(), deps([live(sheet)], fake.gateway))).json()).sources;
+  assertEquals(limits, [FINISH_BATCH, 6, 6]);
+  assertEquals([result.error, result.full_pass_done, result.removed], [undefined, true, 10]);
 });
 
 Deno.test("a cancelled batch at the smallest size is reported", async () => {
