@@ -36,6 +36,12 @@ function gateway(url: string, key: string): IngestGateway {
     async noteError(source, message) {
       await admin.rpc("customer_ingest_note_error", { p_source: source, p_error: message });
     },
+    async lastRuns() {
+      const { data, error } = await admin.rpc("customer_ingest_last_runs");
+      if (error) throw failure("last_runs", error);
+      // Shape fixed by migration 0442: { "<source>": "<ISO time>" | null }.
+      return (data ?? {}) as Record<string, string | null>;
+    },
   };
 }
 

@@ -73,6 +73,8 @@ export interface IngestGateway {
   apply(source: string, limit: number): Promise<{ applied: number; rejected: number; pending: number }>;
   finishScan(source: string, limit: number): Promise<{ removed: number; remaining: boolean; blocked: boolean }>;
   noteError(source: string, message: string): Promise<void>;
+  /** When each sheet was last read (ISO time, or null when never). Optional: older databases rotate instead. */
+  lastRuns?(): Promise<Readonly<Record<string, string | null>>>;
 }
 
 /** One sheet to import. */
@@ -103,6 +105,18 @@ export interface SyncDeps {
   /** A spreadsheet file by its short name, for a read-only probe. Null when its secret is not set. */
   probeFile?: (file: string) => ProbeFile | null | undefined;
   now?: () => number;
+}
+
+/** Sheets in the order to read them: never read first, then the longest wait; ties keep the list order. */
+export function stalestFirst(sources: readonly SheetSource[], runs: Readonly<Record<string, string | null>>): SheetSource[] {
+  const at = (source: string) => {
+    const value = runs[source];
+    const time = value ? Date.parse(value) : Number.NaN;
+    return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time;
+  };
+  return sources.map((config, index) => ({ config, index, time: at(config.source) }))
+    .sort((a, b) => a.time - b.time || a.index - b.index)
+    .map((item) => item.config);
 }
 
 export interface SyncResult {
@@ -412,10 +426,21 @@ export async function handleSyncRequest(request: Request, deps: SyncDeps): Promi
   const results: SyncResult[] = [];
   let failed = false;
   const limiter = new ReadLimiter(READS_PER_RUN, deps.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))), () => deadline - now());
-  // The scheduled run starts with a different sheet every 5 minutes, so a
-  // sheet late in the list is not always the one left without reads.
-  const turn = Math.floor(now() / 300_000) % Math.max(1, deps.sources.length);
-  const ordered = only ? deps.sources : [...deps.sources.slice(turn), ...deps.sources.slice(0, turn)];
+  // The scheduled run reads the sheet that has waited longest first. A run has
+  // time for a few sheets only, and with about 30 sheets a fixed rotation left
+  // MASTER DATABASE unread for over an hour (2026-11-20). Without the last-read
+  // times (older database, or the call failed) it rotates every 5 minutes.
+  let ordered = deps.sources;
+  if (!only) {
+    let runs: Readonly<Record<string, string | null>> | null = null;
+    try { runs = deps.gateway.lastRuns ? await deps.gateway.lastRuns() : null; } catch { runs = null; }
+    if (runs) {
+      ordered = stalestFirst(deps.sources, runs);
+    } else {
+      const turn = Math.floor(now() / 300_000) % Math.max(1, deps.sources.length);
+      ordered = [...deps.sources.slice(turn), ...deps.sources.slice(0, turn)];
+    }
+  }
   for (const config of ordered) {
     if (only && config.source !== only) continue;
     // A one-time sheet is large and slow; it runs only when asked for by name,
