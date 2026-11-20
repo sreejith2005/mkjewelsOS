@@ -82,6 +82,20 @@ and they belong to two customers, after each import batch:
 - Every join (`customer_same_person_joined`) and family link
   (`customer_family_linked`) is audited with the rows that proved it.
 
+## Review of possible duplicates (owner, 2026-11-20; migration 0438)
+
+"Only if you are sure they are the same person, you can merge on your own."
+Sure = same main name and numbers together on 2+ rows. Every other doubt is
+decided by a person at `/crm/master/review` (permission
+`customers.review_duplicates`, Super Admin by default): open "possibly the
+same person" flags, and the joins of 2026-11-19 whose main names differ.
+Same person merges a flag (older record kept) or keeps a join; different
+people keeps a flag apart or separates a join, and the pair is never flagged
+or joined again (`customer.pair_decision`). Every merge saves what the
+removed record had (`customer.merge_records`: numbers, sheet rows, names) so
+it can be separated exactly; joins made before 0438 were rebuilt from the
+rows that linked the pair (each row follows its own main number).
+
 ## Still to build
 
 - Standard vocabularies, mapped from the values as written (kept beside them):

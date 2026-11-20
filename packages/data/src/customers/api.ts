@@ -130,6 +130,36 @@ export async function loadCustomerClientPage(clientCode: string): Promise<Custom
   return data as unknown as CustomerClientPage;
 }
 
+/** One side of a pair on the "Possibly same person" review (migration 0438). */
+export type CustomerReviewSide = Readonly<{
+  client_code: string; name: string | null; other_names: readonly string[]; phones: readonly string[];
+  franchise: string | null; segment: string | null; city: string | null; first_source: string | null; first_origin: string | null;
+  first_seen_at: string | null; last_contacted_at: string | null; interaction_count: number | null; sheet_rows: number;
+}>;
+
+/** A pair waiting for a verdict: a flag ("possible") or a join made automatically ("joined", b is the record joined into a). */
+export type CustomerReviewItem = Readonly<{
+  id: string; kind: "possible" | "joined"; note: string | null; created_at: string;
+  a: CustomerReviewSide; b: CustomerReviewSide;
+  linking_rows: readonly Readonly<{ source: string; sheet_row: number | null }>[] | null;
+}>;
+
+export type CustomerReviewResult = Readonly<{ result: "merged" | "kept_separate" | "kept_joined" | "separated"; client_code: string | null }>;
+
+export async function loadCustomerReviewList(): Promise<CustomerReviewItem[]> {
+  const { data, error } = await db().rpc("customer_review_list", {});
+  if (error) throw error;
+  // Shape fixed by migration 0438.
+  return (data ?? []) as unknown as CustomerReviewItem[];
+}
+
+export async function decideCustomerReview(reviewId: string, same: boolean): Promise<CustomerReviewResult> {
+  const { data, error } = await db().rpc("customer_review_decide", { p_review_id: reviewId, p_same: same });
+  if (error) throw error;
+  // Shape fixed by migration 0438.
+  return data as unknown as CustomerReviewResult;
+}
+
 export async function loadCustomerInteractionPage(interactionCode: string): Promise<CustomerInteractionPage> {
   const { data, error } = await db().rpc("customer_get_interaction_page", { p_interaction_code: interactionCode });
   if (error) throw error;

@@ -87,6 +87,8 @@ export type CustomerListFilterOptions = Readonly<{
   franchises?: readonly Readonly<{ id: string; name: string }>[];
   /** The franchises the counts cover; null means all of them. */
   franchise_view?: readonly string[] | null;
+  /** Pairs waiting on the "Possibly same person" review; null without the permission (migration 0438). */
+  duplicates_to_review?: number | null;
 }>;
 
 /** The p_filters object for public.customer_list. Unset filters are left out. */
