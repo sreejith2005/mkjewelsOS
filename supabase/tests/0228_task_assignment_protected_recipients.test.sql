@@ -1,5 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
+-- Assignment expectations updated for the universal task-author rule in 0438.
 set local search_path = public, extensions;
 select no_plan();
 
@@ -82,36 +83,36 @@ select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','15600000-0000-4000-8000-000000000001',true);
 select lives_ok($$select save_user_access_with_audit('15640000-0000-4000-8000-000000000005','{"tasks.assign_others":"grant"}',null)$$,'grant employee assignment without elevating authority');
 select set_config('request.jwt.claim.sub','15600000-0000-4000-8000-000000000005',true);
-select ok(not exists(select 1 from list_task_assignment_users() where user_role in ('super_admin','admin','manager')),'employee roster excludes protected management');
+select ok(exists(select 1 from list_task_assignment_users() where user_role in ('super_admin','admin','manager')),'employee roster includes management');
 select lives_ok($$select pg_temp.assign_fixture('15640000-0000-4000-8000-000000000006')$$,'employee still assigns a colleague');
-select throws_ok($$select pg_temp.assign_fixture('15640000-0000-4000-8000-000000000001')$$,'42501',null,'direct API cannot assign Super Admin');
-select throws_ok($$select pg_temp.assign_fixture('15640000-0000-4000-8000-000000000003')$$,'42501',null,'direct API cannot assign Admin');
-select throws_ok($$select pg_temp.assign_fixture('15640000-0000-4000-8000-000000000004')$$,'42501',null,'direct API cannot assign Manager');
+select lives_ok($$select pg_temp.assign_fixture('15640000-0000-4000-8000-000000000001')$$,'universal task authors may select senior recipients: direct API can assign Super Admin');
+select lives_ok($$select pg_temp.assign_fixture('15640000-0000-4000-8000-000000000003')$$,'universal task authors may select senior recipients: direct API can assign Admin');
+select lives_ok($$select pg_temp.assign_fixture('15640000-0000-4000-8000-000000000004')$$,'universal task authors may select senior recipients: direct API can assign Manager');
 select set_config('test.protected.task',pg_temp.assign_fixture('15640000-0000-4000-8000-000000000005')::text,true);
-select throws_ok($$select delegate_task_with_audit(current_setting('test.protected.task')::uuid,'15640000-0000-4000-8000-000000000005','15640000-0000-4000-8000-000000000004','Synthetic transfer')$$,'42501',null,'delegation cannot assign protected Manager');
+select lives_ok($$select delegate_task_with_audit(current_setting('test.protected.task')::uuid,'15640000-0000-4000-8000-000000000005','15640000-0000-4000-8000-000000000004','Synthetic transfer')$$,'universal task authors may select senior recipients: delegation can assign allowed Manager');
 reset role;
 insert into dropdown_masters(id,tenant_id,master_type,label,value,is_active) values('15650000-0000-4000-8000-000000000003','15610000-0000-4000-8000-000000000001','designation','Company Owner','company_owner',true);
 update user_profiles set designation_id='15650000-0000-4000-8000-000000000003' where id='15640000-0000-4000-8000-000000000007';
 set local role authenticated;
-select ok(not exists(select 1 from list_task_assignment_users() where id='15640000-0000-4000-8000-000000000007'),'owner designation hidden even with Staff role');
-select throws_ok($$select pg_temp.assign_fixture('15640000-0000-4000-8000-000000000007')$$,'42501',null,'direct API cannot assign Owner designation');
+select ok(exists(select 1 from list_task_assignment_users() where id='15640000-0000-4000-8000-000000000007'),'owner designation available to task authors');
+select lives_ok($$select pg_temp.assign_fixture('15640000-0000-4000-8000-000000000007')$$,'universal task authors may select senior recipients: direct API can assign Owner designation');
 reset role;
 update dropdown_masters set label='Director' where id='15650000-0000-4000-8000-000000000003';
 set local role authenticated;
-select throws_ok($$select pg_temp.assign_fixture('15640000-0000-4000-8000-000000000007')$$,'42501',null,'Director designation protected');
+select lives_ok($$select pg_temp.assign_fixture('15640000-0000-4000-8000-000000000007')$$,'universal task authors may select senior recipients: Director designation allowed');
 reset role;
 update user_profiles set designation_id=null where id='15640000-0000-4000-8000-000000000007';
 set local role authenticated;
 select set_config('request.jwt.claim.sub','15600000-0000-4000-8000-000000000001',true);
 select lives_ok($$select save_user_access_with_audit('15640000-0000-4000-8000-000000000007','{}','manager')$$,'target has elevated Manager authority');
 select set_config('request.jwt.claim.sub','15600000-0000-4000-8000-000000000005',true);
-select ok(not exists(select 1 from list_task_assignment_users() where id='15640000-0000-4000-8000-000000000007'),'elevated Manager target hidden');
-select throws_ok($$select pg_temp.assign_fixture('15640000-0000-4000-8000-000000000007')$$,'42501',null,'elevated Manager target blocked directly');
+select ok(exists(select 1 from list_task_assignment_users() where id='15640000-0000-4000-8000-000000000007'),'elevated Manager target available');
+select lives_ok($$select pg_temp.assign_fixture('15640000-0000-4000-8000-000000000007')$$,'universal task authors may select senior recipients: elevated Manager target allowed directly');
 select set_config('request.jwt.claim.sub','15600000-0000-4000-8000-000000000001',true);
 select lives_ok($$select pg_temp.assign_fixture('15640000-0000-4000-8000-000000000004')$$,'Super Admin existing assignment authority retained');
 select set_config('request.jwt.claim.sub','15600000-0000-4000-8000-000000000004',true);
 select lives_ok($$select pg_temp.assign_fixture('15640000-0000-4000-8000-000000000004')$$,'Manager retains self assignment');
-select throws_ok($$select pg_temp.schedule_fixture('15640000-0000-4000-8000-000000000007')$$,'42501',null,'specific schedule cannot assign elevated Manager');
+select lives_ok($$select pg_temp.schedule_fixture('15640000-0000-4000-8000-000000000007')$$,'universal task authors may select senior recipients: specific schedule can assign elevated Manager');
 select throws_ok($$select save_task_template_with_audit(null,jsonb_build_object(
   'title','Synthetic protected role schedule','recurrence_rule','RRULE:FREQ=DAILY;INTERVAL=1',
   'planned_time','18:00','priority','medium','branch_id','15620000-0000-4000-8000-000000000001',

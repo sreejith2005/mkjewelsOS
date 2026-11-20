@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveTaskMutationCapability } from "./taskCapabilities";
+import { canReviewTask, deriveTaskMutationCapability } from "./taskCapabilities";
 
 describe("task mutation capability", () => {
   it("keeps an ordinary watcher read-only", () => {
@@ -55,4 +55,13 @@ describe("task mutation capability", () => {
       }).canMutate).toBe(false);
     }
   });
+});
+
+describe("In Loop review", () => {
+  const task = { task_type: "delegation", status: "completed", verification_status: "pending", isWatchedByViewer: true, verifier_user_profile_id: "reviewer" };
+  it("allows an In Loop person to review completed manual work", () => expect(canReviewTask(task, "reviewer")).toBe(true));
+  it.each([
+    { status: "pending" }, { verification_status: "verified" }, { task_type: "fms" },
+    { isWatchedByViewer: false, verifier_user_profile_id: "someone-else" },
+  ])("denies review for %o", (patch) => expect(canReviewTask({ ...task, ...patch }, "reviewer")).toBe(false));
 });

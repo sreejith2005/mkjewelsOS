@@ -29,33 +29,26 @@ function Check({ checked, onChange, title, hint }: { checked: boolean; onChange:
  */
 export function ScheduleOptions({
   values,
+  hideInLoop = false,
   onChange,
   people,
 }: {
+  hideInLoop?: boolean;
   values: ScheduleOptionValues;
   onChange: (next: ScheduleOptionValues) => void;
   people: ReadonlyArray<{ id: string | null; employee_name: string | null }>;
 }) {
   const set = (patch: Partial<ScheduleOptionValues>) => onChange({ ...values, ...patch });
-  const verifierMissing = values.verificationRequired && !values.verifierId;
   return (
     <div className="space-y-2" data-testid="schedule-options">
-      <Check
-        checked={values.verificationRequired}
-        hint="Completed occurrences wait in Task Control → Review until verified or rejected."
-        onChange={(verificationRequired) => set({ verificationRequired, verifierId: verificationRequired ? values.verifierId : "" })}
-        title="Verify completed work"
-      />
-      {values.verificationRequired ? (
-        <label className="block pl-1">
-          <span className="mb-1 block text-xs font-semibold text-task-text">Verifier</span>
-          <select aria-invalid={verifierMissing} className="task-field" onChange={(event) => set({ verifierId: event.target.value })} value={values.verifierId}>
-            <option value="">Choose who verifies</option>
-            {people.map((person) => (person.id ? <option key={person.id} value={person.id}>{person.employee_name}</option> : null))}
-          </select>
-          {verifierMissing ? <span className="mt-1 block text-xs text-danger" role="alert">Choose who verifies the completed work.</span> : null}
-        </label>
-      ) : null}
+      {!hideInLoop ? <label className="block">
+        <span className="mb-1 block text-xs font-semibold text-task-text">In Loop</span>
+        <select className="task-field" onChange={(event) => set({ verifierId: event.target.value, verificationRequired: Boolean(event.target.value) })} value={values.verifierId}>
+          <option value="">No one in loop</option>
+          {people.map((person) => person.id ? <option key={person.id} value={person.id}>{person.employee_name}</option> : null)}
+        </select>
+        <span className="mt-1 block text-xs text-task-text-muted">Reviews completed work and can return it for rework.</span>
+      </label> : null}
       <Check checked={values.followupEnabled} hint="Admins can send reminders on open occurrences from Task Control → Review." onChange={(followupEnabled) => set({ followupEnabled })} title="Allow follow-ups" />
       <Check checked={values.buddy} hint="If the doer is on leave or a week-off, the buddy gets that day's occurrence." onChange={(buddy) => set({ buddy })} title="Buddy can cover" />
     </div>

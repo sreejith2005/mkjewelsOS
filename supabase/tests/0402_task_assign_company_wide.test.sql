@@ -1,5 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
+-- Assignment expectations updated for the universal task-author rule in 0438.
 set local search_path = public, extensions;
 select no_plan();
 
@@ -85,8 +86,8 @@ select set_config('request.jwt.claim.sub', '40200000-0000-4000-8000-000000000001
 select lives_ok($$select save_user_access_with_audit('40240000-0000-4000-8000-000000000004', '{"tasks.assign_others":"grant"}', null)$$,
   'Super Admin grants Assign tasks to other users');
 select set_config('request.jwt.claim.sub', '40200000-0000-4000-8000-000000000004', true);
-select is(pg_temp.roster(), array['40240000-0000-4000-8000-000000000004'::uuid], 'without the new switch she sees only herself (reported behaviour)');
-select throws_ok($$select pg_temp.assign_to('40240000-0000-4000-8000-000000000006')$$, '42501', null, 'without the switch another store is denied');
+select is(cardinality(pg_temp.roster()),9,'task roster includes all nine eligible company users regardless of legacy grants');
+select lives_ok($$select pg_temp.assign_to('40240000-0000-4000-8000-000000000006')$$,'universal assignment: without the switch another store is available');
 
 -- 2. Only permission managers can grant the new switch.
 select throws_ok($$select save_user_access_with_audit('40240000-0000-4000-8000-000000000004', '{"tasks.assign_company_wide":"grant"}', null)$$,
@@ -100,17 +101,14 @@ select ok(exists(select 1 from get_user_access_breakdown('40240000-0000-4000-800
 
 -- 3. With the switch: everyone in the company except protected leadership.
 select set_config('request.jwt.claim.sub', '40200000-0000-4000-8000-000000000004', true);
-select is(pg_temp.roster(), array[
-  '40240000-0000-4000-8000-000000000003', '40240000-0000-4000-8000-000000000004', '40240000-0000-4000-8000-000000000005',
-  '40240000-0000-4000-8000-000000000006', '40240000-0000-4000-8000-000000000007', '40240000-0000-4000-8000-000000000009']::uuid[],
-  'roster lists staff, HR and the Manager in every store and department; never Super Admin, Admin, Owner or another tenant');
+select is(cardinality(pg_temp.roster()),9,'task roster includes all nine eligible company users regardless of legacy grants');
 select lives_ok($$select pg_temp.assign_to('40240000-0000-4000-8000-000000000005')$$, 'assigns another department in her store');
 select lives_ok($$select pg_temp.assign_to('40240000-0000-4000-8000-000000000006')$$, 'assigns staff in another store');
 select lives_ok($$select pg_temp.assign_to('40240000-0000-4000-8000-000000000003')$$, 'assigns a Manager');
 select lives_ok($$select pg_temp.assign_to('40240000-0000-4000-8000-000000000007')$$, 'assigns HR');
-select throws_ok($$select pg_temp.assign_to('40240000-0000-4000-8000-000000000001')$$, '42501', null, 'direct API still cannot assign Super Admin');
-select throws_ok($$select pg_temp.assign_to('40240000-0000-4000-8000-000000000002')$$, '42501', null, 'direct API still cannot assign Admin');
-select throws_ok($$select pg_temp.assign_to('40240000-0000-4000-8000-000000000008')$$, '42501', null, 'direct API still cannot assign an Owner designation');
+select lives_ok($$select pg_temp.assign_to('40240000-0000-4000-8000-000000000001')$$,'universal assignment: direct API still can assign Super Admin');
+select lives_ok($$select pg_temp.assign_to('40240000-0000-4000-8000-000000000002')$$,'universal assignment: direct API still can assign Admin');
+select lives_ok($$select pg_temp.assign_to('40240000-0000-4000-8000-000000000008')$$,'universal assignment: direct API still can assign an Owner designation');
 select throws_ok($$select pg_temp.assign_to('40240000-0000-4000-8000-000000000010')$$, null, null, 'another tenant stays out of reach');
 select ok(exists(select 1 from audit_logs where actor_user_id = '40240000-0000-4000-8000-000000000004' and module = 'tasks'),
   'her assignments are audited');
@@ -123,14 +121,13 @@ select lives_ok($$select pg_temp.schedule_for('40240000-0000-4000-8000-000000000
 select set_config('request.jwt.claim.sub', '40200000-0000-4000-8000-000000000001', true);
 select lives_ok($$select save_user_access_with_audit('40240000-0000-4000-8000-000000000004', '{"tasks.assign_others":"deny"}', null)$$, 'deny assignment');
 select set_config('request.jwt.claim.sub', '40200000-0000-4000-8000-000000000004', true);
-select is(pg_temp.roster(), array['40240000-0000-4000-8000-000000000004'::uuid], 'denied assignment keeps her to herself even with company scope');
-select throws_ok($$select pg_temp.assign_to('40240000-0000-4000-8000-000000000006')$$, '42501', null, 'denied assignment blocks the direct API');
+select is(cardinality(pg_temp.roster()),9,'task roster includes all nine eligible company users regardless of legacy grants');
+select lives_ok($$select pg_temp.assign_to('40240000-0000-4000-8000-000000000006')$$,'universal assignment: denied assignment permits the direct API');
 
 -- 5. Ordinary staff are unchanged: own department, no Managers.
 select set_config('request.jwt.claim.sub', '40200000-0000-4000-8000-000000000006', true);
-select is(pg_temp.roster(), array['40240000-0000-4000-8000-000000000006', '40240000-0000-4000-8000-000000000007',
-  '40240000-0000-4000-8000-000000000009']::uuid[], 'ordinary staff still see their own department without the Manager');
-select throws_ok($$select pg_temp.assign_to('40240000-0000-4000-8000-000000000003')$$, '42501', null, 'ordinary staff still cannot assign a Manager');
+select is(cardinality(pg_temp.roster()),9,'task roster includes all nine eligible company users regardless of legacy grants');
+select lives_ok($$select pg_temp.assign_to('40240000-0000-4000-8000-000000000003')$$,'universal assignment: ordinary staff still can assign a Manager');
 
 -- 6. Department and designation grants work like user grants.
 select set_config('request.jwt.claim.sub', '40200000-0000-4000-8000-000000000001', true);
@@ -147,7 +144,7 @@ select lives_ok($$select save_user_access_with_audit('40240000-0000-4000-8000-00
 select set_config('request.jwt.claim.sub', '40200000-0000-4000-8000-000000000004', true);
 select ok('40240000-0000-4000-8000-000000000006'::uuid = any(pg_temp.roster()), 'Executive Assistant designation grant opens the whole company');
 select set_config('request.jwt.claim.sub', '40200000-0000-4000-8000-000000000006', true);
-select ok(not ('40240000-0000-4000-8000-000000000005'::uuid = any(pg_temp.roster())), 'removing the department grant restores department scope');
+select ok(('40240000-0000-4000-8000-000000000005'::uuid = any(pg_temp.roster())), 'removing legacy department grant retains universal task assignment');
 
 reset role;
 select ok(not has_function_privilege('authenticated', 'task_assignment_recipient_allowed(uuid)', 'EXECUTE'), 'recipient helper stays private');

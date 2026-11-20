@@ -29,7 +29,7 @@ export function TaskDetails({ task }: { task: TaskBundle }) {
     task.schedule_kind ? { label: "Repeats", value: paused ? `${taskFrequencyLabel(task.schedule_kind)} · paused` : taskFrequencyLabel(task.schedule_kind) } : null,
     revised ? { label: "Deadline moved", value: originalDue ? `${revised} (was ${originalDue})` : revised } : null,
     task.requires_upload ? { label: "Evidence", value: taskEvidenceLabel(task, task.hasAttachment) } : null,
-    task.verification_required ? { label: "Verification", value: task.verifierName ? `${taskVerificationLabel(task)} · ${task.verifierName}` : taskVerificationLabel(task) } : null,
+    (task.verification_required || (task.verification_status && task.verification_status !== "not_required")) ? { label: "Verification", value: task.verifierName ? `${taskVerificationLabel(task)} · ${task.verifierName}` : taskVerificationLabel(task) } : null,
     task.core_task_label ? { label: "Core task", value: task.core_task_label } : null,
   ];
   const shown = details.flatMap((detail) => detail ? [detail] : []);

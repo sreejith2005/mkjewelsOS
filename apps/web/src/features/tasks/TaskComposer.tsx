@@ -68,15 +68,9 @@ function TaskSelector({ children, id, open, panel }: { children: ReactNode; id: 
   </div>;
 }
 
-export function TaskComposer({ canAssignOtherStores = false, canUseVoice = false, data, onClose, onCreated, onSave, onSaveSchedule, onUploadAttachment, profile }: {
+export function TaskComposer({ canUseVoice = false, data, onClose, onCreated, onSave, onSaveSchedule, onUploadAttachment, profile }: {
   /** Saves one schedule template (and creates a due first occurrence); returns its id. */
   onSaveSchedule?: (payload: Json) => Promise<string>;
-  /**
-   * Offers "Someone at another store" (Franchise -> Store -> Employee) for one-time
-   * tasks. Shown to holders of tasks.assign_cross_location and tasks.assign_others;
-   * the server re-checks the request and every doer's store on save.
-   */
-  canAssignOtherStores?: boolean;
   /** Voice capture is offered only to authors the database grants `tasks.voice_assign`. */
   canUseVoice?: boolean;
   data: TaskReferenceData;
@@ -96,6 +90,7 @@ export function TaskComposer({ canAssignOtherStores = false, canUseVoice = false
   /** People chosen from another store; they are not in the author's own people list. */
   const [otherStorePeople, setOtherStorePeople] = useState<readonly OtherStorePerson[]>([]);
   const [otherStoreOpen, setOtherStoreOpen] = useState(false);
+  const [allDepartments, setAllDepartments] = useState(false);
   const [assignmentMode, setAssignmentMode] = useState<ManualTaskAssignmentMode>("separate");
   const [watchers, setWatchers] = useState<string[]>([]);
   const [formTemplateId, setFormTemplateId] = useState("");
@@ -143,7 +138,6 @@ export function TaskComposer({ canAssignOtherStores = false, canUseVoice = false
     ...otherStorePeople.filter((person) => !eligiblePeople.some((local) => local.id === person.id)),
   ], [eligiblePeople, otherStorePeople]);
   const selectedDoers = useMemo(() => doers.flatMap((id) => pickablePeople.filter((person) => person.id === id)), [doers, pickablePeople]);
-  const hasOtherStoreDoer = selectedDoers.some((person) => person.storeName !== null);
   const addOtherStorePerson = (recipient: AssignmentRecipient) => {
     if (!recipient.departmentId) return setError(`${recipient.name} has no department yet, so a task cannot be assigned to them.`);
     setError(null);
@@ -167,6 +161,7 @@ export function TaskComposer({ canAssignOtherStores = false, canUseVoice = false
   const togglePanel = (next: Exclude<Panel, null>) => setPanel((current) => current === next ? null : next);
   const updateDoers = (nextDoers: string[]) => {
     setDoers(nextDoers);
+    setScheduleOptions((current) => nextDoers.includes(current.verifierId) ? { ...current, verifierId: "", verificationRequired: false } : current);
     setWatchers((current) => current.filter((id) => !nextDoers.includes(id)));
     setAssignmentReason(null);
   };
@@ -247,7 +242,6 @@ export function TaskComposer({ canAssignOtherStores = false, canUseVoice = false
       timing: scheduleType === "as_needed" ? { type: "as_required", triggerLabel } : timing,
       ...scheduleOptions, active: true, personalPerformance: true,
     };
-    if (hasOtherStoreDoer) return setError("Repeating schedules are for your own store. Assign one-time work to another store.");
     const invalid = validateScheduledTaskDraft(draft, people);
     if (invalid) return setError(invalid);
     const saved = [...(savedScheduleFor ?? [])];
@@ -277,7 +271,7 @@ export function TaskComposer({ canAssignOtherStores = false, canUseVoice = false
     // unless the author already picked one.
     if (next !== "once" && !priorityTouched.current) setPriority("medium");
     if (next === "once" && !priorityTouched.current) setPriority("high");
-    if (next !== "once") setPanel((current) => current === "due" || current === "watchers" ? null : current);
+    if (next !== "once") setPanel((current) => current === "due" ? null : current);
   };
 
   const submitManual = async (event: FormEvent) => {
@@ -332,14 +326,15 @@ export function TaskComposer({ canAssignOtherStores = false, canUseVoice = false
   const assignmentChoice = (mode: ManualTaskAssignmentMode, label: string, hint: string, disabled = false) => <label className={cn("flex min-h-11 items-start gap-3 rounded-lg border px-3 py-2 text-sm", effectiveAssignmentMode === mode ? "border-task-accent bg-task-accent-soft" : "border-task-border bg-task-bg", disabled && "opacity-60")}><input checked={effectiveAssignmentMode === mode} className="mt-0.5 size-4 accent-task-accent" disabled={disabled} name="task-assignment-mode" onChange={() => setAssignmentMode(mode)} type="radio" /><span className="min-w-0"><span className="block font-medium text-task-text">{label}</span><span className="block text-xs text-task-text-muted">{hint}</span></span></label>;
   const usersPanel = <div className="space-y-3">
     {selectedDoers.length ? <div aria-label="Selected users" className="flex flex-wrap gap-2">{selectedDoers.map((person) => <button aria-label={`Remove ${person.employee_name ?? "user"}`} className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg border border-task-border bg-task-bg px-3 text-sm" key={person.id} onClick={() => updateDoers(doers.filter((id) => id !== person.id))} type="button"><span className="break-words">{person.employee_name}{person.storeName ? <span className="text-task-text-muted"> · {person.storeName}</span> : null}</span><X className="size-4 shrink-0" /></button>)}</div> : null}
-    <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} label="Assign users" multiple onChange={updateDoers} people={eligiblePeople.flatMap((person) => person.id ? [{ ...person, id: person.id }] : [])} selectedIds={doers} />
-    {canAssignOtherStores && !scheduling ? <div className="space-y-2" data-testid="task-other-store">
-      {otherStoreOpen
-        ? <CrossLocationEmployeePicker context={{ kind: "task" }} onChange={() => undefined} onPick={addOtherStorePerson} value="" />
-        : <Button className="min-h-11" onClick={() => setOtherStoreOpen(true)} type="button" variant="secondary">Someone at another store</Button>}
+    <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} label="Assign users" multiple onChange={updateDoers} people={eligiblePeople.filter((person) => allDepartments || person.department_id === profile.department_id).flatMap((person) => person.id ? [{ ...person, id: person.id }] : [])} selectedIds={doers} />
+    <div className="grid grid-cols-2 gap-2">
+      <Button aria-pressed={allDepartments} className="min-h-11 min-w-0 px-2" onClick={() => setAllDepartments((current) => !current)} type="button" variant="secondary">{allDepartments ? "My department" : "Someone outside my department"}</Button>
+      <Button className="min-h-11 min-w-0 px-2" onClick={() => setOtherStoreOpen((current) => !current)} type="button" variant="secondary">Someone at another store</Button>
+    </div>
+    {otherStoreOpen ? <div className="space-y-2" data-testid="task-other-store">
+      <CrossLocationEmployeePicker context={{ kind: "task" }} onChange={() => undefined} onPick={addOtherStorePerson} value="" />
       <p className="text-xs text-task-text-muted">Franchise, then store, then employee. They get this task only, not your store&apos;s other work.</p>
     </div> : null}
-    {scheduling && hasOtherStoreDoer ? <p className="text-xs text-task-text-muted">Repeating schedules are for your own store. Remove the person from another store or make it a one-time task.</p> : null}
     {scheduling && doers.length > 1 ? <p className="text-xs text-task-text-muted" data-testid="schedule-separate-note">Each selected user gets their own {scheduleType === "as_needed" ? "duty" : "schedule"}. A shared schedule is not available: a schedule has one owner.</p> : null}
     {!scheduling && doers.length > 1 ? <fieldset className="space-y-2" data-testid="task-assignment-mode"><legend className="mb-1 text-xs font-semibold text-task-text">How should {doers.length} users get this task?</legend>
       {assignmentChoice("separate", "Separate task for each user", "Everyone gets their own copy and completes it themselves.")}
@@ -357,7 +352,7 @@ export function TaskComposer({ canAssignOtherStores = false, canUseVoice = false
   </div>;
   const priorityPanel = <fieldset className="grid grid-cols-3 gap-2"><legend className="sr-only">Priority</legend>{priorityOptions.map((option) => <button aria-pressed={priority === option.value} className={cn("min-h-11 min-w-0 rounded-lg border px-2 text-sm", priority === option.value ? "border-task-accent bg-task-accent-soft font-semibold text-task-text" : "border-task-border bg-task-bg text-task-text-muted")} key={option.value} onClick={() => { priorityTouched.current = true; setPriority(option.value); setPanel(null); }} type="button">{priority === option.value ? <Check className="mr-1 inline size-4" /> : null}{option.label}</button>)}</fieldset>;
   const formPanel = <div><label><span className="mb-1 block text-xs font-semibold text-task-text">Required form</span><select className="task-field" onChange={(event) => { setFormTemplateId(event.target.value); setPanel(null); }} value={formTemplateId}><option value="">No form required</option>{data.forms.filter((form) => form.lifecycle === "published").map((form) => <option key={form.id} value={form.id}>{form.name} v{form.version}</option>)}</select></label><p className="mt-2 text-xs text-task-text-muted">The selected form must be completed before this task can be finished.</p></div>;
-  const watchersPanel = <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} disabledIds={doers} label="In Loop · view and comment" multiple onChange={setWatchers} people={eligiblePeople.flatMap((person) => person.id ? [{ ...person, id: person.id }] : [])} selectedIds={watchers} />;
+  const watchersPanel = <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} disabledIds={doers} label="In Loop · review completed work" multiple={!scheduling} onChange={(ids) => scheduling ? setScheduleOptions((current) => ({ ...current, verificationRequired: ids.length > 0, verifierId: ids[0] ?? "" })) : setWatchers(ids)} people={eligiblePeople.flatMap((person) => person.id ? [{ ...person, id: person.id }] : [])} selectedIds={scheduling ? scheduleOptions.verifierId ? [scheduleOptions.verifierId] : [] : watchers} />;
 
   return (
     <Modal mobileFullscreen onClose={submission || savedScheduleFor ? onCreated : onClose} title="Assign New Task" tone="light" wide>
@@ -421,7 +416,7 @@ export function TaskComposer({ canAssignOtherStores = false, canUseVoice = false
 
           {scheduling ? <details className="border-b border-task-border py-3">
             <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-task-text">More options</summary>
-            <div className="mt-2"><ScheduleOptions onChange={setScheduleOptions} people={eligiblePeople} values={scheduleOptions} /></div>
+            <div className="mt-2"><ScheduleOptions hideInLoop onChange={setScheduleOptions} people={eligiblePeople} values={scheduleOptions} /></div>
           </details> : null}
 
           <div className="grid grid-cols-2 gap-2 border-b border-task-border py-3">
@@ -429,9 +424,9 @@ export function TaskComposer({ canAssignOtherStores = false, canUseVoice = false
             {!scheduling ? <TaskSelector id="due" open={panel === "due"} panel={duePanel}><ChipSelector active={panel === "due"} Icon={CalendarDays} label="Due Date" onClick={() => togglePanel("due")} summary={planned ? new Date(planned).toLocaleString("en-IN", { day: "numeric", hour: "numeric", minute: "2-digit", month: "short" }) : undefined} /></TaskSelector> : null}
             <TaskSelector id="priority" open={panel === "priority"} panel={priorityPanel}><ChipSelector active={panel === "priority"} Icon={Flag} label="Priority" onClick={() => togglePanel("priority")} summary={priorityLabel} /></TaskSelector>
             <TaskSelector id="form" open={panel === "form"} panel={formPanel}><ChipSelector active={panel === "form"} Icon={FileText} label="Attach Form" onClick={() => togglePanel("form")} summary={attachedForm?.name} /></TaskSelector>
-            {!scheduling ? <TaskSelector id="watchers" open={panel === "watchers"} panel={watchersPanel}><ChipSelector active={panel === "watchers"} Icon={UserRoundCheck} label="In Loop" onClick={() => togglePanel("watchers")} summary={watchers.length ? `${watchers.length} in loop` : undefined} /></TaskSelector> : null}
+            <TaskSelector id="watchers" open={panel === "watchers"} panel={watchersPanel}><ChipSelector active={panel === "watchers"} Icon={UserRoundCheck} label="In Loop" onClick={() => togglePanel("watchers")} summary={scheduling ? scheduleOptions.verifierId ? "1 in loop" : undefined : watchers.length ? `${watchers.length} in loop` : undefined} /></TaskSelector>
           </div>
-          {scheduling ? <p className="pt-2 text-xs text-task-text-muted" data-testid="schedule-unsupported-note">In Loop and file attachments are for one-time tasks only; schedules do not carry them.</p> : null}
+          {scheduling ? <p className="pt-2 text-xs text-task-text-muted" data-testid="schedule-unsupported-note">The In Loop person reviews completed occurrences. File attachments are for one-time tasks only.</p> : null}
 
 
         </fieldset>

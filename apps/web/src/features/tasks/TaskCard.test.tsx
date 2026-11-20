@@ -407,3 +407,19 @@ describe("TaskCard checklist on a phone", () => {
     }
   });
 });
+
+describe("In Loop completed-work review", () => {
+  it("approves manual work and requires a note to return it", async () => {
+    const onAction = vi.fn().mockResolvedValue(undefined);
+    const reviewer = deriveTaskMutationCapability({ assigneeIds: ["doer"], isWatcher: true, viewerId: "reviewer", viewerRole: "staff" });
+    render(<TaskCard task={{ ...task, status: "completed", verification_status: "pending", isWatchedByViewer: true }} capability={reviewer} categoryLabel="Task" onAction={onAction} viewerId="reviewer" />);
+    fireEvent.click(screen.getByRole("button", { name: /View details/i }));
+    expect(screen.getByRole("button", { name: "Return for rework" }).hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Approve completed work" }));
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ kind: "review", decision: "verified", note: "" }));
+    fireEvent.change(screen.getByLabelText("Review note"), { target: { value: "Please recheck stock" } });
+    fireEvent.click(screen.getByRole("button", { name: "Return for rework" }));
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith({ kind: "review", decision: "rejected", note: "Please recheck stock" }));
+    expect(screen.queryByRole("button", { name: /Complete task:/ })).toBeNull();
+  });
+});
