@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TasksPage } from "./TasksPage";
 
-const mocks = vi.hoisted(() => ({ page: vi.fn(), feed: vi.fn(), tabs: vi.fn(), search: vi.fn(), prepare: vi.fn(), duties: vi.fn(), realtime: vi.fn() }));
+const mocks = vi.hoisted(() => ({ page: vi.fn(), feed: vi.fn(), tabs: vi.fn(), search: vi.fn(), prepare: vi.fn(), duties: vi.fn(), realtime: vi.fn(), verify: vi.fn() }));
 vi.mock("@/auth/AuthContext", async () => {
   const { builtinAccessContext } = await vi.importActual<typeof import("@jewelos/core")>("@jewelos/core");
   const profile = { id: "admin", tenant_id: "tenant", user_role: "admin" as const };
@@ -19,8 +19,9 @@ vi.mock("@/features/tasks/api", () => ({
   uploadTaskAttachment: vi.fn(), loadFmsTaskDeepLink: vi.fn(),
   loadMyOnDemandDuties: mocks.duties, startOnDemandDuty: vi.fn(),
 }));
+vi.mock("@/features/recurringTodo/api", async () => ({ ...await vi.importActual<typeof import("@/features/recurringTodo/api")>("@/features/recurringTodo/api"), verifyRecurringTask: mocks.verify }));
 vi.mock("@/features/realtime/useTenantRealtimeRefresh", () => ({ useTenantRealtimeRefresh: mocks.realtime }));
-vi.mock("@/features/tasks/TaskCard", () => ({ TaskCard: ({ task }: { task: { title: string } }) => <div>{task.title}</div> }));
+vi.mock("@/features/tasks/TaskCard", () => ({ TaskCard: ({ task, onAction }: { task: { title: string; isWatchedByViewer?: boolean; status?: string }; onAction: (action: { kind: "review"; decision: "verified"; note: string }) => Promise<void> }) => <div>{task.title}{task.status === "completed" && task.isWatchedByViewer ? <button onClick={() => { void onAction({ kind: "review", decision: "verified", note: "" }).catch(() => undefined); }}>Review watched task</button> : null}</div> }));
 vi.mock("@/features/tasks/TaskAdminControls", () => ({ TaskAdminControls: () => null }));
 
 vi.mock("@/features/tasks/fms/FmsTaskWorkspace", async () => {
@@ -35,10 +36,17 @@ const page = (title: string, total = 12000) => ({
   tasks: [{ id: title, title, task_type: "delegation", assignees: [], isWatchedByViewer: false }],
   total, counts: { pending: total, overdue: 20, completed: 10, open: total + 20 },
 });
-beforeEach(() => { mocks.search.mockReset(); mocks.page.mockReset(); mocks.feed.mockReset(); mocks.tabs.mockReset(); mocks.prepare.mockReset(); mocks.prepare.mockResolvedValue({ created: 0 }); mocks.duties.mockReset(); mocks.duties.mockResolvedValue([]); mocks.tabs.mockResolvedValue({ mine: 4, delegated: 7, inLoop: 2, all: 13 }); window.history.replaceState({}, "", "/tasks"); });
+beforeEach(() => { mocks.verify.mockReset(); mocks.verify.mockResolvedValue(undefined); mocks.search.mockReset(); mocks.page.mockReset(); mocks.feed.mockReset(); mocks.tabs.mockReset(); mocks.prepare.mockReset(); mocks.prepare.mockResolvedValue({ created: 0 }); mocks.duties.mockReset(); mocks.duties.mockResolvedValue([]); mocks.tabs.mockResolvedValue({ mine: 4, delegated: 7, inLoop: 2, all: 13 }); window.history.replaceState({}, "", "/tasks"); });
 afterEach(cleanup);
 
 describe("task workspace paging", () => {
+  it("routes In Loop review through the review contract without granting doer mutation", async () => {
+    mocks.page.mockResolvedValue({ ...page("Review me", 1), tasks: [{ id: "review-task", title: "Review me", task_type: "delegation", status: "completed", verification_status: "pending", assignees: [], isWatchedByViewer: true }] });
+    render(<TasksPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Review watched task" }));
+    await waitFor(() => expect(mocks.verify).toHaveBeenCalledWith("review-task", "verified", ""));
+  });
+
   it("keeps restored FMS selected when it was opened from the In Loop URL", async () => {
     window.history.replaceState({ taskView: { actorId: "admin", view: "fms", calendarScope: null, status: "pending", offset: 0, filters: { query: "", kind: "all", status: "all", priority: "all", from: "", to: "", subsection: "any", requirement: "all", sort: "due" } } }, "", "/tasks/in-loop");
     mocks.page.mockResolvedValue(page("Unexpected In Loop"));

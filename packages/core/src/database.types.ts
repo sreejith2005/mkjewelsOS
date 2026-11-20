@@ -18263,6 +18263,10 @@ export type Database = {
         Args: { p_storage_path: string }
         Returns: string
       }
+      task_author_recipient_eligible: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
       task_bulk_import_validation: {
         Args: { p_hash: string; p_payload: Json }
         Returns: Json

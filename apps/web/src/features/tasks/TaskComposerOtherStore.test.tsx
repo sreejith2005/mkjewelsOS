@@ -47,15 +47,38 @@ describe("TaskComposer: someone at another store", () => {
   });
   afterEach(cleanup);
 
-  it("is not offered without the cross-location permission", () => {
+  it("offers both assignment actions to every task author", () => {
     renderComposer();
     fireEvent.click(screen.getByRole("button", { name: /Users/i }));
-    expect(screen.queryByRole("button", { name: "Someone at another store" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Someone at another store" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Someone outside my department" })).toBeTruthy();
+  });
+
+  it("starts with the department and expands to all users regardless of hierarchy", () => {
+    const author = data.users[0];
+    if (!author) throw new Error("Missing author fixture");
+    const users = [...data.users, { ...author, id: "director", employee_name: "Director", department_id: "management", user_role: "admin" as const }];
+    renderComposer({ data: { ...data, users } });
+    fireEvent.click(screen.getByRole("button", { name: /Users/i }));
+    expect(screen.queryByRole("checkbox", { name: "Director" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Someone outside my department" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Director" }));
+    fireEvent.click(screen.getByRole("button", { name: "My department" }));
+    expect(screen.getByRole("button", { name: "Remove Director" })).toBeTruthy();
+  });
+
+  it("offers the other-store picker for recurring and as-needed assignments too", () => {
+    renderComposer({ onSaveSchedule: vi.fn() });
+    fireEvent.click(screen.getByRole("button", { name: "Recurring" }));
+    fireEvent.click(screen.getByRole("button", { name: /Users/i }));
+    expect(screen.getByRole("button", { name: "Someone at another store" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "As needed" }));
+    expect(screen.getByRole("button", { name: "Someone at another store" })).toBeTruthy();
   });
 
   it("assigns a one-time task to an employee of another store, naming that store and department", async () => {
     const onSave = vi.fn().mockResolvedValue("task-1");
-    renderComposer({ canAssignOtherStores: true, onSave });
+    renderComposer({ onSave });
     fireEvent.change(screen.getByLabelText("Task title"), { target: { value: "Help with stock count" } });
     fireEvent.click(screen.getByRole("button", { name: /Users/i }));
     fireEvent.click(screen.getByRole("button", { name: "Someone at another store" }));

@@ -29,13 +29,11 @@ export function TaskAdminEditFields({ edit, onChange, reference }: Readonly<{
       {toggle("Upload required", "requiresUpload")}
       {toggle("Form required", "requiresForm")}
       <ReferenceSelect label="Linked form" value={edit.formTemplateId ?? ""} options={reference.forms.map(form => ({ id: form.id, label: form.name + " (v" + form.version + ")" }))} onChange={formTemplateId => onChange({ ...edit, formTemplateId })} />
-      {toggle("Verification required", "verificationRequired")}
-      <ReferenceSelect label="Verifier" value={edit.verifierId ?? ""} options={people.map(user => ({ id: user.id, label: user.employee_name }))} onChange={verifierId => onChange({ ...edit, verifierId })} />
       {toggle("Buddy assignment allowed", "buddyAssignmentAllowed")}
     </fieldset>
     <fieldset className="grid min-w-0 gap-3 rounded-xl border border-task-border p-3"><legend className="px-1 font-semibold">Assignment</legend>
       <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} label="Assignees" multiple people={people} selectedIds={edit.doerIds ?? []} disabledIds={edit.watcherIds ?? []} onChange={doerIds => onChange({ ...edit, doerIds })} />
-      <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} label="In Loop" multiple people={people} selectedIds={edit.watcherIds ?? []} disabledIds={edit.doerIds ?? []} onChange={watcherIds => onChange({ ...edit, watcherIds })} />
+      <AssigneePicker branchNames={branchNames} departmentNames={departmentNames} label="In Loop" multiple people={people} selectedIds={edit.watcherIds ?? []} disabledIds={edit.doerIds ?? []} onChange={watcherIds => onChange({ ...edit, watcherIds, verificationRequired: watcherIds.length > 0, verifierId: watcherIds[0] ?? "" })} />
       {(["doerIds", "watcherIds"] as const).flatMap(key => (edit[key] ?? []).filter(id => !people.some(person => person.id === id)).map(id =>
         <div className="flex flex-wrap items-center gap-2" key={key + id}><span>Current {key === "doerIds" ? "assignee" : "In Loop user"} (unavailable)</span><Button type="button" variant="secondary" onClick={() => onChange({ ...edit, [key]: (edit[key] ?? []).filter(value => value !== id) })}>Remove</Button></div>))}
     </fieldset>

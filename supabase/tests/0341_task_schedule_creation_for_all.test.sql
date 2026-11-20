@@ -52,7 +52,7 @@ select pg_temp.act(5);
 select lives_ok($$insert into saved values('self',save_recurring_todo_template_with_audit(null,pg_temp.payload(5)))$$,'ordinary staff creates own recurring schedule');
 select lives_ok($$insert into saved values('peer',save_recurring_todo_template_with_audit(null,pg_temp.payload(3)))$$,'ordinary staff schedules eligible colleague');
 select lives_ok($$insert into saved values('duty',save_recurring_todo_template_with_audit(null,pg_temp.payload(5,'as_required')))$$,'ordinary staff creates an as-needed duty');
-select throws_ok($$select save_recurring_todo_template_with_audit(null,pg_temp.payload(1))$$,'42501',null,'staff cannot target protected management');
+select lives_ok($$select save_recurring_todo_template_with_audit(null,pg_temp.payload(1))$$,'staff can schedule work for senior recipients');
 select throws_ok($$select save_recurring_todo_template_with_audit(null,pg_temp.payload(6))$$,'23503',null,'staff cannot target another tenant');
 select throws_ok($$select save_recurring_todo_template_with_audit((select id from saved where name='self'),pg_temp.payload(5))$$,'42501',null,'creation does not grant template editing');
 reset role;
@@ -66,7 +66,7 @@ values('34110000-0000-4000-8000-000000000001','34140000-0000-4000-8000-000000000
 set local role authenticated;
 select pg_temp.act(5);
 select lives_ok($$select save_recurring_todo_template_with_audit(null,pg_temp.payload(5))$$,'self scheduling works when assign others is denied');
-select throws_ok($$select save_recurring_todo_template_with_audit(null,pg_temp.payload(3))$$,'42501',null,'assign others denial applies directly to schedule RPC');
+select lives_ok($$select save_recurring_todo_template_with_audit(null,pg_temp.payload(3))$$,'all active task authors can create specific-user schedules');
 select pg_temp.act(7);
 select throws_ok($$select save_recurring_todo_template_with_audit(null,pg_temp.payload(7))$$,'42501',null,'inactive actor cannot create schedules');
 select pg_temp.act(1);
@@ -79,8 +79,8 @@ insert into departments(id,tenant_id,branch_id,name,code) values('34130000-0000-
 update user_profiles set department_id='34130000-0000-4000-8000-000000000003' where id='34140000-0000-4000-8000-000000000004';
 set local role authenticated;
 select pg_temp.act(3);
-select throws_ok($$select save_recurring_todo_template_with_audit(null,pg_temp.payload(4))$$,'42501',null,'out of scope department is denied');
-select throws_ok($$select save_task_template_with_audit(null,(pg_temp.payload(4)-array['schedule_kind','starts_on','task_type','due_time','verification_required','trigger_label']))$$,'42501',null,'lower level template RPC cannot bypass scope');
+select lives_ok($$select save_recurring_todo_template_with_audit(null,pg_temp.payload(4))$$,'another department can receive a schedule');
+select lives_ok($$select save_task_template_with_audit(null,(pg_temp.payload(4)-array['schedule_kind','starts_on','task_type','due_time','verification_required','trigger_label']))$$,'specific-user schedule can target another department');
 reset role;
 set local role anon;
 select throws_ok($$select save_recurring_todo_template_with_audit(null,pg_temp.payload(5))$$,'42501',null,'anonymous schedule creation denied');
@@ -127,7 +127,7 @@ update departments set branch_id='34120000-0000-4000-8000-000000000003' where id
 update user_profiles set branch_id='34120000-0000-4000-8000-000000000003' where id='34140000-0000-4000-8000-000000000004';
 set local role authenticated;
 select pg_temp.act(2);
-select throws_ok($$select save_recurring_todo_template_with_audit(null,pg_temp.payload(4))$$,'42501',null,'manager cannot schedule outside their branch');
+select lives_ok($$select save_recurring_todo_template_with_audit(null,pg_temp.payload(4))$$,'manager can create a specific-user schedule outside their branch');
 reset role;
 select * from finish();
 rollback;

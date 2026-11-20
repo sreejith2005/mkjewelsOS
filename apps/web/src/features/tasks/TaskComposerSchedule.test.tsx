@@ -70,7 +70,7 @@ describe("Create Task scheduling", () => {
     fireEvent.change(screen.getByLabelText("Task title"), { target: { value: "Monthly stock audit" } });
     fireEvent.click(screen.getByRole("button", { name: "Recurring" }));
     expect(screen.queryByRole("button", { name: /Due Date/i })).toBeNull();
-    expect(screen.queryByRole("button", { name: /In Loop/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /In Loop/i })).toBeTruthy();
     expect(screen.getByTestId("schedule-unsupported-note")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Repeats"), { target: { value: "custom" } });
     fireEvent.change(screen.getByLabelText("Unit"), { target: { value: "monthly_weekday" } });
@@ -120,17 +120,17 @@ describe("Create Task scheduling", () => {
     expect(onSaveSchedule.mock.calls[0]?.[0]).toMatchObject({ schedule_kind: "as_required", trigger_label: "Per Customer", is_active: false });
   });
 
-  it("asks for a verifier next to the option before saving", async () => {
-    const onSaveSchedule = vi.fn();
+  it("uses In Loop for schedule review without a separate verifier option", async () => {
+    const onSaveSchedule = vi.fn().mockResolvedValue("schedule-1");
     renderComposer({ onSaveSchedule });
     fireEvent.change(screen.getByLabelText("Task title"), { target: { value: "Vault audit" } });
     fireEvent.click(screen.getByRole("button", { name: "Recurring" }));
     chooseUsers("Teammate");
-    fireEvent.click(screen.getByText("More options"));
-    fireEvent.click(screen.getByLabelText(/Verify completed work/));
-    expect(screen.getByText("Choose who verifies the completed work.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /In Loop/ }));
+    fireEvent.click(screen.getByRole("radio", { name: "Cross-branch teammate" }));
     fireEvent.click(screen.getByRole("button", { name: "Create schedule" }));
-    await screen.findByText(/Choose who verifies the completed work, or turn verification off/);
-    expect(onSaveSchedule).not.toHaveBeenCalled();
+    await waitFor(() => expect(onSaveSchedule).toHaveBeenCalled());
+    expect(onSaveSchedule.mock.calls[0]?.[0]).toMatchObject({ verification_required: true, verifier_user_profile_id: "doer-3" });
+    expect(screen.queryByText("Verifier")).toBeNull();
   });
 });

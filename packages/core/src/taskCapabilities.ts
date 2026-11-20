@@ -32,3 +32,13 @@ export function deriveTaskMutationCapability({
     watcherLabel: isWatcher ? "In Loop" : null,
   };
 }
+
+/** Review authority is separate from permission to perform the assigned work. */
+export function canReviewTask(task: Readonly<{
+  task_type: string | null; status: string | null; verification_status: string | null;
+  isWatchedByViewer: boolean; verifier_user_profile_id: string | null;
+}>, viewerId: string | undefined): boolean {
+  return Boolean(viewerId) && (task.task_type === "delegation" || task.task_type === "checklist")
+    && task.status === "completed" && (task.verification_status === "pending" || task.verification_status === "rejected")
+    && (task.isWatchedByViewer || task.verifier_user_profile_id === viewerId);
+}

@@ -97,7 +97,7 @@ export { calculateTaskChecklistProgress } from "./taskChecklist";
 export type { TaskChecklistProgress, TaskChecklistProgressItem } from "./taskChecklist";
 export { calculateDailyChecklistProgress, validateDailyChecklistDraft, dailyChecklistStatusKey } from "./dailyChecklist";
 export type { DailyChecklistDraft, DailyChecklistItem, DailyChecklistStatus } from "./dailyChecklist";
-export { deriveTaskMutationCapability } from "./taskCapabilities";
+export { canReviewTask, deriveTaskMutationCapability } from "./taskCapabilities";
 export type { TaskMutationCapability } from "./taskCapabilities";
 export { deriveTaskAuthoringCapability } from "./taskAuthoringCapabilities";
 export type { TaskAuthoringCapability, TaskAuthoringScope } from "./taskAuthoringCapabilities";

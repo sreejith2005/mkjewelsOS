@@ -25,7 +25,7 @@ export function AssigningLeftPanel({ records, candidates, busy, onAssign }: Prop
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-task-text">{record.title}</h3><span className="rounded-full bg-task-muted px-2 py-1 text-xs text-task-text-muted">{record.destination}</span></div>
-            <p className="mt-1 text-sm text-task-text-muted">{record.starts_at ? `Starts ${new Date(record.starts_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: record.record_kind === "task" ? "short" : undefined })}` : "No start date"}{record.verification_pending ? " · Verifier will also be resolved" : ""}</p>
+            <p className="mt-1 text-sm text-task-text-muted">{record.starts_at ? `Starts ${new Date(record.starts_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: record.record_kind === "task" ? "short" : undefined })}` : "No start date"}{record.verification_pending ? " · In Loop person will also be resolved" : ""}</p>
           </div>
           <div className="flex min-w-0 flex-col gap-2 sm:flex-row lg:w-[32rem]">
             <select aria-label={`Assign ${record.title}`} className="task-field min-w-0 flex-1" onChange={(event) => setSelections((current) => ({ ...current, [record.id]: event.target.value }))} value={selected}>

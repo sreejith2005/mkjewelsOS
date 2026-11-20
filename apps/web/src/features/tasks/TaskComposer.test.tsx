@@ -66,6 +66,8 @@ describe("TaskComposer selector panels", () => {
   it("honors the server roster for a staff profile with elevated assignment authority", () => {
     renderComposer({ profile: { ...profile, user_role: "staff" } });
     fireEvent.click(screen.getByRole("button", { name: /Users/i }));
+    expect(screen.queryByLabelText("Other department")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Someone outside my department" }));
     expect(screen.getByLabelText("Other department")).toBeTruthy();
   });
   it("retries a failed attachment against the saved task without creating another task", async () => {
@@ -115,6 +117,7 @@ describe("TaskComposer selector panels", () => {
     renderComposer({ onSave, onCreated });
     fireEvent.click(screen.getByRole("button", { name: /Users/i }));
     fireEvent.click(screen.getByLabelText("Teammate"));
+    fireEvent.click(screen.getByRole("button", { name: "Someone outside my department" }));
     fireEvent.click(screen.getByLabelText("Other department"));
     expect((screen.getByLabelText(/Separate task for each user/) as HTMLInputElement).checked).toBe(true);
     expect((screen.getByLabelText(/One shared task/) as HTMLInputElement).disabled).toBe(true);
@@ -156,6 +159,7 @@ describe("TaskComposer selector panels", () => {
     renderComposer({ onSave, onCreated });
     fireEvent.click(screen.getByRole("button", { name: /Users/i }));
     fireEvent.click(screen.getByLabelText("Teammate"));
+    fireEvent.click(screen.getByRole("button", { name: "Someone outside my department" }));
     fireEvent.click(screen.getByLabelText("Other department"));
     fillTitleAndDue();
     fireEvent.click(screen.getByRole("button", { name: "Assign Task" }));
@@ -203,7 +207,7 @@ describe("TaskComposer selector panels", () => {
     expect(screen.getByTestId("task-selector-due").className).not.toContain("col-span-2");
 
     fireEvent.click(screen.getByRole("button", { name: /In Loop/i }));
-    expect(screen.getByLabelText("Search in loop · view and comment")).toBeTruthy();
+    expect(screen.getByLabelText("Search in loop · review completed work")).toBeTruthy();
     fireEvent.click(screen.getByLabelText("Teammate"));
     expect(screen.getByTestId("task-panel-watchers")).toBeTruthy();
   });

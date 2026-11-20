@@ -1,4 +1,4 @@
-import { describeDue, fmsWorkTitle, presentFmsWorkContext } from "@jewelos/core";
+import { canReviewTask, describeDue, fmsWorkTitle, presentFmsWorkContext } from "@jewelos/core";
 import { useEffect, useRef, useState, type ReactNode, type ChangeEvent } from "react";
 import { AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, Clock, Eye, FileText, FileUp, ListChecks, PauseCircle, Users } from "lucide-react";
 import { calculateTaskChecklistProgress, effectiveTaskDeadline, isTaskFeedItemOverdue, TASK_EVIDENCE_ACCEPT, taskEvidenceFileError, type Enums, type TaskMutationCapability } from "@jewelos/core";
@@ -11,6 +11,7 @@ import { TaskDetails } from "./TaskDetails";
 import { TaskRemarks } from "./TaskRemarks";
 
 export type TaskCardAction =
+  | { kind: "review"; decision: "verified" | "rejected"; note: string }
   | { checklistId: string; completed: boolean; kind: "checklist" }
   | { kind: "complete" }
   | { file: File; kind: "upload" }
@@ -61,6 +62,7 @@ export function TaskCard({ management, capability, categoryLabel, onAction, task
   const detailsLabel = `Details for ${taskInput.title ?? "task"}`;
   const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [reviewNote, setReviewNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const checklistPanel = useRef<HTMLElement>(null);
   const [checklistRequested, setChecklistRequested] = useState(false);
@@ -189,7 +191,14 @@ export function TaskCard({ management, capability, categoryLabel, onAction, task
         : faceAction ? <Button aria-label={faceAction.name} className={FACE_ACTION_CLASS} disabled={busy || faceAction.disabled} onClick={() => void act(faceAction.action)} type="button"><faceAction.Icon />{faceAction.label}</Button> : null}
     </div>
     {expanded ? <section aria-label={detailsLabel} className="flex flex-col gap-4 border-t border-task-border bg-task-muted p-4" id={detailsId}>
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {canReviewTask(task, viewerId) ? <div className="mt-3 space-y-2 rounded-xl border border-task-border bg-task-muted p-3">
+      <Field label="Review note"><input className="task-field" maxLength={2000} onChange={(event) => setReviewNote(event.target.value)} placeholder="Required when returning work" value={reviewNote} /></Field>
+      <div className="flex flex-wrap gap-2">
+        <Button disabled={busy} onClick={() => void act({ kind: "review", decision: "verified", note: reviewNote })} type="button">Approve completed work</Button>
+        <Button disabled={busy || !reviewNote.trim()} onClick={() => void act({ kind: "review", decision: "rejected", note: reviewNote })} type="button" variant="secondary">Return for rework</Button>
+      </div>
+    </div> : null}
+    {error ? <Notice tone="danger">{error}</Notice> : null}
       {blocked ? <Notice tone="task">Coverage required. This task is waiting for a manager to arrange cover, so it cannot be completed yet. Ask your manager if it is urgent.</Notice> : null}
       {hasChecklist ? <TaskChecklist disabled={busy} interactive={!completed && !readOnly && !blocked} items={task.checklists} onToggle={toggleChecklistItem} ref={checklistPanel} saving={checklistSaves > 0}
         footer={!checklistPending && !completed && !readOnly && !blocked && !task.requires_form && (!requiresEvidence || task.hasAttachment) ? <Button aria-label={`Complete checklist: ${titleText}`} className="w-full bg-task-accent text-task-text hover:bg-task-accent/90 sm:w-auto sm:self-end" disabled={busy || !canComplete} onClick={() => void act({ kind: "complete" })} type="button"><CheckCircle2 />Complete task</Button> : null} /> : null}
