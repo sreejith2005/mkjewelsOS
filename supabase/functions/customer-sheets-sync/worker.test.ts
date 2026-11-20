@@ -1,6 +1,6 @@
 import { assertEquals } from "@std/assert";
 import {
-  CHUNK_ROWS, FINISH_BATCH, READS_PER_RUN, handleSyncRequest, headerNames, readChunk, toIngestRows,
+  CHUNK_ROWS, FINISH_BATCH, READS_PER_RUN, handleSyncRequest, headerNames, readChunk, stalestFirst, toIngestRows,
   type IngestGateway, type IngestRow, type SheetReader, type SheetSource, type StoreOptions, type SyncDeps,
 } from "./worker.ts";
 
@@ -145,6 +145,23 @@ Deno.test("the scheduled run handles live sheets only; a one-time sheet runs whe
   const scheduled = await (await handleSyncRequest(post(), deps([live(sheet), old(oldSheet)], fake.gateway))).json();
   assertEquals(scheduled.sources.map((item: { source: string }) => item.source), ["runo"]);
   assertEquals(oldSheet.reads.length, 0);
+});
+
+Deno.test("the scheduled run reads the sheet that has waited longest first", async () => {
+  const a = fakeSheet(calls(1, "a")); const b = fakeSheet(calls(1, "b")); const c = fakeSheet(calls(1, "c"));
+  const fake = fakeGateway();
+  const sources: SheetSource[] = [
+    { source: "account", keyColumns: ["callId"], oneTime: false, reader: a },
+    { source: "master", keyColumns: ["callId"], oneTime: false, reader: b },
+    { source: "fresh", keyColumns: ["callId"], oneTime: false, reader: c },
+  ];
+  const runs = { account: "2026-11-20T11:35:00Z", master: "2026-11-20T10:45:00Z", fresh: null };
+  const body = await (await handleSyncRequest(post(), deps(sources, { ...fake.gateway, lastRuns: () => Promise.resolve(runs) }))).json();
+  assertEquals(body.sources.map((item: { source: string }) => item.source), ["fresh", "master", "account"]);
+  assertEquals(stalestFirst(sources, {}).map((item) => item.source), ["account", "master", "fresh"]);
+  // Without the times it still runs every sheet.
+  const failing = await (await handleSyncRequest(post(), deps(sources, { ...fake.gateway, lastRuns: () => Promise.reject(new Error("x")) }))).json();
+  assertEquals(failing.sources.length, 3);
 });
 
 Deno.test("a failing sheet is reported with its code and noted", async () => {
