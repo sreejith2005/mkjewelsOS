@@ -25,6 +25,8 @@ export type CustomerMasterFunctions = {
   customer_list: { Args: { p_filters?: Json; p_limit?: number; p_offset?: number }; Returns: Json };
   customer_list_filters: { Args: { p_franchise?: string | null }; Returns: Json };
   customer_review_list: { Args: Record<string, never>; Returns: Json };
+  customer_form_lookup: { Args: { p_phone: string }; Returns: Json };
+  customer_pincode_lookup: { Args: { p_pincode: string }; Returns: Json };
   customer_review_decide: { Args: { p_review_id: string; p_same: boolean }; Returns: Json };
   customer_ingest_state: { Args: { p_source: string }; Returns: Json };
   customer_ingest_sheet_rows: { Args: { p_source: string; p_rows: Json; p_next_row?: number | null }; Returns: Json };

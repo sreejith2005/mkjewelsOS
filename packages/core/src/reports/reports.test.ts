@@ -3,11 +3,11 @@ import { businessCsvCell, businessExportHeader, businessReports, canExportReport
 
 describe("report catalog",()=>{
   it("contains unique report keys",()=>expect(new Set(REPORT_CATALOG.map((item)=>item.key)).size).toBe(REPORT_CATALOG.length));
-  it("offers the business report catalogue in three categories",()=>{
+  it("offers the business report catalogue in two categories",()=>{
     const all=()=>true;
     const names=businessReports("super_admin",all).map((item)=>item.name);
-    expect(new Set(names)).toEqual(new Set(["Customer Master Database","Customer 360° Journey","Leads and Enquiries","CRM Follow-ups","Lead Source and Conversion","All Form Submissions","FMS Workflow Journey","FMS Stage Performance","Pending and Completed Tasks","Employee Task Performance","CRM Performance","Salesperson Performance","Employee Availability"]));
-    expect(REPORT_CATEGORIES.map((item)=>item.name)).toEqual(["Customer & CRM","Forms, FMS & Tasks","Employee Performance"]);
+    expect(new Set(names)).toEqual(new Set(["All Form Submissions","FMS Workflow Journey","FMS Stage Performance","Pending and Completed Tasks","Employee Task Performance","Employee Availability"]));
+    expect(REPORT_CATEGORIES.map((item)=>item.name)).toEqual(["Forms, FMS & Tasks","Employee Performance"]);
     for(const item of businessReports("super_admin",all))expect(REPORT_CATEGORIES.map((category)=>category.id)).toContain(item.category);
   });
   it("keeps technical and earlier reports out of the business list",()=>{
@@ -15,9 +15,8 @@ describe("report catalog",()=>{
     for(const key of ["notification_delivery_health","export_history","task_operations","fms_sla","form_submissions_reviews","people_task_performance"])expect(keys).not.toContain(key);
     expect(reportFor("task_operations")?.category).toBe("legacy");
   });
-  it("shows CRM reports only with CRM access and people reports only to people managers",()=>{
-    expect(businessReports("manager",()=>false).some((item)=>item.source==="crm")).toBe(false);
-    expect(businessReports("manager",(key)=>key==="crm.view").some((item)=>item.key==="customer_report_master")).toBe(true);
+  it("has no reports from the retired CRM project, and people reports only for people managers",()=>{
+    expect(businessReports("super_admin",()=>true).some((item)=>item.source==="crm")).toBe(false);
     expect(businessReports("staff",()=>true).some((item)=>item.key==="employee_task_performance")).toBe(false);
     expect(businessReports("hr",()=>true).some((item)=>item.key==="form_answers")).toBe(false);
   });
@@ -36,7 +35,7 @@ describe("report catalog",()=>{
     expect(columns.some((column)=>/path|document|email/.test(column.key))).toBe(false);
   });
   it("explains the counts of every performance and conversion report",()=>{
-    for(const key of ["employee_task_performance","customer_report_crm_staff","customer_report_sales","customer_report_sources"])expect(reportFor(key)?.notes?.length).toBeGreaterThan(1);
+    for(const key of ["employee_task_performance"])expect(reportFor(key)?.notes?.length).toBeGreaterThan(1);
   });
 });
 

@@ -50,11 +50,11 @@ export function CustomerMasterPage({ path, navigate }: { path: string; navigate:
   if (route.view === "client") return <CustomerProfileView clientCode={route.code} key={route.code} onBack={backToList} onOpenClient={openClient} onOpenInteraction={openInteraction} />;
   if (route.view === "interaction") return <CustomerInteractionView interactionCode={route.code} key={route.code} onBack={backToList} onOpenClient={openClient} onOpenInteraction={openInteraction} />;
   if (route.view === "review") return <CustomerReviewView onBack={backToList} onOpenClient={openClient} />;
-  return <CustomerMasterList onOpenClient={openClient} onOpenCrm={() => navigate("/crm")} onOpenReview={() => navigate(CUSTOMER_REVIEW_PATH)} />;
+  return <CustomerMasterList onOpenClient={openClient} onOpenReview={() => navigate(CUSTOMER_REVIEW_PATH)} />;
 }
 
 /** Every client and lead in one filtered list (/crm/master). */
-function CustomerMasterList({ onOpenCrm, onOpenClient, onOpenReview }: { onOpenCrm: () => void; onOpenClient: (clientCode: string) => void; onOpenReview: () => void }) {
+function CustomerMasterList({ onOpenClient, onOpenReview }: { onOpenClient: (clientCode: string) => void; onOpenReview: () => void }) {
   const [filters, setFilters] = useState<CustomerListFilters>(() => remembered?.filters ?? EMPTY_CUSTOMER_LIST_FILTERS);
   const [searchText, setSearchText] = useState(() => remembered?.searchText ?? "");
   const [page, setPage] = useState(() => remembered?.page ?? 0);
@@ -136,7 +136,6 @@ function CustomerMasterList({ onOpenCrm, onOpenClient, onOpenReview }: { onOpenC
         </div>
         <div className="flex flex-wrap gap-2">
           {options?.duplicates_to_review ? <Button onClick={onOpenReview} variant="secondary">Possibly same person ({options.duplicates_to_review})</Button> : null}
-          <Button onClick={onOpenCrm} variant="secondary">Open CRM</Button>
         </div>
       </header>
 

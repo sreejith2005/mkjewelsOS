@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, Mic, MicOff, Pause, Play, Square, Wifi, WifiOff } from "lucide-react";
 import { hasPermission, reconcileTranscript, type TranscriptSegment } from "@jewelos/core";
-import { fetchToday, recordingSnapshot, recordingWalkins } from "@jewelos/data";
+import { fetchToday, recordingSnapshot } from "@jewelos/data";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
 import { useRecorder } from "@/features/recording/useRecorder";
@@ -37,12 +37,8 @@ export function RecordFlow({ navigate }: { navigate: (path: string) => void }) {
   const mic = useMicPermission();
   const today = useLoad(fetchToday, []);
   const [consent, setConsent] = useState(false);
-  const [walkin, setWalkin] = useState("");
-  const [walkins, setWalkins] = useState<ReadonlyArray<{ ref: string; label: string }>>([]);
   const [live, setLive] = useState<readonly TranscriptSegment[]>([]);
   const [showLive, setShowLive] = useState(false);
-  const canCrm = hasPermission(access, "crm.view");
-  useEffect(() => { if (canCrm) void recordingWalkins().then(setWalkins).catch(() => setWalkins([])); }, [canCrm]);
 
   const open = ["recording", "paused", "saving", "needs_attention"].includes(rec.state) && rec.activeId;
   const done = (rec.state === "processing" || rec.state === "ready") && rec.activeId;
@@ -141,14 +137,6 @@ export function RecordFlow({ navigate }: { navigate: (path: string) => void }) {
           <p className="mt-1 text-base font-semibold text-task-text">{profile?.employee_name ?? "You"}</p>
           <p className="text-xs text-task-text-muted">Recorded under your sign-in. This cannot be changed.</p>
         </li>
-        {canCrm ? <li>
-          <label className="text-xs font-semibold uppercase tracking-wider text-task-text-muted" htmlFor="si-walkin">Customer (optional)</label>
-          <select className="field mt-1" id="si-walkin" onChange={(event) => setWalkin(event.target.value)} value={walkin}>
-            <option value="">No customer selected</option>
-            {walkins.map((item) => <option key={item.ref} value={item.ref}>{item.label}</option>)}
-          </select>
-          <p className="mt-1 text-xs text-task-text-muted">{walkins.length ? "Only CRM walk-ins already assigned to you or your branch are listed." : "No CRM walk-ins to link right now. You can record without one."}</p>
-        </li> : null}
         <li>
           <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-task-border p-3 has-[:checked]:border-gold/60 has-[:checked]:bg-gold/5">
             <input checked={consent} className="mt-0.5 size-6 shrink-0 accent-gold" onChange={(event) => setConsent(event.target.checked)} type="checkbox" />
@@ -156,7 +144,7 @@ export function RecordFlow({ navigate }: { navigate: (path: string) => void }) {
           </label>
         </li>
       </ol>
-      <Button className="mt-5 min-h-16 w-full text-lg" disabled={blocked || !consent || rec.busy} onClick={() => void rec.start(walkin || undefined)} type="button">
+      <Button className="mt-5 min-h-16 w-full text-lg" disabled={blocked || !consent || rec.busy} onClick={() => void rec.start()} type="button">
         <Mic aria-hidden className="size-6" />{rec.busy ? "Starting…" : "Start recording"}
       </Button>
       {!consent && !blocked ? <p className="mt-2 text-center text-xs text-task-text-muted">Tick the consent box to start.</p> : null}

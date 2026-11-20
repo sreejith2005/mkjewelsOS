@@ -14,7 +14,6 @@ const report = (definition: ReportDefinition) => definition;
 const legacy = (definition: ReportDefinition): ReportDefinition => ({ ...definition, category: "legacy", source: "jewelos" });
 
 const PAGE = ["page","page_size"] as const;
-const CRM_DESCRIPTION = "Read from the CRM through your JewelOS login.";
 
 /*
  * Business Reports 2.0 (2026-11-02). Visible reports are grouped by category. Older keys
@@ -23,55 +22,6 @@ const CRM_DESCRIPTION = "Read from the CRM through your JewelOS login.";
  */
 export const REPORT_CATALOG: readonly ReportDefinition[] = [
   // ---------------------------------------------------------------- Customers & CRM
-  report({key:"customer_report_master",category:"customers",source:"crm",permission:"crm.view",name:"Customer Master Database",
-    description:"One row per customer from the CRM customer master, with contact details, sources, purchase status and follow-up.",
-    roles:ALL,filters:["from","to","crm_branch_id","source","customer_type","purchase_class","crm_name","crm_employee_id","search",...PAGE],dateOptional:true,dateLabel:"Last interaction",
-    columns:[col("customer_id","Customer ID"),col("name","Customer name",undefined,true),col("primary_phone","Primary phone","phone",true),col("alternate_phone","Alternate phone","phone",true),
-      col("billing_phone","Billing phone","phone",true),col("instagram","Instagram ID",undefined,true),col("city","City"),col("state","State"),col("branch","Branch"),
-      col("first_source","First enquiry source"),col("latest_source","Latest enquiry source"),col("lead_or_client","Lead or client"),col("lifecycle","Stage"),
-      col("new_or_returning","New or returning"),col("purchase_status","Purchase status"),col("last_interaction","Last interaction","instant"),col("last_visit","Last visit","instant"),
-      col("assigned_crm","Assigned CRM"),col("salesperson","Salesperson"),col("product_interest","Product interest"),col("budget","Budget"),
-      col("next_followup","Next follow-up","date"),col("followup_status","Follow-up status")],
-    defaultSort:"last interaction desc",maxDateRangeDays:366,exportEligible:true,
-    notes:["One customer is one row: extra phone numbers, Instagram IDs and repeat enquiries stay on the same customer.","Purchase status counts verified purchases only (a recorded visit whose saved outcome or form shows a purchase). A store visit alone is not a purchase.","Returning means more than one recorded store visit.",CRM_DESCRIPTION]}),
-  report({key:"customer_report_journey",category:"customers",source:"crm",permission:"crm.view",name:"Customer 360° Journey",
-    description:"Everything recorded for one customer, oldest first: enquiries, calls, visits, follow-ups and FMS form steps.",
-    roles:ALL,filters:["client_id","from","to",...PAGE],dateOptional:true,dateLabel:"Event date",
-    columns:[col("customer_id","Customer ID"),col("name","Customer name",undefined,true),col("event_at","Date and time","instant"),col("event_type","Event"),col("source","Source"),
-      col("workflow","FMS reference"),col("stage","FMS stage"),col("employee","Responsible employee"),col("details","Collected information",undefined,true),
-      col("outcome","Outcome"),col("followup_date","Follow-up date","date"),col("status","Status")],
-    defaultSort:"event time asc",maxDateRangeDays:366,exportEligible:true,
-    notes:["Each recorded action appears once, from the record that holds it. Engagement questions asked on a visit are listed on that visit's row.","Task assignments are not customer contact and are not listed.",CRM_DESCRIPTION]}),
-  report({key:"customer_report_leads",category:"customers",source:"crm",permission:"crm.view",name:"Leads and Enquiries",
-    description:"CRM leads and form/FMS enquiries received in the period, with source, status and latest call.",
-    roles:ALL,filters:["from","to","crm_branch_id","crm_employee_id","source","search",...PAGE],dateLabel:"Enquiry date",
-    columns:[col("enquiry_at","Enquiry date","instant"),col("entry_type","Entry"),col("customer_id","Customer ID"),col("name","Name",undefined,true),col("phone","Phone","phone",true),
-      col("source","Source"),col("branch","Branch"),col("registered_by","Registered by"),col("lead_status","Lead status"),col("requirement","Requirement"),
-      col("last_call_response","Latest call response"),col("next_followup","Next follow-up","date")],
-    defaultSort:"enquiry date desc",maxDateRangeDays:366,exportEligible:true,
-    notes:["A form/FMS enquiry is counted once per workflow, at its first synced form.",CRM_DESCRIPTION]}),
-  report({key:"customer_report_followups",category:"customers",source:"crm",permission:"crm.view",name:"CRM Follow-ups",
-    description:"Not-bought and lead follow-ups with due date, status, attempts and owner.",
-    roles:ALL,filters:["status","from","to","crm_branch_id","crm_employee_id",...PAGE],dateOptional:true,dateLabel:"Due date",
-    columns:[col("followup_type","Type"),col("customer_id","Customer ID"),col("name","Name",undefined,true),col("phone","Phone","phone",true),col("branch","Branch"),
-      col("status","Status"),col("due_date","Due date","date"),col("overdue","Overdue","boolean"),col("attempts","Attempts","number"),col("last_response","Last response"),
-      col("remark","Remark"),col("action_point","Action point"),col("owner","Owner"),col("created_at","Created","instant")],
-    summary:[{key:"followups",label:"Follow-ups"},{key:"overdue",label:"Overdue"},{key:"due_today",label:"Due today"}],
-    defaultSort:"due date asc",maxDateRangeDays:366,exportEligible:true,notes:["A lead follow-up is the next date set on the lead's latest call.",CRM_DESCRIPTION]}),
-  report({key:"customer_report_sources",category:"customers",source:"crm",permission:"crm.view",name:"Lead Source and Conversion",
-    description:"Enquiries by source, and how many of those people visited a store or bought.",
-    roles:ALL,filters:["from","to","crm_branch_id","crm_employee_id","source",...PAGE],dateLabel:"Enquiry date",
-    columns:[col("source","Source"),col("total_enquiries","Total enquiries","number"),col("unique_leads","Unique leads","number"),col("returning_leads","Returning leads","number"),
-      col("store_visitors","Store visitors","number"),col("visit_rate","Visit rate %","percent"),col("converted_leads","Leads marked converted","number"),
-      col("verified_buyers","Verified buyers","number"),col("buyer_rate","Buyer rate %","percent"),col("open_followups","Open follow-ups","number"),
-      col("fms_started","FMS workflows started","number"),col("fms_completed","FMS workflows completed","number")],
-    summary:[{key:"enquiries",label:"Enquiries"},{key:"unique_leads",label:"Unique leads"},{key:"store_visitors",label:"Store visitors"},{key:"verified_buyers",label:"Verified buyers"}],
-    defaultSort:"total enquiries desc",maxDateRangeDays:366,exportEligible:true,
-    notes:["Total enquiries = CRM leads + the first form of each form/FMS journey received in the period. One person enquiring twice is 2 enquiries but 1 unique lead.",
-      "Unique leads is the denominator for both rates. Visit rate = unique leads with a recorded store visit on or after their first enquiry, up to the end of the period. Buyer rate = unique leads with a verified purchase in that window.",
-      "Returning leads already had recorded CRM history before this enquiry. Online enquiries are never counted as store footfall.",
-      "Won/lost outcomes of FMS workflows are in FMS Workflow Journey.",CRM_DESCRIPTION]}),
-
   // ---------------------------------------------------------------- Forms, FMS and tasks
   report({key:"form_answers",category:"operations",source:"jewelos",name:"All Form Submissions",
     description:"Every submitted form (standalone, task and FMS) with its answers. Choose one form to get one column per question.",
@@ -134,35 +84,6 @@ export const REPORT_CATALOG: readonly ReportDefinition[] = [
       "Reassigned work counts for the person it is assigned to now. Each recurring occurrence is one task. Reopened work counts by its current state.",
       "Completion % = completed ÷ assigned. On-time % = completed by the due time ÷ completed. Average delay is over delayed completions only.",
       "Rejected tasks, skipped or stopped FMS steps, and FMS steps without a deadline are not counted. Original records and their history are unchanged."]}),
-  report({key:"customer_report_crm_staff",category:"people",source:"crm",permission:"crm.view",name:"CRM Performance",
-    description:"Per CRM employee: leads, calls, follow-ups, visits handled, conversions and engagement asks.",
-    roles:ALL,filters:["from","to","crm_branch_id","crm_employee_id","crm_name",...PAGE],dateLabel:"Activity date",
-    columns:[col("employee","Employee"),col("branch","Branch"),col("leads_registered","Leads registered","number"),col("lead_calls","Lead call attempts","number"),
-      col("connected_calls","Connected calls","number"),col("followup_updates","Follow-up updates","number"),col("followup_calls_answered","Follow-up responses recorded","number"),
-      col("followups_completed","Follow-ups completed","number"),col("followups_open","Follow-ups open","number"),col("followups_overdue","Follow-ups overdue","number"),
-      col("visits_attended","Visits handled","number"),col("customers_attended","Customers handled","number"),col("customers_converted","Customers converted","number"),
-      col("referrals_asked","Referrals asked","number"),col("google_reviews_asked","Google reviews asked","number"),col("testimonials_asked","Testimonials asked","number"),
-      col("thank_you_notes_asked","Thank-you notes asked","number"),col("instagram_asked","Instagram follows asked","number"),col("feedback_forms_asked","Feedback forms asked","number"),
-      col("logged_calls","Calls logged","number"),col("whatsapp_messages","WhatsApp messages logged","number"),col("thank_you_sent","Thank-you messages logged","number"),
-      col("fms_stages_completed","Customer FMS steps completed","number")],
-    defaultSort:"employee",maxDateRangeDays:366,exportEligible:true,
-    notes:["Call attempts are every recorded lead call; connected calls are those recorded as CONNECTED. Completed tasks are not counted as calls.",
-      "Visits are credited to the CRM named on the visit. Customers converted = distinct customers with a verified purchase on those visits.",
-      "Engagement columns count what was asked on the visit form, not what the customer did. Open and overdue follow-ups are current, not limited to the period.",
-      "Each count comes from one source record, so nothing is counted twice. Appointments are not recorded in the CRM and are not shown.",CRM_DESCRIPTION]}),
-  report({key:"customer_report_sales",category:"people",source:"crm",permission:"crm.view",name:"Salesperson Performance",
-    description:"Per salesperson: customers attended, verified purchases, orders, returns, exchanges and repairs.",
-    roles:ALL,filters:["from","to","crm_branch_id","crm_employee_id",...PAGE],dateLabel:"Visit date",
-    columns:[col("salesperson","Salesperson"),col("branch","Branch"),col("customers_assigned","Customers assigned","number"),col("visits_attended","Visits attended","number"),
-      col("customers_attended","Customers attended","number"),col("purchase_visits","Purchase visits","number"),col("verified_buyers","Verified buyers","number"),
-      col("conversion_rate","Conversion %","percent"),col("not_bought","Not bought","number"),col("orders_placed","Orders placed","number"),
-      col("orders_picked_up","Orders picked up","number"),col("returns","Returns","number"),col("exchanges","Exchanges","number"),col("repair_visits","Repair visits","number"),
-      col("browse_only_visits","Store visit / price check only","number"),col("outcome_not_recorded","Outcome not recorded","number"),col("followups_completed","Follow-ups completed","number")],
-    defaultSort:"salesperson",maxDateRangeDays:366,exportEligible:true,
-    notes:["Verified purchase = a visit whose saved outcome or visit form shows a purchase. A visit alone, or a completed FMS negotiation step, is never a sale.",
-      "Conversion % = verified buyers ÷ customers attended (distinct customers, visits in the period).",
-      "Orders picked up are orders closed at pickup. Customers assigned is the current count of customers whose latest visit names this salesperson.",
-      "Product demonstrations and response times are not recorded in the CRM and are not shown.",CRM_DESCRIPTION]}),
   report({key:"people_availability",category:"people",source:"jewelos",name:"Employee Availability",
     description:"Each employee's working status and recorded availability by date. Leave reasons are not shown.",
     roles:PEOPLE,filters:["from","to","branch_id","department_id","status","user_profile_id",...PAGE],dateLabel:"Date",
@@ -198,9 +119,10 @@ export const LEGACY_EXPORT_NAMES: Readonly<Record<string, string>> = {
 };
 
 export const REPORT_CATEGORIES: readonly Readonly<{ id: Exclude<ReportCategory, "admin" | "legacy">; name: string; description: string }>[] = [
-  { id: "customers", name: "Customer & CRM", description: "Customers, their history, leads, follow-ups and sources." },
+  // "Customer & CRM" reports read the retired CRM project and were removed on 2026-11-20 (owner);
+  // customer reports on the customer master database come with the next UI work.
   { id: "operations", name: "Forms, FMS & Tasks", description: "Submitted forms with answers, FMS journeys and task status." },
-  { id: "people", name: "Employee Performance", description: "Task, CRM and sales performance, and availability." },
+  { id: "people", name: "Employee Performance", description: "Task performance and availability." },
 ];
 
 export function reportFor(key: string): ReportDefinition | undefined { return REPORT_CATALOG.find((item) => item.key === key); }

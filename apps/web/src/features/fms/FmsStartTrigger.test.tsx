@@ -116,16 +116,11 @@ describe("Start trigger panel", () => {
 });
 
 describe("work page source", () => {
-  it("shows the copied values and links the CRM client only when the server sends the id", async () => {
+  it("shows the copied values and no link to the retired CRM", async () => {
     mocks.source.mockResolvedValue({ sourceType: "crm_walkin", occurredAt: "2026-11-03T06:00:00Z", values: [{ label: "Client code", value: "MKC-77" }], crmClientId: "c1", caseOpen: true });
     render(<FmsTriggerSource instanceId="i1" />);
     expect(await screen.findByText("Started automatically")).toBeTruthy();
     expect(screen.getByText("MKC-77")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Open CRM client profile" }).getAttribute("href")).toBe("/crm/clients/c1");
-    cleanup();
-    mocks.source.mockResolvedValue({ sourceType: "crm_walkin", occurredAt: null, values: [], crmClientId: null, caseOpen: true });
-    render(<FmsTriggerSource instanceId="i2" />);
-    expect(await screen.findByText("Started automatically")).toBeTruthy();
     expect(screen.queryByRole("link")).toBeNull();
   });
   it("renders nothing for a form-started run", async () => {

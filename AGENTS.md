@@ -48,7 +48,6 @@ apps/mobile           Android shell: the deployed web app in one WebView
 packages/core         Pure TypeScript business rules, types, validation, RBAC
 packages/data         Shared data-access layer used by the web app
 packages/api-client   Typed Supabase browser client
-packages/crm-ui       CRM screens rendered by the web app at /crm
 packages/ui-tokens    Shared design tokens
 supabase/             JewelOS project: migrations, pgTAP tests, Edge Functions, local seed
 supabase-crm/         Frozen CRM project (being retired): migrations, pgTAP tests, Edge Functions
@@ -65,13 +64,14 @@ users, tasks, FMS, forms and the customer master database.
   under `supabase/migrations/`, linked directly to JewelOS users, branches and
   permissions (`has_permission`). Add no tables, functions or features to
   `supabase-crm/`.
-- **The CRM project is frozen, not deleted.** `/crm` still reads it through the
-  login bridge (`crm-session-exchange`) and the outbox/inbox sync
-  (`crm-staff-sync`, `sync-deliver`/`crm-sync-receive`, `crm-customer-sync`)
-  until each screen is re-pointed to the `customer` schema. The CRM section is
-  switched off for staff; the project holds demo and stale Sheet data only.
-  Remove the bridge, the sync functions, their cron jobs and `supabase-crm/`
-  only in the cutover change, after the owner confirms.
+- **The old CRM screens are removed (owner decision 2026-11-20).** `/crm`
+  opens the Customers page (`/crm/master`), which reads only the `customer`
+  schema; the web app, Ask Kiara, Reports and forms no longer read the CRM
+  project. The CRM project is frozen until the database clean-up change
+  removes the login bridge (`crm-session-exchange`), the outbox/inbox sync
+  (`crm-staff-sync`, `sync-deliver`/`crm-sync-receive`, `crm-customer-sync`),
+  their cron jobs and `supabase-crm/`; the owner deletes the project a week
+  later, after a final backup.
 - The old JewelOS `crm` schema and `public` legacy CRM tables stay retired: add
   no features to them. They are dropped by a reviewed forward migration after a
   backup, never ad hoc.
@@ -81,16 +81,13 @@ users, tasks, FMS, forms and the customer master database.
   kept (other names, other phones). The same name with a different phone is a
   different client. This replaces the 2026-10-06 phone + name rule.
   `MKC-`/`MKF-`/`MKREF-` identifiers and search are kept.
-- Re-pointed CRM screens keep field, label, order, vocabulary, flow and
-  validation parity with the current `/crm` screens unless the owner asks for a
-  change. Presentation keeps using the JewelOS theme through
-  `packages/crm-ui/src/crm-port/jewelos-theme.css`; map colours to JewelOS
-  `--color-*` variables there.
+- Customer screens live in `apps/web/src/features/customers` and use the
+  JewelOS design tokens like every other section.
 - Hosted staging is the free project `jewelos-staging` (synthetic data only).
   Apply every migration there before production.
 
-The Vite client may contain only `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`,
-`VITE_CRM_SUPABASE_URL`, and `VITE_CRM_SUPABASE_ANON_KEY`. An anon key is safe
+The Vite client may contain only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+(the `VITE_CRM_*` settings went with the old CRM screens on 2026-11-20). An anon key is safe
 to ship only because the database enforces RLS. Service-role keys, cron
 secrets, provider credentials, Auth admin credentials, production exports, and
 customer data never go into client config, source, Git, terminal output, or

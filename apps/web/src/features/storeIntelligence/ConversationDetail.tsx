@@ -14,7 +14,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { Button, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { AudioPlayer, type AudioPlayerHandle } from "./AudioPlayer";
-import { CustomerLinkSection, FollowUpsPanel, OutcomeStrip, ReadinessStrip } from "./IntegrationPanels";
+import { FollowUpsPanel, OutcomeStrip, ReadinessStrip } from "./IntegrationPanels";
 import { siPath, type DetailTab } from "./routes";
 import { Disclosure, Drawer, ErrorState, Meter, Panel, ScoreBadge, SkeletonRows, StatusPill, TabBar, Tag, useFlash } from "./ui";
 import { useLoad } from "./useLoad";
@@ -399,15 +399,14 @@ function ActionsTab({ analyses, analysis, card, integration, integrationError, s
   </div>;
 }
 
-function CustomerDrawer({ card, analysis, integration, segments, onClose, onSeek, onLinked, navigate }: {
+function CustomerDrawer({ analysis, segments, onClose, onSeek }: {
   card: ConversationCard; analysis: StoredSalesAnalysis | null; integration: ConversationIntegration | null; segments: readonly AnalysisTranscriptSegment[];
   onClose: () => void; onSeek: (id: string) => void; onLinked: () => void; navigate: (path: string) => void;
 }) {
   const o = analysis && hasAnalysisOutput(analysis) ? analysis.output : null;
   return <Drawer onClose={onClose} title="Customer details">
     <div className="space-y-5 text-sm">
-      {integration ? <CustomerLinkSection integration={integration} navigate={(path) => { onClose(); navigate(path); }} onChanged={onLinked} retentionExpired={card.retention_expired} sessionId={card.id} />
-        : <p className="text-task-text-muted">Loading the CRM link…</p>}
+      {/* Linking a conversation to an old CRM customer was removed with the CRM project (2026-11-20). */}
       {o ? <>
         <section className="space-y-1.5"><h3 className="font-semibold text-task-text">Looking for</h3>
           {o.product_interests.length || o.customer_requirements.requirements.length ? <ul className="space-y-1.5 text-task-text">{[...o.product_interests, ...o.customer_requirements.requirements].map((c, i) => <li key={i}>{c.text}<Evidence onSeek={onSeek} refs={c.evidence} segments={segments} /></li>)}</ul> : <p className="text-task-text-muted">Not stated.</p>}</section>
