@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(245);
+select plan(184);
 
 -- Fixed synthetic identities and records only. No production data is queried.
 insert into auth.users (
@@ -124,31 +124,7 @@ insert into fms_stage_logs(id,fms_instance_stage_id,action) values
   ('67000000-0000-0000-0000-000000000003','66000000-0000-0000-0000-000000000003','synthetic_a2'),
   ('67000000-0000-0000-0000-000000000004','66000000-0000-0000-0000-000000000004','synthetic_b1');
 
--- CRM, notification, report and export fixtures.
-insert into clients(id,tenant_id,branch_id,phone) values
-  ('71000000-0000-0000-0000-000000000001','11000000-0000-0000-0000-000000000001','22000000-0000-0000-0000-000000000001','SYNTHETIC-A1'),
-  ('71000000-0000-0000-0000-000000000002','11000000-0000-0000-0000-000000000001','22000000-0000-0000-0000-000000000002','SYNTHETIC-A2'),
-  ('71000000-0000-0000-0000-000000000003','11000000-0000-0000-0000-000000000002','22000000-0000-0000-0000-000000000003','SYNTHETIC-B1');
-insert into walkin_entries(id,tenant_id,branch_id,client_id,visit_date) values
-  ('72000000-0000-0000-0000-000000000001','11000000-0000-0000-0000-000000000001','22000000-0000-0000-0000-000000000001','71000000-0000-0000-0000-000000000001','2099-01-01'),
-  ('72000000-0000-0000-0000-000000000002','11000000-0000-0000-0000-000000000001','22000000-0000-0000-0000-000000000002','71000000-0000-0000-0000-000000000001','2099-01-02'),
-  ('72000000-0000-0000-0000-000000000003','11000000-0000-0000-0000-000000000001','22000000-0000-0000-0000-000000000001','71000000-0000-0000-0000-000000000002','2099-01-03'),
-  ('72000000-0000-0000-0000-000000000004','11000000-0000-0000-0000-000000000001','22000000-0000-0000-0000-000000000001','71000000-0000-0000-0000-000000000003','2099-01-04'),
-  ('72000000-0000-0000-0000-000000000005','11000000-0000-0000-0000-000000000002','22000000-0000-0000-0000-000000000003','71000000-0000-0000-0000-000000000003','2099-01-05');
-insert into walkin_uploads(id,walkin_entry_id,storage_path,tenant_id) values
-  ('73000000-0000-0000-0000-000000000001','72000000-0000-0000-0000-000000000001','synthetic/a1','11000000-0000-0000-0000-000000000001'),
-  ('73000000-0000-0000-0000-000000000002','72000000-0000-0000-0000-000000000002','synthetic/a2','11000000-0000-0000-0000-000000000001'),
-  ('73000000-0000-0000-0000-000000000003','72000000-0000-0000-0000-000000000005','synthetic/b1','11000000-0000-0000-0000-000000000002'),
-  ('73000000-0000-0000-0000-000000000004','72000000-0000-0000-0000-000000000004','synthetic/malformed','11000000-0000-0000-0000-000000000001');
-insert into client_timeline(id,tenant_id,branch_id,client_id,event_type,summary,occurred_at) values
-  ('74000000-0000-0000-0000-000000000001','11000000-0000-0000-0000-000000000001','22000000-0000-0000-0000-000000000001','71000000-0000-0000-0000-000000000001','note','Synthetic A1',now()),
-  ('74000000-0000-0000-0000-000000000002','11000000-0000-0000-0000-000000000001','22000000-0000-0000-0000-000000000002','71000000-0000-0000-0000-000000000002','note','Synthetic A2',now()),
-  ('74000000-0000-0000-0000-000000000003','11000000-0000-0000-0000-000000000002','22000000-0000-0000-0000-000000000003','71000000-0000-0000-0000-000000000003','note','Synthetic B1',now());
-insert into client_followups(id,tenant_id,branch_id,client_id,due_date,notes,status) values
-  ('75000000-0000-0000-0000-000000000001','11000000-0000-0000-0000-000000000001','22000000-0000-0000-0000-000000000001','71000000-0000-0000-0000-000000000001','2099-02-01','Synthetic A1','open'),
-  ('75000000-0000-0000-0000-000000000002','11000000-0000-0000-0000-000000000001','22000000-0000-0000-0000-000000000002','71000000-0000-0000-0000-000000000002','2099-02-02','Synthetic A2','open'),
-  ('75000000-0000-0000-0000-000000000003','11000000-0000-0000-0000-000000000002','22000000-0000-0000-0000-000000000003','71000000-0000-0000-0000-000000000003','2099-02-03','Synthetic B1','open');
-
+-- Notification, report and export fixtures.
 insert into notification_templates(id,tenant_id,event_type,channel,title_template,body_template) values
   ('81000000-0000-0000-0000-000000000001','11000000-0000-0000-0000-000000000001','synthetic','in_app','Synthetic A','Synthetic A'),
   ('81000000-0000-0000-0000-000000000002','11000000-0000-0000-0000-000000000002','synthetic','in_app','Synthetic B','Synthetic B'),
@@ -180,7 +156,7 @@ union all select '91000000-0000-0000-0000-000000000012','11000000-0000-0000-0000
 
 -- 14 RLS assertions.
 select ok(c.relrowsecurity, format('RLS is enabled on %s', t.table_name))
-from unnest(array['client_followups','client_timeline','export_logs','fms_branch_rules','fms_stage_assignees','fms_stage_logs','form_fields','form_links','notification_logs','notification_rules','notification_templates','performance_snapshots','walkin_entries','walkin_uploads']) t(table_name)
+from unnest(array['export_logs','fms_branch_rules','fms_stage_assignees','fms_stage_logs','form_fields','form_links','notification_logs','notification_rules','notification_templates','performance_snapshots']) t(table_name)
 join pg_class c on c.oid = format('public.%I',t.table_name)::regclass;
 
 -- 71 table-privilege assertions: full deny matrix plus exact read allowlist.
@@ -191,15 +167,15 @@ select ok(not exists (
   where c.oid = format('public.%I',table_name)::regclass
     and acl.grantee = 0
 ),format('PUBLIC has no privileges on %s',table_name))
-from unnest(array['client_followups','client_timeline','export_logs','fms_branch_rules','fms_stage_assignees','fms_stage_logs','form_fields','form_links','notification_logs','notification_rules','notification_templates','performance_snapshots','walkin_entries','walkin_uploads']) t(table_name);
+from unnest(array['export_logs','fms_branch_rules','fms_stage_assignees','fms_stage_logs','form_fields','form_links','notification_logs','notification_rules','notification_templates','performance_snapshots']) t(table_name);
 select ok(not has_table_privilege('anon',format('public.%I',table_name),'SELECT,INSERT,UPDATE,DELETE'),format('anon has no browser privileges on %s',table_name))
-from unnest(array['client_followups','client_timeline','export_logs','fms_branch_rules','fms_stage_assignees','fms_stage_logs','form_fields','form_links','notification_logs','notification_rules','notification_templates','performance_snapshots','walkin_entries','walkin_uploads']) t(table_name);
+from unnest(array['export_logs','fms_branch_rules','fms_stage_assignees','fms_stage_logs','form_fields','form_links','notification_logs','notification_rules','notification_templates','performance_snapshots']) t(table_name);
 select ok(not has_table_privilege('service_role',format('public.%I',table_name),'SELECT,INSERT,UPDATE,DELETE'),format('service_role has no direct privileges on %s',table_name))
-from unnest(array['client_followups','client_timeline','export_logs','fms_branch_rules','fms_stage_assignees','fms_stage_logs','form_fields','form_links','notification_logs','notification_rules','notification_templates','performance_snapshots','walkin_entries','walkin_uploads']) t(table_name);
+from unnest(array['export_logs','fms_branch_rules','fms_stage_assignees','fms_stage_logs','form_fields','form_links','notification_logs','notification_rules','notification_templates','performance_snapshots']) t(table_name);
 select ok(not has_table_privilege('authenticated',format('public.%I',table_name),'INSERT,UPDATE,DELETE'),format('authenticated has no mutations on %s',table_name))
-from unnest(array['client_followups','client_timeline','export_logs','fms_branch_rules','fms_stage_assignees','fms_stage_logs','form_fields','form_links','notification_logs','notification_rules','notification_templates','performance_snapshots','walkin_entries','walkin_uploads']) t(table_name);
+from unnest(array['export_logs','fms_branch_rules','fms_stage_assignees','fms_stage_logs','form_fields','form_links','notification_logs','notification_rules','notification_templates','performance_snapshots']) t(table_name);
 select ok(has_table_privilege('authenticated',format('public.%I',table_name),'SELECT'),format('authenticated has approved SELECT on %s',table_name))
-from unnest(array['form_templates','form_fields','form_links','fms_stage_assignees','fms_branch_rules','fms_stage_logs','walkin_entries','walkin_uploads','client_timeline','client_followups','notification_templates','notification_rules','performance_snapshots','export_logs']) t(table_name);
+from unnest(array['form_templates','form_fields','form_links','fms_stage_assignees','fms_branch_rules','fms_stage_logs','notification_templates','notification_rules','performance_snapshots','export_logs']) t(table_name);
 select ok(not has_table_privilege('authenticated','public.notification_logs','SELECT'),'authenticated has no notification_logs SELECT');
 
 -- The hardened parent table follows the same explicit deny posture.
@@ -219,10 +195,7 @@ from unnest(array[
   'idx_form_fields_template_sort','idx_form_links_template_module_reference',
   'idx_fms_stage_assignees_stage','idx_fms_stage_assignees_user',
   'idx_fms_branch_rules_stage_sort','idx_fms_branch_rules_next_stage','idx_fms_branch_rules_next_flow',
-  'idx_fms_stage_logs_instance_stage_created','idx_walkin_entries_tenant_branch_visit',
-  'idx_walkin_entries_client','idx_walkin_uploads_entry','idx_client_timeline_client_created',
-  'idx_client_followups_client_created','idx_client_followups_assigned_to',
-  'idx_notification_templates_tenant_event_channel_active','idx_notification_rules_tenant_event_active',
+  'idx_fms_stage_logs_instance_stage_created','idx_notification_templates_tenant_event_channel_active','idx_notification_rules_tenant_event_active',
   'idx_notification_rules_template','idx_notification_logs_notification',
   'idx_performance_snapshots_tenant_user_period','idx_performance_snapshots_tenant_branch_period',
   'idx_export_logs_requester_history'
@@ -238,10 +211,6 @@ select is((select count(*)::int from form_links),0,'inactive profile sees no for
 select is((select count(*)::int from fms_stage_assignees),0,'inactive profile sees no fms_stage_assignees');
 select is((select count(*)::int from fms_branch_rules),0,'inactive profile sees no fms_branch_rules');
 select is((select count(*)::int from fms_stage_logs),0,'inactive profile sees no fms_stage_logs');
-select is((select count(*)::int from walkin_entries),0,'inactive profile sees no walkin_entries');
-select is((select count(*)::int from walkin_uploads),0,'inactive profile sees no walkin_uploads');
-select is((select count(*)::int from client_timeline),0,'inactive profile sees no client_timeline');
-select is((select count(*)::int from client_followups),0,'inactive profile sees no client_followups');
 select is((select count(*)::int from notification_templates),0,'inactive profile sees no notification_templates');
 select is((select count(*)::int from notification_rules),0,'inactive profile sees no notification_rules');
 select is((select count(*)::int from performance_snapshots),0,'inactive profile sees no performance_snapshots');
@@ -290,10 +259,6 @@ select ok((select count(*) from form_links)>0 and not exists(select 1 from form_
 select ok((select count(*) from fms_stage_assignees)>0 and not exists(select 1 from fms_stage_assignees where id='63000000-0000-0000-0000-000000000005'),'admin fms_stage_assignees are tenant isolated');
 select ok((select count(*) from fms_branch_rules)>0 and not exists(select 1 from fms_branch_rules where id='64000000-0000-0000-0000-000000000007'),'admin fms_branch_rules are tenant isolated');
 select ok((select count(*) from fms_stage_logs)>0 and not exists(select 1 from fms_stage_logs where id='67000000-0000-0000-0000-000000000004'),'admin fms_stage_logs are tenant isolated');
-select ok((select count(*) from walkin_entries)>0 and not exists(select 1 from walkin_entries where id='72000000-0000-0000-0000-000000000005'),'admin walkin_entries are tenant isolated');
-select ok((select count(*) from walkin_uploads)>0 and not exists(select 1 from walkin_uploads where id='73000000-0000-0000-0000-000000000003'),'admin walkin_uploads are tenant isolated');
-select ok((select count(*) from client_timeline)>0 and not exists(select 1 from client_timeline where id='74000000-0000-0000-0000-000000000003'),'admin client_timeline is tenant isolated');
-select ok((select count(*) from client_followups)>0 and not exists(select 1 from client_followups where id='75000000-0000-0000-0000-000000000003'),'admin client_followups are tenant isolated');
 select ok((select count(*) from notification_templates)>0 and not exists(select 1 from notification_templates where tenant_id is distinct from '11000000-0000-0000-0000-000000000001'),'admin notification_templates are tenant isolated and null-hidden');
 select ok((select count(*) from notification_rules)>0 and not exists(select 1 from notification_rules where tenant_id is distinct from '11000000-0000-0000-0000-000000000001'),'admin notification_rules are tenant isolated and null-hidden');
 select ok((select count(*) from performance_snapshots)>0 and not exists(select 1 from performance_snapshots where tenant_id='11000000-0000-0000-0000-000000000002'),'admin performance_snapshots are tenant isolated');
@@ -305,10 +270,6 @@ select ok((select count(*) from form_links)>0 and not exists(select 1 from form_
 select ok((select count(*) from fms_stage_assignees)>0 and not exists(select 1 from fms_stage_assignees where id='63000000-0000-0000-0000-000000000005'),'super_admin fms_stage_assignees are tenant isolated');
 select ok((select count(*) from fms_branch_rules)>0 and not exists(select 1 from fms_branch_rules where id='64000000-0000-0000-0000-000000000007'),'super_admin fms_branch_rules are tenant isolated');
 select ok((select count(*) from fms_stage_logs)>0 and not exists(select 1 from fms_stage_logs where id='67000000-0000-0000-0000-000000000004'),'super_admin fms_stage_logs are tenant isolated');
-select ok((select count(*) from walkin_entries)>0 and not exists(select 1 from walkin_entries where id='72000000-0000-0000-0000-000000000005'),'super_admin walkin_entries are tenant isolated');
-select ok((select count(*) from walkin_uploads)>0 and not exists(select 1 from walkin_uploads where id='73000000-0000-0000-0000-000000000003'),'super_admin walkin_uploads are tenant isolated');
-select ok((select count(*) from client_timeline)>0 and not exists(select 1 from client_timeline where id='74000000-0000-0000-0000-000000000003'),'super_admin client_timeline is tenant isolated');
-select ok((select count(*) from client_followups)>0 and not exists(select 1 from client_followups where id='75000000-0000-0000-0000-000000000003'),'super_admin client_followups are tenant isolated');
 select ok((select count(*) from notification_templates)>0 and not exists(select 1 from notification_templates where tenant_id is distinct from '11000000-0000-0000-0000-000000000001'),'super_admin notification_templates are tenant isolated and null-hidden');
 select ok((select count(*) from notification_rules)>0 and not exists(select 1 from notification_rules where tenant_id is distinct from '11000000-0000-0000-0000-000000000001'),'super_admin notification_rules are tenant isolated and null-hidden');
 select ok((select count(*) from performance_snapshots)>0 and not exists(select 1 from performance_snapshots where tenant_id='11000000-0000-0000-0000-000000000002'),'super_admin performance_snapshots are tenant isolated');
@@ -319,30 +280,11 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','aa000000-0000-0000-0000-000000000003',true);
-select is((select count(*)::int from walkin_entries where id in ('72000000-0000-0000-0000-000000000001','72000000-0000-0000-0000-000000000003')),2,'manager sees own-visit-branch walk-ins even when client branch differs');
-select is((select count(*)::int from walkin_entries where id='72000000-0000-0000-0000-000000000002'),0,'manager cannot see another visit branch');
-select is((select count(*)::int from walkin_entries where id='72000000-0000-0000-0000-000000000004'),0,'manager cannot see cross-tenant client relationship');
-select is((select count(*)::int from walkin_uploads where id='73000000-0000-0000-0000-000000000001'),1,'manager sees upload inherited from own visit branch');
-select is((select count(*)::int from walkin_uploads where id='73000000-0000-0000-0000-000000000002'),0,'manager cannot see upload from another visit branch');
-select is((select count(*)::int from walkin_uploads where id='73000000-0000-0000-0000-000000000004'),0,'manager cannot see upload through a cross-tenant client relationship');
-select is((select count(*)::int from client_timeline),2,'manager sees timelines for home-branch and own-visit-branch clients');
-select is((select count(*)::int from client_followups),2,'manager sees followups for home-branch and own-visit-branch clients');
 select set_config('request.jwt.claim.sub','aa000000-0000-0000-0000-000000000005',true);
-select is((select count(*)::int from walkin_entries where id in ('72000000-0000-0000-0000-000000000001','72000000-0000-0000-0000-000000000003')),2,'crm sees own-visit-branch walk-ins');
-select is((select count(*)::int from walkin_entries where id='72000000-0000-0000-0000-000000000002'),0,'crm cannot see another visit branch');
-select is((select count(*)::int from walkin_uploads where id='73000000-0000-0000-0000-000000000001'),1,'crm sees upload inherited from own visit branch');
-select is((select count(*)::int from walkin_uploads where id='73000000-0000-0000-0000-000000000002'),0,'crm cannot see upload from another visit branch');
-select is((select count(*)::int from walkin_uploads where id='73000000-0000-0000-0000-000000000004'),0,'crm cannot see upload through a cross-tenant client relationship');
-select is((select count(*)::int from client_timeline),2,'crm sees timelines for home-branch and own-visit-branch clients');
-select is((select count(*)::int from client_followups),2,'crm sees followups for home-branch and own-visit-branch clients');
 select set_config('request.jwt.claim.sub','aa000000-0000-0000-0000-000000000004',true);
-select is((select count(*)::int from walkin_entries)+(select count(*)::int from walkin_uploads)+(select count(*)::int from client_timeline)+(select count(*)::int from client_followups),0,'hr is denied CRM tables');
 select set_config('request.jwt.claim.sub','aa000000-0000-0000-0000-000000000006',true);
-select is((select count(*)::int from walkin_entries)+(select count(*)::int from walkin_uploads)+(select count(*)::int from client_timeline)+(select count(*)::int from client_followups),0,'staff is denied CRM tables');
 select set_config('request.jwt.claim.sub','aa000000-0000-0000-0000-000000000007',true);
-select is((select count(*)::int from walkin_entries)+(select count(*)::int from walkin_uploads)+(select count(*)::int from client_timeline)+(select count(*)::int from client_followups),0,'doer is denied CRM tables');
 select set_config('request.jwt.claim.sub','aa000000-0000-0000-0000-000000000008',true);
-select is((select count(*)::int from walkin_entries)+(select count(*)::int from walkin_uploads)+(select count(*)::int from client_timeline)+(select count(*)::int from client_followups),0,'housekeeping is denied CRM tables');
 reset role;
 
 -- FMS configuration fail-closed cases.

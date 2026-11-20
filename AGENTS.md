@@ -25,8 +25,7 @@ maintained documents:
 | `docs/MOBILE_RELEASE_GUIDE.md` | Android releases (`scripts/release-mobile.ps1` only) |
 | `docs/REGRESSION_CHECKLIST.md` | Manual regression pass |
 | `docs/ASK_KIARA_APP_HELP_REVIEW.md`, `docs/ASK_KIARA_PRODUCTION_TESTING.md` | Kiara's app-help content and owner test guide |
-| `docs/CRM_TWO_PROJECT_PRODUCTION_RUNBOOK.md`, `docs/CRM_SHEETS_INGEST_CUTOVER.md`, `docs/CRM_WALKIN_FIELD_MAP.md` | CRM project operations and walk-in data |
-| `docs/architecture/` | Hosted data inventory and the Forms/FMS -> CRM customer integration design and mappings |
+| `docs/architecture/` | Hosted data inventory and franchise scope |
 | `docs/FMS_AI_ASSISTANT.md`, `docs/FMS_FOLLOW_UP_GROUPS.md`, `docs/LEAVE_APPLICATIONS.md` | Feature notes still in use |
 | `docs/RECORDING_PILOT.md`, `docs/STORE_INTELLIGENCE_ACTIVATION_RUNBOOK.md` | Store Intelligence pilot rules, AWS processing build, secrets, device matrix and activation |
 | `docs/REPORTS.md` | Reports catalogue, data sources and every KPI formula |
@@ -50,31 +49,27 @@ packages/data         Shared data-access layer used by the web app
 packages/api-client   Typed Supabase browser client
 packages/ui-tokens    Shared design tokens
 supabase/             JewelOS project: migrations, pgTAP tests, Edge Functions, local seed
-supabase-crm/         Frozen CRM project (being retired): migrations, pgTAP tests, Edge Functions
 scripts/              Controlled operational helpers (release, CRM/FMS reconcile, audits)
 ```
 
-### One Supabase project (owner decision 2026-11-12; migration in progress)
+### One Supabase project (owner decision 2026-11-12)
 
 The 2026-10-01 two-project decision is reversed. The target is a single
 Supabase project, the JewelOS project (production ref starts `yima`), holding
 users, tasks, FMS, forms and the customer master database.
 
-- **New customer work goes in the JewelOS project**, in a new `customer` schema
-  under `supabase/migrations/`, linked directly to JewelOS users, branches and
-  permissions (`has_permission`). Add no tables, functions or features to
-  `supabase-crm/`.
-- **The old CRM screens are removed (owner decision 2026-11-20).** `/crm`
-  opens the Customers page (`/crm/master`), which reads only the `customer`
-  schema; the web app, Ask Kiara, Reports and forms no longer read the CRM
-  project. The CRM project is frozen until the database clean-up change
-  removes the login bridge (`crm-session-exchange`), the outbox/inbox sync
-  (`crm-staff-sync`, `sync-deliver`/`crm-sync-receive`, `crm-customer-sync`),
-  their cron jobs and `supabase-crm/`; the owner deletes the project a week
-  later, after a final backup.
-- The old JewelOS `crm` schema and `public` legacy CRM tables stay retired: add
-  no features to them. They are dropped by a reviewed forward migration after a
-  backup, never ad hoc.
+- **Customer work goes in the JewelOS project**, in the `customer` schema under
+  `supabase/migrations/`, linked directly to JewelOS users, branches and
+  permissions (`has_permission`).
+- **The old CRM is removed (owner decision 2026-11-20).** `/crm` opens the
+  Customers page (`/crm/master`), which reads only the `customer` schema. The
+  old CRM screens went in #137; migration 0443 dropped the `crm`, `crm_private`
+  and `crm_sync` schemas, the legacy public CRM tables, the Forms -> CRM
+  integration and their functions, and the CRM sync Edge Functions and
+  `supabase-crm/` were deleted. The separate CRM Supabase project is deleted by
+  the owner after a final backup. Do not restore any of it; the Store
+  Intelligence tables `recording_customer_links` / `recording_crm_outcomes`
+  are kept only as history.
 - **Customer identity (owner decision 2026-11-12):** one phone number is one
   client within a franchise (2026-11-19, migration 0433: Mumbai and Ahmedabad
   customers are kept apart; see `docs/architecture/franchise-scope.md`). The newest name is the main name; every other name and number seen is
@@ -139,8 +134,8 @@ under the Git tag `mobile-native-archive` and are not a reference.
 
 Authenticated, role-aware web routes: Home, Dashboard, Tasks (with Task Control
 and the FMS stage board), FMS (builder, runs, End Nodes, AI assistant), Forms
-Library, Notifications, CRM, Users, Availability (leave), Reports, Dropdown
-Master, Settings (including Customer Integration), and Ask Kiara. Recurring /
+Library, Notifications, CRM (the Customers page), Users, Availability (leave),
+Reports, Dropdown Master, Settings, and Ask Kiara. Recurring /
 To-Do was retired as a page in migration 0340; recurring work now lives in Tasks
 and Task Control. Meeting AI is a menu identifier only.
 
@@ -220,7 +215,7 @@ pnpm.cmd exec turbo run build --force --concurrency=1
 git diff --check
 ```
 
-CI (`.github/workflows/ci.yml`) runs the core, data, CRM and web tests, typecheck,
+CI (`.github/workflows/ci.yml`) runs the core, data and web tests, typecheck,
 build, bundle budgets and `git diff --check`. If Docker, a browser, a device, or hosted credentials are
 unavailable, say exactly what was and was not proven: static/type/build checks
 do not prove Postgres, RLS, RPC, Storage, edge-runtime, or rendered behaviour.
