@@ -4,8 +4,7 @@ import { resolvePageAccess, validateAccessContext, type AccessContext } from "..
 import { validateSectionControls, type SectionControls } from "../../../packages/core/src/settings/sectionAvailability.ts";
 import { accessibleKiaraSections, offeredKiaraTools } from "../../../packages/core/src/assistant/tools.ts";
 import type { KiaraChatResult, KiaraErrorBody } from "../../../packages/core/src/assistant/events.ts";
-import { createActorClient, crmActorFor } from "./actor.ts";
-import { createCrmSession, type CrmSession } from "./tools/crmSession.ts";
+import { createActorClient } from "./actor.ts";
 import { handleKiaraTranscribe, kiaraRoute, type KiaraTranscribeResult } from "./transcribe.ts";
 import { transcriptionModel } from "../_shared/voice/transcribe.ts";
 import {
@@ -24,9 +23,7 @@ import {
 /**
  * Ask Kiara (spec section 7). verify_jwt stays on. Every database call runs as
  * the caller through `actor`, a client built from the anon key and the caller's
- * JWT; this function never reads the service-role key. CRM reads go to the CRM
- * project with a short-lived token from its login bridge, obtained with the
- * caller's JWT for this request only (tools/crmSession.ts).
+ * JWT; this function never reads the service-role key.
  */
 const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, apikey, content-type, accept, x-client-info",
@@ -157,25 +154,8 @@ Deno.serve(async (request: Request) => {
     log,
     signal: controller.signal,
   };
-  // CRM (Phase 5): the CRM project's public URL and anon key. Without them the CRM
-  // tools are not offered. The session is created per request and exchanges the
-  // caller's JewelOS token only when a CRM tool is first used in this question.
-  const crmUrl = Deno.env.get("CRM_SUPABASE_URL")?.trim();
-  const crmAnonKey = Deno.env.get("CRM_SUPABASE_ANON_KEY")?.trim();
-  const crm: CrmSession | null = crmUrl && crmAnonKey
-    ? createCrmSession({
-      crmUrl,
-      crmAnonKey,
-      jewelosToken: token,
-      fetch,
-      actorFor: crmActorFor(crmUrl, crmAnonKey),
-      log,
-      // Optional override of the bridge timeout (default 20 s; see tools/crmSession.ts).
-      ...(Number(Deno.env.get("KIARA_CRM_TIMEOUT_MS")) > 0 ? { timeoutMs: Number(Deno.env.get("KIARA_CRM_TIMEOUT_MS")) } : {}),
-    })
-    : null;
-  const offered = offeredKiaraTools(access, controls).filter((spec) => crm !== null || spec.dataCategory !== "crm");
-  const input = { request: chat, started, offered, accessibleSections: accessibleKiaraSections(access, controls), access, crm };
+  const offered = offeredKiaraTools(access, controls);
+  const input = { request: chat, started, offered, accessibleSections: accessibleKiaraSections(access, controls), access };
 
   const wantsStream = (request.headers.get("Accept") ?? "").includes("text/event-stream");
   if (!wantsStream) {

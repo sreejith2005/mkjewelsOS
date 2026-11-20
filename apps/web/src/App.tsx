@@ -38,9 +38,7 @@ import { Button, Notice } from "@/components/ui";
 import { ApplicationShell } from "@/components/shell/ApplicationShell";
 import { AuthLayout, BrandedLoading, PageLoading } from "@/components/shell/BrandScreens";
 import { LazyPageErrorBoundary } from "@/components/LazyPageErrorBoundary";
-import { crmProjectConfig } from "@/lib/crmProject";
-import { createCrmFormsHost } from "@/features/crm/crmFormsHost";
-import { appCrmServices } from "@/features/crm/crmClientLookup";
+import { customerFormServices } from "@/features/customers/formLookup";
 import { FormCrmServicesContext } from "@/features/forms/crmServicesContext";
 import { lazyPage, prefetchPagesWhenIdle } from "@/lib/lazyPage";
 import { DailyChecklistManager } from "@/features/daily-checklists/DailyChecklistManager";
@@ -66,12 +64,8 @@ const DropdownMasterPage = lazyPage("dropdown-master", () => import("@/pages/Dro
 const FormsPage = lazyPage("forms", () => import("@/pages/FormsPage").then((module) => ({ default: module.FormsPage })));
 const FMSBuilderPage = lazyPage("fms", () => import("@/pages/FMSBuilderPage").then((module) => ({ default: module.FMSBuilderPage })));
 const NotificationsPage = lazyPage("notifications", () => import("@/pages/NotificationsPage").then((module) => ({ default: module.NotificationsPage })));
-// /crm is the ported original CRM (@jewelos/crm-ui, 2026-09-25 owner decision). The old
-// JewelOS CRMPage was retired at the CRM cutover (the old public CRM tables stay as an archive).
-// Since 2026-11-03 it renders inside the JewelOS shell like every other section (layout
-// "section"): JewelOS keeps its header, sidebar and theme switch; the CRM shows its own tabs.
-const CrmApp = lazyPage("crm", () => import("@jewelos/crm-ui").then((module) => ({ default: module.CrmApp })));
-// The customer master (customer schema in this project) is a screen of the CRM section at /crm/master.
+// The CRM section is the customer master database (customer schema in this project). The ported
+// original CRM (@jewelos/crm-ui) and its separate project were retired on 2026-11-20 (owner).
 const CustomerMasterPage = lazyPage("customer-master", () => import("@/pages/CustomerMasterPage").then((module) => ({ default: module.CustomerMasterPage })));
 const TasksPage = lazyPage("tasks", () => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
 const FmsAssignedWorkPage = lazyPage("fms-assigned-work", () => import("@/pages/FmsAssignedWorkPage").then((module) => ({ default: module.FmsAssignedWorkPage })));
@@ -100,7 +94,7 @@ const PAGE_PRELOADS: Partial<Record<PageId, readonly (() => Promise<void>)[]>> =
   dropdown_master: [DropdownMasterPage.preload],
   settings: [SettingsPage.preload],
   ask_kiara: [AskKiaraPage.preload],
-  crm: [CrmApp.preload],
+  crm: [CustomerMasterPage.preload],
   sales_recording: [StoreIntelligencePage.preload],
 };
 
@@ -317,10 +311,9 @@ function AppShell() {
       .filter((item) => accessible.has(item.id))
       .map((item) => ({ ...item, Icon: PAGE_ICONS[item.id] }));
   }, [menu]);
-  // Any form fills a registered client's details from their phone number, for people allowed into CRM (2026-11-04).
+  // Any form fills a customer's details from their phone number, for people allowed into CRM (2026-11-04;
+  // from the customer master database since 2026-11-20).
   const crmLookupAllowed = effectiveAccess !== null && resolvePageAccess(effectiveAccess, sectionControls, "crm") === "allowed";
-  // Form Builder forms linked to CRM registration (CRM Form Settings, 2026-11-03).
-  const crmFormsHost = useMemo(() => createCrmFormsHost(navigate), [navigate]);
   const menuKey = menu.map((item) => item.id).join(",");
   useEffect(() => {
     if (!menuKey) return;
@@ -374,12 +367,11 @@ function AppShell() {
               : currentPage === "fms_builder" ? <FMSBuilderPage />
                 : currentPage === "notifications" ? <NotificationsPage onNavigate={navigate} />
                 : currentPage === "ask_kiara" ? <AskKiaraPage onNavigate={navigate} search={search} />
-                : currentPage === "crm" && (path === "/crm/master" || path.startsWith("/crm/master/")) ? <CustomerMasterPage navigate={navigate} path={path} />
-                : currentPage === "crm" ? <CrmApp crmProject={crmProjectConfig} forms={crmFormsHost} jewelosHomePath="/" layout="section" navigate={navigate} onSignOut={logout} path={path} search={search} supabase={supabase} />
+                : currentPage === "crm" ? <CustomerMasterPage navigate={navigate} path={path === "/crm/master" || path.startsWith("/crm/master/") ? path : "/crm/master"} />
             : <DashboardPage />;
 
   return (
-    <FormCrmServicesContext.Provider value={crmLookupAllowed ? appCrmServices : undefined}>
+    <FormCrmServicesContext.Provider value={crmLookupAllowed ? customerFormServices : undefined}>
     <ApplicationShell
       badges={kiaraBadge ? { ask_kiara: kiaraBadge } : undefined}
       branch={branch}

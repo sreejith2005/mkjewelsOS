@@ -1,18 +1,14 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
-import { ExternalLink, RefreshCw, Search } from "lucide-react";
 import {
-  AI_INTENT_LABEL, candidateQueryKind, CRM_REFUSAL_REASON, CRM_RESULT_LABEL, crmProfilePathFor, DAY_HALF_LABELS, FOLLOW_UP_CHANNEL_LABEL, FOLLOW_UP_CHANNELS,
-  fmsAssignedWorkPath, LINK_STATE_LABEL, linkTargetFor, readinessItems, SYNC_LABEL,
-  type ConversationIntegration, type CrmCandidate, type CrmCandidateResult, type DayHalf, type FollowUpChannel, type FollowUpView, type ReadinessTone, type Suggestion,
+  AI_INTENT_LABEL, CRM_RESULT_LABEL, DAY_HALF_LABELS, FOLLOW_UP_CHANNEL_LABEL, FOLLOW_UP_CHANNELS,
+  fmsAssignedWorkPath, readinessItems, type ConversationIntegration, type DayHalf, type FollowUpChannel, type FollowUpView, type ReadinessTone, type Suggestion,
 } from "@jewelos/core";
-import { createFollowUp, fetchFollowUpOptions, linkCrmCustomer, retryCrmSync, unlinkCrmCustomer, WorkspaceError } from "@jewelos/data";
+import { createFollowUp, fetchFollowUpOptions, WorkspaceError } from "@jewelos/data";
 import { Button, Notice } from "@/components/ui";
-import { cn } from "@/lib/utils";
-import { CandidateSearchFailure, searchCrmCandidates } from "./crmCandidateSearch";
 import { Panel, Tag } from "./ui";
 import { useLoad } from "./useLoad";
 
-const message = (cause: unknown, fallback: string) => (cause instanceof WorkspaceError || cause instanceof CandidateSearchFailure) && cause.message ? cause.message : fallback;
+const message = (cause: unknown, fallback: string) => cause instanceof WorkspaceError && cause.message ? cause.message : fallback;
 const istDate = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
 const istDateTime = (iso: string) => new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" });
 /** Today's India date, YYYY-MM-DD, for the due-day picker. */
@@ -39,128 +35,6 @@ export function ReadinessStrip({ integration }: { integration: ConversationInteg
       <p className="mt-1"><Tag tone={TONE[item.tone]}>{item.value}</Tag></p>
     </li>)}
   </ul>;
-}
-
-// ---------------------------------------------------------------------------
-/** The CRM customer for this conversation: exact search, human choice, audited changes. */
-export function CustomerLinkSection({ sessionId, integration, retentionExpired, onChanged, navigate }: {
-  sessionId: string; integration: ConversationIntegration; retentionExpired: boolean; onChanged: () => void; navigate: (path: string) => void;
-}) {
-  const link = integration.customer;
-  const [mode, setMode] = useState<"view" | "search" | "unlink">("view");
-  const [query, setQuery] = useState("");
-  const [result, setResult] = useState<CrmCandidateResult | null>(null);
-  const [chosen, setChosen] = useState<CrmCandidate | null>(null);
-  const [reason, setReason] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const requestKey = useRef<string>(crypto.randomUUID());
-  const profilePath = crmProfilePathFor(link);
-  const kind = candidateQueryKind(query);
-
-  const search = async () => {
-    setBusy(true); setError(null); setResult(null); setChosen(null);
-    try { const found = await searchCrmCandidates(query.trim()); setResult(found); if (found.candidates.length === 1) setChosen(found.candidates[0]!); }
-    catch (cause) { setError(message(cause, "The CRM could not be searched.")); }
-    finally { setBusy(false); }
-  };
-  const save = async () => {
-    if (!result || !chosen) return;
-    setBusy(true); setError(null);
-    try {
-      // The same request key is reused if this tap is retried after a network failure.
-      const saved = await linkCrmCustomer(sessionId, linkTargetFor(result, chosen), requestKey.current, link ? reason : undefined);
-      requestKey.current = crypto.randomUUID();
-      setNotice(saved.alreadyLinked ? "This customer is already linked." : "Linked. It shows as confirmed once the CRM accepts it.");
-      setMode("view"); setResult(null); setChosen(null); setQuery(""); setReason(""); onChanged();
-    } catch (cause) { setError(message(cause, "The customer could not be linked.")); }
-    finally { setBusy(false); }
-  };
-  const unlink = async () => {
-    setBusy(true); setError(null);
-    try { await unlinkCrmCustomer(sessionId, reason); setNotice("Link removed. The CRM entry is withdrawn when the CRM is reached."); setMode("view"); setReason(""); onChanged(); }
-    catch (cause) { setError(message(cause, "The link could not be removed.")); }
-    finally { setBusy(false); }
-  };
-  const retry = async () => {
-    setBusy(true); setError(null);
-    try { await retryCrmSync(sessionId); setNotice("Sending to the CRM again."); onChanged(); }
-    catch (cause) { setError(message(cause, "Could not send again.")); }
-    finally { setBusy(false); }
-  };
-
-  return <section aria-labelledby="si-crm-customer" className="space-y-3">
-    <h3 className="font-semibold text-task-text" id="si-crm-customer">CRM customer</h3>
-    {notice ? <Notice tone="success">{notice}</Notice> : null}
-    {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
-    {link ? <div className="space-y-2 rounded-xl border border-task-border p-3">
-      <p className="text-base font-semibold text-task-text">{link.name ?? "Name not recorded"}{link.code ? <span className="ml-1.5 text-sm font-normal text-task-text-muted">{link.code}</span> : null}</p>
-      {link.display_source !== "crm_ack" ? <p className="text-xs text-task-text-muted">Name and code as shown in the search; the CRM has not confirmed them yet.</p>
-        : link.display_stale ? <p className="text-xs text-task-text-muted">Saved from the CRM on {istDate(link.verified_at ?? link.linked_at)}; open the CRM profile for current details.</p> : null}
-      <div className="flex flex-wrap gap-2">
-        <Tag tone={link.state === "verified" ? "success" : link.state === "rejected" ? "attention" : "progress"}>{LINK_STATE_LABEL[link.state]}</Tag>
-        <Tag tone={link.sync === "synced" ? "success" : ["failed", "refused"].includes(link.sync) ? "attention" : "progress"}>{SYNC_LABEL[link.sync]}</Tag>
-      </div>
-      {link.state === "rejected" && link.state_reason ? <p className="text-sm text-task-text">{CRM_REFUSAL_REASON[link.state_reason] ?? "The CRM refused it."}</p> : null}
-      <p className="text-xs text-task-text-muted">Linked by {link.linked_by_name ?? "a colleague"} on {istDateTime(link.linked_at)}{link.candidate_count > 1 ? `, chosen from ${link.candidate_count} people with the same ${link.match_basis === "phone" ? "phone number" : "details"}` : ""}.</p>
-      <div className="flex flex-wrap gap-2 pt-1">
-        {profilePath ? <Button onClick={() => navigate(profilePath)} type="button" variant="secondary"><ExternalLink aria-hidden className="size-4" />Open CRM profile</Button> : null}
-        {integration.can_link && ["failed", "waiting_for_crm_approval", "retrying"].includes(link.sync) ? <Button disabled={busy} onClick={() => void retry()} type="button" variant="secondary"><RefreshCw aria-hidden className="size-4" />Send again</Button> : null}
-        {integration.can_link && !retentionExpired && mode === "view" ? <>
-          <Button disabled={busy} onClick={() => { setMode("search"); setError(null); }} type="button" variant="ghost">Change customer</Button>
-          <Button disabled={busy} onClick={() => { setMode("unlink"); setError(null); }} type="button" variant="ghost">Remove link</Button>
-        </> : null}
-      </div>
-    </div> : <p className="text-sm text-task-text-muted">No CRM customer linked. Results stay “Pending CRM confirmation” until one is.</p>}
-
-    {integration.can_link && !link && mode === "view" && !retentionExpired ? <Button onClick={() => setMode("search")} type="button">Link customer</Button> : null}
-    {!integration.can_link && !link ? <p className="text-xs text-task-text-muted">Linking needs CRM access, and is done by the salesperson or a branch manager.</p> : null}
-
-    {mode === "unlink" ? <div className="space-y-2 rounded-xl border border-task-border p-3">
-      <label className="block text-sm font-semibold text-task-text" htmlFor="si-unlink-reason">Why remove this link? (needed)</label>
-      <textarea className="field min-h-20" id="si-unlink-reason" maxLength={500} onChange={(e) => setReason(e.target.value)} value={reason} />
-      <div className="flex flex-wrap gap-2"><Button disabled={busy || reason.trim().length < 3} onClick={() => void unlink()} type="button">Remove link</Button>
-        <Button disabled={busy} onClick={() => { setMode("view"); setReason(""); }} type="button" variant="ghost">Cancel</Button></div>
-    </div> : null}
-
-    {mode === "search" ? <div className="space-y-3 rounded-xl border border-task-border p-3">
-      <form className="space-y-2" onSubmit={(event) => { event.preventDefault(); if (kind !== "invalid") void search(); }} role="search">
-        <label className="block text-sm font-semibold text-task-text" htmlFor="si-crm-query">Client code, visit reference or full phone number</label>
-        <div className="flex gap-2">
-          <input autoComplete="off" className="field flex-1" id="si-crm-query" inputMode="text" maxLength={40} onChange={(e) => { setQuery(e.target.value); setResult(null); setChosen(null); }} placeholder="MKC-200001 or 98765 43210" value={query} />
-          <Button disabled={busy || kind === "invalid"} type="submit"><Search aria-hidden className="size-4" />Search</Button>
-        </div>
-        <p className="text-xs text-task-text-muted">Names are not searched, so a customer is never guessed. Nothing new is created in the CRM from here.</p>
-      </form>
-      {result ? result.candidates.length === 0 ? <p className="text-sm text-task-text">No CRM customer has this {result.query_kind === "phone" ? "phone number" : "code"}. Register the customer in CRM first, then link.</p>
-        : <fieldset className="space-y-2">
-          <legend className="text-sm font-semibold text-task-text">{result.candidates.length > 1 ? `${result.candidates.length} people share this ${result.query_kind === "phone" ? "number" : "reference"}. Choose the right person; they are never merged.` : "Is this the customer?"}</legend>
-          {result.candidates.map((candidate) => <label className={cn("flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border p-3", chosen === candidate ? "border-gold bg-gold/5" : "border-task-border")} key={`${candidate.kind}:${candidate.target_id}`}>
-            <input checked={chosen === candidate} className="mt-1" name="si-crm-candidate" onChange={() => setChosen(candidate)} type="radio" />
-            <span className="min-w-0 text-sm">
-              <span className="block font-semibold text-task-text">{candidate.name}{candidate.client_code ? ` · ${candidate.client_code}` : ""}{candidate.kind === "lead" ? " · Lead" : ""}</span>
-              <span className="block text-task-text-muted">{[candidate.phone_hint, candidate.visit_at ? `Visit ${istDate(candidate.visit_at)}` : candidate.last_visit_at ? `Last visit ${istDate(candidate.last_visit_at)}` : "No visits yet", `${candidate.total_visits} visit${candidate.total_visits === 1 ? "" : "s"}`].filter(Boolean).join(" · ")}</span>
-            </span>
-          </label>)}
-        </fieldset> : null}
-      {link && result?.candidates.length ? <div className="space-y-1">
-        <label className="block text-sm font-semibold text-task-text" htmlFor="si-change-reason">Why change the customer? (needed)</label>
-        <textarea className="field min-h-20" id="si-change-reason" maxLength={500} onChange={(e) => setReason(e.target.value)} value={reason} />
-      </div> : null}
-      <div className="flex flex-wrap gap-2">
-        {result?.candidates.length ? <Button disabled={busy || !chosen || (Boolean(link) && reason.trim().length < 3)} onClick={() => void save()} type="button">{link ? "Change customer" : "Link this customer"}</Button> : null}
-        <Button disabled={busy} onClick={() => { setMode("view"); setResult(null); setChosen(null); setQuery(""); setReason(""); }} type="button" variant="ghost">Cancel</Button>
-      </div>
-    </div> : null}
-
-    {integration.history.length ? <details className="text-sm"><summary className="cursor-pointer font-semibold text-task-text-muted">Earlier links ({integration.history.length})</summary>
-      <ul className="mt-2 space-y-1.5">{integration.history.map((h) => <li className="text-task-text" key={h.link_id}>
-        {h.name ?? "Name not recorded"}{h.code ? ` (${h.code})` : ""} · {h.end_kind === "corrected" ? "corrected" : "removed"} by {h.ended_by_name ?? "a colleague"}{h.ended_at ? ` on ${istDateTime(h.ended_at)}` : ""}{h.end_reason ? `: “${h.end_reason}”` : ""}
-        {h.withdrawal_sync ? <span className="text-task-text-muted"> · CRM entry {h.withdrawal_sync === "synced" ? "withdrawn" : h.withdrawal_sync === "failed" ? "withdrawal failed" : "being withdrawn"}</span> : null}
-      </li>)}</ul>
-    </details> : null}
-  </section>;
 }
 
 // ---------------------------------------------------------------------------

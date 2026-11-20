@@ -35,15 +35,13 @@ Deno.test("customer exports preserve phone text, nested answers, IST and reviewe
  assertStringIncludes(gateway.uploads[0]!.text,"2026-10-01 05:30:00 IST");
  assertStringIncludes(gateway.uploads[0]!.text,'""original"":false');
 });
-Deno.test("business reports export labelled headers, IST times, Yes/No and phones as text",async()=>{
- const gateway=fake([],[{rows:[{followup_type:"Lead follow-up",customer_id:"MKC-1001",name:"=Synthetic",phone:"+91 9876543210",branch:"Main",status:"open",due_date:"2026-11-03",overdue:true,attempts:2,created_at:"2026-11-01T18:45:00Z"}],total:1}]);
- assertEquals(await processExportJob(gateway,{...job,report_key:"customer_report_followups"},"worker"),"completed");
+Deno.test("business reports export labelled headers, IST times and Yes/No",async()=>{
+ const gateway=fake([],[{rows:[{reference_number:"FMS-1",workflow_name:"Follow-up",record_name:"=Synthetic",stage_name:"Call",visit_number:1,assigned_to:"Main",planned_datetime:"2026-11-01T18:45:00Z",status:"done",form_filled:true,delay_minutes:2}],total:1}]);
+ assertEquals(await processExportJob(gateway,{...job,report_key:"fms_stage_visits"},"worker"),"completed");
  const text=gateway.uploads[0]!.text;
- assertStringIncludes(text,"Type,Customer ID,Name,Phone,Branch,Status,Due date,Overdue,Attempts");
- assertStringIncludes(text,"Created (IST)");
- assertStringIncludes(text,'"=""+91 9876543210"""');
+ assertStringIncludes(text,"FMS reference,Workflow,Customer / record,Stage,Visit,Assigned to,Planned (IST)");
  assertStringIncludes(text,"'=Synthetic");
- assertStringIncludes(text,",Yes,2,");
+ assertStringIncludes(text,",Yes,");
  assertStringIncludes(text,"2026-11-02 00:15");
 });
 Deno.test("one form's question columns from the server become the CSV headers",async()=>{

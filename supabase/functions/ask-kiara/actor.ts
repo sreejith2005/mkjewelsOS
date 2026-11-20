@@ -35,15 +35,3 @@ export function createActorClient(client: SupabaseClient): ActorClient {
     },
   };
 }
-
-/**
- * The CRM-project client for one short-lived CRM access token: the CRM project's
- * public anon key plus that token, so CRM RLS applies. Used by the function and
- * the local integration test, so both read the CRM the same way.
- */
-export function crmActorFor(crmUrl: string, crmAnonKey: string): (crmAccessToken: string) => ActorClient {
-  return (crmAccessToken) => createActorClient(createClient(crmUrl, crmAnonKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-    global: { headers: { Authorization: `Bearer ${crmAccessToken}` } },
-  }));
-}

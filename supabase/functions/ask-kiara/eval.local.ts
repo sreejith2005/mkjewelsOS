@@ -3,8 +3,8 @@
  *
  * Runs every case of docs/superpowers/evals/ask-kiara/cases.json against the real
  * `ask-kiara` Edge Function (`supabase functions serve`) on an isolated local stack,
- * signed in as the synthetic users of integration.fixture.sql + eval.fixture.sql
- * (and the CRM fixture for CRM cases). It grades:
+ * signed in as the synthetic users of integration.fixture.sql + eval.fixture.sql.
+ * It grades:
  *   - tools: expected_tools all called, forbidden_tools never called (from the stored turn);
  *   - min_kb_searches and expect_offer (from the stored turn);
  *   - the reply text against must_refuse and `expect`, with a Claude judge that sees the
@@ -12,7 +12,7 @@
  *
  *   KIARA_EVAL=1 SUPABASE_URL=http://127.0.0.1:<port> SUPABASE_ANON_KEY=<local anon key> \
  *   KIARA_DB_CONTAINER=supabase_db_<project> KIARA_EVAL_ENV_FILE=<git-ignored file with ANTHROPIC_API_KEY> \
- *   KIARA_EVAL_OUT=<directory outside the repository> [KIARA_EVAL_ONLY=<id prefix,...>] [KIARA_EVAL_SKIP_CRM=1] \
+ *   KIARA_EVAL_OUT=<directory outside the repository> [KIARA_EVAL_ONLY=<id prefix,...>] \
  *   deno run --allow-env --allow-net --allow-read --allow-write --allow-run eval.local.ts
  *
  * Every question costs real money (the function's model and the judge). Never point it
@@ -70,7 +70,6 @@ const ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const DB = Deno.env.get("KIARA_DB_CONTAINER") ?? "";
 const OUT = Deno.env.get("KIARA_EVAL_OUT") ?? "";
 const ONLY = (Deno.env.get("KIARA_EVAL_ONLY") ?? "").split(",").map((value) => value.trim()).filter(Boolean);
-const SKIP_CRM = Deno.env.get("KIARA_EVAL_SKIP_CRM") === "1";
 const CONCURRENCY = Math.max(1, Number(Deno.env.get("KIARA_EVAL_CONCURRENCY") ?? "3"));
 const PASSWORD = "kiara-local-test-only";
 const TENANT = "20700000-0000-4000-8000-000000000001";
@@ -391,12 +390,9 @@ async function runCase(testCase: EvalCase): Promise<CaseResult> {
   }
 }
 
-const isCrmCase = (testCase: EvalCase) => testCase.id.startsWith("p5-") || /crm_/.test(testCase.expected_tools.join(" ")) || testCase.role === "crm";
-
 const file = new URL("../../../docs/superpowers/evals/ask-kiara/cases.json", import.meta.url);
 const cases = (JSON.parse(await Deno.readTextFile(file)).cases as EvalCase[])
-  .filter((testCase) => !ONLY.length || ONLY.some((prefix) => testCase.id.startsWith(prefix)))
-  .filter((testCase) => !(SKIP_CRM && isCrmCase(testCase)));
+  .filter((testCase) => !ONLY.length || ONLY.some((prefix) => testCase.id.startsWith(prefix)));
 
 await setupKnowledge();
 await Deno.mkdir(OUT, { recursive: true });

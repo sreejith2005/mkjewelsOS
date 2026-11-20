@@ -72,7 +72,6 @@ export function FmsTriggerHistory({ onClose }: { onClose: () => void }) {
           {evaluation.instanceId ? <a className="inline-flex min-h-11 items-center font-semibold text-gold-secondary underline" href={fmsAssignedWorkPath({ kind: "stage", instanceId: evaluation.instanceId, instanceStageId: null })}>Open run {evaluation.referenceNumber}</a> : null}
         </div>)}
         {detail.answers ? <details><summary className="cursor-pointer text-xs text-soft-grey">Saved answers</summary><dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">{Object.entries(detail.answers).map(([key, value]) => [<dt className="text-soft-grey" key={`${key}-k`}>{key}</dt>, <dd className="break-words text-white" key={`${key}-v`}>{Array.isArray(value) ? value.join(", ") : String(value ?? "")}</dd>])}</dl></details> : <p className="text-xs text-soft-grey">Answers are shown only to people with access to this source.</p>}
-        {detail.crmClientId ? <a className="inline-flex min-h-11 items-center text-sm font-semibold text-gold-secondary underline" href={`/crm/clients/${encodeURIComponent(detail.crmClientId)}`}>Open CRM client profile</a> : null}
       </section> : null}
     </div>
   </Modal>;

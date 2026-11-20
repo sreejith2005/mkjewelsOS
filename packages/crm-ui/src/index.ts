@@ -1,9 +1,0 @@
-// Public entry of the ported original CRM. The web app lazy-loads this module for /crm/*.
-// Its type surface is src/public-api.d.ts (kept in step by crm-port/public-api.check.ts), so the
-// web app never type-checks the ported sources under its own compiler settings.
-export { CrmApp, type CrmAppProps } from "./crm-port/crm-app";
-export type { CrmProjectConfig } from "./crm-port/crm-project";
-export { CRM_BASE_PATH, type CrmAuth } from "./crm-port/runtime";
-export type { CrmClientRun, CrmFormLink, CrmFormLinks, CrmFormsHost, CrmLeadSetup, CrmLinkedForm, CrmSubmittedForm } from "./crm-port/forms-host";
-export { createCrmClientLookup, type CrmClientLookup } from "./crm-port/client-lookup";
-export { createCrmCandidateSearch, CrmSearchError, type CrmCandidateSearch } from "./crm-port/store-conversations";

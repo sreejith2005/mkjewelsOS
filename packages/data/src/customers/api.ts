@@ -160,6 +160,19 @@ export async function decideCustomerReview(reviewId: string, same: boolean): Pro
   return data as unknown as CustomerReviewResult;
 }
 
+/**
+ * A form's client lookup (migration 0441): the known details of the customer with this phone
+ * number, keyed as forms ask them, or null; and city, state and country for a pincode.
+ */
+export async function lookupCustomerForForm(kind: "client_phone" | "pincode", value: string): Promise<Readonly<Record<string, string | null>> | null> {
+  const { data, error } = kind === "pincode"
+    ? await db().rpc("customer_pincode_lookup", { p_pincode: value })
+    : await db().rpc("customer_form_lookup", { p_phone: value });
+  if (error) throw error;
+  // Shape fixed by migration 0441: an object of text values, or null.
+  return (data ?? null) as Readonly<Record<string, string | null>> | null;
+}
+
 export async function loadCustomerInteractionPage(interactionCode: string): Promise<CustomerInteractionPage> {
   const { data, error } = await db().rpc("customer_get_interaction_page", { p_interaction_code: interactionCode });
   if (error) throw error;

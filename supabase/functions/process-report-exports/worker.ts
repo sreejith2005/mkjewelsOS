@@ -25,10 +25,6 @@ const COLUMNS:Readonly<Record<string,readonly string[]>>={
   fms_instances_stages:["instance_id","reference_number","flow_name","instance_status","stage_name","stage_status","planned_datetime","assignee_name"],
   fms_sla:["instance_id","reference_number","stage_name","planned_datetime","actual_datetime","sla_state","delay_minutes"],
   form_submissions_reviews:["submission_id","form_name","status","submitted_at","submitted_by_name","reviewed_at","reviewed_by_name"],
-  crm_clients_ownership:["client_id","branch_name","owner_name","status","created_at","profile_complete"],
-  crm_walkins:["walkin_id","client_id","branch_name","visit_date","crm_owner_name","buy_status"],
-  crm_interactions:["interaction_id","client_id","event_type","subject","outcome","occurred_at","actor_name"],
-  crm_followups:["followup_id","client_id","subject","due_date","status","assignee_name","completed_at"],
   people_task_performance:["profile_id","employee_name","tasks_assigned","tasks_completed","completion_rate","on_time_completed","overdue_open","average_delay_minutes"],
   notification_delivery_health:["channel","status","delivery_count","retry_count","latest_attempt_at"],
 };

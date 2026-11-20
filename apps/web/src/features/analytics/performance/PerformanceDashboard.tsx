@@ -26,7 +26,6 @@ import { Legend, StackedBars, TrendColumns, swatchStyle, type StackedRow } from 
 import { EmployeeTable } from "./EmployeeTable";
 import { FmsPerformance } from "./FmsPerformance";
 import { RecordsDrawer, performanceRecordPath, type RecordsSelection } from "./RecordsDrawer";
-import { Accountability } from "./Accountability";
 import { PerformanceOverview } from "./PerformanceOverview";
 
 const REALTIME_TOPICS = ["tasks", "fms"] as const;
@@ -50,7 +49,6 @@ export function PerformanceDashboard({ onOpenInsights }: { onOpenInsights: () =>
   const { profile, access } = useAuth();
   // Presentation only: the server decides team access on every read.
   const canTeam = !!access && hasPermission(access, "dashboard.view_team_performance");
-  const crmAllowed = !!access && hasPermission(access, "crm.view");
   const { filter, update } = useFilterState(canTeam);
   const [selection, setSelection] = useState<RecordsSelection | null>(null);
   const [employee, setEmployee] = useState<PerformanceEmployee | null>(null);
@@ -136,7 +134,6 @@ export function PerformanceDashboard({ onOpenInsights }: { onOpenInsights: () =>
             <FmsPerformance filter={filter} flows={data.flows} onOpen={(selector, title, count, flowId, stageKey) => open(selector, title, count, { flow_id: flowId, kind: "fms" }, stageKey)} />
           </Panel>
           <Comparisons data={data} filter={filter} onOpen={open} onGranularity={(granularity) => update({ ...filter, granularity })} />
-          {crmAllowed ? <Accountability from={filter.from} to={filter.to} /> : null}
           <p className="text-xs text-task-text-muted">
             Want the earlier analysis views (workflows & forms, people & availability, CRM summary)? <button className="font-medium text-task-accent" onClick={onOpenInsights} type="button">Open Management insights</button>.
           </p>
