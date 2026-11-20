@@ -1,11 +1,12 @@
 import { UserSectionAccess } from "@/features/permissions/UserSectionAccess";
 import { SectionAccessMatrix } from "@/features/permissions/SectionAccessMatrix";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Building2, KeyRound, Network, Pencil, Plus, Search, Users } from "lucide-react";
+import { ArrowLeft, Building2, KeyRound, Network, Pencil, Plus, Search, Users } from "lucide-react";
 import { hasPermission, isFormerEmployee, type MyOrgScope } from "@jewelos/core";
 import { supabase } from "@jewelos/api-client";
 import { loadOrganization, type OrganizationData } from "@jewelos/data/users/organization";
 import { loadDirectorScopes, loadMyOrgScope, type DirectorScope } from "@jewelos/data/users/franchise";
+import { updateUserProfile } from "@jewelos/data/users/api";
 import { useAuth } from "@/auth/AuthContext";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { useTenantRealtimeRefresh } from "@/features/realtime/useTenantRealtimeRefresh";
@@ -21,9 +22,19 @@ type Franchise = { id: string; name: string; is_active: boolean };
 type ReferenceData = { employees: Employee[]; branches: Branch[]; departments: Department[]; designations: DropdownMaster[]; franchises: Franchise[]; scope: MyOrgScope | null; directors: ReadonlyMap<string, DirectorScope> };
 const EMPTY: ReferenceData = { employees: [], branches: [], departments: [], designations: [], franchises: [], scope: null, directors: new Map() };
 
-function AccountStatus({ value }: { value: Employee["account_status"] }) {
-  const tone = value === "active" ? "bg-success/15 text-success" : value === "invited" ? "bg-gold/10 text-gold-secondary" : "bg-task-muted text-task-text-muted";
-  return <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${tone}`}>{titleCase(value)}</span>;
+/**
+ * Active or Inactive, the only two account states offered in Users. Former
+ * employees (Left) come only from the resignation workflow and stay a label.
+ * Older Invited or Suspended accounts cannot sign in, so they read as Inactive.
+ */
+function AccountStatus({ value, name, onToggle, busy }: { value: Employee["account_status"]; name: string; onToggle?: ((active: boolean) => void) | undefined; busy?: boolean }) {
+  const active = value === "active";
+  if (value === "left") return <span className="rounded-full bg-task-muted px-2 py-0.5 text-[10px] font-semibold uppercase text-task-text-muted">{titleCase(value)}</span>;
+  if (!onToggle) return <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${active ? "bg-success/15 text-success" : "bg-task-muted text-task-text-muted"}`}>{active ? "Active" : "Inactive"}</span>;
+  return <button aria-checked={active} aria-label={`${name} account active`} className="inline-flex min-h-9 items-center gap-2 rounded-full disabled:cursor-wait disabled:opacity-60" disabled={busy} onClick={(event) => { event.stopPropagation(); onToggle(!active); }} role="switch" type="button">
+    <span className={`relative h-5 w-9 shrink-0 rounded-full transition ${active ? "bg-success" : "bg-task-border"}`}><span className={`absolute top-0.5 size-4 rounded-full bg-task-bg shadow transition-all ${active ? "left-[1.125rem]" : "left-0.5"}`} /></span>
+    <span className={`text-[11px] font-semibold uppercase ${active ? "text-success" : "text-task-text-muted"}`}>{active ? "Active" : "Inactive"}</span>
+  </button>;
 }
 
 export function TeamDirectoryPage() {
@@ -60,6 +71,16 @@ export function TeamDirectoryPage() {
   const userManagementData: UserManagementData = { profiles: data.employees, branches: data.branches, departments: data.departments, dropdowns: data.designations, franchises: data.franchises, scope: data.scope };
   // users.manage_scoped: Directors, Regional Admins, HR and Store Managers manage people in their own scope only (assert_org_user_write).
   const canManage = hasPermission(access, "users.manage") || hasPermission(access, "users.manage_scoped");
+  const [statusBusy, setStatusBusy] = useState<string | null>(null);
+  // Same audited contract as Edit user; the server re-checks scope and keeps one active Super Admin.
+  const setAccountActive = async (employee: Employee, active: boolean) => {
+    setStatusBusy(employee.id); setError(null);
+    try { await updateUserProfile(employee.id, { account_status: active ? "active" : "inactive" }); await load(); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to change the account status."); }
+    finally { setStatusBusy(null); }
+  };
+  // You cannot switch off your own account here; former employees change only through resignation.
+  const statusToggle = (employee: Employee) => canManage && employee.id !== access?.profileId && employee.account_status !== "left" ? (active: boolean) => void setAccountActive(employee, active) : undefined;
   const canManageFranchises = hasPermission(access, "franchise.manage");
   // Admin and Directors see their franchises and add franchises / stores (0397); Super Admin gets the full panel.
   const canAddLocations = !canManageFranchises && hasPermission(access, "organization.add_locations");
@@ -83,12 +104,13 @@ export function TeamDirectoryPage() {
   const empty = (value: string | null | undefined) => value ? value : <span className="text-task-text-muted/70">—</span>;
   return <section className="mx-auto w-full max-w-[110rem]">{sectionAccessEmployee && profile && access && canManageSections ? <UserSectionAccess key={sectionAccessEmployee.id} profileId={sectionAccessEmployee.id} selfId={access.profileId} tenantId={profile.tenant_id} onClose={() => setSectionAccessEmployee(null)} onSaved={load} /> : null}
     <header className="mb-4 flex flex-wrap items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><span className="rounded-xl bg-gold-sheen p-2.5 text-on-gold shadow-gold"><Users className="size-5" /></span><div className="min-w-0"><h1 className="font-display text-[1.75rem] font-semibold leading-tight text-gold-secondary sm:text-[2rem]">Employee Directory</h1><p className="text-sm text-soft-grey tabular-nums">{data.employees.length - formerCount} employees{employees.length !== data.employees.length - formerCount ? ` · ${employees.length} shown` : ""}</p></div></div>
-      <div className="flex flex-wrap items-center gap-2">{canManageSections && profile && access ? <Button aria-expanded={sectionMatrixOpen} onClick={() => setSectionMatrixOpen((open) => !open)} type="button" variant="secondary"><KeyRound className="size-4" />Section access</Button> : null}{canManageFranchises || canAddLocations ? <Button aria-expanded={franchisesOpen} onClick={() => setFranchisesOpen((open) => !open)} type="button" variant="secondary"><Network className="size-4" />Franchises</Button> : null}{canManageOrganization && organizationData ? <Button aria-expanded={organizationOpen} onClick={() => setOrganizationOpen((open) => !open)} type="button" variant="secondary"><Building2 className="size-4" />Branches &amp; departments</Button> : null}{canManage ? <Button onClick={() => setInviting(true)}><Plus className="size-4" />Add user</Button> : null}</div></header>
+      <div className="flex flex-wrap items-center gap-2">{canManageSections && profile && access ? <Button aria-pressed={sectionMatrixOpen} onClick={() => setSectionMatrixOpen((open) => !open)} type="button" variant="secondary">{sectionMatrixOpen ? <><ArrowLeft className="size-4" />Back to employees</> : <><KeyRound className="size-4" />Section access</>}</Button> : null}{canManageFranchises || canAddLocations ? <Button aria-expanded={franchisesOpen} onClick={() => setFranchisesOpen((open) => !open)} type="button" variant="secondary"><Network className="size-4" />Franchises</Button> : null}{canManageOrganization && organizationData ? <Button aria-expanded={organizationOpen} onClick={() => setOrganizationOpen((open) => !open)} type="button" variant="secondary"><Building2 className="size-4" />Branches &amp; departments</Button> : null}{canManage ? <Button onClick={() => setInviting(true)}><Plus className="size-4" />Add user</Button> : null}</div></header>
     {error ? <div className="mb-4"><Notice tone="danger">{error}</Notice></div> : null}
-    {canManageSections && profile && access && sectionMatrixOpen ? <SectionAccessMatrix branches={data.branches} departments={data.departments} onSaved={load} selfId={access.profileId} tenantId={profile.tenant_id} /> : null}
     {canManageFranchises && franchisesOpen ? <FranchiseManager onChanged={load} people={data.employees} /> : null}
     {canAddLocations && franchisesOpen ? <LocationsManager onChanged={load} people={data.employees} /> : null}
     {canManageOrganization && organizationData && organizationOpen ? <OrganizationManager data={organizationData} onChanged={refreshOrganization} /> : null}
+    {/* Section access replaces the employee list so it uses the whole page, with no inner scroll box. */}
+    {canManageSections && profile && access && sectionMatrixOpen ? <SectionAccessMatrix branches={data.branches} departments={data.departments} onSaved={load} selfId={access.profileId} tenantId={profile.tenant_id} /> : <>
     <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-center"><label className="relative block flex-1"><Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-soft-grey" /><input aria-label="Search employees" className="field pl-9" enterKeyHint="search" onChange={(event) => setSearch(event.target.value)} placeholder="Search employee, code, or email" type="search" value={search} /></label><div className={`grid gap-2 lg:flex ${showFranchise ? "grid-cols-3" : "grid-cols-2"}`}>{showFranchise ? <select aria-label="Filter franchise" className="field lg:w-48" onChange={(event) => { setFranchiseId(event.target.value); setBranchId(""); setDepartmentId(""); }} value={franchiseId}><option value="">All franchises</option>{data.franchises.map((franchise) => <option key={franchise.id} value={franchise.id}>{franchise.name}</option>)}</select> : null}<select aria-label="Filter branch" className="field lg:w-48" onChange={(event) => { setBranchId(event.target.value); setDepartmentId(""); }} value={branchId}><option value="">All branches</option>{filteredBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select><select aria-label="Filter department" className="field lg:w-48" onChange={(event) => setDepartmentId(event.target.value)} value={departmentId}><option value="">All departments</option>{filteredDepartments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select></div>{formerCount > 0 ? <label className="flex min-h-11 shrink-0 items-center gap-2 text-sm text-soft-grey"><input checked={showFormer} onChange={(event) => setShowFormer(event.target.checked)} type="checkbox" />Show former employees ({formerCount})</label> : null}</div>
     {loading ? <div className="grid gap-2" aria-label="Loading employees"><div className="skeleton h-12 rounded-xl" /><div className="skeleton h-12 rounded-xl" /><div className="skeleton h-12 rounded-xl" /></div> : employees.length === 0 ? <p className="rounded-xl border border-task-border p-10 text-center text-soft-grey">No employees match the selected filters.</p> : <>
       {/* Desktop: one spreadsheet-like table across every branch; branch and department are columns and filters. */}
@@ -103,16 +125,19 @@ export function TeamDirectoryPage() {
             <td className="border-b border-task-border px-3 py-2 text-task-text">{empty(designationNames.get(employee.designation_id ?? ""))}</td>
             <td className="border-b border-task-border px-3 py-2 text-xs font-semibold text-gold-secondary">{roleLabel(employee)}</td>
             <td className="whitespace-nowrap border-b border-task-border px-3 py-2 text-task-text tabular-nums">{empty(phoneOf(employee))}</td>
-            <td className="border-b border-task-border px-3 py-2"><AccountStatus value={employee.account_status} /></td>
+            <td className="border-b border-task-border px-3 py-2"><AccountStatus busy={statusBusy === employee.id} name={employee.employee_name} onToggle={statusToggle(employee)} value={employee.account_status} /></td>
             {hasAction ? <td className="sticky right-0 border-b border-task-border bg-task-bg px-3 py-2 text-right group-hover:bg-task-muted"><Button aria-label={actionLabel(employee)} className="min-h-9 px-3" onClick={() => openEmployee(employee)} type="button" variant="secondary">{canEditEmployee ? <><Pencil className="size-4" />Edit</> : <><KeyRound className="size-4" />Section access</>}</Button></td> : null}
           </tr>)}</tbody>
         </table>
       </div> : null}
       {/* Phones and tablets: one compact row per person; tap to open what the account may edit. */}
       {desktop ? null : <ul className="-mx-4 divide-y divide-task-border border-y border-task-border sm:-mx-6">{employees.map((employee) => {
-        const body = <><span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gold text-sm font-semibold text-on-gold">{initials(employee.employee_name)}</span><span className="min-w-0 flex-1"><span className="flex min-w-0 items-center gap-2"><span className="truncate text-sm font-semibold text-task-text">{employee.employee_name}</span><AccountStatus value={employee.account_status} /></span><span className="block truncate text-xs text-task-text-muted">{designationNames.get(employee.designation_id ?? "") ?? "No designation"} · {roleLabel(employee)}</span><span className="block truncate text-xs text-task-text-muted">{showFranchise && franchiseLabel(employee) ? `${franchiseLabel(employee)} · ` : ""}{branchNames.get(employee.branch_id) ?? "Unassigned branch"} · {departmentNames.get(employee.department_id) ?? "Unassigned department"}</span></span></>;
-        return <li key={employee.id}>{hasAction ? <button aria-label={actionLabel(employee)} className="flex min-h-16 w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-gold/5" onClick={() => openEmployee(employee)} type="button">{body}<Pencil aria-hidden className="size-4 shrink-0 text-gold-secondary" /></button> : <div className="flex min-h-16 items-center gap-3 px-3 py-2.5">{body}</div>}</li>;
+        const toggle = statusToggle(employee);
+        const body = <><span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gold text-sm font-semibold text-on-gold">{initials(employee.employee_name)}</span><span className="min-w-0 flex-1"><span className="flex min-w-0 items-center gap-2"><span className="truncate text-sm font-semibold text-task-text">{employee.employee_name}</span>{toggle ? null : <AccountStatus name={employee.employee_name} value={employee.account_status} />}</span><span className="block truncate text-xs text-task-text-muted">{designationNames.get(employee.designation_id ?? "") ?? "No designation"} · {roleLabel(employee)}</span><span className="block truncate text-xs text-task-text-muted">{showFranchise && franchiseLabel(employee) ? `${franchiseLabel(employee)} · ` : ""}{branchNames.get(employee.branch_id) ?? "Unassigned branch"} · {departmentNames.get(employee.department_id) ?? "Unassigned department"}</span></span></>;
+        const row = hasAction ? <button aria-label={actionLabel(employee)} className="flex min-h-16 w-full min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left transition hover:bg-gold/5" onClick={() => openEmployee(employee)} type="button">{body}<Pencil aria-hidden className="size-4 shrink-0 text-gold-secondary" /></button> : <div className="flex min-h-16 min-w-0 flex-1 items-center gap-3 px-3 py-2.5">{body}</div>;
+        return <li className={toggle ? "flex items-center" : undefined} key={employee.id}>{row}{toggle ? <span className="shrink-0 pr-3"><AccountStatus busy={statusBusy === employee.id} name={employee.employee_name} onToggle={toggle} value={employee.account_status} /></span> : null}</li>;
       })}</ul>}
+    </>}
     </>}
     {inviting && profile ? <AddUserForm data={userManagementData} role={profile.user_role} onClose={() => setInviting(false)} onDone={load} /> : null}</section>;
 }

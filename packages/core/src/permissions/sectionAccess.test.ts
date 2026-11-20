@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { SECTION_PERMISSIONS, previewSectionAccess, sectionOverrideChanges } from "./sectionAccess";
+import { SECTION_PERMISSIONS, previewSectionAccess, sectionOverrideChanges, sectionToggleChoice } from "./sectionAccess";
 it("shows implemented sections without actions or placeholder sections", () => {
   expect(SECTION_PERMISSIONS.some(item => item.key === "crm.view")).toBe(true);
   expect(SECTION_PERMISSIONS.every(item => item.kind === "module" && item.pageId !== null)).toBe(true);
@@ -11,4 +11,10 @@ it("inherit reveals department even when the server row has an individual denial
 });
 it("keeps authority and action keys out of section changes", () => {
   expect(sectionOverrideChanges({ "crm.view": "deny" }, { "crm.view": null, "forms.manage": "grant" })).toEqual({ "crm.view": null });
+});
+it("a switch stores a personal choice only when it differs from what is inherited", () => {
+  expect(sectionToggleChoice(true, true)).toBeNull();
+  expect(sectionToggleChoice(false, false)).toBeNull();
+  expect(sectionToggleChoice(true, false)).toBe("deny");
+  expect(sectionToggleChoice(false, true)).toBe("grant");
 });
