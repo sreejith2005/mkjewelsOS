@@ -8,7 +8,11 @@ export const CUSTOMER_MASTER_PATH = "/crm/master";
 export type CustomerMasterRoute =
   | Readonly<{ view: "list" }>
   | Readonly<{ view: "client"; code: string }>
-  | Readonly<{ view: "interaction"; code: string }>;
+  | Readonly<{ view: "interaction"; code: string }>
+  | Readonly<{ view: "review" }>;
+
+/** The review of records that may be the same person (migration 0438). */
+export const CUSTOMER_REVIEW_PATH = `${CUSTOMER_MASTER_PATH}/review`;
 
 const clean = (code: string) => code.trim().toUpperCase();
 
@@ -30,5 +34,6 @@ export function parseCustomerMasterPath(path: string): CustomerMasterRoute | nul
   try { code = clean(decodeURIComponent(raw ?? "")); } catch { code = ""; }
   if (kind === "c" && /^MKC-\d+$/.test(code)) return { view: "client", code };
   if (kind === "i" && /^MKI-\d+$/.test(code)) return { view: "interaction", code };
+  if (kind === "review") return { view: "review" };
   return { view: "list" };
 }

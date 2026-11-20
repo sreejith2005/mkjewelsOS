@@ -5,6 +5,7 @@ describe("customer master links", () => {
   it("builds and reads a customer page address", () => {
     expect(customerProfilePath(" mkc-100234 ")).toBe("/crm/master/c/MKC-100234");
     expect(parseCustomerMasterPath("/crm/master/c/MKC-100234")).toEqual({ view: "client", code: "MKC-100234" });
+    expect(parseCustomerMasterPath("/crm/master/review")).toEqual({ view: "review" });
     expect(parseCustomerMasterPath("/crm/master/c/mkc-100234")).toEqual({ view: "client", code: "MKC-100234" });
   });
 

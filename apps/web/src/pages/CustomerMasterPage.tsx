@@ -5,11 +5,12 @@ import { errorMessage, titleCase } from "@/lib/format";
 import { CUSTOMER_LIST_PAGE_SIZE, loadCustomerList, loadCustomerListFilters } from "@/features/customers/api";
 import { CustomerInteractionView } from "@/features/customers/CustomerInteractionView";
 import { CustomerProfileView } from "@/features/customers/CustomerProfileView";
+import { CustomerReviewView } from "@/features/customers/CustomerReviewView";
 import { formatDate, formatDateTime } from "@/features/customers/format";
 import { Tags } from "@/features/customers/parts";
 import {
   activeCustomerFilterCount, CUSTOMER_CONTACT_LABELS, CUSTOMER_SORT_LABELS, CUSTOMER_STAGE_LABELS,
-  CUSTOMER_MASTER_PATH, customerInteractionPath, customerProfilePath, daysAgoLabel, EMPTY_CUSTOMER_LIST_FILTERS, formatPhone,
+  CUSTOMER_MASTER_PATH, CUSTOMER_REVIEW_PATH, customerInteractionPath, customerProfilePath, daysAgoLabel, EMPTY_CUSTOMER_LIST_FILTERS, formatPhone,
   parseCustomerMasterPath,
   type CustomerContactWindow, type CustomerLifecycleStage, type CustomerListFilterOptions, type CustomerListFilters,
   type CustomerListPage, type CustomerListSort, type CustomerSegment,
@@ -48,11 +49,12 @@ export function CustomerMasterPage({ path, navigate }: { path: string; navigate:
   const backToList = () => navigate(CUSTOMER_MASTER_PATH);
   if (route.view === "client") return <CustomerProfileView clientCode={route.code} key={route.code} onBack={backToList} onOpenClient={openClient} onOpenInteraction={openInteraction} />;
   if (route.view === "interaction") return <CustomerInteractionView interactionCode={route.code} key={route.code} onBack={backToList} onOpenClient={openClient} onOpenInteraction={openInteraction} />;
-  return <CustomerMasterList onOpenClient={openClient} onOpenCrm={() => navigate("/crm")} />;
+  if (route.view === "review") return <CustomerReviewView onBack={backToList} onOpenClient={openClient} />;
+  return <CustomerMasterList onOpenClient={openClient} onOpenCrm={() => navigate("/crm")} onOpenReview={() => navigate(CUSTOMER_REVIEW_PATH)} />;
 }
 
 /** Every client and lead in one filtered list (/crm/master). */
-function CustomerMasterList({ onOpenCrm, onOpenClient }: { onOpenCrm: () => void; onOpenClient: (clientCode: string) => void }) {
+function CustomerMasterList({ onOpenCrm, onOpenClient, onOpenReview }: { onOpenCrm: () => void; onOpenClient: (clientCode: string) => void; onOpenReview: () => void }) {
   const [filters, setFilters] = useState<CustomerListFilters>(() => remembered?.filters ?? EMPTY_CUSTOMER_LIST_FILTERS);
   const [searchText, setSearchText] = useState(() => remembered?.searchText ?? "");
   const [page, setPage] = useState(() => remembered?.page ?? 0);
@@ -132,7 +134,10 @@ function CustomerMasterList({ onOpenCrm, onOpenClient }: { onOpenCrm: () => void
           </p>
           {options?.import.some((item) => item.failed) ? <p className="text-sm font-medium text-danger">The last read of a sheet failed. The list shows what was read before.</p> : null}
         </div>
-        <Button onClick={onOpenCrm} variant="secondary">Open CRM</Button>
+        <div className="flex flex-wrap gap-2">
+          {options?.duplicates_to_review ? <Button onClick={onOpenReview} variant="secondary">Possibly same person ({options.duplicates_to_review})</Button> : null}
+          <Button onClick={onOpenCrm} variant="secondary">Open CRM</Button>
+        </div>
       </header>
 
       <div className="sticky top-[calc(3.5rem_+_env(safe-area-inset-top))] z-20 -mx-1 md:top-16 mb-3 space-y-2 bg-obsidian/95 px-1 py-2 backdrop-blur">
