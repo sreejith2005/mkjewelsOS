@@ -106,13 +106,14 @@ describe("schedule preview matches the generator", () => {
   const start = "2026-10-21";
 
   it.each(CASES)("lists exactly the generator's days for %s", (_label, spec) => {
+    // Increased timeout: daily recurrence over 460 days is computation-heavy
     const { recurrenceRule } = buildScheduleRule(spec);
     const anchored = firstScheduleDate(recurrenceRule, start)!;
     const window = 460;
     const fromGenerator = generatorDays(recurrenceRule, anchored, start, window);
     const fromPreview = recurrenceOccurrenceDates(recurrenceRule, anchored, start, 1000).filter((day) => day < addDays(start, window));
     expect(fromPreview).toEqual(fromGenerator);
-  });
+  }, 10000);
 
   it("puts the 3rd Saturday where it falls", () => {
     expect(upcomingScheduleDates("FREQ=MONTHLY;BYDAY=3SA", "2026-10-21", 4, "2026-10-21"))

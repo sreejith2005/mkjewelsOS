@@ -1,4 +1,4 @@
-﻿-- Bounded CRM export adapter, called only by the existing JewelOS private export worker.
+-- Bounded CRM export adapter, called only by the existing JewelOS private export worker.
 create function public.crm_customer_export_batch(p_tenant uuid,p_actor uuid,p_export_id uuid,p_key text,p_filters jsonb,p_before timestamptz,p_offset integer,p_limit integer)
 returns jsonb language plpgsql security definer set search_path='' as $$
 declare query text;result jsonb;actor uuid;begin
