@@ -6,6 +6,7 @@ import { CUSTOMER_LIST_PAGE_SIZE, loadCustomerList, loadCustomerListFilters } fr
 import { CustomerInteractionView } from "@/features/customers/CustomerInteractionView";
 import { CustomerProfileView } from "@/features/customers/CustomerProfileView";
 import { CustomerReviewView } from "@/features/customers/CustomerReviewView";
+import { SheetReadProblems } from "@/features/customers/SheetReadProblems";
 import { formatDate, formatDateTime } from "@/features/customers/format";
 import { Tags } from "@/features/customers/parts";
 import {
@@ -132,7 +133,7 @@ function CustomerMasterList({ onOpenClient, onOpenReview }: { onOpenClient: (cli
             {options ? `${options.total.toLocaleString("en-IN")} people` : "Every client and lead"}
             {lastImport ? `, sheets read ${formatDateTime(lastImport)}` : ""}
           </p>
-          {options?.import.some((item) => item.failed) ? <p className="text-sm font-medium text-danger">The last read of a sheet failed. The list shows what was read before.</p> : null}
+          {options ? <SheetReadProblems items={options.import} /> : null}
         </div>
         <div className="flex flex-wrap gap-2">
           {options?.duplicates_to_review ? <Button onClick={onOpenReview} variant="secondary">Possibly same person ({options.duplicates_to_review})</Button> : null}
