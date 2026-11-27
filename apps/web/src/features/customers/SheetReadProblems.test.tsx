@@ -12,7 +12,8 @@ it("names the failing sheet, the problem, the fix and the times", () => {
       error: "sheet_tab_not_found:AHEMDABAD list", error_since: "2026-11-27T09:00:00Z", last_ok_at: "2026-11-27T08:55:00Z" },
     { source: "walkin", label: "Walk-in", scheduled: true, last_run_at: "2026-11-27T11:58:00Z", rows_received: 5, failed: false },
   ]} />);
-  expect(screen.getByText(/1 sheet could not be read/)).toBeTruthy();
+  expect(screen.getByText(/1 sheet needs attention/)).toBeTruthy();
+  expect((document.querySelector("details") as HTMLDetailsElement).open).toBe(false);
   expect(screen.getByText("AHEMDABAD list")).toBeTruthy();
   expect(screen.getByText(/tab "AHEMDABAD list" is not in the Google Sheet/)).toBeTruthy();
   expect(screen.getByText(/Failing since/)).toBeTruthy();
@@ -22,7 +23,8 @@ it("names the failing sheet, the problem, the fix and the times", () => {
 
 it("warns about a scheduled sheet not read for over 2 hours", () => {
   render(<SheetReadProblems now={now} items={[{ source: "master_sheet", label: "MASTER DATABASE", scheduled: true, last_run_at: "2026-11-27T08:00:00Z", rows_received: 1, failed: false }]} />);
-  expect(screen.getByText(/not been read for over 2 hours/)).toBeTruthy();
+  expect(screen.getByText(/1 sheet needs attention/)).toBeTruthy();
+  expect(screen.getByText(/Not read since/)).toBeTruthy();
   expect(screen.getByText("MASTER DATABASE")).toBeTruthy();
 });
 

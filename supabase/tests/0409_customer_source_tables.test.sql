@@ -3,6 +3,8 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 select plan(31);
+-- 0446 keeps rows gone from the old Runo sheet; this test checks the generic removal on it.
+update customer.source_tables set keep_rows_gone_from_sheet = false where source = 'runo';
 
 create temp table fx(label text primary key, id uuid);
 do $$

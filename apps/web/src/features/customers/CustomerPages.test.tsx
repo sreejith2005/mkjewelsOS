@@ -9,7 +9,7 @@ vi.mock("./api", () => ({ loadCustomerClientPage: mocks.clientPage, loadCustomer
 vi.mock("@/lib/useMediaQuery", () => ({ useMediaQuery: () => mocks.wide }));
 
 import { CustomerInteractionView } from "./CustomerInteractionView";
-import { CustomerProfileView } from "./CustomerProfileView";
+import { CustomerProfileView, TimelineEntry } from "./CustomerProfileView";
 
 const answer = (field_key: string, label: string, value: string, is_current = true, has_column = true) =>
   ({ field_key, label, value, source: "runo", source_label: "Runo calling", observed_at: "2026-11-02T11:00:00Z", is_current, needs_review: false, has_column });
@@ -137,4 +137,12 @@ it("shows every detail of an interaction and its whole sheet row", async () => {
   expect(on.onOpenInteraction).toHaveBeenCalledWith("MKI-1000001");
   fireEvent.click(screen.getByRole("button", { name: "Open customer" }));
   expect(on.onOpenClient).toHaveBeenCalledWith("MKC-100001");
+});
+
+it("shows a Runo call's call log and interaction form as one timeline entry", () => {
+  render(<TimelineEntry entry={{ ...entry, has_interaction_form: true, sheets: ["Runo interactions (LIVE RUNO 26-11-2026)", "Runo call log (LIVE RUNO 26-11-2026)"],
+    call: { duration_seconds: 95, type: "Outgoing", tag: "Connected" } }} onOpen={() => undefined} />);
+  expect(screen.getByText("Call log + interaction form")).toBeTruthy();
+  expect(screen.getByText(/Outgoing · 1 min 35 s · Connected/)).toBeTruthy();
+  expect(screen.getByText(/In 2 sheets:/)).toBeTruthy();
 });
